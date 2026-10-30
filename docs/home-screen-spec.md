@@ -204,8 +204,8 @@ dimmed row at the top edge, and the background fades out.
 cards in the fixed slot, never at the top of the screen; leaving it downward
 scrolls the next row to the top slot and leaves the collapsed row peeking at the
 top edge; settled frames show the background and content block together or
-neither; the content block is never visible over a background below about half
-opacity (the background may lead on entry and trail on exit, as measured, e.g.
+neither; the content block is never more opaque than the background behind it
+(the background may lead on entry and trail on exit, as measured, e.g.
 leaving downward the block is gone in the first frame and the background fades
 over about 450 ms); Left/Right keeps the focused card at the start position.
 
