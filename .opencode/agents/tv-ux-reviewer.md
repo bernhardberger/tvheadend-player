@@ -16,7 +16,7 @@ permission:
   skill: deny
   question: deny
   publish_artifact: deny
-model: openai/gpt-6-astra
+model: claude-code/claude-sonnet-5-5
 variant: medium
 ---
 

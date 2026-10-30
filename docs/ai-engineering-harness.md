@@ -215,7 +215,7 @@ risk:
 | Ordinary release using the existing release path | No additional model approval; retain release artifact and authorization checks |
 | Unresolved visual direction for a substantial new or redesigned TV surface | Optional `tv-ux-brief` against supplied requirements and baseline images |
 | Screenshot-set coverage, metadata, duplication, staleness, or privacy | Primary checks it; optional `tv-evidence-curator` for useful independent work |
-| Final visual hierarchy, alignment, spacing, typography, density, focus appearance, consistency, or Material for TV design | `tv-ux-reviewer` against the curated current manifest |
+| Final visual hierarchy, alignment, spacing, typography, density, focus appearance, consistency, or Material for TV design | `tv-ux-reviewer` pair against the curated current manifest (see UX review pair below) |
 | HTSP, Media3, subscription ownership, or DVR lifecycle | The same engineering pair, bounded to the affected architecture and races |
 
 Neither reviewer is the implementing primary. Both receive the same bounded
@@ -246,14 +246,34 @@ coverage. An explicitly non-substitutable admitted Opus gate requires
 reconciliation with its authority owner (central for centrally admitted work);
 fallback does not pass it.
 
-Final `tv-ux-reviewer` is Astra and dispatches directly at its
-configured default without an Opus quota probe; it provides no Opus coverage.
-
 On actual Opus exhaustion, use the supported authenticated session API
 `POST /session/{exact-reviewer-id}/abort` and verify that session's state. Load
 `opencode-headless-sessions` for the attached-server procedure. Do not abort the
 primary or unrelated sessions, wait for reset, nudge the exhausted reviewer or
 repeatedly spawn replacements. Continue independent fallback and authorized work.
+
+### UX review pair
+
+`tv-ux-reviewer` runs as two independent dispatches of the same role on the
+same frozen packet. Neither needs an Opus quota probe, and neither provides
+Opus coverage:
+
+| Stake | Judgement reviewer | Rules reviewer |
+|---|---|---|
+| Medium: iteration rounds, polish, small surfaces | default (`claude-code/claude-sonnet-5-5`, medium) | override `openai/gpt-6.1-sol#medium` |
+| High: new or redesigned surfaces, closing review of a branch | override `claude-code/claude-sonnet-5-5#high` | override `openai/gpt-6.1-sol#medium` |
+| Low: small visual tweaks | none; the primary checks the captures | none |
+
+The Sonnet reviewer judges hierarchy, flows and copy; the Sol reviewer measures
+safe areas and checks wording. When Claude quota is short, use
+`deepseek/deepseek-flash#max` as the judgement reviewer. Every packet states the
+layout and reading-order rules (group by reading path, focus follows the
+hierarchy) and the owner's accepted and rejected decisions. Layout direction
+stays with the owner. Basis: a 2026-10-30 trial of eleven models on the U15
+round-2 frames, scored against the owner's findings; raising Sol's effort did
+not help, raising Sonnet's did.
+
+### Review packets and verdicts
 
 Every code-review assignment supplies one frozen tested packet: exact acceptance
 criteria, changed files or diff, relevant source/tests, invariants, exclusions,
