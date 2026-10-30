@@ -104,6 +104,70 @@ empty heading or placeholder:
   under the usual browse scrim and no artwork backdrop is drawn, as in Channels
   (`ChannelsImmersiveList.kt`, `LocalWarmPlayback`). Cards keep their artwork.
 - **No On now/Primetime tabs in phase 1.** This row shows On now content.
+- Geometry and motion follow [3.3.1](#331-immersive-row-reference), which is
+  measured from Google's guidance, not interpreted.
+
+#### 3.3.1 Immersive row reference
+
+Measured 2026-10-30 from the guidance page's spec image and its two videos
+(`immersive-list-motion.mp4`, 4.7 s, and `immersive-list-scroll-motion.mp4`,
+5.4 s, both 1920×1080 at 60 fps). Local copies with frame sheets:
+`build/reference/immersive-list/` (ignored; re-download from the guidance page).
+Values are dp on the kit's 960×540 canvas; durations are measured from frame
+differences and are approximate (±1 frame of 17 ms).
+
+**Expanded layout (row focused):**
+
+- Background image 758×426, anchored top-right (starts 202 dp from the left
+  edge), 16:9, under the kit's cinematic scrim; the subject sits top right and is
+  never cropped full-screen under the content.
+- Content block (eyebrow with rating and facts, title, two-line description) at
+  the 58 dp start inset, above the row.
+- 40 dp between the content block and the card row.
+- Card row at about 344–454 dp from the top: 16:9 cards about 196×110, the
+  focused card scaled 1.1 with a border (our shared focus glow).
+- 86 dp below the row: the next row peeks in at the bottom edge.
+
+**Moving within the row (Left/Right):**
+
+- The focused card stays at the row's start position; the row scrolls under it
+  (about 600 ms, settling slowly).
+- Content block crossfades to the new item in about 150–230 ms, starting with the
+  key press.
+- Background crossfades to the new image in about 270–450 ms, starting with the
+  key press; there is no blank or black frame between images.
+
+**Entering the immersive row from the row above (Down):**
+
+- The page does **not** scroll the row to the top. The immersive row stays
+  where it is (it moves down by only about 20 dp).
+- At the same time, the row above fades out while sliding up, and the background
+  plus content block fade in above the row, the content block sliding up into
+  place. The row's own heading ("Trending" in the video) is replaced by the
+  content block.
+- Most of the change happens in about 130 ms; everything settles by about
+  330 ms.
+- Rows that aren't focused are dimmed.
+
+**Leaving the immersive row upward (Up):**
+
+- The exact reverse: the background and content block fade out (the content block
+  sliding down), the row above slides down and fades in, and the immersive row
+  returns to an ordinary dimmed row with its heading. Most of it happens in about
+  100–130 ms; settled by about 350 ms.
+- The row above shows its focused card's title under the card.
+
+**Not shown in the videos:** leaving the immersive row downward to the row below
+(on Home, the genre row) and entering it from below. Rule for Home: the same
+transitions mirrored. Down collapses the immersive row in place (background and
+content block fade out, heading returns, row dims) while the row below moves up
+into the focus position; Up from below reverses it. The owner confirms this with
+the mockup.
+
+**Checks a capture or review must pass:** the immersive row doesn't jump to the
+top of the screen on entry; the row above disappears by fading and sliding, not
+by a page scroll; no frame shows the background without the content block or
+the reverse; Left/Right keeps the focused card at the start position.
 - Programme artwork and title lead; channel identity, broadcast time and progress
   are supporting information.
 
