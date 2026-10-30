@@ -203,9 +203,11 @@ dimmed row at the top edge, and the background fades out.
 **Checks a capture or review must pass:** entering the immersive row puts its
 cards in the fixed slot, never at the top of the screen; leaving it downward
 scrolls the next row to the top slot and leaves the collapsed row peeking at the
-top edge; no frame shows the background without the content block or the
-reverse, apart from the first frame of leaving downward, where the content block
-goes first; Left/Right keeps the focused card at the start position.
+top edge; settled frames show the background and content block together or
+neither; the content block is never visible over a background below about half
+opacity (the background may lead on entry and trail on exit, as measured, e.g.
+leaving downward the block is gone in the first frame and the background fades
+over about 450 ms); Left/Right keeps the focused card at the start position.
 
 ### 3.4 Browse by genre
 
