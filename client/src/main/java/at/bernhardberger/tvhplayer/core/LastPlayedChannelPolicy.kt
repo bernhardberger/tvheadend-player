@@ -2,7 +2,7 @@ package at.bernhardberger.tvhplayer.core
 
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 
-const val RECENT_CHANNEL_LIMIT = 8
+const val RECENT_CHANNEL_LIMIT = 20
 
 object LastPlayedChannelPolicy {
     fun resolve(orderedIds: List<ChannelId>, persistedId: ChannelId?): ChannelId? {

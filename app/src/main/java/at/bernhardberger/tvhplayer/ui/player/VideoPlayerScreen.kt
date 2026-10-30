@@ -1864,4 +1864,4 @@ private fun SessionObservation.dvrEntries(): List<DvrEntry> =
     }.orEmpty()
 
 /** Trial: how many recent channels the row below the top identity offers. */
-private const val RecentChannelCount = 3
+private const val RecentChannelCount = 8

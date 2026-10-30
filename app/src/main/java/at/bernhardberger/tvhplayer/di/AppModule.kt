@@ -98,6 +98,7 @@ val appModule = module {
             clearAppArtwork = {
                 clearAppArtworkBestEffort { get<RemoteLogoCache>().clear() }
             },
+            clearRecentChannels = { get<LastPlayedChannelStore>().clear() },
         )
         val audioOutput = TvheadendAudioOutputProvider(androidContext())
         val liveStartBuffer = TvheadendLiveStartBuffer(500.milliseconds)

@@ -59,6 +59,7 @@ class AppProfileOwner(
     private val ioDispatcher: CoroutineDispatcher,
     private val readProfileForEditing: suspend () -> ServerProfileEditReadResult,
     private val clearAppArtwork: suspend () -> Unit = {},
+    private val clearRecentChannels: suspend () -> Unit = {},
 ) : ConnectionProfileEditor {
     constructor(
         session: TvheadendSession,
@@ -66,6 +67,7 @@ class AppProfileOwner(
         playerSettings: PlayerSettingsStore,
         ioDispatcher: CoroutineDispatcher,
         clearAppArtwork: suspend () -> Unit = {},
+        clearRecentChannels: suspend () -> Unit = {},
     ) : this(
         session = session,
         profileStore = profileStore,
@@ -73,6 +75,7 @@ class AppProfileOwner(
         ioDispatcher = ioDispatcher,
         readProfileForEditing = profileStore::loadProfileForEditing,
         clearAppArtwork = clearAppArtwork,
+        clearRecentChannels = clearRecentChannels,
     )
 
     private val serverMutex = Mutex()
@@ -217,6 +220,7 @@ class AppProfileOwner(
         mutableServerProfile.value = null
         audioProfileId = null
         playerSettings.audioChoices.profileIdentity(replace = true)
+        clearRecentChannels()
         val profile = profileStore.storeAnonymous(host, htspPort)
         check(profile is ServerProfileReadResult.Available)
         try {
@@ -236,6 +240,7 @@ class AppProfileOwner(
         mutableServerProfile.value = null
         audioProfileId = null
         playerSettings.audioChoices.profileIdentity(replace = true)
+        clearRecentChannels()
         val profile = profileStore.storePassword(host, htspPort, username, password)
         check(profile is ServerProfileReadResult.Available)
         try {
@@ -250,6 +255,7 @@ class AppProfileOwner(
         mutableServerProfile.value = null
         audioProfileId = null
         playerSettings.audioChoices.profileIdentity(replace = true)
+        clearRecentChannels()
         val profile = profileStore.clearProfile()
         check(profile == ServerProfileReadResult.Missing)
         try {

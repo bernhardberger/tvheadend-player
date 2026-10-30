@@ -34,6 +34,13 @@ class LastPlayedChannelStore(private val context: Context) {
             .orEmpty()
     }
 
+    suspend fun clear() {
+        context.applianceDataStore.edit { preferences ->
+            preferences.remove(channelIdKey)
+            preferences.remove(Keys.RECENT_CHANNEL_IDS)
+        }
+    }
+
     suspend fun setChannelId(channelId: ChannelId) {
         context.applianceDataStore.edit { preferences ->
             preferences[channelIdKey] = channelId.value

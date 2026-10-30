@@ -199,21 +199,29 @@ class AppProfileOwnerTest {
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    @Test fun acceptedServerSaveAndProfileRemovalClearAppArtwork() = runTest {
+    @Test fun acceptedServerSavesAndProfileRemovalClearAppArtworkAndRecentChannels() = runTest {
         var artworkClears = 0
+        var recentClears = 0
         val owner = profileOwner(
             at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession(),
             PlayerSettingsStore(InMemoryPreferencesDataStore()),
             StandardTestDispatcher(testScheduler),
             clearAppArtwork = { artworkClears++ },
+            clearRecentChannels = { recentClears++ },
         )
         backgroundScope.launch(start = CoroutineStart.UNDISPATCHED) { owner.run() }
         runCurrent()
         assertEquals(0, artworkClears) // Startup preserves the offline cache.
+        assertEquals(0, recentClears) // Startup keeps the current server's watch history.
         owner.saveServer("offline.invalid", 9982)
         assertEquals(1, artworkClears)
-        owner.clearProfile()
+        assertEquals(1, recentClears)
+        owner.savePasswordServer("offline.invalid", 9982, "viewer", "fake password")
         assertEquals(2, artworkClears)
+        assertEquals(2, recentClears)
+        owner.clearProfile()
+        assertEquals(3, artworkClears)
+        assertEquals(3, recentClears)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -478,6 +486,7 @@ class AppProfileOwnerTest {
         settings: PlayerSettingsStore,
         ioDispatcher: CoroutineDispatcher,
         clearAppArtwork: suspend () -> Unit = {},
+        clearRecentChannels: suspend () -> Unit = {},
     ): AppProfileOwner {
         return AppProfileOwner(
             session = session,
@@ -486,6 +495,7 @@ class AppProfileOwnerTest {
             ioDispatcher = ioDispatcher,
             readProfileForEditing = { error("Unexpected editing read") },
             clearAppArtwork = clearAppArtwork,
+            clearRecentChannels = clearRecentChannels,
         )
     }
 
