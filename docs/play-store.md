@@ -627,7 +627,7 @@ For review we run a demo server at tvh-demo.bernhardberger.at, port 19982, with 
 
 To sign in: on the Welcome screen select Continue, enter the server address and port, select Continue, enter the username and password, and select Connect.
 
-Questions: <CONTACT EMAIL>
+Questions: tvhplayer@bernhardberger.at
 ```
 
 What a reviewer needs to see every feature: a reachable Tvheadend 4.3 server
@@ -687,7 +687,7 @@ You need:
 - your own Tvheadend server that speaks HTSP 36 or newer (a recent 4.3 build)
 - the Google account that's signed in on your TV
 
-If you'd like to help, send me that Google account's email address [by private message / by email to <CONTACT EMAIL>], and I'll add you and send you the link. Please stay opted in for the 14 days and keep the app installed; use it like you normally would. Bugs and ideas are welcome as GitHub issues or as private feedback in the Play Store.
+If you'd like to help, send me that Google account's email address [by private message / by email to tvhplayer@bernhardberger.at], and I'll add you and send you the link. Please stay opted in for the 14 days and keep the app installed; use it like you normally would. Bugs and ideas are welcome as GitHub issues or as private feedback in the Play Store.
 
 Thanks!
 ```
@@ -812,8 +812,8 @@ one updates the other.
 
 1. Icon: decided, the existing launcher icon (3.0).
 2. Feature graphic: decided, `final.png` (3.0).
-3. Contact email for Console, store settings and reviewer instructions (it's
-   shown on the store listing).
+3. Contact email: decided, tvhplayer@bernhardberger.at (Store settings →
+   Store Listing contact details, shown on the listing; appeal text).
 4. Data safety: decided, B, saved 2026-10-30 (4.7). Accounts answer: users sign
    in with accounts made outside the app, "Other": "Users sign in with an
    account on their local Tvheadend server, which they create themselves in
