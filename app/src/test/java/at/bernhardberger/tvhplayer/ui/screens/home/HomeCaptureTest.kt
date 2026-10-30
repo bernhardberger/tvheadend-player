@@ -12,14 +12,20 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.InspectableValue
+import androidx.compose.ui.platform.isDebugInspectorInfoEnabled
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.test.core.app.ApplicationProvider
@@ -80,6 +86,7 @@ import at.bernhardberger.tvhplayer.ui.screens.ChannelsLayoutFixture
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.experimental.categories.Category
@@ -146,6 +153,7 @@ class HomeCaptureTest {
     fun firstRun() = atEvening {
         show(Kind.FIRST_RUN)
         capture("6-first-run", "home-onnow-0")
+        assertTop("home-onnow-0", 356f)
     }
 
     /** One, two and three current-activity cards, each card half the content width. */
@@ -157,6 +165,116 @@ class HomeCaptureTest {
 
     @Test
     fun activityThree() = activity(3)
+
+    /** Production choreography sampled at 50 ms, including the interrupted/retargetable page. */
+    @Test
+    fun immersiveMotionStripsAndSlots() = atEvening {
+        show(Kind.BROWSE)
+        settle("home-recent-0")
+        compose.mainClock.autoAdvance = false
+        strip("down-into", Key.DirectionDown, "home-onnow-0", expanded = true)
+        assertTop("home-onnow-0", 356f)
+        val keyline = bounds("home-onnow-0").left.value
+        strip("right", Key.DirectionRight, "home-onnow-1", expanded = true)
+        assertEquals("focused On now card stays on the start keyline", keyline, bounds("home-onnow-1").left.value, 2f)
+        key(Key.DirectionLeft)
+        compose.mainClock.advanceTimeBy(600)
+        awaitFocus("home-onnow-0")
+        assertEquals(keyline, bounds("home-onnow-0").left.value, 2f)
+        strip("down-out", Key.DirectionDown, "home-genre-0", expanded = false)
+        assertTop("home-heading-GENRES", 76f)
+        val collapsed = bounds("home-onnow-0")
+        assertTrue("collapsed On now pictures peek above the genre heading: $collapsed", collapsed.top < 76.dp && collapsed.bottom > 0.dp)
+        strip("up-into", Key.DirectionUp, "home-onnow-0", expanded = true)
+        assertTop("home-onnow-0", 356f)
+        strip("up-out", Key.DirectionUp, "home-recent-0", expanded = false)
+        assertTop("home-heading-RECENT_CHANNELS", 76f)
+        key(Key.DirectionUp)
+        compose.mainClock.advanceTimeBy(600)
+        awaitFocus("home-view-button")
+        assertTrue("header scrolls back with the page", bounds("home-header").top >= 0.dp)
+        key(Key.DirectionDown)
+        compose.mainClock.advanceTimeBy(600)
+        awaitFocus("home-recent-0")
+    }
+
+    @Test
+    fun warmImmersiveKeepsSlotWithoutArtwork() = atEvening {
+        show(Kind.WARM)
+        settle("home-activity-0")
+        key(Key.DirectionDown)
+        key(Key.DirectionDown)
+        settle("home-onnow-0")
+        assertTop("home-onnow-0", 356f)
+        compose.onNodeWithTag("channels-immersive-background").assertDoesNotExist()
+        assertEquals(1f, layerAlpha("home-on-now-block"), 0.02f)
+    }
+
+    @Test
+    fun rapidVerticalMovesRetargetAndReturnToHeader() = atEvening {
+        show(Kind.BROWSE)
+        settle("home-recent-0")
+        compose.mainClock.autoAdvance = false
+        listOf(Key.DirectionDown, Key.DirectionDown, Key.DirectionUp, Key.DirectionUp).forEach {
+            key(it)
+            compose.mainClock.advanceTimeBy(50, ignoreFrameDuration = true)
+            assertOpacityEnvelope()
+        }
+        compose.mainClock.advanceTimeBy(700)
+        awaitFocus("home-recent-0")
+        assertTop("home-heading-RECENT_CHANNELS", 76f)
+        assertSettledOpacity(false)
+    }
+
+    private fun bounds(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).getUnclippedBoundsInRoot()
+
+    private fun assertTop(tag: String, expected: Float) {
+        assertEquals("$tag top slot", expected, bounds(tag).top.value, 8f)
+    }
+
+    /** Read the actual drawing modifier, not parallel test-only animation state or pixel guesses. */
+    @Suppress("UNCHECKED_CAST")
+    private fun layerAlpha(tag: String): Float = compose.runOnIdle {
+        val modifiers = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().layoutInfo.getModifierInfo()
+        val block = modifiers.asSequence().mapNotNull { it.modifier as? InspectableValue }
+            .flatMap { it.inspectableElements }
+            .first { it.name == "block" }.value as GraphicsLayerScope.() -> Unit
+        GraphicsLayerScope().apply(block).alpha
+    }
+
+    private fun assertOpacityEnvelope() {
+        val background = layerAlpha("home-immersive-background")
+        val block = layerAlpha("home-on-now-block")
+        assertTrue("block=$block must not outpace background=$background", block <= background + 0.02f)
+    }
+
+    private fun assertSettledOpacity(expanded: Boolean) {
+        val expected = if (expanded) 1f else 0f
+        assertEquals(expected, layerAlpha("home-immersive-background"), 0.02f)
+        assertEquals(expected, layerAlpha("home-on-now-block"), 0.02f)
+    }
+
+    private fun strip(name: String, key: Key, tag: String, expanded: Boolean) {
+        key(key)
+        compose.mainClock.advanceTimeByFrame()
+        awaitFocus(tag)
+        val strip = Bitmap.createBitmap(320 * 12, 180, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(strip)
+        repeat(12) { frame ->
+            if (frame > 0) compose.mainClock.advanceTimeBy(50, ignoreFrameDuration = true)
+            compose.waitForIdle()
+            assertOpacityEnvelope()
+            if (name == "down-out") assertEquals(0f, layerAlpha("home-on-now-block"), 0.02f)
+            val bitmap = draw()
+            canvas.drawBitmap(bitmap, null, android.graphics.Rect(frame * 320, 0, (frame + 1) * 320, 180), null)
+            bitmap.recycle()
+        }
+        assertSettledOpacity(expanded)
+        File(out, "strips/$name.png").apply { parentFile!!.mkdirs() }.outputStream().use {
+            assertTrue(strip.compress(Bitmap.CompressFormat.PNG, 100, it))
+        }
+        strip.recycle()
+    }
 
     private fun activity(items: Int) = atEvening {
         show(Kind.WARM, items)
@@ -173,6 +291,7 @@ class HomeCaptureTest {
     )
 
     private fun show(kind: Kind, activityItems: Int = 2) {
+        isDebugInspectorInfoEnabled = true
         val scene = scene(kind, activityItems)
         val sections = homeSections(scene.input)
         installFixtures()
