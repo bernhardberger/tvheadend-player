@@ -353,7 +353,7 @@ class PlayerEntryOverlayTest {
         }
 
         assertEquals(backsToLeave, leavePlayer())
-        assertEquals(listOf(RecordingsKey, GuideKey, ChannelsKey), shellStack())
+        assertEquals(listOf(HomeKey, RecordingsKey, GuideKey, ChannelsKey), shellStack())
         assertEquals(80f, drawerWidth(), .5f)
         compose.onNodeWithTag("recording-list-entry-7").assertDoesNotExist()
         compose.onNodeWithTag("channel-row-1").assertIsFocused()
@@ -744,6 +744,10 @@ class PlayerEntryOverlayTest {
             }
         }
         val entryTag = if (channelsLayout == ChannelsLayout.LIST) "channel-row-1" else "channel-card-1"
+        // Home is the landing destination; these journeys browse the channel rows.
+        compose.waitUntil(15_000) { compose.onAllNodes(hasTestTag("nav-channels")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("nav-channels").performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitForIdle()
         compose.waitUntil(15_000) {
             compose.onAllNodes(hasTestTag(entryTag)).fetchSemanticsNodes().isNotEmpty()
         }

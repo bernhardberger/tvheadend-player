@@ -35,6 +35,7 @@ import at.bernhardberger.tvhplayer.ui.screens.PlayerReturnFocus
 import at.bernhardberger.tvhplayer.ui.screens.RecordingsScreen
 import at.bernhardberger.tvhplayer.ui.screens.RecordingsScreenState
 import at.bernhardberger.tvhplayer.ui.screens.SettingsScreen
+import at.bernhardberger.tvhplayer.ui.screens.home.HomeScreen
 
 @Composable
 internal fun StartupGatedChannelsContent(
@@ -51,6 +52,22 @@ internal fun StartupGatedPlayerContent(
     playerContent: @Composable () -> Unit,
 ) {
     if (contentAllowed || enteringPlayer) playerContent()
+}
+
+@Composable
+internal fun HomeRouteContent(
+    contentAllowed: Boolean,
+    contentPadding: PaddingValues,
+    initialFocusEnabled: Boolean,
+) {
+    if (contentAllowed) {
+        ContentContainer(modifier = Modifier.profileLayout("home")) {
+            HomeScreen(
+                contentPadding = contentPadding,
+                initialFocusEnabled = initialFocusEnabled,
+            )
+        }
+    }
 }
 
 @Composable

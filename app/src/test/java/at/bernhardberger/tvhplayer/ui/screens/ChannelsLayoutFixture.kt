@@ -64,6 +64,7 @@ import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.ChannelsKey
 import at.bernhardberger.tvhplayer.ui.GuideKey
+import at.bernhardberger.tvhplayer.ui.HomeKey
 import at.bernhardberger.tvhplayer.ui.SIDEBAR_SCENE_DESTINATION
 import at.bernhardberger.tvhplayer.ui.appDestinationContentTransform
 import at.bernhardberger.tvhplayer.ui.navigateTopLevel
@@ -176,6 +177,9 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
                                     entryDecorators = listOf(rememberSaveableStateHolderNavEntryDecorator()),
                                     transitionSpec = { appDestinationContentTransform() },
                                     entryProvider = entryProvider {
+                                        entry<HomeKey>(metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.HOME)) {
+                                            Box(Modifier.fillMaxSize())
+                                        }
                                         entry<ChannelsKey>(metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.CHANNELS)) {
                                             Channels(padding, !drawerActive && backStack.last() == ChannelsKey, observation, visibility, playerReturn)
                                         }

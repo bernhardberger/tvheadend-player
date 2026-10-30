@@ -295,6 +295,9 @@ class GuideGenreSurvivesNavigationTest {
                 }
             }
         }
+        // Home is the landing destination; these journeys browse the channel rows.
+        compose.waitUntil(15_000) { compose.onAllNodes(hasTestTag("nav-channels")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("nav-channels").performSemanticsAction(SemanticsActions.OnClick)
         compose.waitUntil(15_000) { compose.onAllNodes(hasTestTag("channel-row-1")).fetchSemanticsNodes().isNotEmpty() }
         settle()
     }

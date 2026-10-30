@@ -12,6 +12,7 @@ class AppNavigationTest {
     @Test
     fun inventoryContainsEveryProductionDestinationAndSettingsSection() {
         val keys = setOf<AppNavKey>(
+            HomeKey,
             ChannelsKey,
             GuideKey,
             RecordingsKey,
@@ -51,6 +52,7 @@ class AppNavigationTest {
     @Test
     fun everyRouteShapeRoundTripsThroughTheNavigationSerializer() {
         val routes = listOf<AppNavKey>(
+            HomeKey,
             ChannelsKey,
             GuideKey,
             RecordingsKey,
@@ -97,6 +99,28 @@ class AppNavigationTest {
         assertEquals(1, stack.count { it == GuideKey })
         assertEquals(SettingsSection.PLAYER, stack.lastSettingsSection())
         assertFalse(stack.hasTransientDestinationBelowTop())
+    }
+
+    @Test
+    fun backFromATopLevelDestinationSelectsHomeAndKeepsSiblings() {
+        val stack = mutableListOf<AppNavKey>(HomeKey)
+        stack.navigateTopLevel(ChannelsKey)
+        stack.navigateTopLevel(GuideKey)
+
+        assertTrue(stack.navigateBackTowardHome())
+
+        assertEquals(listOf(ChannelsKey, GuideKey, HomeKey), stack)
+        assertFalse(stack.navigateBackTowardHome())
+    }
+
+    @Test
+    fun backFromAPlayerReturnsToThePageBelowIt() {
+        val stack = mutableListOf<AppNavKey>(HomeKey, GuideKey)
+        stack.pushTransient(LivePlayerKey(channelId = 42, channelName = "News"))
+
+        assertTrue(stack.navigateBackTowardHome())
+
+        assertEquals(listOf(HomeKey, GuideKey), stack)
     }
 
     @Test

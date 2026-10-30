@@ -17,6 +17,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.pressKey
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -243,6 +244,8 @@ class StartupOfflineTest {
         assertEquals("the stage text follows the brand", 1, statusTexts())
         advance(600)
         assertEquals(0, startupScreens())
+        openChannels()
+        advance(300)
         compose.onNodeWithTag("channel-row-1").fetchSemanticsNode()
     }
 
@@ -252,6 +255,8 @@ class StartupOfflineTest {
         session.publish(connecting(catalog))
         advance(100)
         assertEquals(0, startupScreens())
+        openChannels()
+        advance(300)
         compose.onNodeWithTag("channel-row-1").fetchSemanticsNode()
         advance(1_000)
         assertEquals(0, startupScreens() + statusTexts())
@@ -400,6 +405,16 @@ class StartupOfflineTest {
         app(initial, awaitRows = false)
     }
 
+    /** Home is the landing destination; these journeys browse the channel rows. */
+    private fun openChannels() {
+        compose.waitUntil(15_000) {
+            compose.onAllNodes(hasTestTag("nav-channels")).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("nav-channels")
+            .performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitForIdle()
+    }
+
     private fun confirmRow(id: Long, awaitWait: Boolean = true, confirm: Boolean = true) {
         repeat(10) {
             val focusedRow = (1..3L).firstOrNull { row ->
@@ -504,6 +519,7 @@ class StartupOfflineTest {
             }
         }
         if (!awaitRows) return
+        openChannels()
         compose.waitUntil(15_000) {
             compose.onAllNodes(hasTestTag("channel-row-1")).fetchSemanticsNodes().isNotEmpty()
         }

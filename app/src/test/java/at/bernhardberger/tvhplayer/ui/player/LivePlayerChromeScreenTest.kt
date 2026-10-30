@@ -145,7 +145,7 @@ import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.AppRootPlaybackOrchestrator
 import at.bernhardberger.tvhplayer.ui.performMainStartupBack
-import at.bernhardberger.tvhplayer.ui.ChannelsKey
+import at.bernhardberger.tvhplayer.ui.HomeKey
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import at.bernhardberger.tvhplayer.viewmodels.VideoPlayerViewModel
 import kotlin.time.Instant
@@ -370,7 +370,7 @@ class LivePlayerChromeScreenTest {
         requests.resolve(pending.request, CurrentChannelReadiness.Ready(listOf(Channel.create(ChannelId(1), name = "Name 1"))), ChannelId(1))
         compose.runOnIdle {
             performMainStartupBack(requests, requests.state.value) { destination ->
-                assertEquals(ChannelsKey, destination)
+                assertEquals(HomeKey, destination)
                 screenVisible.value = false
             }
             assertEquals(ApplianceLaunchState.Idle, requests.state.value)

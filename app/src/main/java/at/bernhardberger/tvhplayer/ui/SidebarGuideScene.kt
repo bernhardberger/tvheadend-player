@@ -99,6 +99,7 @@ private data class SidebarGuideScene(
 }
 
 private val browseDestinations = listOf(
+    AppDestination.HOME,
     AppDestination.CHANNELS, AppDestination.GUIDE, AppDestination.RECORDINGS, AppDestination.SETTINGS,
 )
 

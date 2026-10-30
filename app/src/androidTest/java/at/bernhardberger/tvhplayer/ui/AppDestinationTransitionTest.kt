@@ -220,6 +220,9 @@ private fun TransitionHarness(
         popTransitionSpec = { appDestinationContentTransform() },
         predictivePopTransitionSpec = { appDestinationContentTransform() },
         entryProvider = entryProvider {
+            entry<HomeKey> {
+                Box(Modifier.fillMaxSize())
+            }
             entry<ChannelsKey> {
                 FocusedDestination(SHELL_A_TAG, destinationFocusEnabled)
             }

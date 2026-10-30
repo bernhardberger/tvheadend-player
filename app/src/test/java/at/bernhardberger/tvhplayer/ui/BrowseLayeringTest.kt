@@ -488,6 +488,9 @@ class BrowseLayeringTest {
                                 sceneStrategies = listOf(rememberSidebarGuideSceneStrategy(drawerActive, backStack.last())),
                                 transitionSpec = { appDestinationContentTransform() },
                                 entryProvider = entryProvider {
+                                    entry<HomeKey>(metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.HOME)) {
+                                        Box(Modifier.fillMaxSize())
+                                    }
                                     entry<ChannelsKey>(metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.CHANNELS)) {
                                         pageContent()
                                     }

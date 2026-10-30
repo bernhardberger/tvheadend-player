@@ -103,7 +103,7 @@ class CachedStartupTransitionTest {
             assertEquals(pending, requests.state.value)
             assertNull(requests.resolve(pending.request, readiness, channels.first().id))
             performMainStartupBack(requests, pending, selectRoot)
-            assertEquals(ChannelsKey, destination)
+            assertEquals(HomeKey, destination)
             assertEquals(ApplianceLaunchState.Idle, requests.state.value)
             performMainStartupBack(requests, pending, selectRoot)
             assertEquals(1, selections)

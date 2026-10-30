@@ -276,12 +276,14 @@ internal fun SideRail(
         systemAnimationsEnabled = android.animation.ValueAnimator.areAnimatorsEnabled()
         onPauseOrDispose { }
     }
+    val homeLabel = stringResource(R.string.nav_home)
     val channelsLabel = stringResource(R.string.nav_channels)
     val epgLabel = stringResource(R.string.nav_epg)
     val recordingsLabel = stringResource(R.string.nav_recordings)
     val settingsLabel = stringResource(R.string.nav_settings)
     val settingsDescription = if (connectionDegraded) stringResource(R.string.connection_problem_label) else settingsLabel
     val mainItems = remember(
+        homeLabel,
         channelsLabel,
         epgLabel,
         recordingsLabel,
@@ -289,6 +291,15 @@ internal fun SideRail(
         availableDestinations,
     ) {
         buildList {
+            if (AppDestination.HOME in availableDestinations) {
+                add(RailItem(AppDestination.HOME, homeLabel) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_home),
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                    )
+                })
+            }
             if (AppDestination.CHANNELS in availableDestinations) {
                 add(RailItem(AppDestination.CHANNELS, channelsLabel) {
                     Icon(
@@ -404,7 +415,7 @@ internal fun SideRail(
     LaunchedEffect(nowPlayingFocusLost) {
         if (nowPlayingFocusLost) {
             focusedControl = null
-            val fallback = AppDestination.CHANNELS.takeIf(itemFocus::containsKey) ?: items.firstOrNull()?.route
+            val fallback = rootRoute.takeIf(itemFocus::containsKey) ?: items.firstOrNull()?.route
             if (fallback != null) {
                 requestRoute(fallback)
                 itemFocus[fallback]?.requestFocus()
@@ -505,7 +516,7 @@ internal fun SideRail(
                             pauseAvailable = pauseAvailable,
                             paused = nowPlayingPaused,
                             fullScreenFocus = fullScreenFocus,
-                            channelsFocus = itemFocus[AppDestination.CHANNELS] ?: activeItemFocus,
+                            channelsFocus = mainItems.firstOrNull()?.route?.let(itemFocus::get) ?: activeItemFocus,
                             programmeAt = programmeAt,
                             nowSecProvider = nowSecProvider,
                             onOpen = onOpenNowPlaying,
@@ -534,7 +545,7 @@ internal fun SideRail(
                                     .withinDrawerSheet(fullWidth, visibleWidthPx)
                                     .focusProperties {
                                         canFocus = !detailsOpen && !modalOpen
-                                        if (item.route == AppDestination.CHANNELS && nowPlaying != null && drawerValue == DrawerValue.Open) {
+                                        if (item.route == mainItems.firstOrNull()?.route && nowPlaying != null && drawerValue == DrawerValue.Open) {
                                             up = fullScreenFocus
                                         }
                                     }
@@ -953,6 +964,7 @@ private fun <T> heldWhile(held: Boolean, value: T): T {
 
 private val AppDestination.testTag: String
     get() = when (this) {
+        AppDestination.HOME -> "nav-home"
         AppDestination.CHANNELS -> "nav-channels"
         AppDestination.GUIDE -> "nav-epg"
         AppDestination.RECORDINGS -> "nav-recordings"

@@ -296,6 +296,28 @@ class NavigationShellEvidenceTest {
 
     @Test
     @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
+    fun withHomeFirstFullScreenSitsAboveHomeAndChannelsReachesHome() {
+        settingsShell(1f, withHome = true)
+        playLive()
+        openDrawer()
+
+        compose.onNodeWithTag("nav-channels").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+        compose.waitForIdle()
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
+        compose.waitForIdle()
+        compose.onNodeWithTag("nav-home").assertIsFocused()
+
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
+        compose.waitForIdle()
+        compose.onNodeWithTag("global-drawer-now-playing-fullscreen").assertIsFocused()
+
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.waitForIdle()
+        compose.onNodeWithTag("nav-home").assertIsFocused()
+    }
+
+    @Test
+    @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
     fun focusedSlotEndingReturnsFocusToTheDrawerDestination() {
         settingsShell(1f)
         playLive()
@@ -1177,7 +1199,7 @@ class NavigationShellEvidenceTest {
     }
 
     /** Settings root on the global shell, over an offline video-like still. */
-    private fun settingsShell(fontScale: Float, density: Float = 1f) {
+    private fun settingsShell(fontScale: Float, density: Float = 1f, withHome: Boolean = false) {
         val still = FixtureArt.art("still-ridge-light").asImageBitmap()
         val recordingStill = FixtureArt.art("still-northline-studio").asImageBitmap()
         lateinit var navigation: DepthNavigationState
@@ -1214,6 +1236,9 @@ class NavigationShellEvidenceTest {
                         ProvideArtworkSession(fixtureObservation.currentSession) {
                         SideRail(
                             currentRoute = AppDestination.SETTINGS,
+                            rootRoute = if (withHome) AppDestination.HOME else AppDestination.CHANNELS,
+                            availableDestinations = setOfNotNull(AppDestination.HOME.takeIf { withHome },
+                                AppDestination.CHANNELS, AppDestination.GUIDE, AppDestination.RECORDINGS, AppDestination.SETTINGS),
                             showEpgMenu = true,
                             onRootBack = {},
                             onBackHandlerChanged = { browseBack = it },

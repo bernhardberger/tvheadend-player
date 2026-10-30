@@ -381,7 +381,7 @@ internal fun closeNormalLivePlayer(
     popBackStack: () -> Boolean,
     selectRoot: (AppNavKey) -> Unit,
 ) {
-    if (!popBackStack()) selectRoot(ChannelsKey)
+    if (!popBackStack()) selectRoot(HomeKey)
 }
 
 internal fun performMainStartupBack(
@@ -392,21 +392,21 @@ internal fun performMainStartupBack(
     cancelStartupAndSelectRoot(
         requests = requests,
         expectedState = expectedState,
-        destination = ChannelsKey,
+        destination = HomeKey,
         selectRoot = selectRoot,
     )
 }
 
 internal enum class DeferredResolvingBackAction {
     NONE,
-    CANCEL_TO_CHANNELS,
+    CANCEL_TO_HOME,
 }
 
 internal fun deferredResolvingBackAction(
     cancellationRequested: Boolean,
 ): DeferredResolvingBackAction = when {
     !cancellationRequested -> DeferredResolvingBackAction.NONE
-    else -> DeferredResolvingBackAction.CANCEL_TO_CHANNELS
+    else -> DeferredResolvingBackAction.CANCEL_TO_HOME
 }
 
 internal fun applyDeferredResolvingBack(
@@ -416,10 +416,10 @@ internal fun applyDeferredResolvingBack(
     selectRoot: (AppNavKey) -> Unit,
 ): Boolean = when (action) {
     DeferredResolvingBackAction.NONE -> false
-    DeferredResolvingBackAction.CANCEL_TO_CHANNELS -> cancelStartupAndSelectRoot(
+    DeferredResolvingBackAction.CANCEL_TO_HOME -> cancelStartupAndSelectRoot(
         requests = requests,
         expectedState = expectedState,
-        destination = ChannelsKey,
+        destination = HomeKey,
         selectRoot = selectRoot,
     )
 }
@@ -489,7 +489,7 @@ fun AppRoot(
         MainStartupComposition(
             state = MainStartupCompositionState(
                 presentation = MainStartupPresentation.Inactive,
-                navigationStartDestination = ChannelsKey,
+                navigationStartDestination = HomeKey,
                 navigationAllowed = true,
                 contentAllowed = true,
             ),
@@ -505,20 +505,20 @@ fun AppRoot(
     var navigationStartDestination by remember {
         mutableStateOf<AppNavKey?>(
             when (val launchState = applianceLaunchState) {
-                ApplianceLaunchState.Idle -> ChannelsKey
+                ApplianceLaunchState.Idle -> HomeKey
                 is ApplianceLaunchState.Pending -> if (
                     deferredBackAction ==
-                    DeferredResolvingBackAction.CANCEL_TO_CHANNELS
+                    DeferredResolvingBackAction.CANCEL_TO_HOME
                 ) {
-                    ChannelsKey
+                    HomeKey
                 } else {
                     null
                 }
                 is ApplianceLaunchState.Entering -> if (
                     deferredBackAction ==
-                    DeferredResolvingBackAction.CANCEL_TO_CHANNELS
+                    DeferredResolvingBackAction.CANCEL_TO_HOME
                 ) {
-                    ChannelsKey
+                    HomeKey
                 } else {
                     LivePlayerKey(
                         channelId = launchState.target.channelId.value,
@@ -740,7 +740,7 @@ fun AppRoot(
     val enterDirective = startupPresentation as? MainStartupPresentation.Enter
     LaunchedEffect(applianceLaunchState, navigationStartDestination) {
         if (applianceLaunchState == ApplianceLaunchState.Idle && navigationStartDestination == null) {
-            selectRoot(ChannelsKey)
+            selectRoot(HomeKey)
         }
     }
     LaunchedEffect(enterDirective, currentChannelReadiness) {
@@ -772,7 +772,7 @@ fun AppRoot(
         {
             if (revealingTarget != null) {
                 startupReveal = null
-                selectRoot(ChannelsKey)
+                selectRoot(HomeKey)
             } else performMainStartupBack(
                 requests = applianceLaunchRequests,
                 expectedState = expectedState,
@@ -788,13 +788,13 @@ fun AppRoot(
 
         when (
             rootBackAction(
-                isStartDestination = currentDestination == ChannelsKey,
+                isStartDestination = currentDestination == HomeKey,
                 warmReturn = warmReturn,
             )
         ) {
             BackAction.FINISH_ACTIVITY -> onRequestExit()
             BackAction.POP_NAVIGATION -> {
-                if (!backStack.popNavigation()) onRequestExit()
+                if (!backStack.navigateBackTowardHome()) onRequestExit()
             }
             BackAction.RETURN_TO_PARENT -> Unit
             BackAction.RETURN_TO_PLAYER -> {
@@ -900,6 +900,16 @@ fun AppRoot(
                     popTransitionSpec = { appRouteContentTransform(playerTransition) },
                     predictivePopTransitionSpec = { appRouteContentTransform(playerTransition) },
                     entryProvider = entryProvider {
+                    entry<HomeKey>(
+                        metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.HOME),
+                    ) {
+                        HomeRouteContent(
+                            contentAllowed = contentAllowed,
+                            contentPadding = contentPadding,
+                            initialFocusEnabled = !drawerActive && currentDestination == HomeKey,
+                        )
+                    }
+
                     entry<ChannelsKey>(
                         metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.CHANNELS),
                     ) {
@@ -1263,9 +1273,10 @@ fun AppRoot(
                         // A fading rail keeps marking the page it fades with.
                         currentRoute = (railBackStack.lastOrNull() ?: currentDestination)?.destination,
                         connectionDegraded = connectionPresentation.degraded,
-                        rootRoute = AppDestination.CHANNELS,
+                        rootRoute = AppDestination.HOME,
                         showEpgMenu = uiSettings.showEpgMenu,
                         availableDestinations = buildSet {
+                            add(AppDestination.HOME)
                             add(AppDestination.CHANNELS)
                             add(AppDestination.GUIDE)
                             add(AppDestination.RECORDINGS)
@@ -1361,6 +1372,7 @@ private fun ApplianceLaunchTarget.matchesPlayerKey(destination: AppNavKey?): Boo
 private fun AppDestination.toTopLevelKey(
     settingsSection: SettingsSection?,
 ): AppNavKey = when (this) {
+    AppDestination.HOME -> HomeKey
     AppDestination.CHANNELS -> ChannelsKey
     AppDestination.GUIDE -> GuideKey
     AppDestination.RECORDINGS -> RecordingsKey

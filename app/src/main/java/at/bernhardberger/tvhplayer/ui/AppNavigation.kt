@@ -11,6 +11,7 @@ import kotlinx.serialization.serializer
 internal sealed interface AppNavKey : NavKey
 
 internal enum class AppDestination {
+    HOME,
     CHANNELS,
     GUIDE,
     RECORDINGS,
@@ -18,6 +19,9 @@ internal enum class AppDestination {
     LIVE_PLAYER,
     RECORDING_PLAYER,
 }
+
+@Serializable
+internal data object HomeKey : AppNavKey
 
 @Serializable
 internal data object ChannelsKey : AppNavKey
@@ -71,6 +75,7 @@ internal enum class RecordingStartMode {
 
 internal val AppNavKey.destination: AppDestination
     get() = when (this) {
+        HomeKey -> AppDestination.HOME
         ChannelsKey -> AppDestination.CHANNELS
         GuideKey -> AppDestination.GUIDE
         RecordingsKey -> AppDestination.RECORDINGS
@@ -90,6 +95,21 @@ internal fun MutableList<AppNavKey>.navigateTopLevel(destination: AppNavKey) {
     removeAll(AppNavKey::isTransientDestination)
     remove(destination)
     add(destination)
+}
+
+/**
+ * Back from a player pops to the page below it; Back from any other top-level destination selects
+ * Home rather than a previously visited sibling, whose entry (and its state) stays in the stack.
+ * False on Home itself or an empty stack.
+ */
+internal fun MutableList<AppNavKey>.navigateBackTowardHome(): Boolean = when {
+    isEmpty() -> false
+    lastOrNull()?.isTransientDestination() == true -> popNavigation()
+    lastOrNull() == HomeKey -> false
+    else -> {
+        navigateTopLevel(HomeKey)
+        true
+    }
 }
 
 internal fun MutableList<AppNavKey>.pushTransient(destination: AppNavKey) {
@@ -117,6 +137,7 @@ internal fun List<AppNavKey>.hasTransientDestinationBelowTop(): Boolean =
 internal fun AppNavKey.isTransientDestination(): Boolean = when (this) {
     is LivePlayerKey,
     is RecordingPlayerKey -> true
+    HomeKey,
     ChannelsKey,
     GuideKey,
     RecordingsKey,

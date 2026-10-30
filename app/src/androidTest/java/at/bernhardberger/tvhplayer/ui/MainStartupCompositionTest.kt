@@ -317,7 +317,7 @@ class MainStartupCompositionTest {
             popBackStack = { false },
             selectRoot = { retainedRoot = it },
         )
-        assertEquals(ChannelsKey, retainedRoot)
+        assertEquals(HomeKey, retainedRoot)
 
         retainedRoot = LivePlayerKey(channelId = 2, channelName = "Two")
         closeNormalLivePlayer(
@@ -508,7 +508,7 @@ class MainStartupCompositionTest {
             cancellationRequested = true,
         )
 
-        assertEquals(DeferredResolvingBackAction.CANCEL_TO_CHANNELS, normalAction)
+        assertEquals(DeferredResolvingBackAction.CANCEL_TO_HOME, normalAction)
         assertTrue(
             applyDeferredResolvingBack(
                 action = normalAction,
@@ -518,7 +518,7 @@ class MainStartupCompositionTest {
             ),
         )
         assertEquals(ApplianceLaunchState.Idle, normalRequests.state.value)
-        assertEquals(ChannelsKey, normalRoot)
+        assertEquals(HomeKey, normalRoot)
         assertFalse(normalRequests.cancel(normalPending))
     }
 

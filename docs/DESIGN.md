@@ -485,7 +485,7 @@ Anatomy per Material for TV / design kit:
   KeyDown/KeyUp cycle so the same press cannot activate the new target.
 - Back unwinds local layers first (dialogs, sheets, depth stacks, scope tabs),
   then focuses the global drawer on the current destination. From a non-root
-  destination the next Back goes to Channels; Back from Channels follows the
+  destination the next Back goes to Home; Back from Home follows the
   warm-player / activity-exit policy.
 - Long localized text and 1.3× font scale must not clip or move anchors; every
   actionable element has an accessible name; status changes use polite live
