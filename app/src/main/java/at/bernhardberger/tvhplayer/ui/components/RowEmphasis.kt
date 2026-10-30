@@ -1,20 +1,35 @@
 package at.bernhardberger.tvhplayer.ui.components
 
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.util.lerp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.ui.TvPassiveAlpha
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 import kotlin.math.abs
 
 internal const val RowChangeMs = 300
 internal val RowChangeMotion = tween<Float>(RowChangeMs, easing = PlayerMotion.Standard)
+internal val RowTextEnter = expandVertically(tween(RowChangeMs, easing = PlayerMotion.Standard), Alignment.Top) +
+    fadeIn(RowChangeMotion)
+internal val RowTextExit = shrinkVertically(tween(RowChangeMs, easing = PlayerMotion.Standard), Alignment.Top) +
+    fadeOut(RowChangeMotion)
 internal const val RowDimAlpha = 0.4f
 internal const val RowHeaderQuietAlpha = TvPassiveAlpha
 internal const val RowHeaderQuietScale = 14f / 24f
@@ -40,6 +55,23 @@ internal fun Modifier.rowHeaderEmphasis(
     scaleY = scaleX
     transformOrigin = TransformOrigin(0f, 1f)
     alpha = lerp(RowHeaderQuietAlpha, 1f, value)
+}
+
+@Composable
+internal fun RowHeading(
+    title: String,
+    emphasis: () -> Float,
+    modifier: Modifier = Modifier,
+    quietScale: Float,
+    focusOverflow: Dp,
+    bottomSpace: Dp,
+) {
+    Text(title, modifier.layout { measurable, constraints ->
+        val heading = measurable.measure(constraints)
+        layout(heading.width, heading.height + bottomSpace.roundToPx()) { heading.place(0, 0) }
+    }.rowHeaderEmphasis(quietScale = quietScale,
+        focusOverflow = focusOverflow, emphasis = emphasis).semantics { heading() },
+        style = MaterialTheme.typography.headlineMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
 }
 
 internal fun Modifier.rowContentEmphasis(emphasis: () -> Float): Modifier = graphicsLayer {

@@ -4,10 +4,8 @@ import android.content.res.Resources
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Transition
 import androidx.compose.animation.core.animateFloat
@@ -43,7 +41,6 @@ import androidx.compose.ui.graphics.*
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.SubcomposeLayout
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInRoot
@@ -568,12 +565,8 @@ private fun DetailsSectionHeading(title: String, emphasis: () -> Float, modifier
     // The row already reserves AiringCardRoom; only its painted overflow reduces the visible gap.
     // One dp compensates optically for the heading's glyph descent.
     bottomSpace: androidx.compose.ui.unit.Dp = DetailsHeadingContentGap - AiringCardRoom + focusOverflow - 1.dp) {
-    Text(title, modifier.layout { measurable, constraints ->
-        val heading = measurable.measure(constraints)
-        layout(heading.width, heading.height + bottomSpace.roundToPx()) { heading.place(0, 0) }
-    }.rowHeaderEmphasis(quietScale = 18f / 28f,
-        focusOverflow = focusOverflow, emphasis = emphasis).semantics { heading() },
-        style = MaterialTheme.typography.headlineMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    RowHeading(title, emphasis, modifier, quietScale = 18f / 28f,
+        focusOverflow = focusOverflow, bottomSpace = bottomSpace)
 }
 
 /**
@@ -726,13 +719,13 @@ private fun AiringCard(
                 progressModifier = Modifier.testTag("details-card-progress-${item.id.value}"))
         },
         title = {
-            textShown.AnimatedVisibility({ it }, enter = AiringTextEnter, exit = AiringTextExit) {
+            textShown.AnimatedVisibility({ it }, enter = RowTextEnter, exit = RowTextExit) {
                 Text(time, Modifier.fillMaxWidth().padding(top = StandardCardTextGap).clearAndSetSemantics { testTag = "details-card-time" },
                     style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         },
         subtitle = {
-            textShown.AnimatedVisibility({ it }, enter = AiringTextEnter, exit = AiringTextExit) {
+            textShown.AnimatedVisibility({ it }, enter = RowTextEnter, exit = RowTextExit) {
                 Column(Modifier.fillMaxWidth().padding(top = 4.dp).clearAndSetSemantics { testTag = "details-card-subtitle-${item.id.value}" },
                     verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     episode?.let {
@@ -748,11 +741,6 @@ private fun AiringCard(
         },
     )
 }
-
-private val AiringTextEnter = expandVertically(tween(RowChangeMs, easing = PlayerMotion.Standard), Alignment.Top) +
-    fadeIn(RowChangeMotion)
-private val AiringTextExit = shrinkVertically(tween(RowChangeMs, easing = PlayerMotion.Standard), Alignment.Top) +
-    fadeOut(RowChangeMotion)
 
 // The blurred backdrop's decode: 16:9 at a sixth of the screen, blurred at 160px wide. Three
 // passes of radius 3 there match the former 32dp live blur on a 1080p screen.
