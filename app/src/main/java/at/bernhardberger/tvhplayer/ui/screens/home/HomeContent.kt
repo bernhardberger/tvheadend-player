@@ -1,0 +1,1053 @@
+package at.bernhardberger.tvhplayer.ui.screens.home
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.tv.material3.CardContainerDefaults
+import androidx.tv.material3.DrawerValue
+import androidx.tv.material3.LocalContentColor
+import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.Text
+import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent
+import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
+import at.bernhardberger.tvheadend.sdk.core.SessionObservation
+import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.core.HomeFocusKey
+import at.bernhardberger.tvhplayer.core.HomeInput
+import at.bernhardberger.tvhplayer.core.HomePlaying
+import at.bernhardberger.tvhplayer.core.HomeSection
+import at.bernhardberger.tvhplayer.core.HomeSectionKind
+import at.bernhardberger.tvhplayer.core.RecordingWatchState
+import at.bernhardberger.tvhplayer.core.homeInitialFocus
+import at.bernhardberger.tvhplayer.core.offeredResumePosition
+import at.bernhardberger.tvhplayer.core.recordingIsRunning
+import at.bernhardberger.tvhplayer.core.recordingLengthSeconds
+import at.bernhardberger.tvhplayer.core.recordingTimeLeft
+import at.bernhardberger.tvhplayer.core.recordingWatchState
+import at.bernhardberger.tvhplayer.core.visibleChannelNumber
+import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
+import at.bernhardberger.tvhplayer.ui.TvBrowseLeadingInset
+import at.bernhardberger.tvhplayer.ui.TvBrowseTrailingInset
+import at.bernhardberger.tvhplayer.ui.TvCardFocusedScale
+import at.bernhardberger.tvhplayer.ui.TvGridGutter
+import at.bernhardberger.tvhplayer.ui.TvTextColors
+import at.bernhardberger.tvhplayer.ui.common.formatClock
+import at.bernhardberger.tvhplayer.ui.common.formatRecordedDuration
+import at.bernhardberger.tvhplayer.ui.common.formatRecordingDate
+import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
+import at.bernhardberger.tvhplayer.ui.common.rememberCurrentEpochSeconds
+import at.bernhardberger.tvhplayer.ui.components.CardGlowReach
+import at.bernhardberger.tvhplayer.ui.components.CompactZapRowOffscreen
+import at.bernhardberger.tvhplayer.ui.components.EmbeddedProgressCardBorderOutset
+import at.bernhardberger.tvhplayer.ui.components.channelTitleText
+import at.bernhardberger.tvhplayer.ui.components.HomeActivityCard
+import at.bernhardberger.tvhplayer.ui.components.HomeAllRecordingsCard
+import at.bernhardberger.tvhplayer.ui.components.HomeCardWidth
+import at.bernhardberger.tvhplayer.ui.components.HomeGenreCard
+import at.bernhardberger.tvhplayer.ui.components.HomeRecentChannelTile
+import at.bernhardberger.tvhplayer.ui.components.HomeUpcomingCard
+import at.bernhardberger.tvhplayer.ui.components.LocalBrowseDrawerState
+import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
+import at.bernhardberger.tvhplayer.ui.components.ProgrammeArtwork
+import at.bernhardberger.tvhplayer.ui.components.RoundIconButton
+import at.bernhardberger.tvhplayer.ui.components.RowHeading
+import at.bernhardberger.tvhplayer.ui.components.StandardCardTextGap
+import at.bernhardberger.tvhplayer.ui.components.StandardProgrammeCard
+import at.bernhardberger.tvhplayer.ui.components.StartKeylineBringIntoViewSpec
+import at.bernhardberger.tvhplayer.ui.screens.ChannelsHeadline
+import at.bernhardberger.tvhplayer.ui.screens.ChannelsImmersiveBackground
+import at.bernhardberger.tvhplayer.ui.screens.ChannelsRowCard
+import at.bernhardberger.tvhplayer.ui.screens.ImmersiveHeroWidth
+import at.bernhardberger.tvhplayer.ui.components.browseDrawerUnderlap
+import at.bernhardberger.tvhplayer.ui.components.browseUnderlap
+import at.bernhardberger.tvhplayer.ui.components.cardGlowRoom
+import at.bernhardberger.tvhplayer.ui.components.navigationEdgeFadeMask
+import at.bernhardberger.tvhplayer.ui.components.overflowingRowViewport
+import at.bernhardberger.tvhplayer.ui.components.progressColor
+import at.bernhardberger.tvhplayer.ui.components.rowContentEmphasis
+import at.bernhardberger.tvhplayer.ui.components.watchingIndicator
+import java.time.Instant
+import kotlin.time.Instant as KotlinInstant
+import java.time.ZoneId
+import java.util.Locale
+import kotlin.math.roundToInt
+
+/** An ordinary focused row's heading sits at this offset from the page's top edge. */
+private val HomeTopSlot = 76.dp
+
+/** The expanded On now row holds its cards at this offset from the page's top edge. */
+private val HomeImmersiveSlot = 356.dp
+
+/** Room the focus ring and card scale need around a card. */
+private val HomeFocusRoom = 12.dp
+
+private val HomeSectionGap = 24.dp
+private val HomeHeadingContentGap = 16.dp
+private val HomeHeroGap = 40.dp
+private val HomeRecentGap = 16.dp
+private val HomeGenreGap = 16.dp
+
+/** Room below the last section so the final card can still scroll to its slot. */
+private val HomeTrailingRoom = 400.dp
+
+/**
+ * Home's approved page: the scroll-away header first, then the spec-order sections drawn from the
+ * policy's [sections]. Only the page draws; opening cards, loading data and page-slot motion belong
+ * to the slices that wire Home into the app (S6/S7/S8), so card actions are plain callbacks.
+ *
+ * The header is the page's first item, not a fixed bar. Section headings stay quiet until their row
+ * takes focus and only that row shows text below its cards. The page scrolls so the focused row's
+ * heading lands in the top slot, or the expanded On now row's cards land in the immersive slot.
+ * [initialFocus] decides the deterministic first stop; with no sections the View options button is
+ * the page's only stop, which keeps a still-empty Home usable.
+ *
+ * [observation] and [input] are the caller's current snapshot. Without them the page still renders
+ * [sections], but the On now backdrop/headline and the activity/shelf details that need the
+ * snapshot are omitted rather than guessed.
+ */
+@Composable
+internal fun HomeContent(
+    sections: List<HomeSection>,
+    contentPadding: PaddingValues,
+    initialFocus: HomeFocusKey?,
+    onFocused: (HomeFocusKey) -> Unit,
+    modifier: Modifier = Modifier,
+    focusEnabled: Boolean = true,
+    observation: SessionObservation? = null,
+    input: HomeInput? = null,
+) {
+    val direction = LocalLayoutDirection.current
+    val ltr = direction == LayoutDirection.Ltr
+    val startPadding = contentPadding.calculateStartPadding(direction)
+    val endPadding = contentPadding.calculateEndPadding(direction)
+    val keyline = startPadding + TvBrowseLeadingInset
+    val endMargin = maxOf(endPadding, TvBrowseTrailingInset)
+    val locale = LocalConfiguration.current.locales[0]
+    val density = LocalDensity.current
+    val zone = remember { ZoneId.systemDefault() }
+    val clock = rememberCurrentEpochSeconds()
+    val nowSec = input?.nowSec ?: clock()
+    val rail = LocalBrowseNavigationFocus.current ?: FocusRequester.Default
+    val drawerState = LocalBrowseDrawerState.current
+    val firstSection = sections.firstOrNull()?.kind
+    val initialKey = remember(sections, initialFocus) { initialFocus ?: homeInitialFocus(sections) }
+    val requesters = remember(sections) {
+        sections.associate { it.kind to FocusRequester() }
+    }
+    val viewRequester = remember { FocusRequester() }
+    var focusedSection by remember { mutableStateOf<HomeSectionKind?>(null) }
+    var focusedOnNow by remember { mutableStateOf<ChannelId?>(null) }
+    val tops = remember { mutableStateMapOf<HomeSectionKind, Float>() }
+    var onNowRowTop by remember { mutableFloatStateOf(0f) }
+    var viewportHeight by remember { mutableIntStateOf(0) }
+    var contentEnd by remember { mutableFloatStateOf(0f) }
+
+    val scrollPx by remember(sections, density) {
+        derivedStateOf {
+            val viewport = viewportHeight.toFloat()
+            val maxScroll = (contentEnd - viewport).coerceAtLeast(0f)
+            val topSlot = with(density) { HomeTopSlot.toPx() }
+            val target = when (val kind = focusedSection) {
+                null -> 0f
+                firstSection -> 0f
+                HomeSectionKind.ON_NOW ->
+                    (tops[kind] ?: 0f) + onNowRowTop - with(density) { HomeImmersiveSlot.toPx() }
+                HomeSectionKind.UPCOMING -> minOf(
+                    (tops[kind] ?: 0f) - topSlot,
+                    contentEnd - viewport + with(density) { HomeSectionGap.toPx() },
+                )
+                else -> (tops[kind] ?: 0f) - topSlot
+            }
+            target.coerceIn(0f, maxScroll)
+        }
+    }
+
+    LaunchedEffect(focusEnabled, initialKey, sections) {
+        if (!focusEnabled) return@LaunchedEffect
+        // Widget focus changes precede composition's drawerActive feedback: never take focus back
+        // from an opening drawer.
+        withFrameNanos { }
+        if (drawerState?.currentValue == DrawerValue.Open) return@LaunchedEffect
+        val target = initialKey?.let { requesters[it.section] } ?: viewRequester
+        repeat(60) {
+            if (target.requestFocus()) return@LaunchedEffect
+            withFrameNanos { }
+        }
+    }
+
+    BoxWithConstraints(
+        modifier.fillMaxSize().onGloballyPositioned { viewportHeight = it.size.height },
+    ) {
+        val halfWidth = ((maxWidth - keyline - endMargin - TvGridGutter) / 2).coerceAtLeast(0.dp)
+        val recordingChannelIds = remember(input?.dvrEntries) {
+            input?.dvrEntries.orEmpty()
+                .filter(::recordingIsRunning)
+                .mapNotNull { it.channelId }
+                .toSet()
+        }
+        val onNow = sections.filterIsInstance<HomeSection.OnNow>().firstOrNull()
+        if (observation != null && onNow != null && focusedSection == HomeSectionKind.ON_NOW) {
+            ChannelsImmersiveBackground(
+                channels = onNow.items.map { it.channel },
+                channelId = { focusedOnNow },
+                observation = observation,
+                nowSec = { nowSec },
+                logoTop = contentPadding.calculateTopPadding() + TvBrowseHeaderHeight,
+                endInset = 48.dp,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        CompositionLocalProvider(LocalContentColor provides TvTextColors.primary) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .wrapContentHeight(Alignment.Top, unbounded = true)
+                    .graphicsLayer { translationY = -scrollPx },
+            ) {
+                HomeHeader(
+                    nowSec = nowSec,
+                    locale = locale,
+                    zone = zone,
+                    endMargin = endMargin,
+                    viewRequester = viewRequester,
+                    firstSectionRequester = firstSection?.let(requesters::get),
+                    rail = rail,
+                    ltr = ltr,
+                )
+                Spacer(Modifier.height((HomeTopSlot - 24.dp - TvBrowseHeaderHeight).coerceAtLeast(0.dp)))
+                sections.forEach { section ->
+                    val kind = section.kind
+                    val focused = focusedSection == kind
+                    val emphasis = if (focused) 1f else 0f
+                    val entryIndex = initialKey
+                        ?.takeIf { it.section == kind }
+                        ?.position
+                        ?.coerceIn(0, (section.itemCount() - 1).coerceAtLeast(0))
+                        ?: 0
+                    val entry = requesters[kind] ?: FocusRequester()
+                    val onNowSection = section as? HomeSection.OnNow
+                    val onSectionFocus = {
+                        if (focusedSection != kind) {
+                            focusedSection = kind
+                            if (kind == HomeSectionKind.ON_NOW) {
+                                focusedOnNow = onNowSection?.items?.firstOrNull()?.channel?.id
+                            }
+                        }
+                    }
+                    val onCardFocus: (Int, String) -> Unit = { index, key ->
+                        onSectionFocus()
+                        onFocused(HomeFocusKey(kind, key, index))
+                    }
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            // The expanded On now row owns the page: the rows above it are out of view.
+                            .graphicsLayer {
+                                alpha = if (focusedSection == HomeSectionKind.ON_NOW &&
+                                    kind.ordinal < HomeSectionKind.ON_NOW.ordinal
+                                ) 0f else 1f
+                            }
+                            .onGloballyPositioned { tops[kind] = it.positionInParent().y }
+                            .onFocusChanged { if (it.hasFocus) onSectionFocus() },
+                    ) {
+                        val headingTitle = section.headingTitle(hasPlaying = input?.playing != null)
+                        val expandedOnNow = focused && onNowSection != null && observation != null
+                        if (expandedOnNow) {
+                            val channelId = focusedOnNow
+                            val item = onNowSection.items.firstOrNull { it.channel.id == channelId }
+                                ?: onNowSection.items.firstOrNull()
+                            if (item != null) {
+                                HomeOnNowBlock(
+                                    channel = item.channel,
+                                    current = item.event,
+                                    next = observation.nextEvent(
+                                        item.channel.id,
+                                        KotlinInstant.fromEpochSeconds(nowSec),
+                                    ),
+                                    recording = item.channel.id in recordingChannelIds,
+                                    nowSec = nowSec,
+                                    keyline = keyline,
+                                )
+                                // The block's foot sits this far above the row's picture, whose own glow
+                                // room already pads the row.
+                                Spacer(Modifier.height(HomeHeroGap - HomeFocusRoom))
+                            }
+                        } else if (headingTitle != null) {
+                            RowHeading(
+                                title = headingTitle,
+                                emphasis = { emphasis },
+                                modifier = Modifier.padding(start = keyline),
+                                quietScale = 18f / 28f,
+                                focusOverflow = section.focusOverflow(halfWidth),
+                                bottomSpace = HomeHeadingContentGap - HomeFocusRoom +
+                                    section.focusOverflow(halfWidth) - 1.dp,
+                            )
+                        }
+                        when (section) {
+                            is HomeSection.CurrentActivity -> HomeActivityRow(
+                                items = section.items,
+                                width = halfWidth,
+                                keyline = keyline,
+                                emphasis = emphasis,
+                                entry = entry,
+                                entryIndex = entryIndex,
+                                rail = rail,
+                                ltr = ltr,
+                                nowSec = nowSec,
+                                input = input,
+                                onCardFocus = onCardFocus,
+                            )
+
+                            is HomeSection.RecentChannels -> HomeRecentRow(
+                                items = section.items,
+                                keyline = keyline,
+                                emphasis = emphasis,
+                                entry = entry,
+                                entryIndex = entryIndex,
+                                rail = rail,
+                                ltr = ltr,
+                                onCardFocus = onCardFocus,
+                            )
+
+                            is HomeSection.OnNow -> HomeOnNowRow(
+                                items = section.items,
+                                keyline = keyline,
+                                emphasis = emphasis,
+                                entry = entry,
+                                entryIndex = entryIndex,
+                                rail = rail,
+                                ltr = ltr,
+                                nowSec = nowSec,
+                                recordingChannelIds = recordingChannelIds,
+                                onCardFocus = { index, channelId ->
+                                    focusedOnNow = channelId
+                                    onCardFocus(index, "onnow:${channelId.value}")
+                                },
+                                onRowTop = { onNowRowTop = it },
+                            )
+
+                            is HomeSection.Genres -> HomeGenreRow(
+                                items = section.items,
+                                keyline = keyline,
+                                emphasis = emphasis,
+                                entry = entry,
+                                entryIndex = entryIndex,
+                                rail = rail,
+                                ltr = ltr,
+                                onCardFocus = onCardFocus,
+                            )
+
+                            is HomeSection.ContinueWatching -> HomeShelfRow(
+                                items = section.items,
+                                continueWatching = true,
+                                keyline = keyline,
+                                emphasis = emphasis,
+                                entry = entry,
+                                entryIndex = entryIndex,
+                                rail = rail,
+                                ltr = ltr,
+                                nowSec = nowSec,
+                                locale = locale,
+                                input = input,
+                                onCardFocus = onCardFocus,
+                            )
+
+                            is HomeSection.RecentlyRecorded -> HomeShelfRow(
+                                items = section.items,
+                                continueWatching = false,
+                                keyline = keyline,
+                                emphasis = emphasis,
+                                entry = entry,
+                                entryIndex = entryIndex,
+                                rail = rail,
+                                ltr = ltr,
+                                nowSec = nowSec,
+                                locale = locale,
+                                input = input,
+                                onCardFocus = onCardFocus,
+                            )
+
+                            is HomeSection.Upcoming -> HomeUpcomingRow(
+                                item = section.items.firstOrNull(),
+                                keyline = keyline,
+                                emphasis = emphasis,
+                                entry = entry,
+                                nowSec = nowSec,
+                                zone = zone,
+                                locale = locale,
+                                rail = rail,
+                                ltr = ltr,
+                                onCardFocus = onCardFocus,
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(HomeSectionGap))
+                }
+                Spacer(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(HomeTrailingRoom)
+                        .onGloballyPositioned { contentEnd = it.positionInParent().y },
+                )
+            }
+        }
+    }
+}
+
+/** The existing date, clock and View options header, now the page's first scrolling item. */
+@Composable
+private fun HomeHeader(
+    nowSec: Long,
+    locale: Locale,
+    zone: ZoneId,
+    endMargin: Dp,
+    viewRequester: FocusRequester,
+    firstSectionRequester: FocusRequester?,
+    rail: FocusRequester,
+    ltr: Boolean,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(top = 24.dp, end = endMargin)
+            .height(TvBrowseHeaderHeight)
+            .testTag("home-header"),
+        horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.End),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = formatRecordingDate(nowSec, dateOnly = true, locale = locale),
+            style = MaterialTheme.typography.titleMedium,
+            color = TvTextColors.tertiary,
+            maxLines = 1,
+        )
+        Text(
+            text = formatClock(Instant.ofEpochSecond(nowSec).atZone(zone), locale),
+            style = MaterialTheme.typography.titleMedium,
+            color = TvTextColors.tertiary,
+            maxLines = 1,
+        )
+        RoundIconButton(
+            icon = painterResource(R.drawable.ic_tune),
+            label = stringResource(R.string.channels_view_options),
+            onClick = { },
+            focusRequester = viewRequester,
+            onFocused = { },
+            modifier = Modifier
+                .focusProperties {
+                    up = FocusRequester.Cancel
+                    down = firstSectionRequester ?: FocusRequester.Cancel
+                    if (ltr) {
+                        left = rail
+                        right = FocusRequester.Cancel
+                    } else {
+                        right = rail
+                        left = FocusRequester.Cancel
+                    }
+                }
+                .testTag("home-view-button"),
+        )
+    }
+}
+
+/**
+ * A Home card row: the same under-the-rail overhang, edge fade, glow room and keyline scroll
+ * target the Channels rows use. The [entryIndex] card takes the section's [entry] requester and,
+ * when it is first, sends Left (or Right in RTL) to the rail.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun <T> HomeCardRow(
+    items: List<T>,
+    keyline: Dp,
+    gap: Dp,
+    emphasis: Float,
+    entry: FocusRequester,
+    entryIndex: Int,
+    rail: FocusRequester,
+    ltr: Boolean,
+    modifier: Modifier = Modifier,
+    itemContent: @Composable (index: Int, item: T, modifier: Modifier) -> Unit,
+) {
+    val underlap = browseDrawerUnderlap()
+    val start = keyline + underlap
+    val density = LocalDensity.current
+    val offscreenPx = with(density) { CompactZapRowOffscreen.roundToPx() }
+    var screenEdge by remember { mutableFloatStateOf(0f) }
+    val state = rememberLazyListState(initialFirstVisibleItemIndex = entryIndex.coerceAtLeast(0))
+    CompositionLocalProvider(
+        LocalBringIntoViewSpec provides StartKeylineBringIntoViewSpec(
+            with(density) { start.toPx() } + offscreenPx.toFloat(),
+        ),
+    ) {
+        LazyRow(
+            state = state,
+            horizontalArrangement = Arrangement.spacedBy(gap),
+            contentPadding = PaddingValues(
+                start = start + CompactZapRowOffscreen,
+                end = keyline + CompactZapRowOffscreen,
+                top = CardGlowReach,
+                bottom = CardGlowReach,
+            ),
+            modifier = modifier
+                .browseUnderlap(underlap)
+                .fillMaxWidth()
+                .onGloballyPositioned { screenEdge = -it.positionInRoot().x.coerceAtLeast(0f) }
+                .cardGlowRoom(top = CardGlowReach - HomeFocusRoom)
+                .rowContentEmphasis { emphasis }
+                .navigationEdgeFadeMask(start - gap, leadingInsetPx = { screenEdge })
+                .overflowingRowViewport(offscreenPx)
+                .focusGroup(),
+        ) {
+            itemsIndexed(items) { index, item ->
+                val itemModifier = Modifier
+                    .then(if (index == entryIndex) Modifier.focusRequester(entry) else Modifier)
+                    .then(
+                        if (index == 0) {
+                            Modifier.focusProperties {
+                                if (ltr) left = rail else right = rail
+                            }
+                        } else {
+                            Modifier
+                        },
+                    )
+                itemContent(index, item, itemModifier)
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeActivityRow(
+    items: List<at.bernhardberger.tvhplayer.core.CurrentActivityItem>,
+    width: Dp,
+    keyline: Dp,
+    emphasis: Float,
+    entry: FocusRequester,
+    entryIndex: Int,
+    rail: FocusRequester,
+    ltr: Boolean,
+    nowSec: Long,
+    input: HomeInput?,
+    onCardFocus: (Int, String) -> Unit,
+) {
+    HomeCardRow(
+        items = items,
+        keyline = keyline,
+        gap = TvGridGutter,
+        emphasis = emphasis,
+        entry = entry,
+        entryIndex = entryIndex,
+        rail = rail,
+        ltr = ltr,
+    ) { index, item, itemModifier ->
+        val playing = item.playing
+        val runningRecording = item.recording
+        val channel = when (playing) {
+            is HomePlaying.LiveChannel -> input?.channels?.firstOrNull { it.id == playing.channelId }
+            else -> runningRecording?.channelId?.let { id ->
+                input?.channels?.firstOrNull { it.id == id }
+            }
+        }
+        val event = ((playing as? HomePlaying.LiveChannel)?.channelId ?: runningRecording?.channelId)
+            ?.let { input?.currentEvents?.get(it) }
+        val label = stringResource(
+            when {
+                playing != null && runningRecording != null -> R.string.home_activity_watching_and_recording
+                playing != null -> R.string.home_activity_watching_live
+                else -> R.string.home_activity_recording
+            },
+        )
+        val title = event?.title?.takeIf(String::isNotBlank)
+            ?: runningRecording?.title?.takeIf(String::isNotBlank)
+            ?: stringResource(R.string.no_epg)
+        val channelLabel = channel?.let {
+            channelTitleText(
+                it.visibleChannelNumber,
+                it.name.orEmpty(),
+            )
+        } ?: runningRecording?.channelName.orEmpty()
+        val description = listOf(label, title, channelLabel)
+            .filter(String::isNotBlank)
+            .joinToString(", ")
+        HomeActivityCard(
+            channel = channel,
+            event = event,
+            entry = runningRecording,
+            playing = playing != null,
+            nowSec = nowSec,
+            width = width,
+            description = description,
+            onClick = { },
+            modifier = itemModifier
+                .testTag("home-activity-$index")
+                .onFocusChanged { if (it.isFocused) onCardFocus(index, activityKey(item)) },
+        )
+    }
+}
+
+@Composable
+private fun HomeRecentRow(
+    items: List<at.bernhardberger.tvhplayer.core.RecentChannelItem>,
+    keyline: Dp,
+    emphasis: Float,
+    entry: FocusRequester,
+    entryIndex: Int,
+    rail: FocusRequester,
+    ltr: Boolean,
+    onCardFocus: (Int, String) -> Unit,
+) {
+    HomeCardRow(
+        items = items,
+        keyline = keyline,
+        gap = HomeRecentGap,
+        emphasis = emphasis,
+        entry = entry,
+        entryIndex = entryIndex,
+        rail = rail,
+        ltr = ltr,
+    ) { index, item, itemModifier ->
+        HomeRecentChannelTile(
+            channel = item.channel,
+            nameShown = emphasis > 0f,
+            onClick = { },
+            modifier = itemModifier
+                .testTag("home-recent-$index")
+                .onFocusChanged {
+                    if (it.isFocused) onCardFocus(index, "channel:${item.channel.id.value}")
+                },
+        )
+    }
+}
+
+@Composable
+private fun HomeOnNowRow(
+    items: List<at.bernhardberger.tvhplayer.core.OnNowItem>,
+    keyline: Dp,
+    emphasis: Float,
+    entry: FocusRequester,
+    entryIndex: Int,
+    rail: FocusRequester,
+    ltr: Boolean,
+    nowSec: Long,
+    recordingChannelIds: Set<ChannelId>,
+    onCardFocus: (Int, ChannelId) -> Unit,
+    onRowTop: (Float) -> Unit,
+) {
+    val density = LocalDensity.current
+    HomeCardRow(
+        items = items,
+        keyline = keyline,
+        gap = TvGridGutter,
+        emphasis = emphasis,
+        entry = entry,
+        entryIndex = entryIndex,
+        rail = rail,
+        ltr = ltr,
+        modifier = Modifier.onGloballyPositioned {
+            // cardGlowRoom draws the row this far above its own layout edge; the page's slot
+            // positions the pictures.
+            onRowTop(it.positionInParent().y + with(density) { HomeFocusRoom.toPx() })
+        },
+    ) { index, item, itemModifier ->
+        ChannelsRowCard(
+            channel = item.channel,
+            event = item.event,
+            nowSec = nowSec,
+            playbackIndicator = watchingIndicator(item.event, nowSec),
+            recording = item.channel.id in recordingChannelIds,
+            onClick = { },
+            onLongClick = { },
+            programmeLoading = false,
+            programmePicture = true,
+            modifier = itemModifier
+                .semantics(mergeDescendants = true) {
+                    contentDescription = listOf(
+                        channelTitleText(item.channel.visibleChannelNumber, item.channel.name.orEmpty()),
+                        item.event.title.orEmpty(),
+                    ).filter { it.isNotBlank() }.joinToString(", ")
+                }
+                .testTag("home-onnow-$index")
+                .onFocusChanged { if (it.isFocused) onCardFocus(index, item.channel.id) },
+            channelName = false,
+            width = HomeCardWidth,
+            tagPrefix = "home-onnow",
+        )
+    }
+}
+
+/**
+ * The expanded On now row's content block: the Channels page's own headline for the focused
+ * channel, so Home and Channels cannot drift apart.
+ */
+@Composable
+private fun HomeOnNowBlock(
+    channel: Channel,
+    current: EpgEvent?,
+    next: EpgEvent?,
+    recording: Boolean,
+    nowSec: Long,
+    keyline: Dp,
+) {
+    ChannelsHeadline(
+        channel = channel,
+        current = current,
+        next = next,
+        nextScheduled = false,
+        recording = recording,
+        now = nowSec,
+        synopsisLines = 2,
+        loading = false,
+        modifier = Modifier
+            .padding(start = keyline)
+            .widthIn(max = ImmersiveHeroWidth),
+        showNext = true,
+        titleStyle = MaterialTheme.typography.headlineLarge.copy(lineHeight = 36.sp),
+    )
+}
+
+@Composable
+private fun HomeGenreRow(
+    items: List<at.bernhardberger.tvhplayer.core.GenreItem>,
+    keyline: Dp,
+    emphasis: Float,
+    entry: FocusRequester,
+    entryIndex: Int,
+    rail: FocusRequester,
+    ltr: Boolean,
+    onCardFocus: (Int, String) -> Unit,
+) {
+    HomeCardRow(
+        items = items,
+        keyline = keyline,
+        gap = HomeGenreGap,
+        emphasis = emphasis,
+        entry = entry,
+        entryIndex = entryIndex,
+        rail = rail,
+        ltr = ltr,
+    ) { index, item, itemModifier ->
+        HomeGenreCard(
+            category = item.category,
+            onClick = { },
+            modifier = itemModifier
+                .testTag("home-genre-$index")
+                .onFocusChanged {
+                    if (it.isFocused) onCardFocus(index, "genre:${item.category.name}")
+                },
+        )
+    }
+}
+
+@Composable
+private fun HomeShelfRow(
+    items: List<at.bernhardberger.tvhplayer.core.RecordingItem>,
+    continueWatching: Boolean,
+    keyline: Dp,
+    emphasis: Float,
+    entry: FocusRequester,
+    entryIndex: Int,
+    rail: FocusRequester,
+    ltr: Boolean,
+    nowSec: Long,
+    locale: Locale,
+    input: HomeInput?,
+    onCardFocus: (Int, String) -> Unit,
+) {
+    // The All recordings end card is part of the row: a null item marks it.
+    val rowItems: List<at.bernhardberger.tvhplayer.core.RecordingItem?> = items + listOf(null)
+    HomeCardRow(
+        items = rowItems,
+        keyline = keyline,
+        gap = TvGridGutter,
+        emphasis = emphasis,
+        entry = entry,
+        entryIndex = entryIndex,
+        rail = rail,
+        ltr = ltr,
+    ) { index, item, itemModifier ->
+        if (item == null) {
+            HomeAllRecordingsCard(
+                onClick = { },
+                textShown = emphasis > 0f,
+                modifier = itemModifier
+                    .testTag("home-all-recordings")
+                    .onFocusChanged {
+                        if (it.isFocused) onCardFocus(index, "all-recordings")
+                    },
+            )
+        } else {
+            val recording = item.entry
+            val channel = recording.channelId?.let { id ->
+                input?.channels?.firstOrNull { it.id == id }
+            }
+            val admission = input?.admission?.invoke(recording)
+            val progress = (recordingWatchState(
+                recording,
+                offeredResumePosition(admission),
+                nowSec,
+            ) as? RecordingWatchState.PartlyWatched)?.fraction?.toFloat()
+            val title = recording.title?.takeIf(String::isNotBlank)
+                ?: stringResource(R.string.no_epg)
+            val subtitle = if (continueWatching) {
+                continueSubtitle(recording, admission, nowSec, locale)
+            } else {
+                recordedSubtitle(recording, nowSec, locale)
+            }
+            StandardProgrammeCard(
+                width = HomeCardWidth,
+                onClick = { },
+                onLongClick = { },
+                modifier = itemModifier
+                    .semantics(mergeDescendants = true) {
+                        contentDescription = listOf(title, subtitle)
+                            .filter(String::isNotBlank)
+                            .joinToString(", ")
+                    }
+                    .testTag("home-shelf-$index")
+                    .onFocusChanged {
+                        if (it.isFocused) {
+                            onCardFocus(index, "recording:${recording.id.value}")
+                        }
+                    },
+                art = recording.image ?: recording.fanartImage,
+                picon = channel?.icon,
+                title = {
+                    AnimatedVisibility(
+                        visible = emphasis > 0f,
+                        enter = at.bernhardberger.tvhplayer.ui.components.RowTextEnter,
+                        exit = at.bernhardberger.tvhplayer.ui.components.RowTextExit,
+                    ) {
+                        Text(
+                            title,
+                            Modifier.fillMaxWidth().padding(top = StandardCardTextGap),
+                            style = MaterialTheme.typography.titleSmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                },
+                subtitle = {
+                    AnimatedVisibility(
+                        visible = emphasis > 0f,
+                        enter = at.bernhardberger.tvhplayer.ui.components.RowTextEnter,
+                        exit = at.bernhardberger.tvhplayer.ui.components.RowTextExit,
+                    ) {
+                        Text(
+                            subtitle,
+                            Modifier.fillMaxWidth().padding(top = 4.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TvTextColors.tertiary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                },
+                contentColor = CardContainerDefaults.contentColor(
+                    contentColor = TvTextColors.secondary,
+                    focusedContentColor = TvTextColors.primary,
+                ),
+                picture = {
+                    ProgrammeArtwork(
+                        image = recording.image ?: recording.fanartImage,
+                        channelIcon = channel?.icon,
+                        progress = progress,
+                        modifier = Modifier.fillMaxSize(),
+                        progressColor = progressColor(watching = true),
+                    )
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeUpcomingRow(
+    item: at.bernhardberger.tvhplayer.core.UpcomingItem?,
+    keyline: Dp,
+    emphasis: Float,
+    entry: FocusRequester,
+    nowSec: Long,
+    zone: ZoneId,
+    locale: Locale,
+    rail: FocusRequester,
+    ltr: Boolean,
+    onCardFocus: (Int, String) -> Unit,
+) {
+    if (item == null) return
+    val next = item.next
+    val title = next.title?.takeIf(String::isNotBlank) ?: stringResource(R.string.no_epg)
+    val whenText = next.start?.let { relativeDayTime(it.epochSeconds, nowSec, zone, locale) }.orEmpty()
+    val summary = stringResource(R.string.home_upcoming_summary, title, whenText)
+    val more = if (item.moreCount > 0) {
+        " · " + pluralStringResource(
+            R.plurals.home_upcoming_more,
+            item.moreCount,
+            item.moreCount,
+        )
+    } else {
+        ""
+    }
+    HomeUpcomingCard(
+        text = summary + more,
+        onClick = { },
+        modifier = Modifier
+            .padding(start = keyline, top = HomeFocusRoom, bottom = HomeFocusRoom)
+            .rowContentEmphasis { emphasis }
+            .focusProperties { if (ltr) left = rail else right = rail }
+            .focusRequester(entry)
+            .testTag("home-upcoming")
+            .onFocusChanged {
+                if (it.isFocused) onCardFocus(0, "upcoming")
+            },
+    )
+}
+
+/** The activity card's key in the same form the policy saves focus with. */
+private fun activityKey(item: at.bernhardberger.tvhplayer.core.CurrentActivityItem): String =
+    when (val playing = item.playing) {
+        is HomePlaying.LiveChannel -> "live:${playing.channelId.value}"
+        is HomePlaying.Recording -> "recording:${playing.entryId.value}"
+        null -> "recording:${item.recording?.id?.value}"
+    }
+
+private fun HomeSection.itemCount(): Int = when (this) {
+    is HomeSection.CurrentActivity -> items.size
+    is HomeSection.RecentChannels -> items.size
+    is HomeSection.OnNow -> items.size
+    is HomeSection.Genres -> items.size
+    is HomeSection.ContinueWatching -> items.size
+    is HomeSection.RecentlyRecorded -> items.size
+    is HomeSection.Upcoming -> items.size
+}
+
+@Composable
+private fun HomeSection.headingTitle(hasPlaying: Boolean): String? = when (this) {
+    is HomeSection.CurrentActivity ->
+        stringResource(if (hasPlaying) R.string.home_now_playing else R.string.recording_state_recording)
+    is HomeSection.RecentChannels -> stringResource(R.string.home_recent_channels)
+    is HomeSection.OnNow -> stringResource(R.string.home_on_now)
+    is HomeSection.Genres -> stringResource(R.string.home_browse_by_genre)
+    is HomeSection.ContinueWatching -> stringResource(R.string.home_continue_watching)
+    is HomeSection.RecentlyRecorded -> stringResource(R.string.home_recently_recorded)
+    is HomeSection.Upcoming -> null
+}
+
+/** The picture height the heading's focus overflow has to cover for this section's row. */
+private fun HomeSection.focusOverflow(halfActivityWidth: Dp): Dp {
+    val pictureHeight = when (this) {
+        is HomeSection.CurrentActivity -> halfActivityWidth * 9f / 16f
+        is HomeSection.RecentChannels -> 104.dp
+        is HomeSection.Genres, is HomeSection.Upcoming -> 56.dp
+        else -> HomeCardWidth * 9f / 16f
+    }
+    return pictureHeight * ((TvCardFocusedScale - 1f) / 2f) +
+        EmbeddedProgressCardBorderOutset * TvCardFocusedScale
+}
+
+@Composable
+private fun continueSubtitle(
+    entry: DvrEntry,
+    admission: RecordingPlaybackAdmission?,
+    nowSec: Long,
+    locale: Locale,
+): String {
+    val resources = LocalContext.current.resources
+    val date = entry.start?.let {
+        formatRecordingDate(it.epochSeconds, dateOnly = true, locale = locale, nowSec = nowSec)
+    }
+    val left = recordingTimeLeft(entry, admission)?.inWholeSeconds?.let {
+        stringResource(R.string.player_minutes_left, formatRecordedDuration(it, resources))
+    }
+    return listOfNotNull(date, left).joinToString(" · ")
+}
+
+@Composable
+private fun recordedSubtitle(entry: DvrEntry, nowSec: Long, locale: Locale): String {
+    val resources = LocalContext.current.resources
+    val whenText = entry.start?.let {
+        relativeDayTime(it.epochSeconds, nowSec, ZoneId.systemDefault(), locale)
+    }
+    val length = recordingLengthSeconds(entry, nowSec)?.let {
+        formatRecordedDuration(it, resources)
+    }
+    return listOfNotNull(whenText, length).joinToString(" · ")
+}
+
+/** "Today 18:00" / "Tomorrow 09:30", otherwise the calendar date and the clock. */
+@Composable
+private fun relativeDayTime(startSec: Long, nowSec: Long, zone: ZoneId, locale: Locale): String {
+    val start = Instant.ofEpochSecond(startSec).atZone(zone)
+    val today = Instant.ofEpochSecond(nowSec).atZone(zone).toLocalDate()
+    val prefix = when (start.toLocalDate()) {
+        today -> stringResource(R.string.today)
+        today.plusDays(1) -> stringResource(R.string.tomorrow)
+        else -> null
+    }
+    val clockText = formatClock(start, locale)
+    return if (prefix != null) {
+        "$prefix $clockText"
+    } else {
+        formatRecordingDate(startSec, dateOnly = true, locale = locale, nowSec = nowSec) +
+            " " + clockText
+    }
+}
