@@ -41,6 +41,7 @@ the whole `docs/` tree. Repository presence, a recent date, or words such as
 
 | Document | Scope and lifecycle |
 |---|---|
+| `home-screen-spec.md` | Home screen (U3): purpose, sections, per-card actions, data rules, focus and the owner decisions of 2026-10-30. |
 | `roadmap-1.0.md` | Internal, preliminary working plan (not a promise): milestone order from the current Player to a signed 1.0; links the plans that own each step. Archive at 1.0. |
 | `play-store.md` | Google Play closed-test preparation for 0.3.0 (owner decision 2026-10-28): Console checklist, store listing, graphics, App content answers, reviewer and tester texts, open risks. Archive once production access is granted, after moving lasting facts into `release-process.md`. |
 | `translations-plan.md` | Approved language slate and staged translation rollout; implementation status is separate from release acceptance. |
