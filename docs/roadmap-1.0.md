@@ -152,6 +152,19 @@ came out of the U4 comparison with other players (TiviMate, Kodi):
   start. Still open: what counts as catch-up with Tvheadend (for example a
   recording in progress), since the server has no catch-up service of its own.
 
+Owner, 2026-10-31, written down for later:
+
+- **Fire TV build and Amazon Appstore listing,** probably before 1.0. Fire OS is
+  Android-based, so the owner expects it to be relatively cheap.
+- **Stretch: Linux build.**
+- **Stretch 2: Linux build with game-controller support,** a Steam store listing
+  and Steam Machine / Steam Deck support.
+- **After 0.4.0:** re-evaluate a browsing row for Continue watching in
+  Recordings.
+- **Pre-tuning:** start tuning when the viewer hovers over a channel row or card,
+  so OK plays sooner; less aimed at zapping. Related to, but not the same as,
+  the live preview idea above: pre-tuning shows nothing until OK.
+
 Owner, 2026-10-11:
 
 - Series rules stay in the Tvheadend web UI: the app adds no series or rule
