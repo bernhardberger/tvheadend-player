@@ -1,6 +1,8 @@
 package at.bernhardberger.tvhplayer.settings
 
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -13,10 +15,24 @@ class UiSettingsTest {
         assertTrue(store.settings.first().hiddenHomeSections.isEmpty())
         val hidden = setOf(at.bernhardberger.tvhplayer.core.HomeSectionKind.RECENT_CHANNELS,
             at.bernhardberger.tvhplayer.core.HomeSectionKind.ON_NOW)
-        store.setHiddenHomeSections(hidden)
+        hidden.forEach { store.setHomeSectionVisible(it, false) }
         assertEquals(hidden, UiSettingsStore(data).settings.first().hiddenHomeSections)
-        store.setHiddenHomeSections(emptySet())
+        hidden.forEach { store.setHomeSectionVisible(it, true) }
         assertTrue(UiSettingsStore(data).settings.first().hiddenHomeSections.isEmpty())
+    }
+
+    @Test fun delayedHomeSectionWritesDoNotOverwriteOtherVisibilityChanges() = kotlinx.coroutines.test.runTest {
+        val release = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val data = InMemoryPreferencesDataStore(beforeUpdate = { release.await() })
+        val store = UiSettingsStore(data)
+        val first = launch { store.setHomeSectionVisible(at.bernhardberger.tvhplayer.core.HomeSectionKind.RECENT_CHANNELS, false) }
+        val second = launch { store.setHomeSectionVisible(at.bernhardberger.tvhplayer.core.HomeSectionKind.ON_NOW, false) }
+        runCurrent()
+        assertTrue(store.settings.first().hiddenHomeSections.isEmpty())
+        release.complete(Unit)
+        first.join(); second.join()
+        assertEquals(setOf(at.bernhardberger.tvhplayer.core.HomeSectionKind.RECENT_CHANNELS,
+            at.bernhardberger.tvhplayer.core.HomeSectionKind.ON_NOW), store.settings.first().hiddenHomeSections)
     }
 
     @Test fun channelNumbersDefaultToOnAndPersistAcrossStoreRecreation() = kotlinx.coroutines.test.runTest {

@@ -161,10 +161,10 @@ private val HomeImmersiveSlot = 356.dp
 /** Room the focus ring and card scale need around a card. */
 private val HomeFocusRoom = 12.dp
 
-private val HomeSectionGap = 24.dp
-private val HomeHeadingContentGap = 16.dp
+internal val HomeSectionGap = 24.dp
+internal val HomeHeadingContentGap = 16.dp
 private val HomeHeroGap = 40.dp
-private val HomeRecentGap = 16.dp
+internal val HomeRecentGap = 16.dp
 private val HomeGenreGap = 16.dp
 
 /** Room below the last section so the final card can still scroll to its slot. */

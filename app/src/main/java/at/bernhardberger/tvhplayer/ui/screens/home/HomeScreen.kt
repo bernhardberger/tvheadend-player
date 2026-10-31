@@ -61,7 +61,7 @@ internal fun HomeScreen(
     val scope by channelsVm.scope.collectAsStateWithLifecycle()
     val observation by channelsVm.observation.collectAsStateWithLifecycle()
     val settingsStore: UiSettingsStore = koinInject()
-    val settings by settingsStore.settings.collectAsStateWithLifecycle(UiSettings())
+    val settings by settingsStore.settings.collectAsStateWithLifecycle<UiSettings?>(null)
     val saveScope = rememberCoroutineScope()
     val owner = remember(scope.scope, observation.currentSession, scope.observation?.currentSession) {
         val frameScope = scope.scope
@@ -88,10 +88,11 @@ internal fun HomeScreen(
     var retainedFrame by remember { mutableStateOf<Triple<HomeInput, SessionObservation, SessionObservation?>?>(null) }
     val frame = alignedInput?.let { Triple(it, observation, scope.observation) } ?: retainedFrame
     SideEffect { if (alignedInput != null) retainedFrame = frame }
-    if (frame == null) return
+    val loadedSettings = settings ?: return
+    if (frame == null || !scope.settingsLoaded) return
     CompositionLocalProvider(LocalTabOwner provides owner) {
         ProvideArtworkSession(frame.second.currentSession, frame.third) {
-        HomeScreenContent(frame.first.copy(hiddenSections = settings.hiddenHomeSections), frame.second, contentPadding, initialFocusEnabled,
+        HomeScreenContent(frame.first.copy(hiddenSections = loadedSettings.hiddenHomeSections), frame.second, contentPadding, initialFocusEnabled,
             focusMemory = focusMemory,
             onPlay = { id, name -> if (current(id)) onPlay(id, name) },
             onPlayRecording = { selection, start ->
@@ -107,7 +108,7 @@ internal fun HomeScreen(
             onRetry = onRetry, onOpenConnectionSettings = onOpenConnectionSettings,
             groups = channelsGroups(scope.scope), activeTagId = scope.scope.activeTagId,
             onSelectTag = { if (owner.isCurrent) channelsVm.selectTag(it) },
-            onHiddenChange = { hidden -> if (owner.isCurrent) saveScope.launch { settingsStore.setHiddenHomeSections(hidden) } },
+            onSectionVisibleChange = { section, visible -> if (owner.isCurrent) saveScope.launch { settingsStore.setHomeSectionVisible(section, visible) } },
             catalogCurrent = scope.channelCatalogCurrent && scope.settingsLoaded,
             hasChannelsOutsideScope = scope.scope.allChannels.isNotEmpty())
         }
@@ -161,7 +162,7 @@ internal fun HomeScreenContent(
     groups: List<ChannelsGroup> = emptyList(),
     activeTagId: ChannelTagId? = null,
     onSelectTag: (ChannelTagId?) -> Unit = {},
-    onHiddenChange: (Set<HomeSectionKind>) -> Unit = {},
+    onSectionVisibleChange: (HomeSectionKind, Boolean) -> Unit = { _, _ -> },
     catalogCurrent: Boolean = observation.channelState.channelCatalogAuthority == RetainedMetadataAuthority.CURRENT,
     hasChannelsOutsideScope: Boolean = observation.channelState.channelCatalogForDisplay?.channels?.isNotEmpty() == true,
     focusMemory: MutableState<HomeFocusKey?> = remember { mutableStateOf(null) },
@@ -244,7 +245,8 @@ internal fun HomeScreenContent(
         onViewOptions = { if (owner?.isCurrent != false) { restoreHeader = true; options = true } },
         emptyContent = {
             if (error != null) AppErrorAlert(error = error, actionFocus = errorFocus,
-                leadingExit = viewFocus, upExit = viewFocus, modifier = Modifier.fillMaxSize(), onAction = {
+                leadingExit = LocalBrowseNavigationFocus.current ?: FocusRequester.Default,
+                upExit = viewFocus, modifier = Modifier.fillMaxSize(), onAction = {
                     when (it) {
                         AppErrorAction.RETRY -> onRetry()
                         AppErrorAction.CONNECTION_SETTINGS -> onOpenConnectionSettings()
@@ -262,7 +264,7 @@ internal fun HomeScreenContent(
         val openingOwner = remember { owner }
         Box(Modifier.onPreviewKeyEvent { openingOwner?.isCurrent == false }) {
             HomeViewOptionsPanel(input.hiddenSections,
-                { if (openingOwner?.isCurrent != false) onHiddenChange(it) }, groups, activeTagId,
+                { section, visible -> if (openingOwner?.isCurrent != false) onSectionVisibleChange(section, visible) }, groups, activeTagId,
                 onSelectTag = { if (openingOwner?.isCurrent != false) onSelectTag(it) },
                 onClose = { options = false })
         }

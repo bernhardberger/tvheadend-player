@@ -23,7 +23,7 @@ class HomeNavigationJourneyTest {
     private val fixture = NavigationJourneyFixture(compose, ServerSettings(host = javaClass.simpleName))
     @After fun after() = fixture.close()
 
-    @Test fun appRootBackFromGuideRestoresTheHomeGenreCard() {
+    @Test fun appRootTwoBackPressesFromGuideReachHomeRailThenRightRestoresTheGenreCard() {
         fixture.app()
         fixture.openDestination("nav-channels", Key.DirectionUp, "nav-home")
         fixture.focus("home-genre-0")
@@ -31,16 +31,14 @@ class HomeNavigationJourneyTest {
         compose.onNodeWithTag("home-genre-1").assertIsFocused()
         fixture.key(Key.Enter)
         compose.onNodeWithTag("guide-filter-button").assertExists()
-        repeat(3) {
-            if (compose.onAllNodes(hasTestTag("home-genre-1")).fetchSemanticsNodes().isEmpty()) {
-                compose.runOnIdle { fixture.back.onBackPressed() }
-                fixture.settle()
-            }
-        }
-        // Back from Guide may return via the drawer; entering content restores its last card.
-        if (compose.onAllNodes(hasTestTag("nav-home") and isFocused()).fetchSemanticsNodes().isNotEmpty()) {
-            fixture.key(Key.DirectionRight)
-        }
+        compose.runOnIdle { fixture.back.onBackPressed() }
+        fixture.settle()
+        compose.onNodeWithTag("nav-epg").assertIsFocused()
+        compose.onNodeWithTag("home-genre-1").assertDoesNotExist()
+        compose.runOnIdle { fixture.back.onBackPressed() }
+        fixture.settle()
+        compose.onNodeWithTag("nav-home").assertIsFocused()
+        fixture.key(Key.DirectionRight)
         compose.onNodeWithTag("home-genre-1").assertIsFocused()
     }
 

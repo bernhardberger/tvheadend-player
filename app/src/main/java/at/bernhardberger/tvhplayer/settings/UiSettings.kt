@@ -72,10 +72,8 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
         dataStore.edit { it[Keys.SHOW_CHANNEL_NUMBERS] = show }
     }
 
-    suspend fun setHiddenHomeSections(hidden: Set<HomeSectionKind>) {
-        dataStore.edit { preferences ->
-            HomeSectionKind.entries.forEach { preferences[Keys.homeSection(it)] = it !in hidden }
-        }
+    suspend fun setHomeSectionVisible(section: HomeSectionKind, visible: Boolean) {
+        dataStore.edit { it[Keys.homeSection(section)] = visible }
     }
 
     suspend fun setChannelsView(view: ChannelsView) {

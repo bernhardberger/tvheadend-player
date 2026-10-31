@@ -170,6 +170,9 @@ class HomeCaptureTest {
     @Test fun loadingFirstMetadata() = atEvening {
         show(Kind.LOADING, screen = true)
         compose.onNodeWithTag("home-loading").assertExists()
+        val tile = compose.onNodeWithTag("home-loading-recent-0", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        assertEquals(at.bernhardberger.tvhplayer.ui.components.HomeRecentTileSize.value, (tile.right - tile.left).value, 0.1f)
+        assertEquals(at.bernhardberger.tvhplayer.ui.components.HomeRecentTileSize.value, (tile.bottom - tile.top).value, 0.1f)
         capture("12-loading", "home-recovery")
     }
 

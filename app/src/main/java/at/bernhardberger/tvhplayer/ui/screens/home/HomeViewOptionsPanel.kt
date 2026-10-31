@@ -13,7 +13,7 @@ import at.bernhardberger.tvhplayer.ui.screens.ChannelsGroup
 @Composable
 internal fun HomeViewOptionsPanel(
     hidden: Set<HomeSectionKind>,
-    onHiddenChange: (Set<HomeSectionKind>) -> Unit,
+    onSectionVisibleChange: (HomeSectionKind, Boolean) -> Unit,
     groups: List<ChannelsGroup>,
     activeTagId: ChannelTagId?,
     onSelectTag: (ChannelTagId?) -> Unit,
@@ -24,7 +24,7 @@ internal fun HomeViewOptionsPanel(
             add(BrowsePanelEntry.Choice(
                 key = "home-view-${kind.name}", label = stringResource(kind.homeLabel()),
                 selected = false, checked = kind !in hidden,
-                onClick = { onHiddenChange(if (kind in hidden) hidden - kind else hidden + kind) },
+                onClick = { onSectionVisibleChange(kind, kind in hidden) },
             ))
         }
         add(BrowsePanelEntry.Divider)

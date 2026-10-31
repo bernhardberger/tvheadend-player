@@ -25,6 +25,8 @@ import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
 import org.koin.dsl.module
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
@@ -63,7 +65,8 @@ class HomeActionsTest {
                 onPlay = { _, _ -> fail("options tuned") }, onPlayRecording = { _, _ -> },
                 onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> },
                 onGenre = {}, onRecordings = {},
-                onHiddenChange = { input = input.copy(hiddenSections = it) })
+                onSectionVisibleChange = { section, visible -> input = input.copy(hiddenSections =
+                    if (visible) input.hiddenSections - section else input.hiddenSections + section) })
         } }
         compose.onNodeWithTag("home-recent-0").performKeyInput { pressKey(Key.DirectionUp); pressKey(Key.Enter) }
         compose.onNodeWithTag("home-view-CURRENT_ACTIVITY").assertIsFocused()
@@ -78,6 +81,36 @@ class HomeActionsTest {
         compose.runOnIdle { enabled = false }
         compose.runOnIdle { enabled = true }
         compose.onNodeWithTag("home-recovery").assertIsFocused()
+    }
+
+    @Test fun rapidOptionsChangesSurviveDelayedStoreWritesWithoutRenderedPreferencesCatchingUp() {
+        val release = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val store = at.bernhardberger.tvhplayer.settings.UiSettingsStore(
+            at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore(beforeUpdate = { release.await() }))
+        val input = HomeInput(listOf(channel), emptyMap(), emptyList(), listOf(channel.id), emptyList(), { null }, null, now)
+        compose.setContent { TVHeadendPlayerTheme {
+            val settings by store.settings.collectAsState(at.bernhardberger.tvhplayer.settings.UiSettings())
+            val saveScope = rememberCoroutineScope()
+            HomeScreenContent(input.copy(hiddenSections = settings.hiddenHomeSections), SessionObservation.create(), PaddingValues(), true,
+                onPlay = { _, _ -> fail("options tuned") }, onPlayRecording = { _, _ -> },
+                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = {},
+                onSectionVisibleChange = { section, visible -> saveScope.launch { store.setHomeSectionVisible(section, visible) } })
+        } }
+        compose.onNodeWithTag("home-recent-0").performKeyInput { pressKey(Key.DirectionUp); pressKey(Key.Enter) }
+        compose.onNodeWithTag("home-view-CURRENT_ACTIVITY").assertIsFocused()
+            .performKeyInput { pressKey(Key.Enter); pressKey(Key.DirectionDown) }
+        compose.onNodeWithTag("home-view-RECENT_CHANNELS").assertIsFocused().performKeyInput { pressKey(Key.Enter) }
+        compose.runOnIdle {
+            assertTrue(kotlinx.coroutines.runBlocking { store.settings.first().hiddenHomeSections.isEmpty() })
+            release.complete(Unit)
+        }
+        compose.waitUntil(5_000) {
+            kotlinx.coroutines.runBlocking { store.settings.first().hiddenHomeSections.size == 2 }
+        }
+        compose.runOnIdle {
+            assertEquals(setOf(HomeSectionKind.CURRENT_ACTIVITY, HomeSectionKind.RECENT_CHANNELS),
+                kotlinx.coroutines.runBlocking { store.settings.first().hiddenHomeSections })
+        }
     }
 
     @Test fun channelsWithoutHistoryRecordingsOrEpgAreNotReportedAsNoChannels() {
@@ -122,13 +155,100 @@ class HomeActionsTest {
         compose.runOnIdle { drawerFocus.requestFocus() }
         compose.mainClock.autoAdvance = false
         compose.runOnIdle { enabled = true }
-        compose.mainClock.advanceTimeByFrame()
         compose.runOnIdle {
             drawer.setValue(androidx.tv.material3.DrawerValue.Open)
-            drawerFocus.requestFocus()
         }
         compose.mainClock.advanceTimeBy(1_200)
         compose.onNodeWithTag("test-drawer").assertIsFocused()
+    }
+
+    @Test fun savedHiddenSectionsNeverRenderOrEnterRootFocusMemoryWhileSettingsLoad() {
+        val now = kotlin.time.Clock.System.now().epochSeconds
+        val release = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val saved = androidx.datastore.preferences.core.preferencesOf(
+            androidx.datastore.preferences.core.booleanPreferencesKey("homeSectionCURRENT_ACTIVITY") to false)
+        val preferences = object : androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences> {
+            override val data = kotlinx.coroutines.flow.flow { release.await(); emit(saved) }
+            override suspend fun updateData(transform: suspend (androidx.datastore.preferences.core.Preferences) -> androidx.datastore.preferences.core.Preferences) = transform(saved)
+        }
+        val event = EpgEvent.create(EventId(1), channel.id, Instant.fromEpochSeconds(now - 60),
+            Instant.fromEpochSeconds(now + 600), title = "On now")
+        val session = FakeTvheadendSession(SessionObservation.create(
+            sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
+            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(channel))),
+            epgState = EpgRepositoryState.Current(EpgSnapshot.create(listOf(event)))))
+        val vm = at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel(session,
+            at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore(at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore()))
+        val viewModels = androidx.lifecycle.ViewModelStore().apply { put("channels", vm) }
+        val memory = mutableStateOf<HomeFocusKey?>(null)
+        val dependencies = org.koin.dsl.koinApplication { modules(module {
+            single { at.bernhardberger.tvhplayer.settings.UiSettingsStore(preferences) }
+        }) }
+        compose.setContent { org.koin.compose.KoinIsolatedContext(dependencies) {
+            DisposableEffect(Unit) { onDispose { viewModels.clear(); dependencies.close() } }
+            TVHeadendPlayerTheme {
+                HomeScreen(PaddingValues(), true, vm, channel.id, null,
+                    onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
+                    onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = {}, focusMemory = memory,
+                    lastPlayedStore = at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore(
+                        androidx.test.core.app.ApplicationProvider.getApplicationContext()))
+            }
+        } }
+        compose.onNodeWithTag("home-view-button").assertDoesNotExist()
+        compose.onNodeWithTag("home-activity-0").assertDoesNotExist()
+        compose.runOnIdle { assertNull(memory.value); release.complete(Unit) }
+        compose.waitUntil(5_000) { compose.onAllNodes(hasTestTag("home-onnow-0") and isFocused()).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("home-activity-0").assertDoesNotExist()
+        compose.runOnIdle { assertEquals(HomeSectionKind.ON_NOW, memory.value?.section) }
+    }
+
+    @Test fun retryLeftReachesTheRailAndUpReachesViewOptions() {
+        val rail = androidx.compose.ui.focus.FocusRequester()
+        val input = HomeInput(emptyList(), emptyMap(), emptyList(), emptyList(), emptyList(), { null }, null, now)
+        compose.setContent { TVHeadendPlayerTheme {
+            CompositionLocalProvider(at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus provides rail) {
+                androidx.compose.foundation.layout.Row {
+                    androidx.tv.material3.Button(onClick = {}, modifier = androidx.compose.ui.Modifier
+                        .focusRequester(rail).testTag("test-rail")) { androidx.tv.material3.Text("Home") }
+                    HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
+                        connectionUiState = ConnectionUiState.Error(at.bernhardberger.tvhplayer.data.ConnectionFailureKind.UNREACHABLE,
+                            SessionRecoveryDisposition.EXPLICIT_RETRY),
+                        onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
+                        onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = {})
+                }
+            }
+        } }
+        compose.onNodeWithText("Retry").assertIsFocused().performKeyInput { pressKey(Key.DirectionUp) }
+        compose.onNodeWithTag("home-view-button").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.onNodeWithText("Retry").assertIsFocused().performKeyInput { pressKey(Key.DirectionLeft) }
+        compose.onNodeWithTag("test-rail").assertIsFocused()
+    }
+
+    @Test fun recordingsOlderThanSevenDaysDoNotClaimTheLibraryIsEmpty() {
+        emptyHomeWithHiddenSections(setOf(HomeSectionKind.RECENT_CHANNELS, HomeSectionKind.ON_NOW),
+            listOf(DvrEntry.create(DvrEntryId(1), state = DvrEntryState.COMPLETED,
+                start = Instant.fromEpochSeconds(now - 8 * 24 * 3600))))
+        compose.onNodeWithText("No recordings yet.").assertDoesNotExist()
+        compose.onNodeWithText("Sections are hidden. Use View options to show them.").assertExists()
+    }
+
+    @Test fun hiddenExplainingSectionsStillShowTheViewOptionsFallback() {
+        emptyHomeWithHiddenSections(setOf(HomeSectionKind.RECENT_CHANNELS, HomeSectionKind.ON_NOW, HomeSectionKind.RECENTLY_RECORDED))
+        compose.onNodeWithText("Sections are hidden. Use View options to show them.").assertExists()
+        compose.onNodeWithTag("home-recovery").assertIsFocused()
+    }
+
+    private fun emptyHomeWithHiddenSections(hidden: Set<HomeSectionKind>, entries: List<DvrEntry> = emptyList()) {
+        val input = HomeInput(listOf(channel), emptyMap(), emptyList(), emptyList(), entries, { null }, null, now, hidden)
+        val observation = SessionObservation.create(
+            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(channel))),
+            epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries)))
+        compose.setContent { TVHeadendPlayerTheme {
+            HomeScreenContent(input, observation, PaddingValues(), true,
+                onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
+                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = {})
+        } }
     }
 
     @Test fun staleHomeOwnerRejectsOkAndMenuBeforeRecomposition() {
