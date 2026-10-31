@@ -157,6 +157,45 @@ class ChannelScopeIntentTest {
         assertSame(session.observation.value, model.scope.value.observation)
     }
 
+    @Test fun newSessionWithEqualChannelsRepublishesTheScopeAndAlignsHomeInput() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val channels = ChannelRepositoryState.Current(catalog)
+        val session = session(channels)
+        val model = ChannelsViewModel(session, ChannelTagSettingsStore(InMemoryPreferencesDataStore()))
+        models.put("scope", model)
+        runCurrent()
+        val before = model.scope.value
+        // Reconnect without changing the retained catalog; StateFlow may conflate the gap.
+        session.publish(SessionObservation.create(sessionState = SessionState.Disconnected, channelState = channels))
+        session.publish(session(channels).observation.value)
+        runCurrent()
+        val latest = session.observation.value
+        assertEquals(before.observation!!.channelState, latest.channelState)
+        assertNotNull(latest.currentSession)
+        assertNotSame(before.observation.currentSession, latest.currentSession)
+        assertSame("Equal channels must not retain the previous session's scope authority", latest, model.scope.value.observation)
+        assertNotNull(at.bernhardberger.tvhplayer.ui.screens.home.homeInput(
+            model.scope.value, latest, emptyList(), null, 0L))
+    }
+
+    @Test fun epgUpdatesWithinTheSameSessionDoNotRepublishTheScope() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val session = session(ChannelRepositoryState.Current(catalog))
+        val model = ChannelsViewModel(session, ChannelTagSettingsStore(InMemoryPreferencesDataStore()))
+        models.put("scope", model)
+        runCurrent()
+        val before = model.scope.value
+        val source = session.observation.value
+        session.publish(SessionObservation.create(source.sessionState, source.channelState,
+            EpgRepositoryState.Current(EpgSnapshot.create(events = listOf(EpgEvent.create(
+                EventId(1), ChannelId(1), kotlin.time.Instant.fromEpochSeconds(0),
+                kotlin.time.Instant.fromEpochSeconds(600), title = "Updated programme")))), source.dvrState))
+        runCurrent()
+        assertSame(source.currentSession, session.observation.value.currentSession)
+        assertNotEquals(source.epgState, session.observation.value.epgState)
+        assertSame("An EPG tick must not rebuild channel scope", before, model.scope.value)
+    }
+
     @Test fun delayedObsoleteWriteCannotReplaceNewerVisibilityAndTag() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val gate = CompletableDeferred<Unit>()

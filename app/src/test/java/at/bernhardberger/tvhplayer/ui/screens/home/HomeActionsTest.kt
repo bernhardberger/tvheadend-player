@@ -318,6 +318,44 @@ class HomeActionsTest {
         compose.runOnIdle { assertTrue(opened) }
     }
 
+    @Test fun firstHomeFrameAfterANewSessionWithEqualChannelsDrawsOnNow() {
+        val now = kotlin.time.Clock.System.now().epochSeconds
+        fun observation() = SessionObservation.create(
+            sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
+            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(channel))),
+            epgState = EpgRepositoryState.Current(EpgSnapshot.create(listOf(EpgEvent.create(EventId(1), channel.id,
+                Instant.fromEpochSeconds(now - 60), Instant.fromEpochSeconds(now + 600), title = "On now")))),
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create()))
+        val session = FakeTvheadendSession(observation())
+        val vm = at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel(session,
+            at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore(at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore()))
+        val viewModels = androidx.lifecycle.ViewModelStore().apply { put("channels", vm) }
+        compose.runOnIdle {
+            val previous = requireNotNull(vm.scope.value.observation)
+            session.publish(SessionObservation.create(sessionState = SessionState.Disconnected, channelState = previous.channelState))
+            session.publish(FakeTvheadendSession(observation()).observation.value)
+            assertEquals(previous.channelState, session.observation.value.channelState)
+            assertNotNull(session.observation.value.currentSession)
+            assertNotSame(previous.currentSession, session.observation.value.currentSession)
+        }
+        val dependencies = org.koin.dsl.koinApplication { modules(module {
+            single { at.bernhardberger.tvhplayer.settings.UiSettingsStore(at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore()) }
+        }) }
+        compose.setContent { org.koin.compose.KoinIsolatedContext(dependencies) {
+            DisposableEffect(Unit) { onDispose { viewModels.clear(); dependencies.close() } }
+            TVHeadendPlayerTheme {
+                HomeScreen(PaddingValues(), true, vm, null, null,
+                    onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
+                    onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> },
+                    lastPlayedStore = at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore(
+                        androidx.test.core.app.ApplicationProvider.getApplicationContext()))
+            }
+        } }
+        compose.mainClock.advanceTimeBy(1_000)
+        compose.onNodeWithTag("home-header").assertExists()
+        compose.onNodeWithTag("home-onnow-0").assertIsDisplayed()
+    }
+
     @Test fun savedHiddenSectionsNeverRenderOrEnterRootFocusMemoryWhileSettingsLoad() {
         val now = kotlin.time.Clock.System.now().epochSeconds
         val release = kotlinx.coroutines.CompletableDeferred<Unit>()

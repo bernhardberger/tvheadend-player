@@ -32,7 +32,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 data class ChannelScopeState(
@@ -70,7 +69,9 @@ class ChannelsViewModel(
     init {
         loadSettings()
         viewModelScope.launch {
-            observation.map { it.channelState }.distinctUntilChanged().collect { publishScope() }
+            observation.distinctUntilChanged { previous, current ->
+                previous.channelState == current.channelState && previous.currentSession === current.currentSession
+            }.collect { publishScope() }
         }
     }
 

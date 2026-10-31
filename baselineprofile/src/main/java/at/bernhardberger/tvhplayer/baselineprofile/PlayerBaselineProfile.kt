@@ -7,7 +7,9 @@ import androidx.benchmark.macro.junit4.BaselineProfileRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.BySelector
-import org.junit.Assert.assertTrue
+import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.UiDevice
+import java.io.File
 import org.junit.FixMethodOrder
 import org.junit.Rule
 import org.junit.Test
@@ -105,7 +107,11 @@ class PlayerBaselineProfile {
             // The topmost section's first card: Right now and Recent channels push On now below
             // the fold once something has played, and a lazy row off screen has no nodes.
             !has(By.res("main-startup-root")) && has(By.res("home-header")) && has(By.res(FirstHomeCard))
-        }, ReadyTimeout))
+        }, ReadyTimeout) || run {
+            println("awaitHome: startup=${has(By.res("main-startup-root"))} header=${has(By.res("home-header"))} " +
+                "card=${has(By.res(FirstHomeCard))} sections=${device.findObjects(By.res(Pattern.compile("home-.*"))).map { it.resourceName }}")
+            false
+        })
     }
 
     private fun MacrobenchmarkScope.homeToChannels() {
@@ -250,3 +256,16 @@ class PlayerBaselineProfile {
 }
 
 private val FirstHomeCard = java.util.regex.Pattern.compile("home-(activity|recent|onnow)-0")
+
+private var failureShots = 0
+
+/** Like JUnit's assertTrue, but keeps a screenshot of the failing frame in the test output. */
+private fun assertTrue(message: String, condition: Boolean) {
+    if (condition) return
+    val args = InstrumentationRegistry.getArguments()
+    args.getString("additionalTestOutputDir")?.let { dir ->
+        val name = "failure-${++failureShots}-" + message.replace(Regex("[^A-Za-z0-9]+"), "-").take(60) + ".png"
+        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(File(dir, name))
+    }
+    org.junit.Assert.fail(message)
+}
