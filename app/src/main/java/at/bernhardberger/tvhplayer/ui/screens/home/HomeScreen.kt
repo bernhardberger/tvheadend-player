@@ -89,6 +89,9 @@ internal fun HomeScreen(
             },
             onReturnToRecording = { id, before -> owner.isCurrent && onReturnToRecording(id, before) },
             onShowGuide = { id, event -> if (current(id)) onShowGuide(id, event) },
+            // A recording's channel may sit outside the selected tag; Recordings acts on it as well.
+            onWatchRecordingChannel = { id, name -> if (owner.isCurrent) onPlay(id, name) },
+            onShowRecordingGuide = { id, event -> if (owner.isCurrent) onShowGuide(id, event) },
             onGenre = { if (current()) onGenre(it) }, onRecordings = { if (current()) onRecordings(it) },
             modifier = modifier, connectionUiState = connectionUiState, connectionFailure = connectionFailure,
             onRetry = onRetry, onOpenConnectionSettings = onOpenConnectionSettings)
@@ -138,6 +141,8 @@ internal fun HomeScreenContent(
     connectionFailure: ConnectionUiState? = connectionUiState,
     onRetry: () -> Unit = {},
     onOpenConnectionSettings: () -> Unit = {},
+    onWatchRecordingChannel: (ChannelId, String) -> Unit = onPlay,
+    onShowRecordingGuide: (ChannelId, EpgEvent?) -> Unit = onShowGuide,
 ) {
     val nowSec = input.nowSec
     val owner = LocalTabOwner.current
@@ -238,7 +243,7 @@ internal fun HomeScreenContent(
         val openingOwner = remember(entry.id) { owner }
         Box(Modifier.onPreviewKeyEvent { openingOwner?.isCurrent == false }) {
             HomeRecordingActions(entry, observation, recordingMenu, nowSec, onPlayRecording,
-                onPlay, onShowGuide, onReturnToRecording, onClose = { recording = null })
+                onWatchRecordingChannel, onShowRecordingGuide, onReturnToRecording, onClose = { recording = null })
         }
         LaunchedEffect(owner) { if (openingOwner?.isCurrent == false) recording = null }
     }

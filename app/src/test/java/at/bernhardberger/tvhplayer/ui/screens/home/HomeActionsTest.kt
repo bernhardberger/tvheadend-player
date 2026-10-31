@@ -193,6 +193,16 @@ class HomeActionsTest {
         compose.runOnIdle { assertEquals(listOf(channel.id), tuned) }
     }
 
+    @Test fun outOfScopeRunningRecordingWatchLiveTunesThroughTheRecordingPath() {
+        val tuned = mutableListOf<ChannelId>()
+        recordingHome(running = true, onWatch = { fail("must not use the scoped channel path") },
+            onPlay = { fail("must not start recording") }, outsideScope = true, onWatchRecording = { tuned += it })
+        compose.onNodeWithTag("home-activity-0").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.mainClock.advanceTimeBy(500)
+        compose.onNodeWithTag("recording-watch-live").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.runOnIdle { assertEquals(listOf(channel.id), tuned) }
+    }
+
     @Test fun continueWatchingOkOffersResumeAndBackRestoresCard() {
         val starts = mutableListOf<RecordingPlaybackStart>()
         recordingHome(running = false, onWatch = { fail("must not tune") }, onPlay = { starts += it })
@@ -204,7 +214,8 @@ class HomeActionsTest {
     }
 
     @OptIn(TvheadendTestingApi::class, at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
-    private fun recordingHome(running: Boolean, onWatch: (ChannelId) -> Unit, onPlay: (RecordingPlaybackStart) -> Unit, playing: Boolean = false, outsideScope: Boolean = false) {
+    private fun recordingHome(running: Boolean, onWatch: (ChannelId) -> Unit, onPlay: (RecordingPlaybackStart) -> Unit, playing: Boolean = false, outsideScope: Boolean = false,
+        onWatchRecording: ((ChannelId) -> Unit)? = null) {
         val entry = DvrEntry.create(DvrEntryId(1), channelId = channel.id, title = "Test recording",
             state = if (running) DvrEntryState.RECORDING else DvrEntryState.COMPLETED,
             start = Instant.fromEpochSeconds(now - 1800), stop = Instant.fromEpochSeconds(if (running) now + 1800 else now),
@@ -230,7 +241,8 @@ class HomeActionsTest {
             TVHeadendPlayerTheme {
             HomeScreenContent(input, observation, PaddingValues(), true,
                 onPlay = { id, _ -> onWatch(id) }, onPlayRecording = { _, start -> onPlay(start) },
-                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = {})
+                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = {},
+                onWatchRecordingChannel = { id, _ -> (onWatchRecording ?: onWatch)(id) })
         } } }
     }
 
