@@ -7,11 +7,11 @@ import org.junit.Test
 
 class GuideViewTest {
     @Test
-    fun missingOrUnknownStoredValuesFallBackToRegularRowsWithTheHeadlineAndGenreColors() {
-        assertEquals(GuideView(GuideRows.REGULAR, headline = true, genreColors = true), GuideView())
+    fun missingOrUnknownStoredValuesFallBackToDenseRowsWithTheHeadlineAndGenreColors() {
+        assertEquals(GuideView(GuideRows.DENSE, headline = true, genreColors = true), GuideView())
         assertEquals(GuideView(), resolveGuideView(null, null, null))
         assertEquals(GuideView(), resolveGuideView("COMPACT", null, null))
-        assertEquals(GuideView(GuideRows.DENSE), resolveGuideView("DENSE", null, null))
+        assertEquals(GuideView(GuideRows.REGULAR), resolveGuideView("REGULAR", null, null))
         assertEquals(GuideView(headline = false), resolveGuideView(null, false, null))
         assertEquals(GuideView(genreColors = false), resolveGuideView(null, null, false))
     }

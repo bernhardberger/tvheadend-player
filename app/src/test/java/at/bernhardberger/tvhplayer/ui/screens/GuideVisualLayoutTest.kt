@@ -2072,7 +2072,7 @@ class GuideVisualLayoutTest {
 
     @Test fun viewOptionsSwitchBetweenRegularAndDenseRows() {
         show()
-        assertEquals("Regular rows by default", 56f, bounds("epg-channel-row-1").height, .1f)
+        assertEquals("Regular rows", 56f, bounds("epg-channel-row-1").height, .1f)
         assertTrue("Regular cells show their start time",
             compose.onAllNodesWithTag("guide-cell-time", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
         key(Key.DirectionRight)
@@ -2538,7 +2538,7 @@ class GuideVisualLayoutTest {
         val releasePreparation = java.util.concurrent.CountDownLatch(1)
         val holdPreparation = mutableStateOf(false)
         try {
-            show(headline = true, uiPreferences = dataStore, preparationBlocker = {
+            show(headline = true, rows = GuideRows.DENSE, uiPreferences = dataStore, preparationBlocker = {
                 if (holdPreparation.value) {
                     rememberPreparedBrowseData(authority = Unit, input = Unit) {
                         preparationHeld.countDown()
@@ -2550,8 +2550,7 @@ class GuideVisualLayoutTest {
             key(Key.DirectionRight)
             tagFocused("channels-view-button")
             key(Key.Enter)
-            tagFocused("guide-view-rows-regular")
-            key(Key.DirectionDown)
+            tagFocused("guide-view-rows-dense")
             key(Key.DirectionDown)
             tagFocused("guide-view-headline")
             key(Key.Enter)
@@ -3224,8 +3223,8 @@ class GuideVisualLayoutTest {
             NoticeContext(profiles.configurationGeneration.value, session.observation.value.currentSession?.generationIdentity)
         }
         uiSettings = UiSettingsStore(uiPreferences)
-        // The grid's geometry without the headline; headline tests keep the default view.
-        if (!headline || rows != GuideRows.REGULAR) runBlocking { uiSettings.setGuideView(GuideView(rows, headline = headline)) }
+        // These tests pin the rows they measure; a test passing the default view writes nothing.
+        if (!headline || rows != GuideView().rows) runBlocking { uiSettings.setGuideView(GuideView(rows, headline = headline)) }
         val noticeModule = module {
             single { notices }
             single { uiSettings }

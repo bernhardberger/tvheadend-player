@@ -116,7 +116,7 @@ internal class NavigationJourneyFixture(
             single { profiles }
             single { settings }
             single { ChannelTagSettingsStore(InMemoryData()) }
-            single { UiSettingsStore(InMemoryData()).apply { runBlocking { setChannelsView(ChannelsView(ChannelsLayout.LIST)) } } }
+            single { UiSettingsStore(InMemoryData()).apply { runBlocking { setChannelsView(ChannelsView(ChannelsLayout.LIST)); setGuideView(GuideView(GuideRows.REGULAR)) } } }
             single { LastPlayedChannelStore(context) }
             single { ChannelSelectionStore() }
             single { guidePosition }

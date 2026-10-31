@@ -839,9 +839,9 @@ activation, DVR eligibility, confirmations and current-session guards remain.
   data for the channel, no programmes in the window, partial or stale data,
   reconnecting, permission denied, server failure or an empty filter
   (`ui/screens/guide/EpgGridContent.kt:538-552`).
-- Guide rows are dense list items. Regular rows (the default) are 56dp high and
-  show the title and start time; Dense rows (View options) are 40dp high and show
-  only the title, as the ruler and headline carry the time. Both scale with the
+- Guide rows are dense list items. Dense rows (the default) are 40dp high and show
+  only the title, as the ruler and headline carry the time; Regular rows (View
+  options) are 56dp high and show the title and start time. Both scale with the
   font scale and grow to fit the channel header and the cell's text
   (`ui/screens/guide/EpgGridContent.kt` `guideTimelineRowHeight`). The header shows the channel
   number (`labelMedium`) beside a picon of at most 48×28dp, or beside the

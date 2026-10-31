@@ -14,7 +14,7 @@ enum class GuideRows {
  * and [genreColors] tints programmes by their genre code.
  */
 data class GuideView(
-    val rows: GuideRows = GuideRows.REGULAR,
+    val rows: GuideRows = GuideRows.DENSE,
     val headline: Boolean = true,
     val genreColors: Boolean = true,
 )
