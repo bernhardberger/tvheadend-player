@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.ui.screens
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Color
 import android.view.View
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -38,6 +39,7 @@ import at.bernhardberger.tvhplayer.ui.startup.MainStartupScreen
 import at.bernhardberger.tvhplayer.viewmodels.resolveChannelScopeState
 import java.io.File
 import org.junit.Before
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.experimental.categories.Category
@@ -126,6 +128,20 @@ class BrowseErrorAlertCaptureTest {
         compose.runOnIdle { view.draw(Canvas(bitmap)) }
         val directory = File("../artifacts/player-chrome/errors").apply { mkdirs() }
         File(directory, "$name-en-font1.0.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        val title = compose.onNodeWithTag("tv-recovery-title").fetchSemanticsNode().boundsInRoot
+        assertTrue("Error title uses theme error", (title.top.toInt() until title.bottom.toInt()).any { y ->
+            (title.left.toInt() until title.right.toInt()).any { x -> bitmap.getPixel(x, y) == Color.rgb(255, 180, 171) }
+        })
+        if (name.startsWith("channels-")) {
+            // Cross both the rail edge (80dp) and the alert's inset edge (118dp), below all content.
+            for (x in 150..270) {
+                val left = bitmap.getPixel(x - 1, 900)
+                val right = bitmap.getPixel(x, 900)
+                assertTrue("Continuous shell backing at x=$x", listOf(Color::red, Color::green, Color::blue).all { channel ->
+                    kotlin.math.abs(channel(left) - channel(right)) <= 1
+                })
+            }
+        }
         bitmap.recycle()
     }
 }

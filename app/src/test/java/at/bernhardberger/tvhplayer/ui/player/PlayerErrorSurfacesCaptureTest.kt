@@ -36,6 +36,7 @@ import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import java.io.File
 import org.junit.Before
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.experimental.categories.Category
@@ -137,6 +138,15 @@ class PlayerErrorSurfacesCaptureTest {
             compose.runOnIdle { view.draw(Canvas(bitmap)) }
             val directory = File("../artifacts/player-chrome/errors").apply { mkdirs() }
             File(directory, "${next.name}-en-font1.0.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            if (next.alert != null) {
+                val neutral = next.name.contains("110-reconnecting") || next.name == "alert-live-recovering"
+                val expected = if (neutral) android.graphics.Color.rgb(225, 226, 229) else android.graphics.Color.rgb(255, 180, 171)
+                val title = compose.onNodeWithTag("tv-recovery-title").fetchSemanticsNode().boundsInRoot
+                assertTrue("${next.name} title uses ${if (neutral) "neutral" else "error"} colour",
+                    (title.top.toInt() until title.bottom.toInt()).any { y ->
+                        (title.left.toInt() until title.right.toInt()).any { x -> bitmap.getPixel(x, y) == expected }
+                    })
+            }
             bitmap.recycle()
         }
     }

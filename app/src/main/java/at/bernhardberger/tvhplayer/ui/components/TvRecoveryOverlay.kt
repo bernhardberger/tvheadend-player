@@ -66,6 +66,8 @@ data class TvRecoveryAction(val label: String, val onClick: () -> Unit)
  * action's requester for a caller that moves focus there itself, as a browse screen does after
  * its navigation rail; the overlay then takes no focus on its own. [leadingExit] is where Left from
  * the first action goes and [upExit] where Up from any action goes; both stay inside by default.
+ * An [icon] identifies an actionable error; its icon and title use the theme error colour. Busy
+ * and waiting alerts keep neutral text and rings. Browse alerts leave the shell's backing visible.
  */
 @Composable
 fun TvRecoveryOverlay(
@@ -91,6 +93,7 @@ fun TvRecoveryOverlay(
     upExit: FocusRequester = FocusRequester.Cancel,
 ) {
     require(actions.size <= MaxRecoveryActions) { "At most $MaxRecoveryActions recovery actions" }
+    val browseShell = LocalBrowseContentLayering.current != null
     val buttons = actions.ifEmpty {
         val primary = if (primaryActionLabel != null && onPrimaryAction != null) {
             TvRecoveryAction(primaryActionLabel, onPrimaryAction)
@@ -136,7 +139,11 @@ fun TvRecoveryOverlay(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(if (opaque) MaterialTheme.colorScheme.background else Color.Black.copy(alpha = TvOverlayBoxAlpha))
+                    .background(
+                        if (!opaque) Color.Black.copy(alpha = TvOverlayBoxAlpha)
+                        else if (browseShell) Color.Transparent
+                        else MaterialTheme.colorScheme.background,
+                    )
                     .padding(48.dp)
                     // Holds focus without a visible indication until the action takes it;
                     // OK and directions there do nothing, so none reaches what is behind.
@@ -157,6 +164,7 @@ fun TvRecoveryOverlay(
             ) {
                 // The kit's Full Screen dialog: icon, 32 dp, headline, 16 dp, body, 48 dp, actions.
                 val ring = busy || !primaryVisible
+                val titleColor = if (icon != null && !ring) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
                 if (ring) {
                     CircularProgressIndicator(
                         color = MaterialTheme.colorScheme.onSurface,
@@ -166,7 +174,7 @@ fun TvRecoveryOverlay(
                     Icon(
                         painter = icon,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurface,
+                        tint = titleColor,
                         modifier = Modifier.size(RecoveryIconSize),
                     )
                 }
@@ -181,7 +189,7 @@ fun TvRecoveryOverlay(
                 ) {
                     Text(
                         text = message,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = titleColor,
                         style = MaterialTheme.typography.headlineMedium,
                         textAlign = TextAlign.Center,
                         modifier = Modifier
