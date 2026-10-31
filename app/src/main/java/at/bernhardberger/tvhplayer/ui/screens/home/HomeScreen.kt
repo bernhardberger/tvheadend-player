@@ -51,7 +51,7 @@ internal fun HomeScreen(
     onReturnToRecording: (DvrEntryId, () -> Unit) -> Boolean,
     onShowGuide: (ChannelId, EpgEvent?) -> Unit,
     onGenre: (ProgrammeCategory) -> Unit,
-    onRecordings: (DvrLibraryMode) -> Unit,
+    onRecordings: (DvrLibraryMode, DvrEntryId?) -> Unit,
     modifier: Modifier = Modifier,
     connectionUiState: ConnectionUiState = ConnectionUiState.Ready,
     connectionFailure: ConnectionUiState? = connectionUiState,
@@ -117,7 +117,7 @@ internal fun HomeScreen(
             // A recording's channel may sit outside the selected tag; Recordings acts on it as well.
             onWatchRecordingChannel = { id, name -> if (owner.isCurrent) onPlay(id, name) },
             onShowRecordingGuide = { id, event -> if (owner.isCurrent) onShowGuide(id, event) },
-            onGenre = { if (current()) onGenre(it) }, onRecordings = { if (current()) onRecordings(it) },
+            onGenre = { if (current()) onGenre(it) }, onRecordings = { mode, entryId -> if (current()) onRecordings(mode, entryId) },
             modifier = modifier.onGloballyPositioned { laidOut = true }, connectionUiState = connectionUiState, connectionFailure = connectionFailure,
             onRetry = onRetry, onOpenConnectionSettings = onOpenConnectionSettings,
             onBrowseChannels = { if (current()) onBrowseChannels() },
@@ -166,7 +166,7 @@ internal fun HomeScreenContent(
     onReturnToRecording: (DvrEntryId, () -> Unit) -> Boolean,
     onShowGuide: (ChannelId, EpgEvent?) -> Unit,
     onGenre: (ProgrammeCategory) -> Unit,
-    onRecordings: (DvrLibraryMode) -> Unit,
+    onRecordings: (DvrLibraryMode, DvrEntryId?) -> Unit,
     modifier: Modifier = Modifier,
     connectionUiState: ConnectionUiState = ConnectionUiState.Ready,
     connectionFailure: ConnectionUiState? = connectionUiState,
@@ -236,14 +236,14 @@ internal fun HomeScreenContent(
             }
             is HomeSection.Genres -> if (!menu) section.items.getOrNull(key.position)?.let { onGenre(it.category) }
             is HomeSection.ContinueWatching -> if (key.item == "all-recordings") {
-                if (!menu) onRecordings(DvrLibraryMode.ARCHIVE)
+                if (!menu) onRecordings(DvrLibraryMode.ARCHIVE, null)
             } else section.items.getOrNull(key.position)?.let { openRecording(it.entry, menu) }
             is HomeSection.RecentlyRecorded -> if (key.item == "all-recordings") {
-                if (!menu) onRecordings(DvrLibraryMode.ARCHIVE)
+                if (!menu) onRecordings(DvrLibraryMode.ARCHIVE, null)
             } else section.items.getOrNull(key.position)?.let { openRecording(it.entry, menu) }
             is HomeSection.Upcoming -> if (!menu) {
-                if (key.item == "all-scheduled") onRecordings(DvrLibraryMode.SCHEDULE)
-                else section.items.getOrNull(key.position)?.entry?.let { recordingMenu = false; recording = it }
+                if (key.item == "all-scheduled") onRecordings(DvrLibraryMode.SCHEDULE, null)
+                else section.items.getOrNull(key.position)?.entry?.let { onRecordings(DvrLibraryMode.SCHEDULE, it.id) }
             }
             null -> Unit
         }

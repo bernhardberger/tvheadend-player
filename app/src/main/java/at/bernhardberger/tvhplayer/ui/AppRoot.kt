@@ -939,7 +939,7 @@ fun AppRoot(
                             },
                             onPlay = requestLivePlayer,
                             onReturnToRecording = returnToWarmRecording,
-                            onRecordings = { mode -> recordingsScreenState.mode.value = mode; navigateTopLevel(RecordingsKey) },
+                            onRecordings = { mode, entryId -> recordingsScreenState.open(mode, entryId); navigateTopLevel(RecordingsKey) },
                             onGenre = { category -> guideGenreRequest = category; navigateTopLevel(GuideKey) },
                             onShowGuide = { channelId, programme ->
                                 guideChannelRequest = PlayerReturnFocus(channelId, channelId, programme?.id, programme?.start?.epochSeconds)

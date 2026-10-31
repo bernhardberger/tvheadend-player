@@ -190,8 +190,19 @@ class RecordingsScreenState {
     val archiveScrollPositions = mutableStateMapOf<String, Int>()
     val archiveScrollOffsets = mutableMapOf<String, Int>()
     val mode = mutableStateOf(DvrLibraryMode.ARCHIVE)
+    internal val requestedScheduleEntryId = mutableStateOf<DvrEntryId?>(null)
     val archiveNavigation = DepthNavigationState(DepthStack(listOf(DepthFrame("archive:"))))
     val archivePath: List<String> get() = archiveLevelPath(archiveNavigation.stack.active.levelId)
+
+    /** Home can enter Schedule at an entry; ordinary tab/rail entry keeps its saved position. */
+    fun open(mode: DvrLibraryMode, entryId: DvrEntryId? = null) {
+        this.mode.value = mode
+        requestedScheduleEntryId.value = entryId.takeIf { mode == DvrLibraryMode.SCHEDULE }
+        if (mode == DvrLibraryMode.SCHEDULE && entryId != null) {
+            selectedKeys["schedule"] = "recording:${recordingItemKey(entryId)}"
+            archiveScrollPositions.remove("schedule")
+        }
+    }
 
     /** Folder actions run one at a time, also when one still finishes after the screen was left and opened again. */
     internal val folderActionLock = Mutex()
@@ -470,6 +481,7 @@ internal fun RecordingsScreenContent(
     LaunchedEffect(
         location,
         itemKeys,
+        screenState.requestedScheduleEntryId.value,
         selectedKeys[location],
         requestContentFocus,
         initialFocusEnabled,
@@ -479,7 +491,12 @@ internal fun RecordingsScreenContent(
         folderMenu,
     ) {
         if (detailsEntry != null || pendingAction != null || folderMenu != null) return@LaunchedEffect
+        val requestedEntry = screenState.requestedScheduleEntryId.value
+        val unavailableScheduleEntry = mode == DvrLibraryMode.SCHEDULE && requestedEntry != null &&
+            observedLibrary.schedule.none { it.id == requestedEntry && it.state == DvrEntryState.SCHEDULED }
+        screenState.requestedScheduleEntryId.value = null
         if (itemKeys.isEmpty() && !alertShown) {
+            if (unavailableScheduleEntry) selectedKeys.remove(location)
             if (!initialFocusEnabled || (!requestContentFocus && !contentFocusOwned)) return@LaunchedEffect
             if (drawerState?.currentValue == androidx.tv.material3.DrawerValue.Open) return@LaunchedEffect
             if (modeFocus.requestFocus()) {
@@ -489,8 +506,9 @@ internal fun RecordingsScreenContent(
             }
             return@LaunchedEffect
         }
-        if (mode != DvrLibraryMode.ARCHIVE && itemKeys.isNotEmpty() && selectedKeys[location] !in itemKeys) {
-            selectedKeys[location] = itemKeys.first()
+        if (mode != DvrLibraryMode.ARCHIVE && (unavailableScheduleEntry ||
+                (itemKeys.isNotEmpty() && selectedKeys[location] !in itemKeys))) {
+            if (itemKeys.isEmpty()) selectedKeys.remove(location) else selectedKeys[location] = itemKeys.first()
             archiveScrollPositions[location] = 0
             screenState.archiveScrollOffsets[location] = 0
             focusRecoveryGeneration++
@@ -635,7 +653,12 @@ internal fun RecordingsScreenContent(
                     mode, location, entries.isEmpty(), connectionUiState, connectionFailure,
                     observation, channelsById, archive,
                     scheduleGroups, problemGroups, selectedKeys[location],
-                    archiveScrollPositions[location] ?: 0,
+                    archiveScrollPositions[location] ?: if (mode == DvrLibraryMode.SCHEDULE) {
+                        // Include section headers so a deep-linked row is composed before focus entry.
+                        scheduleGroups.flatMap { section ->
+                            listOf<String?>(null) + section.entries.map { "recording:${recordingItemKey(it.id)}" }
+                        }.indexOf(selectedKeys[location]).coerceAtLeast(0)
+                    } else 0,
                     screenState.archiveScrollOffsets[location] ?: 0,
                     focusRecoveryGeneration,
                 )

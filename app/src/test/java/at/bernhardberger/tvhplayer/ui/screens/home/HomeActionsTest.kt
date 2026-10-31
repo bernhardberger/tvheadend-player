@@ -45,7 +45,7 @@ class HomeActionsTest {
         compose.setContent { TVHeadendPlayerTheme {
             HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
                 onPlay = { _, _ -> fail("end card tuned") }, onPlayRecording = { _, _ -> },
-                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = {},
+                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> },
                 onBrowseChannels = { opened = true })
         } }
         compose.onNodeWithTag("home-recent-0").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
@@ -126,7 +126,7 @@ class HomeActionsTest {
         compose.setContent { TVHeadendPlayerTheme {
             HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
                 onPlay = { _, _ -> fail("scope selection tuned") }, onPlayRecording = { _, _ -> },
-                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = {},
+                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> },
                 groups = listOf(at.bernhardberger.tvhplayer.ui.screens.ChannelsGroup(null, null, listOf(channel)),
                     at.bernhardberger.tvhplayer.ui.screens.ChannelsGroup(ChannelTagId(8), "Favorites", listOf(channel))),
                 activeTagId = ChannelTagId(8),
@@ -152,7 +152,7 @@ class HomeActionsTest {
             HomeScreenContent(input, SessionObservation.create(), PaddingValues(), enabled,
                 onPlay = { _, _ -> fail("options tuned") }, onPlayRecording = { _, _ -> },
                 onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> },
-                onGenre = {}, onRecordings = {},
+                onGenre = {}, onRecordings = { _, _ -> },
                 onSectionVisibleChange = { section, visible -> input = input.copy(hiddenSections =
                     if (visible) input.hiddenSections - section else input.hiddenSections + section) })
         } }
@@ -181,7 +181,7 @@ class HomeActionsTest {
             val saveScope = rememberCoroutineScope()
             HomeScreenContent(input.copy(hiddenSections = settings.hiddenHomeSections), SessionObservation.create(), PaddingValues(), true,
                 onPlay = { _, _ -> fail("options tuned") }, onPlayRecording = { _, _ -> },
-                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = {},
+                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> },
                 onSectionVisibleChange = { section, visible -> saveScope.launch { store.setHomeSectionVisible(section, visible) } })
         } }
         compose.onNodeWithTag("home-recent-0").performKeyInput { pressKey(Key.DirectionUp); pressKey(Key.DirectionRight); pressKey(Key.Enter) }
@@ -211,7 +211,7 @@ class HomeActionsTest {
         compose.setContent { TVHeadendPlayerTheme {
             HomeScreenContent(input, observation, PaddingValues(), true,
                 onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
-                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = {})
+                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
         } }
         compose.onNodeWithText("Start watching").assertExists()
         compose.onNodeWithText("Channels you watch and recordings will appear here.").assertExists()
@@ -232,7 +232,7 @@ class HomeActionsTest {
                     androidx.compose.foundation.layout.Box {
                         HomeScreenContent(input, SessionObservation.create(), PaddingValues(), enabled,
                             onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
-                            onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = {})
+                            onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
                         androidx.tv.material3.Button(onClick = {}, modifier = androidx.compose.ui.Modifier
                             .then(androidx.compose.ui.Modifier.focusRequester(drawerFocus)).testTag("test-drawer")) {
                             androidx.tv.material3.Text("Drawer")
@@ -257,7 +257,7 @@ class HomeActionsTest {
         compose.setContent { TVHeadendPlayerTheme {
             HomeScreenContent(input.copy(channels = if (current) listOf(channel) else emptyList()), SessionObservation.create(), PaddingValues(), true,
                 onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
-                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = {}, catalogCurrent = current)
+                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> }, catalogCurrent = current)
         } }
         compose.onNodeWithTag("home-view-button").assertIsFocused()
         compose.onNodeWithText("Loading channels…").assertExists()
@@ -283,7 +283,7 @@ class HomeActionsTest {
             focus = androidx.compose.ui.platform.LocalFocusManager.current
             HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
                 onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
-                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = {}, catalogCurrent = false,
+                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> }, catalogCurrent = false,
                 onOpenConnectionSettings = { opened = true })
         } }
         compose.onNodeWithTag("home-view-button").assertIsFocused()
@@ -320,7 +320,7 @@ class HomeActionsTest {
             TVHeadendPlayerTheme {
                 HomeScreen(PaddingValues(), true, vm, channel.id, null,
                     onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
-                    onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = {}, focusMemory = memory,
+                    onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> }, focusMemory = memory,
                     lastPlayedStore = at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore(
                         androidx.test.core.app.ApplicationProvider.getApplicationContext()))
             }
@@ -345,7 +345,7 @@ class HomeActionsTest {
                         connectionUiState = ConnectionUiState.Error(at.bernhardberger.tvhplayer.data.ConnectionFailureKind.UNREACHABLE,
                             SessionRecoveryDisposition.EXPLICIT_RETRY),
                         onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
-                        onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = {})
+                        onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
                 }
             }
         } }
@@ -379,7 +379,7 @@ class HomeActionsTest {
         compose.setContent { TVHeadendPlayerTheme {
             HomeScreenContent(input, observation, PaddingValues(), true,
                 onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
-                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = {})
+                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
         } }
     }
 
@@ -392,7 +392,7 @@ class HomeActionsTest {
                 HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
                     onPlay = { _, _ -> fail("stale frame tuned") }, onPlayRecording = { _, _ -> fail("stale frame played") },
                     onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> fail("stale frame navigated") },
-                    onGenre = { fail("stale frame navigated") }, onRecordings = { fail("stale frame navigated") })
+                    onGenre = { fail("stale frame navigated") }, onRecordings = { _, _ -> fail("stale frame navigated") })
             }
         } }
         compose.onNodeWithTag("home-recent-0").assertIsFocused()
@@ -410,7 +410,7 @@ class HomeActionsTest {
         compose.setContent { TVHeadendPlayerTheme {
             HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
                 onPlay = { id, _ -> tuned += id }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
-                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = {})
+                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
         } }
         compose.onNodeWithTag("home-recent-0").performKeyInput { pressKey(Key.DirectionRight) }
         compose.onNodeWithTag("home-recent-1").assertIsFocused()
@@ -425,7 +425,7 @@ class HomeActionsTest {
         compose.setContent { TVHeadendPlayerTheme {
             HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
                 onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
-                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = {})
+                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
         } }
         compose.onNodeWithTag("home-activity-0").assertIsFocused()
         compose.runOnIdle { input = input.copy(playing = null) }
@@ -439,7 +439,7 @@ class HomeActionsTest {
         compose.setContent { TVHeadendPlayerTheme {
             HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
                 onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
-                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = {})
+                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
         } }
         compose.onNodeWithTag("home-recent-0").assertIsFocused().performKeyInput { pressKey(Key.DirectionUp) }
         compose.onNodeWithTag("home-tags-button").assertIsFocused()
@@ -509,7 +509,7 @@ class HomeActionsTest {
             TVHeadendPlayerTheme {
                 HomeScreenContent(input, observation, PaddingValues(), true,
                     onPlay = { _, _ -> fail("menu tuned") }, onPlayRecording = { _, _ -> fail("menu played") },
-                    onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = {})
+                    onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
             }
         } }
         compose.onNodeWithTag("home-onnow-0").assertIsFocused().performKeyInput { pressKey(Key.Menu) }
@@ -528,7 +528,7 @@ class HomeActionsTest {
         compose.setContent { TVHeadendPlayerTheme {
             HomeScreenContent(input, observation, PaddingValues(), true,
                 onPlay = { id, _ -> tuned += id }, onPlayRecording = { _, _ -> fail("must not restart") },
-                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = {})
+                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
         } }
         compose.onNodeWithTag("home-activity-0").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.runOnIdle { assertEquals(listOf(channel.id), tuned) }
@@ -605,7 +605,7 @@ class HomeActionsTest {
             TVHeadendPlayerTheme {
             HomeScreenContent(input, observation, PaddingValues(), true,
                 onPlay = { id, _ -> onWatch(id) }, onPlayRecording = { _, start -> onPlay(start) },
-                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = {},
+                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> },
                 onWatchRecordingChannel = { id, _ -> (onWatchRecording ?: onWatch)(id) })
         } } }
     }
@@ -617,7 +617,7 @@ class HomeActionsTest {
         compose.setContent { TVHeadendPlayerTheme {
             HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
                 onPlay = { _, _ -> fail("must not tune") }, onPlayRecording = { _, _ -> fail("must not restart") },
-                onReturnToRecording = { id, _ -> returns += id; true }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = {})
+                onReturnToRecording = { id, _ -> returns += id; true }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
         } }
         compose.onNodeWithTag("home-activity-0").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionCenter) }
@@ -632,23 +632,13 @@ class HomeActionsTest {
         compose.setContent { TVHeadendPlayerTheme {
             HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
                 onPlay = { _, _ -> }, onPlayRecording = { _, _ -> },
-                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { modes += it })
+                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { mode, _ -> modes += mode })
         } }
         compose.onNodeWithTag("home-upcoming-0").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionRight) }
         compose.onNodeWithTag("home-all-scheduled").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionCenter) }
         compose.runOnIdle { assertEquals(listOf(DvrLibraryMode.SCHEDULE), modes) }
-    }
-
-    @Test fun upcomingCardOpensRecordingDetailsAndBackRestoresCard() {
-        recordingHome(false, { fail("must not tune") }, { fail("must not play scheduled recording") }, scheduled = true)
-        compose.onNodeWithTag("home-upcoming-0").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.mainClock.advanceTimeBy(600)
-        compose.onNodeWithTag("details-cancel").assertExists()
-        compose.runOnIdle { back.onBackPressed() }
-        compose.mainClock.advanceTimeBy(600)
-        compose.onNodeWithTag("home-upcoming-0").assertIsFocused()
     }
 
     @OptIn(TvheadendTestingApi::class, at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
@@ -670,7 +660,7 @@ class HomeActionsTest {
         compose.setContent { TVHeadendPlayerTheme {
             HomeScreenContent(input, observation, PaddingValues(), true,
                 onPlay = { _, _ -> }, onPlayRecording = { _, start -> starts += start },
-                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { modes += it })
+                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { mode, _ -> modes += mode })
         } }
         compose.onNodeWithTag("home-shelf-0").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionCenter) }
@@ -690,7 +680,7 @@ class HomeActionsTest {
         compose.setContent { TVHeadendPlayerTheme {
             HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
                 onPlay = { id, _ -> tuned += id }, onPlayRecording = { _, _ -> },
-                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = {})
+                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
         } }
         compose.onNodeWithTag("home-recent-0").assertIsFocused()
         compose.runOnIdle { assertTrue(tuned.isEmpty()) }
@@ -708,7 +698,7 @@ class HomeActionsTest {
         compose.setContent { TVHeadendPlayerTheme {
             HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
                 onPlay = { id, _ -> tuned += id }, onPlayRecording = { _, _ -> },
-                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = { genres += it }, onRecordings = {})
+                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = { genres += it }, onRecordings = { _, _ -> })
         } }
         compose.onNodeWithTag("home-onnow-0").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionCenter); pressKey(Key.DirectionDown) }

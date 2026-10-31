@@ -313,6 +313,13 @@ class HomeCaptureTest {
         awaitFocus("home-upcoming-0")
         assertTrue("last card fits the canvas", bounds("home-upcoming-0").bottom <= 540.dp)
         capture("20-upcoming", "home-upcoming-0")
+        repeat(10) {
+            if (compose.onAllNodes(hasTestTag("home-all-scheduled") and isFocused()).fetchSemanticsNodes().isEmpty()) {
+                key(Key.DirectionRight)
+                compose.mainClock.advanceTimeBy(400)
+            }
+        }
+        capture("20b-upcoming-end", "home-all-scheduled")
     }
 
     @Test
@@ -715,7 +722,7 @@ class HomeCaptureTest {
                             ) { padding, _ ->
                                 if (screen) HomeScreenContent(scene.input, scene.observation, padding, true,
                                     onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
-                                    onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = {},
+                                    onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> },
                                     groups = listOf(
                                         at.bernhardberger.tvhplayer.ui.screens.ChannelsGroup(null, null, scene.input.channels),
                                         at.bernhardberger.tvhplayer.ui.screens.ChannelsGroup(ChannelTagId(8), "Favorites", scene.input.channels),

@@ -271,8 +271,13 @@ over about 450 ms); Left/Right keeps the focused card at the start position.
   repeated here.
 - Both rows end with an **All recordings** card that opens Recordings → Archive.
 - **Upcoming recordings:** next-first scheduled entries, up to 10, in the
-  genre text-card kit (56 dp high), each with a title and quiet day/time •
-  channel line. End with **All scheduled**, opening Recordings → Schedule.
+  text-card kit (56 dp high) on the same neutral grey surface as the other
+  end cards, each with a title and quiet day/time • channel line. Genres retain
+  their coloured surfaces. End with **All scheduled** and its event icon,
+  opening Recordings → Schedule.
+  OK on an entry opens Schedule with that row focused and scrolled into view;
+  if it has left the schedule, use the tab's normal initial focus. Back follows
+  the existing drawer → Home path and restores the same Upcoming card.
   Omit the row when nothing is scheduled.
 - Preserve existing recording admission, resume/start-over choices and
   unavailable-recording behavior. A current recording playback return stays warm.
@@ -291,7 +296,7 @@ Each card behaves like the screen it comes from.
 | Active recording | The recording choice dialog (below) | Details, Stop recording, … |
 | Continue watching, Recently recorded | As in Recordings (resume or start over as today) | As in Recordings |
 | All recordings | Recordings → Archive | None |
-| Upcoming recording | Recording details | None |
+| Upcoming recording | Recordings → Schedule, focused on that entry (normal initial focus if gone) | None |
 | All scheduled | Recordings → Schedule | None |
 | Genre | Guide at now with that genre | None |
 

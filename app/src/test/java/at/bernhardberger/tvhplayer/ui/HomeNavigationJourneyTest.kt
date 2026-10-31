@@ -7,6 +7,10 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import at.bernhardberger.tvhplayer.settings.ServerSettings
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import kotlin.time.Instant
 import org.junit.After
 import org.junit.Rule
 import org.junit.Test
@@ -93,5 +97,28 @@ class HomeNavigationJourneyTest {
         compose.onNodeWithTag("nav-home").assertIsFocused()
         fixture.key(Key.DirectionRight)
         compose.onNodeWithTag("home-onnow-1").assertIsFocused()
+    }
+
+    @Test fun upcomingOpensItsScheduleRowAndBackRestoresTheCard() {
+        fixture.app(scheduled = (1L..10L).map { id ->
+            DvrEntry.create(DvrEntryId(id), title = "Scheduled programme $id", state = DvrEntryState.SCHEDULED,
+                start = Instant.fromEpochSeconds(1_900_000_000L + id * 3600),
+                stop = Instant.fromEpochSeconds(1_900_000_000L + id * 3600 + 1800))
+        })
+        fixture.openDestination("nav-channels", Key.DirectionUp, "nav-home")
+        fixture.focus("home-upcoming-0")
+        repeat(8) { fixture.key(Key.DirectionRight) }
+        compose.onNodeWithTag("home-upcoming-8").assertIsFocused()
+        fixture.key(Key.Enter)
+        compose.onNodeWithTag("recordings-schedule-list").assertExists()
+        compose.onNodeWithTag("recording-list-entry-9").assertIsFocused().assertIsDisplayed()
+        compose.runOnIdle { fixture.back.onBackPressed() }
+        fixture.settle()
+        compose.onNodeWithTag("nav-recordings").assertIsFocused()
+        compose.runOnIdle { fixture.back.onBackPressed() }
+        fixture.settle()
+        compose.onNodeWithTag("nav-home").assertIsFocused()
+        fixture.key(Key.DirectionRight)
+        compose.onNodeWithTag("home-upcoming-8").assertIsFocused()
     }
 }

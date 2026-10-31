@@ -73,7 +73,7 @@ internal fun HomeRouteContent(
     onReturnToRecording: (DvrEntryId, () -> Unit) -> Boolean,
     onShowGuide: (ChannelId, at.bernhardberger.tvheadend.sdk.core.EpgEvent?) -> Unit,
     onGenre: (ProgrammeCategory) -> Unit,
-    onRecordings: (at.bernhardberger.tvhplayer.core.DvrLibraryMode) -> Unit,
+    onRecordings: (at.bernhardberger.tvhplayer.core.DvrLibraryMode, at.bernhardberger.tvheadend.sdk.core.DvrEntryId?) -> Unit,
     connectionUiState: ConnectionUiState,
     connectionFailure: ConnectionUiState?,
     onRetry: () -> Unit,

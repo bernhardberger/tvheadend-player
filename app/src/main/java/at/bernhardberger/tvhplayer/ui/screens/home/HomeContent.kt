@@ -110,6 +110,7 @@ import at.bernhardberger.tvhplayer.ui.TvBrowseTrailingInset
 import at.bernhardberger.tvhplayer.ui.TvCardFocusedScale
 import at.bernhardberger.tvhplayer.ui.TvGridGutter
 import at.bernhardberger.tvhplayer.ui.TvTextColors
+import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.formatRecordedDuration
 import at.bernhardberger.tvhplayer.ui.common.formatRecordingDate
@@ -1331,6 +1332,8 @@ private fun HomeUpcomingRow(
         rail = rail, ltr = ltr,
     ) { index, item, modifier ->
         if (item == null) HomeTextCard(stringResource(R.string.home_all_scheduled),
+            containerColor = TvSurfaceColors.containerHigh,
+            leading = { androidx.tv.material3.Icon(painterResource(R.drawable.ic_event), null, Modifier.size(36.dp), tint = TvTextColors.secondary) },
             onClick = { onActivate(items.size, "all-scheduled") },
             modifier = modifier.testTag("home-all-scheduled").onFocusChanged {
                 if (it.isFocused) onCardFocus(items.size, "all-scheduled")
@@ -1339,6 +1342,7 @@ private fun HomeUpcomingRow(
             val title = next.title?.takeIf(String::isNotBlank) ?: stringResource(R.string.no_epg)
             val whenText = next.start?.let { relativeDayTime(it.epochSeconds, nowSec, zone, locale) }.orEmpty()
             HomeTextCard(title, onClick = { onActivate(index, "recording:${next.id.value}") },
+                containerColor = TvSurfaceColors.containerHigh,
                 subtitle = listOf(whenText, next.channelName.orEmpty()).filter(String::isNotBlank).joinToString(" • "),
                 modifier = modifier.width(220.dp).testTag("home-upcoming-$index").onFocusChanged {
                     if (it.isFocused) onCardFocus(index, "recording:${next.id.value}")

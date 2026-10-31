@@ -245,6 +245,29 @@ class RecordingsVisualLayoutTest {
         capture("header-no-space", 1f)
     }
 
+    @Test fun scheduleDeepLinkScrollsToTheEntryBeforeFocus() {
+        screenState.open(at.bernhardberger.tvhplayer.core.DvrLibraryMode.SCHEDULE, DvrEntryId(48))
+        show(entries = (40L..49L).map { recording(it, "Scheduled expedition ${it - 39}", null,
+            DvrEntryState.SCHEDULED, startEpochSeconds = 1_900_000_000L + it * 3600) })
+        compose.onNodeWithTag("recording-list-entry-48").assertIsFocused().assertIsDisplayed()
+        capture("schedule-deep-linked", 1f, "focused entry=48", outputs = "build/outputs/home")
+    }
+
+    @Test fun missingScheduleDeepLinkUsesNormalInitialFocus() {
+        screenState.open(at.bernhardberger.tvhplayer.core.DvrLibraryMode.SCHEDULE, DvrEntryId(99))
+        show(entries = listOf(recording(40, "Scheduled expedition", null, DvrEntryState.SCHEDULED),
+            recording(99, "Already finished", null, DvrEntryState.COMPLETED)))
+        compose.onNodeWithTag("recording-list-entry-40").assertIsFocused().assertIsDisplayed()
+        compose.onNodeWithTag("details-cancel").assertDoesNotExist()
+    }
+
+    @Test fun startedScheduleDeepLinkUsesNormalInitialFocus() {
+        screenState.open(at.bernhardberger.tvhplayer.core.DvrLibraryMode.SCHEDULE, DvrEntryId(99))
+        show(entries = listOf(recording(98, "Recording now", null, DvrEntryState.RECORDING, startEpochSeconds = 1_790_000_000),
+            recording(99, "Just started", null, DvrEntryState.RECORDING, startEpochSeconds = 1_790_000_100)))
+        compose.onNodeWithTag("recording-list-entry-98").assertIsFocused().assertIsDisplayed()
+    }
+
     @Test fun recordingSpaceLineGivesWayToTheTabs() {
         show(diskSpace = DvrDiskSpaceState.Current(DvrDiskSpace(412_000_000_000L, 1_588_000_000_000L, 2_000_000_000_000L)))
         focused("recordings-folder-Documentaries")

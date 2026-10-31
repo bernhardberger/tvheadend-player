@@ -63,7 +63,7 @@ internal class NavigationJourneyFixture(
         key(Key.Enter)
     }
 
-    fun app(withRecording: Boolean = false, emptyEpg: Boolean = false) {
+    fun app(withRecording: Boolean = false, emptyEpg: Boolean = false, scheduled: List<DvrEntry> = emptyList()) {
         val now = kotlin.time.Clock.System.now().epochSeconds
         val catalog = ChannelCatalog.create((1..if (withRecording) 8L else 3L).map {
             Channel.create(ChannelId(it), name = "Name $it", number = it)
@@ -81,10 +81,10 @@ internal class NavigationJourneyFixture(
             channelState = ChannelRepositoryState.Current(catalog),
             epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = if (emptyEpg) emptyList() else events,
                 coverages = catalog.channels.map { EpgCoverage.create(it.id, AIRS_FROM, AIRS_UNTIL) })),
-            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(if (withRecording) listOf(
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create((if (withRecording) listOf(
                 DvrEntry.create(id = DvrEntryId(7), eventId = EventId(66), channelId = ChannelId(6),
                     state = DvrEntryState.COMPLETED, title = "Recorded programme"),
-            ) else emptyList())),
+            ) else emptyList()) + scheduled)),
         )).apply { scriptLivePlaybackSuccess(); if (withRecording) scriptRecordingPlaybackSuccess() }
         val settings = PlayerSettingsStore(InMemoryData())
         val profiles = AppProfileOwner(session, FakeServerProfileStore(ServerProfileReadResult.anonymous(server.host, server.htspPort)),
