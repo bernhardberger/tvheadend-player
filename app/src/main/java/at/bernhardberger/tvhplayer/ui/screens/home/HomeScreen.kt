@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.ui.screens.home
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.foundation.layout.Box
@@ -57,6 +58,7 @@ internal fun HomeScreen(
     modifier: Modifier = Modifier,
     focusMemory: MutableState<HomeFocusKey?> = remember { mutableStateOf(null) },
     lastPlayedStore: LastPlayedChannelStore = koinInject(),
+    onContentDrawn: () -> Unit = {},
 ) {
     val scope by channelsVm.scope.collectAsStateWithLifecycle()
     val observation by channelsVm.observation.collectAsStateWithLifecycle()
@@ -90,6 +92,16 @@ internal fun HomeScreen(
     SideEffect { if (alignedInput != null) retainedFrame = frame }
     val loadedSettings = settings ?: return
     if (frame == null || !scope.settingsLoaded) return
+    var laidOut by remember { mutableStateOf(false) }
+    val latestOnContentDrawn by rememberUpdatedState(onContentDrawn)
+    LaunchedEffect(laidOut) {
+        if (laidOut) {
+            // Layout runs in the frame being drawn. Release startup on the following frame,
+            // never from composition while Home's first layout is still pending.
+            withFrameNanos { }
+            latestOnContentDrawn()
+        }
+    }
     CompositionLocalProvider(LocalTabOwner provides owner) {
         ProvideArtworkSession(frame.second.currentSession, frame.third) {
         HomeScreenContent(frame.first.copy(hiddenSections = loadedSettings.hiddenHomeSections), frame.second, contentPadding, initialFocusEnabled,
@@ -104,7 +116,7 @@ internal fun HomeScreen(
             onWatchRecordingChannel = { id, name -> if (owner.isCurrent) onPlay(id, name) },
             onShowRecordingGuide = { id, event -> if (owner.isCurrent) onShowGuide(id, event) },
             onGenre = { if (current()) onGenre(it) }, onRecordings = { if (current()) onRecordings(it) },
-            modifier = modifier, connectionUiState = connectionUiState, connectionFailure = connectionFailure,
+            modifier = modifier.onGloballyPositioned { laidOut = true }, connectionUiState = connectionUiState, connectionFailure = connectionFailure,
             onRetry = onRetry, onOpenConnectionSettings = onOpenConnectionSettings,
             groups = channelsGroups(scope.scope), activeTagId = scope.scope.activeTagId,
             onSelectTag = { if (owner.isCurrent) channelsVm.selectTag(it) },

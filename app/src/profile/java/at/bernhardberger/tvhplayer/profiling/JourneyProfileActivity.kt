@@ -39,6 +39,8 @@ import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.BrowsingScopeContent
 import at.bernhardberger.tvhplayer.ui.ChannelsKey
+import at.bernhardberger.tvhplayer.ui.HomeKey
+import at.bernhardberger.tvhplayer.ui.screens.home.HomeScreen
 import at.bernhardberger.tvhplayer.ui.GuideKey
 import at.bernhardberger.tvhplayer.ui.RecordingsKey
 import at.bernhardberger.tvhplayer.ui.SIDEBAR_SCENE_DESTINATION
@@ -81,9 +83,9 @@ class JourneyProfileActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val dataset = intent.getStringExtra("dataset") ?: "normal"
-        val journey = intent.getStringExtra("journey") ?: "channels"
+        val journey = intent.getStringExtra("journey") ?: "home"
         require(dataset in setOf("normal", "stress"))
-        require(journey in setOf("channels", "guide"))
+        require(journey in setOf("home", "channels", "guide"))
         val epoch = intent.getLongExtra(
             "datasetEpochSeconds", Clock.System.now().epochSeconds / 1800 * 1800 - 3600,
         )
@@ -126,21 +128,27 @@ class JourneyProfileActivity : AppCompatActivity() {
             // The fixture shows no server artwork: its own plain loader replaces the app's for this activity.
             SingletonImageLoader.setUnsafe(ImageLoader(this@JourneyProfileActivity).also { images = it })
             setContent {
-                val backStack = rememberAppNavBackStack(if (journey == "guide") GuideKey else ChannelsKey)
+                val backStack = rememberAppNavBackStack(when (journey) {
+                    "guide" -> GuideKey
+                    "channels" -> ChannelsKey
+                    else -> HomeKey
+                })
                 val route = backStack.last()
                 val browseBack = remember { mutableStateOf<() -> Unit>({ finish() }) }
                 BackHandler { browseBack.value() }
                 TVHeadendPlayerTheme {
                     SideRail(
+                        rootRoute = AppDestination.HOME,
                         currentRoute = route.destination,
                         showEpgMenu = true,
                         availableDestinations = setOf(
-                            AppDestination.CHANNELS, AppDestination.GUIDE, AppDestination.RECORDINGS,
+                            AppDestination.HOME, AppDestination.CHANNELS, AppDestination.GUIDE, AppDestination.RECORDINGS,
                         ),
                         onRootBack = { finish() },
                         onBackHandlerChanged = { browseBack.value = it },
                         onNavigate = {
                             backStack.navigateTopLevel(when (it) {
+                                AppDestination.HOME -> HomeKey
                                 AppDestination.GUIDE -> GuideKey
                                 AppDestination.RECORDINGS -> RecordingsKey
                                 else -> ChannelsKey
@@ -158,6 +166,22 @@ class JourneyProfileActivity : AppCompatActivity() {
                             transitionSpec = { appDestinationContentTransform() },
                             popTransitionSpec = { appDestinationContentTransform() },
                             entryProvider = entryProvider {
+                                entry<HomeKey>(metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.HOME)) {
+                                    BrowsingScopeContent(catalog, !drawerActive && route == HomeKey) {
+                                        HomeScreen(
+                                            contentPadding = padding,
+                                            initialFocusEnabled = !drawerActive && route == HomeKey,
+                                            channelsVm = catalog,
+                                            playingChannelId = null,
+                                            playingRecordingId = null,
+                                            onPlay = { _, _ -> }, onPlayRecording = { _, _ -> },
+                                            onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> },
+                                            onGenre = { backStack.navigateTopLevel(GuideKey) },
+                                            onRecordings = { backStack.navigateTopLevel(RecordingsKey) },
+                                            lastPlayedStore = lastPlayed,
+                                        )
+                                    }
+                                }
                                 entry<GuideKey>(metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.GUIDE)) {
                                     DisposableEffect(Unit) {
                                         guideCompositionEntries++

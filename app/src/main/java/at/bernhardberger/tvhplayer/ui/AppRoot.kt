@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
@@ -61,6 +62,7 @@ import at.bernhardberger.tvhplayer.core.MainStartupPresentation
 import at.bernhardberger.tvhplayer.core.MainStartupPlaybackOutcome
 import at.bernhardberger.tvhplayer.core.mainStartupReturningToPlayback
 import at.bernhardberger.tvhplayer.core.MainStartupReveal
+import at.bernhardberger.tvhplayer.core.channelsAvailable
 import at.bernhardberger.tvhplayer.core.MainStartupState
 import at.bernhardberger.tvhplayer.core.mainStartupPresentation
 import at.bernhardberger.tvhplayer.core.rootBackAction
@@ -595,6 +597,7 @@ fun AppRoot(
     val browseConnectionFailure = browseFailure.failure
     val retryBrowseConnection = browseFailure.retry
     val currentChannelReadiness = connectionPresentation.currentChannelReadiness
+    val landingCatalogAvailable = currentChannelReadiness.channelsAvailable() || currentChannelReadiness is CurrentChannelReadiness.Ready
     var startupReveal by remember { mutableStateOf<MainStartupReveal?>(null) }
     val revealingTarget = startupReveal?.targetFor(profileGeneration)
     val startupPresentation = mainStartupPresentation(
@@ -664,11 +667,13 @@ fun AppRoot(
                 channelName = visibleLivePlayerName,
             )
     } == true
+    var homeContentDrawn by remember(profileGeneration) { mutableStateOf(false) }
     val coldStart = rememberColdStart(
         launchIdle = applianceLaunchState == ApplianceLaunchState.Idle,
         connectionState = connectionUiState,
         currentChannelReadiness = currentChannelReadiness,
         loadingTiming = startupLoadingTiming,
+        landingContentDrawn = homeContentDrawn,
     )
     val coldStartVisible = applianceLaunchState == ApplianceLaunchState.Idle &&
         coldStart.presentation != MainStartupPresentation.Inactive
@@ -677,7 +682,7 @@ fun AppRoot(
         effectiveStartupPresentation != MainStartupPresentation.Inactive || revealingTarget != null
     val navigationAllowed = when (val launchState = applianceLaunchState) {
         ApplianceLaunchState.Idle ->
-            effectiveStartupPresentation == MainStartupPresentation.Inactive &&
+            ((coldStartVisible && landingCatalogAvailable) || effectiveStartupPresentation == MainStartupPresentation.Inactive) &&
                 navigationStartDestination != null &&
                 backStack.isNotEmpty()
         is ApplianceLaunchState.Pending -> false
@@ -888,7 +893,8 @@ fun AppRoot(
     }
     val content: @Composable (PaddingValues, Boolean, Boolean, List<AppNavKey>) -> Unit = {
             contentPadding, drawerActive, contentAllowed, shellBackStack ->
-            Box(Modifier.fillMaxSize().profileRouteDraw(currentDestination?.destination?.name ?: "NONE", drawerActive)) {
+            Box(Modifier.fillMaxSize().profileRouteDraw(currentDestination?.destination?.name ?: "NONE", drawerActive)
+                .then(if (coldStartVisible) Modifier.clearAndSetSemantics {} else Modifier)) {
                 // The full-screen shell only ever shows players: its edges are player transitions.
                 val playerTransition = shellBackStack.lastOrNull().let { it is LivePlayerKey || it is RecordingPlayerKey }
                 NavDisplay(
@@ -912,9 +918,14 @@ fun AppRoot(
                     ) {
                         HomeRouteContent(
                             homeFocus = homeFocus,
-                            contentAllowed = contentAllowed,
+                            contentAllowed = contentAllowed || coldStartVisible,
                             contentPadding = contentPadding,
-                            initialFocusEnabled = !drawerActive && currentDestination == HomeKey,
+                            initialFocusEnabled = !coldStartVisible && !drawerActive && currentDestination == HomeKey,
+                            onContentDrawn = {
+                                if (landingCatalogAvailable) {
+                                    homeContentDrawn = true
+                                }
+                            },
                             channelsVm = channelsVm,
                             playingChannelId = activeChannelId,
                             playingRecordingId = warmRecordingId,
@@ -1308,6 +1319,7 @@ fun AppRoot(
                         playerShown = { !shouldShowMainNavigationRail(backStack.lastOrNull(), navigationStartDestination) }) {
                     ProvideWatchingProgress(playbackRuntime) {
                     SideRail(
+                        modifier = if (coldStartVisible) Modifier.clearAndSetSemantics {} else Modifier,
                         // A fading rail keeps marking the page it fades with.
                         currentRoute = (railBackStack.lastOrNull() ?: currentDestination)?.destination,
                         connectionDegraded = connectionPresentation.degraded,

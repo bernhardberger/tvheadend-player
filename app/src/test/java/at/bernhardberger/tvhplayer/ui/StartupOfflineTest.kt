@@ -225,6 +225,15 @@ class StartupOfflineTest {
         assertEquals(0, compose.onAllNodes(hasTestTag("main-startup-root")).fetchSemanticsNodes().size)
     }
 
+    @Test fun cachedColdLandingDrawsHomeBeforeReleasingStartupWithoutTuning() {
+        coldApp(connecting(catalog))
+        advance(1_000)
+        compose.onNodeWithTag("home-header").fetchSemanticsNode()
+        assertEquals(0, startupScreens())
+        assertEquals(0, binds())
+        assertEquals(0, compose.onAllNodes(hasTestTag("channel-row-1")).fetchSemanticsNodes().size)
+    }
+
     @Test fun withoutSavedChannelsTheStaticBrandShowsAtOnceAndStaysReadable() {
         coldApp(SessionObservation.create(sessionState = SessionState.Connecting))
         advance(200)
@@ -255,6 +264,7 @@ class StartupOfflineTest {
         session.publish(connecting(catalog))
         advance(100)
         assertEquals(0, startupScreens())
+        compose.onNodeWithTag("home-header").fetchSemanticsNode()
         openChannels()
         advance(300)
         compose.onNodeWithTag("channel-row-1").fetchSemanticsNode()
@@ -524,6 +534,9 @@ class StartupOfflineTest {
             compose.onAllNodes(hasTestTag("channel-row-1")).fetchSemanticsNodes().isNotEmpty()
         }
         settle()
+        // These journeys exercise channel selection, not Home's initial focus or rail traversal.
+        compose.onNodeWithTag("channel-row-1")
+            .performSemanticsAction(SemanticsActions.RequestFocus)
         compose.waitUntil(10_000) { compose.onAllNodes(isFocused()).fetchSemanticsNodes().isNotEmpty() }
         if (compose.onAllNodes(hasTestTag("nav-channels") and isFocused()).fetchSemanticsNodes().isNotEmpty()) {
             key(Key.DirectionRight)

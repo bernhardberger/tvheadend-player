@@ -31,7 +31,7 @@ internal class ColdStart(
 )
 
 /**
- * Shows [coldStartPresentation] until channels can be drawn, once per activity. Saved channels
+ * Shows [coldStartPresentation] until the landing content has drawn, once per activity. Saved channels
  * restore beside connecting with no signal of their own. The startup screen's own brief wait
  * ([loadingTiming], the one grace) shows no stage text, so channels arriving within it lead
  * straight to them; after it the stage text joins the static brand, and the screen stays
@@ -44,6 +44,7 @@ internal fun rememberColdStart(
     connectionState: ConnectionUiState,
     currentChannelReadiness: CurrentChannelReadiness,
     loadingTiming: MainStartupLoadingTiming,
+    landingContentDrawn: Boolean = true,
 ): ColdStart {
     var settled by rememberSaveable { mutableStateOf(false) }
     var failures by remember { mutableStateOf(WaitingConnectionFailure()) }
@@ -51,7 +52,7 @@ internal fun rememberColdStart(
     val live = if (settled || !launchIdle) {
         MainStartupPresentation.Inactive
     } else {
-        coldStartPresentation(connectionState, currentChannelReadiness, failures.shown(connectionState))
+        coldStartPresentation(connectionState, currentChannelReadiness, failures.shown(connectionState), landingContentDrawn)
     }
     SideEffect { failures = failures.observe(connectionState) }
     val waiting = live != MainStartupPresentation.Inactive

@@ -28,7 +28,7 @@ class AppDestinationTransitionTest {
     fun forwardPlayerShellEdgesRemoveTheOutgoingFocusTreeAfterCrossfade() {
         lateinit var backStack: MutableList<AppNavKey>
         composeRule.setContent {
-            backStack = rememberAppNavBackStack(ChannelsKey)
+            backStack = rememberAppNavBackStack(HomeKey)
             TransitionHarness(backStack)
         }
         assertOnlyFocused(SHELL_A_TAG)
@@ -47,7 +47,7 @@ class AppDestinationTransitionTest {
     fun popPlayerShellEdgesRemoveTheOutgoingFocusTreeAfterCrossfade() {
         lateinit var backStack: MutableList<AppNavKey>
         composeRule.setContent {
-            backStack = rememberAppNavBackStack(ChannelsKey)
+            backStack = rememberAppNavBackStack(HomeKey)
             TransitionHarness(backStack)
         }
         composeRule.runOnIdle {
@@ -67,7 +67,7 @@ class AppDestinationTransitionTest {
     fun sameFamilyEdgesCrossfadeWithoutDelayingContentOwnedFocus() {
         lateinit var backStack: MutableList<AppNavKey>
         composeRule.setContent {
-            backStack = rememberAppNavBackStack(ChannelsKey)
+            backStack = rememberAppNavBackStack(HomeKey)
             TransitionHarness(backStack)
         }
 
@@ -112,7 +112,7 @@ class AppDestinationTransitionTest {
     fun frameSeparatedSameFamilyNavigationKeepsOnlyTheLatestDestination() {
         lateinit var backStack: MutableList<AppNavKey>
         composeRule.setContent {
-            backStack = rememberAppNavBackStack(ChannelsKey)
+            backStack = rememberAppNavBackStack(HomeKey)
             TransitionHarness(backStack)
         }
         assertOnlyFocused(SHELL_A_TAG)
@@ -138,7 +138,7 @@ class AppDestinationTransitionTest {
     fun sameFrameRapidNavigationAlwaysComposesTheLatestDestination() {
         lateinit var backStack: MutableList<AppNavKey>
         composeRule.setContent {
-            backStack = rememberAppNavBackStack(ChannelsKey)
+            backStack = rememberAppNavBackStack(HomeKey)
             TransitionHarness(backStack)
         }
 
@@ -167,7 +167,7 @@ class AppDestinationTransitionTest {
     fun crossfadePreservesAnExternalNavigationFocusOwner() {
         lateinit var backStack: MutableList<AppNavKey>
         composeRule.setContent {
-            backStack = rememberAppNavBackStack(ChannelsKey)
+            backStack = rememberAppNavBackStack(HomeKey)
             val navigationFocusRequester = remember { FocusRequester() }
             LaunchedEffect(navigationFocusRequester) {
                 navigationFocusRequester.requestFocus()

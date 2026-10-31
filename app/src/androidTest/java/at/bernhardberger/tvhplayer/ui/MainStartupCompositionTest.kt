@@ -123,7 +123,7 @@ class MainStartupCompositionTest {
                 presentation = MainStartupPresentation.Passive(
                     MainStartupMessageKind.PREPARING,
                 ),
-                navigationStartDestination = ChannelsKey,
+                navigationStartDestination = HomeKey,
                 navigationAllowed = false,
             ),
         )
@@ -152,7 +152,7 @@ class MainStartupCompositionTest {
             assertEquals(0, railCompositions)
             state = MainStartupCompositionState(
                 presentation = MainStartupPresentation.Actionable(noChannelsAppError()),
-                navigationStartDestination = ChannelsKey,
+                navigationStartDestination = HomeKey,
                 navigationAllowed = false,
             )
         }
@@ -251,7 +251,7 @@ class MainStartupCompositionTest {
                 MainStartupComposition(
                     state = MainStartupCompositionState(
                         presentation = MainStartupPresentation.Inactive,
-                        navigationStartDestination = ChannelsKey,
+                        navigationStartDestination = HomeKey,
                         navigationAllowed = true,
                     ),
                     onBack = {},
@@ -282,7 +282,7 @@ class MainStartupCompositionTest {
 
         composeRule.waitForIdle()
         composeRule.runOnIdle {
-            assertEquals(ChannelsKey, observedStart)
+            assertEquals(HomeKey, observedStart)
             assertTrue(channels > 0)
             assertTrue(railCompositions > 0)
             assertTrue(
@@ -653,7 +653,7 @@ class MainStartupCompositionTest {
                     state,
                     onBack = {
                         back++
-                        state = MainStartupCompositionState(MainStartupPresentation.Inactive, ChannelsKey, true)
+                        state = MainStartupCompositionState(MainStartupPresentation.Inactive, HomeKey, true)
                     },
                     onAction = {}, registerActivityKeyContract = { {} },
                     motionEnabled = true, onRevealed = { revealed++ },
@@ -669,7 +669,7 @@ class MainStartupCompositionTest {
         composeRule.mainClock.advanceTimeBy(400L)
         composeRule.runOnIdle {
             assertEquals(1, back)
-            assertEquals(ChannelsKey, state.navigationStartDestination)
+            assertEquals(HomeKey, state.navigationStartDestination)
             assertEquals(0, revealed)
         }
     }
@@ -967,7 +967,7 @@ class MainStartupCompositionTest {
         var entered = 0
         var backCalls = 0
         fun enterContent() {
-            state = MainStartupCompositionState(MainStartupPresentation.Inactive, ChannelsKey, true)
+            state = MainStartupCompositionState(MainStartupPresentation.Inactive, HomeKey, true)
         }
         composeRule.setContent {
             TVHeadendPlayerTheme {
@@ -1049,7 +1049,7 @@ class MainStartupCompositionTest {
             backStack = backStack,
             onBack = { backStack.popNavigation() },
             entryProvider = entryProvider {
-                entry<ChannelsKey> {
+                entry<HomeKey> {
                     if (contentAllowed) onChannelsComposed()
                 }
                 entry<LivePlayerKey> {

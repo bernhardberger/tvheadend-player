@@ -74,10 +74,12 @@ internal fun HomeRouteContent(
     connectionFailure: ConnectionUiState?,
     onRetry: () -> Unit,
     onOpenConnectionSettings: () -> Unit,
+    onContentDrawn: () -> Unit = {},
 ) {
     if (contentAllowed) {
         ContentContainer(modifier = Modifier.profileLayout("home")) {
             BrowsingScopeContent(channelsVm, initialFocusEnabled) { HomeScreen(
+                onContentDrawn = onContentDrawn,
                 focusMemory = homeFocus,
                 contentPadding = contentPadding,
                 initialFocusEnabled = initialFocusEnabled,

@@ -906,23 +906,23 @@
     <string name="channel_schedule_end">No program information after %1$s</string>
     <string name="channel_schedule_loading_more">Loading later days</string>
     <!-- Home: section headings, card labels and accessible names. -->
-    <string name="home_now_playing">Now playing</string>
-    <string name="home_current_activity">Current activity</string>
-    <string name="home_upcoming_recordings">Upcoming recordings</string>
-    <string name="home_no_history">Recently watched channels will appear here.</string>
-    <string name="home_no_recordings">No recordings yet.</string>
-    <string name="home_sections_hidden">Sections are hidden. Use View options to show them.</string>
-    <string name="home_recent_channels">Recent channels</string>
-    <string name="home_on_now">On now</string>
-    <string name="home_browse_by_genre">Browse by genre</string>
-    <string name="home_continue_watching">Continue watching</string>
-    <string name="home_recently_recorded">Recently recorded</string>
-    <string name="home_all_recordings">All recordings</string>
-    <string name="home_activity_watching_live">Watching live</string>
-    <string name="home_activity_recording">Recording</string>
-    <string name="home_activity_watching_and_recording">Watching and recording</string>
-    <string name="home_upcoming_summary">Next: %1$s · %2$s</string>
-    <plurals name="home_upcoming_more">
+    <string name="home_now_playing" tools:ignore="MissingTranslation">Now playing</string>
+    <string name="home_current_activity" tools:ignore="MissingTranslation">Current activity</string>
+    <string name="home_upcoming_recordings" tools:ignore="MissingTranslation">Upcoming recordings</string>
+    <string name="home_no_history" tools:ignore="MissingTranslation">Recently watched channels will appear here.</string>
+    <string name="home_no_recordings" tools:ignore="MissingTranslation">No recordings yet.</string>
+    <string name="home_sections_hidden" tools:ignore="MissingTranslation">Sections are hidden. Use View options to show them.</string>
+    <string name="home_recent_channels" tools:ignore="MissingTranslation">Recent channels</string>
+    <string name="home_on_now" tools:ignore="MissingTranslation">On now</string>
+    <string name="home_browse_by_genre" tools:ignore="MissingTranslation">Browse by genre</string>
+    <string name="home_continue_watching" tools:ignore="MissingTranslation">Continue watching</string>
+    <string name="home_recently_recorded" tools:ignore="MissingTranslation">Recently recorded</string>
+    <string name="home_all_recordings" tools:ignore="MissingTranslation">All recordings</string>
+    <string name="home_activity_watching_live" tools:ignore="MissingTranslation">Watching live</string>
+    <string name="home_activity_recording" tools:ignore="MissingTranslation">Recording</string>
+    <string name="home_activity_watching_and_recording" tools:ignore="MissingTranslation">Watching and recording</string>
+    <string name="home_upcoming_summary" tools:ignore="MissingTranslation">Next: %1$s · %2$s</string>
+    <plurals name="home_upcoming_more" tools:ignore="MissingTranslation">
         <item quantity="one">%1$d more scheduled</item>
         <item quantity="other">%1$d more scheduled</item>
     </plurals>

@@ -55,6 +55,12 @@ class PlayerBaselineProfile {
                     assertTrue("Autostart must bypass Channels", !has(channel()))
                     videoAndReturn(layout)
                 } else {
+                    awaitHome()
+                    await(By.res("home-header"), "Home must draw its header")
+                    key(KeyEvent.KEYCODE_DPAD_DOWN)
+                    focusToward(By.res("home-onnow-0"), KeyEvent.KEYCODE_DPAD_DOWN)
+                    key(KeyEvent.KEYCODE_DPAD_DOWN)
+                    homeToChannels()
                     awaitChannels(layout)
                     await(channel().focused(true), "Cold start must assign channel focus")
                     tuneAndReturn(layout)
@@ -83,13 +89,28 @@ class PlayerBaselineProfile {
     private fun MacrobenchmarkScope.startAtExistingChannels() {
         coldStart()
         assertTrue("Precondition: a stored reachable server and playable channels",
-            device.wait({ !has(By.res("main-startup-root")) && (has(channel()) || has(By.res("player-banner"))) }, ReadyTimeout))
-        if (!has(channel())) {
+            device.wait({ !has(By.res("main-startup-root")) && (has(By.res("home-header")) || has(By.res("player-banner"))) }, ReadyTimeout))
+        if (!has(By.res("home-header"))) {
             awaitVideo()
             key(KeyEvent.KEYCODE_BACK)
         }
+        awaitHome()
+        homeToChannels()
         awaitChannels()
         await(channel().focused(true), "Channels entry must finish restoring focus")
+    }
+
+    private fun MacrobenchmarkScope.awaitHome() {
+        assertTrue("Cold start must draw Home and release startup", device.wait({
+            !has(By.res("main-startup-root")) && has(By.res("home-header")) && has(By.res("home-onnow-0"))
+        }, ReadyTimeout))
+    }
+
+    private fun MacrobenchmarkScope.homeToChannels() {
+        openDrawer("nav-home")
+        focusToward(By.res("nav-channels"), KeyEvent.KEYCODE_DPAD_DOWN)
+        awaitChannels()
+        key(KeyEvent.KEYCODE_DPAD_RIGHT)
     }
 
     private fun MacrobenchmarkScope.awaitChannels(layout: Layout? = null) {
@@ -119,6 +140,10 @@ class PlayerBaselineProfile {
     private fun MacrobenchmarkScope.videoAndReturn(layout: Layout) {
         awaitVideo()
         key(KeyEvent.KEYCODE_BACK)
+        assertTrue("Back must reveal the browsing destination", device.wait({
+            has(By.res("home-header")) || has(channel())
+        }, ReadyTimeout))
+        if (has(By.res("home-header"))) homeToChannels()
         awaitChannels(layout)
         await(channel().focused(true), "Back must restore channel focus")
     }

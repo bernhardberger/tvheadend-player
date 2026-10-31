@@ -76,17 +76,18 @@ fun mainStartupPresentation(
 }
 
 /**
- * A cold start without autoplay waits on the startup screen only while no channel can be shown:
- * saved or current channels, or an authoritative empty catalog (the no-channels screen), end it.
+ * A cold start without autoplay waits until the landing frame has drawn saved or current
+ * channels, or an authoritative empty catalog (the no-channels screen).
  * [failure] is the [waitingConnectionFailure] it keeps showing while automatic attempts run.
  */
 fun coldStartPresentation(
     connectionState: ConnectionUiState,
     currentChannelReadiness: CurrentChannelReadiness,
     failure: ConnectionUiState?,
+    landingContentDrawn: Boolean = true,
 ): MainStartupPresentation {
-    if (currentChannelReadiness.channelsAvailable() ||
-        currentChannelReadiness is CurrentChannelReadiness.Ready
+    if (landingContentDrawn && (currentChannelReadiness.channelsAvailable() ||
+        currentChannelReadiness is CurrentChannelReadiness.Ready)
     ) return MainStartupPresentation.Inactive
     failure?.let { return waitingConnectionFailurePresentation(it) }
     return when (connectionState) {

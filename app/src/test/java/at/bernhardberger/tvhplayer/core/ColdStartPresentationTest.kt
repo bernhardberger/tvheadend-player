@@ -20,9 +20,22 @@ class ColdStartPresentationTest {
         }
         assertEquals(MainStartupPresentation.Inactive,
             coldStartPresentation(ConnectionUiState.Ready, CurrentChannelReadiness.Ready(channels), null))
-        // The Channels screen keeps its own no-channels state.
+        // Home keeps its own no-channels state once drawn.
         assertEquals(MainStartupPresentation.Inactive,
             coldStartPresentation(ConnectionUiState.Ready, CurrentChannelReadiness.Ready(emptyList()), null))
+    }
+
+    @Test fun cachedHomeAndKnownEmptyHomeWaitForTheLandingFrame() {
+        for (readiness in listOf(
+            CurrentChannelReadiness.Browsable(channels),
+            CurrentChannelReadiness.Ready(channels),
+            CurrentChannelReadiness.Ready(emptyList()),
+        )) {
+            assertEquals(MainStartupPresentation.Passive(MainStartupMessageKind.WAITING_FOR_CURRENT_CHANNEL_METADATA),
+                coldStartPresentation(ConnectionUiState.Ready, readiness, null, landingContentDrawn = false))
+            assertEquals(MainStartupPresentation.Inactive,
+                coldStartPresentation(ConnectionUiState.Ready, readiness, null, landingContentDrawn = true))
+        }
     }
 
     @Test fun withoutChannelsTheStartupScreenShowsItsStages() {

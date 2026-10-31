@@ -30,6 +30,7 @@ import androidx.navigation3.ui.NavDisplay
 import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.AppNavKey
 import at.bernhardberger.tvhplayer.ui.ChannelsKey
+import at.bernhardberger.tvhplayer.ui.HomeKey
 import at.bernhardberger.tvhplayer.ui.GuideKey
 import at.bernhardberger.tvhplayer.ui.RecordingsKey
 import at.bernhardberger.tvhplayer.ui.SIDEBAR_SCENE_DESTINATION
@@ -57,11 +58,12 @@ class BrowseDestinationTransitionTest {
 
     @Test fun everyBrowseEdgeAndSettingsCategoryHasAnIntermediateFrame() {
         showScene()
-        var previous = Color.Red
-        var previousDestination = AppDestination.CHANNELS
+        var previous = Color.Magenta
+        var previousDestination = AppDestination.HOME
         compose.mainClock.autoAdvance = false
         try {
             listOf(
+                ChannelsKey to Color.Red,
                 GuideKey to Color.Green,
                 RecordingsKey to Color.Blue,
                 SettingsKey(SettingsSection.GENERAL) to Color.Yellow,
@@ -188,7 +190,7 @@ class BrowseDestinationTransitionTest {
         compose.waitUntilAtLeastOneExists(hasText("Offline channel 1", substring = true), 15_000)
         compose.activityRule.scenario.onActivity { activity ->
             activity.setContent {
-                backStack = rememberAppNavBackStack(ChannelsKey)
+                backStack = rememberAppNavBackStack(HomeKey)
                 val navigationFocus = remember { FocusRequester() }
                 Box(Modifier.fillMaxSize().background(Color.Black).testTag("scene-canvas")) {
                     NavDisplay(
@@ -200,6 +202,9 @@ class BrowseDestinationTransitionTest {
                         popTransitionSpec = { appDestinationContentTransform() },
                         predictivePopTransitionSpec = { appDestinationContentTransform() },
                         entryProvider = entryProvider {
+                            entry<HomeKey>(metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.HOME)) {
+                                Box(Modifier.fillMaxSize().background(Color.Magenta).testTag("destination-HOME"))
+                            }
                             entry<ChannelsKey>(metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.CHANNELS)) {
                                 Box(Modifier.fillMaxSize().background(Color.Red).testTag("destination-CHANNELS"))
                             }
