@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -31,6 +32,31 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class RowEmphasisTest {
     @get:Rule val compose = createComposeRule()
+
+    @Test fun headingReservesQuietHeightAndFocusedGrowthNeverMovesCards() {
+        val emphasis = mutableFloatStateOf(0f)
+        compose.setContent {
+            at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme {
+                Column(Modifier.padding(top = 40.dp)) {
+                    RowHeading("Recent channels", { emphasis.floatValue }, Modifier.testTag("heading"),
+                        quietScale = .5f, focusOverflow = 4.dp, bottomSpace = 8.dp)
+                    Box(Modifier.size(100.dp).testTag("cards"))
+                    androidx.tv.material3.Text("Recent channels", Modifier.testTag("full"),
+                        style = androidx.tv.material3.MaterialTheme.typography.headlineMedium)
+                }
+            }
+        }
+        fun bounds(tag: String) = compose.onNodeWithTag(tag).getUnclippedBoundsInRoot()
+        val quiet = bounds("heading")
+        val cards = bounds("cards")
+        val full = bounds("full")
+        assertEquals((full.bottom - full.top).value * .5f + 8f, (quiet.bottom - quiet.top).value, .5f)
+        for (value in listOf(.5f, 1f)) {
+            compose.runOnIdle { emphasis.floatValue = value }
+            assertEquals("heading layout is fixed at emphasis=$value", quiet, bounds("heading"))
+            assertEquals("cards do not move at emphasis=$value", cards, bounds("cards"))
+        }
+    }
 
     @Test fun customQuietScaleDoesNotChangePlayerDefaultAndInterpolates() {
         val emphasis = mutableFloatStateOf(0f)

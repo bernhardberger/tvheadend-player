@@ -155,6 +155,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import androidx.compose.ui.text.rememberTextMeasurer
 
 /** An ordinary focused row's heading sits at this offset from the page's top edge. */
 private val HomeTopSlot = 76.dp
@@ -165,11 +166,12 @@ internal val HomeImmersiveSlot = 344.dp
 /** Room the focus ring and card scale need around a card. */
 private val HomeFocusRoom = 12.dp
 
-internal val HomeSectionGap = 16.dp
+internal val HomeSectionGap = 24.dp
+private val HomeRecentSectionGap = 8.dp
 internal val HomeHeadingContentGap = 8.dp
 private val HomeOnNowHeadingContentGap = 16.dp
 private val HomeHeroGap = 16.dp
-private val HomeOnNowSectionGap = 4.dp
+private val HomeOnNowSectionGap = 16.dp
 internal val HomeRecentGap = 16.dp
 private val HomeGenreGap = 16.dp
 
@@ -258,13 +260,16 @@ internal fun rememberHomePageMotion(
                     launch { motion.heading.animateTo(1f, tween(200, 150, LinearEasing)) }
                 }
                 from == HomeSectionKind.ON_NOW -> {
-                    launch { motion.progress.animateTo(1f, tween(370, easing = LinearOutSlowInEasing)) }
+                    // The compact recent row's caption expands on RowChangeMotion.
+                    // Share its clock: otherwise a short page return outlives that
+                    // expansion and makes On now reverse in the last frames.
+                    launch { motion.progress.animateTo(1f, RowChangeMotion) }
                     launch { motion.block.animateTo(0f, tween(170, easing = LinearEasing)) }
                     launch { motion.blockShift.animateTo(blockShift, tween(170, easing = LinearEasing)) }
                     launch { motion.background.animateTo(0f, tween(270, easing = LinearEasing)) }
                     launch { motion.heading.animateTo(1f, tween(200, 100, LinearEasing)) }
                     launch { motion.above.animateTo(1f, tween(90, 100, LinearEasing)) }
-                    launch { motion.aboveShift.animateTo(0f, tween(370, easing = LinearOutSlowInEasing)) }
+                    launch { motion.aboveShift.animateTo(0f, RowChangeMotion) }
                 }
                 else -> {
                     launch { motion.progress.animateTo(1f, tween(370, easing = LinearOutSlowInEasing)) }
@@ -335,6 +340,12 @@ internal fun HomeContent(
     val endMargin = maxOf(endPadding, TvBrowseTrailingInset)
     val locale = LocalConfiguration.current.locales[0]
     val density = LocalDensity.current
+    // Quiet headings reserve less height; their focused drawing overflows upward.
+    // Keep that full-size drawing at the ordinary 76dp slot, including at large fonts.
+    val headingHeight = rememberTextMeasurer().measure(
+        "Ag", style = MaterialTheme.typography.headlineMedium, maxLines = 1).size.height
+    val headingGrowth = with(density) { (headingHeight - (headingHeight * (18f / 28f)).roundToInt()).toDp() }
+    val ordinarySlot = HomeTopSlot + headingGrowth
     val zone = remember { ZoneId.systemDefault() }
     val clock = rememberCurrentEpochSeconds()
     val nowSec = input?.nowSec ?: clock()
@@ -357,7 +368,7 @@ internal fun HomeContent(
 
     val scrollTarget: (HomeSectionKind?) -> Float = { kind ->
         val viewport = viewportHeight.toFloat()
-        val topSlot = with(density) { HomeTopSlot.toPx() }
+        val topSlot = with(density) { ordinarySlot.toPx() }
         when (kind) {
             null -> 0f
             HomeSectionKind.ON_NOW ->
@@ -491,7 +502,8 @@ internal fun HomeContent(
                         alpha = motion.above.value
                     },
                 )
-                Spacer(Modifier.height((HomeTopSlot - 24.dp - TvBrowseHeaderHeight).coerceAtLeast(0.dp)))
+                Spacer(Modifier.height(((if (sections.firstOrNull()?.headingTitle() != null) ordinarySlot else HomeTopSlot) -
+                    24.dp - TvBrowseHeaderHeight).coerceAtLeast(0.dp)))
                 if (sections.isEmpty()) {
                     Box(Modifier.height(emptyHeight)) { emptyContent() }
                 }
@@ -694,7 +706,11 @@ internal fun HomeContent(
                             )
                         }
                     }
-                    Spacer(Modifier.height(if (onNowSection != null) HomeOnNowSectionGap else HomeSectionGap))
+                    Spacer(Modifier.height(when {
+                        onNowSection != null -> HomeOnNowSectionGap
+                        kind == HomeSectionKind.RECENT_CHANNELS -> HomeRecentSectionGap
+                        else -> HomeSectionGap
+                    }))
                 }
                 Spacer(
                     Modifier

@@ -23,6 +23,7 @@ import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.ui.TvPassiveAlpha
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 internal const val RowChangeMs = 300
 internal val RowChangeMotion = tween<Float>(RowChangeMs, easing = PlayerMotion.Standard)
@@ -68,7 +69,12 @@ internal fun RowHeading(
 ) {
     Text(title, modifier.layout { measurable, constraints ->
         val heading = measurable.measure(constraints)
-        layout(heading.width, heading.height + bottomSpace.roundToPx()) { heading.place(0, 0) }
+        val quietHeight = (heading.height * quietScale).roundToInt()
+        // Reserve only the quiet drawing. The full-size text grows above this fixed
+        // bottom anchor; emphasis must never remeasure or move the following cards.
+        layout(heading.width, quietHeight + bottomSpace.roundToPx()) {
+            heading.placeRelative(0, quietHeight - heading.height)
+        }
     }.rowHeaderEmphasis(quietScale = quietScale,
         focusOverflow = focusOverflow, emphasis = emphasis).semantics { heading() },
         style = MaterialTheme.typography.headlineMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)

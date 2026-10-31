@@ -565,7 +565,13 @@ private fun DetailsSectionHeading(title: String, emphasis: () -> Float, modifier
     // The row already reserves AiringCardRoom; only its painted overflow reduces the visible gap.
     // One dp compensates optically for the heading's glyph descent.
     bottomSpace: androidx.compose.ui.unit.Dp = DetailsHeadingContentGap - AiringCardRoom + focusOverflow - 1.dp) {
-    RowHeading(title, emphasis, modifier, quietScale = 18f / 28f,
+    // These sections keep their established spacing and 160dp focused keyline.
+    // The shared heading now reserves only its quiet height, so restore the space
+    // above it here, not in RowHeading or in its heading/content gap.
+    val headingHeight = rememberTextMeasurer().measure(
+        title, style = MaterialTheme.typography.headlineMedium, maxLines = 1).size.height
+    val growth = with(LocalDensity.current) { (headingHeight - (headingHeight * (18f / 28f)).roundToInt()).toDp() }
+    RowHeading(title, emphasis, modifier.padding(top = growth), quietScale = 18f / 28f,
         focusOverflow = focusOverflow, bottomSpace = bottomSpace)
 }
 

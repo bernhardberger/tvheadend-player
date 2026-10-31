@@ -21,6 +21,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import androidx.tv.material3.Card
@@ -87,12 +88,13 @@ internal fun HomeRecentChannelTile(
         AnimatedVisibility(visible = nameShown, enter = RowTextEnter, exit = RowTextExit) {
             Text(
                 name,
-                style = channelCaptionStyle(),
+                style = channelCaptionStyle().copy(fontWeight = FontWeight.Normal),
+                textAlign = TextAlign.Center,
                 color = if (focused) TvTextColors.primary else TvTextColors.secondary,
                 maxLines = 2,
                 minLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = StandardCardTextGap),
+                modifier = Modifier.fillMaxWidth().padding(top = StandardCardTextGap),
             )
         }
     }

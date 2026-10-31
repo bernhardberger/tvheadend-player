@@ -89,6 +89,7 @@ import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.ui.components.railNowPlaying
 import at.bernhardberger.tvhplayer.ui.screens.ChannelsLayoutFixture
 import kotlin.time.Duration.Companion.minutes
+import kotlin.math.roundToInt
 import kotlin.time.Instant
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertEquals
@@ -206,6 +207,7 @@ class HomeCaptureTest {
     @Test fun defaultLargeFont() = atEvening {
         show(Kind.BROWSE, fontScale = 1.3f)
         capture("15-default-font-130", "home-recent-0")
+        assertFocusedHeadingTop("home-heading-RECENT_CHANNELS")
     }
 
     @Test fun warmLargeFont() = atEvening {
@@ -260,13 +262,13 @@ class HomeCaptureTest {
         awaitFocus("home-onnow-0")
         assertEquals(keyline, bounds("home-onnow-0").left.value, 2f)
         strip("down-out", Key.DirectionDown, "home-genre-0", expanded = false)
-        assertTop("home-heading-GENRES", 76f)
+        assertFocusedHeadingTop("home-heading-GENRES")
         val collapsed = bounds("home-onnow-0")
         assertTrue("collapsed On now pictures peek above the genre heading: $collapsed", collapsed.top < 76.dp && collapsed.bottom > 0.dp)
         strip("up-into", Key.DirectionUp, "home-onnow-0", expanded = true)
         assertTop("home-onnow-0", HomeImmersiveSlot.value)
         strip("up-out", Key.DirectionUp, "home-recent-0", expanded = false)
-        assertTop("home-heading-RECENT_CHANNELS", 76f)
+        assertFocusedHeadingTop("home-heading-RECENT_CHANNELS")
         key(Key.DirectionUp)
         compose.mainClock.advanceTimeBy(600)
         awaitFocus("home-view-button")
@@ -433,6 +435,16 @@ class HomeCaptureTest {
     }
 
     private fun bounds(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).getUnclippedBoundsInRoot()
+
+    private fun assertFocusedHeadingTop(tag: String) {
+        val node = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode()
+        val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+        node.config[androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult].action!!.invoke(layouts)
+        val fullHeight = layouts.single().size.height
+        val growth = fullHeight - (fullHeight * (18f / 28f)).roundToInt()
+        assertEquals("$tag full-size drawing starts at ordinary slot", 76f,
+            bounds(tag).top.value - growth / 2f, 2f)
+    }
 
     private fun assertImmersiveFits() {
         val block = bounds("home-on-now-block")
