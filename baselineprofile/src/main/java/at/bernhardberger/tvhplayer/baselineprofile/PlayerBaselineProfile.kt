@@ -50,13 +50,8 @@ class PlayerBaselineProfile {
         focusToward(By.res("home-onnow-0"), KeyEvent.KEYCODE_DPAD_DOWN)
         key(KeyEvent.KEYCODE_DPAD_RIGHT)
         key(KeyEvent.KEYCODE_DPAD_LEFT)
-        key(KeyEvent.KEYCODE_MENU)
-        await(By.res("browse-context-menu"), "On now must open its context menu")
-        focusToward(By.res("browse-context-action-details"), KeyEvent.KEYCODE_DPAD_DOWN)
-        key(KeyEvent.KEYCODE_DPAD_CENTER)
-        await(By.res("programme-details-page"), "Programme details must open")
-        key(KeyEvent.KEYCODE_BACK)
-        awaitHome()
+        // No programme details page: on the swiftshader generation emulator, opening it
+        // crashes QEMU itself (SEGV, reproduced 2026-10-30 and twice 2026-10-31).
 
         key(KeyEvent.KEYCODE_DPAD_CENTER)
         awaitVideo()
@@ -66,14 +61,16 @@ class PlayerBaselineProfile {
         }
         key(KeyEvent.KEYCODE_DPAD_DOWN)
         await(By.res("player-pause").focused(true), "Down must reveal the player's action row")
+        // The Schedule button, not GUIDE: the Google TV emulator does not deliver GUIDE to the app.
+        focusToward(By.res("player-schedule"), KeyEvent.KEYCODE_DPAD_RIGHT)
+        key(KeyEvent.KEYCODE_DPAD_CENTER)
+        await(By.res("channel-schedule-panel"), "Schedule must open the channel schedule")
+        key(KeyEvent.KEYCODE_BACK)
+        await(By.res("player-schedule").focused(true), "Back must return to the action row")
         key(KeyEvent.KEYCODE_DPAD_DOWN)
         await(By.res("player-channel-browser"), "Down must open the player's channel row")
         key(KeyEvent.KEYCODE_DPAD_RIGHT)
         key(KeyEvent.KEYCODE_DPAD_LEFT)
-        key(KeyEvent.KEYCODE_GUIDE)
-        await(By.res("channel-schedule-panel"), "Guide must open the channel schedule")
-        key(KeyEvent.KEYCODE_DPAD_DOWN)
-        key(KeyEvent.KEYCODE_BACK)
         playerToHome()
 
         railDestination("nav-home", "nav-epg", KeyEvent.KEYCODE_DPAD_DOWN, By.res("epg-screen"))
@@ -199,7 +196,7 @@ class PlayerBaselineProfile {
         } else return
         key(KeyEvent.KEYCODE_DPAD_DOWN)
         key(KeyEvent.KEYCODE_DPAD_UP)
-        val entry = By.res(Pattern.compile("recording-list-entry-recording:.*"))
+        val entry = By.res(Pattern.compile("recording-list-entry-\\d+"))
         // An empty Archive has no rows. Folder and recording rows keep focus in depth-active.
         repeat(8) {
             val pane = device.findObject(active)
