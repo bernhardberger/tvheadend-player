@@ -406,7 +406,11 @@ internal fun HomeContent(
         repeat(60) {
             if (drawerState?.currentValue == DrawerValue.Open) return@LaunchedEffect
             if (entryFocusApplied && hasHomeFocus && !restoreHeader && !followInitialFocus) return@LaunchedEffect
-            if (target.requestFocus()) { entryFocusApplied = true; return@LaunchedEffect }
+            // A lazy row may still be composing its newly scrolled-to initial card.
+            if (runCatching { target.requestFocus() }.getOrDefault(false)) {
+                entryFocusApplied = true
+                return@LaunchedEffect
+            }
             withFrameNanos { }
         }
     }
@@ -603,7 +607,7 @@ internal fun HomeContent(
                                 emphasis = emphasis,
                                 entry = entry,
                                 entryIndex = entryIndex,
-                                followInitialFocus = followInitialFocus,
+                                followInitialFocus = followInitialFocus && focusEnabled,
                                 rail = rail,
                                 ltr = ltr,
                                 nowSec = nowSec,
@@ -621,7 +625,7 @@ internal fun HomeContent(
                                 textShown = focused,
                                 entry = entry,
                                 entryIndex = entryIndex,
-                                followInitialFocus = followInitialFocus,
+                                followInitialFocus = followInitialFocus && focusEnabled,
                                 rail = rail,
                                 ltr = ltr,
                                 onCardFocus = onCardFocus,
@@ -636,7 +640,7 @@ internal fun HomeContent(
                                 emphasis = emphasis,
                                 entry = entry,
                                 entryIndex = entryIndex,
-                                followInitialFocus = followInitialFocus,
+                                followInitialFocus = followInitialFocus && focusEnabled,
                                 rail = rail,
                                 ltr = ltr,
                                 nowSec = nowSec,
@@ -656,7 +660,7 @@ internal fun HomeContent(
                                 emphasis = emphasis,
                                 entry = entry,
                                 entryIndex = entryIndex,
-                                followInitialFocus = followInitialFocus,
+                                followInitialFocus = followInitialFocus && focusEnabled,
                                 rail = rail,
                                 ltr = ltr,
                                 onCardFocus = onCardFocus,
@@ -672,7 +676,7 @@ internal fun HomeContent(
                                 textShown = focused,
                                 entry = entry,
                                 entryIndex = entryIndex,
-                                followInitialFocus = followInitialFocus,
+                                followInitialFocus = followInitialFocus && focusEnabled,
                                 rail = rail,
                                 ltr = ltr,
                                 nowSec = nowSec,
@@ -692,7 +696,7 @@ internal fun HomeContent(
                                 textShown = focused,
                                 entry = entry,
                                 entryIndex = entryIndex,
-                                followInitialFocus = followInitialFocus,
+                                followInitialFocus = followInitialFocus && focusEnabled,
                                 rail = rail,
                                 ltr = ltr,
                                 nowSec = nowSec,
@@ -709,7 +713,7 @@ internal fun HomeContent(
                                 emphasis = emphasis,
                                 entry = entry,
                                 entryIndex = entryIndex,
-                                followInitialFocus = followInitialFocus,
+                                followInitialFocus = followInitialFocus && focusEnabled,
                                 nowSec = nowSec,
                                 zone = zone,
                                 locale = locale,
@@ -843,6 +847,14 @@ private fun <T> HomeCardRow(
     val state = rememberLazyListState(initialFirstVisibleItemIndex = entryIndex.coerceAtLeast(0))
     var rememberedIndex by remember { mutableIntStateOf(entryIndex) }
     var rememberedKey by remember { mutableStateOf(items.getOrNull(entryIndex)?.let(itemKey)) }
+    val initialItemKey = items.getOrNull(entryIndex)?.let(itemKey)
+    LaunchedEffect(followInitialFocus, initialItemKey, entryIndex) {
+        if (followInitialFocus && initialItemKey != null) {
+            // Key anchoring can leave the new first card outside the composed viewport.
+            // Scrolling forces its layout before the entry request can succeed.
+            state.scrollToItem(entryIndex)
+        }
+    }
     // Before input, entry follows the current initial card rather than its remembered child.
     val restoredIndex = if (followInitialFocus) entryIndex else
         items.indexOfFirst { itemKey(it) == rememberedKey }.takeIf { it >= 0 }

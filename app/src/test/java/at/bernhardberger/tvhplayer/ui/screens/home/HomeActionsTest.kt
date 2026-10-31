@@ -114,11 +114,11 @@ class HomeActionsTest {
     }
 
     private fun earlierOnNowItem(viewerMoved: Boolean) {
-        val channels = (1L..3L).map { Channel.create(ChannelId(it), name = "Channel $it") }
+        val channels = (1L..14L).map { Channel.create(ChannelId(it), name = "Channel $it", number = it) }
         val events = channels.associate { it.id to EpgEvent.create(EventId(it.id.value), it.id,
             Instant.fromEpochSeconds(now - 600), Instant.fromEpochSeconds(now + 600),
             title = "Programme ${it.id.value}") }
-        var input by mutableStateOf(HomeInput(channels, events - channels.first().id, emptyList(),
+        var input by mutableStateOf(HomeInput(channels, events.filterKeys { it.value >= 12 }, emptyList(),
             emptyList(), emptyList(), { null }, null, now))
         compose.setContent { TVHeadendPlayerTheme {
             HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
@@ -132,7 +132,7 @@ class HomeActionsTest {
         }
         compose.runOnIdle { input = input.copy(currentEvents = events) }
         compose.mainClock.advanceTimeBy(600)
-        compose.onNodeWithTag(if (viewerMoved) "home-onnow-2" else "home-onnow-0").assertIsFocused()
+        compose.onNodeWithTag(if (viewerMoved) "home-onnow-12" else "home-onnow-0").assertIsFocused()
     }
 
     private fun lateRunningRecording(viewerMoved: Boolean) {
