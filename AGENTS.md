@@ -101,7 +101,7 @@ repository-local domain overlays, then the focused skill, then local style.
   which checks passed without describing focused evidence as full verification.
   Do not add tests for model names or prompt wording.
 - External review is risk-based, not an automatic approval loop. Non-trivial
-  non-UX work needs independent Astra and Opus reviews of the same bounded
+  non-UX work needs an independent reviewer pair on the same bounded
   evidence, subject to the local review routing below. Follow up only on unresolved
   findings or materially changed behavior, not an automatic third or broad repeat audit. Remediate
   new in-scope blockers autonomously. Never ask the user merely whether to
@@ -197,10 +197,12 @@ Restricted children cannot read project policy: callers must inline applicable
 hard requirements, accepted invariants and exact evidence without redefining the
 role's permissions, output or verdict contract.
 
-Non-trivial non-UX work requires independent Astra `android-reviewer` coverage
-plus an Opus pass: a second `android-reviewer` dispatch with task override
-`model: claude-code/claude-opus-5-5[1m]`, `reasoning: high` (no named Opus agent),
-under the harness routing. Substantial new/redesigned
+Non-trivial non-UX work requires a pair of independent `android-reviewer`
+dispatches under the harness routing. Slices inside a larger branch use Sol
+(`openai/gpt-6.1-sol`, `xhigh`) plus Sonnet (`claude-code/claude-sonnet-5-5`,
+`high`). Closing end-of-branch reviews and standalone changes use Astra plus an
+Opus pass with task override `model: claude-code/claude-opus-5-5`,
+`reasoning: high` (no named Opus agent). Substantial new/redesigned
 TV surfaces require final screenshot-first `tv-ux-reviewer` coverage; use
 `tv-ux-brief` when direction is unresolved. UX review does not replace distinct
 runtime review or physical-TV gates. Low-impact work has no mandatory pair.

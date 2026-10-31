@@ -211,12 +211,13 @@ risk:
 | Change | Independent review |
 |---|---|
 | Documentation, tests, or mechanical work with no production behavior change | Normally none |
-| Non-trivial non-UX change, including security/runtime/lifecycle/concurrency | Independent Astra `android-reviewer` plus an independent Opus pass (second `android-reviewer` dispatch with task override `model: claude-code/claude-opus-5-5[1m]`, `reasoning: high`; no named Opus agent), subject to the quota fallback below |
+| Non-trivial non-UX slice inside a larger branch | Two independent `android-reviewer` dispatches with task overrides: `openai/gpt-6.1-sol` `xhigh` plus `claude-code/claude-sonnet-5-5` `high` |
+| Closing end-of-branch review, or a standalone non-trivial non-UX change, including security/runtime/lifecycle/concurrency | Independent Astra `android-reviewer` plus an independent Opus pass (second `android-reviewer` dispatch with task override `model: claude-code/claude-opus-5-5`, `reasoning: high`; no named Opus agent), subject to the quota fallback below |
 | Ordinary release using the existing release path | No additional model approval; retain release artifact and authorization checks |
 | Unresolved visual direction for a substantial new or redesigned TV surface | Optional `tv-ux-brief` against supplied requirements and baseline images |
 | Screenshot-set coverage, metadata, duplication, staleness, or privacy | Primary checks it; optional `tv-evidence-curator` for useful independent work |
 | Final visual hierarchy, alignment, spacing, typography, density, focus appearance, consistency, or Material for TV design | `tv-ux-reviewer` pair against the curated current manifest (see UX review pair below) |
-| HTSP, Media3, subscription ownership, or DVR lifecycle | The same engineering pair, bounded to the affected architecture and races |
+| HTSP, Media3, subscription ownership, or DVR lifecycle | The matching engineering pair, bounded to the affected architecture and races |
 
 Neither reviewer is the implementing primary. Both receive the same bounded
 change and evidence; the second initial packet is blind to the first verdict and
