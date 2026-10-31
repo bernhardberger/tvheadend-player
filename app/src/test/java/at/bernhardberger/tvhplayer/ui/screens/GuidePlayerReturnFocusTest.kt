@@ -102,6 +102,13 @@ class GuidePlayerReturnFocusTest {
     private var playRequests = 0
     private lateinit var settingsApplication: org.koin.core.KoinApplication
 
+    @Test fun genreEntryStartsAtNowAndFocusesFirstMatchingChannel() {
+        guide(PlayerReturnFocus(ChannelId(1), ChannelId(1)),
+            genreRequest = at.bernhardberger.tvhplayer.core.ProgrammeCategory.SPORT)
+        focused("Channel 2 hour 0")
+        compose.runOnIdle { assertEquals(0, playRequests) }
+    }
+
     @Test
     @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -238,6 +245,7 @@ class GuidePlayerReturnFocusTest {
 
     private fun event(channel: Long, offset: Int) = EpgEvent.create(EventId(channel * 100 + offset + 10),
         channelId = ChannelId(channel), title = "Channel $channel hour $offset",
+        contentGenre = at.bernhardberger.tvheadend.sdk.core.ContentGenre.fromContentType(if (channel == 2L) 0x40 else 0x20),
         start = Instant.fromEpochSeconds(hour + offset * 3600), stop = Instant.fromEpochSeconds(hour + (offset + 1) * 3600))
 
     private fun observation(loaded: Boolean, offline: Boolean = false): SessionObservation {
@@ -263,7 +271,8 @@ class GuidePlayerReturnFocusTest {
         )
     }
 
-    private fun guide(request: PlayerReturnFocus, channelsLoaded: Boolean = true, offline: Boolean = false): FakeTvheadendSession {
+    private fun guide(request: PlayerReturnFocus, channelsLoaded: Boolean = true, offline: Boolean = false,
+        genreRequest: at.bernhardberger.tvhplayer.core.ProgrammeCategory? = null): FakeTvheadendSession {
         val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<Application>()
         val session = FakeTvheadendSession(observation(channelsLoaded, offline))
         val settings = PlayerSettingsStore(preferences())
@@ -302,6 +311,8 @@ class GuidePlayerReturnFocusTest {
                     selection = ChannelSelectionStore(), guidePositionStore = position,
                     lastPlayedStore = LastPlayedChannelStore(context),
                     playerReturn = playerReturn, onPlay = { _, _ -> playRequests++ },
+                    genre = genreRequest ?: at.bernhardberger.tvhplayer.core.ProgrammeCategory.ALL,
+                    genreEntryRequest = genreRequest,
                     notices = notices,
                 )
                 }

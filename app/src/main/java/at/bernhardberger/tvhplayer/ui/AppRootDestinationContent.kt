@@ -59,13 +59,39 @@ internal fun HomeRouteContent(
     contentAllowed: Boolean,
     contentPadding: PaddingValues,
     initialFocusEnabled: Boolean,
+    channelsVm: ChannelsViewModel,
+    playingChannelId: ChannelId?,
+    playingRecordingId: DvrEntryId?,
+    onPlay: (ChannelId, String) -> Unit,
+    onPlayRecording: (RecordingPlaybackSelection, RecordingPlaybackStart) -> Unit,
+    onReturnToRecording: (DvrEntryId, () -> Unit) -> Boolean,
+    onShowGuide: (ChannelId, at.bernhardberger.tvheadend.sdk.core.EpgEvent?) -> Unit,
+    onGenre: (ProgrammeCategory) -> Unit,
+    onRecordings: (at.bernhardberger.tvhplayer.core.DvrLibraryMode) -> Unit,
+    connectionUiState: ConnectionUiState,
+    connectionFailure: ConnectionUiState?,
+    onRetry: () -> Unit,
+    onOpenConnectionSettings: () -> Unit,
 ) {
     if (contentAllowed) {
         ContentContainer(modifier = Modifier.profileLayout("home")) {
-            HomeScreen(
+            BrowsingScopeContent(channelsVm, initialFocusEnabled) { HomeScreen(
                 contentPadding = contentPadding,
                 initialFocusEnabled = initialFocusEnabled,
-            )
+                channelsVm = channelsVm,
+                playingChannelId = playingChannelId,
+                playingRecordingId = playingRecordingId,
+                onPlay = onPlay,
+                onPlayRecording = onPlayRecording,
+                onReturnToRecording = onReturnToRecording,
+                onShowGuide = onShowGuide,
+                onGenre = onGenre,
+                onRecordings = onRecordings,
+                connectionUiState = connectionUiState,
+                connectionFailure = connectionFailure,
+                onRetry = onRetry,
+                onOpenConnectionSettings = onOpenConnectionSettings,
+            ) }
         }
     }
 }
@@ -118,6 +144,7 @@ internal fun GuideRouteContent(
     contentPadding: PaddingValues,
     initialFocusEnabled: Boolean,
     playerReturn: PlayerReturnFocus?,
+    genreRequest: ProgrammeCategory? = null,
     browseReturn: Boolean = false,
     view: GuideView,
     connectionUiState: ConnectionUiState,
@@ -128,7 +155,7 @@ internal fun GuideRouteContent(
     onPlay: (ChannelId, String) -> Unit,
 ) {
     // The highlighted genre lasts while the Guide entry stays in the back stack, not across launches.
-    var genre by rememberSaveable { mutableStateOf(ProgrammeCategory.ALL) }
+    var genre by rememberSaveable(genreRequest) { mutableStateOf(genreRequest ?: ProgrammeCategory.ALL) }
     if (contentAllowed) {
         ContentContainer(modifier = Modifier.profileLayout("guide")) {
             BrowsingScopeContent(channelsVm, initialFocusEnabled) { EpgGridScreen(
@@ -140,6 +167,7 @@ internal fun GuideRouteContent(
                 connectionUiState = connectionUiState,
                 connectionFailure = connectionFailure,
                 playerReturn = playerReturn,
+                genreEntryRequest = genreRequest,
                 browseReturn = browseReturn,
                 onRetry = onRetry,
                 onOpenConnectionSettings = onOpenConnectionSettings,

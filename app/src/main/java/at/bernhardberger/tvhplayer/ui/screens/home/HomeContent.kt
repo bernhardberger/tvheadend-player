@@ -298,6 +298,8 @@ internal fun HomeContent(
     focusEnabled: Boolean = true,
     observation: SessionObservation? = null,
     input: HomeInput? = null,
+    onActivate: (HomeFocusKey) -> Unit = {},
+    onContextMenu: (HomeFocusKey) -> Unit = {},
 ) {
     val direction = LocalLayoutDirection.current
     val ltr = direction == LayoutDirection.Ltr
@@ -314,8 +316,8 @@ internal fun HomeContent(
     val drawerState = LocalBrowseDrawerState.current
     val firstSection = sections.firstOrNull()?.kind
     val initialKey = remember(sections, initialFocus) { initialFocus ?: homeInitialFocus(sections) }
-    val requesters = remember(sections) {
-        sections.associate { it.kind to FocusRequester() }
+    val requesters = remember {
+        HomeSectionKind.entries.associateWith { FocusRequester() }
     }
     val viewRequester = remember { FocusRequester() }
     var focusedSection by remember { mutableStateOf<HomeSectionKind?>(null) }
@@ -345,7 +347,9 @@ internal fun HomeContent(
         derivedStateOf { motion.from + (scrollTarget(motion.to) - motion.from) * motion.progress.value }
     }
 
-    LaunchedEffect(focusEnabled, initialKey, sections) {
+    // Metadata ticks and ordinary D-pad moves must not replay entry focus. Request it on entry,
+    // after the first rows arrive, or when the destination regains ownership after a dialog.
+    LaunchedEffect(focusEnabled, sections.isEmpty()) {
         if (!focusEnabled) return@LaunchedEffect
         // Widget focus changes precede composition's drawerActive feedback: never take focus back
         // from an opening drawer.
@@ -428,7 +432,9 @@ internal fun HomeContent(
                     val entryIndex = initialKey
                         ?.takeIf { it.section == kind }
                         ?.position
-                        ?.coerceIn(0, (section.itemCount() - 1).coerceAtLeast(0))
+                        ?.coerceIn(0, (section.itemCount() - 1 +
+                            if (section is HomeSection.ContinueWatching || section is HomeSection.RecentlyRecorded) 1 else 0)
+                            .coerceAtLeast(0))
                         ?: 0
                     val entry = requesters[kind] ?: FocusRequester()
                     val onNowSection = section as? HomeSection.OnNow
@@ -443,6 +449,12 @@ internal fun HomeContent(
                     val onCardFocus: (Int, String) -> Unit = { index, key ->
                         onSectionFocus()
                         onFocused(HomeFocusKey(kind, key, index))
+                    }
+                    val activate: (Int, String) -> Unit = { index, key ->
+                        onActivate(HomeFocusKey(kind, key, index))
+                    }
+                    val contextMenu: (Int, String) -> Unit = { index, key ->
+                        onContextMenu(HomeFocusKey(kind, key, index))
                     }
                     Column(
                         Modifier
@@ -501,6 +513,8 @@ internal fun HomeContent(
                                 nowSec = nowSec,
                                 input = input,
                                 onCardFocus = onCardFocus,
+                                onActivate = activate,
+                                onContextMenu = contextMenu,
                             )
 
                             is HomeSection.RecentChannels -> HomeRecentRow(
@@ -513,6 +527,8 @@ internal fun HomeContent(
                                 rail = rail,
                                 ltr = ltr,
                                 onCardFocus = onCardFocus,
+                                onActivate = activate,
+                                onContextMenu = contextMenu,
                             )
 
                             is HomeSection.OnNow -> HomeOnNowRow(
@@ -525,6 +541,8 @@ internal fun HomeContent(
                                 ltr = ltr,
                                 nowSec = nowSec,
                                 recordingChannelIds = recordingChannelIds,
+                                onActivate = activate,
+                                onContextMenu = contextMenu,
                                 onCardFocus = { index, channelId ->
                                     onCardFocus(index, "onnow:${channelId.value}")
                                     focusedOnNow = channelId
@@ -541,6 +559,7 @@ internal fun HomeContent(
                                 rail = rail,
                                 ltr = ltr,
                                 onCardFocus = onCardFocus,
+                                onActivate = activate,
                             )
 
                             is HomeSection.ContinueWatching -> HomeShelfRow(
@@ -557,6 +576,8 @@ internal fun HomeContent(
                                 locale = locale,
                                 input = input,
                                 onCardFocus = onCardFocus,
+                                onActivate = activate,
+                                onContextMenu = contextMenu,
                             )
 
                             is HomeSection.RecentlyRecorded -> HomeShelfRow(
@@ -573,6 +594,8 @@ internal fun HomeContent(
                                 locale = locale,
                                 input = input,
                                 onCardFocus = onCardFocus,
+                                onActivate = activate,
+                                onContextMenu = contextMenu,
                             )
 
                             is HomeSection.Upcoming -> HomeUpcomingRow(
@@ -586,6 +609,7 @@ internal fun HomeContent(
                                 rail = rail,
                                 ltr = ltr,
                                 onCardFocus = onCardFocus,
+                                onActivate = activate,
                             )
                         }
                     }
@@ -743,6 +767,8 @@ private fun HomeActivityRow(
     nowSec: Long,
     input: HomeInput?,
     onCardFocus: (Int, String) -> Unit,
+    onActivate: (Int, String) -> Unit,
+    onContextMenu: (Int, String) -> Unit,
 ) {
     HomeCardRow(
         items = items,
@@ -755,18 +781,20 @@ private fun HomeActivityRow(
         ltr = ltr,
     ) { index, item, itemModifier ->
         val playing = item.playing
-        val runningRecording = item.recording
+        val runningRecording = item.recording ?: (playing as? HomePlaying.Recording)?.entryId
+            ?.let { id -> input?.dvrEntries?.firstOrNull { it.id == id } }
         val channel = when (playing) {
             is HomePlaying.LiveChannel -> input?.channels?.firstOrNull { it.id == playing.channelId }
             else -> runningRecording?.channelId?.let { id ->
                 input?.channels?.firstOrNull { it.id == id }
             }
         }
-        val event = ((playing as? HomePlaying.LiveChannel)?.channelId ?: runningRecording?.channelId)
+        val event = ((playing as? HomePlaying.LiveChannel)?.channelId
+            ?: runningRecording?.channelId?.takeIf { playing !is HomePlaying.Recording })
             ?.let { input?.currentEvents?.get(it) }
         val label = stringResource(
             when {
-                playing != null && runningRecording != null -> R.string.home_activity_watching_and_recording
+                playing != null && item.recording != null -> R.string.home_activity_watching_and_recording
                 playing != null -> R.string.home_activity_watching_live
                 else -> R.string.home_activity_recording
             },
@@ -791,7 +819,8 @@ private fun HomeActivityRow(
             nowSec = nowSec,
             width = width,
             description = description,
-            onClick = { },
+            onClick = { onActivate(index, activityKey(item)) },
+            onLongClick = if (playing == null) ({ onContextMenu(index, activityKey(item)) }) else null,
             modifier = itemModifier
                 .testTag("home-activity-$index")
                 .onFocusChanged { if (it.isFocused) onCardFocus(index, activityKey(item)) },
@@ -810,6 +839,8 @@ private fun HomeRecentRow(
     rail: FocusRequester,
     ltr: Boolean,
     onCardFocus: (Int, String) -> Unit,
+    onActivate: (Int, String) -> Unit,
+    onContextMenu: (Int, String) -> Unit,
 ) {
     HomeCardRow(
         items = items,
@@ -824,7 +855,8 @@ private fun HomeRecentRow(
         HomeRecentChannelTile(
             channel = item.channel,
             nameShown = textShown,
-            onClick = { },
+            onClick = { onActivate(index, "channel:${item.channel.id.value}") },
+            onLongClick = { onContextMenu(index, "channel:${item.channel.id.value}") },
             modifier = itemModifier
                 .testTag("home-recent-$index")
                 .onFocusChanged {
@@ -847,6 +879,8 @@ private fun HomeOnNowRow(
     recordingChannelIds: Set<ChannelId>,
     onCardFocus: (Int, ChannelId) -> Unit,
     onRowTop: (Float) -> Unit,
+    onActivate: (Int, String) -> Unit,
+    onContextMenu: (Int, String) -> Unit,
 ) {
     val density = LocalDensity.current
     HomeCardRow(
@@ -870,8 +904,8 @@ private fun HomeOnNowRow(
             nowSec = nowSec,
             playbackIndicator = watchingIndicator(item.event, nowSec),
             recording = item.channel.id in recordingChannelIds,
-            onClick = { },
-            onLongClick = { },
+            onClick = { onActivate(index, "onnow:${item.channel.id.value}") },
+            onLongClick = { onContextMenu(index, "onnow:${item.channel.id.value}") },
             programmeLoading = false,
             programmePicture = true,
             modifier = itemModifier
@@ -973,6 +1007,7 @@ private fun HomeGenreRow(
     rail: FocusRequester,
     ltr: Boolean,
     onCardFocus: (Int, String) -> Unit,
+    onActivate: (Int, String) -> Unit,
 ) {
     HomeCardRow(
         items = items,
@@ -986,7 +1021,7 @@ private fun HomeGenreRow(
     ) { index, item, itemModifier ->
         HomeGenreCard(
             category = item.category,
-            onClick = { },
+            onClick = { onActivate(index, "genre:${item.category.name}") },
             modifier = itemModifier
                 .testTag("home-genre-$index")
                 .onFocusChanged {
@@ -1011,6 +1046,8 @@ private fun HomeShelfRow(
     locale: Locale,
     input: HomeInput?,
     onCardFocus: (Int, String) -> Unit,
+    onActivate: (Int, String) -> Unit,
+    onContextMenu: (Int, String) -> Unit,
 ) {
     // The All recordings end card is part of the row: a null item marks it.
     val rowItems: List<at.bernhardberger.tvhplayer.core.RecordingItem?> = items + listOf(null)
@@ -1026,7 +1063,7 @@ private fun HomeShelfRow(
     ) { index, item, itemModifier ->
         if (item == null) {
             HomeAllRecordingsCard(
-                onClick = { },
+                onClick = { onActivate(index, "all-recordings") },
                 textShown = textShown,
                 modifier = itemModifier
                     .testTag("home-all-recordings")
@@ -1054,8 +1091,8 @@ private fun HomeShelfRow(
             }
             StandardProgrammeCard(
                 width = HomeCardWidth,
-                onClick = { },
-                onLongClick = { },
+                onClick = { onActivate(index, "recording:${recording.id.value}") },
+                onLongClick = { onContextMenu(index, "recording:${recording.id.value}") },
                 modifier = itemModifier
                     .semantics(mergeDescendants = true) {
                         contentDescription = listOf(title, subtitle)
@@ -1131,6 +1168,7 @@ private fun HomeUpcomingRow(
     rail: FocusRequester,
     ltr: Boolean,
     onCardFocus: (Int, String) -> Unit,
+    onActivate: (Int, String) -> Unit,
 ) {
     if (item == null) return
     val next = item.next
@@ -1148,7 +1186,7 @@ private fun HomeUpcomingRow(
     }
     HomeUpcomingCard(
         text = summary + more,
-        onClick = { },
+        onClick = { onActivate(0, "upcoming") },
         modifier = Modifier
             .padding(start = keyline, top = HomeFocusRoom, bottom = HomeFocusRoom)
             .rowContentEmphasis(emphasis)

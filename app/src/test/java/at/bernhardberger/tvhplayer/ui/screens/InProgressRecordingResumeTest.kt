@@ -66,6 +66,27 @@ import kotlin.time.Instant
 class InProgressRecordingResumeTest {
     @get:Rule val compose = createComposeRule()
 
+    @Test fun recordingNowOkOffersWatchLiveBeforeResume() {
+        var watched: at.bernhardberger.tvheadend.sdk.core.ChannelId? = null
+        val starts = openDetails(754L, directly = true, onWatch = { id, _ -> watched = id })
+        compose.onNodeWithTag("recording-watch-live").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.runOnIdle {
+            assertEquals(at.bernhardberger.tvheadend.sdk.core.ChannelId(1), watched)
+            assertTrue(starts.isEmpty())
+        }
+    }
+
+    @Test fun recordingNowOkWithoutPositionOffersStartAfterWatchLive() {
+        val starts = openDetails(null, directly = true, onWatch = { _, _ -> })
+        compose.onNodeWithTag("recording-resume").assertDoesNotExist()
+        compose.onNodeWithTag("recording-watch-live").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionRight) }
+        compose.onNodeWithTag("recording-start-over").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.runOnIdle { assertEquals(listOf(RecordingPlaybackStart.START_OVER), starts) }
+    }
+
     @Test
     fun anInProgressRecordingWithASavedPositionResumesThere() {
         val starts = openDetails(playPositionSeconds = 754L)
@@ -278,6 +299,7 @@ class InProgressRecordingResumeTest {
     private fun openDetails(playPositionSeconds: Long?, directly: Boolean = false, menuOnly: Boolean = false,
         warm: Boolean = false, completed: Boolean = false, fromPlayer: Boolean = false, staleSession: Boolean = false,
         handoff: PlayerEntryHandoff? = null, requestGate: CompletableDeferred<Unit>? = null,
+        onWatch: ((at.bernhardberger.tvheadend.sdk.core.ChannelId, String) -> Unit)? = null,
         onReturn: (DvrEntryId) -> Boolean = { true }): List<RecordingPlaybackStart> {
         val starts = mutableListOf<RecordingPlaybackStart>()
         val observation = observation(playPositionSeconds, completed)
@@ -317,6 +339,7 @@ class InProgressRecordingResumeTest {
                     dvrMutationActions = actions,
                     notices = notices,
                     onPlayRecording = { _, start -> starts += start },
+                    onWatchChannel = onWatch,
                     playingRecordingId = DvrEntryId(1).takeIf { warm },
                     onReturnToRecording = { id, beforeRequest ->
                         val accepted = onReturn(id)
@@ -347,6 +370,7 @@ class InProgressRecordingResumeTest {
         val entry = DvrEntry.create(
             id = DvrEntryId(1),
             title = "Evening News",
+            channelId = at.bernhardberger.tvheadend.sdk.core.ChannelId(1),
             state = if (completed) DvrEntryState.COMPLETED else DvrEntryState.RECORDING,
             start = Instant.fromEpochMilliseconds(now - 1_800_000),
             stop = Instant.fromEpochMilliseconds(now + 1_800_000),
@@ -363,7 +387,8 @@ class InProgressRecordingResumeTest {
                     dvrWrite = CapabilityAccess.ALLOWED,
                 )
             ),
-            channelState = ChannelRepositoryState.Current(ChannelCatalog.create()),
+            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(channels = listOf(
+                at.bernhardberger.tvheadend.sdk.core.Channel.create(at.bernhardberger.tvheadend.sdk.core.ChannelId(1), name = "Test channel")))),
             epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = listOf(entry))),
             recordingProgressCapability = RecordingProgressCapability.SUPPORTED,

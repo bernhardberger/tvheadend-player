@@ -609,10 +609,12 @@ fun AppRoot(
     var livePlayerReturn by remember { mutableStateOf<Pair<AppNavKey, PlayerReturnFocus>?>(null) }
     var recordingPlayerReturnToGuide by remember { mutableStateOf(false) }
     var guideChannelRequest by remember { mutableStateOf<PlayerReturnFocus?>(null) }
+    var guideGenreRequest by remember { mutableStateOf<at.bernhardberger.tvhplayer.core.ProgrammeCategory?>(null) }
     LaunchedEffect(currentDestination) {
         if (livePlayerReturn?.first != currentDestination) livePlayerReturn = null
         if (currentDestination != GuideKey) recordingPlayerReturnToGuide = false
         if (currentDestination != GuideKey) guideChannelRequest = null
+        if (currentDestination != GuideKey) guideGenreRequest = null
     }
     val playerReturnFor = { destination: AppNavKey ->
         livePlayerReturn?.takeIf { it.first == destination }?.second
@@ -907,6 +909,33 @@ fun AppRoot(
                             contentAllowed = contentAllowed,
                             contentPadding = contentPadding,
                             initialFocusEnabled = !drawerActive && currentDestination == HomeKey,
+                            channelsVm = channelsVm,
+                            playingChannelId = activeChannelId,
+                            playingRecordingId = warmRecordingId,
+                            connectionUiState = connectionUiState,
+                            connectionFailure = browseConnectionFailure,
+                            onRetry = retryBrowseConnection,
+                            onOpenConnectionSettings = { navigateTopLevel(SettingsKey(SettingsSection.CONNECTION)) },
+                            onPlay = requestLivePlayer,
+                            onReturnToRecording = returnToWarmRecording,
+                            onRecordings = { mode -> recordingsScreenState.mode.value = mode; navigateTopLevel(RecordingsKey) },
+                            onGenre = { category -> guideGenreRequest = category; navigateTopLevel(GuideKey) },
+                            onShowGuide = { channelId, programme ->
+                                guideChannelRequest = PlayerReturnFocus(channelId, channelId, programme?.id, programme?.start?.epochSeconds)
+                                navigateTopLevel(GuideKey)
+                            },
+                            onPlayRecording = { selection, intent ->
+                                playerEntry.request(playbackSelectionScope) {
+                                    browseStop?.join()
+                                    val target = playbackOrchestrator.requestRecordingPlayer(
+                                        activeChannelId = (playbackRuntime.activeTarget.value as? AppPlaybackTarget.Live)?.channelId,
+                                        activeRecordingId = (playbackRuntime.activeTarget.value as? AppPlaybackTarget.Recording)?.recordingId,
+                                        requestedRecordingId = selection.recordingId,
+                                        startPlayback = { playbackRuntime.playRecording(selection, intent) },
+                                    ) ?: return@request
+                                    backStack.pushTransient(recordingPlayerKey(target.recordingId, intent))
+                                }
+                            },
                         )
                     }
 
@@ -958,6 +987,7 @@ fun AppRoot(
                             contentPadding = contentPadding,
                             initialFocusEnabled = !drawerActive && currentDestination == GuideKey,
                             playerReturn = guideChannelRequest ?: playerReturnFor(GuideKey),
+                            genreRequest = guideGenreRequest,
                             browseReturn = recordingPlayerReturnToGuide,
                             view = uiSettings.guideView,
                             connectionUiState = connectionUiState,

@@ -286,6 +286,7 @@ fun EpgGridScreen(
     connectionUiState: ConnectionUiState = ConnectionUiState.Ready,
     connectionFailure: ConnectionUiState? = connectionUiState,
     playerReturn: PlayerReturnFocus? = null,
+    genreEntryRequest: ProgrammeCategory? = null,
     browseReturn: Boolean = false,
     onRetry: () -> Unit = {},
     onOpenConnectionSettings: () -> Unit = {},
@@ -601,15 +602,14 @@ fun EpgGridScreen(
     }
     }
     RetainEventFocusRequesters()
-    val focusRows = remember(channels, timelineEventIndex) {
+    @Composable
+    fun rememberFocusRows(): List<EpgFocusColumn> = remember(channels, timelineEventIndex) {
         val eventsByChannel = timelineEventIndex.visibleEventsByChannel
         channels.map { channel ->
-            EpgFocusColumn(
-                channelId = channel.id,
-                events = eventsByChannel[channel.id].orEmpty(),
-            )
+            EpgFocusColumn(channelId = channel.id, events = eventsByChannel[channel.id].orEmpty())
         }
     }
+    val focusRows = rememberFocusRows()
     val edgeEvents = remember(preparedIndex, orderedChannelIds) {
         val ids = orderedChannelIds.toSet()
         preparedIndex?.input?.let { input ->
@@ -906,6 +906,8 @@ fun EpgGridScreen(
 
     @Composable
     fun GuidePositionEffects() {
+    // A Home genre card opens the Guide at now on the genre's first programme, once.
+    var genreEntryPending by remember(genreEntryRequest) { mutableStateOf(genreEntryRequest != null) }
     val requestedProgramme = pendingPlayerReturn?.programmeId?.let(observation::event)?.takeIf {
         it.channelId == playerReturnChannelId && it.start.epochSeconds == pendingPlayerReturn.programmeStartSec &&
             it.start.epochSeconds in windowBounds.earliestStartSec..windowBounds.latestStartSec
@@ -934,10 +936,10 @@ fun EpgGridScreen(
             windowStartSec = restored.windowStartSec
             return@LaunchedEffect
         }
-        if (playerReturnChannelId != null || destinationEntryPending && pendingPlayerReturn == null) {
+        if (genreEntryPending || playerReturnChannelId != null || destinationEntryPending && pendingPlayerReturn == null) {
             val nowSec = nowSecProvider()
             // A programme played from its start shows from its hour; one on air, as live, opens just before now.
-            val nowWindow = requestedProgramme?.takeUnless { nowSec in it.start.epochSeconds until it.stop.epochSeconds }
+            val nowWindow = requestedProgramme?.takeUnless { genreEntryPending || nowSec in it.start.epochSeconds until it.stop.epochSeconds }
                 ?.let { windowBounds.constrain(floorGuideWindowToHour(it.start.epochSeconds, guideZoneId)) }
                 ?: guideNowWindowStart(nowSec, windowBounds, guideZoneId)
             // Re-enters once the index for the current-hour window is prepared.
@@ -958,7 +960,8 @@ fun EpgGridScreen(
             ?: return@LaunchedEffect
         val channelIndex = channels.indexOfFirst { it.id == channelId }
         pendingInitialChannelIndex = channelIndex
-        val target = initialTimelineEpgFocus(
+        val target = genreEntryRequest?.takeIf { genreEntryPending }?.let { genreEntryFocus(focusRows, it) }
+            ?: initialTimelineEpgFocus(
             rows = focusRows,
             preferredChannelIndex = channelIndex,
             preferredEventId = requestedProgramme?.id ?: restored?.eventId,
@@ -1003,6 +1006,7 @@ fun EpgGridScreen(
         pendingRestoredPosition = null
         destinationEntryPending = false
         initialPositionDone = true
+        genreEntryPending = false
     }
 
     LaunchedEffect(
@@ -2314,6 +2318,12 @@ internal fun SessionObservation.currentDvrConfigurations(): List<DvrConfiguratio
     }
 
 /** The Guide's 1xx alert, shown only while it has no channels to draw: the connection's failure, or 108 when Ready has none. */
+/** The first programme of [genre] in channel order, for a Guide opened from a Home genre card. */
+internal fun genreEntryFocus(rows: List<EpgFocusColumn>, genre: ProgrammeCategory): EpgFocusTarget? =
+    rows.withIndex().firstNotNullOfOrNull { (index, row) ->
+        row.events.firstOrNull { programmeCategory(it) == genre }?.let { EpgFocusTarget(index, it.id) }
+    }
+
 internal fun guideAppError(
     hasChannels: Boolean,
     isEmptyTag: Boolean,

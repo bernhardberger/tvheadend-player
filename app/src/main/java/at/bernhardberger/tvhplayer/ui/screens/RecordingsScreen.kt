@@ -298,8 +298,12 @@ internal fun RecordingsScreenContent(
     var retainedPreparation by remember(preparationAuthority) {
         mutableStateOf<PreparedBrowseData<DvrSnapshot?, RecordingLibraryPresentation>?>(null)
     }
-    val channels = observation.channelCatalogForDisplay?.channels.orEmpty()
-    val channelsById = remember(channels) { channels.associateBy { it.id } }
+    @Composable
+    fun rememberChannelsById(): Map<ChannelId, Channel> {
+        val channels = observation.channelCatalogForDisplay?.channels.orEmpty()
+        return remember(channels) { channels.associateBy { it.id } }
+    }
+    val channelsById = rememberChannelsById()
     val scope = rememberCoroutineScope()
     val screenState = state ?: remember { RecordingsScreenState() }
     val contentFocus = remember { FocusRequester() }
@@ -362,7 +366,9 @@ internal fun RecordingsScreenContent(
         val capability = current.currentSession
         val action = at.bernhardberger.tvhplayer.core.recordingOpenAction(
             capability?.let { current.recordingPlaybackAdmission(entry) })
-        if (capability != null && (action == at.bernhardberger.tvhplayer.core.RecordingOpenAction.START_OVER ||
+        val activeChoice = recordingIsRunning(entry) && entry.channelId?.let(current::channel) != null &&
+            capability != null && onWatchChannel != null
+        if (!activeChoice && capability != null && (action == at.bernhardberger.tvhplayer.core.RecordingOpenAction.START_OVER ||
                 action == at.bernhardberger.tvhplayer.core.RecordingOpenAction.RESUME)) {
             beforePlay()
             onPlayRecording(RecordingPlaybackSelection(capability, entry.id),
@@ -371,7 +377,7 @@ internal fun RecordingsScreenContent(
             return
         }
         showContextMenu = false
-        showResumeChoice = action == at.bernhardberger.tvhplayer.core.RecordingOpenAction.RESUME_CHOICE
+        showResumeChoice = activeChoice || action == at.bernhardberger.tvhplayer.core.RecordingOpenAction.RESUME_CHOICE
         contentFocusOwned = false
         detailsInitialAction = null
         detailsEntry = entry
@@ -883,7 +889,6 @@ internal fun RecordingsScreenContent(
         @Composable
         fun ResumeChoice() {
             val closeBehindPlayer = rememberCloseBehindPlayer()
-            val resources = androidx.compose.ui.platform.LocalContext.current.resources
             val channel = opened.channelId?.let(channelsById::get)
             val closeResume = {
                 showResumeChoice = false
@@ -897,64 +902,18 @@ internal fun RecordingsScreenContent(
                     onPlayRecording(RecordingPlaybackSelection(capability, opened.id), intent)
                 }
             }
-            val choice = at.bernhardberger.tvhplayer.core.recordingOpenAction(openedAdmission) ==
+            val watchLive: (() -> Unit)? = if (recordingIsRunning(opened) && selectedCapability != null &&
+                channel != null && onWatchChannel != null) ({
+                closeBehindPlayer(closeResume)
+                onWatchChannel(channel.id, channel.name.orEmpty())
+            }) else null
+            val choice = watchLive != null || at.bernhardberger.tvhplayer.core.recordingOpenAction(openedAdmission) ==
                 at.bernhardberger.tvhplayer.core.RecordingOpenAction.RESUME_CHOICE
             LaunchedEffect(choice) {
                 if (!choice) closeResume()
             }
-            val resumeFocus = remember { FocusRequester() }
-            val startOverFocus = remember { FocusRequester() }
-            var startOverFocused by remember(opened.id) { mutableStateOf(false) }
-            val durationMs = at.bernhardberger.tvhplayer.core.recordingDetailsFacts(opened, openedAdmission, nowSec)
-                .firstOrNull { it.kind == at.bernhardberger.tvhplayer.core.DetailsFactKind.LENGTH }?.seconds?.times(1000L)
-            val positionMs = at.bernhardberger.tvhplayer.core.offeredResumePosition(openedAdmission)?.inWholeMilliseconds ?: 0L
-            val resumeEnd = at.bernhardberger.tvhplayer.core.recordingEndsAtSec(nowSec, positionMs, durationMs)
-                ?.let { stringResource(R.string.recording_ends_at, at.bernhardberger.tvhplayer.ui.common.formatClock(it)) }.orEmpty()
-            val startOverEnd = at.bernhardberger.tvhplayer.core.recordingEndsAtSec(nowSec, 0L, durationMs)
-                ?.let { stringResource(R.string.recording_ends_at, at.bernhardberger.tvhplayer.ui.common.formatClock(it)) }.orEmpty()
-            val spokenResume = stringResource(R.string.recording_resume_from,
-                at.bernhardberger.tvhplayer.ui.common.formatDurationMinutes(positionMs / 60_000L, resources, spoken = true))
-            CentredDialog(
-                title = opened.title.orEmpty(),
-                secondaryText = programmeEpisodeLine(opened.episode, opened.subtitle, resources),
-                text = if (startOverFocused) startOverEnd else resumeEnd,
-                eyebrow = { ProvideArtworkSession(selectedCapability, observation) {
-                    at.bernhardberger.tvhplayer.ui.components.ProgrammeEyebrow(channel?.icon, listOfNotNull(
-                    (channel?.let { at.bernhardberger.tvhplayer.ui.components.channelTitleText(it.number, it.name.orEmpty()) }
-                        ?: opened.channelName)?.takeIf(String::isNotBlank),
-                    opened.start?.epochSeconds?.formatDateTime(androidx.compose.ui.platform.LocalConfiguration.current.locales[0]),
-                    ).joinToString(" • "),
-                        Modifier.fillMaxWidth(), Modifier.testTag("recording-resume-picon"))
-                } },
-                onDismiss = closeResume,
-                backEnabled = backEnabled,
-            ) {
-                LaunchedEffect(Unit) { withFrameNanos { }; resumeFocus.requestFocus() }
-                Button(onClick = { play(RecordingPlaybackStart.RESUME) },
-                    modifier = Modifier.height(40.dp).focusRequester(resumeFocus)
-                        .onFocusChanged { if (it.isFocused) startOverFocused = false }
-                        .semantics { contentDescription = spokenResume; if (resumeEnd.isNotBlank()) stateDescription = resumeEnd }
-                        .focusProperties { left = FocusRequester.Cancel; right = startOverFocus }
-                        .testTag("recording-resume"),
-                    contentPadding = ButtonDefaults.ButtonWithIconContentPadding) {
-                    Icon(painterResource(R.drawable.ic_play_arrow), null, Modifier.size(ButtonDefaults.IconSize))
-                    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-                    Text(stringResource(R.string.recording_resume_from,
-                        at.bernhardberger.tvhplayer.core.formatPlaybackDuration(positionMs)),
-                        maxLines = 1, softWrap = false)
-                }
-                OutlinedButton(onClick = { play(RecordingPlaybackStart.START_OVER) },
-                    modifier = Modifier.height(40.dp).focusRequester(startOverFocus)
-                        .onFocusChanged { if (it.isFocused) startOverFocused = true }
-                        .semantics { if (startOverEnd.isNotBlank()) stateDescription = startOverEnd }
-                        .focusProperties { left = resumeFocus; right = FocusRequester.Cancel }
-                        .testTag("recording-start-over"),
-                    contentPadding = OutlinedButtonDefaults.ButtonWithIconContentPadding) {
-                    Icon(painterResource(R.drawable.ic_replay), null, Modifier.size(ButtonDefaults.IconSize))
-                    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-                    Text(stringResource(R.string.context_start_over), maxLines = 1, softWrap = false)
-                }
-            }
+            RecordingPlaybackChoice(opened, openedAdmission, observation, channel, nowSec,
+                onPlay = play, onClose = closeResume, onWatchLive = watchLive, backEnabled = backEnabled)
         }
         if (showResumeChoice) {
             ResumeChoice()
