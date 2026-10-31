@@ -66,7 +66,7 @@ import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvhplayer.core.HomeInput
 import at.bernhardberger.tvhplayer.core.HomePlaying
 import at.bernhardberger.tvhplayer.core.HomeSectionKind
-import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.CubicBezierEasing
 import at.bernhardberger.tvhplayer.core.homeInitialFocus
 import at.bernhardberger.tvhplayer.core.homeSections
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
@@ -168,7 +168,7 @@ class HomeCaptureTest {
     fun firstRun() = atEvening {
         show(Kind.FIRST_RUN)
         capture("6-first-run", "home-onnow-0")
-        assertTop("home-onnow-0", 320f)
+        assertTop("home-onnow-0", HomeImmersiveSlot.value)
     }
 
     @Test fun optionsPanel() = atEvening {
@@ -250,7 +250,8 @@ class HomeCaptureTest {
         settle("home-recent-0")
         compose.mainClock.autoAdvance = false
         strip("down-into", Key.DirectionDown, "home-onnow-0", expanded = true)
-        assertTop("home-onnow-0", 320f)
+        assertTop("home-onnow-0", HomeImmersiveSlot.value)
+        assertImmersiveFits()
         val keyline = bounds("home-onnow-0").left.value
         strip("right", Key.DirectionRight, "home-onnow-1", expanded = true)
         assertEquals("focused On now card stays on the start keyline", keyline, bounds("home-onnow-1").left.value, 2f)
@@ -263,7 +264,7 @@ class HomeCaptureTest {
         val collapsed = bounds("home-onnow-0")
         assertTrue("collapsed On now pictures peek above the genre heading: $collapsed", collapsed.top < 76.dp && collapsed.bottom > 0.dp)
         strip("up-into", Key.DirectionUp, "home-onnow-0", expanded = true)
-        assertTop("home-onnow-0", 320f)
+        assertTop("home-onnow-0", HomeImmersiveSlot.value)
         strip("up-out", Key.DirectionUp, "home-recent-0", expanded = false)
         assertTop("home-heading-RECENT_CHANNELS", 76f)
         key(Key.DirectionUp)
@@ -282,9 +283,20 @@ class HomeCaptureTest {
         key(Key.DirectionDown)
         key(Key.DirectionDown)
         settle("home-onnow-0")
-        assertTop("home-onnow-0", 320f)
+        assertTop("home-onnow-0", HomeImmersiveSlot.value)
         compose.onNodeWithTag("channels-immersive-background").assertDoesNotExist()
         assertEquals(1f, layerAlpha("home-on-now-block"), 0.02f)
+    }
+
+    @Test
+    fun warmUpOutRowTravelsOnce() = atEvening {
+        show(Kind.WARM)
+        settle("home-activity-0")
+        key(Key.DirectionDown)
+        key(Key.DirectionDown)
+        settle("home-onnow-0")
+        compose.mainClock.autoAdvance = false
+        strip("up-out", Key.DirectionUp, "home-recent-0", expanded = false)
     }
 
     @Test
@@ -332,7 +344,7 @@ class HomeCaptureTest {
         settle("home-genre-0")
         key(Key.DirectionUp)
         settle("home-onnow-13")
-        assertTop("home-onnow-13", 320f)
+        assertTop("home-onnow-13", HomeImmersiveSlot.value)
     }
 
     @Test
@@ -343,7 +355,7 @@ class HomeCaptureTest {
         settle("home-view-button")
         compose.mainClock.autoAdvance = false
         strip("first-run-header-down", Key.DirectionDown, "home-onnow-0", expanded = true)
-        assertTop("home-onnow-0", 320f)
+        assertTop("home-onnow-0", HomeImmersiveSlot.value)
         assertEquals(0f, layerScope("home-on-now-block").translationY, 0.1f)
     }
 
@@ -370,10 +382,11 @@ class HomeCaptureTest {
         repeat(29) { frame ->
             if (frame > 0) compose.mainClock.advanceTimeByFrame()
             val elapsed = frame * 16f
-            assertEquals("raw block at $elapsed", ((elapsed - 100f) / 170f).coerceIn(0f, 1f), motion.block.value, 0.01f)
-            assertEquals("raw background at $elapsed", ((elapsed - 100f) / 270f).coerceIn(0f, 1f), motion.background.value, 0.01f)
-            assertEquals("entry page progress at $elapsed", LinearOutSlowInEasing.transform((elapsed / 200f).coerceIn(0f, 1f)), motion.progress.value, 0.01f)
+            assertEquals("raw block at $elapsed", ((elapsed - 100f) / 270f).coerceIn(0f, 1f), motion.block.value, 0.01f)
+            assertEquals("raw background at $elapsed", ((elapsed - 100f) / 370f).coerceIn(0f, 1f), motion.background.value, 0.01f)
+            assertEquals("entry page progress at $elapsed", CubicBezierEasing(0.2f, 0f, 0f, 1f).transform((elapsed / 340f).coerceIn(0f, 1f)), motion.progress.value, 0.01f)
         }
+        compose.mainClock.advanceTimeBy(100)
         // Fully expanded -> Down out -> ordinary Down: the exit must keep fading, not freeze.
         focus(HomeSectionKind.GENRES)
         compose.mainClock.advanceTimeBy(80)
@@ -392,6 +405,21 @@ class HomeCaptureTest {
         assertEquals(0f, motion.blockShift.value, 0.1f)
         // Up out leaves the row above dimmed briefly; an ordinary move must restore it smoothly.
         focus(HomeSectionKind.ON_NOW)
+        assertTrue("Up-in starts above rest", motion.blockShift.value < 0f)
+        assertTrue("Up-in does not grow upward from its bottom", !motion.revealFromBottom)
+        val startShift = motion.blockShift.value
+        compose.mainClock.advanceTimeBy(100, ignoreFrameDuration = true)
+        assertTrue("rows start before info block", motion.progress.value > 0f)
+        assertEquals("block waits for rows", startShift, motion.blockShift.value, 0.1f)
+        assertEquals(0f, motion.block.value, 0.01f)
+        var previousShift = startShift
+        repeat(7) {
+            compose.mainClock.advanceTimeBy(50, ignoreFrameDuration = true)
+            assertTrue("Up-in block moves down toward rest", motion.blockShift.value >= previousShift)
+            previousShift = motion.blockShift.value
+        }
+        assertEquals("Up-in settles by 450 ms", 0f, motion.blockShift.value, 0.1f)
+        assertEquals(1f, motion.block.value, 0.02f)
         compose.mainClock.advanceTimeBy(600)
         focus(HomeSectionKind.RECENT_CHANNELS)
         compose.mainClock.advanceTimeBy(80)
@@ -405,6 +433,24 @@ class HomeCaptureTest {
     }
 
     private fun bounds(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).getUnclippedBoundsInRoot()
+
+    private fun assertImmersiveFits() {
+        val block = bounds("home-on-now-block")
+        val row = bounds("home-onnow-0")
+        assertTrue("whole info block clears safe top: $block", block.top >= 24.dp)
+        assertTrue("programme row stays inside canvas: $row", row.bottom <= 540.dp)
+        assertTrue("eyebrow remains inside block", bounds("channels-headline-channel").top >= 24.dp)
+        compose.onNodeWithTag("channels-immersive-next", useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun immersiveLargeFontKeepsInfoAndRowInsideCanvas() = atEvening {
+        show(Kind.BROWSE, fontScale = 1.3f)
+        settle("home-recent-0")
+        key(Key.DirectionDown)
+        capture("19-on-now-font-130", "home-onnow-0")
+        assertImmersiveFits()
+    }
 
     private fun assertTop(tag: String, expected: Float) {
         assertEquals("$tag top slot", expected, bounds(tag).top.value, 8f)
@@ -443,20 +489,23 @@ class HomeCaptureTest {
         val canvas = Canvas(strip)
         var previousBlockTop: Float? = null
         var blockBottomGap: Float? = null
+        val rowTops = mutableListOf<Float>()
         val aboveTop = bounds("home-header").top.value
         repeat(12) { frame ->
             if (frame > 0) compose.mainClock.advanceTimeBy(50, ignoreFrameDuration = true)
             compose.waitForIdle()
             assertOpacityEnvelope()
+            if (name == "up-out") rowTops += bounds("home-onnow-0").top.value
             val elapsed = frame * 50f
             val delay = when (name) {
                 "down-into", "first-run-header-down" -> 100f
-                "up-into" -> 100f
+                "up-into" -> 150f
                 else -> null
             }
             if (delay != null) {
-                val rawBlock = ((elapsed - delay) / if (name == "up-into") 200f else 170f).coerceIn(0f, 1f)
-                val rawBackground = ((elapsed - delay) / 270f).coerceIn(0f, 1f)
+                val rawBlock = ((elapsed - delay) / if (name == "up-into") 300f else 270f).coerceIn(0f, 1f)
+                val rawBackground = if (name == "up-into") ((elapsed - 50f) / 320f).coerceIn(0f, 1f)
+                    else ((elapsed - delay) / 370f).coerceIn(0f, 1f)
                 assertEquals("drawn block follows reference clocks at $elapsed", minOf(rawBlock, rawBackground), layerAlpha("home-on-now-block"), 0.08f)
             }
             if (name == "down-out") assertEquals(0f, layerAlpha("home-on-now-block"), 0.02f)
@@ -483,6 +532,8 @@ class HomeCaptureTest {
             bitmap.recycle()
         }
         assertSettledOpacity(expanded)
+        if (name == "up-out") assertTrue("Up-out row travels monotonically: $rowTops",
+            rowTops.zipWithNext().all { (a, b) -> b >= a - 0.5f })
         File(out, "strips/$name.png").apply { parentFile!!.mkdirs() }.outputStream().use {
             assertTrue(strip.compress(Bitmap.CompressFormat.PNG, 100, it))
         }

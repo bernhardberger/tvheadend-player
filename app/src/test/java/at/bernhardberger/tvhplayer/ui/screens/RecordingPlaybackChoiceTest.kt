@@ -26,10 +26,14 @@ import kotlin.time.Instant
 class RecordingPlaybackChoiceTest {
     @get:Rule val compose = createComposeRule()
 
-    @Test fun activeChoiceStartsAtWatchLiveAndNavigatesInOrder() {
+    @Test fun activeChoiceStartsAtResumeAndNavigatesInOrder() {
         var watched = 0
         val starts = mutableListOf<RecordingPlaybackStart>()
         show(754L, watch = { watched++ }, play = { starts += it })
+        compose.onNodeWithTag("recording-resume").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionLeft) }
+        compose.onNodeWithText("Watch channel").assertExists()
+        compose.onNodeWithText("Watch from beginning").assertExists()
         compose.onNodeWithTag("recording-watch-live").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionLeft) }
         compose.onNodeWithTag("recording-watch-live").assertIsFocused()
@@ -48,6 +52,8 @@ class RecordingPlaybackChoiceTest {
         var watched = 0
         show(null, watch = { watched++ }, visible = visible, close = { visible.value = false })
         compose.onNodeWithTag("recording-resume").assertDoesNotExist()
+        compose.onNodeWithTag("recording-start-over").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionLeft) }
         compose.onNodeWithTag("recording-watch-live").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionRight) }
         compose.onNodeWithTag("recording-start-over").assertIsFocused()

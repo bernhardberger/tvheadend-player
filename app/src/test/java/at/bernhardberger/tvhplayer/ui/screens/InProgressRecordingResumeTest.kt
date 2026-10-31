@@ -66,9 +66,11 @@ import kotlin.time.Instant
 class InProgressRecordingResumeTest {
     @get:Rule val compose = createComposeRule()
 
-    @Test fun recordingNowOkOffersWatchLiveBeforeResume() {
+    @Test fun recordingNowOkOffersWatchChannelToTheLeftOfResume() {
         var watched: at.bernhardberger.tvheadend.sdk.core.ChannelId? = null
         val starts = openDetails(754L, directly = true, onWatch = { id, _ -> watched = id })
+        compose.onNodeWithTag("recording-resume").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionLeft) }
         compose.onNodeWithTag("recording-watch-live").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionCenter) }
         compose.runOnIdle {
@@ -80,8 +82,6 @@ class InProgressRecordingResumeTest {
     @Test fun recordingNowOkWithoutPositionOffersStartAfterWatchLive() {
         val starts = openDetails(null, directly = true, onWatch = { _, _ -> })
         compose.onNodeWithTag("recording-resume").assertDoesNotExist()
-        compose.onNodeWithTag("recording-watch-live").assertIsFocused()
-            .performKeyInput { pressKey(Key.DirectionRight) }
         compose.onNodeWithTag("recording-start-over").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionCenter) }
         compose.runOnIdle { assertEquals(listOf(RecordingPlaybackStart.START_OVER), starts) }
@@ -91,6 +91,8 @@ class InProgressRecordingResumeTest {
         var latest: SessionObservation? = null
         val starts = openDetails(754L, directly = true, onWatch = { _, _ -> error("stale Watch live") },
             latestObservation = { latest })
+        compose.onNodeWithTag("recording-resume").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionLeft) }
         compose.onNodeWithTag("recording-watch-live").assertIsFocused()
         compose.runOnIdle { latest = observation(754L) }
         compose.onNodeWithTag("recording-watch-live").performKeyInput { pressKey(Key.DirectionCenter) }
@@ -139,7 +141,7 @@ class InProgressRecordingResumeTest {
     @Test fun inProgressMenuStartOverStartsFromBeginning() {
         val starts = openDetails(754L, menuOnly = true)
         compose.onNodeWithText("Watch").performKeyInput { pressKey(Key.DirectionDown) }
-        compose.onNodeWithText("Start over").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithText("Watch from beginning").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.runOnIdle { assertEquals(listOf(RecordingPlaybackStart.START_OVER), starts) }
     }
 
@@ -166,7 +168,7 @@ class InProgressRecordingResumeTest {
         compose.onNodeWithText("Watch").assertDoesNotExist()
         compose.onNodeWithText("Resume").assertDoesNotExist()
         compose.onNodeWithText("Watch live").assertDoesNotExist()
-        compose.onNodeWithText("Start over").assertExists()
+        compose.onNodeWithText("Watch from beginning").assertExists()
         // The playing mark is the button's icon, and the only one in the menu; the list beneath keeps its own.
         val menuMark = hasTestTag("channel-playing-indicator") and hasAnyAncestor(hasTestTag("browse-context-menu"))
         compose.onAllNodes(menuMark, useUnmergedTree = true).assertCountEquals(1)

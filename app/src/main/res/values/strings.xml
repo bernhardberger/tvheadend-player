@@ -57,7 +57,8 @@
     <string name="context_record">Record</string>
     <string name="context_show_guide">Show in Guide</string>
     <string name="context_resume">Resume</string>
-    <string name="context_start_over">Start over</string>
+    <string name="context_start_over">Watch from beginning</string>
+    <string name="recording_choice_watch_channel" tools:ignore="MissingTranslation">Watch channel</string>
     <string name="context_mark_watched">Mark as watched</string>
     <string name="context_mark_unwatched">Mark as unwatched</string>
     <string name="context_delete">Delete</string>

@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,13 +15,17 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.LastBaseline
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -31,6 +36,7 @@ import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import androidx.tv.material3.Icon
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
@@ -79,6 +85,7 @@ internal fun HomeActivityCard(
         else running?.image ?: entry?.image ?: entry?.fanartImage)?.takeIf { session != null }
     val icon = channel?.icon
     val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
     val ring = rememberCardFocusRing(interaction)
     // The current programme gives the title; a bare running entry shows its own text without EPG.
     val title = (if (recordingOnly) entry?.title else running?.title ?: entry?.title)?.takeIf(String::isNotBlank)
@@ -113,8 +120,15 @@ internal fun HomeActivityCard(
                 ChannelAccentFill(icon, channel.id, Modifier.fillMaxSize())
                 PiconBox(
                     icon,
-                    Modifier.align(Alignment.TopEnd).padding(16.dp).size(width * 0.25f, width * 0.14f),
-                    ground = channelAccentGround(icon, channel.id, depth = 0.5f),
+                    Modifier.align(Alignment.TopEnd)
+                        .size(width * 0.55f, width * 0.4f)
+                        .graphicsLayer {
+                            translationX = width.toPx() * 0.06f
+                            translationY = -width.toPx() * 0.04f
+                            alpha = 0.28f
+                        },
+                    ground = null,
+                    placeholders = false,
                 )
             } else {
                 if (channel != null) ChannelAccentFill(null, channel.id, Modifier.fillMaxSize())
@@ -151,36 +165,50 @@ internal fun HomeActivityCard(
                     if (recordingNow) entry?.let { RecordingBadge(it.state) }
                 }
             }
-            Column(
+            Row(
                 Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                ProgrammeEyebrow(picon = icon, text = channelLabel, modifier = Modifier.fillMaxWidth()) {
-                    if (playingRecording && !recordingNow) {
-                        StatusBadge(stringResource(R.string.home_activity_recording), StatusBadgeTone.NEUTRAL)
+                Column(
+                    Modifier.weight(1f).alignBy(LastBaseline),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    ProgrammeEyebrow(picon = icon, text = channelLabel, modifier = Modifier.fillMaxWidth()) {
+                        if (playingRecording && !recordingNow) {
+                            StatusBadge(stringResource(R.string.home_activity_recording), StatusBadgeTone.NEUTRAL)
+                        }
                     }
-                }
-                Text(
-                    title,
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = TvTextColors.primary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                val timesLine = if (playingRecording && viewer?.fraction != null) {
-                    playerMinutesLeft(((viewer.durationMs - viewer.positionMs).coerceAtLeast(0L) + 59_999L).div(60_000L).toInt())
-                } else activityTimesLine(event, entry, playing, nowSec)
-                timesLine.takeIf(String::isNotEmpty)?.let { times ->
                     Text(
-                        times,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = TvTextColors.secondary,
+                        title,
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = TvTextColors.primary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    val timesLine = if (playingRecording && viewer?.fraction != null) {
+                        playerMinutesLeft(((viewer.durationMs - viewer.positionMs).coerceAtLeast(0L) + 59_999L).div(60_000L).toInt())
+                    } else activityTimesLine(event, entry, playing, nowSec)
+                    timesLine.takeIf(String::isNotEmpty)?.let { times ->
+                        Text(
+                            times,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = TvTextColors.secondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
-                Text(stringResource(if (playing) R.string.home_back_to_player else R.string.watch),
-                    style = MaterialTheme.typography.labelSmall, color = TvTextColors.secondary, maxLines = 1)
+                Row(
+                    Modifier.alignBy(LastBaseline),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    val hintColor = if (focused) TvTextColors.primary else TvTextColors.secondary
+                    Icon(painterResource(if (playing) R.drawable.ic_fullscreen else R.drawable.ic_play_arrow),
+                        contentDescription = null, modifier = Modifier.size(18.dp), tint = hintColor)
+                    Text(stringResource(if (playing) R.string.home_back_to_player else R.string.watch),
+                        style = MaterialTheme.typography.labelMedium, color = hintColor, maxLines = 1)
+                }
             }
             val progress = if (playingRecording) viewer?.fraction else if (recordingOnly) {
                 val start = entry?.start?.epochSeconds

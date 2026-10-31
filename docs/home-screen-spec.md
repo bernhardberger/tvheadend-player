@@ -217,8 +217,11 @@ measurements above where they differ):**
   slot with them. The content block is anchored at its bottom just above the
   heading and grows upward: it slides up while fading in, its lines appearing
   bottom-anchored; the background fades in behind it. Settled within about
-  370 ms. Up out of On now is the reverse. It is never a crossfade in place.
-- Slot: cards at about 320 dp, so the next row's heading and the top of its
+  470 ms, with a distance-scaled, emphasized page move. Up out travels once
+  back to the ordinary slot, without overshooting. Up into On now from genres
+  starts the info block 16 dp above rest after 150 ms; it moves down and fades
+  in over 300 ms, after the rows have started. It is never a crossfade in place.
+- Slot: cards at about 344 dp, with 16 dp between heading and cards, so the next row's heading and the top of its
   cards peek at the bottom edge.
 - Every shelf fills the content width with whole cards and the next card peeks
   into the right margin: 4 cards on 16:9 shelves, 6 square tiles plus the end
@@ -286,8 +289,10 @@ Each card behaves like the screen it comes from.
 
 **Recording choice dialog:** OK on an active recording opens the existing
 centred resume dialog (`RecordingsScreen.kt`, `CentredDialog`) with up to three
-buttons: **Watch live** (focused first; tunes the channel), **Resume from …**
-(only with a resume position) and **Play from start**. The same dialog replaces
+buttons: **Watch channel** (tunes the channel), **Resume from …**
+(only with a resume position) and **Watch from beginning**. Resume takes initial
+focus when offered; otherwise Watch from beginning does. That default action is
+filled, and the other buttons are outlined. The same dialog replaces
 the current OK behavior on items in Recordings → **Recording now**.
 
 ## 4. Data
@@ -364,7 +369,7 @@ How phase 2 is presented remains open; the removed tabs are not a requirement.
 2. OK and Hold OK per card as in [3.6](#36-ok-and-hold-ok-on-each-card); On now
    tunes on OK.
 3. Active recordings (Home and Recordings → Recording now) open the choice dialog
-   Watch live / Resume from … / Play from start.
+   Watch channel / Resume from … / Watch from beginning.
 4. Warm playback keeps the video as background; no artwork backdrop then.
 5. Recents: one history, per server profile, up to 20 stored; Home and the
    player show up to 8; shared-scope filter; playing channel left out.

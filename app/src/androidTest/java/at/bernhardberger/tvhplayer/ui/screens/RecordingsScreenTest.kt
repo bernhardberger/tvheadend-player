@@ -1015,7 +1015,7 @@ class RecordingsScreenTest {
             .performKeyInput { pressKey(Key.Menu) }
         composeRule.onNodeWithText("Watch").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionDown) }
-        composeRule.onNodeWithText("Start over").assertIsFocused().pressCenter()
+        composeRule.onNodeWithText("Watch from beginning").assertIsFocused().pressCenter()
         composeRule.runOnIdle { assertEquals(listOf(RecordingPlaybackStart.START_OVER), starts) }
         composeRule.onAllNodesWithTag("programme-details-page").assertCountEquals(0)
     }
