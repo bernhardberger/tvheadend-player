@@ -39,7 +39,9 @@ Still open, to be decided with the mockup:
 ## 2. Header
 
 - No "Home" heading.
-- Top right: quiet date, wall clock, then View options at the far right.
+- Top right: wall clock with the date below it (smaller, muted), then the channel
+  group button (shared with Channels and Guide), then View options at the far
+  right.
 - Use locale and the existing clock-format preference; no seconds.
 - **The header scrolls with the content. It is not fixed.**
 - View options is a working Home-context control, not a placeholder or a feature
@@ -50,12 +52,12 @@ Still open, to be decided with the mockup:
 Sections from top to bottom; an empty section is omitted, never shown as an
 empty heading or placeholder:
 
-1. Current activity
+1. Current activity (heading "Right now": playback, running recordings or both)
 2. Recent channels
 3. On now
 4. Browse by genre
 5. Continue watching
-6. Recently recorded
+6. New recordings
 7. Upcoming recordings
 
 ### 3.1 Current activity
@@ -75,7 +77,8 @@ empty heading or placeholder:
 
 - Compact square picon tiles in **viewing-recency order**, newest first.
 - The same history as the player's recents (one store, see
-  [section 4](#4-data)). Home shows up to 8 tiles, with no "More" card.
+  [section 4](#4-data)). Home shows up to 8 tiles, then an **All channels** end
+  card that opens Channels.
 - Filtered by the shared channel scope, like the player's recents.
 - The channel that is currently playing is left out; it is on the current
   activity card.
@@ -200,6 +203,27 @@ On Home the row below is the genre row, so Down from On now uses the
 "Down out of it" transition: genres take the top slot, On now collapses to a
 dimmed row at the top edge, and the background fades out.
 
+**Home rules (owner 2026-10-31, from the G10 frames; these override the
+measurements above where they differ):**
+
+- The row's heading ("On now") stays small directly above its cards while the
+  row is expanded; it does not grow and is not replaced by the content block.
+  Only ordinary focused rows get the larger heading.
+- While On now is expanded the header row (clock, buttons) and everything above
+  have scrolled off the top; a small muted up chevron at the top centre shows
+  that more is above.
+- Down into On now: the rows above scroll up off the top as one page movement,
+  fading as they leave (about 90 ms to clear), and the row moves up into its
+  slot with them. The content block is anchored at its bottom just above the
+  heading and grows upward: it slides up while fading in, its lines appearing
+  bottom-anchored; the background fades in behind it. Settled within about
+  370 ms. Up out of On now is the reverse. It is never a crossfade in place.
+- Slot: cards at about 320 dp, so the next row's heading and the top of its
+  cards peek at the bottom edge.
+- Every shelf fills the content width with whole cards and the next card peeks
+  into the right margin: 4 cards on 16:9 shelves, 6 square tiles plus the end
+  card on Recent channels, 2 half-width cards on Right now.
+
 **Checks a capture or review must pass:** entering the immersive row puts its
 cards in the fixed slot, never at the top of the screen; leaving it downward
 scrolls the next row to the top slot and leaves the collapsed row peeking at the
@@ -271,8 +295,8 @@ the current OK behavior on items in Recordings → **Recording now**.
 - **Channel scope:** the shared selected channel scope, not a Home-only copy. If
   the selected scope becomes invalid, fall back to All channels; use a first-valid
   fallback only if the catalog can lack All. An intentionally empty but valid
-  scope is not invalid and must not silently become All. Scope selection is in
-  View options, listed first. Open (owner 2026-10-31): how channel groups
+  scope is not invalid and must not silently become All. Scope selection is the
+  header's channel group button. Open (owner 2026-10-31): how channel groups
   should work across Home, Channels, Guide and the player's surfing is to be
   rethought after Home; until then Home follows the shared group.
 - **On now:** current programmes in ascending channel-number order, not recency or
@@ -306,7 +330,8 @@ How phase 2 is presented remains open; the removed tabs are not a requirement.
 
 ## 5. Options, loading and interaction
 
-- Home View options: show/hide for the sections and the shared scope selection,
+- Home View options: show/hide for the sections; the shared channel group has
+  its own header button like Channels and Guide. Section visibility is
   persisted through existing preferences. No row reordering, row editor or
   dashboard framework.
 - Layout-matched skeletons only for genuinely unavailable data. Cached content is
