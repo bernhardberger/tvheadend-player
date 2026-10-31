@@ -603,6 +603,7 @@ internal fun HomeContent(
                                 emphasis = emphasis,
                                 entry = entry,
                                 entryIndex = entryIndex,
+                                followInitialFocus = followInitialFocus,
                                 rail = rail,
                                 ltr = ltr,
                                 nowSec = nowSec,
@@ -620,6 +621,7 @@ internal fun HomeContent(
                                 textShown = focused,
                                 entry = entry,
                                 entryIndex = entryIndex,
+                                followInitialFocus = followInitialFocus,
                                 rail = rail,
                                 ltr = ltr,
                                 onCardFocus = onCardFocus,
@@ -634,6 +636,7 @@ internal fun HomeContent(
                                 emphasis = emphasis,
                                 entry = entry,
                                 entryIndex = entryIndex,
+                                followInitialFocus = followInitialFocus,
                                 rail = rail,
                                 ltr = ltr,
                                 nowSec = nowSec,
@@ -653,6 +656,7 @@ internal fun HomeContent(
                                 emphasis = emphasis,
                                 entry = entry,
                                 entryIndex = entryIndex,
+                                followInitialFocus = followInitialFocus,
                                 rail = rail,
                                 ltr = ltr,
                                 onCardFocus = onCardFocus,
@@ -668,6 +672,7 @@ internal fun HomeContent(
                                 textShown = focused,
                                 entry = entry,
                                 entryIndex = entryIndex,
+                                followInitialFocus = followInitialFocus,
                                 rail = rail,
                                 ltr = ltr,
                                 nowSec = nowSec,
@@ -687,6 +692,7 @@ internal fun HomeContent(
                                 textShown = focused,
                                 entry = entry,
                                 entryIndex = entryIndex,
+                                followInitialFocus = followInitialFocus,
                                 rail = rail,
                                 ltr = ltr,
                                 nowSec = nowSec,
@@ -703,6 +709,7 @@ internal fun HomeContent(
                                 emphasis = emphasis,
                                 entry = entry,
                                 entryIndex = entryIndex,
+                                followInitialFocus = followInitialFocus,
                                 nowSec = nowSec,
                                 zone = zone,
                                 locale = locale,
@@ -822,6 +829,7 @@ private fun <T> HomeCardRow(
     emphasis: () -> Float,
     entry: FocusRequester,
     entryIndex: Int,
+    followInitialFocus: Boolean,
     rail: FocusRequester,
     ltr: Boolean,
     modifier: Modifier = Modifier,
@@ -835,7 +843,9 @@ private fun <T> HomeCardRow(
     val state = rememberLazyListState(initialFirstVisibleItemIndex = entryIndex.coerceAtLeast(0))
     var rememberedIndex by remember { mutableIntStateOf(entryIndex) }
     var rememberedKey by remember { mutableStateOf(items.getOrNull(entryIndex)?.let(itemKey)) }
-    val restoredIndex = items.indexOfFirst { itemKey(it) == rememberedKey }.takeIf { it >= 0 }
+    // Before input, entry follows the current initial card rather than its remembered child.
+    val restoredIndex = if (followInitialFocus) entryIndex else
+        items.indexOfFirst { itemKey(it) == rememberedKey }.takeIf { it >= 0 }
         ?: rememberedIndex.coerceIn(0, items.lastIndex.coerceAtLeast(0))
     CompositionLocalProvider(
         LocalBringIntoViewSpec provides StartKeylineBringIntoViewSpec(
@@ -894,6 +904,7 @@ private fun HomeActivityRow(
     emphasis: () -> Float,
     entry: FocusRequester,
     entryIndex: Int,
+    followInitialFocus: Boolean,
     rail: FocusRequester,
     ltr: Boolean,
     nowSec: Long,
@@ -910,6 +921,7 @@ private fun HomeActivityRow(
         emphasis = emphasis,
         entry = entry,
         entryIndex = entryIndex,
+        followInitialFocus = followInitialFocus,
         rail = rail,
         ltr = ltr,
     ) { index, item, itemModifier ->
@@ -972,6 +984,7 @@ private fun HomeRecentRow(
     textShown: Boolean,
     entry: FocusRequester,
     entryIndex: Int,
+    followInitialFocus: Boolean,
     rail: FocusRequester,
     ltr: Boolean,
     onCardFocus: (Int, String) -> Unit,
@@ -986,6 +999,7 @@ private fun HomeRecentRow(
         emphasis = emphasis,
         entry = entry,
         entryIndex = entryIndex,
+        followInitialFocus = followInitialFocus,
         rail = rail,
         ltr = ltr,
     ) { index, item, itemModifier ->
@@ -1020,6 +1034,7 @@ private fun HomeOnNowRow(
     emphasis: () -> Float,
     entry: FocusRequester,
     entryIndex: Int,
+    followInitialFocus: Boolean,
     rail: FocusRequester,
     ltr: Boolean,
     nowSec: Long,
@@ -1038,6 +1053,7 @@ private fun HomeOnNowRow(
         emphasis = emphasis,
         entry = entry,
         entryIndex = entryIndex,
+        followInitialFocus = followInitialFocus,
         rail = rail,
         ltr = ltr,
         modifier = Modifier.onGloballyPositioned {
@@ -1164,6 +1180,7 @@ private fun HomeGenreRow(
     emphasis: () -> Float,
     entry: FocusRequester,
     entryIndex: Int,
+    followInitialFocus: Boolean,
     rail: FocusRequester,
     ltr: Boolean,
     onCardFocus: (Int, String) -> Unit,
@@ -1177,6 +1194,7 @@ private fun HomeGenreRow(
         emphasis = emphasis,
         entry = entry,
         entryIndex = entryIndex,
+        followInitialFocus = followInitialFocus,
         rail = rail,
         ltr = ltr,
     ) { index, item, itemModifier ->
@@ -1202,6 +1220,7 @@ private fun HomeShelfRow(
     textShown: Boolean,
     entry: FocusRequester,
     entryIndex: Int,
+    followInitialFocus: Boolean,
     rail: FocusRequester,
     ltr: Boolean,
     nowSec: Long,
@@ -1221,6 +1240,7 @@ private fun HomeShelfRow(
         emphasis = emphasis,
         entry = entry,
         entryIndex = entryIndex,
+        followInitialFocus = followInitialFocus,
         rail = rail,
         ltr = ltr,
     ) { index, item, itemModifier ->
@@ -1330,6 +1350,7 @@ private fun HomeUpcomingRow(
     emphasis: () -> Float,
     entry: FocusRequester,
     entryIndex: Int,
+    followInitialFocus: Boolean,
     nowSec: Long,
     zone: ZoneId,
     locale: Locale,
@@ -1340,6 +1361,7 @@ private fun HomeUpcomingRow(
 ) {
     HomeCardRow(items = items + listOf(null), itemKey = { it?.entry?.id?.value ?: "all-scheduled" }, keyline = keyline,
         gap = HomeGenreGap, emphasis = emphasis, entry = entry, entryIndex = entryIndex,
+        followInitialFocus = followInitialFocus,
         rail = rail, ltr = ltr,
     ) { index, item, modifier ->
         if (item == null) HomeTextCard(stringResource(R.string.home_all_scheduled),

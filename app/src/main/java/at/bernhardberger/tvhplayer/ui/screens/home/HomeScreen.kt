@@ -8,8 +8,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.type
 import at.bernhardberger.tvhplayer.ui.components.TabOwner
 import at.bernhardberger.tvhplayer.ui.components.LocalTabOwner
 import at.bernhardberger.tvhplayer.ui.components.AppErrorAlert
@@ -278,7 +276,8 @@ internal fun HomeScreenContent(
         } ?: homeInitialFocus(sections),
         onFocused = { focused = it; restoreHeader = false },
         modifier = modifier.onPreviewKeyEvent {
-            if (it.type == KeyEventType.KeyDown) followInitialFocus = false
+            // Drawer entry may deliver only the release to Home; it is still viewer input.
+            followInitialFocus = false
             false
         },
         followInitialFocus = followInitialFocus && sections.isNotEmpty(),

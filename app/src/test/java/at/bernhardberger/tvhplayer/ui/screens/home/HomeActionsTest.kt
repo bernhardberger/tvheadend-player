@@ -4,6 +4,9 @@ import android.app.Application
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.*
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.*
@@ -60,6 +63,77 @@ class HomeActionsTest {
     @Test fun lateRunningRecordingBecomesInitialFocusBeforeAnyHomeKey() = lateRunningRecording(false)
 
     @Test fun lateRunningRecordingDoesNotReplaceTheViewersChosenCard() = lateRunningRecording(true)
+
+    @Test fun earlierOnNowItemBecomesInitialFocusBeforeAnyHomeKey() = earlierOnNowItem(false)
+
+    @Test fun earlierOnNowItemDoesNotReplaceTheViewersChosenCard() = earlierOnNowItem(true)
+
+    @Test fun drawerEntryKeyUpEndsInitialFocusFollowing() = lateRecordingAfterOwnershipBoundary(true)
+
+    @Test fun ownershipLossEndsInitialFocusFollowingWithoutAHomeKey() = lateRecordingAfterOwnershipBoundary(false)
+
+    private fun lateRecordingAfterOwnershipBoundary(drawerFirst: Boolean) {
+        var enabled by mutableStateOf(!drawerFirst)
+        var input by mutableStateOf(HomeInput(listOf(channel), emptyMap(), emptyList(),
+            listOf(channel.id), emptyList(), { null }, null, now))
+        val drawerFocus = androidx.compose.ui.focus.FocusRequester()
+        compose.setContent { TVHeadendPlayerTheme {
+            androidx.compose.foundation.layout.Box {
+                HomeScreenContent(input, SessionObservation.create(), PaddingValues(), enabled,
+                    onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
+                    onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
+                if (drawerFirst) androidx.tv.material3.Button(onClick = {}, modifier = androidx.compose.ui.Modifier
+                    .focusRequester(drawerFocus).testTag("test-drawer")
+                    .onPreviewKeyEvent {
+                        if (it.key == Key.DirectionRight && it.type == androidx.compose.ui.input.key.KeyEventType.KeyDown) {
+                            enabled = true
+                            true
+                        } else false
+                    }) { androidx.tv.material3.Text("Drawer") }
+            }
+        } }
+        if (drawerFirst) {
+            compose.runOnIdle { drawerFocus.requestFocus() }
+            compose.onNodeWithTag("test-drawer").assertIsFocused()
+                .performKeyInput { keyDown(Key.DirectionRight) }
+            compose.onNodeWithTag("home-recent-0").assertIsFocused()
+                .performKeyInput { keyUp(Key.DirectionRight) }
+        } else {
+            compose.onNodeWithTag("home-recent-0").assertIsFocused()
+            compose.runOnIdle { enabled = false }
+            compose.runOnIdle { enabled = true }
+            compose.onNodeWithTag("home-recent-0").assertIsFocused()
+        }
+        compose.runOnIdle {
+            input = input.copy(dvrEntries = listOf(DvrEntry.create(DvrEntryId(7), channelId = channel.id,
+                title = "Running recording", state = DvrEntryState.RECORDING,
+                start = Instant.fromEpochSeconds(now - 300), stop = Instant.fromEpochSeconds(now + 900))))
+        }
+        compose.mainClock.advanceTimeBy(600)
+        compose.onNodeWithTag("home-recent-0").assertIsFocused()
+    }
+
+    private fun earlierOnNowItem(viewerMoved: Boolean) {
+        val channels = (1L..3L).map { Channel.create(ChannelId(it), name = "Channel $it") }
+        val events = channels.associate { it.id to EpgEvent.create(EventId(it.id.value), it.id,
+            Instant.fromEpochSeconds(now - 600), Instant.fromEpochSeconds(now + 600),
+            title = "Programme ${it.id.value}") }
+        var input by mutableStateOf(HomeInput(channels, events - channels.first().id, emptyList(),
+            emptyList(), emptyList(), { null }, null, now))
+        compose.setContent { TVHeadendPlayerTheme {
+            HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
+                onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
+                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
+        } }
+        compose.onNodeWithTag("home-onnow-0").assertIsFocused()
+        if (viewerMoved) {
+            compose.onNodeWithTag("home-onnow-0").performKeyInput { pressKey(Key.DirectionRight) }
+            compose.onNodeWithTag("home-onnow-1").assertIsFocused()
+        }
+        compose.runOnIdle { input = input.copy(currentEvents = events) }
+        compose.mainClock.advanceTimeBy(600)
+        compose.onNodeWithTag(if (viewerMoved) "home-onnow-2" else "home-onnow-0").assertIsFocused()
+    }
 
     private fun lateRunningRecording(viewerMoved: Boolean) {
         val second = Channel.create(ChannelId(2), name = "Second")
