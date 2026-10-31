@@ -1,5 +1,6 @@
 @file:androidx.media3.common.util.UnstableApi
-@file:OptIn(at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class)
+@file:OptIn(at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class,
+    at.bernhardberger.tvheadend.sdk.playback.SubscriptionInfrastructureApi::class)
 
 package at.bernhardberger.tvhplayer.ui
 
@@ -24,6 +25,8 @@ import at.bernhardberger.tvhplayer.settings.*
 import at.bernhardberger.tvhplayer.stores.*
 import at.bernhardberger.tvhplayer.viewmodels.*
 import at.bernhardberger.tvhplayer.ui.components.awaitBrowsePreparation
+import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyMode
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionOpener
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import org.koin.compose.KoinIsolatedContext
@@ -43,6 +46,11 @@ internal class NavigationJourneyFixture(
     lateinit var back: androidx.activity.OnBackPressedDispatcher
         private set
     val guidePosition = GuidePositionStore()
+    var playerVisible = false
+        private set
+    var startupKeyMode: MainStartupKeyMode = MainStartupKeyMode.Inactive
+        private set
+    val launchRequests = ApplianceLaunchRequests()
 
     fun close() {
         scope.cancel()
@@ -63,7 +71,7 @@ internal class NavigationJourneyFixture(
         key(Key.Enter)
     }
 
-    fun app(withRecording: Boolean = false, emptyEpg: Boolean = false, scheduled: List<DvrEntry> = emptyList()) {
+    fun app(withRecording: Boolean = false, emptyEpg: Boolean = false, scheduled: List<DvrEntry> = emptyList(), autoStartPlayback: Boolean = false) {
         val now = kotlin.time.Clock.System.now().epochSeconds
         val catalog = ChannelCatalog.create((1..if (withRecording) 8L else 3L).map {
             Channel.create(ChannelId(it), name = "Name $it", number = it)
@@ -85,7 +93,11 @@ internal class NavigationJourneyFixture(
                 DvrEntry.create(id = DvrEntryId(7), eventId = EventId(66), channelId = ChannelId(6),
                     state = DvrEntryState.COMPLETED, title = "Recorded programme"),
             ) else emptyList()) + scheduled)),
-        )).apply { scriptLivePlaybackSuccess(); if (withRecording) scriptRecordingPlaybackSuccess() }
+        )).apply {
+            if (autoStartPlayback) scriptLivePlaybackSuccess(SubscriptionOpener { _, _, _ -> awaitCancellation() })
+            else scriptLivePlaybackSuccess()
+            if (withRecording) scriptRecordingPlaybackSuccess()
+        }
         val settings = PlayerSettingsStore(InMemoryData())
         val profiles = AppProfileOwner(session, FakeServerProfileStore(ServerProfileReadResult.anonymous(server.host, server.htspPort)),
             settings, Dispatchers.IO, readProfileForEditing = { ServerProfileEditReadResult.Missing })
@@ -115,15 +127,28 @@ internal class NavigationJourneyFixture(
             viewModel { SettingsStorageViewModel(session.cache, get(), ChannelAccentStore()) {} }
             viewModel { SettingsPlayerViewModel(get(), get(), get(), get(), get()) }
         }
+        launchRequests.requestStartup(autoStartPlayback)
         compose.setContent {
             KoinIsolatedContext(koinApplication { modules(dependencies) }) {
                 TVHeadendPlayerTheme {
                     back = requireNotNull(androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
-                    AppRoot(startupState = MainStartupState.Ready(server, autoStartPlayback = false),
-                        runtimeServerSettings = server, applianceLaunchRequests = ApplianceLaunchRequests(),
-                        onPlayerVisibilityChanged = {}, onRequestExit = {})
+                    AppRoot(startupState = MainStartupState.Ready(server, autoStartPlayback = autoStartPlayback),
+                        runtimeServerSettings = server, applianceLaunchRequests = launchRequests,
+                        onPlayerVisibilityChanged = { playerVisible = it }, onRequestExit = {},
+                        registerActivityKeyContract = { contract ->
+                            startupKeyMode = contract.mode
+                            {}
+                        })
                 }
             }
+        }
+        if (autoStartPlayback) {
+            compose.waitUntil(15_000) {
+                compose.mainClock.advanceTimeByFrame()
+                compose.awaitBrowsePreparation()
+                playerVisible && runtime.activeTarget.value is AppPlaybackTarget.Live
+            }
+            return
         }
         compose.waitUntil(15_000) { compose.onAllNodes(hasTestTag("nav-channels")).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("nav-channels").performSemanticsAction(SemanticsActions.OnClick)

@@ -102,7 +102,9 @@ class PlayerBaselineProfile {
 
     private fun MacrobenchmarkScope.awaitHome() {
         assertTrue("Cold start must draw Home and release startup", device.wait({
-            !has(By.res("main-startup-root")) && has(By.res("home-header")) && has(By.res("home-onnow-0"))
+            // The topmost section's first card: Right now and Recent channels push On now below
+            // the fold once something has played, and a lazy row off screen has no nodes.
+            !has(By.res("main-startup-root")) && has(By.res("home-header")) && has(By.res(FirstHomeCard))
         }, ReadyTimeout))
     }
 
@@ -246,3 +248,5 @@ class PlayerBaselineProfile {
         const val FocusTimeout = 2_000L
     }
 }
+
+private val FirstHomeCard = java.util.regex.Pattern.compile("home-(activity|recent|onnow)-0")

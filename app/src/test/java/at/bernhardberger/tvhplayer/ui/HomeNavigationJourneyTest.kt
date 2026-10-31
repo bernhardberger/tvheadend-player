@@ -7,11 +7,17 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import at.bernhardberger.tvhplayer.settings.ServerSettings
+import at.bernhardberger.tvhplayer.ui.components.awaitBrowsePreparation
+import at.bernhardberger.tvhplayer.core.ApplianceLaunchState
+import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyMode
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import kotlin.time.Instant
 import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -26,6 +32,43 @@ class HomeNavigationJourneyTest {
     @get:Rule val compose = createComposeRule()
     private val fixture = NavigationJourneyFixture(compose, ServerSettings(host = javaClass.simpleName))
     @After fun after() = fixture.close()
+
+    @Test fun autostartLiveWithoutRecordingsReturnsToExposedHomeAndReleasesStartup() {
+        compose.mainClock.autoAdvance = false
+        fixture.app(autoStartPlayback = true)
+        compose.runOnIdle {
+            assertTrue(fixture.playerVisible)
+            // Keep the offline stream pending rather than letting an empty fake stream fail.
+            // Supply the launch completion normally sent by the player's first-picture callback.
+            val entering = fixture.launchRequests.state.value as ApplianceLaunchState.Entering
+            assertTrue(fixture.launchRequests.completePlayerVisibility(entering.target, entering.target.channelId, entering.target.channelName))
+        }
+        fixture.settle()
+        compose.onNodeWithTag("home-header").assertDoesNotExist()
+        repeat(3) {
+            if (fixture.playerVisible) {
+                compose.runOnIdle { fixture.back.onBackPressed() }
+                fixture.settle()
+            }
+        }
+        compose.waitUntil(15_000) {
+            compose.mainClock.advanceTimeBy(50)
+            compose.awaitBrowsePreparation()
+            compose.onAllNodes(hasTestTag("home-header")).fetchSemanticsNodes().isNotEmpty() &&
+                compose.onAllNodes(hasTestTag("home-onnow-0")).fetchSemanticsNodes().isNotEmpty()
+        }
+        fixture.settle()
+        compose.onNodeWithTag("main-startup-root").assertDoesNotExist()
+        compose.runOnIdle {
+            assertFalse(fixture.playerVisible)
+            assertEquals(MainStartupKeyMode.Inactive, fixture.startupKeyMode)
+        }
+        // Home's scroll-away header may be above the viewport when On now owns focus,
+        // but both must remain exposed to the merged accessibility/automation tree.
+        compose.onNodeWithTag("home-header").assertExists()
+        compose.onNodeWithTag("home-onnow-0").assertIsDisplayed()
+        compose.onNodeWithTag("nav-home").assertExists()
+    }
 
     @Test fun emptyHomeBrowseChannelsUsesTheChannelsDestination() {
         fixture.app(emptyEpg = true)
