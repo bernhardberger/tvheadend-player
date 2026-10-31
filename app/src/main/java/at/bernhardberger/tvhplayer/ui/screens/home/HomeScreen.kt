@@ -17,6 +17,8 @@ import at.bernhardberger.tvhplayer.core.*
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.common.rememberCurrentEpochSeconds
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
+import at.bernhardberger.tvhplayer.viewmodels.ChannelScopeState
+import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 import at.bernhardberger.tvhplayer.ui.screens.ChannelContextMenu
 import at.bernhardberger.tvhplayer.ui.screens.DvrMutationAction
 import at.bernhardberger.tvhplayer.ui.rememberCloseBehindPlayer
@@ -69,33 +71,53 @@ internal fun HomeScreen(
     val nowSec = rememberCurrentEpochSeconds()()
     val playing = playingRecordingId?.let(HomePlaying::Recording)
         ?: playingChannelId?.let(HomePlaying::LiveChannel)
-    val input = remember(scope, observation, recents, playing, nowSec) {
-        val channels = scope.scope.visibleChannels
-        HomeInput(
-            channels = channels,
-            currentEvents = channels.mapNotNull { channel ->
-                observation.eventAt(channel.id, Instant.fromEpochSeconds(nowSec))?.let { channel.id to it }
-            }.toMap(),
-            upcomingEvents = guideDisplayEvents(observation.epgSnapshotForDisplay),
-            recentChannelIds = recents,
-            dvrEntries = observation.dvrSnapshotForDisplay?.entries.orEmpty(),
-            admission = observation::recordingPlaybackAdmission,
-            playing = playing,
-            nowSec = nowSec,
-        )
+    val alignedInput = remember(scope, observation, recents, playing, nowSec) {
+        homeInput(scope, observation, recents, playing, nowSec)
     }
+    // Retain the input together with both observations: programme pictures and saved channel
+    // logos must keep the authority of the same aligned frame while the two flows catch up.
+    var retainedFrame by remember { mutableStateOf<Triple<HomeInput, SessionObservation, SessionObservation?>?>(null) }
+    val frame = alignedInput?.let { Triple(it, observation, scope.observation) } ?: retainedFrame
+    SideEffect { if (alignedInput != null) retainedFrame = frame }
+    if (frame == null) return
     CompositionLocalProvider(LocalTabOwner provides owner) {
-        HomeScreenContent(input, observation, contentPadding, initialFocusEnabled,
+        ProvideArtworkSession(frame.second.currentSession, frame.third) {
+        HomeScreenContent(frame.first, frame.second, contentPadding, initialFocusEnabled,
             onPlay = { id, name -> if (current(id)) onPlay(id, name) },
             onPlayRecording = { selection, start ->
-                if (current(input.dvrEntries.firstOrNull { it.id == selection.recordingId }?.channelId)) onPlayRecording(selection, start)
+                if (owner.isCurrent) onPlayRecording(selection, start)
             },
-            onReturnToRecording = { id, before -> current(input.dvrEntries.firstOrNull { it.id == id }?.channelId) && onReturnToRecording(id, before) },
+            onReturnToRecording = { id, before -> owner.isCurrent && onReturnToRecording(id, before) },
             onShowGuide = { id, event -> if (current(id)) onShowGuide(id, event) },
             onGenre = { if (current()) onGenre(it) }, onRecordings = { if (current()) onRecordings(it) },
             modifier = modifier, connectionUiState = connectionUiState, connectionFailure = connectionFailure,
             onRetry = onRetry, onOpenConnectionSettings = onOpenConnectionSettings)
+        }
     }
+}
+
+@OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
+internal fun homeInput(
+    scope: ChannelScopeState,
+    observation: SessionObservation,
+    recents: List<ChannelId>,
+    playing: HomePlaying?,
+    nowSec: Long,
+): HomeInput? {
+    if (scope.observation?.currentSession !== observation.currentSession) return null
+    val channels = scope.scope.visibleChannels
+    return HomeInput(
+        channels = channels,
+        currentEvents = channels.mapNotNull { channel ->
+            observation.eventAt(channel.id, Instant.fromEpochSeconds(nowSec))?.let { channel.id to it }
+        }.toMap(),
+        upcomingEvents = guideDisplayEvents(observation.epgSnapshotForDisplay),
+        recentChannelIds = recents,
+        dvrEntries = observation.dvrSnapshotForDisplay?.entries.orEmpty(),
+        admission = observation::recordingPlaybackAdmission,
+        playing = playing,
+        nowSec = nowSec,
+    )
 }
 
 @Composable
@@ -131,7 +153,6 @@ internal fun HomeScreenContent(
     val closeBehindPlayer = rememberCloseBehindPlayer()
     fun openRecording(entry: DvrEntry, menu: Boolean) {
         if (owner?.isCurrent == false) return
-        if (entry.channelId != null && input.channels.none { it.id == entry.channelId }) return
         if (!menu && entry.id == playingRecordingId &&
             onReturnToRecording(entry.id) { closeBehindPlayer { recording = null } }) return
         val capability = observation.currentSession
@@ -149,8 +170,8 @@ internal fun HomeScreenContent(
                 when (val current = item.playing) {
                     is HomePlaying.LiveChannel -> if (!menu) observation.channel(current.channelId)
                         ?.let { onPlay(it.id, it.name.orEmpty()) }
-                    is HomePlaying.Recording -> if (!menu && !onReturnToRecording(current.entryId) {}) {
-                        input.dvrEntries.firstOrNull { it.id == current.entryId }?.let { openRecording(it, false) }
+                    is HomePlaying.Recording -> if (menu || !onReturnToRecording(current.entryId) {}) {
+                        input.dvrEntries.firstOrNull { it.id == current.entryId }?.let { openRecording(it, menu) }
                     }
                     null -> item.recording?.let { openRecording(it, menu) }
                 }

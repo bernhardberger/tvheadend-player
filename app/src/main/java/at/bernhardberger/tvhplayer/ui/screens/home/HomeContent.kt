@@ -366,6 +366,7 @@ internal fun HomeContent(
     }
 
     LaunchedEffect(sections, focusEnabled) {
+        if (!focusEnabled) { focusedCard = null; return@LaunchedEffect }
         val previous = focusedCard ?: return@LaunchedEffect
         if (!focusEnabled || drawerState?.currentValue == DrawerValue.Open) return@LaunchedEffect
         if (previous.item == "all-recordings" && sections.any { it.kind == previous.section }) return@LaunchedEffect
@@ -432,7 +433,7 @@ internal fun HomeContent(
                     firstSectionRequester = firstSection?.let(requesters::get),
                     rail = rail,
                     ltr = ltr,
-                    onFocused = { focusedSection = null },
+                    onFocused = { focusedSection = null; focusedCard = null },
                     // A negative page offset makes room for a first/early immersive row; it must
                     // not drag the header down into that row's content block.
                     modifier = Modifier.graphicsLayer { translationY = minOf(scrollPx, 0f) },
@@ -837,7 +838,7 @@ private fun HomeActivityRow(
             width = width,
             description = description,
             onClick = { onActivate(index, activityKey(item)) },
-            onLongClick = if (playing == null) ({ onContextMenu(index, activityKey(item)) }) else null,
+            onLongClick = if (playing !is HomePlaying.LiveChannel) ({ onContextMenu(index, activityKey(item)) }) else null,
             modifier = itemModifier
                 .testTag("home-activity-$index")
                 .onFocusChanged { if (it.isFocused) onCardFocus(index, activityKey(item)) },

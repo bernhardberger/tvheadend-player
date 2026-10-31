@@ -82,6 +82,39 @@ class HomeActionsTest {
         compose.onNodeWithTag("home-recent-0").assertIsFocused()
     }
 
+    @Test fun removingLastVisitedCardDoesNotStealHeaderFocus() {
+        val second = Channel.create(ChannelId(2), name = "Second")
+        var input by mutableStateOf(HomeInput(listOf(channel, second), emptyMap(), emptyList(),
+            listOf(channel.id, second.id), emptyList(), { null }, null, now))
+        compose.setContent { TVHeadendPlayerTheme {
+            HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
+                onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
+                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = {})
+        } }
+        compose.onNodeWithTag("home-recent-0").assertIsFocused().performKeyInput { pressKey(Key.DirectionUp) }
+        compose.onNodeWithTag("home-view-button").assertIsFocused()
+        compose.runOnIdle { input = input.copy(recentChannelIds = listOf(second.id)) }
+        compose.onNodeWithTag("home-view-button").assertIsFocused()
+    }
+
+    @Test fun outOfScopeContinueWatchingOpensFromOkAndMenu() {
+        recordingHome(false, { fail("must not tune") }, { }, outsideScope = true)
+        compose.onNodeWithTag("home-shelf-0").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("recording-resume").assertIsFocused().performKeyInput { pressKey(Key.Back) }
+        compose.onNodeWithTag("home-shelf-0").assertIsFocused().performKeyInput { pressKey(Key.Menu) }
+        compose.mainClock.advanceTimeBy(500)
+        compose.onNodeWithTag("browse-context-menu").assertIsDisplayed()
+    }
+
+    @Test fun outOfScopeActivityRecordingFallsBackFromOkAndOpensMenu() {
+        recordingHome(false, { fail("must not tune") }, { }, playing = true, outsideScope = true)
+        compose.onNodeWithTag("home-activity-0").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("recording-resume").assertIsFocused().performKeyInput { pressKey(Key.Back) }
+        compose.onNodeWithTag("home-activity-0").assertIsFocused().performKeyInput { pressKey(Key.Menu) }
+        compose.mainClock.advanceTimeBy(500)
+        compose.onNodeWithTag("browse-context-menu").assertIsDisplayed()
+    }
+
     @Test fun recordingShelfMenuOpensWithoutPlayingAndBackRestoresFocus() {
         recordingHome(false, { fail("menu tuned") }, { fail("menu played") })
         compose.onNodeWithTag("home-shelf-0").assertIsFocused().performKeyInput { pressKey(Key.Menu) }
@@ -171,7 +204,7 @@ class HomeActionsTest {
     }
 
     @OptIn(TvheadendTestingApi::class, at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
-    private fun recordingHome(running: Boolean, onWatch: (ChannelId) -> Unit, onPlay: (RecordingPlaybackStart) -> Unit, playing: Boolean = false) {
+    private fun recordingHome(running: Boolean, onWatch: (ChannelId) -> Unit, onPlay: (RecordingPlaybackStart) -> Unit, playing: Boolean = false, outsideScope: Boolean = false) {
         val entry = DvrEntry.create(DvrEntryId(1), channelId = channel.id, title = "Test recording",
             state = if (running) DvrEntryState.RECORDING else DvrEntryState.COMPLETED,
             start = Instant.fromEpochSeconds(now - 1800), stop = Instant.fromEpochSeconds(if (running) now + 1800 else now),
@@ -189,7 +222,7 @@ class HomeActionsTest {
         val notices = NoticeCenter({ 0L }) { NoticeContext(0, observation.currentSession?.generationIdentity) }
         val dependencies = module { single<TvheadendSession> { session }; single { notices } }
         val application = org.koin.dsl.koinApplication { modules(dependencies) }
-        val input = HomeInput(listOf(channel), emptyMap(), emptyList(), emptyList(), listOf(entry), observation::recordingPlaybackAdmission,
+        val input = HomeInput(if (outsideScope) emptyList() else listOf(channel), emptyMap(), emptyList(), emptyList(), listOf(entry), observation::recordingPlaybackAdmission,
             if (playing) HomePlaying.Recording(entry.id) else null, now)
         compose.setContent { org.koin.compose.KoinIsolatedContext(application) {
             back = androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current!!.onBackPressedDispatcher
