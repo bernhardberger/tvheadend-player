@@ -340,6 +340,31 @@ class HomeActionsTest {
         compose.onNodeWithTag("home-section-GENRES").assertExists()
     }
 
+    @Test fun restoredShortLastRowHasNoEntryClampJump() {
+        val sections = listOf<HomeSection>(HomeSection.RecentChannels(listOf(RecentChannelItem(channel))),
+            HomeSection.OnNow(listOf(OnNowItem(channel, EpgEvent.create(EventId(1), channel.id,
+                Instant.fromEpochSeconds(now - 60), Instant.fromEpochSeconds(now + 600), title = "Programme")))),
+            HomeSection.Genres(listOf(GenreItem(ProgrammeCategory.ALL))),
+            HomeSection.Upcoming(listOf(UpcomingItem(DvrEntry.create(DvrEntryId(1), title = "Scheduled",
+                state = DvrEntryState.SCHEDULED, start = Instant.fromEpochSeconds(now + 600),
+                stop = Instant.fromEpochSeconds(now + 1200))))))
+        compose.mainClock.autoAdvance = false
+        compose.setContent { TVHeadendPlayerTheme {
+            HomeContent(sections, PaddingValues(), HomeFocusKey(HomeSectionKind.UPCOMING, "recording:1", 0), {})
+        } }
+        sections.forEach { compose.onNodeWithTag("home-section-${it.kind.name}").assertExists() }
+        // First layout/focus frames, before the reveal counter has finished. Do not settle first.
+        compose.mainClock.advanceTimeByFrame()
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithTag("home-upcoming-0").assertIsFocused()
+        val first = compose.onNodeWithTag("home-section-UPCOMING").getUnclippedBoundsInRoot()
+        repeat(40) { frame ->
+            compose.mainClock.advanceTimeByFrame()
+            assertEquals("Last-row bounds must stay stable after initial layout, frame $frame", first,
+                compose.onNodeWithTag("home-section-UPCOMING").getUnclippedBoundsInRoot())
+        }
+    }
+
     @Test fun deepEntryComposesItsPrecedingSectionsAndRapidDownOnlyTargetsRenderedCards() {
         val sections = listOf<HomeSection>(HomeSection.RecentChannels(listOf(RecentChannelItem(channel))),
             HomeSection.Genres(listOf(GenreItem(ProgrammeCategory.ALL))),

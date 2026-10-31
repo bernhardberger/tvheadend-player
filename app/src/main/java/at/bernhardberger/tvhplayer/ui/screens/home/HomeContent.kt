@@ -393,7 +393,7 @@ internal fun HomeContent(
             firstSection -> 0f
             else -> ((tops[kind] ?: 0f) - topSlot).coerceAtLeast(0f)
         }
-        if (revealedSections == Int.MAX_VALUE) minOf(desired, (contentEnd - viewport).coerceAtLeast(0f))
+        if (renderedSections.size >= sections.size) minOf(desired, (contentEnd - viewport).coerceAtLeast(0f))
         else desired
     }
     val motion = rememberHomePageMotion(focusedSection, scrollTarget)
