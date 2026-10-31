@@ -7,6 +7,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class UiSettingsTest {
+    @Test fun homeSectionsDefaultVisibleAndPersistIndependently() = kotlinx.coroutines.test.runTest {
+        val data = InMemoryPreferencesDataStore()
+        val store = UiSettingsStore(data)
+        assertTrue(store.settings.first().hiddenHomeSections.isEmpty())
+        val hidden = setOf(at.bernhardberger.tvhplayer.core.HomeSectionKind.RECENT_CHANNELS,
+            at.bernhardberger.tvhplayer.core.HomeSectionKind.ON_NOW)
+        store.setHiddenHomeSections(hidden)
+        assertEquals(hidden, UiSettingsStore(data).settings.first().hiddenHomeSections)
+        store.setHiddenHomeSections(emptySet())
+        assertTrue(UiSettingsStore(data).settings.first().hiddenHomeSections.isEmpty())
+    }
+
     @Test fun channelNumbersDefaultToOnAndPersistAcrossStoreRecreation() = kotlinx.coroutines.test.runTest {
         val data = InMemoryPreferencesDataStore()
         val store = UiSettingsStore(data)

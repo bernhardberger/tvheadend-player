@@ -108,11 +108,9 @@ import kotlin.time.Instant
 class GuideGenreSurvivesNavigationTest {
     @get:Rule val compose = createComposeRule()
     private val context = ApplicationProvider.getApplicationContext<Application>()
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val catalog = ChannelCatalog.create((1..3L).map { Channel.create(ChannelId(it), name = "Name $it", number = it) })
-    private lateinit var player: ExoPlayer
-    private lateinit var back: androidx.activity.OnBackPressedDispatcher
-    private val guidePosition = GuidePositionStore()
+    private val fixture = NavigationJourneyFixture(compose, ServerSettings(host = javaClass.simpleName))
+    private val back get() = fixture.back
+    private val guidePosition get() = fixture.guidePosition
 
     @Test fun guidePickedGenreSurvivesPlayerBack() {
         app()
@@ -227,8 +225,7 @@ class GuideGenreSurvivesNavigationTest {
     }
 
     @After fun after() {
-        scope.cancel()
-        if (::player.isInitialized) player.release()
+        fixture.close()
     }
 
     @Test fun aChosenGenreSurvivesAVisitToChannelsAndBack() {
@@ -269,124 +266,24 @@ class GuideGenreSurvivesNavigationTest {
 
     /** Moves focus to [tag] and settles; the rail's items are reached the way a remote lands on them. */
     private fun focus(tag: String) {
-        compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag(tag)).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithTag(tag).performSemanticsAction(SemanticsActions.RequestFocus) { it() }
-        compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag(tag) and isFocused()).fetchSemanticsNodes().isNotEmpty() }
-        settle()
+        fixture.focus(tag)
     }
 
     /** Enters the rail on the current destination's item, steps to its neighbour and opens it. */
     private fun openDestination(from: String, step: Key, to: String) {
-        focus(from)
-        key(step)
-        compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag(to) and isFocused()).fetchSemanticsNodes().isNotEmpty() }
-        key(Key.Enter)
+        fixture.openDestination(from, step, to)
     }
 
     private fun app(withRecording: Boolean = false) {
-        // Most events span every time; the recording journey has a past programme and a scrolled channel.
-        val now = kotlin.time.Clock.System.now().epochSeconds
-        val catalog = if (withRecording) ChannelCatalog.create((1..8L).map {
-            Channel.create(ChannelId(it), name = "Name $it", number = it)
-        }) else this.catalog
-        fun event(channel: Long, genre: Long) = EpgEvent.create(EventId(channel), ChannelId(channel), AIRS_FROM, AIRS_UNTIL,
-            title = "Programme $channel", contentGenre = ContentGenre.fromContentType(genre))
-        val events = catalog.channels.map { channel ->
-            if (withRecording && channel.id == ChannelId(6)) EpgEvent.create(EventId(6), channel.id,
-                Instant.fromEpochSeconds(now - 1800), AIRS_UNTIL, title = "Programme 6")
-            else event(channel.id.value, if (channel.id == ChannelId(1)) 0x40L else 0x50L)
-        } + if (withRecording) listOf(EpgEvent.create(EventId(66), ChannelId(6), Instant.fromEpochSeconds(now - 7200),
-                Instant.fromEpochSeconds(now - 3600), title = "Recorded programme")) else emptyList()
-        val session = FakeTvheadendSession(SessionObservation.create(
-            sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
-            channelState = ChannelRepositoryState.Current(catalog),
-            // Sport on the first channel, children's programmes after.
-            epgState = EpgRepositoryState.Current(EpgSnapshot.create(
-                events = events,
-                coverages = catalog.channels.map { EpgCoverage.create(it.id, AIRS_FROM, AIRS_UNTIL) },
-            )),
-            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(if (withRecording) listOf(
-                at.bernhardberger.tvheadend.sdk.core.DvrEntry.create(
-                    id = at.bernhardberger.tvheadend.sdk.core.DvrEntryId(7),
-                    eventId = EventId(66), channelId = ChannelId(6),
-                    state = at.bernhardberger.tvheadend.sdk.core.DvrEntryState.COMPLETED, title = "Recorded programme",
-                ),
-            ) else emptyList())),
-        )).apply { scriptLivePlaybackSuccess(); if (withRecording) scriptRecordingPlaybackSuccess() }
-        val settings = PlayerSettingsStore(InMemoryData())
-        val profiles = AppProfileOwner(session, FakeServerProfileStore(ServerProfileReadResult.anonymous("offline.invalid", 9982)),
-            settings, Dispatchers.IO, readProfileForEditing = { ServerProfileEditReadResult.Missing })
-        scope.launch { profiles.run() }
-        player = ExoPlayer.Builder(context).build()
-        val coordinator = createTvheadendPlaybackCoordinator(player).also { it.launchIn(scope) }
-        val runtime = AppPlaybackRuntime(player, session, coordinator, settings, profiles, scope,
-            TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None, PlaybackRuntimePolicy.fromPlayerSettings())
-        val notices = NoticeCenter(android.os.SystemClock::elapsedRealtime) {
-            NoticeContext(profiles.configurationGeneration.value, session.observation.value.currentSession?.generationIdentity)
-        }
-        val dependencies = module {
-            single<TvheadendSession> { session }
-            single { runtime }
-            single { profiles }
-            single { settings }
-            single { ChannelTagSettingsStore(InMemoryData()) }
-            single { UiSettingsStore(InMemoryData()).apply { runBlocking { setChannelsView(ChannelsView(ChannelsLayout.LIST)) } } }
-            single { LastPlayedChannelStore(context) }
-            single { ChannelSelectionStore() }
-            single { guidePosition }
-            single { notices }
-            single { ConnectionNoticeSource(session.observation, profiles.configurationGeneration, notices) }
-            viewModel { AppConnectionViewModel(get(), get(), get()) }
-            viewModel { ChannelsViewModel(get(), get()) }
-            viewModel { VideoPlayerViewModel(get(), get()) }
-            viewModel { SettingsStorageViewModel(session.cache, get(), ChannelAccentStore()) {} }
-            viewModel { SettingsPlayerViewModel(get(), get(), get(), get(), get()) }
-        }
-        val server = ServerSettings(host = "offline.invalid")
-        compose.setContent {
-            KoinIsolatedContext(koinApplication { modules(dependencies) }) {
-                TVHeadendPlayerTheme {
-                    back = requireNotNull(androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
-                    AppRoot(
-                        startupState = MainStartupState.Ready(server, autoStartPlayback = false),
-                        runtimeServerSettings = server,
-                        applianceLaunchRequests = ApplianceLaunchRequests(),
-                        onPlayerVisibilityChanged = {},
-                        onRequestExit = {},
-                    )
-                }
-            }
-        }
-        // Home is the landing destination; these journeys browse the channel rows.
-        compose.waitUntil(15_000) { compose.onAllNodes(hasTestTag("nav-channels")).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithTag("nav-channels").performSemanticsAction(SemanticsActions.OnClick)
-        compose.waitUntil(15_000) { compose.onAllNodes(hasTestTag("channel-row-1")).fetchSemanticsNodes().isNotEmpty() }
-        settle()
+        fixture.app(withRecording)
     }
 
     private fun key(key: Key) {
-        compose.onRoot().performKeyInput { pressKey(key) }
-        compose.waitForIdle()
-        settle()
+        fixture.key(key)
     }
 
     // Background preparation takes real time, which the advanced clock does not see.
     private fun settle() {
-        repeat(10) {
-            compose.mainClock.advanceTimeBy(100)
-            compose.awaitBrowsePreparation()
-        }
-    }
-
-    private companion object {
-        val AIRS_FROM = Instant.parse("2000-01-01T00:00:00Z")
-        val AIRS_UNTIL = Instant.parse("2100-01-01T00:00:00Z")
-    }
-
-    private class InMemoryData : DataStore<Preferences> {
-        val state = MutableStateFlow(emptyPreferences())
-        override val data: Flow<Preferences> get() = state
-        override suspend fun updateData(transform: suspend (Preferences) -> Preferences) =
-            transform(state.value).also { state.value = it }
+        fixture.settle()
     }
 }

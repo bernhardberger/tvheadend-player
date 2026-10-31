@@ -907,6 +907,11 @@
     <string name="channel_schedule_loading_more">Loading later days</string>
     <!-- Home: section headings, card labels and accessible names. -->
     <string name="home_now_playing">Now playing</string>
+    <string name="home_current_activity">Current activity</string>
+    <string name="home_upcoming_recordings">Upcoming recordings</string>
+    <string name="home_no_history">Recently watched channels will appear here.</string>
+    <string name="home_no_recordings">No recordings yet.</string>
+    <string name="home_sections_hidden">Sections are hidden. Use View options to show them.</string>
     <string name="home_recent_channels">Recent channels</string>
     <string name="home_on_now">On now</string>
     <string name="home_browse_by_genre">Browse by genre</string>

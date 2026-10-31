@@ -4,6 +4,8 @@ import android.app.Application
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.*
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import at.bernhardberger.tvheadend.sdk.core.*
@@ -32,6 +34,102 @@ class HomeActionsTest {
     private val now = 1_800_000_000L
     private val channel = Channel.create(ChannelId(1), name = "Test channel")
     private lateinit var back: androidx.activity.OnBackPressedDispatcher
+
+    @Test fun viewOptionsSelectsTheSharedScopeWithoutStartingPlayback() {
+        val input = HomeInput(listOf(channel), emptyMap(), emptyList(), listOf(channel.id), emptyList(), { null }, null, now)
+        var selected: ChannelTagId? = null
+        compose.setContent { TVHeadendPlayerTheme {
+            HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
+                onPlay = { _, _ -> fail("scope selection tuned") }, onPlayRecording = { _, _ -> },
+                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = {},
+                groups = listOf(at.bernhardberger.tvhplayer.ui.screens.ChannelsGroup(ChannelTagId(8), "Favorites", listOf(channel))),
+                onSelectTag = { selected = it })
+        } }
+        compose.onNodeWithTag("home-loading").assertDoesNotExist()
+        compose.onNodeWithTag("home-recent-0").performKeyInput { pressKey(Key.DirectionUp); pressKey(Key.Enter) }
+        repeat(HomeSectionKind.entries.size) {
+            compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        }
+        compose.onNodeWithTag("home-tag-8").assertIsFocused().performKeyInput { pressKey(Key.Enter) }
+        compose.runOnIdle { assertEquals(ChannelTagId(8), selected) }
+    }
+
+    @Test fun optionsToggleAllSectionsAndBackReturnsToHeaderWithoutTuning() {
+        var enabled by mutableStateOf(true)
+        var input by mutableStateOf(HomeInput(listOf(channel), emptyMap(), emptyList(),
+            listOf(channel.id), emptyList(), { null }, null, now))
+        compose.setContent { TVHeadendPlayerTheme {
+            HomeScreenContent(input, SessionObservation.create(), PaddingValues(), enabled,
+                onPlay = { _, _ -> fail("options tuned") }, onPlayRecording = { _, _ -> },
+                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> },
+                onGenre = {}, onRecordings = {},
+                onHiddenChange = { input = input.copy(hiddenSections = it) })
+        } }
+        compose.onNodeWithTag("home-recent-0").performKeyInput { pressKey(Key.DirectionUp); pressKey(Key.Enter) }
+        compose.onNodeWithTag("home-view-CURRENT_ACTIVITY").assertIsFocused()
+        repeat(HomeSectionKind.entries.size) { index ->
+            compose.onNodeWithTag("home-view-${HomeSectionKind.entries[index].name}")
+                .performKeyInput { pressKey(Key.Enter); if (index < HomeSectionKind.entries.lastIndex) pressKey(Key.DirectionDown) }
+        }
+        compose.runOnIdle { assertEquals(HomeSectionKind.entries.toSet(), input.hiddenSections) }
+        compose.onNodeWithTag("home-view-UPCOMING").performKeyInput { pressKey(Key.Back) }
+        compose.onNodeWithTag("home-view-button").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.onNodeWithTag("home-recovery").assertIsFocused()
+        compose.runOnIdle { enabled = false }
+        compose.runOnIdle { enabled = true }
+        compose.onNodeWithTag("home-recovery").assertIsFocused()
+    }
+
+    @Test fun channelsWithoutHistoryRecordingsOrEpgAreNotReportedAsNoChannels() {
+        val input = HomeInput(listOf(channel), emptyMap(), emptyList(), emptyList(), emptyList(), { null }, null, now)
+        val observation = SessionObservation.create(
+            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(channel))),
+            epgState = EpgRepositoryState.Current(EpgSnapshot.create(emptyList())),
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(emptyList())),
+        )
+        compose.setContent { TVHeadendPlayerTheme {
+            HomeScreenContent(input, observation, PaddingValues(), true,
+                onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
+                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = {})
+        } }
+        compose.onNodeWithText("Recently watched channels will appear here.").assertExists()
+        compose.onNodeWithText("No recordings yet.").assertExists()
+        compose.onNodeWithTag("home-recovery").assertIsFocused()
+        compose.onNodeWithTag("home-view-button").assertExists()
+    }
+
+    @Test fun delayedEntryRestoreDoesNotTakeFocusFromAnOpeningDrawer() {
+        var enabled by mutableStateOf(false)
+        lateinit var drawer: androidx.tv.material3.DrawerState
+        val drawerFocus = androidx.compose.ui.focus.FocusRequester()
+        val input = HomeInput(listOf(channel), emptyMap(), emptyList(), listOf(channel.id), emptyList(), { null }, null, now)
+        compose.setContent {
+            drawer = androidx.tv.material3.rememberDrawerState(androidx.tv.material3.DrawerValue.Closed)
+            CompositionLocalProvider(at.bernhardberger.tvhplayer.ui.components.LocalBrowseDrawerState provides drawer) {
+                TVHeadendPlayerTheme {
+                    androidx.compose.foundation.layout.Box {
+                        HomeScreenContent(input, SessionObservation.create(), PaddingValues(), enabled,
+                            onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
+                            onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = {})
+                        androidx.tv.material3.Button(onClick = {}, modifier = androidx.compose.ui.Modifier
+                            .then(androidx.compose.ui.Modifier.focusRequester(drawerFocus)).testTag("test-drawer")) {
+                            androidx.tv.material3.Text("Drawer")
+                        }
+                    }
+                }
+            }
+        }
+        compose.runOnIdle { drawerFocus.requestFocus() }
+        compose.mainClock.autoAdvance = false
+        compose.runOnIdle { enabled = true }
+        compose.mainClock.advanceTimeByFrame()
+        compose.runOnIdle {
+            drawer.setValue(androidx.tv.material3.DrawerValue.Open)
+            drawerFocus.requestFocus()
+        }
+        compose.mainClock.advanceTimeBy(1_200)
+        compose.onNodeWithTag("test-drawer").assertIsFocused()
+    }
 
     @Test fun staleHomeOwnerRejectsOkAndMenuBeforeRecomposition() {
         var current = true

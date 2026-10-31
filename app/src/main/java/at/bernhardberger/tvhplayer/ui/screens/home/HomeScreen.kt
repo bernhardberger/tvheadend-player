@@ -26,6 +26,11 @@ import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import org.koin.compose.koinInject
 import kotlin.time.Instant
+import at.bernhardberger.tvhplayer.settings.UiSettings
+import at.bernhardberger.tvhplayer.settings.UiSettingsStore
+import at.bernhardberger.tvhplayer.ui.screens.ChannelsGroup
+import at.bernhardberger.tvhplayer.ui.screens.channelsGroups
+import kotlinx.coroutines.launch
 
 /**
  * Home's landing page. The page itself, including the scroll-away header, lives in
@@ -50,10 +55,14 @@ internal fun HomeScreen(
     onRetry: () -> Unit = {},
     onOpenConnectionSettings: () -> Unit = {},
     modifier: Modifier = Modifier,
+    focusMemory: MutableState<HomeFocusKey?> = remember { mutableStateOf(null) },
     lastPlayedStore: LastPlayedChannelStore = koinInject(),
 ) {
     val scope by channelsVm.scope.collectAsStateWithLifecycle()
     val observation by channelsVm.observation.collectAsStateWithLifecycle()
+    val settingsStore: UiSettingsStore = koinInject()
+    val settings by settingsStore.settings.collectAsStateWithLifecycle(UiSettings())
+    val saveScope = rememberCoroutineScope()
     val owner = remember(scope.scope, observation.currentSession, scope.observation?.currentSession) {
         val frameScope = scope.scope
         val frameSession = observation.currentSession
@@ -82,7 +91,8 @@ internal fun HomeScreen(
     if (frame == null) return
     CompositionLocalProvider(LocalTabOwner provides owner) {
         ProvideArtworkSession(frame.second.currentSession, frame.third) {
-        HomeScreenContent(frame.first, frame.second, contentPadding, initialFocusEnabled,
+        HomeScreenContent(frame.first.copy(hiddenSections = settings.hiddenHomeSections), frame.second, contentPadding, initialFocusEnabled,
+            focusMemory = focusMemory,
             onPlay = { id, name -> if (current(id)) onPlay(id, name) },
             onPlayRecording = { selection, start ->
                 if (owner.isCurrent) onPlayRecording(selection, start)
@@ -94,7 +104,12 @@ internal fun HomeScreen(
             onShowRecordingGuide = { id, event -> if (owner.isCurrent) onShowGuide(id, event) },
             onGenre = { if (current()) onGenre(it) }, onRecordings = { if (current()) onRecordings(it) },
             modifier = modifier, connectionUiState = connectionUiState, connectionFailure = connectionFailure,
-            onRetry = onRetry, onOpenConnectionSettings = onOpenConnectionSettings)
+            onRetry = onRetry, onOpenConnectionSettings = onOpenConnectionSettings,
+            groups = channelsGroups(scope.scope), activeTagId = scope.scope.activeTagId,
+            onSelectTag = { if (owner.isCurrent) channelsVm.selectTag(it) },
+            onHiddenChange = { hidden -> if (owner.isCurrent) saveScope.launch { settingsStore.setHiddenHomeSections(hidden) } },
+            catalogCurrent = scope.channelCatalogCurrent && scope.settingsLoaded,
+            hasChannelsOutsideScope = scope.scope.allChannels.isNotEmpty())
         }
     }
 }
@@ -143,12 +158,22 @@ internal fun HomeScreenContent(
     onOpenConnectionSettings: () -> Unit = {},
     onWatchRecordingChannel: (ChannelId, String) -> Unit = onPlay,
     onShowRecordingGuide: (ChannelId, EpgEvent?) -> Unit = onShowGuide,
+    groups: List<ChannelsGroup> = emptyList(),
+    activeTagId: ChannelTagId? = null,
+    onSelectTag: (ChannelTagId?) -> Unit = {},
+    onHiddenChange: (Set<HomeSectionKind>) -> Unit = {},
+    catalogCurrent: Boolean = observation.channelState.channelCatalogAuthority == RetainedMetadataAuthority.CURRENT,
+    hasChannelsOutsideScope: Boolean = observation.channelState.channelCatalogForDisplay?.channels?.isNotEmpty() == true,
+    focusMemory: MutableState<HomeFocusKey?> = remember { mutableStateOf(null) },
 ) {
     val nowSec = input.nowSec
     val owner = LocalTabOwner.current
     val playingRecordingId = (input.playing as? HomePlaying.Recording)?.entryId
     val sections = remember(input) { homeSections(input) }
-    var focused by remember { mutableStateOf<HomeFocusKey?>(null) }
+    var focused by focusMemory
+    var options by remember { mutableStateOf(false) }
+    var restoreHeader by remember { mutableStateOf(false) }
+    val viewFocus = remember { FocusRequester() }
     var channelMenu by remember { mutableStateOf<ChannelId?>(null) }
     var channelDetails by remember { mutableStateOf(false) }
     var recording by remember { mutableStateOf<DvrEntry?>(null) }
@@ -199,35 +224,50 @@ internal fun HomeScreenContent(
         }
     }
     val error = if (sections.isEmpty()) connectionFailure?.browseAppError()
-        ?: connectionUiState.browseAppError(noChannels = true).takeIf { connectionUiState == ConnectionUiState.Ready }
+        ?: connectionUiState.browseAppError(noChannels = catalogCurrent && input.channels.isEmpty() && !hasChannelsOutsideScope)
+            .takeIf { connectionUiState == ConnectionUiState.Ready }
         else null
     val errorFocus = remember { FocusRequester() }
-    LaunchedEffect(error, initialFocusEnabled) {
-        if (error != null && initialFocusEnabled) { withFrameNanos { }; errorFocus.requestFocus() }
-    }
-    if (error != null) AppErrorAlert(error = error, actionFocus = errorFocus,
-        leadingExit = LocalBrowseNavigationFocus.current ?: FocusRequester.Default,
-        modifier = modifier.fillMaxSize(), onAction = {
-            when (it) {
-                AppErrorAction.RETRY -> onRetry()
-                AppErrorAction.CONNECTION_SETTINGS -> onOpenConnectionSettings()
-                AppErrorAction.CLOSE -> Unit
-            }
-        }) else HomeContent(
+    HomeContent(
         sections = sections,
         contentPadding = contentPadding,
         initialFocus = focused?.let { previous ->
             if (previous.item == "all-recordings" && sections.any { it.kind == previous.section }) previous
             else homeRestoreFocus(sections, previous)
         } ?: homeInitialFocus(sections),
-        onFocused = { focused = it },
+        onFocused = { focused = it; restoreHeader = false },
         modifier = modifier,
-        focusEnabled = initialFocusEnabled && channelMenu == null && recording == null,
+        focusEnabled = initialFocusEnabled && channelMenu == null && recording == null && !options,
+        viewRequester = viewFocus, restoreHeader = restoreHeader,
+        onHeaderFocused = { restoreHeader = false },
+        emptyFocus = errorFocus,
+        onViewOptions = { if (owner?.isCurrent != false) { restoreHeader = true; options = true } },
+        emptyContent = {
+            if (error != null) AppErrorAlert(error = error, actionFocus = errorFocus,
+                leadingExit = viewFocus, upExit = viewFocus, modifier = Modifier.fillMaxSize(), onAction = {
+                    when (it) {
+                        AppErrorAction.RETRY -> onRetry()
+                        AppErrorAction.CONNECTION_SETTINGS -> onOpenConnectionSettings()
+                        AppErrorAction.CLOSE -> Unit
+                    }
+                }) else HomeEmptyState(input, observation, catalogCurrent, hasChannelsOutsideScope,
+                    errorFocus, viewFocus, onOpenConnectionSettings)
+        },
         observation = observation,
         input = input,
         onActivate = { activate(it, false) },
         onContextMenu = { activate(it, true) },
     )
+    if (options) {
+        val openingOwner = remember { owner }
+        Box(Modifier.onPreviewKeyEvent { openingOwner?.isCurrent == false }) {
+            HomeViewOptionsPanel(input.hiddenSections,
+                { if (openingOwner?.isCurrent != false) onHiddenChange(it) }, groups, activeTagId,
+                onSelectTag = { if (openingOwner?.isCurrent != false) onSelectTag(it) },
+                onClose = { options = false })
+        }
+        LaunchedEffect(owner) { if (openingOwner?.isCurrent == false) options = false }
+    }
     channelMenu?.let { id ->
         val openingOwner = remember(id) { owner }
         Box(Modifier.onPreviewKeyEvent { openingOwner?.isCurrent == false }) {

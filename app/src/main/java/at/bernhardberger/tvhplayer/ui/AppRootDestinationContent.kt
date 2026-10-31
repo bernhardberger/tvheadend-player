@@ -57,6 +57,7 @@ internal fun StartupGatedPlayerContent(
 
 @Composable
 internal fun HomeRouteContent(
+    homeFocus: androidx.compose.runtime.MutableState<at.bernhardberger.tvhplayer.core.HomeFocusKey?>,
     contentAllowed: Boolean,
     contentPadding: PaddingValues,
     initialFocusEnabled: Boolean,
@@ -77,6 +78,7 @@ internal fun HomeRouteContent(
     if (contentAllowed) {
         ContentContainer(modifier = Modifier.profileLayout("home")) {
             BrowsingScopeContent(channelsVm, initialFocusEnabled) { HomeScreen(
+                focusMemory = homeFocus,
                 contentPadding = contentPadding,
                 initialFocusEnabled = initialFocusEnabled,
                 channelsVm = channelsVm,

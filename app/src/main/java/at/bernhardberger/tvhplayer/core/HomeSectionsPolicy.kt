@@ -113,6 +113,7 @@ data class HomeInput(
     val admission: (DvrEntry) -> RecordingPlaybackAdmission?,
     val playing: HomePlaying?,
     val nowSec: Long,
+    val hiddenSections: Set<HomeSectionKind> = emptySet(),
 )
 
 private const val RECENT_CHANNEL_LIMIT = 8
@@ -135,7 +136,7 @@ fun homeSections(input: HomeInput): List<HomeSection> {
         continueWatchingSection(input, resumeOffered)?.let(::add)
         recentlyRecordedSection(input, resumeOffered)?.let(::add)
         upcomingSection(input)?.let(::add)
-    }
+    }.filterNot { it.kind in input.hiddenSections }
 }
 
 /**

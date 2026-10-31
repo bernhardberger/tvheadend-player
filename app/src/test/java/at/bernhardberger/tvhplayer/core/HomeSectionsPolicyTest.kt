@@ -13,6 +13,17 @@ import org.junit.Test
 class HomeSectionsPolicyTest {
     private val nowSec = 1_000_000_000L
 
+    @Test fun hiddenSectionsAreOmittedBeforeInitialAndRestoreFocusSelection() {
+        val input = homeInput(playing = HomePlaying.LiveChannel(ChannelId(1)))
+        val original = homeSections(input)
+        assertEquals(HomeSectionKind.CURRENT_ACTIVITY, homeInitialFocus(original)?.section)
+        val hidden = setOf(HomeSectionKind.CURRENT_ACTIVITY)
+        val visible = homeSections(input.copy(hiddenSections = hidden))
+        assertTrue(visible.none { it.kind in hidden })
+        assertEquals(homeInitialFocus(visible), homeRestoreFocus(visible, requireNotNull(homeInitialFocus(original))))
+        assertTrue(homeSections(input.copy(hiddenSections = HomeSectionKind.entries.toSet())).isEmpty())
+    }
+
     private fun channel(id: Long, number: Long? = id, name: String = "Ch $id") = Channel.create(
         id = ChannelId(id),
         name = name,

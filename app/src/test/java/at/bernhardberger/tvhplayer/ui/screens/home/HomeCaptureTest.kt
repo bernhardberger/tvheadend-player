@@ -159,6 +159,36 @@ class HomeCaptureTest {
         assertTop("home-onnow-0", 356f)
     }
 
+    @Test fun optionsPanel() = atEvening {
+        show(Kind.BROWSE, screen = true)
+        settle("home-recent-0")
+        key(Key.DirectionUp)
+        key(Key.Enter)
+        capture("11-options", "home-view-CURRENT_ACTIVITY")
+    }
+
+    @Test fun loadingFirstMetadata() = atEvening {
+        show(Kind.LOADING, screen = true)
+        compose.onNodeWithTag("home-loading").assertExists()
+        capture("12-loading", "home-recovery")
+    }
+
+    @Test fun channelsButNoHistoryRecordingsOrEpg() = atEvening {
+        show(Kind.EMPTY, screen = true)
+        capture("13-empty", "home-recovery")
+    }
+
+    @Test fun offlineRecovery() = atEvening {
+        show(Kind.OFFLINE, screen = true)
+        compose.onNodeWithTag("connection-problem-badge", useUnmergedTree = true).assertExists()
+        capture("14-offline", "tv-recovery-primary")
+    }
+
+    @Test fun defaultLargeFont() = atEvening {
+        show(Kind.BROWSE, fontScale = 1.3f)
+        capture("15-default-font-130", "home-recent-0")
+    }
+
     /** One, two and three current-activity cards, each card half the content width. */
     @Test
     fun activityOne() = activity(1)
@@ -399,7 +429,7 @@ class HomeCaptureTest {
         capture("act-half-$items", "home-activity-0")
     }
 
-    private enum class Kind { BROWSE, WARM, FIRST_RUN }
+    private enum class Kind { BROWSE, WARM, FIRST_RUN, LOADING, EMPTY, OFFLINE }
 
     private data class Scene(
         val observation: SessionObservation,
@@ -408,9 +438,18 @@ class HomeCaptureTest {
         val nowSec: Long,
     )
 
-    private fun show(kind: Kind, activityItems: Int = 2, longOnNow: Boolean = false) {
+    private fun show(kind: Kind, activityItems: Int = 2, longOnNow: Boolean = false, screen: Boolean = false, fontScale: Float = 1f) {
         isDebugInspectorInfoEnabled = true
-        val scene = scene(kind, activityItems, longOnNow)
+        val base = scene(kind, activityItems, longOnNow)
+        val scene = if (kind in setOf(Kind.LOADING, Kind.EMPTY, Kind.OFFLINE)) base.copy(
+            input = base.input.copy(channels = if (kind == Kind.EMPTY) base.input.channels else emptyList(),
+                currentEvents = emptyMap(), upcomingEvents = emptyList(), recentChannelIds = emptyList(), dvrEntries = emptyList(), playing = null),
+            observation = if (kind == Kind.EMPTY) SessionObservation.create(
+                channelState = ChannelRepositoryState.Current(ChannelCatalog.create(base.input.channels)),
+                epgState = EpgRepositoryState.Current(EpgSnapshot.create(emptyList())),
+                dvrState = DvrRepositoryState.Current(DvrSnapshot.create(emptyList())),
+            ) else SessionObservation.create(), playing = null,
+        ) else base
         val sections = homeSections(scene.input)
         installFixtures()
         val playing = scene.playing
@@ -429,6 +468,8 @@ class HomeCaptureTest {
         val video = if (kind == Kind.WARM) FixtureArt.art("still-northline-studio") else null
         compose.setContent {
             CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(
+                    androidx.compose.ui.platform.LocalDensity.current.density, fontScale),
                 LocalWarmPlayback provides (kind == Kind.WARM),
                 LocalWatchingTarget provides nowPlaying?.target,
                 LocalWatchingChannel provides playing?.id,
@@ -468,9 +509,17 @@ class HomeCaptureTest {
                                     scene.observation.eventAt(id, Instant.fromEpochSeconds(at))
                                 },
                                 animateNowPlaying = false,
+                                connectionDegraded = kind == Kind.OFFLINE,
                                 nowSecProvider = { scene.nowSec },
                             ) { padding, _ ->
-                                HomeContent(
+                                if (screen) HomeScreenContent(scene.input, scene.observation, padding, true,
+                                    onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
+                                    onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = {},
+                                    connectionUiState = if (kind == Kind.OFFLINE) at.bernhardberger.tvhplayer.core.ConnectionUiState.Error(
+                                        at.bernhardberger.tvhplayer.data.ConnectionFailureKind.UNREACHABLE,
+                                        at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition.EXPLICIT_RETRY,
+                                    ) else at.bernhardberger.tvhplayer.core.ConnectionUiState.Ready,
+                                ) else HomeContent(
                                     sections = sections,
                                     contentPadding = padding,
                                     initialFocus = homeInitialFocus(sections),

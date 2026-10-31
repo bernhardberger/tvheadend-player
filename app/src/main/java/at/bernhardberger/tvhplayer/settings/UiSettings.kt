@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import at.bernhardberger.tvhplayer.core.HomeSectionKind
 
 data class UiSettings(
     val showEpgMenu: Boolean = true,
@@ -18,6 +19,7 @@ data class UiSettings(
     val channelsView: ChannelsView = ChannelsView(),
     val guideView: GuideView = GuideView(),
     val showChannelNumbers: Boolean = true,
+    val hiddenHomeSections: Set<HomeSectionKind> = emptySet(),
 )
 
 fun resolveEpgMenuVisibility(storedValue: Boolean?): Boolean = storedValue ?: true
@@ -38,6 +40,7 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
         val GUIDE_ROWS = stringPreferencesKey("guideRowDensity")
         val GUIDE_HEADLINE = booleanPreferencesKey("guideHeadline")
         val GUIDE_GENRE_COLORS = booleanPreferencesKey("guideGenreColors")
+        fun homeSection(kind: HomeSectionKind) = booleanPreferencesKey("homeSection${kind.name}")
     }
 
     val settings: Flow<UiSettings> = dataStore.data.map { preferences ->
@@ -46,6 +49,9 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
             autoStartPlayback = resolvePlaybackAutoStart(preferences[Keys.AUTO_START_PLAYBACK]),
             clockFormat = resolveClockFormat(preferences[Keys.CLOCK_FORMAT]),
             showChannelNumbers = preferences[Keys.SHOW_CHANNEL_NUMBERS] ?: true,
+            hiddenHomeSections = HomeSectionKind.entries.filterTo(mutableSetOf()) {
+                preferences[Keys.homeSection(it)] == false
+            },
             recordingProfileId = preferences[Keys.RECORDING_PROFILE]?.takeIf(String::isNotBlank)?.let(::DvrConfigId),
             channelsView = resolveChannelsView(
                 preferences[Keys.CHANNELS_LAYOUT], { preferences[Keys.channelsChannelNames(it)] },
@@ -64,6 +70,12 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
 
     suspend fun setShowChannelNumbers(show: Boolean) {
         dataStore.edit { it[Keys.SHOW_CHANNEL_NUMBERS] = show }
+    }
+
+    suspend fun setHiddenHomeSections(hidden: Set<HomeSectionKind>) {
+        dataStore.edit { preferences ->
+            HomeSectionKind.entries.forEach { preferences[Keys.homeSection(it)] = it !in hidden }
+        }
     }
 
     suspend fun setChannelsView(view: ChannelsView) {

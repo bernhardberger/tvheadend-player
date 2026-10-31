@@ -611,6 +611,7 @@ fun AppRoot(
     var guideChannelRequest by remember { mutableStateOf<PlayerReturnFocus?>(null) }
     var guideGenreRequest by remember { mutableStateOf<at.bernhardberger.tvhplayer.core.ProgrammeCategory?>(null) }
     var guideGenre by rememberSaveable { mutableStateOf(at.bernhardberger.tvhplayer.core.ProgrammeCategory.ALL) }
+    val homeFocus = remember(profileGeneration) { mutableStateOf<at.bernhardberger.tvhplayer.core.HomeFocusKey?>(null) }
     LaunchedEffect(currentDestination, GuideKey in backStack) {
         if (livePlayerReturn?.first != currentDestination) livePlayerReturn = null
         if (currentDestination != GuideKey) recordingPlayerReturnToGuide = false
@@ -910,6 +911,7 @@ fun AppRoot(
                         metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.HOME),
                     ) {
                         HomeRouteContent(
+                            homeFocus = homeFocus,
                             contentAllowed = contentAllowed,
                             contentPadding = contentPadding,
                             initialFocusEnabled = !drawerActive && currentDestination == HomeKey,

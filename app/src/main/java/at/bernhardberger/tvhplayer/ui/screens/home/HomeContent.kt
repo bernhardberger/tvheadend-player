@@ -47,6 +47,7 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.foundation.focusGroup
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -302,6 +303,12 @@ internal fun HomeContent(
     input: HomeInput? = null,
     onActivate: (HomeFocusKey) -> Unit = {},
     onContextMenu: (HomeFocusKey) -> Unit = {},
+    viewRequester: FocusRequester = remember { FocusRequester() },
+    onViewOptions: () -> Unit = {},
+    onHeaderFocused: () -> Unit = {},
+    restoreHeader: Boolean = false,
+    emptyFocus: FocusRequester? = null,
+    emptyContent: @Composable () -> Unit = {},
 ) {
     val direction = LocalLayoutDirection.current
     val ltr = direction == LayoutDirection.Ltr
@@ -321,8 +328,9 @@ internal fun HomeContent(
     val requesters = remember {
         HomeSectionKind.entries.associateWith { FocusRequester() }
     }
-    val viewRequester = remember { FocusRequester() }
     var focusedSection by remember { mutableStateOf<HomeSectionKind?>(null) }
+    var hasHomeFocus by remember { mutableStateOf(false) }
+    var entryFocusApplied by remember { mutableStateOf(false) }
     var focusedCard by remember { mutableStateOf<HomeFocusKey?>(null) }
     var focusedOnNow by remember { mutableStateOf<ChannelId?>(null) }
     val tops = remember { mutableStateMapOf<HomeSectionKind, Float>() }
@@ -358,9 +366,12 @@ internal fun HomeContent(
         // from an opening drawer.
         withFrameNanos { }
         if (drawerState?.currentValue == DrawerValue.Open) return@LaunchedEffect
-        val target = initialKey?.let { requesters[it.section] } ?: viewRequester
+        if (entryFocusApplied && hasHomeFocus && !restoreHeader) return@LaunchedEffect
+        val target = if (restoreHeader) viewRequester else initialKey?.let { requesters[it.section] } ?: emptyFocus ?: viewRequester
         repeat(60) {
-            if (target.requestFocus()) return@LaunchedEffect
+            if (drawerState?.currentValue == DrawerValue.Open) return@LaunchedEffect
+            if (entryFocusApplied && hasHomeFocus && !restoreHeader) return@LaunchedEffect
+            if (target.requestFocus()) { entryFocusApplied = true; return@LaunchedEffect }
             withFrameNanos { }
         }
     }
@@ -374,13 +385,15 @@ internal fun HomeContent(
         if (restored?.section == previous.section && restored.item == previous.item) return@LaunchedEffect
         withFrameNanos { }
         if (!focusEnabled || drawerState?.currentValue == DrawerValue.Open) return@LaunchedEffect
-        (restored?.let { requesters[it.section] } ?: viewRequester).requestFocus()
+        (restored?.let { requesters[it.section] } ?: emptyFocus ?: viewRequester).requestFocus()
     }
 
     BoxWithConstraints(
-        modifier.fillMaxSize().onGloballyPositioned { viewportHeight = it.size.height },
+        modifier.fillMaxSize().onGloballyPositioned { viewportHeight = it.size.height }
+            .onFocusChanged { hasHomeFocus = it.hasFocus }.focusGroup(),
     ) {
         val halfWidth = ((maxWidth - keyline - endMargin - TvGridGutter) / 2).coerceAtLeast(0.dp)
+        val emptyHeight = (maxHeight - HomeTopSlot).coerceAtLeast(0.dp)
         val recordingChannelIds = remember(input?.dvrEntries) {
             input?.dvrEntries.orEmpty()
                 .filter(::recordingIsRunning)
@@ -430,15 +443,19 @@ internal fun HomeContent(
                     zone = zone,
                     endMargin = endMargin,
                     viewRequester = viewRequester,
-                    firstSectionRequester = firstSection?.let(requesters::get),
+                    firstSectionRequester = firstSection?.let(requesters::get) ?: emptyFocus,
                     rail = rail,
                     ltr = ltr,
-                    onFocused = { focusedSection = null; focusedCard = null },
+                    onFocused = { focusedSection = null; focusedCard = null; onHeaderFocused() },
+                    onViewOptions = onViewOptions,
                     // A negative page offset makes room for a first/early immersive row; it must
                     // not drag the header down into that row's content block.
                     modifier = Modifier.graphicsLayer { translationY = minOf(scrollPx, 0f) },
                 )
                 Spacer(Modifier.height((HomeTopSlot - 24.dp - TvBrowseHeaderHeight).coerceAtLeast(0.dp)))
+                if (sections.isEmpty()) {
+                    Box(Modifier.height(emptyHeight)) { emptyContent() }
+                }
                 sections.forEach { section ->
                     val kind = section.kind
                     val focused = focusedSection == kind
@@ -654,6 +671,7 @@ private fun HomeHeader(
     rail: FocusRequester,
     ltr: Boolean,
     onFocused: () -> Unit,
+    onViewOptions: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -680,7 +698,7 @@ private fun HomeHeader(
         RoundIconButton(
             icon = painterResource(R.drawable.ic_tune),
             label = stringResource(R.string.channels_view_options),
-            onClick = { },
+            onClick = onViewOptions,
             focusRequester = viewRequester,
             onFocused = onFocused,
             modifier = Modifier
