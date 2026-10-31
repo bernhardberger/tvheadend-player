@@ -53,6 +53,31 @@ class HomeActionsTest {
         compose.runOnIdle { assertTrue(opened) }
     }
 
+    @Test fun rowReentryRestoresItemIdentityAfterAnEarlierItemLeaves() = recentRowRefresh(false)
+
+    @Test fun rowReentryUsesClampedPreviousIndexWhenItsItemLeaves() = recentRowRefresh(true)
+
+    private fun recentRowRefresh(removeFocused: Boolean) {
+        val channels = (1L..3L).map { Channel.create(ChannelId(it), name = "Channel $it") }
+        val recents = mutableStateOf(channels.map { it.id })
+        val scheduled = DvrEntry.create(DvrEntryId(1), title = "Upcoming", state = DvrEntryState.SCHEDULED,
+            start = Instant.fromEpochSeconds(now + 600), stop = Instant.fromEpochSeconds(now + 1800))
+        compose.setContent { TVHeadendPlayerTheme {
+            HomeScreenContent(HomeInput(channels, emptyMap(), emptyList(), recents.value, listOf(scheduled), { null }, null, now),
+                SessionObservation.create(), PaddingValues(), true,
+                onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
+                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
+        } }
+        compose.onNodeWithTag("home-recent-0").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
+        compose.onNodeWithTag("home-recent-1").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.mainClock.advanceTimeBy(600)
+        compose.onNodeWithTag("home-upcoming-0").assertIsFocused()
+        compose.runOnIdle { recents.value = recents.value.filter { it != ChannelId(if (removeFocused) 2 else 1) } }
+        compose.onNodeWithTag("home-upcoming-0").performKeyInput { pressKey(Key.DirectionUp) }
+        compose.mainClock.advanceTimeBy(600)
+        compose.onNodeWithTag(if (removeFocused) "home-recent-1" else "home-recent-0").assertIsFocused()
+    }
+
     @Test fun finishedRecordingPlaybackHasNeutralBadgeAndViewerProgress() {
         showRecordingPlayback(DvrEntryState.COMPLETED)
         compose.onNodeWithTag("channel-recording-indicator", useUnmergedTree = true).assertDoesNotExist()

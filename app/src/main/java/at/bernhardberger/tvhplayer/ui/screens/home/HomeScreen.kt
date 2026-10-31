@@ -263,7 +263,7 @@ internal fun HomeScreenContent(
         sections = sections,
         contentPadding = contentPadding,
         initialFocus = focused?.let { previous ->
-            if (previous.item in setOf("all-recordings", "all-channels") && sections.any { it.kind == previous.section }) previous
+            if (previous.item in HomeEndCardKeys && sections.any { it.kind == previous.section }) previous
             else homeRestoreFocus(sections, previous)
         } ?: homeInitialFocus(sections),
         onFocused = { focused = it; restoreHeader = false },

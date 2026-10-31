@@ -121,4 +121,23 @@ class HomeNavigationJourneyTest {
         fixture.key(Key.DirectionRight)
         compose.onNodeWithTag("home-upcoming-8").assertIsFocused()
     }
+
+    @Test fun allScheduledBackRestoresTheEndCard() {
+        fixture.app(scheduled = listOf(DvrEntry.create(DvrEntryId(1), title = "Scheduled programme",
+            state = DvrEntryState.SCHEDULED, start = Instant.fromEpochSeconds(1_900_000_000),
+            stop = Instant.fromEpochSeconds(1_900_001_800))))
+        fixture.openDestination("nav-channels", Key.DirectionUp, "nav-home")
+        fixture.focus("home-upcoming-0")
+        fixture.key(Key.DirectionRight)
+        compose.onNodeWithTag("home-all-scheduled").assertIsFocused()
+        fixture.key(Key.Enter)
+        compose.onNodeWithTag("recordings-schedule-list").assertExists()
+        compose.runOnIdle { fixture.back.onBackPressed() }
+        fixture.settle()
+        compose.runOnIdle { fixture.back.onBackPressed() }
+        fixture.settle()
+        compose.onNodeWithTag("nav-home").assertIsFocused()
+        fixture.key(Key.DirectionRight)
+        compose.onNodeWithTag("home-all-scheduled").assertIsFocused()
+    }
 }

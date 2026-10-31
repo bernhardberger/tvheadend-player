@@ -157,6 +157,8 @@ import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 import androidx.compose.ui.text.rememberTextMeasurer
 
+internal val HomeEndCardKeys = setOf("all-recordings", "all-channels", "all-scheduled")
+
 /** An ordinary focused row's heading sits at this offset from the page's top edge. */
 private val HomeTopSlot = 76.dp
 
@@ -411,7 +413,7 @@ internal fun HomeContent(
         if (!focusEnabled) return@LaunchedEffect
         val previous = focusedCard ?: return@LaunchedEffect
         if (!focusEnabled || drawerState?.currentValue == DrawerValue.Open) return@LaunchedEffect
-        if (previous.item in setOf("all-recordings", "all-channels", "all-scheduled") && sections.any { it.kind == previous.section }) return@LaunchedEffect
+        if (previous.item in HomeEndCardKeys && sections.any { it.kind == previous.section }) return@LaunchedEffect
         val restored = homeRestoreFocus(sections, previous)
         if (restored?.section == previous.section && restored.item == previous.item) return@LaunchedEffect
         withFrameNanos { }
@@ -831,6 +833,9 @@ private fun <T> HomeCardRow(
     var screenEdge by remember { mutableFloatStateOf(0f) }
     val state = rememberLazyListState(initialFirstVisibleItemIndex = entryIndex.coerceAtLeast(0))
     var rememberedIndex by remember { mutableIntStateOf(entryIndex) }
+    var rememberedKey by remember { mutableStateOf(items.getOrNull(entryIndex)?.let(itemKey)) }
+    val restoredIndex = items.indexOfFirst { itemKey(it) == rememberedKey }.takeIf { it >= 0 }
+        ?: rememberedIndex.coerceIn(0, items.lastIndex.coerceAtLeast(0))
     CompositionLocalProvider(
         LocalBringIntoViewSpec provides StartKeylineBringIntoViewSpec(
             with(density) { start.toPx() } + offscreenPx.toFloat(),
@@ -858,8 +863,13 @@ private fun <T> HomeCardRow(
         ) {
             itemsIndexed(items, key = { _, item -> itemKey(item) }) { index, item ->
                 val itemModifier = Modifier
-                    .then(if (index == rememberedIndex.coerceIn(items.indices)) Modifier.focusRequester(entry) else Modifier)
-                    .onFocusChanged { if (it.isFocused) rememberedIndex = index }
+                    .then(if (index == restoredIndex) Modifier.focusRequester(entry) else Modifier)
+                    .onFocusChanged {
+                        if (it.isFocused) {
+                            rememberedKey = itemKey(item)
+                            rememberedIndex = index
+                        }
+                    }
                     .then(
                         if (index == 0) {
                             Modifier.focusProperties {

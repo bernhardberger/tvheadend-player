@@ -268,6 +268,17 @@ class RecordingsVisualLayoutTest {
         compose.onNodeWithTag("recording-list-entry-98").assertIsFocused().assertIsDisplayed()
     }
 
+    @Test fun scheduleDeepLinkWaitsForTheFirstLoadedSnapshot() {
+        screenState.open(at.bernhardberger.tvhplayer.core.DvrLibraryMode.SCHEDULE, DvrEntryId(48))
+        show(snapshotLoaded = false)
+        compose.runOnIdle { assertEquals(DvrEntryId(48), screenState.requestedScheduleEntryId.value) }
+        publish((40L..49L).map { recording(it, "Scheduled expedition ${it - 39}", null,
+            DvrEntryState.SCHEDULED, startEpochSeconds = 1_900_000_000L + it * 3600) })
+        compose.mainClock.advanceTimeBy(600)
+        compose.onNodeWithTag("recording-list-entry-48").assertIsFocused().assertIsDisplayed()
+        compose.runOnIdle { assertNull(screenState.requestedScheduleEntryId.value) }
+    }
+
     @Test fun recordingSpaceLineGivesWayToTheTabs() {
         show(diskSpace = DvrDiskSpaceState.Current(DvrDiskSpace(412_000_000_000L, 1_588_000_000_000L, 2_000_000_000_000L)))
         focused("recordings-folder-Documentaries")
@@ -1336,7 +1347,7 @@ class RecordingsVisualLayoutTest {
     }
 
     private fun show(scale: Float = 1f, empty: Boolean = false, entries: List<DvrEntry>? = null, endPadding: Dp? = null,
-        diskSpace: DvrDiskSpaceState = DvrDiskSpaceState.Unknown, channels: List<Channel> = emptyList()) {
+        diskSpace: DvrDiskSpaceState = DvrDiskSpaceState.Unknown, channels: List<Channel> = emptyList(), snapshotLoaded: Boolean = true) {
         endPaddingState.value = endPadding
         val recordings = entries ?: if (empty) emptyList() else listOf(
             recording(1, LONG_TITLE, "Documentaries/northern.ts"),
@@ -1353,13 +1364,13 @@ class RecordingsVisualLayoutTest {
             )),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(channels, emptyList())),
             epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
-            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(recordings)),
+            dvrState = if (snapshotLoaded) DvrRepositoryState.Current(DvrSnapshot.create(recordings)) else SessionObservation.create().dvrState,
             dvrDiskSpaceState = diskSpace,
             recordingProgressCapability = RecordingProgressCapability.SUPPORTED,
         )
         session = FakeTvheadendSession(observation)
         val currentObservation = session.observation.value
-        assertNotNull("Exercise live capability/session guards, not cached-only rows", currentObservation.currentSession)
+        if (snapshotLoaded) assertNotNull("Exercise live capability/session guards, not cached-only rows", currentObservation.currentSession)
         val actions = DvrMutationActions(session.dvrRepository)
         val notices = NoticeCenter(android.os.SystemClock::elapsedRealtime) {
             NoticeContext(0L, session.observation.value.currentSession?.generationIdentity)

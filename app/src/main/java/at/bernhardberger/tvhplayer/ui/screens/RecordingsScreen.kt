@@ -482,6 +482,7 @@ internal fun RecordingsScreenContent(
         location,
         itemKeys,
         screenState.requestedScheduleEntryId.value,
+        observation.dvrSnapshotForDisplay != null,
         selectedKeys[location],
         requestContentFocus,
         initialFocusEnabled,
@@ -492,9 +493,13 @@ internal fun RecordingsScreenContent(
     ) {
         if (detailsEntry != null || pendingAction != null || folderMenu != null) return@LaunchedEffect
         val requestedEntry = screenState.requestedScheduleEntryId.value
-        val unavailableScheduleEntry = mode == DvrLibraryMode.SCHEDULE && requestedEntry != null &&
+        val snapshotLoaded = observation.dvrSnapshotForDisplay != null
+        val unavailableScheduleEntry = snapshotLoaded && mode == DvrLibraryMode.SCHEDULE && requestedEntry != null &&
             observedLibrary.schedule.none { it.id == requestedEntry && it.state == DvrEntryState.SCHEDULED }
-        screenState.requestedScheduleEntryId.value = null
+        if (snapshotLoaded && requestedEntry != null) {
+            screenState.requestedScheduleEntryId.value = null
+            requestContentFocus = true
+        }
         if (itemKeys.isEmpty() && !alertShown) {
             if (unavailableScheduleEntry) selectedKeys.remove(location)
             if (!initialFocusEnabled || (!requestContentFocus && !contentFocusOwned)) return@LaunchedEffect
