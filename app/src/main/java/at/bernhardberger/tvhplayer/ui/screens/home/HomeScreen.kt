@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.type
 import at.bernhardberger.tvhplayer.ui.components.TabOwner
 import at.bernhardberger.tvhplayer.ui.components.LocalTabOwner
 import at.bernhardberger.tvhplayer.ui.components.AppErrorAlert
@@ -188,6 +190,9 @@ internal fun HomeScreenContent(
     val playingRecordingId = (input.playing as? HomePlaying.Recording)?.entryId
     val sections = remember(input) { homeSections(input) }
     var focused by focusMemory
+    // A fresh landing follows late-arriving sections only until input or a restore boundary.
+    var followInitialFocus by remember { mutableStateOf(focused == null) }
+    var hadFocusOwnership by remember { mutableStateOf(false) }
     var options by remember { mutableStateOf(false) }
     var tags by remember { mutableStateOf(false) }
     val tagsFocus = remember { FocusRequester() }
@@ -259,16 +264,25 @@ internal fun HomeScreenContent(
     }
     val openOptions = { if (owner?.isCurrent != false) { restoreTagHeader = false; restoreHeader = true; options = true } }
     val errorFocus = remember { FocusRequester() }
+    val contentFocusEnabled = initialFocusEnabled && channelMenu == null && recording == null && !options && !tags
+    LaunchedEffect(contentFocusEnabled) {
+        if (contentFocusEnabled) hadFocusOwnership = true
+        else if (hadFocusOwnership) followInitialFocus = false
+    }
     HomeContent(
         sections = sections,
         contentPadding = contentPadding,
-        initialFocus = focused?.let { previous ->
+        initialFocus = if (followInitialFocus) homeInitialFocus(sections) else focused?.let { previous ->
             if (previous.item in HomeEndCardKeys && sections.any { it.kind == previous.section }) previous
             else homeRestoreFocus(sections, previous)
         } ?: homeInitialFocus(sections),
         onFocused = { focused = it; restoreHeader = false },
-        modifier = modifier,
-        focusEnabled = initialFocusEnabled && channelMenu == null && recording == null && !options && !tags,
+        modifier = modifier.onPreviewKeyEvent {
+            if (it.type == KeyEventType.KeyDown) followInitialFocus = false
+            false
+        },
+        followInitialFocus = followInitialFocus && sections.isNotEmpty(),
+        focusEnabled = contentFocusEnabled,
         tagsRequester = tagsFocus,
         tag = activeTagId?.let { id -> groups.firstOrNull { it.tagId == id }?.name },
         onTags = { if (owner?.isCurrent != false) { restoreTagHeader = true; restoreHeader = true; tags = true } },

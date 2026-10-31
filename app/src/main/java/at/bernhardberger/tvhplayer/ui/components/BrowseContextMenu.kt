@@ -115,7 +115,8 @@ internal fun BrowseContextMenu(
                         else -> action.label(watchChannel)
                     }),
                     { onAction(action) },
-                    Modifier.focusRequester(requesters.getValue(action))
+                    Modifier.testTag("browse-context-action-${action.name.lowercase()}")
+                        .focusRequester(requesters.getValue(action))
                         .onFocusChanged { if (it.isFocused) { focusedAction = action; focusedIndex = index } }
                         .focusProperties {
                             up = actions.getOrNull(index - 1)?.let(requesters::get) ?: FocusRequester.Cancel

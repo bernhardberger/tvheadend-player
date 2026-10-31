@@ -24,15 +24,81 @@ class PlayerBaselineProfile {
     @get:Rule
     val baselineProfile = BaselineProfileRule()
 
-    @Test fun startup01Immersive() = startup(Layout.Immersive)
+    @Test fun startup01Home() = journey(startup = true) {
+        coldStart()
+        awaitHome()
+        await(By.res("home-header"), "Fresh Home must draw its header")
+        await(By.res(FirstHomeCard).focused(true), "Fresh Home must focus its topmost card")
+        focusToward(By.res("home-onnow-0"), KeyEvent.KEYCODE_DPAD_DOWN)
+    }
 
-    @Test fun startup02Grid() = startup(Layout.Grid)
+    @Test fun startup02Autostart() = journey(startup = true, autoplay = true) {
+        coldStart()
+        awaitVideo()
+        playerToHome()
+    }
 
-    @Test fun startup03List() = startup(Layout.List)
+    @Test fun evening01BrowseAndWatch() = journey(startup = false) {
+        // Benchmark 1.5 kills the process before each profileBlock, even for baseline-only
+        // collection. Launch here without an explicit cold-start/reset of our own.
+        startActivityAndWait()
+        awaitHome()
+        homeToTop()
+        // There are at most seven Home rows. At the ends, further presses stay in Home.
+        repeat(7) { key(KeyEvent.KEYCODE_DPAD_DOWN) }
+        homeToTop()
+        focusToward(By.res("home-onnow-0"), KeyEvent.KEYCODE_DPAD_DOWN)
+        key(KeyEvent.KEYCODE_DPAD_RIGHT)
+        key(KeyEvent.KEYCODE_DPAD_LEFT)
+        key(KeyEvent.KEYCODE_MENU)
+        await(By.res("browse-context-menu"), "On now must open its context menu")
+        focusToward(By.res("browse-context-action-details"), KeyEvent.KEYCODE_DPAD_DOWN)
+        key(KeyEvent.KEYCODE_DPAD_CENTER)
+        await(By.res("programme-details-page"), "Programme details must open")
+        key(KeyEvent.KEYCODE_BACK)
+        awaitHome()
 
-    @Test fun startup04AutostartPlayback() = startup(Layout.Immersive, autoplay = true)
+        key(KeyEvent.KEYCODE_DPAD_CENTER)
+        awaitVideo()
+        listOf(KeyEvent.KEYCODE_CHANNEL_UP, KeyEvent.KEYCODE_CHANNEL_DOWN).forEach {
+            key(it)
+            awaitVideo()
+        }
+        key(KeyEvent.KEYCODE_DPAD_DOWN)
+        await(By.res("player-pause").focused(true), "Down must reveal the player's action row")
+        key(KeyEvent.KEYCODE_DPAD_DOWN)
+        await(By.res("player-channel-browser"), "Down must open the player's channel row")
+        key(KeyEvent.KEYCODE_DPAD_RIGHT)
+        key(KeyEvent.KEYCODE_DPAD_LEFT)
+        key(KeyEvent.KEYCODE_GUIDE)
+        await(By.res("channel-schedule-panel"), "Guide must open the channel schedule")
+        key(KeyEvent.KEYCODE_DPAD_DOWN)
+        key(KeyEvent.KEYCODE_BACK)
+        playerToHome()
 
-    private fun startup(layout: Layout, autoplay: Boolean = false) {
+        railDestination("nav-home", "nav-epg", KeyEvent.KEYCODE_DPAD_DOWN, By.res("epg-screen"))
+        await(By.res("epg-programme-viewport"), "Guide programmes must draw")
+        repeat(3) { key(KeyEvent.KEYCODE_PAGE_DOWN) }
+        repeat(12) { key(KeyEvent.KEYCODE_DPAD_RIGHT) }
+        railDestination("nav-epg", "nav-home", KeyEvent.KEYCODE_DPAD_UP, homeContent())
+        awaitHome()
+
+        homeToChannels()
+        val originalLayout = Layout.entries.single { has(By.res(it.readyTag)) }
+        Layout.entries.forEach { layout ->
+            selectLayout(layout)
+            key(KeyEvent.KEYCODE_DPAD_DOWN)
+            if (layout != Layout.List) key(KeyEvent.KEYCODE_DPAD_RIGHT)
+            key(KeyEvent.KEYCODE_DPAD_DOWN)
+            if (layout != Layout.List) key(KeyEvent.KEYCODE_DPAD_LEFT)
+            key(KeyEvent.KEYCODE_DPAD_UP)
+        }
+        selectLayout(originalLayout)
+        railDestination("nav-channels", "nav-recordings", KeyEvent.KEYCODE_DPAD_DOWN, By.res("recordings-header"))
+        browseArchiveAndPlay()
+    }
+
+    private fun journey(startup: Boolean, autoplay: Boolean = false, body: MacrobenchmarkScope.() -> Unit) {
         // UI setup is outside collect: Settings and View options are not startup work.
         val setup = MacrobenchmarkScope(PackageName, launchWithClearTask = true)
         setup.startAtExistingChannels()
@@ -42,32 +108,16 @@ class PlayerBaselineProfile {
         try {
             setup.setAutoplay(false)
             setup.settingsToChannels()
-            setup.selectLayout(layout)
             if (autoplay) {
                 // Establish a playable last channel through the real UI before enabling autostart.
-                setup.tuneAndReturn(layout)
+                setup.tuneAndReturn(originalLayout)
                 setup.openAutoplay()
                 setup.setAutoplay(true)
                 setup.settingsToChannels()
             }
-            baselineProfile.collect(packageName = PackageName, includeInStartupProfile = true) {
-                coldStart()
-                if (autoplay) {
-                    await(By.res("player-banner"), "Autostart must enter the player")
-                    assertTrue("Autostart must bypass Channels", !has(channel()))
-                    videoAndReturn(layout)
-                } else {
-                    awaitHome()
-                    await(By.res("home-header"), "Home must draw its header")
-                    key(KeyEvent.KEYCODE_DPAD_DOWN)
-                    focusToward(By.res("home-onnow-0"), KeyEvent.KEYCODE_DPAD_DOWN)
-                    key(KeyEvent.KEYCODE_DPAD_DOWN)
-                    homeToChannels()
-                    awaitChannels(layout)
-                    await(channel().focused(true), "Cold start must assign channel focus")
-                    tuneAndReturn(layout)
-                }
-            }
+            setup.railDestination("nav-channels", "nav-home", KeyEvent.KEYCODE_DPAD_UP, homeContent())
+            setup.awaitHome()
+            baselineProfile.collect(packageName = PackageName, includeInStartupProfile = startup, profileBlock = body)
         } finally {
             // Also restore after a failed collection. Never clear app data or change defaults.
             try {
@@ -91,10 +141,10 @@ class PlayerBaselineProfile {
     private fun MacrobenchmarkScope.startAtExistingChannels() {
         coldStart()
         assertTrue("Precondition: a stored reachable server and playable channels",
-            device.wait({ !has(By.res("main-startup-root")) && (has(By.res("home-header")) || has(By.res("player-banner"))) }, ReadyTimeout))
-        if (!has(By.res("home-header"))) {
+            device.wait({ !has(By.res("main-startup-root")) && (has(homeContent()) || has(By.res("player-banner"))) }, ReadyTimeout))
+        if (!has(homeContent())) {
             awaitVideo()
-            key(KeyEvent.KEYCODE_BACK)
+            playerToHome()
         }
         awaitHome()
         homeToChannels()
@@ -106,12 +156,78 @@ class PlayerBaselineProfile {
         assertTrue("Cold start must draw Home and release startup", device.wait({
             // The topmost section's first card: Right now and Recent channels push On now below
             // the fold once something has played, and a lazy row off screen has no nodes.
-            !has(By.res("main-startup-root")) && has(By.res("home-header")) && has(By.res(FirstHomeCard))
-        }, ReadyTimeout) || run {
-            println("awaitHome: startup=${has(By.res("main-startup-root"))} header=${has(By.res("home-header"))} " +
-                "card=${has(By.res(FirstHomeCard))} sections=${device.findObjects(By.res(Pattern.compile("home-.*"))).map { it.resourceName }}")
-            false
-        })
+            !has(By.res("main-startup-root")) &&
+                has(homeContent())
+        }, ReadyTimeout))
+    }
+
+    private fun MacrobenchmarkScope.homeToTop() {
+        focusToward(By.res("home-header").hasDescendant(By.focused(true)), KeyEvent.KEYCODE_DPAD_UP, focused = false)
+        key(KeyEvent.KEYCODE_DPAD_DOWN)
+        await(By.res(FirstHomeCard).focused(true), "Home must return to its topmost card")
+    }
+
+    private fun MacrobenchmarkScope.playerToHome() {
+        repeat(4) {
+            key(KeyEvent.KEYCODE_BACK)
+            if (device.wait({ !has(By.res("main-startup-root")) && has(homeContent()) }, FocusTimeout)) {
+                awaitHome()
+                return
+            }
+        }
+        assertTrue("Back must return from playback to Home", false)
+    }
+
+    private fun MacrobenchmarkScope.railDestination(current: String, target: String, direction: Int, ready: BySelector) {
+        openDrawer(current)
+        focusToward(By.res(target), direction)
+        await(ready, "The selected browsing destination must draw")
+        key(KeyEvent.KEYCODE_DPAD_RIGHT)
+    }
+
+    private fun MacrobenchmarkScope.browseArchiveAndPlay() {
+        focusToward(By.res("recordings-mode-tabs").hasDescendant(By.focused(true)), KeyEvent.KEYCODE_DPAD_UP, focused = false)
+        focusToward(By.res("recordings-mode-archive"), KeyEvent.KEYCODE_DPAD_LEFT)
+        key(KeyEvent.KEYCODE_DPAD_DOWN)
+        await(By.res("recordings-archive-list"), "Archive must draw")
+        val active = By.res("depth-active")
+        await(active, "Archive must finish preparing its active list")
+        // Empty content has no focusable rows; do not confuse an in-flight focus request
+        // on a populated Archive with an empty library.
+        if (device.findObject(active).hasObject(By.focusable(true))) {
+            await(By.res("depth-active").hasDescendant(By.focused(true)), "Archive rows must receive focus")
+        } else return
+        key(KeyEvent.KEYCODE_DPAD_DOWN)
+        key(KeyEvent.KEYCODE_DPAD_UP)
+        val entry = By.res(Pattern.compile("recording-list-entry-recording:.*"))
+        // An empty Archive has no rows. Folder and recording rows keep focus in depth-active.
+        repeat(8) {
+            val pane = device.findObject(active)
+            val recording = pane?.findObject(entry)
+            if (recording != null) {
+                focusToward(By.res(recording.resourceName), KeyEvent.KEYCODE_DPAD_DOWN)
+                key(KeyEvent.KEYCODE_MENU)
+                await(By.res("browse-context-menu"), "Recording actions must open")
+                val play = By.res(Pattern.compile("browse-context-action-(resume|play|watch|start_over)"))
+                focusToward(play, KeyEvent.KEYCODE_DPAD_DOWN)
+                key(KeyEvent.KEYCODE_DPAD_CENTER)
+                awaitVideo()
+                key(KeyEvent.KEYCODE_BACK)
+                await(By.res("recordings-header"), "Back must return to Recordings")
+                return
+            }
+            val focused = device.findObject(By.focused(true))
+            assertTrue("A populated Archive must keep focus in its active list",
+                focused != null && pane?.hasObject(By.focused(true)) == true)
+            if (focused == null) return
+            val previous = focused.resourceName
+            key(KeyEvent.KEYCODE_DPAD_CENTER)
+            assertTrue("Archive folder must finish opening", device.wait({
+                has(By.res("depth-active").hasDescendant(By.focused(true))) &&
+                    !has(By.res(previous).focused(true))
+            }, ReadyTimeout))
+        }
+        assertTrue("Archive folders must lead to recording rows", false)
     }
 
     private fun MacrobenchmarkScope.homeToChannels() {
@@ -241,6 +357,8 @@ class PlayerBaselineProfile {
     }
 
     private fun channel() = By.res(Pattern.compile("channel-(row|card)-.*"))
+
+    private fun homeContent() = By.res(Pattern.compile("home-((activity|recent|onnow)-0|section-.*)"))
 
     private enum class Layout(val readyTag: String) {
         Immersive("channels-immersive-cards"),

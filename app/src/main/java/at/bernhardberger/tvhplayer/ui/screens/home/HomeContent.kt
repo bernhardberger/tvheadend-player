@@ -32,6 +32,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -319,6 +320,7 @@ internal fun HomeContent(
     onFocused: (HomeFocusKey) -> Unit,
     modifier: Modifier = Modifier,
     focusEnabled: Boolean = true,
+    followInitialFocus: Boolean = false,
     observation: SessionObservation? = null,
     input: HomeInput? = null,
     onActivate: (HomeFocusKey) -> Unit = {},
@@ -393,24 +395,24 @@ internal fun HomeContent(
 
     // Metadata ticks and ordinary D-pad moves must not replay entry focus. Request it on entry,
     // after the first rows arrive, or when the destination regains ownership after a dialog.
-    LaunchedEffect(focusEnabled, sections.isEmpty(), emptyFocus) {
+    LaunchedEffect(focusEnabled, sections.isEmpty(), emptyFocus, initialKey, followInitialFocus) {
         if (!focusEnabled) return@LaunchedEffect
         // Widget focus changes precede composition's drawerActive feedback: never take focus back
         // from an opening drawer.
         withFrameNanos { }
         if (drawerState?.currentValue == DrawerValue.Open) return@LaunchedEffect
-        if (entryFocusApplied && hasHomeFocus && !restoreHeader) return@LaunchedEffect
+        if (entryFocusApplied && hasHomeFocus && !restoreHeader && !followInitialFocus) return@LaunchedEffect
         val target = if (restoreHeader) (if (restoreTags) tagsRequester else viewRequester) else initialKey?.let { requesters[it.section] } ?: emptyFocus ?: viewRequester
         repeat(60) {
             if (drawerState?.currentValue == DrawerValue.Open) return@LaunchedEffect
-            if (entryFocusApplied && hasHomeFocus && !restoreHeader) return@LaunchedEffect
+            if (entryFocusApplied && hasHomeFocus && !restoreHeader && !followInitialFocus) return@LaunchedEffect
             if (target.requestFocus()) { entryFocusApplied = true; return@LaunchedEffect }
             withFrameNanos { }
         }
     }
 
     LaunchedEffect(sections, focusEnabled) {
-        if (!focusEnabled) return@LaunchedEffect
+        if (!focusEnabled || followInitialFocus) return@LaunchedEffect
         val previous = focusedCard ?: return@LaunchedEffect
         if (!focusEnabled || drawerState?.currentValue == DrawerValue.Open) return@LaunchedEffect
         if (previous.item in HomeEndCardKeys && sections.any { it.kind == previous.section }) return@LaunchedEffect
@@ -512,7 +514,7 @@ internal fun HomeContent(
                 if (sections.isEmpty()) {
                     Box(Modifier.height(emptyHeight)) { emptyContent() }
                 }
-                sections.forEach { section ->
+                sections.forEach { section -> key(section.kind) {
                     val kind = section.kind
                     val focused = focusedSection == kind
                     val emphasisState = animateFloatAsState(if (focused) 1f else 0f, RowChangeMotion, label = "home-row-emphasis")
@@ -716,7 +718,7 @@ internal fun HomeContent(
                         kind == HomeSectionKind.RECENT_CHANNELS -> HomeRecentSectionGap
                         else -> HomeSectionGap
                     }))
-                }
+                } }
                 Spacer(
                     Modifier
                         .fillMaxWidth()

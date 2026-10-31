@@ -57,6 +57,37 @@ class HomeActionsTest {
 
     @Test fun rowReentryUsesClampedPreviousIndexWhenItsItemLeaves() = recentRowRefresh(true)
 
+    @Test fun lateRunningRecordingBecomesInitialFocusBeforeAnyHomeKey() = lateRunningRecording(false)
+
+    @Test fun lateRunningRecordingDoesNotReplaceTheViewersChosenCard() = lateRunningRecording(true)
+
+    private fun lateRunningRecording(viewerMoved: Boolean) {
+        val second = Channel.create(ChannelId(2), name = "Second")
+        var input by mutableStateOf(HomeInput(listOf(channel, second), emptyMap(), emptyList(),
+            listOf(channel.id, second.id), emptyList(), { null }, null, now))
+        compose.setContent { TVHeadendPlayerTheme {
+            HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
+                onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
+                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
+        } }
+        compose.onNodeWithTag("home-recent-0").assertIsFocused()
+        if (viewerMoved) {
+            compose.onNodeWithTag("home-recent-0").performKeyInput { pressKey(Key.DirectionRight) }
+            compose.onNodeWithTag("home-recent-1").assertIsFocused()
+        }
+        compose.runOnIdle {
+            input = input.copy(dvrEntries = listOf(DvrEntry.create(DvrEntryId(7), channelId = channel.id,
+                title = "Running recording", state = DvrEntryState.RECORDING,
+                start = Instant.fromEpochSeconds(now - 300), stop = Instant.fromEpochSeconds(now + 900))))
+        }
+        compose.mainClock.advanceTimeBy(600)
+        compose.onNodeWithTag(if (viewerMoved) "home-recent-1" else "home-activity-0").assertIsFocused()
+        if (!viewerMoved) {
+            val header = compose.onNodeWithTag("home-header").assertIsDisplayed().getUnclippedBoundsInRoot()
+            assertTrue("Initial first-section focus keeps the header inside the viewport", header.top.value >= 0f)
+        }
+    }
+
     private fun recentRowRefresh(removeFocused: Boolean) {
         val channels = (1L..3L).map { Channel.create(ChannelId(it), name = "Channel $it") }
         val recents = mutableStateOf(channels.map { it.id })

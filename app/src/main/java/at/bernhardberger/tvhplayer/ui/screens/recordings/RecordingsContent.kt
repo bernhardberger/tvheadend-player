@@ -216,6 +216,7 @@ internal fun RecordingModeTabs(
         DvrLibraryMode.entries.forEach { mode ->
             AppTab(
                 selected = selected == mode,
+                modifier = Modifier.testTag("recordings-mode-${mode.name.lowercase()}"),
                 label = stringResource(
                     when (mode) {
                         DvrLibraryMode.ARCHIVE -> R.string.recordings_archive
