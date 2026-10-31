@@ -313,7 +313,7 @@ internal fun HomeScreenContent(
         Box(Modifier.onPreviewKeyEvent { openingOwner?.isCurrent == false }) {
             HomeViewOptionsPanel(input.hiddenSections,
                 { section, visible -> if (openingOwner?.isCurrent != false) onSectionVisibleChange(section, visible) },
-                onClose = { options = false })
+                onClose = { runCatching { viewFocus.requestFocus() }; options = false })
         }
         LaunchedEffect(owner) { if (openingOwner?.isCurrent == false) options = false }
     }
@@ -321,8 +321,12 @@ internal fun HomeScreenContent(
         val openingOwner = remember { owner }
         Box(Modifier.onPreviewKeyEvent { openingOwner?.isCurrent == false }) {
             at.bernhardberger.tvhplayer.ui.screens.ChannelsTagsPanel(groups, activeTagId,
-                onSelect = { if (openingOwner?.isCurrent != false) onSelectTag(it); tags = false },
-                onClose = { tags = false })
+                onSelect = {
+                    if (openingOwner?.isCurrent != false) onSelectTag(it)
+                    runCatching { tagsFocus.requestFocus() }
+                    tags = false
+                },
+                onClose = { runCatching { tagsFocus.requestFocus() }; tags = false })
         }
         LaunchedEffect(owner) { if (openingOwner?.isCurrent == false) tags = false }
     }

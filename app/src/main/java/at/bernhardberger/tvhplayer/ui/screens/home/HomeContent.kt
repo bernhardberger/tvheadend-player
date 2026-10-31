@@ -42,6 +42,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -357,6 +358,18 @@ internal fun HomeContent(
     val drawerState = LocalBrowseDrawerState.current
     val firstSection = sections.firstOrNull()?.kind
     val initialKey = remember(sections, initialFocus) { initialFocus ?: homeInitialFocus(sections) }
+    var revealedSections by remember { mutableIntStateOf(1) }
+    val sectionCount by rememberUpdatedState(sections.size)
+    LaunchedEffect(sections.isNotEmpty()) {
+        if (sections.isEmpty() || revealedSections == Int.MAX_VALUE) return@LaunchedEffect
+        while (revealedSections < sectionCount) {
+            withFrameNanos { }
+            revealedSections++
+        }
+        revealedSections = Int.MAX_VALUE
+    }
+    val renderedSections = sections.take(maxOf(revealedSections,
+        1 + sections.indexOfFirst { it.kind == initialKey?.section }))
     val requesters = remember {
         HomeSectionKind.entries.associateWith { FocusRequester() }
     }
@@ -380,7 +393,8 @@ internal fun HomeContent(
             firstSection -> 0f
             else -> ((tops[kind] ?: 0f) - topSlot).coerceAtLeast(0f)
         }
-        minOf(desired, (contentEnd - viewport).coerceAtLeast(0f))
+        if (revealedSections == Int.MAX_VALUE) minOf(desired, (contentEnd - viewport).coerceAtLeast(0f))
+        else desired
     }
     val motion = rememberHomePageMotion(focusedSection, scrollTarget)
     val scrollPx by remember(motion, scrollTarget) {
@@ -415,16 +429,17 @@ internal fun HomeContent(
         }
     }
 
-    LaunchedEffect(sections, focusEnabled) {
+    LaunchedEffect(sections, focusEnabled, revealedSections) {
         if (!focusEnabled || followInitialFocus) return@LaunchedEffect
         val previous = focusedCard ?: return@LaunchedEffect
         if (!focusEnabled || drawerState?.currentValue == DrawerValue.Open) return@LaunchedEffect
         if (previous.item in HomeEndCardKeys && sections.any { it.kind == previous.section }) return@LaunchedEffect
         val restored = homeRestoreFocus(sections, previous)
+        if (restored != null && renderedSections.none { it.kind == restored.section }) return@LaunchedEffect
         if (restored?.section == previous.section && restored.item == previous.item) return@LaunchedEffect
         withFrameNanos { }
         if (!focusEnabled || drawerState?.currentValue == DrawerValue.Open) return@LaunchedEffect
-        (restored?.let { requesters[it.section] } ?: emptyFocus ?: viewRequester).requestFocus()
+        runCatching { (restored?.let { requesters[it.section] } ?: emptyFocus ?: viewRequester).requestFocus() }
     }
 
     BoxWithConstraints(
@@ -439,8 +454,8 @@ internal fun HomeContent(
                         FocusDirection.Left
                     }
                     if (requestedFocusDirection == awayFromNavigation) {
-                        val key = focusedCard ?: initialKey
-                        (key?.let { requesters[it.section] } ?: emptyFocus ?: viewRequester).requestFocus()
+                        val key = (focusedCard ?: initialKey)?.takeIf { target -> renderedSections.any { it.kind == target.section } }
+                        runCatching { (key?.let { requesters[it.section] } ?: emptyFocus ?: viewRequester).requestFocus() }
                     }
                 }
             }.focusGroup(),
@@ -455,7 +470,7 @@ internal fun HomeContent(
                 .mapNotNull { it.channelId }
                 .toSet()
         }
-        val onNow = sections.filterIsInstance<HomeSection.OnNow>().firstOrNull()
+        val onNow = renderedSections.filterIsInstance<HomeSection.OnNow>().firstOrNull()
         if (observation != null && onNow != null) {
             Box(
                 Modifier.fillMaxSize().testTag("home-immersive-background")
@@ -480,14 +495,16 @@ internal fun HomeContent(
                     .graphicsLayer { translationY = -scrollPx }
                     .onPreviewKeyEvent { event ->
                         if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                        val index = sections.indexOfFirst { it.kind == focusedSection }
+                        val index = renderedSections.indexOfFirst { it.kind == focusedSection }
                         when (event.key) {
                             Key.DirectionDown -> {
-                                val next = if (focusedSection == null) firstSection else sections.getOrNull(index + 1)?.kind
-                                next?.let { requesters[it]?.requestFocus() } ?: false
+                                val next = if (focusedSection == null) firstSection else renderedSections.getOrNull(index + 1)?.kind
+                                next?.let { runCatching { requesters[it]?.requestFocus() ?: false }.getOrDefault(false) } ?: false
                             }
                             Key.DirectionUp -> if (index == 0) tagsRequester.requestFocus()
-                                else sections.getOrNull(index - 1)?.kind?.let { requesters[it]?.requestFocus() } ?: false
+                                else renderedSections.getOrNull(index - 1)?.kind?.let {
+                                    runCatching { requesters[it]?.requestFocus() ?: false }.getOrDefault(false)
+                                } ?: false
                             else -> false
                         }
                     },
@@ -518,7 +535,7 @@ internal fun HomeContent(
                 if (sections.isEmpty()) {
                     Box(Modifier.height(emptyHeight)) { emptyContent() }
                 }
-                sections.forEach { section -> key(section.kind) {
+                renderedSections.forEach { section -> key(section.kind) {
                     val kind = section.kind
                     val focused = focusedSection == kind
                     val emphasisState = animateFloatAsState(if (focused) 1f else 0f, RowChangeMotion, label = "home-row-emphasis")

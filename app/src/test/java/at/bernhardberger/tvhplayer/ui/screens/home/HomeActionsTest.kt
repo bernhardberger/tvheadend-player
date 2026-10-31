@@ -274,6 +274,94 @@ class HomeActionsTest {
         compose.onNodeWithTag("home-tags-button").assertIsFocused()
     }
 
+    @Test fun panelBackAndTagSelectionNeverRefocusACard() {
+        val memory = mutableStateOf<HomeFocusKey?>(null)
+        val input = HomeInput(listOf(channel), emptyMap(), emptyList(), listOf(channel.id), emptyList(), { null }, null, now)
+        compose.setContent { TVHeadendPlayerTheme {
+            HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
+                onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
+                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> }, focusMemory = memory,
+                groups = listOf(at.bernhardberger.tvhplayer.ui.screens.ChannelsGroup(null, null, listOf(channel)),
+                    at.bernhardberger.tvhplayer.ui.screens.ChannelsGroup(ChannelTagId(8), "Favorites", listOf(channel))),
+                activeTagId = ChannelTagId(8))
+        } }
+        compose.onNodeWithTag("home-recent-0").performKeyInput { pressKey(Key.DirectionUp); pressKey(Key.DirectionRight); pressKey(Key.Enter) }
+        fun closeAndCheck(panel: String, opener: String, key: Key) {
+            compose.runOnIdle { memory.value = null }
+            compose.mainClock.autoAdvance = false
+            compose.onNodeWithTag(panel).performKeyInput { pressKey(key) }
+            repeat(5) {
+                compose.mainClock.advanceTimeByFrame()
+                compose.onNodeWithTag(opener).assertIsFocused()
+                compose.runOnIdle { assertNull("Closing a panel must not report card focus", memory.value) }
+            }
+            compose.mainClock.autoAdvance = true
+        }
+        closeAndCheck("home-view-CURRENT_ACTIVITY", "home-view-button", Key.Back)
+        compose.onNodeWithTag("home-view-button").performKeyInput { pressKey(Key.DirectionLeft); pressKey(Key.Enter) }
+        closeAndCheck("channels-tags-8", "home-tags-button", Key.Back)
+        compose.onNodeWithTag("home-tags-button").performKeyInput { pressKey(Key.Enter) }
+        closeAndCheck("channels-tags-8", "home-tags-button", Key.Enter)
+    }
+
+    @Test fun entryRevealsOneSectionPerFrameAndLateSectionsAppearImmediately() {
+        val event = EpgEvent.create(EventId(1), channel.id, Instant.fromEpochSeconds(now - 60),
+            Instant.fromEpochSeconds(now + 600), title = "Programme")
+        var sections by mutableStateOf(listOf<HomeSection>(
+            HomeSection.RecentChannels(listOf(RecentChannelItem(channel))),
+            HomeSection.OnNow(listOf(OnNowItem(channel, event))),
+            HomeSection.Upcoming(listOf(UpcomingItem(DvrEntry.create(DvrEntryId(1), title = "Scheduled",
+                state = DvrEntryState.SCHEDULED, start = Instant.fromEpochSeconds(now + 600),
+                stop = Instant.fromEpochSeconds(now + 1200)))))))
+        compose.mainClock.autoAdvance = false
+        compose.setContent { TVHeadendPlayerTheme {
+            HomeContent(sections, PaddingValues(), homeInitialFocus(sections), {})
+        } }
+        compose.onNodeWithTag("home-section-RECENT_CHANNELS").assertExists()
+        compose.onNodeWithTag("home-section-ON_NOW").assertDoesNotExist()
+        compose.onNodeWithTag("home-section-UPCOMING").assertDoesNotExist()
+        // The first clock frame starts the effect; its frame callback invalidates the next composition.
+        compose.mainClock.advanceTimeByFrame()
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithTag("home-section-ON_NOW").assertExists()
+        compose.onNodeWithTag("home-section-UPCOMING").assertDoesNotExist()
+        compose.onNodeWithTag("home-recent-0").performKeyInput {
+            pressKey(Key.DirectionDown)
+            pressKey(Key.DirectionDown)
+            pressKey(Key.DirectionDown)
+        }
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithTag("home-section-UPCOMING").assertExists()
+        compose.mainClock.advanceTimeBy(600)
+        compose.onAllNodes(isFocused() and hasAnyAncestor(hasTestTag("home-section-RECENT_CHANNELS") or
+            hasTestTag("home-section-ON_NOW") or hasTestTag("home-section-UPCOMING"))).assertCountEquals(1)
+        compose.runOnIdle { sections = sections + HomeSection.Genres(listOf(GenreItem(ProgrammeCategory.ALL))) }
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithTag("home-section-GENRES").assertExists()
+    }
+
+    @Test fun deepEntryComposesItsPrecedingSectionsAndRapidDownOnlyTargetsRenderedCards() {
+        val sections = listOf<HomeSection>(HomeSection.RecentChannels(listOf(RecentChannelItem(channel))),
+            HomeSection.Genres(listOf(GenreItem(ProgrammeCategory.ALL))),
+            HomeSection.Upcoming(listOf(UpcomingItem(DvrEntry.create(DvrEntryId(1), title = "Scheduled",
+                state = DvrEntryState.SCHEDULED, start = Instant.fromEpochSeconds(now + 600),
+                stop = Instant.fromEpochSeconds(now + 1200))))))
+        compose.mainClock.autoAdvance = false
+        compose.setContent { TVHeadendPlayerTheme {
+            HomeContent(sections, PaddingValues(), HomeFocusKey(HomeSectionKind.UPCOMING, "recording:1", 0), {})
+        } }
+        sections.forEach { compose.onNodeWithTag("home-section-${it.kind.name}").assertExists() }
+        compose.mainClock.advanceTimeBy(600)
+        compose.onNodeWithTag("home-upcoming-0").assertIsFocused()
+        val before = compose.onNodeWithTag("home-upcoming-0").getUnclippedBoundsInRoot()
+        repeat(5) {
+            compose.onNodeWithTag("home-upcoming-0").performKeyInput { pressKey(Key.DirectionDown) }
+            compose.mainClock.advanceTimeByFrame()
+        }
+        compose.onNodeWithTag("home-upcoming-0").assertIsFocused()
+        assertEquals(before, compose.onNodeWithTag("home-upcoming-0").getUnclippedBoundsInRoot())
+    }
+
     @Test fun optionsToggleAllSectionsAndBackReturnsToHeaderWithoutTuning() {
         var enabled by mutableStateOf(true)
         var input by mutableStateOf(HomeInput(listOf(channel), emptyMap(), emptyList(),
