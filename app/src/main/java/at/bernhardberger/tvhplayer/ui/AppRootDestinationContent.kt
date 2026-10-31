@@ -7,6 +7,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import at.bernhardberger.tvhplayer.core.ProgrammeCategory
@@ -17,6 +20,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import at.bernhardberger.tvhplayer.ui.components.ChannelSettingsNotice
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onGloballyPositioned
 import at.bernhardberger.tvhplayer.profiling.profileLayout
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
@@ -77,9 +81,13 @@ internal fun HomeRouteContent(
     onContentDrawn: () -> Unit = {},
 ) {
     if (contentAllowed) {
+        var recoveryDrawn by remember { mutableStateOf(false) }
+        var homeDrawn by remember { mutableStateOf(false) }
         ContentContainer(modifier = Modifier.profileLayout("home")) {
-            BrowsingScopeContent(channelsVm, initialFocusEnabled) { HomeScreen(
-                onContentDrawn = onContentDrawn,
+            BrowsingScopeContent(channelsVm, initialFocusEnabled,
+                onRecoveryDrawn = { recoveryDrawn = true; onContentDrawn() },
+                retainLoadFailure = recoveryDrawn && !homeDrawn) { HomeScreen(
+                onContentDrawn = { homeDrawn = true; onContentDrawn() },
                 focusMemory = homeFocus,
                 contentPadding = contentPadding,
                 initialFocusEnabled = initialFocusEnabled,
@@ -295,16 +303,31 @@ internal fun LivePlayerRouteContent(
 internal fun BrowsingScopeContent(
     channelsVm: ChannelsViewModel,
     initialFocusEnabled: Boolean,
+    onRecoveryDrawn: () -> Unit = {},
+    retainLoadFailure: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val state by channelsVm.scope.collectAsStateWithLifecycle()
     val failed by channelsVm.settingsFailure.collectAsStateWithLifecycle()
+    val loadFailed = !state.settingsLoaded && failed
+    var recoveryLaidOut by remember(loadFailed) { mutableStateOf(false) }
+    val latestOnRecoveryDrawn by rememberUpdatedState(onRecoveryDrawn)
+    LaunchedEffect(recoveryLaidOut) {
+        if (recoveryLaidOut) {
+            // Like Home's content, the recovery must draw before startup releases it.
+            withFrameNanos { }
+            latestOnRecoveryDrawn()
+        }
+    }
     Column(Modifier.fillMaxSize()) {
         ChannelSettingsNotice(
-            loaded = state.settingsLoaded,
-            failed = failed,
+            // Keep Retry attached until Home can take focus; removing it while Home is
+            // still preparing would let the drawer claim focus and open itself.
+            loaded = state.settingsLoaded && !retainLoadFailure,
+            failed = failed || retainLoadFailure,
             onRetry = channelsVm::retrySettings,
             initialFocusEnabled = initialFocusEnabled,
+            modifier = Modifier.onGloballyPositioned { if (loadFailed) recoveryLaidOut = true },
         )
         if (state.settingsLoaded) Box(Modifier.weight(1f)) { content() }
     }

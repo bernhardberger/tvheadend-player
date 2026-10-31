@@ -41,8 +41,8 @@ internal val HomeGenreCardHeight = 56.dp
 internal fun HomeGenreCard(
     category: ProgrammeCategory,
     onClick: () -> Unit,
-    onLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
 ) {
     val colors = tvGenreColors(category)
     val label = programmeCategoryLabel(category)

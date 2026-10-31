@@ -63,8 +63,8 @@ internal fun HomeActivityCard(
     width: Dp,
     description: String,
     onClick: () -> Unit,
-    onLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
 ) {
     val contextMenu = rememberBrowseContextMenuTrigger(onLongClick, menuKey = true)
     val running = event?.takeIf { it.isRunning(nowSec) }

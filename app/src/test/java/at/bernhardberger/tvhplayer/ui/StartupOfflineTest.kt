@@ -13,6 +13,7 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isFocused
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
@@ -97,6 +98,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.time.Duration
+import java.io.IOException
 
 /**
  * Startup and play before the session is ready. OK on a saved channel row opens the player for
@@ -232,6 +234,42 @@ class StartupOfflineTest {
         assertEquals(0, startupScreens())
         assertEquals(0, binds())
         assertEquals(0, compose.onAllNodes(hasTestTag("channel-row-1")).fetchSemanticsNodes().size)
+    }
+
+    @Test fun cachedColdLandingHoldsStartupAndHidesHomeAndRailUntilSettingsArrive() {
+        val gate = CompletableDeferred<Unit>()
+        val tags = InMemoryData().apply { readGate = gate }
+        app(ready(catalog), awaitRows = false, tagData = tags)
+        advance(1_000)
+        assertEquals(1, startupScreens())
+        val landingOrRail = SemanticsMatcher("Home or navigation rail") { node ->
+            val tag = node.config.getOrElse(SemanticsProperties.TestTag) { "" }
+            tag.startsWith("home-") || tag.startsWith("nav-")
+        }
+        // clearAndSetSemantics hides the landing tree from accessibility's merged view.
+        assertEquals(0, compose.onAllNodes(landingOrRail).fetchSemanticsNodes().size)
+        assertEquals(0, compose.onAllNodes(isFocused(), useUnmergedTree = true).fetchSemanticsNodes().size)
+
+        gate.complete(Unit)
+        advance(1_000)
+        assertEquals(0, startupScreens())
+        compose.onNodeWithTag("home-header").fetchSemanticsNode()
+        compose.onNodeWithTag("home-recovery").assertIsFocused()
+        assertEquals(0, binds())
+    }
+
+    @Test fun failedChannelSettingsReleaseColdStartupToRetryThenHome() {
+        val tags = InMemoryData().apply { failNextRead = true }
+        app(ready(catalog), awaitRows = false, tagData = tags)
+        advance(1_000)
+        assertEquals(0, startupScreens())
+        compose.onNode(hasText("Retry") and isFocused()).assertIsFocused()
+        key(Key.DirectionCenter)
+        advance(1_000)
+        compose.onNodeWithTag("home-header").fetchSemanticsNode()
+        compose.onNodeWithTag("home-recovery").assertIsFocused()
+        assertEquals(0, startupScreens())
+        assertEquals(0, binds())
     }
 
     @Test fun withoutSavedChannelsTheStaticBrandShowsAtOnceAndStaysReadable() {
@@ -478,6 +516,7 @@ class StartupOfflineTest {
         initial: SessionObservation = connecting(catalog),
         awaitRows: Boolean = true,
         profile: ServerProfileReadResult = ServerProfileReadResult.anonymous("offline.invalid", 9982),
+        tagData: InMemoryData = InMemoryData(),
     ) {
         session = FakeTvheadendSession(initial).apply { scriptLivePlaybackSuccess() }
         val data = InMemoryData().also { playerData = it }
@@ -498,7 +537,7 @@ class StartupOfflineTest {
             single { runtime }
             single { profiles }
             single { settings }
-            single { ChannelTagSettingsStore(InMemoryData()) }
+            single { ChannelTagSettingsStore(tagData) }
             // These journeys walk the list's rows.
             single { UiSettingsStore(InMemoryData()).apply { runBlocking { setChannelsView(ChannelsView(ChannelsLayout.LIST)) } } }
             single { LastPlayedChannelStore(context) }
@@ -547,8 +586,13 @@ class StartupOfflineTest {
         val state = MutableStateFlow(emptyPreferences())
         /** Holds every read that starts while set, as a slow store would. */
         var readGate: CompletableDeferred<Unit>? = null
+        var failNextRead = false
         override val data: Flow<Preferences> get() = flow {
             readGate?.await()
+            if (failNextRead) {
+                failNextRead = false
+                throw IOException("Settings read failed")
+            }
             emitAll(state)
         }
         override suspend fun updateData(transform: suspend (Preferences) -> Preferences) =

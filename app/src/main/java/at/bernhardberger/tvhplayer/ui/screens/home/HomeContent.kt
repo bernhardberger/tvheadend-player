@@ -468,7 +468,7 @@ internal fun HomeContent(
                             if (section is HomeSection.ContinueWatching || section is HomeSection.RecentlyRecorded) 1 else 0)
                             .coerceAtLeast(0))
                         ?: 0
-                    val entry = requesters[kind] ?: FocusRequester()
+                    val entry = requireNotNull(requesters[kind])
                     val onNowSection = section as? HomeSection.OnNow
                     val onSectionFocus = {
                         if (focusedSection != kind) {

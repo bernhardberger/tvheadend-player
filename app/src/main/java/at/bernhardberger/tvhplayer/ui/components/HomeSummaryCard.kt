@@ -44,9 +44,9 @@ internal val HomeCardWidth = 196.dp
 @Composable
 internal fun HomeAllRecordingsCard(
     onClick: () -> Unit,
-    onLongClick: (() -> Unit)? = null,
     textShown: Boolean,
     modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
 ) {
     val label = stringResource(R.string.home_all_recordings)
     StandardProgrammeCard(
@@ -97,8 +97,8 @@ internal fun HomeAllRecordingsCard(
 internal fun HomeUpcomingCard(
     text: String,
     onClick: () -> Unit,
-    onLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val ring = rememberCardFocusRing(interaction)

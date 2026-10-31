@@ -45,8 +45,8 @@ internal fun HomeRecentChannelTile(
     channel: Channel,
     nameShown: Boolean,
     onClick: () -> Unit,
-    onLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val ring = rememberCardFocusRing(interaction)

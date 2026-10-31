@@ -116,7 +116,7 @@
     <string name="active_tag_unavailable">The selected channel group is no longer available. Showing another available group.</string>
     <string name="dismiss">Dismiss</string>
     <!-- Main navigation item: the Home landing page. Noun. Max 12. -->
-    <string name="nav_home">Home</string>
+    <string name="nav_home" tools:ignore="MissingTranslation">Home</string>
     <string name="nav_channels">Channels</string>
     <!-- Main navigation item: the electronic program guide (TV schedule grid). Noun. Max 12. -->
     <string name="nav_epg">Guide</string>
