@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
@@ -16,6 +17,7 @@ import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.InspectableValue
 import androidx.compose.ui.platform.isDebugInspectorInfoEnabled
 import androidx.compose.ui.test.SemanticsMatcher
@@ -27,7 +29,6 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.performKeyInput
-import androidx.compose.ui.test.pressKey
 import androidx.test.core.app.ApplicationProvider
 import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
@@ -62,6 +63,8 @@ import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvhplayer.core.HomeInput
 import at.bernhardberger.tvhplayer.core.HomePlaying
+import at.bernhardberger.tvhplayer.core.HomeSectionKind
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import at.bernhardberger.tvhplayer.core.homeInitialFocus
 import at.bernhardberger.tvhplayer.core.homeSections
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
@@ -214,16 +217,117 @@ class HomeCaptureTest {
     fun rapidVerticalMovesRetargetAndReturnToHeader() = atEvening {
         show(Kind.BROWSE)
         settle("home-recent-0")
+        key(Key.DirectionDown)
+        settle("home-onnow-0")
         compose.mainClock.autoAdvance = false
-        listOf(Key.DirectionDown, Key.DirectionDown, Key.DirectionUp, Key.DirectionUp).forEach {
-            key(it)
+        listOf(
+            Key.DirectionDown to "home-genre-0",
+            Key.DirectionDown to "home-shelf-0",
+            Key.DirectionUp to "home-genre-0",
+            Key.DirectionUp to "home-onnow-0",
+            Key.DirectionUp to "home-recent-0",
+            Key.DirectionUp to "home-view-button",
+        ).forEach { (direction, tag) ->
+            key(direction)
             compose.mainClock.advanceTimeBy(50, ignoreFrameDuration = true)
+            awaitFocus(tag)
             assertOpacityEnvelope()
         }
         compose.mainClock.advanceTimeBy(700)
-        awaitFocus("home-recent-0")
-        assertTop("home-heading-RECENT_CHANNELS", 76f)
+        awaitFocus("home-view-button")
         assertSettledOpacity(false)
+        assertEquals(1f, layerAlpha("home-section-RECENT_CHANNELS"), 0.02f)
+    }
+
+    @Test
+    fun verticalEntryRestoresScrolledCards() = atEvening {
+        show(Kind.BROWSE, longOnNow = true)
+        settle("home-recent-0")
+        key(Key.DirectionDown)
+        settle("home-onnow-0")
+        repeat(2) { key(Key.DirectionRight) }
+        settle("home-onnow-2")
+        key(Key.DirectionDown)
+        settle("home-genre-0")
+        key(Key.DirectionUp)
+        settle("home-onnow-2")
+        repeat(11) { key(Key.DirectionRight) }
+        settle("home-onnow-13")
+        compose.onNodeWithTag("home-onnow-0").assertDoesNotExist()
+        key(Key.DirectionDown)
+        settle("home-genre-0")
+        key(Key.DirectionUp)
+        settle("home-onnow-13")
+        assertTop("home-onnow-13", 356f)
+    }
+
+    @Test
+    fun firstRunHeaderRoundTripAnimatesWithoutDisplacingBlock() = atEvening {
+        show(Kind.FIRST_RUN)
+        settle("home-onnow-0")
+        key(Key.DirectionUp)
+        settle("home-view-button")
+        compose.mainClock.autoAdvance = false
+        strip("first-run-header-down", Key.DirectionDown, "home-onnow-0", expanded = true)
+        assertTop("home-onnow-0", 356f)
+        assertEquals(0f, layerScope("home-on-now-block").translationY, 0.1f)
+    }
+
+    @Test
+    fun rawReferenceClocksAndInterruptedOrdinaryMoves() {
+        val focused = mutableStateOf<HomeSectionKind?>(HomeSectionKind.RECENT_CHANNELS)
+        lateinit var motion: HomePageMotion
+        compose.setContent {
+            val current = rememberHomePageMotion(focused.value) { if (it == HomeSectionKind.ON_NOW) 200f else 0f }
+            SideEffect { motion = current }
+            Box(Modifier.fillMaxSize().testTag("motion-${focused.value}"))
+        }
+        compose.waitForIdle()
+        assertEquals(HomeSectionKind.RECENT_CHANNELS, motion.to)
+        compose.mainClock.autoAdvance = false
+        fun focus(kind: HomeSectionKind?) {
+            compose.runOnIdle { focused.value = kind }
+            compose.waitForIdle()
+            compose.mainClock.advanceTimeUntil { motion.to == kind }
+            compose.mainClock.advanceTimeByFrame()
+            compose.waitForIdle()
+        }
+        focus(HomeSectionKind.ON_NOW)
+        repeat(29) { frame ->
+            if (frame > 0) compose.mainClock.advanceTimeByFrame()
+            val elapsed = frame * 16f
+            assertEquals("raw block at $elapsed", ((elapsed - 130f) / 200f).coerceIn(0f, 1f), motion.block.value, 0.01f)
+            assertEquals("raw background at $elapsed", ((elapsed - 130f) / 270f).coerceIn(0f, 1f), motion.background.value, 0.01f)
+            assertEquals("entry page progress at $elapsed", LinearOutSlowInEasing.transform((elapsed / 200f).coerceIn(0f, 1f)), motion.progress.value, 0.01f)
+        }
+        // Fully expanded -> Down out -> ordinary Down: the exit must keep fading, not freeze.
+        focus(HomeSectionKind.GENRES)
+        compose.mainClock.advanceTimeBy(80)
+        focus(HomeSectionKind.CONTINUE_WATCHING)
+        var lastBackground = motion.background.value
+        repeat(4) {
+            compose.mainClock.advanceTimeBy(50)
+            assertTrue("interrupted background keeps fading", motion.background.value < lastBackground || lastBackground == 0f)
+            lastBackground = motion.background.value
+        }
+        assertEquals(0f, motion.background.value, 0.02f)
+        assertEquals(1f, motion.above.value, 0.02f)
+        assertEquals(0f, motion.aboveShift.value, 0.1f)
+        assertEquals(1f, motion.heading.value, 0.02f)
+        assertEquals(0f, motion.block.value, 0.02f)
+        assertEquals(0f, motion.blockShift.value, 0.1f)
+        // Up out leaves the row above dimmed briefly; an ordinary move must restore it smoothly.
+        focus(HomeSectionKind.ON_NOW)
+        compose.mainClock.advanceTimeBy(600)
+        focus(HomeSectionKind.RECENT_CHANNELS)
+        compose.mainClock.advanceTimeBy(80)
+        focus(null)
+        val aboveBefore = motion.above.value
+        compose.mainClock.advanceTimeBy(100)
+        assertTrue(motion.above.value > aboveBefore)
+        assertTrue(motion.above.value < 1f)
+        compose.mainClock.advanceTimeBy(150)
+        assertEquals(1f, motion.above.value, 0.02f)
     }
 
     private fun bounds(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).getUnclippedBoundsInRoot()
@@ -234,13 +338,15 @@ class HomeCaptureTest {
 
     /** Read the actual drawing modifier, not parallel test-only animation state or pixel guesses. */
     @Suppress("UNCHECKED_CAST")
-    private fun layerAlpha(tag: String): Float = compose.runOnIdle {
+    private fun layerScope(tag: String): GraphicsLayerScope = compose.runOnIdle {
         val modifiers = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().layoutInfo.getModifierInfo()
         val block = modifiers.asSequence().mapNotNull { it.modifier as? InspectableValue }
             .flatMap { it.inspectableElements }
             .first { it.name == "block" }.value as GraphicsLayerScope.() -> Unit
-        GraphicsLayerScope().apply(block).alpha
+        GraphicsLayerScope().apply(block)
     }
+
+    private fun layerAlpha(tag: String) = layerScope(tag).alpha
 
     private fun assertOpacityEnvelope() {
         val background = layerAlpha("home-immersive-background")
@@ -257,6 +363,7 @@ class HomeCaptureTest {
     private fun strip(name: String, key: Key, tag: String, expanded: Boolean) {
         key(key)
         compose.mainClock.advanceTimeByFrame()
+        compose.mainClock.advanceTimeByFrame()
         awaitFocus(tag)
         val strip = Bitmap.createBitmap(320 * 12, 180, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(strip)
@@ -264,6 +371,17 @@ class HomeCaptureTest {
             if (frame > 0) compose.mainClock.advanceTimeBy(50, ignoreFrameDuration = true)
             compose.waitForIdle()
             assertOpacityEnvelope()
+            val elapsed = frame * 50f
+            val delay = when (name) {
+                "down-into", "first-run-header-down" -> 130f
+                "up-into" -> 100f
+                else -> null
+            }
+            if (delay != null) {
+                val rawBlock = ((elapsed - delay) / 200f).coerceIn(0f, 1f)
+                val rawBackground = ((elapsed - delay) / 270f).coerceIn(0f, 1f)
+                assertEquals("drawn block follows reference clocks at $elapsed", minOf(rawBlock, rawBackground), layerAlpha("home-on-now-block"), 0.08f)
+            }
             if (name == "down-out") assertEquals(0f, layerAlpha("home-on-now-block"), 0.02f)
             val bitmap = draw()
             canvas.drawBitmap(bitmap, null, android.graphics.Rect(frame * 320, 0, (frame + 1) * 320, 180), null)
@@ -290,9 +408,9 @@ class HomeCaptureTest {
         val nowSec: Long,
     )
 
-    private fun show(kind: Kind, activityItems: Int = 2) {
+    private fun show(kind: Kind, activityItems: Int = 2, longOnNow: Boolean = false) {
         isDebugInspectorInfoEnabled = true
-        val scene = scene(kind, activityItems)
+        val scene = scene(kind, activityItems, longOnNow)
         val sections = homeSections(scene.input)
         installFixtures()
         val playing = scene.playing
@@ -390,7 +508,7 @@ class HomeCaptureTest {
         )
     }
 
-    private fun scene(kind: Kind, activityItems: Int): Scene {
+    private fun scene(kind: Kind, activityItems: Int, longOnNow: Boolean): Scene {
         val now = 1_791_144_900L
         val channels = ChannelsLayoutFixture.LINE_UP.mapIndexed { index, (name, _) ->
             Channel.create(
@@ -443,7 +561,15 @@ class HomeCaptureTest {
                 contentGenre = genreCodes[index]?.let { ContentGenre.fromContentType((it.code shl 4).toLong()) },
                 nextEventId = EventId(channel.id.value * 100 + 1),
             )
-        }
+        } + if (longOnNow) channels.drop(titles.size).map { channel ->
+            EpgEvent.create(
+                id = EventId(channel.id.value * 100),
+                channelId = channel.id,
+                start = Instant.fromEpochSeconds(now - 600),
+                stop = Instant.fromEpochSeconds(now + 1800),
+                title = "Evening coverage",
+            )
+        } else emptyList()
         val upcomingEvents = titles.indices.map { index ->
             val channel = channels[index]
             val switch = if (index == 0) now + 45 * 60 else now + (25 + index * 5) * 60
@@ -682,7 +808,7 @@ class HomeCaptureTest {
     }
 
     private fun key(key: Key) {
-        compose.onRoot().performKeyInput { pressKey(key) }
+        compose.onRoot().performKeyInput { keyDown(key); keyUp(key) }
         compose.waitForIdle()
     }
 
