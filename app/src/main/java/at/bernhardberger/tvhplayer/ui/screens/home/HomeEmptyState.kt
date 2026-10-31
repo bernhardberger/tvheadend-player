@@ -114,18 +114,18 @@ private fun HomeLoadingSkeletons(modifier: Modifier = Modifier) {
         Column(Modifier.wrapContentHeight(Alignment.Top, unbounded = true),
             verticalArrangement = Arrangement.spacedBy(HomeSectionGap)) {
             Column(verticalArrangement = Arrangement.spacedBy(HomeHeadingContentGap)) {
-                Box(Modifier.size(HomeCardWidth, headingHeight).background(MaterialTheme.colorScheme.surfaceVariant))
+                Box(Modifier.size(HomeCardWidth, headingHeight).background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.extraSmall))
                 Row(horizontalArrangement = Arrangement.spacedBy(TvGridGutter)) {
                     repeat(2) {
-                        Box(Modifier.width(activityWidth).aspectRatio(16f / 9f).background(MaterialTheme.colorScheme.surfaceVariant))
+                        Box(Modifier.width(activityWidth).aspectRatio(16f / 9f).background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.medium))
                     }
                 }
             }
             Column(verticalArrangement = Arrangement.spacedBy(HomeHeadingContentGap)) {
-                Box(Modifier.size(HomeCardWidth, headingHeight).background(MaterialTheme.colorScheme.surfaceVariant))
+                Box(Modifier.size(HomeCardWidth, headingHeight).background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.extraSmall))
                 Row(horizontalArrangement = Arrangement.spacedBy(HomeRecentGap)) {
                     repeat(tileCount) {
-                        Box(Modifier.size(HomeRecentTileSize).background(MaterialTheme.colorScheme.surfaceVariant).testTag("home-loading-recent-$it"))
+                        Box(Modifier.size(HomeRecentTileSize).background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.medium).testTag("home-loading-recent-$it"))
                     }
                 }
             }
