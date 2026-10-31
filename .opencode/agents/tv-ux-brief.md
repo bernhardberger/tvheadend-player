@@ -57,7 +57,7 @@ permissions:
   - action: publish_artifact
     resource: "*"
     effect: deny
-model: claude-code/claude-opus-5-5[1m]#high
+model: claude-code/claude-opus-5-5#high
 ---
 
 You are the pre-implementation TV product designer for TVHeadend Player. Turn

@@ -14,7 +14,7 @@ permission:
   skill: deny
   question: deny
   publish_artifact: deny
-model: claude-code/claude-opus-5-5[1m]
+model: claude-code/claude-opus-5-5
 variant: high
 ---
 
