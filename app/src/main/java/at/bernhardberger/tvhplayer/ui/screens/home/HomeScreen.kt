@@ -32,6 +32,7 @@ import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.ui.screens.ChannelsGroup
 import at.bernhardberger.tvhplayer.ui.screens.channelsGroups
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 /**
  * Home's landing page. The page itself, including the scroll-away header, lives in
@@ -56,6 +57,7 @@ internal fun HomeScreen(
     connectionFailure: ConnectionUiState? = connectionUiState,
     onRetry: () -> Unit = {},
     onOpenConnectionSettings: () -> Unit = {},
+    onBrowseChannels: () -> Unit = {},
     focusMemory: MutableState<HomeFocusKey?> = remember { mutableStateOf(null) },
     lastPlayedStore: LastPlayedChannelStore = koinInject(),
     onContentDrawn: () -> Unit = {},
@@ -118,6 +120,7 @@ internal fun HomeScreen(
             onGenre = { if (current()) onGenre(it) }, onRecordings = { if (current()) onRecordings(it) },
             modifier = modifier.onGloballyPositioned { laidOut = true }, connectionUiState = connectionUiState, connectionFailure = connectionFailure,
             onRetry = onRetry, onOpenConnectionSettings = onOpenConnectionSettings,
+            onBrowseChannels = { if (current()) onBrowseChannels() },
             groups = channelsGroups(scope.scope), activeTagId = scope.scope.activeTagId,
             onSelectTag = { if (owner.isCurrent) channelsVm.selectTag(it) },
             onSectionVisibleChange = { section, visible -> if (owner.isCurrent) saveScope.launch { settingsStore.setHomeSectionVisible(section, visible) } },
@@ -169,6 +172,7 @@ internal fun HomeScreenContent(
     connectionFailure: ConnectionUiState? = connectionUiState,
     onRetry: () -> Unit = {},
     onOpenConnectionSettings: () -> Unit = {},
+    onBrowseChannels: () -> Unit = {},
     onWatchRecordingChannel: (ChannelId, String) -> Unit = onPlay,
     onShowRecordingGuide: (ChannelId, EpgEvent?) -> Unit = onShowGuide,
     groups: List<ChannelsGroup> = emptyList(),
@@ -240,6 +244,12 @@ internal fun HomeScreenContent(
         ?: connectionUiState.browseAppError(noChannels = catalogCurrent && input.channels.isEmpty() && !hasChannelsOutsideScope)
             .takeIf { connectionUiState == ConnectionUiState.Ready }
         else null
+    val loading = sections.isEmpty() && error == null && !catalogCurrent && input.channels.isEmpty()
+    var loadingDelayed by remember(loading) { mutableStateOf(false) }
+    LaunchedEffect(loading) {
+        if (loading) { delay(10_000); loadingDelayed = true }
+    }
+    val openOptions = { if (owner?.isCurrent != false) { restoreHeader = true; options = true } }
     val errorFocus = remember { FocusRequester() }
     HomeContent(
         sections = sections,
@@ -253,8 +263,8 @@ internal fun HomeScreenContent(
         focusEnabled = initialFocusEnabled && channelMenu == null && recording == null && !options,
         viewRequester = viewFocus, restoreHeader = restoreHeader,
         onHeaderFocused = { restoreHeader = false },
-        emptyFocus = errorFocus,
-        onViewOptions = { if (owner?.isCurrent != false) { restoreHeader = true; options = true } },
+        emptyFocus = errorFocus.takeUnless { loading && !loadingDelayed },
+        onViewOptions = openOptions,
         emptyContent = {
             if (error != null) AppErrorAlert(error = error, actionFocus = errorFocus,
                 leadingExit = LocalBrowseNavigationFocus.current ?: FocusRequester.Default,
@@ -264,8 +274,9 @@ internal fun HomeScreenContent(
                         AppErrorAction.CONNECTION_SETTINGS -> onOpenConnectionSettings()
                         AppErrorAction.CLOSE -> Unit
                     }
-                }) else HomeEmptyState(input, observation, catalogCurrent, hasChannelsOutsideScope,
-                    errorFocus, viewFocus, onOpenConnectionSettings)
+                }) else HomeEmptyState(input, catalogCurrent, hasChannelsOutsideScope,
+                    loadingDelayed, contentPadding, errorFocus, viewFocus, onOpenConnectionSettings,
+                    onBrowseChannels, openOptions)
         },
         observation = observation,
         input = input,

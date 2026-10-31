@@ -910,6 +910,12 @@
     <string name="home_current_activity" tools:ignore="MissingTranslation">Current activity</string>
     <string name="home_upcoming_recordings" tools:ignore="MissingTranslation">Upcoming recordings</string>
     <string name="home_no_history" tools:ignore="MissingTranslation">Recently watched channels will appear here.</string>
+    <string name="home_start_watching" tools:ignore="MissingTranslation">Start watching</string>
+    <string name="home_start_watching_hint" tools:ignore="MissingTranslation">Channels you watch and recordings will appear here.</string>
+    <string name="home_browse_channels" tools:ignore="MissingTranslation">Browse channels</string>
+    <string name="home_loading_channels" tools:ignore="MissingTranslation">Loading channels…</string>
+    <string name="home_still_connecting" tools:ignore="MissingTranslation">Still connecting…</string>
+    <string name="home_sections" tools:ignore="MissingTranslation">Sections</string>
     <string name="home_no_recordings" tools:ignore="MissingTranslation">No recordings yet.</string>
     <string name="home_sections_hidden" tools:ignore="MissingTranslation">Sections are hidden. Use View options to show them.</string>
     <string name="home_recent_channels" tools:ignore="MissingTranslation">Recent channels</string>

@@ -44,14 +44,15 @@ class HomeActionsTest {
             HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
                 onPlay = { _, _ -> fail("scope selection tuned") }, onPlayRecording = { _, _ -> },
                 onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = {},
-                groups = listOf(at.bernhardberger.tvhplayer.ui.screens.ChannelsGroup(ChannelTagId(8), "Favorites", listOf(channel))),
+                groups = listOf(at.bernhardberger.tvhplayer.ui.screens.ChannelsGroup(null, null, listOf(channel)),
+                    at.bernhardberger.tvhplayer.ui.screens.ChannelsGroup(ChannelTagId(8), "Favorites", listOf(channel))),
+                activeTagId = ChannelTagId(8),
                 onSelectTag = { selected = it })
         } }
         compose.onNodeWithTag("home-loading").assertDoesNotExist()
         compose.onNodeWithTag("home-recent-0").performKeyInput { pressKey(Key.DirectionUp); pressKey(Key.Enter) }
-        repeat(HomeSectionKind.entries.size) {
-            compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
-        }
+        compose.onNodeWithTag("home-tag-8").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.onNodeWithTag("home-view-CURRENT_ACTIVITY").assertIsFocused().performKeyInput { pressKey(Key.DirectionUp) }
         compose.onNodeWithTag("home-tag-8").assertIsFocused().performKeyInput { pressKey(Key.Enter) }
         compose.runOnIdle { assertEquals(ChannelTagId(8), selected) }
     }
@@ -125,9 +126,10 @@ class HomeActionsTest {
                 onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
                 onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = {})
         } }
-        compose.onNodeWithText("Recently watched channels will appear here.").assertExists()
-        compose.onNodeWithText("No recordings yet.").assertExists()
-        compose.onNodeWithTag("home-recovery").assertIsFocused()
+        compose.onNodeWithText("Start watching").assertExists()
+        compose.onNodeWithText("Channels you watch and recordings will appear here.").assertExists()
+        compose.onNodeWithText("Connection settings").assertDoesNotExist()
+        compose.onNodeWithText("Browse channels").assertIsFocused()
         compose.onNodeWithTag("home-view-button").assertExists()
     }
 
@@ -160,6 +162,48 @@ class HomeActionsTest {
         }
         compose.mainClock.advanceTimeBy(1_200)
         compose.onNodeWithTag("test-drawer").assertIsFocused()
+    }
+
+    @Test fun loadingOffersSettingsAfterTenSecondsWithoutTakingHeaderFocus() {
+        var current by mutableStateOf(false)
+        val input = HomeInput(emptyList(), emptyMap(), emptyList(), emptyList(), emptyList(), { null }, null, now)
+        compose.setContent { TVHeadendPlayerTheme {
+            HomeScreenContent(input.copy(channels = if (current) listOf(channel) else emptyList()), SessionObservation.create(), PaddingValues(), true,
+                onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
+                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = {}, catalogCurrent = current)
+        } }
+        compose.onNodeWithTag("home-view-button").assertIsFocused()
+        compose.onNodeWithText("Loading channels…").assertExists()
+        compose.onNodeWithTag("home-recovery").assertDoesNotExist()
+        compose.mainClock.advanceTimeBy(9_000)
+        compose.onNodeWithTag("home-recovery").assertDoesNotExist()
+        compose.mainClock.advanceTimeBy(1_100)
+        compose.onNodeWithText("Still connecting…").assertExists()
+        compose.onNodeWithText("Connection settings").assertExists()
+        compose.onNodeWithTag("home-view-button").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.onNodeWithTag("home-recovery").assertIsFocused().performKeyInput { pressKey(Key.DirectionUp) }
+        compose.onNodeWithTag("home-view-button").assertIsFocused()
+        compose.runOnIdle { current = true }
+        compose.onNodeWithText("Still connecting…").assertDoesNotExist()
+        compose.onNodeWithText("Connection settings").assertDoesNotExist()
+    }
+
+    @Test fun delayedSettingsTakesFocusOnlyWhenHomeHasNoFocusedControl() {
+        lateinit var focus: androidx.compose.ui.focus.FocusManager
+        var opened = false
+        val input = HomeInput(emptyList(), emptyMap(), emptyList(), emptyList(), emptyList(), { null }, null, now)
+        compose.setContent { TVHeadendPlayerTheme {
+            focus = androidx.compose.ui.platform.LocalFocusManager.current
+            HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
+                onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
+                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = {}, catalogCurrent = false,
+                onOpenConnectionSettings = { opened = true })
+        } }
+        compose.onNodeWithTag("home-view-button").assertIsFocused()
+        compose.runOnIdle { focus.clearFocus(force = true) }
+        compose.mainClock.advanceTimeBy(10_100)
+        compose.onNodeWithTag("home-recovery").assertIsFocused().performKeyInput { pressKey(Key.Enter) }
+        compose.runOnIdle { assertTrue(opened) }
     }
 
     @Test fun savedHiddenSectionsNeverRenderOrEnterRootFocusMemoryWhileSettingsLoad() {
@@ -229,13 +273,14 @@ class HomeActionsTest {
             listOf(DvrEntry.create(DvrEntryId(1), state = DvrEntryState.COMPLETED,
                 start = Instant.fromEpochSeconds(now - 8 * 24 * 3600))))
         compose.onNodeWithText("No recordings yet.").assertDoesNotExist()
-        compose.onNodeWithText("Sections are hidden. Use View options to show them.").assertExists()
+        compose.onNodeWithText("Channels you watch and recordings will appear here.").assertExists()
     }
 
     @Test fun hiddenExplainingSectionsStillShowTheViewOptionsFallback() {
-        emptyHomeWithHiddenSections(setOf(HomeSectionKind.RECENT_CHANNELS, HomeSectionKind.ON_NOW, HomeSectionKind.RECENTLY_RECORDED))
+        emptyHomeWithHiddenSections(HomeSectionKind.entries.toSet())
         compose.onNodeWithText("Sections are hidden. Use View options to show them.").assertExists()
-        compose.onNodeWithTag("home-recovery").assertIsFocused()
+        compose.onNodeWithTag("home-recovery").assertIsFocused().performKeyInput { pressKey(Key.Enter) }
+        compose.onNodeWithTag("home-view-CURRENT_ACTIVITY").assertIsFocused()
     }
 
     private fun emptyHomeWithHiddenSections(hidden: Set<HomeSectionKind>, entries: List<DvrEntry> = emptyList()) {

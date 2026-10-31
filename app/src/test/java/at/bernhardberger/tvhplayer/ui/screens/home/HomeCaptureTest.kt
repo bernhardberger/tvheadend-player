@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens.home
 
+import androidx.compose.ui.test.onNodeWithText
+
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -164,7 +166,7 @@ class HomeCaptureTest {
         settle("home-recent-0")
         key(Key.DirectionUp)
         key(Key.Enter)
-        capture("11-options", "home-view-CURRENT_ACTIVITY")
+        capture("11-options", "home-tag-all")
     }
 
     @Test fun loadingFirstMetadata() = atEvening {
@@ -173,11 +175,15 @@ class HomeCaptureTest {
         val tile = compose.onNodeWithTag("home-loading-recent-0", useUnmergedTree = true).getUnclippedBoundsInRoot()
         assertEquals(at.bernhardberger.tvhplayer.ui.components.HomeRecentTileSize.value, (tile.right - tile.left).value, 0.1f)
         assertEquals(at.bernhardberger.tvhplayer.ui.components.HomeRecentTileSize.value, (tile.bottom - tile.top).value, 0.1f)
-        capture("12-loading", "home-recovery")
+        compose.onNodeWithText("Loading channels…").assertExists()
+        compose.onNodeWithTag("home-recovery").assertDoesNotExist()
+        assertEquals(130f, tile.left.value, 0.1f)
+        capture("12-loading", "home-view-button")
     }
 
     @Test fun channelsButNoHistoryRecordingsOrEpg() = atEvening {
         show(Kind.EMPTY, screen = true)
+        compose.onNodeWithText("Browse channels").assertExists()
         capture("13-empty", "home-recovery")
     }
 
@@ -518,6 +524,10 @@ class HomeCaptureTest {
                                 if (screen) HomeScreenContent(scene.input, scene.observation, padding, true,
                                     onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
                                     onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = {},
+                                    groups = listOf(
+                                        at.bernhardberger.tvhplayer.ui.screens.ChannelsGroup(null, null, scene.input.channels),
+                                        at.bernhardberger.tvhplayer.ui.screens.ChannelsGroup(ChannelTagId(8), "Favorites", scene.input.channels),
+                                    ),
                                     connectionUiState = if (kind == Kind.OFFLINE) at.bernhardberger.tvhplayer.core.ConnectionUiState.Error(
                                         at.bernhardberger.tvhplayer.data.ConnectionFailureKind.UNREACHABLE,
                                         at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition.EXPLICIT_RETRY,

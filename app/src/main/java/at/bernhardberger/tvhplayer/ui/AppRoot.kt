@@ -933,6 +933,10 @@ fun AppRoot(
                             connectionFailure = browseConnectionFailure,
                             onRetry = retryBrowseConnection,
                             onOpenConnectionSettings = { navigateTopLevel(SettingsKey(SettingsSection.CONNECTION)) },
+                            onBrowseChannels = {
+                                playbackOrchestrator.browseNavigationSelected(activeChannelId, activeRecordingId)
+                                navigateTopLevel(ChannelsKey)
+                            },
                             onPlay = requestLivePlayer,
                             onReturnToRecording = returnToWarmRecording,
                             onRecordings = { mode -> recordingsScreenState.mode.value = mode; navigateTopLevel(RecordingsKey) },

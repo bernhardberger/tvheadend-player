@@ -272,7 +272,9 @@ the current OK behavior on items in Recordings → **Recording now**.
   the selected scope becomes invalid, fall back to All channels; use a first-valid
   fallback only if the catalog can lack All. An intentionally empty but valid
   scope is not invalid and must not silently become All. Scope selection is in
-  View options.
+  View options, listed first. Open (owner 2026-10-31): how channel groups
+  should work across Home, Channels, Guide and the player's surfing is to be
+  rethought after Home; until then Home follows the shared group.
 - **On now:** current programmes in ascending channel-number order, not recency or
   recommendation ranking. Keep the existing comparator for ties, subchannels and
   unnumbered channels. Ended programmes must not stay actionable as current

@@ -23,6 +23,24 @@ class HomeNavigationJourneyTest {
     private val fixture = NavigationJourneyFixture(compose, ServerSettings(host = javaClass.simpleName))
     @After fun after() = fixture.close()
 
+    @Test fun emptyHomeBrowseChannelsUsesTheChannelsDestination() {
+        fixture.app(emptyEpg = true)
+        fixture.openDestination("nav-channels", Key.DirectionUp, "nav-home")
+        fixture.key(Key.DirectionRight)
+        compose.onNodeWithText("Browse channels").assertIsFocused()
+        fixture.key(Key.DirectionUp)
+        compose.onNodeWithTag("home-view-button").assertIsFocused()
+        fixture.key(Key.DirectionDown)
+        compose.onNodeWithText("Browse channels").assertIsFocused()
+        fixture.key(Key.DirectionLeft)
+        compose.onNodeWithTag("nav-home").assertIsFocused()
+        fixture.key(Key.DirectionRight)
+        compose.onNodeWithText("Browse channels").assertIsFocused()
+        fixture.key(Key.Enter)
+        compose.onNodeWithTag("channel-row-1").assertIsFocused()
+        compose.onNodeWithTag("home-view-button").assertDoesNotExist()
+    }
+
     @Test fun appRootTwoBackPressesFromGuideReachHomeRailThenRightRestoresTheGenreCard() {
         fixture.app()
         fixture.openDestination("nav-channels", Key.DirectionUp, "nav-home")

@@ -78,6 +78,7 @@ internal fun HomeRouteContent(
     connectionFailure: ConnectionUiState?,
     onRetry: () -> Unit,
     onOpenConnectionSettings: () -> Unit,
+    onBrowseChannels: () -> Unit,
     onContentDrawn: () -> Unit = {},
 ) {
     if (contentAllowed) {
@@ -104,6 +105,7 @@ internal fun HomeRouteContent(
                 connectionFailure = connectionFailure,
                 onRetry = onRetry,
                 onOpenConnectionSettings = onOpenConnectionSettings,
+                onBrowseChannels = onBrowseChannels,
             ) }
         }
     }

@@ -7,6 +7,10 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.width
@@ -14,6 +18,7 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -23,57 +28,78 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.HomeInput
 import at.bernhardberger.tvhplayer.core.HomeSectionKind
-import at.bernhardberger.tvhplayer.core.partitionDvrLibrary
+import at.bernhardberger.tvhplayer.ui.TvBrowseLeadingInset
+import at.bernhardberger.tvhplayer.ui.TvBrowseTrailingInset
 import at.bernhardberger.tvhplayer.ui.TvGridGutter
 import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import at.bernhardberger.tvhplayer.ui.components.HomeCardWidth
 import at.bernhardberger.tvhplayer.ui.components.HomeRecentTileSize
+import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
 
 /** No fictional cards: unavailable metadata has skeletons; known empty data has explanatory copy. */
 @Composable
 internal fun HomeEmptyState(
     input: HomeInput,
-    observation: SessionObservation,
     catalogCurrent: Boolean,
     hasChannelsOutsideScope: Boolean,
+    loadingDelayed: Boolean,
+    contentPadding: PaddingValues,
     actionFocus: FocusRequester,
     headerFocus: FocusRequester,
     onConnectionSettings: () -> Unit,
+    onBrowseChannels: () -> Unit,
+    onViewOptions: () -> Unit,
 ) {
     val loading = !catalogCurrent && input.channels.isEmpty()
-    Column(Modifier.padding(start = 40.dp, end = 40.dp, bottom = if (loading) TvGridVerticalMargin else 0.dp).testTag("home-empty"),
-        verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        when {
-            input.hiddenSections.size == HomeSectionKind.entries.size -> Text(stringResource(R.string.home_sections_hidden))
-            loading -> HomeLoadingSkeletons(Modifier.weight(1f, fill = false).clipToBounds())
-            input.channels.isEmpty() && hasChannelsOutsideScope -> Text(stringResource(R.string.empty_channel_tag))
-            else -> {
-                val explainHistory = HomeSectionKind.RECENT_CHANNELS !in input.hiddenSections
-                val explainEpg = HomeSectionKind.ON_NOW !in input.hiddenSections
-                val explainRecordings = HomeSectionKind.RECENTLY_RECORDED !in input.hiddenSections &&
-                    (observation.dvrSnapshotForDisplay == null || partitionDvrLibrary(input.dvrEntries).archive.isEmpty())
-                if (explainHistory) Text(stringResource(R.string.home_no_history))
-                if (explainEpg) {
-                    if (observation.epgSnapshotForDisplay == null) HomeLoadingSkeletons(Modifier.weight(1f, fill = false).clipToBounds())
-                    else Text(stringResource(R.string.no_epg))
-                }
-                if (explainRecordings) {
-                    Text(stringResource(if (observation.dvrSnapshotForDisplay == null) R.string.recordings_loading else R.string.home_no_recordings))
-                }
-                if (!explainHistory && !explainEpg && !explainRecordings) Text(stringResource(R.string.home_sections_hidden))
-            }
+    val hidden = input.hiddenSections.size == HomeSectionKind.entries.size
+    val direction = LocalLayoutDirection.current
+    val leading = LocalBrowseNavigationFocus.current ?: FocusRequester.Default
+    Column(Modifier.fillMaxSize().padding(
+        start = contentPadding.calculateStartPadding(direction) + TvBrowseLeadingInset,
+        end = maxOf(contentPadding.calculateEndPadding(direction), TvBrowseTrailingInset),
+        bottom = TvGridVerticalMargin,
+    ).testTag("home-empty"),
+        horizontalAlignment = if (loading) Alignment.Start else Alignment.CenterHorizontally,
+        verticalArrangement = if (loading) Arrangement.spacedBy(16.dp) else Arrangement.spacedBy(16.dp, Alignment.CenterVertically)) {
+        Text(stringResource(when {
+            loadingDelayed -> R.string.home_still_connecting
+            loading -> R.string.home_loading_channels
+            hidden -> R.string.channels_view_options
+            else -> R.string.home_start_watching
+        }), style = MaterialTheme.typography.headlineMedium,
+            textAlign = if (loading) TextAlign.Start else TextAlign.Center,
+            modifier = Modifier.semantics { heading() })
+        if (loading) {
+            HomeLoadingSkeletons(Modifier.weight(1f).clipToBounds())
+        } else {
+            Text(stringResource(when {
+                hidden -> R.string.home_sections_hidden
+                input.channels.isEmpty() && hasChannelsOutsideScope -> R.string.empty_channel_tag
+                else -> R.string.home_start_watching_hint
+            }), style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
         }
-        Button(onClick = onConnectionSettings, modifier = Modifier.focusRequester(actionFocus)
-            .focusProperties { up = headerFocus }.testTag("home-recovery")) {
-            Text(stringResource(R.string.action_connection_settings))
+        if (!loading || loadingDelayed) {
+            Button(onClick = when {
+                loading -> onConnectionSettings
+                hidden -> onViewOptions
+                else -> onBrowseChannels
+            }, modifier = Modifier.focusRequester(actionFocus)
+                .focusProperties { up = headerFocus; left = leading }.testTag("home-recovery")) {
+                Text(stringResource(when {
+                    loading -> R.string.action_connection_settings
+                    hidden -> R.string.channels_view_options
+                    else -> R.string.home_browse_channels
+                }))
+            }
         }
     }
 }

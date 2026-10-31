@@ -20,14 +20,6 @@ internal fun HomeViewOptionsPanel(
     onClose: () -> Unit,
 ) {
     val entries = buildList {
-        HomeSectionKind.entries.forEach { kind ->
-            add(BrowsePanelEntry.Choice(
-                key = "home-view-${kind.name}", label = stringResource(kind.homeLabel()),
-                selected = false, checked = kind !in hidden,
-                onClick = { onSectionVisibleChange(kind, kind in hidden) },
-            ))
-        }
-        add(BrowsePanelEntry.Divider)
         add(BrowsePanelEntry.Section(stringResource(R.string.browse_tags)))
         groups.forEach { group ->
             add(BrowsePanelEntry.Choice(
@@ -37,9 +29,21 @@ internal fun HomeViewOptionsPanel(
                 onClick = { onSelectTag(group.tagId) },
             ))
         }
+        add(BrowsePanelEntry.Divider)
+        add(BrowsePanelEntry.Section(stringResource(R.string.home_sections)))
+        HomeSectionKind.entries.forEach { kind ->
+            add(BrowsePanelEntry.Choice(
+                key = "home-view-${kind.name}", label = stringResource(kind.homeLabel()),
+                selected = false, checked = kind !in hidden,
+                onClick = { onSectionVisibleChange(kind, kind in hidden) },
+            ))
+        }
     }
     BrowseSidePanel(stringResource(R.string.channels_view_options), "home-view-panel", onClose) {
-        BrowsePanelList(entries, radio = false, focusKey = "home-view-${HomeSectionKind.CURRENT_ACTIVITY.name}")
+        BrowsePanelList(entries, radio = false, focusKey = groups.firstOrNull { it.tagId == activeTagId }
+            ?.let { "home-tag-${it.tagId?.value ?: "all"}" }
+            ?: groups.firstOrNull()?.let { "home-tag-${it.tagId?.value ?: "all"}" }
+            ?: "home-view-${HomeSectionKind.CURRENT_ACTIVITY.name}")
     }
 }
 

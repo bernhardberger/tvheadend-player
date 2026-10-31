@@ -360,7 +360,7 @@ internal fun HomeContent(
 
     // Metadata ticks and ordinary D-pad moves must not replay entry focus. Request it on entry,
     // after the first rows arrive, or when the destination regains ownership after a dialog.
-    LaunchedEffect(focusEnabled, sections.isEmpty()) {
+    LaunchedEffect(focusEnabled, sections.isEmpty(), emptyFocus) {
         if (!focusEnabled) return@LaunchedEffect
         // Widget focus changes precede composition's drawerActive feedback: never take focus back
         // from an opening drawer.

@@ -63,7 +63,7 @@ internal class NavigationJourneyFixture(
         key(Key.Enter)
     }
 
-    fun app(withRecording: Boolean = false) {
+    fun app(withRecording: Boolean = false, emptyEpg: Boolean = false) {
         val now = kotlin.time.Clock.System.now().epochSeconds
         val catalog = ChannelCatalog.create((1..if (withRecording) 8L else 3L).map {
             Channel.create(ChannelId(it), name = "Name $it", number = it)
@@ -79,7 +79,7 @@ internal class NavigationJourneyFixture(
         val session = FakeTvheadendSession(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
             channelState = ChannelRepositoryState.Current(catalog),
-            epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = events,
+            epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = if (emptyEpg) emptyList() else events,
                 coverages = catalog.channels.map { EpgCoverage.create(it.id, AIRS_FROM, AIRS_UNTIL) })),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(if (withRecording) listOf(
                 DvrEntry.create(id = DvrEntryId(7), eventId = EventId(66), channelId = ChannelId(6),
