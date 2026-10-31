@@ -166,15 +166,19 @@ class HomeNavigationJourneyTest {
     }
 
     @Test fun allScheduledBackRestoresTheEndCard() {
-        fixture.app(scheduled = listOf(DvrEntry.create(DvrEntryId(1), title = "Scheduled programme",
+        val scheduled = DvrEntry.create(DvrEntryId(1), title = "Scheduled programme",
             state = DvrEntryState.SCHEDULED, start = Instant.fromEpochSeconds(1_900_000_000),
-            stop = Instant.fromEpochSeconds(1_900_001_800))))
+            stop = Instant.fromEpochSeconds(1_900_001_800))
+        fixture.app(scheduled = listOf(scheduled))
         fixture.openDestination("nav-channels", Key.DirectionUp, "nav-home")
         fixture.focus("home-upcoming-0")
         fixture.key(Key.DirectionRight)
         compose.onNodeWithTag("home-all-scheduled").assertIsFocused()
         fixture.key(Key.Enter)
         compose.onNodeWithTag("recordings-schedule-list").assertExists()
+        fixture.publishRecordings(listOf(scheduled, DvrEntry.create(DvrEntryId(2), title = "New scheduled programme",
+            state = DvrEntryState.SCHEDULED, start = Instant.fromEpochSeconds(1_900_003_600),
+            stop = Instant.fromEpochSeconds(1_900_005_400))))
         compose.runOnIdle { fixture.back.onBackPressed() }
         fixture.settle()
         compose.runOnIdle { fixture.back.onBackPressed() }

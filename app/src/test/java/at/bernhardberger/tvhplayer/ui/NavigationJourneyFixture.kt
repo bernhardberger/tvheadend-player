@@ -43,6 +43,7 @@ internal class NavigationJourneyFixture(
     private val context = ApplicationProvider.getApplicationContext<Application>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private lateinit var player: ExoPlayer
+    private lateinit var session: FakeTvheadendSession
     lateinit var back: androidx.activity.OnBackPressedDispatcher
         private set
     val guidePosition = GuidePositionStore()
@@ -84,7 +85,7 @@ internal class NavigationJourneyFixture(
             else event(channel.id.value, if (channel.id == ChannelId(1)) 0x40L else 0x50L)
         } + if (withRecording) listOf(EpgEvent.create(EventId(66), ChannelId(6), Instant.fromEpochSeconds(now - 7200),
             Instant.fromEpochSeconds(now - 3600), title = "Recorded programme")) else emptyList()
-        val session = FakeTvheadendSession(SessionObservation.create(
+        session = FakeTvheadendSession(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
             channelState = ChannelRepositoryState.Current(catalog),
             epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = if (emptyEpg) emptyList() else events,
@@ -160,6 +161,15 @@ internal class NavigationJourneyFixture(
         compose.onRoot().performKeyInput { pressKey(key) }
         compose.waitForIdle()
         settle()
+    }
+
+    fun publishRecordings(entries: List<DvrEntry>) {
+        compose.runOnIdle {
+            val current = session.observation.value
+            session.publish(SessionObservation.create(current.sessionState, current.channelState, current.epgState,
+                DvrRepositoryState.Current(DvrSnapshot.create(entries))))
+        }
+        compose.awaitBrowsePreparation()
     }
 
     fun settle() {

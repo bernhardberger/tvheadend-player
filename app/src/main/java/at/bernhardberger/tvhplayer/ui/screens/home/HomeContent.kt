@@ -517,13 +517,12 @@ internal fun HomeContent(
                     val focused = focusedSection == kind
                     val emphasisState = animateFloatAsState(if (focused) 1f else 0f, RowChangeMotion, label = "home-row-emphasis")
                     val emphasis = { emphasisState.value }
-                    val entryIndex = initialKey
-                        ?.takeIf { it.section == kind }
-                        ?.position
-                        ?.coerceIn(0, (section.itemCount() - 1 +
-                            if (section is HomeSection.ContinueWatching || section is HomeSection.RecentlyRecorded || section is HomeSection.RecentChannels) 1 else 0)
-                            .coerceAtLeast(0))
-                        ?: 0
+                    val lastIndex = (section.itemCount() - 1 +
+                        if (section is HomeSection.ContinueWatching || section is HomeSection.RecentlyRecorded || section is HomeSection.RecentChannels) 1 else 0)
+                        .coerceAtLeast(0)
+                    val entryIndex = initialKey?.takeIf { it.section == kind }?.let {
+                        if (it.item in HomeEndCardKeys) lastIndex else it.position.coerceIn(0, lastIndex)
+                    } ?: 0
                     val entry = requireNotNull(requesters[kind])
                     val onNowSection = section as? HomeSection.OnNow
                     val onSectionFocus = {

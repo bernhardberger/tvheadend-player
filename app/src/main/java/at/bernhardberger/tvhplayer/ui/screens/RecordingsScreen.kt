@@ -60,6 +60,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -317,6 +318,9 @@ internal fun RecordingsScreenContent(
     val channelsById = rememberChannelsById()
     val scope = rememberCoroutineScope()
     val screenState = state ?: remember { RecordingsScreenState() }
+    DisposableEffect(screenState) {
+        onDispose { screenState.requestedScheduleEntryId.value = null }
+    }
     val contentFocus = remember { FocusRequester() }
     val modeFocus = remember { FocusRequester() }
     val selectedKeys = screenState.selectedKeys
@@ -325,10 +329,20 @@ internal fun RecordingsScreenContent(
     val archiveNavigation = screenState.archiveNavigation
     val archiveLevel = archiveNavigation.stack.active.levelId
     val drawerFocus = LocalBrowseNavigationFocus.current
+    val drawerState = at.bernhardberger.tvhplayer.ui.components.LocalBrowseDrawerState.current
     var requestContentFocus by remember { mutableStateOf(true) }
     var contentHasFocus by remember { mutableStateOf(false) }
     var contentFocusOwned by remember { mutableStateOf(false) }
     var loadingFocusParked by remember { mutableStateOf(false) }
+    LaunchedEffect(initialFocusEnabled, drawerState?.currentValue, screenState.requestedScheduleEntryId.value) {
+        if ((!initialFocusEnabled || drawerState?.currentValue == androidx.tv.material3.DrawerValue.Open) &&
+            screenState.requestedScheduleEntryId.value != null
+        ) {
+            screenState.requestedScheduleEntryId.value = null
+            requestContentFocus = false
+            loadingFocusParked = false
+        }
+    }
     var relocatingKey by remember { mutableStateOf<Key?>(null) }
     var focusRecoveryGeneration by remember { mutableIntStateOf(0) }
     var detailsEntry by remember { mutableStateOf<DvrEntry?>(null) }
@@ -425,7 +439,12 @@ internal fun RecordingsScreenContent(
         }
     }) content@{
     BrowsePreparationPending(initialFocusEnabled, ready = prepared != null,
-        onReadyFocus = { requestContentFocus = true; true },
+        onReadyFocus = {
+            // A new session can replace preparation while the viewer owns a mode tab.
+            // The temporary anchor must hand back to that tab, not revive a deep link.
+            if (!requestContentFocus && !contentFocusOwned && !loadingFocusParked) modeFocus.requestFocus()
+            else { requestContentFocus = true; true }
+        },
         skeleton = { RecordingsPreparationSkeleton(contentPadding, startPadding) })
     if (prepared == null) return@content
     val observedEntries = prepared.input?.entries.orEmpty()
@@ -462,7 +481,6 @@ internal fun RecordingsScreenContent(
     }
     val alertShown = recordingsAppError(entries.isEmpty(), connectionUiState, connectionFailure) != null
 
-    val drawerState = at.bernhardberger.tvhplayer.ui.components.LocalBrowseDrawerState.current
     LaunchedEffect(observedEntries) {
         // Transfer locally before removing the actual focused node. Keeping only the
         // old key would recreate the node and leave the same focus vacancy.
@@ -482,7 +500,8 @@ internal fun RecordingsScreenContent(
         location,
         itemKeys,
         screenState.requestedScheduleEntryId.value,
-        observation.dvrSnapshotForDisplay != null,
+        prepared.input,
+        observation.dvrSnapshotForDisplay,
         selectedKeys[location],
         requestContentFocus,
         initialFocusEnabled,
@@ -493,12 +512,16 @@ internal fun RecordingsScreenContent(
     ) {
         if (detailsEntry != null || pendingAction != null || folderMenu != null) return@LaunchedEffect
         val requestedEntry = screenState.requestedScheduleEntryId.value
-        val snapshotLoaded = observation.dvrSnapshotForDisplay != null
-        val unavailableScheduleEntry = snapshotLoaded && mode == DvrLibraryMode.SCHEDULE && requestedEntry != null &&
+        // Preparation retains the last projection while the new snapshot is calculated.
+        // Only the projection built from the displayed snapshot can judge this target.
+        val snapshotReady = prepared.input != null && prepared.input == observation.dvrSnapshotForDisplay
+        val unavailableScheduleEntry = snapshotReady && mode == DvrLibraryMode.SCHEDULE && requestedEntry != null &&
             observedLibrary.schedule.none { it.id == requestedEntry && it.state == DvrEntryState.SCHEDULED }
-        if (snapshotLoaded && requestedEntry != null) {
+        if (snapshotReady && requestedEntry != null) {
             screenState.requestedScheduleEntryId.value = null
-            requestContentFocus = true
+            if (mode == DvrLibraryMode.SCHEDULE && initialFocusEnabled && (loadingFocusParked || contentFocusOwned)) {
+                requestContentFocus = true
+            }
         }
         if (itemKeys.isEmpty() && !alertShown) {
             if (unavailableScheduleEntry) selectedKeys.remove(location)
@@ -511,6 +534,7 @@ internal fun RecordingsScreenContent(
             }
             return@LaunchedEffect
         }
+        if (requestedEntry != null && !snapshotReady) return@LaunchedEffect
         if (mode != DvrLibraryMode.ARCHIVE && (unavailableScheduleEntry ||
                 (itemKeys.isNotEmpty() && selectedKeys[location] !in itemKeys))) {
             if (itemKeys.isEmpty()) selectedKeys.remove(location) else selectedKeys[location] = itemKeys.first()
@@ -605,12 +629,14 @@ internal fun RecordingsScreenContent(
                     onFocused = {
                         modeMotion.select(it, DvrLibraryMode.entries)
                         if (mode != it) {
+                            screenState.requestedScheduleEntryId.value = null
                             contentFocusOwned = false
                             requestContentFocus = false
                         }
                         mode = it
                     },
                     onClick = {
+                        screenState.requestedScheduleEntryId.value = null
                         modeMotion.select(it, DvrLibraryMode.entries)
                         mode = it
                         requestContentFocus = true
@@ -619,9 +645,9 @@ internal fun RecordingsScreenContent(
                         requestContentFocus = true
                     },
                     modifier = Modifier
-                        .onFocusChanged { if (!it.hasFocus) loadingFocusParked = false }
                         .onPreviewKeyEvent {
                             // A deliberate header move gives the viewer ownership, not the loading handoff.
+                            screenState.requestedScheduleEntryId.value = null
                             loadingFocusParked = false
                             contentFocusOwned = false
                             false

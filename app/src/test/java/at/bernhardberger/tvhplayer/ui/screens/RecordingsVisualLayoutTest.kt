@@ -62,6 +62,10 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.ui.components.awaitBrowsePreparation
+import at.bernhardberger.tvhplayer.ui.components.browsePreparationLane
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import kotlin.coroutines.EmptyCoroutineContext
 
 /** Offline production screen and shell, with real D-pad focus and no server/player. */
 @RunWith(RobolectricTestRunner::class)
@@ -276,6 +280,66 @@ class RecordingsVisualLayoutTest {
             DvrEntryState.SCHEDULED, startEpochSeconds = 1_900_000_000L + it * 3600) })
         compose.mainClock.advanceTimeBy(600)
         compose.onNodeWithTag("recording-list-entry-48").assertIsFocused().assertIsDisplayed()
+        compose.runOnIdle { assertNull(screenState.requestedScheduleEntryId.value) }
+    }
+
+    @Test fun scheduleDeepLinkWaitsForTheMatchingPreparedSnapshot() {
+        screenState.open(at.bernhardberger.tvhplayer.core.DvrLibraryMode.SCHEDULE)
+        show(empty = true)
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        browsePreparationLane.dispatch(EmptyCoroutineContext) {
+            entered.countDown()
+            check(release.await(10, TimeUnit.SECONDS)) { "Test did not release preparation" }
+        }
+        assertTrue(entered.await(10, TimeUnit.SECONDS))
+        try {
+            publish((40L..49L).map { recording(it, "Scheduled expedition ${it - 39}", null,
+                DvrEntryState.SCHEDULED, startEpochSeconds = 1_900_000_000L + it * 3600) }, awaitPreparation = false)
+            compose.runOnIdle {
+                screenState.open(at.bernhardberger.tvhplayer.core.DvrLibraryMode.SCHEDULE, DvrEntryId(48))
+            }
+            compose.waitForIdle()
+            compose.runOnIdle { assertEquals("The old empty projection cannot judge the new snapshot",
+                DvrEntryId(48), screenState.requestedScheduleEntryId.value) }
+        } finally {
+            release.countDown()
+        }
+        compose.awaitBrowsePreparation()
+        compose.mainClock.advanceTimeBy(600)
+        compose.onNodeWithTag("recording-list-entry-48").assertIsFocused().assertIsDisplayed()
+        compose.runOnIdle { assertNull(screenState.requestedScheduleEntryId.value) }
+    }
+
+    @Test fun scheduleDeepLinkDoesNotStealFocusAfterTheViewerChangesTabs() {
+        screenState.open(at.bernhardberger.tvhplayer.core.DvrLibraryMode.SCHEDULE, DvrEntryId(48))
+        show(snapshotLoaded = false)
+        compose.onNodeWithText("Schedule").assertIsFocused()
+        key(Key.DirectionRight)
+        compose.onNodeWithText("Problems").assertIsFocused()
+        publish(listOf(recording(48, "Scheduled expedition", null, DvrEntryState.SCHEDULED),
+            recording(99, "Failed expedition", null, DvrEntryState.COMPLETED_ERROR)))
+        compose.mainClock.advanceTimeBy(600)
+        compose.onNodeWithText("Problems").assertIsFocused()
+        compose.runOnIdle { assertNull(screenState.requestedScheduleEntryId.value) }
+    }
+
+    @Test fun scheduleDeepLinkIsCancelledWhenTheDrawerTakesFocus() {
+        screenState.open(at.bernhardberger.tvhplayer.core.DvrLibraryMode.SCHEDULE, DvrEntryId(48))
+        show(snapshotLoaded = false)
+        compose.onNodeWithTag("nav-recordings").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+        compose.mainClock.advanceTimeBy(600)
+        compose.runOnIdle { assertNull(screenState.requestedScheduleEntryId.value) }
+        publish(listOf(recording(48, "Scheduled expedition", null, DvrEntryState.SCHEDULED)))
+        compose.mainClock.advanceTimeBy(600)
+        compose.onNodeWithTag("nav-recordings").assertIsFocused()
+    }
+
+    @Test fun scheduleDeepLinkIsCancelledWhenTheScreenLeaves() {
+        screenState.open(at.bernhardberger.tvhplayer.core.DvrLibraryMode.SCHEDULE, DvrEntryId(48))
+        show(snapshotLoaded = false)
+        compose.runOnIdle { screenShown.value = false }
+        compose.waitForIdle()
         compose.runOnIdle { assertNull(screenState.requestedScheduleEntryId.value) }
     }
 
@@ -1334,7 +1398,7 @@ class RecordingsVisualLayoutTest {
             useUnmergedTree = true).assertIsDisplayed()
     }
 
-    private fun publish(entries: List<DvrEntry>) {
+    private fun publish(entries: List<DvrEntry>, awaitPreparation: Boolean = true) {
         compose.runOnIdle {
             session.publish(session.observation.value.let {
                 SessionObservation.create(it.sessionState, it.channelState, it.epgState,
@@ -1343,7 +1407,7 @@ class RecordingsVisualLayoutTest {
                     dvrDiskSpaceState = it.dvrDiskSpaceState)
             })
         }
-        compose.awaitBrowsePreparation()
+        if (awaitPreparation) compose.awaitBrowsePreparation()
     }
 
     private fun show(scale: Float = 1f, empty: Boolean = false, entries: List<DvrEntry>? = null, endPadding: Dp? = null,
