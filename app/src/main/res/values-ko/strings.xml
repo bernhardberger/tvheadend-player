@@ -136,7 +136,7 @@
     <string name="onboarding_welcome_body">개인 Tvheadend 서버의 실시간 TV와 녹화를 시청할 수 있습니다.</string>
     <string name="onboarding_find_searching">검색 중…</string>
     <string name="onboarding_find_on_network">이 네트워크에서</string>
-    <string name="onboarding_found_server_detail">%1$s · 포트 %2$d</string>
+    <string name="onboarding_found_server_detail">%1$s • 포트 %2$d</string>
     <string name="onboarding_find_none_body">많은 Tvheadend 서버는 네트워크에 자신의 존재를 알리지 않습니다. 대신 Tvheadend 웹 인터페이스에 접속할 때 사용하는 주소를 입력해 주세요.</string>
     <string name="onboarding_search_again">다시 검색</string>
     <string name="onboarding_step_server">서버</string>
@@ -158,10 +158,10 @@
     <string name="onboarding_connecting_body">서버를 확인하고 %1$s 계정으로 로그인하고 있습니다. 취소하려면 Back을 눌러 주세요.</string>
     <string name="onboarding_connecting_body_anonymous">서버를 확인하고 있습니다. 취소하려면 Back을 눌러 주세요.</string>
     <string name="onboarding_connecting">연결 중…</string>
-    <string name="onboarding_failure_meta">%1$s · 포트 %2$s · 사용자 %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s · 포트 %2$s</string>
+    <string name="onboarding_failure_meta">%1$s • 포트 %2$s • 사용자 %3$s</string>
+    <string name="onboarding_failure_meta_anonymous">%1$s • 포트 %2$s</string>
     <string name="onboarding_change_address">주소 변경</string>
-    <string name="onboarding_change_address_detail">%1$s · 포트 %2$s</string>
+    <string name="onboarding_change_address_detail">%1$s • 포트 %2$s</string>
     <string name="onboarding_change_sign_in">계정 변경</string>
     <string name="onboarding_change_sign_in_detail">사용자: %1$s</string>
     <string name="onboarding_change_sign_in_anonymous">계정 없이</string>
@@ -305,7 +305,7 @@
     <string name="guide_time_evening">저녁</string>
     <string name="guide_time_prime_time">프라임 타임</string>
     <string name="guide_time_late_night">심야</string>
-    <string name="epg_date_button">%1$s · %2$s</string>
+    <string name="epg_date_button">%1$s • %2$s</string>
     <string name="epg_date_button_description">%1$s, %2$s. 시간 변경</string>
     <string name="today">오늘</string>
     <string name="tomorrow">내일</string>

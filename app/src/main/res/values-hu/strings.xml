@@ -136,7 +136,7 @@
     <string name="onboarding_welcome_body">Nézz élő TV-adást és felvételeket a saját Tvheadend-szerveredről.</string>
     <string name="onboarding_find_searching">Keresés…</string>
     <string name="onboarding_find_on_network">Ezen a hálózaton</string>
-    <string name="onboarding_found_server_detail">%1$s · port: %2$d</string>
+    <string name="onboarding_found_server_detail">%1$s • port: %2$d</string>
     <string name="onboarding_find_none_body">Sok Tvheadend-szerver nem hirdeti magát a hálózaton. Add meg helyette a Tvheadend webes felületéhez használt címet.</string>
     <string name="onboarding_search_again">Új keresés</string>
     <string name="onboarding_step_server">Szerver</string>
@@ -158,10 +158,10 @@
     <string name="onboarding_connecting_body">Szerver ellenőrzése és bejelentkezés ezzel a felhasználóval: %1$s. A megszakításhoz nyomd meg a Back gombot.</string>
     <string name="onboarding_connecting_body_anonymous">Szerver ellenőrzése. A megszakításhoz nyomd meg a Back gombot.</string>
     <string name="onboarding_connecting">Csatlakozás…</string>
-    <string name="onboarding_failure_meta">%1$s · port: %2$s · felhasználó: %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s · port: %2$s</string>
+    <string name="onboarding_failure_meta">%1$s • port: %2$s • felhasználó: %3$s</string>
+    <string name="onboarding_failure_meta_anonymous">%1$s • port: %2$s</string>
     <string name="onboarding_change_address">Cím módosítása</string>
-    <string name="onboarding_change_address_detail">%1$s · port: %2$s</string>
+    <string name="onboarding_change_address_detail">%1$s • port: %2$s</string>
     <string name="onboarding_change_sign_in">Fiók módosítása</string>
     <string name="onboarding_change_sign_in_detail">Felhasználó: %1$s</string>
     <string name="onboarding_change_sign_in_anonymous">Fiók nélkül</string>
@@ -305,7 +305,7 @@
     <string name="guide_time_evening">Este</string>
     <string name="guide_time_prime_time">Főműsoridő</string>
     <string name="guide_time_late_night">Késő éjjel</string>
-    <string name="epg_date_button">%1$s · %2$s</string>
+    <string name="epg_date_button">%1$s • %2$s</string>
     <string name="epg_date_button_description">%1$s, %2$s. Időpont módosítása</string>
     <string name="today">Ma</string>
     <string name="tomorrow">Holnap</string>

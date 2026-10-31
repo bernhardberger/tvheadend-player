@@ -136,7 +136,7 @@
     <string name="onboarding_welcome_body">Se live-tv og optagelser fra din egen Tvheadend-server.</string>
     <string name="onboarding_find_searching">Søger…</string>
     <string name="onboarding_find_on_network">På dette netværk</string>
-    <string name="onboarding_found_server_detail">%1$s · port %2$d</string>
+    <string name="onboarding_found_server_detail">%1$s • port %2$d</string>
     <string name="onboarding_find_none_body">Mange Tvheadend-servere annoncerer ikke sig selv på netværket. Indtast i stedet den adresse, du bruger til Tvheadends webgrænseflade.</string>
     <string name="onboarding_search_again">Søg igen</string>
     <string name="onboarding_step_server">Server</string>
@@ -158,10 +158,10 @@
     <string name="onboarding_connecting_body">Kontrollerer serveren og logger ind som %1$s. Tryk på Back for at annullere.</string>
     <string name="onboarding_connecting_body_anonymous">Kontrollerer serveren. Tryk på Back for at annullere.</string>
     <string name="onboarding_connecting">Opretter forbindelse…</string>
-    <string name="onboarding_failure_meta">%1$s · port %2$s · bruger %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s · port %2$s</string>
+    <string name="onboarding_failure_meta">%1$s • port %2$s • bruger %3$s</string>
+    <string name="onboarding_failure_meta_anonymous">%1$s • port %2$s</string>
     <string name="onboarding_change_address">Skift adresse</string>
-    <string name="onboarding_change_address_detail">%1$s · port %2$s</string>
+    <string name="onboarding_change_address_detail">%1$s • port %2$s</string>
     <string name="onboarding_change_sign_in">Skift konto</string>
     <string name="onboarding_change_sign_in_detail">Bruger: %1$s</string>
     <string name="onboarding_change_sign_in_anonymous">Uden en konto</string>
@@ -305,7 +305,7 @@
     <string name="guide_time_evening">Aften</string>
     <string name="guide_time_prime_time">Bedste sendetid</string>
     <string name="guide_time_late_night">Sen aften</string>
-    <string name="epg_date_button">%1$s · %2$s</string>
+    <string name="epg_date_button">%1$s • %2$s</string>
     <string name="epg_date_button_description">%1$s, %2$s. Skift tidspunkt</string>
     <string name="today">I dag</string>
     <string name="tomorrow">I morgen</string>

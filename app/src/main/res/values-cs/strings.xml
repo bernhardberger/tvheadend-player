@@ -136,7 +136,7 @@
     <string name="onboarding_welcome_body">Sleduj živé vysílání a nahrávky z vlastního serveru Tvheadend.</string>
     <string name="onboarding_find_searching">Hledání…</string>
     <string name="onboarding_find_on_network">V této síti</string>
-    <string name="onboarding_found_server_detail">%1$s · port %2$d</string>
+    <string name="onboarding_found_server_detail">%1$s • port %2$d</string>
     <string name="onboarding_find_none_body">Mnoho serverů Tvheadend svou přítomnost v síti neoznamuje. Zadej místo toho adresu, kterou používáš pro webové rozhraní Tvheadend.</string>
     <string name="onboarding_search_again">Hledat znovu</string>
     <string name="onboarding_step_server">Server</string>
@@ -158,10 +158,10 @@
     <string name="onboarding_connecting_body">Ověřování serveru a přihlašování jako %1$s. Stisknutím Back akci zrušíš.</string>
     <string name="onboarding_connecting_body_anonymous">Ověřování serveru. Stisknutím Back akci zrušíš.</string>
     <string name="onboarding_connecting">Připojování…</string>
-    <string name="onboarding_failure_meta">%1$s · port %2$s · uživatel %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s · port %2$s</string>
+    <string name="onboarding_failure_meta">%1$s • port %2$s • uživatel %3$s</string>
+    <string name="onboarding_failure_meta_anonymous">%1$s • port %2$s</string>
     <string name="onboarding_change_address">Změnit adresu</string>
-    <string name="onboarding_change_address_detail">%1$s · port %2$s</string>
+    <string name="onboarding_change_address_detail">%1$s • port %2$s</string>
     <string name="onboarding_change_sign_in">Změnit účet</string>
     <string name="onboarding_change_sign_in_detail">Uživatel: %1$s</string>
     <string name="onboarding_change_sign_in_anonymous">Bez účtu</string>
@@ -305,7 +305,7 @@
     <string name="guide_time_evening">Večer</string>
     <string name="guide_time_prime_time">Hlavní čas</string>
     <string name="guide_time_late_night">Pozdní noc</string>
-    <string name="epg_date_button">%1$s · %2$s</string>
+    <string name="epg_date_button">%1$s • %2$s</string>
     <string name="epg_date_button_description">%1$s, %2$s. Změnit čas</string>
     <string name="today">Dnes</string>
     <string name="tomorrow">Zítra</string>

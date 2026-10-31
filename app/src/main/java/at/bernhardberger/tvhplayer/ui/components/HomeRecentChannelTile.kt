@@ -22,6 +22,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.MaterialTheme
@@ -47,13 +48,14 @@ internal fun HomeRecentChannelTile(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null,
+    width: Dp = HomeRecentTileSize,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val ring = rememberCardFocusRing(interaction)
     val contextMenu = rememberBrowseContextMenuTrigger(onLongClick, menuKey = true)
     var focused by remember { mutableStateOf(false) }
     val name = channelTitleText(channel.visibleChannelNumber, channel.name.orEmpty())
-    Column(Modifier.width(HomeRecentTileSize)) {
+    Column(Modifier.width(width)) {
         Card(
             onClick = onClick,
             onLongClick = contextMenu.onLongClick,
@@ -75,8 +77,7 @@ internal fun HomeRecentChannelTile(
                 if (channel.icon != null) {
                     PiconBox(
                         channel.icon,
-                        Modifier.align(Alignment.TopCenter)
-                            .padding(top = HomeRecentTileSize / 8f)
+                        Modifier.align(Alignment.Center)
                             .fillMaxWidth(0.72f),
                         ground = channelAccentGround(channel.icon, channel.id, depth = 0.5f),
                     )
@@ -86,7 +87,7 @@ internal fun HomeRecentChannelTile(
         AnimatedVisibility(visible = nameShown, enter = RowTextEnter, exit = RowTextExit) {
             Text(
                 name,
-                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Normal),
+                style = channelCaptionStyle(),
                 color = if (focused) TvTextColors.primary else TvTextColors.secondary,
                 maxLines = 2,
                 minLines = 2,

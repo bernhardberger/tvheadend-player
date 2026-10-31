@@ -33,6 +33,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
@@ -45,6 +46,7 @@ import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.common.formatRecordedDuration
 import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
 import at.bernhardberger.tvhplayer.ui.common.isRunning
+import at.bernhardberger.tvhplayer.ui.player.playerMinutesLeft
 import coil3.compose.AsyncImage
 import kotlin.math.ceil
 
@@ -65,17 +67,21 @@ internal fun HomeActivityCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null,
+    playingRecording: Boolean = false,
 ) {
     val contextMenu = rememberBrowseContextMenuTrigger(onLongClick, menuKey = true)
     val running = event?.takeIf { it.isRunning(nowSec) }
+    val recordingOnly = !playing && entry != null
+    val recordingNow = entry?.state == DvrEntryState.RECORDING || entry?.state == DvrEntryState.RECORDING_ERROR
+    val viewer = if (playingRecording) recordingViewerPosition(entry?.id) else null
     val session = LocalArtworkContext.current.currentSession
-    val image = (running?.image ?: entry?.image ?: entry?.fanartImage)?.takeIf { session != null }
+    val image = (if (recordingOnly) entry?.image ?: entry?.fanartImage
+        else running?.image ?: entry?.image ?: entry?.fanartImage)?.takeIf { session != null }
     val icon = channel?.icon
     val interaction = remember { MutableInteractionSource() }
     val ring = rememberCardFocusRing(interaction)
     // The current programme gives the title; a bare running entry shows its own text without EPG.
-    val title = running?.title?.takeIf(String::isNotBlank)
-        ?: entry?.title?.takeIf(String::isNotBlank)
+    val title = (if (recordingOnly) entry?.title else running?.title ?: entry?.title)?.takeIf(String::isNotBlank)
         ?: stringResource(R.string.no_epg)
     val channelLabel = channel?.let { channelTitleText(it.visibleChannelNumber, it.name.orEmpty()) }
         ?: entry?.channelName.orEmpty()
@@ -105,13 +111,11 @@ internal fun HomeActivityCard(
                 )
             } else if (channel != null && icon != null) {
                 ChannelAccentFill(icon, channel.id, Modifier.fillMaxSize())
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    PiconBox(
-                        icon,
-                        Modifier.size(width * 0.4f, width * 0.225f),
-                        ground = channelAccentGround(icon, channel.id, depth = 0.5f),
-                    )
-                }
+                PiconBox(
+                    icon,
+                    Modifier.align(Alignment.TopEnd).padding(16.dp).size(width * 0.25f, width * 0.14f),
+                    ground = channelAccentGround(icon, channel.id, depth = 0.5f),
+                )
             } else {
                 if (channel != null) ChannelAccentFill(null, channel.id, Modifier.fillMaxSize())
             }
@@ -127,7 +131,7 @@ internal fun HomeActivityCard(
             )
             if (playing || entry != null) {
                 Row(
-                    Modifier.align(Alignment.TopEnd).padding(12.dp),
+                    Modifier.align(if (image == null) Alignment.TopStart else Alignment.TopEnd).padding(12.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -140,29 +144,21 @@ internal fun HomeActivityCard(
                             androidx.compose.runtime.CompositionLocalProvider(
                                 LocalContentColor provides TvTextColors.primary,
                             ) {
-                                ChannelNowIndicators(playingNow = true, recordingNow = entry != null)
+                                ChannelNowIndicators(playingNow = true, recordingNow = recordingNow)
                             }
                         }
                     }
-                    entry?.let { RecordingBadge(it.state) }
+                    if (recordingNow) entry?.let { RecordingBadge(it.state) }
                 }
             }
             Column(
                 Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    if (icon != null) ArtworkLogoPlate(icon, Modifier, scale = 0.875f)
-                    Text(
-                        channelLabel,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = TvTextColors.secondary,
-                        maxLines = 1,
-                        modifier = Modifier.weight(1f),
-                    )
+                ProgrammeEyebrow(picon = icon, text = channelLabel, modifier = Modifier.fillMaxWidth()) {
+                    if (playingRecording && !recordingNow) {
+                        StatusBadge(stringResource(R.string.home_activity_recording), StatusBadgeTone.NEUTRAL)
+                    }
                 }
                 Text(
                     title,
@@ -171,7 +167,10 @@ internal fun HomeActivityCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                activityTimesLine(event, entry, playing, nowSec).takeIf(String::isNotEmpty)?.let { times ->
+                val timesLine = if (playingRecording && viewer?.fraction != null) {
+                    playerMinutesLeft(((viewer.durationMs - viewer.positionMs).coerceAtLeast(0L) + 59_999L).div(60_000L).toInt())
+                } else activityTimesLine(event, entry, playing, nowSec)
+                timesLine.takeIf(String::isNotEmpty)?.let { times ->
                     Text(
                         times,
                         style = MaterialTheme.typography.labelMedium,
@@ -180,15 +179,23 @@ internal fun HomeActivityCard(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+                Text(stringResource(if (playing) R.string.home_back_to_player else R.string.watch),
+                    style = MaterialTheme.typography.labelSmall, color = TvTextColors.secondary, maxLines = 1)
             }
-            val progress = running?.let { programmeProgress(it, nowSec) }
+            val progress = if (playingRecording) viewer?.fraction else if (recordingOnly) {
+                val start = entry?.start?.epochSeconds
+                val stop = entry?.stop?.epochSeconds
+                if (start != null && stop != null && stop > start && nowSec >= start) {
+                    ((nowSec - start).toFloat() / (stop - start)).coerceIn(0f, 1f)
+                } else null
+            } else running?.let { programmeProgress(it, nowSec) }
             // The strip follows the viewer when Home's resident channel plays this programme, as
             // Channels' cards do; colour follows the watching-progress locals.
             if (progress != null) {
                 ProgressStrip(
                     progress,
                     Modifier.align(Alignment.BottomStart).fillMaxWidth(),
-                    color = progressColor(watchingIndicator(running, nowSec).isPlayingItem),
+                    color = progressColor(playingRecording || !recordingOnly && running?.let { watchingIndicator(it, nowSec).isPlayingItem } == true),
                     height = TvCardProgressStripHeight,
                 )
             }
@@ -196,11 +203,15 @@ internal fun HomeActivityCard(
     }
 }
 
-/** "18:58–21:05 · N min left" for the running programme, else the entry's schedule. */
+/** "18:58–21:05 • N min left" for the running programme, else the entry's schedule. */
 @Composable
 private fun activityTimesLine(event: EpgEvent?, entry: DvrEntry?, playing: Boolean, nowSec: Long): String {
-    val start = event?.start?.epochSeconds ?: entry?.start?.epochSeconds
-    val stop = event?.stop?.epochSeconds ?: entry?.stop?.epochSeconds
+    val recordingOnly = !playing && entry != null
+    val start = if (recordingOnly) entry?.start?.epochSeconds else event?.start?.epochSeconds ?: entry?.start?.epochSeconds
+    val stop = if (recordingOnly) entry?.stop?.epochSeconds else event?.stop?.epochSeconds ?: entry?.stop?.epochSeconds
+    if (recordingOnly && start != null && nowSec < start) {
+        return stringResource(R.string.home_recording_starts_at, formatHm(start))
+    }
     val range = when {
         start != null && stop != null -> formatTimeInterval(start, stop)
         start != null -> formatHm(start)
@@ -208,7 +219,7 @@ private fun activityTimesLine(event: EpgEvent?, entry: DvrEntry?, playing: Boole
     }
     // A playing recording resumes where it was left; a programme that is still on air counts down.
     val minutesLeft = stop
-        ?.takeIf { event != null && it > nowSec }
+        ?.takeIf { (recordingOnly || event != null) && it > nowSec }
         ?.let { ceil((it - nowSec) / 60.0).toLong() }
     val left = minutesLeft?.let { minutes ->
         stringResource(
@@ -216,5 +227,5 @@ private fun activityTimesLine(event: EpgEvent?, entry: DvrEntry?, playing: Boole
             formatRecordedDuration(minutes * 60L, LocalContext.current.resources),
         )
     }
-    return listOfNotNull(range, left).joinToString(" · ")
+    return listOfNotNull(range, left).joinToString(" • ")
 }

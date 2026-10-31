@@ -136,7 +136,7 @@
     <string name="onboarding_welcome_body">Titta på direktsänd tv och inspelningar från din egen Tvheadend-server.</string>
     <string name="onboarding_find_searching">Söker…</string>
     <string name="onboarding_find_on_network">På det här nätverket</string>
-    <string name="onboarding_found_server_detail">%1$s · port %2$d</string>
+    <string name="onboarding_found_server_detail">%1$s • port %2$d</string>
     <string name="onboarding_find_none_body">Många Tvheadend-servrar annonserar inte sin närvaro på nätverket. Ange i stället adressen du använder för Tvheadends webbgränssnitt.</string>
     <string name="onboarding_search_again">Sök igen</string>
     <string name="onboarding_step_server">Server</string>
@@ -158,10 +158,10 @@
     <string name="onboarding_connecting_body">Kontrollerar servern och loggar in som %1$s. Tryck på Back för att avbryta.</string>
     <string name="onboarding_connecting_body_anonymous">Kontrollerar servern. Tryck på Back för att avbryta.</string>
     <string name="onboarding_connecting">Ansluter…</string>
-    <string name="onboarding_failure_meta">%1$s · port %2$s · användare %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s · port %2$s</string>
+    <string name="onboarding_failure_meta">%1$s • port %2$s • användare %3$s</string>
+    <string name="onboarding_failure_meta_anonymous">%1$s • port %2$s</string>
     <string name="onboarding_change_address">Ändra adress</string>
-    <string name="onboarding_change_address_detail">%1$s · port %2$s</string>
+    <string name="onboarding_change_address_detail">%1$s • port %2$s</string>
     <string name="onboarding_change_sign_in">Ändra konto</string>
     <string name="onboarding_change_sign_in_detail">Användare: %1$s</string>
     <string name="onboarding_change_sign_in_anonymous">Utan konto</string>
@@ -305,7 +305,7 @@
     <string name="guide_time_evening">Kväll</string>
     <string name="guide_time_prime_time">Bästa sändningstid</string>
     <string name="guide_time_late_night">Sen kväll</string>
-    <string name="epg_date_button">%1$s · %2$s</string>
+    <string name="epg_date_button">%1$s • %2$s</string>
     <string name="epg_date_button_description">%1$s, %2$s. Ändra tiden</string>
     <string name="today">I dag</string>
     <string name="tomorrow">I morgon</string>

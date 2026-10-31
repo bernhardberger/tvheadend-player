@@ -155,7 +155,7 @@
     <string name="onboarding_welcome_body">Watch live TV and recordings from your own Tvheadend server.</string>
     <string name="onboarding_find_searching">Searching…</string>
     <string name="onboarding_find_on_network">On this network</string>
-    <string name="onboarding_found_server_detail">%1$s · port %2$d</string>
+    <string name="onboarding_found_server_detail">%1$s • port %2$d</string>
     <string name="onboarding_find_none_body">Many Tvheadend servers don’t announce themselves on the network. Enter the address you use for Tvheadend’s web interface instead.</string>
     <string name="onboarding_search_again">Search again</string>
     <string name="onboarding_step_server">Server</string>
@@ -177,10 +177,10 @@
     <string name="onboarding_connecting_body">Checking the server and signing in as %1$s. Press Back to cancel.</string>
     <string name="onboarding_connecting_body_anonymous">Checking the server. Press Back to cancel.</string>
     <string name="onboarding_connecting">Connecting…</string>
-    <string name="onboarding_failure_meta">%1$s · port %2$s · user %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s · port %2$s</string>
+    <string name="onboarding_failure_meta">%1$s • port %2$s • user %3$s</string>
+    <string name="onboarding_failure_meta_anonymous">%1$s • port %2$s</string>
     <string name="onboarding_change_address">Change address</string>
-    <string name="onboarding_change_address_detail">%1$s · port %2$s</string>
+    <string name="onboarding_change_address_detail">%1$s • port %2$s</string>
     <string name="onboarding_change_sign_in">Change account</string>
     <string name="onboarding_change_sign_in_detail">User: %1$s</string>
     <string name="onboarding_change_sign_in_anonymous">Without an account</string>
@@ -445,7 +445,7 @@
     <!-- Guide time-of-day shortcut: the evening hours with the main programs (about 20:00–23:00). Max 14. -->
     <string name="guide_time_prime_time">Prime time</string>
     <string name="guide_time_late_night">Late night</string>
-    <string name="epg_date_button">%1$s · %2$s</string>
+    <string name="epg_date_button">%1$s • %2$s</string>
     <string name="epg_date_button_description">%1$s, %2$s. Change the time</string>
     <string name="today">Today</string>
     <string name="tomorrow">Tomorrow</string>
@@ -906,8 +906,7 @@
     <string name="channel_schedule_end">No program information after %1$s</string>
     <string name="channel_schedule_loading_more">Loading later days</string>
     <!-- Home: section headings, card labels and accessible names. -->
-    <string name="home_now_playing" tools:ignore="MissingTranslation">Now playing</string>
-    <string name="home_current_activity" tools:ignore="MissingTranslation">Current activity</string>
+    <string name="home_now_playing" tools:ignore="MissingTranslation">Right now</string>
     <string name="home_upcoming_recordings" tools:ignore="MissingTranslation">Upcoming recordings</string>
     <string name="home_no_history" tools:ignore="MissingTranslation">Recently watched channels will appear here.</string>
     <string name="home_start_watching" tools:ignore="MissingTranslation">Start watching</string>
@@ -922,12 +921,14 @@
     <string name="home_on_now" tools:ignore="MissingTranslation">On now</string>
     <string name="home_browse_by_genre" tools:ignore="MissingTranslation">Browse by genre</string>
     <string name="home_continue_watching" tools:ignore="MissingTranslation">Continue watching</string>
-    <string name="home_recently_recorded" tools:ignore="MissingTranslation">Recently recorded</string>
+    <string name="home_recently_recorded" tools:ignore="MissingTranslation">New recordings</string>
+    <string name="home_back_to_player" tools:ignore="MissingTranslation">Back to player</string>
+    <string name="home_recording_starts_at" tools:ignore="MissingTranslation">Starts at %1$s</string>
     <string name="home_all_recordings" tools:ignore="MissingTranslation">All recordings</string>
     <string name="home_activity_watching_live" tools:ignore="MissingTranslation">Watching live</string>
     <string name="home_activity_recording" tools:ignore="MissingTranslation">Recording</string>
     <string name="home_activity_watching_and_recording" tools:ignore="MissingTranslation">Watching and recording</string>
-    <string name="home_upcoming_summary" tools:ignore="MissingTranslation">Next: %1$s · %2$s</string>
+    <string name="home_upcoming_summary" tools:ignore="MissingTranslation">Next: %1$s • %2$s</string>
     <plurals name="home_upcoming_more" tools:ignore="MissingTranslation">
         <item quantity="one">%1$d more scheduled</item>
         <item quantity="other">%1$d more scheduled</item>

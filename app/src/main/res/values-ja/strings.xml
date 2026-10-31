@@ -136,7 +136,7 @@
     <string name="onboarding_welcome_body">自身のTvheadendサーバーからテレビのライブ放送や録画を視聴できます。</string>
     <string name="onboarding_find_searching">検索中…</string>
     <string name="onboarding_find_on_network">このネットワーク上のサーバー</string>
-    <string name="onboarding_found_server_detail">%1$s · ポート%2$d</string>
+    <string name="onboarding_found_server_detail">%1$s • ポート%2$d</string>
     <string name="onboarding_find_none_body">多くのTvheadendサーバーはネットワーク上に存在を通知しません。代わりにTvheadendのウェブ画面で使用しているアドレスを入力してください。</string>
     <string name="onboarding_search_again">再検索</string>
     <string name="onboarding_step_server">サーバー</string>
@@ -158,10 +158,10 @@
     <string name="onboarding_connecting_body">サーバーを確認し、%1$sとしてログインしています。取り消すにはBackを押してください。</string>
     <string name="onboarding_connecting_body_anonymous">サーバーを確認しています。取り消すにはBackを押してください。</string>
     <string name="onboarding_connecting">接続中…</string>
-    <string name="onboarding_failure_meta">%1$s · ポート%2$s · ユーザー%3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s · ポート%2$s</string>
+    <string name="onboarding_failure_meta">%1$s • ポート%2$s • ユーザー%3$s</string>
+    <string name="onboarding_failure_meta_anonymous">%1$s • ポート%2$s</string>
     <string name="onboarding_change_address">アドレスを変更</string>
-    <string name="onboarding_change_address_detail">%1$s · ポート%2$s</string>
+    <string name="onboarding_change_address_detail">%1$s • ポート%2$s</string>
     <string name="onboarding_change_sign_in">アカウントを変更</string>
     <string name="onboarding_change_sign_in_detail">ユーザー：%1$s</string>
     <string name="onboarding_change_sign_in_anonymous">アカウントなし</string>
@@ -305,7 +305,7 @@
     <string name="guide_time_evening">夕方</string>
     <string name="guide_time_prime_time">プライムタイム</string>
     <string name="guide_time_late_night">深夜</string>
-    <string name="epg_date_button">%1$s · %2$s</string>
+    <string name="epg_date_button">%1$s • %2$s</string>
     <string name="epg_date_button_description">%1$s、%2$s。時刻を変更</string>
     <string name="today">今日</string>
     <string name="tomorrow">明日</string>

@@ -22,6 +22,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.CardContainerDefaults
@@ -47,10 +48,13 @@ internal fun HomeAllRecordingsCard(
     textShown: Boolean,
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null,
+    width: Dp = HomeCardWidth,
+    allChannels: Boolean = false,
 ) {
-    val label = stringResource(R.string.home_all_recordings)
+    val label = stringResource(if (allChannels) R.string.all_channels else R.string.home_all_recordings)
     StandardProgrammeCard(
-        width = HomeCardWidth,
+        width = width,
+        aspectRatio = if (allChannels) 1f else 16f / 9f,
         onClick = onClick,
         onLongClick = onLongClick,
         modifier = modifier.semantics(mergeDescendants = true) { contentDescription = label },
@@ -78,7 +82,7 @@ internal fun HomeAllRecordingsCard(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    painterResource(R.drawable.ic_video_library),
+                    painterResource(if (allChannels) R.drawable.ic_live_tv_outlined else R.drawable.ic_video_library),
                     null,
                     Modifier.size(36.dp),
                     tint = TvTextColors.secondary,

@@ -136,7 +136,7 @@
     <string name="onboarding_welcome_body">Дивіться прямий ефір і записи з власного сервера Tvheadend.</string>
     <string name="onboarding_find_searching">Пошук…</string>
     <string name="onboarding_find_on_network">У цій мережі</string>
-    <string name="onboarding_found_server_detail">%1$s · порт %2$d</string>
+    <string name="onboarding_found_server_detail">%1$s • порт %2$d</string>
     <string name="onboarding_find_none_body">Багато серверів Tvheadend не повідомляють про себе в мережі. Натомість введіть адресу, яку ви використовуєте для вебінтерфейсу Tvheadend.</string>
     <string name="onboarding_search_again">Шукати знову</string>
     <string name="onboarding_step_server">Сервер</string>
@@ -158,10 +158,10 @@
     <string name="onboarding_connecting_body">Перевірка сервера та вхід як %1$s. Натисніть Back для скасування.</string>
     <string name="onboarding_connecting_body_anonymous">Перевірка сервера. Натисніть Back для скасування.</string>
     <string name="onboarding_connecting">Підключення…</string>
-    <string name="onboarding_failure_meta">%1$s · порт %2$s · користувач %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s · порт %2$s</string>
+    <string name="onboarding_failure_meta">%1$s • порт %2$s • користувач %3$s</string>
+    <string name="onboarding_failure_meta_anonymous">%1$s • порт %2$s</string>
     <string name="onboarding_change_address">Змінити адресу</string>
-    <string name="onboarding_change_address_detail">%1$s · порт %2$s</string>
+    <string name="onboarding_change_address_detail">%1$s • порт %2$s</string>
     <string name="onboarding_change_sign_in">Змінити обліковий запис</string>
     <string name="onboarding_change_sign_in_detail">Користувач: %1$s</string>
     <string name="onboarding_change_sign_in_anonymous">Без облікового запису</string>
@@ -305,7 +305,7 @@
     <string name="guide_time_evening">Вечір</string>
     <string name="guide_time_prime_time">Прайм-тайм</string>
     <string name="guide_time_late_night">Пізня ніч</string>
-    <string name="epg_date_button">%1$s · %2$s</string>
+    <string name="epg_date_button">%1$s • %2$s</string>
     <string name="epg_date_button_description">%1$s, %2$s. Змінити час</string>
     <string name="today">Сьогодні</string>
     <string name="tomorrow">Завтра</string>

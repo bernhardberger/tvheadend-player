@@ -75,10 +75,23 @@ class HomeNavigationJourneyTest {
                 fixture.settle()
             }
         }
-        org.junit.Assert.assertEquals("return focus: ${compose.onNode(isFocused()).printToString()}",
-            1, compose.onAllNodes(hasTestTag("home-onnow-1") and isFocused()).fetchSemanticsNodes().size)
+        compose.onNodeWithTag("home-onnow-1").assertIsFocused()
         val after = compose.onNodeWithTag("home-onnow-1").getUnclippedBoundsInRoot()
         org.junit.Assert.assertEquals(before.left.value, after.left.value, 2f)
         org.junit.Assert.assertEquals(before.top.value, after.top.value, 2f)
+    }
+
+    @Test fun realRailRightRestoresTheCardLeftBehindInsteadOfUpcoming() {
+        fixture.app()
+        fixture.openDestination("nav-channels", Key.DirectionUp, "nav-home")
+        fixture.key(Key.DirectionRight)
+        compose.onNodeWithTag("home-onnow-0").assertIsFocused()
+        fixture.key(Key.DirectionRight)
+        compose.onNodeWithTag("home-onnow-1").assertIsFocused()
+        compose.runOnIdle { fixture.back.onBackPressed() }
+        fixture.settle()
+        compose.onNodeWithTag("nav-home").assertIsFocused()
+        fixture.key(Key.DirectionRight)
+        compose.onNodeWithTag("home-onnow-1").assertIsFocused()
     }
 }

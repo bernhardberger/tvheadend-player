@@ -154,11 +154,21 @@ class HomeCaptureTest {
         capture("5-warm", "home-activity-0")
     }
 
+    @Test fun warmWithoutArtwork() = atEvening {
+        show(Kind.WARM, noArtwork = true)
+        capture("17-warm-no-art", "home-activity-0")
+    }
+
+    @Test fun warmWithoutArtworkLargeFont() = atEvening {
+        show(Kind.WARM, noArtwork = true, fontScale = 1.3f)
+        capture("18-warm-no-art-font-130", "home-activity-0")
+    }
+
     @Test
     fun firstRun() = atEvening {
         show(Kind.FIRST_RUN)
         capture("6-first-run", "home-onnow-0")
-        assertTop("home-onnow-0", 356f)
+        assertTop("home-onnow-0", 320f)
     }
 
     @Test fun optionsPanel() = atEvening {
@@ -166,7 +176,7 @@ class HomeCaptureTest {
         settle("home-recent-0")
         key(Key.DirectionUp)
         key(Key.Enter)
-        capture("11-options", "home-tag-all")
+        capture("11-options", "home-view-CURRENT_ACTIVITY")
     }
 
     @Test fun loadingFirstMetadata() = atEvening {
@@ -198,6 +208,31 @@ class HomeCaptureTest {
         capture("15-default-font-130", "home-recent-0")
     }
 
+    @Test fun warmLargeFont() = atEvening {
+        show(Kind.WARM, fontScale = 1.3f)
+        capture("16-warm-font-130", "home-activity-0")
+    }
+
+    @Test fun wholeCardsFillAndNextCardPeeksInMargin() = atEvening {
+        show(Kind.BROWSE, longOnNow = true)
+        settle("home-recent-0")
+        val recent = bounds("home-recent-0")
+        assertEquals("six whole recent tiles end at grid end", 902f,
+            recent.left.value + (recent.right - recent.left).value * 6 + 16f * 5, 2f)
+        assertTrue("seventh recent tile peeks in right margin", bounds("home-recent-6").left >= 902.dp)
+        key(Key.DirectionDown)
+        settle("home-onnow-0")
+        val card = bounds("home-onnow-0")
+        assertEquals("four whole programmes end at grid end", 902f,
+            card.left.value + (card.right - card.left).value * 4 + 20f * 3, 2f)
+        assertTrue("fifth programme peeks in right margin", bounds("home-onnow-4").left >= 902.dp)
+        assertTrue("fifth programme is visible", bounds("home-onnow-4").left < 960.dp)
+        assertTrue("header is above viewport", bounds("home-header").bottom <= 0.dp)
+        compose.onNodeWithTag("home-up-hint", useUnmergedTree = true).assertExists()
+        assertEquals("On now heading keeps quiet size", 18f / 28f,
+            layerScope("home-heading-ON_NOW").scaleX, 0.02f)
+    }
+
     /** One, two and three current-activity cards, each card half the content width. */
     @Test
     fun activityOne() = activity(1)
@@ -215,7 +250,7 @@ class HomeCaptureTest {
         settle("home-recent-0")
         compose.mainClock.autoAdvance = false
         strip("down-into", Key.DirectionDown, "home-onnow-0", expanded = true)
-        assertTop("home-onnow-0", 356f)
+        assertTop("home-onnow-0", 320f)
         val keyline = bounds("home-onnow-0").left.value
         strip("right", Key.DirectionRight, "home-onnow-1", expanded = true)
         assertEquals("focused On now card stays on the start keyline", keyline, bounds("home-onnow-1").left.value, 2f)
@@ -228,7 +263,7 @@ class HomeCaptureTest {
         val collapsed = bounds("home-onnow-0")
         assertTrue("collapsed On now pictures peek above the genre heading: $collapsed", collapsed.top < 76.dp && collapsed.bottom > 0.dp)
         strip("up-into", Key.DirectionUp, "home-onnow-0", expanded = true)
-        assertTop("home-onnow-0", 356f)
+        assertTop("home-onnow-0", 320f)
         strip("up-out", Key.DirectionUp, "home-recent-0", expanded = false)
         assertTop("home-heading-RECENT_CHANNELS", 76f)
         key(Key.DirectionUp)
@@ -247,7 +282,7 @@ class HomeCaptureTest {
         key(Key.DirectionDown)
         key(Key.DirectionDown)
         settle("home-onnow-0")
-        assertTop("home-onnow-0", 356f)
+        assertTop("home-onnow-0", 320f)
         compose.onNodeWithTag("channels-immersive-background").assertDoesNotExist()
         assertEquals(1f, layerAlpha("home-on-now-block"), 0.02f)
     }
@@ -297,7 +332,7 @@ class HomeCaptureTest {
         settle("home-genre-0")
         key(Key.DirectionUp)
         settle("home-onnow-13")
-        assertTop("home-onnow-13", 356f)
+        assertTop("home-onnow-13", 320f)
     }
 
     @Test
@@ -308,7 +343,7 @@ class HomeCaptureTest {
         settle("home-view-button")
         compose.mainClock.autoAdvance = false
         strip("first-run-header-down", Key.DirectionDown, "home-onnow-0", expanded = true)
-        assertTop("home-onnow-0", 356f)
+        assertTop("home-onnow-0", 320f)
         assertEquals(0f, layerScope("home-on-now-block").translationY, 0.1f)
     }
 
@@ -335,8 +370,8 @@ class HomeCaptureTest {
         repeat(29) { frame ->
             if (frame > 0) compose.mainClock.advanceTimeByFrame()
             val elapsed = frame * 16f
-            assertEquals("raw block at $elapsed", ((elapsed - 130f) / 200f).coerceIn(0f, 1f), motion.block.value, 0.01f)
-            assertEquals("raw background at $elapsed", ((elapsed - 130f) / 270f).coerceIn(0f, 1f), motion.background.value, 0.01f)
+            assertEquals("raw block at $elapsed", ((elapsed - 100f) / 170f).coerceIn(0f, 1f), motion.block.value, 0.01f)
+            assertEquals("raw background at $elapsed", ((elapsed - 100f) / 270f).coerceIn(0f, 1f), motion.background.value, 0.01f)
             assertEquals("entry page progress at $elapsed", LinearOutSlowInEasing.transform((elapsed / 200f).coerceIn(0f, 1f)), motion.progress.value, 0.01f)
         }
         // Fully expanded -> Down out -> ordinary Down: the exit must keep fading, not freeze.
@@ -406,22 +441,43 @@ class HomeCaptureTest {
         awaitFocus(tag)
         val strip = Bitmap.createBitmap(320 * 12, 180, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(strip)
+        var previousBlockTop: Float? = null
+        var blockBottomGap: Float? = null
+        val aboveTop = bounds("home-header").top.value
         repeat(12) { frame ->
             if (frame > 0) compose.mainClock.advanceTimeBy(50, ignoreFrameDuration = true)
             compose.waitForIdle()
             assertOpacityEnvelope()
             val elapsed = frame * 50f
             val delay = when (name) {
-                "down-into", "first-run-header-down" -> 130f
+                "down-into", "first-run-header-down" -> 100f
                 "up-into" -> 100f
                 else -> null
             }
             if (delay != null) {
-                val rawBlock = ((elapsed - delay) / 200f).coerceIn(0f, 1f)
+                val rawBlock = ((elapsed - delay) / if (name == "up-into") 200f else 170f).coerceIn(0f, 1f)
                 val rawBackground = ((elapsed - delay) / 270f).coerceIn(0f, 1f)
                 assertEquals("drawn block follows reference clocks at $elapsed", minOf(rawBlock, rawBackground), layerAlpha("home-on-now-block"), 0.08f)
             }
             if (name == "down-out") assertEquals(0f, layerAlpha("home-on-now-block"), 0.02f)
+            if (name == "down-into" || name == "first-run-header-down") {
+                if (frame == 2) {
+                    assertTrue("header leaves upward, not a crossfade in place", bounds("home-header").top.value < aboveTop - 24f)
+                    assertTrue("header clears the top edge", bounds("home-header").bottom <= 0.dp)
+                    if (name == "down-into") assertTrue("recent row clears the top edge: ${bounds("home-section-RECENT_CHANNELS")}, shift=${layerScope("home-section-RECENT_CHANNELS").translationY}",
+                        bounds("home-section-RECENT_CHANNELS").bottom <= 0.dp)
+                }
+                if (frame in 3..5) {
+                    val block = bounds("home-on-now-block")
+                    val heading = bounds("home-heading-ON_NOW")
+                    val gap = (heading.top - block.bottom).value
+                    blockBottomGap?.let { assertEquals("block bottom stays anchored above heading", it, gap, 1f) }
+                    blockBottomGap = gap
+                    val top = (block.top - heading.top).value
+                    previousBlockTop?.let { assertTrue("block extends upward from its bottom edge", top < it) }
+                    previousBlockTop = top
+                }
+            }
             val bitmap = draw()
             canvas.drawBitmap(bitmap, null, android.graphics.Rect(frame * 320, 0, (frame + 1) * 320, 180), null)
             bitmap.recycle()
@@ -447,9 +503,9 @@ class HomeCaptureTest {
         val nowSec: Long,
     )
 
-    private fun show(kind: Kind, activityItems: Int = 2, longOnNow: Boolean = false, screen: Boolean = false, fontScale: Float = 1f) {
+    private fun show(kind: Kind, activityItems: Int = 2, longOnNow: Boolean = false, screen: Boolean = false, fontScale: Float = 1f, noArtwork: Boolean = false) {
         isDebugInspectorInfoEnabled = true
-        val base = scene(kind, activityItems, longOnNow)
+        val base = scene(kind, activityItems, longOnNow, noArtwork)
         val scene = if (kind in setOf(Kind.LOADING, Kind.EMPTY, Kind.OFFLINE)) base.copy(
             input = base.input.copy(channels = if (kind == Kind.EMPTY) base.input.channels else emptyList(),
                 currentEvents = emptyMap(), upcomingEvents = emptyList(), recentChannelIds = emptyList(), dvrEntries = emptyList(), playing = null),
@@ -570,7 +626,7 @@ class HomeCaptureTest {
         )
     }
 
-    private fun scene(kind: Kind, activityItems: Int, longOnNow: Boolean): Scene {
+    private fun scene(kind: Kind, activityItems: Int, longOnNow: Boolean, noArtwork: Boolean): Scene {
         val now = 1_791_144_900L
         val channels = ChannelsLayoutFixture.LINE_UP.mapIndexed { index, (name, _) ->
             Channel.create(
@@ -619,7 +675,7 @@ class HomeCaptureTest {
                 copyrightYear = 2024L.takeIf { index == 0 },
                 rating = EpgRating(12, "XMLTV:FSK:12", null, null, null, null).takeIf { index == 0 },
                 summary = synopses[index],
-                image = ArtworkId(101 + index).takeIf { index != 5 && index < 7 },
+                image = ArtworkId(101 + index).takeIf { !noArtwork && index != 5 && index < 7 },
                 contentGenre = genreCodes[index]?.let { ContentGenre.fromContentType((it.code shl 4).toLong()) },
                 nextEventId = EventId(channel.id.value * 100 + 1),
             )

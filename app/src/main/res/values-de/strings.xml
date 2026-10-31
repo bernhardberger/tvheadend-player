@@ -141,7 +141,7 @@
     <string name="onboarding_welcome_body">Schau Live-TV und Aufnahmen von deinem eigenen Tvheadend-Server.</string>
     <string name="onboarding_find_searching">Suche läuft…</string>
     <string name="onboarding_find_on_network">In diesem Netzwerk</string>
-    <string name="onboarding_found_server_detail">%1$s · Port %2$d</string>
+    <string name="onboarding_found_server_detail">%1$s • Port %2$d</string>
     <string name="onboarding_find_none_body">Viele Tvheadend-Server machen sich im Netzwerk nicht bekannt. Gib stattdessen die Adresse ein, die du für die Weboberfläche von Tvheadend verwendest.</string>
     <string name="onboarding_search_again">Erneut suchen</string>
     <string name="onboarding_step_server">Server</string>
@@ -163,10 +163,10 @@
     <string name="onboarding_connecting_body">Der Server wird geprüft und du wirst als %1$s angemeldet. Drücke Zurück, um abzubrechen.</string>
     <string name="onboarding_connecting_body_anonymous">Der Server wird geprüft. Drücke Zurück, um abzubrechen.</string>
     <string name="onboarding_connecting">Wird verbunden…</string>
-    <string name="onboarding_failure_meta">%1$s · Port %2$s · Benutzer %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s · Port %2$s</string>
+    <string name="onboarding_failure_meta">%1$s • Port %2$s • Benutzer %3$s</string>
+    <string name="onboarding_failure_meta_anonymous">%1$s • Port %2$s</string>
     <string name="onboarding_change_address">Adresse ändern</string>
-    <string name="onboarding_change_address_detail">%1$s · Port %2$s</string>
+    <string name="onboarding_change_address_detail">%1$s • Port %2$s</string>
     <string name="onboarding_change_sign_in">Konto ändern</string>
     <string name="onboarding_change_sign_in_detail">Benutzer: %1$s</string>
     <string name="onboarding_change_sign_in_anonymous">Ohne Konto</string>
@@ -317,7 +317,7 @@
     <string name="guide_time_evening">Abend</string>
     <string name="guide_time_prime_time">Hauptabend</string>
     <string name="guide_time_late_night">Spätabend</string>
-    <string name="epg_date_button">%1$s · %2$s</string>
+    <string name="epg_date_button">%1$s • %2$s</string>
     <string name="epg_date_button_description">%1$s, %2$s. Zeit ändern</string>
     <string name="today">Heute</string>
     <string name="tomorrow">Morgen</string>

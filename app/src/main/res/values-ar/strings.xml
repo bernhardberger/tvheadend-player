@@ -136,7 +136,7 @@
     <string name="onboarding_welcome_body">مشاهدة البث التلفزيوني المباشر والتسجيلات من خادم Tvheadend الخاص.</string>
     <string name="onboarding_find_searching">جارٍ البحث…</string>
     <string name="onboarding_find_on_network">على هذه الشبكة</string>
-    <string name="onboarding_found_server_detail">%1$s · المنفذ %2$d</string>
+    <string name="onboarding_found_server_detail">%1$s • المنفذ %2$d</string>
     <string name="onboarding_find_none_body">لا تعلن خوادم Tvheadend كثيرة عن وجودها على الشبكة. يمكن بدلًا من ذلك إدخال العنوان المستخدم لواجهة ويب Tvheadend.</string>
     <string name="onboarding_search_again">إعادة البحث</string>
     <string name="onboarding_step_server">الخادم</string>
@@ -158,10 +158,10 @@
     <string name="onboarding_connecting_body">جارٍ التحقق من الخادم وتسجيل الدخول باسم %1$s. للإلغاء، يمكن الضغط على Back.</string>
     <string name="onboarding_connecting_body_anonymous">جارٍ التحقق من الخادم. للإلغاء، يمكن الضغط على Back.</string>
     <string name="onboarding_connecting">جارٍ الاتصال…</string>
-    <string name="onboarding_failure_meta">%1$s · المنفذ %2$s · المستخدم %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s · المنفذ %2$s</string>
+    <string name="onboarding_failure_meta">%1$s • المنفذ %2$s • المستخدم %3$s</string>
+    <string name="onboarding_failure_meta_anonymous">%1$s • المنفذ %2$s</string>
     <string name="onboarding_change_address">تغيير العنوان</string>
-    <string name="onboarding_change_address_detail">%1$s · المنفذ %2$s</string>
+    <string name="onboarding_change_address_detail">%1$s • المنفذ %2$s</string>
     <string name="onboarding_change_sign_in">تغيير الحساب</string>
     <string name="onboarding_change_sign_in_detail">المستخدم: %1$s</string>
     <string name="onboarding_change_sign_in_anonymous">دون حساب</string>
@@ -305,7 +305,7 @@
     <string name="guide_time_evening">المساء</string>
     <string name="guide_time_prime_time">وقت الذروة</string>
     <string name="guide_time_late_night">آخر الليل</string>
-    <string name="epg_date_button">%1$s · %2$s</string>
+    <string name="epg_date_button">%1$s • %2$s</string>
     <string name="epg_date_button_description">%1$s، %2$s. تغيير الوقت</string>
     <string name="today">اليوم</string>
     <string name="tomorrow">غدًا</string>

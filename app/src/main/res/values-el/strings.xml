@@ -136,7 +136,7 @@
     <string name="onboarding_welcome_body">Δες ζωντανή τηλεόραση και εγγραφές από τον δικό σου διακομιστή Tvheadend.</string>
     <string name="onboarding_find_searching">Αναζήτηση…</string>
     <string name="onboarding_find_on_network">Σε αυτό το δίκτυο</string>
-    <string name="onboarding_found_server_detail">%1$s · θύρα %2$d</string>
+    <string name="onboarding_found_server_detail">%1$s • θύρα %2$d</string>
     <string name="onboarding_find_none_body">Πολλοί διακομιστές Tvheadend δεν ανακοινώνουν την παρουσία τους στο δίκτυο. Πληκτρολόγησε τη διεύθυνση που χρησιμοποιείς για τη διεπαφή ιστού του Tvheadend.</string>
     <string name="onboarding_search_again">Νέα αναζήτηση</string>
     <string name="onboarding_step_server">Διακομιστής</string>
@@ -158,10 +158,10 @@
     <string name="onboarding_connecting_body">Έλεγχος διακομιστή και σύνδεση ως %1$s. Πάτησε Back για ακύρωση.</string>
     <string name="onboarding_connecting_body_anonymous">Έλεγχος διακομιστή. Πάτησε Back για ακύρωση.</string>
     <string name="onboarding_connecting">Σύνδεση…</string>
-    <string name="onboarding_failure_meta">%1$s · θύρα %2$s · χρήστης %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s · θύρα %2$s</string>
+    <string name="onboarding_failure_meta">%1$s • θύρα %2$s • χρήστης %3$s</string>
+    <string name="onboarding_failure_meta_anonymous">%1$s • θύρα %2$s</string>
     <string name="onboarding_change_address">Αλλαγή διεύθυνσης</string>
-    <string name="onboarding_change_address_detail">%1$s · θύρα %2$s</string>
+    <string name="onboarding_change_address_detail">%1$s • θύρα %2$s</string>
     <string name="onboarding_change_sign_in">Αλλαγή λογαριασμού</string>
     <string name="onboarding_change_sign_in_detail">Χρήστης: %1$s</string>
     <string name="onboarding_change_sign_in_anonymous">Χωρίς λογαριασμό</string>
@@ -305,7 +305,7 @@
     <string name="guide_time_evening">Βράδυ</string>
     <string name="guide_time_prime_time">Ζώνη υψηλής τηλεθέασης</string>
     <string name="guide_time_late_night">Αργά τη νύχτα</string>
-    <string name="epg_date_button">%1$s · %2$s</string>
+    <string name="epg_date_button">%1$s • %2$s</string>
     <string name="epg_date_button_description">%1$s, %2$s. Αλλαγή ώρας</string>
     <string name="today">Σήμερα</string>
     <string name="tomorrow">Αύριο</string>

@@ -578,7 +578,7 @@ internal fun ChannelsRowCard(
                 // The card's content colour: muted, and white on the focused card, so the eye goes there.
                 Text(channelTitleText(channel.visibleChannelNumber, channel.name.orEmpty()),
                     Modifier.weight(1f).testTag("$tag-identity"),
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Normal), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    style = at.bernhardberger.tvhplayer.ui.components.channelCaptionStyle(), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 ChannelNowIndicators(playingNow = playbackIndicator == ChannelPlaybackIndicator.PLAYING,
                     recordingNow = false, playbackIndicator = playbackIndicator)
             }

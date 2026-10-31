@@ -136,7 +136,7 @@
     <string name="onboarding_welcome_body">Kijk live-tv en opnamen van je eigen Tvheadend-server.</string>
     <string name="onboarding_find_searching">Zoeken…</string>
     <string name="onboarding_find_on_network">Op dit netwerk</string>
-    <string name="onboarding_found_server_detail">%1$s · poort %2$d</string>
+    <string name="onboarding_found_server_detail">%1$s • poort %2$d</string>
     <string name="onboarding_find_none_body">Veel Tvheadend-servers melden zich niet aan op het netwerk. Voer in plaats daarvan het adres in dat je voor de webinterface van Tvheadend gebruikt.</string>
     <string name="onboarding_search_again">Opnieuw zoeken</string>
     <string name="onboarding_step_server">Server</string>
@@ -158,10 +158,10 @@
     <string name="onboarding_connecting_body">De server controleren en aanmelden als %1$s. Druk op Back om te annuleren.</string>
     <string name="onboarding_connecting_body_anonymous">De server controleren. Druk op Back om te annuleren.</string>
     <string name="onboarding_connecting">Verbinden…</string>
-    <string name="onboarding_failure_meta">%1$s · poort %2$s · gebruiker %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s · poort %2$s</string>
+    <string name="onboarding_failure_meta">%1$s • poort %2$s • gebruiker %3$s</string>
+    <string name="onboarding_failure_meta_anonymous">%1$s • poort %2$s</string>
     <string name="onboarding_change_address">Adres wijzigen</string>
-    <string name="onboarding_change_address_detail">%1$s · poort %2$s</string>
+    <string name="onboarding_change_address_detail">%1$s • poort %2$s</string>
     <string name="onboarding_change_sign_in">Account wijzigen</string>
     <string name="onboarding_change_sign_in_detail">Gebruiker: %1$s</string>
     <string name="onboarding_change_sign_in_anonymous">Zonder account</string>
@@ -305,7 +305,7 @@
     <string name="guide_time_evening">Avond</string>
     <string name="guide_time_prime_time">Primetime</string>
     <string name="guide_time_late_night">Late avond</string>
-    <string name="epg_date_button">%1$s · %2$s</string>
+    <string name="epg_date_button">%1$s • %2$s</string>
     <string name="epg_date_button_description">%1$s, %2$s. Tijd wijzigen</string>
     <string name="today">Vandaag</string>
     <string name="tomorrow">Morgen</string>

@@ -136,7 +136,7 @@
     <string name="onboarding_welcome_body">צפייה בשידורי טלוויזיה חיים ובהקלטות משרת Tvheadend פרטי.</string>
     <string name="onboarding_find_searching">חיפוש…</string>
     <string name="onboarding_find_on_network">ברשת הזו</string>
-    <string name="onboarding_found_server_detail">%1$s · יציאה %2$d</string>
+    <string name="onboarding_found_server_detail">%1$s • יציאה %2$d</string>
     <string name="onboarding_find_none_body">שרתי Tvheadend רבים אינם מכריזים על נוכחותם ברשת. אפשר להזין במקום זאת את הכתובת המשמשת לממשק האינטרנט של Tvheadend.</string>
     <string name="onboarding_search_again">חיפוש חוזר</string>
     <string name="onboarding_step_server">שרת</string>
@@ -158,10 +158,10 @@
     <string name="onboarding_connecting_body">בדיקת השרת וכניסה בשם %1$s. לחיצה על Back תבטל את הפעולה.</string>
     <string name="onboarding_connecting_body_anonymous">בדיקת השרת. לחיצה על Back תבטל את הפעולה.</string>
     <string name="onboarding_connecting">התחברות…</string>
-    <string name="onboarding_failure_meta">%1$s · יציאה %2$s · משתמש %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s · יציאה %2$s</string>
+    <string name="onboarding_failure_meta">%1$s • יציאה %2$s • משתמש %3$s</string>
+    <string name="onboarding_failure_meta_anonymous">%1$s • יציאה %2$s</string>
     <string name="onboarding_change_address">שינוי כתובת</string>
-    <string name="onboarding_change_address_detail">%1$s · יציאה %2$s</string>
+    <string name="onboarding_change_address_detail">%1$s • יציאה %2$s</string>
     <string name="onboarding_change_sign_in">שינוי חשבון</string>
     <string name="onboarding_change_sign_in_detail">משתמש: %1$s</string>
     <string name="onboarding_change_sign_in_anonymous">ללא חשבון</string>
@@ -305,7 +305,7 @@
     <string name="guide_time_evening">ערב</string>
     <string name="guide_time_prime_time">שעות השיא</string>
     <string name="guide_time_late_night">לילה מאוחר</string>
-    <string name="epg_date_button">%1$s · %2$s</string>
+    <string name="epg_date_button">%1$s • %2$s</string>
     <string name="epg_date_button_description">%1$s, %2$s. שינוי השעה</string>
     <string name="today">היום</string>
     <string name="tomorrow">מחר</string>

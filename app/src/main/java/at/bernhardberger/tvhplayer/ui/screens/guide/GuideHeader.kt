@@ -118,8 +118,8 @@ internal fun guideWindowShowsNow(nowSec: Long, windowStartSec: Long, windowEndSe
     nowSec in windowStartSec until windowEndSec
 
 /**
- * A pill on the header's resting fill naming the Guide's day and time: "Today · Now" while now is
- * in the window, otherwise the window's start down to the half hour, "Sat · 20:00", as a long
+ * A pill on the header's resting fill naming the Guide's day and time: "Today • Now" while now is
+ * in the window, otherwise the window's start down to the half hour, "Sat • 20:00", as a long
  * programme may shift the window to any minute. OK opens the day and time panel.
  */
 @Composable

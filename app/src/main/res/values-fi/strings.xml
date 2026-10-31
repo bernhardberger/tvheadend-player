@@ -136,7 +136,7 @@
     <string name="onboarding_welcome_body">Katso suoria TV-lähetyksiä ja tallenteita omalta Tvheadend-palvelimeltasi.</string>
     <string name="onboarding_find_searching">Etsitään…</string>
     <string name="onboarding_find_on_network">Tässä verkossa</string>
-    <string name="onboarding_found_server_detail">%1$s · portti %2$d</string>
+    <string name="onboarding_found_server_detail">%1$s • portti %2$d</string>
     <string name="onboarding_find_none_body">Monet Tvheadend-palvelimet eivät ilmoita itsestään verkossa. Anna sen sijaan osoite, jota käytät Tvheadendin verkkokäyttöliittymään.</string>
     <string name="onboarding_search_again">Etsi uudelleen</string>
     <string name="onboarding_step_server">Palvelin</string>
@@ -158,10 +158,10 @@
     <string name="onboarding_connecting_body">Tarkistetaan palvelinta ja kirjaudutaan käyttäjänä %1$s. Peruuta painamalla Back.</string>
     <string name="onboarding_connecting_body_anonymous">Tarkistetaan palvelinta. Peruuta painamalla Back.</string>
     <string name="onboarding_connecting">Yhdistetään…</string>
-    <string name="onboarding_failure_meta">%1$s · portti %2$s · käyttäjä %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s · portti %2$s</string>
+    <string name="onboarding_failure_meta">%1$s • portti %2$s • käyttäjä %3$s</string>
+    <string name="onboarding_failure_meta_anonymous">%1$s • portti %2$s</string>
     <string name="onboarding_change_address">Vaihda osoite</string>
-    <string name="onboarding_change_address_detail">%1$s · portti %2$s</string>
+    <string name="onboarding_change_address_detail">%1$s • portti %2$s</string>
     <string name="onboarding_change_sign_in">Vaihda tili</string>
     <string name="onboarding_change_sign_in_detail">Käyttäjä: %1$s</string>
     <string name="onboarding_change_sign_in_anonymous">Ilman tiliä</string>
@@ -305,7 +305,7 @@
     <string name="guide_time_evening">Ilta</string>
     <string name="guide_time_prime_time">Paras katseluaika</string>
     <string name="guide_time_late_night">Myöhäisilta</string>
-    <string name="epg_date_button">%1$s · %2$s</string>
+    <string name="epg_date_button">%1$s • %2$s</string>
     <string name="epg_date_button_description">%1$s, %2$s. Vaihda ajankohtaa</string>
     <string name="today">Tänään</string>
     <string name="tomorrow">Huomenna</string>

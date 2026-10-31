@@ -136,7 +136,7 @@
     <string name="onboarding_welcome_body">Oglądaj telewizję na żywo i nagrania z własnego serwera Tvheadend.</string>
     <string name="onboarding_find_searching">Wyszukiwanie…</string>
     <string name="onboarding_find_on_network">W tej sieci</string>
-    <string name="onboarding_found_server_detail">%1$s · port %2$d</string>
+    <string name="onboarding_found_server_detail">%1$s • port %2$d</string>
     <string name="onboarding_find_none_body">Wiele serwerów Tvheadend nie ogłasza swojej obecności w sieci. Wpisz zamiast tego adres, którego używasz do interfejsu WWW Tvheadend.</string>
     <string name="onboarding_search_again">Szukaj ponownie</string>
     <string name="onboarding_step_server">Serwer</string>
@@ -158,10 +158,10 @@
     <string name="onboarding_connecting_body">Sprawdzanie serwera i logowanie jako %1$s. Naciśnij Back, aby anulować.</string>
     <string name="onboarding_connecting_body_anonymous">Sprawdzanie serwera. Naciśnij Back, aby anulować.</string>
     <string name="onboarding_connecting">Łączenie…</string>
-    <string name="onboarding_failure_meta">%1$s · port %2$s · użytkownik %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s · port %2$s</string>
+    <string name="onboarding_failure_meta">%1$s • port %2$s • użytkownik %3$s</string>
+    <string name="onboarding_failure_meta_anonymous">%1$s • port %2$s</string>
     <string name="onboarding_change_address">Zmień adres</string>
-    <string name="onboarding_change_address_detail">%1$s · port %2$s</string>
+    <string name="onboarding_change_address_detail">%1$s • port %2$s</string>
     <string name="onboarding_change_sign_in">Zmień konto</string>
     <string name="onboarding_change_sign_in_detail">Użytkownik: %1$s</string>
     <string name="onboarding_change_sign_in_anonymous">Bez konta</string>
@@ -305,7 +305,7 @@
     <string name="guide_time_evening">Wieczór</string>
     <string name="guide_time_prime_time">Pasmo główne</string>
     <string name="guide_time_late_night">Późna noc</string>
-    <string name="epg_date_button">%1$s · %2$s</string>
+    <string name="epg_date_button">%1$s • %2$s</string>
     <string name="epg_date_button_description">%1$s, %2$s. Zmień godzinę</string>
     <string name="today">Dzisiaj</string>
     <string name="tomorrow">Jutro</string>

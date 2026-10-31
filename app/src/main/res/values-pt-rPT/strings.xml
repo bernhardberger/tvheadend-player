@@ -136,7 +136,7 @@
     <string name="onboarding_welcome_body">Vê TV em direto e gravações do teu próprio servidor Tvheadend.</string>
     <string name="onboarding_find_searching">A procurar…</string>
     <string name="onboarding_find_on_network">Nesta rede</string>
-    <string name="onboarding_found_server_detail">%1$s · porta %2$d</string>
+    <string name="onboarding_found_server_detail">%1$s • porta %2$d</string>
     <string name="onboarding_find_none_body">Muitos servidores Tvheadend não anunciam a sua presença na rede. Introduz antes o endereço que usas para a interface web do Tvheadend.</string>
     <string name="onboarding_search_again">Procurar novamente</string>
     <string name="onboarding_step_server">Servidor</string>
@@ -158,10 +158,10 @@
     <string name="onboarding_connecting_body">A verificar o servidor e a iniciar sessão como %1$s. Prime Back para cancelar.</string>
     <string name="onboarding_connecting_body_anonymous">A verificar o servidor. Prime Back para cancelar.</string>
     <string name="onboarding_connecting">A ligar…</string>
-    <string name="onboarding_failure_meta">%1$s · porta %2$s · utilizador %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s · porta %2$s</string>
+    <string name="onboarding_failure_meta">%1$s • porta %2$s • utilizador %3$s</string>
+    <string name="onboarding_failure_meta_anonymous">%1$s • porta %2$s</string>
     <string name="onboarding_change_address">Alterar endereço</string>
-    <string name="onboarding_change_address_detail">%1$s · porta %2$s</string>
+    <string name="onboarding_change_address_detail">%1$s • porta %2$s</string>
     <string name="onboarding_change_sign_in">Alterar conta</string>
     <string name="onboarding_change_sign_in_detail">Utilizador: %1$s</string>
     <string name="onboarding_change_sign_in_anonymous">Sem conta</string>
@@ -305,7 +305,7 @@
     <string name="guide_time_evening">Noite</string>
     <string name="guide_time_prime_time">Horário nobre</string>
     <string name="guide_time_late_night">Madrugada</string>
-    <string name="epg_date_button">%1$s · %2$s</string>
+    <string name="epg_date_button">%1$s • %2$s</string>
     <string name="epg_date_button_description">%1$s, %2$s. Alterar a hora</string>
     <string name="today">Hoje</string>
     <string name="tomorrow">Amanhã</string>

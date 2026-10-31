@@ -136,7 +136,7 @@
     <string name="onboarding_welcome_body">Vizionează TV în direct și înregistrări de pe propriul tău server Tvheadend.</string>
     <string name="onboarding_find_searching">Se caută…</string>
     <string name="onboarding_find_on_network">În această rețea</string>
-    <string name="onboarding_found_server_detail">%1$s · port %2$d</string>
+    <string name="onboarding_found_server_detail">%1$s • port %2$d</string>
     <string name="onboarding_find_none_body">Multe servere Tvheadend nu își anunță prezența în rețea. Introdu în schimb adresa pe care o folosești pentru interfața web Tvheadend.</string>
     <string name="onboarding_search_again">Caută din nou</string>
     <string name="onboarding_step_server">Server</string>
@@ -158,10 +158,10 @@
     <string name="onboarding_connecting_body">Se verifică serverul și se efectuează autentificarea ca %1$s. Apasă Back pentru a anula.</string>
     <string name="onboarding_connecting_body_anonymous">Se verifică serverul. Apasă Back pentru a anula.</string>
     <string name="onboarding_connecting">Conectare…</string>
-    <string name="onboarding_failure_meta">%1$s · port %2$s · utilizator %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s · port %2$s</string>
+    <string name="onboarding_failure_meta">%1$s • port %2$s • utilizator %3$s</string>
+    <string name="onboarding_failure_meta_anonymous">%1$s • port %2$s</string>
     <string name="onboarding_change_address">Schimbă adresa</string>
-    <string name="onboarding_change_address_detail">%1$s · port %2$s</string>
+    <string name="onboarding_change_address_detail">%1$s • port %2$s</string>
     <string name="onboarding_change_sign_in">Schimbă contul</string>
     <string name="onboarding_change_sign_in_detail">Utilizator: %1$s</string>
     <string name="onboarding_change_sign_in_anonymous">Fără cont</string>
@@ -305,7 +305,7 @@
     <string name="guide_time_evening">Seara</string>
     <string name="guide_time_prime_time">Ore de maximă audiență</string>
     <string name="guide_time_late_night">Noaptea târziu</string>
-    <string name="epg_date_button">%1$s · %2$s</string>
+    <string name="epg_date_button">%1$s • %2$s</string>
     <string name="epg_date_button_description">%1$s, %2$s. Schimbă ora</string>
     <string name="today">Astăzi</string>
     <string name="tomorrow">Mâine</string>

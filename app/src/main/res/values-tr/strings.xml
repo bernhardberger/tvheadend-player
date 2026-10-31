@@ -136,7 +136,7 @@
     <string name="onboarding_welcome_body">Kendi Tvheadend sunucunuzdan canlı TV ve kayıtları izleyin.</string>
     <string name="onboarding_find_searching">Aranıyor…</string>
     <string name="onboarding_find_on_network">Bu ağda</string>
-    <string name="onboarding_found_server_detail">%1$s · bağlantı noktası %2$d</string>
+    <string name="onboarding_found_server_detail">%1$s • bağlantı noktası %2$d</string>
     <string name="onboarding_find_none_body">Birçok Tvheadend sunucusu ağda kendini duyurmaz. Bunun yerine Tvheadend web arayüzü için kullandığınız adresi girin.</string>
     <string name="onboarding_search_again">Yeniden ara</string>
     <string name="onboarding_step_server">Sunucu</string>
@@ -158,10 +158,10 @@
     <string name="onboarding_connecting_body">Sunucu kontrol ediliyor ve %1$s kullanıcı adıyla oturum açılıyor. İptal etmek için Back tuşuna basın.</string>
     <string name="onboarding_connecting_body_anonymous">Sunucu kontrol ediliyor. İptal etmek için Back tuşuna basın.</string>
     <string name="onboarding_connecting">Bağlanılıyor…</string>
-    <string name="onboarding_failure_meta">%1$s · bağlantı noktası %2$s · kullanıcı %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s · bağlantı noktası %2$s</string>
+    <string name="onboarding_failure_meta">%1$s • bağlantı noktası %2$s • kullanıcı %3$s</string>
+    <string name="onboarding_failure_meta_anonymous">%1$s • bağlantı noktası %2$s</string>
     <string name="onboarding_change_address">Adresi değiştir</string>
-    <string name="onboarding_change_address_detail">%1$s · bağlantı noktası %2$s</string>
+    <string name="onboarding_change_address_detail">%1$s • bağlantı noktası %2$s</string>
     <string name="onboarding_change_sign_in">Hesabı değiştir</string>
     <string name="onboarding_change_sign_in_detail">Kullanıcı: %1$s</string>
     <string name="onboarding_change_sign_in_anonymous">Hesap olmadan</string>
@@ -305,7 +305,7 @@
     <string name="guide_time_evening">Akşam</string>
     <string name="guide_time_prime_time">En çok izlenen saatler</string>
     <string name="guide_time_late_night">Gece</string>
-    <string name="epg_date_button">%1$s · %2$s</string>
+    <string name="epg_date_button">%1$s • %2$s</string>
     <string name="epg_date_button_description">%1$s, %2$s. Zamanı değiştir</string>
     <string name="today">Bugün</string>
     <string name="tomorrow">Yarın</string>

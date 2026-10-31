@@ -37,6 +37,7 @@ internal fun StandardProgrammeCard(
     title: @Composable () -> Unit,
     subtitle: @Composable () -> Unit,
     contentColor: CardContainerColors = CardContainerDefaults.contentColor(),
+    aspectRatio: Float = 16f / 9f,
     picture: @Composable BoxScope.() -> Unit,
 ) {
     StandardCardContainer(
@@ -45,7 +46,7 @@ internal fun StandardProgrammeCard(
             val ring = rememberCardFocusRing(interaction)
             Card(onClick = onClick, onLongClick = onLongClick, interactionSource = interaction,
                 modifier = modifier.cardFocusRing(ring, MaterialTheme.colorScheme.onSurface)
-                    .fillMaxWidth().aspectRatio(16f / 9f),
+                    .fillMaxWidth().aspectRatio(aspectRatio),
                 colors = CardDefaults.colors(containerColor = TvSurfaceColors.containerLowest),
                 glow = artworkCardGlow(art, picon, interaction),
                 scale = EmbeddedProgressCardScale,

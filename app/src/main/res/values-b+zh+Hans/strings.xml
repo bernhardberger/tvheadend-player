@@ -136,7 +136,7 @@
     <string name="onboarding_welcome_body">观看个人Tvheadend服务器上的电视直播和录制内容。</string>
     <string name="onboarding_find_searching">正在搜索…</string>
     <string name="onboarding_find_on_network">此网络上的服务器</string>
-    <string name="onboarding_found_server_detail">%1$s · 端口%2$d</string>
+    <string name="onboarding_found_server_detail">%1$s • 端口%2$d</string>
     <string name="onboarding_find_none_body">许多Tvheadend服务器不会在网络上广播自身信息。请改为输入访问Tvheadend网页界面时使用的地址。</string>
     <string name="onboarding_search_again">重新搜索</string>
     <string name="onboarding_step_server">服务器</string>
@@ -158,10 +158,10 @@
     <string name="onboarding_connecting_body">正在检查服务器并以%1$s登录。按Back取消。</string>
     <string name="onboarding_connecting_body_anonymous">正在检查服务器。按Back取消。</string>
     <string name="onboarding_connecting">正在连接…</string>
-    <string name="onboarding_failure_meta">%1$s · 端口%2$s · 用户%3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s · 端口%2$s</string>
+    <string name="onboarding_failure_meta">%1$s • 端口%2$s • 用户%3$s</string>
+    <string name="onboarding_failure_meta_anonymous">%1$s • 端口%2$s</string>
     <string name="onboarding_change_address">更改地址</string>
-    <string name="onboarding_change_address_detail">%1$s · 端口%2$s</string>
+    <string name="onboarding_change_address_detail">%1$s • 端口%2$s</string>
     <string name="onboarding_change_sign_in">更改账号</string>
     <string name="onboarding_change_sign_in_detail">用户：%1$s</string>
     <string name="onboarding_change_sign_in_anonymous">不使用账号</string>
@@ -305,7 +305,7 @@
     <string name="guide_time_evening">晚间</string>
     <string name="guide_time_prime_time">黄金时段</string>
     <string name="guide_time_late_night">深夜</string>
-    <string name="epg_date_button">%1$s · %2$s</string>
+    <string name="epg_date_button">%1$s • %2$s</string>
     <string name="epg_date_button_description">%1$s，%2$s。更改时间</string>
     <string name="today">今天</string>
     <string name="tomorrow">明天</string>

@@ -781,7 +781,7 @@ class WatchingProgressTest {
                                     observation.currentSession, observation, false, { _, _ -> }, {})
                                 // As the Recordings screen opens it for the playing recording.
                                 "recording-menu" -> BrowseContextMenu(recording.title.orEmpty(), channel.name.orEmpty(),
-                                    "", "Tue 15 Sep · 19:00 – 21:00",
+                                    "", "Tue 15 Sep • 19:00 – 21:00",
                                     recordingContextActions(recording, SessionObservation.create(recordingProgressCapability =
                                         RecordingProgressCapability.SUPPORTED).recordingPlaybackAdmission(recording), true,
                                         playing = true), {}, {}, summary = event.summary.orEmpty(),

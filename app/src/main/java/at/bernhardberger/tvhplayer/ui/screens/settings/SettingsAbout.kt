@@ -78,7 +78,7 @@ private fun aboutServerText(state: SessionState): String {
     val ready = state as? SessionState.Ready ?: return stringResource(R.string.about_not_connected)
     // Explicit allowlist: never render a profile, endpoint, web root or diagnostic object.
     return listOfNotNull(ready.capabilities.serverName, ready.capabilities.serverVersion)
-        .filter { it.isNotBlank() }.joinToString(" · ")
+        .filter { it.isNotBlank() }.joinToString(" • ")
         .ifEmpty { stringResource(R.string.about_connected) }
 }
 

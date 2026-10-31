@@ -189,7 +189,10 @@ internal fun HomeScreenContent(
     val sections = remember(input) { homeSections(input) }
     var focused by focusMemory
     var options by remember { mutableStateOf(false) }
+    var tags by remember { mutableStateOf(false) }
+    val tagsFocus = remember { FocusRequester() }
     var restoreHeader by remember { mutableStateOf(false) }
+    var restoreTagHeader by remember { mutableStateOf(false) }
     val viewFocus = remember { FocusRequester() }
     var channelMenu by remember { mutableStateOf<ChannelId?>(null) }
     var channelDetails by remember { mutableStateOf(false) }
@@ -223,7 +226,9 @@ internal fun HomeScreenContent(
                     null -> item.recording?.let { openRecording(it, menu) }
                 }
             }
-            is HomeSection.RecentChannels -> section.items.getOrNull(key.position)?.channel?.let {
+            is HomeSection.RecentChannels -> if (key.item == "all-channels") {
+                if (!menu) onBrowseChannels()
+            } else section.items.getOrNull(key.position)?.channel?.let {
                 if (menu) { channelDetails = false; channelMenu = it.id } else onPlay(it.id, it.name.orEmpty())
             }
             is HomeSection.OnNow -> section.items.getOrNull(key.position)?.channel?.let {
@@ -249,18 +254,22 @@ internal fun HomeScreenContent(
     LaunchedEffect(loading) {
         if (loading) { delay(10_000); loadingDelayed = true }
     }
-    val openOptions = { if (owner?.isCurrent != false) { restoreHeader = true; options = true } }
+    val openOptions = { if (owner?.isCurrent != false) { restoreTagHeader = false; restoreHeader = true; options = true } }
     val errorFocus = remember { FocusRequester() }
     HomeContent(
         sections = sections,
         contentPadding = contentPadding,
         initialFocus = focused?.let { previous ->
-            if (previous.item == "all-recordings" && sections.any { it.kind == previous.section }) previous
+            if (previous.item in setOf("all-recordings", "all-channels") && sections.any { it.kind == previous.section }) previous
             else homeRestoreFocus(sections, previous)
         } ?: homeInitialFocus(sections),
         onFocused = { focused = it; restoreHeader = false },
         modifier = modifier,
-        focusEnabled = initialFocusEnabled && channelMenu == null && recording == null && !options,
+        focusEnabled = initialFocusEnabled && channelMenu == null && recording == null && !options && !tags,
+        tagsRequester = tagsFocus,
+        tag = activeTagId?.let { id -> groups.firstOrNull { it.tagId == id }?.name },
+        onTags = { if (owner?.isCurrent != false) { restoreTagHeader = true; restoreHeader = true; tags = true } },
+        restoreTags = restoreTagHeader,
         viewRequester = viewFocus, restoreHeader = restoreHeader,
         onHeaderFocused = { restoreHeader = false },
         emptyFocus = errorFocus.takeUnless { loading && !loadingDelayed },
@@ -287,11 +296,19 @@ internal fun HomeScreenContent(
         val openingOwner = remember { owner }
         Box(Modifier.onPreviewKeyEvent { openingOwner?.isCurrent == false }) {
             HomeViewOptionsPanel(input.hiddenSections,
-                { section, visible -> if (openingOwner?.isCurrent != false) onSectionVisibleChange(section, visible) }, groups, activeTagId,
-                onSelectTag = { if (openingOwner?.isCurrent != false) onSelectTag(it) },
+                { section, visible -> if (openingOwner?.isCurrent != false) onSectionVisibleChange(section, visible) },
                 onClose = { options = false })
         }
         LaunchedEffect(owner) { if (openingOwner?.isCurrent == false) options = false }
+    }
+    if (tags) {
+        val openingOwner = remember { owner }
+        Box(Modifier.onPreviewKeyEvent { openingOwner?.isCurrent == false }) {
+            at.bernhardberger.tvhplayer.ui.screens.ChannelsTagsPanel(groups, activeTagId,
+                onSelect = { if (openingOwner?.isCurrent != false) onSelectTag(it); tags = false },
+                onClose = { tags = false })
+        }
+        LaunchedEffect(owner) { if (openingOwner?.isCurrent == false) tags = false }
     }
     channelMenu?.let { id ->
         val openingOwner = remember(id) { owner }

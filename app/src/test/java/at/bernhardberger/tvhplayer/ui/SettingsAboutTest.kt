@@ -70,9 +70,9 @@ class SettingsAboutTest {
             serverName = "Demonstration", serverVersion = "4.3"))
         show()
         press(Key.DirectionCenter)
-        compose.onNodeWithText("Demonstration · 4.3", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Demonstration • 4.3", substring = true).assertIsDisplayed()
         compose.runOnIdle { sessionState = SessionState.Connecting }
-        compose.onAllNodesWithText("Demonstration · 4.3", substring = true).assertCountEquals(0)
+        compose.onAllNodesWithText("Demonstration • 4.3", substring = true).assertCountEquals(0)
         compose.onNodeWithText("Not connected", substring = true).assertIsDisplayed()
     }
 

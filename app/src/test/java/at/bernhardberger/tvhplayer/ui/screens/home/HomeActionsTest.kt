@@ -11,6 +11,8 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvhplayer.core.*
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.ui.components.*
+import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -37,7 +39,86 @@ class HomeActionsTest {
     private val channel = Channel.create(ChannelId(1), name = "Test channel")
     private lateinit var back: androidx.activity.OnBackPressedDispatcher
 
-    @Test fun viewOptionsSelectsTheSharedScopeWithoutStartingPlayback() {
+    @Test fun recentChannelsEndCardOpensChannelsWithoutTuning() {
+        var opened = false
+        val input = HomeInput(listOf(channel), emptyMap(), emptyList(), listOf(channel.id), emptyList(), { null }, null, now)
+        compose.setContent { TVHeadendPlayerTheme {
+            HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
+                onPlay = { _, _ -> fail("end card tuned") }, onPlayRecording = { _, _ -> },
+                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = {},
+                onBrowseChannels = { opened = true })
+        } }
+        compose.onNodeWithTag("home-recent-0").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
+        compose.onNodeWithTag("home-all-channels").assertIsFocused().performKeyInput { pressKey(Key.Enter) }
+        compose.runOnIdle { assertTrue(opened) }
+    }
+
+    @Test fun finishedRecordingPlaybackHasNeutralBadgeAndViewerProgress() {
+        showRecordingPlayback(DvrEntryState.COMPLETED)
+        compose.onNodeWithTag("channel-recording-indicator", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithContentDescription("Recording", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("30m left", useUnmergedTree = true).assertExists()
+        compose.onAllNodes(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.ProgressBarRangeInfo,
+            androidx.compose.ui.semantics.ProgressBarRangeInfo(0.25f, 0f..1f)), useUnmergedTree = true).assertCountEquals(1)
+    }
+
+    @Test fun recordingPlaybackWhileStillRecordingKeepsRecordingIndicator() {
+        showRecordingPlayback(DvrEntryState.RECORDING)
+        compose.onNodeWithTag("channel-recording-indicator", useUnmergedTree = true).assertExists()
+        compose.onNodeWithContentDescription("Recording", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithText("30m left", useUnmergedTree = true).assertExists()
+    }
+
+    private fun showRecordingPlayback(state: DvrEntryState) {
+        val entry = DvrEntry.create(DvrEntryId(1), channelId = channel.id, title = "Recorded programme",
+            state = state, start = Instant.fromEpochSeconds(now - 2400), stop = Instant.fromEpochSeconds(now))
+        val position = mutableStateOf<RecordingViewerPosition?>(RecordingViewerPosition(entry.id, 600_000, 2_400_000))
+        compose.setContent { TVHeadendPlayerTheme {
+            CompositionLocalProvider(LocalWatchingTarget provides AppPlaybackTarget.Recording(entry.id),
+                LocalWatchingIndicator provides ChannelPlaybackIndicator.PLAYING, LocalRecordingPosition provides position) {
+                HomeActivityCard(channel, null, entry, true, now, androidx.compose.ui.unit.Dp(400f), "Playing recording", {},
+                    playingRecording = true)
+            }
+        } }
+    }
+
+    @Test fun recordingOnlyPrePaddingUsesEntryTitleAndStartInsteadOfLiveProgramme() {
+        val event = EpgEvent.create(EventId(1), channel.id, Instant.fromEpochSeconds(now - 600),
+            Instant.fromEpochSeconds(now + 600), title = "Live programme")
+        val entry = DvrEntry.create(DvrEntryId(1), channelId = channel.id, title = "Recorded programme",
+            state = DvrEntryState.RECORDING, start = Instant.fromEpochSeconds(now + 300),
+            stop = Instant.fromEpochSeconds(now + 3900))
+        compose.setContent { TVHeadendPlayerTheme {
+            at.bernhardberger.tvhplayer.ui.components.HomeActivityCard(channel, event, entry, false, now,
+                androidx.compose.ui.unit.Dp(400f), "Recording", {})
+        } }
+        compose.onNodeWithText("Recorded programme", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("Live programme", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithText("Starts at ${at.bernhardberger.tvhplayer.ui.common.formatHm(now + 300)}",
+            useUnmergedTree = true).assertExists()
+        compose.onAllNodes(SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.ProgressBarRangeInfo),
+            useUnmergedTree = true).assertCountEquals(0)
+        compose.onNodeWithText("Watch", useUnmergedTree = true).assertExists()
+    }
+
+    @Test fun playingAndRecordingKeepsTheLiveProgramme() {
+        val event = EpgEvent.create(EventId(1), channel.id, Instant.fromEpochSeconds(now - 600),
+            Instant.fromEpochSeconds(now + 600), title = "Live programme")
+        val entry = DvrEntry.create(DvrEntryId(1), channelId = channel.id, title = "Recorded programme",
+            state = DvrEntryState.RECORDING, start = Instant.fromEpochSeconds(now + 300),
+            stop = Instant.fromEpochSeconds(now + 3900))
+        compose.setContent { TVHeadendPlayerTheme {
+            at.bernhardberger.tvhplayer.ui.components.HomeActivityCard(channel, event, entry, true, now,
+                androidx.compose.ui.unit.Dp(400f), "Playing", {})
+        } }
+        compose.onNodeWithText("Live programme", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("Recorded programme", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithText("Back to player", useUnmergedTree = true).assertExists()
+        compose.onAllNodes(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.ProgressBarRangeInfo,
+            androidx.compose.ui.semantics.ProgressBarRangeInfo(0.5f, 0f..1f)), useUnmergedTree = true).assertCountEquals(1)
+    }
+
+    @Test fun groupButtonSelectsSharedScopeAndViewOptionsContainsOnlySections() {
         val input = HomeInput(listOf(channel), emptyMap(), emptyList(), listOf(channel.id), emptyList(), { null }, null, now)
         var selected: ChannelTagId? = null
         compose.setContent { TVHeadendPlayerTheme {
@@ -51,10 +132,14 @@ class HomeActionsTest {
         } }
         compose.onNodeWithTag("home-loading").assertDoesNotExist()
         compose.onNodeWithTag("home-recent-0").performKeyInput { pressKey(Key.DirectionUp); pressKey(Key.Enter) }
-        compose.onNodeWithTag("home-tag-8").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
-        compose.onNodeWithTag("home-view-CURRENT_ACTIVITY").assertIsFocused().performKeyInput { pressKey(Key.DirectionUp) }
-        compose.onNodeWithTag("home-tag-8").assertIsFocused().performKeyInput { pressKey(Key.Enter) }
+        compose.onNodeWithTag("home-view-CURRENT_ACTIVITY").assertIsFocused()
+        compose.onNodeWithText("Right now").assertExists()
+        compose.onNodeWithTag("home-tag-8").assertDoesNotExist()
+        compose.onNodeWithTag("home-view-CURRENT_ACTIVITY").performKeyInput { pressKey(Key.Back) }
+        compose.onNodeWithTag("home-view-button").assertIsFocused().performKeyInput { pressKey(Key.DirectionLeft); pressKey(Key.Enter) }
+        compose.onNodeWithTag("channels-tags-8").assertIsFocused().performKeyInput { pressKey(Key.Enter) }
         compose.runOnIdle { assertEquals(ChannelTagId(8), selected) }
+        compose.onNodeWithTag("home-tags-button").assertIsFocused()
     }
 
     @Test fun optionsToggleAllSectionsAndBackReturnsToHeaderWithoutTuning() {
