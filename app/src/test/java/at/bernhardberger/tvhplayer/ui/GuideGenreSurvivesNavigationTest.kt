@@ -10,6 +10,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.hasTestTag
@@ -112,6 +113,67 @@ class GuideGenreSurvivesNavigationTest {
     private lateinit var player: ExoPlayer
     private lateinit var back: androidx.activity.OnBackPressedDispatcher
     private val guidePosition = GuidePositionStore()
+
+    @Test fun guidePickedGenreSurvivesPlayerBack() {
+        app()
+        openDestination("nav-channels", Key.DirectionDown, "nav-epg")
+        focus("guide-filter-button")
+        key(Key.Enter)
+        focus("guide-genre-sport")
+        key(Key.Enter)
+        focus("guide-date-button")
+        key(Key.DirectionDown)
+        key(Key.Enter)
+        focus("details-watch")
+        key(Key.Enter)
+        compose.onNodeWithTag("guide-date-button").assertDoesNotExist()
+        repeat(3) {
+            if (compose.onAllNodes(hasTestTag("guide-date-button")).fetchSemanticsNodes().isEmpty()) {
+                compose.runOnIdle { back.onBackPressed() }
+                settle()
+            }
+        }
+        compose.onNodeWithTag("guide-filter-button").assertContentDescriptionEquals(
+            context.getString(R.string.header_button_value_description, context.getString(R.string.guide_filter),
+                context.getString(R.string.programme_category_sport)))
+    }
+
+    @Test fun homeGenreSurvivesPlayerBackAndAnotherHomeGenreRepositionsTheRetainedGuide() {
+        app()
+        openDestination("nav-channels", Key.DirectionUp, "nav-home")
+        focus("home-genre-0")
+        key(Key.Enter)
+        val sport = context.getString(R.string.header_button_value_description,
+            context.getString(R.string.guide_filter), context.getString(R.string.programme_category_sport))
+        compose.onNodeWithTag("guide-filter-button").assertContentDescriptionEquals(sport)
+        org.junit.Assert.assertEquals(ChannelId(1), guidePosition.position.value?.channelId)
+        focus("guide-date-button")
+        key(Key.DirectionDown)
+        key(Key.Enter)
+        focus("details-watch")
+        key(Key.Enter)
+        compose.onNodeWithTag("guide-date-button").assertDoesNotExist()
+        repeat(3) {
+            if (compose.onAllNodes(hasTestTag("guide-date-button")).fetchSemanticsNodes().isEmpty()) {
+                compose.runOnIdle { back.onBackPressed() }
+                settle()
+            }
+        }
+        compose.onNodeWithTag("guide-filter-button").assertContentDescriptionEquals(sport)
+        focus("nav-epg")
+        key(Key.DirectionUp)
+        key(Key.DirectionUp)
+        key(Key.Enter)
+        key(Key.DirectionRight)
+        focus("home-genre-0")
+        key(Key.DirectionRight)
+        compose.onNodeWithTag("home-genre-1").assertIsFocused()
+        key(Key.Enter)
+        compose.onNodeWithTag("guide-filter-button").assertContentDescriptionEquals(
+            context.getString(R.string.header_button_value_description, context.getString(R.string.guide_filter),
+                context.getString(R.string.programme_category_children)))
+        org.junit.Assert.assertEquals(ChannelId(2), guidePosition.position.value?.channelId)
+    }
 
     @Test fun recordingPlayerBackRestoresTheGuideProgrammeWindowAndViewport() {
         app(withRecording = true)

@@ -36,6 +36,8 @@ internal fun HomeRecordingActions(
     onClose: () -> Unit,
 ) {
     val opening = remember { observation }
+    val frameOwner = LocalTabOwner.current
+    val owner = remember { frameOwner }
     val session: TvheadendSession = koinInject()
     val notices: NoticeCenter = koinInject()
     val scope = rememberCoroutineScope()
@@ -53,7 +55,7 @@ internal fun HomeRecordingActions(
     val pending = rememberPlayerEntryPending()
     val play: (RecordingPlaybackStart) -> Unit = { start ->
         val current = session.observation.value
-        if (capability != null && current.currentSession === capability &&
+        if (owner?.isCurrent != false && capability != null && current.currentSession === capability &&
             current.dvrEntry(opened.id)?.let(current::recordingPlaybackAdmission)?.let {
                 recordingOpenAction(it) != RecordingOpenAction.DETAILS
             } == true) {
@@ -73,11 +75,15 @@ internal fun HomeRecordingActions(
     if (details) {
         RecordingDetailsHost(opened, opening, observation, { session.observation.value }, nowSec,
             mutations, notices, scope, onPlayRecording = { selection, start ->
-                closeBehindPlayer(onClose); onPlay(selection, start)
+                if (owner?.isCurrent != false) { closeBehindPlayer(onClose); onPlay(selection, start) }
             }, onClose = onClose,
-            onWatchChannel = { id, name -> closeBehindPlayer(onClose); onWatchChannel(id, name) },
+            onWatchChannel = { id, name ->
+                if (owner?.isCurrent != false) { closeBehindPlayer(onClose); onWatchChannel(id, name) }
+            },
             onShowGuide = onShowGuide,
-            onContinueWatching = { onReturnToRecording(opened.id) { closeBehindPlayer(onClose) } },
+            onContinueWatching = {
+                if (owner?.isCurrent != false) onReturnToRecording(opened.id) { closeBehindPlayer(onClose) }
+            },
             initialAction = initialAction)
     } else if (menu) {
         val canModify = capability != null && (observation.sessionState as? SessionState.Ready)
@@ -97,7 +103,8 @@ internal fun HomeRecordingActions(
             modifier = Modifier.onPreviewKeyEvent { pending() || mutationBusy },
             onClose = onClose,
             backEnabled = pendingMutation == null && !mutationBusy,
-            onAction = { action ->
+            onAction = handle@{ action ->
+                if (owner?.isCurrent == false) return@handle
                 when (action) {
                     BrowseContextAction.CONTINUE_WATCHING -> onReturnToRecording(opened.id) { closeBehindPlayer(onClose) }
                     BrowseContextAction.WATCH, BrowseContextAction.RESUME -> play(RecordingPlaybackStart.RESUME)
@@ -110,7 +117,7 @@ internal fun HomeRecordingActions(
                         scope.launch {
                             val current = session.observation.value
                             val latest = current.dvrEntry(opened.id)
-                            if (capability == null || current.currentSession !== capability || latest == null ||
+                            if (owner?.isCurrent == false || capability == null || current.currentSession !== capability || latest == null ||
                                 recordingWatchStateAction(latest, current.recordingPlaybackAdmission(latest),
                                     (current.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED) != action
                             ) { mutationBusy = false; return@launch }
@@ -138,7 +145,7 @@ internal fun HomeRecordingActions(
         if (choice) RecordingPlaybackChoice(opened, admission, observation, channel, nowSec,
             onPlay = play, onClose = onClose,
             onWatchLive = if (active) ({
-                if (session.observation.value.currentSession === capability) {
+                if (owner?.isCurrent != false && session.observation.value.currentSession === capability) {
                     closeBehindPlayer(onClose); onWatchChannel(requireNotNull(channel).id, channel.name.orEmpty())
                 }
             }) else null)
@@ -158,11 +165,11 @@ internal fun HomeRecordingActions(
                 locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]),
             onDismiss = { if (!mutationBusy) { pendingMutation = null; onClose() } },
             onConfirm = {
-                if (!mutationBusy) {
+                if (!mutationBusy && owner?.isCurrent != false) {
                     mutationBusy = true
                     scope.launch {
                         val current = session.observation.value
-                        if (current.currentSession !== capability || !mutation.recordingStateIsCurrent(current)) {
+                        if (owner?.isCurrent == false || current.currentSession !== capability || !mutation.recordingStateIsCurrent(current)) {
                             mutationBusy = false; pendingMutation = null; onClose(); return@launch
                         }
                         val context = notices.context()

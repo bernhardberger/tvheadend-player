@@ -4,6 +4,7 @@ import at.bernhardberger.tvhplayer.settings.ChannelsView
 import at.bernhardberger.tvhplayer.settings.GuideView
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -145,6 +146,8 @@ internal fun GuideRouteContent(
     initialFocusEnabled: Boolean,
     playerReturn: PlayerReturnFocus?,
     genreRequest: ProgrammeCategory? = null,
+    genre: ProgrammeCategory,
+    onGenreChange: (ProgrammeCategory) -> Unit,
     browseReturn: Boolean = false,
     view: GuideView,
     connectionUiState: ConnectionUiState,
@@ -154,8 +157,8 @@ internal fun GuideRouteContent(
     onPlayRecording: (RecordingPlaybackSelection) -> Unit,
     onPlay: (ChannelId, String) -> Unit,
 ) {
-    // The highlighted genre lasts while the Guide entry stays in the back stack, not across launches.
-    var genre by rememberSaveable(genreRequest) { mutableStateOf(genreRequest ?: ProgrammeCategory.ALL) }
+    // AppRoot keeps the selection while the player replaces the browse shell.
+    LaunchedEffect(genreRequest) { genreRequest?.let(onGenreChange) }
     if (contentAllowed) {
         ContentContainer(modifier = Modifier.profileLayout("guide")) {
             BrowsingScopeContent(channelsVm, initialFocusEnabled) { EpgGridScreen(
@@ -172,7 +175,7 @@ internal fun GuideRouteContent(
                 onRetry = onRetry,
                 onOpenConnectionSettings = onOpenConnectionSettings,
                 genre = genre,
-                onGenreChange = { genre = it },
+                onGenreChange = onGenreChange,
                 onPlayRecording = onPlayRecording,
                 onPlay = onPlay,
             ) }

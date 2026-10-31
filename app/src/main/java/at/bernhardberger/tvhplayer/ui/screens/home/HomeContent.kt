@@ -93,6 +93,7 @@ import at.bernhardberger.tvhplayer.core.HomeSectionKind
 import at.bernhardberger.tvhplayer.core.OnNowItem
 import at.bernhardberger.tvhplayer.core.RecordingWatchState
 import at.bernhardberger.tvhplayer.core.homeInitialFocus
+import at.bernhardberger.tvhplayer.core.homeRestoreFocus
 import at.bernhardberger.tvhplayer.core.offeredResumePosition
 import at.bernhardberger.tvhplayer.core.recordingIsRunning
 import at.bernhardberger.tvhplayer.core.recordingLengthSeconds
@@ -114,6 +115,7 @@ import at.bernhardberger.tvhplayer.ui.components.CardGlowReach
 import at.bernhardberger.tvhplayer.ui.components.CompactZapRowOffscreen
 import at.bernhardberger.tvhplayer.ui.components.EmbeddedProgressCardBorderOutset
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
+import at.bernhardberger.tvhplayer.ui.components.rememberBrowseContextMenuTrigger
 import at.bernhardberger.tvhplayer.ui.components.HomeActivityCard
 import at.bernhardberger.tvhplayer.ui.components.HomeAllRecordingsCard
 import at.bernhardberger.tvhplayer.ui.components.HomeCardWidth
@@ -321,6 +323,7 @@ internal fun HomeContent(
     }
     val viewRequester = remember { FocusRequester() }
     var focusedSection by remember { mutableStateOf<HomeSectionKind?>(null) }
+    var focusedCard by remember { mutableStateOf<HomeFocusKey?>(null) }
     var focusedOnNow by remember { mutableStateOf<ChannelId?>(null) }
     val tops = remember { mutableStateMapOf<HomeSectionKind, Float>() }
     var onNowRowTop by remember { mutableFloatStateOf(0f) }
@@ -360,6 +363,17 @@ internal fun HomeContent(
             if (target.requestFocus()) return@LaunchedEffect
             withFrameNanos { }
         }
+    }
+
+    LaunchedEffect(sections, focusEnabled) {
+        val previous = focusedCard ?: return@LaunchedEffect
+        if (!focusEnabled || drawerState?.currentValue == DrawerValue.Open) return@LaunchedEffect
+        if (previous.item == "all-recordings" && sections.any { it.kind == previous.section }) return@LaunchedEffect
+        val restored = homeRestoreFocus(sections, previous)
+        if (restored?.section == previous.section && restored.item == previous.item) return@LaunchedEffect
+        withFrameNanos { }
+        if (!focusEnabled || drawerState?.currentValue == DrawerValue.Open) return@LaunchedEffect
+        (restored?.let { requesters[it.section] } ?: viewRequester).requestFocus()
     }
 
     BoxWithConstraints(
@@ -448,6 +462,7 @@ internal fun HomeContent(
                     }
                     val onCardFocus: (Int, String) -> Unit = { index, key ->
                         onSectionFocus()
+                        focusedCard = HomeFocusKey(kind, key, index)
                         onFocused(HomeFocusKey(kind, key, index))
                     }
                     val activate: (Int, String) -> Unit = { index, key ->
@@ -693,6 +708,7 @@ private fun HomeHeader(
 @Composable
 private fun <T> HomeCardRow(
     items: List<T>,
+    itemKey: (T) -> Any,
     keyline: Dp,
     gap: Dp,
     emphasis: () -> Float,
@@ -736,7 +752,7 @@ private fun <T> HomeCardRow(
                 .focusRequester(entry)
                 .focusRestorer(fallback),
         ) {
-            itemsIndexed(items, key = { index, _ -> index }) { index, item ->
+            itemsIndexed(items, key = { _, item -> itemKey(item) }) { index, item ->
                 val itemModifier = Modifier
                     .then(if (index == entryIndex) Modifier.focusRequester(fallback) else Modifier)
                     .then(
@@ -772,6 +788,7 @@ private fun HomeActivityRow(
 ) {
     HomeCardRow(
         items = items,
+        itemKey = ::activityKey,
         keyline = keyline,
         gap = TvGridGutter,
         emphasis = emphasis,
@@ -844,6 +861,7 @@ private fun HomeRecentRow(
 ) {
     HomeCardRow(
         items = items,
+        itemKey = { it.channel.id.value },
         keyline = keyline,
         gap = HomeRecentGap,
         emphasis = emphasis,
@@ -885,6 +903,7 @@ private fun HomeOnNowRow(
     val density = LocalDensity.current
     HomeCardRow(
         items = items,
+        itemKey = { it.channel.id.value },
         keyline = keyline,
         gap = TvGridGutter,
         emphasis = emphasis,
@@ -1011,6 +1030,7 @@ private fun HomeGenreRow(
 ) {
     HomeCardRow(
         items = items,
+        itemKey = { it.category.name },
         keyline = keyline,
         gap = HomeGenreGap,
         emphasis = emphasis,
@@ -1053,6 +1073,7 @@ private fun HomeShelfRow(
     val rowItems: List<at.bernhardberger.tvhplayer.core.RecordingItem?> = items + listOf(null)
     HomeCardRow(
         items = rowItems,
+        itemKey = { it?.entry?.id?.value ?: "all-recordings" },
         keyline = keyline,
         gap = TvGridGutter,
         emphasis = emphasis,
@@ -1084,6 +1105,9 @@ private fun HomeShelfRow(
             ) as? RecordingWatchState.PartlyWatched)?.fraction?.toFloat()
             val title = recording.title?.takeIf(String::isNotBlank)
                 ?: stringResource(R.string.no_epg)
+            val contextMenu = rememberBrowseContextMenuTrigger(
+                onOpen = { onContextMenu(index, "recording:${recording.id.value}") },
+            )
             val subtitle = if (continueWatching) {
                 continueSubtitle(recording, admission, nowSec, locale)
             } else {
@@ -1092,8 +1116,8 @@ private fun HomeShelfRow(
             StandardProgrammeCard(
                 width = HomeCardWidth,
                 onClick = { onActivate(index, "recording:${recording.id.value}") },
-                onLongClick = { onContextMenu(index, "recording:${recording.id.value}") },
-                modifier = itemModifier
+                onLongClick = contextMenu.onLongClick,
+                modifier = itemModifier.then(contextMenu.modifier)
                     .semantics(mergeDescendants = true) {
                         contentDescription = listOf(title, subtitle)
                             .filter(String::isNotBlank)

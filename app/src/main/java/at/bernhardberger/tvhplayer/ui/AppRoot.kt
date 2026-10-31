@@ -610,11 +610,15 @@ fun AppRoot(
     var recordingPlayerReturnToGuide by remember { mutableStateOf(false) }
     var guideChannelRequest by remember { mutableStateOf<PlayerReturnFocus?>(null) }
     var guideGenreRequest by remember { mutableStateOf<at.bernhardberger.tvhplayer.core.ProgrammeCategory?>(null) }
-    LaunchedEffect(currentDestination) {
+    var guideGenre by rememberSaveable { mutableStateOf(at.bernhardberger.tvhplayer.core.ProgrammeCategory.ALL) }
+    LaunchedEffect(currentDestination, GuideKey in backStack) {
         if (livePlayerReturn?.first != currentDestination) livePlayerReturn = null
         if (currentDestination != GuideKey) recordingPlayerReturnToGuide = false
         if (currentDestination != GuideKey) guideChannelRequest = null
         if (currentDestination != GuideKey) guideGenreRequest = null
+        if (GuideKey !in backStack) {
+            guideGenre = at.bernhardberger.tvhplayer.core.ProgrammeCategory.ALL
+        }
     }
     val playerReturnFor = { destination: AppNavKey ->
         livePlayerReturn?.takeIf { it.first == destination }?.second
@@ -988,6 +992,8 @@ fun AppRoot(
                             initialFocusEnabled = !drawerActive && currentDestination == GuideKey,
                             playerReturn = guideChannelRequest ?: playerReturnFor(GuideKey),
                             genreRequest = guideGenreRequest,
+                            genre = guideGenre,
+                            onGenreChange = { guideGenre = it },
                             browseReturn = recordingPlayerReturnToGuide,
                             view = uiSettings.guideView,
                             connectionUiState = connectionUiState,

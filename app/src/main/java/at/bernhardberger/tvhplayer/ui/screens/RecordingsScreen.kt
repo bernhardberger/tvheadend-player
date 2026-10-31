@@ -904,8 +904,10 @@ internal fun RecordingsScreenContent(
             }
             val watchLive: (() -> Unit)? = if (recordingIsRunning(opened) && selectedCapability != null &&
                 channel != null && onWatchChannel != null) ({
-                closeBehindPlayer(closeResume)
-                onWatchChannel(channel.id, channel.name.orEmpty())
+                if (latestObservationProvider().currentSession === selectedCapability) {
+                    closeBehindPlayer(closeResume)
+                    onWatchChannel(channel.id, channel.name.orEmpty())
+                }
             }) else null
             val choice = watchLive != null || at.bernhardberger.tvhplayer.core.recordingOpenAction(openedAdmission) ==
                 at.bernhardberger.tvhplayer.core.RecordingOpenAction.RESUME_CHOICE

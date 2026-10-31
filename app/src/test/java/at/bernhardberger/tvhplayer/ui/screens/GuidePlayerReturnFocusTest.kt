@@ -109,6 +109,18 @@ class GuidePlayerReturnFocusTest {
         compose.runOnIdle { assertEquals(0, playRequests) }
     }
 
+    @Test fun genreEntryWithoutPlayerReturnWinsOverUnsettledPreferredChannelCoverage() {
+        guide(null, genreRequest = at.bernhardberger.tvhplayer.core.ProgrammeCategory.SPORT, settledCoverage = false)
+        focused("Channel 2 hour 0")
+        compose.runOnIdle { assertEquals(0, playRequests) }
+    }
+
+    @Test fun genreEntryMovesToTheEarliestUpcomingMatchOutsideTheNowWindow() {
+        guide(null, genreRequest = at.bernhardberger.tvhplayer.core.ProgrammeCategory.SPORT, upcomingSport = true)
+        focused("Channel 2 hour 3")
+        compose.runOnIdle { assertEquals(0, playRequests) }
+    }
+
     @Test
     @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -248,15 +260,21 @@ class GuidePlayerReturnFocusTest {
         contentGenre = at.bernhardberger.tvheadend.sdk.core.ContentGenre.fromContentType(if (channel == 2L) 0x40 else 0x20),
         start = Instant.fromEpochSeconds(hour + offset * 3600), stop = Instant.fromEpochSeconds(hour + (offset + 1) * 3600))
 
-    private fun observation(loaded: Boolean, offline: Boolean = false): SessionObservation {
+    private fun observation(loaded: Boolean, offline: Boolean = false, settledCoverage: Boolean = true, upcomingSport: Boolean = false): SessionObservation {
         val channels = if (loaded) (1..3L).map { Channel.create(ChannelId(it), name = "Name $it", number = it) } else emptyList()
         // Channel 3 has no EPG.
         val withEpg = listOf(1L, 2L)
         val catalog = ChannelCatalog.create(channels)
         val epg = EpgSnapshot.create(
-                events = withEpg.flatMap { channel -> (0..3).map { event(channel, it) } },
+                events = withEpg.flatMap { channel -> (0..3).map { offset ->
+                    if (upcomingSport && channel == 2L && offset < 3) EpgEvent.create(
+                        EventId(channel * 100 + offset + 10), ChannelId(channel),
+                        Instant.fromEpochSeconds(hour + offset * 3600), Instant.fromEpochSeconds(hour + (offset + 1) * 3600),
+                        title = "Channel $channel hour $offset", contentGenre = at.bernhardberger.tvheadend.sdk.core.ContentGenre.fromContentType(0x20))
+                    else event(channel, offset)
+                } },
                 historicalEvents = withEpg.flatMap { channel -> (-4..-1).map { event(channel, it) } },
-                coverages = channels.map {
+                coverages = if (!settledCoverage) emptyList() else channels.map {
                     EpgCoverage.create(channelId = it.id, coveredFrom = Instant.fromEpochSeconds(hour),
                         coveredTo = Instant.fromEpochSeconds(hour + 7 * 86400))
                 },
@@ -271,10 +289,11 @@ class GuidePlayerReturnFocusTest {
         )
     }
 
-    private fun guide(request: PlayerReturnFocus, channelsLoaded: Boolean = true, offline: Boolean = false,
-        genreRequest: at.bernhardberger.tvhplayer.core.ProgrammeCategory? = null): FakeTvheadendSession {
+    private fun guide(request: PlayerReturnFocus?, channelsLoaded: Boolean = true, offline: Boolean = false,
+        genreRequest: at.bernhardberger.tvhplayer.core.ProgrammeCategory? = null,
+        settledCoverage: Boolean = true, upcomingSport: Boolean = false): FakeTvheadendSession {
         val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<Application>()
-        val session = FakeTvheadendSession(observation(channelsLoaded, offline))
+        val session = FakeTvheadendSession(observation(channelsLoaded, offline, settledCoverage, upcomingSport))
         val settings = PlayerSettingsStore(preferences())
         val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.IO,
             readProfileForEditing = { ServerProfileEditReadResult.Missing })

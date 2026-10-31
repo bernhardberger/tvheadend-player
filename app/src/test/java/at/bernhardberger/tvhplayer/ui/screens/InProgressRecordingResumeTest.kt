@@ -87,6 +87,17 @@ class InProgressRecordingResumeTest {
         compose.runOnIdle { assertEquals(listOf(RecordingPlaybackStart.START_OVER), starts) }
     }
 
+    @Test fun recordingWatchLiveRejectsAReplacedSessionBeforeRecomposition() {
+        var latest: SessionObservation? = null
+        val starts = openDetails(754L, directly = true, onWatch = { _, _ -> error("stale Watch live") },
+            latestObservation = { latest })
+        compose.onNodeWithTag("recording-watch-live").assertIsFocused()
+        compose.runOnIdle { latest = observation(754L) }
+        compose.onNodeWithTag("recording-watch-live").performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("recording-watch-live").assertIsFocused()
+        compose.runOnIdle { assertTrue(starts.isEmpty()) }
+    }
+
     @Test
     fun anInProgressRecordingWithASavedPositionResumesThere() {
         val starts = openDetails(playPositionSeconds = 754L)
@@ -300,6 +311,7 @@ class InProgressRecordingResumeTest {
         warm: Boolean = false, completed: Boolean = false, fromPlayer: Boolean = false, staleSession: Boolean = false,
         handoff: PlayerEntryHandoff? = null, requestGate: CompletableDeferred<Unit>? = null,
         onWatch: ((at.bernhardberger.tvheadend.sdk.core.ChannelId, String) -> Unit)? = null,
+        latestObservation: (() -> SessionObservation?)? = null,
         onReturn: (DvrEntryId) -> Boolean = { true }): List<RecordingPlaybackStart> {
         val starts = mutableListOf<RecordingPlaybackStart>()
         val observation = observation(playPositionSeconds, completed)
@@ -335,6 +347,7 @@ class InProgressRecordingResumeTest {
                     onPlayRecording = { _, start -> starts += start }, onClose = { onReturn(DvrEntryId(1)) },
                 ) else RecordingsScreenContent(
                     observation = observation,
+                    currentObservation = { latestObservation?.invoke() ?: observation },
                     state = state,
                     dvrMutationActions = actions,
                     notices = notices,

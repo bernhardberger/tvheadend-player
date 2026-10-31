@@ -5,6 +5,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import at.bernhardberger.tvhplayer.ui.components.TabOwner
+import at.bernhardberger.tvhplayer.ui.components.LocalTabOwner
 import at.bernhardberger.tvhplayer.ui.components.AppErrorAlert
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -48,6 +52,19 @@ internal fun HomeScreen(
 ) {
     val scope by channelsVm.scope.collectAsStateWithLifecycle()
     val observation by channelsVm.observation.collectAsStateWithLifecycle()
+    val owner = remember(scope.scope, observation.currentSession, scope.observation?.currentSession) {
+        val frameScope = scope.scope
+        val frameSession = observation.currentSession
+        val scopeSession = scope.observation?.currentSession
+        TabOwner {
+            channelsVm.scope.value.scope == frameScope &&
+                channelsVm.observation.value.currentSession === frameSession &&
+                scopeSession === frameSession
+        }
+    }
+    DisposableEffect(owner) { onDispose { owner.release() } }
+    fun current(channelId: ChannelId? = null) = owner.isCurrent &&
+        (channelId == null || channelsVm.scope.value.scope.visibleChannels.any { it.id == channelId })
     val recents by lastPlayedStore.recentChannelIds.collectAsStateWithLifecycle(emptyList())
     val nowSec = rememberCurrentEpochSeconds()()
     val playing = playingRecordingId?.let(HomePlaying::Recording)
@@ -67,9 +84,18 @@ internal fun HomeScreen(
             nowSec = nowSec,
         )
     }
-    HomeScreenContent(input, observation, contentPadding, initialFocusEnabled, onPlay,
-        onPlayRecording, onReturnToRecording, onShowGuide, onGenre, onRecordings, modifier,
-        connectionUiState, connectionFailure, onRetry, onOpenConnectionSettings)
+    CompositionLocalProvider(LocalTabOwner provides owner) {
+        HomeScreenContent(input, observation, contentPadding, initialFocusEnabled,
+            onPlay = { id, name -> if (current(id)) onPlay(id, name) },
+            onPlayRecording = { selection, start ->
+                if (current(input.dvrEntries.firstOrNull { it.id == selection.recordingId }?.channelId)) onPlayRecording(selection, start)
+            },
+            onReturnToRecording = { id, before -> current(input.dvrEntries.firstOrNull { it.id == id }?.channelId) && onReturnToRecording(id, before) },
+            onShowGuide = { id, event -> if (current(id)) onShowGuide(id, event) },
+            onGenre = { if (current()) onGenre(it) }, onRecordings = { if (current()) onRecordings(it) },
+            modifier = modifier, connectionUiState = connectionUiState, connectionFailure = connectionFailure,
+            onRetry = onRetry, onOpenConnectionSettings = onOpenConnectionSettings)
+    }
 }
 
 @Composable
@@ -92,6 +118,7 @@ internal fun HomeScreenContent(
     onOpenConnectionSettings: () -> Unit = {},
 ) {
     val nowSec = input.nowSec
+    val owner = LocalTabOwner.current
     val playingRecordingId = (input.playing as? HomePlaying.Recording)?.entryId
     val sections = remember(input) { homeSections(input) }
     var focused by remember { mutableStateOf<HomeFocusKey?>(null) }
@@ -103,6 +130,8 @@ internal fun HomeScreenContent(
     val mutationInFlight = remember { mutableStateOf<DvrMutationAction?>(null) }
     val closeBehindPlayer = rememberCloseBehindPlayer()
     fun openRecording(entry: DvrEntry, menu: Boolean) {
+        if (owner?.isCurrent == false) return
+        if (entry.channelId != null && input.channels.none { it.id == entry.channelId }) return
         if (!menu && entry.id == playingRecordingId &&
             onReturnToRecording(entry.id) { closeBehindPlayer { recording = null } }) return
         val capability = observation.currentSession
@@ -113,13 +142,16 @@ internal fun HomeScreenContent(
                 if (action == RecordingOpenAction.RESUME) RecordingPlaybackStart.RESUME else RecordingPlaybackStart.START_OVER)
         } else { recordingMenu = menu; recording = entry }
     }
-    val activate: (HomeFocusKey, Boolean) -> Unit = { key, menu ->
+    val activate: (HomeFocusKey, Boolean) -> Unit = activate@{ key, menu ->
+        if (owner?.isCurrent == false) return@activate
         when (val section = sections.firstOrNull { it.kind == key.section }) {
             is HomeSection.CurrentActivity -> section.items.getOrNull(key.position)?.let { item ->
                 when (val current = item.playing) {
                     is HomePlaying.LiveChannel -> if (!menu) observation.channel(current.channelId)
                         ?.let { onPlay(it.id, it.name.orEmpty()) }
-                    is HomePlaying.Recording -> if (!menu) onReturnToRecording(current.entryId) {}
+                    is HomePlaying.Recording -> if (!menu && !onReturnToRecording(current.entryId) {}) {
+                        input.dvrEntries.firstOrNull { it.id == current.entryId }?.let { openRecording(it, false) }
+                    }
                     null -> item.recording?.let { openRecording(it, menu) }
                 }
             }
@@ -171,14 +203,22 @@ internal fun HomeScreenContent(
         onContextMenu = { activate(it, true) },
     )
     channelMenu?.let { id ->
-        ChannelContextMenu(id, observation, { nowSec }, mutationScope, mutationInFlight,
-            onPlay = onPlay, onShowGuide = onShowGuide,
-            onClose = { channelMenu = null }, showDetails = channelDetails,
-            onShowDetails = { channelDetails = true },
-            onPlayRecording = { onPlayRecording(it, RecordingPlaybackStart.START_OVER) })
+        val openingOwner = remember(id) { owner }
+        Box(Modifier.onPreviewKeyEvent { openingOwner?.isCurrent == false }) {
+            ChannelContextMenu(id, observation, { nowSec }, mutationScope, mutationInFlight,
+                onPlay = onPlay, onShowGuide = onShowGuide,
+                onClose = { channelMenu = null }, showDetails = channelDetails,
+                onShowDetails = { channelDetails = true },
+                onPlayRecording = { onPlayRecording(it, RecordingPlaybackStart.START_OVER) })
+        }
+        LaunchedEffect(owner) { if (openingOwner?.isCurrent == false) channelMenu = null }
     }
     recording?.let { entry ->
-        HomeRecordingActions(entry, observation, recordingMenu, nowSec, onPlayRecording,
-            onPlay, onShowGuide, onReturnToRecording, onClose = { recording = null })
+        val openingOwner = remember(entry.id) { owner }
+        Box(Modifier.onPreviewKeyEvent { openingOwner?.isCurrent == false }) {
+            HomeRecordingActions(entry, observation, recordingMenu, nowSec, onPlayRecording,
+                onPlay, onShowGuide, onReturnToRecording, onClose = { recording = null })
+        }
+        LaunchedEffect(owner) { if (openingOwner?.isCurrent == false) recording = null }
     }
 }
