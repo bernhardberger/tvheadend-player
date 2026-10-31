@@ -116,6 +116,7 @@ internal fun TwoColumnDialogButton(
     label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    subtitle: String? = null,
     icon: (@Composable () -> Unit)? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -129,6 +130,15 @@ internal fun TwoColumnDialogButton(
                 WideButtonDefaults.Background(enabled = true, interactionSource = interaction)
             }
         },
-        title = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = if (subtitle == null) 10.dp else 4.dp),
+        // Keep the compact stack in the title slot: native subtitle mode top-aligns
+        // the icon and reserves a taller row. Single-line actions retain native padding.
+        title = {
+            Column(verticalArrangement = Arrangement.Center) {
+                Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.labelSmall,
+                    color = LocalContentColor.current.copy(alpha = 0.6f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        },
         icon = icon)
 }

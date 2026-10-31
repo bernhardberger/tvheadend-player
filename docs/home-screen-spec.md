@@ -217,7 +217,13 @@ measurements above where they differ):**
   slot with them. The content block is anchored at its bottom just above the
   heading and grows upward: it slides up while fading in, its lines appearing
   bottom-anchored; the background fades in behind it. Settled within about
-  470 ms, with a distance-scaled, emphasized page move. Up out travels once
+  470 ms. The page move uses 410 ms cubic-bezier(0.46, 0, 0, 1), fitted to
+  G10 frames 81–103 (PTS 5.142678–5.642578 s); the 240×135 row track runs
+  from y≈125 to 91 px, with 0.87 px RMS fit error. The fitted onset is 5.150 s;
+  the variable-frame-rate reference has a 100 ms gap before frame 82, so onset
+  is approximate. Background/block retain their 100 ms delay and 370/270 ms
+  fades. Layout changes in the departing caption are compensated at the row
+  anchor, not eased again into the page destination. Up out travels once
   back to the ordinary slot, without overshooting. Up into On now from genres
   starts the info block 16 dp above rest after 150 ms; it moves down and fades
   in over 300 ms, after the rows have started. It is never a crossfade in place.
@@ -264,9 +270,10 @@ over about 450 ms); Left/Right keeps the focused card at the start position.
   been started, newest first, up to 10. A recording in Continue watching is not
   repeated here.
 - Both rows end with an **All recordings** card that opens Recordings → Archive.
-- **Upcoming recordings:** one quiet summary card, not a row, for example
-  "Next: Tatort · Today 20:15 · 3 more scheduled". Omitted when nothing is
-  scheduled.
+- **Upcoming recordings:** next-first scheduled entries, up to 10, in the
+  genre text-card kit (56 dp high), each with a title and quiet day/time •
+  channel line. End with **All scheduled**, opening Recordings → Schedule.
+  Omit the row when nothing is scheduled.
 - Preserve existing recording admission, resume/start-over choices and
   unavailable-recording behavior. A current recording playback return stays warm.
 - Preserve existing progress semantics: viewer position (orange) and broadcast or
@@ -284,16 +291,30 @@ Each card behaves like the screen it comes from.
 | Active recording | The recording choice dialog (below) | Details, Stop recording, … |
 | Continue watching, Recently recorded | As in Recordings (resume or start over as today) | As in Recordings |
 | All recordings | Recordings → Archive | None |
-| Upcoming summary | Recordings → Schedule | None |
+| Upcoming recording | Recording details | None |
+| All scheduled | Recordings → Schedule | None |
 | Genre | Guide at now with that genre | None |
 
 **Recording choice dialog:** OK on an active recording opens the existing
 centred resume dialog (`RecordingsScreen.kt`, `CentredDialog`) with up to three
 buttons: **Watch channel** (tunes the channel), **Resume from …**
-(only with a resume position) and **Watch from beginning**. Resume takes initial
-focus when offered; otherwise Watch from beginning does. That default action is
+(only with a resume position) and **Watch from beginning**. Without a resume
+point the start action is **Play recording**, with the play icon; with one,
+Watch from beginning uses the replay icon. Resume takes initial
+focus when offered; otherwise Play recording does. That default action is
 filled, and the other buttons are outlined. The same dialog replaces
 the current OK behavior on items in Recordings → **Recording now**.
+The focused action's Ends at time belongs in the eyebrow, not a body line;
+changing focus must not resize the dialog. Context-menu Resume keeps its label
+and shows the offered position as a smaller quiet second line ("from 12:34").
+Its icon and compact text stack are vertically centred; single-line actions
+keep their existing height. Running recording menus (Home and Recordings)
+offer **Watch channel**, with the live-TV icon, after the play/resume actions.
+It uses the choice dialog's channel-tune path, including channels outside the
+Home scope; finished and scheduled recordings do not offer it.
+Right now uses only the REC badge's dot as its running-recording mark, alongside
+the animated playback icon when playing. Recording-only cards also use one REC;
+finished recording playback has the neutral Recording badge, not REC or a red dot.
 
 ## 4. Data
 
@@ -356,6 +377,9 @@ How phase 2 is presented remains open; the removed tabs are not a requirement.
 - Focus never starts playback or recording actions. A key that reveals or moves
   focus is consumed so it cannot also activate the new target.
 - Stable focused items survive refresh.
+- Up from the first row reaches the channel group button. Last-row scroll
+  targets stop at the content end; no artificial trailing room pulls a bottom
+  row down when focused.
 - Complete D-pad reachability, predictable Back, accessibility names, long
   localized labels, 1.3× font scale and reduced motion are part of the TV floor.
 - Foreground, session, profile and capability guards still apply. EPG work does
@@ -377,7 +401,7 @@ How phase 2 is presented remains open; the removed tabs are not a requirement.
    next 24 hours; Guide opens at now and focuses the first match; Home's choice
    replaces the Guide filter.
 7. Recording shelves: Continue watching and Recently recorded (7 days) up to 10
-   each, ending with All recordings; Upcoming as one summary card; section order
+   each, ending with All recordings; Upcoming as text cards plus All scheduled; section order
    as in [section 3](#3-content-order-and-hierarchy).
 8. Initial focus and duplicate activity as in [section 5](#5-options-loading-and-interaction)
    and [3.1](#31-current-activity).

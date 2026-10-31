@@ -125,7 +125,7 @@ import at.bernhardberger.tvhplayer.ui.components.HomeAllRecordingsCard
 import at.bernhardberger.tvhplayer.ui.components.HomeCardWidth
 import at.bernhardberger.tvhplayer.ui.components.HomeGenreCard
 import at.bernhardberger.tvhplayer.ui.components.HomeRecentChannelTile
-import at.bernhardberger.tvhplayer.ui.components.HomeUpcomingCard
+import at.bernhardberger.tvhplayer.ui.components.HomeTextCard
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseDrawerState
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeArtwork
@@ -153,7 +153,6 @@ import java.time.ZoneId
 import java.util.Locale
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
-import kotlin.math.abs
 import kotlin.math.roundToInt
 import androidx.compose.ui.text.rememberTextMeasurer
 
@@ -176,14 +175,15 @@ internal val HomeRecentGap = 16.dp
 private val HomeGenreGap = 16.dp
 
 private val HomeEmphasizedEasing = CubicBezierEasing(0.2f, 0f, 0f, 1f)
-
-/** Room below the last section so the final card can still scroll to its slot. */
-private val HomeTrailingRoom = 400.dp
+// G10 frames 81–103, timestamp-fitted row travel (240x135 source, <1px RMS).
+internal val HomeDownInEasing = CubicBezierEasing(0.46f, 0f, 0f, 1f)
+internal const val HomeDownInMs = 410
 
 /** Interrupted moves start at the currently drawn page position, following live row measurements. */
 internal class HomePageMotion {
     val progress = Animatable(1f)
     var from by mutableFloatStateOf(0f)
+    var destination by mutableFloatStateOf(0f)
     var to by mutableStateOf<HomeSectionKind?>(null)
     val above = Animatable(1f)
     val aboveShift = Animatable(0f)
@@ -224,17 +224,16 @@ internal fun rememberHomePageMotion(
             motion.blockShift.snapTo(0f)
             return@LaunchedEffect
         }
-        motion.from += (target(motion.to) - motion.from) * motion.progress.value
+        motion.from = target(motion.to) + (motion.from - motion.destination) * (1f - motion.progress.value)
         motion.to = to
+        motion.destination = target(to)
         motion.progress.snapTo(0f)
-        val distanceDp = with(density) { abs(target(to) - motion.from).toDp().value }
-        val downInDuration = (200 + distanceDp * 1.4f).roundToInt().coerceIn(200, 470)
         coroutineScope {
             when {
                 expanded && (from == null || from.ordinal < HomeSectionKind.ON_NOW.ordinal) -> {
                     motion.revealFromBottom = true
                     motion.blockShift.snapTo(blockShift)
-                    launch { motion.progress.animateTo(1f, tween(downInDuration, easing = HomeEmphasizedEasing)) }
+                    launch { motion.progress.animateTo(1f, tween(HomeDownInMs, easing = HomeDownInEasing)) }
                     launch { motion.above.animateTo(0f, tween(90, easing = LinearEasing)) }
                     launch { motion.aboveShift.animateTo(-shift, tween(90, easing = LinearOutSlowInEasing)) }
                     launch { motion.heading.animateTo(0f, tween(130, easing = LinearEasing)) }
@@ -369,21 +368,24 @@ internal fun HomeContent(
     val scrollTarget: (HomeSectionKind?) -> Float = { kind ->
         val viewport = viewportHeight.toFloat()
         val topSlot = with(density) { ordinarySlot.toPx() }
-        when (kind) {
+        val desired = when (kind) {
             null -> 0f
             HomeSectionKind.ON_NOW ->
                 (tops[kind] ?: 0f) + onNowRowTop - with(density) { HomeImmersiveSlot.toPx() }
             firstSection -> 0f
-            HomeSectionKind.UPCOMING -> minOf(
-                (tops[kind] ?: 0f) - topSlot,
-                contentEnd - viewport + with(density) { HomeSectionGap.toPx() },
-            ).coerceAtLeast(0f)
             else -> ((tops[kind] ?: 0f) - topSlot).coerceAtLeast(0f)
         }
+        minOf(desired, (contentEnd - viewport).coerceAtLeast(0f))
     }
     val motion = rememberHomePageMotion(focusedSection, scrollTarget)
     val scrollPx by remember(motion, scrollTarget) {
-        derivedStateOf { motion.from + (scrollTarget(motion.to) - motion.from) * motion.progress.value }
+        derivedStateOf {
+            // Caption collapse changes both row tops and the content-end clamp. Anchor
+            // remaining travel to that live target rather than easing its layout drift
+            // a second time (which drove rows past their slot and back).
+            scrollTarget(motion.to) +
+                (motion.from - motion.destination) * (1f - motion.progress.value)
+        }
     }
 
     // Metadata ticks and ordinary D-pad moves must not replay entry focus. Request it on entry,
@@ -408,7 +410,7 @@ internal fun HomeContent(
         if (!focusEnabled) return@LaunchedEffect
         val previous = focusedCard ?: return@LaunchedEffect
         if (!focusEnabled || drawerState?.currentValue == DrawerValue.Open) return@LaunchedEffect
-        if (previous.item in setOf("all-recordings", "all-channels") && sections.any { it.kind == previous.section }) return@LaunchedEffect
+        if (previous.item in setOf("all-recordings", "all-channels", "all-scheduled") && sections.any { it.kind == previous.section }) return@LaunchedEffect
         val restored = homeRestoreFocus(sections, previous)
         if (restored?.section == previous.section && restored.item == previous.item) return@LaunchedEffect
         withFrameNanos { }
@@ -475,7 +477,7 @@ internal fun HomeContent(
                                 val next = if (focusedSection == null) firstSection else sections.getOrNull(index + 1)?.kind
                                 next?.let { requesters[it]?.requestFocus() } ?: false
                             }
-                            Key.DirectionUp -> if (index == 0) viewRequester.requestFocus()
+                            Key.DirectionUp -> if (index == 0) tagsRequester.requestFocus()
                                 else sections.getOrNull(index - 1)?.kind?.let { requesters[it]?.requestFocus() } ?: false
                             else -> false
                         }
@@ -692,10 +694,11 @@ internal fun HomeContent(
                             )
 
                             is HomeSection.Upcoming -> HomeUpcomingRow(
-                                item = section.items.firstOrNull(),
+                                items = section.items,
                                 keyline = keyline,
                                 emphasis = emphasis,
                                 entry = entry,
+                                entryIndex = entryIndex,
                                 nowSec = nowSec,
                                 zone = zone,
                                 locale = locale,
@@ -715,7 +718,7 @@ internal fun HomeContent(
                 Spacer(
                     Modifier
                         .fillMaxWidth()
-                        .height(HomeTrailingRoom)
+                        .height(0.dp)
                         .onGloballyPositioned { contentEnd = it.positionInParent().y },
                 )
             }
@@ -1310,10 +1313,11 @@ private fun HomeShelfRow(
 
 @Composable
 private fun HomeUpcomingRow(
-    item: at.bernhardberger.tvhplayer.core.UpcomingItem?,
+    items: List<at.bernhardberger.tvhplayer.core.UpcomingItem>,
     keyline: Dp,
     emphasis: () -> Float,
     entry: FocusRequester,
+    entryIndex: Int,
     nowSec: Long,
     zone: ZoneId,
     locale: Locale,
@@ -1322,33 +1326,25 @@ private fun HomeUpcomingRow(
     onCardFocus: (Int, String) -> Unit,
     onActivate: (Int, String) -> Unit,
 ) {
-    if (item == null) return
-    val next = item.next
-    val title = next.title?.takeIf(String::isNotBlank) ?: stringResource(R.string.no_epg)
-    val whenText = next.start?.let { relativeDayTime(it.epochSeconds, nowSec, zone, locale) }.orEmpty()
-    val summary = stringResource(R.string.home_upcoming_summary, title, whenText)
-    val more = if (item.moreCount > 0) {
-        " • " + pluralStringResource(
-            R.plurals.home_upcoming_more,
-            item.moreCount,
-            item.moreCount,
-        )
-    } else {
-        ""
+    HomeCardRow(items = items + listOf(null), itemKey = { it?.entry?.id?.value ?: "all-scheduled" }, keyline = keyline,
+        gap = HomeGenreGap, emphasis = emphasis, entry = entry, entryIndex = entryIndex,
+        rail = rail, ltr = ltr,
+    ) { index, item, modifier ->
+        if (item == null) HomeTextCard(stringResource(R.string.home_all_scheduled),
+            onClick = { onActivate(items.size, "all-scheduled") },
+            modifier = modifier.testTag("home-all-scheduled").onFocusChanged {
+                if (it.isFocused) onCardFocus(items.size, "all-scheduled")
+            }) else {
+            val next = item.entry
+            val title = next.title?.takeIf(String::isNotBlank) ?: stringResource(R.string.no_epg)
+            val whenText = next.start?.let { relativeDayTime(it.epochSeconds, nowSec, zone, locale) }.orEmpty()
+            HomeTextCard(title, onClick = { onActivate(index, "recording:${next.id.value}") },
+                subtitle = listOf(whenText, next.channelName.orEmpty()).filter(String::isNotBlank).joinToString(" • "),
+                modifier = modifier.width(220.dp).testTag("home-upcoming-$index").onFocusChanged {
+                    if (it.isFocused) onCardFocus(index, "recording:${next.id.value}")
+                })
+        }
     }
-    HomeUpcomingCard(
-        text = summary + more,
-        onClick = { onActivate(0, "upcoming") },
-        modifier = Modifier
-            .padding(start = keyline, top = HomeFocusRoom, bottom = HomeFocusRoom)
-            .rowContentEmphasis(emphasis)
-            .focusProperties { if (ltr) left = rail else right = rail }
-            .focusRequester(entry)
-            .testTag("home-upcoming")
-            .onFocusChanged {
-                if (it.isFocused) onCardFocus(0, "upcoming")
-            },
-    )
 }
 
 /** The activity card's key in the same form the policy saves focus with. */
@@ -1366,7 +1362,7 @@ private fun HomeSection.itemCount(): Int = when (this) {
     is HomeSection.Genres -> items.size
     is HomeSection.ContinueWatching -> items.size
     is HomeSection.RecentlyRecorded -> items.size
-    is HomeSection.Upcoming -> items.size
+    is HomeSection.Upcoming -> items.size + 1
 }
 
 @Composable
@@ -1377,7 +1373,7 @@ private fun HomeSection.headingTitle(): String? = when (this) {
     is HomeSection.Genres -> stringResource(R.string.home_browse_by_genre)
     is HomeSection.ContinueWatching -> stringResource(R.string.home_continue_watching)
     is HomeSection.RecentlyRecorded -> stringResource(R.string.home_recently_recorded)
-    is HomeSection.Upcoming -> null
+    is HomeSection.Upcoming -> stringResource(R.string.home_upcoming_recordings)
 }
 
 /** The picture height the heading's focus overflow has to cover for this section's row. */

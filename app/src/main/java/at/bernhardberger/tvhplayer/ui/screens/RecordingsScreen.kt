@@ -980,11 +980,14 @@ internal fun RecordingsScreenContent(
                 androidx.compose.ui.platform.LocalConfiguration.current.locales[0]),
             summary = opened.summary?.takeIf(String::isNotBlank) ?: opened.description.orEmpty(),
             recordingState = opened.state,
+            resumePositionMs = at.bernhardberger.tvhplayer.core.offeredResumePosition(openedAdmission)?.inWholeMilliseconds,
             playbackIndicator = watchingIndicator(opened.id),
             actions = recordingContextActions(opened, canModifyRecordings = selectedCapability != null &&
                 (observation.sessionState as? at.bernhardberger.tvheadend.sdk.core.SessionState.Ready)
                     ?.capabilities?.dvrWrite == at.bernhardberger.tvheadend.sdk.core.CapabilityAccess.ALLOWED,
-                admission = openedAdmission, playing = selectedCapability != null && opened.id ==
+                admission = openedAdmission,
+                canWatchChannel = selectedCapability != null && onWatchChannel != null && opened.channelId?.let(channelsById::get) != null,
+                playing = selectedCapability != null && opened.id ==
                     at.bernhardberger.tvhplayer.ui.warmRecordingId(
                         at.bernhardberger.tvhplayer.ui.components.LocalWatchingTarget.current,
                         at.bernhardberger.tvhplayer.ui.components.LocalRecordingPlaybackSelection.current,
@@ -993,13 +996,25 @@ internal fun RecordingsScreenContent(
             onAction = { action ->
                 val playing = selectedCapability?.takeIf { action in listOf(BrowseContextAction.WATCH,
                     BrowseContextAction.PLAY, BrowseContextAction.RESUME, BrowseContextAction.START_OVER,
-                    BrowseContextAction.CONTINUE_WATCHING) }
+                    BrowseContextAction.CONTINUE_WATCHING, BrowseContextAction.WATCH_LIVE) }
                 // Playback keeps the menu up until the player has replaced browse.
                 if (playing == null) {
                     menuConsumed = action != BrowseContextAction.DETAILS
                     showContextMenu = action in listOf(BrowseContextAction.STOP, BrowseContextAction.CANCEL, BrowseContextAction.DELETE)
                 }
                 when (action) {
+                    BrowseContextAction.WATCH_LIVE -> opened.channelId?.let(channelsById::get)?.let { channel ->
+                        if (playing != null && latestObservationProvider().currentSession === playing && onWatchChannel != null) {
+                            closeBehindPlayer {
+                                showContextMenu = false
+                                detailsEntry = null
+                                detailsObservation = null
+                                detailsInitialAction = null
+                                requestContentFocus = true
+                            }
+                            onWatchChannel(channel.id, channel.name.orEmpty())
+                        }
+                    }
                     BrowseContextAction.CONTINUE_WATCHING -> playing?.let { continueWatching() }
                     BrowseContextAction.WATCH, BrowseContextAction.PLAY,
                     BrowseContextAction.RESUME, BrowseContextAction.START_OVER -> playing?.let {

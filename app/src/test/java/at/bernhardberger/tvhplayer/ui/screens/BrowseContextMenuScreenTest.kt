@@ -440,6 +440,38 @@ class BrowseContextMenuScreenTest {
     }
 
     @Test @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
+    fun recordingMenuResumeHasQuietPositionLine() {
+        show(recordings = true)
+        compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
+        compose.onNodeWithText("Resume").assertIsFocused()
+        compose.onNodeWithText("Watch channel").assertDoesNotExist()
+        compose.onNodeWithText("from 1:02:00", useUnmergedTree = true).assertExists()
+        val button = compose.onNodeWithText("Resume").getUnclippedBoundsInRoot()
+        val title = compose.onNodeWithText("Resume", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        val position = compose.onNodeWithText("from 1:02:00", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        assertEquals("resume stack is vertically centred", (button.top.value + button.bottom.value) / 2,
+            (title.top.value + position.bottom.value) / 2, 0.5f)
+        assertTrue("two-line action stays compact", (button.bottom - button.top).value <= 56f)
+        capture("recordings-resume-position")
+    }
+
+    @Test fun runningRecordingMenuWatchesChannelAfterPlaybackActions() {
+        show(recordings = true, recordingState = DvrEntryState.RECORDING, growingFile = true)
+        compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
+        compose.onNodeWithText("Watch").assertIsFocused().performKeyInput {
+            pressKey(Key.DirectionDown); pressKey(Key.DirectionDown)
+        }
+        compose.onNodeWithText("Watch channel").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.runOnIdle { assertEquals(ChannelId(1), watchedChannel); assertEquals(0, plays) }
+    }
+
+    @Test fun scheduledRecordingMenuDoesNotOfferWatchChannel() {
+        show(recordings = true, recordingState = DvrEntryState.SCHEDULED)
+        compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
+        compose.onNodeWithText("Watch channel").assertDoesNotExist()
+    }
+
+    @Test @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
     fun recordingResumeDialogCapture() = recordingOkShowsResumeAndBackRestoresRow()
 
     @Test fun recordingOkShowsResumeAndBackRestoresRow() {
@@ -455,7 +487,7 @@ class BrowseContextMenuScreenTest {
         compose.onNode(hasText("101 Ridge Earth HD • ", substring = true) and hasAnyAncestor(hasTestTag("centred-dialog-content"))).assertExists()
         compose.onNodeWithText("Watched", substring = true).assertDoesNotExist()
         assertResumePiconGeometry(picon = true)
-        compose.onNodeWithText(resumeEnd).assertExists()
+        compose.onNodeWithText(resumeEnd, substring = true).assertExists()
         compose.onNodeWithTag("recording-resume").assert(
             SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, resumeEnd))
         compose.onNodeWithTag("recording-start-over").assert(
@@ -480,8 +512,8 @@ class BrowseContextMenuScreenTest {
         row.performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("recording-resume").performKeyInput { pressKey(Key.DirectionRight) }
         compose.onNodeWithTag("recording-start-over").assertIsFocused()
-        compose.onNodeWithText(startOverEnd).assertExists()
-        compose.onNodeWithText(resumeEnd).assertDoesNotExist()
+        compose.onNodeWithText(startOverEnd, substring = true).assertExists()
+        compose.onNodeWithText(resumeEnd, substring = true).assertDoesNotExist()
         capture("resume-start-over", "u15-dialogs")
         compose.onNodeWithTag("recording-start-over").performKeyInput { pressKey(Key.DirectionCenter) }
         assertEquals(1, plays)
@@ -1315,6 +1347,7 @@ class BrowseContextMenuScreenTest {
         assertEquals(0, plays)
     }
 
+    @OptIn(TvheadendTestingApi::class)
     private fun show(recordings: Boolean, dvrWrite: CapabilityAccess = CapabilityAccess.ALLOWED,
         recordingState: DvrEntryState = DvrEntryState.COMPLETED, channelRecording: Boolean = false,
         guideMenu: Boolean = false, artwork: Boolean = true, noProgramme: Boolean = false,
@@ -1325,7 +1358,7 @@ class BrowseContextMenuScreenTest {
         fixedNow: Long? = null, profiles: Boolean = false, scopeTabs: Boolean = false,
         offline: Boolean = false, guideDetails: Boolean = false, entryHandoff: Boolean = false,
         rootArtwork: FakeTvheadendSession? = null, watching: Boolean = false,
-        behindLive: Boolean = false): FakeTvheadendSession {
+        behindLive: Boolean = false, growingFile: Boolean = false): FakeTvheadendSession {
         val context = ApplicationProvider.getApplicationContext<Application>()
         val now = fixedNow?.let(Instant::fromEpochSeconds) ?: Instant.parse("2026-09-15T19:00:00Z")
         check(android.os.SystemClock.setCurrentTimeMillis(now.toEpochMilliseconds()))
@@ -1350,6 +1383,8 @@ class BrowseContextMenuScreenTest {
             folder = emptyList(),
             summary = summary, description = description, subtitle = episodeSubtitle,
             channelName = channel.name, state = recordingState, playPosition = 3720.seconds,
+            files = if (growingFile) listOf(TvheadendTestResultFactory.recordingFile(serverPath = "test.ts",
+                start = now - 7200.seconds, stop = now)) else null,
             start = if (recordingState == DvrEntryState.SCHEDULED) now + 3600.seconds else now - 7200.seconds,
             stop = if (unknownDuration) null else if (recordingState == DvrEntryState.SCHEDULED) now + 9000.seconds else now - 1800.seconds,
             image = if (artwork) ArtworkId(2) else null, fanartImage = if (fanartOnly) ArtworkId(2) else null)

@@ -59,6 +59,7 @@ fun recordingContextActions(
     admission: RecordingPlaybackAdmission?,
     canModifyRecordings: Boolean,
     playing: Boolean = false,
+    canWatchChannel: Boolean = false,
 ): List<BrowseContextAction> = buildList {
     if (playing) add(BrowseContextAction.CONTINUE_WATCHING)
     if (recordingPlaybackOffered(admission)) {
@@ -76,6 +77,7 @@ fun recordingContextActions(
             else -> add(BrowseContextAction.PLAY)
         }
     }
+    if (canWatchChannel && recordingIsRunning(entry)) add(BrowseContextAction.WATCH_LIVE)
     add(BrowseContextAction.DETAILS)
     recordingWatchStateAction(entry, admission, canModifyRecordings)?.let(::add)
     if (canModifyRecordings) when (entry.state) {

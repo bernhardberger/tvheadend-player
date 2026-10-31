@@ -121,10 +121,9 @@ internal fun HomeActivityCard(
                 PiconBox(
                     icon,
                     Modifier.align(Alignment.TopEnd)
+                        .padding(12.dp)
                         .size(width * 0.55f, width * 0.4f)
                         .graphicsLayer {
-                            translationX = width.toPx() * 0.06f
-                            translationY = -width.toPx() * 0.04f
                             alpha = 0.28f
                         },
                     ground = null,
@@ -158,7 +157,8 @@ internal fun HomeActivityCard(
                             androidx.compose.runtime.CompositionLocalProvider(
                                 LocalContentColor provides TvTextColors.primary,
                             ) {
-                                ChannelNowIndicators(playingNow = true, recordingNow = recordingNow)
+                                // REC below already owns the recording dot; keep only playback here.
+                                ChannelNowIndicators(playingNow = true, recordingNow = false)
                             }
                         }
                     }

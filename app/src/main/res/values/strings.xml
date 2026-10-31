@@ -59,6 +59,9 @@
     <string name="context_resume">Resume</string>
     <string name="context_start_over">Watch from beginning</string>
     <string name="recording_choice_watch_channel" tools:ignore="MissingTranslation">Watch channel</string>
+    <string name="recording_choice_play" tools:ignore="MissingTranslation">Play recording</string>
+    <string name="context_resume_from" tools:ignore="MissingTranslation">from %1$s</string>
+    <string name="home_all_scheduled" tools:ignore="MissingTranslation">All scheduled</string>
     <string name="context_mark_watched">Mark as watched</string>
     <string name="context_mark_unwatched">Mark as unwatched</string>
     <string name="context_delete">Delete</string>

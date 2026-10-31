@@ -64,7 +64,7 @@ sealed interface HomeSection {
         override val kind: HomeSectionKind = HomeSectionKind.RECENTLY_RECORDED
     }
 
-    /** One quiet summary card, never a row: the next scheduled entry and how many follow it. */
+    /** The next scheduled recordings, followed by All scheduled in the UI. */
     data class Upcoming(val items: List<UpcomingItem>) : HomeSection {
         override val kind: HomeSectionKind = HomeSectionKind.UPCOMING
     }
@@ -91,8 +91,7 @@ data class GenreItem(val category: ProgrammeCategory)
 data class RecordingItem(val entry: DvrEntry)
 
 data class UpcomingItem(
-    val next: DvrEntry,
-    val moreCount: Int,
+    val entry: DvrEntry,
 )
 
 data class HomeInput(
@@ -300,13 +299,13 @@ private fun recentlyRecordedSection(
     return HomeSection.RecentlyRecorded(items)
 }
 
-/** One summary card for the next scheduled recording; nothing scheduled means no section at all. */
+/** Next-first scheduled recordings; nothing scheduled means no section at all. */
 private fun upcomingSection(input: HomeInput): HomeSection.Upcoming? {
     val scheduled = input.dvrEntries
         .filter { it.state == DvrEntryState.SCHEDULED }
         .sortedBy { it.start?.epochSeconds ?: Long.MAX_VALUE }
-    val next = scheduled.firstOrNull() ?: return null
-    return HomeSection.Upcoming(listOf(UpcomingItem(next = next, moreCount = scheduled.size - 1)))
+    if (scheduled.isEmpty()) return null
+    return HomeSection.Upcoming(scheduled.take(10).map { UpcomingItem(it) })
 }
 
 private fun isRunningAt(event: EpgEventEntry, nowSec: Long): Boolean =
@@ -319,7 +318,7 @@ private fun HomeSection.itemKeys(): List<String> = when (this) {
     is HomeSection.Genres -> items.map { "genre:${it.category.name}" }
     is HomeSection.ContinueWatching -> items.map { "recording:${it.entry.id.value}" }
     is HomeSection.RecentlyRecorded -> items.map { "recording:${it.entry.id.value}" }
-    is HomeSection.Upcoming -> items.map { "upcoming" }
+    is HomeSection.Upcoming -> items.map { "recording:${it.entry.id.value}" }
 }
 
 /** The playing side names the card when one plays; otherwise the running recording does. */

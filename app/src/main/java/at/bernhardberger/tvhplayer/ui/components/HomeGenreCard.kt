@@ -5,6 +5,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -48,6 +49,21 @@ internal fun HomeGenreCard(
     val label = programmeCategoryLabel(category)
     val dot = colors?.base ?: Color.Transparent
     val container = colors?.tint ?: TvSurfaceColors.containerLowest
+    HomeTextCard(label, onClick, modifier, onLongClick, containerColor = container,
+        leading = { Box(Modifier.size(10.dp).background(dot, CircleShape)) })
+}
+
+/** The same compact text-card kit for genres and scheduled recordings. */
+@Composable
+internal fun HomeTextCard(
+    title: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
+    subtitle: String? = null,
+    containerColor: Color = TvSurfaceColors.containerLowest,
+    leading: (@Composable () -> Unit)? = null,
+) {
     val interaction = remember { MutableInteractionSource() }
     val ring = rememberCardFocusRing(interaction)
     val contextMenu = rememberBrowseContextMenuTrigger(onLongClick, menuKey = true)
@@ -57,12 +73,12 @@ internal fun HomeGenreCard(
         interactionSource = interaction,
         modifier = modifier
             .height(HomeGenreCardHeight)
-            .semantics(mergeDescendants = true) { contentDescription = label }
+            .semantics(mergeDescendants = true) { contentDescription = listOfNotNull(title, subtitle).joinToString(", ") }
             .cardFocusRing(ring, MaterialTheme.colorScheme.onSurface)
             .then(contextMenu.modifier),
         colors = CardDefaults.colors(
-            containerColor = container,
-            focusedContainerColor = container,
+            containerColor = containerColor,
+            focusedContainerColor = containerColor,
         ),
         glow = CardDefaults.glow(),
         scale = EmbeddedProgressCardScale,
@@ -73,14 +89,18 @@ internal fun HomeGenreCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Box(Modifier.size(10.dp).background(dot, CircleShape))
-            Text(
-                label,
-                style = MaterialTheme.typography.titleMedium,
-                color = TvTextColors.primary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            leading?.invoke()
+            Column {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TvTextColors.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.labelSmall,
+                    color = TvTextColors.secondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
         }
     }
 }

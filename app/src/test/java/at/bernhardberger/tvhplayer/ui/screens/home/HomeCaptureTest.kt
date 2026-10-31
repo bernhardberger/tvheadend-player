@@ -25,6 +25,10 @@ import androidx.compose.ui.platform.isDebugInspectorInfoEnabled
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isFocused
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onNodeWithTag
@@ -146,7 +150,7 @@ class HomeCaptureTest {
         capture("4-continue", "home-shelf-0")
         key(Key.DirectionDown)
         key(Key.DirectionDown)
-        capture("4b-upcoming", "home-upcoming")
+        capture("4b-upcoming", "home-upcoming-0")
     }
 
     @Test
@@ -176,6 +180,7 @@ class HomeCaptureTest {
         show(Kind.BROWSE, screen = true)
         settle("home-recent-0")
         key(Key.DirectionUp)
+        key(Key.DirectionRight)
         key(Key.Enter)
         capture("11-options", "home-view-CURRENT_ACTIVITY")
     }
@@ -271,7 +276,7 @@ class HomeCaptureTest {
         assertFocusedHeadingTop("home-heading-RECENT_CHANNELS")
         key(Key.DirectionUp)
         compose.mainClock.advanceTimeBy(600)
-        awaitFocus("home-view-button")
+        awaitFocus("home-tags-button")
         assertTrue("header scrolls back with the page", bounds("home-header").top >= 0.dp)
         key(Key.DirectionDown)
         compose.mainClock.advanceTimeBy(600)
@@ -288,6 +293,36 @@ class HomeCaptureTest {
         assertTop("home-onnow-0", HomeImmersiveSlot.value)
         compose.onNodeWithTag("channels-immersive-background").assertDoesNotExist()
         assertEquals(1f, layerAlpha("home-on-now-block"), 0.02f)
+    }
+
+    @Test
+    fun lastRowNeverMovesDownOnEntry() = atEvening {
+        show(Kind.BROWSE)
+        settle("home-recent-0")
+        repeat(4) { key(Key.DirectionDown) }
+        settle("home-shelf-0")
+        var previous = bounds("home-upcoming-0").top.value
+        compose.mainClock.autoAdvance = false
+        key(Key.DirectionDown)
+        repeat(14) {
+            compose.mainClock.advanceTimeBy(50, ignoreFrameDuration = true)
+            val y = bounds("home-upcoming-0").top.value
+            assertTrue("last row never moves down: $previous -> $y", y <= previous + 0.5f)
+            previous = y
+        }
+        awaitFocus("home-upcoming-0")
+        assertTrue("last card fits the canvas", bounds("home-upcoming-0").bottom <= 540.dp)
+        capture("20-upcoming", "home-upcoming-0")
+    }
+
+    @Test
+    fun warmDownInRowTravelsOnce() = atEvening {
+        show(Kind.WARM)
+        settle("home-activity-0")
+        key(Key.DirectionDown)
+        settle("home-recent-0")
+        compose.mainClock.autoAdvance = false
+        strip("warm-down-into", Key.DirectionDown, "home-onnow-0", expanded = true)
     }
 
     @Test
@@ -314,7 +349,7 @@ class HomeCaptureTest {
             Key.DirectionUp to "home-genre-0",
             Key.DirectionUp to "home-onnow-0",
             Key.DirectionUp to "home-recent-0",
-            Key.DirectionUp to "home-view-button",
+            Key.DirectionUp to "home-tags-button",
         ).forEach { (direction, tag) ->
             key(direction)
             compose.mainClock.advanceTimeBy(50, ignoreFrameDuration = true)
@@ -322,7 +357,7 @@ class HomeCaptureTest {
             assertOpacityEnvelope()
         }
         compose.mainClock.advanceTimeBy(700)
-        awaitFocus("home-view-button")
+        awaitFocus("home-tags-button")
         assertSettledOpacity(false)
         assertEquals(1f, layerAlpha("home-section-RECENT_CHANNELS"), 0.02f)
     }
@@ -354,7 +389,7 @@ class HomeCaptureTest {
         show(Kind.FIRST_RUN)
         settle("home-onnow-0")
         key(Key.DirectionUp)
-        settle("home-view-button")
+        settle("home-tags-button")
         compose.mainClock.autoAdvance = false
         strip("first-run-header-down", Key.DirectionDown, "home-onnow-0", expanded = true)
         assertTop("home-onnow-0", HomeImmersiveSlot.value)
@@ -386,7 +421,7 @@ class HomeCaptureTest {
             val elapsed = frame * 16f
             assertEquals("raw block at $elapsed", ((elapsed - 100f) / 270f).coerceIn(0f, 1f), motion.block.value, 0.01f)
             assertEquals("raw background at $elapsed", ((elapsed - 100f) / 370f).coerceIn(0f, 1f), motion.background.value, 0.01f)
-            assertEquals("entry page progress at $elapsed", CubicBezierEasing(0.2f, 0f, 0f, 1f).transform((elapsed / 340f).coerceIn(0f, 1f)), motion.progress.value, 0.01f)
+            assertEquals("entry page progress at $elapsed", HomeDownInEasing.transform((elapsed / HomeDownInMs).coerceIn(0f, 1f)), motion.progress.value, 0.01f)
         }
         compose.mainClock.advanceTimeBy(100)
         // Fully expanded -> Down out -> ordinary Down: the exit must keep fading, not freeze.
@@ -507,7 +542,7 @@ class HomeCaptureTest {
             if (frame > 0) compose.mainClock.advanceTimeBy(50, ignoreFrameDuration = true)
             compose.waitForIdle()
             assertOpacityEnvelope()
-            if (name == "up-out") rowTops += bounds("home-onnow-0").top.value
+            if (name == "up-out" || name.endsWith("down-into")) rowTops += bounds("home-onnow-0").top.value
             val elapsed = frame * 50f
             val delay = when (name) {
                 "down-into", "first-run-header-down" -> 100f
@@ -546,6 +581,8 @@ class HomeCaptureTest {
         assertSettledOpacity(expanded)
         if (name == "up-out") assertTrue("Up-out row travels monotonically: $rowTops",
             rowTops.zipWithNext().all { (a, b) -> b >= a - 0.5f })
+        if (name.endsWith("down-into")) assertTrue("Down-in row travels monotonically: $rowTops",
+            rowTops.zipWithNext().all { (a, b) -> b <= a + 0.5f })
         File(out, "strips/$name.png").apply { parentFile!!.mkdirs() }.outputStream().use {
             assertTrue(strip.compress(Bitmap.CompressFormat.PNG, 100, it))
         }
@@ -555,6 +592,42 @@ class HomeCaptureTest {
     private fun activity(items: Int) = atEvening {
         show(Kind.WARM, items)
         capture("act-half-$items", "home-activity-0")
+    }
+
+    @Test fun activityStatesKeepOneRecordingMark() = atEvening {
+        val scene = scene(Kind.WARM, 2, false, false)
+        val channel = scene.input.channels.first { it.id == ChannelId(3) }
+        val event = scene.input.currentEvents.getValue(channel.id)
+        val running = running(901, channel.id.value, 300, event.title, 103, scene.nowSec, 20, 40)
+        val finished = scene.input.dvrEntries.first { it.id == DvrEntryId(201) }
+        installFixtures()
+        compose.setContent { TVHeadendPlayerTheme {
+            view = LocalView.current
+            ProvideArtworkSession(scene.observation.currentSession, scene.observation) {
+                Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                    androidx.compose.foundation.layout.Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp)) {
+                        at.bernhardberger.tvhplayer.ui.components.HomeActivityCard(channel, event, running, true, scene.nowSec,
+                            268.dp, "Live and recording", {}, Modifier.testTag("activity-live-recording"))
+                        at.bernhardberger.tvhplayer.ui.components.HomeActivityCard(channel, null, running, false, scene.nowSec,
+                            268.dp, "Recording only", {}, Modifier.testTag("activity-recording-only"))
+                        at.bernhardberger.tvhplayer.ui.components.HomeActivityCard(scene.input.channels.first { it.id == ChannelId(6) }, null,
+                            finished, true, scene.nowSec, 268.dp, "Finished recording playback", {},
+                            Modifier.testTag("activity-finished"), playingRecording = true)
+                    }
+                }
+            }
+        } }
+        compose.onNodeWithTag("activity-live-recording").requestFocus()
+        compose.onNodeWithTag("channel-recording-indicator", useUnmergedTree = true).assertDoesNotExist()
+        listOf("activity-live-recording", "activity-recording-only").forEach { tag ->
+            compose.onAllNodes(hasTestTag("recording-badge") and hasAnyAncestor(hasTestTag(tag)), useUnmergedTree = true).assertCountEquals(1)
+        }
+        listOf("activity-live-recording", "activity-finished").forEach { tag ->
+            compose.onNode(hasTestTag("channel-playing-indicator") and hasAnyAncestor(hasTestTag(tag)), useUnmergedTree = true).assertExists()
+        }
+        compose.onNode(hasTestTag("recording-badge") and hasAnyAncestor(hasTestTag("activity-finished")), useUnmergedTree = true).assertDoesNotExist()
+        compose.onAllNodes(hasContentDescription("Recording") and hasAnyAncestor(hasTestTag("activity-finished")), useUnmergedTree = true).assertCountEquals(1)
+        capture("21-activity-recording-marks", "activity-live-recording")
     }
 
     private enum class Kind { BROWSE, WARM, FIRST_RUN, LOADING, EMPTY, OFFLINE }

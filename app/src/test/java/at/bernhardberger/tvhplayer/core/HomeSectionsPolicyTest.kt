@@ -313,9 +313,14 @@ class HomeSectionsPolicyTest {
             ),
             sections.map { it.kind },
         )
-        val upcoming = sections.filterIsInstance<HomeSection.Upcoming>().single().items.single()
-        assertEquals(31L, upcoming.next.id.value)
-        assertEquals(1, upcoming.moreCount)
+        val upcoming = sections.filterIsInstance<HomeSection.Upcoming>().single().items
+        assertEquals(listOf(31L, 32L), upcoming.map { it.entry.id.value })
+    }
+
+    @Test fun upcomingIsNextFirstCappedAtTenAndSkipsOtherStates() {
+        val scheduled = (1L..12L).map { entry(it, DvrEntryState.SCHEDULED, start = nowSec + it * 60) }
+        val sections = homeSections(homeInput(dvrEntries = scheduled.reversed() + entry(20, DvrEntryState.COMPLETED)))
+        assertEquals((1L..10L).toList(), sections.filterIsInstance<HomeSection.Upcoming>().single().items.map { it.entry.id.value })
     }
 
     @Test fun emptyInputYieldsNoSections() {

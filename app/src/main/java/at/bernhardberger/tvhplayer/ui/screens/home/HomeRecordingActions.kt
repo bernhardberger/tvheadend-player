@@ -53,6 +53,11 @@ internal fun HomeRecordingActions(
     val channel = opened.channelId?.let(observation::channel)
     val closeBehindPlayer = rememberCloseBehindPlayer()
     val pending = rememberPlayerEntryPending()
+    val watchLive: (() -> Unit)? = if (recordingIsRunning(opened) && channel != null && capability != null) ({
+        if (owner?.isCurrent != false && session.observation.value.currentSession === capability) {
+            closeBehindPlayer(onClose); onWatchChannel(channel.id, channel.name.orEmpty())
+        }
+    }) else null
     val play: (RecordingPlaybackStart) -> Unit = { start ->
         val current = session.observation.value
         if (owner?.isCurrent != false && capability != null && current.currentSession === capability &&
@@ -96,8 +101,9 @@ internal fun HomeRecordingActions(
                 opened.stop?.epochSeconds, androidx.compose.ui.platform.LocalConfiguration.current.locales[0]),
             summary = opened.summary?.takeIf(String::isNotBlank) ?: opened.description.orEmpty(),
             recordingState = opened.state,
+            resumePositionMs = offeredResumePosition(admission)?.inWholeMilliseconds,
             playbackIndicator = watchingIndicator(opened.id),
-            actions = recordingContextActions(opened, admission, canModify,
+            actions = recordingContextActions(opened, admission, canModify, canWatchChannel = watchLive != null,
                 playing = capability != null && at.bernhardberger.tvhplayer.ui.warmRecordingId(
                     LocalWatchingTarget.current, LocalRecordingPlaybackSelection.current, observation.currentSession) == opened.id),
             modifier = Modifier.onPreviewKeyEvent { pending() || mutationBusy },
@@ -109,6 +115,7 @@ internal fun HomeRecordingActions(
                     BrowseContextAction.CONTINUE_WATCHING -> onReturnToRecording(opened.id) { closeBehindPlayer(onClose) }
                     BrowseContextAction.WATCH, BrowseContextAction.RESUME -> play(RecordingPlaybackStart.RESUME)
                     BrowseContextAction.PLAY, BrowseContextAction.START_OVER -> play(RecordingPlaybackStart.START_OVER)
+                    BrowseContextAction.WATCH_LIVE -> watchLive?.invoke()
                     BrowseContextAction.STOP -> capability?.let { pendingMutation = DvrMutationAction.Stop(it, opened.id) }
                     BrowseContextAction.CANCEL -> capability?.let { pendingMutation = DvrMutationAction.Cancel(it, opened.id) }
                     BrowseContextAction.DELETE -> capability?.let { pendingMutation = DvrMutationAction.Delete(it, opened.id) }
@@ -139,16 +146,12 @@ internal fun HomeRecordingActions(
             } },
         )
     } else {
-        val active = recordingIsRunning(opened) && channel != null && capability != null
+        val active = watchLive != null
         val choice = active || recordingOpenAction(admission) == RecordingOpenAction.RESUME_CHOICE
         LaunchedEffect(choice) { if (!choice) details = true }
         if (choice) RecordingPlaybackChoice(opened, admission, observation, channel, nowSec,
             onPlay = play, onClose = onClose,
-            onWatchLive = if (active) ({
-                if (owner?.isCurrent != false && session.observation.value.currentSession === capability) {
-                    closeBehindPlayer(onClose); onWatchChannel(requireNotNull(channel).id, channel.name.orEmpty())
-                }
-            }) else null)
+            onWatchLive = watchLive)
     }
     pendingMutation?.takeIf { capability != null && pendingCurrent }?.let { mutation ->
         val action = when (mutation) {

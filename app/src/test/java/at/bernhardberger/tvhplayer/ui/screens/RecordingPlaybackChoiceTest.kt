@@ -51,6 +51,8 @@ class RecordingPlaybackChoiceTest {
         val visible = mutableStateOf(true)
         var watched = 0
         show(null, watch = { watched++ }, visible = visible, close = { visible.value = false })
+        compose.onNodeWithText("Play recording").assertExists()
+        compose.onNodeWithText("Watch from beginning").assertDoesNotExist()
         compose.onNodeWithTag("recording-resume").assertDoesNotExist()
         compose.onNodeWithTag("recording-start-over").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionLeft) }
@@ -69,6 +71,16 @@ class RecordingPlaybackChoiceTest {
         compose.onNodeWithTag("recording-resume").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionCenter) }
         compose.runOnIdle { assertEquals(listOf(RecordingPlaybackStart.RESUME), starts) }
+    }
+
+    @Test fun endsAtInEyebrowDoesNotResizeDialogWhenWatchingChannel() {
+        show(754L, watch = {})
+        val before = compose.onNodeWithTag("centred-dialog-card").getUnclippedBoundsInRoot()
+        compose.onNodeWithText("Ends at", substring = true).assertExists()
+        compose.onNodeWithTag("recording-resume").performKeyInput { pressKey(Key.DirectionLeft) }
+        compose.onNodeWithTag("recording-watch-live").assertIsFocused()
+        compose.onNodeWithText("Ends at", substring = true).assertDoesNotExist()
+        assertEquals(before, compose.onNodeWithTag("centred-dialog-card").getUnclippedBoundsInRoot())
     }
 
     private fun show(position: Long?, watch: (() -> Unit)? = null,

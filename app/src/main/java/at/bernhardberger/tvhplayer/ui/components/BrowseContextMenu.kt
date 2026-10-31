@@ -70,6 +70,7 @@ internal fun BrowseContextMenu(
     programDetailsLabel: Boolean = false,
     backEnabled: Boolean = true,
     recordingState: DvrEntryState? = null,
+    resumePositionMs: Long? = null,
     /** The playing item's mark, drawn as Continue watching's icon. */
     playbackIndicator: ChannelPlaybackIndicator = ChannelPlaybackIndicator.NONE,
     artwork: @Composable () -> Unit,
@@ -107,8 +108,12 @@ internal fun BrowseContextMenu(
         actions.forEachIndexed { index, action ->
             key(action) {
                 TwoColumnDialogButton(
-                    stringResource(if (programDetailsLabel && action == BrowseContextAction.DETAILS)
-                        R.string.details_program else action.label(watchChannel)),
+                    stringResource(when {
+                        action == BrowseContextAction.WATCH_LIVE && recordingState in
+                            listOf(DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR) -> R.string.recording_choice_watch_channel
+                        programDetailsLabel && action == BrowseContextAction.DETAILS -> R.string.details_program
+                        else -> action.label(watchChannel)
+                    }),
                     { onAction(action) },
                     Modifier.focusRequester(requesters.getValue(action))
                         .onFocusChanged { if (it.isFocused) { focusedAction = action; focusedIndex = index } }
@@ -116,7 +121,11 @@ internal fun BrowseContextMenu(
                             up = actions.getOrNull(index - 1)?.let(requesters::get) ?: FocusRequester.Cancel
                             down = actions.getOrNull(index + 1)?.let(requesters::get) ?: FocusRequester.Cancel
                             left = FocusRequester.Cancel; right = FocusRequester.Cancel
-                        }) {
+                        },
+                    subtitle = resumePositionMs?.takeIf { action == BrowseContextAction.RESUME && it > 0 }
+                        ?.let { stringResource(at.bernhardberger.tvhplayer.R.string.context_resume_from,
+                            at.bernhardberger.tvhplayer.core.formatPlaybackDuration(it)) },
+                ) {
                     BrowseContextActionIcon(action, playbackIndicator.takeIf {
                         action == BrowseContextAction.CONTINUE_WATCHING } ?: ChannelPlaybackIndicator.NONE, 24.dp)
                 }

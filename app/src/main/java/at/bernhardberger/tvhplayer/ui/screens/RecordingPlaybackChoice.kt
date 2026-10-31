@@ -52,13 +52,14 @@ internal fun RecordingPlaybackChoice(
     CentredDialog(
         title = entry.title.orEmpty(),
         secondaryText = programmeEpisodeLine(entry.episode, entry.subtitle, resources),
-        text = if (liveFocused) "" else if (startFocused) startEnd else resumeEnd,
+        text = "",
         eyebrow = {
             ProvideArtworkSession(observation.currentSession, observation) {
                 ProgrammeEyebrow(channel?.icon, listOfNotNull(
                     (channel?.let { channelTitleText(it.number, it.name.orEmpty()) }
                         ?: entry.channelName)?.takeIf(String::isNotBlank),
                     entry.start?.epochSeconds?.formatDateTime(LocalConfiguration.current.locales[0]),
+                    (if (liveFocused) "" else if (startFocused) startEnd else resumeEnd).takeIf(String::isNotBlank),
                 ).joinToString(" • "), Modifier.fillMaxWidth(), Modifier.testTag("recording-resume-picon"))
             }
         },
@@ -97,9 +98,9 @@ internal fun RecordingPlaybackChoice(
                 .focusProperties { left = if (resumePosition != null) resumeFocus else if (onWatchLive != null) liveFocus else FocusRequester.Cancel; right = FocusRequester.Cancel }
                 .testTag("recording-start-over")
         val startContent: @Composable RowScope.() -> Unit = {
-            Icon(painterResource(R.drawable.ic_replay), null, Modifier.size(ButtonDefaults.IconSize))
+            Icon(painterResource(if (resumePosition == null) R.drawable.ic_play_arrow else R.drawable.ic_replay), null, Modifier.size(ButtonDefaults.IconSize))
             Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-            Text(stringResource(R.string.context_start_over), maxLines = 1, softWrap = false)
+            Text(stringResource(if (resumePosition == null) R.string.recording_choice_play else R.string.context_start_over), maxLines = 1, softWrap = false)
         }
         if (resumePosition == null) Button(
             onClick = { onPlay(RecordingPlaybackStart.START_OVER) }, modifier = startModifier,

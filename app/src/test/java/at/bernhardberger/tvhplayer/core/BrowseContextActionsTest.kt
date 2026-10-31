@@ -126,6 +126,22 @@ class BrowseContextActionsTest {
         assertEquals(listOf(DETAILS, CANCEL), actions(recording(DvrEntryState.SCHEDULED)))
     }
 
+    @Test fun watchChannelFollowsPlaybackOnlyForRunningRecordingsWithATunePath() {
+        val running = recording(DvrEntryState.RECORDING, 20, listOf(file()))
+        val observation = SessionObservation.create(recordingProgressCapability = RecordingProgressCapability.SUPPORTED)
+        assertEquals(listOf(WATCH, START_OVER, WATCH_LIVE, DETAILS, STOP), recordingContextActions(
+            running, observation.recordingPlaybackAdmission(running), true, canWatchChannel = true))
+        assertEquals(listOf(CONTINUE_WATCHING, START_OVER, WATCH_LIVE, DETAILS, STOP), recordingContextActions(
+            running, observation.recordingPlaybackAdmission(running), true, playing = true, canWatchChannel = true))
+        listOf(DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR, DvrEntryState.COMPLETED, DvrEntryState.SCHEDULED).forEach { state ->
+            val entry = recording(state)
+            val actions = recordingContextActions(entry, null, false, canWatchChannel = true)
+            assertEquals("$state", state == DvrEntryState.RECORDING || state == DvrEntryState.RECORDING_ERROR,
+                WATCH_LIVE in actions)
+            assertEquals(listOf(DETAILS), recordingContextActions(entry, null, false, canWatchChannel = false))
+        }
+    }
+
     @Test fun failedRecordingsWithoutAPlayableFileOnlyOfferDetailsAndDelete() {
         listOf(DvrEntryState.MISSED, DvrEntryState.INVALID,
             DvrEntryState.COMPLETED_ERROR, DvrEntryState.FILE_MISSING).forEach {
