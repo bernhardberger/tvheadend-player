@@ -265,8 +265,9 @@ Opus coverage:
 | Low: small visual tweaks | none; the primary checks the captures | none |
 
 The Sonnet reviewer judges hierarchy, flows and copy; the Sol reviewer measures
-safe areas and checks wording. When Claude quota is short, use
-`deepseek/deepseek-flash#max` as the judgement reviewer. Every packet states the
+safe areas and checks wording. When Claude quota is short, run only the Sol
+reviewer, record the Sonnet judgement review as missing, and let the owner
+choose to run it later or name a substitute. Every packet states the
 layout and reading-order rules (group by reading path, focus follows the
 hierarchy) and the owner's accepted and rejected decisions. Layout direction
 stays with the owner. Basis: a 2026-10-30 trial of eleven models on the U15
