@@ -77,6 +77,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
@@ -166,6 +167,7 @@ import kotlin.math.roundToInt
 import androidx.compose.ui.text.rememberTextMeasurer
 
 internal val HomeEndCardKeys = setOf("all-recordings", "all-channels", "all-scheduled")
+private val HomeActivationKeys = setOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter)
 
 /** An ordinary focused row's heading sits at this offset from the page's top edge. */
 private val HomeTopSlot = 76.dp
@@ -394,7 +396,8 @@ internal fun HomeContent(
     var onNowRowTop by remember { mutableFloatStateOf(0f) }
     var viewportHeight by remember { mutableIntStateOf(0) }
     var contentEnd by remember { mutableFloatStateOf(0f) }
-    var focusedBottomSlack by remember { mutableFloatStateOf(0f) }
+    // Page offset minus the focused row's top when it took focus: holds its place on screen.
+    var focusedRowAnchor by remember { mutableStateOf<Float?>(null) }
 
     val scrollTarget: (HomeSectionKind?) -> Float = { kind ->
         val viewport = viewportHeight.toFloat()
@@ -408,10 +411,10 @@ internal fun HomeContent(
         }
         val insertedAboveFocus = kind != null && kind == focusedSection &&
             sections.takeWhile { it.kind != kind }.any { it.kind !in focusedPrecedingSections }
-        // On a short page, newly inserted rows must not spend the old bottom slack by
-        // pushing the focused row down. Preserve that slack until the viewer changes rows.
-        val bottomSlack = if (insertedAboveFocus) focusedBottomSlack else 0f
-        if (renderedSections.size >= sections.size) minOf(desired, (contentEnd - viewport + bottomSlack).coerceAtLeast(0f))
+        // On a short page, a row inserted above must not push the focused row down, whatever
+        // happens below it. Hold the row where it was until the viewer changes rows.
+        val heldOffset = focusedRowAnchor?.takeIf { insertedAboveFocus }?.let { anchor -> tops[kind]?.plus(anchor) }
+        if (renderedSections.size >= sections.size) minOf(desired, (heldOffset ?: (contentEnd - viewport)).coerceAtLeast(0f))
         else desired
     }
     val motion = rememberHomePageMotion(focusedSection, scrollTarget)
@@ -448,6 +451,10 @@ internal fun HomeContent(
                 return@LaunchedEffect
             }
             withFrameNanos { }
+        }
+        // Never strand focus on the invisible action: the header takes over, else the slot goes.
+        if (sections.isNotEmpty() && emptyHasFocus && !runCatching { viewRequester.requestFocus() }.getOrDefault(false)) {
+            emptyHasFocus = false
         }
     }
 
@@ -557,16 +564,20 @@ internal fun HomeContent(
                 // Keep the focused action attached until the first card accepts focus. Removing
                 // it first lets non-touch-mode focus search escape to the navigation rail.
                 if (sections.isEmpty() || emptyHasFocus) {
+                    val handingOff = sections.isNotEmpty()
                     Box(Modifier
                         .layout { measurable, constraints ->
                             val placeable = measurable.measure(constraints)
-                            layout(placeable.width, if (sections.isEmpty()) placeable.height else 0) {
+                            layout(placeable.width, if (handingOff) 0 else placeable.height) {
                                 placeable.place(0, 0)
                             }
                         }
                         .height(emptyHeight)
-                        .graphicsLayer { alpha = if (sections.isEmpty()) 1f else 0f }
-                        .onFocusChanged { emptyHasFocus = it.hasFocus }) { emptyContent() }
+                        .graphicsLayer { alpha = if (handingOff) 0f else 1f }
+                        .onFocusChanged { emptyHasFocus = it.hasFocus }
+                        // Invisible during the hand-off, so it can be neither pressed nor announced.
+                        .onPreviewKeyEvent { handingOff && it.key in HomeActivationKeys }
+                        .then(if (handingOff) Modifier.clearAndSetSemantics { } else Modifier)) { emptyContent() }
                 }
                 renderedSections.forEach { section -> key(section.kind) {
                     val kind = section.kind
@@ -592,7 +603,7 @@ internal fun HomeContent(
                     }
                     val onCardFocus: (Int, String) -> Unit = { index, key ->
                         if (focusedCard?.section != kind) {
-                            focusedBottomSlack = (viewportHeight - contentEnd).coerceAtLeast(0f)
+                            focusedRowAnchor = tops[kind]?.let { top -> scrollTarget(kind) - top }
                         }
                         onSectionFocus()
                         focusedCard = HomeFocusKey(kind, key, index)
@@ -897,7 +908,6 @@ private fun <T> HomeCardRow(
     val start = keyline + underlap
     val density = LocalDensity.current
     val offscreenPx = with(density) { CompactZapRowOffscreen.roundToPx() }
-    val ltr = LocalLayoutDirection.current == LayoutDirection.Ltr
     var screenEdge by remember { mutableFloatStateOf(0f) }
     val state = rememberLazyListState(initialFirstVisibleItemIndex = entryIndex.coerceAtLeast(0))
     var rememberedIndex by remember { mutableIntStateOf(entryIndex) }

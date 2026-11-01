@@ -255,6 +255,11 @@ internal fun HomeScreenContent(
         ?: connectionUiState.browseAppError(noChannels = catalogCurrent && input.channels.isEmpty() && !hasChannelsOutsideScope)
             .takeIf { connectionUiState == ConnectionUiState.Ready }
         else null
+    // The empty slot outlives the first rows until a card takes focus: swapping the alert for the
+    // empty state in that moment would drop its focused action onto the navigation rail.
+    var lastEmptyError by remember { mutableStateOf(error) }
+    SideEffect { if (sections.isEmpty()) lastEmptyError = error }
+    val shownError = if (sections.isEmpty()) error else lastEmptyError
     val loading = sections.isEmpty() && error == null && !catalogCurrent && input.channels.isEmpty()
     var loadingDelayed by remember(loading) { mutableStateOf(false) }
     LaunchedEffect(loading) {
@@ -291,7 +296,7 @@ internal fun HomeScreenContent(
         emptyFocus = errorFocus.takeUnless { loading && !loadingDelayed },
         onViewOptions = openOptions,
         emptyContent = {
-            if (error != null) AppErrorAlert(error = error, actionFocus = errorFocus,
+            if (shownError != null) AppErrorAlert(error = shownError, actionFocus = errorFocus,
                 leadingExit = LocalBrowseNavigationFocus.current ?: FocusRequester.Default,
                 upExit = viewFocus, modifier = Modifier.fillMaxSize(), onAction = {
                     when (it) {

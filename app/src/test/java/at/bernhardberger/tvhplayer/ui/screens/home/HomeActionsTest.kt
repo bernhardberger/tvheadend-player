@@ -228,6 +228,122 @@ class HomeActionsTest {
             else androidx.tv.material3.DrawerValue.Closed, drawer.currentValue) }
     }
 
+    private fun onNowSections() = listOf(HomeSection.OnNow(listOf(OnNowItem(channel,
+        EpgEvent.create(EventId(1), channel.id, Instant.fromEpochSeconds(now - 60),
+            Instant.fromEpochSeconds(now + 600), title = "Programme")))))
+
+    @Test fun aHandOffThatNeverLandsCannotBePressedAndMovesFocusToTheHeader() {
+        leaveTouchMode()
+        var sections by mutableStateOf(emptyList<HomeSection>())
+        var pressed = 0
+        val empty = androidx.compose.ui.focus.FocusRequester()
+        compose.setContent { TVHeadendPlayerTheme {
+            // A section that is not on the page can never take the entry focus.
+            HomeContent(sections, PaddingValues(),
+                HomeFocusKey(HomeSectionKind.UPCOMING, "missing", 0).takeIf { sections.isNotEmpty() }, {}, emptyFocus = empty,
+                emptyContent = {
+                    androidx.tv.material3.Button({ pressed++ }, modifier = androidx.compose.ui.Modifier
+                        .focusRequester(empty).testTag("empty-action")) { androidx.tv.material3.Text("Browse channels") }
+                })
+        } }
+        compose.onNodeWithTag("empty-action").assertIsFocused().performKeyInput { pressKey(Key.Enter) }
+        compose.runOnIdle { assertEquals("The visible action must work", 1, pressed) }
+        compose.mainClock.autoAdvance = false
+        compose.runOnIdle { sections = onNowSections() }
+        repeat(5) { compose.waitForIdle(); compose.mainClock.advanceTimeByFrame() }
+        // Hidden: gone from the semantics tree, still holding focus.
+        compose.onNodeWithTag("empty-action").assertDoesNotExist()
+        compose.onAllNodes(isFocused()).assertCountEquals(0)
+        compose.onRoot().performKeyInput { keyDown(Key.Enter) }
+        repeat(3) { compose.waitForIdle(); compose.mainClock.advanceTimeByFrame() }
+        compose.onRoot().performKeyInput { keyUp(Key.Enter) }
+        repeat(3) { compose.waitForIdle(); compose.mainClock.advanceTimeByFrame() }
+        compose.runOnIdle { assertEquals("The hidden action must not", 1, pressed) }
+        compose.mainClock.autoAdvance = true
+        compose.mainClock.advanceTimeBy(2_000)
+        compose.onNodeWithTag("home-view-button").assertIsFocused()
+        compose.onNodeWithTag("empty-action").assertDoesNotExist()
+    }
+
+    @Test fun firstSectionsReplacingAFocusedErrorDoNotOpenTheDrawer() {
+        leaveTouchMode()
+        var input by mutableStateOf(HomeInput(emptyList(), emptyMap(), emptyList(), emptyList(), emptyList(), { null }, null, now))
+        val rail = androidx.compose.ui.focus.FocusRequester()
+        lateinit var drawer: androidx.tv.material3.DrawerState
+        compose.setContent { TVHeadendPlayerTheme {
+            drawer = androidx.tv.material3.rememberDrawerState(androidx.tv.material3.DrawerValue.Closed)
+            CompositionLocalProvider(LocalBrowseDrawerState provides drawer, LocalBrowseNavigationFocus provides rail) {
+                androidx.compose.foundation.layout.Box {
+                    HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
+                        onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
+                        onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> }, catalogCurrent = true)
+                    androidx.tv.material3.Button({}, modifier = androidx.compose.ui.Modifier.focusRequester(rail)
+                        .onFocusChanged { if (it.isFocused) drawer.setValue(androidx.tv.material3.DrawerValue.Open) }
+                        .testTag("test-rail")) { androidx.tv.material3.Text("Home") }
+                }
+            }
+        } }
+        compose.mainClock.advanceTimeBy(600)
+        compose.onNodeWithTag("test-rail").assertIsNotFocused()
+        compose.onAllNodes(isFocused()).assertCountEquals(1)
+        compose.runOnIdle { input = input.copy(channels = listOf(channel), recentChannelIds = listOf(channel.id)) }
+        compose.mainClock.advanceTimeBy(600)
+        compose.onNodeWithTag("home-recent-0").assertIsFocused()
+        compose.runOnIdle { assertEquals(androidx.tv.material3.DrawerValue.Closed, drawer.currentValue) }
+    }
+
+    @Test fun aRecordingReplacingTheRowBelowKeepsTheFocusedRowInPlace() {
+        val second = Channel.create(ChannelId(2), name = "Second")
+        val scheduled = DvrEntry.create(DvrEntryId(7), channelId = channel.id, title = "Soon",
+            state = DvrEntryState.SCHEDULED, start = Instant.fromEpochSeconds(now + 600), stop = Instant.fromEpochSeconds(now + 1800))
+        var input by mutableStateOf(HomeInput(listOf(channel, second), emptyMap(), emptyList(),
+            listOf(channel.id, second.id), listOf(scheduled), { null }, null, now))
+        compose.setContent { TVHeadendPlayerTheme {
+            HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
+                onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
+                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
+        } }
+        compose.onNodeWithTag("home-recent-0").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.mainClock.advanceTimeBy(600)
+        compose.onNodeWithTag("home-upcoming-0").assertIsFocused().performKeyInput { pressKey(Key.DirectionUp) }
+        compose.mainClock.advanceTimeBy(600)
+        compose.onNodeWithTag("home-recent-0").assertIsFocused()
+        val top = compose.onNodeWithTag("home-recent-0").getUnclippedBoundsInRoot().top.value
+        compose.runOnIdle {
+            input = input.copy(dvrEntries = listOf(DvrEntry.create(DvrEntryId(7), channelId = channel.id, title = "Soon",
+                state = DvrEntryState.RECORDING, start = Instant.fromEpochSeconds(now - 300), stop = Instant.fromEpochSeconds(now + 900))))
+        }
+        compose.mainClock.autoAdvance = false
+        repeat(40) {
+            compose.mainClock.advanceTimeByFrame()
+            compose.onNodeWithTag("home-recent-0").assertIsFocused()
+            assertEquals("The row must hold its place", top,
+                compose.onNodeWithTag("home-recent-0").getUnclippedBoundsInRoot().top.value, 1f)
+        }
+        compose.mainClock.autoAdvance = true
+        compose.onNodeWithTag("home-upcoming-0").assertDoesNotExist()
+        compose.onNodeWithTag("home-activity-0").assertExists()
+    }
+
+    @Test fun dataArrivingBeforeEntryLandsStillReachesThePriorityCard() {
+        var input by mutableStateOf(HomeInput(listOf(channel), emptyMap(), emptyList(),
+            listOf(channel.id), emptyList(), { null }, null, now))
+        compose.mainClock.autoAdvance = false
+        compose.setContent { TVHeadendPlayerTheme {
+            HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
+                onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
+                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
+        } }
+        compose.runOnIdle {
+            input = input.copy(dvrEntries = listOf(DvrEntry.create(DvrEntryId(7), channelId = channel.id,
+                title = "Running recording", state = DvrEntryState.RECORDING,
+                start = Instant.fromEpochSeconds(now - 300), stop = Instant.fromEpochSeconds(now + 900))))
+        }
+        compose.mainClock.autoAdvance = true
+        compose.mainClock.advanceTimeBy(600)
+        compose.onNodeWithTag("home-activity-0").assertIsFocused()
+    }
+
     private fun recentRowRefresh(removeFocused: Boolean) {
         val channels = (1L..3L).map { Channel.create(ChannelId(it), name = "Channel $it") }
         val recents = mutableStateOf(channels.map { it.id })
