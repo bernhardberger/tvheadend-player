@@ -36,7 +36,8 @@ internal class FieldOpenPress {
         if (isEditing || event.key !in FieldOpenKeys) return false
         return when (event.type) {
             KeyEventType.KeyDown -> {
-                pressedKey = event.key
+                // A repeat is a key held since before focus came here: it keeps the field quiet.
+                if (event.nativeKeyEvent.repeatCount == 0) pressedKey = event.key
                 true
             }
 

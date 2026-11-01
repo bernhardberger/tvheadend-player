@@ -60,6 +60,28 @@ class TvTextFieldOpenKeyTest {
         assertEditing("none")
     }
 
+    @Test
+    fun aHeldOkThatReachesAFieldOnlyAsARepeatOpensNothing() {
+        showFields()
+        compose.onNodeWithTag("text").requestFocus()
+        key(AndroidKeyEvent.ACTION_DOWN, AndroidKeyEvent.KEYCODE_DPAD_CENTER)
+        compose.onNodeWithTag("password").requestFocus()
+        key(AndroidKeyEvent.ACTION_DOWN, AndroidKeyEvent.KEYCODE_DPAD_CENTER, repeat = 1)
+        key(AndroidKeyEvent.ACTION_UP, AndroidKeyEvent.KEYCODE_DPAD_CENTER)
+        assertEditing("none")
+    }
+
+    @Test
+    fun aPressEndedByLeavingTheFieldOpensNothingOnReturn() {
+        showFields()
+        compose.onNodeWithTag("text").requestFocus()
+        key(AndroidKeyEvent.ACTION_DOWN, AndroidKeyEvent.KEYCODE_DPAD_CENTER)
+        compose.onNodeWithTag("password").requestFocus()
+        compose.onNodeWithTag("text").requestFocus()
+        key(AndroidKeyEvent.ACTION_UP, AndroidKeyEvent.KEYCODE_DPAD_CENTER)
+        assertEditing("none")
+    }
+
     private fun assertOkOpensOnRelease(id: String, code: Int) {
         key(AndroidKeyEvent.ACTION_DOWN, code)
         assertEditing("none")
