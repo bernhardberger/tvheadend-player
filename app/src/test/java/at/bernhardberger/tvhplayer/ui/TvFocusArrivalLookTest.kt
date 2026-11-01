@@ -204,10 +204,11 @@ class TvFocusArrivalLookTest {
         ))
         val notices = NoticeCenter(android.os.SystemClock::elapsedRealtime) { NoticeContext(0L, null) }
         val state = RecordingsScreenState()
+        val observation = session.observation.value
         host {
             SideRail(rootRoute = AppDestination.HOME, availableDestinations = setOf(AppDestination.HOME, AppDestination.RECORDINGS),
                 currentRoute = AppDestination.RECORDINGS, onRootBack = {}, onNavigate = {}) { padding, drawer ->
-                RecordingsScreenContent(observation = session.observation.value, currentObservation = { session.observation.value },
+                RecordingsScreenContent(observation = observation, currentObservation = { observation },
                     state = state, contentPadding = padding, initialFocusEnabled = !drawer, backEnabled = !drawer,
                     connectionUiState = ConnectionUiState.Ready, dvrMutationActions = DvrMutationActions(session.dvrRepository),
                     notices = notices, onRetry = {}, onPlayRecording = { _, _ -> })

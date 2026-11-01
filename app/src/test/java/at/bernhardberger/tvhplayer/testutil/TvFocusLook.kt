@@ -8,7 +8,6 @@ import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.AndroidComposeTestRule
 import kotlin.math.abs
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.robolectric.util.ReflectionHelpers
 import org.robolectric.util.ReflectionHelpers.ClassParameter
@@ -36,9 +35,9 @@ internal fun SemanticsNodeInteraction.assertLooksAsWhenRefocused(name: String, a
     assertTrue("$name on arrival looks as after refocus, but ${changed * 100}% of its pixels differ", changed < 0.005f)
 }
 
+/** A focused control may change size, as an on-air Guide cell does when focus clips it: all of it differs then. */
 private fun pixelDifference(a: PixelMap, b: PixelMap): Float {
-    assertEquals(a.width, b.width)
-    assertEquals(a.height, b.height)
+    if (a.width != b.width || a.height != b.height) return 1f
     var changed = 0
     for (x in 0 until a.width) for (y in 0 until a.height) {
         val p = a[x, y]; val q = b[x, y]
