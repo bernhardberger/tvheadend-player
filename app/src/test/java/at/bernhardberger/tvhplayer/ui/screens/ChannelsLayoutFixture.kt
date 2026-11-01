@@ -154,6 +154,7 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
                         val backStack = rememberAppNavBackStack(ChannelsKey)
                         ProvideArtworkSession(observation.currentSession) {
                         SideRail(
+                            rootRoute = AppDestination.HOME, availableDestinations = setOf(AppDestination.HOME, AppDestination.CHANNELS, AppDestination.GUIDE, AppDestination.RECORDINGS, AppDestination.SETTINGS),
                             currentRoute = if (backStack.last() == GuideKey) AppDestination.GUIDE else AppDestination.CHANNELS,
                             showEpgMenu = true,
                             onRootBack = {},

@@ -1471,6 +1471,7 @@ class RecordingsVisualLayoutTest {
                     backDispatcher = requireNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                         SideRail(
+                            rootRoute = AppDestination.HOME, availableDestinations = setOf(AppDestination.HOME, AppDestination.CHANNELS, AppDestination.GUIDE, AppDestination.RECORDINGS, AppDestination.SETTINGS),
                             currentRoute = AppDestination.RECORDINGS,
                             showEpgMenu = true,
                             onRootBack = { navigationRequests++ },

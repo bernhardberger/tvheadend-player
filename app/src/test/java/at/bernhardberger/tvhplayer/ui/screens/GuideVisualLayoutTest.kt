@@ -239,7 +239,7 @@ class GuideVisualLayoutTest {
             DvrEntry.create(DvrEntryId(1), eventId = events[3].id, channelId = ChannelId(2), state = DvrEntryState.RECORDING),
             DvrEntry.create(DvrEntryId(2), eventId = events[2].id, channelId = ChannelId(1), state = DvrEntryState.SCHEDULED),
         )
-        show(headline = true, history = false, channelNames = names, events = events, tagName = "Favorites", recordings = recordings)
+        show(headline = true, rows = GuideRows.DENSE, history = false, channelNames = names, events = events, tagName = "Favorites", recordings = recordings)
         key(Key.DirectionDown)
         focused("Ridge Light")
         if (store) {
@@ -3266,6 +3266,7 @@ class GuideVisualLayoutTest {
                     }
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                         SideRail(currentRoute = AppDestination.GUIDE, showEpgMenu = true,
+                            rootRoute = AppDestination.HOME, availableDestinations = setOf(AppDestination.HOME, AppDestination.CHANNELS, AppDestination.GUIDE, AppDestination.RECORDINGS, AppDestination.SETTINGS),
                             onRootBack = { navigationRequests++ }, onNavigate = { navigationRequests++ }) { padding, drawer ->
                             val view = uiSettings.settings.collectAsState(UiSettings()).value.guideView
                             rowHeight = guideTimelineRowHeight(view.rows).value
