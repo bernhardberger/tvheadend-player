@@ -64,7 +64,7 @@ subreddit's rules for posts about your own project first:
 ```text
 Title: Tvheadend client for Android TV, looking for beta testers
 
-A bit of a backstory to this project: when ORF retired Cryptoworks my mum's CI modules stopped working. I got her Google TVs instead of new modules, then couldn't find a Tvheadend app simple enough for her, so I started building one. It got a bit out of hand.
+A bit of a backstory to this project: when our SAT provider retired Cryptoworks my mum's CI modules stopped working. I got her Google TVs instead of new modules, then couldn't find a Tvheadend app simple enough for her, so I started building one. It got a bit out of hand.
 
 It's open source (GPLv3). Guide, timeshift, recordings, three channel layouts, and it all works with a plain D-pad remote.
 
