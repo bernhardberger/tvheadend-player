@@ -7,27 +7,33 @@ current release and the install path works on a real TV with your own account
 (1.9). Before posting, `ROADMAP.md` and `artwork/screenshots/home.png` have to be
 on `main`, because the posts link them.
 
-Tvheadend forum, category Client Apps, with the image
-`https://raw.githubusercontent.com/bernhardberger/tvheadend-player/main/artwork/screenshots/home.png`:
+Tvheadend forum, category Client Apps. The screenshots are inline Markdown images;
+check the preview, and attach them by hand if the forum doesn't render them:
 
 ```text
-Tvheadend Player for Android TV: join the beta
+Tvheadend Player for Android TV: beta testers welcome
 
 Hi all,
 
-I'd like to invite you to the beta of Tvheadend Player, an unofficial open source (GPLv3) Android TV client for Tvheadend that started out as a fork of tvhstream. You can do everything with just the D-pad.
+I'd like to invite you to the beta of Tvheadend Player, an unofficial open source (GPLv3) Android TV client for Tvheadend that started out as a fork of tvhstream. It's focused on a D-pad-first experience and follows Google's TV design guidelines.
 
 What's in it so far:
-- Home with what's playing or recording, recent channels and what's on now
-- Channels as cards, a grid or a list
+- A home screen that shows what's going on right now and gets you back to what you were doing
+- Channels with customizable views: an immersive list, a classic PVR-style list, or a grid to see more at a glance
 - A program guide with genre colors and a genre filter
-- Pause and rewind through your server's timeshift buffer
-- Recordings with your server's folders, resume, watched status and free space
+- Server timeshift support
+- Recordings with a folder browser
 - Audio passthrough, DVB and teletext subtitles, and frame rate switching on Android 11+
 
 Everything goes over HTSP, with no analytics, ads or accounts.
 
-Screenshots and code: https://github.com/bernhardberger/tvheadend-player
+![Home](https://raw.githubusercontent.com/bernhardberger/tvheadend-player/main/artwork/screenshots/home.png)
+![Channels](https://raw.githubusercontent.com/bernhardberger/tvheadend-player/main/artwork/screenshots/channels.png)
+![Guide](https://raw.githubusercontent.com/bernhardberger/tvheadend-player/main/artwork/screenshots/guide.png)
+![Player](https://raw.githubusercontent.com/bernhardberger/tvheadend-player/main/artwork/screenshots/player.png)
+![Recordings](https://raw.githubusercontent.com/bernhardberger/tvheadend-player/main/artwork/screenshots/recordings-folders.png)
+
+Code and more screenshots: https://github.com/bernhardberger/tvheadend-player
 Roadmap: https://github.com/bernhardberger/tvheadend-player/blob/main/ROADMAP.md
 
 I'd love your feedback and ideas, and data points from different hardware and setups. The beta is also the way onto the Play Store, which will make it much easier for everyone to install.
@@ -38,7 +44,7 @@ You'll need an Android TV or Google TV device on Android 9+ and Tvheadend 4.3 (H
 2. Opt in: https://play.google.com/apps/testing/at.bernhardberger.tvhplayer
 3. Install it on the TV from the Play Store. It's not in search yet, so use the link from step 2.
 
-Google needs at least 12 testers on the beta track for 14 days before the app can be published, so please keep it installed and stay in the whole time.
+Google needs at least 12 testers on the beta track for 14 days before the app can be published, so I'd appreciate it if you stayed for the 14 days and gave feedback.
 
 Please report bugs on GitHub if you can: https://github.com/bernhardberger/tvheadend-player/issues
 Feedback and discussion are welcome right here in this thread or in the beta Google group.
@@ -46,13 +52,14 @@ Feedback and discussion are welcome right here in this thread or in the beta Goo
 Prefer to skip Play? The APKs are on GitHub, signed with the same key, so you can switch either way.
 ```
 
-r/tvheadend, with `artwork/screenshots/home.png` as the image. Check the
+r/tvheadend, with `home.png`, `channels.png`, `guide.png` and `player.png` from
+`artwork/screenshots/` as an image gallery. Check the
 subreddit's rules for posts about your own project first:
 
 ```text
-Title: Tvheadend Player for Android TV: join the beta
+Title: Tvheadend Player for Android TV: beta testers welcome
 
-I'd like to invite you to the beta of Tvheadend Player, an unofficial open source (GPLv3) Android TV and Google TV client for Tvheadend: Home, Channels, a program guide, timeshift and recordings over HTSP, all with just the D-pad.
+I'd like to invite you to the beta of Tvheadend Player, an unofficial open source (GPLv3) Android TV and Google TV client for Tvheadend: Home, Channels, a program guide, timeshift and recordings over HTSP, focused on a D-pad-first experience.
 
 I'd love your feedback and ideas, and data points from different hardware and setups. The beta is also the way onto the Play Store, which will make it much easier for everyone to install.
 
@@ -62,7 +69,7 @@ You'll need an Android TV or Google TV device on Android 9+ and Tvheadend 4.3.
 2. Opt in: https://play.google.com/apps/testing/at.bernhardberger.tvhplayer
 3. Install it on the TV from the Play Store. It's not in search yet, so use the link from step 2.
 
-Google needs at least 12 testers on the beta track for 14 days before the app can be published, so please keep it installed and stay in the whole time.
+Google needs at least 12 testers on the beta track for 14 days before the app can be published, so I'd appreciate it if you stayed for the 14 days and gave feedback.
 
 Please report bugs on GitHub if you can: https://github.com/bernhardberger/tvheadend-player/issues
 Feedback and discussion are welcome right here on this post or in the beta Google group.

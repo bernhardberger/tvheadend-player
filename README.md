@@ -179,8 +179,8 @@ You need an Android TV or Google TV device and your own Tvheadend server. With t
 Google account on your TV, join the
 [testers group](https://groups.google.com/g/tvheadend-player-testers), then
 [opt in](https://play.google.com/apps/testing/at.bernhardberger.tvhplayer)
-and install the app from the Play Store. Please stay in for the 14 days Google
-requires before the app can be published.
+and install the app from the Play Store. I'd appreciate it if you stayed for the 14
+days Google requires before the app can be published and gave feedback.
 
 Please report bugs on [GitHub](https://github.com/bernhardberger/tvheadend-player/issues) if you can. Feedback and discussion are
 welcome in the group.
