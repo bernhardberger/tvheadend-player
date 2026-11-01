@@ -104,15 +104,7 @@ Thanks for testing Tvheadend Player.
 If you have the GitHub APK installed, the Play version installs over it, and a newer GitHub APK installs over the Play version.
 
 Some TVs, Sony for example, ship with a keyboard that makes you type through a phone app. If you can't type the server address, switch to Gboard: TV Settings, System or Device Preferences, Keyboard, Current keyboard.
-
-Known problems in 0.4.0, all fixed in the next update:
-- The server search can offer a long address starting with fe80 that won't connect. Type your server's IP address instead.
-- Channel logos and programme pictures can stay missing after first setup. Force stop the app once (TV Settings, Apps) and open it again.
-- Start watching at the end of setup may not look selected. Pressing OK still works.
-- On TVs with Gboard, pressing OK on a text field can jump to the next field. Press Back twice, then move to the field you want.
 ```
-
-Remove the known-problems list from the pinned text once 0.4.1 is live.
 
 Step 3 isn't documented by Google for TVs; check it with your own account
 first (1.9) and adjust the text. The last paragraph holds: Play App Signing
