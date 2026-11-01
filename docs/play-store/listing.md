@@ -74,14 +74,14 @@ Open Source unter der GNU GPL v3, mit dem Quellcode zu jeder Version: github.com
 
 Up to 500 Unicode characters per language, each language between its tags
 (<https://support.google.com/googleplay/android-developer/answer/9859348>).
-These are the 0.4.0 notes. English 412/500, German 437/500 (counted without the
+These are the 0.4.1 notes. English 431/500, German 482/500 (counted without the
 tags). Paste both into the one release-notes box.
 
 ```text
 <en-US>
-New Home screen: the app now opens on what's playing or recording, your recent channels, what's on now, genres and recordings. Hide sections you don't want in View options. The Guide fits more channels with dense rows by default. Choosing a running recording now asks whether to watch the channel, resume or start from the beginning. All changes: github.com/bernhardberger/tvheadend-player/blob/main/CHANGELOG.md
+Easier first setup: a new Welcome screen and a server search of its own that finds the IPv4 address. Pictures no longer stay missing after setup, and OK on a text field no longer skips to the next one on TVs with Gboard. Home keeps your place when you come back and no longer flashes empty on launch. Cards keep their logo until the picture has loaded. All changes: github.com/bernhardberger/tvheadend-player/blob/main/CHANGELOG.md
 </en-US>
 <de-DE>
-Neuer Startbildschirm: Die App öffnet mit dem, was gerade läuft oder aufgenommen wird, letzten Sendern, aktuellem Programm, Genres und Aufnahmen. Unerwünschte Bereiche lassen sich in den Ansichtsoptionen ausblenden. Das TV-Programm zeigt standardmäßig mehr Sender. Bei einer laufenden Aufnahme fragt die App nun: Sender ansehen, fortsetzen oder von vorn. Alle Änderungen: github.com/bernhardberger/tvheadend-player/blob/main/CHANGELOG.md
+Einfachere Ersteinrichtung: neuer Willkommensbildschirm und eine eigene Serversuche, die die IPv4-Adresse findet. Bilder fehlen nach der Einrichtung nicht mehr, und OK auf einem Textfeld springt auf Fernsehern mit Gboard nicht mehr zum nächsten Feld. Der Startbildschirm behält beim Zurückkehren die Position und ist beim Start nicht mehr kurz leer. Karten zeigen ihr Logo, bis das Bild geladen ist. Alle Änderungen: github.com/bernhardberger/tvheadend-player/blob/main/CHANGELOG.md
 </de-DE>
 ```
