@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -207,6 +208,7 @@ internal val ImmersiveHeroWidth = 480.dp
  * Without [programArt] the logo stands in, matching cards that show logos. The picture is the
  * channel's on-now programme's unless [picture] picks another, as the Guide's focused programme.
  * The picture is as wide as the kit's unless [pictureHeight] scales it down to a height.
+ * [logoMaxHeight] can constrain the fallback logo to a shorter headline's available space.
  * It reaches under the closed rail, beneath the shell's gradient. Warm playback keeps the video as
  * the background, so nothing is drawn.
  */
@@ -222,6 +224,7 @@ internal fun ChannelsImmersiveBackground(
     programArt: Boolean = true,
     picture: (ChannelId) -> ArtworkId? = { observation.eventAt(it, Instant.fromEpochSeconds(nowSec()))?.image },
     pictureHeight: Dp? = null,
+    logoMaxHeight: Dp = Dp.Infinity,
 ) {
     if (LocalWarmPlayback.current) return
     val session = observation.currentSession != null
@@ -280,6 +283,7 @@ internal fun ChannelsImmersiveBackground(
         Box(Modifier.fillMaxSize()) {
             DetailsHeroLogo(shown.icon,
                 Modifier.align(Alignment.TopEnd).padding(top = logoTop + ImmersiveFallbackLogoTop, end = endInset)
+                    .heightIn(max = logoMaxHeight)
                     .testTag("channels-immersive-picon"),
             )
         }

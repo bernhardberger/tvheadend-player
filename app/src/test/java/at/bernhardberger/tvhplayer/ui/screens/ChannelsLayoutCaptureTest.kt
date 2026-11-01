@@ -61,6 +61,15 @@ class ChannelsLayoutCaptureTest {
     fun presentationGrid() = presentation("channels-grid",
         ChannelsView(ChannelsLayout.GRID, programArt = setOf(ChannelsLayout.IMMERSIVE, ChannelsLayout.GRID)), card(1))
 
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
+    fun gridWithoutNamesTopAndScrolled() = atEvening {
+        fixture.show(ChannelsView(ChannelsLayout.GRID, programArt = setOf(ChannelsLayout.GRID),
+            channelNames = emptySet()), fixture.fixtureArt(), presentation = true)
+        capture("grid-no-names-top", card(1), outputs = "build/outputs/041-guide-channels")
+        repeat(2) { fixture.key(Key.DirectionDown) }
+        capture("grid-no-names-scrolled", card(9), outputs = "build/outputs/041-guide-channels")
+    }
+
     /** The same evening as a list. */
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])

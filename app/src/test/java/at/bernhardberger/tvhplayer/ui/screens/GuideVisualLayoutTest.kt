@@ -2813,6 +2813,57 @@ class GuideVisualLayoutTest {
 
     @Test fun theHeadlinesLogoStartsBelowTheHeaderRowAtLargeText() = headlineLogoBelowTheRow(1.3f)
 
+    @Test fun tallHeadlineLogoKeepsClearOfTheTimeline() {
+        headlineLogoScene(120, 240)
+        val logo = bounds("channels-immersive-picon")
+        val ruler = bounds("epg-time-ruler")
+        assertTrue("Tall logo needs at least 20dp above timeline: logo=$logo ruler=$ruler",
+            ruler.top - logo.bottom >= 20f - .5f)
+        assertTrue("Logo stays inside the headline's reserved space",
+            logo.height <= headlineHeight - 24f - 8f + .5f)
+    }
+
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
+    @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
+    fun headlineLogoWideCapture() = headlineLogoCapture("wide", 400, 120)
+
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
+    @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
+    fun headlineLogoSquareCapture() = headlineLogoCapture("square", 240, 240)
+
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
+    @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
+    fun headlineLogoTallCapture() = headlineLogoCapture("tall", 120, 240)
+
+    private fun headlineLogoCapture(shape: String, width: Int, height: Int) {
+        headlineLogoScene(width, height)
+        capture("guide-logo-$shape", 1f, LayoutDirection.Ltr, outputs = "build/outputs/041-guide-channels").recycle()
+        File("build/outputs/041-guide-channels/guide-logo-$shape.txt").appendText(
+            "art=fixture ridge-earth picon rescaled to ${width}x$height for deliberate aspect stress; Ridge Light, no programme art\n" +
+                "logoFrame=${bounds("channels-immersive-picon")}; ruler=${bounds("epg-time-ruler")}\n",
+        )
+    }
+
+    private fun headlineLogoScene(width: Int, height: Int) {
+        // Deliberate aspect-ratio stress variants of the same fictional mark; no real picons.
+        val art = at.bernhardberger.tvhplayer.testutil.FixtureArt
+        val logo = Bitmap.createScaledBitmap(art.picon("ridge-earth"), width, height, true)
+        loader = art.imageLoader(context(), mapOf(ArtworkId(1) to logo))
+        images.install(loader)
+        show(headline = true, history = false, channelNames = listOf("Ridge Earth"), events = listOf(
+            EpgEvent.create(EventId(110), ChannelId(1), Instant.fromEpochSeconds(hour),
+                Instant.fromEpochSeconds(hour + 3600), title = "Ridge Light",
+                summary = "Seasonal mountain light, forests and weather moving over a ridge."),
+        ))
+        key(Key.DirectionDown)
+        focused("Ridge Light")
+        compose.waitUntil(10_000) {
+            compose.onAllNodesWithTag("channels-immersive-picon").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.mainClock.advanceTimeBy(1_500)
+        compose.waitForIdle()
+    }
+
     /** The channel's logo, shown without a programme picture, starts below the row however tall it grows. */
     private fun headlineLogoBelowTheRow(scale: Float) {
         show(scale = scale, headline = true)

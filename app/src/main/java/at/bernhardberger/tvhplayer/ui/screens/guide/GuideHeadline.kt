@@ -169,6 +169,9 @@ internal fun GuideHeadlineBackground(
             modifier = modifier,
             picture = { id -> programme()?.event?.takeIf { it.channelId == id }?.image },
             pictureHeight = logoTop + headlineDrop + guideHeadlineHeight() + GuideHeadlineRulerGap + GuideHeadlinePictureReach,
+            // The logo starts 24dp below logoTop; end it 8dp above the headline's bottom.
+            // Together with the 12dp ruler gap, this reserves at least 20dp above the timeline.
+            logoMaxHeight = guideHeadlineHeight() - 24.dp - 8.dp,
         )
     }
 }
