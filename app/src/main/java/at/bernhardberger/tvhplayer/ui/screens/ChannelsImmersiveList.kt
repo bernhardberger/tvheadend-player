@@ -158,6 +158,7 @@ import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.request.transformations
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
+import at.bernhardberger.tvhplayer.ui.components.rememberPictureLoad
 import at.bernhardberger.tvhplayer.ui.components.ChannelAccentFill
 import at.bernhardberger.tvhplayer.ui.components.channelAccentGround
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
@@ -492,7 +493,6 @@ internal fun ChannelsRowCard(
     val tag = "$tagPrefix-${channel.id.value}"
     val session = LocalArtworkContext.current.currentSession
     val art = running?.image?.takeIf { programmePicture && session != null }
-    var artFailed by remember(art, session) { mutableStateOf(false) }
     val context = LocalPlatformContext.current
     val textHeight = with(LocalDensity.current) { MaterialTheme.typography.titleSmall.lineHeight.toDp() } +
         ImmersiveCardTextBottom
@@ -500,19 +500,17 @@ internal fun ChannelsRowCard(
     val artModel = remember(art, session) {
         if (art == null || session == null) null else AppArtworkSource(session, art)
     }
-    val showsArt = artModel != null && !artFailed
+    val artLoad = rememberPictureLoad(artModel)
+    val showsArt = artModel != null && artLoad.loaded
     StandardProgrammeCard(
         width = width,
         onClick = onClick,
         onLongClick = contextMenu.onLongClick,
         modifier = modifier.then(contextMenu.modifier),
-        art = art.takeIf { showsArt },
+        art = art.takeUnless { artLoad.failed },
         picon = channel.icon,
         picture = {
-            if (artModel != null && !artFailed) AsyncImage(artModel, contentDescription = null,
-                contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().testTag("$tag-art"),
-                onError = { artFailed = true })
-            else {
+            if (artLoad.needsFallback) {
                 ChannelAccentFill(channel.icon, channel.id, Modifier.fillMaxSize())
                 Box(Modifier.fillMaxSize().padding(top = ImmersiveCardLogoInset, bottom = textHeight + ImmersiveCardLogoInset),
                     contentAlignment = Alignment.Center) {
@@ -526,7 +524,7 @@ internal fun ChannelsRowCard(
                 .padding(start = 12.dp, end = 12.dp, bottom = ImmersiveCardTextBottom)
             // Without a picture the logo leads; beside picture cards its programme stays quiet.
             val lineColor = if (programmePicture) TvTextColors.secondary else TvTextColors.primary
-            if (!showsArt) CompositionLocalProvider(LocalContentColor provides lineColor) {
+            if (artLoad.needsFallback) CompositionLocalProvider(LocalContentColor provides lineColor) {
                 ProvideTextStyle(MaterialTheme.typography.titleSmall.copy(color = lineColor)) {
                     Row(lineModifier, verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -546,6 +544,9 @@ internal fun ChannelsRowCard(
                     }
                 }
             }
+            if (artModel != null && !artLoad.failed) AsyncImage(artModel, contentDescription = null,
+                contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().testTag("$tag-art"),
+                onSuccess = artLoad::onSuccess, onError = { artLoad.onError() })
             // The picture carries the channel's logo in its embed corner, like the airing cards.
             if (showsArt && channel.icon != null) ArtworkLogoPlate(channel.icon,
                 Modifier.align(Alignment.BottomStart).padding(ImmersiveCardEmbedInset).testTag("$tag-art-picon"),

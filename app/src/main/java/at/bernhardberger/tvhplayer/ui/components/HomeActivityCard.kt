@@ -84,6 +84,9 @@ internal fun HomeActivityCard(
     val image = (if (recordingOnly) entry?.image ?: entry?.fanartImage
         else running?.image ?: entry?.image ?: entry?.fanartImage)?.takeIf { session != null }
     val icon = channel?.icon
+    val model = remember(session, image) { image?.let { AppArtworkSource(session, it) } }
+    val load = rememberPictureLoad(model)
+    val pictured = model != null && !load.failed
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val ring = rememberCardFocusRing(interaction)
@@ -108,17 +111,10 @@ internal fun HomeActivityCard(
         border = embeddedProgressCardBorder(),
     ) {
         Box(Modifier.fillMaxSize()) {
-            // The programme's picture, or the channel's logo on its ambient fill without one.
-            if (image != null) {
-                AsyncImage(
-                    AppArtworkSource(session!!, image),
-                    null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            } else if (channel != null && icon != null) {
+            // The channel's logo on its ambient fill, until and unless the programme's picture covers it.
+            if (load.needsFallback && channel != null) {
                 ChannelAccentFill(icon, channel.id, Modifier.fillMaxSize())
-                PiconBox(
+                if (icon != null) PiconBox(
                     icon,
                     Modifier.align(Alignment.TopEnd)
                         .padding(12.dp)
@@ -129,8 +125,16 @@ internal fun HomeActivityCard(
                     ground = null,
                     placeholders = false,
                 )
-            } else {
-                if (channel != null) ChannelAccentFill(null, channel.id, Modifier.fillMaxSize())
+            }
+            if (pictured) {
+                AsyncImage(
+                    model,
+                    null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                    onSuccess = load::onSuccess,
+                    onError = { load.onError() },
+                )
             }
             // The scrim carries the labels; the picture stays readable above it.
             Box(
@@ -144,7 +148,7 @@ internal fun HomeActivityCard(
             )
             if (playing || entry != null) {
                 Row(
-                    Modifier.align(if (image == null) Alignment.TopStart else Alignment.TopEnd).padding(12.dp),
+                    Modifier.align(if (pictured) Alignment.TopEnd else Alignment.TopStart).padding(12.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
