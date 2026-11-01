@@ -102,6 +102,8 @@ fun ChannelTagSelector(
             }
             .navigationEdgeFadeMask(
                 width = TvNavigationRailGradientRunout,
+                // Short text tabs retain the linear mask; picture rows recede more strongly.
+                midpointAlpha = 0.5f,
                 maskEnabled = {
                     edgeFadeState.availableFadeWidthPx(
                         activeIndex = selectedIndex,

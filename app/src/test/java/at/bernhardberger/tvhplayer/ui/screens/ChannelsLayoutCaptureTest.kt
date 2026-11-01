@@ -192,6 +192,16 @@ class ChannelsLayoutCaptureTest {
     @Test fun gridProgramme() = grid(cardArt = true)
     @Test fun gridLogo() = grid(cardArt = false)
     @Test fun immersiveProgramme() = immersive(cardArt = true)
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun rowRailOverlap() {
+        fixture.show(ChannelsView(ChannelsLayout.IMMERSIVE, setOf(ChannelsLayout.IMMERSIVE)), fixture.fixtureArt(), presentation = true)
+        fixture.awaitFocus(card(1))
+        fixture.key(Key.DirectionRight)
+        capture("row-rail-overlap", card(2))
+        val bounds = compose.onNode(card(2)).fetchSemanticsNode().boundsInRoot
+        assertTrue("focused card clears mask", bounds.left >= 260f)
+    }
     @Test fun immersiveLogo() = immersive(cardArt = false)
     @Test fun viewOptionsList() = viewOptions(ChannelsLayout.LIST)
     @Test fun viewOptionsGrid() = viewOptions(ChannelsLayout.GRID)

@@ -1,7 +1,11 @@
 package at.bernhardberger.tvhplayer.ui.screens.home
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.Crossfade
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -9,6 +13,7 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.snap
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Arrangement
@@ -62,6 +67,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -891,6 +897,7 @@ private fun <T> HomeCardRow(
     val start = keyline + underlap
     val density = LocalDensity.current
     val offscreenPx = with(density) { CompactZapRowOffscreen.roundToPx() }
+    val ltr = LocalLayoutDirection.current == LayoutDirection.Ltr
     var screenEdge by remember { mutableFloatStateOf(0f) }
     val state = rememberLazyListState(initialFirstVisibleItemIndex = entryIndex.coerceAtLeast(0))
     var rememberedIndex by remember { mutableIntStateOf(entryIndex) }
@@ -924,7 +931,11 @@ private fun <T> HomeCardRow(
             modifier = modifier
                 .browseUnderlap(underlap)
                 .fillMaxWidth()
-                .onGloballyPositioned { screenEdge = -it.positionInRoot().x.coerceAtLeast(0f) }
+                .onGloballyPositioned { coordinates ->
+                    val left = coordinates.positionInRoot().x
+                    val rootWidth = coordinates.findRootCoordinates().size.width
+                    screenEdge = (if (ltr) -left else left + coordinates.size.width - rootWidth).coerceAtLeast(0f)
+                }
                 .cardGlowRoom(top = CardGlowReach - HomeFocusRoom)
                 .rowContentEmphasis(emphasis)
                 .navigationEdgeFadeMask(start - gap, leadingInsetPx = { screenEdge })
@@ -1168,9 +1179,14 @@ private fun HomeOnNowDetails(
             block.place(0, -block.height - (HomeHeroGap + 20.dp).roundToPx())
         }
     }) {
-        Crossfade(
+        AnimatedContent(
             targetState = item,
-            animationSpec = tween(200, easing = LinearEasing),
+            transitionSpec = {
+                fadeIn(tween(200, easing = LinearEasing)) togetherWith
+                    fadeOut(tween(200, easing = LinearEasing)) using
+                    SizeTransform(clip = false) { _, _ -> snap() }
+            },
+            contentAlignment = Alignment.BottomStart,
             label = "home-on-now-details",
             modifier = Modifier.testTag("home-on-now-block")
                 .layout { measurable, constraints ->
@@ -1197,6 +1213,7 @@ private fun HomeOnNowDetails(
                 recording = shown.channel.id in recordingChannelIds,
                 nowSec = nowSec,
                 keyline = keyline,
+                modifier = Modifier.wrapContentHeight(Alignment.Bottom),
             )
         }
     }
@@ -1214,6 +1231,7 @@ private fun HomeOnNowBlock(
     recording: Boolean,
     nowSec: Long,
     keyline: Dp,
+    modifier: Modifier = Modifier,
 ) {
     ChannelsHeadline(
         channel = channel,
@@ -1225,7 +1243,7 @@ private fun HomeOnNowBlock(
         synopsisLines = 2,
         fitSynopsis = true,
         loading = false,
-        modifier = Modifier
+        modifier = modifier
             .padding(start = keyline)
             .widthIn(max = ImmersiveHeroWidth),
         showNext = true,

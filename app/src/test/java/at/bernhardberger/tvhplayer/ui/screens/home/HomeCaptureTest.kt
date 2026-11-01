@@ -112,7 +112,6 @@ import java.util.TimeZone
  * [homeSections] policy over the fictional fixture pack, at 20:15. Each capture focuses the same
  * card the approved mockup captured, so the PNGs compare state by state.
  */
-@Category(VisualCapture::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(
     sdk = [34],
@@ -138,6 +137,7 @@ class HomeCaptureTest {
         .apply { mkdirs() }
     private val context: Application get() = ApplicationProvider.getApplicationContext()
 
+    @Category(VisualCapture::class)
     @Test
     fun browse() = atEvening {
         show(Kind.BROWSE)
@@ -154,6 +154,7 @@ class HomeCaptureTest {
     }
 
     /** Store listing candidates: the same page as the mockup states, under the store's locale and output folder. */
+    @Category(VisualCapture::class)
     @Test @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi")
     fun storeHome() = atEvening {
         val presentation = File("build/outputs/presentation").apply { mkdirs() }
@@ -164,6 +165,7 @@ class HomeCaptureTest {
         assertTrue(presentation.isDirectory)
     }
 
+    @Category(VisualCapture::class)
     @Test @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi")
     fun storeHomeWarm() = atEvening {
         File("build/outputs/presentation").mkdirs()
@@ -171,22 +173,82 @@ class HomeCaptureTest {
         capture("../presentation/store-home-warm", "home-activity-0")
     }
 
+    @Category(VisualCapture::class)
     @Test
     fun warm() = atEvening {
         show(Kind.WARM)
         capture("5-warm", "home-activity-0")
     }
 
+    @Category(VisualCapture::class)
+    @Test fun rowRailOverlap() = atEvening {
+        show(Kind.BROWSE)
+        settle("home-recent-0")
+        key(Key.DirectionDown)
+        settle("home-onnow-0")
+        key(Key.DirectionRight)
+        capture("row-rail-overlap", "home-onnow-1")
+        assertTrue("focused card clears mask", bounds("home-onnow-1").left >= 130.dp)
+    }
+
+    @Test fun aCardLeavingUnderTheRailFadesOutAtTheScreenEdge() = atEvening {
+        show(Kind.BROWSE)
+        settle("home-recent-0")
+        key(Key.DirectionDown)
+        settle("home-onnow-0")
+        key(Key.DirectionRight)
+        settle("home-onnow-1")
+        val leaving = bounds("home-onnow-0")
+        val scale = context.resources.displayMetrics.density
+        val bitmap = draw()
+        val brightness = { x: Float, y: Float ->
+            val pixel = androidx.compose.ui.graphics.Color(bitmap.getPixel((x * scale).toInt(), (y * scale).toInt()))
+            maxOf(pixel.red, pixel.green, pixel.blue)
+        }
+        val middle = (leaving.top.value + leaving.bottom.value) / 2
+        val underTheRail = brightness(40f, middle)
+        val besideTheRow = brightness(40f, leaving.top.value - 12f)
+        bitmap.recycle()
+        assertTrue("the leaving card has receded under the rail: $underTheRail vs $besideTheRow", underTheRail - besideTheRow < 0.1f)
+    }
+
+    @Test fun infoBottomStaysAnchoredDuringTextHeightChange() = atEvening {
+        show(Kind.BROWSE, infoLineCounts = true)
+        settle("home-recent-0")
+        key(Key.DirectionDown)
+        settle("home-onnow-0")
+        val bottom = bounds("channels-immersive-next").bottom.value
+        compose.mainClock.autoAdvance = false
+        listOf(Key.DirectionRight, Key.DirectionLeft).forEach { direction ->
+            key(direction)
+            repeat(16) {
+                compose.mainClock.advanceTimeBy(16)
+                compose.waitForIdle()
+                val footers = compose.onAllNodes(hasTestTag("channels-immersive-next"), useUnmergedTree = true)
+                    .fetchSemanticsNodes()
+                assertTrue("the info footer remains present", footers.isNotEmpty())
+                footers.forEach { node ->
+                    assertEquals("outgoing and incoming footer stay bottom anchored", bottom,
+                        node.boundsInRoot.bottom / context.resources.displayMetrics.density, 1f)
+                }
+            }
+            compose.mainClock.advanceTimeBy(600)
+        }
+    }
+
+    @Category(VisualCapture::class)
     @Test fun warmWithoutArtwork() = atEvening {
         show(Kind.WARM, noArtwork = true)
         capture("17-warm-no-art", "home-activity-0")
     }
 
+    @Category(VisualCapture::class)
     @Test fun warmWithoutArtworkLargeFont() = atEvening {
         show(Kind.WARM, noArtwork = true, fontScale = 1.3f)
         capture("18-warm-no-art-font-130", "home-activity-0")
     }
 
+    @Category(VisualCapture::class)
     @Test
     fun firstRun() = atEvening {
         show(Kind.FIRST_RUN)
@@ -194,6 +256,7 @@ class HomeCaptureTest {
         assertTop("home-onnow-0", HomeImmersiveSlot.value)
     }
 
+    @Category(VisualCapture::class)
     @Test fun optionsPanel() = atEvening {
         show(Kind.BROWSE, screen = true)
         settle("home-recent-0")
@@ -203,6 +266,7 @@ class HomeCaptureTest {
         capture("11-options", "home-view-CURRENT_ACTIVITY")
     }
 
+    @Category(VisualCapture::class)
     @Test fun loadingFirstMetadata() = atEvening {
         show(Kind.LOADING, screen = true)
         compose.onNodeWithTag("home-loading").assertExists()
@@ -215,29 +279,34 @@ class HomeCaptureTest {
         capture("12-loading", "home-view-button")
     }
 
+    @Category(VisualCapture::class)
     @Test fun channelsButNoHistoryRecordingsOrEpg() = atEvening {
         show(Kind.EMPTY, screen = true)
         compose.onNodeWithText("Browse channels").assertExists()
         capture("13-empty", "home-recovery")
     }
 
+    @Category(VisualCapture::class)
     @Test fun offlineRecovery() = atEvening {
         show(Kind.OFFLINE, screen = true)
         compose.onNodeWithTag("connection-problem-badge", useUnmergedTree = true).assertExists()
         capture("14-offline", "tv-recovery-primary")
     }
 
+    @Category(VisualCapture::class)
     @Test fun defaultLargeFont() = atEvening {
         show(Kind.BROWSE, fontScale = 1.3f)
         capture("15-default-font-130", "home-recent-0")
         assertFocusedHeadingTop("home-heading-RECENT_CHANNELS")
     }
 
+    @Category(VisualCapture::class)
     @Test fun warmLargeFont() = atEvening {
         show(Kind.WARM, fontScale = 1.3f)
         capture("16-warm-font-130", "home-activity-0")
     }
 
+    @Category(VisualCapture::class)
     @Test fun wholeCardsFillAndNextCardPeeksInMargin() = atEvening {
         show(Kind.BROWSE, longOnNow = true)
         settle("home-recent-0")
@@ -259,16 +328,20 @@ class HomeCaptureTest {
     }
 
     /** One, two and three current-activity cards, each card half the content width. */
+    @Category(VisualCapture::class)
     @Test
     fun activityOne() = activity(1)
 
+    @Category(VisualCapture::class)
     @Test
     fun activityTwo() = activity(2)
 
+    @Category(VisualCapture::class)
     @Test
     fun activityThree() = activity(3)
 
     /** Production choreography sampled at 50 ms, including the interrupted/retargetable page. */
+    @Category(VisualCapture::class)
     @Test
     fun immersiveMotionStripsAndSlots() = atEvening {
         show(Kind.BROWSE)
@@ -301,6 +374,7 @@ class HomeCaptureTest {
         awaitFocus("home-recent-0")
     }
 
+    @Category(VisualCapture::class)
     @Test
     fun warmImmersiveKeepsSlotWithoutArtwork() = atEvening {
         show(Kind.WARM)
@@ -313,6 +387,7 @@ class HomeCaptureTest {
         assertEquals(1f, layerAlpha("home-on-now-block"), 0.02f)
     }
 
+    @Category(VisualCapture::class)
     @Test
     fun lastRowNeverMovesDownOnEntry() = atEvening {
         show(Kind.BROWSE)
@@ -340,6 +415,7 @@ class HomeCaptureTest {
         capture("20b-upcoming-end", "home-all-scheduled")
     }
 
+    @Category(VisualCapture::class)
     @Test
     fun warmDownInRowTravelsOnce() = atEvening {
         show(Kind.WARM)
@@ -350,6 +426,7 @@ class HomeCaptureTest {
         strip("warm-down-into", Key.DirectionDown, "home-onnow-0", expanded = true)
     }
 
+    @Category(VisualCapture::class)
     @Test
     fun warmUpOutRowTravelsOnce() = atEvening {
         show(Kind.WARM)
@@ -361,6 +438,7 @@ class HomeCaptureTest {
         strip("up-out", Key.DirectionUp, "home-recent-0", expanded = false)
     }
 
+    @Category(VisualCapture::class)
     @Test
     fun rapidVerticalMovesRetargetAndReturnToHeader() = atEvening {
         show(Kind.BROWSE)
@@ -387,6 +465,7 @@ class HomeCaptureTest {
         assertEquals(1f, layerAlpha("home-section-RECENT_CHANNELS"), 0.02f)
     }
 
+    @Category(VisualCapture::class)
     @Test
     fun verticalEntryRestoresScrolledCards() = atEvening {
         show(Kind.BROWSE, longOnNow = true)
@@ -409,6 +488,7 @@ class HomeCaptureTest {
         assertTop("home-onnow-13", HomeImmersiveSlot.value)
     }
 
+    @Category(VisualCapture::class)
     @Test
     fun firstRunHeaderRoundTripAnimatesWithoutDisplacingBlock() = atEvening {
         show(Kind.FIRST_RUN)
@@ -421,6 +501,7 @@ class HomeCaptureTest {
         assertEquals(0f, layerScope("home-on-now-block").translationY, 0.1f)
     }
 
+    @Category(VisualCapture::class)
     @Test
     fun rawReferenceClocksAndInterruptedOrdinaryMoves() {
         val focused = mutableStateOf<HomeSectionKind?>(HomeSectionKind.RECENT_CHANNELS)
@@ -515,6 +596,7 @@ class HomeCaptureTest {
         compose.onNodeWithTag("channels-immersive-next", useUnmergedTree = true).assertExists()
     }
 
+    @Category(VisualCapture::class)
     @Test
     fun immersiveLargeFontKeepsInfoAndRowInsideCanvas() = atEvening {
         show(Kind.BROWSE, fontScale = 1.3f)
@@ -619,6 +701,7 @@ class HomeCaptureTest {
         capture("act-half-$items", "home-activity-0")
     }
 
+    @Category(VisualCapture::class)
     @Test fun activityStatesKeepOneRecordingMark() = atEvening {
         val scene = scene(Kind.WARM, 2, false, false)
         val channel = scene.input.channels.first { it.id == ChannelId(3) }
@@ -664,9 +747,9 @@ class HomeCaptureTest {
         val nowSec: Long,
     )
 
-    private fun show(kind: Kind, activityItems: Int = 2, longOnNow: Boolean = false, screen: Boolean = false, fontScale: Float = 1f, noArtwork: Boolean = false) {
+    private fun show(kind: Kind, activityItems: Int = 2, longOnNow: Boolean = false, screen: Boolean = false, fontScale: Float = 1f, noArtwork: Boolean = false, infoLineCounts: Boolean = false) {
         isDebugInspectorInfoEnabled = true
-        val base = scene(kind, activityItems, longOnNow, noArtwork)
+        val base = scene(kind, activityItems, longOnNow, noArtwork, infoLineCounts)
         val scene = if (kind in setOf(Kind.LOADING, Kind.EMPTY, Kind.OFFLINE)) base.copy(
             input = base.input.copy(channels = if (kind == Kind.EMPTY) base.input.channels else emptyList(),
                 currentEvents = emptyMap(), upcomingEvents = emptyList(), recentChannelIds = emptyList(), dvrEntries = emptyList(), playing = null),
@@ -786,7 +869,7 @@ class HomeCaptureTest {
         )
     }
 
-    private fun scene(kind: Kind, activityItems: Int, longOnNow: Boolean, noArtwork: Boolean): Scene {
+    private fun scene(kind: Kind, activityItems: Int, longOnNow: Boolean, noArtwork: Boolean, infoLineCounts: Boolean = false): Scene {
         val now = 1_791_144_900L
         val channels = ChannelsLayoutFixture.LINE_UP.mapIndexed { index, (name, _) ->
             Channel.create(
@@ -834,7 +917,11 @@ class HomeCaptureTest {
                 episode = EpgEpisode(null, null, 2, 5, 3, 10, null, null, "S2 E3").takeIf { index == 0 },
                 copyrightYear = 2024L.takeIf { index == 0 },
                 rating = EpgRating(12, "XMLTV:FSK:12", null, null, null, null).takeIf { index == 0 },
-                summary = synopses[index],
+                summary = when {
+                    infoLineCounts && index == 0 -> "Mountain light."
+                    infoLineCounts && index == 1 -> "Match coverage.\nHarbor FC meet Amber Town.\nA floodlit stadium."
+                    else -> synopses[index]
+                },
                 image = ArtworkId(101 + index).takeIf { !noArtwork && index != 5 && index < 7 },
                 contentGenre = genreCodes[index]?.let { ContentGenre.fromContentType((it.code shl 4).toLong()) },
                 nextEventId = EventId(channel.id.value * 100 + 1),
