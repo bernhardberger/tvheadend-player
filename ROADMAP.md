@@ -1,6 +1,6 @@
 # Roadmap
 
-Where this is going, as of 0.4.0. No dates. What's already shipped is in the
+Where this is going, as of 0.4.1. No dates. What's already shipped is in the
 [changelog](CHANGELOG.md).
 
 ## Before 1.0

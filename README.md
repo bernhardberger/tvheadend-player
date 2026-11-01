@@ -13,6 +13,11 @@ the D-pad.
 > It isn't an official Tvheadend app and isn't affiliated with or endorsed by
 > the Tvheadend project.
 
+> [!NOTE]
+> I'm looking for beta testers on Google Play. If you have an Android TV or
+> Google TV device and a Tvheadend server,
+> [here's how to join](#beta-testing-on-google-play).
+
 ![Home with Northline Tonight playing, Harbor Kickoff recording and recent channels below](artwork/screenshots/home.png)
 
 | | | |
@@ -178,9 +183,10 @@ easier for everyone to install.
 You need an Android TV or Google TV device and your own Tvheadend server. With the
 Google account on your TV, join the
 [testers group](https://groups.google.com/g/tvheadend-player-testers), then
-[opt in](https://play.google.com/apps/testing/at.bernhardberger.tvhplayer)
-and install the app from the Play Store. I'd appreciate it if you stayed for the 14
-days Google requires before the app can be published and gave feedback.
+[opt in](https://play.google.com/apps/testing/at.bernhardberger.tvhplayer) on a
+phone or computer. On that page, follow the Google Play link, select Install and
+pick your TV. The app isn't in Play search yet. I'd appreciate it if you stayed for
+the 14 days Google requires before the app can be published and gave feedback.
 
 Please report bugs on [GitHub](https://github.com/bernhardberger/tvheadend-player/issues) if you can. Feedback and discussion are
 welcome in the group.
@@ -190,9 +196,9 @@ one updates the other.
 
 ## First start
 
-Setup takes three steps: Server, Account and Connect. The app first looks for
-Tvheadend servers on your local network. If none answers, type in the server's
-address and HTSP port. Then enter your Tvheadend username and password. The app
+Setup takes three steps: Server, Account and Connect. Type in the server's address
+and HTSP port, or let the app look for Tvheadend servers on your local network and
+pick one. Then enter your Tvheadend username and password. The app
 tests the connection before it saves anything, then loads your channels and
 guide. To change the connection later, go to Settings → Connection → Set up
 connection.

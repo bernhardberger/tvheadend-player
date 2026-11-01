@@ -44,7 +44,7 @@ You'll need an Android TV or Google TV device on Android 9+ and Tvheadend 4.3 (H
 
 1. Join the group with the Google account on your TV: https://groups.google.com/g/tvheadend-player-testers
 2. Opt in: https://play.google.com/apps/testing/at.bernhardberger.tvhplayer
-3. Install it on the TV from the Play Store. It's not in search yet, so use the link from step 2.
+3. On that page, follow the Google Play link, select Install and pick your TV. The app isn't in Play search yet.
 
 Google needs at least 12 testers on the beta track for 14 days before the app can be published, so I'd appreciate it if you stayed for the 14 days and gave feedback.
 
@@ -74,7 +74,7 @@ It's in closed testing on Play right now. Google wants 12 testers for 14 days be
 
 1. Join the group with the Google account on your TV: https://groups.google.com/g/tvheadend-player-testers
 2. Opt in: https://play.google.com/apps/testing/at.bernhardberger.tvhplayer
-3. Install it from the Play Store on the TV. It's not in search yet, so use the link from step 2.
+3. On that page, follow the Google Play link, select Install and pick your TV. The app isn't in Play search yet.
 
 APKs are on GitHub if you don't want Play.
 
@@ -97,7 +97,7 @@ Thanks for testing Tvheadend Player.
 
 1. Join this group with the same Google account that's signed in on your TV (you're here if you can read this).
 2. Open this link on a phone or computer signed in with that account, and select "Become a tester": https://play.google.com/apps/testing/at.bernhardberger.tvhplayer
-3. Install the app on your TV from the Play Store (still signed in with that account). The app doesn't show up in Play search yet, so use the link from step 2.
+3. On the page from step 2, follow the Google Play link, select Install and pick your TV. The app doesn't show up in Play search yet.
 4. Please stay opted in for at least 14 days in a row and keep the app installed. Google requires those 14 days before the app can be published, so please don't opt out and back in. Leaving the group also removes you from the test.
 5. Feedback: open an issue at https://github.com/bernhardberger/tvheadend-player/issues, post in this group, or leave private feedback on the app's Play Store page. Only I can read the private feedback.
 
@@ -106,6 +106,9 @@ If you have the GitHub APK installed, the Play version installs over it, and a n
 Some TVs, Sony for example, ship with a keyboard that makes you type through a phone app. If you can't type the server address, switch to Gboard: TV Settings, System or Device Preferences, Keyboard, Current keyboard.
 ```
 
-Step 3 isn't documented by Google for TVs; check it with your own account
-first (1.9) and adjust the text. The last paragraph holds: Play App Signing
+Step 3 isn't documented by Google for TVs. On 2026-11-02 the web Play dialog
+offered the owner's TVs as install targets and marked phones as not compatible;
+the install from that dialog hasn't been run, because the G10 already had the app.
+The group's welcome post still has the older wording of step 3. The paragraph on
+signing holds: Play App Signing
 uses our key (SHA-256 checked in Console 2026-10-30, 1.2).
