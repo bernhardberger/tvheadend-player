@@ -50,6 +50,7 @@ import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.settings.ChannelsLayout
 import at.bernhardberger.tvhplayer.settings.ChannelsView
+import at.bernhardberger.tvhplayer.settings.GuideRows
 import at.bernhardberger.tvhplayer.settings.GuideView
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideViewOptionsPanel
 import at.bernhardberger.tvhplayer.core.ChannelScopeVisibility
@@ -355,7 +356,7 @@ class SettingsDepthNavigationTest {
     private fun showPanelSwitch(tag: String) {
         var stats by mutableStateOf(false)
         var channels by mutableStateOf(ChannelsView(layout = ChannelsLayout.GRID, programArt = emptySet()))
-        var guide by mutableStateOf(GuideView(headline = false, genreColors = false))
+        var guide by mutableStateOf(GuideView(rows = GuideRows.REGULAR, headline = false, genreColors = false))
         compose.setContent {
             TVHeadendPlayerTheme {
                 captureView = LocalView.current
