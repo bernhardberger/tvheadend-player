@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.4.0
+
+### Home
+
+- The app now opens on a new Home screen, the first item in the side menu. It
+  shows what's playing or recording right now, your recent channels, what's on
+  now, genres, recordings to continue, new recordings and upcoming recordings.
+  Sections without content stay hidden.
+- OK on a card does what it does on the screen it comes from: a channel tunes, a
+  recording plays, and a genre opens the Guide at the first matching programme.
+- View options on Home hide the sections you don't want, and the channel group
+  button chooses which channels Home draws from.
+- Back from Channels, the Guide or Recordings now goes to Home, and Back on Home
+  leaves the app.
+
+### Guide
+
+- Dense rows are the new default, so more channels fit on screen. Regular rows
+  are still in View options, and a Guide view you already changed stays as it is.
+
+### Recordings
+
+- Choosing a running recording now asks whether to watch the channel, resume, or
+  watch from the beginning. Its menu offers Watch channel too.
+- Resume in a recording's menu shows the position it resumes from.
+
+### Player
+
+- The channel row in the player shows up to 8 recent channels instead of 3.
+
+### Everywhere
+
+- Recent channels now belong to one server: changing the server clears them.
+- Error messages show their title and icon in the error color, and browse screens
+  no longer show a visible seam beside the side menu when an error appears.
+
 ## 0.3.2
 
 ### Settings
