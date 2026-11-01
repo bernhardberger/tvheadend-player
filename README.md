@@ -13,7 +13,7 @@ the D-pad.
 > It isn't an official Tvheadend app and isn't affiliated with or endorsed by
 > the Tvheadend project.
 
-![Channels as large picture cards, with Ridge Light on Ridge Earth focused and Harbor Kickoff marked as recording](artwork/screenshots/channels.png)
+![Home with Northline Tonight playing, Harbor Kickoff recording and recent channels below](artwork/screenshots/home.png)
 
 | | | |
 |---|---|---|
@@ -22,6 +22,8 @@ the D-pad.
 
 | | |
 |---|---|
+| ![Home's On now row with Ridge Light focused and its details above](artwork/screenshots/home-on-now.png) | ![Channels as large picture cards, with Ridge Light on Ridge Earth focused and Harbor Kickoff marked as recording](artwork/screenshots/channels.png) |
+| What's on now on Home | Channels as picture cards |
 | ![The program guide, with Ridge Light focused, Harbor Kickoff recording and Tide Watch scheduled](artwork/screenshots/guide.png) | ![The details page for Ridge Light, with its picture across the screen](artwork/screenshots/details.png) |
 | Program guide | Program details |
 | ![The player controls over Ridge Light, with Pause focused](artwork/screenshots/player.png) | ![The channel list over the playing picture, with Ridge Earth focused and its program above](artwork/screenshots/player-rail.png) |
@@ -96,6 +98,13 @@ them before Tvheadend imports it.
 
 ## What it does
 
+**Home**
+
+- The app opens on Home: what's playing or recording right now, your recent
+  channels, what's on now, genres, recordings to continue, new recordings and
+  upcoming recordings.
+- Hide the sections you don't want, and pick which channel group Home draws from.
+
 **Live TV**
 
 - Switch channels with channel up and down, from the channel list under the
@@ -157,7 +166,24 @@ changes between releases. For everyday use, take the Play build.
 
 You can install both side by side. To install an APK outside the Play Store,
 allow installs from unknown sources for the app you open it with, a file manager
-for example. I'm not promising a Google Play listing.
+for example.
+
+## Beta testing on Google Play
+
+Tvheadend Player is in a closed test on Google Play. Before Google lets a new
+developer publish an app, at least 12 testers have to stay in the test for 14
+days in a row, and I'd be glad if you joined.
+
+You need an Android TV or Google TV device and your own Tvheadend server.
+With the Google account on your TV, join the
+[testers group](https://groups.google.com/g/tvheadend-player-testers), then
+[opt in to the test](https://play.google.com/apps/testing/at.bernhardberger.tvhplayer)
+and install the app from the Play Store. Please stay in the test for the 14
+days. Feedback goes to [GitHub issues](https://github.com/bernhardberger/tvheadend-player/issues),
+the group, or the private feedback in the Play Store.
+
+The Play version and the GitHub APKs are signed with the same key, so either
+one updates the other.
 
 ## First start
 
@@ -175,6 +201,10 @@ address and login stay on the TV, and the password is stored encrypted. Apart
 from looking for Tvheadend servers on your local network during setup, the app
 only talks to your Tvheadend server. The details are in the
 [privacy policy](privacy-policy.md).
+
+## Roadmap
+
+What I plan to work on before and after 1.0 is in [`ROADMAP.md`](ROADMAP.md).
 
 ## How this app is made
 

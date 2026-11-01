@@ -686,30 +686,72 @@ Upload it unlisted to YouTube (or another host you choose) and put the link in
 
 ## 6. Testers
 
-### 6.1 Invitation (Tvheadend forum and r/tvheadend)
+### 6.1 Invitations
 
-Nothing is posted by agents. Title and text for both places:
+Nothing is posted by agents. Post these only when the closed track has the
+current release and the install path works on a real TV with your own account
+(1.9). Before posting, `ROADMAP.md` and `artwork/screenshots/home.png` have to be
+on `main`, because the posts link them.
+
+Tvheadend forum, category Client Apps, with the image
+`https://raw.githubusercontent.com/bernhardberger/tvheadend-player/main/artwork/screenshots/home.png`:
 
 ```text
-Testers wanted: Tvheadend Player for Android TV on Google Play
+Tvheadend Player for Android TV: testers wanted for Google Play
 
-I'm building Tvheadend Player, a Tvheadend client for Android TV and Google TV, built around the remote. It's open source (GPLv3) and not an official Tvheadend app: https://github.com/bernhardberger/tvheadend-player
+I'm building Tvheadend Player, an Android TV and Google TV client for Tvheadend that you can use entirely with the D-pad. I started it for my mum, who needed a Tvheadend app simple enough for her, and then I wanted it for myself too. It's open source (GPLv3), started as a fork of tvhstream, and isn't an official Tvheadend app.
 
-I'd like to bring it to Google Play. As a new developer account, I need at least 12 testers who stay in a closed test for 14 days in a row before Google lets me publish it.
+What's there today:
+- Home, with what's playing or recording, recent channels and what's on now
+- Channels as cards, a grid or a list, and a program guide with genre colors and a genre filter
+- Pause and rewind through your server's timeshift buffer
+- Recordings with your server's folders, resume, watched status and free space
+- Audio passthrough, DVB and teletext subtitles, and frame rate switching on Android 11 and newer
+
+Everything goes over HTSP, so channels, guide and recordings update when they change on the server. There are no analytics, no ads and no account.
+
+Why I'm asking: Google only lets a new developer publish after at least 12 testers have stayed in a closed test for 14 days in a row. I'd also like reports from hardware I don't have, and a list of what you miss.
 
 You need:
 - an Android TV or Google TV device on Android 9 or newer
-- your own Tvheadend server that speaks HTSP 36 or newer (a recent 4.3 build)
+- your own Tvheadend server that speaks HTSP 36 or newer (Tvheadend 4.3; 4.2 is too old)
 - the Google account that's signed in on your TV
 
-If you'd like to help:
-1. Join the testers group with that Google account: https://groups.google.com/g/tvheadend-player-testers
+To join:
+1. Join the testers group with that account: https://groups.google.com/g/tvheadend-player-testers
 2. Opt in to the test: https://play.google.com/apps/testing/at.bernhardberger.tvhplayer
-3. Install Tvheadend Player on your TV from the Play Store.
+3. Install Tvheadend Player on your TV from the Play Store. It doesn't show up in search yet, so use the link from step 2.
 
-Please stay opted in for the 14 days and keep the app installed; use it like you normally would. Bugs and ideas are welcome as GitHub issues (https://github.com/bernhardberger/tvheadend-player/issues), as posts in the group, or as private feedback in the Play Store.
+Please stay opted in for the 14 days and keep the app installed; leaving and rejoining restarts your days. Use it however you normally watch TV. Bugs and ideas go to GitHub issues, the group, or private feedback in the Play Store.
+
+If you'd rather not use Play, the APKs are on GitHub. They're signed with the same key as the Play version, so either one updates the other.
+
+Project and screenshots: https://github.com/bernhardberger/tvheadend-player
+What's planned: https://github.com/bernhardberger/tvheadend-player/blob/main/ROADMAP.md
+
+I build this with AI coding agents, and the README says how: https://github.com/bernhardberger/tvheadend-player#how-this-app-is-made
 
 Thanks!
+```
+
+r/tvheadend, with `artwork/screenshots/home.png` as the image. Check the
+subreddit's rules for posts about your own project first:
+
+```text
+Title: Open-source Android TV client for Tvheadend, looking for 12+ testers for Google Play
+
+Tvheadend Player is an Android TV and Google TV client for Tvheadend that you can use entirely with the D-pad: Home, Channels, a program guide, timeshift and recordings over HTSP. It's GPLv3, isn't an official Tvheadend app, and is built with AI coding agents (the README says how).
+
+Google won't let a new developer publish until at least 12 testers have stayed in a closed test for 14 days in a row. If you have an Android TV or Google TV device on Android 9+ and a Tvheadend 4.3 server, I'd be glad if you joined:
+
+1. Join the group with the Google account on your TV: https://groups.google.com/g/tvheadend-player-testers
+2. Opt in: https://play.google.com/apps/testing/at.bernhardberger.tvhplayer
+3. Install it on the TV from the Play Store, using the link from step 2. It doesn't show up in search yet.
+
+Please stay in for the 14 days. Bugs and missing features are welcome, especially from hardware I don't have.
+
+GitHub: https://github.com/bernhardberger/tvheadend-player
+Roadmap: https://github.com/bernhardberger/tvheadend-player/blob/main/ROADMAP.md
 ```
 
 ### 6.2 Tester instructions
@@ -731,30 +773,6 @@ If you have the GitHub APK installed, the Play version installs over it, and a n
 Step 3 isn't documented by Google for TVs; check it with your own account
 first (1.9) and adjust the text. The last paragraph holds: Play App Signing
 uses our key (SHA-256 checked in Console 2026-10-30, 1.2).
-
-### 6.3 Draft "Beta testing" section for README.md
-
-For the README after "Download and install", once the opt-in link exists. It
-replaces "I'm not promising a Google Play listing." in that section:
-
-```markdown
-## Beta testing on Google Play
-
-Tvheadend Player is in a closed test on Google Play. Before Google lets a new
-developer publish an app, at least 12 testers have to stay in the test for 14
-days in a row, and I'd be glad if you joined.
-
-You need an Android TV or Google TV device and your own Tvheadend server.
-With the Google account on your TV, join the
-[testers group](https://groups.google.com/g/tvheadend-player-testers), then
-[opt in to the test](https://play.google.com/apps/testing/at.bernhardberger.tvhplayer)
-and install the app from the Play Store. Please stay in the test for the 14
-days. Feedback goes to [GitHub issues](https://github.com/bernhardberger/tvheadend-player/issues),
-the group, or the private feedback in the Play Store.
-
-The Play version and the GitHub APKs are signed with the same key, so either
-one updates the other.
-```
 
 ## 7. Open risks
 

@@ -1,8 +1,8 @@
 # Working plan to 1.0
 
-**Status:** Internal, preliminary working plan of the maintainer, not a
-published project roadmap: nothing here is a promise or a release date, and
-items change or drop without notice. First draft 2026-10-11; reconciled
+**Status:** Internal, preliminary working plan of the maintainer; the published
+roadmap is [`ROADMAP.md`](../ROADMAP.md). Nothing here is a promise or a release
+date, and items change or drop without notice. First draft 2026-10-11; reconciled
 2026-10-28 against `main` at `08b3df64` (0.3.1, SDK 0.36.0). The current
 disposition below replaces the old version allocation; the SDK version is
 pinned in `gradle/libs.versions.toml`.
