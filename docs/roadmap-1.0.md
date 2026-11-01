@@ -130,7 +130,9 @@ In 1.0:
 
 Not in 1.0:
 
-- Multiple servers (at least not simultaneously).
+- Simultaneous servers. Stored server/user profiles with switching, one active
+  at a time, are wanted before 1.0 if feasible (owner, 2026-11-01). The SDK's
+  `ServerProfileStore` holds a single profile today.
 - App-owned favourites beyond Tvheadend channel tags.
 - Picture-in-picture. Android TV allows PiP only from Android 14 and only for
   communication, smart-home, health or ticker content; media playback in PiP is
@@ -172,6 +174,18 @@ Owner, 2026-10-11:
   replaces the earlier "series recording" scope item and drops D1–D3, D5 and
   D6 (later the same day; supersedes "D5 and D6 are in"). Rule-made
   recordings already appear in Recordings.
+- Update, owner 2026-11-01: full timer and rule editing goes to touch devices or
+  a companion app first, because it is cumbersome on a TV. Before 1.0 the TV app
+  may get a simplified or read-only view: which rules exist and where a scheduled
+  recording comes from.
+- To check before 1.0, owner 2026-11-01: a stream profile per channel, for
+  server-side deinterlacing of some channels on problematic hardware. Tvheadend
+  has no per-channel profile setting. HTSP `subscribe` takes a `profile` per
+  subscription (`src/htsp_server.c`, `htsp_method_subscribe`), and the SDK
+  playback request already carries `streamProfileId`, so the mapping would be
+  app-owned. Needs a libav server build and a transcode profile. If the user's
+  access entry excludes the requested profile, `profile_find_by_list` silently
+  picks another, so the result needs checking. Read from source; not tried.
 - Manual one-off recordings (D9) are in, after D4 free disk space, and may be
   dropped if time runs short (owner 2026-10-12).
 - No numeric performance targets at all (startup, zap or UI response): the

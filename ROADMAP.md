@@ -44,10 +44,21 @@ Fire OS is based on Android, so I expect this to be relatively cheap.
 
 ## Maybe before 1.0, maybe after
 
-- **Recording timers and series rules in the app.** If they come, they come
-  together, either at the end of the way to 1.0 or with the phone app, which
-  needs them anyway. Until then you set them up in the Tvheadend web interface,
-  and what they record shows up in Recordings.
+- **Server profiles.** I'd like this before 1.0: several servers or users saved
+  in the app, with a way to switch between them. One at a time, not several at
+  once.
+- **A stream profile per channel.** Some hardware has trouble with interlaced
+  channels, and letting Tvheadend deinterlace only those channels could help.
+  Tvheadend has no per-channel setting for this, but the app can ask for a profile
+  each time it tunes, so the choice could live in the app. It only helps with a
+  server that can transcode, and that re-encoding costs the server CPU or GPU
+  time. I still need to try it.
+- **A simple view of recording timers and series rules.** Editing them with a
+  remote is fiddly, so I'd rather build that cleanly for touch devices or a
+  companion app first. Before 1.0 the TV app might get a simplified interface, or
+  at least a read-only one that shows your rules and where a scheduled recording
+  came from. Until then you set them up in the Tvheadend web interface, and what
+  they record shows up in Recordings.
 - **Sleep timer.** Stop playback after a countdown or at the end of the program,
   with a warning on screen first.
 - **Arabic and Hebrew.** These need right-to-left layout fixes before they can
@@ -59,8 +70,10 @@ Fire OS is based on Android, so I expect this to be relatively cheap.
   Picture-in-picture could come with it. Android TV doesn't allow
   [media playback in picture-in-picture](https://developer.android.com/training/tv/get-started/multitasking),
   so it can't come to the TV app.
+- **Full editing of recording timers and series rules**, on touch devices or in
+  a companion app first.
 - **Search.** What it should cover is still open.
-- **Multiple servers.** Maybe, and not for a while.
+- **Watching from several servers at once.** Maybe, and not for a while.
 
 ## Ideas, not scheduled
 
