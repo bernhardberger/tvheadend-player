@@ -16,19 +16,19 @@ from pathlib import Path, PurePosixPath
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SDK_COORDINATE = "at.bernhardberger.tvheadend:sdk-media3:0.37.0"
-SDK_VERSION = "0.37.0"
+SDK_COORDINATE = "at.bernhardberger.tvheadend:sdk-media3:0.38.0"
+SDK_VERSION = "0.38.0"
 EVIDENCE_DIRECTORY = ROOT / "app/build/released-sdk-evidence"
 SDK_AAR_NAME = f"sdk-media3-{SDK_VERSION}.aar"
 NATIVE_DIRECTORY = ROOT / "decoder-ffmpeg"
 PROVENANCE = json.loads((NATIVE_DIRECTORY / "provenance.json").read_text())
 FFMPEG_SOURCES_NAME = PROVENANCE["sourceArchive"]
-EXPECTED_AAR_SHA256 = "bf230a40519d9a0659d3af78b4f4177d75192c88d50e7e56ddc652c65fa21a56"
+EXPECTED_AAR_SHA256 = "94c9ef1312ef74d28521d3aefa3ed0950493d9e0de1dc958e7ce7030f14babc7"
 EXPECTED_FFMPEG_SOURCES_SHA256 = PROVENANCE["sourceArchiveSha256"]
 EXPECTED_STANDARD_SOURCE_SHA256 = {
-    f"sdk-android-{SDK_VERSION}-sources.jar": "ffe4dbe0a9fb0c01f3707b5327548b9fba954df4eec4c9a9a74c360f7c5aaaf0",
-    f"sdk-core-{SDK_VERSION}-sources.jar": "c3623ea8769745f828e676a67fd4a8b921fc737f9ba541076242f43110ae6e28",
-    f"sdk-media3-{SDK_VERSION}-sources.jar": "26327307128376d8f37977793d5531079c86a4c0a73af8ca11977b733e59f522",
+    f"sdk-android-{SDK_VERSION}-sources.jar": "cd7247a235f765c98b2902888c9ab3f59711cab70c9341be44453b68d203c52f",
+    f"sdk-core-{SDK_VERSION}-sources.jar": "b89b8d4c47aba58f5d4bf0293159ab88c8c20a9134b4bc17e64129e6a5bfb2b6",
+    f"sdk-media3-{SDK_VERSION}-sources.jar": "c695d08ca0a39c0644d2e1a0f2ec69670a757cd76d04cf39bafdb6d23df63c49",
     f"sdk-playback-{SDK_VERSION}-sources.jar": "6e1bd6efd99f4b62b06c51fb806c3810312cb21756be4c3fd799fe9860211f11",
 }
 # Same rule as app/build.gradle.kts and tools/prepare-release: a release is a plain X.Y.Z; a
