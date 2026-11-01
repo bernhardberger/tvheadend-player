@@ -197,6 +197,10 @@ Restricted children cannot read project policy: callers must inline applicable
 hard requirements, accepted invariants and exact evidence without redefining the
 role's permissions, output or verdict contract.
 
+Every `app-implementer` dispatch names its model: Sol medium to start, Sol high
+when medium can't do it, Sonnet high for bounded test-driven UI bugs, Opus high
+only for genuine design or visual judgement (table in the harness doc).
+
 Non-trivial non-UX work requires a pair of independent `android-reviewer`
 dispatches under the harness routing. Slices inside a larger branch use Sol
 (`openai/gpt-6.1-sol`, `xhigh`) plus Sonnet (`claude-code/claude-sonnet-5-5`,

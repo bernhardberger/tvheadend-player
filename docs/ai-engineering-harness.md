@@ -184,17 +184,20 @@ shared Gradle, device, Git, signing, publishing and release mutations. Disjoint
 work or repository/resource overlap alone is not a central scheduler gate and
 does not require a new lock or approval protocol.
 
-Use the implementer's configured model and effort by default. The caller may
-override effort through Task's `reasoning` parameter: `low` only for explicitly
-mechanical work, or `high` up front for evident difficult implementation. No
-lower-effort failure is required first; `max` is exceptional for a concrete
-unresolved hard case. Resolve routine implementation choices inside accepted
-requirements and writable scope. Return consequential product/authority gaps or
-missing load-bearing evidence to the primary. Keep the model inherited from the
-Astra assignment unless the operator explicitly selects another implementation
-model for the task. Explicit model choices retain the implementer's permissions,
-scope boundaries and verification gates. Existing
-Opus review routing is unchanged.
+Every `app-implementer` dispatch names its model. The configured default, Sol
+medium, is only what a forgotten model falls back to.
+
+| Slice | Model |
+|---|---|
+| Well-specified or mechanical; the normal start | `openai/gpt-6.1-sol#medium`, `#high` when medium can't do it |
+| Bounded, test-driven UI bug: failing test first, then the fix | `claude-code/claude-sonnet-5-5#high` |
+| Genuinely needs design or visual judgement | `claude-code/claude-opus-5-5#high`, after the route check below |
+
+The operator's explicit choice for a task wins. Resolve routine implementation
+choices inside accepted requirements and writable scope. Return consequential
+product/authority gaps or missing load-bearing evidence to the primary. Explicit
+model choices retain the implementer's permissions, scope boundaries and
+verification gates. Existing Opus review routing is unchanged.
 
 Before implementation, confirm that the dispatched session exposes an editing
 tool and Bash. If either is missing, report the capability gap rather than
