@@ -305,12 +305,17 @@ internal class ConnectionSetupState(
     }
 
     private suspend fun commit(): Boolean {
+        // Accepted before the save: the app root leaves first-run as soon as the profile publishes,
+        // which cancels the held test before submit returns. If that save then fails, the profile
+        // owner's recovery settles the session, because nothing is left here to do it.
+        accepted = true
         val saved = form.submit(profiles) == ConnectionFormFeedback.SAVED
         if (saved) {
-            accepted = true
             sessionWork?.cancel()
             form.clearPassword()
             onSaved()
+        } else {
+            accepted = false
         }
         return saved
     }

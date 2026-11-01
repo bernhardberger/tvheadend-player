@@ -14,8 +14,12 @@ import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.settings.ConnectionFormState
 import at.bernhardberger.tvhplayer.settings.ConnectionProfileEditor
 import at.bernhardberger.tvhplayer.settings.ServerSettings
+import java.io.IOException
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
@@ -157,6 +161,60 @@ class ConnectionSetupStateTest {
         runCurrent()
         assertEquals("$HOST:9982:$USERNAME", profiles.saved)
         assertEquals("", form.password)
+    }
+
+    @Test
+    fun theFirstRunFlowEndingDuringTheSaveKeepsTheConnection() = runTest {
+        val saving = CompletableDeferred<Unit>()
+        profiles.pendingSave = saving
+        // The app root leaves first-run as soon as the profile publishes, cancelling this scope
+        // while the save still clears old artwork and before submit returns.
+        val composition = CoroutineScope(coroutineContext + Job(backgroundScope.coroutineContext[Job]))
+        form.updateHost(HOST)
+        form.updateUsername(USERNAME)
+        form.updatePassword(PASSWORD)
+        val state = ConnectionSetupState(
+            form, session, profiles, { discovery }, composition, step = SetupStep.SIGN_IN,
+        )
+        state.connect()
+        runCurrent()
+        session.publish(ready())
+        runCurrent()
+        assertEquals(SetupStep.DONE, state.step)
+
+        state.save()
+        runCurrent()
+        assertEquals("$HOST:9982:$USERNAME", profiles.saved)
+        composition.cancel()
+        runCurrent()
+
+        assertEquals(
+            "The saved profile keeps the connection the test made",
+            listOf(FakeSessionCall.DISCONNECT, FakeSessionCall.CONNECT),
+            session.calls,
+        )
+    }
+
+    @Test
+    fun aSaveThatFailsStillLetsBackDropTheTestedConnection() = runTest {
+        profiles.saveFailure = IOException("Fake store failure")
+        val state = signIn(username = USERNAME, password = PASSWORD)
+        state.connect()
+        runCurrent()
+        session.publish(ready())
+        runCurrent()
+
+        state.save()
+        runCurrent()
+        assertEquals(SetupStep.DONE, state.step)
+        assertEquals(listOf(FakeSessionCall.DISCONNECT, FakeSessionCall.CONNECT), session.calls)
+
+        assertTrue(state.back())
+        runCurrent()
+        assertEquals(
+            listOf(FakeSessionCall.DISCONNECT, FakeSessionCall.CONNECT, FakeSessionCall.DISCONNECT),
+            session.calls,
+        )
     }
 
     @Test
@@ -608,6 +666,8 @@ class ConnectionSetupStateTest {
 private class FakeProfiles : ConnectionProfileEditor {
     override val serverSettings: Flow<ServerSettings> = emptyFlow()
     var saved: String? = null
+    var pendingSave: CompletableDeferred<Unit>? = null
+    var saveFailure: Exception? = null
 
     override suspend fun loadServerForEditing(applyAvailable: (String, Int, String, String) -> Unit) = Unit
 
@@ -621,7 +681,9 @@ private class FakeProfiles : ConnectionProfileEditor {
         username: String,
         password: String,
     ) {
+        saveFailure?.let { throw it }
         saved = "$host:$htspPort:$username"
+        pendingSave?.await()
     }
 
     override suspend fun clearProfile() = Unit
