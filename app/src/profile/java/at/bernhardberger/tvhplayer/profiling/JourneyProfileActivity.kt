@@ -22,6 +22,8 @@ import androidx.media3.exoplayer.ExoPlayer
 import at.bernhardberger.tvheadend.sdk.android.TvheadendServerProfileStore
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult
 import at.bernhardberger.tvheadend.sdk.core.EpgCoverageAcquisitionResult
+import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
+import at.bernhardberger.tvheadend.sdk.media3.TvheadendLiveStartBuffer
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendLoadControl
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendRenderersFactory
@@ -68,9 +70,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.milliseconds
 
 /** Isolated SDK-domain fixtures feeding the unchanged production screens and state owners. */
-@OptIn(DelicateCoilApi::class)
+@OptIn(DelicateCoilApi::class, ExperimentalTvheadendApi::class)
 class JourneyProfileActivity : AppCompatActivity() {
     private var runtimeOwner: SdkRuntimeOwner? = null
     private var images: ImageLoader? = null
@@ -108,11 +111,11 @@ class JourneyProfileActivity : AppCompatActivity() {
                 session, profileStore, settings, Dispatchers.IO,
             )
             val audioOutput = at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider(this@JourneyProfileActivity)
-            val player = ExoPlayer.Builder(this@JourneyProfileActivity)
+            val loadControl = createTvheadendLoadControl(TvheadendLiveStartBuffer(500.milliseconds))
+            val player = loadControl.configure(ExoPlayer.Builder(this@JourneyProfileActivity))
                 .setRenderersFactory(createTvheadendRenderersFactory(this@JourneyProfileActivity, audioOutput))
-                .setLoadControl(createTvheadendLoadControl())
                 .build()
-            val coordinator = createTvheadendPlaybackCoordinator(player)
+            val coordinator = createTvheadendPlaybackCoordinator(player, loadControl)
             val runtime = AppPlaybackRuntime(player, session, coordinator, settings, profiles, scope, audioOutput,
                 at.bernhardberger.tvhplayer.playback.PlaybackAudioFocus.None,
                 at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy.fromPlayerSettings(trace = ProfilePlaybackTrace))

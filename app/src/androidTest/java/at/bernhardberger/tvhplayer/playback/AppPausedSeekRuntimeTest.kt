@@ -1,6 +1,7 @@
 @file:androidx.media3.common.util.UnstableApi
 @file:OptIn(
     at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class,
+    at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class,
     at.bernhardberger.tvheadend.sdk.playback.SubscriptionInfrastructureApi::class,
 )
 
@@ -23,6 +24,7 @@ import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandResult
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentSeekResult
+import at.bernhardberger.tvheadend.sdk.media3.TvheadendLiveStartBuffer
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendLoadControl
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendRenderersFactory
@@ -42,6 +44,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import java.security.MessageDigest
 import org.json.JSONObject
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Duration.Companion.microseconds
 import kotlin.time.TimeSource
@@ -92,9 +95,9 @@ class AppPausedSeekRuntimeTest {
             val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
             val profileJob = scope.launch { profiles.run() }
             val audioOutput = at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider(context)
+            val loadControl = createTvheadendLoadControl(TvheadendLiveStartBuffer(500.milliseconds))
             val player = withContext(Dispatchers.Main) {
-                ExoPlayer.Builder(context, createTvheadendRenderersFactory(context, audioOutput))
-                    .setLoadControl(createTvheadendLoadControl())
+                loadControl.configure(ExoPlayer.Builder(context, createTvheadendRenderersFactory(context, audioOutput)))
                     .build().apply {
                         volume = 0f
                         setVideoSurface(surface)
@@ -108,7 +111,7 @@ class AppPausedSeekRuntimeTest {
                         })
                     }
             }
-            val coordinator = withContext(Dispatchers.Main) { createTvheadendPlaybackCoordinator(player) }
+            val coordinator = withContext(Dispatchers.Main) { createTvheadendPlaybackCoordinator(player, loadControl) }
             val lifetime = coordinator.launchIn(scope)
             val runtime = withContext(Dispatchers.Main) { AppPlaybackRuntime(player, session, coordinator, settings, profiles, scope, audioOutput, PlaybackAudioFocus.None,
                 at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy.fromPlayerSettings()) }
