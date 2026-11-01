@@ -185,17 +185,17 @@ internal val HomeDownInEasing = CubicBezierEasing(0.46f, 0f, 0f, 1f)
 internal const val HomeDownInMs = 410
 
 /** Interrupted moves start at the currently drawn page position, following live row measurements. */
-internal class HomePageMotion {
+internal class HomePageMotion(initial: HomeSectionKind? = null, immersiveShift: Float = 0f) {
     val progress = Animatable(1f)
     var from by mutableFloatStateOf(0f)
     var destination by mutableFloatStateOf(0f)
-    var to by mutableStateOf<HomeSectionKind?>(null)
-    val above = Animatable(1f)
-    val aboveShift = Animatable(0f)
-    val block = Animatable(0f)
+    var to by mutableStateOf(initial)
+    val above = Animatable(if (initial == HomeSectionKind.ON_NOW) 0f else 1f)
+    val aboveShift = Animatable(if (initial == HomeSectionKind.ON_NOW) -immersiveShift else 0f)
+    val block = Animatable(if (initial == HomeSectionKind.ON_NOW) 1f else 0f)
     val blockShift = Animatable(0f)
-    val background = Animatable(0f)
-    val heading = Animatable(1f)
+    val background = Animatable(if (initial == HomeSectionKind.ON_NOW) 1f else 0f)
+    val heading = Animatable(if (initial == HomeSectionKind.ON_NOW) 0f else 1f)
     var revealFromBottom by mutableStateOf(true)
 }
 
@@ -205,13 +205,14 @@ internal fun rememberHomePageMotion(
     focused: HomeSectionKind?,
     target: (HomeSectionKind?) -> Float,
 ): HomePageMotion {
-    val motion = remember { HomePageMotion() }
     val density = LocalDensity.current
-    var previous by remember { mutableStateOf<HomeSectionKind?>(null) }
-    var initialized by remember { mutableStateOf(false) }
+    val motion = remember { HomePageMotion(focused, with(density) { HomeImmersiveSlot.toPx() }) }
+    var previous by remember { mutableStateOf(focused) }
+    var initialized by remember { mutableStateOf(focused != null) }
     LaunchedEffect(focused) {
         val to = focused
         val from = previous
+        if (initialized && to == from) return@LaunchedEffect
         previous = to
         val shift = with(density) { HomeImmersiveSlot.toPx() }
         val blockShift = with(density) { 16.dp.toPx() }
@@ -373,15 +374,21 @@ internal fun HomeContent(
     val requesters = remember {
         HomeSectionKind.entries.associateWith { FocusRequester() }
     }
-    var focusedSection by remember { mutableStateOf<HomeSectionKind?>(null) }
+    var focusedSection by remember { mutableStateOf(initialKey?.section.takeUnless { restoreHeader }) }
+    var focusedPrecedingSections by remember {
+        mutableStateOf(sections.takeWhile { it.kind != focusedSection }.map { it.kind })
+    }
     var hasHomeFocus by remember { mutableStateOf(false) }
     var entryFocusApplied by remember { mutableStateOf(false) }
+    var previousFocusEnabled by remember { mutableStateOf(false) }
+    var emptyHasFocus by remember { mutableStateOf(false) }
     var focusedCard by remember { mutableStateOf<HomeFocusKey?>(null) }
     var focusedOnNow by remember { mutableStateOf<ChannelId?>(null) }
     val tops = remember { mutableStateMapOf<HomeSectionKind, Float>() }
     var onNowRowTop by remember { mutableFloatStateOf(0f) }
     var viewportHeight by remember { mutableIntStateOf(0) }
     var contentEnd by remember { mutableFloatStateOf(0f) }
+    var focusedBottomSlack by remember { mutableFloatStateOf(0f) }
 
     val scrollTarget: (HomeSectionKind?) -> Float = { kind ->
         val viewport = viewportHeight.toFloat()
@@ -393,7 +400,12 @@ internal fun HomeContent(
             firstSection -> 0f
             else -> ((tops[kind] ?: 0f) - topSlot).coerceAtLeast(0f)
         }
-        if (renderedSections.size >= sections.size) minOf(desired, (contentEnd - viewport).coerceAtLeast(0f))
+        val insertedAboveFocus = kind != null && kind == focusedSection &&
+            sections.takeWhile { it.kind != kind }.any { it.kind !in focusedPrecedingSections }
+        // On a short page, newly inserted rows must not spend the old bottom slack by
+        // pushing the focused row down. Preserve that slack until the viewer changes rows.
+        val bottomSlack = if (insertedAboveFocus) focusedBottomSlack else 0f
+        if (renderedSections.size >= sections.size) minOf(desired, (contentEnd - viewport + bottomSlack).coerceAtLeast(0f))
         else desired
     }
     val motion = rememberHomePageMotion(focusedSection, scrollTarget)
@@ -410,16 +422,20 @@ internal fun HomeContent(
     // Metadata ticks and ordinary D-pad moves must not replay entry focus. Request it on entry,
     // after the first rows arrive, or when the destination regains ownership after a dialog.
     LaunchedEffect(focusEnabled, sections.isEmpty(), emptyFocus, initialKey, followInitialFocus) {
+        val regainingOwnership = focusEnabled && !previousFocusEnabled
+        previousFocusEnabled = focusEnabled
         if (!focusEnabled) return@LaunchedEffect
         // Widget focus changes precede composition's drawerActive feedback: never take focus back
         // from an opening drawer.
         withFrameNanos { }
         if (drawerState?.currentValue == DrawerValue.Open) return@LaunchedEffect
-        if (entryFocusApplied && hasHomeFocus && !restoreHeader && !followInitialFocus) return@LaunchedEffect
+        if (entryFocusApplied && !emptyHasFocus && !restoreHeader && !followInitialFocus &&
+            (hasHomeFocus || (sections.isNotEmpty() && !regainingOwnership))) return@LaunchedEffect
         val target = if (restoreHeader) (if (restoreTags) tagsRequester else viewRequester) else initialKey?.let { requesters[it.section] } ?: emptyFocus ?: viewRequester
         repeat(60) {
             if (drawerState?.currentValue == DrawerValue.Open) return@LaunchedEffect
-            if (entryFocusApplied && hasHomeFocus && !restoreHeader && !followInitialFocus) return@LaunchedEffect
+            if (entryFocusApplied && !emptyHasFocus && !restoreHeader && !followInitialFocus &&
+                (hasHomeFocus || (sections.isNotEmpty() && !regainingOwnership))) return@LaunchedEffect
             // A lazy row may still be composing its newly scrolled-to initial card.
             if (runCatching { target.requestFocus() }.getOrDefault(false)) {
                 entryFocusApplied = true
@@ -532,8 +548,19 @@ internal fun HomeContent(
                 )
                 Spacer(Modifier.height(((if (sections.firstOrNull()?.headingTitle() != null) ordinarySlot else HomeTopSlot) -
                     24.dp - TvBrowseHeaderHeight).coerceAtLeast(0.dp)))
-                if (sections.isEmpty()) {
-                    Box(Modifier.height(emptyHeight)) { emptyContent() }
+                // Keep the focused action attached until the first card accepts focus. Removing
+                // it first lets non-touch-mode focus search escape to the navigation rail.
+                if (sections.isEmpty() || emptyHasFocus) {
+                    Box(Modifier
+                        .layout { measurable, constraints ->
+                            val placeable = measurable.measure(constraints)
+                            layout(placeable.width, if (sections.isEmpty()) placeable.height else 0) {
+                                placeable.place(0, 0)
+                            }
+                        }
+                        .height(emptyHeight)
+                        .graphicsLayer { alpha = if (sections.isEmpty()) 1f else 0f }
+                        .onFocusChanged { emptyHasFocus = it.hasFocus }) { emptyContent() }
                 }
                 renderedSections.forEach { section -> key(section.kind) {
                     val kind = section.kind
@@ -550,6 +577,7 @@ internal fun HomeContent(
                     val onNowSection = section as? HomeSection.OnNow
                     val onSectionFocus = {
                         if (focusedSection != kind) {
+                            focusedPrecedingSections = sections.takeWhile { it.kind != kind }.map { it.kind }
                             focusedSection = kind
                             if (kind == HomeSectionKind.ON_NOW) {
                                 focusedOnNow = onNowSection?.items?.firstOrNull()?.channel?.id
@@ -557,6 +585,9 @@ internal fun HomeContent(
                         }
                     }
                     val onCardFocus: (Int, String) -> Unit = { index, key ->
+                        if (focusedCard?.section != kind) {
+                            focusedBottomSlack = (viewportHeight - contentEnd).coerceAtLeast(0f)
+                        }
                         onSectionFocus()
                         focusedCard = HomeFocusKey(kind, key, index)
                         onFocused(HomeFocusKey(kind, key, index))

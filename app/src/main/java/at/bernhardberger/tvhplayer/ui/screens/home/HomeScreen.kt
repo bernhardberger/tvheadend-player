@@ -188,7 +188,7 @@ internal fun HomeScreenContent(
     val playingRecordingId = (input.playing as? HomePlaying.Recording)?.entryId
     val sections = remember(input) { homeSections(input) }
     var focused by focusMemory
-    // A fresh landing follows late-arriving sections only until input or a restore boundary.
+    // Startup priority applies until a card lands; later metadata must not replace that card.
     var followInitialFocus by remember { mutableStateOf(focused == null) }
     var hadFocusOwnership by remember { mutableStateOf(false) }
     var options by remember { mutableStateOf(false) }
@@ -274,7 +274,7 @@ internal fun HomeScreenContent(
             if (previous.item in HomeEndCardKeys && sections.any { it.kind == previous.section }) previous
             else homeRestoreFocus(sections, previous)
         } ?: homeInitialFocus(sections),
-        onFocused = { focused = it; restoreHeader = false },
+        onFocused = { focused = it; followInitialFocus = false; restoreHeader = false },
         modifier = modifier.onPreviewKeyEvent {
             // Drawer entry may deliver only the release to Home; it is still viewer input.
             followInitialFocus = false

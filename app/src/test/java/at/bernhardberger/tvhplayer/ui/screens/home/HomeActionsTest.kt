@@ -8,9 +8,9 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createComposeRule
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvhplayer.core.*
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
@@ -37,7 +37,7 @@ import kotlinx.coroutines.flow.first
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class HomeActionsTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule val compose = androidx.compose.ui.test.junit4.createAndroidComposeRule<androidx.activity.ComponentActivity>()
     private val now = 1_800_000_000L
     private val channel = Channel.create(ChannelId(1), name = "Test channel")
     private lateinit var back: androidx.activity.OnBackPressedDispatcher
@@ -60,11 +60,11 @@ class HomeActionsTest {
 
     @Test fun rowReentryUsesClampedPreviousIndexWhenItsItemLeaves() = recentRowRefresh(true)
 
-    @Test fun lateRunningRecordingBecomesInitialFocusBeforeAnyHomeKey() = lateRunningRecording(false)
+    @Test fun lateRunningRecordingPreservesLandedFocusBeforeAnyHomeKey() = lateRunningRecording(false)
 
     @Test fun lateRunningRecordingDoesNotReplaceTheViewersChosenCard() = lateRunningRecording(true)
 
-    @Test fun earlierOnNowItemBecomesInitialFocusBeforeAnyHomeKey() = earlierOnNowItem(false)
+    @Test fun earlierOnNowItemPreservesLandedFocusBeforeAnyHomeKey() = earlierOnNowItem(false)
 
     @Test fun earlierOnNowItemDoesNotReplaceTheViewersChosenCard() = earlierOnNowItem(true)
 
@@ -132,7 +132,7 @@ class HomeActionsTest {
         }
         compose.runOnIdle { input = input.copy(currentEvents = events) }
         compose.mainClock.advanceTimeBy(600)
-        compose.onNodeWithTag(if (viewerMoved) "home-onnow-12" else "home-onnow-0").assertIsFocused()
+        compose.onNodeWithTag(if (viewerMoved) "home-onnow-12" else "home-onnow-11").assertIsFocused()
     }
 
     private fun lateRunningRecording(viewerMoved: Boolean) {
@@ -145,21 +145,87 @@ class HomeActionsTest {
                 onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
         } }
         compose.onNodeWithTag("home-recent-0").assertIsFocused()
+        leaveTouchMode()
         if (viewerMoved) {
             compose.onNodeWithTag("home-recent-0").performKeyInput { pressKey(Key.DirectionRight) }
             compose.onNodeWithTag("home-recent-1").assertIsFocused()
         }
+        val tag = if (viewerMoved) "home-recent-1" else "home-recent-0"
+        val top = compose.onNodeWithTag(tag).getUnclippedBoundsInRoot().top.value
         compose.runOnIdle {
             input = input.copy(dvrEntries = listOf(DvrEntry.create(DvrEntryId(7), channelId = channel.id,
                 title = "Running recording", state = DvrEntryState.RECORDING,
                 start = Instant.fromEpochSeconds(now - 300), stop = Instant.fromEpochSeconds(now + 900))))
         }
-        compose.mainClock.advanceTimeBy(600)
-        compose.onNodeWithTag(if (viewerMoved) "home-recent-1" else "home-activity-0").assertIsFocused()
-        if (!viewerMoved) {
-            val header = compose.onNodeWithTag("home-header").assertIsDisplayed().getUnclippedBoundsInRoot()
-            assertTrue("Initial first-section focus keeps the header inside the viewport", header.top.value >= 0f)
+        compose.mainClock.autoAdvance = false
+        repeat(40) {
+            compose.mainClock.advanceTimeByFrame()
+            compose.onNodeWithTag(tag).assertIsFocused()
+            assertEquals("Inserted activity must not move the focused card", top,
+                compose.onNodeWithTag(tag).getUnclippedBoundsInRoot().top.value, 1f)
         }
+        compose.mainClock.autoAdvance = true
+    }
+
+    @Test fun restoredMotionStartsAtItsDestinationInComposition() {
+        var first = true
+        var destination: HomeSectionKind? = null
+        compose.setContent {
+            val motion = rememberHomePageMotion(HomeSectionKind.UPCOMING) { 300f }
+            if (first) { destination = motion.to; first = false }
+        }
+        compose.runOnIdle { assertEquals(HomeSectionKind.UPCOMING, destination) }
+    }
+
+    private fun leaveTouchMode() {
+        compose.runOnIdle {
+            org.robolectric.util.ReflectionHelpers.callInstanceMethod<Boolean>(
+                compose.activity.window.decorView.parent, "ensureTouchModeLocally",
+                org.robolectric.util.ReflectionHelpers.ClassParameter.from(Boolean::class.javaPrimitiveType, false))
+        }
+    }
+
+    @Test fun firstSectionsReplaceFocusedEmptyActionWithoutOpeningDrawer() = emptyToSections(null)
+
+    @Test fun firstSectionsDoNotTakeFocusFromTheHeader() = emptyToSections("home-view-button")
+
+    @Test fun firstSectionsDoNotTakeFocusFromTheRail() = emptyToSections("test-rail")
+
+    private fun emptyToSections(viewerTarget: String?) {
+        leaveTouchMode()
+        var sections by mutableStateOf(emptyList<HomeSection>())
+        val empty = androidx.compose.ui.focus.FocusRequester()
+        val rail = androidx.compose.ui.focus.FocusRequester()
+        val header = androidx.compose.ui.focus.FocusRequester()
+        lateinit var drawer: androidx.tv.material3.DrawerState
+        compose.setContent { TVHeadendPlayerTheme {
+            drawer = androidx.tv.material3.rememberDrawerState(androidx.tv.material3.DrawerValue.Closed)
+            CompositionLocalProvider(LocalBrowseDrawerState provides drawer, LocalBrowseNavigationFocus provides rail) {
+                androidx.compose.foundation.layout.Box {
+                    HomeContent(sections, PaddingValues(), homeInitialFocus(sections), {}, emptyFocus = empty,
+                        viewRequester = header,
+                        emptyContent = {
+                            androidx.tv.material3.Button({}, modifier = androidx.compose.ui.Modifier
+                                .focusRequester(empty).testTag("empty-action")) { androidx.tv.material3.Text("Browse channels") }
+                        })
+                    androidx.tv.material3.Button({}, modifier = androidx.compose.ui.Modifier.focusRequester(rail)
+                        .onFocusChanged { if (it.isFocused) drawer.setValue(androidx.tv.material3.DrawerValue.Open) }
+                        .testTag("test-rail")) { androidx.tv.material3.Text("Home") }
+                }
+            }
+        } }
+        compose.onNodeWithTag("empty-action").assertIsFocused()
+        if (viewerTarget != null) compose.runOnIdle {
+            (if (viewerTarget == "test-rail") rail else header).requestFocus()
+        }
+        if (viewerTarget != null) compose.onNodeWithTag(viewerTarget).assertIsFocused()
+        compose.runOnIdle { sections = listOf(HomeSection.OnNow(listOf(OnNowItem(channel,
+            EpgEvent.create(EventId(1), channel.id, Instant.fromEpochSeconds(now - 60),
+                Instant.fromEpochSeconds(now + 600), title = "Programme"))))) }
+        compose.mainClock.advanceTimeBy(600)
+        compose.onNodeWithTag(viewerTarget ?: "home-onnow-0").assertIsFocused()
+        compose.runOnIdle { assertEquals(if (viewerTarget == "test-rail") androidx.tv.material3.DrawerValue.Open
+            else androidx.tv.material3.DrawerValue.Closed, drawer.currentValue) }
     }
 
     private fun recentRowRefresh(removeFocused: Boolean) {
@@ -341,6 +407,7 @@ class HomeActionsTest {
     }
 
     @Test fun restoredShortLastRowHasNoEntryClampJump() {
+        leaveTouchMode()
         val sections = listOf<HomeSection>(HomeSection.RecentChannels(listOf(RecentChannelItem(channel))),
             HomeSection.OnNow(listOf(OnNowItem(channel, EpgEvent.create(EventId(1), channel.id,
                 Instant.fromEpochSeconds(now - 60), Instant.fromEpochSeconds(now + 600), title = "Programme")))),
