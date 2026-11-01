@@ -16,6 +16,9 @@
   app is restarted.
 - Pressing OK on a text field no longer skips to the next field on TVs with
   Gboard.
+- Searching for servers no longer offers an address that can't connect on servers
+  that also announce IPv6. It now finds their IPv4 address, including on Android
+  12 and older.
 
 ### Home
 
