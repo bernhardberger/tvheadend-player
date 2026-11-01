@@ -57,25 +57,23 @@ r/tvheadend, with `home.png`, `channels.png`, `guide.png` and `player.png` from
 subreddit's rules for posts about your own project first:
 
 ```text
-Title: Been working on an open source Android TV client for Tvheadend, beta testers welcome
+Title: Tvheadend client for Android TV, looking for beta testers
 
-I've been working on a Tvheadend client for Android TV and Google TV, and it's at the point where I'd like other people to try it. It's open source (GPLv3) and made for the remote, so it's D-pad first all the way through.
+When ORF retired Cryptoworks my mum's CI modules stopped working. I got her Google TVs instead of new modules, then couldn't find a Tvheadend app simple enough for her, so I started building one. It got a bit out of hand.
 
-There's a home screen that gets you back to what you were doing, three channel views (immersive, PVR-style list, grid), a program guide, server timeshift and recordings with a folder browser. Screenshots are above.
+It's open source (GPLv3). Guide, timeshift, recordings, three channel layouts, and it all works with a plain D-pad remote.
 
-Mostly I'm curious how it runs on your box, and what's missing before you'd use it every day.
-
-If you've got Android TV or Google TV (Android 9+) and Tvheadend 4.3:
+It's in closed testing on Play right now. Google wants 12 testers for 14 days before it goes public. You need Tvheadend 4.3 and an Android TV or Google TV box on Android 9+:
 
 1. Join the group with the Google account on your TV: https://groups.google.com/g/tvheadend-player-testers
 2. Opt in: https://play.google.com/apps/testing/at.bernhardberger.tvhplayer
 3. Install it from the Play Store on the TV. It's not in search yet, so use the link from step 2.
 
-Google wants 12 testers for 14 days before it can go on the Play Store for everyone, so stick around for the 14 days if you can. Don't want Play? The APKs are on GitHub.
+APKs are on GitHub if you don't want Play.
 
-Bugs go to GitHub issues if you can, anything else just comment here.
+Bugs on GitHub please, everything else here. Especially interested in boxes other than mine.
 
-GitHub: https://github.com/bernhardberger/tvheadend-player
+https://github.com/bernhardberger/tvheadend-player
 Roadmap: https://github.com/bernhardberger/tvheadend-player/blob/main/ROADMAP.md
 ```
 
