@@ -49,7 +49,7 @@ import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
 @Composable
 internal fun HomeEmptyState(
     input: HomeInput,
-    catalogCurrent: Boolean,
+    loading: Boolean,
     hasChannelsOutsideScope: Boolean,
     loadingDelayed: Boolean,
     contentPadding: PaddingValues,
@@ -59,7 +59,6 @@ internal fun HomeEmptyState(
     onBrowseChannels: () -> Unit,
     onViewOptions: () -> Unit,
 ) {
-    val loading = !catalogCurrent && input.channels.isEmpty()
     val hidden = input.hiddenSections.size == HomeSectionKind.entries.size
     val direction = LocalLayoutDirection.current
     val leading = LocalBrowseNavigationFocus.current ?: FocusRequester.Default
@@ -71,8 +70,9 @@ internal fun HomeEmptyState(
         horizontalAlignment = if (loading) Alignment.Start else Alignment.CenterHorizontally,
         verticalArrangement = if (loading) Arrangement.spacedBy(16.dp) else Arrangement.spacedBy(16.dp, Alignment.CenterVertically)) {
         Text(stringResource(when {
-            loadingDelayed -> R.string.home_still_connecting
-            loading -> R.string.home_loading_channels
+            loading && loadingDelayed -> R.string.home_still_connecting
+            loading && input.channels.isEmpty() -> R.string.home_loading_channels
+            loading -> R.string.loading
             hidden -> R.string.channels_view_options
             else -> R.string.home_start_watching
         }), style = MaterialTheme.typography.headlineMedium,

@@ -260,11 +260,20 @@ internal fun HomeScreenContent(
     var lastEmptyError by remember { mutableStateOf(error) }
     SideEffect { if (sections.isEmpty()) lastEmptyError = error }
     val shownError = if (sections.isEmpty()) error else lastEmptyError
-    val loading = sections.isEmpty() && error == null && !catalogCurrent && input.channels.isEmpty()
-    var loadingDelayed by remember(loading) { mutableStateOf(false) }
-    LaunchedEffect(loading) {
-        if (loading) { delay(10_000); loadingDelayed = true }
+    // Known channels with no rows yet only mean an empty Home once the guide and recordings have
+    // synchronized. Saved data arrives moments after the catalog on a cold start.
+    val waiting = sections.isEmpty() && error == null && when {
+        input.channels.isEmpty() -> !catalogCurrent
+        input.hiddenSections.size == HomeSectionKind.entries.size -> false
+        else -> !catalogCurrent || observation.epgSnapshotAuthority != RetainedMetadataAuthority.CURRENT ||
+            observation.dvrSnapshotAuthority != RetainedMetadataAuthority.CURRENT
     }
+    var loadingDelayed by remember(waiting) { mutableStateOf(false) }
+    LaunchedEffect(waiting) {
+        if (waiting) { delay(10_000); loadingDelayed = true }
+    }
+    // Rows that never arrive still end in the real empty Home, with its way into Channels.
+    val loading = waiting && (input.channels.isEmpty() || !loadingDelayed)
     val openOptions = { if (owner?.isCurrent != false) { restoreTagHeader = false; restoreHeader = true; options = true } }
     val errorFocus = remember { FocusRequester() }
     val contentFocusEnabled = initialFocusEnabled && channelMenu == null && recording == null && !options && !tags
@@ -304,7 +313,7 @@ internal fun HomeScreenContent(
                         AppErrorAction.CONNECTION_SETTINGS -> onOpenConnectionSettings()
                         AppErrorAction.CLOSE -> Unit
                     }
-                }) else HomeEmptyState(input, catalogCurrent, hasChannelsOutsideScope,
+                }) else HomeEmptyState(input, loading, hasChannelsOutsideScope,
                     loadingDelayed, contentPadding, errorFocus, viewFocus, onOpenConnectionSettings,
                     onBrowseChannels, openOptions)
         },

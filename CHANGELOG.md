@@ -22,6 +22,8 @@
 - Starting the app with something recording no longer opens the side menu by
   itself or leaves nothing focused.
 - The programme info on On now no longer jumps while you scroll a row.
+- Home no longer flashes the empty Start watching screen on launch while it waits
+  for the guide.
 
 ### Channels and Home cards
 

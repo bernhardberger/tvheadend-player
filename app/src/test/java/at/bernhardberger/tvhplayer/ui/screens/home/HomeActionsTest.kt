@@ -676,6 +676,52 @@ class HomeActionsTest {
         compose.onNodeWithTag("home-view-button").assertExists()
     }
 
+    private fun channelsAwaitingRows(input: () -> HomeInput, observation: () -> SessionObservation) {
+        compose.setContent { TVHeadendPlayerTheme {
+            HomeScreenContent(input(), observation(), PaddingValues(), true,
+                onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
+                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
+        } }
+    }
+
+    @Test fun savedChannelsWaitingForTheGuideShowLoadingThenItsRowsWithoutAnEmptyHome() {
+        val event = EpgEvent.create(EventId(1), channel.id, Instant.fromEpochSeconds(now - 60),
+            Instant.fromEpochSeconds(now + 600), title = "Programme")
+        val catalog = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(channel)))
+        var restored by mutableStateOf(false)
+        channelsAwaitingRows(
+            input = { HomeInput(listOf(channel), if (restored) mapOf(channel.id to event) else emptyMap(), emptyList(), emptyList(), emptyList(), { null }, null, now) },
+            observation = { SessionObservation.create(channelState = catalog,
+                epgState = if (restored) EpgRepositoryState.Current(EpgSnapshot.create(listOf(event))) else EpgRepositoryState.Empty,
+                dvrState = if (restored) DvrRepositoryState.Current(DvrSnapshot.create(emptyList())) else DvrRepositoryState.Empty) },
+        )
+        compose.onNodeWithTag("home-loading").assertExists()
+        compose.onNodeWithText("Loading…").assertExists()
+        compose.onNodeWithText("Start watching").assertDoesNotExist()
+        compose.onNodeWithTag("home-recovery").assertDoesNotExist()
+        compose.onNodeWithTag("home-view-button").assertIsFocused()
+        compose.runOnIdle { restored = true }
+        compose.mainClock.advanceTimeBy(600)
+        compose.onNodeWithTag("home-loading").assertDoesNotExist()
+        compose.onNodeWithTag("home-onnow-0").assertIsFocused()
+    }
+
+    @Test fun rowsThatNeverArriveEndInTheEmptyHomeInsteadOfLoadingForever() {
+        val input = HomeInput(listOf(channel), emptyMap(), emptyList(), emptyList(), emptyList(), { null }, null, now)
+        val observation = SessionObservation.create(channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(channel))))
+        channelsAwaitingRows({ input }, { observation })
+        compose.mainClock.advanceTimeBy(9_000)
+        compose.onNodeWithTag("home-loading").assertExists()
+        compose.mainClock.advanceTimeBy(1_100)
+        compose.onNodeWithTag("home-loading").assertDoesNotExist()
+        compose.onNodeWithText("Start watching").assertExists()
+        compose.onNodeWithText("Still connecting…").assertDoesNotExist()
+        compose.onNodeWithText("Connection settings").assertDoesNotExist()
+        compose.onNodeWithText("Browse channels").assertExists()
+        compose.onNodeWithTag("home-view-button").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.onNodeWithText("Browse channels").assertIsFocused()
+    }
+
     @Test fun delayedEntryRestoreDoesNotTakeFocusFromAnOpeningDrawer() {
         var enabled by mutableStateOf(false)
         lateinit var drawer: androidx.tv.material3.DrawerState
