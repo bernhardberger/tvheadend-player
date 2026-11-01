@@ -49,6 +49,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -161,6 +162,7 @@ import java.time.Instant
 import kotlin.time.Instant as KotlinInstant
 import java.time.ZoneId
 import java.util.Locale
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -396,9 +398,13 @@ internal fun HomeContent(
     var onNowRowTop by remember { mutableFloatStateOf(0f) }
     var viewportHeight by remember { mutableIntStateOf(0) }
     var contentEnd by remember { mutableFloatStateOf(0f) }
-    // Page offset minus the focused row's top when it took focus: holds its place on screen.
+    // The focused row's settled page offset minus its top: what holds its place on screen.
     var focusedRowAnchor by remember { mutableStateOf<Float?>(null) }
 
+    val insertedAboveFocus: (HomeSectionKind?) -> Boolean = { kind ->
+        kind != null && kind == focusedSection &&
+            sections.takeWhile { it.kind != kind }.any { it.kind !in focusedPrecedingSections }
+    }
     val scrollTarget: (HomeSectionKind?) -> Float = { kind ->
         val viewport = viewportHeight.toFloat()
         val topSlot = with(density) { ordinarySlot.toPx() }
@@ -409,13 +415,24 @@ internal fun HomeContent(
             firstSection -> 0f
             else -> ((tops[kind] ?: 0f) - topSlot).coerceAtLeast(0f)
         }
-        val insertedAboveFocus = kind != null && kind == focusedSection &&
-            sections.takeWhile { it.kind != kind }.any { it.kind !in focusedPrecedingSections }
         // On a short page, a row inserted above must not push the focused row down, whatever
         // happens below it. Hold the row where it was until the viewer changes rows.
-        val heldOffset = focusedRowAnchor?.takeIf { insertedAboveFocus }?.let { anchor -> tops[kind]?.plus(anchor) }
+        val heldOffset = if (insertedAboveFocus(kind)) {
+            focusedRowAnchor?.let { anchor -> tops[kind]?.plus(anchor) }
+        } else {
+            null
+        }
         if (renderedSections.size >= sections.size) minOf(desired, (heldOffset ?: (contentEnd - viewport)).coerceAtLeast(0f))
         else desired
+    }
+    val currentScrollTarget by rememberUpdatedState(scrollTarget)
+    val currentInsertedAboveFocus by rememberUpdatedState(insertedAboveFocus)
+    // Follows captions collapsing and rows revealing; the insertion itself must not move it.
+    LaunchedEffect(focusedSection) {
+        val kind = focusedSection ?: return@LaunchedEffect
+        snapshotFlow {
+            if (currentInsertedAboveFocus(kind)) null else tops[kind]?.let { currentScrollTarget(kind) - it }
+        }.filterNotNull().collect { focusedRowAnchor = it }
     }
     val motion = rememberHomePageMotion(focusedSection, scrollTarget)
     val scrollPx by remember(motion, scrollTarget) {
@@ -602,9 +619,6 @@ internal fun HomeContent(
                         }
                     }
                     val onCardFocus: (Int, String) -> Unit = { index, key ->
-                        if (focusedCard?.section != kind) {
-                            focusedRowAnchor = tops[kind]?.let { top -> scrollTarget(kind) - top }
-                        }
                         onSectionFocus()
                         focusedCard = HomeFocusKey(kind, key, index)
                         onFocused(HomeFocusKey(kind, key, index))

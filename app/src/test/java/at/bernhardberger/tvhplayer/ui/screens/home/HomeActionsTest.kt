@@ -325,6 +325,36 @@ class HomeActionsTest {
         compose.onNodeWithTag("home-activity-0").assertExists()
     }
 
+    @Test fun aRowInsertedAfterTheCaptionCollapsedKeepsTheFocusedRowInPlace() {
+        val second = Channel.create(ChannelId(2), name = "Second")
+        val scheduled = DvrEntry.create(DvrEntryId(7), channelId = channel.id, title = "Soon",
+            state = DvrEntryState.SCHEDULED, start = Instant.fromEpochSeconds(now + 600), stop = Instant.fromEpochSeconds(now + 1800))
+        var input by mutableStateOf(HomeInput(listOf(channel, second), emptyMap(), emptyList(),
+            listOf(channel.id, second.id), listOf(scheduled), { null }, null, now))
+        compose.setContent { TVHeadendPlayerTheme {
+            HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
+                onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
+                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
+        } }
+        compose.onNodeWithTag("home-recent-0").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.mainClock.advanceTimeBy(600)
+        compose.onNodeWithTag("home-upcoming-0").assertIsFocused()
+        val top = compose.onNodeWithTag("home-upcoming-0").getUnclippedBoundsInRoot().top.value
+        compose.runOnIdle {
+            input = input.copy(dvrEntries = listOf(scheduled, DvrEntry.create(DvrEntryId(8), channelId = second.id, title = "Running",
+                state = DvrEntryState.RECORDING, start = Instant.fromEpochSeconds(now - 300), stop = Instant.fromEpochSeconds(now + 900))))
+        }
+        compose.mainClock.autoAdvance = false
+        repeat(40) {
+            compose.mainClock.advanceTimeByFrame()
+            compose.onNodeWithTag("home-upcoming-0").assertIsFocused()
+            assertEquals("The row must hold its place", top,
+                compose.onNodeWithTag("home-upcoming-0").getUnclippedBoundsInRoot().top.value, 1f)
+        }
+        compose.mainClock.autoAdvance = true
+        compose.onNodeWithTag("home-activity-0").assertExists()
+    }
+
     @Test fun dataArrivingBeforeEntryLandsStillReachesThePriorityCard() {
         var input by mutableStateOf(HomeInput(listOf(channel), emptyMap(), emptyList(),
             listOf(channel.id), emptyList(), { null }, null, now))
