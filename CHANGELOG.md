@@ -15,6 +15,28 @@
 - Pictures and channel logos no longer stay missing after first setup until the
   app is restarted.
 
+### Home
+
+- Coming back to Home now keeps your place instead of showing the top and then
+  jumping to the row you left.
+- Starting the app with something recording no longer opens the side menu by
+  itself or leaves nothing focused.
+- The programme info on On now no longer jumps while you scroll a row.
+
+### Channels and Home cards
+
+- Cards keep their logo and programme until the picture has faded in, instead of
+  going black while it loads.
+- Cards leaving under the side menu now fade out properly.
+
+### Guide
+
+- Tall channel logos in the Guide's headline no longer run into the timeline.
+
+### Player
+
+- The Close button in an empty channel schedule now looks focused.
+
 ### Everywhere
 
 - In German, the Guide is now called TV-Programm instead of Programmführer.
