@@ -102,6 +102,8 @@ Thanks for testing Tvheadend Player.
 5. Feedback: open an issue at https://github.com/bernhardberger/tvheadend-player/issues, post in this group, or leave private feedback on the app's Play Store page. Only I can read the private feedback.
 
 If you have the GitHub APK installed, the Play version installs over it, and a newer GitHub APK installs over the Play version.
+
+Some TVs, Sony for example, ship with a keyboard that makes you type through a phone app. If you can't type the server address, switch to Gboard: TV Settings, System or Device Preferences, Keyboard, Current keyboard.
 ```
 
 Step 3 isn't documented by Google for TVs; check it with your own account
