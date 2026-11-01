@@ -15,7 +15,7 @@ Tvheadend Player for Android TV: beta testers welcome
 
 Hi all,
 
-I'd like to invite you to the beta of Tvheadend Player, an unofficial open source (GPLv3) Android TV client for Tvheadend that started out as a fork of tvhstream. It's focused on a D-pad-first experience and follows Google's TV design guidelines.
+I'd like to invite you to the beta of Tvheadend Player, an unofficial open source (GPLv3) Android TV client for Tvheadend that started out as a fork of tvhstream. It's no relation to TVHplayer, mfat's desktop client. It's focused on a D-pad-first experience and follows Google's TV design guidelines.
 
 What's in it so far:
 - A home screen that shows what's going on right now and gets you back to what you were doing
@@ -65,6 +65,8 @@ subreddit's rules for posts about your own project first:
 Title: Tvheadend client for Android TV, looking for beta testers
 
 A bit of a backstory to this project: when our SAT provider retired Cryptoworks my mum's CI modules stopped working. I got her Google TVs instead of new modules, then couldn't find a Tvheadend app simple enough for her, so I started building one. It got a bit out of hand.
+
+It's called Tvheadend Player, and it's no relation to TVHplayer, mfat's desktop client.
 
 It's open source (GPLv3). Guide, timeshift, recordings, three channel layouts, and it all works with a plain D-pad remote.
 
