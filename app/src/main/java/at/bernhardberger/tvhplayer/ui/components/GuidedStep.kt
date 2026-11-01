@@ -13,11 +13,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -57,7 +57,6 @@ import at.bernhardberger.tvhplayer.ui.TvSpacing12
 import at.bernhardberger.tvhplayer.ui.TvSpacing80
 import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
 import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
-import at.bernhardberger.tvhplayer.ui.TvTextDisabledAlpha
 
 /** The first field or button of a field step lines up with the step line's text. */
 val GuidedStepFieldTop = 6.dp
@@ -65,11 +64,16 @@ val GuidedStepFieldTop = 6.dp
 /** Choice buttons start level with the title under the step line. */
 val GuidedStepChoiceTop = 38.dp
 
+/** The 27 dp bottom safe line plus room for a focused action's scale. */
+private val GuidedStepBottomReserve = 35.dp
+
 private val GuidedStepActionShape = RoundedCornerShape(12.dp)
 
 /**
  * A guided step: guidance on the left, the step's fields or choices on the right, both
  * [TvBrowseColumnWidth] wide and centred as a pair. Only [actions] holds focusable content.
+ * The actions run to the screen's edges, which alone cut them; focus scrolling keeps the focused
+ * one, with its focused scale, inside the safe area.
  */
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
@@ -83,21 +87,24 @@ fun GuidedStepLayout(
     val density = LocalDensity.current
     val actionScroll = rememberScrollState()
     val focusScroll = remember(platformScroll, density) {
-        with(density) { InsetBringIntoViewSpec(platformScroll, 8.dp.toPx(), 32.dp.toPx()) }
+        with(density) { InsetBringIntoViewSpec(platformScroll, TvSpacing80.toPx(), GuidedStepBottomReserve.toPx()) }
     }
-    // Reserve space around each viewport for the TV controls' focused scale.
-    Box(modifier.fillMaxSize().padding(top = TvSpacing80 - 8.dp, bottom = 27.dp), contentAlignment = Alignment.TopCenter) {
-        Row(horizontalArrangement = Arrangement.spacedBy(TvBrowseColumnGap)) {
-            Column(Modifier.width(TvBrowseColumnWidth).verticalScroll(rememberScrollState()).padding(top = 8.dp), content = guidance)
+    Box(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        Row(Modifier.fillMaxHeight(), horizontalArrangement = Arrangement.spacedBy(TvBrowseColumnGap)) {
+            Column(
+                Modifier.width(TvBrowseColumnWidth)
+                    // Clears the 27 dp safe line and first run's signature standing on it.
+                    .padding(top = TvSpacing80 - 8.dp, bottom = 64.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(top = 8.dp),
+                content = guidance,
+            )
             CompositionLocalProvider(LocalBringIntoViewSpec provides focusScroll) {
                 Column(
                     Modifier.width(TvBrowseColumnWidth)
-                        // The mask's layer must include the native focused-scale overhang.
-                        .requiredWidth(TvBrowseColumnWidth + 48.dp)
-                        .listEdgeFadeMask(0.dp, 24.dp, { false }, { actionScroll.canScrollForward })
-                        .padding(horizontal = 24.dp)
+                        .fillMaxHeight()
                         .verticalScroll(actionScroll)
-                        .padding(top = 8.dp + actionsTop, bottom = 32.dp),
+                        .padding(top = TvSpacing80 + actionsTop, bottom = GuidedStepBottomReserve),
                     verticalArrangement = Arrangement.spacedBy(TvSpacing12),
                     content = actions,
                 )
@@ -265,13 +272,11 @@ fun GuidedStepAction(
     /** The unfocused fill; list rows such as found servers pass [Color.Transparent]. */
     containerColor: Color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
     @DrawableRes trailingIcon: Int? = null,
-    enabled: Boolean = true,
     leadingIcon: (@Composable () -> Unit)? = null,
 ) {
     val colors = MaterialTheme.colorScheme
     Surface(
         onClick = onClick,
-        enabled = enabled,
         modifier = modifier.width(TvBrowseColumnWidth).semantics { role = Role.Button },
         shape = ClickableSurfaceDefaults.shape(GuidedStepActionShape),
         colors = ClickableSurfaceDefaults.colors(
@@ -281,8 +286,6 @@ fun GuidedStepAction(
             focusedContentColor = colors.inverseOnSurface,
             pressedContainerColor = colors.onSurface,
             pressedContentColor = colors.inverseOnSurface,
-            disabledContainerColor = containerColor,
-            disabledContentColor = colors.onSurface.copy(alpha = TvTextDisabledAlpha),
         ),
         scale = ClickableSurfaceDefaults.scale(focusedScale = TvGuidedActionFocusedScale),
     ) {

@@ -137,7 +137,7 @@ class SettingsConnectionDepthTest {
         assertEquals(1, editor.loads)
         // Editing keeps the saved address on Continue and searches only when asked.
         compose.onNodeWithTag("setup-continue").assertIsFocused()
-        compose.onNodeWithText("Find my server").assertIsDisplayed()
+        compose.onNodeWithText("Find servers on my network").assertIsDisplayed()
         compose.onAllNodes(hasSetTextAction()).assertCountEquals(0)
         // Settings stays where it was under the setup.
         assertEquals(2, navigation.stack.frames.size)

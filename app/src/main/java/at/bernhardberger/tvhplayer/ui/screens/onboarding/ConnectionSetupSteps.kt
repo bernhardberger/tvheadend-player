@@ -3,9 +3,9 @@ package at.bernhardberger.tvhplayer.ui.screens.onboarding
 import androidx.activity.compose.BackHandler
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -43,6 +43,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
@@ -54,7 +55,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
-import androidx.tv.material3.ButtonDefaults
+import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.android.DiscoveredTvheadendServer
@@ -91,39 +92,21 @@ private const val PASSWORD_FIELD = "setup-password"
 @Composable
 internal fun ConnectionSetupFlow(state: ConnectionSetupState) {
     BackHandler(enabled = state.step.previous(state.mode) != null) { state.back() }
-    when (state.step) {
-        SetupStep.WELCOME -> WelcomeStep(state)
-        SetupStep.ADDRESS -> AddressStep(state)
-        SetupStep.SIGN_IN -> SignInStep(state)
-        SetupStep.CONNECTING -> ConnectStep(state)
-        SetupStep.FAILED -> FailureStep(state, state.failure ?: SetupFailure.OTHER)
-        SetupStep.DONE -> DoneStep(state)
-    }
-}
-
-/** First-run introduction, outside the numbered Server / Account / Connect steps. */
-@Composable
-private fun WelcomeStep(state: ConnectionSetupState) {
-    val next = remember { FocusRequester() }
-    LaunchedEffect(Unit) { next.requestFocus() }
-    GuidedStepLayout(
-        guidance = {
-            GuidedStepGuidance(
-                title = stringResource(R.string.onboarding_title),
-                body = stringResource(R.string.onboarding_welcome_body),
-                lead = { Image(painterResource(R.drawable.startup_brand_symbol), null, Modifier.size(48.dp)) },
-            )
-        },
-        actionsTop = GuidedStepChoiceTop,
-    ) {
-        Button(
-            onClick = state::enterAddress,
-            modifier = Modifier.focusRequester(next).testTag("setup-welcome-continue"),
-            colors = ButtonDefaults.colors(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-            ),
-        ) { Text(stringResource(R.string.onboarding_continue)) }
+    Box(Modifier.fillMaxSize()) {
+        when (state.step) {
+            // Stays on top of every other step while it morphs away, so it isn't one of them.
+            SetupStep.WELCOME -> Unit
+            SetupStep.ADDRESS -> AddressStep(state)
+            SetupStep.FIND_SERVER -> FindServerStep(state)
+            SetupStep.SIGN_IN -> SignInStep(state)
+            SetupStep.CONNECTING -> ConnectStep(state)
+            SetupStep.FAILED -> FailureStep(state, state.failure ?: SetupFailure.OTHER)
+            SetupStep.DONE -> DoneStep(state)
+        }
+        if (state.mode == SetupMode.FIRST_RUN) {
+            SetupSignature()
+            SetupWelcome(state)
+        }
     }
 }
 
@@ -140,30 +123,42 @@ private fun SetupStepper(current: Int, failed: Boolean = false) {
     )
 }
 
+/**
+ * The network search, on its own screen so a list of servers can use all of it. It starts as the
+ * screen opens and results don't move focus. Choosing a server fills in its address and goes on to
+ * Account; a search that found nothing offers the address field directly.
+ */
 @Composable
-private fun ServerSearch(state: ConnectionSetupState, search: FocusRequester) {
+private fun FindServerStep(state: ConnectionSetupState) {
+    val search = remember { FocusRequester() }
     LaunchedEffect(state.findFocusRequest) {
         if (state.findFocus == null && state.takeFindFocusRequest(state.findFocusRequest)) search.requestFocus()
     }
     val request = state.searchRequest
-    LaunchedEffect(request) { if (request > 0) state.search(request) }
-    GuidedStepAction(
-        title = stringResource(when {
-            state.searching -> R.string.onboarding_find_searching
-            state.searchRequest == 0 -> R.string.onboarding_find_server
-            else -> R.string.onboarding_search_again
-        }),
-        icon = R.drawable.ic_search,
-        enabled = !state.searching,
-        leadingIcon = if (state.searching) {
-            { CircularProgressIndicator(Modifier.size(24.dp), color = MaterialTheme.colorScheme.primary, strokeWidth = 3.dp) }
-        } else null,
-        onClick = state::findServer,
-        modifier = Modifier.focusRequester(search).onFocusChanged {
-            if (it.isFocused) state.onFindFocused(null)
-        }.testTag("setup-find-server"),
-    )
-    if (state.searchRequest > 0) {
+    LaunchedEffect(request) { state.search(request) }
+    GuidedStepLayout(
+        guidance = {
+            GuidedStepGuidance(
+                title = stringResource(R.string.onboarding_find_title),
+                body = stringResource(R.string.onboarding_find_body),
+                stepper = { SetupStepper(SetupStage.SERVER.ordinal) },
+            )
+        },
+    ) {
+        GuidedStepAction(
+            title = stringResource(if (state.searching) R.string.onboarding_find_searching else R.string.onboarding_search_again),
+            icon = R.drawable.ic_search,
+            // Stays enabled while it runs: it holds focus then, and a disabled action can't show it.
+            leadingIcon = if (state.searching) {
+                { CircularProgressIndicator(Modifier.size(24.dp), color = LocalContentColor.current, strokeWidth = 3.dp) }
+            } else null,
+            onClick = { if (!state.searching) state.findServer() },
+            modifier = arrivalFocus(search).onFocusChanged {
+                if (it.isFocused) state.onFindFocused(null)
+            }.semantics {
+                if (state.searching) disabled()
+            }.testTag("setup-search-again"),
+        )
         if (state.servers.isNotEmpty()) {
             Text(
                 text = stringResource(R.string.onboarding_find_on_network),
@@ -173,13 +168,19 @@ private fun ServerSearch(state: ConnectionSetupState, search: FocusRequester) {
                 modifier = Modifier.semantics { heading() },
             )
         }
+        state.servers.forEachIndexed { index, server ->
+            androidx.compose.runtime.key(server) { FoundServerRow(state, server, index) }
+        }
         if (!state.searching && state.servers.isEmpty()) {
             Text(stringResource(R.string.onboarding_find_none_body), style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = TvTextSecondaryAlpha),
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
-        }
-        state.servers.forEachIndexed { index, server ->
-            androidx.compose.runtime.key(server) { FoundServerRow(state, server, index) }
+            GuidedStepAction(
+                title = stringResource(R.string.onboarding_enter_address_manually),
+                icon = R.drawable.ic_edit,
+                onClick = state::enterAddressManually,
+                modifier = Modifier.testTag("setup-enter-manually"),
+            )
         }
     }
 }
@@ -204,12 +205,12 @@ private fun FoundServerRow(state: ConnectionSetupState, server: DiscoveredTvhead
 
 @Composable
 private fun AddressStep(state: ConnectionSetupState) {
-    LaunchedEffect(Unit) { state.onServerOpened() }
     val search = remember { FocusRequester() }
     val host = remember { FocusRequester() }
     val port = remember { FocusRequester() }
     val next = remember { FocusRequester() }
     LaunchedEffect(state.focusRequest) {
+        withFrameNanos { }
         when (state.addressFocus) {
             AddressFocus.SEARCH -> search
             AddressFocus.HOST -> host
@@ -226,14 +227,17 @@ private fun AddressStep(state: ConnectionSetupState) {
             )
         },
     ) {
-        ServerSearch(state, search)
+        GuidedStepAction(
+            title = stringResource(R.string.onboarding_find_server),
+            icon = R.drawable.ic_search,
+            onClick = state::openSearch,
+            modifier = Modifier.focusRequester(search).testTag("setup-find-server"),
+        )
         AddressFields(state, host, port, onPortDone = { state.focusAddress(AddressFocus.CONTINUE) })
         MainActionButton(
             label = R.string.onboarding_continue,
             onClick = state::continueFromAddress,
-            modifier = Modifier.focusRequester(next).onFocusChanged {
-                if (it.isFocused) state.onFindFocused(null)
-            }.testTag("setup-continue"),
+            modifier = Modifier.focusRequester(next).testTag("setup-continue"),
         )
     }
 }
@@ -263,9 +267,7 @@ private fun AddressFields(
             imeAction = ImeAction.Next,
         ),
         onImeAction = { editingId = PORT_FIELD },
-        modifier = Modifier.focusRequester(hostFocus).onFocusChanged {
-            if (it.isFocused) state.onFindFocused(null)
-        },
+        modifier = Modifier.focusRequester(hostFocus),
     )
     SetupTextField(
         id = PORT_FIELD,
@@ -281,9 +283,7 @@ private fun AddressFields(
             editingId = null
             onPortDone()
         },
-        modifier = Modifier.focusRequester(portFocus).onFocusChanged {
-            if (it.isFocused) state.onFindFocused(null)
-        },
+        modifier = Modifier.focusRequester(portFocus),
     )
 }
 
@@ -383,6 +383,7 @@ private fun SignInStep(state: ConnectionSetupState) {
     val password = remember { FocusRequester() }
     val connect = remember { FocusRequester() }
     LaunchedEffect(state.focusRequest) {
+        withFrameNanos { }
         when (state.signInFocus) {
             SignInFocus.USERNAME -> username
             SignInFocus.PASSWORD -> password
@@ -394,6 +395,7 @@ private fun SignInStep(state: ConnectionSetupState) {
             title = stringResource(R.string.onboarding_sign_in_title),
             body = stringResource(R.string.onboarding_sign_in_body),
             stepper = { SetupStepper(SetupStage.SIGN_IN.ordinal) },
+            meta = stringResource(R.string.onboarding_change_address_detail, state.form.host.trim(), state.form.port.trim()),
         )
     }) {
         SignInFields(
@@ -547,8 +549,7 @@ private fun ConnectingStatus(modifier: Modifier) {
 private fun FailureStep(state: ConnectionSetupState, failure: SetupFailure) {
     val context = LocalContext.current
     val text = remember(context) { AppErrorText(context) }
-    val first = remember { FocusRequester() }
-    LaunchedEffect(failure) { first.requestFocus() }
+    val firstAction = arrivalFocus()
     val form = state.form
     val host = form.host.trim()
     val port = form.port.trim()
@@ -575,7 +576,7 @@ private fun FailureStep(state: ConnectionSetupState, failure: SetupFailure) {
                 action = action,
                 form = form,
                 onClick = { state.onAction(action) },
-                modifier = if (index == 0) Modifier.focusRequester(first) else Modifier,
+                modifier = if (index == 0) firstAction else Modifier,
             )
         }
         SaveFailedText(form.feedback)
@@ -634,19 +635,26 @@ private fun SetupActionButton(
     )
 }
 
+/**
+ * Focus for the action a screen opens on. As a focused action leaves, a TV hands focus straight to
+ * the first focusable, in the frame it attaches, and a request from an effect can run as early. A
+ * TV button's highlight isn't listening yet then, so it would hold focus but look unfocused.
+ * Keeping it out of reach for that frame lets this request land with it listening.
+ */
+@Composable
+internal fun arrivalFocus(requester: FocusRequester = remember { FocusRequester() }): Modifier {
+    var ready by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        withFrameNanos { }
+        ready = true
+        requester.requestFocus()
+    }
+    return Modifier.focusProperties { canFocus = ready }.focusRequester(requester)
+}
+
 /** The centred result after a passed test; "Start watching" saves and the app takes over. */
 @Composable
 private fun DoneStep(state: ConnectionSetupState) {
-    val start = remember { FocusRequester() }
-    // When the focused status leaves, a TV hands focus straight to the first focusable, in the frame
-    // it attaches. The button's highlight isn't listening yet, so it would hold focus but look
-    // unfocused. Keeping it out of reach for that frame lets this request land with it listening.
-    var canFocusStart by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        withFrameNanos { }
-        canFocusStart = true
-        start.requestFocus()
-    }
     val form = state.form
     val body = if (form.username.isBlank()) {
         stringResource(R.string.onboarding_done_body_anonymous)
@@ -654,7 +662,7 @@ private fun DoneStep(state: ConnectionSetupState) {
         stringResource(R.string.onboarding_done_body, form.username)
     }
     Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(top = TvSpacing80, bottom = 40.dp),
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(top = TvSpacing80, bottom = 64.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         SetupStepper(SetupStage.entries.size)
@@ -679,7 +687,7 @@ private fun DoneStep(state: ConnectionSetupState) {
         Spacer(Modifier.height(24.dp))
         Button(
             onClick = state::save,
-            modifier = Modifier.focusProperties { canFocus = canFocusStart }.focusRequester(start).testTag("setup-start-watching"),
+            modifier = arrivalFocus().testTag("setup-start-watching"),
         ) {
             Text(stringResource(if (state.mode == SetupMode.EDIT) R.string.onboarding_save_connection else R.string.onboarding_start_watching))
         }

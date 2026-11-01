@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Setup
+
+- First setup opens with a new Welcome screen that grows out of the startup
+  logo. The setup steps after it show the app's name and version in the corner.
+- Finding servers is now a button on the Server step. Results get their own
+  screen, and picking one goes straight on to Account. If the search finds
+  nothing, you can go straight to entering the address.
+- Long lists in setup now use the full height of the screen instead of fading out.
+- The action a TV hands focus to when a step opens now always looks focused,
+  including Start watching at the end of first setup.
+- Pictures and channel logos no longer stay missing after first setup until the
+  app is restarted.
+
 ### Everywhere
 
 - In German, the Guide is now called TV-Programm instead of Programmführer.

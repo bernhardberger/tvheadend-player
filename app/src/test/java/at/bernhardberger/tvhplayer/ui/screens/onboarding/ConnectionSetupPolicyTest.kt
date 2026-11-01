@@ -16,8 +16,11 @@ class ConnectionSetupPolicyTest {
         assertNull(SetupStep.WELCOME.previous())
         assertEquals(SetupStep.WELCOME, SetupStep.ADDRESS.previous())
         assertNull(SetupStep.ADDRESS.previous(SetupMode.EDIT))
+        assertEquals(SetupStep.ADDRESS, SetupStep.FIND_SERVER.previous())
+        assertEquals(SetupStep.ADDRESS, SetupStep.FIND_SERVER.previous(SetupMode.EDIT))
         assertEquals(SetupStep.ADDRESS, SetupStep.SIGN_IN.previous())
         assertEquals(SetupStage.SERVER, SetupStep.ADDRESS.stage)
+        assertEquals(SetupStage.SERVER, SetupStep.FIND_SERVER.stage)
         assertEquals(SetupStage.SIGN_IN, SetupStep.SIGN_IN.stage)
         for (step in listOf(SetupStep.CONNECTING, SetupStep.FAILED, SetupStep.DONE)) {
             assertEquals(SetupStep.SIGN_IN, step.previous())

@@ -44,6 +44,7 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.MaterialTheme
@@ -57,7 +58,7 @@ import at.bernhardberger.tvhplayer.ui.TvSpacing32
 import at.bernhardberger.tvhplayer.ui.components.AppErrorAlert
 
 private val MainStartupContentMaxWidth = 560.dp
-private val MainStartupMarkSize = 80.dp
+internal val MainStartupMarkSize = 80.dp
 private val MainStartupBackground = Color(0xFF0F1014)
 private val MainStartupBrandFont = FontFamily(Font(R.font.outfit_550, FontWeight(550)))
 private const val MainStartupRootTag = "main-startup-root"
@@ -174,9 +175,10 @@ private fun MainStartupStatus(messageKind: MainStartupMessageKind) {
 }
 
 @Composable
-private fun MainStartupFrame(
+internal fun MainStartupFrame(
     contentPadding: PaddingValues,
     modifier: Modifier,
+    markModifier: Modifier = Modifier,
     backgroundMotionEnabled: Boolean = false,
     brandingVisible: Boolean = true,
     // Hidden through the brief wait, so a fast start shows no logo; the layout stays.
@@ -217,29 +219,19 @@ private fun MainStartupFrame(
                     Image(
                         painter = painterResource(R.drawable.startup_brand_symbol),
                         contentDescription = null,
-                        modifier = Modifier
+                        modifier = markModifier
                             .size(MainStartupMarkSize)
                             .alpha(if (brandShown) 1f else 0f)
                             .testTag(MainStartupMarkTag),
                     )
                     Spacer(modifier = Modifier.height(14.dp))
-                    CompositionLocalProvider(LocalDensity provides Density(density.density, 1f)) {
-                        Text(
-                            text = buildAnnotatedString {
-                                withStyle(SpanStyle(color = Color(0xFFE3E3E8))) { append("Tvheadend ") }
-                                withStyle(SpanStyle(color = Color(0xFFFA7F00))) { append("Player") }
-                            },
-                            fontFamily = MainStartupBrandFont,
-                            fontWeight = FontWeight(550),
-                            fontSize = 28.sp,
-                            lineHeight = 36.sp,
-                            maxLines = 1,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .alpha(if (brandShown) 1f else 0f)
-                                .semantics { heading() },
-                        )
-                    }
+                    BrandWordmark(
+                        fontSize = 28.sp,
+                        lineHeight = 36.sp,
+                        modifier = Modifier
+                            .alpha(if (brandShown) 1f else 0f)
+                            .semantics { heading() },
+                    )
                 }
                 if (bodyContent != null && brandingVisible) {
                     bodyContent()
@@ -256,6 +248,26 @@ private fun MainStartupFrame(
                 ) { bodyContent() }
             }
         }
+    }
+}
+
+/** The product's name in its brand font and colors, at one size whatever the font scale. */
+@Composable
+internal fun BrandWordmark(fontSize: TextUnit, lineHeight: TextUnit, modifier: Modifier = Modifier) {
+    CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 1f)) {
+        Text(
+            text = buildAnnotatedString {
+                withStyle(SpanStyle(color = Color(0xFFE3E3E8))) { append("Tvheadend ") }
+                withStyle(SpanStyle(color = Color(0xFFFA7F00))) { append("Player") }
+            },
+            fontFamily = MainStartupBrandFont,
+            fontWeight = FontWeight(550),
+            fontSize = fontSize,
+            lineHeight = lineHeight,
+            maxLines = 1,
+            textAlign = TextAlign.Center,
+            modifier = modifier,
+        )
     }
 }
 

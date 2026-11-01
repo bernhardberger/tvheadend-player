@@ -7,13 +7,14 @@ import at.bernhardberger.tvhplayer.core.AppErrorCondition
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Three screens: server, account and connection test. The last screen shows the running test
- * and its outcome in place. Network discovery belongs to the server screen. First run has an
- * unnumbered welcome before these screens; editing skips it.
+ * Three stages: server, account and connection test. The test's screen shows it running and its
+ * outcome in place. The server stage has a second screen for the network search, opened from its
+ * first. First run has an unnumbered welcome before these screens; editing skips it.
  */
 internal enum class SetupStep {
     WELCOME,
     ADDRESS,
+    FIND_SERVER,
     SIGN_IN,
     CONNECTING,
     FAILED,
@@ -36,7 +37,7 @@ internal enum class SetupMode {
 internal fun SetupStep.previous(mode: SetupMode = SetupMode.FIRST_RUN): SetupStep? = when (this) {
     SetupStep.WELCOME -> null
     SetupStep.ADDRESS -> if (mode == SetupMode.FIRST_RUN) SetupStep.WELCOME else null
-    SetupStep.SIGN_IN -> SetupStep.ADDRESS
+    SetupStep.FIND_SERVER, SetupStep.SIGN_IN -> SetupStep.ADDRESS
     SetupStep.CONNECTING, SetupStep.FAILED, SetupStep.DONE -> SetupStep.SIGN_IN
 }
 
@@ -61,7 +62,7 @@ internal enum class SetupStage { SERVER, SIGN_IN, CONNECT }
 internal val SetupStep.stage: SetupStage?
     get() = when (this) {
         SetupStep.WELCOME -> null
-        SetupStep.ADDRESS -> SetupStage.SERVER
+        SetupStep.ADDRESS, SetupStep.FIND_SERVER -> SetupStage.SERVER
         SetupStep.SIGN_IN -> SetupStage.SIGN_IN
         SetupStep.CONNECTING, SetupStep.FAILED, SetupStep.DONE -> SetupStage.CONNECT
     }

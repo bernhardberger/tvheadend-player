@@ -33,6 +33,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.dropWhile
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.transformWhile
@@ -81,7 +82,7 @@ internal class ConnectionSetupState(
     var servers by mutableStateOf(emptyList<DiscoveredTvheadendServer>())
         private set
 
-    /** True while the Server screen's inline search is running. */
+    /** True while the search screen's search is running. */
     var searching by mutableStateOf(false)
         private set
 
@@ -125,6 +126,8 @@ internal class ConnectionSetupState(
 
     init {
         if (step == SetupStep.SIGN_IN) signInFocus = firstEmptySignInField() ?: SignInFocus.CONNECT
+        // The search screen always shows a search; a recreated one starts its own.
+        if (step == SetupStep.FIND_SERVER) startSearch()
     }
 
     /**
@@ -140,17 +143,21 @@ internal class ConnectionSetupState(
         step = SetupStep.ADDRESS
     }
 
-    /**
-     * First run searches as the Server step opens. Editing already has an address, so it searches
-     * only when asked.
-     */
-    fun onServerOpened() {
-        if (!editing) findServer()
+    /** Opens the search screen, which searches right away. */
+    fun openSearch() {
+        startSearch()
+        step = SetupStep.FIND_SERVER
     }
 
-    /** Starts discovery inside the Server step without moving focus away from the action. */
+    /** Searches again on the search screen, without moving focus away from the action. */
     fun findServer() {
         startSearch()
+    }
+
+    /** Leaves a search that found nothing for the address field. */
+    fun enterAddressManually() {
+        focusAddress(AddressFocus.HOST)
+        step = SetupStep.ADDRESS
     }
 
     /**
@@ -176,7 +183,7 @@ internal class ConnectionSetupState(
 
     private fun showServers(found: List<DiscoveredTvheadendServer>) {
         val target = findFocus
-        // Never steal focus from an address being typed while discovery answers.
+        // Focus only moves when the server it was on has gone.
         if (target != null && target !in found) {
             focusFind(found.firstOrNull())
         }
@@ -193,6 +200,7 @@ internal class ConnectionSetupState(
         form.updateHost(server.host)
         form.updatePort(server.port.toString())
         addressErrorsShown = false
+        step = SetupStep.ADDRESS
         continueFromAddress()
     }
 
@@ -270,7 +278,11 @@ internal class ConnectionSetupState(
             awaitCancellation()
         } finally {
             if (!settled && !accepted) withContext(NonCancellable) {
-                if (passed) session.disconnect()
+                // Publishing a save ends first run, which cancels this test before the save returns,
+                // so only the owner can say whether a profile now keeps this connection. This also
+                // waits out a save in progress; one it never took leaves nothing saved.
+                val saved = profiles.serverSettings.firstOrNull()?.host?.isNotBlank() == true
+                if (passed && (editing || !saved)) session.disconnect()
                 if (editing) restoreSaved()
             }
         }
@@ -305,17 +317,12 @@ internal class ConnectionSetupState(
     }
 
     private suspend fun commit(): Boolean {
-        // Accepted before the save: the app root leaves first-run as soon as the profile publishes,
-        // which cancels the held test before submit returns. If that save then fails, the profile
-        // owner's recovery settles the session, because nothing is left here to do it.
-        accepted = true
         val saved = form.submit(profiles) == ConnectionFormFeedback.SAVED
         if (saved) {
+            accepted = true
             sessionWork?.cancel()
             form.clearPassword()
             onSaved()
-        } else {
-            accepted = false
         }
         return saved
     }
@@ -336,7 +343,7 @@ internal class ConnectionSetupState(
             else -> Unit
         }
         when (previous) {
-            SetupStep.ADDRESS -> focusAddress(AddressFocus.CONTINUE)
+            SetupStep.ADDRESS -> focusAddress(if (step == SetupStep.FIND_SERVER) AddressFocus.SEARCH else AddressFocus.CONTINUE)
             SetupStep.SIGN_IN -> focusSignIn(SignInFocus.CONNECT)
             else -> Unit
         }

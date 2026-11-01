@@ -47,11 +47,14 @@ class OnboardingScreenTest {
     }
 
     @Test
-    fun aSearchWithoutServersStaysBesideTheAddress() {
+    fun aSearchWithoutServersOffersTheAddressField() {
         show(SetupStep.ADDRESS, ConnectionFormState())
         press(Key.DirectionCenter)
-        composeRule.onNodeWithTag("setup-host").assertExists()
         composeRule.onNodeWithText("Search again").assertIsFocused()
+        press(Key.DirectionDown)
+        composeRule.onNodeWithTag("setup-enter-manually").assertIsFocused()
+        press(Key.DirectionCenter)
+        composeRule.onNodeWithTag("setup-host").assertIsFocused()
     }
 
     @Test

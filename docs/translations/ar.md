@@ -35,6 +35,8 @@ Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retain
 
 Review corrections: past-tense recorded dates, singular TV/GUIDE button, channel/category number, explicit audio-channel counts and compact seconds. RTL layout acceptance remains open; see the round report.
 
+0.4.1 setup search strings drafted against `e59ff38a` by GPT-6.1 Sol and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer.
+
 ## Open questions
 
 - Regional broadcast terminology for multiplex and timeshift needs reviewer attention.

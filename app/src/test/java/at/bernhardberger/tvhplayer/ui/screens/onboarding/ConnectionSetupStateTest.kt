@@ -22,7 +22,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
@@ -42,9 +42,9 @@ class ConnectionSetupStateTest {
     private val discovery = MutableStateFlow(discovering())
 
     @Test
-    fun automaticAndManualSearchNeverValidateTheAddress() = runTest {
+    fun aSearchNeverValidatesTheAddress() = runTest {
         val state = setup()
-        state.onServerOpened()
+        state.openSearch()
         assertEquals(1, state.searchRequest)
         assertFalse(state.hostError)
         backgroundScope.launch { state.search(state.searchRequest) }
@@ -59,6 +59,8 @@ class ConnectionSetupStateTest {
         assertFalse(state.hostError)
         state.findServer()
         assertFalse(state.hostError)
+        assertTrue(state.back())
+        assertFalse(state.hostError)
         state.continueFromAddress()
         assertTrue(state.hostError)
     }
@@ -66,11 +68,11 @@ class ConnectionSetupStateTest {
     @Test
     fun staleSearchCannotStartOrClearTheCurrentSearch() = runTest {
         val state = setup()
-        state.onServerOpened()
+        state.openSearch()
         val firstRequest = state.searchRequest
         val first = backgroundScope.launch { state.search(firstRequest) }
         runCurrent()
-        state.onServerOpened()
+        state.findServer()
         val currentRequest = state.searchRequest
         first.cancel()
         runCurrent()
@@ -93,11 +95,11 @@ class ConnectionSetupStateTest {
         val state = edit()
         val savedHost = form.host
         val savedPort = form.port
-        state.onServerOpened()
         assertEquals(0, state.searchRequest)
         assertFalse(state.searching)
         assertEquals(AddressFocus.CONTINUE, state.addressFocus)
-        state.findServer()
+        state.openSearch()
+        assertEquals(SetupStep.FIND_SERVER, state.step)
         assertEquals(1, state.searchRequest)
         assertTrue(state.searching)
         assertEquals(savedHost, form.host)
@@ -190,6 +192,62 @@ class ConnectionSetupStateTest {
 
         assertEquals(
             "The saved profile keeps the connection the test made",
+            listOf(FakeSessionCall.DISCONNECT, FakeSessionCall.CONNECT),
+            session.calls,
+        )
+    }
+
+    @Test
+    fun theFirstRunFlowEndingBeforeTheOwnerTookTheSaveDropsTheConnection() = runTest {
+        profiles.pendingAdmission = CompletableDeferred()
+        val composition = CoroutineScope(coroutineContext + Job(backgroundScope.coroutineContext[Job]))
+        form.updateHost(HOST)
+        form.updateUsername(USERNAME)
+        form.updatePassword(PASSWORD)
+        val state = ConnectionSetupState(
+            form, session, profiles, { discovery }, composition, step = SetupStep.SIGN_IN,
+        )
+        state.connect()
+        runCurrent()
+        session.publish(ready())
+        runCurrent()
+
+        state.save()
+        runCurrent()
+        composition.cancel()
+        runCurrent()
+
+        assertNull(profiles.saved)
+        assertEquals(
+            "Nothing was saved, so nothing may keep the tested connection",
+            listOf(FakeSessionCall.DISCONNECT, FakeSessionCall.CONNECT, FakeSessionCall.DISCONNECT),
+            session.calls,
+        )
+    }
+
+    @Test
+    fun theFirstRunFlowEndingMidSaveWaitsForTheOutcome() = runTest {
+        val composition = CoroutineScope(coroutineContext + Job(backgroundScope.coroutineContext[Job]))
+        form.updateHost(HOST)
+        form.updateUsername(USERNAME)
+        form.updatePassword(PASSWORD)
+        val state = ConnectionSetupState(
+            form, session, profiles, { discovery }, composition, step = SetupStep.SIGN_IN,
+        )
+        state.connect()
+        runCurrent()
+        session.publish(ready())
+        runCurrent()
+
+        profiles.settings.value = null
+        composition.cancel()
+        runCurrent()
+        assertEquals(listOf(FakeSessionCall.DISCONNECT, FakeSessionCall.CONNECT), session.calls)
+
+        profiles.settings.value = ServerSettings(host = HOST)
+        runCurrent()
+        assertEquals(
+            "The save landed, so the connection stays",
             listOf(FakeSessionCall.DISCONNECT, FakeSessionCall.CONNECT),
             session.calls,
         )
@@ -293,10 +351,10 @@ class ConnectionSetupStateTest {
     @Test
     fun discoveryDoesNotStealFocusAndChoosingAServerAdvancesToAccount() = runTest {
         val state = setup()
-        state.findServer()
-        assertEquals(SetupStep.ADDRESS, state.step)
+        state.openSearch()
+        assertEquals(SetupStep.FIND_SERVER, state.step)
         assertTrue(state.searching)
-        assertNull("The address entry holds focus until a server answers", state.findFocus)
+        assertNull("The search action holds focus until a server answers", state.findFocus)
         backgroundScope.launch { state.search(state.searchRequest) }
         runCurrent()
         assertEquals(emptyList<DiscoveredTvheadendServer>(), state.servers)
@@ -304,7 +362,7 @@ class ConnectionSetupStateTest {
         discovery.value = discovering(LIVING_ROOM, OFFICE)
         runCurrent()
         assertEquals(listOf(LIVING_ROOM, OFFICE), state.servers)
-        assertNull("Typing is not interrupted by discovery", state.findFocus)
+        assertNull("Results don't take focus", state.findFocus)
 
         state.chooseServer(OFFICE)
         assertEquals(SetupStep.SIGN_IN, state.step)
@@ -321,7 +379,7 @@ class ConnectionSetupStateTest {
     @Test
     fun aSearchThatFindsNothingEndsAfterItsWindowAndCanRetryInPlace() = runTest {
         val state = setup()
-        state.findServer()
+        state.openSearch()
         backgroundScope.launch { state.search(state.searchRequest) }
         advanceTimeBy(DiscoveryWindow - 1.milliseconds)
         assertTrue(state.searching)
@@ -329,21 +387,39 @@ class ConnectionSetupStateTest {
         assertFalse(state.searching)
         assertEquals(emptyList<DiscoveredTvheadendServer>(), state.servers)
 
-        state.enterAddress()
-        assertEquals(SetupStep.ADDRESS, state.step)
         val request = state.searchRequest
         state.findServer()
-        assertEquals(SetupStep.ADDRESS, state.step)
+        assertEquals(SetupStep.FIND_SERVER, state.step)
         assertTrue("An empty search starts again", state.searching)
         assertEquals(request + 1, state.searchRequest)
         assertNull(state.findFocus)
     }
 
     @Test
+    fun theSearchScreenLeavesForTheAddressFieldOrItsAction() = runTest {
+        val state = setup()
+        state.openSearch()
+        state.enterAddressManually()
+        assertEquals(SetupStep.ADDRESS, state.step)
+        assertEquals(AddressFocus.HOST, state.addressFocus)
+        state.openSearch()
+        assertTrue(state.back())
+        assertEquals(SetupStep.ADDRESS, state.step)
+        assertEquals(AddressFocus.SEARCH, state.addressFocus)
+    }
+
+    @Test
+    fun aRecreatedSearchScreenStartsItsOwnSearch() = runTest {
+        val state = ConnectionSetupState(form, session, profiles, { discovery }, backgroundScope, SetupMode.EDIT, step = SetupStep.FIND_SERVER)
+        assertEquals(1, state.searchRequest)
+        assertTrue(state.searching)
+    }
+
+    @Test
     fun anUnavailableSearchEndsAtOnce() = runTest {
         discovery.value = TvheadendDiscoveryState.Unavailable(TvheadendDiscoveryFailure.PERMISSION_DENIED)
         val state = setup()
-        state.findServer()
+        state.openSearch()
         backgroundScope.launch { state.search(state.searchRequest) }
         runCurrent()
         assertFalse(state.searching)
@@ -353,7 +429,7 @@ class ConnectionSetupStateTest {
     @Test
     fun aServerThatLeavesHandsFocusOnButAMovedFocusStays() = runTest {
         val state = setup()
-        state.findServer()
+        state.openSearch()
         backgroundScope.launch { state.search(state.searchRequest) }
         discovery.value = discovering(LIVING_ROOM, OFFICE)
         runCurrent()
@@ -366,7 +442,7 @@ class ConnectionSetupStateTest {
         state.onFindFocused(null)
         discovery.value = discovering(LIVING_ROOM, OFFICE)
         runCurrent()
-        assertNull("Focus on the address entry stays there", state.findFocus)
+        assertNull("Focus on the search action stays there", state.findFocus)
     }
 
     @Test
@@ -664,8 +740,10 @@ class ConnectionSetupStateTest {
 }
 
 private class FakeProfiles : ConnectionProfileEditor {
-    override val serverSettings: Flow<ServerSettings> = emptyFlow()
+    val settings = MutableStateFlow<ServerSettings?>(ServerSettings())
+    override val serverSettings: Flow<ServerSettings> = settings.filterNotNull()
     var saved: String? = null
+    var pendingAdmission: CompletableDeferred<Unit>? = null
     var pendingSave: CompletableDeferred<Unit>? = null
     var saveFailure: Exception? = null
 
@@ -681,8 +759,10 @@ private class FakeProfiles : ConnectionProfileEditor {
         username: String,
         password: String,
     ) {
+        pendingAdmission?.await()
         saveFailure?.let { throw it }
         saved = "$host:$htspPort:$username"
+        settings.value = ServerSettings(host = host, htspPort = htspPort)
         pendingSave?.await()
     }
 
