@@ -188,7 +188,7 @@ internal fun ChannelSchedule(
                 Text(stringResource(R.string.no_epg), style = MaterialTheme.typography.titleLarge)
                 Text(stringResource(R.string.channel_schedule_empty), style = MaterialTheme.typography.bodyMedium,
                     color = TvTextColors.secondary)
-                Button(onClick = onClose, modifier = Modifier.padding(top = TvSpacing12).focusRequester(emptyFocus)) {
+                Button(onClick = onClose, modifier = Modifier.padding(top = TvSpacing12).then(arrivalFocus(emptyFocus))) {
                     Text(stringResource(R.string.close))
                 }
             }

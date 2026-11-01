@@ -33,7 +33,6 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
@@ -70,6 +69,7 @@ import at.bernhardberger.tvhplayer.ui.TvTextDisabledAlpha
 import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
 import at.bernhardberger.tvhplayer.ui.common.AppErrorText
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepAction
+import at.bernhardberger.tvhplayer.ui.components.arrivalFocus
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepBadge
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepChoiceTop
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepGuidance
@@ -633,23 +633,6 @@ private fun SetupActionButton(
         onClick = onClick,
         modifier = modifier.testTag("setup-action-${action.name.lowercase()}"),
     )
-}
-
-/**
- * Focus for the action a screen opens on. As a focused action leaves, a TV hands focus straight to
- * the first focusable, in the frame it attaches, and a request from an effect can run as early. A
- * TV button's highlight isn't listening yet then, so it would hold focus but look unfocused.
- * Keeping it out of reach for that frame lets this request land with it listening.
- */
-@Composable
-internal fun arrivalFocus(requester: FocusRequester = remember { FocusRequester() }): Modifier {
-    var ready by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        withFrameNanos { }
-        ready = true
-        requester.requestFocus()
-    }
-    return Modifier.focusProperties { canFocus = ready }.focusRequester(requester)
 }
 
 /** The centred result after a passed test; "Start watching" saves and the app takes over. */

@@ -32,7 +32,7 @@ import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isFocused
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -67,6 +67,8 @@ import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.GuidePosition
 import at.bernhardberger.tvhplayer.stores.GuidePositionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
+import at.bernhardberger.tvhplayer.testutil.assertLooksAsWhenRefocused
+import at.bernhardberger.tvhplayer.testutil.leaveTouchModeBeforeComposing
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import kotlinx.coroutines.CoroutineScope
@@ -91,7 +93,7 @@ import kotlin.time.Instant
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
 class GuidePlayerReturnFocusTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule val compose = createAndroidComposeRule<androidx.activity.ComponentActivity>()
     private val models = ViewModelStore()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private lateinit var player: ExoPlayer
@@ -101,6 +103,40 @@ class GuidePlayerReturnFocusTest {
     private lateinit var view: View
     private var playRequests = 0
     private lateinit var settingsApplication: org.koin.core.KoinApplication
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun programmeCellLooksFocusedWhenAWindowJumpComposesIt() {
+        compose.leaveTouchModeBeforeComposing()
+        val programme = event(2, 3)
+        guide(PlayerReturnFocus(ChannelId(2), ChannelId(2), programme.id, programme.start.epochSeconds))
+        focused("Channel 2 hour 3")
+        assertCellLooksAsWhenRefocused("Channel 2 hour 3", Key.DirectionUp, Key.DirectionDown)
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun programmeCellLooksFocusedWhenStartingAtNow() {
+        compose.leaveTouchModeBeforeComposing()
+        guide(PlayerReturnFocus(ChannelId(1), ChannelId(1)))
+        focused("Channel 1 hour 0")
+        assertCellLooksAsWhenRefocused("Channel 1 hour 0", Key.DirectionDown, Key.DirectionUp)
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun programmeCellLooksFocusedWhenStepsRightComposeIt() {
+        compose.leaveTouchModeBeforeComposing()
+        guide(PlayerReturnFocus(ChannelId(1), ChannelId(1)))
+        focused("Channel 1 hour 0")
+        // Only the last arrival is compared: leaving and returning on the way would move the window.
+        repeat(3) { key(Key.DirectionRight) }
+        focused("Channel 1 hour 3")
+        assertCellLooksAsWhenRefocused("Channel 1 hour 3", Key.DirectionDown, Key.DirectionUp)
+    }
+
+    private fun assertCellLooksAsWhenRefocused(title: String, away: Key, back: Key) = compose.onNodeWithText(title)
+        .assertLooksAsWhenRefocused(title, { key(away) }, { key(back) })
 
     @Test fun genreEntryStartsAtNowAndFocusesFirstMatchingChannel() {
         guide(PlayerReturnFocus(ChannelId(1), ChannelId(1)),

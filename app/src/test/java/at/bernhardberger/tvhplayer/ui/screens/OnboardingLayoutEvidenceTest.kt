@@ -46,6 +46,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import at.bernhardberger.tvhplayer.testutil.leaveTouchModeBeforeComposing
 import org.robolectric.util.ReflectionHelpers
 import org.robolectric.util.ReflectionHelpers.ClassParameter
 import java.io.File
@@ -698,11 +699,7 @@ class OnboardingLayoutEvidenceTest {
         assertLooksFocused("setup-continue")
     }
 
-    private fun leaveTouchModeBeforeComposing() {
-        compose.runOnUiThread {
-            ReflectionHelpers.callInstanceMethod<Boolean>(compose.activity.window.decorView.parent, "ensureTouchModeLocally", ClassParameter.from(Boolean::class.javaPrimitiveType, false))
-        }
-    }
+    private fun leaveTouchModeBeforeComposing() = compose.leaveTouchModeBeforeComposing()
 
     private fun assertFieldLooksFocused(tag: String) {
         val node = compose.onNodeWithTag(tag).assertIsFocused()

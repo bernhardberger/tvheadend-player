@@ -53,6 +53,7 @@ import at.bernhardberger.tvhplayer.ui.TvBrowseColumnGap
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
 import at.bernhardberger.tvhplayer.ui.TvFullScreenPadding
 import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
+import at.bernhardberger.tvhplayer.ui.components.arrivalFocus
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 import at.bernhardberger.tvhplayer.ui.startup.BrandWordmark
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupFrame
