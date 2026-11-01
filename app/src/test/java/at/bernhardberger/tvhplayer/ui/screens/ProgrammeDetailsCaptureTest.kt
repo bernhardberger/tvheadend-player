@@ -335,18 +335,34 @@ class ProgrammeDetailsCaptureTest {
     }
 
     /** The README scene: Ridge Light from the Guide, on air 20:00-21:00 on 2026-10-04 under a 20:15 clock. */
-    @Test fun presentation() {
-        val start = Instant.parse("2026-10-04T20:00:00Z")
-        val now = start.epochSeconds + 900
-        val channel = Channel.create(ChannelId(1), name = "Ridge Earth", number = 1, icon = ChannelIcon.ImageCache(ArtworkId(1)))
-        val event = EpgEvent.create(EventId(1), channel.id, start, start + 3600.seconds,
+    @Test fun presentation() = presentationScene(store = false)
+
+    @Test @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi")
+    fun storeDetails() = presentationScene(store = true)
+
+    private fun presentationScene(store: Boolean) {
+        if (store) images.install(FixtureArt.imageLoader(ApplicationProvider.getApplicationContext(), mapOf(
+            // The title-free still leaves the page's own channel, status and title legible.
+            ArtworkId(1) to FixtureArt.picon("ion-frame"), ArtworkId(2) to FixtureArt.art("still-ion-wake"))))
+        val start = Instant.parse(if (store) "2026-10-04T19:20:00Z" else "2026-10-04T20:00:00Z")
+        val now = Instant.parse("2026-10-04T20:15:00Z").epochSeconds
+        val channel = Channel.create(ChannelId(if (store) 5 else 1), name = if (store) "Ion Frame" else "Ridge Earth",
+            number = if (store) 5 else 1, icon = ChannelIcon.ImageCache(ArtworkId(1)))
+        val event = if (store) EpgEvent.create(EventId(5), channel.id, start, start + 3900.seconds,
+            title = "Ion Wake", subtitle = "A signal beyond the city", genre = "Animation",
+            summary = "A night courier follows a mysterious signal across a city of light.",
+            description = "A night courier follows a mysterious signal across a city of light. " +
+                "With the last train gone, she takes the rooftops towards the old relay tower, " +
+                "where an unexpected voice is waiting on the other end.",
+            copyrightYear = 2025L, image = ArtworkId(2))
+        else EpgEvent.create(EventId(1), channel.id, start, start + 3600.seconds,
             title = "Ridge Light", subtitle = "Winter on the ridge", genre = "Documentary",
             summary = "Seasonal mountain light, forests and weather moving over a ridge.",
             description = "Seasonal mountain light, forests and weather moving over a ridge. As the first snow settles, " +
                 "the crew follows deer down to the valley woods and waits out a storm at the hut below the summit.",
             episode = EpgEpisode(null, null, 2, 5, 3, 10, null, null, "S2 E3"), copyrightYear = 2024L,
             image = ArtworkId(2))
-        val repeat = EpgEvent.create(EventId(2), channel.id, start + 86400.seconds, start + 90000.seconds,
+        val repeat = EpgEvent.create(EventId(2), channel.id, start + 86400.seconds, event.stop + 86400.seconds,
             title = event.title, subtitle = event.subtitle, image = event.image)
         compose.setContent {
             CompositionLocalProvider(LocalDensity provides Density(2f, 1f)) {
@@ -372,7 +388,7 @@ class ProgrammeDetailsCaptureTest {
         val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
         compose.runOnIdle { view.draw(Canvas(bitmap)) }
         val directory = File("build/outputs/presentation").apply { mkdirs() }
-        File(directory, "details.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        File(directory, if (store) "store-details.png" else "details.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         bitmap.recycle()
     }
 

@@ -176,7 +176,13 @@ class GuideVisualLayoutTest {
 
     /** The README scene: the fixture pack's line-up on 2026-10-04 with Ridge Light on air at 20:15, xhdpi. */
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
-    fun presentation() {
+    fun presentation() = presentationScene(store = false)
+
+    /** Store guide: the news row separates this blue studio scene from the live match. */
+    @Test @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi")
+    fun storeGuide() = presentationScene(store = true)
+
+    private fun presentationScene(store: Boolean) {
         val names = listOf("Ridge Earth", "Harbor Sport", "Northline News", "Kite Kids", "Ion Frame", "Amber Stage", "Harbor Lights")
         val picons = listOf("ridge-earth", "harbor-sport", "northline-news", "kite-kids", "ion-frame", "amber-stage", "harbor-lights")
         val art = listOf("ridge-light", "harbor-kickoff", "northline-tonight", "field-desk", "paper-kite-tales", "little-orbit",
@@ -221,7 +227,11 @@ class GuideVisualLayoutTest {
         loader.shutdown()
         loader = at.bernhardberger.tvhplayer.testutil.FixtureArt.imageLoader(context(), buildMap {
             picons.forEachIndexed { index, name -> put(ArtworkId(index + 1), at.bernhardberger.tvhplayer.testutil.FixtureArt.picon(name)) }
-            art.forEachIndexed { index, name -> put(ArtworkId(101 + index), at.bernhardberger.tvhplayer.testutil.FixtureArt.art(name)) }
+            art.forEachIndexed { index, name ->
+                // The title-free studio still leaves the Guide's native header chips clear.
+                val image = if (store && name == "northline-tonight") "still-northline-studio" else name
+                put(ArtworkId(101 + index), at.bernhardberger.tvhplayer.testutil.FixtureArt.art(image))
+            }
         })
         images.install(loader)
         // Harbor Kickoff is recording now and the 21:00 Tide Watch on Ridge Earth is scheduled.
@@ -229,12 +239,21 @@ class GuideVisualLayoutTest {
             DvrEntry.create(DvrEntryId(1), eventId = events[3].id, channelId = ChannelId(2), state = DvrEntryState.RECORDING),
             DvrEntry.create(DvrEntryId(2), eventId = events[2].id, channelId = ChannelId(1), state = DvrEntryState.SCHEDULED),
         )
-        show(headline = true, history = false, channelNames = names, events = events, tagName = "Favorites", recordings = recordings)
+        show(headline = true, rows = GuideRows.DENSE, history = false, channelNames = names, events = events, tagName = "Favorites", recordings = recordings)
         key(Key.DirectionDown)
         focused("Ridge Light")
+        if (store) {
+            repeat(2) { key(Key.DirectionDown) }
+            focused("Northline Tonight")
+            // Let the settled headline's image request and its subsequent crossfade each finish.
+            repeat(20) {
+                compose.mainClock.advanceTimeBy(100)
+                compose.waitForIdle()
+            }
+        }
         compose.mainClock.advanceTimeBy(1_500)
         compose.waitForIdle()
-        capture("guide", 1f, LayoutDirection.Ltr, outputs = "build/outputs/presentation").recycle()
+        capture(if (store) "store-guide" else "guide", 1f, LayoutDirection.Ltr, outputs = "build/outputs/presentation").recycle()
     }
 
     @Test fun retainedEntryWaitsForRowsWhenNewCoverageArrivesBeforePreparation() {
@@ -3247,6 +3266,7 @@ class GuideVisualLayoutTest {
                     }
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                         SideRail(currentRoute = AppDestination.GUIDE,
+                            rootRoute = AppDestination.HOME, availableDestinations = setOf(AppDestination.HOME, AppDestination.CHANNELS, AppDestination.GUIDE, AppDestination.RECORDINGS, AppDestination.SETTINGS),
                             onRootBack = { navigationRequests++ }, onNavigate = { navigationRequests++ }) { padding, drawer ->
                             val view = uiSettings.settings.collectAsState(UiSettings()).value.guideView
                             rowHeight = guideTimelineRowHeight(view.rows).value

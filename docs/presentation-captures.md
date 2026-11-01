@@ -76,6 +76,69 @@ the player and the channel schedule pass the time as arguments. The player, sche
 backdrop is the `still-ridge-light` fixture and the side menu's is `still-northline-studio`, not decoded video: it is fine for a screenshot of
 fictional content, not evidence of SurfaceView capture, decoding or response.
 
+## Play Store candidate review
+
+Round 3 retains the first four round-2 PNGs byte-for-byte and adds programme
+details and the player channel schedule. Keep `captures/play-store/round2/`
+with its manifest, first four plain PNGs, feature C, icon and banner. To recreate
+that baseline, use this document and the packager at commit `adbc9f2a` in a
+separate checkout; its instructions include the round-1 comparison prerequisite.
+No baseline images are tracked.
+
+Run both whole classes owning the new scenes, then package in the same checkout:
+
+```bash
+ANDROID_HOME=/opt/android-sdk timeout --kill-after=5s 20m ./gradlew \
+  :app:testPlayDebugUnitTest -Ptvhplayer.captureTests=all \
+  --tests '*.ProgrammeDetailsCaptureTest' \
+  --tests '*.ChannelScheduleCaptureTest' --console=plain --no-scan
+python3 tools/prepare-play-assets.py
+```
+
+Use `all`, not `only`: the details method is not tagged as a visual capture.
+Run the tests immediately before packaging; the script checks results but
+cannot establish source freshness from XML. Both whole classes must pass
+without skips. Retained frames carry their round-2 test evidence; they are
+not regenerated or described as newly tested.
+
+The order is Channels (Harbor Kickoff, recording), Guide (Northline Tonight),
+Player (Harbor Lights Live), Recordings (Glass Harbor, saved progress), then:
+
+- `ProgrammeDetailsCaptureTest.storeDetails`: Ion Frame's Ion Wake,
+  19:20–20:25; Watch focused. A title-free still leaves the native page text clear.
+- `ChannelScheduleCaptureTest.storeSchedule`: Harbor Lights Live, 19:00–22:00;
+  the on-air row focused over the same concert still as Player.
+
+All six use English (US), font scale 1.0 and the fictional evening clock
+2026-10-04 20:15 UTC. Recording now is omitted from this set.
+
+The script needs Python 3, Pillow and CairoSVG and uses the pinned Outfit font.
+It writes ignored `captures/play-store/round3/`: six plain 1920×1080 RGB PNGs,
+the final 1024×500 graphic plus five earlier directions as references, the
+retained icon and banner, 960px-wide previews,
+320px thumbnails and an image-embedded `review.html`. The variations use the
+canonical symbol's paths and colours with its background omitted; the mark
+itself is unchanged. Their television screens contain complete app captures.
+Plain screenshots preserve every RGB pixel, without added frames or copy.
+
+The review leads with `feature/final.png`, then its 320px thumbnail beside C5
+and C1. Earlier directions are collapsed reference material. The final combines
+C5's remote-led copy and complete Channels screen with C1's standless frame.
+Its background and diffuse backlight are sampled from the stadium portion of
+that screen, excluding programme-card artwork. No source screenshot is cropped.
+The packager verifies
+retained files against the round-2 manifest before copying. The new manifest
+records the source commit, tracked diff hash, new tests, inherited evidence,
+input hashes and every output file's SHA-256 except itself. Add the local report
+and review evidence before the final packaging pass so they are hashed too.
+
+These are candidates for owner selection, not uploaded assets. Keep at least one
+plain screenshot in a proposed listing set. TV-G4 requires an unaltered current
+TV-app screenshot; acceptance of offline fixture renders remains a submission
+question. The review includes Google rule citations; round 2 retains the listing
+comparisons that informed these directions.
+Only copy selected assets to `artwork/play/` after owner approval.
+
 ## Editorial use
 
 Lead with what the app is and that it connects straight to Tvheadend. Pick one

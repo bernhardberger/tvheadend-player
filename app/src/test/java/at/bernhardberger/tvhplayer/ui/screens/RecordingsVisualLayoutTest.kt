@@ -166,7 +166,7 @@ class RecordingsVisualLayoutTest {
     }
 
     /** Eight recordings of the README evening's channels, with their logos, focused on the Documentaries folder. */
-    private fun presentationLibrary() {
+    private fun presentationLibrary(store: Boolean = false) {
         assertTrue(android.os.SystemClock.setCurrentTimeMillis(1_791_144_900_000L))
         val evening = 1_791_057_600L
         // The channels as Channels and the player number them; each logo is the channel's fixture picon.
@@ -195,7 +195,7 @@ class RecordingsVisualLayoutTest {
             recording(5, "River Court", 2, "Sport", evening - 3 * 86400, 105, "river-court",
                 "Indoor basketball, River Court against North Quay."),
             recording(6, "Glass Harbor", 6, null, evening + 1800, 120, "glass-harbor",
-                "A quiet drama about night-shift workers in a harbor glass workshop."),
+                "A quiet drama about night-shift workers in a harbor glass workshop.", position = 2145.takeIf { store }?.toLong()),
             recording(7, "Harbor Lights Live", 7, null, evening - 86400, 90, "harbor-lights-live",
                 "A small-hall concert with a quartet."),
             recording(8, "Paper Kite Tales", 4, null, evening - 2 * 86400 - 7200, 30, "paper-kite-tales",
@@ -220,6 +220,30 @@ class RecordingsVisualLayoutTest {
         focused("recordings-folder-Sport")
         key(Key.DirectionDown)
         focused("recordings-folder-Documentaries")
+    }
+
+    /** Store archive: a complete, partly watched drama, distinct from tonight's live scenes. */
+    @Test @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun storeRecording() {
+        presentationLibrary(store = true)
+        key(Key.DirectionDown)
+        focused("recording-list-entry-6")
+        compose.mainClock.advanceTimeBy(1_500)
+        compose.waitForIdle()
+        capture("store-recording", 1f, outputs = "build/outputs/presentation")
+    }
+
+    /** Store library: the running match is visible without opening the virtual folder. */
+    @Test @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun storeRecordingNow() {
+        presentationLibrary(store = true)
+        repeat(2) { key(Key.DirectionUp) }
+        focused("recordings-recording-now-folder")
+        compose.mainClock.advanceTimeBy(1_500)
+        compose.waitForIdle()
+        capture("store-recording-now", 1f, outputs = "build/outputs/presentation")
     }
 
     @Test fun recordingSpaceLineIsQuietInformationInTheHeader() {
@@ -1447,6 +1471,7 @@ class RecordingsVisualLayoutTest {
                     backDispatcher = requireNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                         SideRail(
+                            rootRoute = AppDestination.HOME, availableDestinations = setOf(AppDestination.HOME, AppDestination.CHANNELS, AppDestination.GUIDE, AppDestination.RECORDINGS, AppDestination.SETTINGS),
                             currentRoute = AppDestination.RECORDINGS,
                             onRootBack = { navigationRequests++ },
                             onNavigate = { navigationRequests++ },

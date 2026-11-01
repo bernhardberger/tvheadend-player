@@ -153,6 +153,24 @@ class HomeCaptureTest {
         capture("4b-upcoming", "home-upcoming-0")
     }
 
+    /** Store listing candidates: the same page as the mockup states, under the store's locale and output folder. */
+    @Test @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi")
+    fun storeHome() = atEvening {
+        val presentation = File("build/outputs/presentation").apply { mkdirs() }
+        show(Kind.BROWSE)
+        capture("../presentation/store-home-recent", "home-recent-0")
+        key(Key.DirectionDown)
+        capture("../presentation/store-home-onnow", "home-onnow-0")
+        assertTrue(presentation.isDirectory)
+    }
+
+    @Test @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi")
+    fun storeHomeWarm() = atEvening {
+        File("build/outputs/presentation").mkdirs()
+        show(Kind.WARM)
+        capture("../presentation/store-home-warm", "home-activity-0")
+    }
+
     @Test
     fun warm() = atEvening {
         show(Kind.WARM)

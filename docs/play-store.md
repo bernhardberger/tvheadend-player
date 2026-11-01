@@ -330,20 +330,23 @@ without alpha, 320 to 3840 px, the long side at most twice the short side, up to
 eight per device type, and at least one Android TV screenshot; TV banner
 1280×720, JPEG or 24-bit PNG without alpha.
 
-### 3.0 Uploaded set (2026-10-29)
+### 3.0 Uploaded set (2026-10-29, screenshots replaced 2026-11-01 for 0.4.0)
 
-Saved as a draft on the default (en-US) listing. The files come from branch
-`docs/play-assets` at d0563891, under `captures/play-store/round3/`
-(reproduction in that branch's `docs/presentation-captures.md`):
+Saved as a draft on the default (en-US) listing. The icon, feature graphic and
+banner come from branch `docs/play-assets` at d0563891, under
+`captures/play-store/round3/` (reproduction in that branch's
+`docs/presentation-captures.md`). The screenshots come from the `store*` capture
+tests in `docs/play-assets-040`, stored under the ignored
+`captures/play-store/round4/plain/`:
 
 | Slot | File |
 |---|---|
 | App icon | `icon/current-rgba.png` |
 | Feature graphic | `feature/final.png`: mark and name, "Built around the remote.", the Channels screen in a slim frame |
-| Android TV screenshots, in order | `plain/01-channels.png`, `02-guide.png`, `03-player.png`, `04-recording.png`, `05-details.png`, `06-schedule.png` |
+| Android TV screenshots, in order | `plain/01-home.png`, `02-channels.png`, `03-guide.png` (Dense rows), `04-player.png`, `05-recording.png`, `06-details.png`, `07-schedule.png` |
 | TV banner | `banner/current.png` |
 | Phone screenshots | none |
-| 10-inch tablet screenshots | `01-channels.png`, `02-guide.png`. A full save needs two phone or tablet screenshots, and the Android TV opt-in needs a fully saved listing, so these break the loop. After the opt-in (2026-10-29) Console still refuses to save without them ("Upload at least 2 phone or tablet screenshots"). Try again once TV is approved. Android XR has no opt-out in Console; the leanback requirement keeps phones and headsets from installing |
+| 10-inch tablet screenshots | `02-channels.png`, `03-guide.png`. A full save needs two phone or tablet screenshots, and the Android TV opt-in needs a fully saved listing, so these break the loop. After the opt-in (2026-10-29) Console still refuses to save without them ("Upload at least 2 phone or tablet screenshots"). Try again once TV is approved. Android XR has no opt-out in Console; the leanback requirement keeps phones and headsets from installing |
 | AI asset declaration | "Don't label assets" (owner, 2026-10-29): fictional sample art inside app screens, not depicting anything real |
 | Video | none yet, see [5.2](#52-demo-video-shot-list) |
 
@@ -351,7 +354,8 @@ The Android TV section of the listing only appears after adding Android TV
 under **Test and release → Advanced settings → Form factors**.
 
 Console's asset library adds several selected files in a scrambled order. Add
-the screenshots one at a time, in order.
+the screenshots one at a time, in order, and wait for each upload to land in the
+slot before starting the next; overlapping uploads get lost.
 
 Android XR shows as an active form factor that can't be removed. That's
 harmless: the manifest requires `android.software.leanback`, so XR headsets
