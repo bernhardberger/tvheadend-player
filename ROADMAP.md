@@ -16,11 +16,8 @@ Where this is going, as of 0.4.0. No dates. What's already shipped is in the
 - **Polish.** Channels and the player get adjusted to the rules Home set. Focus
   and Back get a pass across all screens, and time and duration formats get tidied
   up.
-- **Speed.** Startup, first picture after tuning and scrolling the guide with
-  pictures, all measured on a budget Google TV.
-- **TalkBack.** A pass over every screen.
-- **Appliance build.** The build that makes a TV start straight into the app.
-  HOME, GUIDE and waking the TV still need work.
+- **Speed.** Making it feel fast on budget Google TVs.
+- **Appliance build.** For TVs that should start straight into the app.
 - **Fire TV.** A build and an Amazon Appstore listing.
 
 ## I want these before 1.0, if they work out
@@ -34,34 +31,32 @@ Where this is going, as of 0.4.0. No dates. What's already shipped is in the
   and cumbersome, so I'd rather add proper editing on touch devices or a companion
   app first. On the TV I might add a simplified interface, or at least a read-only
   one, just so you can check your rules and where a scheduled recording comes from.
-- **Sleep timer.** After a countdown or at the end of the program.
-- **Arabic and Hebrew.** The right-to-left layouts need fixing first.
+- **RTL language support.** A few bugs to fix first.
 
 ## After 1.0
 
-- **Phone and tablet app** ([issue #1](https://github.com/bernhardberger/tvheadend-player/issues/1)),
-  probably with picture-in-picture. Android TV
-  [doesn't allow it for media playback](https://developer.android.com/training/tv/get-started/multitasking).
+- **Phone and tablet app** ([issue #1](https://github.com/bernhardberger/tvheadend-player/issues/1))
+  with picture-in-picture.
 - **Editing timers and series rules** on touch devices or in a companion app.
 - **Search.**
-- **Watching several servers at once.** Maybe, not soon.
 
 ## Ideas
 
-Written down, not decided:
+Some things I've been thinking about:
 
 - Live preview of the focused channel, as a setting (it costs a tuner on every
   focus change)
 - Tuning ahead when you hover over a channel, so OK plays sooner
 - Reminders for programs that haven't started
-- Markers for programs you can still watch from the start
-- A Continue watching row in Recordings
-- A Linux build, then game controller support for the Steam Deck and Steam Machine
+- Catch-up markers
+- More ways to browse Recordings (today it mostly focuses on folders)
+- A Linux build for x86 and arm64, then game controller support for the Steam Deck,
+  Steam Machine and other distros and hardware
 
-## Not coming
+## Out of scope for now
 
-- **A separate favorites list in 1.0.** Your Tvheadend channel tags are your
-  favorites, and the channel group button picks one.
+- **Watching several servers at once.**
+- **A separate favorites list.** Tvheadend channel tags do that job.
 - **Rows on the Google TV home screen.** Google only shows them for apps it has
   certified.
 

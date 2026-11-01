@@ -130,7 +130,7 @@ In 1.0:
 
 Not in 1.0:
 
-- Simultaneous servers. Stored server/user profiles with switching, one active
+- Simultaneous servers: out of scope for now. Stored server/user profiles with switching, one active
   at a time, are wanted before 1.0 if feasible (owner, 2026-11-01). The SDK's
   `ServerProfileStore` holds a single profile today.
 - App-owned favourites beyond Tvheadend channel tags.
@@ -139,8 +139,7 @@ Not in 1.0:
   explicitly disallowed
   (<https://developer.android.com/training/tv/get-started/multitasking>).
 
-Stretch goal: sleep timer (countdown or "end of programme" that stops playback
-after an on-screen warning).
+Sleep timer: dropped (owner, 2026-11-01).
 
 Feature ideas for later (owner, 2026-10-22), written down, not scheduled. They
 came out of the U4 comparison with other players (TiviMate, Kodi):

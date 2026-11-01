@@ -170,16 +170,20 @@ for example.
 
 ## Beta testing on Google Play
 
-It's in a closed test on Google Play, and Google won't let me publish until 12
-people have stayed in for 14 days in a row. If you have an Android TV or Google TV
-device and your own Tvheadend server, I'd be glad if you joined.
+Tvheadend Player is in a closed test on Google Play, and you're welcome to join.
+I'd love your feedback and ideas, and data points from different hardware and
+setups. The beta is also the way onto the Play Store, which will make it much
+easier for everyone to install.
 
-With the Google account on your TV, join the
+You need an Android TV or Google TV device and your own Tvheadend server. With the
+Google account on your TV, join the
 [testers group](https://groups.google.com/g/tvheadend-player-testers), then
 [opt in](https://play.google.com/apps/testing/at.bernhardberger.tvhplayer)
-and install the app from the Play Store. Bugs and ideas go to
-[GitHub issues](https://github.com/bernhardberger/tvheadend-player/issues) or the
-group.
+and install the app from the Play Store. Please stay in for the 14 days Google
+requires before the app can be published.
+
+Please report bugs on [GitHub](https://github.com/bernhardberger/tvheadend-player/issues) if you can. Feedback and discussion are
+welcome in the group.
 
 The Play version and the GitHub APKs are signed with the same key, so either
 one updates the other.
