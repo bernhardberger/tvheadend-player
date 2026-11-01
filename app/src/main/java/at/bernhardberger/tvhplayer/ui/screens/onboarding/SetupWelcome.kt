@@ -200,12 +200,15 @@ internal fun SetupSignature() {
                     contentDescription = null,
                     modifier = Modifier.size(SignatureMarkSize),
                 )
-                BrandWordmark(fontSize = 14.sp, lineHeight = 20.sp)
-                Text(
-                    text = BuildConfig.VERSION_NAME,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = TvTextSecondaryAlpha),
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    BrandWordmark(fontSize = 14.sp, lineHeight = 20.sp, modifier = Modifier.alignByBaseline())
+                    Text(
+                        text = BuildConfig.VERSION_NAME,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = TvTextSecondaryAlpha),
+                        modifier = Modifier.alignByBaseline(),
+                    )
+                }
             }
         }
     }
