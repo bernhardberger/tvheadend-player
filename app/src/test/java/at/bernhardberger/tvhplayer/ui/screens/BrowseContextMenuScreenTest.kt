@@ -1479,7 +1479,7 @@ class BrowseContextMenuScreenTest {
                         }
                         if (realRail) at.bernhardberger.tvhplayer.ui.components.SideRail(
                             currentRoute = at.bernhardberger.tvhplayer.ui.AppDestination.CHANNELS,
-                            showEpgMenu = true, onRootBack = {}, onNavigate = {},
+                            onRootBack = {}, onNavigate = {},
                         ) { _, drawerActive -> content(drawerActive) } else content(false)
                     }
                     }

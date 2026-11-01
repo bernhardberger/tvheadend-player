@@ -55,7 +55,6 @@ internal fun settingsGeneralLevels(
                     LocaleListCompat.forLanguageTags(language.applicationLocaleTag(system)))
             }
         },
-        onToggleEpg = { scope.launch { settingsStore.setShowEpgMenu(!settings.showEpgMenu) } },
         onToggleChannelNumbers = { scope.launch { settingsStore.setShowChannelNumbers(!settings.showChannelNumbers) } },
         onClearCache = storageViewModel::clearCache,
         onSelectClockFormat = { format ->
@@ -73,7 +72,6 @@ internal fun settingsGeneralLevels(
     statistics: CacheStatistics,
     clearState: CacheClearState,
     onSelectLanguage: (AppLanguage) -> Unit,
-    onToggleEpg: () -> Unit,
     onClearCache: () -> Unit,
     onSelectClockFormat: (ClockFormat) -> Unit = {},
     onToggleChannelNumbers: () -> Unit = {},
@@ -100,8 +98,6 @@ internal fun settingsGeneralLevels(
                 ?: selectedLanguage.nativeLabel(), child = LANGUAGE_LEVEL),
             settingsRow(CLOCK_FORMAT_LEVEL, clockFormatTitle,
                 clockFormats.first { it.first == settings.clockFormat }.second, child = CLOCK_FORMAT_LEVEL),
-            settingsRow("guide-menu", stringResource(R.string.show_epg_menu),
-                checked = settings.showEpgMenu, onClick = onToggleEpg),
             settingsRow("channel-numbers", stringResource(R.string.settings_channel_numbers),
                 supporting = stringResource(R.string.settings_channel_numbers_help),
                 checked = settings.showChannelNumbers, onClick = onToggleChannelNumbers),

@@ -245,7 +245,6 @@ internal fun Modifier.browseScreenBackdrop(): Modifier {
 @Composable
 internal fun SideRail(
     currentRoute: AppDestination?,
-    showEpgMenu: Boolean,
     onRootBack: () -> Unit,
     onNavigate: (AppDestination) -> Unit,
     modifier: Modifier = Modifier,
@@ -287,7 +286,6 @@ internal fun SideRail(
         channelsLabel,
         epgLabel,
         recordingsLabel,
-        showEpgMenu,
         availableDestinations,
     ) {
         buildList {
@@ -309,7 +307,7 @@ internal fun SideRail(
                     )
                 })
             }
-            if (showEpgMenu && AppDestination.GUIDE in availableDestinations) {
+            if (AppDestination.GUIDE in availableDestinations) {
                 add(RailItem(AppDestination.GUIDE, epgLabel) {
                     Icon(
                         painter = painterResource(R.drawable.ic_event),

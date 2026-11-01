@@ -114,7 +114,7 @@ class OfflinePatternTest {
                     view = LocalView.current
                     val navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.CONNECTION.name)
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                        SideRail(currentRoute = AppDestination.SETTINGS, showEpgMenu = true,
+                        SideRail(currentRoute = AppDestination.SETTINGS,
                             connectionDegraded = degraded, onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                             SettingsScreenNavigation(navigation, listOf(settingsRootLevel(),
                                 settingsConnectionOverview(

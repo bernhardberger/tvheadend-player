@@ -478,7 +478,6 @@ class BrowseLayeringTest {
                                 is SettingsKey -> AppDestination.SETTINGS
                                 else -> AppDestination.GUIDE
                             },
-                            showEpgMenu = true,
                             onRootBack = {},
                             onNavigate = {},
                         ) { _, drawerActive ->

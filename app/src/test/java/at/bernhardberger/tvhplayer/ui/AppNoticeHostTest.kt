@@ -164,7 +164,7 @@ class AppNoticeHostTest {
                             val statistics by cache.statistics.collectAsState()
                             val navigation = rememberDepthNavigationState(SettingsSection.GENERAL.name)
                             SettingsScreenNavigation(navigation, settingsGeneralLevels(UiSettings(), AppLanguage.SYSTEM,
-                                statistics, clearState, {}, {}, model::clearCache))
+                                statistics, clearState, {}, model::clearCache))
                         } else {
                             val focus = remember { FocusRequester() }
                             Button(onClick = { clicks++ }, modifier = Modifier.focusRequester(focus)) { Text("Playback action") }

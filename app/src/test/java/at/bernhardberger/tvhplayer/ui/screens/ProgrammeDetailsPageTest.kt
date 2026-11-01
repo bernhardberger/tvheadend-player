@@ -1518,7 +1518,7 @@ class ProgrammeDetailsPageTest {
                                 DvrConfiguration(DvrConfigId("archive"), "Archive", ""))) }
                         }
                         if (realRail) at.bernhardberger.tvhplayer.ui.components.SideRail(
-                            currentRoute = AppDestination.CHANNELS, showEpgMenu = true, onRootBack = {}, onNavigate = {},
+                            currentRoute = AppDestination.CHANNELS, onRootBack = {}, onNavigate = {},
                         ) { _, _ -> details() } else details()
                     }
                 }

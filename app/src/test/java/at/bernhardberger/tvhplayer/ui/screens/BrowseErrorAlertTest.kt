@@ -251,7 +251,7 @@ class BrowseErrorAlertTest {
             TVHeadendPlayerTheme {
                 Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                     SideRail(currentRoute = if (recordings) AppDestination.RECORDINGS else AppDestination.CHANNELS,
-                        showEpgMenu = true, onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
+                        onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                         if (recordings) RecordingsScreenContent(
                             observation = observation,
                             contentPadding = padding,

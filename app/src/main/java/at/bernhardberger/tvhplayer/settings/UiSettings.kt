@@ -12,7 +12,6 @@ import kotlinx.coroutines.flow.map
 import at.bernhardberger.tvhplayer.core.HomeSectionKind
 
 data class UiSettings(
-    val showEpgMenu: Boolean = true,
     val autoStartPlayback: Boolean = false,
     val clockFormat: ClockFormat = ClockFormat.SYSTEM,
     val recordingProfileId: DvrConfigId? = null,
@@ -22,13 +21,11 @@ data class UiSettings(
     val hiddenHomeSections: Set<HomeSectionKind> = emptySet(),
 )
 
-fun resolveEpgMenuVisibility(storedValue: Boolean?): Boolean = storedValue ?: true
 fun resolvePlaybackAutoStart(storedValue: Boolean?): Boolean = storedValue ?: false
 
 class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
     constructor(context: Context) : this(context.dataStore)
     private object Keys {
-        val SHOW_EPG_MENU = booleanPreferencesKey("showEpgMenu")
         val AUTO_START_PLAYBACK = booleanPreferencesKey("autoStartPlayback")
         val CLOCK_FORMAT = stringPreferencesKey("clockFormat")
         val SHOW_CHANNEL_NUMBERS = booleanPreferencesKey("showChannelNumbers")
@@ -45,7 +42,6 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
 
     val settings: Flow<UiSettings> = dataStore.data.map { preferences ->
         UiSettings(
-            showEpgMenu = resolveEpgMenuVisibility(preferences[Keys.SHOW_EPG_MENU]),
             autoStartPlayback = resolvePlaybackAutoStart(preferences[Keys.AUTO_START_PLAYBACK]),
             clockFormat = resolveClockFormat(preferences[Keys.CLOCK_FORMAT]),
             showChannelNumbers = preferences[Keys.SHOW_CHANNEL_NUMBERS] ?: true,
@@ -92,12 +88,6 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
             preferences[Keys.GUIDE_ROWS] = view.rows.name
             preferences[Keys.GUIDE_HEADLINE] = view.headline
             preferences[Keys.GUIDE_GENRE_COLORS] = view.genreColors
-        }
-    }
-
-    suspend fun setShowEpgMenu(show: Boolean) {
-        dataStore.edit { preferences ->
-            preferences[Keys.SHOW_EPG_MENU] = show
         }
     }
 

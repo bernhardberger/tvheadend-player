@@ -815,7 +815,6 @@ class ChannelsStandardLayoutEvidenceTest {
                         navigation = { _, _ ->
                         SideRail(
                             currentRoute = AppDestination.CHANNELS,
-                            showEpgMenu = true,
                             onRootBack = {},
                             onNavigate = {},
                         ) { padding, drawerActive ->

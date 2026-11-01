@@ -117,14 +117,10 @@
     <string name="settings_channel_numbers_help">Kumandanızda rakam tuşları yoksa kapatın</string>
     <string name="settings_channel_tags_nav">Kanal grupları</string>
     <string name="settings_channel_tags_last_enabled">Gerekli — en az bir grup açık kalmalıdır.</string>
-    <string name="show_epg_menu">Rehberi yan menüde göster</string>
-    <string name="show_epg_menu_description">Program rehberini ana gezinme panelinde göster.</string>
     <string name="player_info">Bilgi</string>
     <string name="player_channel_number_none">Kanal yok</string>
     <string name="player_shelf_playing">Oynatılıyor</string>
     <string name="player_shelf_recording">Şimdi kaydediliyor</string>
-    <string name="show_epg_menu_enabled">Rehber menüsünü göster: Açık</string>
-    <string name="show_epg_menu_disabled">Rehber menüsünü göster: Kapalı</string>
     <string name="port_htsp">HTSP bağlantı noktası</string>
     <string name="port_http">HTTP bağlantı noktası</string>
     <string name="username">Kullanıcı adı</string>

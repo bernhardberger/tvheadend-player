@@ -1448,7 +1448,6 @@ class RecordingsVisualLayoutTest {
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                         SideRail(
                             currentRoute = AppDestination.RECORDINGS,
-                            showEpgMenu = true,
                             onRootBack = { navigationRequests++ },
                             onNavigate = { navigationRequests++ },
                         ) { padding, drawer ->

@@ -117,14 +117,10 @@
     <string name="settings_channel_numbers_help">Выключите, если на пульте нет цифровых кнопок</string>
     <string name="settings_channel_tags_nav">Группы каналов</string>
     <string name="settings_channel_tags_last_enabled">Обязательно — хотя бы одна группа должна оставаться включённой.</string>
-    <string name="show_epg_menu">Показывать телепрограмму в боковом меню</string>
-    <string name="show_epg_menu_description">Показывать телепрограмму на главной панели навигации.</string>
     <string name="player_info">Информация</string>
     <string name="player_channel_number_none">Нет канала</string>
     <string name="player_shelf_playing">Воспроизводится</string>
     <string name="player_shelf_recording">Идёт запись</string>
-    <string name="show_epg_menu_enabled">Меню телепрограммы: Вкл.</string>
-    <string name="show_epg_menu_disabled">Меню телепрограммы: Выкл.</string>
     <string name="port_htsp">Порт HTSP</string>
     <string name="port_http">Порт HTTP</string>
     <string name="username">Имя пользователя</string>

@@ -140,14 +140,10 @@
     <string name="settings_general">General</string>
     <string name="settings_channel_tags_nav">Channel groups</string>
     <string name="settings_channel_tags_last_enabled">Required — at least one group must stay on.</string>
-    <string name="show_epg_menu">Show Guide in the side menu</string>
-    <string name="show_epg_menu_description">Show Guide in the main navigation rail.</string>
     <string name="player_info">Info</string>
     <string name="player_channel_number_none">No channel</string>
     <string name="player_shelf_playing">Playing</string>
     <string name="player_shelf_recording">Recording now</string>
-    <string name="show_epg_menu_enabled">Show Guide menu: On</string>
-    <string name="show_epg_menu_disabled">Show Guide menu: Off</string>
     <string name="port_htsp">HTSP port</string>
     <string name="port_http">Http Port</string>
     <string name="username">Username</string>

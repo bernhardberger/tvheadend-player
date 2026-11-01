@@ -700,7 +700,6 @@ class HomeCaptureTest {
                         ProvideArtworkSession(scene.observation.currentSession) {
                             SideRail(
                                 currentRoute = AppDestination.HOME,
-                                showEpgMenu = true,
                                 onRootBack = {},
                                 onNavigate = {},
                                 rootRoute = AppDestination.HOME,

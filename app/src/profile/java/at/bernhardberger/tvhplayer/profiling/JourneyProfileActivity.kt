@@ -140,7 +140,6 @@ class JourneyProfileActivity : AppCompatActivity() {
                     SideRail(
                         rootRoute = AppDestination.HOME,
                         currentRoute = route.destination,
-                        showEpgMenu = true,
                         availableDestinations = setOf(
                             AppDestination.HOME, AppDestination.CHANNELS, AppDestination.GUIDE, AppDestination.RECORDINGS,
                         ),

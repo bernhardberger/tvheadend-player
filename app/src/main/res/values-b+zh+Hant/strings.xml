@@ -117,14 +117,10 @@
     <string name="settings_channel_numbers_help">遙控器沒有數字鍵時請關閉</string>
     <string name="settings_channel_tags_nav">頻道群組</string>
     <string name="settings_channel_tags_last_enabled">必要 — 至少須開啟一個群組。</string>
-    <string name="show_epg_menu">在側邊選單顯示節目表</string>
-    <string name="show_epg_menu_description">在主要導覽列中顯示節目表。</string>
     <string name="player_info">資訊</string>
     <string name="player_channel_number_none">無頻道</string>
     <string name="player_shelf_playing">播放中</string>
     <string name="player_shelf_recording">錄影中</string>
-    <string name="show_epg_menu_enabled">顯示節目表選單：開啟</string>
-    <string name="show_epg_menu_disabled">顯示節目表選單：關閉</string>
     <string name="port_htsp">HTSP連接埠</string>
     <string name="port_http">HTTP連接埠</string>
     <string name="username">使用者名稱</string>

@@ -3246,7 +3246,7 @@ class GuideVisualLayoutTest {
                         previousRulerHeight = maxOf(28.dp, typography.labelSmall.lineHeight.toDp() + 12.dp).value
                     }
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                        SideRail(currentRoute = AppDestination.GUIDE, showEpgMenu = true,
+                        SideRail(currentRoute = AppDestination.GUIDE,
                             onRootBack = { navigationRequests++ }, onNavigate = { navigationRequests++ }) { padding, drawer ->
                             val view = uiSettings.settings.collectAsState(UiSettings()).value.guideView
                             rowHeight = guideTimelineRowHeight(view.rows).value

@@ -117,14 +117,10 @@
     <string name="settings_channel_numbers_help">Désactive si ta télécommande n’a pas de touches numériques</string>
     <string name="settings_channel_tags_nav">Groupes de chaînes</string>
     <string name="settings_channel_tags_last_enabled">Obligatoire — au moins un groupe doit rester activé.</string>
-    <string name="show_epg_menu">Afficher le Guide dans le menu latéral</string>
-    <string name="show_epg_menu_description">Afficher le guide dans la barre de navigation principale.</string>
     <string name="player_info">Infos</string>
     <string name="player_channel_number_none">Aucune chaîne</string>
     <string name="player_shelf_playing">En lecture</string>
     <string name="player_shelf_recording">Enregistrement en cours</string>
-    <string name="show_epg_menu_enabled">Afficher le menu Guide : activé</string>
-    <string name="show_epg_menu_disabled">Afficher le menu Guide : désactivé</string>
     <string name="port_htsp">Port HTSP</string>
     <string name="port_http">Port HTTP</string>
     <string name="username">Nom d’utilisateur</string>

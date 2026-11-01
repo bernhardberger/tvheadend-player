@@ -86,7 +86,7 @@ class SettingsDepthNavigationTest {
                 captureView = LocalView.current
                 val navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.PLAYER.name)
                 Box(Modifier.semantics { testTagsAsResourceId = true }) {
-                    SideRail(currentRoute = AppDestination.SETTINGS, showEpgMenu = true,
+                    SideRail(currentRoute = AppDestination.SETTINGS,
                         onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                         SettingsScreenNavigation(navigation, listOf(settingsRootLevel(false),
                             settingsPlayerLevel(SettingsPlayerUiState(), {}),
@@ -186,9 +186,6 @@ class SettingsDepthNavigationTest {
     @Test fun audioDescriptionAccessibilityCheckedStateTracksCenterAndReentry() =
         switchAccessibilityCheckedStateTracksCenterAndReentry("audio-description", 3, SettingsSection.AUDIO)
 
-    @Test fun guideMenuAccessibilityCheckedStateTracksCenterAndReentry() =
-        switchAccessibilityCheckedStateTracksCenterAndReentry("guide-menu", 2, SettingsSection.GENERAL)
-
     @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
     @Test fun channelNumbersAreReachableAccessibleAndPersistAfterReopeningGeneral() {
         val data = at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore()
@@ -203,7 +200,7 @@ class SettingsDepthNavigationTest {
                 Box(Modifier.semantics { testTagsAsResourceId = true }) {
                     SettingsScreenNavigation(navigation, listOf(settingsRootLevel(false)) + settingsGeneralLevels(
                         settings, AppLanguage.SYSTEM, CacheStatistics.EMPTY, CacheClearState.IDLE,
-                        onSelectLanguage = {}, onToggleEpg = {}, onClearCache = {},
+                        onSelectLanguage = {}, onClearCache = {},
                         onToggleChannelNumbers = { scope.launch { store.setShowChannelNumbers(!settings.showChannelNumbers) } },
                     ))
                 }
@@ -212,7 +209,7 @@ class SettingsDepthNavigationTest {
         try {
             compose.onNodeWithTag("settings-row-GENERAL").assertIsFocused()
             press(Key.DirectionCenter)
-            repeat(3) { press(Key.DirectionDown) }
+            repeat(2) { press(Key.DirectionDown) }
             assertAccessibleSwitch("settings-row-channel-numbers", checked = true)
             compose.onNodeWithText("Turn off if your remote has no number keys").assertExists()
             press(Key.DirectionCenter)
@@ -244,7 +241,6 @@ class SettingsDepthNavigationTest {
     ) {
         var ui by mutableStateOf(SettingsPlayerUiState(autoStartPlayback = false, timeshiftEnabled = false,
             tunnelingEnabled = false, audioPassthroughEnabled = false, audioDescription = false))
-        var settings by mutableStateOf(UiSettings(showEpgMenu = false))
         var visibility by mutableStateOf(ChannelScopeVisibility(configured = true,
             allChannelsVisible = rowId != "all-channels", visibleTagIds = setOf(ChannelTagId(2))))
         compose.setContent {
@@ -252,7 +248,7 @@ class SettingsDepthNavigationTest {
                 captureView = LocalView.current
                 val navigation = rememberDepthNavigationState(SETTINGS_ROOT, section.name)
                 Box(Modifier.semantics { testTagsAsResourceId = true }) {
-                    SideRail(currentRoute = AppDestination.SETTINGS, showEpgMenu = true,
+                    SideRail(currentRoute = AppDestination.SETTINGS,
                         onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                         SettingsScreenNavigation(navigation, listOf(settingsRootLevel(false),
                             settingsPlayerLevel(ui,
@@ -269,9 +265,8 @@ class SettingsDepthNavigationTest {
                                     visibility = if (tag == null) visibility.copy(allChannelsVisible = !visibility.allChannelsVisible)
                                     else visibility.copy(visibleTagIds = if (tag in visibility.visibleTagIds)
                                         visibility.visibleTagIds - tag else visibility.visibleTagIds + tag)
-                                })) + settingsGeneralLevels(settings, AppLanguage.SYSTEM, CacheStatistics.EMPTY,
-                            CacheClearState.IDLE, onSelectLanguage = {},
-                            onToggleEpg = { settings = settings.copy(showEpgMenu = !settings.showEpgMenu) }, onClearCache = {}),
+                                })) + settingsGeneralLevels(UiSettings(), AppLanguage.SYSTEM, CacheStatistics.EMPTY,
+                            CacheClearState.IDLE, onSelectLanguage = {}, onClearCache = {}),
                             initialFocusEnabled = !drawerActive, contentPadding = padding)
                     }
                 }
@@ -585,7 +580,7 @@ class SettingsDepthNavigationTest {
         compose.setContent {
             TVHeadendPlayerTheme {
                 val navigation = rememberDepthNavigationState(RECORDINGS_LEVEL)
-                SideRail(currentRoute = AppDestination.SETTINGS, showEpgMenu = true,
+                SideRail(currentRoute = AppDestination.SETTINGS,
                     onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                     SettingsScreenNavigation(navigation,
                         settingsRecordingLevels(profiles, preferred) { id ->
@@ -1046,7 +1041,6 @@ class SettingsDepthNavigationTest {
 
     @Test fun rootGeneralLanguageChoiceAndSwitchAreExplicitAndRestoreParent() {
         var language by mutableStateOf(AppLanguage.SYSTEM)
-        var showGuide by mutableStateOf(true)
         var clockFormat by mutableStateOf(ClockFormat.SYSTEM)
         var languageCalls = 0
         var clearCalls = 0
@@ -1059,13 +1053,13 @@ class SettingsDepthNavigationTest {
                 Box(Modifier.fillMaxSize().background(Color.Black)) {
                     DebugVideoBackdrop(true, Modifier.fillMaxSize())
                     WarmPlaybackScrim() // This fixture explicitly models warm playback.
-                    SideRail(currentRoute = AppDestination.SETTINGS, showEpgMenu = true,
+                    SideRail(currentRoute = AppDestination.SETTINGS,
                         onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                     SettingsScreenNavigation(navigation,
                         listOf(settingsRootLevel()) + settingsGeneralLevels(
-                            UiSettings(showEpgMenu = showGuide, clockFormat = clockFormat), language, CacheStatistics.EMPTY,
+                            UiSettings(clockFormat = clockFormat), language, CacheStatistics.EMPTY,
                             CacheClearState.IDLE,
-                            { languageCalls++; navigation.pop(); language = it }, { showGuide = !showGuide }, { clearCalls++ },
+                            { languageCalls++; navigation.pop(); language = it }, { clearCalls++ },
                             onSelectClockFormat = { navigation.pop(); clockFormat = it }),
                         initialFocusEnabled = !drawerActive, contentPadding = padding)
                     }
@@ -1102,11 +1096,6 @@ class SettingsDepthNavigationTest {
         compose.onNodeWithText("12-hour (8:15 PM)").assertExists()
         assertEquals(ClockFormat.TWELVE_HOUR, clockFormat)
         press(Key.DirectionDown)
-        press(Key.DirectionRight)
-        assertTrue(showGuide)
-        press(Key.DirectionCenter)
-        assertFalse(showGuide)
-        press(Key.DirectionDown)
         compose.onNodeWithText("Channel numbers").assertIsFocused()
         press(Key.DirectionDown)
         compose.onNodeWithText("Clear cache").assertIsFocused()
@@ -1134,7 +1123,7 @@ class SettingsDepthNavigationTest {
                     listOf(settingsRootLevel()) + settingsGeneralLevels(
                         // Arabic has resources but is left out of the 0.3.0 picker.
                         UiSettings(), AppLanguage("ar"), CacheStatistics.EMPTY, CacheClearState.IDLE,
-                        { navigation.pop(); selected = it }, {}, {}))
+                        { navigation.pop(); selected = it }, {}))
             }
         }
         press(Key.DirectionCenter)
@@ -1252,10 +1241,10 @@ class SettingsDepthNavigationTest {
                     Box(Modifier.fillMaxSize()) {
                         DebugVideoBackdrop(true, Modifier.fillMaxSize())
                         WarmPlaybackScrim() // This fixture explicitly models warm playback.
-                        SideRail(currentRoute = AppDestination.SETTINGS, showEpgMenu = true,
+                        SideRail(currentRoute = AppDestination.SETTINGS,
                             onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                             SettingsScreenNavigation(navigation, listOf(settingsRootLevel()) + settingsGeneralLevels(
-                                UiSettings(), AppLanguage("de"), CacheStatistics.EMPTY, clearState, {}, {},
+                                UiSettings(), AppLanguage("de"), CacheStatistics.EMPTY, clearState, {},
                                 { calls++; clearState = CacheClearState.CLEARING }),
                                 initialFocusEnabled = !drawerActive, contentPadding = padding)
                         }
@@ -1293,7 +1282,7 @@ class SettingsDepthNavigationTest {
                 Box(Modifier.fillMaxSize()) {
                     DebugVideoBackdrop(true, Modifier.fillMaxSize())
                     WarmPlaybackScrim() // This fixture explicitly models warm playback.
-                    SideRail(currentRoute = AppDestination.SETTINGS, showEpgMenu = true,
+                    SideRail(currentRoute = AppDestination.SETTINGS,
                         onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                         SettingsScreenNavigation(navigation, listOf(settingsRootLevel(applianceBuild = true),
                             settingsChannelTagsLevel(emptyList(), ChannelScopeVisibility(), loaded, failed,

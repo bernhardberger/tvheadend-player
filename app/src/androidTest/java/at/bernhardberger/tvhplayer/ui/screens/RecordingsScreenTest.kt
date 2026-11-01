@@ -183,7 +183,7 @@ class RecordingsScreenTest {
             TVHeadendPlayerTheme {
                 at.bernhardberger.tvhplayer.ui.components.SideRail(
                     currentRoute = at.bernhardberger.tvhplayer.ui.AppDestination.RECORDINGS,
-                    showEpgMenu = true, onRootBack = {}, onNavigate = {},
+                    onRootBack = {}, onNavigate = {},
                 ) { padding, active ->
                     TestRecordingsScreen(sessionObservation = observation.value, contentPadding = padding,
                         initialFocusEnabled = !active, backEnabled = !active)
@@ -328,7 +328,6 @@ class RecordingsScreenTest {
             TVHeadendPlayerTheme {
                 at.bernhardberger.tvhplayer.ui.components.SideRail(
                     currentRoute = at.bernhardberger.tvhplayer.ui.AppDestination.RECORDINGS,
-                    showEpgMenu = true,
                     onRootBack = {},
                     onNavigate = {},
                 ) { padding, active ->
@@ -398,7 +397,7 @@ class RecordingsScreenTest {
                 androidx.activity.compose.BackHandler { shellBack() }
                 at.bernhardberger.tvhplayer.ui.components.SideRail(
                     currentRoute = at.bernhardberger.tvhplayer.ui.AppDestination.RECORDINGS,
-                    showEpgMenu = true, onRootBack = {}, onNavigate = {},
+                    onRootBack = {}, onNavigate = {},
                     onBackHandlerChanged = { shellBack = it },
                 ) { padding, active ->
                     androidx.compose.runtime.SideEffect { drawerActive = active }
@@ -457,7 +456,7 @@ class RecordingsScreenTest {
                 BackHandler { shellBack() }
                 at.bernhardberger.tvhplayer.ui.components.SideRail(
                     currentRoute = at.bernhardberger.tvhplayer.ui.AppDestination.RECORDINGS,
-                    showEpgMenu = true, onRootBack = {}, onNavigate = {},
+                    onRootBack = {}, onNavigate = {},
                     onBackHandlerChanged = { shellBack = it },
                 ) { padding, active ->
                     androidx.compose.runtime.SideEffect { drawerActive = active }
@@ -512,7 +511,7 @@ class RecordingsScreenTest {
             TVHeadendPlayerTheme {
                 at.bernhardberger.tvhplayer.ui.components.SideRail(
                     currentRoute = at.bernhardberger.tvhplayer.ui.AppDestination.RECORDINGS,
-                    showEpgMenu = true, onRootBack = {}, onNavigate = {},
+                    onRootBack = {}, onNavigate = {},
                 ) { padding, active ->
                     androidx.compose.runtime.SideEffect { drawerActive = active }
                     TestRecordingsScreen(entries = entries.value, contentPadding = padding,
@@ -565,7 +564,7 @@ class RecordingsScreenTest {
             TVHeadendPlayerTheme {
                 at.bernhardberger.tvhplayer.ui.components.SideRail(
                     currentRoute = at.bernhardberger.tvhplayer.ui.AppDestination.RECORDINGS,
-                    showEpgMenu = true, onRootBack = {}, onNavigate = {},
+                    onRootBack = {}, onNavigate = {},
                 ) { padding, active ->
                     androidx.compose.runtime.SideEffect { drawerActive = active }
                     TestRecordingsScreen(entries = entries.value, contentPadding = padding,
@@ -604,7 +603,7 @@ class RecordingsScreenTest {
             TVHeadendPlayerTheme {
                 at.bernhardberger.tvhplayer.ui.components.SideRail(
                     currentRoute = at.bernhardberger.tvhplayer.ui.AppDestination.RECORDINGS,
-                    showEpgMenu = true, onRootBack = {}, onNavigate = {},
+                    onRootBack = {}, onNavigate = {},
                 ) { padding, active ->
                     androidx.compose.runtime.SideEffect { drawerActive = active }
                     TestRecordingsScreen(entries = entries.value, contentPadding = padding,
@@ -645,7 +644,7 @@ class RecordingsScreenTest {
             TVHeadendPlayerTheme {
                 at.bernhardberger.tvhplayer.ui.components.SideRail(
                     currentRoute = at.bernhardberger.tvhplayer.ui.AppDestination.RECORDINGS,
-                    showEpgMenu = true, onRootBack = {}, onNavigate = {},
+                    onRootBack = {}, onNavigate = {},
                 ) { padding, active ->
                     androidx.compose.runtime.SideEffect { drawerActive = active }
                     TestRecordingsScreen(entries = entries.value, contentPadding = padding,

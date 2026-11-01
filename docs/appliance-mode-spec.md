@@ -308,8 +308,7 @@ fun adjacentChannelId(
     installed package/signature/version details are recorded without secrets.
     The strict native release-provenance gate must also pass.
 12. The operator UI can follow the system language or explicitly select German
-    or English, and can hide the Guide entry in the navigation rail (Settings,
-    "Show Guide menu", on by default) without disabling playback.
+    or English.
 13. The EPG uses one shared horizontal time axis with fixed channel rows. Cards
     never overlap, the focused programme remains fully visible, Up/Down changes
     channel, Left/Right changes time, and CH+/CH- pages channel rows without

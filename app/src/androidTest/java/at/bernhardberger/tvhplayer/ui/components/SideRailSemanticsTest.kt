@@ -62,7 +62,6 @@ class SideRailSemanticsTest {
             TVHeadendPlayerTheme {
                 SideRail(
                     currentRoute = AppDestination.CHANNELS,
-                    showEpgMenu = true,
                     onRootBack = {},
                     onNavigate = {},
                     content = { _, _ -> },
@@ -85,7 +84,6 @@ class SideRailSemanticsTest {
                 TVHeadendPlayerTheme {
                     SideRail(
                         currentRoute = AppDestination.CHANNELS,
-                        showEpgMenu = true,
                         onRootBack = {},
                         onNavigate = {},
                         content = { _, drawerActive ->
@@ -248,7 +246,6 @@ class SideRailSemanticsTest {
             TVHeadendPlayerTheme {
                 SideRail(
                     currentRoute = AppDestination.CHANNELS,
-                    showEpgMenu = true,
                     onRootBack = {},
                     onNavigate = {},
                     content = { contentPadding, _ ->
@@ -282,7 +279,6 @@ class SideRailSemanticsTest {
             TVHeadendPlayerTheme {
                 SideRail(
                     currentRoute = AppDestination.CHANNELS,
-                    showEpgMenu = true,
                     onRootBack = {},
                     onNavigate = {},
                     content = { contentPadding, _ ->
@@ -316,7 +312,6 @@ class SideRailSemanticsTest {
                 SideRail(
                     currentRoute = route.value,
                     rootRoute = AppDestination.CHANNELS,
-                    showEpgMenu = true,
                     onRootBack = { rootBackCount += 1 },
                     onNavigate = { route.value = it },
                     onBackHandlerChanged = { browseBackHandler = it },
@@ -414,7 +409,6 @@ class SideRailSemanticsTest {
                 SideRail(
                     currentRoute = reportedRoute.value,
                     rootRoute = AppDestination.CHANNELS,
-                    showEpgMenu = true,
                     onRootBack = { rootBackCount += 1 },
                     onNavigate = { requestedRoutes += it },
                     onBackHandlerChanged = { browseBackHandler = it },
@@ -530,10 +524,17 @@ class SideRailSemanticsTest {
         )
     }
 
+    private val allDestinations = setOf(
+        AppDestination.CHANNELS,
+        AppDestination.GUIDE,
+        AppDestination.RECORDINGS,
+        AppDestination.SETTINGS,
+    )
+
     @Test
     fun removingAPendingClosedDrawerItemDiscardsItBeforeReentry() {
         val reportedRoute = mutableStateOf(AppDestination.CHANNELS)
-        val showEpgMenu = mutableStateOf(true)
+        val destinations = mutableStateOf(allDestinations)
         val requestedRoutes = mutableListOf<AppDestination>()
         val contentFocus = FocusRequester()
         composeRule.setContent {
@@ -541,7 +542,7 @@ class SideRailSemanticsTest {
                 SideRail(
                     currentRoute = reportedRoute.value,
                     rootRoute = AppDestination.CHANNELS,
-                    showEpgMenu = showEpgMenu.value,
+                    availableDestinations = destinations.value,
                     onRootBack = {},
                     onNavigate = { requestedRoutes += it },
                     content = { _, drawerActive ->
@@ -572,8 +573,8 @@ class SideRailSemanticsTest {
             .performKeyInput { pressKey(Key.DirectionRight) }
         composeRule.onNodeWithTag("closed-item-change-browse-focus").assertIsFocused()
 
-        composeRule.runOnIdle { showEpgMenu.value = false }
-        composeRule.runOnIdle { showEpgMenu.value = true }
+        composeRule.runOnIdle { destinations.value = allDestinations - AppDestination.GUIDE }
+        composeRule.runOnIdle { destinations.value = allDestinations }
         composeRule.onNodeWithTag("closed-item-change-browse-focus")
             .performKeyInput { pressKey(Key.DirectionLeft) }
 
@@ -584,7 +585,7 @@ class SideRailSemanticsTest {
     @Test
     fun removingTheFocusedOpenDrawerItemUsesADeterministicFallback() {
         val reportedRoute = mutableStateOf(AppDestination.GUIDE)
-        val showEpgMenu = mutableStateOf(true)
+        val destinations = mutableStateOf(allDestinations)
         val requestedRoutes = mutableListOf<AppDestination>()
         val contentFocus = FocusRequester()
         composeRule.setContent {
@@ -592,7 +593,7 @@ class SideRailSemanticsTest {
                 SideRail(
                     currentRoute = reportedRoute.value,
                     rootRoute = AppDestination.CHANNELS,
-                    showEpgMenu = showEpgMenu.value,
+                    availableDestinations = destinations.value,
                     onRootBack = {},
                     onNavigate = {
                         requestedRoutes += it
@@ -620,7 +621,7 @@ class SideRailSemanticsTest {
             .performKeyInput { pressKey(Key.DirectionLeft) }
         composeRule.onNodeWithTag("nav-epg").assertIsFocused()
 
-        composeRule.runOnIdle { showEpgMenu.value = false }
+        composeRule.runOnIdle { destinations.value = allDestinations - AppDestination.GUIDE }
         composeRule.waitForIdle()
 
         composeRule.onNodeWithTag("nav-channels").assertIsFocused()
@@ -632,7 +633,7 @@ class SideRailSemanticsTest {
     @Test
     fun removingAnotherItemPreservesAStillValidRapidNavigationIntent() {
         val reportedRoute = mutableStateOf(AppDestination.GUIDE)
-        val showEpgMenu = mutableStateOf(true)
+        val destinations = mutableStateOf(allDestinations)
         val requestedRoutes = mutableListOf<AppDestination>()
         val contentFocus = FocusRequester()
         composeRule.setContent {
@@ -640,7 +641,7 @@ class SideRailSemanticsTest {
                 SideRail(
                     currentRoute = reportedRoute.value,
                     rootRoute = AppDestination.CHANNELS,
-                    showEpgMenu = showEpgMenu.value,
+                    availableDestinations = destinations.value,
                     onRootBack = {},
                     onNavigate = { requestedRoutes += it },
                     content = { _, drawerActive ->
@@ -670,7 +671,7 @@ class SideRailSemanticsTest {
         composeRule.runOnIdle {
             assertEquals(listOf(AppDestination.RECORDINGS), requestedRoutes)
             // EPG feedback is still reported when that unrelated item disappears.
-            showEpgMenu.value = false
+            destinations.value = allDestinations - AppDestination.GUIDE
         }
         composeRule.waitForIdle()
 
@@ -691,7 +692,6 @@ class SideRailSemanticsTest {
                 BackHandler { browseBackHandler() }
                 SideRail(
                     currentRoute = AppDestination.CHANNELS,
-                    showEpgMenu = true,
                     onRootBack = { rootBackCount += 1 },
                     onNavigate = {},
                     onBackHandlerChanged = { browseBackHandler = it },

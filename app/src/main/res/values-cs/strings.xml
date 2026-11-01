@@ -117,14 +117,10 @@
     <string name="settings_channel_numbers_help">Vypni, pokud ovladač nemá číselná tlačítka</string>
     <string name="settings_channel_tags_nav">Skupiny kanálů</string>
     <string name="settings_channel_tags_last_enabled">Povinné — alespoň jedna skupina musí zůstat zapnutá.</string>
-    <string name="show_epg_menu">Zobrazit Program v postranní nabídce</string>
-    <string name="show_epg_menu_description">Zobrazit Program v hlavním navigačním panelu.</string>
     <string name="player_info">Informace</string>
     <string name="player_channel_number_none">Žádný kanál</string>
     <string name="player_shelf_playing">Přehrává se</string>
     <string name="player_shelf_recording">Právě se nahrává</string>
-    <string name="show_epg_menu_enabled">Nabídka Program: zapnuto</string>
-    <string name="show_epg_menu_disabled">Nabídka Program: vypnuto</string>
     <string name="port_htsp">Port HTSP</string>
     <string name="port_http">Port HTTP</string>
     <string name="username">Uživatelské jméno</string>

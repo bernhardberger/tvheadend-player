@@ -30,6 +30,11 @@
 
 - The channel row in the player shows up to 8 recent channels instead of 3.
 
+### Settings
+
+- The Show Guide in the side menu setting is gone. The Guide is always in the
+  side menu, even if you had turned it off.
+
 ### Everywhere
 
 - Recent channels now belong to one server: changing the server clears them.

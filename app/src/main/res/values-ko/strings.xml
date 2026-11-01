@@ -117,14 +117,10 @@
     <string name="settings_channel_numbers_help">리모컨에 숫자 버튼이 없으면 꺼 주세요</string>
     <string name="settings_channel_tags_nav">채널 그룹</string>
     <string name="settings_channel_tags_last_enabled">필수 — 하나 이상의 그룹은 켜져 있어야 합니다.</string>
-    <string name="show_epg_menu">측면 메뉴에 편성표 표시</string>
-    <string name="show_epg_menu_description">기본 탐색 레일에 편성표를 표시합니다.</string>
     <string name="player_info">정보</string>
     <string name="player_channel_number_none">채널 없음</string>
     <string name="player_shelf_playing">재생 중</string>
     <string name="player_shelf_recording">녹화 중</string>
-    <string name="show_epg_menu_enabled">편성표 메뉴 표시: 켜짐</string>
-    <string name="show_epg_menu_disabled">편성표 메뉴 표시: 꺼짐</string>
     <string name="port_htsp">HTSP 포트</string>
     <string name="port_http">HTTP 포트</string>
     <string name="username">사용자 이름</string>

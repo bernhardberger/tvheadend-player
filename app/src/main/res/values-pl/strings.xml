@@ -117,14 +117,10 @@
     <string name="settings_channel_numbers_help">Wyłącz, jeśli pilot nie ma przycisków numerycznych</string>
     <string name="settings_channel_tags_nav">Grupy kanałów</string>
     <string name="settings_channel_tags_last_enabled">Wymagane — co najmniej jedna grupa musi pozostać włączona.</string>
-    <string name="show_epg_menu">Pokazuj Program TV w menu bocznym</string>
-    <string name="show_epg_menu_description">Pokaż Program TV w głównym panelu nawigacji.</string>
     <string name="player_info">Informacje</string>
     <string name="player_channel_number_none">Brak kanału</string>
     <string name="player_shelf_playing">Odtwarzanie</string>
     <string name="player_shelf_recording">Trwa nagrywanie</string>
-    <string name="show_epg_menu_enabled">Menu Program TV: włączone</string>
-    <string name="show_epg_menu_disabled">Menu Program TV: wyłączone</string>
     <string name="port_htsp">Port HTSP</string>
     <string name="port_http">Port HTTP</string>
     <string name="username">Nazwa użytkownika</string>

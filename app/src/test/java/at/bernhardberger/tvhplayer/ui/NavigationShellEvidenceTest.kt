@@ -863,7 +863,6 @@ class NavigationShellEvidenceTest {
                 Box(Modifier.fillMaxSize().background(Color.Red)) {
                     SideRail(
                         currentRoute = AppDestination.CHANNELS,
-                        showEpgMenu = true,
                         onRootBack = {},
                         onNavigate = {},
                     ) { _, drawerActive ->
@@ -1239,7 +1238,6 @@ class NavigationShellEvidenceTest {
                             rootRoute = if (withHome) AppDestination.HOME else AppDestination.CHANNELS,
                             availableDestinations = setOfNotNull(AppDestination.HOME.takeIf { withHome },
                                 AppDestination.CHANNELS, AppDestination.GUIDE, AppDestination.RECORDINGS, AppDestination.SETTINGS),
-                            showEpgMenu = true,
                             onRootBack = {},
                             onBackHandlerChanged = { browseBack = it },
                             onNavigate = { navigations += it },
@@ -1269,7 +1267,7 @@ class NavigationShellEvidenceTest {
                                 navigation,
                                 listOf(settingsRootLevel()) + settingsGeneralLevels(
                                     UiSettings(), AppLanguage.SYSTEM, CacheStatistics.EMPTY,
-                                    CacheClearState.IDLE, {}, {}, {},
+                                    CacheClearState.IDLE, {}, {},
                                 ),
                                 initialFocusEnabled = !drawerActive,
                                 contentPadding = padding,

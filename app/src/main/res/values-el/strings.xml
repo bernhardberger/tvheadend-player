@@ -117,14 +117,10 @@
     <string name="settings_channel_numbers_help">Απενεργοποίησε αν το τηλεχειριστήριο δεν έχει αριθμητικά πλήκτρα</string>
     <string name="settings_channel_tags_nav">Ομάδες καναλιών</string>
     <string name="settings_channel_tags_last_enabled">Απαιτείται — τουλάχιστον μία ομάδα πρέπει να παραμένει ενεργή.</string>
-    <string name="show_epg_menu">Εμφάνιση Οδηγού στο πλαϊνό μενού</string>
-    <string name="show_epg_menu_description">Εμφάνιση του οδηγού στην κύρια γραμμή πλοήγησης.</string>
     <string name="player_info">Πληροφορίες</string>
     <string name="player_channel_number_none">Κανένα κανάλι</string>
     <string name="player_shelf_playing">Αναπαραγωγή</string>
     <string name="player_shelf_recording">Εγγραφή τώρα</string>
-    <string name="show_epg_menu_enabled">Εμφάνιση μενού οδηγού: Ενεργή</string>
-    <string name="show_epg_menu_disabled">Εμφάνιση μενού οδηγού: Ανενεργή</string>
     <string name="port_htsp">Θύρα HTSP</string>
     <string name="port_http">Θύρα HTTP</string>
     <string name="username">Όνομα χρήστη</string>

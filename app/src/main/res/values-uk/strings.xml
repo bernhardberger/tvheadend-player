@@ -117,14 +117,10 @@
     <string name="settings_channel_numbers_help">Вимкніть, якщо на пульті немає цифрових кнопок</string>
     <string name="settings_channel_tags_nav">Групи каналів</string>
     <string name="settings_channel_tags_last_enabled">Обов’язково — принаймні одна група має залишатися ввімкненою.</string>
-    <string name="show_epg_menu">Показувати телепрограму в бічному меню</string>
-    <string name="show_epg_menu_description">Показувати телепрограму на головній панелі навігації.</string>
     <string name="player_info">Інформація</string>
     <string name="player_channel_number_none">Немає каналу</string>
     <string name="player_shelf_playing">Відтворюється</string>
     <string name="player_shelf_recording">Триває запис</string>
-    <string name="show_epg_menu_enabled">Меню телепрограми: Увімк.</string>
-    <string name="show_epg_menu_disabled">Меню телепрограми: Вимк.</string>
     <string name="port_htsp">Порт HTSP</string>
     <string name="port_http">Порт HTTP</string>
     <string name="username">Ім’я користувача</string>

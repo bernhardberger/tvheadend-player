@@ -89,7 +89,6 @@ class DrawerOpeningCaptureTest {
                 Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                     SideRail(
                         currentRoute = AppDestination.CHANNELS,
-                        showEpgMenu = true,
                         onRootBack = {},
                         onNavigate = {},
                     ) { padding, _ ->

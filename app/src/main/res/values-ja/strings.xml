@@ -117,14 +117,10 @@
     <string name="settings_channel_numbers_help">リモコンに数字ボタンがない場合はオフにしてください</string>
     <string name="settings_channel_tags_nav">チャンネルグループ</string>
     <string name="settings_channel_tags_last_enabled">必須 — 少なくとも1つのグループをオンにする必要があります。</string>
-    <string name="show_epg_menu">サイドメニューに番組表を表示</string>
-    <string name="show_epg_menu_description">メインナビゲーションレールに番組表を表示します。</string>
     <string name="player_info">情報</string>
     <string name="player_channel_number_none">チャンネルなし</string>
     <string name="player_shelf_playing">再生中</string>
     <string name="player_shelf_recording">録画中</string>
-    <string name="show_epg_menu_enabled">番組表メニューを表示：オン</string>
-    <string name="show_epg_menu_disabled">番組表メニューを表示：オフ</string>
     <string name="port_htsp">HTSPポート</string>
     <string name="port_http">HTTPポート</string>
     <string name="username">ユーザー名</string>

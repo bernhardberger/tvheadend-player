@@ -117,14 +117,10 @@
     <string name="settings_channel_numbers_help">Zet uit als je afstandsbediening geen cijfertoetsen heeft</string>
     <string name="settings_channel_tags_nav">Zendergroepen</string>
     <string name="settings_channel_tags_last_enabled">Verplicht — minstens één groep moet ingeschakeld blijven.</string>
-    <string name="show_epg_menu">Tv-gids in het zijmenu tonen</string>
-    <string name="show_epg_menu_description">Toon de tv-gids in de hoofdnavigatiebalk.</string>
     <string name="player_info">Info</string>
     <string name="player_channel_number_none">Geen zender</string>
     <string name="player_shelf_playing">Wordt afgespeeld</string>
     <string name="player_shelf_recording">Wordt opgenomen</string>
-    <string name="show_epg_menu_enabled">Tv-gidsmenu tonen: Aan</string>
-    <string name="show_epg_menu_disabled">Tv-gidsmenu tonen: Uit</string>
     <string name="port_htsp">HTSP-poort</string>
     <string name="port_http">HTTP-poort</string>
     <string name="username">Gebruikersnaam</string>

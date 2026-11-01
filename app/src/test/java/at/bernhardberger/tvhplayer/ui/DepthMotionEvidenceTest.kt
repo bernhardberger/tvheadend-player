@@ -874,7 +874,6 @@ class DepthMotionEvidenceTest {
                     Box(Modifier.fillMaxSize().background(Color.Black)) {
                         SideRail(
                             currentRoute = AppDestination.SETTINGS,
-                            showEpgMenu = true,
                             onRootBack = {},
                             onNavigate = {},
                          ) { padding, drawerActive ->
@@ -893,7 +892,7 @@ class DepthMotionEvidenceTest {
                                 navigation,
                                 listOf(settingsRootLevel()) + settingsGeneralLevels(
                                     UiSettings(), AppLanguage.SYSTEM, CacheStatistics.EMPTY,
-                                    CacheClearState.IDLE, {}, {}, {},
+                                    CacheClearState.IDLE, {}, {},
                                 ),
                                 initialFocusEnabled = !drawerActive,
                                 contentPadding = padding,

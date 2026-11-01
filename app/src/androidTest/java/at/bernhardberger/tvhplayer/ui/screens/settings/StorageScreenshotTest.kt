@@ -81,7 +81,6 @@ class StorageScreenshotTest(private val language: String, private val scale: Flo
                                 settings = UiSettings(),
                                 selectedLanguage = AppLanguage.SYSTEM,
                                 onSelectLanguage = {},
-                                onToggleEpg = {},
                                 statistics = if (state == CacheClearState.CLEARED) CacheStatistics.EMPTY else CacheStatistics(500_000, 12_000_000, 340),
                                 clearState = state,
                                 onClearCache = { clearCalls++ },

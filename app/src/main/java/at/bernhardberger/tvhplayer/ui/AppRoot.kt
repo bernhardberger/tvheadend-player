@@ -1328,7 +1328,6 @@ fun AppRoot(
                         currentRoute = (railBackStack.lastOrNull() ?: currentDestination)?.destination,
                         connectionDegraded = connectionPresentation.degraded,
                         rootRoute = AppDestination.HOME,
-                        showEpgMenu = uiSettings.showEpgMenu,
                         availableDestinations = buildSet {
                             add(AppDestination.HOME)
                             add(AppDestination.CHANNELS)

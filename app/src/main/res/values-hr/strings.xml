@@ -117,14 +117,10 @@
     <string name="settings_channel_numbers_help">Isključi ako daljinski upravljač nema brojčane tipke</string>
     <string name="settings_channel_tags_nav">Grupe kanala</string>
     <string name="settings_channel_tags_last_enabled">Obavezno — barem jedna grupa mora ostati uključena.</string>
-    <string name="show_epg_menu">Prikaži TV vodič u bočnom izborniku</string>
-    <string name="show_epg_menu_description">Prikaži TV vodič na glavnoj navigacijskoj traci.</string>
     <string name="player_info">Informacije</string>
     <string name="player_channel_number_none">Nema kanala</string>
     <string name="player_shelf_playing">Reproducira se</string>
     <string name="player_shelf_recording">Snimanje u tijeku</string>
-    <string name="show_epg_menu_enabled">Izbornik TV vodiča: uključen</string>
-    <string name="show_epg_menu_disabled">Izbornik TV vodiča: isključen</string>
     <string name="port_htsp">HTSP priključak</string>
     <string name="port_http">HTTP priključak</string>
     <string name="username">Korisničko ime</string>

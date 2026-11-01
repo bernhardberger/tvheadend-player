@@ -70,7 +70,7 @@ class SettingsConnectionDepthTest {
             TVHeadendPlayerTheme {
                 androidx.tv.material3.Surface {
                     val navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.CONNECTION.name)
-                    SideRail(currentRoute = AppDestination.SETTINGS, showEpgMenu = true,
+                    SideRail(currentRoute = AppDestination.SETTINGS,
                         onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                     SettingsWithSetup(navigation, { onSaved ->
                         SettingsConnection(editor, session, { restores++ }, onSaved = onSaved)
@@ -240,7 +240,7 @@ class SettingsConnectionDepthTest {
         compose.setContent {
             TVHeadendPlayerTheme {
                 navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.CONNECTION.name)
-                SideRail(currentRoute = AppDestination.SETTINGS, showEpgMenu = true,
+                SideRail(currentRoute = AppDestination.SETTINGS,
                     onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                     SettingsWithSetup(navigation, { onSaved -> editor.Screen(form, onSaved) },
                         initialFocusEnabled = !drawerActive, contentPadding = padding)

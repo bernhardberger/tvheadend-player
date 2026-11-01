@@ -140,7 +140,7 @@ class ChannelsScreenshotTest(private val scenario: String) {
                 var activeTag by remember { mutableStateOf<ChannelTagId?>(null) }
                 TVHeadendPlayerTheme {
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                        SideRail(currentRoute = AppDestination.CHANNELS, showEpgMenu = true, onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
+                        SideRail(currentRoute = AppDestination.CHANNELS, onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                             ChannelsScreenContent(
                                 view = ChannelsView(ChannelsLayout.LIST),
                                 contentPadding = padding, initialFocusEnabled = !drawerActive,

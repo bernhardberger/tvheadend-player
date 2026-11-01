@@ -117,14 +117,10 @@
     <string name="settings_channel_numbers_help">Kapcsold ki, ha a távirányítón nincsenek számgombok</string>
     <string name="settings_channel_tags_nav">Csatornacsoportok</string>
     <string name="settings_channel_tags_last_enabled">Kötelező — legalább egy csoportnak bekapcsolva kell maradnia.</string>
-    <string name="show_epg_menu">Műsorújság megjelenítése az oldalmenüben</string>
-    <string name="show_epg_menu_description">Műsorújság megjelenítése a fő navigációs sávban.</string>
     <string name="player_info">Információ</string>
     <string name="player_channel_number_none">Nincs csatorna</string>
     <string name="player_shelf_playing">Lejátszás</string>
     <string name="player_shelf_recording">Felvétel folyamatban</string>
-    <string name="show_epg_menu_enabled">Műsorújság menü: be</string>
-    <string name="show_epg_menu_disabled">Műsorújság menü: ki</string>
     <string name="port_htsp">HTSP-port</string>
     <string name="port_http">HTTP-port</string>
     <string name="username">Felhasználónév</string>

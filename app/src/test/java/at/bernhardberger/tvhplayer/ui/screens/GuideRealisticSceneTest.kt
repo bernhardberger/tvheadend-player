@@ -800,7 +800,7 @@ class GuideRealisticSceneTest {
                     TVHeadendPlayerTheme {
                         view = LocalView.current
                         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                            SideRail(currentRoute = AppDestination.GUIDE, showEpgMenu = true,
+                            SideRail(currentRoute = AppDestination.GUIDE,
                                 onRootBack = { navigationRequests++ }, onNavigate = { navigationRequests++ }) { padding, drawer ->
                                 layering = requireNotNull(at.bernhardberger.tvhplayer.ui.components.LocalBrowseContentLayering.current)
                                 val view = uiSettings.settings.collectAsState(UiSettings()).value.guideView

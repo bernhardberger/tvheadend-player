@@ -117,14 +117,10 @@
     <string name="settings_channel_numbers_help">Disattiva se il telecomando non ha tasti numerici</string>
     <string name="settings_channel_tags_nav">Gruppi di canali</string>
     <string name="settings_channel_tags_last_enabled">Obbligatorio: almeno un gruppo deve restare attivo.</string>
-    <string name="show_epg_menu">Mostra la Guida nel menu laterale</string>
-    <string name="show_epg_menu_description">Mostra la guida nella barra di navigazione principale.</string>
     <string name="player_info">Info</string>
     <string name="player_channel_number_none">Nessun canale</string>
     <string name="player_shelf_playing">In riproduzione</string>
     <string name="player_shelf_recording">Registrazione in corso</string>
-    <string name="show_epg_menu_enabled">Mostra menu Guida: attivo</string>
-    <string name="show_epg_menu_disabled">Mostra menu Guida: disattivo</string>
     <string name="port_htsp">Porta HTSP</string>
     <string name="port_http">Porta HTTP</string>
     <string name="username">Nome utente</string>

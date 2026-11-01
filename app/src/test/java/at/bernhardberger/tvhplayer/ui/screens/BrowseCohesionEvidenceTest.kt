@@ -164,7 +164,7 @@ class BrowseCohesionEvidenceTest {
                     view = LocalView.current
                     val displayed = if (disconnected) offline else connected
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                        SideRail(currentRoute = AppDestination.CHANNELS, showEpgMenu = true,
+                        SideRail(currentRoute = AppDestination.CHANNELS,
                             connectionDegraded = disconnected, onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                             ChannelsScreenContent(view = ChannelsView(ChannelsLayout.LIST), contentPadding = padding, initialFocusEnabled = !drawerActive,
                                 channelScopeState = resolveChannelScopeState(displayed.channelState, null),
@@ -552,7 +552,6 @@ class BrowseCohesionEvidenceTest {
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                         SideRail(
                             currentRoute = destination,
-                            showEpgMenu = true,
                             onRootBack = { navigationRequests++ },
                             onNavigate = { navigationRequests++ },
                             content = content,

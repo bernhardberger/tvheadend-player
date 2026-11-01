@@ -27,7 +27,6 @@ class RailProfileActivity : ComponentActivity() {
             TVHeadendPlayerTheme {
                 SideRail(
                     currentRoute = route,
-                    showEpgMenu = true,
                     onRootBack = { finish() },
                     onNavigate = { route = it },
                 ) { padding, _ ->

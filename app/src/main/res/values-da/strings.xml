@@ -117,14 +117,10 @@
     <string name="settings_channel_numbers_help">Slå fra, hvis din fjernbetjening ikke har talknapper</string>
     <string name="settings_channel_tags_nav">Kanalgrupper</string>
     <string name="settings_channel_tags_last_enabled">Påkrævet — mindst én gruppe skal være slået til.</string>
-    <string name="show_epg_menu">Vis Tv-guide i sidemenuen</string>
-    <string name="show_epg_menu_description">Vis tv-guiden i hovednavigationspanelet.</string>
     <string name="player_info">Info</string>
     <string name="player_channel_number_none">Ingen kanal</string>
     <string name="player_shelf_playing">Afspiller</string>
     <string name="player_shelf_recording">Optager nu</string>
-    <string name="show_epg_menu_enabled">Vis tv-guidemenu: Til</string>
-    <string name="show_epg_menu_disabled">Vis tv-guidemenu: Fra</string>
     <string name="port_htsp">HTSP-port</string>
     <string name="port_http">HTTP-port</string>
     <string name="username">Brugernavn</string>

@@ -122,14 +122,10 @@
     <string name="settings_general">Allgemein</string>
     <string name="settings_channel_tags_nav">Sendergruppen</string>
     <string name="settings_channel_tags_last_enabled">Erforderlich – mindestens eine Gruppe muss aktiv bleiben.</string>
-    <string name="show_epg_menu">Programmführer im Seitenmenü zeigen</string>
-    <string name="show_epg_menu_description">Programmführer in der Hauptnavigation anzeigen.</string>
     <string name="player_info">Info</string>
     <string name="player_channel_number_none">Kein Sender</string>
     <string name="player_shelf_playing">Wiedergabe</string>
     <string name="player_shelf_recording">Aufnahme läuft</string>
-    <string name="show_epg_menu_enabled">Programmführer-Menü anzeigen: Ein</string>
-    <string name="show_epg_menu_disabled">Programmführer-Menü anzeigen: Aus</string>
     <string name="port_htsp">HTSP-Port</string>
     <string name="port_http">HTTP-Port</string>
     <string name="username">Benutzername</string>

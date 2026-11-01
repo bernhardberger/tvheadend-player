@@ -117,14 +117,10 @@
     <string name="settings_channel_numbers_help">يمكن تعطيلها إذا لم يكن بجهاز التحكم أزرار أرقام</string>
     <string name="settings_channel_tags_nav">مجموعات القنوات</string>
     <string name="settings_channel_tags_last_enabled">مطلوب — يجب إبقاء مجموعة واحدة على الأقل مفعّلة.</string>
-    <string name="show_epg_menu">عرض دليل البرامج في القائمة الجانبية</string>
-    <string name="show_epg_menu_description">يعرض دليل البرامج في شريط التنقل الرئيسي.</string>
     <string name="player_info">حول</string>
     <string name="player_channel_number_none">لا توجد قنوات</string>
     <string name="player_shelf_playing">قيد التشغيل الآن</string>
     <string name="player_shelf_recording">جارٍ التسجيل</string>
-    <string name="show_epg_menu_enabled">عرض مدخل دليل البرامج: مفعّل</string>
-    <string name="show_epg_menu_disabled">عرض مدخل دليل البرامج: متوقف</string>
     <string name="port_htsp">منفذ HTSP</string>
     <string name="port_http">منفذ HTTP</string>
     <string name="username">اسم المستخدم</string>

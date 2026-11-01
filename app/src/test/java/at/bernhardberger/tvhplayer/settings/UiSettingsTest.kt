@@ -47,17 +47,6 @@ class UiSettingsTest {
     }
 
     @Test
-    fun epgMenu_isShownWhenNoPreferenceHasBeenSaved() {
-        assertTrue(resolveEpgMenuVisibility(null))
-    }
-
-    @Test
-    fun epgMenu_respectsSavedPreference() {
-        assertFalse(resolveEpgMenuVisibility(false))
-        assertTrue(resolveEpgMenuVisibility(true))
-    }
-
-    @Test
     fun playbackAutoStart_isDisabledWhenNoPreferenceHasBeenSaved() {
         assertFalse(resolvePlaybackAutoStart(null))
     }

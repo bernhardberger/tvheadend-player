@@ -61,7 +61,7 @@ class SettingsVisualEvidenceTest {
                     view = LocalView.current
                     val navigation = rememberDepthNavigationState(SettingsSection.PLAYER.name, WARM_PLAYBACK_LEVEL)
                     Box(Modifier.fillMaxSize().background(androidx.tv.material3.MaterialTheme.colorScheme.background)) {
-                        SideRail(currentRoute = AppDestination.SETTINGS, showEpgMenu = true,
+                        SideRail(currentRoute = AppDestination.SETTINGS,
                             onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                             SettingsScreenNavigation(navigation, listOf(
                                 settingsPlayerLevel(at.bernhardberger.tvhplayer.viewmodels.SettingsPlayerUiState(warmPlaybackMode = mode), {}),
@@ -133,12 +133,12 @@ class SettingsVisualEvidenceTest {
                     Box(Modifier.fillMaxSize().background(Color.Black)) {
                         DebugVideoBackdrop(true, Modifier.fillMaxSize())
                         WarmPlaybackScrim()
-                        SideRail(currentRoute = AppDestination.SETTINGS, showEpgMenu = true,
+                        SideRail(currentRoute = AppDestination.SETTINGS,
                             onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                             SettingsScreenNavigation(navigation, listOf(
                                 settingsRootLevel(applianceBuild = false,
                                     connectionStatus = resources.getString(at.bernhardberger.tvhplayer.R.string.error_101_title))) +
-                                settingsGeneralLevels(UiSettings(), AppLanguage.SYSTEM, CacheStatistics.EMPTY, CacheClearState.IDLE, {}, {}, {}),
+                                settingsGeneralLevels(UiSettings(), AppLanguage.SYSTEM, CacheStatistics.EMPTY, CacheClearState.IDLE, {}, {}),
                                 initialFocusEnabled = !drawerActive, contentPadding = padding)
                         }
                     }
@@ -178,7 +178,7 @@ class SettingsVisualEvidenceTest {
                         if (still == null) DebugVideoBackdrop(true, Modifier.fillMaxSize())
                         else Image(still, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                         WarmPlaybackScrim() // This evidence set explicitly models warm playback.
-                        SideRail(currentRoute = AppDestination.SETTINGS, showEpgMenu = true,
+                        SideRail(currentRoute = AppDestination.SETTINGS,
                             onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                             SettingsScreenNavigation(navigation,
                                 // The status page opens only while a retry can fix the connection.
@@ -188,7 +188,7 @@ class SettingsVisualEvidenceTest {
                                     settingsConnectionOverview(resources.getString(at.bernhardberger.tvhplayer.R.string.error_101_title),
                                         "tvheadend.local", 9982, degraded = true)) +
                                     settingsGeneralLevels(UiSettings(), AppLanguage.SYSTEM, CacheStatistics.EMPTY, cacheState,
-                                        {}, {}, { cacheCalls++; cacheState = CacheClearState.CLEARING }),
+                                        {}, { cacheCalls++; cacheState = CacheClearState.CLEARING }),
                                 initialFocusEnabled = !drawerActive, contentPadding = padding)
                         }
                         if (cacheState == CacheClearState.CLEARED || cacheState == CacheClearState.FAILED) {
@@ -223,9 +223,7 @@ class SettingsVisualEvidenceTest {
         capture("$prefix-root-middle-focus", middleFocus = true)
         press(Key.DirectionUp)
         press(Key.DirectionCenter)
-        // The German Guide toggle title wraps to a second line instead of being cut off.
-        if (fontScale == 1f) assertRowTops(76f, 144f, 212f, if (locale == "de") 283f else 264f,
-            if (locale == "de") 360f else 332f)
+        if (fontScale == 1f) assertRowTops(76f, 144f, 212f, if (locale == "de") 289f else 280f)
         capture("$prefix-general")
         press(Key.DirectionDown)
         capture("$prefix-general-middle-focus", middleFocus = true)
@@ -312,7 +310,7 @@ class SettingsVisualEvidenceTest {
                 Box(Modifier.fillMaxSize().background(Color.Black)) {
                     DebugVideoBackdrop(true, Modifier.fillMaxSize())
                     WarmPlaybackScrim() // This evidence set explicitly models warm playback.
-                    SideRail(currentRoute = AppDestination.SETTINGS, showEpgMenu = true,
+                    SideRail(currentRoute = AppDestination.SETTINGS,
                         onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                         SettingsScreenNavigation(navigation, listOf(settingsRootLevel(applianceBuild = false, connectionStatus = "Connected"),
                             settingsPlayerLevel(ui, {}), settingsKeepChannelLevel(ui.keepChannelMinutes) {},
@@ -352,7 +350,7 @@ class SettingsVisualEvidenceTest {
                 Box(Modifier.fillMaxSize().background(Color.Black)) {
                     Image(still, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                     WarmPlaybackScrim()
-                    SideRail(currentRoute = AppDestination.SETTINGS, showEpgMenu = true,
+                    SideRail(currentRoute = AppDestination.SETTINGS,
                         onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                         SettingsScreenNavigation(navigation, listOf(settingsRootLevel(applianceBuild = false, connectionStatus = "Connected"),
                             settingsPlayerLevel(ui, {})),

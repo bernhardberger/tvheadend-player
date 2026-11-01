@@ -117,14 +117,10 @@
     <string name="settings_channel_numbers_help">יש לכבות אם אין בשלט כפתורי ספרות</string>
     <string name="settings_channel_tags_nav">קבוצות ערוצים</string>
     <string name="settings_channel_tags_last_enabled">נדרש — לפחות קבוצה אחת חייבת להישאר פעילה.</string>
-    <string name="show_epg_menu">הצגת המדריך בתפריט הצד</string>
-    <string name="show_epg_menu_description">מציג את המדריך בסרגל הניווט הראשי.</string>
     <string name="player_info">מידע</string>
     <string name="player_channel_number_none">אין ערוצים</string>
     <string name="player_shelf_playing">כעת בהפעלה</string>
     <string name="player_shelf_recording">הקלטה פעילה</string>
-    <string name="show_epg_menu_enabled">הצגת כניסה למדריך: פעילה</string>
-    <string name="show_epg_menu_disabled">הצגת כניסה למדריך: כבויה</string>
     <string name="port_htsp">יציאת HTSP</string>
     <string name="port_http">יציאת HTTP</string>
     <string name="username">שם משתמש</string>

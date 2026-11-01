@@ -117,14 +117,10 @@
     <string name="settings_channel_numbers_help">Poista käytöstä, jos kaukosäätimessä ei ole numeropainikkeita</string>
     <string name="settings_channel_tags_nav">Kanavaryhmät</string>
     <string name="settings_channel_tags_last_enabled">Pakollinen — vähintään yhden ryhmän on oltava käytössä.</string>
-    <string name="show_epg_menu">Näytä Ohjelmaopas sivuvalikossa</string>
-    <string name="show_epg_menu_description">Näytä ohjelmaopas päänavigointipaneelissa.</string>
     <string name="player_info">Tiedot</string>
     <string name="player_channel_number_none">Ei kanavaa</string>
     <string name="player_shelf_playing">Toistetaan</string>
     <string name="player_shelf_recording">Tallennetaan</string>
-    <string name="show_epg_menu_enabled">Näytä ohjelmaopas valikossa: Päällä</string>
-    <string name="show_epg_menu_disabled">Näytä ohjelmaopas valikossa: Pois</string>
     <string name="port_htsp">HTSP-portti</string>
     <string name="port_http">HTTP-portti</string>
     <string name="username">Käyttäjänimi</string>

@@ -117,14 +117,10 @@
     <string name="settings_channel_numbers_help">Slå av hvis fjernkontrollen ikke har tallknapper</string>
     <string name="settings_channel_tags_nav">Kanalgrupper</string>
     <string name="settings_channel_tags_last_enabled">Påkrevd — minst én gruppe må være på.</string>
-    <string name="show_epg_menu">Vis TV-guide i sidemenyen</string>
-    <string name="show_epg_menu_description">Vis TV-guiden i hovednavigasjonspanelet.</string>
     <string name="player_info">Info</string>
     <string name="player_channel_number_none">Ingen kanal</string>
     <string name="player_shelf_playing">Spiller av</string>
     <string name="player_shelf_recording">Tar opp nå</string>
-    <string name="show_epg_menu_enabled">Vis TV-guidemeny: På</string>
-    <string name="show_epg_menu_disabled">Vis TV-guidemeny: Av</string>
     <string name="port_htsp">HTSP-port</string>
     <string name="port_http">HTTP-port</string>
     <string name="username">Brukernavn</string>

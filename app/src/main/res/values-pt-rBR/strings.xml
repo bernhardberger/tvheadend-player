@@ -117,14 +117,10 @@
     <string name="settings_channel_numbers_help">Desative se o controle remoto não tiver botões numéricos</string>
     <string name="settings_channel_tags_nav">Grupos de canais</string>
     <string name="settings_channel_tags_last_enabled">Obrigatório — pelo menos um grupo precisa ficar ativado.</string>
-    <string name="show_epg_menu">Mostrar o Guia no menu lateral</string>
-    <string name="show_epg_menu_description">Mostrar o guia na barra de navegação principal.</string>
     <string name="player_info">Informações</string>
     <string name="player_channel_number_none">Sem canal</string>
     <string name="player_shelf_playing">Reproduzindo</string>
     <string name="player_shelf_recording">Gravando agora</string>
-    <string name="show_epg_menu_enabled">Mostrar menu do guia: ativado</string>
-    <string name="show_epg_menu_disabled">Mostrar menu do guia: desativado</string>
     <string name="port_htsp">Porta HTSP</string>
     <string name="port_http">Porta HTTP</string>
     <string name="username">Nome de usuário</string>

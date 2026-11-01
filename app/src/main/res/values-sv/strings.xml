@@ -117,14 +117,10 @@
     <string name="settings_channel_numbers_help">Stäng av om fjärrkontrollen saknar sifferknappar</string>
     <string name="settings_channel_tags_nav">Kanalgrupper</string>
     <string name="settings_channel_tags_last_enabled">Krävs — minst en grupp måste vara på.</string>
-    <string name="show_epg_menu">Visa Tv-guide i sidomenyn</string>
-    <string name="show_epg_menu_description">Visa tv-guiden i huvudnavigeringsfältet.</string>
     <string name="player_info">Info</string>
     <string name="player_channel_number_none">Ingen kanal</string>
     <string name="player_shelf_playing">Spelas upp</string>
     <string name="player_shelf_recording">Spelas in nu</string>
-    <string name="show_epg_menu_enabled">Visa tv-guidemenyn: På</string>
-    <string name="show_epg_menu_disabled">Visa tv-guidemenyn: Av</string>
     <string name="port_htsp">HTSP-port</string>
     <string name="port_http">HTTP-port</string>
     <string name="username">Användarnamn</string>

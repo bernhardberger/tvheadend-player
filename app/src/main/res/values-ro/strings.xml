@@ -117,14 +117,10 @@
     <string name="settings_channel_numbers_help">Dezactivează dacă telecomanda nu are butoane numerice</string>
     <string name="settings_channel_tags_nav">Grupuri de canale</string>
     <string name="settings_channel_tags_last_enabled">Obligatoriu — cel puțin un grup trebuie să rămână activ.</string>
-    <string name="show_epg_menu">Arată Ghid TV în meniul lateral</string>
-    <string name="show_epg_menu_description">Arată ghidul TV în bara principală de navigare.</string>
     <string name="player_info">Info</string>
     <string name="player_channel_number_none">Niciun canal</string>
     <string name="player_shelf_playing">Se redă</string>
     <string name="player_shelf_recording">Se înregistrează</string>
-    <string name="show_epg_menu_enabled">Arată meniul Ghid TV: Activat</string>
-    <string name="show_epg_menu_disabled">Arată meniul Ghid TV: Dezactivat</string>
     <string name="port_htsp">Port HTSP</string>
     <string name="port_http">Port HTTP</string>
     <string name="username">Nume de utilizator</string>
