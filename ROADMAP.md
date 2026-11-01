@@ -8,8 +8,9 @@ Where this is going, as of 0.4.0. No dates. What's already shipped is in the
 - **Google Play.** It's in a closed test right now. Google wants 12 testers for
   14 days in a row, then reviews the production release. Until then the APKs are
   on GitHub.
-- **More devices.** Sony and NVIDIA Shield are next, and I'm comparing how
-  interlaced channels look on them.
+- **More devices.** I can test on TCL and Sony TVs and an Nvidia Shield, and I'm
+  comparing how interlaced channels look on them. Reports from anything else are
+  welcome.
 - **Remote keys.** GUIDE only toggles the channel schedule in the player right
   now. GUIDE and TV should work across the whole app. There'll also be a small
   screen that shows which key code your remote sends.

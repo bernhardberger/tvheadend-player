@@ -36,7 +36,9 @@ Everything goes over HTSP, with no analytics, ads or accounts.
 Code and more screenshots: https://github.com/bernhardberger/tvheadend-player
 Roadmap: https://github.com/bernhardberger/tvheadend-player/blob/main/ROADMAP.md
 
-I'd love your feedback and ideas, and data points from different hardware and setups. The beta is also the way onto the Play Store, which will make it much easier for everyone to install.
+I'd love your feedback and ideas, and data points from setups other than mine. I can currently only test it on TCL and Sony TVs and an Nvidia Shield. The beta is also the way onto the Play Store, which will make it much easier for everyone to install.
+
+I'm also interested in how others use Tvheadend. Our household's usage might be vastly different from yours, and the app might be a bit opinionated right now. I've tried my best to keep it neutral and fall back gracefully without artwork and with only EIT EPG data, but it might work and look best with a somewhat rich XMLTV guide.
 
 You'll need an Android TV or Google TV device on Android 9+ and Tvheadend 4.3 (HTSP 36 or newer).
 
@@ -50,6 +52,9 @@ Please report bugs on GitHub if you can: https://github.com/bernhardberger/tvhea
 Feedback and discussion are welcome right here in this thread or in the beta Google group.
 
 Prefer to skip Play? The APKs are on GitHub, signed with the same key, so you can switch either way.
+
+For developers: the app is built on two libraries of mine that you can use for your own Tvheadend projects. tvheadend-htsp-kotlin is a Kotlin/JVM client library for HTSP, covering versions 36 to 44, with its first 1.0 release candidate on Maven Central: https://github.com/bernhardberger/tvheadend-htsp-kotlin
+tvheadend-sdk is a Kotlin SDK for JVM and Android. It's still in development and its API can change between releases: https://github.com/bernhardberger/tvheadend-sdk
 ```
 
 r/tvheadend, with `home.png`, `channels.png`, `guide.png` and `player.png` from
@@ -59,7 +64,7 @@ subreddit's rules for posts about your own project first:
 ```text
 Title: Tvheadend client for Android TV, looking for beta testers
 
-When ORF retired Cryptoworks my mum's CI modules stopped working. I got her Google TVs instead of new modules, then couldn't find a Tvheadend app simple enough for her, so I started building one. It got a bit out of hand.
+A bit of a backstory to this project: when ORF retired Cryptoworks my mum's CI modules stopped working. I got her Google TVs instead of new modules, then couldn't find a Tvheadend app simple enough for her, so I started building one. It got a bit out of hand.
 
 It's open source (GPLv3). Guide, timeshift, recordings, three channel layouts, and it all works with a plain D-pad remote.
 
@@ -71,7 +76,11 @@ It's in closed testing on Play right now. Google wants 12 testers for 14 days be
 
 APKs are on GitHub if you don't want Play.
 
-Bugs on GitHub please, everything else here. Especially interested in boxes other than mine.
+Bugs on GitHub please, everything else here.
+
+I'm especially interested in setups other than mine, and data points are welcome. I can currently only test it on TCL and Sony TVs and an Nvidia Shield.
+
+I'm also interested in how others use Tvheadend. Our household's usage might be vastly different from yours, and the app might be a bit opinionated right now. I've tried my best to keep it neutral and fall back gracefully without artwork and with only EIT EPG data, but it might work and look best with a somewhat rich XMLTV guide.
 
 https://github.com/bernhardberger/tvheadend-player
 Roadmap: https://github.com/bernhardberger/tvheadend-player/blob/main/ROADMAP.md
