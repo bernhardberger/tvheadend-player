@@ -29,9 +29,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
@@ -636,7 +638,15 @@ private fun SetupActionButton(
 @Composable
 private fun DoneStep(state: ConnectionSetupState) {
     val start = remember { FocusRequester() }
-    LaunchedEffect(Unit) { start.requestFocus() }
+    // When the focused status leaves, a TV hands focus straight to the first focusable, in the frame
+    // it attaches. The button's highlight isn't listening yet, so it would hold focus but look
+    // unfocused. Keeping it out of reach for that frame lets this request land with it listening.
+    var canFocusStart by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        withFrameNanos { }
+        canFocusStart = true
+        start.requestFocus()
+    }
     val form = state.form
     val body = if (form.username.isBlank()) {
         stringResource(R.string.onboarding_done_body_anonymous)
@@ -667,7 +677,10 @@ private fun DoneStep(state: ConnectionSetupState) {
         // Keep the button's own layout unpadded: Column can otherwise constrain it to zero
         // after the success copy grows (notably at 1.3x fonts), leaving no focusable target.
         Spacer(Modifier.height(24.dp))
-        Button(onClick = state::save, modifier = Modifier.focusRequester(start).testTag("setup-start-watching")) {
+        Button(
+            onClick = state::save,
+            modifier = Modifier.focusProperties { canFocus = canFocusStart }.focusRequester(start).testTag("setup-start-watching"),
+        ) {
             Text(stringResource(if (state.mode == SetupMode.EDIT) R.string.onboarding_save_connection else R.string.onboarding_start_watching))
         }
         SaveFailedText(form.feedback)

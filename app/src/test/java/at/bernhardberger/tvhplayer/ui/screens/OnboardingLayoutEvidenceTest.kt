@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -44,6 +46,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.util.ReflectionHelpers
+import org.robolectric.util.ReflectionHelpers.ClassParameter
 import java.io.File
 
 /** Production steps, with offline state and remote keys; never a live server or credential. */
@@ -498,6 +502,23 @@ class OnboardingLayoutEvidenceTest {
         compose.runOnUiThread { state.continueFromAddress() }
         compose.waitForIdle()
         capture("server-validation")
+    }
+
+    @Test fun theSuccessActionLooksFocusedWhenTheTestPasses() {
+        show(SetupStep.SIGN_IN, ConnectionFormState(host = "192.0.2.10"))
+        // A TV is not in touch mode, the test default: only then does the view hand focus straight back.
+        compose.runOnIdle {
+            ReflectionHelpers.callInstanceMethod<Boolean>(view.rootView.parent, "ensureTouchModeLocally", ClassParameter.from(Boolean::class.javaPrimitiveType, false))
+        }
+        compose.runOnIdle { state.continueFromSignIn() }
+        compose.waitForIdle()
+        compose.onNodeWithTag("setup-connecting").assertIsFocused()
+        compose.runOnIdle { session.publish(ready()) }
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeBy(1_000)
+        compose.onNodeWithTag("setup-start-watching").assertIsFocused()
+        val fill = compose.onNodeWithTag("setup-start-watching").captureToImage().toPixelMap().let { it[12, it.height / 2] }
+        assertTrue("the focused action has a light fill, was $fill", fill.luminance() > 0.5f)
     }
 
     private fun pseudoAccount() {
