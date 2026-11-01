@@ -17,7 +17,7 @@ Informal **du**, already in use in the app. Action labels are infinitives or nou
 ## Term decisions
 
 - `nav_channels` Sender: a TV service, not a frequency.
-- `nav_epg` Programmführer; `nav_recordings` Aufnahmen; `record` Aufnehmen; `context_watch` Ansehen.
+- `nav_epg` TV-Programm; `nav_recordings` Aufnahmen; `record` Aufnehmen; `context_watch` Ansehen.
 - `details_retention` Aufbewahrung; `recording_state_missed` Verpasst; `recording_state_completed` Abgeschlossen; `timeshift_live` Live.
 - `cancel_recording` Aufnahme abbrechen (future), `stop_recording` Aufnahme beenden (active), `context_delete` Löschen.
 - `player_tuning` Sender wird eingestellt: switching to a channel, not scanning.

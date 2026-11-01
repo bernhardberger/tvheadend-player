@@ -25,7 +25,7 @@ Channel,チャンネル,ja,TV service rather than a frequency,round-1 draft nav_
 Channel,채널,ko,TV service rather than a frequency,round-1 draft nav_channels; tvheadend web UI: 채널
 Channel,القنوات,ar,TV service rather than a frequency,round-1 draft nav_channels (plural label)
 Channel,ערוצים,he,TV service rather than a frequency,round-1 draft nav_channels (plural label); tvheadend web UI: ערוץ (differs)
-Guide,Programmführer,de,Electronic program guide,app values-de nav_epg; tvheadend web UI: Electronic Program Guide (differs)
+Guide,TV-Programm,de,Electronic program guide,app values-de nav_epg; tvheadend web UI: Electronic Program Guide (differs)
 Guide,Guide,fr,Electronic program guide,round-1 draft nav_epg; tvheadend web UI: Guide de Programme Electronique (differs)
 Guide,Guía,es,Electronic program guide,round-1 draft nav_epg; tvheadend web UI: Guía
 Guide,Guida,it,Electronic program guide,round-1 draft nav_epg; tvheadend web UI: Guida elettronica dei programmi (differs)

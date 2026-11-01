@@ -106,7 +106,7 @@
     <string name="active_tag_unavailable">Die gewählte Sendergruppe ist nicht mehr verfügbar. Eine andere verfügbare Gruppe wird angezeigt.</string>
     <string name="dismiss">Ausblenden</string>
     <string name="nav_channels">Sender</string>
-    <string name="nav_epg">Programmführer</string>
+    <string name="nav_epg">TV-Programm</string>
     <string name="nav_recordings">Aufnahmen</string>
     <string name="nav_settings">Einstellungen</string>
 
@@ -272,7 +272,7 @@
     <string name="display_mode_16_9">16:9 ausfüllen</string>
     <string name="display_mode_4_3">4:3 ausfüllen</string>
 
-    <string name="epg_title">Programmführer</string>
+    <string name="epg_title">TV-Programm</string>
     <string name="header_button_value_description">%1$s, %2$s</string>
     <string name="epg_clear_filter">Filter löschen</string>
     <string name="epg_search">Suchen</string>
@@ -540,7 +540,7 @@
     <string name="connection_loading_channels">Sender werden geladen\u2026</string>
     <string name="retry">Erneut versuchen</string>
     <string name="settings_channel_groups_loading">Sendergruppen werden geladen…</string>
-    <string name="settings_channel_groups_description">Wähle, welche Gruppen unter Sender und im Programmführer erscheinen.</string>
+    <string name="settings_channel_groups_description">Wähle, welche Gruppen unter Sender und im TV-Programm erscheinen.</string>
     <string name="channel_settings_load_failed">Die Kanaleinstellungen konnten nicht geladen werden.</string>
     <string name="channel_settings_save_failed">Deine Kanaleinstellungen sind aktiv, konnten aber nicht gespeichert werden.</string>
     <string name="recording_marker_label">Marke %1$d • %2$s</string>

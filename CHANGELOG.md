@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Everywhere
+
+- In German, the Guide is now called TV-Programm instead of Programmführer.
+
 ## 0.4.0
 
 ### Home

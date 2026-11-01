@@ -204,6 +204,9 @@ Sent 2026-10-30: 16 changes (listing, app content, TV opt-in, Alpha track with
 0.3.2 (164)). Managed publishing is off, so the closed test opens to group
 members as soon as Google approves.
 
+Sent 2026-11-01: `0.4.0 (165)` on the same track, with the new Android TV and
+10-inch tablet screenshots. In review at the time of writing.
+
 ### 1.9 After approval
 
 1. Send the opt-in link and the [tester instructions](#62-tester-instructions).
@@ -272,7 +275,7 @@ Open source under the GNU GPL v3, with the source code for every release: github
 ### 2.2 German (de-DE)
 
 Informal *du*, as in the app (`docs/translations/de.md`), and the app's own
-German terms (Programmführer, Senderliste, Laufende Aufnahmen, Immersiv,
+German terms (TV-Programm, Senderliste, Laufende Aufnahmen, Immersiv,
 Raster, Liste).
 
 **App name** (16/30)
@@ -290,11 +293,11 @@ Ein Tvheadend-Client für Android TV, gemacht für die Fernbedienung.
 **Full description** (720/4000)
 
 ```text
-Tvheadend Player ist eine App für Android TV und Google TV für deinen eigenen Tvheadend-Server. Live-TV schauen, im Programmführer stöbern und Aufnahmen abspielen, alles mit dem Steuerkreuz der Fernbedienung.
+Tvheadend Player ist eine App für Android TV und Google TV für deinen eigenen Tvheadend-Server. Live-TV schauen, im TV-Programm stöbern und Aufnahmen abspielen, alles mit dem Steuerkreuz der Fernbedienung.
 
 Die App ist unabhängig, keine offizielle Tvheadend-App, und bringt keine eigenen Sender mit. Du brauchst einen Tvheadend-4.3-Server, den dein Fernseher erreicht.
 
-• Live-TV, Programmführer und deine Aufnahmen in einer App
+• Live-TV, TV-Programm und deine Aufnahmen in einer App
 • Gemacht für die Fernbedienung, gebaut mit Googles Material Design für TV
 • Live-TV läuft weiter, während du stöberst
 • Keine Werbung, keine Analyse, kein Konto zum Anmelden
@@ -306,15 +309,15 @@ Open Source unter der GNU GPL v3, mit dem Quellcode zu jeder Version: github.com
 
 Up to 500 Unicode characters per language, each language between its tags
 (<https://support.google.com/googleplay/android-developer/answer/9859348>).
-English 458/500, German 491/500 (counted without the
+These are the 0.4.0 notes. English 412/500, German 437/500 (counted without the
 tags). Paste both into the one release-notes box.
 
 ```text
 <en-US>
-First release on Google Play, as a closed test. New: setup in three steps that looks for Tvheadend servers on your network, reworked Channels (Immersive, Grid, List) and Guide, one details page everywhere, and menus on Hold OK or Menu. In the player: channel number entry, the channel list under the controls, the channel's schedule beside the picture and clearer error messages. All changes: github.com/bernhardberger/tvheadend-player/blob/main/CHANGELOG.md
+New Home screen: the app now opens on what's playing or recording, your recent channels, what's on now, genres and recordings. Hide sections you don't want in View options. The Guide fits more channels with dense rows by default. Choosing a running recording now asks whether to watch the channel, resume or start from the beginning. All changes: github.com/bernhardberger/tvheadend-player/blob/main/CHANGELOG.md
 </en-US>
 <de-DE>
-Erste Version auf Google Play, als geschlossener Test. Neu: Einrichtung in drei Schritten mit Serversuche im Netzwerk, überarbeitete Senderansicht (Immersiv, Raster, Liste) und Programmführer, eine Detailseite überall und Menüs mit langem OK-Druck oder der Menütaste. Im Player: Sendernummer eintippen, die Senderliste unter der Steuerung, das Programm des Senders neben dem Bild und klarere Fehlermeldungen. Alle Änderungen: github.com/bernhardberger/tvheadend-player/blob/main/CHANGELOG.md
+Neuer Startbildschirm: Die App öffnet mit dem, was gerade läuft oder aufgenommen wird, letzten Sendern, aktuellem Programm, Genres und Aufnahmen. Unerwünschte Bereiche lassen sich in den Ansichtsoptionen ausblenden. Das TV-Programm zeigt standardmäßig mehr Sender. Bei einer laufenden Aufnahme fragt die App nun: Sender ansehen, fortsetzen oder von vorn. Alle Änderungen: github.com/bernhardberger/tvheadend-player/blob/main/CHANGELOG.md
 </de-DE>
 ```
 
