@@ -677,4 +677,37 @@
     <string name="channel_schedule_gap">Sem informações de programas até %1$s</string>
     <string name="channel_schedule_end">Sem informações de programas após %1$s</string>
     <string name="channel_schedule_loading_more">A carregar os dias seguintes</string>
+    <string name="recording_choice_watch_channel">Ver canal</string>
+    <string name="recording_choice_play">Reproduzir gravação</string>
+    <string name="context_resume_from">a partir de %1$s</string>
+    <string name="home_all_scheduled">Todas as agendadas</string>
+    <string name="nav_home">Início</string>
+    <string name="home_now_playing">Neste momento</string>
+    <string name="home_upcoming_recordings">Próximas gravações</string>
+    <string name="home_no_history">Os canais vistos recentemente aparecerão aqui.</string>
+    <string name="home_start_watching">Começar a ver</string>
+    <string name="home_start_watching_hint">Os canais que vês e as gravações aparecerão aqui.</string>
+    <string name="home_browse_channels">Explorar canais</string>
+    <string name="home_loading_channels">A carregar canais…</string>
+    <string name="home_still_connecting">Ainda a ligar…</string>
+    <string name="home_sections">Secções</string>
+    <string name="home_no_recordings">Ainda não há gravações.</string>
+    <string name="home_sections_hidden">As secções estão ocultas. Usa as opções de visualização para as mostrar.</string>
+    <string name="home_recent_channels">Canais recentes</string>
+    <string name="home_on_now">Agora na TV</string>
+    <string name="home_browse_by_genre">Explorar por género</string>
+    <string name="home_continue_watching">Continuar a ver</string>
+    <string name="home_recently_recorded">Novas gravações</string>
+    <string name="home_back_to_player">Voltar ao leitor</string>
+    <string name="home_recording_starts_at">Começa às %1$s</string>
+    <string name="home_all_recordings">Todas as gravações</string>
+    <string name="home_activity_watching_live">A ver em direto</string>
+    <string name="home_activity_recording">A gravar</string>
+    <string name="home_activity_watching_and_recording">A ver e a gravar</string>
+    <string name="home_upcoming_summary">A seguir: %1$s • %2$s</string>
+    <plurals name="home_upcoming_more">
+        <item quantity="one">Mais %1$d agendada</item>
+        <item quantity="many">Mais %1$d agendadas</item>
+        <item quantity="other">Mais %1$d agendadas</item>
+    </plurals>
 </resources>

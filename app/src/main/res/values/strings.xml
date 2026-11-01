@@ -58,10 +58,10 @@
     <string name="context_show_guide">Show in Guide</string>
     <string name="context_resume">Resume</string>
     <string name="context_start_over">Watch from beginning</string>
-    <string name="recording_choice_watch_channel" tools:ignore="MissingTranslation">Watch channel</string>
-    <string name="recording_choice_play" tools:ignore="MissingTranslation">Play recording</string>
-    <string name="context_resume_from" tools:ignore="MissingTranslation">from %1$s</string>
-    <string name="home_all_scheduled" tools:ignore="MissingTranslation">All scheduled</string>
+    <string name="recording_choice_watch_channel">Watch channel</string>
+    <string name="recording_choice_play">Play recording</string>
+    <string name="context_resume_from">from %1$s</string>
+    <string name="home_all_scheduled">All scheduled</string>
     <string name="context_mark_watched">Mark as watched</string>
     <string name="context_mark_unwatched">Mark as unwatched</string>
     <string name="context_delete">Delete</string>
@@ -120,7 +120,7 @@
     <string name="active_tag_unavailable">The selected channel group is no longer available. Showing another available group.</string>
     <string name="dismiss">Dismiss</string>
     <!-- Main navigation item: the Home landing page. Noun. Max 12. -->
-    <string name="nav_home" tools:ignore="MissingTranslation">Home</string>
+    <string name="nav_home">Home</string>
     <string name="nav_channels">Channels</string>
     <!-- Main navigation item: the electronic program guide (TV schedule grid). Noun. Max 12. -->
     <string name="nav_epg">Guide</string>
@@ -910,30 +910,30 @@
     <string name="channel_schedule_end">No program information after %1$s</string>
     <string name="channel_schedule_loading_more">Loading later days</string>
     <!-- Home: section headings, card labels and accessible names. -->
-    <string name="home_now_playing" tools:ignore="MissingTranslation">Right now</string>
-    <string name="home_upcoming_recordings" tools:ignore="MissingTranslation">Upcoming recordings</string>
-    <string name="home_no_history" tools:ignore="MissingTranslation">Recently watched channels will appear here.</string>
-    <string name="home_start_watching" tools:ignore="MissingTranslation">Start watching</string>
-    <string name="home_start_watching_hint" tools:ignore="MissingTranslation">Channels you watch and recordings will appear here.</string>
-    <string name="home_browse_channels" tools:ignore="MissingTranslation">Browse channels</string>
-    <string name="home_loading_channels" tools:ignore="MissingTranslation">Loading channels…</string>
-    <string name="home_still_connecting" tools:ignore="MissingTranslation">Still connecting…</string>
-    <string name="home_sections" tools:ignore="MissingTranslation">Sections</string>
-    <string name="home_no_recordings" tools:ignore="MissingTranslation">No recordings yet.</string>
-    <string name="home_sections_hidden" tools:ignore="MissingTranslation">Sections are hidden. Use View options to show them.</string>
-    <string name="home_recent_channels" tools:ignore="MissingTranslation">Recent channels</string>
-    <string name="home_on_now" tools:ignore="MissingTranslation">On now</string>
-    <string name="home_browse_by_genre" tools:ignore="MissingTranslation">Browse by genre</string>
-    <string name="home_continue_watching" tools:ignore="MissingTranslation">Continue watching</string>
-    <string name="home_recently_recorded" tools:ignore="MissingTranslation">New recordings</string>
-    <string name="home_back_to_player" tools:ignore="MissingTranslation">Back to player</string>
-    <string name="home_recording_starts_at" tools:ignore="MissingTranslation">Starts at %1$s</string>
-    <string name="home_all_recordings" tools:ignore="MissingTranslation">All recordings</string>
-    <string name="home_activity_watching_live" tools:ignore="MissingTranslation">Watching live</string>
-    <string name="home_activity_recording" tools:ignore="MissingTranslation">Recording</string>
-    <string name="home_activity_watching_and_recording" tools:ignore="MissingTranslation">Watching and recording</string>
-    <string name="home_upcoming_summary" tools:ignore="MissingTranslation">Next: %1$s • %2$s</string>
-    <plurals name="home_upcoming_more" tools:ignore="MissingTranslation">
+    <string name="home_now_playing">Right now</string>
+    <string name="home_upcoming_recordings">Upcoming recordings</string>
+    <string name="home_no_history">Recently watched channels will appear here.</string>
+    <string name="home_start_watching">Start watching</string>
+    <string name="home_start_watching_hint">Channels you watch and recordings will appear here.</string>
+    <string name="home_browse_channels">Browse channels</string>
+    <string name="home_loading_channels">Loading channels…</string>
+    <string name="home_still_connecting">Still connecting…</string>
+    <string name="home_sections">Sections</string>
+    <string name="home_no_recordings">No recordings yet.</string>
+    <string name="home_sections_hidden">Sections are hidden. Use View options to show them.</string>
+    <string name="home_recent_channels">Recent channels</string>
+    <string name="home_on_now">On now</string>
+    <string name="home_browse_by_genre">Browse by genre</string>
+    <string name="home_continue_watching">Continue watching</string>
+    <string name="home_recently_recorded">New recordings</string>
+    <string name="home_back_to_player">Back to player</string>
+    <string name="home_recording_starts_at">Starts at %1$s</string>
+    <string name="home_all_recordings">All recordings</string>
+    <string name="home_activity_watching_live">Watching live</string>
+    <string name="home_activity_recording">Recording</string>
+    <string name="home_activity_watching_and_recording">Watching and recording</string>
+    <string name="home_upcoming_summary">Next: %1$s • %2$s</string>
+    <plurals name="home_upcoming_more">
         <item quantity="one">%1$d more scheduled</item>
         <item quantity="other">%1$d more scheduled</item>
     </plurals>

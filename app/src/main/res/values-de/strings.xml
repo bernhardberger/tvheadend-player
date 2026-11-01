@@ -48,7 +48,7 @@
     <string name="context_record">Aufnehmen</string>
     <string name="context_show_guide">Im Programm zeigen</string>
     <string name="context_resume">Fortsetzen</string>
-    <string name="context_start_over">Von vorne starten</string>
+    <string name="context_start_over">Von Anfang an ansehen</string>
     <string name="context_mark_watched">Als gesehen markieren</string>
     <string name="context_mark_unwatched">Als ungesehen markieren</string>
     <string name="context_delete">Löschen</string>
@@ -734,4 +734,36 @@
     <string name="channel_schedule_gap">Keine Programminformationen bis %1$s</string>
     <string name="channel_schedule_end">Keine Programminformationen nach %1$s</string>
     <string name="channel_schedule_loading_more">Weitere Tage werden geladen</string>
+    <string name="recording_choice_watch_channel">Sender ansehen</string>
+    <string name="recording_choice_play">Aufnahme abspielen</string>
+    <string name="context_resume_from">ab %1$s</string>
+    <string name="home_all_scheduled">Alle geplanten</string>
+    <string name="nav_home">Startseite</string>
+    <string name="home_now_playing">Gerade aktiv</string>
+    <string name="home_upcoming_recordings">Geplante Aufnahmen</string>
+    <string name="home_no_history">Zuletzt angesehene Sender erscheinen hier.</string>
+    <string name="home_start_watching">Jetzt ansehen</string>
+    <string name="home_start_watching_hint">Angesehene Sender und Aufnahmen erscheinen hier.</string>
+    <string name="home_browse_channels">Sender durchstöbern</string>
+    <string name="home_loading_channels">Sender werden geladen…</string>
+    <string name="home_still_connecting">Verbindung wird noch hergestellt…</string>
+    <string name="home_sections">Bereiche</string>
+    <string name="home_no_recordings">Noch keine Aufnahmen.</string>
+    <string name="home_sections_hidden">Bereiche sind ausgeblendet. Blende sie über die Ansichtsoptionen ein.</string>
+    <string name="home_recent_channels">Letzte Sender</string>
+    <string name="home_on_now">Jetzt im TV</string>
+    <string name="home_browse_by_genre">Nach Genre stöbern</string>
+    <string name="home_continue_watching">Weiterschauen</string>
+    <string name="home_recently_recorded">Neue Aufnahmen</string>
+    <string name="home_back_to_player">Zur Wiedergabe</string>
+    <string name="home_recording_starts_at">Beginn um %1$s</string>
+    <string name="home_all_recordings">Alle Aufnahmen</string>
+    <string name="home_activity_watching_live">Live ansehen</string>
+    <string name="home_activity_recording">Aufnahme läuft</string>
+    <string name="home_activity_watching_and_recording">Ansehen und aufnehmen</string>
+    <string name="home_upcoming_summary">Als Nächstes: %1$s • %2$s</string>
+    <plurals name="home_upcoming_more">
+        <item quantity="one">%1$d weitere geplant</item>
+        <item quantity="other">%1$d weitere geplant</item>
+    </plurals>
 </resources>

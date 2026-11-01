@@ -46,7 +46,7 @@
     <string name="context_record">Opnemen</string>
     <string name="context_show_guide">Tonen in tv-gids</string>
     <string name="context_resume">Hervatten</string>
-    <string name="context_start_over">Opnieuw beginnen</string>
+    <string name="context_start_over">Vanaf het begin kijken</string>
     <string name="context_mark_watched">Markeren als bekeken</string>
     <string name="context_mark_unwatched">Markeren als niet bekeken</string>
     <string name="context_delete">Verwijderen</string>
@@ -718,4 +718,36 @@
     <string name="channel_schedule_gap">Geen programma-informatie tot %1$s</string>
     <string name="channel_schedule_end">Geen programma-informatie na %1$s</string>
     <string name="channel_schedule_loading_more">Latere dagen laden</string>
+    <string name="recording_choice_watch_channel">Zender kijken</string>
+    <string name="recording_choice_play">Opname afspelen</string>
+    <string name="context_resume_from">vanaf %1$s</string>
+    <string name="home_all_scheduled">Alle geplande</string>
+    <string name="nav_home">Startpagina</string>
+    <string name="home_now_playing">Op dit moment</string>
+    <string name="home_upcoming_recordings">Geplande opnamen</string>
+    <string name="home_no_history">Recent bekeken zenders verschijnen hier.</string>
+    <string name="home_start_watching">Begin met kijken</string>
+    <string name="home_start_watching_hint">Zenders die je bekijkt en opnamen verschijnen hier.</string>
+    <string name="home_browse_channels">Zenders verkennen</string>
+    <string name="home_loading_channels">Zenders laden…</string>
+    <string name="home_still_connecting">Nog aan het verbinden…</string>
+    <string name="home_sections">Secties</string>
+    <string name="home_no_recordings">Nog geen opnamen.</string>
+    <string name="home_sections_hidden">Secties zijn verborgen. Toon ze via de weergaveopties.</string>
+    <string name="home_recent_channels">Recente zenders</string>
+    <string name="home_on_now">Nu op tv</string>
+    <string name="home_browse_by_genre">Op genre zoeken</string>
+    <string name="home_continue_watching">Verder kijken</string>
+    <string name="home_recently_recorded">Nieuwe opnamen</string>
+    <string name="home_back_to_player">Terug naar speler</string>
+    <string name="home_recording_starts_at">Begint om %1$s</string>
+    <string name="home_all_recordings">Alle opnamen</string>
+    <string name="home_activity_watching_live">Live kijken</string>
+    <string name="home_activity_recording">Opname bezig</string>
+    <string name="home_activity_watching_and_recording">Kijken en opnemen</string>
+    <string name="home_upcoming_summary">Hierna: %1$s • %2$s</string>
+    <plurals name="home_upcoming_more">
+        <item quantity="one">Nog %1$d gepland</item>
+        <item quantity="other">Nog %1$d gepland</item>
+    </plurals>
 </resources>

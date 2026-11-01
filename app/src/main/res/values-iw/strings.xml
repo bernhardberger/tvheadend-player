@@ -46,7 +46,7 @@
     <string name="context_record">הקלטה</string>
     <string name="context_show_guide">הצגה במדריך</string>
     <string name="context_resume">המשך צפייה</string>
-    <string name="context_start_over">התחלה מחדש</string>
+    <string name="context_start_over">צפייה מההתחלה</string>
     <string name="context_mark_watched">סימון כנצפה</string>
     <string name="context_mark_unwatched">סימון כלא נצפה</string>
     <string name="context_delete">מחיקה</string>
@@ -736,4 +736,37 @@
     <string name="channel_schedule_gap">אין מידע על תוכניות עד %1$s</string>
     <string name="channel_schedule_end">אין מידע על תוכניות אחרי %1$s</string>
     <string name="channel_schedule_loading_more">טעינת ימים מאוחרים יותר</string>
+    <string name="recording_choice_watch_channel">צפייה בערוץ</string>
+    <string name="recording_choice_play">הפעלת הקלטה</string>
+    <string name="context_resume_from">מ־%1$s</string>
+    <string name="home_all_scheduled">כל המתוזמנות</string>
+    <string name="nav_home">בית</string>
+    <string name="home_now_playing">פעילות נוכחית</string>
+    <string name="home_upcoming_recordings">הקלטות קרובות</string>
+    <string name="home_no_history">ערוצים שנצפו לאחרונה יופיעו כאן.</string>
+    <string name="home_start_watching">התחלת צפייה</string>
+    <string name="home_start_watching_hint">ערוצים שנצפים והקלטות יופיעו כאן.</string>
+    <string name="home_browse_channels">עיון בערוצים</string>
+    <string name="home_loading_channels">טעינת ערוצים…</string>
+    <string name="home_still_connecting">ההתחברות עדיין מתבצעת…</string>
+    <string name="home_sections">מקטעים</string>
+    <string name="home_no_recordings">אין הקלטות עדיין.</string>
+    <string name="home_sections_hidden">המקטעים מוסתרים. אפשר להציג אותם דרך אפשרויות התצוגה.</string>
+    <string name="home_recent_channels">ערוצים אחרונים</string>
+    <string name="home_on_now">משודר עכשיו</string>
+    <string name="home_browse_by_genre">עיון לפי סוגה</string>
+    <string name="home_continue_watching">המשך צפייה</string>
+    <string name="home_recently_recorded">הקלטות חדשות</string>
+    <string name="home_back_to_player">חזרה לנגן</string>
+    <string name="home_recording_starts_at">התחלה ב־%1$s</string>
+    <string name="home_all_recordings">כל ההקלטות</string>
+    <string name="home_activity_watching_live">צפייה בשידור חי</string>
+    <string name="home_activity_recording">הקלטה פעילה</string>
+    <string name="home_activity_watching_and_recording">צפייה והקלטה</string>
+    <string name="home_upcoming_summary">הבא: %1$s • %2$s</string>
+    <plurals name="home_upcoming_more">
+        <item quantity="one">עוד %1$d הקלטה מתוזמנת</item>
+        <item quantity="two">עוד %1$d הקלטות מתוזמנות</item>
+        <item quantity="other">עוד %1$d הקלטות מתוזמנות</item>
+    </plurals>
 </resources>

@@ -46,7 +46,7 @@
     <string name="context_record">녹화</string>
     <string name="context_show_guide">편성표에서 보기</string>
     <string name="context_resume">이어서 재생</string>
-    <string name="context_start_over">처음부터</string>
+    <string name="context_start_over">처음부터 시청</string>
     <string name="context_mark_watched">시청 완료로 표시</string>
     <string name="context_mark_unwatched">미시청으로 표시</string>
     <string name="context_delete">삭제</string>
@@ -700,4 +700,35 @@
     <string name="channel_schedule_gap">%1$s까지 프로그램 정보 없음</string>
     <string name="channel_schedule_end">%1$s 이후 프로그램 정보 없음</string>
     <string name="channel_schedule_loading_more">이후 날짜 불러오는 중</string>
+    <string name="recording_choice_watch_channel">채널 시청</string>
+    <string name="recording_choice_play">녹화 재생</string>
+    <string name="context_resume_from">%1$s부터</string>
+    <string name="home_all_scheduled">모든 예약</string>
+    <string name="nav_home">홈</string>
+    <string name="home_now_playing">현재 활동</string>
+    <string name="home_upcoming_recordings">예정된 녹화</string>
+    <string name="home_no_history">최근 시청한 채널이 여기에 표시됩니다.</string>
+    <string name="home_start_watching">시청 시작</string>
+    <string name="home_start_watching_hint">시청하는 채널과 녹화가 여기에 표시됩니다.</string>
+    <string name="home_browse_channels">채널 탐색</string>
+    <string name="home_loading_channels">채널 로드 중…</string>
+    <string name="home_still_connecting">아직 연결 중…</string>
+    <string name="home_sections">섹션</string>
+    <string name="home_no_recordings">아직 녹화가 없습니다.</string>
+    <string name="home_sections_hidden">섹션이 숨겨져 있습니다. 보기 옵션에서 표시할 수 있습니다.</string>
+    <string name="home_recent_channels">최근 채널</string>
+    <string name="home_on_now">방송 중</string>
+    <string name="home_browse_by_genre">장르별 탐색</string>
+    <string name="home_continue_watching">계속 시청</string>
+    <string name="home_recently_recorded">새 녹화</string>
+    <string name="home_back_to_player">플레이어로 돌아가기</string>
+    <string name="home_recording_starts_at">%1$s에 시작</string>
+    <string name="home_all_recordings">모든 녹화</string>
+    <string name="home_activity_watching_live">실시간 시청 중</string>
+    <string name="home_activity_recording">녹화 중</string>
+    <string name="home_activity_watching_and_recording">시청 및 녹화 중</string>
+    <string name="home_upcoming_summary">다음: %1$s • %2$s</string>
+    <plurals name="home_upcoming_more">
+        <item quantity="other">예약 %1$d개 더 있음</item>
+    </plurals>
 </resources>

@@ -46,7 +46,7 @@
     <string name="context_record">Snimi</string>
     <string name="context_show_guide">Prikaži u TV vodiču</string>
     <string name="context_resume">Nastavi</string>
-    <string name="context_start_over">Od početka</string>
+    <string name="context_start_over">Gledaj od početka</string>
     <string name="context_mark_watched">Označi kao pogledano</string>
     <string name="context_mark_unwatched">Označi kao nepogledano</string>
     <string name="context_delete">Izbriši</string>
@@ -737,4 +737,37 @@
     <string name="channel_schedule_gap">Nema informacija o emisijama do %1$s</string>
     <string name="channel_schedule_end">Nema informacija o emisijama nakon %1$s</string>
     <string name="channel_schedule_loading_more">Učitavanje sljedećih dana</string>
+    <string name="recording_choice_watch_channel">Gledaj kanal</string>
+    <string name="recording_choice_play">Reproduciraj snimku</string>
+    <string name="context_resume_from">od %1$s</string>
+    <string name="home_all_scheduled">Sva zakazana</string>
+    <string name="nav_home">Početna</string>
+    <string name="home_now_playing">Upravo sada</string>
+    <string name="home_upcoming_recordings">Nadolazeća snimanja</string>
+    <string name="home_no_history">Ovdje će se pojaviti nedavno gledani kanali.</string>
+    <string name="home_start_watching">Počni gledati</string>
+    <string name="home_start_watching_hint">Ovdje će se pojaviti kanali koje gledaš i snimke.</string>
+    <string name="home_browse_channels">Pregledaj kanale</string>
+    <string name="home_loading_channels">Učitavanje kanala…</string>
+    <string name="home_still_connecting">Povezivanje još traje…</string>
+    <string name="home_sections">Odjeljci</string>
+    <string name="home_no_recordings">Još nema snimki.</string>
+    <string name="home_sections_hidden">Odjeljci su skriveni. Prikaži ih u mogućnostima prikaza.</string>
+    <string name="home_recent_channels">Nedavni kanali</string>
+    <string name="home_on_now">Sada na TV-u</string>
+    <string name="home_browse_by_genre">Pregledaj po žanru</string>
+    <string name="home_continue_watching">Nastavi gledati</string>
+    <string name="home_recently_recorded">Nove snimke</string>
+    <string name="home_back_to_player">Natrag na reproduktor</string>
+    <string name="home_recording_starts_at">Počinje u %1$s</string>
+    <string name="home_all_recordings">Sve snimke</string>
+    <string name="home_activity_watching_live">Gledanje uživo</string>
+    <string name="home_activity_recording">Snimanje</string>
+    <string name="home_activity_watching_and_recording">Gledanje i snimanje</string>
+    <string name="home_upcoming_summary">Sljedeće: %1$s • %2$s</string>
+    <plurals name="home_upcoming_more">
+        <item quantity="one">Još %1$d zakazano snimanje</item>
+        <item quantity="few">Još %1$d zakazana snimanja</item>
+        <item quantity="other">Još %1$d zakazanih snimanja</item>
+    </plurals>
 </resources>

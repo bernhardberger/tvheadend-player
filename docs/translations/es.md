@@ -26,6 +26,8 @@ Informal **tú** in directions; infinitives on action labels. Vocabulary leans t
 
 Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retaining unchanged round-1 text from `daebdd86`. Full resources reviewed by Sonnet 5.5 (medium). The keycap-localization suggestion was rejected because literal remote key names are preserved; style alternatives remain unchanged. No human reviewer; remains labeled machine-drafted.
 
+0.4.0 Home strings drafted against `d2d9a9ab` by GPT-6.1 Sol and reviewed by Sonnet 5.5 (high); still machine-drafted, no human reviewer.
+
 ## Open questions
 
 - Confirm whether the slate wants Spain-specific vocabulary (vídeo, mando, ajustes) or a more Latin-American one.

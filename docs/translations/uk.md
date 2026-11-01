@@ -27,6 +27,8 @@ Polite plural **ви** (lowercase when explicit); infinitive action labels.
 
 Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retaining unchanged round-1 text from `daebdd86`. Full resources reviewed by Sonnet 5.5 (medium), including the recovered unchanged About draft; `keep_channel_setting` now explicitly means keeping the channel tuned during pause, rather than saving a channel. No human reviewer; remains labeled machine-drafted.
 
+0.4.0 Home strings drafted against `d2d9a9ab` by GPT-6.1 Sol and reviewed by Sonnet 5.5 (high); still machine-drafted, no human reviewer.
+
 ## Open questions
 
 - Confirm *режим ТВ-приставки* and *Занурення* (immersive layout).

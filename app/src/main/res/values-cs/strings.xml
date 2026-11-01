@@ -46,7 +46,7 @@
     <string name="context_record">Nahrát</string>
     <string name="context_show_guide">Zobrazit v programu</string>
     <string name="context_resume">Pokračovat</string>
-    <string name="context_start_over">Od začátku</string>
+    <string name="context_start_over">Sledovat od začátku</string>
     <string name="context_mark_watched">Označit jako zhlédnuté</string>
     <string name="context_mark_unwatched">Označit jako nezhlédnuté</string>
     <string name="context_delete">Smazat</string>
@@ -754,4 +754,38 @@
     <string name="channel_schedule_gap">Do %1$s nejsou informace o pořadech</string>
     <string name="channel_schedule_end">Po %1$s nejsou informace o pořadech</string>
     <string name="channel_schedule_loading_more">Načítání dalších dnů</string>
+    <string name="recording_choice_watch_channel">Sledovat kanál</string>
+    <string name="recording_choice_play">Přehrát nahrávku</string>
+    <string name="context_resume_from">od %1$s</string>
+    <string name="home_all_scheduled">Všechna plánovaná</string>
+    <string name="nav_home">Úvod</string>
+    <string name="home_now_playing">Právě teď</string>
+    <string name="home_upcoming_recordings">Nadcházející nahrávání</string>
+    <string name="home_no_history">Zde se zobrazí nedávno sledované kanály.</string>
+    <string name="home_start_watching">Začít sledovat</string>
+    <string name="home_start_watching_hint">Zde se zobrazí sledované kanály a nahrávky.</string>
+    <string name="home_browse_channels">Procházet kanály</string>
+    <string name="home_loading_channels">Načítání kanálů…</string>
+    <string name="home_still_connecting">Stále se připojuje…</string>
+    <string name="home_sections">Sekce</string>
+    <string name="home_no_recordings">Zatím žádné nahrávky.</string>
+    <string name="home_sections_hidden">Sekce jsou skryté. Zobraz je v možnostech zobrazení.</string>
+    <string name="home_recent_channels">Nedávné kanály</string>
+    <string name="home_on_now">Právě v TV</string>
+    <string name="home_browse_by_genre">Procházet podle žánru</string>
+    <string name="home_continue_watching">Pokračovat ve sledování</string>
+    <string name="home_recently_recorded">Nové nahrávky</string>
+    <string name="home_back_to_player">Zpět do přehrávače</string>
+    <string name="home_recording_starts_at">Začíná v %1$s</string>
+    <string name="home_all_recordings">Všechny nahrávky</string>
+    <string name="home_activity_watching_live">Sledování živě</string>
+    <string name="home_activity_recording">Nahrávání</string>
+    <string name="home_activity_watching_and_recording">Sledování a nahrávání</string>
+    <string name="home_upcoming_summary">Následuje: %1$s • %2$s</string>
+    <plurals name="home_upcoming_more">
+        <item quantity="one">Ještě %1$d plánované nahrávání</item>
+        <item quantity="few">Ještě %1$d plánovaná nahrávání</item>
+        <item quantity="many">Ještě %1$d plánovaného nahrávání</item>
+        <item quantity="other">Ještě %1$d plánovaných nahrávání</item>
+    </plurals>
 </resources>

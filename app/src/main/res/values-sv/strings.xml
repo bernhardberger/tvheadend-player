@@ -46,7 +46,7 @@
     <string name="context_record">Spela in</string>
     <string name="context_show_guide">Visa i tv-guiden</string>
     <string name="context_resume">Fortsätt</string>
-    <string name="context_start_over">Börja om</string>
+    <string name="context_start_over">Titta från början</string>
     <string name="context_mark_watched">Markera som sedd</string>
     <string name="context_mark_unwatched">Markera som osedd</string>
     <string name="context_delete">Radera</string>
@@ -718,4 +718,36 @@
     <string name="channel_schedule_gap">Ingen programinformation fram till %1$s</string>
     <string name="channel_schedule_end">Ingen programinformation efter %1$s</string>
     <string name="channel_schedule_loading_more">Laddar senare dagar</string>
+    <string name="recording_choice_watch_channel">Titta på kanal</string>
+    <string name="recording_choice_play">Spela upp inspelningen</string>
+    <string name="context_resume_from">från %1$s</string>
+    <string name="home_all_scheduled">Alla schemalagda</string>
+    <string name="nav_home">Hem</string>
+    <string name="home_now_playing">Just nu</string>
+    <string name="home_upcoming_recordings">Kommande inspelningar</string>
+    <string name="home_no_history">Kanaler du nyligen har sett visas här.</string>
+    <string name="home_start_watching">Börja titta</string>
+    <string name="home_start_watching_hint">Kanaler du tittar på och inspelningar visas här.</string>
+    <string name="home_browse_channels">Bläddra bland kanaler</string>
+    <string name="home_loading_channels">Laddar kanaler…</string>
+    <string name="home_still_connecting">Ansluter fortfarande…</string>
+    <string name="home_sections">Sektioner</string>
+    <string name="home_no_recordings">Inga inspelningar än.</string>
+    <string name="home_sections_hidden">Sektionerna är dolda. Visa dem via visningsalternativen.</string>
+    <string name="home_recent_channels">Senaste kanaler</string>
+    <string name="home_on_now">På tv nu</string>
+    <string name="home_browse_by_genre">Bläddra efter genre</string>
+    <string name="home_continue_watching">Fortsätt titta</string>
+    <string name="home_recently_recorded">Nya inspelningar</string>
+    <string name="home_back_to_player">Tillbaka till spelaren</string>
+    <string name="home_recording_starts_at">Börjar %1$s</string>
+    <string name="home_all_recordings">Alla inspelningar</string>
+    <string name="home_activity_watching_live">Tittar direkt</string>
+    <string name="home_activity_recording">Spelar in</string>
+    <string name="home_activity_watching_and_recording">Tittar och spelar in</string>
+    <string name="home_upcoming_summary">Härnäst: %1$s • %2$s</string>
+    <plurals name="home_upcoming_more">
+        <item quantity="one">%1$d till schemalagd</item>
+        <item quantity="other">%1$d till schemalagda</item>
+    </plurals>
 </resources>

@@ -46,7 +46,7 @@
     <string name="context_record">Tallenna</string>
     <string name="context_show_guide">Näytä ohjelmaoppaassa</string>
     <string name="context_resume">Jatka</string>
-    <string name="context_start_over">Aloita alusta</string>
+    <string name="context_start_over">Katso alusta</string>
     <string name="context_mark_watched">Merkitse katsotuksi</string>
     <string name="context_mark_unwatched">Merkitse katsomattomaksi</string>
     <string name="context_delete">Poista</string>
@@ -718,4 +718,36 @@
     <string name="channel_schedule_gap">Ei ohjelmatietoja ennen ajankohtaa %1$s</string>
     <string name="channel_schedule_end">Ei ohjelmatietoja ajankohdan %1$s jälkeen</string>
     <string name="channel_schedule_loading_more">Ladataan myöhempiä päiviä</string>
+    <string name="recording_choice_watch_channel">Katso kanavaa</string>
+    <string name="recording_choice_play">Toista tallenne</string>
+    <string name="context_resume_from">kohdasta %1$s</string>
+    <string name="home_all_scheduled">Kaikki ajastetut</string>
+    <string name="nav_home">Etusivu</string>
+    <string name="home_now_playing">Juuri nyt</string>
+    <string name="home_upcoming_recordings">Tulevat tallennukset</string>
+    <string name="home_no_history">Viimeksi katsotut kanavat näkyvät tässä.</string>
+    <string name="home_start_watching">Aloita katselu</string>
+    <string name="home_start_watching_hint">Katsomasi kanavat ja tallenteet näkyvät tässä.</string>
+    <string name="home_browse_channels">Selaa kanavia</string>
+    <string name="home_loading_channels">Ladataan kanavia…</string>
+    <string name="home_still_connecting">Yhdistetään yhä…</string>
+    <string name="home_sections">Osiot</string>
+    <string name="home_no_recordings">Ei vielä tallenteita.</string>
+    <string name="home_sections_hidden">Osiot on piilotettu. Näytä ne näkymäasetuksista.</string>
+    <string name="home_recent_channels">Viimeisimmät kanavat</string>
+    <string name="home_on_now">Nyt TV:ssä</string>
+    <string name="home_browse_by_genre">Selaa lajityypeittäin</string>
+    <string name="home_continue_watching">Jatka katselua</string>
+    <string name="home_recently_recorded">Uudet tallenteet</string>
+    <string name="home_back_to_player">Takaisin soittimeen</string>
+    <string name="home_recording_starts_at">Alkaa klo %1$s</string>
+    <string name="home_all_recordings">Kaikki tallenteet</string>
+    <string name="home_activity_watching_live">Suoran lähetyksen katselu</string>
+    <string name="home_activity_recording">Tallennus käynnissä</string>
+    <string name="home_activity_watching_and_recording">Katselu ja tallennus</string>
+    <string name="home_upcoming_summary">Seuraavaksi: %1$s • %2$s</string>
+    <plurals name="home_upcoming_more">
+        <item quantity="one">Vielä %1$d ajastettu</item>
+        <item quantity="other">Vielä %1$d ajastettua</item>
+    </plurals>
 </resources>

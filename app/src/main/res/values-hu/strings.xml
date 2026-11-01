@@ -46,7 +46,7 @@
     <string name="context_record">Felvétel</string>
     <string name="context_show_guide">Megnyitás a műsorújságban</string>
     <string name="context_resume">Folytatás</string>
-    <string name="context_start_over">Elölről</string>
+    <string name="context_start_over">Megnézés az elejétől</string>
     <string name="context_mark_watched">Megjelölés megnézettként</string>
     <string name="context_mark_unwatched">Megjelölés nem látottként</string>
     <string name="context_delete">Törlés</string>
@@ -718,4 +718,36 @@
     <string name="channel_schedule_gap">Nincs műsorinformáció eddig: %1$s</string>
     <string name="channel_schedule_end">Nincs műsorinformáció ezután: %1$s</string>
     <string name="channel_schedule_loading_more">Későbbi napok betöltése</string>
+    <string name="recording_choice_watch_channel">Csatorna nézése</string>
+    <string name="recording_choice_play">Felvétel lejátszása</string>
+    <string name="context_resume_from">innen: %1$s</string>
+    <string name="home_all_scheduled">Összes ütemezett</string>
+    <string name="nav_home">Kezdőlap</string>
+    <string name="home_now_playing">Éppen most</string>
+    <string name="home_upcoming_recordings">Közelgő felvételek</string>
+    <string name="home_no_history">Itt jelennek meg a legutóbb nézett csatornák.</string>
+    <string name="home_start_watching">Nézés indítása</string>
+    <string name="home_start_watching_hint">Itt jelennek meg a nézett csatornák és a felvételek.</string>
+    <string name="home_browse_channels">Csatornák böngészése</string>
+    <string name="home_loading_channels">Csatornák betöltése…</string>
+    <string name="home_still_connecting">Csatlakozás folyamatban…</string>
+    <string name="home_sections">Szakaszok</string>
+    <string name="home_no_recordings">Még nincsenek felvételek.</string>
+    <string name="home_sections_hidden">A szakaszok rejtve vannak. A nézetbeállításokban jelenítheted meg őket.</string>
+    <string name="home_recent_channels">Legutóbbi csatornák</string>
+    <string name="home_on_now">Most adásban</string>
+    <string name="home_browse_by_genre">Böngészés műfaj szerint</string>
+    <string name="home_continue_watching">Nézés folytatása</string>
+    <string name="home_recently_recorded">Új felvételek</string>
+    <string name="home_back_to_player">Vissza a lejátszóhoz</string>
+    <string name="home_recording_starts_at">Kezdés: %1$s</string>
+    <string name="home_all_recordings">Összes felvétel</string>
+    <string name="home_activity_watching_live">Élő adás nézése</string>
+    <string name="home_activity_recording">Felvétel folyamatban</string>
+    <string name="home_activity_watching_and_recording">Nézés és felvétel</string>
+    <string name="home_upcoming_summary">Következő: %1$s • %2$s</string>
+    <plurals name="home_upcoming_more">
+        <item quantity="one">Még %1$d ütemezett</item>
+        <item quantity="other">Még %1$d ütemezett</item>
+    </plurals>
 </resources>

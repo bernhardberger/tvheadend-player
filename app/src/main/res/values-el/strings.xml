@@ -46,7 +46,7 @@
     <string name="context_record">Εγγραφή</string>
     <string name="context_show_guide">Εμφάνιση στον οδηγό</string>
     <string name="context_resume">Συνέχεια</string>
-    <string name="context_start_over">Από την αρχή</string>
+    <string name="context_start_over">Προβολή από την αρχή</string>
     <string name="context_mark_watched">Σήμανση ως προβλημένη</string>
     <string name="context_mark_unwatched">Σήμανση ως μη προβλημένη</string>
     <string name="context_delete">Διαγραφή</string>
@@ -718,4 +718,36 @@
     <string name="channel_schedule_gap">Χωρίς πληροφορίες προγράμματος έως %1$s</string>
     <string name="channel_schedule_end">Χωρίς πληροφορίες προγράμματος μετά τις %1$s</string>
     <string name="channel_schedule_loading_more">Φόρτωση επόμενων ημερών</string>
+    <string name="recording_choice_watch_channel">Προβολή καναλιού</string>
+    <string name="recording_choice_play">Αναπαραγωγή εγγραφής</string>
+    <string name="context_resume_from">από %1$s</string>
+    <string name="home_all_scheduled">Όλες οι προγραμματισμένες</string>
+    <string name="nav_home">Αρχική</string>
+    <string name="home_now_playing">Αυτή τη στιγμή</string>
+    <string name="home_upcoming_recordings">Προσεχείς εγγραφές</string>
+    <string name="home_no_history">Εδώ θα εμφανίζονται τα κανάλια που είδες πρόσφατα.</string>
+    <string name="home_start_watching">Έναρξη προβολής</string>
+    <string name="home_start_watching_hint">Εδώ θα εμφανίζονται τα κανάλια που βλέπεις και οι εγγραφές.</string>
+    <string name="home_browse_channels">Περιήγηση στα κανάλια</string>
+    <string name="home_loading_channels">Φόρτωση καναλιών…</string>
+    <string name="home_still_connecting">Σύνδεση σε εξέλιξη…</string>
+    <string name="home_sections">Ενότητες</string>
+    <string name="home_no_recordings">Δεν υπάρχουν ακόμα εγγραφές.</string>
+    <string name="home_sections_hidden">Οι ενότητες είναι κρυφές. Εμφάνισέ τες από τις επιλογές προβολής.</string>
+    <string name="home_recent_channels">Πρόσφατα κανάλια</string>
+    <string name="home_on_now">Τώρα στην TV</string>
+    <string name="home_browse_by_genre">Περιήγηση ανά είδος</string>
+    <string name="home_continue_watching">Συνέχιση προβολής</string>
+    <string name="home_recently_recorded">Νέες εγγραφές</string>
+    <string name="home_back_to_player">Πίσω στην αναπαραγωγή</string>
+    <string name="home_recording_starts_at">Έναρξη στις %1$s</string>
+    <string name="home_all_recordings">Όλες οι εγγραφές</string>
+    <string name="home_activity_watching_live">Ζωντανή προβολή</string>
+    <string name="home_activity_recording">Εγγραφή σε εξέλιξη</string>
+    <string name="home_activity_watching_and_recording">Προβολή και εγγραφή</string>
+    <string name="home_upcoming_summary">Επόμενο: %1$s • %2$s</string>
+    <plurals name="home_upcoming_more">
+        <item quantity="one">%1$d ακόμη προγραμματισμένη</item>
+        <item quantity="other">%1$d ακόμη προγραμματισμένες</item>
+    </plurals>
 </resources>

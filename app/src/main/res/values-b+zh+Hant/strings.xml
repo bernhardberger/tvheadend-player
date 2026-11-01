@@ -670,4 +670,35 @@
     <string name="channel_schedule_gap">%1$s之前沒有節目資訊</string>
     <string name="channel_schedule_end">%1$s之後沒有節目資訊</string>
     <string name="channel_schedule_loading_more">正在載入後續日期</string>
+    <string name="recording_choice_watch_channel">觀看頻道</string>
+    <string name="recording_choice_play">播放錄影</string>
+    <string name="context_resume_from">從%1$s繼續播放</string>
+    <string name="home_all_scheduled">所有預約</string>
+    <string name="nav_home">首頁</string>
+    <string name="home_now_playing">目前活動</string>
+    <string name="home_upcoming_recordings">即將錄影</string>
+    <string name="home_no_history">最近觀看的頻道會顯示在這裡。</string>
+    <string name="home_start_watching">開始觀看</string>
+    <string name="home_start_watching_hint">看過的頻道與錄影會顯示在這裡。</string>
+    <string name="home_browse_channels">瀏覽頻道</string>
+    <string name="home_loading_channels">正在載入頻道…</string>
+    <string name="home_still_connecting">仍在連線中…</string>
+    <string name="home_sections">區塊</string>
+    <string name="home_no_recordings">尚無錄影。</string>
+    <string name="home_sections_hidden">區塊已隱藏。請透過檢視選項顯示區塊。</string>
+    <string name="home_recent_channels">最近觀看的頻道</string>
+    <string name="home_on_now">現正播出</string>
+    <string name="home_browse_by_genre">依類型瀏覽</string>
+    <string name="home_continue_watching">繼續觀看</string>
+    <string name="home_recently_recorded">最新錄影</string>
+    <string name="home_back_to_player">返回播放器</string>
+    <string name="home_recording_starts_at">%1$s 開始</string>
+    <string name="home_all_recordings">所有錄影</string>
+    <string name="home_activity_watching_live">正在觀看直播</string>
+    <string name="home_activity_recording">正在錄影</string>
+    <string name="home_activity_watching_and_recording">正在觀看與錄影</string>
+    <string name="home_upcoming_summary">接下來：%1$s • %2$s</string>
+    <plurals name="home_upcoming_more">
+        <item quantity="other">另有 %1$d 項預約</item>
+    </plurals>
 </resources>

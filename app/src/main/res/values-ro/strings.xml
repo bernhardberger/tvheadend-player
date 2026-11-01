@@ -46,7 +46,7 @@
     <string name="context_record">Înregistrează</string>
     <string name="context_show_guide">Arată în ghid</string>
     <string name="context_resume">Reia</string>
-    <string name="context_start_over">De la început</string>
+    <string name="context_start_over">Vizionează de la început</string>
     <string name="context_mark_watched">Marchează ca vizionată</string>
     <string name="context_mark_unwatched">Marchează ca nevizionată</string>
     <string name="context_delete">Șterge</string>
@@ -736,4 +736,37 @@
     <string name="channel_schedule_gap">Nu există informații despre emisiuni până la %1$s</string>
     <string name="channel_schedule_end">Nu există informații despre emisiuni după %1$s</string>
     <string name="channel_schedule_loading_more">Se încarcă zilele următoare</string>
+    <string name="recording_choice_watch_channel">Vizionează canalul</string>
+    <string name="recording_choice_play">Redă înregistrarea</string>
+    <string name="context_resume_from">de la %1$s</string>
+    <string name="home_all_scheduled">Toate programările</string>
+    <string name="nav_home">Acasă</string>
+    <string name="home_now_playing">Chiar acum</string>
+    <string name="home_upcoming_recordings">Înregistrări viitoare</string>
+    <string name="home_no_history">Canalele vizionate recent vor apărea aici.</string>
+    <string name="home_start_watching">Începe vizionarea</string>
+    <string name="home_start_watching_hint">Canalele pe care le vizionezi și înregistrările vor apărea aici.</string>
+    <string name="home_browse_channels">Răsfoiește canalele</string>
+    <string name="home_loading_channels">Se încarcă canalele…</string>
+    <string name="home_still_connecting">Conectarea continuă…</string>
+    <string name="home_sections">Secțiuni</string>
+    <string name="home_no_recordings">Încă nu există înregistrări.</string>
+    <string name="home_sections_hidden">Secțiunile sunt ascunse. Folosește opțiunile de afișare pentru a le afișa.</string>
+    <string name="home_recent_channels">Canale recente</string>
+    <string name="home_on_now">Acum la TV</string>
+    <string name="home_browse_by_genre">Răsfoiește după gen</string>
+    <string name="home_continue_watching">Continuă vizionarea</string>
+    <string name="home_recently_recorded">Înregistrări noi</string>
+    <string name="home_back_to_player">Înapoi la player</string>
+    <string name="home_recording_starts_at">Începe la %1$s</string>
+    <string name="home_all_recordings">Toate înregistrările</string>
+    <string name="home_activity_watching_live">Vizionare în direct</string>
+    <string name="home_activity_recording">Înregistrare în curs</string>
+    <string name="home_activity_watching_and_recording">Vizionare și înregistrare</string>
+    <string name="home_upcoming_summary">Urmează: %1$s • %2$s</string>
+    <plurals name="home_upcoming_more">
+        <item quantity="one">Încă %1$d înregistrare programată</item>
+        <item quantity="few">Încă %1$d înregistrări programate</item>
+        <item quantity="other">Încă %1$d de înregistrări programate</item>
+    </plurals>
 </resources>

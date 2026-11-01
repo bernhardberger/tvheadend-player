@@ -46,7 +46,7 @@
     <string name="context_record">録画</string>
     <string name="context_show_guide">番組表に表示</string>
     <string name="context_resume">再開</string>
-    <string name="context_start_over">最初から</string>
+    <string name="context_start_over">最初から視聴</string>
     <string name="context_mark_watched">視聴済みにする</string>
     <string name="context_mark_unwatched">未視聴にする</string>
     <string name="context_delete">削除</string>
@@ -700,4 +700,35 @@
     <string name="channel_schedule_gap">%1$sまで番組情報がありません</string>
     <string name="channel_schedule_end">%1$s以降の番組情報がありません</string>
     <string name="channel_schedule_loading_more">後の日付を読み込み中</string>
+    <string name="recording_choice_watch_channel">チャンネルを視聴</string>
+    <string name="recording_choice_play">録画を再生</string>
+    <string name="context_resume_from">%1$s から</string>
+    <string name="home_all_scheduled">すべての録画予約</string>
+    <string name="nav_home">ホーム</string>
+    <string name="home_now_playing">現在のアクティビティ</string>
+    <string name="home_upcoming_recordings">今後の録画</string>
+    <string name="home_no_history">最近視聴したチャンネルがここに表示されます。</string>
+    <string name="home_start_watching">視聴を開始</string>
+    <string name="home_start_watching_hint">視聴したチャンネルや録画がここに表示されます。</string>
+    <string name="home_browse_channels">チャンネルを探す</string>
+    <string name="home_loading_channels">チャンネルを読み込み中…</string>
+    <string name="home_still_connecting">引き続き接続中…</string>
+    <string name="home_sections">セクション</string>
+    <string name="home_no_recordings">まだ録画はありません。</string>
+    <string name="home_sections_hidden">セクションは非表示です。表示オプションで表示できます。</string>
+    <string name="home_recent_channels">最近のチャンネル</string>
+    <string name="home_on_now">放送中</string>
+    <string name="home_browse_by_genre">ジャンルで探す</string>
+    <string name="home_continue_watching">視聴を続ける</string>
+    <string name="home_recently_recorded">最近の録画</string>
+    <string name="home_back_to_player">プレーヤーに戻る</string>
+    <string name="home_recording_starts_at">%1$s に開始</string>
+    <string name="home_all_recordings">すべての録画</string>
+    <string name="home_activity_watching_live">ライブ視聴中</string>
+    <string name="home_activity_recording">録画中</string>
+    <string name="home_activity_watching_and_recording">視聴・録画中</string>
+    <string name="home_upcoming_summary">次：%1$s • %2$s</string>
+    <plurals name="home_upcoming_more">
+        <item quantity="other">ほか %1$d 件の録画予約</item>
+    </plurals>
 </resources>

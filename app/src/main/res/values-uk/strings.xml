@@ -46,7 +46,7 @@
     <string name="context_record">Записати</string>
     <string name="context_show_guide">Показати в телепрограмі</string>
     <string name="context_resume">Продовжити</string>
-    <string name="context_start_over">Від початку</string>
+    <string name="context_start_over">Дивитися від початку</string>
     <string name="context_mark_watched">Позначити як переглянуте</string>
     <string name="context_mark_unwatched">Позначити як непереглянуте</string>
     <string name="context_delete">Видалити</string>
@@ -755,4 +755,38 @@
     <string name="channel_schedule_gap">Немає інформації про передачі до %1$s</string>
     <string name="channel_schedule_end">Немає інформації про передачі після %1$s</string>
     <string name="channel_schedule_loading_more">Завантаження наступних днів</string>
+    <string name="recording_choice_watch_channel">Дивитися канал</string>
+    <string name="recording_choice_play">Відтворити запис</string>
+    <string name="context_resume_from">від %1$s</string>
+    <string name="home_all_scheduled">Усі заплановані</string>
+    <string name="nav_home">Головна</string>
+    <string name="home_now_playing">Просто зараз</string>
+    <string name="home_upcoming_recordings">Майбутні записи</string>
+    <string name="home_no_history">Тут з’являться нещодавно переглянуті канали.</string>
+    <string name="home_start_watching">Почати перегляд</string>
+    <string name="home_start_watching_hint">Тут з’являться канали, які ви дивитеся, та записи.</string>
+    <string name="home_browse_channels">Огляд каналів</string>
+    <string name="home_loading_channels">Завантаження каналів…</string>
+    <string name="home_still_connecting">Підключення триває…</string>
+    <string name="home_sections">Розділи</string>
+    <string name="home_no_recordings">Записів поки немає.</string>
+    <string name="home_sections_hidden">Розділи приховані. Увімкніть їх у параметрах вигляду.</string>
+    <string name="home_recent_channels">Нещодавні канали</string>
+    <string name="home_on_now">Зараз в ефірі</string>
+    <string name="home_browse_by_genre">Огляд за жанрами</string>
+    <string name="home_continue_watching">Продовжити перегляд</string>
+    <string name="home_recently_recorded">Нові записи</string>
+    <string name="home_back_to_player">До програвача</string>
+    <string name="home_recording_starts_at">Початок о %1$s</string>
+    <string name="home_all_recordings">Усі записи</string>
+    <string name="home_activity_watching_live">Перегляд прямого ефіру</string>
+    <string name="home_activity_recording">Триває запис</string>
+    <string name="home_activity_watching_and_recording">Перегляд і запис</string>
+    <string name="home_upcoming_summary">Далі: %1$s • %2$s</string>
+    <plurals name="home_upcoming_more">
+        <item quantity="one">Ще %1$d запланований запис</item>
+        <item quantity="few">Ще %1$d заплановані записи</item>
+        <item quantity="many">Ще %1$d запланованих записів</item>
+        <item quantity="other">Ще %1$d запланованого запису</item>
+    </plurals>
 </resources>

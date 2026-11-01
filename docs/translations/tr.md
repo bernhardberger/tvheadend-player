@@ -13,6 +13,8 @@ unchanged round-1 text from `daebdd86`. Full resources reviewed by Sonnet 5.5
 (medium); no definite linguistic defects reported. The approved polite register
 is retained. No human reviewer; remains labeled machine-drafted.
 
+0.4.0 Home strings drafted against `d2d9a9ab` by GPT-6.1 Sol and reviewed by Sonnet 5.5 (high); still machine-drafted, no human reviewer.
+
 ## Typography
 
 - Android folder: `values-tr`.

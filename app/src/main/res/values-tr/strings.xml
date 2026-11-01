@@ -46,7 +46,7 @@
     <string name="context_record">Kaydet</string>
     <string name="context_show_guide">Rehberde göster</string>
     <string name="context_resume">Devam et</string>
-    <string name="context_start_over">Baştan başlat</string>
+    <string name="context_start_over">Baştan izle</string>
     <string name="context_mark_watched">İzlendi olarak işaretle</string>
     <string name="context_mark_unwatched">İzlenmedi olarak işaretle</string>
     <string name="context_delete">Sil</string>
@@ -718,4 +718,36 @@
     <string name="channel_schedule_gap">%1$s saatine kadar program bilgisi yok</string>
     <string name="channel_schedule_end">%1$s saatinden sonra program bilgisi yok</string>
     <string name="channel_schedule_loading_more">Sonraki günler yükleniyor</string>
+    <string name="recording_choice_watch_channel">Kanalı izle</string>
+    <string name="recording_choice_play">Kaydı oynat</string>
+    <string name="context_resume_from">%1$s konumundan</string>
+    <string name="home_all_scheduled">Tüm planlananlar</string>
+    <string name="nav_home">Ana sayfa</string>
+    <string name="home_now_playing">Şu anda</string>
+    <string name="home_upcoming_recordings">Yaklaşan kayıtlar</string>
+    <string name="home_no_history">Son izlenen kanallar burada görünecek.</string>
+    <string name="home_start_watching">İzlemeye başla</string>
+    <string name="home_start_watching_hint">İzlediğiniz kanallar ve kayıtlar burada görünecek.</string>
+    <string name="home_browse_channels">Kanallara göz at</string>
+    <string name="home_loading_channels">Kanallar yükleniyor…</string>
+    <string name="home_still_connecting">Hâlâ bağlanıyor…</string>
+    <string name="home_sections">Bölümler</string>
+    <string name="home_no_recordings">Henüz kayıt yok.</string>
+    <string name="home_sections_hidden">Bölümler gizli. Göstermek için görünüm seçeneklerini kullanın.</string>
+    <string name="home_recent_channels">Son kanallar</string>
+    <string name="home_on_now">Şimdi yayında</string>
+    <string name="home_browse_by_genre">Türe göre göz at</string>
+    <string name="home_continue_watching">İzlemeye devam et</string>
+    <string name="home_recently_recorded">Yeni kayıtlar</string>
+    <string name="home_back_to_player">Oynatıcıya dön</string>
+    <string name="home_recording_starts_at">Başlangıç: %1$s</string>
+    <string name="home_all_recordings">Tüm kayıtlar</string>
+    <string name="home_activity_watching_live">Canlı izleniyor</string>
+    <string name="home_activity_recording">Kaydediliyor</string>
+    <string name="home_activity_watching_and_recording">İzleniyor ve kaydediliyor</string>
+    <string name="home_upcoming_summary">Sıradaki: %1$s • %2$s</string>
+    <plurals name="home_upcoming_more">
+        <item quantity="one">%1$d kayıt daha planlandı</item>
+        <item quantity="other">%1$d kayıt daha planlandı</item>
+    </plurals>
 </resources>

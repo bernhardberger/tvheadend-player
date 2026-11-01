@@ -25,6 +25,8 @@ Neutral action labels with polite explanatory and recovery sentences (approved 2
 
 Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retaining unchanged round-1 text from `daebdd86`. Full resources reviewed by Sonnet 5.5 (medium); spoken seek direction and legal-notice meaning corrected. No human reviewer; remains labeled machine-drafted.
 
+0.4.0 Home strings drafted against `d2d9a9ab` by GPT-6.1 Sol and reviewed by Sonnet 5.5 (high); still machine-drafted, no human reviewer.
+
 ## Open questions
 
 - Review 専用機モード (`settings_appliance`), シーク terminology and dense accessibility disclosures.

@@ -46,7 +46,7 @@
     <string name="context_record">Optag</string>
     <string name="context_show_guide">Vis i tv-guiden</string>
     <string name="context_resume">Fortsæt</string>
-    <string name="context_start_over">Start forfra</string>
+    <string name="context_start_over">Se fra begyndelsen</string>
     <string name="context_mark_watched">Markér som set</string>
     <string name="context_mark_unwatched">Markér som ikke set</string>
     <string name="context_delete">Slet</string>
@@ -718,4 +718,36 @@
     <string name="channel_schedule_gap">Ingen programoplysninger indtil %1$s</string>
     <string name="channel_schedule_end">Ingen programoplysninger efter %1$s</string>
     <string name="channel_schedule_loading_more">Indlæser senere dage</string>
+    <string name="recording_choice_watch_channel">Se kanal</string>
+    <string name="recording_choice_play">Afspil optagelse</string>
+    <string name="context_resume_from">fra %1$s</string>
+    <string name="home_all_scheduled">Alle planlagte</string>
+    <string name="nav_home">Forside</string>
+    <string name="home_now_playing">Lige nu</string>
+    <string name="home_upcoming_recordings">Kommende optagelser</string>
+    <string name="home_no_history">Senest sete kanaler vises her.</string>
+    <string name="home_start_watching">Begynd at se</string>
+    <string name="home_start_watching_hint">Kanaler, du ser, og optagelser vises her.</string>
+    <string name="home_browse_channels">Gennemse kanaler</string>
+    <string name="home_loading_channels">Indlæser kanaler…</string>
+    <string name="home_still_connecting">Opretter stadig forbindelse…</string>
+    <string name="home_sections">Sektioner</string>
+    <string name="home_no_recordings">Ingen optagelser endnu.</string>
+    <string name="home_sections_hidden">Sektionerne er skjult. Brug visningsmulighederne til at vise dem.</string>
+    <string name="home_recent_channels">Seneste kanaler</string>
+    <string name="home_on_now">På tv nu</string>
+    <string name="home_browse_by_genre">Gennemse efter genre</string>
+    <string name="home_continue_watching">Se videre</string>
+    <string name="home_recently_recorded">Nye optagelser</string>
+    <string name="home_back_to_player">Tilbage til afspilleren</string>
+    <string name="home_recording_starts_at">Starter kl. %1$s</string>
+    <string name="home_all_recordings">Alle optagelser</string>
+    <string name="home_activity_watching_live">Ser live-tv</string>
+    <string name="home_activity_recording">Optager</string>
+    <string name="home_activity_watching_and_recording">Ser og optager</string>
+    <string name="home_upcoming_summary">Næste: %1$s • %2$s</string>
+    <plurals name="home_upcoming_more">
+        <item quantity="one">%1$d mere planlagt</item>
+        <item quantity="other">%1$d mere planlagt</item>
+    </plurals>
 </resources>

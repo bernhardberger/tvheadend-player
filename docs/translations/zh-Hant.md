@@ -26,6 +26,8 @@ Neutral, Taiwan-oriented software terminology, no reader pronouns; polite 請 in
 
 Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retaining unchanged round-1 text from `daebdd86`. Full resources reviewed by Sonnet 5.5 (medium); Behind live meaning and service-entry terminology corrected. No human reviewer; remains labeled machine-drafted. A representative Settings capture checks Traditional Chinese rendering, not whole-language visual acceptance.
 
+0.4.0 Home strings drafted against `d2d9a9ab` by GPT-6.1 Sol and reviewed by Sonnet 5.5 (high); still machine-drafted, no human reviewer.
+
 ## Open questions
 
 - Needs its own Traditional Chinese terminology review; no universal regional suitability is claimed.

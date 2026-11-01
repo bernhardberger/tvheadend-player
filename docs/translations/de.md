@@ -26,6 +26,8 @@ Informal **du**, already in use in the app. Action labels are infinitives or nou
 
 Existing German strings predate this workflow; they are kept and only changed for source changes or accepted corrections.
 
+0.4.0 Home strings drafted against `d2d9a9ab` by GPT-6.1 Sol and reviewed by Sonnet 5.5 (high); still machine-drafted, no human reviewer.
+
 ## Open questions
 
 - None recorded.

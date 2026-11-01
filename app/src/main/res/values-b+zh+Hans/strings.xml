@@ -670,4 +670,35 @@
     <string name="channel_schedule_gap">%1$s之前没有节目信息</string>
     <string name="channel_schedule_end">%1$s之后没有节目信息</string>
     <string name="channel_schedule_loading_more">正在加载后续日期</string>
+    <string name="recording_choice_watch_channel">观看频道</string>
+    <string name="recording_choice_play">播放录制内容</string>
+    <string name="context_resume_from">从%1$s继续播放</string>
+    <string name="home_all_scheduled">全部录制计划</string>
+    <string name="nav_home">首页</string>
+    <string name="home_now_playing">当前活动</string>
+    <string name="home_upcoming_recordings">即将录制</string>
+    <string name="home_no_history">最近观看的频道将显示在此处。</string>
+    <string name="home_start_watching">开始观看</string>
+    <string name="home_start_watching_hint">观看过的频道和录制内容将显示在此处。</string>
+    <string name="home_browse_channels">浏览频道</string>
+    <string name="home_loading_channels">正在加载频道…</string>
+    <string name="home_still_connecting">仍在连接…</string>
+    <string name="home_sections">分区</string>
+    <string name="home_no_recordings">暂无录制内容。</string>
+    <string name="home_sections_hidden">分区已隐藏。请在显示选项中显示分区。</string>
+    <string name="home_recent_channels">最近观看的频道</string>
+    <string name="home_on_now">正在播出</string>
+    <string name="home_browse_by_genre">按类型浏览</string>
+    <string name="home_continue_watching">继续观看</string>
+    <string name="home_recently_recorded">最新录制</string>
+    <string name="home_back_to_player">返回播放器</string>
+    <string name="home_recording_starts_at">%1$s 开始</string>
+    <string name="home_all_recordings">全部录制内容</string>
+    <string name="home_activity_watching_live">正在观看直播</string>
+    <string name="home_activity_recording">正在录制</string>
+    <string name="home_activity_watching_and_recording">正在观看并录制</string>
+    <string name="home_upcoming_summary">接下来：%1$s • %2$s</string>
+    <plurals name="home_upcoming_more">
+        <item quantity="other">另有 %1$d 项录制计划</item>
+    </plurals>
 </resources>

@@ -29,6 +29,8 @@ Gender-neutral: nominal actions and impersonal guidance (יש, אפשר); no mas
 
 Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retaining unchanged round-1 text from `daebdd86`. Full resources reviewed by Sonnet 5.5 (medium); singular button/action labels, category number and audio-channel counts corrected. No human reviewer; remains labeled machine-drafted. RTL layout acceptance remains open; see the round report.
 
+0.4.0 Home strings drafted against `d2d9a9ab` by GPT-6.1 Sol and reviewed by Sonnet 5.5 (high); still machine-drafted, no human reviewer.
+
 ## Open questions
 
 - Verify the plural categories on supported Android versions before integration.
