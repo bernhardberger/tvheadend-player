@@ -14,6 +14,8 @@
   including Start watching at the end of first setup.
 - Pictures and channel logos no longer stay missing after first setup until the
   app is restarted.
+- Pressing OK on a text field no longer skips to the next field on TVs with
+  Gboard.
 
 ### Home
 

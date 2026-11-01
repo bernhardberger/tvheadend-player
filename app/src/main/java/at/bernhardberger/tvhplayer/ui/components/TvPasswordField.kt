@@ -59,6 +59,7 @@ fun TvPasswordField(
 
     var passwordVisible by remember { mutableStateOf(false) }
     var textFocused by remember { mutableStateOf(false) }
+    val openPress = remember { FieldOpenPress() }
 
     val isEditing = editingId == id
     val displayedPresentation = presentationValue.takeIf { !isEditing && value.isEmpty() }
@@ -102,21 +103,17 @@ fun TvPasswordField(
             .focusRequester(textFocus)
             .onFocusChanged { state ->
                 textFocused = state.isFocused
+                if (!state.isFocused) openPress.cancel()
                 if (!state.isFocused && isEditing) setEditingId(null)
             }
             .onPreviewKeyEvent { ev ->
                 // This modifier also sees events from the nested eye button. Only the text
                 // target may open the IME; let the TV button handle its own activation.
-                if (!textFocused || ev.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                if (!textFocused) return@onPreviewKeyEvent false
+                if (openPress.handle(ev, isEditing) { setEditingId(id) }) return@onPreviewKeyEvent true
+                if (ev.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
 
                 when (ev.key) {
-                    Key.Enter, Key.NumPadEnter, Key.DirectionCenter -> {
-                        if (!isEditing) {
-                            setEditingId(id)
-                            true
-                        } else false
-                    }
-
                     Key.DirectionRight -> {
                         if (!isEditing && canReveal) {
                             eyeFocus.requestFocus()
