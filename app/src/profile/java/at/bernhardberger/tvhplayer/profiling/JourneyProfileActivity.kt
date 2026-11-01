@@ -176,7 +176,7 @@ class JourneyProfileActivity : AppCompatActivity() {
                                             onPlay = { _, _ -> }, onPlayRecording = { _, _ -> },
                                             onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> },
                                             onGenre = { backStack.navigateTopLevel(GuideKey) },
-                                            onRecordings = { backStack.navigateTopLevel(RecordingsKey) },
+                                            onRecordings = { _, _ -> backStack.navigateTopLevel(RecordingsKey) },
                                             lastPlayedStore = lastPlayed,
                                         )
                                     }

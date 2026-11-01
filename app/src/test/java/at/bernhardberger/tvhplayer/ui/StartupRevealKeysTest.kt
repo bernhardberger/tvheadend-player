@@ -125,9 +125,13 @@ class StartupRevealKeysTest {
         val covered = pixel(view)
         assertTrue("the startup screen covers the player", covered != android.graphics.Color.RED)
 
-        val start = compose.mainClock.currentTime
         change { state = state.copy(presentation = MainStartupPresentation.Inactive, revealRequestId = 1) }
+        // Apply the handoff and launch its effect before giving the animation its first frame.
         compose.mainClock.advanceTimeByFrame()
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeByFrame()
+        compose.waitForIdle()
+        val start = compose.mainClock.currentTime
         compose.mainClock.advanceTimeBy(PlayerMotion.PictureHoldMs - 20L)
         assertEquals("opaque through the hold", covered, pixel(view))
         compose.mainClock.advanceTimeBy(20L + StartupRevealMs / 2)
