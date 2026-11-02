@@ -118,8 +118,10 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
         guide: Boolean = false,
         presentation: Boolean = false,
         playingLive: ChannelId? = null,
+        channelCount: Int = LINE_UP.size,
+        tagNotice: Boolean = false,
     ) {
-        val observation = observation(tags, manyTags, emptyGroup, recordingNow, scheduledNext, guidePending, firstTitle, presentation)
+        val observation = observation(tags, manyTags, emptyGroup, recordingNow, scheduledNext, guidePending, firstTitle, presentation, channelCount)
         // All channels is opt-in under Settings: hiding it shows the tags only.
         val visibility = if (allChannels) ChannelScopeVisibility() else ChannelScopeVisibility(
             configured = true, allChannelsVisible = false,
@@ -167,7 +169,7 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
                             nowSecProvider = { System.currentTimeMillis() / 1000 },
                         ) { padding, drawerActive ->
                             if (!guide) {
-                                Channels(padding, !drawerActive, observation, visibility, playerReturn)
+                                Channels(padding, !drawerActive, observation, visibility, playerReturn, tagNotice)
                             } else {
                                 // The app's browse scene: the drawer's focus moves between Channels and a bare Guide.
                                 NavDisplay(
@@ -181,7 +183,7 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
                                             Box(Modifier.fillMaxSize())
                                         }
                                         entry<ChannelsKey>(metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.CHANNELS)) {
-                                            Channels(padding, !drawerActive && backStack.last() == ChannelsKey, observation, visibility, playerReturn)
+                                            Channels(padding, !drawerActive && backStack.last() == ChannelsKey, observation, visibility, playerReturn, tagNotice)
                                         }
                                         entry<GuideKey>(metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.GUIDE)) {
                                             Box(Modifier.fillMaxSize().testTag("guide-page"))
@@ -205,6 +207,7 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
         observation: SessionObservation,
         visibility: ChannelScopeVisibility,
         playerReturn: PlayerReturnFocus?,
+        tagNotice: Boolean,
     ) {
         var activeTag by remember { mutableStateOf<ChannelTagId?>(null) }
         ChannelsScreenContent(
@@ -212,7 +215,7 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
             initialFocusEnabled = initialFocusEnabled,
             channelScopeState = resolveChannelScopeState(observation.channelState, activeTag, visibility),
             observation = observation,
-            tagNotice = false,
+            tagNotice = tagNotice,
             selectedId = { selected },
             playingChannelId = playerReturn?.playingChannelId,
             playerReturn = playerReturn,
@@ -251,12 +254,16 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
     private fun observation(
         tags: Boolean, manyTags: Boolean, emptyGroup: Boolean, recordingNow: Int?, scheduledNext: Int?,
         guidePending: Boolean, firstTitle: String?, presentation: Boolean,
+        channelCount: Int,
     ): SessionObservation {
-        val channels = LINE_UP.mapIndexed { index, (name, _) ->
+        // Longer wall scenes repeat the fictional networks as additional channel numbers,
+        // reusing their picons; the extra channels deliberately have no programme data.
+        val channels = List(channelCount) { index ->
+            val (name, _) = LINE_UP[index % LINE_UP.size]
             Channel.create(
                 // The README scene keeps every name short; the long German one is a layout case.
                 id = ChannelId(index + 1L), name = if (presentation && index == 1) "Harbor Sport" else name, number = index + 1L,
-                icon = ChannelIcon.ImageCache(ArtworkId(index + 1)),
+                icon = ChannelIcon.ImageCache(ArtworkId(index % LINE_UP.size + 1)),
                 tagIds = if (manyTags) listOfNotNull(ChannelTagId(1).takeIf { index < 6 }, ChannelTagId(2L + index % (TAG_NAMES.size - 1)))
                     else listOf(ChannelTagId(if (index < 6) 1 else 2)),
             )
@@ -278,7 +285,7 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
             // The README scene gives picon-only Lantern Hour a programme too, so no visible card is empty.
             val title = firstTitle.takeIf { index == 0 } ?: (if (presentation && index == 1) "Harbor Kickoff" else null)
                 ?: (if (presentation && index == 7) "Stories by Lamplight" else null)
-                ?: LINE_UP[index].second ?: return@mapIndexedNotNull null
+                ?: LINE_UP.getOrNull(index)?.second ?: return@mapIndexedNotNull null
             // The presentation lineup shares the Guide's 20:15 evening, including the running match.
             val minutes = if (presentation) listOf(-15 to 45, -45 to 90, -15 to 30, -10 to 35,
                 -55 to 10, -75 to 15, -75 to 105).getOrNull(index) else null

@@ -152,7 +152,6 @@ import at.bernhardberger.tvhplayer.ui.components.rememberTabReader
 import at.bernhardberger.tvhplayer.ui.components.tabFocus
 import at.bernhardberger.tvhplayer.ui.components.underBrowseShellScrim
 import at.bernhardberger.tvhplayer.ui.player.programmeFactsSegments
-import at.bernhardberger.tvhplayer.ui.screens.guide.guideHeadlineHeight
 import kotlin.time.Instant
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
@@ -621,8 +620,7 @@ internal fun ChannelsImmersiveHero(
     nowSec: () -> Long,
     modifier: Modifier,
     besideList: Boolean = false,
-    sparse: Boolean = false,
-    /** A direction is held on the row, list or grid: the hero stays until focus rests. */
+    /** A direction is held on the immersive row or list: the hero stays until focus rests. */
     held: Boolean = false,
 ) {
     // A leaving group keeps showing its own channel while it fades.
@@ -635,7 +633,7 @@ internal fun ChannelsImmersiveHero(
     val typography = MaterialTheme.typography
     // A fixed height keeps the row in place while the hero's text changes length; shorter text
     // sits on the row, so a two-line title grows upward. Beside the list nothing moves with it.
-    val height = if (sparse) guideHeadlineHeight() else with(LocalDensity.current) {
+    val height = with(LocalDensity.current) {
         typography.labelMedium.lineHeight.toDp() + ProgrammeHeadlineTitleGap + typography.headlineLarge.lineHeight.toDp() * 2 +
             4.dp + typography.bodyLarge.lineHeight.toDp() +
             ProgrammeHeadlineGroupGap + ProgrammeHeadlineFactsLineHeight + ProgrammeHeadlineLineGap + typography.labelMedium.lineHeight.toDp() +
@@ -660,15 +658,12 @@ internal fun ChannelsImmersiveHero(
         // Beside the list the headline hangs from the picture, and the synopsis takes what is left.
         ChannelsHeadline(channel, current, next, nextScheduled, channel.id in frame.recordingIds, now,
             synopsisLines = when {
-                sparse -> 0
                 besideList -> ImmersiveListSynopsisLines
                 else -> ImmersiveSynopsisLines
             },
-            loading = frame.guideLoading, fitSynopsis = besideList, showNext = !sparse,
-            // Beside the list the title steps down one size, so it doesn't compete with the rows;
-            // the sparse headline over the grid is the Guide's.
+            loading = frame.guideLoading, fitSynopsis = besideList,
+            // Beside the list the title steps down one size, so it doesn't compete with the rows.
             titleStyle = when {
-                sparse -> MaterialTheme.typography.headlineSmall
                 besideList -> MaterialTheme.typography.titleLarge
                 else -> MaterialTheme.typography.headlineLarge.copy(lineHeight = ImmersiveTitleLineHeight)
             },

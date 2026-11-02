@@ -5,9 +5,11 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithTag
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.settings.ChannelsLayout
 import at.bernhardberger.tvhplayer.settings.ChannelsView
@@ -68,6 +70,40 @@ class ChannelsLayoutCaptureTest {
         capture("grid-no-names-top", card(1), outputs = "build/outputs/041-guide-channels")
         repeat(2) { fixture.key(Key.DirectionDown) }
         capture("grid-no-names-scrolled", card(9), outputs = "build/outputs/041-guide-channels")
+    }
+
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
+    fun gridWallTopScrolledLastRowAndViewOptions() = atEvening {
+        fixture.show(ChannelsView(ChannelsLayout.GRID, programArt = setOf(ChannelsLayout.GRID)),
+            fixture.fixtureArt(), presentation = true, channelCount = 30)
+        capture("grid-top", card(1), outputs = "build/outputs/043-channels")
+        fixture.key(Key.DirectionDown)
+        capture("grid-scrolled", card(5), outputs = "build/outputs/043-channels")
+        repeat(6) { fixture.key(Key.DirectionDown) }
+        capture("grid-last-row", card(29), outputs = "build/outputs/043-channels")
+        repeat(7) { fixture.key(Key.DirectionUp) }
+        fixture.awaitFocus(card(1))
+        fixture.key(Key.DirectionUp)
+        fixture.key(Key.DirectionRight)
+        fixture.key(Key.DirectionCenter)
+        fixture.awaitFocus(hasTestTag("channels-view-layout-grid"))
+        repeat(2) { fixture.key(Key.DirectionDown) }
+        listOf("layout-immersive", "layout-list", "layout-grid", "program-art", "channel-names").forEach {
+            compose.onNodeWithTag("channels-view-$it").assertIsDisplayed()
+        }
+        capture("grid-view-options", hasTestTag("channels-view-channel-names"), outputs = "build/outputs/043-channels")
+    }
+
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
+    fun wallRegressionImmersive() = atEvening {
+        fixture.show(ChannelsView(), fixture.fixtureArt(), presentation = true, recordingNow = 2, scheduledNext = 1)
+        capture("immersive", card(1), outputs = "build/outputs/043-channels")
+    }
+
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
+    fun wallRegressionList() = atEvening {
+        fixture.show(ChannelsView(ChannelsLayout.LIST), fixture.fixtureArt(), presentation = true, recordingNow = 2, scheduledNext = 1)
+        capture("list", row(1), outputs = "build/outputs/043-channels")
     }
 
     /** The same evening as a list. */
@@ -315,7 +351,7 @@ class ChannelsLayoutCaptureTest {
             shell=TVHeadendPlayerTheme + SideRail; background=theme background, no video
             view=${fixture.channelsView}
             focus=${focus.description} reached by D-pad
-            art=fictional fixture pack; channels 8-18 picon-only without EPG; channel 6 EPG without art
+            art=fictional fixture pack; channels 8-18 picon-only without EPG; channel 6 EPG without art${if (outputs == "build/outputs/043-channels" && name.startsWith("grid-")) "; wall lineup=30 channels; 19-30 repeat fixture networks/picons without EPG" else ""}
             evidenceLimit=static composition only; not physical-TV focus feel, motion or overscan
             """.trimIndent() + "\n",
         )

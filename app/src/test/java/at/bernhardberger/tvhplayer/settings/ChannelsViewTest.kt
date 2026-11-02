@@ -60,7 +60,8 @@ class ChannelsViewTest {
 
     @Test
     fun theStoreKeepsEveryValueOfTheView() = runTest {
-        val store = UiSettingsStore(InMemoryPreferencesDataStore())
+        val data = InMemoryPreferencesDataStore()
+        val store = UiSettingsStore(data)
         assertEquals(ChannelsView(), store.settings.first().channelsView)
         val view = ChannelsView(ChannelsLayout.GRID, setOf(ChannelsLayout.IMMERSIVE, ChannelsLayout.GRID))
         store.setChannelsView(view)
@@ -68,5 +69,9 @@ class ChannelsViewTest {
         val namedGrid = ChannelsView(ChannelsLayout.GRID, emptySet(), setOf(ChannelsLayout.GRID))
         store.setChannelsView(namedGrid)
         assertEquals(namedGrid, store.settings.first().channelsView)
+        assertEquals(namedGrid, UiSettingsStore(data).settings.first().channelsView)
+        val list = namedGrid.copy(layout = ChannelsLayout.LIST)
+        store.setChannelsView(list)
+        assertEquals(list, UiSettingsStore(data).settings.first().channelsView)
     }
 }

@@ -274,7 +274,7 @@ Paths below are relative to `app/src/main/java/at/bernhardberger/tvhplayer/ui/`.
 | Progress bar | `components/ProgressStrip.kt` |
 | Channel title | `components/ChannelTitle.kt` — `channelTitleText` |
 | Picon | `components/PiconBox.kt` — dimmed TV icon while loading, normal-strength TV icon when there is no logo or it fails |
-| Focused card's info above a row | `components/FocusedInfo.kt` — on Home's On now, Channels Immersive, Grid and List (with the List's picture), the Guide's headline and the zap rail: a 300 ms linear swap in which old and new text meet faintly, the List's picture crossfading over the same 300 ms; while a direction is held, Home, Channels and the Guide keep the last text and picture until focus rests (300 ms, with the backdrop), and the zap rail hides its info and brings it back 250 ms after release; a new programme on the same card updates in place |
+| Focused card's info above a row | `components/FocusedInfo.kt` — on Home's On now, Channels Immersive and List (with the List's picture), the Guide's headline and the zap rail: a 300 ms linear swap in which old and new text meet faintly, the List's picture crossfading over the same 300 ms; while a direction is held, Home, Channels Immersive/List and the Guide keep the last text and picture until focus rests (300 ms, with the backdrop), and the zap rail hides its info and brings it back 250 ms after release; a new programme on the same card updates in place |
 | Now-playing plate | `player/NowPlayingStrip.kt` — `NowPlayingPlate`: 48×27 picon plate (channel number without a logo) with the 2dp viewer-position strip, shared by the player strip and the rail's playing slot |
 | Image load fade | `../images/TvheadendArtworkLoader.kt` — the shared loader fades every logo and programme picture in over 200 ms when actually loaded; memory-cache hits show at once |
 | Reading box | `components/ProgrammeDetailsLayout.kt` — `ProgrammeDetailsFullDescription` |
@@ -657,8 +657,11 @@ tuner loss and interruption are failures, limit expiry is informational.
 Visual baseline accepted for implementation 2026-10-04 after the coordinated
 browse concept review, revised in the U4 polish rounds through 2026-10-21. View
 options offer three layouts, in this order: **Immersive** (the default), **List**
-and **Grid**. Immersive and Grid each keep their own **Program art** switch, off
-by default; off, cards and backdrops use channel logos instead of programme art.
+and **Grid**. Grid is a wall of cards, without a programme headline or backdrop;
+there is no programme-info switch. Immersive and Grid each keep their own
+**Program art** and **Channel names** switches. Program art defaults on in
+Immersive and off in Grid; Channel names defaults off in both. With Program art
+off, cards (and Immersive's backdrop) use channel logos instead of programme art.
 List always shows programme art (its pane picture is the point), so it has no
 switch (owner, 2026-10-25). The switch sits below a divider under its own
 heading, "Immersive options" or "Grid options", since it applies to that layout
@@ -736,12 +739,9 @@ only.
   safe inset (y512), and is left out rather than cut when no whole line fits.
   Without EPG the title reads the no-EPG label and the other programme lines are
   omitted.
-- **List backdrop.** Without warm playback, List uses the Grid's blurred
-  backdrop below: the focused programme's art, or without art the logo colour
-  behind a blurred logo. A sharp picture in the corner would
-  repeat the pane's picture, so the corner backdrop stays with Immersive. Over
-  warm playback there is no backdrop.
-- The headline pane is passive and never an additional D-pad target. It fades
+- **List and Grid background.** Both use the plain browse background without
+  a programme backdrop. Warm playback remains visible behind browse.
+- The Immersive and List headline pane is passive and never an additional D-pad target. It fades
   through the shared focused-info change rather than hard-cutting as the browsed
   row changes: short enough that fast row-to-row browsing still feels immediate. Each
   state resolves its own EPG, so the outgoing copy keeps the channel it was written
@@ -760,15 +760,17 @@ only.
   picture fills the top-end corner from the screen's top edge, as the kit's
   immersive list does, under its cinematic scrim over the programme's ambient
   tint. Without art, the channel's logo colour fills the screen behind a blurred
-  copy of the logo, and the 240×135 logo stands at the top end, over the Grid only as tall as the headline leaves room for. The backdrop stays
+  copy of the logo, and the 240×135 logo stands at the top end. The backdrop stays
   in place when the drawer opens; only the sharp logo moves with the content.
-- **Grid.** The headline stays fixed above four columns of the immersive row's
-  compact cards. The focused row is pinned just below it and the rows move under
-  it. While the grid can scroll back, the bottom of the row above fades out into
-  the 40dp gap under the headline, so it shows the viewer they are down the list;
-  in the first row nothing stands there. Rows leaving at the top dissolve through
-  the same fade. The backdrop is the focused programme's blurred art, or with
-  Program art off the logo colour behind a blurred logo.
+- **Grid.** Four columns of the immersive row's compact cards form a wall,
+  without a programme headline or backdrop. The header scrolls away with the
+  rows and returns at the first row, with no fade or scrim. At rest on the
+  960×540 reference canvas, cards start at y116, 48dp below the header controls;
+  scrolled focus sits at y48 while earlier rows are cut by the physical top
+  edge. A partial row peeks at both ends where more rows remain. Card sizes
+  and gutters are unchanged. Up from the first row reaches the header, Down
+  returns to the remembered card, and Left at a row's start reaches the rail.
+  An unavailable-tag notice keeps the header pinned and the notice clear of it.
 - **Cards.** In Channels, programme-art cards darken towards their text with a
   linear scrim in the kit's colour (80% at the text, 95% at the bottom), and the
   channel logo stands over the art inside a soft dark halo. That scrim is baked

@@ -5,7 +5,6 @@ import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.gestures.BringIntoViewSpec
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.PaddingValues
@@ -20,14 +19,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -38,7 +29,6 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -50,8 +40,6 @@ import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
-import at.bernhardberger.tvhplayer.ui.components.EndHoldOnInterruption
-import at.bernhardberger.tvhplayer.ui.components.directionalHold
 import at.bernhardberger.tvhplayer.ui.components.CardGlowReach
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
 import at.bernhardberger.tvhplayer.ui.components.CompactZapCardGap
@@ -70,11 +58,14 @@ private val ChannelsGridRowGap = 16.dp
  */
 internal val ChannelsGridEdgeInset = 16.dp
 
+/** Scrolled rows sit this far below the physical top edge, leaving the preceding row's tail visible. */
+internal val ChannelsGridFocusLine = 48.dp
+
 /**
  * Wall of the immersive row's cards in [ChannelsGridColumns] columns. D-pad moves within the grid; Right at the last
  * column and Down at the last row stay, Left at the first column leaves for the navigation rail
- * and Up from the first row reaches the header buttons. The grid scrolls in place below the
- * headline with the focused row pinned at its top and the row above fading out behind it.
+ * and Up from the first row reaches the header buttons. The header scrolls away with the rows;
+ * the focused row sits at [ChannelsGridFocusLine], with the preceding row cut by the screen edge.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -96,19 +87,23 @@ internal fun ChannelsGrid(
     onExitTowardNavigation: () -> Unit,
     onPage: (Int) -> Boolean,
     modifier: Modifier = Modifier,
-    /** Whether a direction is being held down, so what follows focus can wait for it to rest. */
-    onHold: (Boolean) -> Unit = {},
+    /** Top reserve that scrolls away with the first row; zero while a notice pins the header. */
+    scrollingHeaderHeight: Dp = 0.dp,
 ) {
     val columns = ChannelsGridColumns
     val ltr = LocalLayoutDirection.current == LayoutDirection.Ltr
     val density = LocalDensity.current
-    val bringIntoView = remember(density) {
-        with(density) {
-            ChannelsGridBringIntoViewSpec(topInsetPx = CardGlowReach.toPx())
+    var focusedIndex by remember { mutableIntStateOf(-1) }
+    val bringIntoView = remember(density, scrollingHeaderHeight) {
+        ChannelsGridBringIntoViewSpec {
+            val reserve = when {
+                focusedIndex < columns -> scrollingHeaderHeight
+                scrollingHeaderHeight > 0.dp -> ChannelsGridFocusLine - ChannelsGridEdgeInset
+                else -> 0.dp
+            }
+            with(density) { (CardGlowReach + reserve).toPx() }
         }
     }
-    var focusedIndex by remember { mutableIntStateOf(-1) }
-    EndHoldOnInterruption(onHold)
     val lastRow = channels.lastIndex / columns
     BoxWithConstraints(modifier) {
     val cardWidth = (maxWidth - ChannelsGridEdgeInset * 2 - CompactZapCardGap * (columns - 1)) / columns
@@ -122,18 +117,15 @@ internal fun ChannelsGrid(
             contentPadding = PaddingValues(
                 start = CardGlowReach,
                 end = CardGlowReach,
-                top = CardGlowReach,
+                top = CardGlowReach + scrollingHeaderHeight,
                 bottom = TvGridVerticalMargin,
             ),
             modifier = Modifier
                 .fillMaxSize()
                 .testTag("channels-grid")
-                // A hold that runs out into the header or rail ends with its release there.
-                .onFocusChanged { if (!it.hasFocus) onHold(false) }
                 .focusGroup()
                 .focusRestorer()
                 .onPreviewKeyEvent { event ->
-                    event.directionalHold()?.let(onHold)
                     if (!isCurrent) return@onPreviewKeyEvent true
                     if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                     val index = focusedIndex.takeIf { it in channels.indices }
@@ -150,7 +142,7 @@ internal fun ChannelsGrid(
                         else -> ChannelNavigation.pageDirectionForKeyCode(event.nativeKeyEvent.keyCode)?.let(onPage) ?: false
                     }
                 }
-                // The focused card's glow reaches past the inset, into the headline gap above.
+                // The focused card's glow reaches past the inset above.
                 .cardGlowRoom(
                     horizontal = CardGlowReach - ChannelsGridEdgeInset,
                     top = CardGlowReach - ChannelsGridEdgeInset,
@@ -165,40 +157,38 @@ internal fun ChannelsGrid(
                 val event = remember(channelId, frame.observation, now) {
                     frame.observation.eventAt(channelId, kotlin.time.Instant.fromEpochSeconds(now))
                 }
-                Box(Modifier.fadeAboveFocusLine(state, index)) {
-                    ChannelsRowCard(
-                        channel = channel,
-                        event = event,
-                        nowSec = now,
-                        playbackIndicator = frame.playbackIndicator.takeIf { channelId == frame.playbackChannelId }
-                            ?: ChannelPlaybackIndicator.NONE,
-                        recording = channelId in frame.recordingIds,
-                        onClick = { onPlay(channel) },
-                        onLongClick = { onOpenContextMenu(channelId) },
-                        programmeLoading = frame.guideLoading,
-                        programmePicture = programmePicture,
-                        channelName = channelNames,
-                        width = cardWidth,
-                        tagPrefix = "channels-grid",
-                        modifier = Modifier
-                            .then(if (isCurrent) Modifier.focusRequester(focusRequesters.getValue(channelId)) else Modifier)
-                            .tabFocus()
-                            .focusProperties {
-                                if (index % columns == 0) {
-                                    if (ltr) left = navigationFocus ?: FocusRequester.Default
-                                    else right = navigationFocus ?: FocusRequester.Default
-                                }
-                                if (index < columns && headerFocus != null) up = headerFocus
+                ChannelsRowCard(
+                    channel = channel,
+                    event = event,
+                    nowSec = now,
+                    playbackIndicator = frame.playbackIndicator.takeIf { channelId == frame.playbackChannelId }
+                        ?: ChannelPlaybackIndicator.NONE,
+                    recording = channelId in frame.recordingIds,
+                    onClick = { onPlay(channel) },
+                    onLongClick = { onOpenContextMenu(channelId) },
+                    programmeLoading = frame.guideLoading,
+                    programmePicture = programmePicture,
+                    channelName = channelNames,
+                    width = cardWidth,
+                    tagPrefix = "channels-grid",
+                    modifier = Modifier
+                        .then(if (isCurrent) Modifier.focusRequester(focusRequesters.getValue(channelId)) else Modifier)
+                        .tabFocus()
+                        .focusProperties {
+                            if (index % columns == 0) {
+                                if (ltr) left = navigationFocus ?: FocusRequester.Default
+                                else right = navigationFocus ?: FocusRequester.Default
                             }
-                            .onFocusChanged {
-                                if (it.isFocused) {
-                                    focusedIndex = index
-                                    onFocusChannel(channelId)
-                                }
+                            if (index < columns && headerFocus != null) up = headerFocus
+                        }
+                        .onFocusChanged {
+                            if (it.isFocused) {
+                                focusedIndex = index
+                                onFocusChannel(channelId)
                             }
-                            .testTag("channel-card-${channelId.value}"),
-                    )
-                }
+                        }
+                        .testTag("channel-card-${channelId.value}"),
+                )
             }
         }
     }
@@ -218,48 +208,11 @@ internal fun Modifier.overflowTop(overflow: Dp): Modifier = layout { measurable,
 }
 
 /**
- * A row above the focus line fades out into the headline gap, so the bottom of the row above stays
- * in view whenever the grid can scroll back, and leaving rows dissolve instead of being cut. The
- * focused row sits on the line, so its glow still reaches the gap whole. Placement is read during
- * drawing, not focus: focus changes before the scroll starts.
- */
-private fun Modifier.fadeAboveFocusLine(state: LazyGridState, index: Int) = drawWithCache {
-    val paint = Paint()
-    val reach = CardGlowReach.toPx()
-    onDrawWithContent {
-        // Offsets count from the content padding's end, where the focused row stays.
-        val top = state.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }?.offset?.y
-        if (top == null || top >= 0) drawContent()
-        else {
-            val line = -top.toFloat()
-            val edge = line - reach
-            // Isolate only this item, without cropping its side and bottom glow.
-            val bounds = Rect(-reach, edge, size.width + reach, size.height + reach)
-            if (edge < bounds.bottom) clipRect(-size.width, edge, 2 * size.width, 2 * size.height) {
-                drawContext.canvas.saveLayer(bounds, paint)
-                this@onDrawWithContent.drawContent()
-                drawRect(
-                    Brush.verticalGradient(
-                        0f to Color.Transparent, 0.4f to Color.Black.copy(alpha = 0.08f),
-                        0.6f to Color.Black.copy(alpha = 0.35f), 1f to Color.Black,
-                        startY = edge, endY = line,
-                    ),
-                    topLeft = Offset(bounds.left, edge),
-                    size = Size(bounds.width, reach),
-                    blendMode = BlendMode.DstIn,
-                )
-                drawContext.canvas.restore()
-            }
-        }
-    }
-}
-
-/**
- * Holds the focused row at the grid's top, below its inset, so the rows move under it and only the
- * row above shows, fading out into the headline gap. Near the end the scroll stops at its bound, which leaves the last rows in place.
+ * Holds the focused row below the top edge. Near the end the scroll stops at its bound,
+ * which leaves the last rows in place.
  */
 @OptIn(ExperimentalFoundationApi::class)
-internal class ChannelsGridBringIntoViewSpec(private val topInsetPx: Float) : BringIntoViewSpec {
+internal class ChannelsGridBringIntoViewSpec(private val topInsetPx: () -> Float) : BringIntoViewSpec {
     override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float =
-        offset - topInsetPx
+        offset - topInsetPx()
 }
