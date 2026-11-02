@@ -582,6 +582,36 @@ class ChannelsLayoutFocusTest {
         compose.onAllNodes(headline, useUnmergedTree = true).assertCountEquals(1)
     }
 
+    private fun assertHeroWaitsForAHeldKey(keyCode: Int, reached: SemanticsMatcher) {
+        fun press(action: Int, repeat: Int = 0) {
+            compose.onRoot().performKeyPress(androidx.compose.ui.input.key.KeyEvent(android.view.KeyEvent(
+                0L, 0L, action, keyCode, repeat)))
+            compose.waitForIdle()
+        }
+        val headline = hasTestTag("channels-headline-channel") and hasAnyAncestor(hasTestTag("channels-immersive-hero"))
+        compose.onAllNodes(headline, useUnmergedTree = true).assertCountEquals(1)
+        press(android.view.KeyEvent.ACTION_DOWN)
+        press(android.view.KeyEvent.ACTION_DOWN, repeat = 1)
+        fixture.awaitFocus(reached)
+        compose.mainClock.advanceTimeBy(600)
+        compose.onAllNodes(headline, useUnmergedTree = true).assertCountEquals(0)
+        press(android.view.KeyEvent.ACTION_UP)
+        compose.mainClock.advanceTimeBy(600)
+        compose.onAllNodes(headline, useUnmergedTree = true).assertCountEquals(1)
+    }
+
+    @Test fun theListsInfoWaitsForAHeldKeyToRest() {
+        fixture.show(list)
+        fixture.awaitFocus(row(1))
+        assertHeroWaitsForAHeldKey(android.view.KeyEvent.KEYCODE_DPAD_DOWN, row(3))
+    }
+
+    @Test fun theGridsInfoWaitsForAHeldKeyToRest() {
+        fixture.show(grid)
+        fixture.awaitFocus(card(1))
+        assertHeroWaitsForAHeldKey(android.view.KeyEvent.KEYCODE_DPAD_RIGHT, card(3))
+    }
+
     @Test @GraphicsMode(GraphicsMode.Mode.NATIVE) fun theNameBelowACardPastTheKeylineIsMutedWithIt() {
         fixture.show(ChannelsView(ChannelsLayout.IMMERSIVE, channelNames = setOf(ChannelsLayout.IMMERSIVE)))
         fixture.awaitFocus(card(1))

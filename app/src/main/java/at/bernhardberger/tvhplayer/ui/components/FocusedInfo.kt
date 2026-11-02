@@ -20,20 +20,39 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalWindowInfo
-import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 import kotlinx.coroutines.delay
 
 /** How long focus must rest after a held key before the focused card's info returns. */
 internal const val FocusedInfoSettleMs = 250L
 
+private const val FocusedInfoOutDelayMs = 30
+private const val FocusedInfoOutMs = 120
+private const val FocusedInfoInDelayMs = 120
+private const val FocusedInfoInMs = 180
+private const val FocusedInfoTotalMs = FocusedInfoInDelayMs + FocusedInfoInMs
+
 /**
- * What follows focus, from one focused card or programme to the next: a plain linear crossfade, with
- * the backdrop's duration, so a picture and its text change together.
+ * The text that follows focus, from one focused card or programme to the next. Between a crossfade,
+ * where two texts stack at half strength and smear, and an out-then-in, which blinks through nothing:
+ * the old text is nearly gone when the new one starts, so they meet only faintly.
  */
-internal fun focusedInfoSwap(): ContentTransform {
-    val fade = tween<Float>(BrowseMotionPolicy.focusChangeFadeMs, easing = LinearEasing)
-    return ContentTransform(fadeIn(fade), fadeOut(fade), sizeTransform = null)
-}
+internal fun focusedInfoSwap(): ContentTransform =
+    ContentTransform(
+        fadeIn(tween(FocusedInfoInMs, delayMillis = FocusedInfoInDelayMs, easing = LinearEasing)),
+        fadeOut(tween(FocusedInfoOutMs, delayMillis = FocusedInfoOutDelayMs, easing = LinearEasing)),
+        sizeTransform = null,
+    )
+
+/**
+ * The picture beside that text, ending with it. A new picture fades in over the old one, which stays
+ * until it is covered, so there is no dip to the background and no two ghosts of a picture.
+ */
+internal fun focusedPictureSwap(): ContentTransform =
+    ContentTransform(
+        fadeIn(tween(FocusedInfoTotalMs, easing = LinearEasing)),
+        fadeOut(tween(durationMillis = 1, delayMillis = FocusedInfoTotalMs)),
+        sizeTransform = null,
+    )
 
 /**
  * [value], or null while [held] and for [settleMs] after it is released. Each single press
@@ -55,11 +74,13 @@ internal fun <T : Any> rememberUnlessHeld(value: T?, held: Boolean, settleMs: Lo
 
 /** Whether this Left or Right event is a key held down and repeating; null for any other key. */
 internal fun KeyEvent.horizontalHold(): Boolean? =
-    if (key == Key.DirectionLeft || key == Key.DirectionRight) {
-        type == KeyEventType.KeyDown && nativeKeyEvent.repeatCount > 0
-    } else {
-        null
-    }
+    if (key == Key.DirectionLeft || key == Key.DirectionRight) repeating() else null
+
+/** The same for all four directions, for what moves both ways. */
+internal fun KeyEvent.directionalHold(): Boolean? =
+    if (key == Key.DirectionUp || key == Key.DirectionDown) repeating() else horizontalHold()
+
+private fun KeyEvent.repeating() = type == KeyEventType.KeyDown && nativeKeyEvent.repeatCount > 0
 
 /**
  * Ends a hold whose release may never arrive: another window took the keys, or the row that saw

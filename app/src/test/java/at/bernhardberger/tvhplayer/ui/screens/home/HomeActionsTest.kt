@@ -1315,6 +1315,22 @@ class HomeActionsTest {
         compose.mainClock.autoAdvance = true
     }
 
+    @Test fun aReturnWithFocusStillOnTheRailShowsTheRememberedCardsInfo() {
+        val items = (1L..6).map { id ->
+            val item = Channel.create(ChannelId(id), name = "Channel $id", number = id)
+            OnNowItem(item, EpgEvent.create(EventId(id), item.id, Instant.fromEpochSeconds(now - 600),
+                Instant.fromEpochSeconds(now + 600), title = "Programme $id"))
+        }
+        compose.setContent { TVHeadendPlayerTheme {
+            HomeContent(listOf(HomeSection.OnNow(items)), PaddingValues(),
+                HomeFocusKey(HomeSectionKind.ON_NOW, "onnow:4", 3), {},
+                focusEnabled = false, observation = SessionObservation.create())
+        } }
+        compose.waitForIdle()
+        onNowInfo("Programme 4").assertCountEquals(1)
+        onNowInfo("Programme 1").assertCountEquals(0)
+    }
+
     @Test fun aHoldWhoseReleaseGotLostInAnotherWindowEndsWhenThatWindowTakesOver() {
         val focused = mutableStateOf(true)
         onNowRow(6, window = object : androidx.compose.ui.platform.WindowInfo {

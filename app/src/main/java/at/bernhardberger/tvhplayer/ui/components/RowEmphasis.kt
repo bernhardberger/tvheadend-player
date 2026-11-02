@@ -43,8 +43,10 @@ internal val RowTravelEasing = CubicBezierEasing(0.46f, 0f, 0f, 1f)
 internal val RowTravelMotion = tween<Float>(RowTravelMs, easing = RowTravelEasing)
 
 internal const val RowDimAlpha = 0.4f
-/** A card wholly past its row's start keyline, where it lies under the navigation drawer, in any row. */
-internal const val RowPastStartAlpha = 0.12f
+/** A card wholly past its row's start keyline, where it lies under the navigation drawer, in the focused row. */
+internal const val RowPastStartAlpha = 0.2f
+/** The same in a row without focus, whose own dimming counts towards it. */
+private const val DimmedRowPastStartAlpha = 0.12f
 internal const val RowHeaderQuietAlpha = TvPassiveAlpha
 internal const val RowHeaderQuietScale = 14f / 24f
 
@@ -63,7 +65,8 @@ internal fun Modifier.mutedPastRowStart(
 ): Modifier = graphicsLayer {
     val item = state.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
     val past = if (item == null || focused()) 0f else (-item.offset / (item.size + gapPx)).coerceIn(0f, 1f)
-    alpha = lerp(1f, RowPastStartAlpha / rowDimAlpha(rowEmphasis()), past)
+    val emphasis = rowEmphasis()
+    alpha = lerp(1f, lerp(DimmedRowPastStartAlpha, RowPastStartAlpha, emphasis) / rowDimAlpha(emphasis), past)
     compositingStrategy = if (past > 0f) CompositingStrategy.Offscreen else CompositingStrategy.Auto
 }
 

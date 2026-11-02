@@ -134,6 +134,7 @@ import at.bernhardberger.tvhplayer.ui.components.browseScreenBackdrop
 import at.bernhardberger.tvhplayer.ui.components.browseUnderlap
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import at.bernhardberger.tvhplayer.ui.components.focusedInfoSwap
+import at.bernhardberger.tvhplayer.ui.components.focusedPictureSwap
 import at.bernhardberger.tvhplayer.ui.components.EndHoldOnInterruption
 import at.bernhardberger.tvhplayer.ui.components.horizontalHold
 import at.bernhardberger.tvhplayer.ui.components.mutedPastRowStart
@@ -604,7 +605,7 @@ internal fun ChannelsImmersiveHero(
     modifier: Modifier,
     besideList: Boolean = false,
     sparse: Boolean = false,
-    /** Left or Right is held on the row: the hero waits until focus rests. */
+    /** A direction is held on the row, list or grid: the hero waits until focus rests. */
     held: Boolean = false,
 ) {
     // A leaving group keeps showing its own channel while it fades.
@@ -738,14 +739,18 @@ internal fun ChannelsListArt(
     nowSec: () -> Long,
     programArt: Boolean,
     modifier: Modifier,
+    /** A direction is held on the list: the picture waits until focus rests, as the text does. */
+    held: Boolean = false,
 ) {
     val focusedId = rememberTabReader(frame.focusedId)
     val entryId = rememberTabReader(frame.entryId)
-    val channelId = focusedId()?.takeIf { id -> channels.any { it.id == id } }
-        ?: browsingFocusChannelId(channels, entryId())
+    val channelId = rememberUnlessHeld(
+        focusedId()?.takeIf { id -> channels.any { it.id == id } } ?: browsingFocusChannelId(channels, entryId()),
+        held,
+    )
     AnimatedContent(
         targetState = channelId,
-        transitionSpec = { focusedInfoSwap() },
+        transitionSpec = { focusedPictureSwap() },
         modifier = modifier.width(ProgrammePaneWidth).aspectRatio(16f / 9f).testTag("channels-list-art"),
         label = "listArt",
     ) { id ->

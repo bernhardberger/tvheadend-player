@@ -70,13 +70,13 @@ internal object BrowseMotionPolicy {
     const val backdropSettleMs = 300L
     const val backdropIntervalMs = 500L
     const val backdropLoadTimeoutMs = 2_000L
-    /** One crossfade for whatever follows focus: backdrops, the info above a row, a pane's picture. */
-    const val focusChangeFadeMs = 225
+    private const val backdropFadeMs = 225
     /**
-     * How much larger a backdrop starts while it fades in, settling toward its top end corner. A fit to
-     * the G10's launcher recording gives 1.5-2% at the fade's start, but a small sideways shift fits
-     * that recording about as well: the zoom follows what the launcher looks like, not a clean measurement.
+     * How large a backdrop starts while it fades in, growing about its middle to full size with the
+     * fade. Fitted to five transitions on the G10's launcher: the best scale rises from 97.5% at 10%
+     * alpha to 99.5% at 80%, always about the middle, and leaves 1.2 to 3 times less difference than
+     * no movement or a sideways shift while the fade runs.
      */
-    const val backdropAppearScale = 1.02f
-    fun <T> backdropFade() = tween<T>(focusChangeFadeMs, easing = LinearEasing)
+    const val backdropAppearScale = 0.97f
+    fun <T> backdropFade() = tween<T>(backdropFadeMs, easing = LinearEasing)
 }

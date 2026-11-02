@@ -217,13 +217,13 @@ class HomeCaptureTest {
         settle("home-onnow-1")
         assertTrue("the card has left the keyline for the rail", bounds("home-onnow-0").right < 130.dp)
         val muted = cardBrightness()
-        assertTrue("the leaving card is muted: $muted vs $atTheKeyline", muted < atTheKeyline * 0.3f)
+        assertTrue("the leaving card is muted: $muted vs $atTheKeyline", muted < atTheKeyline * 0.35f)
         assertTrue("and still there, right to the screen edge: $muted", muted > atTheKeyline * 0.05f)
-        // The same past the keyline in a row without focus, whose own dimming counts towards it.
+        // Fainter still past the keyline in a row without focus, whose own dimming counts towards it.
         key(Key.DirectionUp)
         settle("home-recent-0")
         val inADimmedRow = cardBrightness()
-        assertEquals(muted, inADimmedRow, 0.02f)
+        assertTrue("a dimmed row's card is fainter: $inADimmedRow vs $muted", inADimmedRow < muted)
     }
 
     @Test fun infoBottomStaysAnchoredDuringTextHeightChange() = atEvening {

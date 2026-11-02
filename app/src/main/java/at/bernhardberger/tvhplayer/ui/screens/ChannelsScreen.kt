@@ -130,6 +130,8 @@ import at.bernhardberger.tvhplayer.ui.TvPanelBrowseAlpha
 import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
 import at.bernhardberger.tvhplayer.ui.TvBrowseLeadingInset
 import at.bernhardberger.tvhplayer.ui.TvBrowseTrailingInset
+import at.bernhardberger.tvhplayer.ui.components.EndHoldOnInterruption
+import at.bernhardberger.tvhplayer.ui.components.directionalHold
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideHeadlineHeight
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideHeadlineLogoMaxHeight
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeadlineRulerGap
@@ -308,6 +310,8 @@ internal fun ChannelsScreenContent(
     // One-shot per player return; AppRoot clears the request when the destination changes.
     var playerReturnPending by remember(playerReturn) { mutableStateOf(playerReturn != null) }
     var focusedChannelId by remember { mutableStateOf<ChannelId?>(null) }
+    // A direction held on the list or grid; Immersive's row keeps its own.
+    var browseHeld by remember { mutableStateOf(false) }
     var contextChannelId by remember { mutableStateOf<ChannelId?>(null) }
     var showProgrammeDetails by remember { mutableStateOf(false) }
     var contentFocusOwned by remember { mutableStateOf(false) }
@@ -886,7 +890,7 @@ internal fun ChannelsScreenContent(
                     )
                     if (tagNotice) Spacer(Modifier.height(8.dp))
                     ChannelsImmersiveHero(channels, frame, nowSecProvider, Modifier.padding(start = ChannelsGridEdgeInset),
-                        sparse = true)
+                        sparse = true, held = browseHeld)
                     // The immersive row's 40dp from headline to cards, less the grid's own inset.
                     Spacer(Modifier.height(ChannelsGridHeadlineGap - ChannelsGridEdgeInset))
                     ChannelsGrid(
@@ -905,6 +909,7 @@ internal fun ChannelsScreenContent(
                         onOpenContextMenu = { if (owner.isCurrent) openChannelContextMenu(it) },
                         onExitTowardNavigation = { relinquishContentFocus() },
                         onPage = ::pageChannels,
+                        onHold = { browseHeld = it },
                         modifier = Modifier.weight(1f).fillMaxWidth().then(contentEntry),
                     )
                 }
@@ -930,6 +935,7 @@ internal fun ChannelsScreenContent(
                         )
                         if (tagNotice) Spacer(Modifier.height(8.dp))
                         val topOverflow = if (tagNotice) 0.dp else contentPadding.calculateTopPadding()
+                        EndHoldOnInterruption { browseHeld = it }
 
                         CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoViewSpec) {
                             LazyColumn(
@@ -951,6 +957,7 @@ internal fun ChannelsScreenContent(
                                     .focusGroup()
                                     .focusRestorer()
                                     .onPreviewKeyEvent { event ->
+                                        event.directionalHold()?.let { browseHeld = it }
                                         if (!owner.isCurrent) return@onPreviewKeyEvent true
                                         if (event.type != KeyEventType.KeyDown) {
                                             return@onPreviewKeyEvent false
@@ -1050,9 +1057,9 @@ internal fun ChannelsScreenContent(
                     ) {
                         // Below the header buttons, with the list's top reserve.
                         ChannelsListArt(channels, frame, nowSecProvider, view.showsProgramArt,
-                            Modifier.padding(top = ChannelsListTopReserve))
+                            Modifier.padding(top = ChannelsListTopReserve), held = browseHeld)
                         ChannelsImmersiveHero(channels, frame, nowSecProvider,
-                            Modifier.padding(top = ProgrammePanePictureGap).weight(1f).widthIn(max = ProgrammePaneWidth), besideList = true)
+                            Modifier.padding(top = ProgrammePanePictureGap).weight(1f).widthIn(max = ProgrammePaneWidth), besideList = true, held = browseHeld)
                     }
                 }
             }

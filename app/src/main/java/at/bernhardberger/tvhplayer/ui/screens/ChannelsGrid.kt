@@ -50,6 +50,8 @@ import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
+import at.bernhardberger.tvhplayer.ui.components.EndHoldOnInterruption
+import at.bernhardberger.tvhplayer.ui.components.directionalHold
 import at.bernhardberger.tvhplayer.ui.components.CardGlowReach
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
 import at.bernhardberger.tvhplayer.ui.components.CompactZapCardGap
@@ -93,6 +95,8 @@ internal fun ChannelsGrid(
     onOpenContextMenu: (ChannelId) -> Unit,
     onExitTowardNavigation: () -> Unit,
     onPage: (Int) -> Boolean,
+    /** Whether a direction is being held down, so what follows focus can wait for it to rest. */
+    onHold: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val columns = ChannelsGridColumns
@@ -104,6 +108,7 @@ internal fun ChannelsGrid(
         }
     }
     var focusedIndex by remember { mutableIntStateOf(-1) }
+    EndHoldOnInterruption(onHold)
     val lastRow = channels.lastIndex / columns
     BoxWithConstraints(modifier) {
     val cardWidth = (maxWidth - ChannelsGridEdgeInset * 2 - CompactZapCardGap * (columns - 1)) / columns
@@ -126,6 +131,7 @@ internal fun ChannelsGrid(
                 .focusGroup()
                 .focusRestorer()
                 .onPreviewKeyEvent { event ->
+                    event.directionalHold()?.let(onHold)
                     if (!isCurrent) return@onPreviewKeyEvent true
                     if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                     val index = focusedIndex.takeIf { it in channels.indices }

@@ -748,7 +748,7 @@ only.
 - **Immersive.** One row of 196dp compact cards, 20dp apart (the kit gutter),
   rests at the bottom of the screen with its first card on the x130 keyline. The
   row runs under the rail and the opened drawer to the screen edge. A card past
-  the keyline is muted to 12% as a whole, the name below it included, as it leaves, so its image doesn't compete
+  the keyline is muted to 20%, and 12% in a row without focus, as a whole, the name below it included, as it leaves, so its image doesn't compete
   with the rail's labels; Home's rows do the same. The same headline
   sits 40dp above the cards, with two synopsis lines and, last, the List pane's
   quiet Next line (trial 2026-10-22). Down stays on the row, Up reaches the header and Left at
@@ -774,7 +774,7 @@ only.
   kit's card scrim.
 - **Backdrop timing.** Every focus-following backdrop changes as Leanback's does:
   it settles for 300ms, changes at most every 500ms, waits up to 2s for its
-  picture and then fades in over the old one in 225ms, settling from 2% larger toward its top end corner as on the Google TV launcher, so there is no dip to grey.
+  picture and then fades in over the old one in 225ms, growing from 97% about its middle as on the Google TV launcher, so there is no dip to grey.
   Before a session, saved logos give their stored colour and blur from the first
   frame.
 

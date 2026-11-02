@@ -391,6 +391,12 @@ internal fun HomeContent(
     var emptyHasFocus by remember { mutableStateOf(false) }
     var focusedCard by remember { mutableStateOf<HomeFocusKey?>(null) }
     var focusedOnNow by remember { mutableStateOf<ChannelId?>(null) }
+    // On a return the rail can keep focus, so no card reports itself; the remembered one still shows.
+    val restoredOnNow = remember(sections, initialKey) {
+        val items = sections.filterIsInstance<HomeSection.OnNow>().firstOrNull()?.items.orEmpty()
+        initialKey?.takeIf { it.section == HomeSectionKind.ON_NOW }
+            ?.let { items.getOrNull(it.position.coerceAtMost(items.lastIndex)) }?.channel?.id
+    }
     var onNowHeld by remember { mutableStateOf(false) }
     val tops = remember { mutableStateMapOf<HomeSectionKind, Float>() }
     var onNowRowTop by remember { mutableFloatStateOf(0f) }
@@ -522,7 +528,7 @@ internal fun HomeContent(
             ) {
                 ChannelsImmersiveBackground(
                     channels = onNow.items.map { it.channel },
-                    channelId = { focusedOnNow },
+                    channelId = { focusedOnNow ?: restoredOnNow },
                     observation = observation,
                     nowSec = { nowSec },
                     logoTop = contentPadding.calculateTopPadding() + TvBrowseHeaderHeight,
@@ -661,7 +667,7 @@ internal fun HomeContent(
                                 )
                             }
                             if (onNowSection != null && observation != null) {
-                                val item = onNowSection.items.firstOrNull { it.channel.id == focusedOnNow }
+                                val item = onNowSection.items.firstOrNull { it.channel.id == (focusedOnNow ?: restoredOnNow) }
                                     ?: onNowSection.items.firstOrNull()
                                 if (item != null) {
                                     HomeOnNowDetails(
