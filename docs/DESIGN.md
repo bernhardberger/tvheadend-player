@@ -738,9 +738,9 @@ only.
   behind a blurred logo. A sharp picture in the corner would
   repeat the pane's picture, so the corner backdrop stays with Immersive. Over
   warm playback there is no backdrop.
-- The headline pane is passive and never an additional D-pad target. It
-  **crossfades** rather than hard-cutting as the browsed row changes: a 160ms
-  dissolve, short enough that fast row-to-row browsing still feels immediate. Each
+- The headline pane is passive and never an additional D-pad target. It fades
+  through the shared focused-info change rather than hard-cutting as the browsed
+  row changes: short enough that fast row-to-row browsing still feels immediate. Each
   state resolves its own EPG, so the outgoing copy keeps the channel it was written
   for. Missing programme metadata does not itself make a channel unwatchable. Do
   not add a persistent OK reminder. While the guide is still on its way, the title
@@ -759,13 +759,13 @@ only.
   tint. Without art, the channel's logo colour fills the screen behind a blurred
   copy of the logo, and the 240×135 logo stands at the top end. The backdrop stays
   in place when the drawer opens; only the sharp logo moves with the content.
-- **Grid.** Three columns of channel-first cards (`[number] [name]`, then
-  `HH:MM • programme`). Cards are 16:9 unless the last visible row would be mostly
-  cut off; then they shrink so a further whole row fits, never flatter than 2:1 or
-  below the card's text height. The header scrolls away with the rows and returns
-  with the first row; the focused row is held below the visible half of the row
-  above. The backdrop is the focused programme's blurred art, or with Program art
-  off the logo colour behind a blurred logo.
+- **Grid.** The headline stays fixed above four columns of the immersive row's
+  compact cards. The focused row is pinned just below it and the rows move under
+  it. While the grid can scroll back, the bottom of the row above fades out into
+  the 40dp gap under the headline, so it shows the viewer they are down the list;
+  in the first row nothing stands there. Rows leaving at the top dissolve through
+  the same fade. The backdrop is the focused programme's blurred art, or with
+  Program art off the logo colour behind a blurred logo.
 - **Cards.** In Channels, programme-art cards darken towards their text with a
   linear scrim in the kit's colour (80% at the text, 95% at the bottom), and the
   channel logo stands over the art inside a soft dark halo. That scrim is baked

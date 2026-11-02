@@ -11,6 +11,9 @@
 - Cards leaving under the side menu are now dimmed as a whole instead of fading out
   toward the screen edge.
 - On now's Next line now shows when that programme is set to record.
+- The Channels grid now shows the bottom of the row above as a faint fade while
+  you can scroll back, so you can tell you're down the list. Rows leaving at the
+  top dissolve into it instead of flickering.
 
 ## 0.4.1
 

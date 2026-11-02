@@ -72,7 +72,7 @@ internal val ChannelsGridEdgeInset = 16.dp
  * Wall of the immersive row's cards in [ChannelsGridColumns] columns. D-pad moves within the grid; Right at the last
  * column and Down at the last row stay, Left at the first column leaves for the navigation rail
  * and Up from the first row reaches the header buttons. The grid scrolls in place below the
- * headline with the focused row pinned at its top, so no row is ever cut off there.
+ * headline with the focused row pinned at its top and the row above fading out behind it.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -157,7 +157,7 @@ internal fun ChannelsGrid(
                 val event = remember(channelId, frame.observation, now) {
                     frame.observation.eventAt(channelId, kotlin.time.Instant.fromEpochSeconds(now))
                 }
-                Box(Modifier.clipAboveInset(state, index)) {
+                Box(Modifier.fadeAboveFocusLine(state, index)) {
                     ChannelsRowCard(
                         channel = channel,
                         event = event,
@@ -210,46 +210,45 @@ internal fun Modifier.overflowTop(overflow: Dp): Modifier = layout { measurable,
 }
 
 /**
- * Only a card whose resting top is inside the viewport can spill glow above the inset. During
- * scrolling, fade the departing content and glow together; at rest retain the original inset clip.
- * Read placement during drawing, not focus: focus changes before the scroll starts.
+ * A row above the focus line fades out into the headline gap, so the bottom of the row above stays
+ * in view whenever the grid can scroll back, and leaving rows dissolve instead of being cut. The
+ * focused row sits on the line, so its glow still reaches the gap whole. Placement is read during
+ * drawing, not focus: focus changes before the scroll starts.
  */
-private fun Modifier.clipAboveInset(state: LazyGridState, index: Int) = drawWithCache {
+private fun Modifier.fadeAboveFocusLine(state: LazyGridState, index: Int) = drawWithCache {
     val paint = Paint()
-    val inset = ChannelsGridEdgeInset.toPx()
     val reach = CardGlowReach.toPx()
     onDrawWithContent {
         // Offsets count from the content padding's end, where the focused row stays.
         val top = state.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }?.offset?.y
         if (top == null || top >= 0) drawContent()
         else {
-            val edge = -inset - top
-            clipRect(-size.width, edge, 2 * size.width, 2 * size.height) {
-                if (state.isScrollInProgress) {
-                    // Isolate only this departing item, without cropping its side/bottom glow.
-                    val bounds = Rect(-reach, edge, size.width + reach, size.height + reach)
-                    drawContext.canvas.saveLayer(bounds, paint)
-                    this@onDrawWithContent.drawContent()
-                    drawRect(
-                        Brush.verticalGradient(
-                            0f to Color.Transparent, 0.25f to Color.Black.copy(alpha = 0.1f),
-                            0.75f to Color.Black.copy(alpha = 0.9f), 1f to Color.Black,
-                            startY = edge, endY = edge + inset,
-                        ),
-                        topLeft = Offset(bounds.left, edge),
-                        size = Size(bounds.width, inset),
-                        blendMode = BlendMode.DstIn,
-                    )
-                    drawContext.canvas.restore()
-                } else this@onDrawWithContent.drawContent()
+            val line = -top.toFloat()
+            val edge = line - reach
+            // Isolate only this item, without cropping its side and bottom glow.
+            val bounds = Rect(-reach, edge, size.width + reach, size.height + reach)
+            if (edge < bounds.bottom) clipRect(-size.width, edge, 2 * size.width, 2 * size.height) {
+                drawContext.canvas.saveLayer(bounds, paint)
+                this@onDrawWithContent.drawContent()
+                drawRect(
+                    Brush.verticalGradient(
+                        0f to Color.Transparent, 0.4f to Color.Black.copy(alpha = 0.08f),
+                        0.6f to Color.Black.copy(alpha = 0.35f), 1f to Color.Black,
+                        startY = edge, endY = line,
+                    ),
+                    topLeft = Offset(bounds.left, edge),
+                    size = Size(bounds.width, reach),
+                    blendMode = BlendMode.DstIn,
+                )
+                drawContext.canvas.restore()
             }
         }
     }
 }
 
 /**
- * Holds the focused row at the grid's top, below its inset, so the rows move under it and none is
- * cut off above it. Near the end the scroll stops at its bound, which leaves the last rows in place.
+ * Holds the focused row at the grid's top, below its inset, so the rows move under it and only the
+ * row above shows, fading out into the headline gap. Near the end the scroll stops at its bound, which leaves the last rows in place.
  */
 @OptIn(ExperimentalFoundationApi::class)
 internal class ChannelsGridBringIntoViewSpec(private val topInsetPx: Float) : BringIntoViewSpec {

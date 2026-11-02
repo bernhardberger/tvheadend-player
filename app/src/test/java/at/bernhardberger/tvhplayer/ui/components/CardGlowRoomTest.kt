@@ -103,11 +103,35 @@ class CardGlowRoomTest {
         fixture.show(ChannelsView(ChannelsLayout.GRID, setOf(ChannelsLayout.GRID)), fixture.fixtureArt())
         fixture.awaitFocus(card(1))
         repeat(2) { fixture.key(Key.DirectionDown) }
-        // The row above still shows its last pixel rows just below the grid's inset line, as before.
+        // Past the inset line the row above fades out, so only the gap before it shows the glow alone.
         channels("grid-3-scrolled", card(1 + 2 * ChannelsGridColumns), Side.TOP, rowAbove = ChannelsGridEdgeInset.value)
     }
 
-    @Test fun gridClipsContentAndFadesTheEdgeMidScrollInBothDirections() = gridScrollFrames()
+    @Test fun theRowAboveShowsOnlyWhileTheGridCanScrollBack() {
+        fixture.show(ChannelsView(ChannelsLayout.GRID, setOf(ChannelsLayout.GRID)), fixture.fixtureArt())
+        fixture.awaitFocus(card(1))
+        val line = bounds(card(1)).top.toInt()
+        val column = bounds(card(3))
+        val xRange = (column.left + column.width / 4).toInt() until (column.right - column.width / 4).toInt()
+        fun rowAboveEdge(): Float {
+            compose.mainClock.advanceTimeBy(1_500)
+            compose.waitForIdle()
+            val frame = draw()
+            val bottomEdge = line - ChannelsGridEdgeInset.value.toInt()
+            val step = xRange.map { abs(luminance(frame.getPixel(it, bottomEdge - 2)) - luminance(frame.getPixel(it, bottomEdge + 1))) }.average()
+            frame.recycle()
+            return step.toFloat()
+        }
+        assertTrue("nothing stands above the first row", rowAboveEdge() < 1f)
+        fixture.key(Key.DirectionDown)
+        fixture.awaitFocus(card(1 + ChannelsGridColumns))
+        assertTrue("the row above ends visibly above the focused row", rowAboveEdge() > 1f)
+        fixture.key(Key.DirectionUp)
+        fixture.awaitFocus(card(1))
+        assertTrue("back at the top nothing stands above it again", rowAboveEdge() < 1f)
+    }
+
+    @Test fun gridFadesRowsIntoTheHeadlineGapMidScrollInBothDirections() = gridScrollFrames()
 
     @Test @Category(VisualCapture::class)
     fun captureGridScrollFrames() = gridScrollFrames()
@@ -124,7 +148,7 @@ class CardGlowRoomTest {
         repeat(40) { compose.mainClock.advanceTimeBy(100); compose.waitForIdle() }
         fixture.awaitFocus(card(1))
         val first = bounds(card(1))
-        val inset = (first.top - ChannelsGridEdgeInset.value).toInt()
+        val gapTop = (first.top - CardGlowReach.value).toInt()
         val xRange = (first.left + first.width / 4).toInt() until (first.right - first.width / 4).toInt()
         fun top() = compose.onNode(card(1)).fetchSemanticsNode().layoutInfo.coordinates.positionInRoot().y
         fun sample(direction: String) {
@@ -135,16 +159,16 @@ class CardGlowRoomTest {
             assertTrue("$direction actually scrolls", abs(start - middle) > 1f)
             val frame = draw()
             save("grid-scroll-$direction", frame)
-            for (y in inset - 24 until inset) {
+            // The gap's upper part: rows have all but faded there, so only faint detail remains.
+            for (y in gapTop until gapTop + 6) {
                 for (x in xRange) {
-                    // Only a smooth glow may reach this gap, not the picture/lettering or a cut edge.
                     val step = abs(luminance(frame.getPixel(x, y)) - luminance(frame.getPixel(x, y - 1)))
-                    assertTrue("$direction: content or a cut in headline gap at $x,$y: $step", step < MaxStep)
+                    assertTrue("$direction: content or a cut in headline gap at $x,$y: $step", step < 2 * MaxStep)
                 }
             }
-            val above = xRange.map { luminance(frame.getPixel(it, inset - 1)) }.average()
-            val edge = xRange.map { luminance(frame.getPixel(it, inset)) }.average()
-            assertTrue("$direction: hard cut at viewport edge: $above -> $edge", abs(edge - above) < MaxStep)
+            val above = xRange.map { luminance(frame.getPixel(it, gapTop - 1)) }.average()
+            val edge = xRange.map { luminance(frame.getPixel(it, gapTop)) }.average()
+            assertTrue("$direction: hard cut at the grid's upper edge: $above -> $edge", abs(edge - above) < MaxStep)
             frame.recycle()
             compose.mainClock.advanceTimeBy(32)
             compose.waitForIdle()
@@ -404,7 +428,9 @@ class CardGlowRoomTest {
             val glow = profile.first() - profile.last()
             report.append("$side: step=${"%.1f".format(step)} glow=${"%.1f".format(glow)} profile=${profile.joinToString(",") { "%.0f".format(it) }}\n")
             if (failure == null && step > MaxStep) failure = "$name: the glow is cut on its $side side (a step of $step)"
-            if (failure == null && glow < MinGlow) failure = "$name: no glow reaches past the $side side ($glow)"
+            // Above a scrolled grid only the glow's first pixels stand clear of the row above.
+            val minGlow = if (side == Side.TOP && rowAbove != null) MinGlow / 2 else MinGlow
+            if (failure == null && glow < minGlow) failure = "$name: no glow reaches past the $side side ($glow)"
         }
         File(directory(), "$name.txt").takeIf { writes }?.writeText(
             "canvas=960x540 dp; density=1.0 (mdpi); locale=en; fontScale=1.0\n" +
@@ -417,7 +443,7 @@ class CardGlowRoomTest {
 
     /**
      * Mean brightness at each pixel from just past the lifted ring out to [Reach] beyond [side],
-     * over the middle half of that edge, without the [rowAbove]'s last [RowAboveEdge] pixel rows.
+     * over the middle half of that edge, stopping short of the [rowAbove]'s bottom edge.
      */
     private fun profile(bitmap: Bitmap, card: Rect, side: Side, rowAbove: Float? = null): List<Float> {
         val vertical = side == Side.TOP || side == Side.BOTTOM
@@ -425,8 +451,8 @@ class CardGlowRoomTest {
             else (card.top + card.height / 4).toInt() until (card.bottom - card.height / 4).toInt() step 4
         // The ring's outer edge, lifted 5% with the card about its centre.
         val ring = ((4.25f + 1.25f) * 1.05f + 0.025f * (if (vertical) card.height else card.width)).toInt() + 1
-        val skipped = rowAbove?.let { (it - RowAboveEdge).toInt()..it.toInt() } ?: IntRange.EMPTY
-        return (ring..Reach).filter { it !in skipped }.map { distance ->
+        val last = rowAbove?.let { it.toInt() - 2 } ?: Reach
+        return (ring..last).map { distance ->
             lines.map { along ->
                 val (x, y) = when (side) {
                     Side.TOP -> along to card.top.toInt() - 1 - distance
@@ -469,6 +495,5 @@ class CardGlowRoomTest {
         const val MaxStep = 3.5f
         const val MinGlow = 4f
         /** Pixel rows at the bottom edge of the row above a scrolled grid's focused row that show its content. */
-        const val RowAboveEdge = 3
     }
 }
