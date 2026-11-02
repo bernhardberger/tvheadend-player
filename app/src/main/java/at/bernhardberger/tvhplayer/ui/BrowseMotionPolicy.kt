@@ -61,11 +61,11 @@ internal object BrowseMotionPolicy {
     fun besideMarkEnter(gapPx: Int): EnterTransition = fadeIn() + slideInHorizontally { -gapPx }
 
     /**
-     * Leanback's background timing, for any backdrop that follows focus: it follows once focus
-     * has rested [backdropSettleMs], but changes at most once per [backdropIntervalMs], so
-     * stepping at a steady pace does not repaint the screen on every step. As in Leanback's
-     * sample, the new backdrop waits for its picture, at most [backdropLoadTimeoutMs],
-     * and fades in over the old one; the fade shows the change at once and then settles.
+     * The timing of any backdrop that follows focus: a step from rest changes it at once, as on the
+     * G10's launcher, and steps closer together than [backdropSettleMs] wait until focus has rested
+     * that long. It changes at most once per [backdropIntervalMs], so stepping at a steady pace
+     * does not repaint the screen on every step. The new backdrop waits for its picture, at most
+     * [backdropLoadTimeoutMs], and fades in over the old one.
      */
     const val backdropSettleMs = 300L
     const val backdropIntervalMs = 500L

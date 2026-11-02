@@ -137,7 +137,8 @@ import at.bernhardberger.tvhplayer.ui.components.focusedInfoSwap
 import at.bernhardberger.tvhplayer.ui.components.focusedPictureSwap
 import at.bernhardberger.tvhplayer.ui.components.EndHoldOnInterruption
 import at.bernhardberger.tvhplayer.ui.components.horizontalHold
-import at.bernhardberger.tvhplayer.ui.components.mutedPastRowStart
+import at.bernhardberger.tvhplayer.ui.components.MutedPastRowStart
+import at.bernhardberger.tvhplayer.ui.components.mutedTextPastRowStart
 import at.bernhardberger.tvhplayer.ui.components.rememberUnlessHeld
 import at.bernhardberger.tvhplayer.ui.components.overflowingRowViewport
 import at.bernhardberger.tvhplayer.ui.components.programmeAboutFacts
@@ -426,7 +427,7 @@ private fun ChannelsCardRow(
                     frame.observation.eventAt(channelId, Instant.fromEpochSeconds(now))
                 }
                 // The card and the name below it run on under the navigation drawer past the keyline.
-                Box(Modifier.mutedPastRowStart(state, index, gapPx) { focusedIndex == index }) {
+                MutedPastRowStart(state, index, gapPx, focused = { focusedIndex == index }) {
                 ChannelsRowCard(
                     channel = channel,
                     event = event,
@@ -524,6 +525,7 @@ internal fun ChannelsRowCard(
             }
             val lineModifier = Modifier.align(Alignment.BottomStart).fillMaxWidth()
                 .padding(start = 12.dp, end = 12.dp, bottom = ImmersiveCardTextBottom)
+                .mutedTextPastRowStart()
             // Without a picture the logo leads; beside picture cards its programme stays quiet.
             val lineColor = if (programmePicture) TvTextColors.secondary else TvTextColors.primary
             if (artLoad.needsFallback) CompositionLocalProvider(LocalContentColor provides lineColor) {

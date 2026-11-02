@@ -54,8 +54,8 @@ internal fun StandardProgrammeCard(
                 Box(Modifier.fillMaxSize(), content = picture)
             }
         },
-        title = title,
-        subtitle = subtitle,
+        title = { Box(Modifier.mutedTextPastRowStart()) { title() } },
+        subtitle = { Box(Modifier.mutedTextPastRowStart()) { subtitle() } },
         contentColor = contentColor,
     )
 }

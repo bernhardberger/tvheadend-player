@@ -9,13 +9,14 @@
 - Holding Left or Right on a row hides the programme info until you stop, on
   Home's On now and on Channels the same way as the player's channel row. The
   Channels grid and list do the same for any direction held.
-- Cards leaving under the side menu are now dimmed as a whole, with their names,
-  instead of fading out toward the screen edge.
+- Cards leaving under the side menu are now dimmed as a whole instead of fading out
+  toward the screen edge, with the text on and below them dimmed further.
 - On now's Next line now shows when that programme is set to record.
 - Returning to Home with the side menu still open now shows the info and backdrop of
   the On now card you left, not those of the row's first card.
 - Programme info, the Channels list's picture, the Guide's headline and the backdrop
-  now change more softly, ending together; a new backdrop also grows slightly into place.
+  now change more softly, ending together; a new backdrop starts right away after a
+  single press and grows slightly into place.
 - The channel logo above the Channels grid is smaller and no longer runs into the
   row behind the headline.
 - While Home waits for its first rows it shows nothing at first, then a spinner

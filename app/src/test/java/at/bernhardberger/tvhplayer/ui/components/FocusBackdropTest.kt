@@ -59,8 +59,8 @@ class FocusBackdropTest {
         show { if (it == "B") 400 else 0 }
         advance(1_000)
         focus("B")
-        advance(400)
-        // C replaces B as focus settles again, just after B has finished loading.
+        advance(450)
+        // C follows just after B has finished loading, too soon after it to change at once.
         focus("C")
         advance(2_000)
         assertEquals(listOf("A", "B", "C"), reveals.map { it.first })
@@ -69,21 +69,21 @@ class FocusBackdropTest {
         }
     }
 
-    @Test fun focusSettlesBeforeTheBackdropChangesAndOneThatNeverLoadsShowsAfterTheWait() {
+    @Test fun aStepFromRestChangesAtOnceAndQuickStepsWaitForFocusToRest() {
         show { if (it == "never") null else 0 }
         advance(1_000)
         for (step in listOf("1", "2", "3", "4", "5")) {
             focus(step)
             advance(100)
         }
-        assertEquals("Nothing changes while focus moves", listOf("A"), reveals.map { it.first })
+        assertEquals("Only the first step changes while focus moves", listOf("A", "1"), reveals.map { it.first })
         advance(BrowseMotionPolicy.backdropSettleMs)
-        assertEquals(listOf("A", "5"), reveals.map { it.first })
+        assertEquals(listOf("A", "1", "5"), reveals.map { it.first })
         advance(1_000)
 
         focus("never")
         val changed = compose.mainClock.currentTime
-        advance(BrowseMotionPolicy.backdropSettleMs + BrowseMotionPolicy.backdropLoadTimeoutMs - 100)
+        advance(BrowseMotionPolicy.backdropLoadTimeoutMs - 100)
         assertEquals("The current backdrop stays while the next one loads", "5", reveals.last().first)
         advance(200)
         assertEquals("never", reveals.last().first)

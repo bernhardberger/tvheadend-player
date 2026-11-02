@@ -90,7 +90,7 @@ internal fun HomeTextCard(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             leading?.invoke()
-            Column {
+            Column(Modifier.mutedTextPastRowStart()) {
                 Text(
                     title,
                     style = MaterialTheme.typography.titleMedium,

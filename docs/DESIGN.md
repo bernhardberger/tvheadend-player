@@ -748,7 +748,7 @@ only.
 - **Immersive.** One row of 196dp compact cards, 20dp apart (the kit gutter),
   rests at the bottom of the screen with its first card on the x130 keyline. The
   row runs under the rail and the opened drawer to the screen edge. A card past
-  the keyline is muted to 20%, and 12% in a row without focus, as a whole, the name below it included, as it leaves, so its image doesn't compete
+  the keyline is muted to 20%, and 12% in a row without focus, as a whole as it leaves, with the text on and below it muted further to 12% in any row, so its image doesn't compete
   with the rail's labels; Home's rows do the same. The same headline
   sits 40dp above the cards, with two synopsis lines and, last, the List pane's
   quiet Next line (trial 2026-10-22). Down stays on the row, Up reaches the header and Left at
@@ -772,8 +772,9 @@ only.
   into the card's bitmap, since live gradients over a dozen pictures were too slow
   on the G10. Logo cards use the logo's ambient colour. The player rail keeps the
   kit's card scrim.
-- **Backdrop timing.** Every focus-following backdrop changes as Leanback's does:
-  it settles for 300ms, changes at most every 500ms, waits up to 2s for its
+- **Backdrop timing.** Every focus-following backdrop changes at once on a step
+  from rest, as on the Google TV launcher; steps closer together than 300ms wait
+  until focus has rested that long. It changes at most every 500ms, waits up to 2s for its
   picture and then fades in over the old one in 225ms, growing from 97% about its middle as on the Google TV launcher, so there is no dip to grey.
   Before a session, saved logos give their stored colour and blur from the first
   frame.

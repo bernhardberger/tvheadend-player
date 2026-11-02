@@ -151,7 +151,7 @@ import at.bernhardberger.tvhplayer.ui.components.RowTravelMotion
 import at.bernhardberger.tvhplayer.ui.components.focusedInfoSwap
 import at.bernhardberger.tvhplayer.ui.components.EndHoldOnInterruption
 import at.bernhardberger.tvhplayer.ui.components.horizontalHold
-import at.bernhardberger.tvhplayer.ui.components.mutedPastRowStart
+import at.bernhardberger.tvhplayer.ui.components.MutedPastRowStart
 import at.bernhardberger.tvhplayer.ui.components.rememberUnlessHeld
 import at.bernhardberger.tvhplayer.ui.screens.isScheduled
 import at.bernhardberger.tvhplayer.ui.components.overflowingRowViewport
@@ -995,7 +995,7 @@ private fun <T> HomeCardRow(
                         },
                     )
                 // The card and any label below it run on under the navigation drawer past the keyline.
-                Box(Modifier.mutedPastRowStart(state, index, gapPx, emphasis) { rememberedKey == itemKey(item) }) {
+                MutedPastRowStart(state, index, gapPx, emphasis, { rememberedKey == itemKey(item) }) {
                     itemContent(index, item, itemModifier)
                 }
             }

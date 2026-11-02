@@ -170,7 +170,7 @@ internal fun HomeActivityCard(
                 }
             }
             Row(
-                Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(16.dp),
+                Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(16.dp).mutedTextPastRowStart(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Column(

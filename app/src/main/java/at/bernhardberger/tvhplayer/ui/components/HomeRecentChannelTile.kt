@@ -94,7 +94,7 @@ internal fun HomeRecentChannelTile(
                 maxLines = 2,
                 minLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth().padding(top = StandardCardTextGap),
+                modifier = Modifier.fillMaxWidth().padding(top = StandardCardTextGap).mutedTextPastRowStart(),
             )
         }
     }

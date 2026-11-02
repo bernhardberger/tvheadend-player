@@ -17,9 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.util.lerp
 import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
-import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -34,13 +33,13 @@ private class BackdropLayer<T>(val id: Int, val target: T) {
 
 /**
  * A backdrop that follows the focused item [target] reads, with the browse screens' backdrop
- * timing ([BrowseMotionPolicy.backdropSettleMs]). Each new backdrop is composed unseen until its
+ * timing ([BrowseMotionPolicy.backdropSettleMs]): a step from rest changes it at once, and steps
+ * in quick succession wait for focus to rest. Each new backdrop is composed unseen until its
  * [content] reports it ready, so the previous one stays instead of a half-loaded one showing,
- * then fades in over it while sliding into place, at most once per [BrowseMotionPolicy.backdropIntervalMs]; [onReveal]
+ * then fades in over it while growing into place, at most once per [BrowseMotionPolicy.backdropIntervalMs]; [onReveal]
  * tells which one is fading in. Reading the target here keeps focus steps from recomposing the
  * caller.
  */
-@OptIn(FlowPreview::class)
 @Composable
 internal fun <T> FocusBackdrop(
     target: () -> T,
@@ -54,14 +53,18 @@ internal fun <T> FocusBackdrop(
     val reveals = remember { Mutex() }
     LaunchedEffect(Unit) {
         var nextId = 1
-        val targets = snapshotFlow { currentTarget() }.debounce(BrowseMotionPolicy.backdropSettleMs)
-        while (true) {
-            val next = targets.first { it != layers.last().target }
-            // One still loading has not shown anything; the newer target replaces it.
-            layers.removeAll { !it.revealing }
-            if (layers.lastOrNull()?.target != next) layers += BackdropLayer(nextId++, next)
-            // The next change also waits for focus to settle, which completes the interval.
-            delay(BrowseMotionPolicy.backdropIntervalMs - BrowseMotionPolicy.backdropSettleMs)
+        var resting = true
+        // Another step cancels whichever wait is running, and it then counts as quick.
+        snapshotFlow { currentTarget() }.collectLatest { next ->
+            if (next != layers.last().target) {
+                if (!resting) delay(BrowseMotionPolicy.backdropSettleMs)
+                // One still loading has not shown anything; the newer target replaces it.
+                layers.removeAll { !it.revealing }
+                if (layers.lastOrNull()?.target != next) layers += BackdropLayer(nextId++, next)
+                resting = false
+                delay(BrowseMotionPolicy.backdropSettleMs)
+            }
+            resting = true
         }
     }
     Box(modifier) {
