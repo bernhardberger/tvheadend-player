@@ -48,10 +48,7 @@ internal val RowTravelMotion = tween<Float>(RowTravelMs, easing = RowTravelEasin
 internal const val RowDimAlpha = 0.4f
 /** A card wholly past its row's start keyline, where it lies under the navigation drawer, in the focused row. */
 internal const val RowPastStartAlpha = 0.2f
-/**
- * The same in a row without focus, whose own dimming counts towards it, and for text in any row.
- * Light text on a dark card stands out far more than a picture at the same alpha.
- */
+/** The same in a row without focus, whose own dimming counts towards it. */
 private const val DimmedRowPastStartAlpha = 0.12f
 internal const val RowHeaderQuietAlpha = TvPassiveAlpha
 internal const val RowHeaderQuietScale = 14f / 24f
@@ -59,7 +56,10 @@ internal const val RowHeaderQuietScale = 14f / 24f
 /** What a row item's text multiplies its alpha by, on top of its card's. Outside these rows, nothing. */
 private val LocalRowItemTextAlpha = compositionLocalOf<() -> Float> { { 1f } }
 
-/** For text on or below a card in a row: it mutes further than the card past the row's start. */
+/**
+ * For text on or below a card in a row: it is gone once the card is past the row's start, where
+ * the drawer's own labels would clash with it. The card stays as a dim shape.
+ */
 @Composable
 internal fun Modifier.mutedTextPastRowStart(): Modifier {
     val textAlpha = LocalRowItemTextAlpha.current
@@ -86,9 +86,7 @@ internal fun MutedPastRowStart(
         return if (item == null || focused()) 0f else (-item.offset / (item.size + gapPx)).coerceIn(0f, 1f)
     }
     fun rowAlpha() = lerp(DimmedRowPastStartAlpha, RowPastStartAlpha, rowEmphasis())
-    CompositionLocalProvider(
-        LocalRowItemTextAlpha provides { lerp(1f, DimmedRowPastStartAlpha / rowAlpha(), past()) },
-    ) {
+    CompositionLocalProvider(LocalRowItemTextAlpha provides { 1f - past() }) {
         Box(Modifier.graphicsLayer {
             val past = past()
             alpha = lerp(1f, rowAlpha() / rowDimAlpha(rowEmphasis()), past)

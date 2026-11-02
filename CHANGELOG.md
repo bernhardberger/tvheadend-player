@@ -10,7 +10,7 @@
   info and picture on screen until you stop, instead of updating on every card
   along the way.
 - Cards leaving under the side menu are now dimmed as a whole instead of fading out
-  toward the screen edge, with the text on and below them dimmed further.
+  toward the screen edge, and their text is hidden so it can't clash with the menu.
 - On now's Next line now shows when that programme is set to record.
 - Returning to Home with the side menu still open now shows the info and backdrop of
   the On now card you left, not those of the row's first card.

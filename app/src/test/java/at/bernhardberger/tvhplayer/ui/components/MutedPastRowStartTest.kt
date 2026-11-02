@@ -60,17 +60,17 @@ class MutedPastRowStartTest {
         return compose.onRoot().captureToImage().toPixelMap()[bounds.center.x.toInt(), bounds.center.y.toInt()].red
     }
 
-    @Test fun textMutesFurtherThanItsCardInTheFocusedRow() {
+    @Test fun textIsGoneAndTheCardStaysDimInTheFocusedRow() {
         show(emphasis = 1f)
         assertEquals(RowPastStartAlpha, brightness("card-0"), 0.01f)
-        assertEquals(0.12f, brightness("text-0"), 0.01f)
+        assertEquals(0f, brightness("text-0"), 0.01f)
     }
 
-    @Test fun inARowWithoutFocusBothAlreadySitAtTheTextsLevel() {
+    @Test fun textIsGoneAndTheCardStaysDimInARowWithoutFocus() {
         // The row's own dimming is its parent's; this is only what is added to that.
         show(emphasis = 0f)
         assertEquals(0.12f / RowDimAlpha, brightness("card-0"), 0.01f)
-        assertEquals(0.12f / RowDimAlpha, brightness("text-0"), 0.01f)
+        assertEquals(0f, brightness("text-0"), 0.01f)
     }
 
     @Test fun aFocusedCardAndACardInPlaceKeepTheirText() {

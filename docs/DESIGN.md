@@ -748,7 +748,7 @@ only.
 - **Immersive.** One row of 196dp compact cards, 20dp apart (the kit gutter),
   rests at the bottom of the screen with its first card on the x130 keyline. The
   row runs under the rail and the opened drawer to the screen edge. A card past
-  the keyline is muted to 20%, and 12% in a row without focus, as a whole as it leaves, with the text on and below it muted further to 12% in any row, so its image doesn't compete
+  the keyline is muted to 20%, and 12% in a row without focus, as a whole as it leaves, with the text on and below it hidden in any row, so its image doesn't compete
   with the rail's labels; Home's rows do the same. The same headline
   sits 40dp above the cards, with two synopsis lines and, last, the List pane's
   quiet Next line (trial 2026-10-22). Down stays on the row, Up reaches the header and Left at
