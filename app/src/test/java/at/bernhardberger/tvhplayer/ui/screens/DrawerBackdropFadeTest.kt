@@ -11,6 +11,7 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.settings.ChannelsLayout
 import at.bernhardberger.tvhplayer.settings.ChannelsView
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
+import at.bernhardberger.tvhplayer.ui.components.RowPastStartAlpha
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -53,8 +54,9 @@ class DrawerBackdropFadeTest {
             assertTrue("frame $frame shows a picture behind the drawer: $off", off < .01f)
             val page = distance(it, guide, PageCards)
             val behind = distance(it, guide, CardsBehindDrawer)
+            // Those cards are past the keyline, so they are muted and show no text.
             if (page > .05f) assertTrue("frame $frame: cards %.3f behind the drawer, %.3f on the page".format(behind, page),
-                behind > page / 4)
+                behind > page * RowPastStartAlpha / 2)
         }
     }
 

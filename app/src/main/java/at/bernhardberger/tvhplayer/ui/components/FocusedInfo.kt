@@ -23,6 +23,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalWindowInfo
 import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 
 /** How long focus must rest after a held key before the focused card's info returns. */
 internal const val FocusedInfoSettleMs = 250L
@@ -77,6 +78,33 @@ internal fun <T> rememberHeldBack(value: T, held: Boolean, settleMs: Long = Brow
     val shown = if (rested) value else last.shown
     SideEffect { last.shown = shown }
     return shown
+}
+
+/**
+ * [rememberHeldBack] for a value read outside composition, as [FocusBackdrop] reads its target, so
+ * focus steps don't recompose the caller. [held] is read with the value: a key's first repeat sets
+ * it before focus moves, so that step is held back too.
+ */
+@Composable
+internal fun <T> rememberHeldBackReader(
+    value: () -> T,
+    held: () -> Boolean,
+    settleMs: Long = BrowseMotionPolicy.backdropSettleMs,
+): () -> T {
+    val currentValue by rememberUpdatedState(value)
+    val currentHeld by rememberUpdatedState(held)
+    var rested by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) {
+        snapshotFlow { currentHeld() }.collectLatest { isHeld ->
+            if (isHeld) rested = false
+            else if (!rested) {
+                delay(settleMs)
+                rested = true
+            }
+        }
+    }
+    val last = remember { object { var shown = value() } }
+    return remember { { if (!currentHeld() && rested) currentValue().also { last.shown = it } else last.shown } }
 }
 
 @Composable

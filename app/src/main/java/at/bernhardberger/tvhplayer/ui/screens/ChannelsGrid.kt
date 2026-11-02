@@ -95,9 +95,9 @@ internal fun ChannelsGrid(
     onOpenContextMenu: (ChannelId) -> Unit,
     onExitTowardNavigation: () -> Unit,
     onPage: (Int) -> Boolean,
+    modifier: Modifier = Modifier,
     /** Whether a direction is being held down, so what follows focus can wait for it to rest. */
     onHold: (Boolean) -> Unit = {},
-    modifier: Modifier = Modifier,
 ) {
     val columns = ChannelsGridColumns
     val ltr = LocalLayoutDirection.current == LayoutDirection.Ltr
@@ -128,6 +128,8 @@ internal fun ChannelsGrid(
             modifier = Modifier
                 .fillMaxSize()
                 .testTag("channels-grid")
+                // A hold that runs out into the header or rail ends with its release there.
+                .onFocusChanged { if (!it.hasFocus) onHold(false) }
                 .focusGroup()
                 .focusRestorer()
                 .onPreviewKeyEvent { event ->

@@ -140,6 +140,7 @@ import at.bernhardberger.tvhplayer.ui.components.horizontalHold
 import at.bernhardberger.tvhplayer.ui.components.MutedPastRowStart
 import at.bernhardberger.tvhplayer.ui.components.mutedTextPastRowStart
 import at.bernhardberger.tvhplayer.ui.components.rememberHeldBack
+import at.bernhardberger.tvhplayer.ui.components.rememberHeldBackReader
 import at.bernhardberger.tvhplayer.ui.components.overflowingRowViewport
 import at.bernhardberger.tvhplayer.ui.components.programmeAboutFacts
 import at.bernhardberger.tvhplayer.ui.components.programmeHeaderMetadata
@@ -210,7 +211,8 @@ internal val ImmersiveHeroWidth = 480.dp
  * channel's on-now programme's unless [picture] picks another, as the Guide's focused programme.
  * The picture is as wide as the kit's unless [pictureHeight] scales it down to a height.
  * [logoMaxHeight] can constrain the fallback logo to a shorter headline's available space.
- * [order] is the row focus walks along, for loading the next backdrops ahead.
+ * [order] is the row focus walks along, for loading the next backdrops ahead. While [held] the
+ * backdrop stays on what it shows, as the info above the row does, and both change together.
  * It reaches under the closed rail, beneath the shell's gradient. Warm playback keeps the video as
  * the background, so nothing is drawn.
  */
@@ -228,8 +230,10 @@ internal fun ChannelsImmersiveBackground(
     pictureHeight: Dp? = null,
     logoMaxHeight: Dp = Dp.Infinity,
     order: List<ChannelId> = emptyList(),
+    held: () -> Boolean = { false },
 ) {
     if (LocalWarmPlayback.current) return
+    val shownChannelId = rememberHeldBackReader(channelId, held)
     val session = observation.currentSession != null
     val artwork = LocalArtworkContext.current
     var revealed by remember { mutableStateOf<ChannelBackdrop?>(null) }
@@ -243,13 +247,13 @@ internal fun ChannelsImmersiveBackground(
     FocusBackdrop(
         // A new backdrop for whatever changes what it shows, so the session's and the guide's
         // arrival fade in like a focus step rather than popping in piece by piece.
-        { backdropOf(channelId()) },
+        { backdropOf(shownChannelId()) },
         // The art in the corner leaves the rest clear, so the gradient is kept off its holes.
         modifier.browseScreenBackdrop().underBrowseShellScrim().testTag("channels-immersive-background"),
         onReveal = { revealed = it },
         // One step away along the row, or the row's start while focus is elsewhere.
         ahead = {
-            val at = order.indexOf(channelId())
+            val at = order.indexOf(shownChannelId())
             val next = if (at < 0) order.take(1) else listOfNotNull(order.getOrNull(at - 1), order.getOrNull(at + 1))
             next.map(::backdropOf)
         },
@@ -340,10 +344,12 @@ internal fun ChannelsImmersiveBody(
     state: LazyListState,
     current: Boolean,
     bottomInset: Dp,
+    /** A direction is held on the row; the screen's backdrop waits with the info here. */
+    held: Boolean,
+    onHold: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     rowModifier: Modifier = Modifier,
 ) {
-    var held by remember { mutableStateOf(false) }
     Column(modifier.padding(bottom = (bottomInset - ImmersiveFocusRoom).coerceAtLeast(0.dp))) {
         Spacer(Modifier.weight(1f))
         ChannelsImmersiveHero(channels, cards.frame, cards.nowSec, Modifier.padding(start = cards.keyline), held = held)
@@ -353,7 +359,7 @@ internal fun ChannelsImmersiveBody(
             cards = cards,
             state = state,
             current = current,
-            onHold = { held = it },
+            onHold = onHold,
             modifier = rowModifier,
         )
     }

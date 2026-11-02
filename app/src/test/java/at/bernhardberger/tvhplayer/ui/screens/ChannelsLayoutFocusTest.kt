@@ -602,6 +602,74 @@ class ChannelsLayoutFocusTest {
         assertHeroWaitsForAHeldKey(android.view.KeyEvent.KEYCODE_DPAD_RIGHT, card(3))
     }
 
+    /** Repeats that run out of the content: the release lands in the header, which only ends it by focus. */
+    private fun assertAHoldLeavingTheContentEndsThere(along: Int, reached: SemanticsMatcher) {
+        fun press(keyCode: Int, repeat: Int, action: Int = android.view.KeyEvent.ACTION_DOWN) {
+            compose.onRoot().performKeyPress(androidx.compose.ui.input.key.KeyEvent(android.view.KeyEvent(
+                0L, 0L, action, keyCode, repeat)))
+            compose.waitForIdle()
+        }
+        fun headline() = compose.onNode(hasTestTag("channels-headline-channel") and hasAnyAncestor(hasTestTag("channels-immersive-hero")))
+            .fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.Text].joinToString()
+        press(along, 0)
+        val afterPress = headline()
+        press(along, 1)
+        fixture.awaitFocus(reached)
+        assertEquals(afterPress, headline())
+        val up = android.view.KeyEvent.KEYCODE_DPAD_UP
+        repeat(4) { press(up, 2 + it) }
+        fixture.awaitFocus(hasTestTag("channels-tags-button"))
+        press(up, 0, android.view.KeyEvent.ACTION_UP)
+        compose.mainClock.advanceTimeBy(600)
+        assertNotEquals("the info catches up though the release never reached the content", afterPress, headline())
+    }
+
+    @Test fun aHoldThatLeavesTheListEndsThere() {
+        fixture.show(list)
+        fixture.awaitFocus(row(1))
+        assertAHoldLeavingTheContentEndsThere(android.view.KeyEvent.KEYCODE_DPAD_DOWN, row(3))
+    }
+
+    @Test fun aHoldThatLeavesTheGridEndsThere() {
+        fixture.show(grid)
+        fixture.awaitFocus(card(1))
+        assertAHoldLeavingTheContentEndsThere(android.view.KeyEvent.KEYCODE_DPAD_RIGHT, card(3))
+    }
+
+    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE) fun aHeldKeyKeepsTheBackdropUntilItRests() {
+        fixture.show(ChannelsView(ChannelsLayout.IMMERSIVE, setOf(ChannelsLayout.IMMERSIVE)), fixture.fixtureArt())
+        fixture.awaitFocus(card(1))
+        val right = android.view.KeyEvent.KEYCODE_DPAD_RIGHT
+        fun press(action: Int, repeat: Int) {
+            compose.onRoot().performKeyPress(androidx.compose.ui.input.key.KeyEvent(android.view.KeyEvent(
+                0L, 0L, action, right, repeat)))
+            compose.waitForIdle()
+        }
+        fun settle() {
+            compose.mainClock.advanceTimeBy(2_500)
+            compose.waitForIdle()
+        }
+        // The top end of the screen, clear of the header's middle and of the cards.
+        fun picture() = compose.onRoot().captureToImage().toPixelMap().let { pixels ->
+            List(40) { x -> List(20) { y -> pixels[pixels.width / 2 + x * pixels.width / 90, pixels.height / 8 + y * pixels.height / 80] } }.flatten()
+        }
+        press(android.view.KeyEvent.ACTION_DOWN, 0)
+        press(android.view.KeyEvent.ACTION_UP, 0)
+        settle()
+        val rested = picture()
+        press(android.view.KeyEvent.ACTION_DOWN, 0)
+        settle()
+        val stepped = picture()
+        assertNotEquals("each channel has its own backdrop here", rested, stepped)
+        press(android.view.KeyEvent.ACTION_DOWN, 1)
+        fixture.awaitFocus(card(4))
+        settle()
+        assertEquals("the backdrop stays while the key is held", stepped, picture())
+        press(android.view.KeyEvent.ACTION_UP, 0)
+        settle()
+        assertNotEquals("it changes once the key rests", stepped, picture())
+    }
+
     @Test @GraphicsMode(GraphicsMode.Mode.NATIVE) fun theNameBelowACardPastTheKeylineIsMutedWithIt() {
         fixture.show(ChannelsView(ChannelsLayout.IMMERSIVE, channelNames = setOf(ChannelsLayout.IMMERSIVE)))
         fixture.awaitFocus(card(1))

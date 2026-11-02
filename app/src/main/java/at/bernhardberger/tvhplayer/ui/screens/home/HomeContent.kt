@@ -532,6 +532,7 @@ internal fun HomeContent(
                     channels = onNow.items.map { it.channel },
                     order = onNow.items.map { it.channel.id },
                     channelId = { focusedOnNow ?: restoredOnNow },
+                    held = { onNowHeld },
                     observation = observation,
                     nowSec = { nowSec },
                     logoTop = contentPadding.calculateTopPadding() + TvBrowseHeaderHeight,

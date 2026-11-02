@@ -310,7 +310,7 @@ internal fun ChannelsScreenContent(
     // One-shot per player return; AppRoot clears the request when the destination changes.
     var playerReturnPending by remember(playerReturn) { mutableStateOf(playerReturn != null) }
     var focusedChannelId by remember { mutableStateOf<ChannelId?>(null) }
-    // A direction held on the list or grid; Immersive's row keeps its own.
+    // A direction held on the row, list or grid: the info and the backdrop wait for it to rest.
     var browseHeld by remember { mutableStateOf(false) }
     var contextChannelId by remember { mutableStateOf<ChannelId?>(null) }
     var showProgrammeDetails by remember { mutableStateOf(false) }
@@ -671,6 +671,7 @@ internal fun ChannelsScreenContent(
                     channels = channelScope.allChannels,
                     order = orderedChannelIds,
                     channelId = { focusedChannelId?.takeIf(orderedChannelIds::contains) ?: scopeEntryChannelId() },
+                    held = { browseHeld },
                     observation = observation,
                     nowSec = nowSec,
                     logoTop = contentPadding.calculateTopPadding() + TvBrowseHeaderHeight,
@@ -867,6 +868,8 @@ internal fun ChannelsScreenContent(
                         state = rememberTabListState(rowState),
                         current = owner.isCurrent,
                         bottomInset = contentPadding.calculateBottomPadding(),
+                        held = browseHeld,
+                        onHold = { browseHeld = it },
                         modifier = Modifier.weight(1f).fillMaxWidth(),
                         rowModifier = contentEntry,
                     )
@@ -955,6 +958,8 @@ internal fun ChannelsScreenContent(
                                     .listEdgeFades(listState)
                                     .testTag("channels-list")
                                     .then(contentEntry)
+                                    // A hold that runs out into the header ends with its release there.
+                                    .onFocusChanged { if (!it.hasFocus) browseHeld = false }
                                     .focusGroup()
                                     .focusRestorer()
                                     .onPreviewKeyEvent { event ->

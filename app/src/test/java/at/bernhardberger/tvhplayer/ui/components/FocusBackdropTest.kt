@@ -57,6 +57,36 @@ class FocusBackdropTest {
         Snapshot.sendApplyNotifications()
     }
 
+    @Test fun aHoldKeepsTheBackdropOnWhatItShowsUntilTheKeyRests() {
+        var held by mutableStateOf(false)
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            val shown = rememberHeldBackReader({ target }, { held })
+            FocusBackdrop(shown, onReveal = { reveals += it to compose.mainClock.currentTime }) { _, onReady ->
+                LaunchedEffect(Unit) { onReady() }
+            }
+        }
+        advance(1_000)
+        reveals.clear()
+        focus("B")
+        advance(450)
+        assertEquals(listOf("B"), reveals.map { it.first })
+        // Rested again when the first repeat arrives: it sets the hold, then moves focus.
+        for (item in listOf("C", "D", "E", "F", "G", "H")) {
+            held = true
+            focus(item)
+            advance(50)
+        }
+        advance(1_000)
+        assertEquals(listOf("B"), reveals.map { it.first })
+        held = false
+        Snapshot.sendApplyNotifications()
+        advance(BrowseMotionPolicy.backdropSettleMs - 50)
+        assertEquals(listOf("B"), reveals.map { it.first })
+        advance(100)
+        assertEquals(listOf("B", "H"), reveals.map { it.first })
+    }
+
     @Test fun aSlowBackdropAndAQuickSuccessorStillChangeAtMostOncePerInterval() {
         show { if (it == "B") 400 else 0 }
         advance(1_000)
