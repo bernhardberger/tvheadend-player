@@ -137,10 +137,10 @@ differences and are approximate (±1 frame of 17 ms).
 
 - The focused card stays at the row's start position; the row scrolls under it
   (about 600 ms, settling slowly).
-- Content block fades through to the new item in about 200 ms (`components/FocusedInfo.kt`), starting with the
-  key press.
-- Background crossfades to the new image in about 270–450 ms, starting with the
-  key press; there is no blank or black frame between images.
+- Content block fades through to the new item in about 350 ms (`components/FocusedInfo.kt`), starting with the
+  key press: the old text waits 100 ms and leaves in 85 ms, the new one comes in over the last 115 ms.
+- Background crossfades to the new image in about 225 ms once focus has settled for 300 ms, sliding the last
+  8 dp into place from the left as on the Google TV launcher; there is no blank or black frame between images.
 
 **Entering the immersive row from the row above (Down):**
 
@@ -365,8 +365,10 @@ How phase 2 is presented remains open; the removed tabs are not a requirement.
   its own header button like Channels and Guide. Section visibility is
   persisted through existing preferences. No row reordering, row editor or
   dashboard framework.
-- Layout-matched skeletons only for genuinely unavailable data. Cached content is
-  never covered by blocking loading UI during refresh.
+- Rows that have not arrived show nothing for the first 1.5 s, then a spinner with a
+  short line under it. No layout skeleton: sections can be hidden and rows come and
+  go, so the page's shape is not known yet. Cached content is never covered by
+  blocking loading UI during refresh.
 - Distinguish no history, no recordings, missing EPG, missing artwork,
   disconnected, loading and unavailable content. Recovery stays reachable even
   when optional sections are hidden. Offline follows the shared pattern (one-off

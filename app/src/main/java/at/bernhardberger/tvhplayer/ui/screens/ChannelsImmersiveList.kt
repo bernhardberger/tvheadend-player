@@ -182,9 +182,9 @@ private val ImmersiveCardEmbedInset = 8.dp
 private val ImmersiveCardTextBottom = 8.dp
 
 /** A logo's clearance in the picture above the programme line and below the card's top. */
-private val ImmersiveCardLogoInset = 8.dp
+private val ImmersiveCardLogoInset = 12.dp
 
-private const val ImmersiveCardLogoWidthFraction = 0.6f
+private const val ImmersiveCardLogoWidthFraction = 0.5f
 
 /** Room above and below the cards for their native focus scale and outline. */
 private val ImmersiveFocusRoom = 12.dp

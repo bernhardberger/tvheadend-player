@@ -217,8 +217,13 @@ class HomeCaptureTest {
         settle("home-onnow-1")
         assertTrue("the card has left the keyline for the rail", bounds("home-onnow-0").right < 130.dp)
         val muted = cardBrightness()
-        assertTrue("the leaving card is muted: $muted vs $atTheKeyline", muted < atTheKeyline * 0.6f)
-        assertTrue("and still there, right to the screen edge: $muted", muted > atTheKeyline * 0.1f)
+        assertTrue("the leaving card is muted: $muted vs $atTheKeyline", muted < atTheKeyline * 0.3f)
+        assertTrue("and still there, right to the screen edge: $muted", muted > atTheKeyline * 0.05f)
+        // The same past the keyline in a row without focus, whose own dimming counts towards it.
+        key(Key.DirectionUp)
+        settle("home-recent-0")
+        val inADimmedRow = cardBrightness()
+        assertEquals(muted, inADimmedRow, 0.02f)
     }
 
     @Test fun infoBottomStaysAnchoredDuringTextHeightChange() = atEvening {
@@ -278,13 +283,11 @@ class HomeCaptureTest {
     @Category(VisualCapture::class)
     @Test fun loadingFirstMetadata() = atEvening {
         show(Kind.LOADING, screen = true)
+        compose.onNodeWithTag("home-loading").assertDoesNotExist()
+        compose.mainClock.advanceTimeBy(1_700)
         compose.onNodeWithTag("home-loading").assertExists()
-        val tile = compose.onNodeWithTag("home-loading-recent-0", useUnmergedTree = true).getUnclippedBoundsInRoot()
-        assertEquals(at.bernhardberger.tvhplayer.ui.components.HomeRecentTileSize.value, (tile.right - tile.left).value, 0.1f)
-        assertEquals(at.bernhardberger.tvhplayer.ui.components.HomeRecentTileSize.value, (tile.bottom - tile.top).value, 0.1f)
         compose.onNodeWithText("Loading channels…").assertExists()
         compose.onNodeWithTag("home-recovery").assertDoesNotExist()
-        assertEquals(130f, tile.left.value, 0.1f)
         capture("12-loading", "home-view-button")
     }
 

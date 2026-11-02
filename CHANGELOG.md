@@ -11,6 +11,11 @@
 - Cards leaving under the side menu are now dimmed as a whole instead of fading out
   toward the screen edge.
 - On now's Next line now shows when that programme is set to record.
+- Programme info above a row and the backdrop now change more softly, timed like
+  the Google TV launcher; a new backdrop also slides the last bit into place.
+- Channel logos on cards without a picture are a bit smaller.
+- While Home waits for its first rows it shows nothing at first, then a spinner
+  with a short line, instead of a skeleton that often didn't match the page.
 - The Channels grid now shows the bottom of the row above as a faint fade while
   you can scroll back, so you can tell you're down the list. Rows leaving at the
   top dissolve into it instead of flickering.

@@ -695,9 +695,15 @@ class HomeActionsTest {
                 epgState = if (restored) EpgRepositoryState.Current(EpgSnapshot.create(listOf(event))) else EpgRepositoryState.Empty,
                 dvrState = if (restored) DvrRepositoryState.Current(DvrSnapshot.create(emptyList())) else DvrRepositoryState.Empty) },
         )
+        // A usual cold start ends here, without anything to see.
+        compose.onNodeWithTag("home-loading").assertDoesNotExist()
+        compose.onNodeWithText("Loading…").assertDoesNotExist()
+        compose.onNodeWithText("Start watching").assertDoesNotExist()
+        compose.onNodeWithTag("home-recovery").assertDoesNotExist()
+        compose.onNodeWithTag("home-view-button").assertIsFocused()
+        compose.mainClock.advanceTimeBy(1_700)
         compose.onNodeWithTag("home-loading").assertExists()
         compose.onNodeWithText("Loading…").assertExists()
-        compose.onNodeWithText("Start watching").assertDoesNotExist()
         compose.onNodeWithTag("home-recovery").assertDoesNotExist()
         compose.onNodeWithTag("home-view-button").assertIsFocused()
         compose.runOnIdle { restored = true }
@@ -762,9 +768,10 @@ class HomeActionsTest {
                 onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> }, catalogCurrent = current)
         } }
         compose.onNodeWithTag("home-view-button").assertIsFocused()
+        compose.mainClock.advanceTimeBy(1_700)
         compose.onNodeWithText("Loading channels…").assertExists()
         compose.onNodeWithTag("home-recovery").assertDoesNotExist()
-        compose.mainClock.advanceTimeBy(9_000)
+        compose.mainClock.advanceTimeBy(7_300)
         compose.onNodeWithTag("home-recovery").assertDoesNotExist()
         compose.mainClock.advanceTimeBy(1_100)
         compose.onNodeWithText("Still connecting…").assertExists()

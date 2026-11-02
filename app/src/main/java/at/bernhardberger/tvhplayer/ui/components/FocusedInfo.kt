@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.components
 
 import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -19,23 +20,25 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalWindowInfo
-import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 import kotlinx.coroutines.delay
 
 /** How long focus must rest after a held key before the focused card's info returns. */
 internal const val FocusedInfoSettleMs = 250L
-private const val FocusedInfoOutMs = 75
-private const val FocusedInfoInDelayMs = 50
+private const val FocusedInfoOutDelayMs = 100
+private const val FocusedInfoOutMs = 85
+private const val FocusedInfoInDelayMs = 235
+private const val FocusedInfoInMs = 115
 
 /**
- * The info above an immersive row, from one focused card to the next: out quickly, in a little
- * slower. Both sides are bottom-aligned texts of different lengths, so an overlap would stack
- * two titles and descriptions; the new side waits for the old one.
+ * The info above an immersive row, from one focused card to the next, with the G10 Google TV
+ * launcher's timing: the old text waits for the row to get going, leaves, and after a short gap
+ * the new text comes in, all linear. Both sides are bottom-aligned texts of different lengths, so
+ * an overlap would stack two titles and descriptions; the new side waits for the old one.
  */
 internal fun focusedInfoSwap(): ContentTransform =
     ContentTransform(
-        targetContentEnter = fadeIn(tween(PlayerMotion.ShortMs, delayMillis = FocusedInfoInDelayMs, easing = PlayerMotion.EmphasizedDecelerate)),
-        initialContentExit = fadeOut(tween(FocusedInfoOutMs, easing = PlayerMotion.StandardAccelerate)),
+        targetContentEnter = fadeIn(tween(FocusedInfoInMs, delayMillis = FocusedInfoInDelayMs, easing = LinearEasing)),
+        initialContentExit = fadeOut(tween(FocusedInfoOutMs, delayMillis = FocusedInfoOutDelayMs, easing = LinearEasing)),
         sizeTransform = null,
     )
 

@@ -15,6 +15,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.delay
@@ -35,7 +38,7 @@ private class BackdropLayer<T>(val id: Int, val target: T) {
  * A backdrop that follows the focused item [target] reads, with the browse screens' backdrop
  * timing ([BrowseMotionPolicy.backdropSettleMs]). Each new backdrop is composed unseen until its
  * [content] reports it ready, so the previous one stays instead of a half-loaded one showing,
- * then fades in over it, at most once per [BrowseMotionPolicy.backdropIntervalMs]; [onReveal]
+ * then fades in over it while sliding into place, at most once per [BrowseMotionPolicy.backdropIntervalMs]; [onReveal]
  * tells which one is fading in. Reading the target here keeps focus steps from recomposing the
  * caller.
  */
@@ -63,6 +66,8 @@ internal fun <T> FocusBackdrop(
             delay(BrowseMotionPolicy.backdropIntervalMs - BrowseMotionPolicy.backdropSettleMs)
         }
     }
+    val appearOffset = with(LocalDensity.current) { BrowseMotionPolicy.backdropAppearOffset.toPx() } *
+        if (LocalLayoutDirection.current == LayoutDirection.Ltr) -1f else 1f
     Box(modifier) {
         for (layer in layers) key(layer.id) {
             LaunchedEffect(Unit) {
@@ -84,7 +89,10 @@ internal fun <T> FocusBackdrop(
                     delay(BrowseMotionPolicy.backdropIntervalMs)
                 }
             }
-            Box(Modifier.fillMaxSize().graphicsLayer { alpha = layer.alpha.value }) {
+            Box(Modifier.fillMaxSize().graphicsLayer {
+                alpha = layer.alpha.value
+                translationX = (1f - alpha) * appearOffset
+            }) {
                 content(layer.target) { layer.ready = true }
             }
         }

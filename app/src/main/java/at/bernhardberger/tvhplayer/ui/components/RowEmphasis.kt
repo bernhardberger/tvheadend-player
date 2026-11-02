@@ -43,8 +43,8 @@ internal val RowTravelEasing = CubicBezierEasing(0.46f, 0f, 0f, 1f)
 internal val RowTravelMotion = tween<Float>(RowTravelMs, easing = RowTravelEasing)
 
 internal const val RowDimAlpha = 0.4f
-/** A card wholly past its row's start keyline, where it lies under the navigation drawer. */
-internal const val RowPastStartAlpha = 0.3f
+/** A card wholly past its row's start keyline, where it lies under the navigation drawer, in any row. */
+internal const val RowPastStartAlpha = 0.12f
 internal const val RowHeaderQuietAlpha = TvPassiveAlpha
 internal const val RowHeaderQuietScale = 14f / 24f
 
@@ -57,11 +57,13 @@ internal fun Modifier.mutedPastRowStart(
     state: LazyListState,
     index: Int,
     gapPx: Float,
+    /** The emphasis its row is drawn with, which already dims the card. */
+    rowEmphasis: () -> Float = { 1f },
     focused: () -> Boolean,
 ): Modifier = graphicsLayer {
     val item = state.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
     val past = if (item == null || focused()) 0f else (-item.offset / (item.size + gapPx)).coerceIn(0f, 1f)
-    alpha = lerp(1f, RowPastStartAlpha, past)
+    alpha = lerp(1f, RowPastStartAlpha / rowDimAlpha(rowEmphasis()), past)
     compositingStrategy = if (past > 0f) CompositingStrategy.Offscreen else CompositingStrategy.Auto
 }
 
@@ -116,5 +118,7 @@ internal fun Modifier.rowContentEmphasis(emphasis: () -> Float): Modifier = grap
     // focus overflow inside their bounds, including during the native card scale transition.
     // At full emphasis no offscreen buffer is needed and overflow remains unrestricted.
     compositingStrategy = if (value < 1f) CompositingStrategy.Offscreen else CompositingStrategy.ModulateAlpha
-    alpha = lerp(RowDimAlpha, 1f, value)
+    alpha = rowDimAlpha(value)
 }
+
+private fun rowDimAlpha(emphasis: Float): Float = lerp(RowDimAlpha, 1f, emphasis)

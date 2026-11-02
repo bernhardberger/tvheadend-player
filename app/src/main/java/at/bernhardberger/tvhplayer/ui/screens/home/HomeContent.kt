@@ -973,7 +973,7 @@ private fun <T> HomeCardRow(
             itemsIndexed(items, key = { _, item -> itemKey(item) }) { index, item ->
                 val itemModifier = Modifier
                     // The card before the keyline runs on under the navigation drawer.
-                    .mutedPastRowStart(state, index, gapPx) { rememberedKey == itemKey(item) }
+                    .mutedPastRowStart(state, index, gapPx, emphasis) { rememberedKey == itemKey(item) }
                     .then(if (index == restoredIndex) Modifier.focusRequester(entry) else Modifier)
                     .onFocusChanged {
                         if (it.isFocused) {
