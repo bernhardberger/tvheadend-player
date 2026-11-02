@@ -5,16 +5,20 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalWindowInfo
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 import kotlinx.coroutines.delay
 
@@ -60,3 +64,17 @@ internal fun KeyEvent.horizontalHold(): Boolean? =
     } else {
         null
     }
+
+/**
+ * Ends a hold whose release may never arrive: another window took the keys, or the row that saw
+ * the press left the screen. Otherwise the info would stay hidden until the next Left or Right.
+ */
+@Composable
+internal fun EndHoldOnInterruption(onHold: (Boolean) -> Unit) {
+    val hold by rememberUpdatedState(onHold)
+    val window = LocalWindowInfo.current
+    LaunchedEffect(window) {
+        snapshotFlow { window.isWindowFocused }.collect { if (!it) hold(false) }
+    }
+    DisposableEffect(Unit) { onDispose { hold(false) } }
+}

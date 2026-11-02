@@ -1247,16 +1247,24 @@ class HomeActionsTest {
         compose.runOnIdle { assertEquals(listOf(channel.id), tuned); assertEquals(listOf(ProgrammeCategory.SPORT), genres) }
     }
 
-    private fun onNowRow(count: Int, observation: SessionObservation = SessionObservation.create()): MutableState<HomeInput> {
+    private fun onNowRow(
+        count: Int,
+        observation: SessionObservation = SessionObservation.create(),
+        window: androidx.compose.ui.platform.WindowInfo? = null,
+    ): MutableState<HomeInput> {
         val channels = (1L..count).map { Channel.create(ChannelId(it), name = "Channel $it", number = it) }
         val events = channels.associate { it.id to EpgEvent.create(EventId(it.id.value), it.id,
             Instant.fromEpochSeconds(now - 600), Instant.fromEpochSeconds(now + 600),
             title = "Programme ${it.id.value}") }
         val input = mutableStateOf(HomeInput(channels, events, emptyList(), emptyList(), emptyList(), { null }, null, now))
         compose.setContent { TVHeadendPlayerTheme {
-            HomeScreenContent(input.value, observation, PaddingValues(), true,
-                onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
-                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalWindowInfo provides (window ?: androidx.compose.ui.platform.LocalWindowInfo.current),
+            ) {
+                HomeScreenContent(input.value, observation, PaddingValues(), true,
+                    onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
+                    onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
+            }
         } }
         compose.onNodeWithTag("home-onnow-0").assertIsFocused()
         return input
@@ -1298,6 +1306,25 @@ class HomeActionsTest {
         compose.mainClock.advanceTimeBy(100)
         onNowInfo("Programme 4").assertCountEquals(1)
         compose.mainClock.autoAdvance = true
+    }
+
+    @Test fun aHoldWhoseReleaseGotLostInAnotherWindowEndsWhenThatWindowTakesOver() {
+        val focused = mutableStateOf(true)
+        onNowRow(6, window = object : androidx.compose.ui.platform.WindowInfo {
+            override val isWindowFocused get() = focused.value
+        })
+        horizontalKey(android.view.KeyEvent.ACTION_DOWN)
+        horizontalKey(android.view.KeyEvent.ACTION_DOWN, repeat = 1)
+        val card = "home-onnow-2"
+        compose.onNodeWithTag(card).assertIsFocused()
+        compose.mainClock.advanceTimeBy(FocusedInfoSettleMs * 2)
+        onNowInfo("Programme").assertCountEquals(0)
+        compose.runOnIdle { focused.value = false }
+        compose.waitForIdle()
+        compose.runOnIdle { focused.value = true }
+        compose.mainClock.advanceTimeBy(FocusedInfoSettleMs * 2)
+        compose.onNodeWithTag(card).assertIsFocused()
+        onNowInfo("Programme 3").assertCountEquals(1)
     }
 
     @Test fun aNewProgrammeOnTheFocusedCardUpdatesInPlace() {

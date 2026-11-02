@@ -149,6 +149,7 @@ import at.bernhardberger.tvhplayer.ui.components.browseUnderlap
 import at.bernhardberger.tvhplayer.ui.components.cardGlowRoom
 import at.bernhardberger.tvhplayer.ui.components.RowTravelMotion
 import at.bernhardberger.tvhplayer.ui.components.focusedInfoSwap
+import at.bernhardberger.tvhplayer.ui.components.EndHoldOnInterruption
 import at.bernhardberger.tvhplayer.ui.components.horizontalHold
 import at.bernhardberger.tvhplayer.ui.components.mutedPastRowStart
 import at.bernhardberger.tvhplayer.ui.components.rememberUnlessHeld
@@ -922,6 +923,7 @@ private fun <T> HomeCardRow(
     val start = keyline + underlap
     val density = LocalDensity.current
     val offscreenPx = with(density) { CompactZapRowOffscreen.roundToPx() }
+    EndHoldOnInterruption(onHold)
     val gapPx = with(density) { gap.toPx() }
     val state = rememberLazyListState(initialFirstVisibleItemIndex = entryIndex.coerceAtLeast(0))
     var rememberedIndex by remember { mutableIntStateOf(entryIndex) }
