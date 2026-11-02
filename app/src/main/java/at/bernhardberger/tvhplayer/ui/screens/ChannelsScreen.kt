@@ -895,7 +895,7 @@ internal fun ChannelsScreenContent(
                     if (tagNotice) Spacer(Modifier.height(8.dp))
                     ChannelsImmersiveHero(channels, frame, nowSecProvider, Modifier.padding(start = ChannelsGridEdgeInset),
                         sparse = true, held = browseHeld)
-                    // The immersive row's 40dp from headline to cards, less the grid's own inset.
+                    // The headline's gap to the cards, less the grid's own inset.
                     Spacer(Modifier.height(ChannelsGridHeadlineGap - ChannelsGridEdgeInset))
                     ChannelsGrid(
                         channels = channels,
@@ -1301,6 +1301,6 @@ private fun connectingMessage(state: ConnectionUiState): String = stringResource
 /** Between the header and the content below it. */
 private val ChannelsHeaderGap = 8.dp
 
-/** From the grid's headline to its first cards, as the kit's immersive list has it. */
-private val ChannelsGridHeadlineGap = 40.dp
+/** From the grid's headline to its first cards: the row above's fade, then clear space under the headline. */
+private val ChannelsGridHeadlineGap = 48.dp
 

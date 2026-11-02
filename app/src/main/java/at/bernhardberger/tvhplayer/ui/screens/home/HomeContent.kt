@@ -536,7 +536,7 @@ internal fun HomeContent(
                     observation = observation,
                     nowSec = { nowSec },
                     logoTop = contentPadding.calculateTopPadding() + TvBrowseHeaderHeight,
-                    endInset = 48.dp,
+                    endInset = endMargin,
                     modifier = Modifier.fillMaxSize(),
                 )
             }
