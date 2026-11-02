@@ -137,7 +137,7 @@ differences and are approximate (±1 frame of 17 ms).
 
 - The focused card stays at the row's start position; the row scrolls under it
   (about 600 ms, settling slowly).
-- Content block crossfades to the new item in about 150–230 ms, starting with the
+- Content block fades through to the new item in about 200 ms (`components/FocusedInfo.kt`), starting with the
   key press.
 - Background crossfades to the new image in about 270–450 ms, starting with the
   key press; there is no blank or black frame between images.

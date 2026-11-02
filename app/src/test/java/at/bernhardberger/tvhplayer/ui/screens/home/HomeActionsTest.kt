@@ -1246,4 +1246,89 @@ class HomeActionsTest {
             .performKeyInput { pressKey(Key.DirectionCenter) }
         compose.runOnIdle { assertEquals(listOf(channel.id), tuned); assertEquals(listOf(ProgrammeCategory.SPORT), genres) }
     }
+
+    private fun onNowRow(count: Int, observation: SessionObservation = SessionObservation.create()): MutableState<HomeInput> {
+        val channels = (1L..count).map { Channel.create(ChannelId(it), name = "Channel $it", number = it) }
+        val events = channels.associate { it.id to EpgEvent.create(EventId(it.id.value), it.id,
+            Instant.fromEpochSeconds(now - 600), Instant.fromEpochSeconds(now + 600),
+            title = "Programme ${it.id.value}") }
+        val input = mutableStateOf(HomeInput(channels, events, emptyList(), emptyList(), emptyList(), { null }, null, now))
+        compose.setContent { TVHeadendPlayerTheme {
+            HomeScreenContent(input.value, observation, PaddingValues(), true,
+                onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
+                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
+        } }
+        compose.onNodeWithTag("home-onnow-0").assertIsFocused()
+        return input
+    }
+
+    private fun onNowInfo(text: String) =
+        compose.onAllNodes(hasAnyAncestor(hasTestTag("home-on-now-block")) and hasText(text, substring = true), useUnmergedTree = true)
+
+    private fun horizontalKey(action: Int, repeat: Int = 0) {
+        compose.onRoot().performKeyPress(androidx.compose.ui.input.key.KeyEvent(android.view.KeyEvent(
+            0L, 0L, action, android.view.KeyEvent.KEYCODE_DPAD_RIGHT, repeat)))
+        compose.waitForIdle()
+    }
+
+    @Test fun rightAtTheLastCardStaysOnIt() {
+        onNowRow(2)
+        compose.onNodeWithTag("home-onnow-0").performKeyInput { pressKey(Key.DirectionRight) }
+        compose.onNodeWithTag("home-onnow-1").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionRight) }
+        compose.onNodeWithTag("home-onnow-1").assertIsFocused()
+    }
+
+    @Test fun onNowInfoFollowsEachPressAndWaitsForAHeldKeyToRest() {
+        onNowRow(6)
+        onNowInfo("Programme 1").assertCountEquals(1)
+        horizontalKey(android.view.KeyEvent.ACTION_DOWN)
+        horizontalKey(android.view.KeyEvent.ACTION_UP)
+        compose.onNodeWithTag("home-onnow-1").assertIsFocused()
+        onNowInfo("Programme 2").assertCountEquals(1)
+        horizontalKey(android.view.KeyEvent.ACTION_DOWN)
+        horizontalKey(android.view.KeyEvent.ACTION_DOWN, repeat = 1)
+        compose.onNodeWithTag("home-onnow-3").assertIsFocused()
+        compose.mainClock.advanceTimeBy(FocusedInfoSettleMs * 2)
+        onNowInfo("Programme").assertCountEquals(0)
+        compose.mainClock.autoAdvance = false
+        horizontalKey(android.view.KeyEvent.ACTION_UP)
+        compose.mainClock.advanceTimeBy(FocusedInfoSettleMs - 50)
+        onNowInfo("Programme").assertCountEquals(0)
+        compose.mainClock.advanceTimeBy(100)
+        onNowInfo("Programme 4").assertCountEquals(1)
+        compose.mainClock.autoAdvance = true
+    }
+
+    @Test fun aNewProgrammeOnTheFocusedCardUpdatesInPlace() {
+        val input = onNowRow(2)
+        onNowInfo("Programme 1").assertCountEquals(1)
+        compose.mainClock.autoAdvance = false
+        compose.runOnIdle {
+            input.value = input.value.copy(currentEvents = input.value.currentEvents + (ChannelId(1) to EpgEvent.create(
+                EventId(99), ChannelId(1), Instant.fromEpochSeconds(now), Instant.fromEpochSeconds(now + 600),
+                title = "Following programme")))
+        }
+        repeat(30) {
+            compose.mainClock.advanceTimeByFrame()
+            compose.waitForIdle()
+            val shown = listOf("Programme 1", "Following programme").sumOf { onNowInfo(it).fetchSemanticsNodes().size }
+            assertEquals("the old and new programme are never both on screen", 1, shown)
+        }
+        onNowInfo("Following programme").assertCountEquals(1)
+        compose.mainClock.autoAdvance = true
+    }
+
+    @Test fun onNowNextLineMarksAScheduledRecording() {
+        val next = EpgEvent.create(EventId(50), ChannelId(1),
+            Instant.fromEpochSeconds(now + 600), Instant.fromEpochSeconds(now + 1200), title = "Later")
+        onNowRow(1, SessionObservation.create(
+            epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = listOf(next))),
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = listOf(
+                DvrEntry.create(id = DvrEntryId(9), eventId = next.id, state = DvrEntryState.SCHEDULED)))),
+        ))
+        onNowInfo("Later").assertCountEquals(1)
+        compose.onNode(hasAnyAncestor(hasTestTag("home-on-now-block")) and hasTestTag("channels-next-scheduled"), useUnmergedTree = true)
+            .assertExists()
+    }
 }

@@ -24,6 +24,8 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performKeyPress
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.settings.ChannelsLayout
@@ -558,6 +560,26 @@ class ChannelsLayoutFocusTest {
         // The header is nearer the rail than the bottom row; Right still returns to the card.
         fixture.key(Key.DirectionRight)
         fixture.awaitFocus(card(1))
+    }
+
+    @Test fun immersiveHeroWaitsForAHeldKeyToRest() {
+        fixture.show(immersive)
+        fixture.awaitFocus(card(1))
+        fun press(action: Int, repeat: Int = 0) {
+            compose.onRoot().performKeyPress(androidx.compose.ui.input.key.KeyEvent(android.view.KeyEvent(
+                0L, 0L, action, android.view.KeyEvent.KEYCODE_DPAD_RIGHT, repeat)))
+            compose.waitForIdle()
+        }
+        val headline = hasTestTag("channels-headline-channel") and hasAnyAncestor(hasTestTag("channels-immersive-hero"))
+        compose.onAllNodes(headline, useUnmergedTree = true).assertCountEquals(1)
+        press(android.view.KeyEvent.ACTION_DOWN)
+        press(android.view.KeyEvent.ACTION_DOWN, repeat = 1)
+        fixture.awaitFocus(card(3))
+        compose.mainClock.advanceTimeBy(600)
+        compose.onAllNodes(headline, useUnmergedTree = true).assertCountEquals(0)
+        press(android.view.KeyEvent.ACTION_UP)
+        compose.mainClock.advanceTimeBy(600)
+        compose.onAllNodes(headline, useUnmergedTree = true).assertCountEquals(1)
     }
 
     @Test fun immersiveGroupPickerReturnsToEachGroupsCard() {

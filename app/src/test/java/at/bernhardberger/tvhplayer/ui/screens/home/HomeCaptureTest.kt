@@ -89,6 +89,8 @@ import at.bernhardberger.tvhplayer.ui.components.LocalWatchingChannel
 import at.bernhardberger.tvhplayer.ui.components.LocalWatchingIndicator
 import at.bernhardberger.tvhplayer.ui.components.LocalWatchingTarget
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
+import at.bernhardberger.tvhplayer.ui.components.RowTravelEasing
+import at.bernhardberger.tvhplayer.ui.components.RowTravelMs
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.ui.components.railNowPlaying
 import at.bernhardberger.tvhplayer.ui.screens.ChannelsLayoutFixture
@@ -191,25 +193,32 @@ class HomeCaptureTest {
         assertTrue("focused card clears mask", bounds("home-onnow-1").left >= 130.dp)
     }
 
-    @Test fun aCardLeavingUnderTheRailFadesOutAtTheScreenEdge() = atEvening {
+    @Test fun aCardLeavingUnderTheRailIsMutedAsAWhole() = atEvening {
         show(Kind.BROWSE)
         settle("home-recent-0")
         key(Key.DirectionDown)
         settle("home-onnow-0")
+        val scale = context.resources.displayMetrics.density
+        // The brightest of the card's visible middle line, clear of the focus ring and corners.
+        fun cardBrightness(): Float {
+            val card = bounds("home-onnow-0")
+            val bitmap = draw()
+            val y = (((card.top.value + card.bottom.value) / 2) * scale).toInt()
+            val from = ((card.right.value - 90f).coerceAtLeast(0f) * scale).toInt()
+            val brightest = (from until ((card.right.value - 8f) * scale).toInt()).maxOf {
+                val pixel = androidx.compose.ui.graphics.Color(bitmap.getPixel(it, y))
+                maxOf(pixel.red, pixel.green, pixel.blue)
+            }
+            bitmap.recycle()
+            return brightest
+        }
+        val atTheKeyline = cardBrightness()
         key(Key.DirectionRight)
         settle("home-onnow-1")
-        val leaving = bounds("home-onnow-0")
-        val scale = context.resources.displayMetrics.density
-        val bitmap = draw()
-        val brightness = { x: Float, y: Float ->
-            val pixel = androidx.compose.ui.graphics.Color(bitmap.getPixel((x * scale).toInt(), (y * scale).toInt()))
-            maxOf(pixel.red, pixel.green, pixel.blue)
-        }
-        val middle = (leaving.top.value + leaving.bottom.value) / 2
-        val underTheRail = brightness(40f, middle)
-        val besideTheRow = brightness(40f, leaving.top.value - 12f)
-        bitmap.recycle()
-        assertTrue("the leaving card has receded under the rail: $underTheRail vs $besideTheRow", underTheRail - besideTheRow < 0.1f)
+        assertTrue("the card has left the keyline for the rail", bounds("home-onnow-0").right < 130.dp)
+        val muted = cardBrightness()
+        assertTrue("the leaving card is muted: $muted vs $atTheKeyline", muted < atTheKeyline * 0.6f)
+        assertTrue("and still there, right to the screen edge: $muted", muted > atTheKeyline * 0.1f)
     }
 
     @Test fun infoBottomStaysAnchoredDuringTextHeightChange() = atEvening {
@@ -527,7 +536,7 @@ class HomeCaptureTest {
             val elapsed = frame * 16f
             assertEquals("raw block at $elapsed", ((elapsed - 100f) / 270f).coerceIn(0f, 1f), motion.block.value, 0.01f)
             assertEquals("raw background at $elapsed", ((elapsed - 100f) / 370f).coerceIn(0f, 1f), motion.background.value, 0.01f)
-            assertEquals("entry page progress at $elapsed", HomeDownInEasing.transform((elapsed / HomeDownInMs).coerceIn(0f, 1f)), motion.progress.value, 0.01f)
+            assertEquals("entry page progress at $elapsed", RowTravelEasing.transform((elapsed / RowTravelMs).coerceIn(0f, 1f)), motion.progress.value, 0.01f)
         }
         compose.mainClock.advanceTimeBy(100)
         // Fully expanded -> Down out -> ordinary Down: the exit must keep fading, not freeze.

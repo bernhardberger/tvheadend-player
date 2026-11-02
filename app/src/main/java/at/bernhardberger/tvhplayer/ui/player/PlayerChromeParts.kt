@@ -1,15 +1,13 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.ui.components.focusedInfoSwap
+import at.bernhardberger.tvhplayer.ui.components.rememberUnlessHeld
 import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
 import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
 import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
 import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.togetherWith
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,11 +17,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,7 +49,6 @@ import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
 import at.bernhardberger.tvhplayer.ui.common.formatTimeIntervalSpoken
 import at.bernhardberger.tvhplayer.ui.common.programmeMetadata
 import java.time.ZoneId
-import kotlinx.coroutines.delay
 
 /* Player chrome wiring helpers. */
 
@@ -125,27 +119,6 @@ internal data class QuickZapPreviewSnapshot(
     val subtitle: String? = null,
 )
 
-/** How long focus must rest on a quick-zap card after a held key before its preview fades in. */
-internal const val QuickZapPreviewSettleMs = 250L
-
-/**
- * [value], or null while [held] and for [settleMs] after it is released. Each single press
- * shows its value at once, so the previews crossfade; a held key shows and loads nothing per
- * card until focus rests where it stopped.
- */
-@Composable
-internal fun <T : Any> rememberUnlessHeld(value: T?, held: Boolean, settleMs: Long): T? {
-    var rested by remember { mutableStateOf(true) }
-    LaunchedEffect(held) {
-        if (held) rested = false
-        else if (!rested) {
-            delay(settleMs)
-            rested = true
-        }
-    }
-    return value.takeIf { !held && rested }
-}
-
 /**
  * Passive preview of the focused quick-zap card, bottom-anchored in a fixed slot so neither the
  * tray nor the cards move with the preview's length. A press crossfades to the new card's
@@ -162,7 +135,7 @@ internal fun QuickZapTrayPreview(
     compact: Boolean = false,
     scrolling: Boolean = false,
 ) {
-    val settledId = rememberUnlessHeld(channel?.id, scrolling, QuickZapPreviewSettleMs)
+    val settledId = rememberUnlessHeld(channel?.id, scrolling)
     val snapshot = channel?.takeIf { it.id == settledId }?.let {
         QuickZapPreviewSnapshot(
             channelId = it.id,
@@ -189,8 +162,6 @@ internal fun QuickZapTrayPreview(
     }
 }
 
-private const val QuickZapPreviewOutMs = 75
-private const val QuickZapPreviewInDelayMs = 50
 
 /**
  * Fades between the focused cards' previews: out quickly, in a little slower. Each side
@@ -205,14 +176,7 @@ internal fun QuickZapTrayPreviewFrame(
 ) {
     AnimatedContent(
         targetState = snapshot,
-        // A short fade through: both sides are bottom-aligned texts of different lengths, so an
-        // overlap would stack two titles and descriptions. The new side waits for the old one.
-        transitionSpec = {
-            (fadeIn(
-                tween(PlayerMotion.ShortMs, delayMillis = QuickZapPreviewInDelayMs, easing = PlayerMotion.EmphasizedDecelerate)
-            ) togetherWith
-                fadeOut(tween(QuickZapPreviewOutMs, easing = PlayerMotion.StandardAccelerate))).using(null)
-        },
+        transitionSpec = { focusedInfoSwap() },
         contentKey = { it?.channelId },
         // Both sides sit on the cards while they overlap, as the slot itself does; a shorter
         // preview would otherwise start at the taller one's top and drop when that one leaves.

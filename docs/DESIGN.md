@@ -267,10 +267,11 @@ Paths below are relative to `app/src/main/java/at/bernhardberger/tvhplayer/ui/`.
 
 | Shared pattern | Component |
 |---|---|
-| Row/section emphasis | `components/RowEmphasis.kt` — one 300 ms position clock, deferred header scale/alpha and content dimming |
+| Row/section emphasis | `components/RowEmphasis.kt` — one 300 ms position clock, one 410 ms clock where the rows themselves travel (Home into On now, the zap rail), deferred header scale/alpha, content dimming and the muted card past a row's start |
 | Progress bar | `components/ProgressStrip.kt` |
 | Channel title | `components/ChannelTitle.kt` — `channelTitleText` |
 | Picon | `components/PiconBox.kt` — dimmed TV icon while loading, normal-strength TV icon when there is no logo or it fails |
+| Focused card's info above a row | `components/FocusedInfo.kt` — on Home's On now, Channels Immersive and the zap rail: fades through (out 75 ms, in 150 ms after 50 ms), hidden while Left/Right is held and back 250 ms after release; a new programme on the same card updates in place |
 | Now-playing plate | `player/NowPlayingStrip.kt` — `NowPlayingPlate`: 48×27 picon plate (channel number without a logo) with the 2dp viewer-position strip, shared by the player strip and the rail's playing slot |
 | Image load fade | `../images/TvheadendArtworkLoader.kt` — the shared loader fades every logo and programme picture in over 200 ms when actually loaded; memory-cache hits show at once |
 | Reading box | `components/ProgrammeDetailsLayout.kt` — `ProgrammeDetailsFullDescription` |
@@ -746,8 +747,9 @@ only.
   and time hold skeleton lines rather than claiming no EPG.
 - **Immersive.** One row of 196dp compact cards, 20dp apart (the kit gutter),
   rests at the bottom of the screen with its first card on the x130 keyline. The
-  row runs under the rail and the opened drawer to the screen edge; cards under
-  the opened drawer dim to at most the kit's 50% modal scrim. The same headline
+  row runs under the rail and the opened drawer to the screen edge. A card past
+  the keyline is muted to 30% as a whole as it leaves, so its image doesn't compete
+  with the rail's labels; Home's rows do the same. The same headline
   sits 40dp above the cards, with two synopsis lines and, last, the List pane's
   quiet Next line (trial 2026-10-22). Down stays on the row, Up reaches the header and Left at
   the row's start reaches the rail.
@@ -1129,7 +1131,7 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   titled with the active channel group (or All channels),
   the second is Recent channels and is absent while empty. The quiet row's title
   shrinks to title-small at the passive alpha and its cards dim to 40%; Down and
-  Up change rows over 300 ms and each row keeps its card and viewport. Up from the
+  Up change rows over 410 ms and each row keeps its card and viewport. Up from the
   first row returns to the controls. The top band's centred up hint names what
   Up leads to: Back to TV on the first row, the first row's title on Recent; the
   label swaps with the browse fade through (90 ms out, then 210 ms in).

@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.ui.components.FocusedInfoSettleMs
+import at.bernhardberger.tvhplayer.ui.components.rememberUnlessHeld
 import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
 import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import android.app.Application
@@ -164,7 +166,7 @@ class PlayerChromeEvidenceTest {
             block()
             androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications()
         }
-        compose.setContent { shown = rememberUnlessHeld(focused, held, QuickZapPreviewSettleMs) }
+        compose.setContent { shown = rememberUnlessHeld(focused, held) }
         compose.waitForIdle()
         assertEquals("the opening card previews at once", ChannelId(1), shown)
         compose.mainClock.autoAdvance = false
@@ -177,10 +179,10 @@ class PlayerChromeEvidenceTest {
         compose.mainClock.advanceTimeByFrame()
         assertNull("a held key hides the preview from its first repeat", shown)
         set { focused = ChannelId(4) }
-        compose.mainClock.advanceTimeBy(QuickZapPreviewSettleMs * 2)
+        compose.mainClock.advanceTimeBy(FocusedInfoSettleMs * 2)
         assertNull("and keeps it hidden while held", shown)
         set { held = false }
-        compose.mainClock.advanceTimeBy(QuickZapPreviewSettleMs - 50)
+        compose.mainClock.advanceTimeBy(FocusedInfoSettleMs - 50)
         assertNull("focus rests before the preview returns", shown)
         compose.mainClock.advanceTimeBy(100)
         assertEquals(ChannelId(4), shown)

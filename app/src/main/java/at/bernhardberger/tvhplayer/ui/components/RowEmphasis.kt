@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.components
 
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -12,6 +13,7 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -31,9 +33,37 @@ internal val RowTextEnter = expandVertically(tween(RowChangeMs, easing = PlayerM
     fadeIn(RowChangeMotion)
 internal val RowTextExit = shrinkVertically(tween(RowChangeMs, easing = PlayerMotion.Standard), Alignment.Top) +
     fadeOut(RowChangeMotion)
+
+/**
+ * A step from one row to the next where the rows themselves travel. Fitted to the G10's Google TV
+ * launcher, frames 81–103 (240x135 source, under 1 px RMS).
+ */
+internal const val RowTravelMs = 410
+internal val RowTravelEasing = CubicBezierEasing(0.46f, 0f, 0f, 1f)
+internal val RowTravelMotion = tween<Float>(RowTravelMs, easing = RowTravelEasing)
+
 internal const val RowDimAlpha = 0.4f
+/** A card wholly past its row's start keyline, where it lies under the navigation drawer. */
+internal const val RowPastStartAlpha = 0.3f
 internal const val RowHeaderQuietAlpha = TvPassiveAlpha
 internal const val RowHeaderQuietScale = 14f / 24f
+
+/**
+ * Mutes the card at [index] of [state]'s row as it passes the row's start keyline, following the
+ * scroll without recomposing. Only such a card pays for a layer, a card-sized one, and the
+ * focused card takes none: a layer would clip its glow.
+ */
+internal fun Modifier.mutedPastRowStart(
+    state: LazyListState,
+    index: Int,
+    gapPx: Float,
+    focused: () -> Boolean,
+): Modifier = graphicsLayer {
+    val item = state.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
+    val past = if (item == null || focused()) 0f else (-item.offset / (item.size + gapPx)).coerceIn(0f, 1f)
+    alpha = lerp(1f, RowPastStartAlpha, past)
+    compositingStrategy = if (past > 0f) CompositingStrategy.Offscreen else CompositingStrategy.Auto
+}
 
 /** A row's emphasis at [distance] rows from the shared position. */
 internal fun rowEmphasis(distance: Float): Float = (1f - abs(distance)).coerceIn(0f, 1f)

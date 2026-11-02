@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Home and Channels
+
+- Right at the end of a Home row now stays on the last card instead of jumping to
+  the header.
+- Holding Left or Right on a row hides the programme info until you stop, on
+  Home's On now and on Channels the same way as the player's channel row.
+- Cards leaving under the side menu are now dimmed as a whole instead of fading out
+  toward the screen edge.
+- On now's Next line now shows when that programme is set to record.
+
 ## 0.4.1
 
 ### Setup

@@ -5,8 +5,6 @@ import at.bernhardberger.tvhplayer.ui.TvLogoPlateColor
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -40,7 +38,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -59,9 +56,6 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.layout.findRootCoordinates
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -139,7 +133,10 @@ import at.bernhardberger.tvhplayer.ui.components.browseDrawerUnderlap
 import at.bernhardberger.tvhplayer.ui.components.browseScreenBackdrop
 import at.bernhardberger.tvhplayer.ui.components.browseUnderlap
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
-import at.bernhardberger.tvhplayer.ui.components.navigationEdgeFadeMask
+import at.bernhardberger.tvhplayer.ui.components.focusedInfoSwap
+import at.bernhardberger.tvhplayer.ui.components.horizontalHold
+import at.bernhardberger.tvhplayer.ui.components.mutedPastRowStart
+import at.bernhardberger.tvhplayer.ui.components.rememberUnlessHeld
 import at.bernhardberger.tvhplayer.ui.components.overflowingRowViewport
 import at.bernhardberger.tvhplayer.ui.components.programmeAboutFacts
 import at.bernhardberger.tvhplayer.ui.components.programmeHeaderMetadata
@@ -316,6 +313,10 @@ internal class ChannelsImmersiveCards(
     val onPage: (Int) -> Boolean,
 )
 
+/** Whether a recording is scheduled for [event], the mark on a headline's Next line. */
+internal fun SessionObservation.isScheduled(event: EpgEvent?): Boolean =
+    event?.let { dvrEntryForEvent(it.id) }?.state == DvrEntryState.SCHEDULED
+
 /**
  * The immersive list: the focused channel's programme above one row of compact zap cards along
  * the bottom, over [ChannelsImmersiveBackground]. Up from the row reaches the header, Left at its
@@ -331,15 +332,17 @@ internal fun ChannelsImmersiveBody(
     modifier: Modifier = Modifier,
     rowModifier: Modifier = Modifier,
 ) {
+    var held by remember { mutableStateOf(false) }
     Column(modifier.padding(bottom = (bottomInset - ImmersiveFocusRoom).coerceAtLeast(0.dp))) {
         Spacer(Modifier.weight(1f))
-        ChannelsImmersiveHero(channels, cards.frame, cards.nowSec, Modifier.padding(start = cards.keyline))
+        ChannelsImmersiveHero(channels, cards.frame, cards.nowSec, Modifier.padding(start = cards.keyline), held = held)
         Spacer(Modifier.height(ImmersiveHeroGap))
         ChannelsCardRow(
             channels = channels,
             cards = cards,
             state = state,
             current = current,
+            onHold = { held = it },
             modifier = rowModifier,
         )
     }
@@ -356,6 +359,7 @@ private fun ChannelsCardRow(
     cards: ChannelsImmersiveCards,
     state: LazyListState,
     current: Boolean,
+    onHold: (Boolean) -> Unit,
     modifier: Modifier,
 ) {
     val ltr = LocalLayoutDirection.current == LayoutDirection.Ltr
@@ -364,8 +368,7 @@ private fun ChannelsCardRow(
     // The row reaches under the drawer to the screen edge, open or closed, so its keyline lies that much further in.
     val underlap = browseDrawerUnderlap()
     val keyline = cards.keyline + underlap
-    // Where the screen's edge lies in the row, as the drawer moves it, for the fade.
-    var screenEdge by remember { mutableFloatStateOf(0f) }
+    val gapPx = with(density) { CompactZapCardGap.toPx() }
     val bringIntoView = remember(density, keyline) {
         StartKeylineBringIntoViewSpec(with(density) { keyline.toPx() } + offscreenPx)
     }
@@ -385,22 +388,15 @@ private fun ChannelsCardRow(
             modifier = modifier
                 .browseUnderlap(underlap)
                 .fillMaxWidth()
-                .onGloballyPositioned { coordinates ->
-                    val left = coordinates.positionInRoot().x
-                    val rootWidth = coordinates.findRootCoordinates().size.width
-                    screenEdge = (if (ltr) -left else left + coordinates.size.width - rootWidth).coerceAtLeast(0f)
-                }
-                // The focused card's glow reaches past the focus room, outside the fade's layer.
+                // The focused card's glow reaches past the focus room.
                 .cardGlowRoom(top = CardGlowReach - ImmersiveFocusRoom)
-                // The card before the keyline runs on under the navigation drawer and fades out at the screen edge.
-                .navigationEdgeFadeMask(keyline - CompactZapCardGap, leadingInsetPx = { screenEdge })
-                // Under the opening drawer the cards darken like the backdrop, inside the fade's layer.
-                .underBrowseShellScrim(inOffscreenLayer = true)
                 .overflowingRowViewport(offscreenPx)
                 .testTag("channels-immersive-cards")
+                .onFocusChanged { if (!it.hasFocus) onHold(false) }
                 .focusGroup()
                 .focusRestorer()
                 .onPreviewKeyEvent { event ->
+                    if (current) event.horizontalHold()?.let(onHold)
                     if (!current || event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                     val index = focusedIndex.takeIf { it in channels.indices }
                     val towardNavigation = if (ltr) Key.DirectionLeft else Key.DirectionRight
@@ -439,6 +435,8 @@ private fun ChannelsCardRow(
                     programmePicture = cards.programmePicture,
                     channelName = cards.channelNames,
                     modifier = Modifier
+                        // The card before the keyline runs on under the navigation drawer.
+                        .mutedPastRowStart(state, index, gapPx) { focusedIndex == index }
                         .then(if (requester != null) Modifier.focusRequester(requester) else Modifier)
                         .tabFocus()
                         .focusProperties {
@@ -603,12 +601,16 @@ internal fun ChannelsImmersiveHero(
     modifier: Modifier,
     besideList: Boolean = false,
     sparse: Boolean = false,
+    /** Left or Right is held on the row: the hero waits until focus rests. */
+    held: Boolean = false,
 ) {
     // A leaving group keeps showing its own channel while it fades.
     val focusedId = rememberTabReader(frame.focusedId)
     val entryId = rememberTabReader(frame.entryId)
-    val channelId = focusedId()?.takeIf { id -> channels.any { it.id == id } }
-        ?: browsingFocusChannelId(channels, entryId())
+    val channelId = rememberUnlessHeld(
+        focusedId()?.takeIf { id -> channels.any { it.id == id } } ?: browsingFocusChannelId(channels, entryId()),
+        held,
+    )
     val typography = MaterialTheme.typography
     // A fixed height keeps the row in place while the hero's text changes length; shorter text
     // sits on the row, so a two-line title grows upward. Beside the list nothing moves with it.
@@ -621,11 +623,7 @@ internal fun ChannelsImmersiveHero(
     }
     AnimatedContent(
         targetState = channelId,
-        transitionSpec = {
-            fadeIn(tween(ChannelsDetailCrossfadeMillis)) togetherWith
-                fadeOut(tween(ChannelsDetailCrossfadeMillis)) using
-                SizeTransform(clip = false) { _, _ -> snap() }
-        },
+        transitionSpec = { focusedInfoSwap() },
         contentAlignment = if (besideList) Alignment.TopStart else Alignment.BottomStart,
         modifier = modifier.then(if (besideList) Modifier else Modifier.height(height))
             .widthIn(max = ImmersiveHeroWidth).testTag("channels-immersive-hero"),
@@ -636,9 +634,7 @@ internal fun ChannelsImmersiveHero(
         val observation = frame.observation
         val current = remember(observation, id, now) { observation.eventAt(channel.id, Instant.fromEpochSeconds(now)) }
         val next = remember(observation, id, now) { observation.nextEvent(channel.id, Instant.fromEpochSeconds(now)) }
-        val nextScheduled = remember(observation, next) {
-            next?.let { observation.dvrEntryForEvent(it.id) }?.state == DvrEntryState.SCHEDULED
-        }
+        val nextScheduled = remember(observation, next) { observation.isScheduled(next) }
         // AnimatedContent hands its fixed height to the content; wrapping keeps short text on the row.
         // Beside the list the headline hangs from the picture, and the synopsis takes what is left.
         ChannelsHeadline(channel, current, next, nextScheduled, channel.id in frame.recordingIds, now,

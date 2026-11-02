@@ -326,8 +326,8 @@ class ChannelsStandardLayoutEvidenceTest {
 
         compose.mainClock.autoAdvance = false
         compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
-        compose.mainClock.advanceTimeBy(ChannelsDetailCrossfadeMillis / 2L)
-        // Both headlines are on screen during the dissolve, and the outgoing copy
+        compose.mainClock.advanceTimeBy(60L)
+        // Both headlines are still composed during the swap, and the outgoing copy
         // keeps the channel it was written for instead of adopting the new row's EPG.
         compose.onAllNodes(hasTestTag("channels-headline-channel") and hasText(title(1))).assertCountEquals(1)
         compose.onAllNodes(hasTestTag("channels-headline-channel") and hasText(title(2))).assertCountEquals(1)

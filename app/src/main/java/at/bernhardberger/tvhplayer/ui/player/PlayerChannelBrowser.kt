@@ -32,7 +32,8 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
 import at.bernhardberger.tvhplayer.ui.components.CardGlowReach
-import at.bernhardberger.tvhplayer.ui.components.RowChangeMotion
+import at.bernhardberger.tvhplayer.ui.components.RowTravelMotion
+import at.bernhardberger.tvhplayer.ui.components.horizontalHold
 import at.bernhardberger.tvhplayer.ui.components.RowDimAlpha
 import at.bernhardberger.tvhplayer.ui.components.RowHeaderQuietAlpha
 import at.bernhardberger.tvhplayer.ui.components.cardGlowRoom
@@ -117,7 +118,7 @@ internal fun PlayerChannelBrowser(
     // Read when called: a retired card's retained click must not act for the row that left.
     fun owns(row: PlayerChannelRow) = row == (state.row.takeIf { it in currentRows } ?: PlayerChannelRow.ON_NOW)
     val position by animateFloatAsState(rows.indexOf(current).toFloat(),
-        RowChangeMotion, label = "player-channel-row")
+        RowTravelMotion, label = "player-channel-row")
     val typography = MaterialTheme.typography
     val density = LocalDensity.current
     val cardHeight = with(density) { 94.dp + typography.titleMedium.lineHeight.toDp() + typography.bodySmall.lineHeight.toDp() }
@@ -146,9 +147,7 @@ internal fun PlayerChannelBrowser(
                 if (event.type == KeyEventType.KeyDown) activationKeyCode = event.nativeKeyEvent.keyCode
                 else if (event.type == KeyEventType.KeyUp && activationKeyCode == event.nativeKeyEvent.keyCode) activationKeyCode = null
             }
-            if (event.key == Key.DirectionLeft || event.key == Key.DirectionRight) {
-                state.scrolling = event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount > 0
-            }
+            event.horizontalHold()?.let { state.scrolling = it }
             val step = when (event.key) {
                 Key.DirectionDown -> 1
                 Key.DirectionUp -> -1
