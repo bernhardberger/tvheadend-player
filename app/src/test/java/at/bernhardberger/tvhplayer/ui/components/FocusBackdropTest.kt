@@ -29,13 +29,15 @@ class FocusBackdropTest {
     private val reveals = mutableListOf<Pair<String, Long>>()
     private var layers by mutableIntStateOf(0)
     private var mostLayers = 0
+    private val composed = mutableListOf<String>()
 
     /** Shows backdrops that report ready after [loadMs] of their target, or never for null. */
-    private fun show(loadMs: (String) -> Long?) {
+    private fun show(ahead: () -> List<String> = { emptyList() }, loadMs: (String) -> Long?) {
         compose.mainClock.autoAdvance = false
         compose.setContent {
-            FocusBackdrop({ target }, onReveal = { reveals += it to compose.mainClock.currentTime }) { shown, onReady ->
+            FocusBackdrop({ target }, onReveal = { reveals += it to compose.mainClock.currentTime }, ahead = ahead) { shown, onReady ->
                 DisposableEffect(Unit) {
+                    composed += shown
                     mostLayers = maxOf(mostLayers, ++layers)
                     onDispose { layers-- }
                 }
@@ -89,5 +91,20 @@ class FocusBackdropTest {
         assertEquals("never", reveals.last().first)
         assertTrue(reveals.last().second - changed >= BrowseMotionPolicy.backdropLoadTimeoutMs)
         assertEquals("Only the shown backdrop and the next one are composed", 2, mostLayers)
+    }
+
+    @Test fun theNextBackdropsLoadOnceFocusRestsAndNotWhileItMoves() {
+        show(ahead = { listOf("$target-" , "$target+") }) { 0 }
+        advance(1_000)
+        assertEquals("Ahead of the first backdrop", listOf("A", "A-", "A+"), composed)
+        composed.clear()
+
+        for (step in listOf("1", "2", "3")) {
+            focus(step)
+            advance(100)
+        }
+        assertEquals("Nothing ahead of a step focus already left", emptyList<String>(), composed.filter { it.length > 1 })
+        advance(1_000)
+        assertEquals(listOf("3-", "3+"), composed.filter { it.length > 1 })
     }
 }

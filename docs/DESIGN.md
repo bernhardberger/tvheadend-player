@@ -776,6 +776,8 @@ only.
   from rest, as on the Google TV launcher; steps closer together than 300ms wait
   until focus has rested that long. It changes at most every 500ms, waits up to 2s for its
   picture and then fades in over the old one in 225ms, growing from 97% about its middle as on the Google TV launcher, so there is no dip to grey.
+  While focus rests, the backdrops one step away along the row load unseen, so a
+  first visit starts as quickly as a return.
   Before a session, saved logos give their stored colour and blur from the first
   frame.
 

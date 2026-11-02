@@ -210,6 +210,7 @@ internal val ImmersiveHeroWidth = 480.dp
  * channel's on-now programme's unless [picture] picks another, as the Guide's focused programme.
  * The picture is as wide as the kit's unless [pictureHeight] scales it down to a height.
  * [logoMaxHeight] can constrain the fallback logo to a shorter headline's available space.
+ * [order] is the row focus walks along, for loading the next backdrops ahead.
  * It reaches under the closed rail, beneath the shell's gradient. Warm playback keeps the video as
  * the background, so nothing is drawn.
  */
@@ -226,25 +227,32 @@ internal fun ChannelsImmersiveBackground(
     picture: (ChannelId) -> ArtworkId? = { observation.eventAt(it, Instant.fromEpochSeconds(nowSec()))?.image },
     pictureHeight: Dp? = null,
     logoMaxHeight: Dp = Dp.Infinity,
+    order: List<ChannelId> = emptyList(),
 ) {
     if (LocalWarmPlayback.current) return
     val session = observation.currentSession != null
     val artwork = LocalArtworkContext.current
     var revealed by remember { mutableStateOf<ChannelBackdrop?>(null) }
+    fun backdropOf(id: ChannelId?): ChannelBackdrop {
+        val art = id?.takeIf { programArt && session }?.let(picture)
+        val channel = channels.firstOrNull { it.id == id }
+        val icon = channel?.icon
+        return ChannelBackdrop(id, art, icon, logo = channel != null && (session || icon is ChannelIcon.RemoteUrl ||
+            icon?.let { (artwork.logo(it) as? AppArtworkSource)?.saved } != null))
+    }
     FocusBackdrop(
         // A new backdrop for whatever changes what it shows, so the session's and the guide's
         // arrival fade in like a focus step rather than popping in piece by piece.
-        {
-            val id = channelId()
-            val art = id?.takeIf { programArt && session }?.let(picture)
-            val channel = channels.firstOrNull { it.id == id }
-            val icon = channel?.icon
-            ChannelBackdrop(id, art, icon, logo = channel != null && (session || icon is ChannelIcon.RemoteUrl ||
-                icon?.let { (artwork.logo(it) as? AppArtworkSource)?.saved } != null))
-        },
+        { backdropOf(channelId()) },
         // The art in the corner leaves the rest clear, so the gradient is kept off its holes.
         modifier.browseScreenBackdrop().underBrowseShellScrim().testTag("channels-immersive-background"),
         onReveal = { revealed = it },
+        // One step away along the row, or the row's start while focus is elsewhere.
+        ahead = {
+            val at = order.indexOf(channelId())
+            val next = if (at < 0) order.take(1) else listOfNotNull(order.getOrNull(at - 1), order.getOrNull(at + 1))
+            next.map(::backdropOf)
+        },
     ) { shown, onReady ->
         val channel = shown.channel
         // Without a session, a saved logo or a remote URL, the plain background stays.

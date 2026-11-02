@@ -65,7 +65,8 @@ internal object BrowseMotionPolicy {
      * G10's launcher, and steps closer together than [backdropSettleMs] wait until focus has rested
      * that long. It changes at most once per [backdropIntervalMs], so stepping at a steady pace
      * does not repaint the screen on every step. The new backdrop waits for its picture, at most
-     * [backdropLoadTimeoutMs], and fades in over the old one.
+     * [backdropLoadTimeoutMs], and fades in over the old one. The next ones along a row load while
+     * focus rests, so a first visit needn't wait for that picture either.
      */
     const val backdropSettleMs = 300L
     const val backdropIntervalMs = 500L

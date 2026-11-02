@@ -16,7 +16,7 @@
   the On now card you left, not those of the row's first card.
 - Programme info, the Channels list's picture, the Guide's headline and the backdrop
   now change more softly, ending together; a new backdrop starts right away after a
-  single press and grows slightly into place.
+  single press, even to a card you haven't visited yet, and grows slightly into place.
 - The channel logo above the Channels grid is smaller and no longer runs into the
   row behind the headline.
 - While Home waits for its first rows it shows nothing at first, then a spinner

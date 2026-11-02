@@ -528,6 +528,7 @@ internal fun HomeContent(
             ) {
                 ChannelsImmersiveBackground(
                     channels = onNow.items.map { it.channel },
+                    order = onNow.items.map { it.channel.id },
                     channelId = { focusedOnNow ?: restoredOnNow },
                     observation = observation,
                     nowSec = { nowSec },

@@ -669,6 +669,7 @@ internal fun ChannelsScreenContent(
                     programArt = view.showsProgramArt,
                     // The shown channel follows focus after a delay; it may still be the previous group's.
                     channels = channelScope.allChannels,
+                    order = orderedChannelIds,
                     channelId = { focusedChannelId?.takeIf(orderedChannelIds::contains) ?: scopeEntryChannelId() },
                     observation = observation,
                     nowSec = nowSec,

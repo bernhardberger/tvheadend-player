@@ -15,6 +15,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.util.lerp
 import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 import kotlinx.coroutines.delay
@@ -37,18 +38,22 @@ private class BackdropLayer<T>(val id: Int, val target: T) {
  * in quick succession wait for focus to rest. Each new backdrop is composed unseen until its
  * [content] reports it ready, so the previous one stays instead of a half-loaded one showing,
  * then fades in over it while growing into place, at most once per [BrowseMotionPolicy.backdropIntervalMs]; [onReveal]
- * tells which one is fading in. Reading the target here keeps focus steps from recomposing the
- * caller.
+ * tells which one is fading in. Once focus rests, [ahead]'s backdrops load unseen too, so a step
+ * to one of them can change at once instead of waiting for its picture. Reading the target here
+ * keeps focus steps from recomposing the caller.
  */
 @Composable
 internal fun <T> FocusBackdrop(
     target: () -> T,
     modifier: Modifier = Modifier,
     onReveal: (T) -> Unit = {},
+    ahead: () -> List<T> = { emptyList() },
     content: @Composable (target: T, onReady: () -> Unit) -> Unit,
 ) {
     val currentTarget by rememberUpdatedState(target)
     val currentOnReveal by rememberUpdatedState(onReveal)
+    val currentAhead by rememberUpdatedState(ahead)
+    var loadingAhead by remember { mutableStateOf(emptyList<T>()) }
     val layers = remember { mutableStateListOf(BackdropLayer(0, target())) }
     val reveals = remember { Mutex() }
     LaunchedEffect(Unit) {
@@ -65,9 +70,15 @@ internal fun <T> FocusBackdrop(
                 delay(BrowseMotionPolicy.backdropSettleMs)
             }
             resting = true
+            snapshotFlow { currentAhead() }.collect { loadingAhead = it }
         }
     }
     Box(modifier) {
+        for (item in loadingAhead) key(item) {
+            Box(Modifier.fillMaxSize().graphicsLayer { alpha = 0f }.clearAndSetSemantics {}) {
+                content(item) {}
+            }
+        }
         for (layer in layers) key(layer.id) {
             LaunchedEffect(Unit) {
                 withTimeoutOrNull(BrowseMotionPolicy.backdropLoadTimeoutMs) {
