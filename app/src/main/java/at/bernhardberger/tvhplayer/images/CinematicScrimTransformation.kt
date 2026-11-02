@@ -30,10 +30,21 @@ internal object CinematicScrimTransformation : Transformation() {
 }
 
 /**
+ * The kit's scrim on the immersive Channels and Home backdrop, also easing out under the header
+ * band so its clock and buttons hold on a bright sky.
+ */
+internal object ImmersiveScrimTransformation : Transformation() {
+    override val cacheKey: String = "immersiveScrim"
+
+    override suspend fun transform(input: Bitmap, size: Size): Bitmap =
+        scrimmed(input, size) { width, height -> listOf(kitCinematicScrimMask(width, height), headerFade(height * .25f)) }
+}
+
+/**
  * The Guide headline's softer scrim. The picture keeps 90% of itself at its top-right, as under
  * the kit's scrim, and eases out to clear along the whole of its left edge and, by 64% of its
  * height, its bottom, so it never shows a cut. The picture reaches into the grid; gone by then,
- * it never sits behind the time ruler at any font size.
+ * it never sits behind the time ruler at any font size. The top eases out under the header band.
  */
 internal object GuideScrimTransformation : Transformation() {
     override val cacheKey: String = "guideScrim"
@@ -42,9 +53,13 @@ internal object GuideScrimTransformation : Transformation() {
         listOf(
             easedRamp(0f, 0f, width * .6f, 0f, from = 0f, to = .9f),
             easedRamp(0f, height * .2f, 0f, height * .64f, from = 1f, to = 0f),
+            headerFade(height * .35f),
         )
     }
 }
+
+/** The picture at about a third along its top edge, back to whole by [end], about where the header band ends. */
+private fun headerFade(end: Float): Shader = easedRamp(0f, 0f, 0f, end, from = .35f, to = 1f)
 
 /** Alpha easing from [from] at (x0, y0) to [to] at (x1, y1) along a smoothstep curve, held beyond either end. */
 private fun easedRamp(x0: Float, y0: Float, x1: Float, y1: Float, from: Float, to: Float): Shader {

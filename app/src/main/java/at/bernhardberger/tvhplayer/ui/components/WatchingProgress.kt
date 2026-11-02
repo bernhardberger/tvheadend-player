@@ -115,6 +115,14 @@ internal fun programmeProgress(event: EpgEvent?, nowSec: Long): Float? {
     return event.progress(at).takeIf { event.isRunning(at) }
 }
 
+/** Minutes left of a running programme, from the viewer's position when it is the one playing. */
+@Composable
+internal fun programmeMinutesLeft(event: EpgEvent?, nowSec: Long): Int? {
+    if (event == null || programmeProgress(event, nowSec) == null) return null
+    val at = if (watchingIndicator(event, nowSec).isPlayingItem) liveViewerEpochSec(event.channelId, nowSec) ?: return null else nowSec
+    return ((event.stop.epochSeconds - at + 59) / 60).toInt()
+}
+
 @Composable
 internal fun watchingIndicator(recordingId: DvrEntryId?): ChannelPlaybackIndicator =
     if (recordingId != null && LocalWatchingTarget.current == AppPlaybackTarget.Recording(recordingId))

@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.ui.common.rememberDetailsEpochSeconds
+import at.bernhardberger.tvhplayer.ui.components.BrowseHeaderClock
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvhplayer.ui.components.watchingIndicator
 import at.bernhardberger.tvhplayer.ui.components.recordingViewerPosition
@@ -658,12 +660,12 @@ internal fun RecordingsScreenContent(
             },
             // Quiet information at the row's end: no focus stop. The tabs measure first, so the
             // text only gets the width they leave; it ellipsizes there and hides when too narrow.
-            actions = spaceValue?.let { value ->
-                {
+            actions = {
+                if (spaceValue != null) {
                     BoxWithConstraints(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
                         if (maxWidth >= RecordingSpaceMinWidth) {
                             Text(
-                                text = value,
+                                text = spaceValue,
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = TvTextColors.tertiary,
                                 maxLines = 1,
@@ -674,7 +676,10 @@ internal fun RecordingsScreenContent(
                             )
                         }
                     }
+                } else {
+                    Spacer(Modifier.weight(1f))
                 }
+                BrowseHeaderClock(rememberDetailsEpochSeconds(nowSecProvider))
             },
         )
         TabContent(

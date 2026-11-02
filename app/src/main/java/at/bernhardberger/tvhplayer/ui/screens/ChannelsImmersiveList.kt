@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.ui.components.programmeMinutesLeft
 import at.bernhardberger.tvhplayer.ui.TvCardProgressStripHeight
 import at.bernhardberger.tvhplayer.ui.TvLogoPlateColor
 
@@ -284,7 +285,7 @@ internal fun ChannelsImmersiveBackground(
             val tint = rememberDetailsTint(art, shown.icon, onSettled = { tintSettled = true })
             Box(Modifier.fillMaxSize().drawBehind { drawRect(tint.value) }.testTag("channels-backdrop"))
             DetailsHero(art, Modifier.align(Alignment.TopEnd).testTag("channels-immersive-art"),
-                onSettled = { pictureSettled = true }, height = pictureHeight)
+                onSettled = { pictureSettled = true }, height = pictureHeight, underHeader = true)
         }
     }
     // The sharp logo belongs to the content: it moves with it as the drawer opens, while the
@@ -718,6 +719,7 @@ internal fun ChannelsHeadline(
         timing = current?.let { formatTimeInterval(it.start.epochSeconds, it.stop.epochSeconds) },
         progress = programmeProgress(current, now),
         progressColor = progressColor(watchingIndicator(current, now).isPlayingItem, recording),
+        minutesLeft = programmeMinutesLeft(current, now),
         synopsis = current?.takeIf { synopsisLines > 0 }?.let(::channelsProgrammeSynopsis),
         fitSynopsis = fitSynopsis,
         loading = current == null && loading,

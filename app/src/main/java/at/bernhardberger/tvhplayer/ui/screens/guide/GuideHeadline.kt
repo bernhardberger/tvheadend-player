@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens.guide
 
+import at.bernhardberger.tvhplayer.ui.components.programmeMinutesLeft
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -350,6 +351,7 @@ private fun GuideHeadlineContent(
         timing = event?.let { guideHeadlineTiming(it, now) },
         progress = programmeProgress(event, now),
         progressColor = progressColor(indicator.isPlayingItem, recording?.let(::recordingIsRunning) == true),
+        minutesLeft = programmeMinutesLeft(event, now),
         // No synopsis: in the Guide the grid below carries the weight.
         loading = event == null && loading,
         titleStyle = titleStyle,

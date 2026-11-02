@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.components
 
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import at.bernhardberger.tvhplayer.ui.TvSpacing4
 import androidx.tv.material3.Icon
 import androidx.compose.ui.res.painterResource
@@ -44,6 +46,7 @@ import at.bernhardberger.tvhplayer.ui.TvGridColumnWidth
 import at.bernhardberger.tvhplayer.ui.TvGridGutter
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.TvTextColors
+import at.bernhardberger.tvhplayer.ui.player.playerMinutesLeft
 import at.bernhardberger.tvhplayer.ui.player.programmeFactsSegments
 
 /**
@@ -128,6 +131,7 @@ internal fun ProgrammeHeadline(
     timingMaxLines: Int = 1,
     progress: Float? = null,
     progressColor: Color = MaterialTheme.colorScheme.primary,
+    minutesLeft: Int? = null,
     synopsis: String? = null,
     fitSynopsis: Boolean = false,
     loading: Boolean = false,
@@ -175,6 +179,11 @@ internal fun ProgrammeHeadline(
                     overflow = TextOverflow.Ellipsis)
                 // Shorter rather than pushed off the end by a long time line.
                 if (progress != null) ProgressStrip(progress, Modifier.weight(1f, fill = false).width(160.dp), progressColor)
+                if (progress != null && minutesLeft != null) {
+                    val spoken = playerMinutesLeft(minutesLeft, spoken = true)
+                    Text(playerMinutesLeft(minutesLeft), style = typography.labelMedium, color = TvTextColors.tertiary, maxLines = 1,
+                        modifier = Modifier.testTag("$tagPrefix-time-left").semantics { contentDescription = spoken })
+                }
             }
         }
         status?.invoke(Modifier.padding(top = ProgrammeHeadlineLineGap))

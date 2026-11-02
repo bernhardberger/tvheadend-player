@@ -25,7 +25,7 @@ import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
+import at.bernhardberger.tvhplayer.ui.components.browseHeaderMinHeight
 import at.bernhardberger.tvhplayer.ui.TvBrowseLeadingInset
 import at.bernhardberger.tvhplayer.ui.TvBrowseTrailingInset
 import at.bernhardberger.tvhplayer.ui.TvGhostFillAlpha
@@ -43,12 +43,12 @@ import java.util.Locale
 /**
  * The Guide header's height, shared with the loading skeleton's empty header row so the grid does
  * not move when the real screen replaces it: the icon buttons' 40dp, or the date button's label
- * line with its padding once text grows.
+ * line with its padding once text grows, or the clock's two lines.
  */
 @Composable
 @ReadOnlyComposable
 internal fun guideHeaderMinHeight(): Dp = with(LocalDensity.current) {
-    maxOf(TvBrowseHeaderHeight, MaterialTheme.typography.labelLarge.lineHeight.toDp() +
+    maxOf(browseHeaderMinHeight(), MaterialTheme.typography.labelLarge.lineHeight.toDp() +
         ButtonDefaults.ContentPadding.calculateTopPadding() + ButtonDefaults.ContentPadding.calculateBottomPadding())
 }
 
@@ -92,6 +92,7 @@ internal fun GuideHeader(
         onFocused = onFocused,
         onOpen = onOpen,
         onMoveToContent = onMoveToContent,
+        nowSecProvider = nowSecProvider,
         modifier = Modifier
             .padding(
                 start = startPadding + TvBrowseLeadingInset,

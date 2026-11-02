@@ -1178,8 +1178,9 @@ class GuideVisualLayoutTest {
         val viewOptions = bounds("channels-view-button")
         assertEquals(902f, viewOptions.right, .1f)
         val heading = compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, context().getString(R.string.epg_title))).fetchSemanticsNode().boundsInRoot
-        assertEquals("Actions stay centred on the header row", heading.center.y, viewOptions.center.y, .1f)
-        assertEquals("The date button shares the header row", heading.center.y, bounds("guide-date-button").center.y, .1f)
+        // The header's height follows the clock's two lines now, which is odd in pixels here: half a pixel of rounding.
+        assertEquals("Actions stay centred on the header row", heading.center.y, viewOptions.center.y, .5f)
+        assertEquals("The date button shares the header row", heading.center.y, bounds("guide-date-button").center.y, .5f)
         val bitmap = capture("guide-header-focus-large-de", 1.3f, LayoutDirection.Ltr)
         assertTrue("Native focused button clears the 48dp physical safe area", nativeFocusBounds(bitmap).right <= 912f)
         bitmap.recycle()
@@ -2425,6 +2426,8 @@ class GuideVisualLayoutTest {
         val header = bounds("guide-date-button")
         val headline = bounds("guide-headline")
         val ruler = bounds("epg-time-ruler")
+        // The header carries the time and date, level with its buttons.
+        assertEquals(header.center.y, bounds("browse-header-clock").center.y, .5f)
         assertTrue("Headline below the header's buttons: header=$header headline=$headline", headline.top >= header.bottom)
         assertTrue("Ruler below the headline: headline=$headline ruler=$ruler", ruler.top >= headline.bottom)
         val first = bounds("epg-channel-row-1").top
@@ -2433,6 +2436,7 @@ class GuideVisualLayoutTest {
         compose.onNodeWithTag("channels-immersive-background").assertExists()
         compose.onNodeWithTag("guide-headline").assert(hasText(title(1, 0), substring = true))
             .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Focused))
+        compose.onNodeWithTag("guide-headline-time-left", useUnmergedTree = true).assertExists()
         key(Key.DirectionDown)
         focused(title(1, 0))
         assertEquals("The headline's height does not depend on its text", headline, bounds("guide-headline"))
@@ -2464,7 +2468,14 @@ class GuideVisualLayoutTest {
         }
         focused(title(1, 2))
         headlineTitle(title(1, 2))
-        assertEquals(headline, bounds("guide-headline"))
+        // Programme 2 is not on air, so it has no bar and no time left: the headline is as tall and
+        // as placed as programme 0's, which has them, but not as wide.
+        val settled = bounds("guide-headline")
+        assertEquals(headline.top, settled.top, .5f)
+        assertEquals(headline.bottom, settled.bottom, .5f)
+        assertEquals(headline.left, settled.left, .5f)
+        assertTrue("Without the time left the headline is narrower: $headline $settled", settled.right < headline.right)
+        compose.onNodeWithTag("guide-headline-time-left", useUnmergedTree = true).assertDoesNotExist()
         // Programme 2 lies inside the window that opened just before now.
         assertNoPlayback()
     }

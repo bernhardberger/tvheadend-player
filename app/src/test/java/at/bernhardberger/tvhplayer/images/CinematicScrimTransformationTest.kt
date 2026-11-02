@@ -52,14 +52,29 @@ class CinematicScrimTransformationTest {
         assertTrue("$bottom", bottom.all { it == 0 })
         // The picture is gone from 64% of its height down, where the time ruler sits.
         assertEquals(0, alpha(output, output.width - 1, (output.height * .64f).toInt() + 1))
-        // Along the top row it rises steadily from the left edge to 90% at the top-right.
+        // Along the top row it rises steadily from the left edge to about a third of 90% at the top-right,
+        // the header fading it.
         val top = (0 until output.width step 20).map { alpha(output, it, 0) }
         assertTrue("$top", top.zipWithNext().all { (left, right) -> right >= left })
-        assertEquals(230f, alpha(output, output.width - 1, 0).toFloat(), 3f)
-        // Wider and softer than the kit's scrim: across the picture's top half it keeps at least as much.
-        val wider = (output.width / 2 until output.width step 20).flatMap { x ->
-            (0 until output.height / 3 step 15).map { y -> Triple(x, y, alpha(output, x, y) - alpha(kit, x, y)) }
+        assertEquals(80f, alpha(output, output.width - 1, 0).toFloat(), 3f)
+        // Wider and softer than the kit's scrim: past the header band it keeps at least as much.
+        val belowHeader = (output.height * .35f).toInt() + 1
+        val wider = (output.width / 2 until output.width step 20).map { x ->
+            Pair(x, alpha(output, x, belowHeader) - alpha(kit, x, belowHeader))
         }
-        assertTrue("$wider", wider.all { it.third >= -2 })
+        assertTrue("$wider", wider.all { it.second >= -2 })
+    }
+
+    @Test
+    fun theImmersivePictureIsTheKitsWithItsTopEasedOutUnderTheHeader() {
+        val input = Bitmap.createBitmap(400, 300, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.WHITE) }
+        val output = runBlocking { ImmersiveScrimTransformation.transform(input, Size(160, 90)) }
+        val kit = runBlocking { CinematicScrimTransformation.transform(input, Size(160, 90)) }
+        fun alpha(bitmap: Bitmap, x: Int, y: Int) = Color.alpha(bitmap.getPixel(x, y))
+        val x = (output.width * 912.4f / 960f).toInt()
+
+        assertEquals(alpha(kit, x, 0) * .35f, alpha(output, x, 0).toFloat(), 3f)
+        val below = (output.height * .25f).toInt() + 1
+        assertEquals(alpha(kit, x, below).toFloat(), alpha(output, x, below).toFloat(), 2f)
     }
 }
