@@ -74,14 +74,14 @@ Open Source unter der GNU GPL v3, mit dem Quellcode zu jeder Version: github.com
 
 Up to 500 Unicode characters per language, each language between its tags
 (<https://support.google.com/googleplay/android-developer/answer/9859348>).
-These are the 0.4.1 notes. English 431/500, German 482/500 (counted without the
+These are the 0.4.2 notes. English 452/500, German 488/500 (counted without the
 tags). Paste both into the one release-notes box.
 
 ```text
 <en-US>
-Easier first setup: a new Welcome screen and a server search of its own that finds the IPv4 address. Pictures no longer stay missing after setup, and OK on a text field no longer skips to the next one on TVs with Gboard. Home keeps your place when you come back and no longer flashes empty on launch. Cards keep their logo until the picture has loaded. All changes: github.com/bernhardberger/tvheadend-player/blob/main/CHANGELOG.md
+Home and Channels now change more softly: programme info, pictures and the backdrop move together, and holding a key leaves them in place until you let go. A new backdrop starts right away. Cards leaving under the side menu are dimmed and their text is hidden. Right at the end of a Home row stays on the last card. While Home loads you see a spinner instead of a skeleton. All changes: github.com/bernhardberger/tvheadend-player/blob/main/CHANGELOG.md
 </en-US>
 <de-DE>
-Einfachere Ersteinrichtung: neuer Willkommensbildschirm und eine eigene Serversuche, die die IPv4-Adresse findet. Bilder fehlen nach der Einrichtung nicht mehr, und OK auf einem Textfeld springt auf Fernsehern mit Gboard nicht mehr zum nächsten Feld. Der Startbildschirm behält beim Zurückkehren die Position und ist beim Start nicht mehr kurz leer. Karten zeigen ihr Logo, bis das Bild geladen ist. Alle Änderungen: github.com/bernhardberger/tvheadend-player/blob/main/CHANGELOG.md
+Startseite und Sender wechseln jetzt sanfter: Programminfo, Bilder und Hintergrund ändern sich gemeinsam, und eine gehaltene Taste lässt sie stehen, bis du loslässt. Ein neuer Hintergrund startet sofort. Karten unter dem Seitenmenü werden abgedunkelt, ihr Text ausgeblendet. Rechts am Ende einer Reihe bleibt auf der letzten Karte. Beim Laden der Startseite gibt es einen Spinner statt eines Platzhalters. Alle Änderungen: github.com/bernhardberger/tvheadend-player/blob/main/CHANGELOG.md
 </de-DE>
 ```
