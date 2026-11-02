@@ -74,10 +74,10 @@ internal object BrowseMotionPolicy {
     private const val backdropFadeMs = 225
     /**
      * How large a backdrop starts while it fades in, growing about its middle to full size with the
-     * fade. Fitted to five transitions on the G10's launcher: the best scale rises from 97.5% at 10%
-     * alpha to 99.5% at 80%, always about the middle, and leaves 1.2 to 3 times less difference than
-     * no movement or a sideways shift while the fade runs.
+     * fade. The G10's launcher does the same, from about 97.5% at 10% alpha to 99.5% at 80%
+     * (measured on five transitions); this keeps the direction at half that travel, which was too
+     * much for browsing here.
      */
-    const val backdropAppearScale = 0.97f
+    const val backdropAppearScale = 0.985f
     fun <T> backdropFade() = tween<T>(backdropFadeMs, easing = LinearEasing)
 }

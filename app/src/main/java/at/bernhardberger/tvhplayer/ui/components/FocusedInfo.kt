@@ -6,6 +6,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -20,6 +21,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalWindowInfo
+import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 import kotlinx.coroutines.delay
 
 /** How long focus must rest after a held key before the focused card's info returns. */
@@ -60,7 +62,25 @@ internal fun focusedPictureSwap(): ContentTransform =
  * card until focus rests where it stopped.
  */
 @Composable
-internal fun <T : Any> rememberUnlessHeld(value: T?, held: Boolean, settleMs: Long = FocusedInfoSettleMs): T? {
+internal fun <T : Any> rememberUnlessHeld(value: T?, held: Boolean, settleMs: Long = FocusedInfoSettleMs): T? =
+    value.takeIf { rememberRested(held, settleMs) }
+
+/**
+ * [value], or the one last shown while [held] and for [settleMs] after it is released. For the
+ * browse screens, where the backdrop stays too and a blank would leave a picture without its text.
+ * The default rests when the backdrop does, so both change together.
+ */
+@Composable
+internal fun <T> rememberHeldBack(value: T, held: Boolean, settleMs: Long = BrowseMotionPolicy.backdropSettleMs): T {
+    val rested = rememberRested(held, settleMs)
+    val last = remember { object { var shown = value } }
+    val shown = if (rested) value else last.shown
+    SideEffect { last.shown = shown }
+    return shown
+}
+
+@Composable
+private fun rememberRested(held: Boolean, settleMs: Long): Boolean {
     var rested by remember { mutableStateOf(true) }
     LaunchedEffect(held) {
         if (held) rested = false
@@ -69,7 +89,7 @@ internal fun <T : Any> rememberUnlessHeld(value: T?, held: Boolean, settleMs: Lo
             rested = true
         }
     }
-    return value.takeIf { !held && rested }
+    return !held && rested
 }
 
 /** Whether this Left or Right event is a key held down and repeating; null for any other key. */

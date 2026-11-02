@@ -271,7 +271,7 @@ Paths below are relative to `app/src/main/java/at/bernhardberger/tvhplayer/ui/`.
 | Progress bar | `components/ProgressStrip.kt` |
 | Channel title | `components/ChannelTitle.kt` — `channelTitleText` |
 | Picon | `components/PiconBox.kt` — dimmed TV icon while loading, normal-strength TV icon when there is no logo or it fails |
-| Focused card's info above a row | `components/FocusedInfo.kt` — on Home's On now, Channels Immersive, Grid and List (with the List's picture), the Guide's headline and the zap rail: one 225 ms linear crossfade, the backdrop's; hidden on Home, Immersive and the zap rail while Left/Right is held and back 250 ms after release; a new programme on the same card updates in place |
+| Focused card's info above a row | `components/FocusedInfo.kt` — on Home's On now, Channels Immersive, Grid and List (with the List's picture), the Guide's headline and the zap rail: a 300 ms linear swap in which old and new text meet faintly, the List's picture crossfading over the same 300 ms; while a direction is held, Home, Channels and the Guide keep the last text and picture until focus rests (300 ms, with the backdrop), and the zap rail hides its info and brings it back 250 ms after release; a new programme on the same card updates in place |
 | Now-playing plate | `player/NowPlayingStrip.kt` — `NowPlayingPlate`: 48×27 picon plate (channel number without a logo) with the 2dp viewer-position strip, shared by the player strip and the rail's playing slot |
 | Image load fade | `../images/TvheadendArtworkLoader.kt` — the shared loader fades every logo and programme picture in over 200 ms when actually loaded; memory-cache hits show at once |
 | Reading box | `components/ProgrammeDetailsLayout.kt` — `ProgrammeDetailsFullDescription` |

@@ -6,9 +6,9 @@
 
 - Right at the end of a Home row now stays on the last card instead of jumping to
   the header.
-- Holding Left or Right on a row hides the programme info until you stop, on
-  Home's On now and on Channels the same way as the player's channel row. The
-  Channels grid and list do the same for any direction held.
+- Holding a direction on Home's On now and on Channels now keeps the last programme
+  info and picture on screen until you stop, instead of updating on every card
+  along the way.
 - Cards leaving under the side menu are now dimmed as a whole instead of fading out
   toward the screen edge, with the text on and below them dimmed further.
 - On now's Next line now shows when that programme is set to record.

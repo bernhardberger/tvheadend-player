@@ -152,7 +152,8 @@ import at.bernhardberger.tvhplayer.ui.components.focusedInfoSwap
 import at.bernhardberger.tvhplayer.ui.components.EndHoldOnInterruption
 import at.bernhardberger.tvhplayer.ui.components.horizontalHold
 import at.bernhardberger.tvhplayer.ui.components.MutedPastRowStart
-import at.bernhardberger.tvhplayer.ui.components.rememberUnlessHeld
+import at.bernhardberger.tvhplayer.ui.components.browseScreenBackdrop
+import at.bernhardberger.tvhplayer.ui.components.rememberHeldBack
 import at.bernhardberger.tvhplayer.ui.screens.isScheduled
 import at.bernhardberger.tvhplayer.ui.components.overflowingRowViewport
 import at.bernhardberger.tvhplayer.ui.components.progressColor
@@ -522,8 +523,9 @@ internal fun HomeContent(
         }
         val onNow = renderedSections.filterIsInstance<HomeSection.OnNow>().firstOrNull()
         if (observation != null && onNow != null) {
+            // The backdrop runs under the rail, so the fade's layer has to reach the screen edge too.
             Box(
-                Modifier.fillMaxSize().testTag("home-immersive-background")
+                Modifier.fillMaxSize().browseScreenBackdrop().testTag("home-immersive-background")
                     .graphicsLayer { alpha = motion.background.value },
             ) {
                 ChannelsImmersiveBackground(
@@ -1219,12 +1221,11 @@ private fun HomeOnNowDetails(
             block.place(0, -block.height - (HomeHeroGap + 20.dp).roundToPx())
         }
     }) {
-        val settled = rememberUnlessHeld(item.channel.id, held)
         AnimatedContent(
-            targetState = item.takeIf { it.channel.id == settled },
+            targetState = rememberHeldBack(item, held),
             transitionSpec = { focusedInfoSwap() },
             // A new programme on the same card updates in place.
-            contentKey = { it?.channel?.id },
+            contentKey = { it.channel.id },
             contentAlignment = Alignment.BottomStart,
             label = "home-on-now-details",
             modifier = Modifier.testTag("home-on-now-block")
@@ -1245,19 +1246,17 @@ private fun HomeOnNowDetails(
                     if (minOf(motion.block.value, motion.background.value) <= 0.05f) hideFromAccessibility()
                 },
         ) { shown ->
-            if (shown != null) {
-                val next = observation.nextEvent(shown.channel.id, KotlinInstant.fromEpochSeconds(nowSec))
-                HomeOnNowBlock(
-                    channel = shown.channel,
-                    current = shown.event,
-                    next = next,
-                    nextScheduled = observation.isScheduled(next),
-                    recording = shown.channel.id in recordingChannelIds,
-                    nowSec = nowSec,
-                    keyline = keyline,
-                    modifier = Modifier.wrapContentHeight(Alignment.Bottom),
-                )
-            }
+            val next = observation.nextEvent(shown.channel.id, KotlinInstant.fromEpochSeconds(nowSec))
+            HomeOnNowBlock(
+                channel = shown.channel,
+                current = shown.event,
+                next = next,
+                nextScheduled = observation.isScheduled(next),
+                recording = shown.channel.id in recordingChannelIds,
+                nowSec = nowSec,
+                keyline = keyline,
+                modifier = Modifier.wrapContentHeight(Alignment.Bottom),
+            )
         }
     }
 }

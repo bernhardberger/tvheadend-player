@@ -36,6 +36,7 @@ import at.bernhardberger.tvhplayer.ui.components.CompactZapRowOffscreen
 import at.bernhardberger.tvhplayer.ui.components.OpenDrawerWidth
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import org.junit.Rule
@@ -565,21 +566,7 @@ class ChannelsLayoutFocusTest {
     @Test fun immersiveHeroWaitsForAHeldKeyToRest() {
         fixture.show(immersive)
         fixture.awaitFocus(card(1))
-        fun press(action: Int, repeat: Int = 0) {
-            compose.onRoot().performKeyPress(androidx.compose.ui.input.key.KeyEvent(android.view.KeyEvent(
-                0L, 0L, action, android.view.KeyEvent.KEYCODE_DPAD_RIGHT, repeat)))
-            compose.waitForIdle()
-        }
-        val headline = hasTestTag("channels-headline-channel") and hasAnyAncestor(hasTestTag("channels-immersive-hero"))
-        compose.onAllNodes(headline, useUnmergedTree = true).assertCountEquals(1)
-        press(android.view.KeyEvent.ACTION_DOWN)
-        press(android.view.KeyEvent.ACTION_DOWN, repeat = 1)
-        fixture.awaitFocus(card(3))
-        compose.mainClock.advanceTimeBy(600)
-        compose.onAllNodes(headline, useUnmergedTree = true).assertCountEquals(0)
-        press(android.view.KeyEvent.ACTION_UP)
-        compose.mainClock.advanceTimeBy(600)
-        compose.onAllNodes(headline, useUnmergedTree = true).assertCountEquals(1)
+        assertHeroWaitsForAHeldKey(android.view.KeyEvent.KEYCODE_DPAD_RIGHT, card(3))
     }
 
     private fun assertHeroWaitsForAHeldKey(keyCode: Int, reached: SemanticsMatcher) {
@@ -588,16 +575,19 @@ class ChannelsLayoutFocusTest {
                 0L, 0L, action, keyCode, repeat)))
             compose.waitForIdle()
         }
-        val headline = hasTestTag("channels-headline-channel") and hasAnyAncestor(hasTestTag("channels-immersive-hero"))
-        compose.onAllNodes(headline, useUnmergedTree = true).assertCountEquals(1)
+        fun headline() = compose.onNode(hasTestTag("channels-headline-channel") and hasAnyAncestor(hasTestTag("channels-immersive-hero")))
+            .fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.Text].joinToString()
+        val start = headline()
         press(android.view.KeyEvent.ACTION_DOWN)
+        val afterPress = headline()
+        assertNotEquals("a single press changes the info at once", start, afterPress)
         press(android.view.KeyEvent.ACTION_DOWN, repeat = 1)
         fixture.awaitFocus(reached)
         compose.mainClock.advanceTimeBy(600)
-        compose.onAllNodes(headline, useUnmergedTree = true).assertCountEquals(0)
+        assertEquals("the last info stays while the key is held", afterPress, headline())
         press(android.view.KeyEvent.ACTION_UP)
         compose.mainClock.advanceTimeBy(600)
-        compose.onAllNodes(headline, useUnmergedTree = true).assertCountEquals(1)
+        assertNotEquals("it catches up once focus rests", afterPress, headline())
     }
 
     @Test fun theListsInfoWaitsForAHeldKeyToRest() {

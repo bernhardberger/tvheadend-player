@@ -193,6 +193,13 @@ class HomeCaptureTest {
         assertTrue("focused card clears mask", bounds("home-onnow-1").left >= 130.dp)
     }
 
+    @Test fun theBackdropsFadeReachesTheScreenEdgeUnderTheRail() = atEvening {
+        show(Kind.BROWSE)
+        settle("home-recent-0")
+        // A layer no wider than the content would leave a band under the rail while it fades.
+        assertEquals(0f, bounds("home-immersive-background").left.value, 0.5f)
+    }
+
     @Test fun aCardLeavingUnderTheRailIsMutedAsAWhole() = atEvening {
         show(Kind.BROWSE)
         settle("home-recent-0")

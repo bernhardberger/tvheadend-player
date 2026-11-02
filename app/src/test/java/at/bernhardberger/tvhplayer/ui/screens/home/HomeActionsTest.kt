@@ -11,6 +11,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.*
+import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvhplayer.core.*
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
@@ -1304,12 +1305,14 @@ class HomeActionsTest {
         horizontalKey(android.view.KeyEvent.ACTION_DOWN)
         horizontalKey(android.view.KeyEvent.ACTION_DOWN, repeat = 1)
         compose.onNodeWithTag("home-onnow-3").assertIsFocused()
-        compose.mainClock.advanceTimeBy(FocusedInfoSettleMs * 2)
-        onNowInfo("Programme").assertCountEquals(0)
+        compose.mainClock.advanceTimeBy(BrowseMotionPolicy.backdropSettleMs * 2)
+        onNowInfo("Programme 3").assertCountEquals(1)
+        onNowInfo("Programme 4").assertCountEquals(0)
         compose.mainClock.autoAdvance = false
         horizontalKey(android.view.KeyEvent.ACTION_UP)
-        compose.mainClock.advanceTimeBy(FocusedInfoSettleMs - 50)
-        onNowInfo("Programme").assertCountEquals(0)
+        compose.mainClock.advanceTimeBy(BrowseMotionPolicy.backdropSettleMs - 50)
+        onNowInfo("Programme 3").assertCountEquals(1)
+        onNowInfo("Programme 4").assertCountEquals(0)
         compose.mainClock.advanceTimeBy(100)
         onNowInfo("Programme 4").assertCountEquals(1)
         compose.mainClock.autoAdvance = true
@@ -1340,12 +1343,12 @@ class HomeActionsTest {
         horizontalKey(android.view.KeyEvent.ACTION_DOWN, repeat = 1)
         val card = "home-onnow-2"
         compose.onNodeWithTag(card).assertIsFocused()
-        compose.mainClock.advanceTimeBy(FocusedInfoSettleMs * 2)
-        onNowInfo("Programme").assertCountEquals(0)
+        compose.mainClock.advanceTimeBy(BrowseMotionPolicy.backdropSettleMs * 2)
+        onNowInfo("Programme 3").assertCountEquals(0)
         compose.runOnIdle { focused.value = false }
         compose.waitForIdle()
         compose.runOnIdle { focused.value = true }
-        compose.mainClock.advanceTimeBy(FocusedInfoSettleMs * 2)
+        compose.mainClock.advanceTimeBy(BrowseMotionPolicy.backdropSettleMs * 2)
         compose.onNodeWithTag(card).assertIsFocused()
         onNowInfo("Programme 3").assertCountEquals(1)
     }

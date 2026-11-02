@@ -139,7 +139,7 @@ import at.bernhardberger.tvhplayer.ui.components.EndHoldOnInterruption
 import at.bernhardberger.tvhplayer.ui.components.horizontalHold
 import at.bernhardberger.tvhplayer.ui.components.MutedPastRowStart
 import at.bernhardberger.tvhplayer.ui.components.mutedTextPastRowStart
-import at.bernhardberger.tvhplayer.ui.components.rememberUnlessHeld
+import at.bernhardberger.tvhplayer.ui.components.rememberHeldBack
 import at.bernhardberger.tvhplayer.ui.components.overflowingRowViewport
 import at.bernhardberger.tvhplayer.ui.components.programmeAboutFacts
 import at.bernhardberger.tvhplayer.ui.components.programmeHeaderMetadata
@@ -615,13 +615,13 @@ internal fun ChannelsImmersiveHero(
     modifier: Modifier,
     besideList: Boolean = false,
     sparse: Boolean = false,
-    /** A direction is held on the row, list or grid: the hero waits until focus rests. */
+    /** A direction is held on the row, list or grid: the hero stays until focus rests. */
     held: Boolean = false,
 ) {
     // A leaving group keeps showing its own channel while it fades.
     val focusedId = rememberTabReader(frame.focusedId)
     val entryId = rememberTabReader(frame.entryId)
-    val channelId = rememberUnlessHeld(
+    val channelId = rememberHeldBack(
         focusedId()?.takeIf { id -> channels.any { it.id == id } } ?: browsingFocusChannelId(channels, entryId()),
         held,
     )
@@ -749,12 +749,12 @@ internal fun ChannelsListArt(
     nowSec: () -> Long,
     programArt: Boolean,
     modifier: Modifier,
-    /** A direction is held on the list: the picture waits until focus rests, as the text does. */
+    /** A direction is held on the list: the picture stays until focus rests, as the text does. */
     held: Boolean = false,
 ) {
     val focusedId = rememberTabReader(frame.focusedId)
     val entryId = rememberTabReader(frame.entryId)
-    val channelId = rememberUnlessHeld(
+    val channelId = rememberHeldBack(
         focusedId()?.takeIf { id -> channels.any { it.id == id } } ?: browsingFocusChannelId(channels, entryId()),
         held,
     )
