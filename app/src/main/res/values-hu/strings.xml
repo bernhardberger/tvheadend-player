@@ -477,18 +477,6 @@
     <string name="seek_offset_forward_description">%1$s előre</string>
     <string name="seek_offset_back_description">%1$s vissza</string>
     <string name="seek_offset_none_description">Nincs változás</string>
-    <plurals name="seek_offset_hours">
-        <item quantity="one">%1$d óra</item>
-        <item quantity="other">%1$d óra</item>
-    </plurals>
-    <plurals name="seek_offset_minutes">
-        <item quantity="one">%1$d perc</item>
-        <item quantity="other">%1$d perc</item>
-    </plurals>
-    <plurals name="seek_offset_seconds">
-        <item quantity="one">%1$d másodperc</item>
-        <item quantity="other">%1$d másodperc</item>
-    </plurals>
     <string name="player_on_now">Most játszott</string>
     <string name="track_unknown_language">Ismeretlen nyelv</string>
     <string name="track_multiple_languages">Több nyelv</string>
@@ -543,7 +531,6 @@
     <string name="keep_channel_needs_timeshift">Akkor érhető el, ha a(z) „%1$s” be van kapcsolva.</string>
     <string name="startup_buffer_setting">Indulási puffer</string>
     <string name="startup_buffer_automatic">Automatikus • %1$s</string>
-    <string name="startup_buffer_seconds">%1$s s</string>
     <string name="startup_buffer_description">A rövidebb gyorsabban indul, a hosszabb véd a kimaradásoktól.</string>
     <string name="background_live_stopped">Az élő TV leállt, amíg az alkalmazás a háttérben volt</string>
     <string name="background_tuner_lost">A tunerre máshol volt szükség; az élő TV újraindult</string>
@@ -665,7 +652,7 @@
     <string name="error_109_title">Nem sikerült betölteni a TV-adatokat</string>
     <string name="error_109_reason">Hiba történt a betöltés közben.</string>
     <string name="error_110_title">A szerver nem érhető el</string>
-    <string name="error_110_reason">Újracsatlakozás %1$d s múlva…</string>
+    <string name="error_110_reason">Újracsatlakozás %1$s múlva…</string>
     <string name="error_110_reason_pending">Újracsatlakozás…</string>
     <string name="error_111_title">Ezen a címen nincs Tvheadend-szerver</string>
     <string name="error_111_reason">Érkezett válasz, de nem a Tvheadend HTSP-szolgáltatásától.</string>
@@ -673,7 +660,7 @@
     <string name="error_112_title">Ez a TV nem csatlakozik hálózathoz</string>
     <string name="error_112_reason">Hálózat nélkül nem éri el a szervert.</string>
     <string name="error_hint_check_tv_network">Ellenőrizd a TV hálózati beállításait.</string>
-    <string name="error_reconnect_next_attempt">Következő kísérlet %1$d s múlva</string>
+    <string name="error_reconnect_next_attempt">Következő kísérlet %1$s múlva</string>
     <string name="error_201_title">Nincs szabad tuner</string>
     <string name="error_201_reason">Jelenleg az összes tuner használatban van.</string>
     <string name="error_202_title">Nincs jel</string>

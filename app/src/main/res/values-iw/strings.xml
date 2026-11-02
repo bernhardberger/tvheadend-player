@@ -486,21 +486,6 @@
     <string name="seek_offset_forward_description">%1$s קדימה</string>
     <string name="seek_offset_back_description">%1$s אחורה</string>
     <string name="seek_offset_none_description">ללא שינוי</string>
-    <plurals name="seek_offset_hours">
-        <item quantity="one">%1$d שעה</item>
-        <item quantity="two">%1$d שעות</item>
-        <item quantity="other">%1$d שעות</item>
-    </plurals>
-    <plurals name="seek_offset_minutes">
-        <item quantity="one">%1$d דקה</item>
-        <item quantity="two">%1$d דקות</item>
-        <item quantity="other">%1$d דקות</item>
-    </plurals>
-    <plurals name="seek_offset_seconds">
-        <item quantity="one">%1$d שנייה</item>
-        <item quantity="two">%1$d שניות</item>
-        <item quantity="other">%1$d שניות</item>
-    </plurals>
     <string name="player_on_now">כעת בהפעלה</string>
     <string name="track_unknown_language">שפה לא ידועה</string>
     <string name="track_multiple_languages">שפות מרובות</string>
@@ -555,7 +540,6 @@
     <string name="keep_channel_needs_timeshift">זמין כאשר ״%1$s״ מופעלת.</string>
     <string name="startup_buffer_setting">מאגר התחלתי</string>
     <string name="startup_buffer_automatic">אוטומטי • %1$s</string>
-    <string name="startup_buffer_seconds">%1$s שנ׳</string>
     <string name="startup_buffer_description">זמן קצר מתחיל מהר; זמן ארוך מגן מפני קיטועים.</string>
     <string name="background_live_stopped">הטלוויזיה בשידור חי נעצרה כשהאפליקציה הייתה ברקע</string>
     <string name="background_tuner_lost">הטלוויזיה בשידור חי הופעלה מחדש אחרי שהמקלט נדרש במקום אחר</string>
@@ -683,7 +667,7 @@
     <string name="error_109_title">לא ניתן לטעון את נתוני הטלוויזיה</string>
     <string name="error_109_reason">אירעה שגיאה בטעינה.</string>
     <string name="error_110_title">לא ניתן להגיע לשרת</string>
-    <string name="error_110_reason">חיבור מחדש בעוד %1$d שניות…</string>
+    <string name="error_110_reason">חיבור מחדש בעוד %1$s…</string>
     <string name="error_110_reason_pending">מתבצע חיבור מחדש…</string>
     <string name="error_111_title">אין שרת Tvheadend בכתובת הזו</string>
     <string name="error_111_reason">התקבלה תשובה, אך לא משירות HTSP של Tvheadend.</string>
@@ -691,7 +675,7 @@
     <string name="error_112_title">הטלוויזיה הזו אינה מחוברת לרשת</string>
     <string name="error_112_reason">ללא רשת, אין אפשרות להגיע לשרת.</string>
     <string name="error_hint_check_tv_network">יש לבדוק את הגדרות הרשת בטלוויזיה.</string>
-    <string name="error_reconnect_next_attempt">הניסיון הבא בעוד %1$d שניות</string>
+    <string name="error_reconnect_next_attempt">הניסיון הבא בעוד %1$s</string>
     <string name="error_201_title">אין מקלט זמין</string>
     <string name="error_201_reason">כל המקלטים נמצאים בשימוש כרגע.</string>
     <string name="error_202_title">אין אות</string>

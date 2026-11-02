@@ -486,21 +486,6 @@
     <string name="seek_offset_forward_description">%1$s înainte</string>
     <string name="seek_offset_back_description">%1$s înapoi</string>
     <string name="seek_offset_none_description">Nicio modificare</string>
-    <plurals name="seek_offset_hours">
-        <item quantity="one">%1$d oră</item>
-        <item quantity="few">%1$d ore</item>
-        <item quantity="other">%1$d de ore</item>
-    </plurals>
-    <plurals name="seek_offset_minutes">
-        <item quantity="one">%1$d minut</item>
-        <item quantity="few">%1$d minute</item>
-        <item quantity="other">%1$d de minute</item>
-    </plurals>
-    <plurals name="seek_offset_seconds">
-        <item quantity="one">%1$d secundă</item>
-        <item quantity="few">%1$d secunde</item>
-        <item quantity="other">%1$d de secunde</item>
-    </plurals>
     <string name="player_on_now">Se redă acum</string>
     <string name="track_unknown_language">Limbă necunoscută</string>
     <string name="track_multiple_languages">Mai multe limbi</string>
@@ -555,7 +540,6 @@
     <string name="keep_channel_needs_timeshift">Disponibil când „%1$s” este activată.</string>
     <string name="startup_buffer_setting">Buffer de pornire</string>
     <string name="startup_buffer_automatic">Automat • %1$s</string>
-    <string name="startup_buffer_seconds">%1$s s</string>
     <string name="startup_buffer_description">Un buffer mai scurt pornește mai repede; unul mai lung protejează împotriva întreruperilor.</string>
     <string name="background_live_stopped">Televiziunea în direct a fost oprită în timp ce aplicația era în fundal</string>
     <string name="background_tuner_lost">Tunerul a fost necesar în altă parte; televiziunea în direct a fost repornită</string>
@@ -683,7 +667,7 @@
     <string name="error_109_title">Datele TV nu au putut fi încărcate</string>
     <string name="error_109_reason">A apărut o problemă la încărcare.</string>
     <string name="error_110_title">Serverul nu poate fi contactat</string>
-    <string name="error_110_reason">Reconectare în %1$d s…</string>
+    <string name="error_110_reason">Reconectare în %1$s…</string>
     <string name="error_110_reason_pending">Reconectare…</string>
     <string name="error_111_title">Niciun server Tvheadend la această adresă</string>
     <string name="error_111_reason">Ceva a răspuns, dar nu este serviciul HTSP al Tvheadend.</string>
@@ -691,7 +675,7 @@
     <string name="error_112_title">Acest televizor nu este conectat la o rețea</string>
     <string name="error_112_reason">Fără rețea, nu poate contacta serverul.</string>
     <string name="error_hint_check_tv_network">Verifică setările de rețea ale televizorului.</string>
-    <string name="error_reconnect_next_attempt">Următoarea încercare în %1$d s</string>
+    <string name="error_reconnect_next_attempt">Următoarea încercare în %1$s</string>
     <string name="error_201_title">Niciun tuner liber</string>
     <string name="error_201_reason">Toate tunerele sunt folosite momentan.</string>
     <string name="error_202_title">Fără semnal</string>

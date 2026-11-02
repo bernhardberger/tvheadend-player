@@ -513,30 +513,6 @@
     <string name="seek_offset_forward_description">تقديم بمقدار %1$s</string>
     <string name="seek_offset_back_description">رجوع بمقدار %1$s</string>
     <string name="seek_offset_none_description">لا تغيير</string>
-    <plurals name="seek_offset_hours">
-        <item quantity="zero">%1$d ساعة</item>
-        <item quantity="one">%1$d ساعة</item>
-        <item quantity="two">%1$d ساعتان</item>
-        <item quantity="few">%1$d ساعات</item>
-        <item quantity="many">%1$d ساعة</item>
-        <item quantity="other">%1$d ساعة</item>
-    </plurals>
-    <plurals name="seek_offset_minutes">
-        <item quantity="zero">%1$d دقيقة</item>
-        <item quantity="one">%1$d دقيقة</item>
-        <item quantity="two">%1$d دقيقتان</item>
-        <item quantity="few">%1$d دقائق</item>
-        <item quantity="many">%1$d دقيقة</item>
-        <item quantity="other">%1$d دقيقة</item>
-    </plurals>
-    <plurals name="seek_offset_seconds">
-        <item quantity="zero">%1$d ثانية</item>
-        <item quantity="one">%1$d ثانية</item>
-        <item quantity="two">%1$d ثانيتان</item>
-        <item quantity="few">%1$d ثوانٍ</item>
-        <item quantity="many">%1$d ثانية</item>
-        <item quantity="other">%1$d ثانية</item>
-    </plurals>
     <string name="player_on_now">قيد التشغيل الآن</string>
     <string name="track_unknown_language">لغة غير معروفة</string>
     <string name="track_multiple_languages">لغات متعددة</string>
@@ -591,7 +567,6 @@
     <string name="keep_channel_needs_timeshift">متاح عند تفعيل «%1$s».</string>
     <string name="startup_buffer_setting">مخزن بدء التشغيل</string>
     <string name="startup_buffer_automatic">تلقائي • %1$s</string>
-    <string name="startup_buffer_seconds">%1$s ث</string>
     <string name="startup_buffer_description">القيم القصيرة تسرّع البدء؛ والقيم الأطول تحمي من التقطّع.</string>
     <string name="background_live_stopped">توقف التلفزيون المباشر أثناء وجود التطبيق في الخلفية</string>
     <string name="background_tuner_lost">أُعيد تشغيل التلفزيون المباشر بعد الحاجة إلى الموالف في مكان آخر</string>
@@ -737,7 +712,7 @@
     <string name="error_109_title">تعذّر تحميل بيانات التلفزيون</string>
     <string name="error_109_reason">حدث خطأ أثناء التحميل.</string>
     <string name="error_110_title">لا يمكن الوصول إلى الخادم</string>
-    <string name="error_110_reason">إعادة الاتصال بعد %1$d ث…</string>
+    <string name="error_110_reason">إعادة الاتصال بعد %1$s…</string>
     <string name="error_110_reason_pending">جارٍ إعادة الاتصال…</string>
     <string name="error_111_title">لا يوجد خادم Tvheadend على هذا العنوان</string>
     <string name="error_111_reason">وصلت استجابة، لكنها ليست من خدمة HTSP التابعة لـ Tvheadend.</string>
@@ -745,7 +720,7 @@
     <string name="error_112_title">هذا التلفزيون غير متصل بشبكة</string>
     <string name="error_112_reason">لا يمكن الوصول إلى الخادم دون شبكة.</string>
     <string name="error_hint_check_tv_network">يلزم التحقق من إعدادات شبكة التلفزيون.</string>
-    <string name="error_reconnect_next_attempt">المحاولة التالية بعد %1$d ث</string>
+    <string name="error_reconnect_next_attempt">المحاولة التالية بعد %1$s</string>
     <string name="error_201_title">لا يوجد موالف متاح</string>
     <string name="error_201_reason">كل الموالفات مشغولة حاليًا.</string>
     <string name="error_202_title">لا توجد إشارة</string>

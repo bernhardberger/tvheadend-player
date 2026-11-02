@@ -495,24 +495,6 @@
     <string name="seek_offset_forward_description">%1$s vpřed</string>
     <string name="seek_offset_back_description">%1$s zpět</string>
     <string name="seek_offset_none_description">Beze změny</string>
-    <plurals name="seek_offset_hours">
-        <item quantity="one">%1$d hodina</item>
-        <item quantity="few">%1$d hodiny</item>
-        <item quantity="many">%1$d hodiny</item>
-        <item quantity="other">%1$d hodin</item>
-    </plurals>
-    <plurals name="seek_offset_minutes">
-        <item quantity="one">%1$d minuta</item>
-        <item quantity="few">%1$d minuty</item>
-        <item quantity="many">%1$d minuty</item>
-        <item quantity="other">%1$d minut</item>
-    </plurals>
-    <plurals name="seek_offset_seconds">
-        <item quantity="one">%1$d sekunda</item>
-        <item quantity="few">%1$d sekundy</item>
-        <item quantity="many">%1$d sekundy</item>
-        <item quantity="other">%1$d sekund</item>
-    </plurals>
     <string name="player_on_now">Právě se přehrává</string>
     <string name="track_unknown_language">Neznámý jazyk</string>
     <string name="track_multiple_languages">Více jazyků</string>
@@ -567,7 +549,6 @@
     <string name="keep_channel_needs_timeshift">Dostupné při zapnuté volbě „%1$s“.</string>
     <string name="startup_buffer_setting">Počáteční vyrovnávací paměť</string>
     <string name="startup_buffer_automatic">Automaticky • %1$s</string>
-    <string name="startup_buffer_seconds">%1$s s</string>
     <string name="startup_buffer_description">Kratší spouští rychleji, delší chrání před výpadky.</string>
     <string name="background_live_stopped">Živá TV byla zastavena, když byla aplikace na pozadí</string>
     <string name="background_tuner_lost">Tuner byl potřeba jinde; živá TV byla znovu spuštěna</string>
@@ -701,7 +682,7 @@
     <string name="error_109_title">TV data se nepodařilo načíst</string>
     <string name="error_109_reason">Při načítání došlo k chybě.</string>
     <string name="error_110_title">Server není dostupný</string>
-    <string name="error_110_reason">Obnovení připojení za %1$d s…</string>
+    <string name="error_110_reason">Obnovení připojení za %1$s…</string>
     <string name="error_110_reason_pending">Obnovování připojení…</string>
     <string name="error_111_title">Na této adrese není server Tvheadend</string>
     <string name="error_111_reason">Něco odpovědělo, ale není to služba HTSP serveru Tvheadend.</string>
@@ -709,7 +690,7 @@
     <string name="error_112_title">Tento televizor není připojený k síti</string>
     <string name="error_112_reason">Bez sítě se nemůže spojit se serverem.</string>
     <string name="error_hint_check_tv_network">Zkontroluj síťová nastavení televizoru.</string>
-    <string name="error_reconnect_next_attempt">Další pokus za %1$d s</string>
+    <string name="error_reconnect_next_attempt">Další pokus za %1$s</string>
     <string name="error_201_title">Žádný volný tuner</string>
     <string name="error_201_reason">Všechny tunery se právě používají.</string>
     <string name="error_202_title">Žádný signál</string>

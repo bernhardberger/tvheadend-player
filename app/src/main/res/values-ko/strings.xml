@@ -468,15 +468,6 @@
     <string name="seek_offset_forward_description">%1$s 앞으로</string>
     <string name="seek_offset_back_description">%1$s 뒤로</string>
     <string name="seek_offset_none_description">변경 없음</string>
-    <plurals name="seek_offset_hours">
-        <item quantity="other">%1$d시간</item>
-    </plurals>
-    <plurals name="seek_offset_minutes">
-        <item quantity="other">%1$d분</item>
-    </plurals>
-    <plurals name="seek_offset_seconds">
-        <item quantity="other">%1$d초</item>
-    </plurals>
     <string name="player_on_now">현재 재생 중</string>
     <string name="track_unknown_language">알 수 없는 언어</string>
     <string name="track_multiple_languages">여러 언어</string>
@@ -531,7 +522,6 @@
     <string name="keep_channel_needs_timeshift">“%1$s” 설정이 켜져 있을 때 사용할 수 있습니다.</string>
     <string name="startup_buffer_setting">시작 버퍼</string>
     <string name="startup_buffer_automatic">자동 • %1$s</string>
-    <string name="startup_buffer_seconds">%1$s초</string>
     <string name="startup_buffer_description">짧으면 빨리 시작하고, 길면 끊김을 방지합니다.</string>
     <string name="background_live_stopped">앱이 백그라운드에 있는 동안 실시간 TV가 중지되었습니다</string>
     <string name="background_tuner_lost">튜너가 다른 곳에서 필요해져 실시간 TV가 다시 시작되었습니다</string>
@@ -647,7 +637,7 @@
     <string name="error_109_title">TV 데이터를 불러오지 못했습니다</string>
     <string name="error_109_reason">불러오는 중 문제가 발생했습니다.</string>
     <string name="error_110_title">서버에 연결할 수 없습니다</string>
-    <string name="error_110_reason">%1$d초 후 다시 연결합니다…</string>
+    <string name="error_110_reason">%1$s 후 다시 연결합니다…</string>
     <string name="error_110_reason_pending">다시 연결 중…</string>
     <string name="error_111_title">이 주소에 Tvheadend 서버가 없음</string>
     <string name="error_111_reason">응답은 받았지만 Tvheadend의 HTSP 서비스가 아닙니다.</string>
@@ -655,7 +645,7 @@
     <string name="error_112_title">이 TV가 네트워크에 연결되어 있지 않음</string>
     <string name="error_112_reason">네트워크 연결 없이는 서버에 접속할 수 없습니다.</string>
     <string name="error_hint_check_tv_network">TV의 네트워크 설정을 확인해 주세요.</string>
-    <string name="error_reconnect_next_attempt">%1$d초 후 다음 시도</string>
+    <string name="error_reconnect_next_attempt">%1$s 후 다음 시도</string>
     <string name="error_201_title">사용 가능한 튜너 없음</string>
     <string name="error_201_reason">현재 모든 튜너가 사용 중입니다.</string>
     <string name="error_202_title">신호 없음</string>

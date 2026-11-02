@@ -62,10 +62,10 @@ class StartupBufferSettingsUiTest {
     private fun level(locale: String, scale: Float) {
         val german = locale == "de"
         val title = if (german) "Startpuffer" else "Start-up buffer"
-        // Automatic starts at 0.5 s, shown in locale decimals.
-        val automatic = if (german) "Automatisch • 0,5 s" else "Automatic • 0.5 s"
-        val half = if (german) "0,5 s" else "0.5 s"
-        val oneAndHalf = if (german) "1,5 s" else "1.5 s"
+        // Automatic starts at half a second, in the locale's decimals and unit.
+        val automatic = if (german) "Automatisch • 0,5 Sek." else "Automatic • 0.5s"
+        val half = if (german) "0,5 Sek." else "0.5s"
+        val oneAndHalf = if (german) "1,5 Sek." else "1.5s"
         val description = if (german) "Kürzer startet schneller, länger schützt vor Aussetzern."
             else "Shorter starts faster; longer protects against dropouts."
         var ui by mutableStateOf(SettingsPlayerUiState())
@@ -125,7 +125,7 @@ class StartupBufferSettingsUiTest {
             assertFalse("Description overlaps a row", row.boundsInRoot.overlaps(descriptionBounds))
         }
         assertFalse("Description is cut off", overflows(description))
-        for (label in listOf(half, "1 s", oneAndHalf, "2 s", "3 s")) {
+        for (label in listOf(half, if (german) "1 Sek." else "1s", oneAndHalf, if (german) "2 Sek." else "2s", if (german) "3 Sek." else "3s")) {
             compose.onNode(hasText(label) and hasClickAction()).assertIsNotSelected()
         }
         capture(view, "$locale-level-font$scale")
@@ -148,7 +148,7 @@ class StartupBufferSettingsUiTest {
         capture(view, "$locale-level-fixed-font$scale")
         compose.runOnIdle { ui = ui.copy(startupBufferLearnedMillis = 1500) }
         key(Key.DirectionUp)
-        val learned = if (german) "Automatisch • 1,5 s" else "Automatic • 1.5 s"
+        val learned = if (german) "Automatisch • 1,5 Sek." else "Automatic • 1.5s"
         compose.onNode(isFocused() and hasText(learned)).assertIsNotSelected()
         key(Key.DirectionCenter)
         assertEquals(STARTUP_BUFFER_AUTOMATIC, ui.startupBufferMillis)

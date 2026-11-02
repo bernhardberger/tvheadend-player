@@ -468,15 +468,6 @@
     <string name="seek_offset_forward_description">%1$s進む</string>
     <string name="seek_offset_back_description">%1$s戻る</string>
     <string name="seek_offset_none_description">変更なし</string>
-    <plurals name="seek_offset_hours">
-        <item quantity="other">%1$d時間</item>
-    </plurals>
-    <plurals name="seek_offset_minutes">
-        <item quantity="other">%1$d分</item>
-    </plurals>
-    <plurals name="seek_offset_seconds">
-        <item quantity="other">%1$d秒</item>
-    </plurals>
     <string name="player_on_now">再生中</string>
     <string name="track_unknown_language">不明な言語</string>
     <string name="track_multiple_languages">複数言語</string>
@@ -531,7 +522,6 @@
     <string name="keep_channel_needs_timeshift">「%1$s」がオンの場合に利用できます。</string>
     <string name="startup_buffer_setting">起動時のバッファ</string>
     <string name="startup_buffer_automatic">自動 • %1$s</string>
-    <string name="startup_buffer_seconds">%1$s秒</string>
     <string name="startup_buffer_description">短くすると素早く開始し、長くすると途切れを防ぎます。</string>
     <string name="background_live_stopped">アプリがバックグラウンドにある間にライブテレビが停止しました</string>
     <string name="background_tuner_lost">チューナーが別の用途で必要になったため、ライブテレビを再開しました</string>
@@ -647,7 +637,7 @@
     <string name="error_109_title">テレビデータを読み込めませんでした</string>
     <string name="error_109_reason">読み込み中に問題が発生しました。</string>
     <string name="error_110_title">サーバーに接続できません</string>
-    <string name="error_110_reason">%1$d秒後に再接続します…</string>
+    <string name="error_110_reason">%1$s後に再接続します…</string>
     <string name="error_110_reason_pending">再接続中…</string>
     <string name="error_111_title">このアドレスにTvheadendサーバーはありません</string>
     <string name="error_111_reason">応答がありましたが、TvheadendのHTSPサービスではありません。</string>
@@ -655,7 +645,7 @@
     <string name="error_112_title">このテレビはネットワークに接続されていません</string>
     <string name="error_112_reason">ネットワーク接続がないため、サーバーに接続できません。</string>
     <string name="error_hint_check_tv_network">テレビのネットワーク設定を確認してください。</string>
-    <string name="error_reconnect_next_attempt">次の試行まで%1$d秒</string>
+    <string name="error_reconnect_next_attempt">次の試行まで%1$s</string>
     <string name="error_201_title">空いているチューナーがありません</string>
     <string name="error_201_reason">現在、すべてのチューナーが使用中です。</string>
     <string name="error_202_title">信号なし</string>

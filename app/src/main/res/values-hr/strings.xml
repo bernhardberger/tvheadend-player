@@ -486,21 +486,6 @@
     <string name="seek_offset_forward_description">%1$s naprijed</string>
     <string name="seek_offset_back_description">%1$s natrag</string>
     <string name="seek_offset_none_description">Bez promjene</string>
-    <plurals name="seek_offset_hours">
-        <item quantity="one">%1$d sat</item>
-        <item quantity="few">%1$d sata</item>
-        <item quantity="other">%1$d sati</item>
-    </plurals>
-    <plurals name="seek_offset_minutes">
-        <item quantity="one">%1$d minuta</item>
-        <item quantity="few">%1$d minute</item>
-        <item quantity="other">%1$d minuta</item>
-    </plurals>
-    <plurals name="seek_offset_seconds">
-        <item quantity="one">%1$d sekunda</item>
-        <item quantity="few">%1$d sekunde</item>
-        <item quantity="other">%1$d sekundi</item>
-    </plurals>
     <string name="player_on_now">Trenutačno se reproducira</string>
     <string name="track_unknown_language">Nepoznat jezik</string>
     <string name="track_multiple_languages">Više jezika</string>
@@ -555,7 +540,6 @@
     <string name="keep_channel_needs_timeshift">Dostupno kada je uključena opcija „%1$s”.</string>
     <string name="startup_buffer_setting">Početni međuspremnik</string>
     <string name="startup_buffer_automatic">Automatski • %1$s</string>
-    <string name="startup_buffer_seconds">%1$s s</string>
     <string name="startup_buffer_description">Kraći omogućuje brži početak, dulji štiti od prekida.</string>
     <string name="background_live_stopped">TV uživo zaustavljen je dok je aplikacija bila u pozadini</string>
     <string name="background_tuner_lost">Tuner je bio potreban drugdje; TV uživo ponovno je pokrenut</string>
@@ -684,7 +668,7 @@
     <string name="error_109_title">TV podatke nije moguće učitati</string>
     <string name="error_109_reason">Došlo je do pogreške tijekom učitavanja.</string>
     <string name="error_110_title">Poslužitelj nije dostupan</string>
-    <string name="error_110_reason">Ponovno povezivanje za %1$d s…</string>
+    <string name="error_110_reason">Ponovno povezivanje za %1$s…</string>
     <string name="error_110_reason_pending">Ponovno povezivanje…</string>
     <string name="error_111_title">Na ovoj adresi nema poslužitelja Tvheadend</string>
     <string name="error_111_reason">Nešto je odgovorilo, ali to nije usluga HTSP sustava Tvheadend.</string>
@@ -692,7 +676,7 @@
     <string name="error_112_title">Ovaj televizor nije povezan s mrežom</string>
     <string name="error_112_reason">Bez mreže ne može pristupiti poslužitelju.</string>
     <string name="error_hint_check_tv_network">Provjeri mrežne postavke televizora.</string>
-    <string name="error_reconnect_next_attempt">Sljedeći pokušaj za %1$d s</string>
+    <string name="error_reconnect_next_attempt">Sljedeći pokušaj za %1$s</string>
     <string name="error_201_title">Nema slobodnog tunera</string>
     <string name="error_201_reason">Svi se tuneri trenutačno koriste.</string>
     <string name="error_202_title">Nema signala</string>

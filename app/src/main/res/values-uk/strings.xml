@@ -495,24 +495,6 @@
     <string name="seek_offset_forward_description">%1$s уперед</string>
     <string name="seek_offset_back_description">%1$s назад</string>
     <string name="seek_offset_none_description">Без змін</string>
-    <plurals name="seek_offset_hours">
-        <item quantity="one">%1$d година</item>
-        <item quantity="few">%1$d години</item>
-        <item quantity="many">%1$d годин</item>
-        <item quantity="other">%1$d години</item>
-    </plurals>
-    <plurals name="seek_offset_minutes">
-        <item quantity="one">%1$d хвилина</item>
-        <item quantity="few">%1$d хвилини</item>
-        <item quantity="many">%1$d хвилин</item>
-        <item quantity="other">%1$d хвилини</item>
-    </plurals>
-    <plurals name="seek_offset_seconds">
-        <item quantity="one">%1$d секунда</item>
-        <item quantity="few">%1$d секунди</item>
-        <item quantity="many">%1$d секунд</item>
-        <item quantity="other">%1$d секунди</item>
-    </plurals>
     <string name="player_on_now">Зараз відтворюється</string>
     <string name="track_unknown_language">Невідома мова</string>
     <string name="track_multiple_languages">Кілька мов</string>
@@ -567,7 +549,6 @@
     <string name="keep_channel_needs_timeshift">Доступно, коли ввімкнено параметр «%1$s».</string>
     <string name="startup_buffer_setting">Початковий буфер</string>
     <string name="startup_buffer_automatic">Автоматично • %1$s</string>
-    <string name="startup_buffer_seconds">%1$s с</string>
     <string name="startup_buffer_description">Коротший буфер прискорює запуск, довший захищає від переривань.</string>
     <string name="background_live_stopped">Прямий ефір зупинено, поки застосунок був у фоні</string>
     <string name="background_tuner_lost">Тюнер знадобився для іншого завдання; прямий ефір перезапущено</string>
@@ -702,7 +683,7 @@
     <string name="error_109_title">Не вдалося завантажити дані ТБ</string>
     <string name="error_109_reason">Під час завантаження сталася помилка.</string>
     <string name="error_110_title">Сервер недоступний</string>
-    <string name="error_110_reason">Повторне підключення через %1$d с…</string>
+    <string name="error_110_reason">Повторне підключення через %1$s…</string>
     <string name="error_110_reason_pending">Повторне підключення…</string>
     <string name="error_111_title">За цією адресою немає сервера Tvheadend</string>
     <string name="error_111_reason">Відповідь отримано, але не від служби HTSP сервера Tvheadend.</string>
@@ -710,7 +691,7 @@
     <string name="error_112_title">Телевізор не підключено до мережі</string>
     <string name="error_112_reason">Без мережі він не може зв’язатися із сервером.</string>
     <string name="error_hint_check_tv_network">Перевірте мережеві налаштування телевізора.</string>
-    <string name="error_reconnect_next_attempt">Наступна спроба через %1$d с</string>
+    <string name="error_reconnect_next_attempt">Наступна спроба через %1$s</string>
     <string name="error_201_title">Немає вільного тюнера</string>
     <string name="error_201_reason">Зараз усі тюнери зайняті.</string>
     <string name="error_202_title">Немає сигналу</string>

@@ -436,7 +436,7 @@ class PlayerChromeTimelineRowTest {
         compose.runOnIdle { timeline = burstStep(-90_000, "Gamma", settled = true) }
         restFor(16)
         val settled = spoken("player-seekbar", merged = true)
-        assertTrue(settled, settled.startsWith("Gamma. ") && settled.contains("1 minute 30 seconds back, target ${formatClock(now - 90)}"))
+        assertTrue(settled, settled.startsWith("Gamma. ") && settled.contains("1 minute, 30 seconds back, target ${formatClock(now - 90)}"))
         for ((delta, title) in listOf(-120_000L to "Delta", -150_000L to "Epsilon")) {
             compose.runOnIdle { timeline = burstStep(delta, title, settled = false) }
             restFor(100)
@@ -445,7 +445,7 @@ class PlayerChromeTimelineRowTest {
         compose.runOnIdle { timeline = burstStep(-150_000, "Epsilon", settled = true) }
         restFor(16)
         val next = spoken("player-seekbar", merged = true)
-        assertTrue(next, next.startsWith("Epsilon. ") && next.contains("2 minutes 30 seconds back, target ${formatClock(now - 150)}"))
+        assertTrue(next, next.startsWith("Epsilon. ") && next.contains("2 minutes, 30 seconds back, target ${formatClock(now - 150)}"))
         compose.runOnIdle { timeline = live(burstBuffer, programmeWindow = window("Known")) }
         restFor(16)
         assertEquals("the step is over", before, spoken("player-seekbar", merged = true))
@@ -481,7 +481,7 @@ class PlayerChromeTimelineRowTest {
         chrome(PlayerChromeMode.CONTROLS, live(buffer.copy(positionMs = -300_000), committedState = buffer.copy(positionMs = -4_000_000),
             previewing = true, step = TimeshiftSeekDecision(-300_000, 3_700_000, false), stepSettled = true))
         assertEquals(
-            "1 hour 1 minute 40 seconds forward, target ${formatClock(now - 300)}. 5:00 behind live. Buffer starts 2:00:00 behind live.",
+            "1 hour, 1 minute, 40 seconds forward, target ${formatClock(now - 300)}. 5:00 behind live. Buffer starts 2:00:00 behind live.",
             spoken("player-seekbar", merged = true),
         )
     }
@@ -494,7 +494,7 @@ class PlayerChromeTimelineRowTest {
             }
         }
         settle()
-        assertEquals("1 hour 2 minutes forward, target 1:19:25. Total 2:00:00.", spoken("player-seekbar", merged = true))
+        assertEquals("1 hour, 2 minutes forward, target 1:19:25. Total 2:00:00.", spoken("player-seekbar", merged = true))
     }
 
     // 3. A preview into a metadata gap does not borrow the committed programme.

@@ -477,18 +477,6 @@
     <string name="seek_offset_forward_description">%1$s vooruit</string>
     <string name="seek_offset_back_description">%1$s terug</string>
     <string name="seek_offset_none_description">Geen wijziging</string>
-    <plurals name="seek_offset_hours">
-        <item quantity="one">%1$d uur</item>
-        <item quantity="other">%1$d uur</item>
-    </plurals>
-    <plurals name="seek_offset_minutes">
-        <item quantity="one">%1$d minuut</item>
-        <item quantity="other">%1$d minuten</item>
-    </plurals>
-    <plurals name="seek_offset_seconds">
-        <item quantity="one">%1$d seconde</item>
-        <item quantity="other">%1$d seconden</item>
-    </plurals>
     <string name="player_on_now">Wordt nu afgespeeld</string>
     <string name="track_unknown_language">Onbekende taal</string>
     <string name="track_multiple_languages">Meerdere talen</string>
@@ -543,7 +531,6 @@
     <string name="keep_channel_needs_timeshift">Beschikbaar wanneer “%1$s” aan staat.</string>
     <string name="startup_buffer_setting">Startbuffer</string>
     <string name="startup_buffer_automatic">Automatisch • %1$s</string>
-    <string name="startup_buffer_seconds">%1$s s</string>
     <string name="startup_buffer_description">Korter start sneller; langer beschermt tegen haperingen.</string>
     <string name="background_live_stopped">Live-tv is gestopt terwijl de app op de achtergrond stond</string>
     <string name="background_tuner_lost">De tuner was elders nodig; live-tv is opnieuw gestart</string>
@@ -665,7 +652,7 @@
     <string name="error_109_title">Tv-gegevens konden niet worden geladen</string>
     <string name="error_109_reason">Er is iets misgegaan tijdens het laden.</string>
     <string name="error_110_title">Server niet bereikbaar</string>
-    <string name="error_110_reason">Opnieuw verbinden over %1$d s…</string>
+    <string name="error_110_reason">Opnieuw verbinden over %1$s…</string>
     <string name="error_110_reason_pending">Opnieuw verbinden…</string>
     <string name="error_111_title">Geen Tvheadend-server op dit adres</string>
     <string name="error_111_reason">Er kwam antwoord, maar niet van de HTSP-service van Tvheadend.</string>
@@ -673,7 +660,7 @@
     <string name="error_112_title">Deze tv is niet verbonden met een netwerk</string>
     <string name="error_112_reason">Zonder netwerk kan de tv de server niet bereiken.</string>
     <string name="error_hint_check_tv_network">Controleer de netwerkinstellingen van de tv.</string>
-    <string name="error_reconnect_next_attempt">Volgende poging over %1$d s</string>
+    <string name="error_reconnect_next_attempt">Volgende poging over %1$s</string>
     <string name="error_201_title">Geen vrije tuner</string>
     <string name="error_201_reason">Alle tuners zijn momenteel in gebruik.</string>
     <string name="error_202_title">Geen signaal</string>

@@ -450,15 +450,6 @@
     <string name="seek_offset_forward_description">往前%1$s</string>
     <string name="seek_offset_back_description">往回%1$s</string>
     <string name="seek_offset_none_description">無變更</string>
-    <plurals name="seek_offset_hours">
-        <item quantity="other">%1$d小時</item>
-    </plurals>
-    <plurals name="seek_offset_minutes">
-        <item quantity="other">%1$d分鐘</item>
-    </plurals>
-    <plurals name="seek_offset_seconds">
-        <item quantity="other">%1$d秒</item>
-    </plurals>
     <string name="player_on_now">播放中</string>
     <string name="track_unknown_language">未知語言</string>
     <string name="track_multiple_languages">多種語言</string>
@@ -513,7 +504,6 @@
     <string name="keep_channel_needs_timeshift">開啟「%1$s」後即可使用。</string>
     <string name="startup_buffer_setting">啟動緩衝</string>
     <string name="startup_buffer_automatic">自動 • %1$s</string>
-    <string name="startup_buffer_seconds">%1$s s</string>
     <string name="startup_buffer_description">緩衝越短，啟動越快；緩衝越長，越能避免播放中斷。</string>
     <string name="background_live_stopped">應用程式在背景執行時，電視直播已停止</string>
     <string name="background_tuner_lost">其他作業需要使用調諧器；電視直播已重新啟動</string>
@@ -617,7 +607,7 @@
     <string name="error_109_title">無法載入電視資料</string>
     <string name="error_109_reason">載入時發生問題。</string>
     <string name="error_110_title">無法連線至伺服器</string>
-    <string name="error_110_reason">%1$d s後重新連線…</string>
+    <string name="error_110_reason">%1$s後重新連線…</string>
     <string name="error_110_reason_pending">正在重新連線…</string>
     <string name="error_111_title">此位址沒有Tvheadend伺服器</string>
     <string name="error_111_reason">收到回應，但並非Tvheadend的HTSP服務。</string>
@@ -625,7 +615,7 @@
     <string name="error_112_title">此電視未連接網路</string>
     <string name="error_112_reason">沒有網路連線，無法存取伺服器。</string>
     <string name="error_hint_check_tv_network">請檢查電視的網路設定。</string>
-    <string name="error_reconnect_next_attempt">%1$d s後再次嘗試</string>
+    <string name="error_reconnect_next_attempt">%1$s後再次嘗試</string>
     <string name="error_201_title">沒有閒置調諧器</string>
     <string name="error_201_reason">目前所有調諧器都在使用中。</string>
     <string name="error_202_title">無訊號</string>

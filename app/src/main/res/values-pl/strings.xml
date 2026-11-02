@@ -495,24 +495,6 @@
     <string name="seek_offset_forward_description">%1$s do przodu</string>
     <string name="seek_offset_back_description">%1$s do tyłu</string>
     <string name="seek_offset_none_description">Bez zmian</string>
-    <plurals name="seek_offset_hours">
-        <item quantity="one">%1$d godzina</item>
-        <item quantity="few">%1$d godziny</item>
-        <item quantity="many">%1$d godzin</item>
-        <item quantity="other">%1$d godziny</item>
-    </plurals>
-    <plurals name="seek_offset_minutes">
-        <item quantity="one">%1$d minuta</item>
-        <item quantity="few">%1$d minuty</item>
-        <item quantity="many">%1$d minut</item>
-        <item quantity="other">%1$d minuty</item>
-    </plurals>
-    <plurals name="seek_offset_seconds">
-        <item quantity="one">%1$d sekunda</item>
-        <item quantity="few">%1$d sekundy</item>
-        <item quantity="many">%1$d sekund</item>
-        <item quantity="other">%1$d sekundy</item>
-    </plurals>
     <string name="player_on_now">Teraz odtwarzane</string>
     <string name="track_unknown_language">Nieznany język</string>
     <string name="track_multiple_languages">Wiele języków</string>
@@ -567,7 +549,6 @@
     <string name="keep_channel_needs_timeshift">Dostępne, gdy opcja „%1$s” jest włączona.</string>
     <string name="startup_buffer_setting">Bufor początkowy</string>
     <string name="startup_buffer_automatic">Automatycznie • %1$s</string>
-    <string name="startup_buffer_seconds">%1$s s</string>
     <string name="startup_buffer_description">Krótszy przyspiesza start, dłuższy chroni przed przerwami.</string>
     <string name="background_live_stopped">Telewizja na żywo została zatrzymana, gdy aplikacja była w tle</string>
     <string name="background_tuner_lost">Tuner był potrzebny gdzie indziej; telewizja na żywo została uruchomiona ponownie</string>
@@ -701,7 +682,7 @@
     <string name="error_109_title">Nie udało się wczytać danych TV</string>
     <string name="error_109_reason">Podczas wczytywania wystąpił błąd.</string>
     <string name="error_110_title">Nie można połączyć się z serwerem</string>
-    <string name="error_110_reason">Ponowne łączenie za %1$d s…</string>
+    <string name="error_110_reason">Ponowne łączenie za %1$s…</string>
     <string name="error_110_reason_pending">Ponowne łączenie…</string>
     <string name="error_111_title">Pod tym adresem nie ma serwera Tvheadend</string>
     <string name="error_111_reason">Otrzymano odpowiedź, ale nie od usługi HTSP Tvheadend.</string>
@@ -709,7 +690,7 @@
     <string name="error_112_title">Ten telewizor nie jest połączony z siecią</string>
     <string name="error_112_reason">Bez sieci nie może połączyć się z serwerem.</string>
     <string name="error_hint_check_tv_network">Sprawdź ustawienia sieciowe telewizora.</string>
-    <string name="error_reconnect_next_attempt">Następna próba za %1$d s</string>
+    <string name="error_reconnect_next_attempt">Następna próba za %1$s</string>
     <string name="error_201_title">Brak wolnego tunera</string>
     <string name="error_201_reason">Wszystkie tunery są teraz używane.</string>
     <string name="error_202_title">Brak sygnału</string>

@@ -477,18 +477,6 @@
     <string name="seek_offset_forward_description">%1$s μπροστά</string>
     <string name="seek_offset_back_description">%1$s πίσω</string>
     <string name="seek_offset_none_description">Καμία αλλαγή</string>
-    <plurals name="seek_offset_hours">
-        <item quantity="one">%1$d ώρα</item>
-        <item quantity="other">%1$d ώρες</item>
-    </plurals>
-    <plurals name="seek_offset_minutes">
-        <item quantity="one">%1$d λεπτό</item>
-        <item quantity="other">%1$d λεπτά</item>
-    </plurals>
-    <plurals name="seek_offset_seconds">
-        <item quantity="one">%1$d δευτερόλεπτο</item>
-        <item quantity="other">%1$d δευτερόλεπτα</item>
-    </plurals>
     <string name="player_on_now">Αναπαράγεται τώρα</string>
     <string name="track_unknown_language">Άγνωστη γλώσσα</string>
     <string name="track_multiple_languages">Πολλές γλώσσες</string>
@@ -543,7 +531,6 @@
     <string name="keep_channel_needs_timeshift">Διαθέσιμο όταν είναι ενεργή η «%1$s».</string>
     <string name="startup_buffer_setting">Μνήμη εκκίνησης</string>
     <string name="startup_buffer_automatic">Αυτόματα • %1$s</string>
-    <string name="startup_buffer_seconds">%1$s s</string>
     <string name="startup_buffer_description">Η μικρότερη μνήμη ξεκινά πιο γρήγορα· η μεγαλύτερη προστατεύει από διακοπές.</string>
     <string name="background_live_stopped">Η ζωντανή TV διακόπηκε όσο η εφαρμογή ήταν στο παρασκήνιο</string>
     <string name="background_tuner_lost">Ο δέκτης χρειάστηκε αλλού· η ζωντανή TV επανεκκινήθηκε</string>
@@ -665,7 +652,7 @@
     <string name="error_109_title">Αδυναμία φόρτωσης δεδομένων TV</string>
     <string name="error_109_reason">Παρουσιάστηκε πρόβλημα κατά τη φόρτωση.</string>
     <string name="error_110_title">Αδυναμία πρόσβασης στον διακομιστή</string>
-    <string name="error_110_reason">Επανασύνδεση σε %1$d s…</string>
+    <string name="error_110_reason">Επανασύνδεση σε %1$s…</string>
     <string name="error_110_reason_pending">Επανασύνδεση…</string>
     <string name="error_111_title">Δεν υπάρχει διακομιστής Tvheadend σε αυτή τη διεύθυνση</string>
     <string name="error_111_reason">Κάτι απάντησε, αλλά δεν είναι η υπηρεσία HTSP του Tvheadend.</string>
@@ -673,7 +660,7 @@
     <string name="error_112_title">Αυτή η τηλεόραση δεν είναι συνδεδεμένη σε δίκτυο</string>
     <string name="error_112_reason">Χωρίς δίκτυο δεν μπορεί να επικοινωνήσει με τον διακομιστή.</string>
     <string name="error_hint_check_tv_network">Έλεγξε τις ρυθμίσεις δικτύου της τηλεόρασης.</string>
-    <string name="error_reconnect_next_attempt">Επόμενη προσπάθεια σε %1$d s</string>
+    <string name="error_reconnect_next_attempt">Επόμενη προσπάθεια σε %1$s</string>
     <string name="error_201_title">Δεν υπάρχει ελεύθερος δέκτης</string>
     <string name="error_201_reason">Όλοι οι δέκτες χρησιμοποιούνται αυτή τη στιγμή.</string>
     <string name="error_202_title">Δεν υπάρχει σήμα</string>

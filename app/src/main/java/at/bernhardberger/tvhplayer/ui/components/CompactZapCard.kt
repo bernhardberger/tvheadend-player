@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -46,6 +47,7 @@ import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.ui.common.formatDurationMinutes
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.images.LogoHaloTransformation
 import at.bernhardberger.tvhplayer.images.ScrimTransformation
@@ -207,7 +209,8 @@ internal fun CompactZapCard(
                 )
                 if (!channelLed && programme != null && currentEvent != null) {
                     Text(
-                        stringResource(R.string.quick_zap_minutes_left, minutesLeft(currentEvent, nowSec)),
+                        " • " + stringResource(R.string.player_minutes_left,
+                            formatDurationMinutes(minutesLeft(currentEvent, nowSec), LocalResources.current)),
                         maxLines = 1, softWrap = false,
                         modifier = Modifier.testTag("$tag-left"),
                     )
@@ -228,7 +231,7 @@ internal fun CompactZapCard(
     )
 }
 
-private fun minutesLeft(event: EpgEvent, nowSec: Long): Int = ((event.stop.epochSeconds - nowSec + 59) / 60).toInt()
+private fun minutesLeft(event: EpgEvent, nowSec: Long): Long = (event.stop.epochSeconds - nowSec + 59) / 60
 
 /**
  * The card's height without a caller's preference: the kit's 196x110 at font scale 1.0, with the

@@ -1,3 +1,0 @@
-<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en">
-    <string name="quick_zap_minutes_left">\u0020• %1$dm left</string>
-</resources>

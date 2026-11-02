@@ -477,18 +477,6 @@
     <string name="seek_offset_forward_description">%1$s eteenpäin</string>
     <string name="seek_offset_back_description">%1$s taaksepäin</string>
     <string name="seek_offset_none_description">Ei muutosta</string>
-    <plurals name="seek_offset_hours">
-        <item quantity="one">%1$d tunti</item>
-        <item quantity="other">%1$d tuntia</item>
-    </plurals>
-    <plurals name="seek_offset_minutes">
-        <item quantity="one">%1$d minuutti</item>
-        <item quantity="other">%1$d minuuttia</item>
-    </plurals>
-    <plurals name="seek_offset_seconds">
-        <item quantity="one">%1$d sekunti</item>
-        <item quantity="other">%1$d sekuntia</item>
-    </plurals>
     <string name="player_on_now">Toistetaan nyt</string>
     <string name="track_unknown_language">Tuntematon kieli</string>
     <string name="track_multiple_languages">Useita kieliä</string>
@@ -543,7 +531,6 @@
     <string name="keep_channel_needs_timeshift">Käytettävissä, kun ”%1$s” on käytössä.</string>
     <string name="startup_buffer_setting">Aloituspuskuri</string>
     <string name="startup_buffer_automatic">Automaattinen • %1$s</string>
-    <string name="startup_buffer_seconds">%1$s s</string>
     <string name="startup_buffer_description">Lyhyempi aloittaa nopeammin, pidempi suojaa katkoilta.</string>
     <string name="background_live_stopped">Suora TV-lähetys pysäytettiin sovelluksen ollessa taustalla</string>
     <string name="background_tuner_lost">Viritintä tarvittiin muualla; suora TV-lähetys käynnistettiin uudelleen</string>
@@ -665,7 +652,7 @@
     <string name="error_109_title">TV-tietoja ei voitu ladata</string>
     <string name="error_109_reason">Latauksessa tapahtui virhe.</string>
     <string name="error_110_title">Palvelimeen ei saada yhteyttä</string>
-    <string name="error_110_reason">Yhdistetään uudelleen %1$d s kuluttua…</string>
+    <string name="error_110_reason">Yhdistetään uudelleen %1$s kuluttua…</string>
     <string name="error_110_reason_pending">Yhdistetään uudelleen…</string>
     <string name="error_111_title">Tässä osoitteessa ei ole Tvheadend-palvelinta</string>
     <string name="error_111_reason">Jokin vastasi, mutta se ei ole Tvheadendin HTSP-palvelu.</string>
@@ -673,7 +660,7 @@
     <string name="error_112_title">Tämä televisio ei ole yhteydessä verkkoon</string>
     <string name="error_112_reason">Ilman verkkoyhteyttä se ei tavoita palvelinta.</string>
     <string name="error_hint_check_tv_network">Tarkista television verkkoasetukset.</string>
-    <string name="error_reconnect_next_attempt">Seuraava yritys %1$d s kuluttua</string>
+    <string name="error_reconnect_next_attempt">Seuraava yritys %1$s kuluttua</string>
     <string name="error_201_title">Ei vapaata viritintä</string>
     <string name="error_201_reason">Kaikki virittimet ovat juuri nyt käytössä.</string>
     <string name="error_202_title">Ei signaalia</string>

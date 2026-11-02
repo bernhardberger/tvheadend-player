@@ -477,18 +477,6 @@
     <string name="seek_offset_forward_description">%1$s frem</string>
     <string name="seek_offset_back_description">%1$s tilbage</string>
     <string name="seek_offset_none_description">Ingen ændring</string>
-    <plurals name="seek_offset_hours">
-        <item quantity="one">%1$d time</item>
-        <item quantity="other">%1$d timer</item>
-    </plurals>
-    <plurals name="seek_offset_minutes">
-        <item quantity="one">%1$d minut</item>
-        <item quantity="other">%1$d minutter</item>
-    </plurals>
-    <plurals name="seek_offset_seconds">
-        <item quantity="one">%1$d sekund</item>
-        <item quantity="other">%1$d sekunder</item>
-    </plurals>
     <string name="player_on_now">Afspiller nu</string>
     <string name="track_unknown_language">Ukendt sprog</string>
     <string name="track_multiple_languages">Flere sprog</string>
@@ -543,7 +531,6 @@
     <string name="keep_channel_needs_timeshift">Tilgængelig, når ”%1$s” er slået til.</string>
     <string name="startup_buffer_setting">Startbuffer</string>
     <string name="startup_buffer_automatic">Automatisk • %1$s</string>
-    <string name="startup_buffer_seconds">%1$s s</string>
     <string name="startup_buffer_description">Kortere giver hurtigere start; længere beskytter mod udfald.</string>
     <string name="background_live_stopped">Live-tv blev stoppet, mens appen var i baggrunden</string>
     <string name="background_tuner_lost">Tuneren skulle bruges et andet sted; live-tv blev genstartet</string>
@@ -665,7 +652,7 @@
     <string name="error_109_title">Kunne ikke indlæse tv-data</string>
     <string name="error_109_reason">Noget gik galt under indlæsningen.</string>
     <string name="error_110_title">Kan ikke nå serveren</string>
-    <string name="error_110_reason">Genopretter forbindelse om %1$d s…</string>
+    <string name="error_110_reason">Genopretter forbindelse om %1$s…</string>
     <string name="error_110_reason_pending">Genopretter forbindelse…</string>
     <string name="error_111_title">Ingen Tvheadend-server på denne adresse</string>
     <string name="error_111_reason">Noget svarede, men det er ikke Tvheadends HTSP-tjeneste.</string>
@@ -673,7 +660,7 @@
     <string name="error_112_title">Dette tv er ikke tilsluttet et netværk</string>
     <string name="error_112_reason">Uden et netværk kan det ikke nå serveren.</string>
     <string name="error_hint_check_tv_network">Kontrollér tv’ets netværksindstillinger.</string>
-    <string name="error_reconnect_next_attempt">Næste forsøg om %1$d s</string>
+    <string name="error_reconnect_next_attempt">Næste forsøg om %1$s</string>
     <string name="error_201_title">Ingen ledig tuner</string>
     <string name="error_201_reason">Alle tunere er i brug lige nu.</string>
     <string name="error_202_title">Intet signal</string>

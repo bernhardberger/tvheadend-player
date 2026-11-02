@@ -64,7 +64,7 @@ class AppErrorTextTest {
     }
 
     @Test fun countdownAndStartTimeFillTheirSentences() {
-        assertEquals("Reconnecting in 5 s…", text.reason(AppErrorCondition.RECONNECTING, reconnectInSeconds = 5))
+        assertEquals("Reconnecting in 5s…", text.reason(AppErrorCondition.RECONNECTING, reconnectInSeconds = 5))
         assertEquals("Reconnecting…", text.reason(AppErrorCondition.RECONNECTING))
         // A due or overdue attempt has no countdown left to show.
         assertEquals("Reconnecting…", text.reason(AppErrorCondition.RECONNECTING, reconnectInSeconds = 0))

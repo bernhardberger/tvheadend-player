@@ -450,15 +450,6 @@
     <string name="seek_offset_forward_description">向前%1$s</string>
     <string name="seek_offset_back_description">向后%1$s</string>
     <string name="seek_offset_none_description">无变化</string>
-    <plurals name="seek_offset_hours">
-        <item quantity="other">%1$d小时</item>
-    </plurals>
-    <plurals name="seek_offset_minutes">
-        <item quantity="other">%1$d分钟</item>
-    </plurals>
-    <plurals name="seek_offset_seconds">
-        <item quantity="other">%1$d秒</item>
-    </plurals>
     <string name="player_on_now">正在播放</string>
     <string name="track_unknown_language">未知语言</string>
     <string name="track_multiple_languages">多种语言</string>
@@ -513,7 +504,6 @@
     <string name="keep_channel_needs_timeshift">开启“%1$s”后可用。</string>
     <string name="startup_buffer_setting">启动缓冲</string>
     <string name="startup_buffer_automatic">自动 • %1$s</string>
-    <string name="startup_buffer_seconds">%1$s s</string>
     <string name="startup_buffer_description">缓冲越短，启动越快；缓冲越长，越能防止中断。</string>
     <string name="background_live_stopped">应用在后台时，电视直播已停止</string>
     <string name="background_tuner_lost">其他任务需要使用调谐器；电视直播已重新启动</string>
@@ -617,7 +607,7 @@
     <string name="error_109_title">无法加载电视数据</string>
     <string name="error_109_reason">加载时发生错误。</string>
     <string name="error_110_title">无法连接服务器</string>
-    <string name="error_110_reason">%1$d s后重新连接…</string>
+    <string name="error_110_reason">%1$s后重新连接…</string>
     <string name="error_110_reason_pending">正在重新连接…</string>
     <string name="error_111_title">此地址没有Tvheadend服务器</string>
     <string name="error_111_reason">收到了响应，但并非Tvheadend的HTSP服务。</string>
@@ -625,7 +615,7 @@
     <string name="error_112_title">此电视未连接网络</string>
     <string name="error_112_reason">没有网络连接，无法访问服务器。</string>
     <string name="error_hint_check_tv_network">请检查电视的网络设置。</string>
-    <string name="error_reconnect_next_attempt">%1$d s后再次尝试</string>
+    <string name="error_reconnect_next_attempt">%1$s后再次尝试</string>
     <string name="error_201_title">没有空闲调谐器</string>
     <string name="error_201_reason">所有调谐器目前都在使用中。</string>
     <string name="error_202_title">无信号</string>

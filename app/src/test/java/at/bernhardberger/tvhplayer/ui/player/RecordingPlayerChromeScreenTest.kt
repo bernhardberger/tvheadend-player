@@ -239,7 +239,7 @@ class RecordingPlayerChromeScreenTest {
         assertTrue("the label still follows every step", texts("+1:30"))
         compose.mainClock.advanceTimeBy(500)
         compose.waitForIdle()
-        assertEquals("1 minute 30 seconds forward, target 0:11:30. Total 1:00:00.", description("recording-seek-preview"))
+        assertEquals("1 minute, 30 seconds forward, target 0:11:30. Total 1:00:00.", description("recording-seek-preview"))
     }
 
     @Test fun aStoppedScreenLeavesNoBannerBehind() {
@@ -366,7 +366,7 @@ class RecordingPlayerChromeScreenTest {
             stepId = SeekStepId()
         }
         settle()
-        assertEquals("1 minute 30 seconds forward, target 0:11:30. Total 1:00:00.", description("recording-seek-preview"))
+        assertEquals("1 minute, 30 seconds forward, target 0:11:30. Total 1:00:00.", description("recording-seek-preview"))
     }
 
     @Test fun aNewStepKeepsTheSettledStepsWordsOnTheFocusedSeekbarUntilItSettles() {
@@ -397,7 +397,7 @@ class RecordingPlayerChromeScreenTest {
         assertEquals("the older step's words stay until the new one settles", first, seekbar())
         compose.runOnIdle { settled = true }
         settle()
-        assertEquals("1 minute 30 seconds forward, target 0:11:30. Total 1:00:00.", seekbar())
+        assertEquals("1 minute, 30 seconds forward, target 0:11:30. Total 1:00:00.", seekbar())
     }
 
     @Test fun upFromTheSeekbarStaysAtTheTopEdgeAndTheBarRowHasNoStatusSlot() {

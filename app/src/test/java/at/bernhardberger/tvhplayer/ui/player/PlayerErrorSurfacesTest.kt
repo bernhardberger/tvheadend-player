@@ -222,12 +222,12 @@ class PlayerErrorSurfacesTest {
         }
         compose.mainClock.advanceTimeByFrame()
         compose.onNodeWithTag("tv-recovery-title").assert(hasText("Reconnecting…"))
-        compose.onNodeWithTag("tv-recovery-status").assert(hasText("Next attempt in 3 s"))
+        compose.onNodeWithTag("tv-recovery-status").assert(hasText("Next attempt in 3s"))
         compose.onNodeWithTag("tv-recovery-primary").assert(hasText("Close"))
         assertEquals(0, compose.onAllNodes(hasTestTag("tv-recovery-secondary")).fetchSemanticsNodes().size)
 
         compose.mainClock.advanceTimeBy(1_000L)
-        compose.onNodeWithTag("tv-recovery-status").assert(hasText("Next attempt in 2 s"))
+        compose.onNodeWithTag("tv-recovery-status").assert(hasText("Next attempt in 2s"))
         compose.mainClock.advanceTimeBy(2_000L)
         compose.onNodeWithTag("tv-recovery-title").assert(hasText("Reconnecting…"))
         assertEquals(0, compose.onAllNodes(hasTestTag("tv-recovery-status")).fetchSemanticsNodes().size)
@@ -247,9 +247,9 @@ class PlayerErrorSurfacesTest {
             )
         }
         compose.mainClock.advanceTimeByFrame()
-        compose.onNodeWithTag("tv-recovery-status").assert(hasText("Next attempt in 11 s"))
+        compose.onNodeWithTag("tv-recovery-status").assert(hasText("Next attempt in 11s"))
         compose.mainClock.advanceTimeBy(1_000L)
-        compose.onNodeWithTag("tv-recovery-status").assert(hasText("Next attempt in 10 s"))
+        compose.onNodeWithTag("tv-recovery-status").assert(hasText("Next attempt in 10s"))
 
         // A layer over the alert hides it while the attempt's time runs on.
         compose.runOnIdle { visible.value = false }
@@ -258,7 +258,7 @@ class PlayerErrorSurfacesTest {
         compose.runOnIdle { visible.value = true }
         compose.waitForIdle()
         compose.mainClock.advanceTimeBy(500L)
-        compose.onNodeWithTag("tv-recovery-status").assert(hasText("Next attempt in 6 s"))
+        compose.onNodeWithTag("tv-recovery-status").assert(hasText("Next attempt in 6s"))
     }
 
     @Test
@@ -284,7 +284,7 @@ class PlayerErrorSurfacesTest {
         compose.onNodeWithTag("tv-recovery-overlay")
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Reconnecting…"))
         compose.mainClock.advanceTimeBy(1_000L)
-        compose.onNodeWithTag("tv-recovery-status").assert(hasText("Next attempt in 5 s"))
+        compose.onNodeWithTag("tv-recovery-status").assert(hasText("Next attempt in 5s"))
         compose.onNodeWithTag("tv-recovery-overlay")
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Reconnecting…"))
     }

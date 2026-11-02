@@ -642,18 +642,6 @@
     <string name="seek_offset_forward_description">%1$s forward</string>
     <string name="seek_offset_back_description">%1$s back</string>
     <string name="seek_offset_none_description">No change</string>
-    <plurals name="seek_offset_hours">
-        <item quantity="one">%1$d hour</item>
-        <item quantity="other">%1$d hours</item>
-    </plurals>
-    <plurals name="seek_offset_minutes">
-        <item quantity="one">%1$d minute</item>
-        <item quantity="other">%1$d minutes</item>
-    </plurals>
-    <plurals name="seek_offset_seconds">
-        <item quantity="one">%1$d second</item>
-        <item quantity="other">%1$d seconds</item>
-    </plurals>
     <string name="player_on_now">Currently playing</string>
     <string name="track_unknown_language">Unknown language</string>
     <string name="track_multiple_languages">Multiple languages</string>
@@ -711,7 +699,6 @@
     <string name="keep_channel_needs_timeshift">Available when “%1$s” is on.</string>
     <string name="startup_buffer_setting">Start-up buffer</string>
     <string name="startup_buffer_automatic">Automatic • %1$s</string>
-    <string name="startup_buffer_seconds">%1$s s</string>
     <string name="startup_buffer_description">Shorter starts faster; longer protects against dropouts.</string>
     <string name="background_live_stopped">Live TV was stopped while the app was in the background</string>
     <string name="background_tuner_lost">The tuner was needed elsewhere; live TV was restarted</string>
@@ -849,7 +836,7 @@
     <string name="error_109_reason">Something went wrong while loading.</string>
     <string name="error_110_title">Can’t reach the server</string>
     <!-- Error reason while reconnecting. %1$d = seconds until the next attempt. "s" is the seconds unit symbol. -->
-    <string name="error_110_reason">Reconnecting in %1$d s…</string>
+    <string name="error_110_reason">Reconnecting in %1$s…</string>
     <string name="error_110_reason_pending">Reconnecting…</string>
     <string name="error_111_title">No Tvheadend server at this address</string>
     <string name="error_111_reason">Something answered, but it isn’t Tvheadend’s HTSP service.</string>
@@ -857,7 +844,7 @@
     <string name="error_112_title">This TV isn’t connected to a network</string>
     <string name="error_112_reason">Without a network, it can’t reach the server.</string>
     <string name="error_hint_check_tv_network">Check the TV’s network settings.</string>
-    <string name="error_reconnect_next_attempt">Next attempt in %1$d s</string>
+    <string name="error_reconnect_next_attempt">Next attempt in %1$s</string>
     <string name="error_201_title">No free tuner</string>
     <string name="error_201_reason">Every tuner is in use right now.</string>
     <string name="error_202_title">No signal</string>

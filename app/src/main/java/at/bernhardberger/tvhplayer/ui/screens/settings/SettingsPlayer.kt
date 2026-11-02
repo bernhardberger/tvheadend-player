@@ -2,13 +2,14 @@ package at.bernhardberger.tvhplayer.ui.screens.settings
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import at.bernhardberger.tvheadend.sdk.core.StreamProfileId
 import at.bernhardberger.tvheadend.sdk.core.StreamProfilesResult
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.ui.common.formatDurationSeconds
 import at.bernhardberger.tvhplayer.core.streamProfilePresentation
 import at.bernhardberger.tvhplayer.settings.FrameRateSwitching
 import at.bernhardberger.tvhplayer.settings.WarmPlaybackMode
@@ -121,7 +122,7 @@ internal fun settingsStartupBufferLevel(millis: Int, learnedMillis: Int, onSelec
         }, initialItemId = "startup-buffer-$millis",
         description = stringResource(R.string.startup_buffer_description))
 
-/** "Automatic • 1 s" with the learned level, or a fixed level in locale decimals ("0,5 s"). */
+/** "Automatic • 1s" with the learned level, or a fixed level in locale decimals ("0,5s"), to a tenth of a second. */
 @Composable
 internal fun startupBufferLabel(millis: Int, learnedMillis: Int): String =
     if (millis == STARTUP_BUFFER_AUTOMATIC) {
@@ -129,10 +130,8 @@ internal fun startupBufferLabel(millis: Int, learnedMillis: Int): String =
     } else startupBufferSeconds(millis)
 
 @Composable
-private fun startupBufferSeconds(millis: Int): String {
-    return stringResource(R.string.startup_buffer_seconds,
-        at.bernhardberger.tvhplayer.ui.common.formatDecimal(millis / 1000.0, LocalConfiguration.current.locales[0], 0, 1))
-}
+private fun startupBufferSeconds(millis: Int): String =
+    formatDurationSeconds(Math.round(millis / 100.0) / 10.0, LocalResources.current)
 
 internal const val STREAM_PROFILE_LEVEL = "stream-profile"
 internal const val STREAM_PROFILE_DEFAULT = "profile-default"

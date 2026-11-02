@@ -477,18 +477,6 @@
     <string name="seek_offset_forward_description">%1$s ileri</string>
     <string name="seek_offset_back_description">%1$s geri</string>
     <string name="seek_offset_none_description">Değişiklik yok</string>
-    <plurals name="seek_offset_hours">
-        <item quantity="one">%1$d saat</item>
-        <item quantity="other">%1$d saat</item>
-    </plurals>
-    <plurals name="seek_offset_minutes">
-        <item quantity="one">%1$d dakika</item>
-        <item quantity="other">%1$d dakika</item>
-    </plurals>
-    <plurals name="seek_offset_seconds">
-        <item quantity="one">%1$d saniye</item>
-        <item quantity="other">%1$d saniye</item>
-    </plurals>
     <string name="player_on_now">Şimdi oynatılıyor</string>
     <string name="track_unknown_language">Bilinmeyen dil</string>
     <string name="track_multiple_languages">Birden çok dil</string>
@@ -543,7 +531,6 @@
     <string name="keep_channel_needs_timeshift">“%1$s” açıkken kullanılabilir.</string>
     <string name="startup_buffer_setting">Başlangıç arabelleği</string>
     <string name="startup_buffer_automatic">Otomatik • %1$s</string>
-    <string name="startup_buffer_seconds">%1$s sn</string>
     <string name="startup_buffer_description">Daha kısa süre hızlı başlatır; daha uzun süre kesintilere karşı korur.</string>
     <string name="background_live_stopped">Uygulama arka plandayken canlı TV durduruldu</string>
     <string name="background_tuner_lost">Ayarlayıcıya başka yerde ihtiyaç duyuldu; canlı TV yeniden başlatıldı</string>
@@ -665,7 +652,7 @@
     <string name="error_109_title">TV verileri yüklenemedi</string>
     <string name="error_109_reason">Yükleme sırasında bir sorun oluştu.</string>
     <string name="error_110_title">Sunucuya ulaşılamıyor</string>
-    <string name="error_110_reason">%1$d sn sonra yeniden bağlanılıyor…</string>
+    <string name="error_110_reason">%1$s sonra yeniden bağlanılıyor…</string>
     <string name="error_110_reason_pending">Yeniden bağlanılıyor…</string>
     <string name="error_111_title">Bu adreste Tvheadend sunucusu yok</string>
     <string name="error_111_reason">Bir yanıt geldi, ancak Tvheadend HTSP hizmetinden değil.</string>
@@ -673,7 +660,7 @@
     <string name="error_112_title">Bu TV bir ağa bağlı değil</string>
     <string name="error_112_reason">Ağ olmadan sunucuya ulaşamaz.</string>
     <string name="error_hint_check_tv_network">TV ağ ayarlarını kontrol edin.</string>
-    <string name="error_reconnect_next_attempt">Sonraki deneme %1$d sn sonra</string>
+    <string name="error_reconnect_next_attempt">Sonraki deneme %1$s sonra</string>
     <string name="error_201_title">Boş ayarlayıcı yok</string>
     <string name="error_201_reason">Şu anda tüm ayarlayıcılar kullanımda.</string>
     <string name="error_202_title">Sinyal yok</string>

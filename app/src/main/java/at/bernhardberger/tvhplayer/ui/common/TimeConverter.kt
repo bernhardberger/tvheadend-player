@@ -140,16 +140,36 @@ fun formatDurationMinutes(
     if (spoken) android.icu.text.MeasureFormat.FormatWidth.WIDE else android.icu.text.MeasureFormat.FormatWidth.NARROW,
 ).format(android.icu.util.Measure(minutes.coerceAtLeast(0L), android.icu.util.MeasureUnit.MINUTE))
 
+/** Seconds, whole or fractional, in the configured app locale. */
+fun formatDurationSeconds(
+    seconds: Number,
+    resources: android.content.res.Resources,
+    spoken: Boolean = false,
+): String = android.icu.text.MeasureFormat.getInstance(
+    resources.configuration.locales[0],
+    if (spoken) android.icu.text.MeasureFormat.FormatWidth.WIDE else android.icu.text.MeasureFormat.FormatWidth.NARROW,
+).format(android.icu.util.Measure(seconds, android.icu.util.MeasureUnit.SECOND))
+
 /** A recorded length: seconds while under a minute, otherwise whole minutes as [formatDurationMinutes]. */
 fun formatRecordedDuration(
     seconds: Long,
     resources: android.content.res.Resources,
     spoken: Boolean = false,
 ): String = if (seconds !in 1L until 60L) formatDurationMinutes(seconds / 60L, resources, spoken)
-else android.icu.text.MeasureFormat.getInstance(
-    resources.configuration.locales[0],
-    if (spoken) android.icu.text.MeasureFormat.FormatWidth.WIDE else android.icu.text.MeasureFormat.FormatWidth.NARROW,
-).format(android.icu.util.Measure(seconds, android.icu.util.MeasureUnit.SECOND))
+else formatDurationSeconds(seconds, resources, spoken)
+
+/** A length as read aloud, in the configured app locale; zero units are left out, so whole minutes read without "0 seconds". */
+fun formatSpokenDuration(totalSeconds: Long, resources: android.content.res.Resources): String {
+    val measures = listOf(
+        totalSeconds / 3_600L to android.icu.util.MeasureUnit.HOUR,
+        totalSeconds % 3_600L / 60L to android.icu.util.MeasureUnit.MINUTE,
+        totalSeconds % 60L to android.icu.util.MeasureUnit.SECOND,
+    ).filter { (amount, _) -> amount > 0L }.map { (amount, unit) -> android.icu.util.Measure(amount, unit) }
+    return android.icu.text.MeasureFormat.getInstance(
+        resources.configuration.locales[0],
+        android.icu.text.MeasureFormat.FormatWidth.WIDE,
+    ).formatMeasures(*measures.toTypedArray())
+}
 
 /** Whole-hour jump amounts, with the unit written out in the configured app locale. */
 fun formatWholeHours(hours: Long, resources: android.content.res.Resources): String =

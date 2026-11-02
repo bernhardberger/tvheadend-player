@@ -36,13 +36,14 @@ internal class AppErrorText(private val context: Context) {
      */
     fun reconnecting(inSeconds: Int?): String =
         if (inSeconds != null && inSeconds > 0) {
-            context.getString(R.string.error_110_reason, inSeconds)
+            context.getString(R.string.error_110_reason, formatDurationSeconds(inSeconds, context.resources))
         } else {
             context.getString(R.string.error_110_reason_pending)
         }
 
     /** The countdown line under the plain [reconnecting] text while the next attempt is [inSeconds] away. */
-    fun nextAttempt(inSeconds: Int): String = context.getString(R.string.error_reconnect_next_attempt, inSeconds)
+    fun nextAttempt(inSeconds: Int): String =
+        context.getString(R.string.error_reconnect_next_attempt, formatDurationSeconds(inSeconds, context.resources))
 
     /** What helps, or null where it would only repeat the reason (a countdown, a start time, a finish). */
     fun hint(condition: AppErrorCondition): String? = condition.hintRes()?.let(context::getString)

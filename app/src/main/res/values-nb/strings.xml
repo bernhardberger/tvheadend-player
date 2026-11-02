@@ -477,18 +477,6 @@
     <string name="seek_offset_forward_description">%1$s frem</string>
     <string name="seek_offset_back_description">%1$s tilbake</string>
     <string name="seek_offset_none_description">Ingen endring</string>
-    <plurals name="seek_offset_hours">
-        <item quantity="one">%1$d time</item>
-        <item quantity="other">%1$d timer</item>
-    </plurals>
-    <plurals name="seek_offset_minutes">
-        <item quantity="one">%1$d minutt</item>
-        <item quantity="other">%1$d minutter</item>
-    </plurals>
-    <plurals name="seek_offset_seconds">
-        <item quantity="one">%1$d sekund</item>
-        <item quantity="other">%1$d sekunder</item>
-    </plurals>
     <string name="player_on_now">Spiller av nå</string>
     <string name="track_unknown_language">Ukjent språk</string>
     <string name="track_multiple_languages">Flere språk</string>
@@ -543,7 +531,6 @@
     <string name="keep_channel_needs_timeshift">Tilgjengelig når «%1$s» er på.</string>
     <string name="startup_buffer_setting">Oppstartsbuffer</string>
     <string name="startup_buffer_automatic">Automatisk • %1$s</string>
-    <string name="startup_buffer_seconds">%1$s s</string>
     <string name="startup_buffer_description">Kortere gir raskere start; lengre beskytter mot avbrudd.</string>
     <string name="background_live_stopped">Direkte-TV ble stoppet mens appen var i bakgrunnen</string>
     <string name="background_tuner_lost">Tuneren var nødvendig et annet sted; direkte-TV ble startet på nytt</string>
@@ -665,7 +652,7 @@
     <string name="error_109_title">Kunne ikke laste inn TV-data</string>
     <string name="error_109_reason">Noe gikk galt under innlastingen.</string>
     <string name="error_110_title">Kan ikke nå serveren</string>
-    <string name="error_110_reason">Kobler til på nytt om %1$d s…</string>
+    <string name="error_110_reason">Kobler til på nytt om %1$s…</string>
     <string name="error_110_reason_pending">Kobler til på nytt…</string>
     <string name="error_111_title">Ingen Tvheadend-server på denne adressen</string>
     <string name="error_111_reason">Noe svarte, men det er ikke Tvheadends HTSP-tjeneste.</string>
@@ -673,7 +660,7 @@
     <string name="error_112_title">Denne TV-en er ikke koblet til et nettverk</string>
     <string name="error_112_reason">Uten nettverk kan den ikke nå serveren.</string>
     <string name="error_hint_check_tv_network">Kontroller nettverksinnstillingene på TV-en.</string>
-    <string name="error_reconnect_next_attempt">Neste forsøk om %1$d s</string>
+    <string name="error_reconnect_next_attempt">Neste forsøk om %1$s</string>
     <string name="error_201_title">Ingen ledig tuner</string>
     <string name="error_201_reason">Alle tunere er i bruk akkurat nå.</string>
     <string name="error_202_title">Intet signal</string>

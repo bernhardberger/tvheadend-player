@@ -486,21 +486,6 @@
     <string name="seek_offset_forward_description">%1$s avanti</string>
     <string name="seek_offset_back_description">%1$s indietro</string>
     <string name="seek_offset_none_description">Nessuna modifica</string>
-    <plurals name="seek_offset_hours">
-        <item quantity="one">%1$d ora</item>
-        <item quantity="many">%1$d ore</item>
-        <item quantity="other">%1$d ore</item>
-    </plurals>
-    <plurals name="seek_offset_minutes">
-        <item quantity="one">%1$d minuto</item>
-        <item quantity="many">%1$d minuti</item>
-        <item quantity="other">%1$d minuti</item>
-    </plurals>
-    <plurals name="seek_offset_seconds">
-        <item quantity="one">%1$d secondo</item>
-        <item quantity="many">%1$d secondi</item>
-        <item quantity="other">%1$d secondi</item>
-    </plurals>
     <string name="player_on_now">In riproduzione</string>
     <string name="track_unknown_language">Lingua sconosciuta</string>
     <string name="track_multiple_languages">Più lingue</string>
@@ -555,7 +540,6 @@
     <string name="keep_channel_needs_timeshift">Disponibile quando «%1$s» è attiva.</string>
     <string name="startup_buffer_setting">Buffer di avvio</string>
     <string name="startup_buffer_automatic">Automatico • %1$s</string>
-    <string name="startup_buffer_seconds">%1$s s</string>
     <string name="startup_buffer_description">Più breve: avvio più rapido; più lungo: protezione dalle interruzioni.</string>
     <string name="background_live_stopped">La TV in diretta è stata interrotta mentre l’app era in background</string>
     <string name="background_tuner_lost">Il sintonizzatore serviva per un altro uso; la TV in diretta è stata riavviata</string>
@@ -683,7 +667,7 @@
     <string name="error_109_title">Impossibile caricare i dati TV</string>
     <string name="error_109_reason">Si è verificato un errore durante il caricamento.</string>
     <string name="error_110_title">Server non raggiungibile</string>
-    <string name="error_110_reason">Riconnessione tra %1$d s…</string>
+    <string name="error_110_reason">Riconnessione tra %1$s…</string>
     <string name="error_110_reason_pending">Riconnessione…</string>
     <string name="error_111_title">Nessun server Tvheadend a questo indirizzo</string>
     <string name="error_111_reason">Qualcosa ha risposto, ma non è il servizio HTSP di Tvheadend.</string>
@@ -691,7 +675,7 @@
     <string name="error_112_title">Questo televisore non è connesso a una rete</string>
     <string name="error_112_reason">Senza rete non può raggiungere il server.</string>
     <string name="error_hint_check_tv_network">Controlla le impostazioni di rete del televisore.</string>
-    <string name="error_reconnect_next_attempt">Prossimo tentativo tra %1$d s</string>
+    <string name="error_reconnect_next_attempt">Prossimo tentativo tra %1$s</string>
     <string name="error_201_title">Nessun sintonizzatore libero</string>
     <string name="error_201_reason">Tutti i sintonizzatori sono attualmente in uso.</string>
     <string name="error_202_title">Nessun segnale</string>
