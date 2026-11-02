@@ -73,8 +73,9 @@ internal object BrowseMotionPolicy {
     /** One crossfade for whatever follows focus: backdrops, the info above a row, a pane's picture. */
     const val focusChangeFadeMs = 225
     /**
-     * How much larger a backdrop starts while it fades in, settling toward its top end corner:
-     * fitted to the G10's launcher, where the same picture is 1.5-2% larger at the fade's start.
+     * How much larger a backdrop starts while it fades in, settling toward its top end corner. A fit to
+     * the G10's launcher recording gives 1.5-2% at the fade's start, but a small sideways shift fits
+     * that recording about as well: the zoom follows what the launcher looks like, not a clean measurement.
      */
     const val backdropAppearScale = 1.02f
     fun <T> backdropFade() = tween<T>(focusChangeFadeMs, easing = LinearEasing)
