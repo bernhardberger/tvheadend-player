@@ -3,7 +3,9 @@
 **Status:** Internal, preliminary working plan of the maintainer; the published
 roadmap is [`ROADMAP.md`](../ROADMAP.md). Nothing here is a promise or a release
 date, and items change or drop without notice. First draft 2026-10-11; reconciled
-2026-10-28 against `main` at `08b3df64` (0.3.1, SDK 0.36.0). The current
+2026-10-28 against `main` at `08b3df64` (0.3.1, SDK 0.36.0); the rows for U3, U7,
+U14, U18, P5, P6, S2, S4, S7, S8 and S11 updated 2026-11-02 after 0.4.1 (SDK 0.38.0),
+the rest not rechecked since. The current
 disposition below replaces the old version allocation; the SDK version is
 pinned in `gradle/libs.versions.toml`.
 **Scope:** Everything between the current Player and a signed 1.0 release of the
@@ -43,7 +45,7 @@ Roadmap D-items below are distinct from the same-numbered defects in
 |---|---|---|
 | P1, P2 | Implemented: decoder counters and privacy-safe failure classification | P1 does **not** include A/V offset: Media3 supplies no honest value (defect D14). Diagnostic delivery does not close the underlying playback reports. |
 | P3, P4 | Deferred by owner, 2026-10-12 | Reopen the broad reliability session when a defect recurs; independently reported newer defects still need disposition. |
-| P5, P6 | Open; after 0.3.2 (owner 2026-10-29) | Current-stack interlaced/device matrix; owner decision on the G08 render-mode report. G08, Sony and NVIDIA Shield testing/rollout is coordinated by the owner after 0.3.2 and may need appliance-build fixes and device quirks. |
+| P5, P6 | Open; later (owner 2026-11-02) | Current-stack interlaced/device matrix; owner decision on the G08 render-mode report. G08, Sony and NVIDIA Shield testing waits until the owner can get to those TVs and the appliance build is touched up; it may need appliance-build fixes and device quirks. |
 | D1–D3, D5, D6 | Out: rules/editing remain in the server UI | No new implementation obligation. |
 | D4, D7 | Implemented: disk space; growing-recording playback and resume | D8's real-server mutation pass remains a separate exit. |
 | D8 | Acceptance unverified | Record schedule/cancel/delete end to end on the selected candidate; include D9 if retained. |
@@ -52,20 +54,20 @@ Roadmap D-items below are distinct from the same-numbered defects in
 | H2–H5, A3 | Out of 1.0 | Launcher integration and its deep-link work remain excluded. This does not remove the separate in-app Home requirement U3. |
 | U1 | Partial | Current Channels layouts and player rail supersede much of the trial work; explicit final trial disposition and branch cleanup (X3) remain unverified. |
 | U2 | Completed initial owner-corrected inventory | Its October 11–12 observations are design history, not a current missing-feature list. |
-| U3 | Open; specified 2026-10-30 | Product rules and owner decisions in [`home-screen-spec.md`](home-screen-spec.md); the first implementation attempt was rejected and removed. Next: mockup round (recent-tile labels, On now info density), then the implementation plan, starting with D70. |
+| U3 | Shipped in 0.4.0 | Product rules and owner decisions in [`home-screen-spec.md`](home-screen-spec.md). Committee review deferred by the owner (2026-11-02, "a bit later"). |
 | U4 | Implemented **and owner-accepted on G10, 2026-10-22** | List, Grid, Immersive, group filtering and skeletons; acceptance recorded in `d3277266`. Later changes still belong to final candidate acceptance. |
 | U5 | Implemented core rework in 0.3.0 | Header/day-time panel, densities, genre filter/colors, recording marks and focus fixes. Final physical acceptance unverified; E7 records remaining artwork cost. Persistent past-guide history was explicitly not required for 1.0. |
 | U6 | Substantially implemented in 0.3.0 | Tabs, folder browse, running/missed/error states, actual recorded length, padded stop, watch status and free space delivered. D9 remains open; extra genre/channel views were ideas, not evidence of missing core functionality. Physical acceptance unverified. |
-| U7 | Implemented core rework in 0.3.0; privacy reader added in 0.3.1 | Guided server discovery/connection setup, reorganized settings, About and three-stage background playback delivered. U18 is still separate; physical acceptance unverified. |
+| U7 | Implemented core rework in 0.3.0; privacy reader added in 0.3.1 | Guided server discovery/connection setup, reorganized settings, About and three-stage background playback delivered. First setup reworked in 0.4.1 and checked by the owner on the G10; Settings and About physical acceptance unverified. |
 | U8, U20 | Substantially implemented in 0.3.0 | Shared Info/details, recording date, channel identity, rail peek, Audio/Subtitles actions, relative seek steps and in-place number entry delivered. Final seek-step choice/polish and G10 sign-off remain to reconcile. Owner retained the Channels-down cue on 2026-10-28 (defect D22). |
 | U9, U10 | Implemented | Startup rework and hidden Guide search. Global search stays after 1.0; startup timing/feel remains part of candidate acceptance. |
 | U11 | Partial acceptance record | U4 has explicit acceptance. No blanket sign-off found for all reworked screens. Batch the remaining journeys on the final candidate. |
 | U12 | Partial evidence, exit unverified | Extensive production-composable capture/layout tests exist. They are not by themselves proof of a settled, maintained screenshot-golden suite. |
 | U13, U17, U19 | Implemented | Clock override, locale-aware formatting and shared bullet separators. Width/readability remains in final localized-screen acceptance. |
-| U14 | Partial; a later, larger slice (owner 2026-10-29) | Live-player GUIDE now toggles its channel Schedule panel (`LivePlayerLayerState.handleScheduleKey`). That is not the original all-screen GUIDE/TV/LIST contract. Device quirks need a key-capture diagnostic first, so testers can report raw key codes. |
+| U14 | Partial; a later, larger slice (owner 2026-10-29) | Live-player GUIDE now toggles its channel Schedule panel (`LivePlayerLayerState.handleScheduleKey`). That is not the original all-screen GUIDE/TV/LIST contract. Device quirks need a key-capture diagnostic first, so testers can report raw key codes; that diagnostic comes with the appliance touch-up (owner 2026-11-02). |
 | U15 | Implemented | Shared context menus, details family and error catalog integrated into live, recording and browse/startup surfaces. The old 0.4 allocation is obsolete. |
 | U16 | Partial; final consistency pass still pending | Many entry/Back restorations landed, including Guide time/position, recording-player return and folder-row restoration. No complete TV-DB/all-screen acceptance record found. |
-| U18 | Open | `channelTitleText` still includes every non-null number; no app-wide hide-number setting found. |
+| U18 | Implemented | `96bcb485`: Settings → General hides channel numbers app-wide (`channelTitleText`/`channelTitleNumber`), with `89ed1f6e` for the player placeholder and `cffe602f` for translations. |
 | E1 | Dropped | No timing budgets or automatic speed verdicts. |
 | E2, E4 | Implemented measurement lane; execution exit unverified; run once on the 0.3.2 candidate | `fd5d4f8c` adds `:macrobenchmark` and G10 journeys; optimized tracing keep rules exist. Current lane uses real-server `profileServer`, not the original fixture proposal. Assembly/source alone does not establish a successful on-device runner or a complete recorded run. |
 | E3 | Implemented generator and committed profiles | Startup generation landed in `418366c4`; generation reminder is in the release process. Retain the APK-only/DM comparison as unverified rather than calling the entire original exit complete. |
@@ -81,10 +83,10 @@ Roadmap D-items below are distinct from the same-numbered defects in
 | R4 | Acceptance unverified | Screen semantics/test work does not substitute for the cross-screen TalkBack pass. |
 | R7 | Optional for 1.0 | Existing build CI is not evidence of the requested dependency-update/wrapper-validation automation. |
 | S1, S3, S6 | Implemented | Separate Play/Appliance IDs and manifests, two APKs and Play AAB pipeline. Console enrollment and exact-candidate verification are separate gates. |
-| S2, S11 | Owner decided to start testing with 0.3.0; preparation delivered | No Console submission, 12-tester/14-day completion or production-access grant established by repository evidence. |
-| S4 | Planned instructions/video access route | Review acceptance unverified; do not treat the preparation pack or video plan as Google's approval. |
+| S2, S11 | Closed test running; 0.4.1 published on it | Tester recruiting started 2026-11-02 (group welcome, private messages, Reddit and forum posts). The 12-tester/14-day window and production access are not met yet; production needs the owner's go. |
+| S4 | Review server live; access details saved in Console (2026-10-30) | Homelab demo server; off-LAN acceptance passed with the owner over mobile data. See [`play-store/risks.md`](play-store/risks.md) item 1 and [`play-store/app-content.md`](play-store/app-content.md) 4.4. Google's production-access review is still ahead. |
 | S5 | Partial | Product covers many checklist requirements; complete per-ID audit and physical validation/deviations remain. |
-| S7, S8 | Preparation pack delivered | Listing/graphics and declaration guidance in `play-store.md`; completion/submission in Console unverified. |
+| S7, S8 | Listing and screenshots published on the closed track with 0.4.1 | English and German listing. See [`play-store/`](play-store/) for the pack; declarations not rechecked here, and the listing's AI-label answer is still for the owner to check. |
 | S9 | Done (owner 2026-10-29) | GPL-on-Play conclusion recorded in `product-identity-plan.md` → Google Play distribution. |
 | S10 | Open | Package/key registration (owner console step before 1.0) not established. |
 | S12 | Watch-ahead, outside current target-36 work | Revisit at the target-37 upgrade; not a feature to build for this baseline. |
@@ -131,7 +133,7 @@ In 1.0:
 Not in 1.0:
 
 - Simultaneous servers: out of scope for now. Stored server/user profiles with switching, one active
-  at a time, are wanted before 1.0 if feasible (owner, 2026-11-01). The SDK's
+  at a time, are the main target of 0.5.0 (owner, 2026-11-02). The SDK's
   `ServerProfileStore` holds a single profile today.
 - App-owned favourites beyond Tvheadend channel tags.
 - Picture-in-picture. Android TV allows PiP only from Android 14 and only for
@@ -506,7 +508,7 @@ assigning new version numbers or changing the owner's scope decisions.
 | Stage | Remaining scope | Exit |
 |---|---|---|
 | Delivered baseline: 0.3.0 → 0.3.1 | Screen reworks, shared patterns, startup, DVR improvements, localization, R8, profiles, Play/Appliance/AAB pipeline; subsequent recovery fixes | Credit implementation now; carry only the specific unresolved items and acceptance gates above. |
-| Feature closure | U3 Home, D9 manual recording (or owner drops it), U18 number visibility, U14 remote contract; U8/U20 residual polish and U1 dispositions | Each remaining requirement implemented or explicitly removed by owner; U16's cross-screen entry/Back rule settled. |
+| Feature closure | Stored server profiles (0.5.0), D9 manual recording (or owner drops it), U14 remote contract; U8/U20 residual polish and U1 dispositions | Each remaining requirement implemented or explicitly removed by owner; U16's cross-screen entry/Back rule settled. |
 | Quality closure, alongside feature work | Open defect dispositions; E2/E4 executed evidence, E5–E10 remaining measurements/improvements, U12, R3 revalidation, S5 audit | Focused fixes and evidence; no resurrection of dropped performance budgets or already-closed defects. |
 | Physical release-candidate acceptance | U11, D8, P5, A1–A2, R4, E9; current-candidate native/release checks, privacy/notices, trial cleanup | Named journeys observed on the candidate; unresolved failures fixed or explicitly dispositioned. Prior Channels acceptance narrows work but does not certify the whole candidate. |
 | Play track, in parallel from 0.3.x | S2/S4/S7/S8/S11 closed-test submission, access route and tester window; S9/S10 conclusions/registration | Recorded Console/review outcomes, test feedback triaged, production access granted. |
