@@ -972,8 +972,6 @@ private fun <T> HomeCardRow(
         ) {
             itemsIndexed(items, key = { _, item -> itemKey(item) }) { index, item ->
                 val itemModifier = Modifier
-                    // The card before the keyline runs on under the navigation drawer.
-                    .mutedPastRowStart(state, index, gapPx, emphasis) { rememberedKey == itemKey(item) }
                     .then(if (index == restoredIndex) Modifier.focusRequester(entry) else Modifier)
                     .onFocusChanged {
                         if (it.isFocused) {
@@ -990,7 +988,10 @@ private fun <T> HomeCardRow(
                             Modifier
                         },
                     )
-                itemContent(index, item, itemModifier)
+                // The card and any label below it run on under the navigation drawer past the keyline.
+                Box(Modifier.mutedPastRowStart(state, index, gapPx, emphasis) { rememberedKey == itemKey(item) }) {
+                    itemContent(index, item, itemModifier)
+                }
             }
         }
     }

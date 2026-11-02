@@ -137,10 +137,10 @@ differences and are approximate (±1 frame of 17 ms).
 
 - The focused card stays at the row's start position; the row scrolls under it
   (about 600 ms, settling slowly).
-- Content block fades through to the new item in about 350 ms (`components/FocusedInfo.kt`), starting with the
-  key press: the old text waits 100 ms and leaves in 85 ms, the new one comes in over the last 115 ms.
-- Background crossfades to the new image in about 225 ms once focus has settled for 300 ms, sliding the last
-  8 dp into place from the left as on the Google TV launcher; there is no blank or black frame between images.
+- Content block crossfades to the new item in 225 ms (`components/FocusedInfo.kt`), starting with the
+  key press.
+- Background crossfades to the new image in about 225 ms once focus has settled for 300 ms, settling from
+  2% larger toward its top end corner as on the Google TV launcher; there is no blank or black frame between images.
 
 **Entering the immersive row from the row above (Down):**
 

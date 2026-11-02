@@ -87,6 +87,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -130,6 +131,7 @@ import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
 import at.bernhardberger.tvhplayer.ui.TvBrowseLeadingInset
 import at.bernhardberger.tvhplayer.ui.TvBrowseTrailingInset
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideHeadlineHeight
+import at.bernhardberger.tvhplayer.ui.screens.guide.guideHeadlineLogoMaxHeight
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeadlineRulerGap
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeadlinePictureReach
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
@@ -675,6 +677,8 @@ internal fun ChannelsScreenContent(
                         contentPadding.calculateTopPadding() + TvBrowseHeaderHeight + ChannelsHeaderGap + guideHeadlineHeight() +
                             GuideHeadlineRulerGap + GuideHeadlinePictureReach
                     } else null,
+                    // Above the row behind the headline's gap, whatever the logo's shape.
+                    logoMaxHeight = if (layout == ChannelsLayout.GRID) guideHeadlineLogoMaxHeight() else Dp.Infinity,
                 )
             }
         }
@@ -1287,5 +1291,3 @@ private val ChannelsHeaderGap = 8.dp
 /** From the grid's headline to its first cards, as the kit's immersive list has it. */
 private val ChannelsGridHeadlineGap = 40.dp
 
-/** Focused-programme dissolve. Short enough to keep row-to-row browsing responsive. */
-internal const val ChannelsDetailCrossfadeMillis = 160

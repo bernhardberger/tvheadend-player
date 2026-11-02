@@ -20,27 +20,20 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalWindowInfo
+import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 import kotlinx.coroutines.delay
 
 /** How long focus must rest after a held key before the focused card's info returns. */
 internal const val FocusedInfoSettleMs = 250L
-private const val FocusedInfoOutDelayMs = 100
-private const val FocusedInfoOutMs = 85
-private const val FocusedInfoInDelayMs = 235
-private const val FocusedInfoInMs = 115
 
 /**
- * The info above an immersive row, from one focused card to the next, with the G10 Google TV
- * launcher's timing: the old text waits for the row to get going, leaves, and after a short gap
- * the new text comes in, all linear. Both sides are bottom-aligned texts of different lengths, so
- * an overlap would stack two titles and descriptions; the new side waits for the old one.
+ * What follows focus, from one focused card or programme to the next: a plain linear crossfade, with
+ * the backdrop's duration, so a picture and its text change together.
  */
-internal fun focusedInfoSwap(): ContentTransform =
-    ContentTransform(
-        targetContentEnter = fadeIn(tween(FocusedInfoInMs, delayMillis = FocusedInfoInDelayMs, easing = LinearEasing)),
-        initialContentExit = fadeOut(tween(FocusedInfoOutMs, delayMillis = FocusedInfoOutDelayMs, easing = LinearEasing)),
-        sizeTransform = null,
-    )
+internal fun focusedInfoSwap(): ContentTransform {
+    val fade = tween<Float>(BrowseMotionPolicy.focusChangeFadeMs, easing = LinearEasing)
+    return ContentTransform(fadeIn(fade), fadeOut(fade), sizeTransform = null)
+}
 
 /**
  * [value], or null while [held] and for [settleMs] after it is released. Each single press

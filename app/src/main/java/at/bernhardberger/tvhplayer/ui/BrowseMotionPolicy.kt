@@ -14,7 +14,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
-import androidx.compose.ui.unit.dp
 
 /**
  * Tab body motion belongs to the shared TabContent, for both pages and sections. The player's
@@ -71,8 +70,12 @@ internal object BrowseMotionPolicy {
     const val backdropSettleMs = 300L
     const val backdropIntervalMs = 500L
     const val backdropLoadTimeoutMs = 2_000L
-    private const val backdropFadeMs = 225
-    /** How far left of its place a backdrop starts while it fades in, as on the G10's launcher. */
-    val backdropAppearOffset = 8.dp
-    fun <T> backdropFade() = tween<T>(backdropFadeMs, easing = LinearEasing)
+    /** One crossfade for whatever follows focus: backdrops, the info above a row, a pane's picture. */
+    const val focusChangeFadeMs = 225
+    /**
+     * How much larger a backdrop starts while it fades in, settling toward its top end corner:
+     * fitted to the G10's launcher, where the same picture is 1.5-2% larger at the fade's start.
+     */
+    const val backdropAppearScale = 1.02f
+    fun <T> backdropFade() = tween<T>(focusChangeFadeMs, easing = LinearEasing)
 }

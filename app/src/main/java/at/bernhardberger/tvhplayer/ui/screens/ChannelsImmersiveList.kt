@@ -182,9 +182,9 @@ private val ImmersiveCardEmbedInset = 8.dp
 private val ImmersiveCardTextBottom = 8.dp
 
 /** A logo's clearance in the picture above the programme line and below the card's top. */
-private val ImmersiveCardLogoInset = 12.dp
+private val ImmersiveCardLogoInset = 8.dp
 
-private const val ImmersiveCardLogoWidthFraction = 0.5f
+private const val ImmersiveCardLogoWidthFraction = 0.6f
 
 /** Room above and below the cards for their native focus scale and outline. */
 private val ImmersiveFocusRoom = 12.dp
@@ -424,6 +424,8 @@ private fun ChannelsCardRow(
                 val event = remember(channelId, frame.observation, now) {
                     frame.observation.eventAt(channelId, Instant.fromEpochSeconds(now))
                 }
+                // The card and the name below it run on under the navigation drawer past the keyline.
+                Box(Modifier.mutedPastRowStart(state, index, gapPx) { focusedIndex == index }) {
                 ChannelsRowCard(
                     channel = channel,
                     event = event,
@@ -437,8 +439,6 @@ private fun ChannelsCardRow(
                     programmePicture = cards.programmePicture,
                     channelName = cards.channelNames,
                     modifier = Modifier
-                        // The card before the keyline runs on under the navigation drawer.
-                        .mutedPastRowStart(state, index, gapPx) { focusedIndex == index }
                         .then(if (requester != null) Modifier.focusRequester(requester) else Modifier)
                         .tabFocus()
                         .focusProperties {
@@ -457,6 +457,7 @@ private fun ChannelsCardRow(
                         }
                         .then(if (current) Modifier.testTag("channel-card-${channelId.value}") else Modifier),
                 )
+                }
             }
         }
     }
@@ -744,7 +745,7 @@ internal fun ChannelsListArt(
         ?: browsingFocusChannelId(channels, entryId())
     AnimatedContent(
         targetState = channelId,
-        transitionSpec = { fadeIn(tween(ChannelsDetailCrossfadeMillis)) togetherWith fadeOut(tween(ChannelsDetailCrossfadeMillis)) },
+        transitionSpec = { focusedInfoSwap() },
         modifier = modifier.width(ProgrammePaneWidth).aspectRatio(16f / 9f).testTag("channels-list-art"),
         label = "listArt",
     ) { id ->

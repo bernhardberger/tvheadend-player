@@ -14,10 +14,11 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.util.lerp
 import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.delay
@@ -66,8 +67,7 @@ internal fun <T> FocusBackdrop(
             delay(BrowseMotionPolicy.backdropIntervalMs - BrowseMotionPolicy.backdropSettleMs)
         }
     }
-    val appearOffset = with(LocalDensity.current) { BrowseMotionPolicy.backdropAppearOffset.toPx() } *
-        if (LocalLayoutDirection.current == LayoutDirection.Ltr) -1f else 1f
+    val settlesToward = TransformOrigin(if (LocalLayoutDirection.current == LayoutDirection.Ltr) 1f else 0f, 0f)
     Box(modifier) {
         for (layer in layers) key(layer.id) {
             LaunchedEffect(Unit) {
@@ -91,7 +91,9 @@ internal fun <T> FocusBackdrop(
             }
             Box(Modifier.fillMaxSize().graphicsLayer {
                 alpha = layer.alpha.value
-                translationX = (1f - alpha) * appearOffset
+                scaleX = lerp(BrowseMotionPolicy.backdropAppearScale, 1f, alpha)
+                scaleY = scaleX
+                transformOrigin = settlesToward
             }) {
                 content(layer.target) { layer.ready = true }
             }

@@ -8,12 +8,13 @@
   the header.
 - Holding Left or Right on a row hides the programme info until you stop, on
   Home's On now and on Channels the same way as the player's channel row.
-- Cards leaving under the side menu are now dimmed as a whole instead of fading out
-  toward the screen edge.
+- Cards leaving under the side menu are now dimmed as a whole, with their names,
+  instead of fading out toward the screen edge.
 - On now's Next line now shows when that programme is set to record.
-- Programme info above a row and the backdrop now change more softly, timed like
-  the Google TV launcher; a new backdrop also slides the last bit into place.
-- Channel logos on cards without a picture are a bit smaller.
+- Programme info, the Channels list's picture, the Guide's headline and the backdrop
+  now change with one soft crossfade; a new backdrop also settles from slightly larger.
+- The channel logo above the Channels grid is smaller and no longer runs into the
+  row behind the headline.
 - While Home waits for its first rows it shows nothing at first, then a spinner
   with a short line, instead of a skeleton that often didn't match the page.
 - The Channels grid now shows the bottom of the row above as a faint fade while

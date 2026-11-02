@@ -271,7 +271,7 @@ Paths below are relative to `app/src/main/java/at/bernhardberger/tvhplayer/ui/`.
 | Progress bar | `components/ProgressStrip.kt` |
 | Channel title | `components/ChannelTitle.kt` — `channelTitleText` |
 | Picon | `components/PiconBox.kt` — dimmed TV icon while loading, normal-strength TV icon when there is no logo or it fails |
-| Focused card's info above a row | `components/FocusedInfo.kt` — on Home's On now, Channels Immersive and the zap rail: fades through with the G10 launcher's linear timing (out 100–185 ms, in 235–350 ms), hidden while Left/Right is held and back 250 ms after release; a new programme on the same card updates in place |
+| Focused card's info above a row | `components/FocusedInfo.kt` — on Home's On now, Channels Immersive, Grid and List (with the List's picture), the Guide's headline and the zap rail: one 225 ms linear crossfade, the backdrop's; hidden on Home, Immersive and the zap rail while Left/Right is held and back 250 ms after release; a new programme on the same card updates in place |
 | Now-playing plate | `player/NowPlayingStrip.kt` — `NowPlayingPlate`: 48×27 picon plate (channel number without a logo) with the 2dp viewer-position strip, shared by the player strip and the rail's playing slot |
 | Image load fade | `../images/TvheadendArtworkLoader.kt` — the shared loader fades every logo and programme picture in over 200 ms when actually loaded; memory-cache hits show at once |
 | Reading box | `components/ProgrammeDetailsLayout.kt` — `ProgrammeDetailsFullDescription` |
@@ -748,7 +748,7 @@ only.
 - **Immersive.** One row of 196dp compact cards, 20dp apart (the kit gutter),
   rests at the bottom of the screen with its first card on the x130 keyline. The
   row runs under the rail and the opened drawer to the screen edge. A card past
-  the keyline is muted to 12% as a whole as it leaves, so its image doesn't compete
+  the keyline is muted to 12% as a whole, the name below it included, as it leaves, so its image doesn't compete
   with the rail's labels; Home's rows do the same. The same headline
   sits 40dp above the cards, with two synopsis lines and, last, the List pane's
   quiet Next line (trial 2026-10-22). Down stays on the row, Up reaches the header and Left at
@@ -757,7 +757,7 @@ only.
   picture fills the top-end corner from the screen's top edge, as the kit's
   immersive list does, under its cinematic scrim over the programme's ambient
   tint. Without art, the channel's logo colour fills the screen behind a blurred
-  copy of the logo, and the 240×135 logo stands at the top end. The backdrop stays
+  copy of the logo, and the 240×135 logo stands at the top end, over the Grid only as tall as the headline leaves room for. The backdrop stays
   in place when the drawer opens; only the sharp logo moves with the content.
 - **Grid.** The headline stays fixed above four columns of the immersive row's
   compact cards. The focused row is pinned just below it and the rows move under
@@ -774,7 +774,7 @@ only.
   kit's card scrim.
 - **Backdrop timing.** Every focus-following backdrop changes as Leanback's does:
   it settles for 300ms, changes at most every 500ms, waits up to 2s for its
-  picture and then fades in over the old one in 225ms, sliding the last 8dp into place from the left, so there is no dip to grey.
+  picture and then fades in over the old one in 225ms, settling from 2% larger toward its top end corner as on the Google TV launcher, so there is no dip to grey.
   Before a session, saved logos give their stored colour and blur from the first
   frame.
 

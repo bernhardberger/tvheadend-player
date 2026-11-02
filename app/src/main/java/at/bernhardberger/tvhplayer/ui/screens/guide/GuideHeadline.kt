@@ -5,9 +5,6 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -69,7 +66,7 @@ import at.bernhardberger.tvhplayer.ui.components.StatusBadgeTone
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import at.bernhardberger.tvhplayer.ui.components.programmeAboutFacts
 import at.bernhardberger.tvhplayer.ui.components.programmeHeaderMetadata
-import at.bernhardberger.tvhplayer.ui.screens.ChannelsDetailCrossfadeMillis
+import at.bernhardberger.tvhplayer.ui.components.focusedInfoSwap
 import at.bernhardberger.tvhplayer.ui.screens.ChannelsImmersiveBackground
 import at.bernhardberger.tvhplayer.ui.screens.ImmersiveHeroWidth
 import java.time.Instant
@@ -169,9 +166,8 @@ internal fun GuideHeadlineBackground(
             modifier = modifier,
             picture = { id -> programme()?.event?.takeIf { it.channelId == id }?.image },
             pictureHeight = logoTop + headlineDrop + guideHeadlineHeight() + GuideHeadlineRulerGap + GuideHeadlinePictureReach,
-            // The logo starts 24dp below logoTop; end it 8dp above the headline's bottom.
             // Together with the 12dp ruler gap, this reserves at least 20dp above the timeline.
-            logoMaxHeight = guideHeadlineHeight() - 24.dp - 8.dp,
+            logoMaxHeight = guideHeadlineLogoMaxHeight(),
         )
     }
 }
@@ -200,6 +196,10 @@ internal fun guideHeadlineHeight(): Dp {
 internal fun guideHeadlineEyebrowHeight(): Dp = with(LocalDensity.current) {
     maxOf(GuideHeadlinePiconHeight, MaterialTheme.typography.labelMedium.lineHeight.toDp())
 }
+
+/** A fallback logo's height beside the headline: it starts 24dp below the header and ends 8dp above the headline's bottom. */
+@Composable
+internal fun guideHeadlineLogoMaxHeight(): Dp = guideHeadlineHeight() - 24.dp - 8.dp
 
 /** The room between the headline and the time ruler below it. */
 internal val GuideHeadlineRulerGap = 12.dp
@@ -271,8 +271,7 @@ internal fun GuideHeadline(
                 val change = if (initialState == null) {
                     EnterTransition.None togetherWith ExitTransition.None
                 } else {
-                    fadeIn(tween(ChannelsDetailCrossfadeMillis)) togetherWith
-                        fadeOut(tween(ChannelsDetailCrossfadeMillis))
+                    focusedInfoSwap()
                 }
                 change using SizeTransform(clip = false) { _, _ -> snap() }
             },

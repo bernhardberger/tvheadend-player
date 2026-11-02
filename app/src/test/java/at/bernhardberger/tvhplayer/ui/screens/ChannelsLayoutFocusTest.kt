@@ -582,6 +582,33 @@ class ChannelsLayoutFocusTest {
         compose.onAllNodes(headline, useUnmergedTree = true).assertCountEquals(1)
     }
 
+    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE) fun theNameBelowACardPastTheKeylineIsMutedWithIt() {
+        fixture.show(ChannelsView(ChannelsLayout.IMMERSIVE, channelNames = setOf(ChannelsLayout.IMMERSIVE)))
+        fixture.awaitFocus(card(1))
+        fun brightestOf(tag: String): Float {
+            val bounds = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+            val pixels = compose.onRoot().captureToImage().toPixelMap()
+            var brightest = 0f
+            for (x in bounds.left.toInt().coerceAtLeast(0) until bounds.right.toInt().coerceAtMost(pixels.width)) {
+                for (y in bounds.top.toInt() until bounds.bottom.toInt().coerceAtMost(pixels.height)) {
+                    val pixel = pixels[x, y]
+                    brightest = maxOf(brightest, pixel.red, pixel.green, pixel.blue)
+                }
+            }
+            return brightest
+        }
+        // Neither has focus when measured.
+        val inPlace = brightestOf("channels-immersive-2-identity")
+        fixture.key(Key.DirectionRight)
+        fixture.awaitFocus(card(2))
+        fixture.key(Key.DirectionRight)
+        fixture.awaitFocus(card(3))
+        compose.waitForIdle()
+        val past = brightestOf("channels-immersive-2-identity")
+        // The rail's own icons, in the same band, set the floor of what this can see.
+        assertTrue("the name fades with its card: $past vs $inPlace", past < inPlace * 0.6f)
+    }
+
     @Test fun immersiveGroupPickerReturnsToEachGroupsCard() {
         fixture.show(immersive)
         fixture.awaitFocus(card(1))
