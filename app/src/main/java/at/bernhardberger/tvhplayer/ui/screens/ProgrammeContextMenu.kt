@@ -59,7 +59,7 @@ internal fun ProgrammeContextMenu(
                         "browse-context-artwork" else "browse-context-picon"),
                     plateModifier = Modifier.testTag("browse-context-plate"),
                     progressModifier = Modifier.testTag("browse-context-progress"),
-                    progressColor = progressColor(indicator.isPlayingItem))
+                    progressColor = progressColor(indicator.isPlayingItem, recording?.let(::recordingIsRunning) == true))
             }
         },
     )

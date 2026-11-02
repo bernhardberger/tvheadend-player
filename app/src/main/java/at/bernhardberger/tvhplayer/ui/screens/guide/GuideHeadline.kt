@@ -349,7 +349,7 @@ private fun GuideHeadlineContent(
         rating = event?.rating?.let { programmeAgeRating(it.label, it.age) },
         timing = event?.let { guideHeadlineTiming(it, now) },
         progress = programmeProgress(event, now),
-        progressColor = progressColor(indicator.isPlayingItem),
+        progressColor = progressColor(indicator.isPlayingItem, recording?.let(::recordingIsRunning) == true),
         // No synopsis: in the Guide the grid below carries the weight.
         loading = event == null && loading,
         titleStyle = titleStyle,

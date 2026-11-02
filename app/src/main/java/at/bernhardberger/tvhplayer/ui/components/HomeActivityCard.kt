@@ -43,6 +43,7 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
+import at.bernhardberger.tvhplayer.core.recordingElapsedProgress
 import at.bernhardberger.tvhplayer.core.visibleChannelNumber
 import at.bernhardberger.tvhplayer.ui.TvCardProgressStripHeight
 import at.bernhardberger.tvhplayer.ui.TvLogoPlateColor
@@ -215,11 +216,7 @@ internal fun HomeActivityCard(
                 }
             }
             val progress = if (playingRecording) viewer?.fraction else if (recordingOnly) {
-                val start = entry?.start?.epochSeconds
-                val stop = entry?.stop?.epochSeconds
-                if (start != null && stop != null && stop > start && nowSec >= start) {
-                    ((nowSec - start).toFloat() / (stop - start)).coerceIn(0f, 1f)
-                } else null
+                entry?.let { recordingElapsedProgress(it, nowSec) }
             } else running?.let { programmeProgress(it, nowSec) }
             // The strip follows the viewer when Home's resident channel plays this programme, as
             // Channels' cards do; colour follows the watching-progress locals.
@@ -227,7 +224,8 @@ internal fun HomeActivityCard(
                 ProgressStrip(
                     progress,
                     Modifier.align(Alignment.BottomStart).fillMaxWidth(),
-                    color = progressColor(playingRecording || !recordingOnly && running?.let { watchingIndicator(it, nowSec).isPlayingItem } == true),
+                    color = progressColor(playingRecording || !recordingOnly && running?.let { watchingIndicator(it, nowSec).isPlayingItem } == true,
+                        recording = recordingNow),
                     height = TvCardProgressStripHeight,
                 )
             }

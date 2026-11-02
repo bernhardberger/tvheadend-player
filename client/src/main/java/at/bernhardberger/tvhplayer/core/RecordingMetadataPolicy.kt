@@ -18,6 +18,14 @@ const val RECORDING_STOPPED_EARLY_MIN_SHORTFALL_SECONDS = 120L
 fun recordingIsRunning(recording: DvrEntry): Boolean =
     recording.state == DvrEntryState.RECORDING || recording.state == DvrEntryState.RECORDING_ERROR
 
+/** How far [nowSec] is through the recording's scheduled time; null without one or before it starts. */
+fun recordingElapsedProgress(recording: DvrEntry, nowSec: Long): Float? {
+    val start = recording.start?.epochSeconds ?: return null
+    val stop = recording.stop?.epochSeconds ?: return null
+    if (stop <= start || nowSec < start) return null
+    return ((nowSec - start).toFloat() / (stop - start)).coerceIn(0f, 1f)
+}
+
 /** The scheduled start less the effective pre-padding Tvheadend reports for the entry. */
 fun recordingPaddedStart(recording: DvrEntry): Instant? =
     recording.start?.let { it - (recording.startExtraMinutes ?: Duration.ZERO) }

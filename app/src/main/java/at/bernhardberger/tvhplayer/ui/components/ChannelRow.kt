@@ -158,7 +158,7 @@ fun ChannelRow(
                     Spacer(Modifier.height(ChannelProgressGap))
                     ProgressStrip(
                         progress = progress,
-                        color = progressColor(watchingIndicator(programme, nowSec).isPlayingItem),
+                        color = progressColor(watchingIndicator(programme, nowSec).isPlayingItem, recordingNow, focused),
                         height = ChannelRowProgressHeight,
                         trackColor = if (focused) {
                             MaterialTheme.colorScheme.inverseOnSurface.copy(

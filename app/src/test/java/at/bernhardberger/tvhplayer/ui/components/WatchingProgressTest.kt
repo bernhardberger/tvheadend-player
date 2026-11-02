@@ -132,9 +132,11 @@ class WatchingProgressTest {
     }
     @After fun restore() { Locale.setDefault(locale); TimeZone.setDefault(zone) }
 
-    @Test fun watchingUsesViewerColorAndOtherItemsUseAmbientColor() {
-        assertEquals(Color.Yellow, progressColor(true, Color.Cyan, Color.Yellow))
-        assertEquals(Color.Cyan, progressColor(false, Color.Cyan, Color.Yellow))
+    @Test fun watchingUsesViewerColorRecordingUsesItsRedAndOtherItemsUseAmbientColor() {
+        assertEquals(Color.Yellow, progressColor(true, false, Color.Cyan, Color.Yellow, Color.Red))
+        assertEquals(Color.Yellow, progressColor(true, true, Color.Cyan, Color.Yellow, Color.Red))
+        assertEquals(Color.Red, progressColor(false, true, Color.Cyan, Color.Yellow, Color.Red))
+        assertEquals(Color.Cyan, progressColor(false, false, Color.Cyan, Color.Yellow, Color.Red))
     }
 
     @Test fun recordingUsesTheSamePlayingPausedAndStoppedPolicyAsLive() {

@@ -733,8 +733,12 @@ class HomeCaptureTest {
             ProvideArtworkSession(scene.observation.currentSession, scene.observation) {
                 Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = androidx.compose.ui.Alignment.Center) {
                     androidx.compose.foundation.layout.Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp)) {
-                        at.bernhardberger.tvhplayer.ui.components.HomeActivityCard(channel, event, running, true, scene.nowSec,
-                            268.dp, "Live and recording", {}, Modifier.testTag("activity-live-recording"))
+                        // The viewer wins: this one's strip is orange, the recording-only card's red.
+                        CompositionLocalProvider(at.bernhardberger.tvhplayer.ui.components.LocalWatchingChannel provides channel.id,
+                            at.bernhardberger.tvhplayer.ui.components.LocalWatchingIndicator provides at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator.PLAYING) {
+                            at.bernhardberger.tvhplayer.ui.components.HomeActivityCard(channel, event, running, true, scene.nowSec,
+                                268.dp, "Live and recording", {}, Modifier.testTag("activity-live-recording"))
+                        }
                         at.bernhardberger.tvhplayer.ui.components.HomeActivityCard(channel, null, running, false, scene.nowSec,
                             268.dp, "Recording only", {}, Modifier.testTag("activity-recording-only"))
                         at.bernhardberger.tvhplayer.ui.components.HomeActivityCard(scene.input.channels.first { it.id == ChannelId(6) }, null,

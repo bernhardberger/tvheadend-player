@@ -1153,7 +1153,8 @@ private fun DetailsProgress(event: EpgEvent?, recording: DvrEntry?, recordingAdm
         val minutesLeft = at?.takeIf { progress != null }?.let { ((event.stop.epochSeconds - it + 59) / 60).toInt() }
         DetailsTimeline(start, progress, if (minutesLeft != null) "$end • ${playerMinutesLeft(minutesLeft)}" else end,
             if (minutesLeft != null) "$spokenRange, ${playerMinutesLeft(minutesLeft, spoken = true)}" else spokenRange,
-            Modifier.widthIn(max = 470.dp).fillMaxWidth(), color = progressColor(indicator.isPlayingItem))
+            Modifier.widthIn(max = 470.dp).fillMaxWidth(),
+            color = progressColor(indicator.isPlayingItem, recording?.let(::recordingIsRunning) == true))
     } else if (recording != null && (event == null || !event.isRunning(nowSec))) {
         val facts = recordingDetailsFacts(recording, recordingAdmission, nowSec)
         val viewer = recordingViewerPosition(recording.id)?.takeIf { it.fraction != null }

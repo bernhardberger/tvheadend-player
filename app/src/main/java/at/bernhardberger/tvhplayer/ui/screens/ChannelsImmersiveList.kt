@@ -590,7 +590,7 @@ internal fun ChannelsRowCard(
             val progress = programmeProgress(running, nowSec)
             if (progress != null) ProgressStrip(progress,
                 Modifier.align(Alignment.BottomStart).fillMaxWidth().testTag("$tag-progress"),
-                color = progressColor(watchingIndicator(running, nowSec).isPlayingItem),
+                color = progressColor(watchingIndicator(running, nowSec).isPlayingItem, recording),
                 height = TvCardProgressStripHeight)
         },
         title = {
@@ -717,7 +717,7 @@ internal fun ChannelsHeadline(
         rating = current?.rating?.let { programmeAgeRating(it.label, it.age) },
         timing = current?.let { formatTimeInterval(it.start.epochSeconds, it.stop.epochSeconds) },
         progress = programmeProgress(current, now),
-        progressColor = progressColor(watchingIndicator(current, now).isPlayingItem),
+        progressColor = progressColor(watchingIndicator(current, now).isPlayingItem, recording),
         synopsis = current?.takeIf { synopsisLines > 0 }?.let(::channelsProgrammeSynopsis),
         fitSynopsis = fitSynopsis,
         loading = current == null && loading,

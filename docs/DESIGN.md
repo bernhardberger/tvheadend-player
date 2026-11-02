@@ -63,7 +63,9 @@ Meaning of colour:
   orange = where *the viewer* is in something they watch (player seek position,
   resume point, how far a recording has been watched, on cards, details and
   dialogs alike); cyan = time passing on air, independent of the viewer (how far
-  the current programme or a running recording is). One bar, one meaning; if a
+  the current programme is); recording red = the same passive time for something
+  recording now (decided 2026-11-02). The viewer wins: a recording you are
+  watching stays orange and its mark says it records. One bar, one meaning; if a
   surface needs both, show two bars rather than one bar in two colours.
   The playing item carries the same neutral playing mark and orange progress on
   every surface showing it: Channels List, Grid, Immersive, Quick Zap (including
@@ -83,8 +85,9 @@ Meaning of colour:
   Idle and Finished have neither playing identity nor viewer progress.
 - **Recording red** means "a recording exists or runs". **`error`** means "a
   failure the user must act on". No component declares its own red: marks come
-  from `RecordingStatusIndicator` (dot) and `RecordingBadge` (badge), and a
-  source test keeps the recording reds inside those two and the theme.
+  from `RecordingStatusIndicator` (dot) and `RecordingBadge` (badge), progress
+  bars and other drawn marks from `recordingMarkColor`, and a source test keeps
+  the recording reds inside those owners and the theme.
   - **Dot** (16dp, a clock when scheduled) only in rows and grid cells, at the
     right end of the title line: channel rows, Recordings rows, Guide cells
     (the title ellipsizes first). The lines above and

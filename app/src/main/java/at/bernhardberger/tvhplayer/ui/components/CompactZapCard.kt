@@ -222,7 +222,7 @@ internal fun CompactZapCard(
             if (progress != null) {
                 ProgressStrip(
                     progress = progress,
-                    color = progressColor(watchingIndicator(currentEvent, nowSec).isPlayingItem),
+                    color = progressColor(watchingIndicator(currentEvent, nowSec).isPlayingItem, recording),
                     height = TvCompactProgressStripHeight,
                     modifier = Modifier.fillMaxWidth().testTag("$tag-progress"),
                 )

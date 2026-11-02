@@ -108,6 +108,7 @@ import at.bernhardberger.tvhplayer.core.DvrLibraryMode
 import at.bernhardberger.tvhplayer.core.DvrProblemBucket
 import at.bernhardberger.tvhplayer.core.DvrScheduleSection
 import at.bernhardberger.tvhplayer.core.DvrScheduleSectionKind
+import at.bernhardberger.tvhplayer.core.recordingElapsedProgress
 import at.bernhardberger.tvhplayer.core.recordingFocusTargetKey
 import at.bernhardberger.tvhplayer.core.RecordingWatchState
 import at.bernhardberger.tvhplayer.core.recordingIsRunning
@@ -407,6 +408,8 @@ internal fun RecordingMetadataPane(
     val failure = entry.subscriptionError?.label()
         ?: if (kind == RecordingRowKind.PROBLEM) problemStateLabel(entry.state) else null
     val watched = watchState == RecordingWatchState.Watched
+    val viewerFraction = recordingViewerPosition(entry.id)?.fraction ?: (watchState as? RecordingWatchState.PartlyWatched)?.fraction?.toFloat()
+    val running = recordingIsRunning(entry)
     val rule = if (kind == RecordingRowKind.SCHEDULE) recordingRuleLabel(entry) else null
     val partialSize = if (kind == RecordingRowKind.PROBLEM) recordingSizeBytes(entry)?.takeIf { it > 0 } else null
     // The Schedule row's own words for the padded stop, when the padding moves it.
@@ -455,10 +458,10 @@ internal fun RecordingMetadataPane(
                     append(resources.getString(R.string.recording_length_recorded, formatRecordedDuration(it, resources)))
                 }
             }.takeIf(String::isNotEmpty),
-            // How far it was watched, as the details page's timeline.
+            // How far it was watched, as the details page's timeline; unwatched, how far a running one is.
             timingMaxLines = 2,
-            progress = recordingViewerPosition(entry.id)?.fraction ?: (watchState as? RecordingWatchState.PartlyWatched)?.fraction?.toFloat(),
-            progressColor = progressColor(true),
+            progress = viewerFraction ?: recordingElapsedProgress(entry, nowSec).takeIf { running },
+            progressColor = progressColor(viewerFraction != null, running),
             synopsis = programmeSynopsis(entry.title, entry.subtitle, entry.summary, entry.description),
             fitSynopsis = true,
             titleStyle = MaterialTheme.typography.titleLarge,

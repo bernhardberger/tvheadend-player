@@ -132,6 +132,7 @@ import at.bernhardberger.tvhplayer.core.buildDvrArchive
 import at.bernhardberger.tvhplayer.core.groupDvrProblems
 import at.bernhardberger.tvhplayer.core.groupDvrSchedule
 import at.bernhardberger.tvhplayer.core.partitionDvrLibrary
+import at.bernhardberger.tvhplayer.core.recordingElapsedProgress
 import at.bernhardberger.tvhplayer.core.recordingIsRunning
 import at.bernhardberger.tvhplayer.core.watchedCount
 import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
@@ -1108,11 +1109,14 @@ internal fun RecordingsScreenContent(
             artwork = {
                 val artwork = (opened.image ?: opened.fanartImage)?.takeIf { selectedCapability != null }
                 ProvideArtworkSession(selectedCapability, observation) {
-                    ProgrammeArtwork(artwork, opened.channelId?.let(channelsById::get)?.icon, recordingViewerPosition(opened.id)?.fraction,
+                    val viewerFraction = recordingViewerPosition(opened.id)?.fraction
+                    val running = recordingIsRunning(opened)
+                    ProgrammeArtwork(artwork, opened.channelId?.let(channelsById::get)?.icon,
+                        viewerFraction ?: recordingElapsedProgress(opened, nowSec).takeIf { running },
                         Modifier.fillMaxSize().testTag(if (artwork != null)
                             "browse-context-artwork" else "browse-context-picon"),
                         plateModifier = Modifier.testTag("browse-context-plate"),
-                        progressModifier = Modifier.testTag("browse-context-progress"), progressColor = progressColor(true))
+                        progressModifier = Modifier.testTag("browse-context-progress"), progressColor = progressColor(viewerFraction != null, running))
                 }
             },
         )

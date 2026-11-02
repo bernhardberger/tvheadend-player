@@ -203,9 +203,15 @@ internal fun HoldWatching(held: Boolean, content: @Composable () -> Unit) {
         content = content)
 }
 
-/** Single colour decision for all viewer-position and ambient progress strips. */
-internal fun progressColor(watching: Boolean, onAir: Color, viewer: Color): Color = if (watching) viewer else onAir
+/** Single colour decision for all progress strips: the viewer's position wins, then a running recording. */
+internal fun progressColor(watching: Boolean, recording: Boolean, onAir: Color, viewer: Color, recordingNow: Color): Color = when {
+    watching -> viewer
+    recording -> recordingNow
+    else -> onAir
+}
 
+/** [focused]: the strip sits on a focused, light row, which takes the deeper recording red. */
 @Composable
-internal fun progressColor(watching: Boolean): Color =
-    progressColor(watching, MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.tertiary)
+internal fun progressColor(watching: Boolean, recording: Boolean = false, focused: Boolean = false): Color =
+    progressColor(watching, recording, MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.tertiary,
+        recordingMarkColor(focused))

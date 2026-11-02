@@ -35,6 +35,14 @@ class RecordingMetadataPolicyTest {
     private fun timed(state: DvrEntryState, vararg files: DvrRecordingFile) = DvrEntry.create(DvrEntryId(1), state = state,
         start = at(1_000), stop = at(1_000 + 61 * 60), files = files.toList().takeIf { it.isNotEmpty() })
 
+    @Test fun elapsedProgressRunsAcrossTheScheduleAndNeedsOne() {
+        val entry = timed(DvrEntryState.RECORDING)
+        assertEquals(0.5f, recordingElapsedProgress(entry, nowSec = 1_000 + 61 * 30)!!, 0.001f)
+        assertEquals(1f, recordingElapsedProgress(entry, nowSec = 99_999)!!, 0f)
+        assertNull(recordingElapsedProgress(entry, nowSec = 999))
+        assertNull(recordingElapsedProgress(DvrEntry.create(DvrEntryId(1), start = at(1_000)), nowSec = 1_100))
+    }
+
     @Test fun lengthSumsTheFilesTimesRatherThanTheSchedule() {
         assertEquals(5L, recordingLengthSeconds(timed(DvrEntryState.COMPLETED,
             DvrRecordingFile.create(start = at(1_010), stop = at(1_015))), nowSec = 99_999))

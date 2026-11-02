@@ -51,8 +51,8 @@ class SemanticColorUsageTest {
     }
     @Test
     fun recordingRedsAreDrawnOnlyByTheSharedBadgeAndDot() {
-        // Every recording mark goes through RecordingBadge or RecordingStatusIndicator, so each surface
-        // gets the red picked for it.
+        // Every recording mark goes through RecordingBadge or RecordingStatusIndicator, and a mark or
+        // progress bar drawn elsewhere through recordingMarkColor, so each surface gets the red picked for it.
         val owners = setOf("ui/Theme.kt", "ui/components/RecordingStatusIndicator.kt", "ui/components/StatusBadge.kt")
         val reds = Regex("""\bTv(OnRecordingContainer|RecordingContainer|RecordingFocused|Recording)Color\b""")
         val sourceRoot = File(repositoryRoot, "app/src/main/java/at/bernhardberger/tvhplayer")

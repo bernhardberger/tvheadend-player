@@ -447,7 +447,8 @@ private fun ChannelScheduleRow(
                     style = MaterialTheme.typography.bodyMedium)
                 if (progress != null) {
                     Spacer(Modifier.height(ScheduleProgressGap))
-                    ProgressStrip(progress, Modifier.fillMaxWidth(), color = progressColor(watched),
+                    ProgressStrip(progress, Modifier.fillMaxWidth(),
+                        color = progressColor(watched, recording in ScheduleRunningStates, focused),
                         height = ChannelRowProgressHeight,
                         trackColor = if (focused) MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = TvTextDisabledAlpha)
                             else MaterialTheme.colorScheme.onSurface.copy(alpha = TvTrackAlpha))
@@ -463,6 +464,7 @@ private fun ChannelScheduleRow(
 /** The separator of the channel rows' programme line. */
 private const val ScheduleSeparator = " • "
 private val ScheduleProgressGap = 3.dp
+private val ScheduleRunningStates = setOf(DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)
 private val ScheduleFailedStates = setOf(DvrEntryState.COMPLETED_ERROR, DvrEntryState.FILE_MISSING, DvrEntryState.MISSED)
 
 internal fun scheduleEventDay(event: EpgEvent, today: java.time.LocalDate, zone: ZoneId): java.time.LocalDate {
