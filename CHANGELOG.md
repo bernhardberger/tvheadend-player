@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Settings
+
+- CH+/− now page through Settings lists a screen at a time, as they already do
+  in Channels, the Guide and Recordings.
+
 ## 0.4.3
 
 ### Channels and Home

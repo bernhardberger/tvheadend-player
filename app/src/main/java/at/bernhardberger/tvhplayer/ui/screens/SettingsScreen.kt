@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.BuildConfig
+import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.ui.*
 import at.bernhardberger.tvhplayer.ui.common.recordingSpaceText
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
@@ -145,6 +146,7 @@ internal fun SettingsScreenNavigation(
             backEnabled = backEnabled && !setupOpen,
             isCurrent = isCurrent,
             onRootBack = rootFocus?.let { { it.requestFocus() } },
+            pageKeyDirection = ChannelNavigation::pageDirectionForKeyCode,
         )
         if (shownSetup != null) {
             // Registered before the setup's own handler, so its steps go back first.
