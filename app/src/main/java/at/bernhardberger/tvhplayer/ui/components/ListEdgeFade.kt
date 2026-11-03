@@ -51,7 +51,7 @@ internal val ListScrolledTopReserve = ListTopFadeHeight + ListFocusBreathingRoom
 internal val PanelListTopFade = 24.dp
 internal val PanelListBottomFade = 128.dp
 
-/** Fixed focus insets avoid feeding each fade's visibility back into focus scrolling. */
+/** Fixed focus insets, without pivot-scrolling away readable first rows at the list's start. */
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
 internal fun PanelListEdges(
@@ -60,9 +60,20 @@ internal fun PanelListEdges(
 ) {
     val platform = LocalBringIntoViewSpec.current
     val density = LocalDensity.current
-    val spec = remember(platform, density) {
+    val spec = remember(platform, density, listState) {
         with(density) {
-            InsetBringIntoViewSpec(platform, PanelListTopFade.toPx(), PanelListBottomFade.toPx())
+            val bottomInset = PanelListBottomFade.toPx()
+            val inset = InsetBringIntoViewSpec(platform, PanelListTopFade.toPx(), bottomInset)
+            object : BringIntoViewSpec {
+                override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
+                    // The TV pivot otherwise moves an already-readable near-top selection up,
+                    // clipping earlier rows. Keep the boundary until focus needs the bottom reserve.
+                    if (!listState.canScrollBackward && offset >= 0f && offset + size <= containerSize - bottomInset) {
+                        return 0f
+                    }
+                    return inset.calculateScrollDistance(offset, size, containerSize)
+                }
+            }
         }
     }
     CompositionLocalProvider(LocalBringIntoViewSpec provides spec) {

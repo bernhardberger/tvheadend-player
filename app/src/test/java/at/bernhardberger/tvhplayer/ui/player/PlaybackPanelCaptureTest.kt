@@ -51,6 +51,7 @@ import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
@@ -65,6 +66,9 @@ import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.core.ProgrammeAction
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.ui.AppDestination
+import at.bernhardberger.tvhplayer.ui.common.AppClock
+import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.ui.screens.guide.ConfirmProgrammeActionDialog
 import at.bernhardberger.tvhplayer.ui.screens.recordings.PendingRecordingAction
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingConfirmationDialog
@@ -206,6 +210,33 @@ class PlaybackPanelCaptureTest {
         compose.onNodeWithTag("playback-options-track-automatic").assertIsFocused()
         assertTrue(compose.onNodeWithTag("playback-options-track-list").fetchSemanticsNode().config[ListBottomFadeVisible])
         capture(view, "player-audio-en-font1.0", output = "043-panels").recycle()
+    }
+
+    /** Match the browse shell, early-morning bounds and 12-hour clock of the integrated report. */
+    @Test fun guideTimeCurrentDayKeepsFirstRowBelowTitle() {
+        val previousClock = AppClock.systemUses24Hour
+        AppClock.systemUses24Hour = false
+        try {
+            val now = Instant.parse("2026-11-03T01:32:00Z").epochSecond
+            val view = panelScene {
+                SideRail(currentRoute = AppDestination.GUIDE, onRootBack = {}, onNavigate = {}) { _, _ ->
+                    GuideTimePanel(now, now + 7200, GuideWindowBounds(now - 21600, now + 7 * 86400),
+                        ZoneId.of("UTC"), { now }, {}, {}, {})
+                }
+            }
+            compose.onNodeWithTag("guide-time-day-0").assertIsFocused()
+            capture(view, "guide-time-current-day-en-font1.0", output = "043-panels").recycle()
+            val first = compose.onNodeWithTag("guide-time-now")
+            val full = first.getUnclippedBoundsInRoot()
+            val clipped = first.fetchSemanticsNode().boundsInRoot
+            val title = compose.onNodeWithText("Day and time").getUnclippedBoundsInRoot()
+            assertTrue("Now begins below the title: $full / $title", full.top >= title.bottom)
+            assertEquals("Now is fully visible, not clipped by the list", (full.bottom - full.top).value * 2f, clipped.height, 0.5f)
+            val lists = compose.onAllNodes(SemanticsMatcher.keyIsDefined(ListTopFadeVisible)).fetchSemanticsNodes()
+            assertFalse("Opening near the top must not scroll the day list", lists.first().config[ListTopFadeVisible])
+        } finally {
+            AppClock.systemUses24Hour = previousClock
+        }
     }
 
     private fun panelScene(content: @Composable () -> Unit): View {
