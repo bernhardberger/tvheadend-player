@@ -82,7 +82,6 @@ import at.bernhardberger.tvhplayer.ui.notifications.label
 import at.bernhardberger.tvhplayer.images.BackdropTransformation
 import at.bernhardberger.tvhplayer.images.CinematicScrimTransformation
 import at.bernhardberger.tvhplayer.images.GuideScrimTransformation
-import at.bernhardberger.tvhplayer.images.ImmersiveScrimTransformation
 import coil3.SingletonImageLoader
 import coil3.Image
 import coil3.toBitmap
@@ -870,9 +869,8 @@ private const val DetailsReadingDimAlpha = .6f
 /**
  * The kit's immersive background: top-right 16:9 art with the kit's cinematic scrim baked in, to
  * draw over the page's colour, as wide as the kit's or as tall as [height]. The Guide's picture,
- * the one given a [height], takes the Guide's softer scrim instead. Under a header, as [underHeader]
- * says, the top of the kit's fades too. [onSettled] reports once the picture has loaded or failed, or
- * at once when there is none.
+ * the one given a [height], takes the Guide's softer scrim instead. [onSettled] reports once the
+ * picture has loaded or failed, or at once when there is none.
  */
 @Composable
 internal fun DetailsHero(
@@ -880,7 +878,6 @@ internal fun DetailsHero(
     modifier: Modifier,
     onSettled: (() -> Unit)? = null,
     height: Dp? = null,
-    underHeader: Boolean = false,
 ) {
     val session = LocalArtworkContext.current.currentSession
     if (session == null) {
@@ -888,13 +885,9 @@ internal fun DetailsHero(
         return
     }
     val context = LocalPlatformContext.current
-    val request = remember(session, image, context, height != null, underHeader) {
-        val scrim = when {
-            height != null -> GuideScrimTransformation
-            underHeader -> ImmersiveScrimTransformation
-            else -> CinematicScrimTransformation
-        }
-        ImageRequest.Builder(context).data(AppArtworkSource(session, image)).transformations(scrim).build()
+    val request = remember(session, image, context, height != null) {
+        ImageRequest.Builder(context).data(AppArtworkSource(session, image))
+            .transformations(if (height != null) GuideScrimTransformation else CinematicScrimTransformation).build()
     }
     AsyncImage(request, null,
         contentScale = ContentScale.Crop,

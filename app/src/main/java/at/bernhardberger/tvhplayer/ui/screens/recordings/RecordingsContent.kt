@@ -127,7 +127,7 @@ import at.bernhardberger.tvhplayer.core.watchedCount
 import at.bernhardberger.tvhplayer.core.runningRecordings
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnGap
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
-import at.bernhardberger.tvhplayer.ui.components.browseHeaderMinHeight
+import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
 import at.bernhardberger.tvhplayer.ui.TvBrowseLeadingInset
 import at.bernhardberger.tvhplayer.ui.TvSpacing12
 import at.bernhardberger.tvhplayer.ui.TvSpacing4
@@ -1082,12 +1082,12 @@ internal fun recordingsLoading(
 /**
  * The Recordings header's height, shared with [RecordingsPreparationSkeleton]'s empty header row so
  * the skeleton does not move when the real screen replaces it: 40dp, or the mode tabs' label line
- * with its padding or the clock's two lines once text grows.
+ * with its padding once text grows.
  */
 @Composable
 @ReadOnlyComposable
 internal fun recordingsHeaderMinHeight(): Dp = with(LocalDensity.current) {
-    maxOf(browseHeaderMinHeight(), MaterialTheme.typography.titleSmall.lineHeight.toDp() + TvSpacing8 * 2)
+    maxOf(TvBrowseHeaderHeight, MaterialTheme.typography.titleSmall.lineHeight.toDp() + TvSpacing8 * 2)
 }
 
 /**

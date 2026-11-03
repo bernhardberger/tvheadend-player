@@ -284,7 +284,7 @@ internal fun ChannelsImmersiveBackground(
             val tint = rememberDetailsTint(art, shown.icon, onSettled = { tintSettled = true })
             Box(Modifier.fillMaxSize().drawBehind { drawRect(tint.value) }.testTag("channels-backdrop"))
             DetailsHero(art, Modifier.align(Alignment.TopEnd).testTag("channels-immersive-art"),
-                onSettled = { pictureSettled = true }, height = pictureHeight, underHeader = true)
+                onSettled = { pictureSettled = true }, height = pictureHeight)
         }
     }
     // The sharp logo belongs to the content: it moves with it as the drawer opens, while the

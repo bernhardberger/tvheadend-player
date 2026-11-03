@@ -255,9 +255,7 @@ class RecordingsVisualLayoutTest {
         // It ends the tabs' row, level with them and clear of them.
         assertEquals(bounds("recordings-mode-tabs").center.y, bounds("recordings-space").center.y, .5f)
         assertTrue(bounds("recordings-space").left >= bounds("recordings-mode-tabs").right)
-        // The clock ends the row; the line ends before it.
-        assertEquals(902f, bounds("browse-header-clock").right, .5f)
-        assertTrue(bounds("recordings-space").right <= bounds("browse-header-clock").left)
+        assertEquals(902f, bounds("recordings-space").right, .5f)
         assertEquals(130f, bounds("recordings-header").left, .1f)
         assertEquals(902f, bounds("recordings-header").right, .1f)
         focused("recordings-folder-Documentaries")
@@ -375,11 +373,9 @@ class RecordingsVisualLayoutTest {
         val tabs = bounds("recordings-mode-tabs")
         val full = bounds("recordings-space").width
         assertTrue("the fixture's text must be wider than the hiding threshold ($full)", full > 120f)
-        // The header row runs from x130 to the trailing inset; its actions start 12dp after the tabs,
-        // and the clock takes its width and a gap at their end.
-        val clockWidth = bounds("browse-header-clock").width + 12f
+        // The header row runs from x130 to the trailing inset; its actions start 12dp after the tabs.
         fun leaveForSpace(width: Float) = compose.runOnIdle {
-            endPaddingState.value = (960f - tabs.right - 12f - clockWidth - width).dp
+            endPaddingState.value = (960f - tabs.right - 12f - width).dp
         }
         leaveForSpace((full + 96f) / 2f)
         compose.waitForIdle()

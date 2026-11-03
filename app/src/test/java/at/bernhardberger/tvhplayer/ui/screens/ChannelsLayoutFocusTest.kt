@@ -583,8 +583,7 @@ class ChannelsLayoutFocusTest {
         assertEquals("Focus alone never tunes", 0, fixture.plays)
     }
 
-    // Native text metrics: the header's clock is two real lines, which the slot holds at this size.
-    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE) fun immersiveBodyStartsAtTheTopPaddingAndItsHeaderButtonsStayInTheTopSlot() {
+    @Test fun immersiveBodyStartsAtTheTopPaddingAndItsHeaderButtonsStayInTheTopSlot() {
         fixture.show(immersive)
         fixture.awaitFocus(card(1))
         val header = compose.onNodeWithTag("channels-header").fetchSemanticsNode()
@@ -609,8 +608,6 @@ class ChannelsLayoutFocusTest {
         fixture.awaitFocus(row(1))
         compose.onNodeWithTag("channels-header").assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Channels"))
         compose.onNode(hasText("Channels") and hasAnyAncestor(hasTestTag("channels-header")), useUnmergedTree = true).assertDoesNotExist()
-        // The time and date the other top-level headers show.
-        compose.onNode(hasTestTag("browse-header-clock") and hasAnyAncestor(hasTestTag("channels-header"))).assertExists()
         assertTag("All channels")
         fixture.key(Key.DirectionUp)
         fixture.awaitFocus(tagsButton)

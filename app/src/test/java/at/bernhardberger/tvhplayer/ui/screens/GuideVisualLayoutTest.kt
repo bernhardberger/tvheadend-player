@@ -1177,9 +1177,8 @@ class GuideVisualLayoutTest {
         val viewOptions = bounds("channels-view-button")
         assertEquals(902f, viewOptions.right, .1f)
         val heading = compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, context().getString(R.string.epg_title))).fetchSemanticsNode().boundsInRoot
-        // The header's height follows the clock's two lines now, which is odd in pixels here: half a pixel of rounding.
-        assertEquals("Actions stay centred on the header row", heading.center.y, viewOptions.center.y, .5f)
-        assertEquals("The date button shares the header row", heading.center.y, bounds("guide-date-button").center.y, .5f)
+        assertEquals("Actions stay centred on the header row", heading.center.y, viewOptions.center.y, .1f)
+        assertEquals("The date button shares the header row", heading.center.y, bounds("guide-date-button").center.y, .1f)
         val bitmap = capture("guide-header-focus-large-de", 1.3f, LayoutDirection.Ltr)
         assertTrue("Native focused button clears the 48dp physical safe area", nativeFocusBounds(bitmap).right <= 912f)
         bitmap.recycle()
@@ -2423,8 +2422,6 @@ class GuideVisualLayoutTest {
         val header = bounds("guide-date-button")
         val headline = bounds("guide-headline")
         val ruler = bounds("epg-time-ruler")
-        // The header carries the time and date, level with its buttons.
-        assertEquals(header.center.y, bounds("browse-header-clock").center.y, .5f)
         assertTrue("Headline below the header's buttons: header=$header headline=$headline", headline.top >= header.bottom)
         assertTrue("Ruler below the headline: headline=$headline ruler=$ruler", ruler.top >= headline.bottom)
         val first = bounds("epg-channel-row-1").top

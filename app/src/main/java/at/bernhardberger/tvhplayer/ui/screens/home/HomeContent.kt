@@ -1,6 +1,5 @@
 package at.bernhardberger.tvhplayer.ui.screens.home
 
-import at.bernhardberger.tvhplayer.ui.components.BrowseHeaderClock
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
@@ -566,6 +565,8 @@ internal fun HomeContent(
             ) {
                 HomeHeader(
                     nowSec = nowSec,
+                    locale = locale,
+                    zone = zone,
                     endMargin = endMargin,
                     viewRequester = viewRequester,
                     firstSectionRequester = firstSection?.let(requesters::get) ?: emptyFocus,
@@ -842,6 +843,8 @@ internal fun homeRowCardWidth(contentWidth: Dp, columns: Int, gap: Dp): Dp =
 @Composable
 private fun HomeHeader(
     nowSec: Long,
+    locale: Locale,
+    zone: ZoneId,
     endMargin: Dp,
     viewRequester: FocusRequester,
     firstSectionRequester: FocusRequester?,
@@ -863,7 +866,16 @@ private fun HomeHeader(
         horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.End),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        BrowseHeaderClock(nowSec, Modifier.weight(1f, fill = false))
+        Column(horizontalAlignment = Alignment.End) {
+        Text(
+            text = formatClock(Instant.ofEpochSecond(nowSec).atZone(zone), locale),
+            style = MaterialTheme.typography.titleMedium,
+            color = TvTextColors.tertiary,
+            maxLines = 1,
+        )
+        Text(formatRecordingDate(nowSec, dateOnly = true, locale = locale),
+            style = MaterialTheme.typography.bodySmall, color = TvTextColors.secondary, maxLines = 1)
+        }
         RoundIconButton(icon = painterResource(R.drawable.ic_sell),
             label = stringResource(R.string.browse_tags), value = tag ?: stringResource(R.string.all_channels),
             active = tag != null, onClick = onTags, focusRequester = tagsRequester, onFocused = onFocused,

@@ -1,7 +1,5 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
-import at.bernhardberger.tvhplayer.ui.common.rememberDetailsEpochSeconds
-import at.bernhardberger.tvhplayer.ui.components.BrowseHeaderClock
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -69,7 +67,6 @@ internal fun ChannelsHeader(
     showFilter: Boolean = false,
     filter: String? = null,
     filterDot: Color? = null,
-    nowSecProvider: () -> Long = { System.currentTimeMillis() / 1000L },
 ) {
     val ltr = LocalLayoutDirection.current == LayoutDirection.Ltr
     val rail = navigationFocus ?: FocusRequester.Default
@@ -101,7 +98,6 @@ internal fun ChannelsHeader(
                 horizontalArrangement = Arrangement.spacedBy(TvGridGutter),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                BrowseHeaderClock(rememberDetailsEpochSeconds(nowSecProvider), Modifier.weight(1f, fill = false))
                 leading?.invoke(this, startEdge.focusProperties { up = FocusRequester.Cancel })
                 if (tagsShown || filterShown) Row(
                     horizontalArrangement = Arrangement.spacedBy(TvSpacing8),

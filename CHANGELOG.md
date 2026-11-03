@@ -8,8 +8,6 @@
   a backdrop. Its header scrolls away with the rows. If you already use Grid,
   you'll get this layout on update. Immersive, List and Grid remain available.
 - Home's channel logo now lines up with the page's right margin.
-- Backdrop pictures now fade out under the header so the clock and buttons stay
-  readable over bright pictures.
 
 ### Progress and time
 
@@ -18,7 +16,6 @@
   details, all three Channels layouts, the Guide headline and channel schedules.
 - The program headline on Home's On now, Channels and Guide now shows the time
   left to the right of its progress bar.
-- Channels, Guide and Recordings now show the clock and date in their headers.
 - Start-up buffer amounts and reconnect countdowns now use the system's number
   and time-unit formatting for the app's language.
 

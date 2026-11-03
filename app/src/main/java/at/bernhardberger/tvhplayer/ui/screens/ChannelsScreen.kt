@@ -127,7 +127,7 @@ import at.bernhardberger.tvhplayer.ui.components.ProgrammePanePictureGap
 import at.bernhardberger.tvhplayer.ui.components.ProgrammePaneWidth
 import at.bernhardberger.tvhplayer.ui.components.UnavailableTagNotice
 import at.bernhardberger.tvhplayer.ui.TvPanelBrowseAlpha
-import at.bernhardberger.tvhplayer.ui.components.browseHeaderMinHeight
+import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
 import at.bernhardberger.tvhplayer.ui.TvBrowseLeadingInset
 import at.bernhardberger.tvhplayer.ui.TvBrowseTrailingInset
 import at.bernhardberger.tvhplayer.ui.components.EndHoldOnInterruption
@@ -651,7 +651,6 @@ internal fun ChannelsScreenContent(
 
     @Composable
     fun ChannelBrowseContent() {
-    val headerSlot = browseHeaderMinHeight()
     val detailsLayering = at.bernhardberger.tvhplayer.ui.components.LocalBrowseContentLayering.current
     Box(
         Modifier
@@ -671,7 +670,7 @@ internal fun ChannelsScreenContent(
                     held = { browseHeld },
                     observation = observation,
                     nowSec = nowSec,
-                    logoTop = contentPadding.calculateTopPadding() + headerSlot,
+                    logoTop = contentPadding.calculateTopPadding() + TvBrowseHeaderHeight,
                     endInset = detailPanePadding.calculateEndPadding(layoutDirection),
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -717,7 +716,7 @@ internal fun ChannelsScreenContent(
                     val placeable = measurable.measure(constraints)
                     layout(placeable.width, 0) {
                         // Like Home, the header leaves with the cards rather than covering them.
-                        // Use its measured height, including enlarged/localized clock text.
+                        // Use its measured height, including enlarged/localized controls.
                         val travel = if (layout == ChannelsLayout.GRID && !tagNotice && channels.isNotEmpty()) {
                             val band = placeable.height + contentPadding.calculateTopPadding().roundToPx()
                             if (gridState.firstVisibleItemIndex > 0) band
@@ -733,7 +732,7 @@ internal fun ChannelsScreenContent(
             }
             Header()
             // What the list layout shows below the header instead of beside it keeps the header's band.
-            val listHeaderBand = if (layout == ChannelsLayout.LIST) headerSlot + ChannelsHeaderGap else 0.dp
+            val listHeaderBand = if (layout == ChannelsLayout.LIST) TvBrowseHeaderHeight + ChannelsHeaderGap else 0.dp
             Box(Modifier.weight(1f).fillMaxWidth()) {
             TabContent(
                 motion = scopeMotion,
@@ -842,7 +841,7 @@ internal fun ChannelsScreenContent(
                         // The header overlays the body's top, so the notice starts below it.
                         modifier = Modifier.padding(
                             start = startPadding + TvBrowseLeadingInset,
-                            top = headerSlot + ChannelsHeaderGap,
+                            top = TvBrowseHeaderHeight + ChannelsHeaderGap,
                             end = detailPanePadding.calculateEndPadding(layoutDirection),
                         ),
                     )
@@ -885,7 +884,7 @@ internal fun ChannelsScreenContent(
                     // The header scrolls with the rows, but stays clear of a notice.
                     val headerScrolls = !tagNotice
                     val topOverflow = if (headerScrolls) contentPadding.calculateTopPadding() else 0.dp
-                    if (!headerScrolls) Spacer(Modifier.height(headerSlot + ChannelsHeaderGap))
+                    if (!headerScrolls) Spacer(Modifier.height(TvBrowseHeaderHeight + ChannelsHeaderGap))
                     UnavailableTagNotice(
                         visible = tagNotice,
                         onDismiss = { if (owner.isCurrent) onDismissTagNotice() },
@@ -903,7 +902,7 @@ internal fun ChannelsScreenContent(
                         // sit one focus-line gap below the controls; later rows sit at that gap
                         // from the physical top, with the preceding row cut by the screen edge.
                         scrollingHeaderHeight = if (headerScrolls) {
-                            topOverflow + headerSlot + ChannelsGridFocusLine - ChannelsGridEdgeInset
+                            topOverflow + TvBrowseHeaderHeight + ChannelsGridFocusLine - ChannelsGridEdgeInset
                         } else 0.dp,
                         isCurrent = owner.isCurrent,
                         focusRequesters = rowFocusRequesters,
