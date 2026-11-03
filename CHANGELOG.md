@@ -27,11 +27,13 @@
 
 ### Recordings
 
-- Recordings you deleted no longer show as failed under Problems.
+- Recordings you deleted no longer show as failed under Problems (#4).
 - A running recording now has a progress bar in its info pane and menu.
 - Navigation markers now also appear at commercial-break and cut boundaries
   when the server provides them. Nothing is skipped automatically (#6).
-- MKV and MP4 recordings with chapters stored in the file now get navigation markers from those chapters, unless the server already provides commercial breaks or cuts for them (#7).
+- MKV and MP4 recordings with chapters stored in the file now get navigation
+  markers from those chapters, unless the server already provides commercial
+  breaks or cuts for them (#7).
 
 ## 0.4.2
 
