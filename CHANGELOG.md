@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.4.3
+
+### Channels and Home
+
+- The Channels Grid is now a wall of cards, without the program info above it or
+  a backdrop. Its header scrolls away with the rows. If you already use Grid,
+  you'll get this layout on update. Immersive, List and Grid remain available.
+- Home's channel logo now lines up with the page's right margin.
+- Backdrop pictures now fade out under the header so the clock and buttons stay
+  readable over bright pictures.
+
+### Progress and time
+
+- Progress bars are orange for what you're watching, cyan for other programs on
+  air and red for running recordings. This applies to Home cards, Recordings,
+  details, all three Channels layouts, the Guide headline and channel schedules.
+- The program headline on Home's On now, Channels and Guide now shows the time
+  left to the right of its progress bar.
+- Channels, Guide and Recordings now show the clock and date in their headers.
+- Start-up buffer amounts and reconnect countdowns now use the system's number
+  and time-unit formatting for the app's language.
+
+### Side panels
+
+- Browse panel lists now fade at the bottom like the player's lists.
+- Opening a panel near the top of its list no longer cuts off the first row
+  under the title, for example in Guide's Day and time panel.
+
+### Recordings
+
+- A running recording now has a progress bar in its info pane and menu.
+- Navigation markers now also appear at commercial-break and cut boundaries
+  when the server provides them. Nothing is skipped automatically (#6).
+
 ## 0.4.2
 
 ### Home and Channels
