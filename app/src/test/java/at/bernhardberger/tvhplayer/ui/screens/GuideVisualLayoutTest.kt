@@ -1174,7 +1174,6 @@ class GuideVisualLayoutTest {
         tagFocused("channels-view-button")
         key(Key.DirectionRight)
         tagFocused("channels-view-button")
-        compose.onNodeWithTag("epg-search-open").assertDoesNotExist()
         val viewOptions = bounds("channels-view-button")
         assertEquals(902f, viewOptions.right, .1f)
         val heading = compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, context().getString(R.string.epg_title))).fetchSemanticsNode().boundsInRoot
@@ -1186,10 +1185,8 @@ class GuideVisualLayoutTest {
         bitmap.recycle()
     }
 
-    @Test fun hiddenSearchEntryKeepsHeaderNavigationAndRestorationOnVisibleActions() {
+    @Test fun headerNavigationAndRestorationStayOnVisibleActions() {
         show()
-        compose.onNodeWithTag("epg-search-open").assertDoesNotExist()
-        compose.onNodeWithText(context().getString(R.string.epg_search)).assertDoesNotExist()
         compose.onNodeWithText(context().getString(R.string.now)).assertDoesNotExist()
         // A guide without genre codes has nothing to filter by.
         compose.onNodeWithTag("guide-filter-button").assertDoesNotExist()

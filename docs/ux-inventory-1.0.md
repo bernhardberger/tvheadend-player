@@ -102,7 +102,7 @@ These recur on several screens and are better decided once than per screen.
    - the Recordings lists (Archive, Schedule, Problems);
    - the splash and startup stages;
    - notices;
-   - the Guide search and jump dialogs;
+   - the Guide jump dialog;
    - the Guide error and empty states;
    - the connection editor;
    - the shell over Channels or Guide.
@@ -589,9 +589,7 @@ bear on this:
   - Past programmes: Watch only if recorded.
 - Record asks for a DVR config when there are several, then records at once; it
   has no confirmation (`ui/screens/ProgrammeDetailsHost.kt:200`, `docs/DESIGN.md` §10).
-- Search is a dialog inside the Guide, scoped to the active tag. It runs a
-  server full-text query on button press. Results open the same details. It
-  maps distinct errors.
+- The app has no search.
 - There is no global search, no `KEYCODE_SEARCH` and no voice input.
 - `EpgGridScreen.kt` is about 2,400 lines with several focus and request state
   machines, a rework risk.
@@ -649,9 +647,8 @@ bear on this:
 - Search: the TV quality guidelines dropped in-app search as a requirement
   in May 2026 (TV-SB removed in favour of Engage SDK). Tier 2 "TV Optimized"
   has TV-VS: an app that has search integrates voice input, for example a
-  microphone button next to the search field or Gboard voice input. So keep
-  today's Guide search through the rewrite and add voice input to its field;
-  that covers TV-VS without a global search. Engage SDK (TV-EC, TV-ER, tier 1)
+  microphone button next to the search field or Gboard voice input. The app has
+  no search, so TV-VS does not apply. Engage SDK (TV-EC, TV-ER, tier 1)
   is partner-only (H1).
 
 **Genre (owner, 2026-10-12, third pass)**

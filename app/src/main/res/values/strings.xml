@@ -407,24 +407,7 @@
     <string name="epg_title">Guide</string>
     <string name="header_button_value_description">%1$s, %2$s</string>
     <string name="epg_clear_filter">Clear filter</string>
-    <string name="epg_search">Search</string>
-    <string name="epg_search_title">Search guide</string>
-    <string name="epg_search_query">Program title or description</string>
-    <string name="epg_search_action">Search</string>
-    <!-- Guide search hint; OK is the center button on the remote. -->
-    <string name="epg_search_hint">Select the search field and press OK to enter a program title or description.</string>
-    <string name="epg_search_searching">Searching the guide…</string>
-    <string name="epg_search_empty">No programs match this search.</string>
-    <string name="epg_search_connection_unavailable">Connect to your Tvheadend server before searching the guide.</string>
-    <string name="epg_search_invalid">Your Tvheadend server could not use this search. Change the search text and try again.</string>
-    <string name="epg_search_denied">This account is not allowed to search guide data.</string>
-    <string name="epg_search_connection_limit">Your Tvheadend server is handling too many requests. Try again shortly.</string>
-    <string name="epg_search_not_supported">This Tvheadend server does not support guide search.</string>
-    <string name="epg_search_unavailable">Search isn’t available right now.</string>
-    <string name="epg_search_untitled">Untitled program</string>
     <string name="epg_search_unknown_channel">Unknown channel</string>
-    <string name="epg_search_result_schedule">%1$s • %2$s</string>
-    <string name="epg_search_result_description">%1$s, %2$s. Open program details.</string>
     <string name="programme_category_all">All genres</string>
     <string name="programme_category_film_drama">Film &amp; Drama</string>
     <string name="programme_category_news">News</string>

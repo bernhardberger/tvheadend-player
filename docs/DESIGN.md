@@ -795,8 +795,8 @@ activation, DVR eligibility, confirmations and current-session guards remain.
 - Headings share x130/y32 and scopes y80 on the reference canvas. Use native TV
   Material rows/cards and indication with reserved focus-growth space. Text scale
   changes the available rows/columns, never the native font sizes.
-- Guide keeps date/Now/Search together using existing working actions, with
-  trailing focus clearance. Its header (pane title "Guide") holds the date pill, Tags
+- Guide keeps its date and scope actions together with trailing focus clearance.
+  Its header (pane title "Guide") holds the date pill, Tags
   and Filter 8dp apart, and View options, 20dp between the groups. Filter shows
   once the guide carries genre codes (or while a genre is chosen) and opens
   "Filter by genre": All genres and the genre families, each with its color dot

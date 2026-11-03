@@ -8,11 +8,6 @@
     <string name="guide_view_headline">Show programme info</string>
     <string name="guide_view_genre_colors">Genre colours</string>
     <string name="player_programme_progress_description">Programme progress, %1$s of %2$s</string>
-    <string name="epg_search_query">Programme title or description</string>
-    <string name="epg_search_hint">Select the search field and press OK to enter a programme title or description.</string>
-    <string name="epg_search_empty">No programmes match this search.</string>
-    <string name="epg_search_untitled">Untitled programme</string>
-    <string name="epg_search_result_description">%1$s, %2$s. Open programme details.</string>
     <string name="epg_empty_day">No programmes in this time window</string>
     <string name="epg_details_action_hint">Programme actions are shown in this panel. Playback never starts directly from the guide.</string>
     <string name="epg_no_actions">There are no available actions for this programme.</string>

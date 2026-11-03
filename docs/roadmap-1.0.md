@@ -207,7 +207,7 @@ onboarding and the shipped language slate has expanded.
 Present:
 
 - Live TV with timeshift and the programme window.
-- Channels with tags; Guide with EPG search.
+- Channels with tags; Guide.
 - Recordings (Archive, Schedule, Problems) with single-event
   schedule/stop/cancel/delete.
 - Resume from the server position, cutpoint markers.

@@ -70,13 +70,10 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.tv.material3.MaterialTheme
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
-import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
-import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.DvrConfiguration
 import at.bernhardberger.tvheadend.sdk.core.DvrConfigurationsState
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
-import at.bernhardberger.tvheadend.sdk.core.EpgSearchResult
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
@@ -181,8 +178,6 @@ import at.bernhardberger.tvhplayer.ui.components.InsetBringIntoViewSpec
 
 private const val CHANNEL_PAGE_SIZE = 6
 private const val GUIDE_COVERAGE_NAVIGATION_TIMEOUT_MS = 10_000L
-// Hidden for 1.0, owner decision 2026-10-12.
-private const val GuideSearchEntryVisible = false
 
 private data class FrontierRequest(
     val channelId: ChannelId,
@@ -233,13 +228,6 @@ private data class WindowFocusRequest(
     val programmeStartSec: Long? = null,
     /** Now and Back-to-now: the programme on air is anchored at now, as on entry. */
     val atNow: Boolean = false,
-)
-
-private data class GuideSearchRequest(
-    val observation: SessionObservation,
-    val currentSession: CurrentSessionObservation,
-    val query: String,
-    val tagId: ChannelTagId?,
 )
 
 private data class GuideIndexInput(
@@ -341,9 +329,6 @@ fun EpgGridScreen(
     val dvrMutationActions = remember(session.dvrRepository) {
         DvrMutationActions(session.dvrRepository)
     }
-    val epgSearchActions = remember(session.epgRepository) {
-        EpgSearchActions(session.epgRepository)
-    }
     // Event callbacks must validate the scope that produced their rows, not a newer
     // collector value that can arrive before this composition is replaced.
     val channelScopeState = channelViewModel.scope.collectAsStateWithLifecycle().value
@@ -442,15 +427,7 @@ fun EpgGridScreen(
     var showContextMenu by remember { mutableStateOf(false) }
     var detailsObservation by remember { mutableStateOf<SessionObservation?>(null) }
     var restoreDetailsFocus by remember { mutableStateOf(false) }
-    var detailsFromSearch by remember { mutableStateOf(false) }
     var showTimePanel by remember { mutableStateOf(false) }
-    var showSearchDialog by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
-    var searchResult by remember { mutableStateOf<EpgSearchResult?>(null) }
-    var searchObservation by remember { mutableStateOf<SessionObservation?>(null) }
-    var searchRequest by remember { mutableStateOf<GuideSearchRequest?>(null) }
-    var restoreSearchHeaderFocus by remember { mutableStateOf(false) }
-    var restoreSearchResultFocus by remember { mutableStateOf<EventId?>(null) }
     var frontierRequest by remember { mutableStateOf<FrontierRequest?>(null) }
     var pendingFrontierOrigin by remember { mutableStateOf<FrontierOrigin?>(null) }
     var channelFocusRequest by remember { mutableStateOf<ChannelFocusRequest?>(null) }
@@ -474,7 +451,7 @@ fun EpgGridScreen(
     var preparationEntryToScope by remember { mutableStateOf(false) }
     val mayFocusProgramme by rememberUpdatedState(
         initialFocusEnabled && programmeFocusOwned &&
-            detailsEvent == null && !showSearchDialog && !showTimePanel && openPanel == null &&
+            detailsEvent == null && !showTimePanel && openPanel == null &&
             channelFocusRequest == null
     )
 
@@ -565,31 +542,6 @@ fun EpgGridScreen(
 
     LaunchedEffect(lastPlayedStore) {
         lastPlayedId = lastPlayedStore.channelId.first()
-    }
-
-    LaunchedEffect(searchRequest, epgSearchActions) {
-        val request = searchRequest ?: return@LaunchedEffect
-        try {
-            val result = epgSearchActions.execute(
-                currentSession = request.currentSession,
-                query = request.query,
-                tagId = request.tagId,
-            )
-            if (searchRequest == request) {
-                searchObservation = request.observation
-                searchResult = result
-            }
-        } finally {
-            if (searchRequest == request) searchRequest = null
-        }
-    }
-
-    LaunchedEffect(showSearchDialog, restoreSearchHeaderFocus, indexCurrent) {
-        if (indexCurrent && !showSearchDialog && restoreSearchHeaderFocus) {
-            withFrameNanos { }
-            runCatching { guideDateFocus.requestFocus() }
-            restoreSearchHeaderFocus = false
-        }
     }
 
     val epgState = preparedIndex?.input?.state ?: observation.epgState
@@ -1609,7 +1561,7 @@ fun EpgGridScreen(
     }
 
     val programmeBackEnabled = indexCurrent && initialFocusEnabled && programmeFocusOwned &&
-        detailsEvent == null && !showSearchDialog && !showTimePanel && openPanel == null
+        detailsEvent == null && !showTimePanel && openPanel == null
     BackHandler(enabled = programmeBackEnabled) { if (!backToNow()) backToRail() }
 
     fun moveFocus(direction: EpgFocusDirection): Boolean {
@@ -1801,41 +1753,11 @@ fun EpgGridScreen(
 
     fun closeDetails() {
         showContextMenu = false
-        val searchEventId = detailsEvent?.id.takeIf { detailsFromSearch }
         detailsEvent = null
         detailsObservation = null
-        if (showSearchDialog && searchEventId != null) {
-            restoreSearchResultFocus = searchEventId
-        } else {
-            programmeFocusOwned = true
-            restoreDetailsFocus = true
-        }
-        detailsFromSearch = false
+        programmeFocusOwned = true
+        restoreDetailsFocus = true
     }
-
-    fun closeSearch() {
-        showSearchDialog = false
-        searchRequest = null
-        searchResult = null
-        searchObservation = null
-        searchQuery = ""
-        restoreSearchResultFocus = null
-        restoreSearchHeaderFocus = true
-    }
-
-    @Composable
-    fun SearchSessionEffect() {
-    val searchGeneration = searchObservation?.currentSession ?: searchRequest?.currentSession
-    LaunchedEffect(currentSession, searchGeneration) {
-        if (searchGeneration != null && searchGeneration !== currentSession) {
-            if (detailsFromSearch) {
-                closeDetails()
-            }
-            closeSearch()
-        }
-    }
-    }
-    SearchSessionEffect()
 
 
     /** Closes the open side panel and returns focus to the header button that opened it. */
@@ -2150,7 +2072,6 @@ fun EpgGridScreen(
                     )
                     detailsEvent = event
                     detailsObservation = frameObservation
-                    detailsFromSearch = false
                     showContextMenu = false
                 },
                 onOpenProgrammeContextMenu = menu@{ channelIndex, event, frameObservation ->
@@ -2162,7 +2083,6 @@ fun EpgGridScreen(
                     selectedTarget = EpgFocusTarget(channelIndex, event.id)
                     detailsEvent = event
                     detailsObservation = frameObservation
-                    detailsFromSearch = false
                     showContextMenu = true
                 },
             )
@@ -2174,55 +2094,6 @@ fun EpgGridScreen(
         fun GuideOverlays(settingsScope: kotlinx.coroutines.CoroutineScope) {
         val settingsStore: UiSettingsStore = koinInject()
         GuideOverlayHost(
-            contentPadding = contentPadding,
-            showSearchDialog = showSearchDialog,
-            detailsFromSearch = detailsFromSearch,
-            searchQuery = searchQuery,
-            searchResult = searchResult,
-            searching = searchRequest != null,
-            searchEnabled = currentSession != null,
-            searchChannelName = { channelId ->
-                val resultObservation = searchObservation?.let {
-                    searchResultObservation(it, observation)
-                }
-                channelId?.let { resultObservation?.channel(it)?.name }
-            },
-            restoreSearchResultFocus = restoreSearchResultFocus,
-            onSearchFocusRestored = { restoreSearchResultFocus = null },
-            onSearchQueryChange = { query ->
-                searchQuery = query
-                searchResult = null
-                searchObservation = null
-                searchRequest = null
-            },
-            onSearch = {
-                currentSession?.let { capability ->
-                    searchResult = null
-                    searchObservation = null
-                    searchRequest = GuideSearchRequest(
-                        observation = observation,
-                        currentSession = capability,
-                        query = searchQuery,
-                        tagId = channelScope.activeTagId,
-                    )
-                }
-            },
-            onOpenSearchDetails = { event ->
-                searchObservation?.let { searchedObservation ->
-                    val resultObservation = searchResultObservation(
-                        searchedObservation,
-                        observation,
-                    )
-                    if (resultObservation != null) {
-                        releaseProgrammeFocus()
-                        detailsEvent = event
-                        detailsObservation = resultObservation
-                        detailsFromSearch = true
-                        restoreSearchResultFocus = null
-                    }
-                }
-            },
-            onDismissSearch = ::closeSearch,
             detailsEvent = detailsEvent,
             detailsObservation = detailsObservation,
             observation = observation,
@@ -2238,7 +2109,6 @@ fun EpgGridScreen(
             onCloseDetails = ::closeDetails,
             eventFocusRequesters = eventFocusRequesters,
             onShowGuide = { channelId, programme ->
-                showSearchDialog = false
                 restoreDetailsFocus = false
                 val available = programme?.id?.let(observation::event)?.takeIf {
                     it.channelId == channelId &&
@@ -2300,18 +2170,6 @@ fun EpgGridScreen(
 
 private fun SessionObservation.dvrEntries(): List<DvrEntry> =
     dvrSnapshotForDisplay?.entries.orEmpty()
-
-internal fun searchResultObservation(
-    searchedObservation: SessionObservation,
-    currentObservation: SessionObservation,
-): SessionObservation? = if (
-    searchedObservation.currentSession != null &&
-    searchedObservation.currentSession === currentObservation.currentSession
-) {
-    currentObservation
-} else {
-    null
-}
 
 internal fun currentDvrMutation(
     mutation: DvrMutationAction?,

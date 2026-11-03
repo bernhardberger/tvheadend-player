@@ -21,54 +21,17 @@ import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
-import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
-import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Test
 
 @OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
 class EpgSearchObservationPolicyTest {
-    @Test
-    fun sameSessionPublicationRefreshesDetailsRecordingOutsideRetainedEpgWindow() {
-        val session = FakeTvheadendSession(observation())
-        val opening = session.observation.value
-        val event = EpgEvent.create(
-            id = EventId(21), channelId = ChannelId(7),
-            start = Instant.fromEpochSeconds(1_800_000_000),
-            stop = Instant.fromEpochSeconds(1_800_003_600),
-        )
-        val recording = DvrEntry.create(id = DvrEntryId(31), eventId = event.id)
-        session.publish(observation(recordings = listOf(recording)))
-        val refreshed = requireNotNull(searchResultObservation(opening, session.observation.value))
-
-        assertSame(opening.currentSession, refreshed.currentSession)
-        assertSame(recording, refreshed.dvrEntryForEvent(event))
-        session.publish(observation())
-        assertNull(searchResultObservation(opening, session.observation.value)?.dvrEntryForEvent(event))
-    }
-
-    @Test
-    fun staleSearchResultCannotAcquireTheReconnectedGeneration() {
-        val searched = observation()
-        val reconnected = observation()
-
-        assertNotSame(searched.currentSession, reconnected.currentSession)
-        assertNull(searchResultObservation(searched, reconnected))
-    }
-
-    @Test
-    fun currentSearchResultUsesTheLatestObservation() {
-        val current = observation()
-
-        assertSame(current, searchResultObservation(current, current))
-    }
-
     @Test
     fun searchEventFindsRecordingOutsideRetainedTimelineWindow() {
         val event = EpgEvent.create(
