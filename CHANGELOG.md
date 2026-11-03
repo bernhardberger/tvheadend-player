@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.4
 
 ### Settings
 
@@ -9,7 +9,8 @@
 
 ### Recordings
 
-- Problems no longer lists recordings Tvheadend counts as removed: ones you deleted, and ones whose file is gone (#4).
+- Problems no longer lists recordings Tvheadend counts as removed: ones you
+  deleted, and ones whose file is gone (#4).
 
 ## 0.4.3
 
