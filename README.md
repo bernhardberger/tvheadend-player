@@ -22,7 +22,7 @@ the D-pad.
 
 | | | |
 |---|---|---|
-| ![Channels as a list, with Ridge Earth focused and Ridge Light's picture and details beside it](artwork/screenshots/channels-list.png) | ![Channels as a grid of program pictures, with Ridge Light on Ridge Earth focused](artwork/screenshots/channels-grid.png) | ![Channels as large cards without program pictures, showing channel logos and text](artwork/screenshots/channels-logos.png) |
+| ![Channels as a list, with Ridge Earth focused and Ridge Light's picture and details beside it](artwork/screenshots/channels-list.png) | ![Channels as a wall of cards with program pictures and channel logos, with Ridge Earth focused](artwork/screenshots/channels-grid.png) | ![Channels as large cards without program pictures, showing channel logos and text](artwork/screenshots/channels-logos.png) |
 | Channels as a list | Channels as a grid | Channels without program pictures |
 
 | | |
