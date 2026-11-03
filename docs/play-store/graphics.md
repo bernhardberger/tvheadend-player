@@ -9,19 +9,21 @@ eight per device type, and at least one Android TV screenshot; TV banner
 
 ## 3.0 Uploaded set (2026-10-29, screenshots replaced 2026-11-01 for 0.4.0)
 
-Saved as a draft on the default (en-US) listing. The icon, feature graphic and
-banner come from branch `docs/play-assets` at d0563891, under
-`captures/play-store/round3/` (reproduction in that branch's
-`docs/presentation-captures.md`). The screenshots come from the `store*` capture
-tests in `docs/play-assets-040`, stored under the ignored
-`captures/play-store/round4/plain/`:
+Saved as a draft on the default (en-US) listing. The 0.4.0 set now in Play Console
+was made with an earlier version of these captures. Regenerate the feature
+graphic and screenshots with `tools/prepare-play-assets.py`, following
+[Play Store set](../presentation-captures.md#play-store-set). Its outputs are in
+ignored `captures/play-store/current/`. The icon source is
+`app/src/main/ic_launcher-playstore.png`; the banner source is
+`artwork/tvheadend-player-banner@4x.png`. Update the date above after an
+owner-approved replacement is uploaded.
 
 | Slot | File |
 |---|---|
-| App icon | `icon/current-rgba.png` |
+| App icon | `icon.png`, fully opaque RGBA from `app/src/main/ic_launcher-playstore.png` |
 | Feature graphic | `feature/final.png`: mark and name, "Built around the remote.", the Channels screen in a slim frame |
 | Android TV screenshots, in order | `plain/01-home.png`, `02-channels.png`, `03-guide.png` (Dense rows), `04-player.png`, `05-recording.png`, `06-details.png`, `07-schedule.png` |
-| TV banner | `banner/current.png` |
+| TV banner | `banner.png`, byte copy of `artwork/tvheadend-player-banner@4x.png` |
 | Phone screenshots | none |
 | 10-inch tablet screenshots | `02-channels.png`, `03-guide.png`. A full save needs two phone or tablet screenshots, and the Android TV opt-in needs a fully saved listing, so these break the loop. After the opt-in (2026-10-29) Console still refuses to save without them ("Upload at least 2 phone or tablet screenshots"). Try again once TV is approved. Android XR has no opt-out in Console; the leanback requirement keeps phones and headsets from installing |
 | AI asset declaration | "Don't label assets" (owner, 2026-10-29): fictional sample art inside app screens, not depicting anything real |

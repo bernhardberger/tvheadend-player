@@ -99,6 +99,19 @@ binaries resolve by version alone, and unlike a Central release, a snapshot is
 not immutable and does not pass Central's release validation. A development
 pin is therefore weaker evidence than a released SDK.
 
+## Screenshots
+
+When a release changes how the app looks, run the [README captures and Play Store
+set](presentation-captures.md) before the release commit. Skip this for a release
+with no visible change. Look at the changed images, copy selected README images
+to `artwork/screenshots/` as RGB per that guide, update README alt text where the
+scene changed, and include those images and text in the release commit.
+
+Upload the Play set in Play Console only after the owner has seen and approved
+it. Follow the upload-order note in [graphics §3.0](play-store/graphics.md)
+and update the date in that section when uploaded. The icon and banner are brand
+artwork and change only when the artwork does.
+
 ## Unsigned preparation on the build host
 
 ### Guided workflow
