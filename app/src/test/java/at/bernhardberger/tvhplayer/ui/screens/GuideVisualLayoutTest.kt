@@ -3004,6 +3004,23 @@ class GuideVisualLayoutTest {
         assertNoPlayback()
     }
 
+    @Test fun aServerDeletedRecordingHasNoGuideCellMarkOrHeadlineBadge() {
+        show(headline = true, recordings = listOf(
+            DvrEntry.create(DvrEntryId(1), eventId = EventId(110),
+                state = DvrEntryState.FILE_MISSING, files = emptyList()),
+        ))
+        key(Key.DirectionDown)
+        focused(title(1, 0))
+        compose.mainClock.advanceTimeBy(GuideHeadlineSettleMs + 300)
+        compose.waitForIdle()
+        compose.onNodeWithTag("guide-cell-failed-mark", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("recording-badge-failed", useUnmergedTree = true).assertDoesNotExist()
+        val description = compose.onNode(hasContentDescription(title(1, 0), substring = true))
+            .fetchSemanticsNode().config.getOrElseNullable(SemanticsProperties.ContentDescription) { null }
+            .orEmpty().joinToString()
+        assertFalse(description, description.contains(context().getString(R.string.recording_state_failed)))
+    }
+
     @Test fun aFinishedRecordingIsTheDotAndAFailedOrMissedOneTheErrorMarkAndTheHeadlineBadgesThem() {
         // Past programmes come from the history fixture: channel 1 recorded, 2 failed, 4 missed.
         fun recording(id: Long, channel: Int, state: DvrEntryState) =

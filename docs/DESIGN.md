@@ -119,7 +119,8 @@ Meaning of colour:
   - In Recordings overlines a failure, missed recordings included, is an
     `error` "!" symbol; cancelled and stopped early are muted symbols. Problems
     lists missed recordings under "Failed"; only invalid entries are "Canceled"
-    (decided 2026-10-24). A running row's overline shows its start and
+    (decided 2026-10-24). Server-deleted recordings are hidden throughout the app.
+    A running row's overline shows its start and
     "until …", not the word "Recording". The word stands only where the state
     is the topic, never as a red label by itself.
 - **Reds are picked by surface.** Recording red and `error` are tones of the

@@ -134,6 +134,7 @@ import at.bernhardberger.tvhplayer.core.groupDvrSchedule
 import at.bernhardberger.tvhplayer.core.partitionDvrLibrary
 import at.bernhardberger.tvhplayer.core.recordingElapsedProgress
 import at.bernhardberger.tvhplayer.core.recordingIsRunning
+import at.bernhardberger.tvhplayer.core.recordingWasDeleted
 import at.bernhardberger.tvhplayer.core.watchedCount
 import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.ui.TvSpacing12
@@ -898,7 +899,7 @@ internal fun RecordingsScreenContent(
         ?.takeIf { observation.currentSession === it }
     val opened = detailsEntry?.let { entry ->
         if (selectedCapability != null && observation.dvrState is DvrRepositoryState.Current) {
-            observation.dvrEntry(entry.id)
+            observation.dvrEntry(entry.id)?.takeUnless(::recordingWasDeleted)
         } else entry
     }
     // The SDK admits the opened entry with the observation it was read from; without its session nothing plays.

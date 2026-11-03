@@ -27,6 +27,7 @@
 
 ### Recordings
 
+- Recordings you deleted no longer show as failed under Problems.
 - A running recording now has a progress bar in its info pane and menu.
 - Navigation markers now also appear at commercial-break and cut boundaries
   when the server provides them. Nothing is skipped automatically (#6).

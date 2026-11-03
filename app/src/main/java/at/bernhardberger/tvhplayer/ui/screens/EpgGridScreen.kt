@@ -133,6 +133,7 @@ import at.bernhardberger.tvhplayer.ui.common.clockWidthSamples
 import at.bernhardberger.tvhplayer.ui.common.programmeCategoryLabel
 import at.bernhardberger.tvhplayer.ui.tvGenreColors
 import at.bernhardberger.tvhplayer.core.TimelineEpgEventIndex
+import at.bernhardberger.tvhplayer.core.recordingWasDeleted
 import at.bernhardberger.tvhplayer.ui.components.rememberTabContentMotion
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideChannelWidth
@@ -2169,7 +2170,7 @@ fun EpgGridScreen(
 }
 
 private fun SessionObservation.dvrEntries(): List<DvrEntry> =
-    dvrSnapshotForDisplay?.entries.orEmpty()
+    dvrSnapshotForDisplay?.entries.orEmpty().filterNot(::recordingWasDeleted)
 
 internal fun currentDvrMutation(
     mutation: DvrMutationAction?,

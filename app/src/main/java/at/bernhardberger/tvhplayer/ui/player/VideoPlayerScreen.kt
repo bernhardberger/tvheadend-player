@@ -115,6 +115,7 @@ import at.bernhardberger.tvhplayer.playback.currentLivePlaybackSelection
 import at.bernhardberger.tvhplayer.playback.resolveLivePlaybackSelection
 import at.bernhardberger.tvhplayer.playback.toAppPresentation
 import at.bernhardberger.tvhplayer.core.projectedTimeshiftState
+import at.bernhardberger.tvhplayer.core.recordingWasDeleted
 import at.bernhardberger.tvhplayer.core.liveBarEnd
 import at.bernhardberger.tvhplayer.core.playerStateCell
 import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
@@ -1859,7 +1860,7 @@ fun VideoPlayerScreen(
 }
 
 private fun SessionObservation.dvrEntries(): List<DvrEntry> =
-    dvrSnapshotForDisplay?.entries.orEmpty().takeIf {
+    dvrSnapshotForDisplay?.entries.orEmpty().filterNot(::recordingWasDeleted).takeIf {
         dvrSnapshotAuthority == RetainedMetadataAuthority.CURRENT
     }.orEmpty()
 

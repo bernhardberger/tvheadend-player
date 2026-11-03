@@ -48,6 +48,7 @@ import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.EpgFocusTarget
 import at.bernhardberger.tvhplayer.core.TimelineEpgEventIndex
+import at.bernhardberger.tvhplayer.core.recordingWasDeleted
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 import at.bernhardberger.tvhplayer.ui.TvBrowseLeadingInset
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
@@ -278,7 +279,7 @@ internal fun GuideTimelineBody(
                     },
                     recordingForEvent = { event ->
                         profileTrace("P48:guideRecordingLookup") {
-                            observation.dvrEntryForEvent(event)
+                            observation.dvrEntryForEvent(event)?.takeUnless(::recordingWasDeleted)
                         }
                     },
                     onOpenDetails = {

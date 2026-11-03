@@ -96,7 +96,7 @@ internal fun ProgrammeDetailsHost(
     SideEffect { if (live != null) lastKnown = live }
     val event = live ?: lastKnown
     val channel = event.channelId?.let(displayObservation::channel)
-    val recording = displayObservation.dvrEntryForEvent(event)
+    val recording = displayObservation.dvrEntryForEvent(event)?.takeUnless(::recordingWasDeleted)
     val canModify = capability != null && displayObservation.dvrState is DvrRepositoryState.Current &&
         (displayObservation.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
     val currentMutation = currentDvrMutation(pending, sessionObservation, observation)
@@ -215,7 +215,7 @@ internal fun ProgrammeDetailsHost(
         }
         if (capability == null || capability !== current.currentSession) { close(); return@action }
         val actionEvent = current.event(programme.id) ?: programme
-        val actionRecording = current.dvrEntryForEvent(actionEvent)
+        val actionRecording = current.dvrEntryForEvent(actionEvent)?.takeUnless(::recordingWasDeleted)
         val actionCanModify = current.dvrState is DvrRepositoryState.Current &&
             (current.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
         if (action == BrowseContextAction.PLAY && actionRecording != null) {
@@ -294,7 +294,7 @@ internal fun ProgrammeDetailsHost(
             val pageLive = displayObservation.event(page.id)
             val pageEvent = pageLive ?: if (page.id == selected.id) event else page
             val pageChannel = pageEvent.channelId?.let(displayObservation::channel)
-            val pageRecording = displayObservation.dvrEntryForEvent(pageEvent)
+            val pageRecording = displayObservation.dvrEntryForEvent(pageEvent)?.takeUnless(::recordingWasDeleted)
             // Once per programme, EPG publication and details minute, not per grid tick.
             val snapshot = displayObservation.epgSnapshotForDisplay
             val airings = remember(pageEvent, snapshot, displayObservation.channelState, nowSec) {
@@ -344,7 +344,7 @@ internal fun ProgrammeDetailsHost(
     menuAiring?.let { airing ->
         val menuEvent = displayObservation.event(airing.id) ?: airing
         ProgrammeContextMenu(menuEvent, menuEvent.channelId?.let(displayObservation::channel),
-            displayObservation.dvrEntryForEvent(menuEvent),
+            displayObservation.dvrEntryForEvent(menuEvent)?.takeUnless(::recordingWasDeleted),
             nowSec = nowSec, canModify = canModify, currentSession = capability, observation = displayObservation,
             canPlayRecording = onPlayRecording != null, onAction = act, onClose = { menuAiring = null }, backEnabled = !closing,
             modifier = Modifier.onPreviewKeyEvent(keyHandler))

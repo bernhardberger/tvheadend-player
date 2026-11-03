@@ -55,7 +55,7 @@ internal fun RecordingDetailsHost(
     val (displayObservation, displayNowSec, playingId) = if (departing) lastPresentation else presentation
     val capability = openingObservation.currentSession?.takeIf { displayObservation.currentSession === it }
     val opened = if (capability != null && displayObservation.dvrState is DvrRepositoryState.Current)
-        displayObservation.dvrEntry(recording.id) else recording
+        displayObservation.dvrEntry(recording.id)?.takeUnless(::recordingWasDeleted) else recording
     LaunchedEffect(opened == null) { if (opened == null) onClose() }
     if (opened == null) return
     val admission = capability?.let {

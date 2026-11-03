@@ -1139,6 +1139,30 @@ class RecordingsVisualLayoutTest {
         assertNoCommands()
     }
 
+    @Test fun serverDeletedRecordingClosesItsDetailsAndFocusesTheNextRow() {
+        val entries = (1L..3L).map { recording(it, "Recording $it", "recording$it.ts") }
+        show(entries = entries)
+        focused("recording-list-entry-1")
+        key(Key.DirectionDown)
+        focused("recording-list-entry-2")
+        key(Key.Menu)
+        compose.onNodeWithText("Details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("details-play").assertIsFocused()
+        publish(entries.map { if (it.id == DvrEntryId(2))
+            DvrEntry.create(it.id, title = it.title, state = DvrEntryState.FILE_MISSING, files = emptyList()) else it })
+        compose.onNodeWithTag("details-play").assertDoesNotExist()
+        compose.onNodeWithTag("details-delete").assertDoesNotExist()
+        focused("recording-list-entry-3")
+        repeat(2) { key(Key.DirectionUp) }
+        key(Key.DirectionRight)
+        key(Key.DirectionRight)
+        compose.onNodeWithText("Problems").assertIsFocused()
+        compose.onNodeWithText("Failed").assertDoesNotExist()
+        compose.onNodeWithText("No recording problems.").assertIsDisplayed()
+        compose.onNodeWithTag("recording-list-entry-2").assertDoesNotExist()
+        assertNoCommands()
+    }
+
     @Test fun removedRecordingUsesNextNeighborWithoutDismissingAnotherDetailsPanel() {
         val entries = (1L..3L).map { recording(it, "Recording $it", "recording$it.ts") }
         show(entries = entries)

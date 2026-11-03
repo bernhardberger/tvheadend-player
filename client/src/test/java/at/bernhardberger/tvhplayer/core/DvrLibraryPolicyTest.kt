@@ -3,11 +3,33 @@ package at.bernhardberger.tvhplayer.core
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvheadend.sdk.core.DvrRecordingFile
 import kotlin.time.Instant
 import org.junit.Assert.*
 import org.junit.Test
 
 class DvrLibraryPolicyTest {
+    @Test fun explicitlyEmptyMissingFilesMeansDeleted() {
+        assertTrue(recordingWasDeleted(DvrEntry.create(DvrEntryId(1),
+            state = DvrEntryState.FILE_MISSING, files = emptyList())))
+    }
+
+    @Test fun listedMissingFileRemainsAProblem() {
+        assertFalse(recordingWasDeleted(DvrEntry.create(DvrEntryId(1),
+            state = DvrEntryState.FILE_MISSING, files = listOf(DvrRecordingFile.create()))))
+    }
+
+    @Test fun absentFilesDoesNotMeanDeleted() {
+        assertFalse(recordingWasDeleted(DvrEntry.create(DvrEntryId(1), state = DvrEntryState.FILE_MISSING)))
+    }
+
+    @Test fun otherStatesWithEmptyFilesAreNotDeleted() {
+        listOf(DvrEntryState.COMPLETED, DvrEntryState.COMPLETED_ERROR, DvrEntryState.MISSED,
+            DvrEntryState.INVALID).forEach { state ->
+            assertFalse(recordingWasDeleted(DvrEntry.create(DvrEntryId(1), state = state, files = emptyList())))
+        }
+    }
+
     @Test fun runningEntriesKeepTheirFullFolderDepthAndExistingSort() {
         val path = listOf("Series", "Season", "Episodes")
         val completed = entry(1, DvrEntryState.COMPLETED, 100, path)

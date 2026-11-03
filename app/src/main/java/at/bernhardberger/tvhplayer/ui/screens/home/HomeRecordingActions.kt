@@ -44,7 +44,7 @@ internal fun HomeRecordingActions(
     val mutations = remember(session) { DvrMutationActions(session.dvrRepository) }
     val capability = opening.currentSession?.takeIf { it === observation.currentSession }
     val opened = if (capability != null && observation.dvrState is DvrRepositoryState.Current)
-        observation.dvrEntry(entry.id) else entry
+        observation.dvrEntry(entry.id)?.takeUnless(::recordingWasDeleted) else entry
     LaunchedEffect(capability, opened) {
         if (opening.currentSession != null && capability == null || opened == null) onClose()
     }

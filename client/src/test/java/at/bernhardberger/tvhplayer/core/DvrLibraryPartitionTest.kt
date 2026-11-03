@@ -3,12 +3,27 @@ package at.bernhardberger.tvhplayer.core
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvheadend.sdk.core.DvrRecordingFile
 import java.time.ZoneOffset
 import kotlin.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class DvrLibraryPartitionTest {
+    @Test fun serverDeletedEntriesDisappearButRealMissingFilesRemainProblems() {
+        val deleted = DvrEntry.create(DvrEntryId(10), state = DvrEntryState.FILE_MISSING, files = emptyList())
+        val missing = DvrEntry.create(DvrEntryId(11), state = DvrEntryState.FILE_MISSING,
+            files = listOf(DvrRecordingFile.create()))
+        val neverRecorded = DvrEntry.create(DvrEntryId(12), state = DvrEntryState.FILE_MISSING)
+        val failed = DvrEntry.create(DvrEntryId(13), state = DvrEntryState.COMPLETED_ERROR, files = emptyList())
+        val library = partitionDvrLibrary(listOf(deleted, missing, neverRecorded, failed))
+
+        assertEquals(listOf(missing, neverRecorded, failed), library.problems)
+        assertEquals(listOf(missing, neverRecorded, failed),
+            groupDvrProblems(listOf(deleted, missing, neverRecorded, failed))[DvrProblemBucket.FAILED])
+        assertEquals(emptyList<DvrEntry>(), partitionDvrLibrary(listOf(deleted)).problems)
+    }
+
     private fun entry(id: Long, state: DvrEntryState, start: Long) =
         DvrEntry.create(DvrEntryId(id), state = state, start = Instant.fromEpochSeconds(start))
 

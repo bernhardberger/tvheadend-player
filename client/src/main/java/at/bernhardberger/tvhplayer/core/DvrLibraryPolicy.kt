@@ -100,6 +100,15 @@ fun DvrArchiveFolder.runningRecordings(): List<DvrEntry> =
 fun chooseDvrConfig(configs: List<DvrConfiguration>, preferredId: DvrConfigId? = null): DvrConfigId? =
     (configs.firstOrNull { it.id == preferredId } ?: configs.firstOrNull { it.name.isBlank() } ?: configs.firstOrNull())?.id
 
+/**
+ * Tvheadend retains deleted entries as FILE_MISSING with an explicitly empty files list.
+ * Interim policy until the SDK exposes a dedicated deleted state.
+ */
+fun recordingWasDeleted(entry: DvrEntry): Boolean {
+    val files = entry.files
+    return entry.state == DvrEntryState.FILE_MISSING && files != null && files.isEmpty()
+}
+
 fun partitionDvrLibrary(entries: List<DvrEntry>): DvrLibraryPartition = DvrLibraryPartition(
     archive = entries
         .filter {
@@ -114,7 +123,7 @@ fun partitionDvrLibrary(entries: List<DvrEntry>): DvrLibraryPartition = DvrLibra
         ),
     problems = entries
         .filter {
-            it.state in setOf(
+            !recordingWasDeleted(it) && it.state in setOf(
                 DvrEntryState.MISSED,
                 DvrEntryState.INVALID,
                 DvrEntryState.COMPLETED_ERROR,
@@ -175,7 +184,7 @@ fun groupDvrSchedule(
 
 fun groupDvrProblems(entries: List<DvrEntry>): Map<DvrProblemBucket, List<DvrEntry>> =
     DvrProblemBucket.entries.associateWith { bucket ->
-        entries.filter {
+        entries.filterNot(::recordingWasDeleted).filter {
             when (bucket) {
                 // A missed recording failed to happen; only one never meant to happen is canceled.
                 DvrProblemBucket.FAILED -> it.state in setOf(
