@@ -55,7 +55,7 @@ class GuideRenderingCostContractTest {
     fun guideUsesOneWindowBoundedPerChannelEventIndex() {
         val guide = screenSource.section(
             "fun EpgGridScreen(",
-            "private fun SessionObservation.dvrEntries()",
+            "internal fun currentDvrMutation(",
         )
 
         assertEquals(1, (guide + movedGuideSource).count("indexTimelineEventsByChannel("))
@@ -150,7 +150,7 @@ class GuideRenderingCostContractTest {
     fun guideFocusUsesCompositionTimingAndBoundsRequesterRetention() {
         val guide = screenSource.section(
             "fun EpgGridScreen(",
-            "private fun SessionObservation.dvrEntries()",
+            "internal fun currentDvrMutation(",
         )
         val selectedTargetFocus = guide.section(
             "LaunchedEffect(\n        selectedTarget,",
@@ -193,7 +193,7 @@ class GuideRenderingCostContractTest {
     fun guideClockUpdatesAreReadThroughAConsumerProvider() {
         val guide = screenSource.section(
             "fun EpgGridScreen(",
-            "private fun SessionObservation.dvrEntries()",
+            "internal fun currentDvrMutation(",
         )
         val ruler = contentSource.section(
             "internal fun TimelineTimeRuler(",
