@@ -43,7 +43,7 @@ import at.bernhardberger.tvhplayer.core.EpgFocusColumn
 import at.bernhardberger.tvhplayer.core.EpgFocusTarget
 import at.bernhardberger.tvhplayer.core.programmeAgeRating
 import at.bernhardberger.tvhplayer.core.recordingIsRunning
-import at.bernhardberger.tvhplayer.core.recordingWasDeleted
+import at.bernhardberger.tvhplayer.core.recordingWasRemoved
 import at.bernhardberger.tvhplayer.core.visibleChannelNumber
 import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
 import at.bernhardberger.tvhplayer.ui.common.isRunning
@@ -317,7 +317,7 @@ private fun GuideHeadlineContent(
     // The rows' marks as badges: a running recording or a scheduled one, a failed one as details
     // names it, and, beyond details, a finished one and a missed one.
     // The held event, as the cells pass it: the ID lookup only knows the current snapshot, not history.
-    val recording = event?.let { observation.dvrEntryForEvent(it) }?.takeUnless(::recordingWasDeleted)
+    val recording = event?.let { observation.dvrEntryForEvent(it) }?.takeUnless(::recordingWasRemoved)
     val mark = recording?.state?.takeIf {
         recordingIsRunning(recording) || it == DvrEntryState.SCHEDULED || it == DvrEntryState.COMPLETED ||
             it == DvrEntryState.COMPLETED_ERROR || it == DvrEntryState.FILE_MISSING || it == DvrEntryState.MISSED

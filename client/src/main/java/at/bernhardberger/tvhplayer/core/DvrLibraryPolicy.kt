@@ -101,13 +101,14 @@ fun chooseDvrConfig(configs: List<DvrConfiguration>, preferredId: DvrConfigId? =
     (configs.firstOrNull { it.id == preferredId } ?: configs.firstOrNull { it.name.isBlank() } ?: configs.firstOrNull())?.id
 
 /**
- * Tvheadend retains deleted entries as FILE_MISSING with an explicitly empty files list.
- * Interim policy until the SDK exposes a dedicated deleted state.
+ * Matches Tvheadend's web UI Removed classification for completed entries in
+ * dvr_entry_is_finished (src/dvr/dvr_db.c), reported as "File missing" by
+ * src/htsp_server.c. This covers deletions before and after a server restart,
+ * files removed outside Tvheadend, and recordings that never wrote a file once
+ * Tvheadend has reloaded them. HTSP exposes nothing finer (fileremoved is not exposed).
+ * Interim policy until the SDK exposes a dedicated removed state.
  */
-fun recordingWasDeleted(entry: DvrEntry): Boolean {
-    val files = entry.files
-    return entry.state == DvrEntryState.FILE_MISSING && files != null && files.isEmpty()
-}
+fun recordingWasRemoved(entry: DvrEntry): Boolean = entry.state == DvrEntryState.FILE_MISSING
 
 fun partitionDvrLibrary(entries: List<DvrEntry>): DvrLibraryPartition = DvrLibraryPartition(
     archive = entries
@@ -123,7 +124,7 @@ fun partitionDvrLibrary(entries: List<DvrEntry>): DvrLibraryPartition = DvrLibra
         ),
     problems = entries
         .filter {
-            !recordingWasDeleted(it) && it.state in setOf(
+            !recordingWasRemoved(it) && it.state in setOf(
                 DvrEntryState.MISSED,
                 DvrEntryState.INVALID,
                 DvrEntryState.COMPLETED_ERROR,
@@ -184,7 +185,7 @@ fun groupDvrSchedule(
 
 fun groupDvrProblems(entries: List<DvrEntry>): Map<DvrProblemBucket, List<DvrEntry>> =
     DvrProblemBucket.entries.associateWith { bucket ->
-        entries.filterNot(::recordingWasDeleted).filter {
+        entries.filterNot(::recordingWasRemoved).filter {
             when (bucket) {
                 // A missed recording failed to happen; only one never meant to happen is canceled.
                 DvrProblemBucket.FAILED -> it.state in setOf(

@@ -102,7 +102,7 @@ import at.bernhardberger.tvhplayer.core.activeRecordingChannelIds
 import at.bernhardberger.tvhplayer.core.channelNowStatus
 import at.bernhardberger.tvhplayer.core.AppErrorAction
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
-import at.bernhardberger.tvhplayer.core.recordingWasDeleted
+import at.bernhardberger.tvhplayer.core.recordingWasRemoved
 import at.bernhardberger.tvhplayer.core.browseAppError
 import at.bernhardberger.tvhplayer.core.awaitsGuide
 import at.bernhardberger.tvhplayer.core.forEmptyChannelPresentation
@@ -289,7 +289,7 @@ internal fun ChannelsScreenContent(
     val header = remember { ChannelsHeaderFocus() }
     val headerEntryFocus = header.entry(hasTagChoice = groups.size > 1)
     var openPanel by remember { mutableStateOf<ChannelsPanel?>(null) }
-    val dvrEntries = observation.dvrSnapshotForDisplay?.entries.orEmpty().filterNot(::recordingWasDeleted)
+    val dvrEntries = observation.dvrSnapshotForDisplay?.entries.orEmpty().filterNot(::recordingWasRemoved)
     val recordingChannelIds = remember(dvrEntries) { activeRecordingChannelIds(dvrEntries) }
     val channels = channelScope.visibleChannels
     val orderedChannelIds = remember(channels) { channels.map { it.id } }

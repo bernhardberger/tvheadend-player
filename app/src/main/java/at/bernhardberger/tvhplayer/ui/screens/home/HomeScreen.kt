@@ -147,7 +147,7 @@ internal fun homeInput(
         }.toMap(),
         upcomingEvents = guideDisplayEvents(observation.epgSnapshotForDisplay),
         recentChannelIds = recents,
-        dvrEntries = observation.dvrSnapshotForDisplay?.entries.orEmpty().filterNot(::recordingWasDeleted),
+        dvrEntries = observation.dvrSnapshotForDisplay?.entries.orEmpty().filterNot(::recordingWasRemoved),
         admission = observation::recordingPlaybackAdmission,
         playing = playing,
         nowSec = nowSec,

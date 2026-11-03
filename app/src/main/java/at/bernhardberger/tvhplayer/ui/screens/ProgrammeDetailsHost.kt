@@ -96,7 +96,7 @@ internal fun ProgrammeDetailsHost(
     SideEffect { if (live != null) lastKnown = live }
     val event = live ?: lastKnown
     val channel = event.channelId?.let(displayObservation::channel)
-    val recording = displayObservation.dvrEntryForEvent(event)?.takeUnless(::recordingWasDeleted)
+    val recording = displayObservation.dvrEntryForEvent(event)?.takeUnless(::recordingWasRemoved)
     val canModify = capability != null && displayObservation.dvrState is DvrRepositoryState.Current &&
         (displayObservation.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
     val currentMutation = currentDvrMutation(pending, sessionObservation, observation)
@@ -295,7 +295,7 @@ internal fun ProgrammeDetailsHost(
             val pageLive = displayObservation.event(page.id)
             val pageEvent = pageLive ?: if (page.id == selected.id) event else page
             val pageChannel = pageEvent.channelId?.let(displayObservation::channel)
-            val pageRecording = displayObservation.dvrEntryForEvent(pageEvent)?.takeUnless(::recordingWasDeleted)
+            val pageRecording = displayObservation.dvrEntryForEvent(pageEvent)?.takeUnless(::recordingWasRemoved)
             // Once per programme, EPG publication and details minute, not per grid tick.
             val snapshot = displayObservation.epgSnapshotForDisplay
             val airings = remember(pageEvent, snapshot, displayObservation.channelState, nowSec) {
@@ -345,7 +345,7 @@ internal fun ProgrammeDetailsHost(
     menuAiring?.let { airing ->
         val menuEvent = displayObservation.event(airing.id) ?: airing
         ProgrammeContextMenu(menuEvent, menuEvent.channelId?.let(displayObservation::channel),
-            displayObservation.dvrEntryForEvent(menuEvent)?.takeUnless(::recordingWasDeleted),
+            displayObservation.dvrEntryForEvent(menuEvent)?.takeUnless(::recordingWasRemoved),
             nowSec = nowSec, canModify = canModify, currentSession = capability, observation = displayObservation,
             canPlayRecording = onPlayRecording != null, onAction = act, onClose = { menuAiring = null }, backEnabled = !closing,
             modifier = Modifier.onPreviewKeyEvent(keyHandler))

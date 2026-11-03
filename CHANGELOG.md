@@ -7,6 +7,10 @@
 - CH+/− now page through Settings lists a screen at a time, as they already do
   in Channels, the Guide and Recordings.
 
+### Recordings
+
+- Problems no longer lists recordings Tvheadend counts as removed: ones you deleted, and ones whose file is gone (#4).
+
 ## 0.4.3
 
 ### Channels and Home

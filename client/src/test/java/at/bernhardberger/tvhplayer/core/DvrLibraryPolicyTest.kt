@@ -9,24 +9,27 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class DvrLibraryPolicyTest {
-    @Test fun explicitlyEmptyMissingFilesMeansDeleted() {
-        assertTrue(recordingWasDeleted(DvrEntry.create(DvrEntryId(1),
+    @Test fun explicitlyEmptyMissingFilesMeansRemoved() {
+        assertTrue(recordingWasRemoved(DvrEntry.create(DvrEntryId(1),
             state = DvrEntryState.FILE_MISSING, files = emptyList())))
     }
 
-    @Test fun listedMissingFileRemainsAProblem() {
-        assertFalse(recordingWasDeleted(DvrEntry.create(DvrEntryId(1),
+    @Test fun listedMissingFileMeansRemoved() {
+        assertTrue(recordingWasRemoved(DvrEntry.create(DvrEntryId(1),
             state = DvrEntryState.FILE_MISSING, files = listOf(DvrRecordingFile.create()))))
     }
 
-    @Test fun absentFilesDoesNotMeanDeleted() {
-        assertFalse(recordingWasDeleted(DvrEntry.create(DvrEntryId(1), state = DvrEntryState.FILE_MISSING)))
+    @Test fun absentMissingFilesAfterServerRestartMeansRemoved() {
+        assertTrue(recordingWasRemoved(DvrEntry.create(DvrEntryId(1), state = DvrEntryState.FILE_MISSING)))
     }
 
-    @Test fun otherStatesWithEmptyFilesAreNotDeleted() {
+    @Test fun otherStatesWithAnyFilesShapeAreNotRemoved() {
         listOf(DvrEntryState.COMPLETED, DvrEntryState.COMPLETED_ERROR, DvrEntryState.MISSED,
-            DvrEntryState.INVALID).forEach { state ->
-            assertFalse(recordingWasDeleted(DvrEntry.create(DvrEntryId(1), state = state, files = emptyList())))
+            DvrEntryState.INVALID, DvrEntryState.RECORDING_ERROR).forEach { state ->
+            assertFalse(recordingWasRemoved(DvrEntry.create(DvrEntryId(1), state = state, files = emptyList())))
+            assertFalse(recordingWasRemoved(DvrEntry.create(DvrEntryId(1), state = state)))
+            assertFalse(recordingWasRemoved(DvrEntry.create(DvrEntryId(1), state = state,
+                files = listOf(DvrRecordingFile.create()))))
         }
     }
 

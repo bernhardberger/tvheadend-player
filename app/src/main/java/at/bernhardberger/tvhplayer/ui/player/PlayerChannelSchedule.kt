@@ -6,7 +6,7 @@ import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
-import at.bernhardberger.tvhplayer.core.recordingWasDeleted
+import at.bernhardberger.tvhplayer.core.recordingWasRemoved
 import at.bernhardberger.tvhplayer.core.toConnectionUiState
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
@@ -90,7 +90,7 @@ internal fun PlayerChannelSchedule(
             ChannelSchedule(channel, events, nowSec, viewerSec,
                  loading = scheduleLoading(connection, observation.epgState) || moreLoading,
                  offline = scheduleOffline(connection, observation.epgState),
-                recording = { observation.dvrEntryForEvent(it)?.takeUnless(::recordingWasDeleted)?.state },
+                recording = { observation.dvrEntryForEvent(it)?.takeUnless(::recordingWasRemoved)?.state },
                 onOpen = { contextMenu = false; layers.showScheduleDetails(it) },
                 onContextMenu = { contextMenu = true; layers.showScheduleDetails(it) },
                 onClose = { layers.closeSchedule() }, onRetry = onRetry,

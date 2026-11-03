@@ -7,7 +7,7 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.core.recordingWasDeleted
+import at.bernhardberger.tvhplayer.core.recordingWasRemoved
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.ui.common.formatDurationMinutes
@@ -52,7 +52,7 @@ internal fun railNowPlaying(
         }
         is AppPlaybackTarget.Recording -> {
             if (warmRecordingId != target.recordingId) return null
-            val entry = observation.dvrEntry(target.recordingId)?.takeUnless(::recordingWasDeleted) ?: return null
+            val entry = observation.dvrEntry(target.recordingId)?.takeUnless(::recordingWasRemoved) ?: return null
             val channel = entry.channelId?.let(observation::channel)
             RailNowPlaying(target, entry.channelId, channel?.number,
                 channel?.name ?: entry.channelName.orEmpty(), channel?.icon,

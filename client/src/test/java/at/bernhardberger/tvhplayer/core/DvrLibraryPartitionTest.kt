@@ -10,18 +10,20 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class DvrLibraryPartitionTest {
-    @Test fun serverDeletedEntriesDisappearButRealMissingFilesRemainProblems() {
+    @Test fun allMissingFilesAreRemovedInsteadOfProblems() {
         val deleted = DvrEntry.create(DvrEntryId(10), state = DvrEntryState.FILE_MISSING, files = emptyList())
         val missing = DvrEntry.create(DvrEntryId(11), state = DvrEntryState.FILE_MISSING,
             files = listOf(DvrRecordingFile.create()))
-        val neverRecorded = DvrEntry.create(DvrEntryId(12), state = DvrEntryState.FILE_MISSING)
+        val deletedAfterRestart = DvrEntry.create(DvrEntryId(12), state = DvrEntryState.FILE_MISSING)
         val failed = DvrEntry.create(DvrEntryId(13), state = DvrEntryState.COMPLETED_ERROR, files = emptyList())
-        val library = partitionDvrLibrary(listOf(deleted, missing, neverRecorded, failed))
+        val library = partitionDvrLibrary(listOf(deleted, missing, deletedAfterRestart, failed))
 
-        assertEquals(listOf(missing, neverRecorded, failed), library.problems)
-        assertEquals(listOf(missing, neverRecorded, failed),
-            groupDvrProblems(listOf(deleted, missing, neverRecorded, failed))[DvrProblemBucket.FAILED])
+        assertEquals(listOf(failed), library.problems)
+        assertEquals(listOf(failed),
+            groupDvrProblems(listOf(deleted, missing, deletedAfterRestart, failed))[DvrProblemBucket.FAILED])
         assertEquals(emptyList<DvrEntry>(), partitionDvrLibrary(listOf(deleted)).problems)
+        assertEquals(emptyList<DvrEntry>(), partitionDvrLibrary(listOf(deletedAfterRestart)).problems)
+        assertEquals(emptyList<DvrEntry>(), partitionDvrLibrary(listOf(missing)).problems)
     }
 
     private fun entry(id: Long, state: DvrEntryState, start: Long) =
