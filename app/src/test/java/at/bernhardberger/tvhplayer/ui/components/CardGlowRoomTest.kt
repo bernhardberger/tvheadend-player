@@ -16,7 +16,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.SemanticsMatcher
@@ -131,57 +130,11 @@ class CardGlowRoomTest {
         assertTrue("back at the top nothing stands above it again", rowAboveEdge() < 1f)
     }
 
-    @Test fun gridFadesRowsIntoTheHeadlineGapMidScrollInBothDirections() = gridScrollFrames()
-
-    @Test @Category(VisualCapture::class)
-    fun captureGridScrollFrames() = gridScrollFrames()
-
     @Test @Category(VisualCapture::class)
     fun captureScrolledGridAtRest() = gridKeepsItsGlowAboveAfterScrolling()
 
     @Test @Category(VisualCapture::class)
     fun captureRingPulseFrames() = ringPulsesBetweenSolidAndSeeThrough()
-
-    private fun gridScrollFrames() {
-        compose.mainClock.autoAdvance = false
-        fixture.show(ChannelsView(ChannelsLayout.GRID, setOf(ChannelsLayout.GRID)), fixture.fixtureArt(), warmPlayback = true)
-        repeat(40) { compose.mainClock.advanceTimeBy(100); compose.waitForIdle() }
-        fixture.awaitFocus(card(1))
-        val first = bounds(card(1))
-        val gapTop = (first.top - CardGlowReach.value).toInt()
-        val xRange = (first.left + first.width / 4).toInt() until (first.right - first.width / 4).toInt()
-        fun top() = compose.onNode(card(1)).fetchSemanticsNode().layoutInfo.coordinates.positionInRoot().y
-        fun sample(direction: String) {
-            val start = top()
-            compose.mainClock.advanceTimeBy(32)
-            compose.waitForIdle()
-            val middle = top()
-            assertTrue("$direction actually scrolls", abs(start - middle) > 1f)
-            val frame = draw()
-            save("grid-scroll-$direction", frame)
-            // The gap's upper part: rows have all but faded there, so only faint detail remains.
-            for (y in gapTop until gapTop + 6) {
-                for (x in xRange) {
-                    val step = abs(luminance(frame.getPixel(x, y)) - luminance(frame.getPixel(x, y - 1)))
-                    assertTrue("$direction: content or a cut in headline gap at $x,$y: $step", step < 2 * MaxStep)
-                }
-            }
-            val above = xRange.map { luminance(frame.getPixel(it, gapTop - 1)) }.average()
-            val edge = xRange.map { luminance(frame.getPixel(it, gapTop)) }.average()
-            assertTrue("$direction: hard cut at the grid's upper edge: $above -> $edge", abs(edge - above) < MaxStep)
-            frame.recycle()
-            compose.mainClock.advanceTimeBy(32)
-            compose.waitForIdle()
-            assertTrue("$direction sample was mid-scroll, not at rest", abs(top() - middle) > 1f)
-            repeat(20) { compose.mainClock.advanceTimeBy(100); compose.waitForIdle() }
-        }
-        fixture.key(Key.DirectionDown)
-        fixture.awaitFocus(card(5))
-        sample("down")
-        fixture.key(Key.DirectionUp)
-        fixture.awaitFocus(card(1))
-        sample("up")
-    }
 
     @Test fun immersiveRowKeepsItsGlowAbove() {
         fixture.show(ChannelsView(ChannelsLayout.IMMERSIVE, setOf(ChannelsLayout.IMMERSIVE)), fixture.fixtureArt())

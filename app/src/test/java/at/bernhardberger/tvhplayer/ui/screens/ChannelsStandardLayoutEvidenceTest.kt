@@ -682,21 +682,19 @@ class ChannelsStandardLayoutEvidenceTest {
     }
 
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
-    fun headlineHangsFromThePictureAcrossChannelsWithAndWithoutMetadata() = checkDetailAnchors(1f, pictureTop = 80f)
+    fun headlineHangsFromThePictureAcrossChannelsWithAndWithoutMetadata() = checkDetailAnchors(1f)
 
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
-    fun enlargedGermanHeadlineHangsFromThePictureAcrossChannelsWithAndWithoutMetadata() =
-        // The header's clock needs more than the slot at this size.
-        checkDetailAnchors(1.3f, pictureTop = 87f)
+    fun enlargedGermanHeadlineHangsFromThePictureAcrossChannelsWithAndWithoutMetadata() = checkDetailAnchors(1.3f)
 
-    private fun checkDetailAnchors(fontScale: Float, pictureTop: Float) {
+    private fun checkDetailAnchors(fontScale: Float) {
         channelsShell(fontScale)
         enterAndFocus(1)
         for (channel in 1..NO_EPG) {
             if (channel > 1) key(Key.DirectionDown)
             row(channel).assertIsFocused()
             val picture = detail("channels-list-art").bounds()
-            assertEquals("the picture keeps the pane's top", pictureTop, picture.top, .5f)
+            assertEquals("the picture keeps the pane's top", 80f, picture.top, .5f)
             assertEquals("the kit's four-column card", 268f, picture.width, .5f)
             assertEquals("at 16:9", 150.75f, picture.height, .5f)
             assertEquals("the headline hangs from the picture", picture.bottom + 20f, headlineChannel().bounds().top, .5f)
