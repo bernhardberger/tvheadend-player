@@ -9,6 +9,46 @@ import org.junit.Test
 
 class RecordingMarkerPolicyTest {
     @Test
+    fun chaptersMergeWithScenesAndAreSortedDistinctAndInsideDuration() {
+        assertEquals(listOf(0L, 20L, 30L, 90L), recordingMarkerPositions(
+            listOf(marker(0, 20), marker(20, 90)), 100,
+            listOf(30L, 20L, 30L, 0L, -1L, 100L, 110L),
+        ))
+    }
+
+    @Test
+    fun anyCommercialOrCutIntervalSuppressesAllChapters() {
+        for (action in listOf(DvrCutpointAction.COMMERCIAL_BREAK, DvrCutpointAction.CUT)) {
+            assertEquals(listOf(0L, 10L, 20L, 90L), recordingMarkerPositions(
+                listOf(DvrCutpoint(10.milliseconds, 20.milliseconds, action), marker(20, 90)),
+                100, listOf(11L, 21L, 30L),
+            ))
+            // Even an out-of-range interval establishes the source precedence.
+            assertTrue(recordingMarkerPositions(
+                listOf(DvrCutpoint(100.milliseconds, 110.milliseconds, action)), 100, listOf(30L),
+            ).isEmpty())
+        }
+    }
+
+    @Test
+    fun muteAndUnknownDoNotSuppressChapters() {
+        for (action in listOf(DvrCutpointAction.MUTE, DvrCutpointAction.UNKNOWN)) {
+            assertEquals(listOf(0L, 30L), recordingMarkerPositions(
+                listOf(DvrCutpoint(10.milliseconds, 20.milliseconds, action)), 100, listOf(30L),
+            ))
+        }
+    }
+
+    @Test
+    fun chaptersAloneIncludeStartButNeverInventAnEnd() {
+        assertEquals(listOf(0L, 30L), recordingMarkerPositions(emptyList(), 100, listOf(30L)))
+        assertTrue(recordingMarkerPositions(emptyList(), 100, listOf(0L)).isEmpty())
+        assertEquals(listOf(0L, 4_000L), recordingMarkerPositions(emptyList(), 10_000, listOf(0L, 4_000L)))
+        assertTrue(recordingMarkerPositions(emptyList(), 100, listOf(-1L, 100L, 110L)).isEmpty())
+        assertTrue(recordingMarkerPositions(emptyList(), 0, listOf(0L, 30L)).isEmpty())
+    }
+
+    @Test
     fun sceneMarkersUseTheSdkSceneBoundaryOfActualTvheadendIntervals() {
         val points = listOf(marker(0, 10_000), marker(10_000, 90_000))
         assertEquals(

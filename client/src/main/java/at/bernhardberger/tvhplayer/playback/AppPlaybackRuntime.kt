@@ -234,6 +234,7 @@ class AppPlaybackRuntime(
         targetInstallationInProgress = { targetInstallationInProgress },
     )
     val recordingCutpoints = recordingMarkers.recordingCutpoints
+    val recordingChapterStartsMs = recordingMarkers.recordingChapterStartsMs
     val recordingMarkerRevision = recordingMarkers.recordingMarkerRevision
     @Volatile
     private var activeTargetEpoch: Long? = null
@@ -442,6 +443,7 @@ class AppPlaybackRuntime(
         }
 
         override fun onTracksChanged(tracks: Tracks) {
+            recordingMarkers.onTracksChanged()
             // Known tracks without video (radio): nothing to request. Empty tracks during a zap keep the rate.
             if (tracks.groups.isNotEmpty() && !tracks.containsType(androidx.media3.common.C.TRACK_TYPE_VIDEO)) {
                 frameRate.reset()

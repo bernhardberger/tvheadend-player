@@ -47,6 +47,35 @@ import org.junit.Test
 class AppPlaybackRuntimeTest {
     @Test
     @OptIn(at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi::class)
+    fun arrivingChaptersDoNotDiscardAnInFlightCutpointResponse() = runTest {
+        val entry = DvrEntry.create(id = DvrEntryId(4), state = at.bernhardberger.tvheadend.sdk.core.DvrEntryState.COMPLETED)
+        val fake = at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession(currentObservation(recordings = listOf(entry)))
+        val response = CompletableDeferred<Unit>()
+        val points = listOf(at.bernhardberger.tvheadend.sdk.core.DvrCutpoint(
+            Duration.ZERO, 10.seconds, at.bernhardberger.tvheadend.sdk.core.DvrCutpointAction.SCENE_MARKER,
+        ))
+        val binding = (at.bernhardberger.tvheadend.sdk.core.TvheadendTestResultFactory.boundCompletedRecordingPlayback(
+            fake, fake.captureCurrentSession(), entry.id,
+            cutpoints = {
+                response.await()
+                at.bernhardberger.tvheadend.sdk.core.DvrCutpointsResult.Available.create(points)
+            },
+        ) as at.bernhardberger.tvheadend.sdk.core.PlaybackBindingResult.Bound).binding
+        val query = RecordingMarkerQuery()
+        query.use(binding)
+        val job = launch { query.refresh(binding) }
+        runCurrent()
+        query.updateChapters(listOf(0L, 5_000L))
+        val chapterRevision = query.revision.value
+        response.complete(Unit)
+        job.join()
+        assertEquals(points, query.cutpoints.value)
+        assertEquals(listOf(0L, 5_000L), query.chapterStartsMs.value)
+        assertTrue(query.revision.value > chapterRevision)
+    }
+
+    @Test
+    @OptIn(at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi::class)
     fun successfulMarkerResponsesPublishAndLateResponsesCannotRestoreRetiredMarkers() = runTest {
         for (retirement in listOf("stop", "reinstall", "generation", "replacement", "cancel")) {
             val entry = DvrEntry.create(id = DvrEntryId(4), state = at.bernhardberger.tvheadend.sdk.core.DvrEntryState.COMPLETED)
@@ -68,6 +97,7 @@ class AppPlaybackRuntimeTest {
             query.use(binding)
             query.refresh(binding)
             assertEquals(points, query.cutpoints.value)
+            query.updateChapters(listOf(0L, 5_000L))
             delayed = true
             val job = launch { query.refresh(binding) }
             runCurrent()
@@ -75,6 +105,9 @@ class AppPlaybackRuntimeTest {
             assertFalse(job.isCompleted)
             query.use(null)
             assertTrue(query.cutpoints.value.isEmpty())
+            assertTrue(query.chapterStartsMs.value.isEmpty())
+            query.updateChapters(listOf(9_000L))
+            assertTrue(query.chapterStartsMs.value.isEmpty())
             when (retirement) {
                 "reinstall" -> query.use(binding) // Same object is still fenced by installation revision.
                 "generation" -> fake.replaceGeneration(currentObservation(recordings = listOf(entry)))
@@ -101,13 +134,20 @@ class AppPlaybackRuntimeTest {
         query.use(binding)
         val initialRevision = query.revision.value
         assertTrue(query.isCurrent(binding))
+        query.updateChapters(listOf(0L, 5_000L))
+        assertTrue(query.revision.value > initialRevision)
+        val chapterRevision = query.revision.value
+        query.updateChapters(listOf(0L, 5_000L))
+        assertEquals(chapterRevision, query.revision.value)
         query.refresh(binding) // The installed SDK fake supplies NotReady: ordinary seeking remains.
         assertTrue(query.cutpoints.value.isEmpty())
         query.use(null)
         assertFalse(query.isCurrent(binding))
+        assertTrue(query.chapterStartsMs.value.isEmpty())
         query.refresh(binding)
         assertTrue(query.cutpoints.value.isEmpty())
         query.use(binding)
+        assertTrue(query.chapterStartsMs.value.isEmpty())
         assertTrue(query.revision.value > initialRevision)
         fake.replaceGeneration(currentObservation(recordings = listOf(entry)))
         assertFalse(query.isCurrent(binding))

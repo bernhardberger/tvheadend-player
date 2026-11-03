@@ -1002,7 +1002,9 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   is dimmed but focusable and states the reason in the timeline feedback line.
   Above a recording's markers, Up from the seekbar opens the markers and Up again
   closes them. Recording markers include scene boundaries and both endpoints of
-  commercial-break and cut intervals; they only navigate and never skip content automatically.
+  commercial-break and cut intervals, plus chapters stored in the recording file
+  when Tvheadend supplies no commercial-break or cut intervals; they only navigate
+  and never skip content automatically.
 - The controls leave over 200 ms (standard accelerate), 100 ms when a modal
   layer replaces them.
 - Numeric entry is a state of the top identity's place: the identity's chip,

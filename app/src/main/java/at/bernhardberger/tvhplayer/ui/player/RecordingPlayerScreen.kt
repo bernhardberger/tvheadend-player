@@ -116,6 +116,7 @@ fun RecordingPlayerScreen(
     val recordingSelection by session.recordingSelection.collectAsStateWithLifecycle()
     val recordingAdmission by session.recordingAdmission.collectAsStateWithLifecycle()
     val cutpoints by session.recordingCutpoints.collectAsStateWithLifecycle()
+    val chapterStartsMs by session.recordingChapterStartsMs.collectAsStateWithLifecycle()
     val markerRevision by session.recordingMarkerRevision.collectAsStateWithLifecycle()
     val observation by tvheadendSession.observation.collectAsStateWithLifecycle()
     val currentSession = observation.currentSession
@@ -179,9 +180,9 @@ fun RecordingPlayerScreen(
     val positionMs = timelineState.positionMs
     val durationMs = timelineState.durationMs
     val displayDurationMs = timelineState.displayDurationMs
-    val markers = remember(cutpoints, durationMs, timelineState.canSeek, retainedSelection, currentSession) {
+    val markers = remember(cutpoints, chapterStartsMs, durationMs, timelineState.canSeek, retainedSelection, currentSession) {
         if (timelineState.canSeek && retainedSelection != null && retainedSelection.currentSession === currentSession) {
-            at.bernhardberger.tvhplayer.core.recordingMarkerPositions(cutpoints, durationMs)
+            at.bernhardberger.tvhplayer.core.recordingMarkerPositions(cutpoints, durationMs, chapterStartsMs)
         } else emptyList()
     }
     val markerNavigation = remember { RecordingMarkerNavigation() }

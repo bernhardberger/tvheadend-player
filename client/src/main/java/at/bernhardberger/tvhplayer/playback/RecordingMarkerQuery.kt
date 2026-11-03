@@ -16,15 +16,27 @@ import kotlinx.coroutines.flow.asStateFlow
 /** Optional metadata for the installed binding; cancellation alone is not a stale-reply fence. */
 internal class RecordingMarkerQuery {
     private var binding: PlaybackBinding.Recording? = null
+    // Metadata revisions dismiss navigation, but must not invalidate a pending cutpoint fetch.
+    private var installation = 0L
     private val _revision = MutableStateFlow(0L)
     val revision = _revision.asStateFlow()
     private val _cutpoints = MutableStateFlow<List<DvrCutpoint>>(emptyList())
     val cutpoints = _cutpoints.asStateFlow()
+    private val _chapterStartsMs = MutableStateFlow<List<Long>>(emptyList())
+    val chapterStartsMs = _chapterStartsMs.asStateFlow()
 
     fun use(value: PlaybackBinding.Recording?) {
-        _revision.value++
+        installation++
         binding = value
         _cutpoints.value = emptyList()
+        _chapterStartsMs.value = emptyList()
+        _revision.value++
+    }
+
+    fun updateChapters(startsMs: List<Long>) {
+        if (!isCurrent() || startsMs == _chapterStartsMs.value) return
+        _chapterStartsMs.value = startsMs
+        _revision.value++
     }
 
     @OptIn(ExperimentalTvheadendApi::class)
@@ -41,7 +53,7 @@ internal class RecordingMarkerQuery {
 
     suspend fun refresh(value: PlaybackBinding.Recording) {
         if (!isCurrent(value)) return
-        val expectedRevision = revision.value
+        val expectedInstallation = installation
         val result = try {
             value.cutpoints()
         } catch (cancelled: CancellationException) {
@@ -51,8 +63,12 @@ internal class RecordingMarkerQuery {
             null
         }
         currentCoroutineContext().ensureActive()
-        if (expectedRevision == revision.value && isCurrent(value)) {
-            _cutpoints.value = (result as? DvrCutpointsResult.Available)?.cutpoints.orEmpty()
+        if (expectedInstallation == installation && isCurrent(value)) {
+            val points = (result as? DvrCutpointsResult.Available)?.cutpoints.orEmpty()
+            if (points != _cutpoints.value) {
+                _cutpoints.value = points
+                _revision.value++
+            }
         }
     }
 }
