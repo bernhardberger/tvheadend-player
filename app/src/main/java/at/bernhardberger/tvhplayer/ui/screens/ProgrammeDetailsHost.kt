@@ -215,7 +215,8 @@ internal fun ProgrammeDetailsHost(
         }
         if (capability == null || capability !== current.currentSession) { close(); return@action }
         val actionEvent = current.event(programme.id) ?: programme
-        val actionRecording = current.dvrEntryForEvent(actionEvent)?.takeUnless(::recordingWasDeleted)
+        // Display reads hide server-deleted recordings; an action stays raw so playback admission reports it.
+        val actionRecording = current.dvrEntryForEvent(actionEvent)
         val actionCanModify = current.dvrState is DvrRepositoryState.Current &&
             (current.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
         if (action == BrowseContextAction.PLAY && actionRecording != null) {

@@ -39,8 +39,9 @@ import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
-import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
+import at.bernhardberger.tvhplayer.ui.TvCardFocusedScale
 import at.bernhardberger.tvhplayer.ui.components.CardGlowReach
+import at.bernhardberger.tvhplayer.ui.components.EmbeddedProgressCardBorderOutset
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
 import at.bernhardberger.tvhplayer.ui.components.CompactZapCardGap
 import at.bernhardberger.tvhplayer.ui.components.cardGlowRoom
@@ -57,6 +58,9 @@ private val ChannelsGridRowGap = 16.dp
  * further out, to [CardGlowReach], past its own bounds.
  */
 internal val ChannelsGridEdgeInset = 16.dp
+
+/** DESIGN.md §4: the focused last row, outline included, ends this far above the screen bottom. */
+internal val ChannelsGridBottomSafeInset = 32.dp
 
 /** Scrolled rows sit this far below the physical top edge, leaving the preceding row's tail visible. */
 internal val ChannelsGridFocusLine = 48.dp
@@ -107,6 +111,9 @@ internal fun ChannelsGrid(
     val lastRow = channels.lastIndex / columns
     BoxWithConstraints(modifier) {
     val cardWidth = (maxWidth - ChannelsGridEdgeInset * 2 - CompactZapCardGap * (columns - 1)) / columns
+    // The last row's focus scale and outline grow past its picture; they too stay inside the safe inset.
+    val focusGrowth = cardWidth * (9f / 16f) * ((TvCardFocusedScale - 1f) / 2f) +
+        EmbeddedProgressCardBorderOutset * TvCardFocusedScale
     CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoView) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(columns),
@@ -118,7 +125,7 @@ internal fun ChannelsGrid(
                 start = CardGlowReach,
                 end = CardGlowReach,
                 top = CardGlowReach + scrollingHeaderHeight,
-                bottom = TvGridVerticalMargin,
+                bottom = ChannelsGridBottomSafeInset + focusGrowth,
             ),
             modifier = Modifier
                 .fillMaxSize()

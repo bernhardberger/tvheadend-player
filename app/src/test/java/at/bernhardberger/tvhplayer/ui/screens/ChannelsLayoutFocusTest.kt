@@ -568,6 +568,82 @@ class ChannelsLayoutFocusTest {
         assertEquals("Up holds the place too", focusLine, compose.onNode(card(5)).fetchSemanticsNode().positionInRoot.y, .5f)
     }
 
+    private fun recordingBadge(id: Int) = hasTestTag("recording-badge") and hasAnyAncestor(card(id))
+
+    /** A grid card follows the rule of the other layouts: watched orange, passive recording red, otherwise cyan. */
+    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE) fun gridCardsShowARunningRecordingAsRedWithItsBadge() {
+        // Channel 2 records, channel 3 is watched, channel 4 only airs.
+        fixture.show(grid, recordingNow = 2, playingLive = ChannelId(3))
+        fixture.awaitFocus(card(1))
+        compose.mainClock.advanceTimeBy(1_500)
+        compose.waitForIdle()
+        compose.onNode(recordingBadge(2), useUnmergedTree = true).assertExists()
+        compose.onAllNodes(recordingBadge(3), useUnmergedTree = true).assertCountEquals(0)
+        compose.onAllNodes(recordingBadge(4), useUnmergedTree = true).assertCountEquals(0)
+        val pixels = compose.onRoot().captureToImage().toPixelMap()
+        fun stripColor(id: Int): androidx.compose.ui.graphics.Color {
+            val strip = compose.onNodeWithTag("channels-grid-$id-progress", useUnmergedTree = true).getUnclippedBoundsInRoot()
+            return pixels[strip.left.value.toInt() + 2, ((strip.top.value + strip.bottom.value) / 2).toInt()]
+        }
+        val recording = stripColor(2)
+        val watched = stripColor(3)
+        val onAir = stripColor(4)
+        assertTrue("recording $recording is red", recording.red > recording.blue)
+        assertTrue("on air $onAir is cyan", onAir.blue > onAir.red)
+        assertNotEquals(recording, watched)
+        assertNotEquals(watched, onAir)
+        assertNotEquals(recording, onAir)
+    }
+
+    /** A recording the viewer also watches keeps its badge; the bar follows the viewer. */
+    @Test fun gridCardKeepsItsRecordingBadgeWhileWatched() {
+        fixture.show(grid, recordingNow = 3, playingLive = ChannelId(3))
+        fixture.awaitFocus(card(1))
+        compose.onNode(recordingBadge(3), useUnmergedTree = true).assertExists()
+    }
+
+    @Test fun gridWallLastRowKeepsTheFocusedCardAndItsOutlineClearOfTheBottomSafeInset() {
+        fixture.show(grid, channelCount = 30)
+        fixture.awaitFocus(card(1))
+        repeat(7) { fixture.key(Key.DirectionDown) }
+        fixture.awaitFocus(card(29))
+        compose.waitForIdle()
+        val bounds = compose.onNode(card(29)).getUnclippedBoundsInRoot()
+        val screen = compose.onRoot().getUnclippedBoundsInRoot()
+        // The ring and the focus scale grow past the picture's bounds.
+        val growth = (bounds.bottom - bounds.top) * ((at.bernhardberger.tvhplayer.ui.TvCardFocusedScale - 1f) / 2f) +
+            at.bernhardberger.tvhplayer.ui.components.EmbeddedProgressCardBorderOutset * at.bernhardberger.tvhplayer.ui.TvCardFocusedScale
+        val clearance = screen.bottom - (bounds.bottom + growth)
+        assertTrue("focused outline clears the 32dp bottom safe inset: $clearance (card $bounds, screen $screen)",
+            clearance.value >= 32f - .5f)
+    }
+
+    /** Closing View options on a deep channel after choosing the grid leaves the header button on screen. */
+    @Test fun gridHeaderButtonIsOnScreenWhenViewOptionsCloseOverADeepChannel() {
+        fixture.show(immersive, channelCount = 30)
+        fixture.awaitFocus(card(1))
+        repeat(12) { fixture.key(Key.DirectionRight) }
+        fixture.awaitFocus(card(13))
+        fixture.key(Key.DirectionUp)
+        fixture.awaitFocus(tagsButton)
+        fixture.key(Key.DirectionRight)
+        fixture.awaitFocus(viewButton)
+        fixture.key(Key.DirectionCenter)
+        fixture.awaitFocus(option("layout-immersive"))
+        repeat(2) { fixture.key(Key.DirectionDown) }
+        fixture.awaitFocus(option("layout-grid"))
+        fixture.key(Key.DirectionCenter)
+        fixture.key(Key.Back)
+        fixture.awaitFocus(viewButton)
+        compose.waitForIdle()
+        val bounds = compose.onNode(viewButton).getUnclippedBoundsInRoot()
+        val screen = compose.onRoot().getUnclippedBoundsInRoot()
+        assertTrue("the focused header button is on screen: $bounds; screen $screen",
+            bounds.top >= screen.top && bounds.bottom <= screen.bottom)
+        fixture.key(Key.DirectionDown)
+        fixture.awaitFocus(card(13))
+    }
+
     @Test fun immersiveDownStaysAndUpReachesTheHeader() {
         fixture.show(immersive)
         fixture.awaitFocus(card(1))

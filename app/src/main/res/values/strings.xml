@@ -818,7 +818,7 @@
     <string name="error_109_title">Couldn’t load TV data</string>
     <string name="error_109_reason">Something went wrong while loading.</string>
     <string name="error_110_title">Can’t reach the server</string>
-    <!-- Error reason while reconnecting. %1$d = seconds until the next attempt. "s" is the seconds unit symbol. -->
+    <!-- Error reason while reconnecting. %1$s = formatted time until the next attempt, units included (for example "30 s"). -->
     <string name="error_110_reason">Reconnecting in %1$s…</string>
     <string name="error_110_reason_pending">Reconnecting…</string>
     <string name="error_111_title">No Tvheadend server at this address</string>
@@ -827,6 +827,7 @@
     <string name="error_112_title">This TV isn’t connected to a network</string>
     <string name="error_112_reason">Without a network, it can’t reach the server.</string>
     <string name="error_hint_check_tv_network">Check the TV’s network settings.</string>
+    <!-- Error detail while reconnecting. %1$s = formatted time until the next attempt, units included (for example "30 s"). -->
     <string name="error_reconnect_next_attempt">Next attempt in %1$s</string>
     <string name="error_201_title">No free tuner</string>
     <string name="error_201_reason">Every tuner is in use right now.</string>

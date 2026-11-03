@@ -72,7 +72,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrConfiguration
 import at.bernhardberger.tvheadend.sdk.core.DvrConfigurationsState
-import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
@@ -133,7 +132,6 @@ import at.bernhardberger.tvhplayer.ui.common.clockWidthSamples
 import at.bernhardberger.tvhplayer.ui.common.programmeCategoryLabel
 import at.bernhardberger.tvhplayer.ui.tvGenreColors
 import at.bernhardberger.tvhplayer.core.TimelineEpgEventIndex
-import at.bernhardberger.tvhplayer.core.recordingWasDeleted
 import at.bernhardberger.tvhplayer.ui.components.rememberTabContentMotion
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideChannelWidth
@@ -345,7 +343,6 @@ fun EpgGridScreen(
     val selectedChannelId by selection.selectedId.collectAsStateWithLifecycle()
     val activePlaybackTarget by playerSession.activeTarget.collectAsStateWithLifecycle()
     val playingChannelId = (activePlaybackTarget as? AppPlaybackTarget.Live)?.channelId
-    val dvrEntries = observation.dvrEntries()
     val eventFocusRequesters = remember { mutableMapOf<EventId, FocusRequester>() }
     val guideDateFocus = remember { FocusRequester() }
     val guideRetryFocus = remember { FocusRequester() }
@@ -2168,9 +2165,6 @@ fun EpgGridScreen(
     }
     }
 }
-
-private fun SessionObservation.dvrEntries(): List<DvrEntry> =
-    dvrSnapshotForDisplay?.entries.orEmpty().filterNot(::recordingWasDeleted)
 
 internal fun currentDvrMutation(
     mutation: DvrMutationAction?,

@@ -74,8 +74,9 @@ class ChannelsLayoutCaptureTest {
 
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
     fun gridWallTopScrolledLastRowAndViewOptions() = atEvening {
+        // Harbor Kickoff records, as in the Immersive and List wall captures.
         fixture.show(ChannelsView(ChannelsLayout.GRID, programArt = setOf(ChannelsLayout.GRID)),
-            fixture.fixtureArt(), presentation = true, channelCount = 30)
+            fixture.fixtureArt(), presentation = true, channelCount = 30, recordingNow = 2, scheduledNext = 1)
         capture("grid-top", card(1), outputs = "build/outputs/043-channels")
         fixture.key(Key.DirectionDown)
         capture("grid-scrolled", card(5), outputs = "build/outputs/043-channels")
@@ -92,6 +93,14 @@ class ChannelsLayoutCaptureTest {
             compose.onNodeWithTag("channels-view-$it").assertIsDisplayed()
         }
         capture("grid-view-options", hasTestTag("channels-view-channel-names"), outputs = "build/outputs/043-channels")
+    }
+
+    /** The channel being watched also records: orange bar, and the recording badge stays. */
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
+    fun gridWatchedRecording() = atEvening {
+        fixture.show(ChannelsView(ChannelsLayout.GRID, programArt = setOf(ChannelsLayout.GRID)),
+            fixture.fixtureArt(), presentation = true, channelCount = 30, recordingNow = 2, playingLive = ChannelId(2))
+        capture("grid-watched-recording", card(1), outputs = "build/outputs/043-channels")
     }
 
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")

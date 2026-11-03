@@ -200,6 +200,71 @@ class ProgrammeDvrSdkAdoptionTest {
         compose.runOnIdle { assertEquals(selected.id, stopped) }
     }
 
+    private fun observation(entry: DvrEntry?) = SessionObservation.create(
+        sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED,
+            dvrWrite = CapabilityAccess.ALLOWED)),
+        channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(Channel.create(ChannelId(1), name = "Ridge Earth")))),
+        epgState = EpgRepositoryState.Current(EpgSnapshot.create(listOf(event))),
+        dvrState = DvrRepositoryState.Current(DvrSnapshot.create(listOfNotNull(entry))),
+    )
+
+    private fun deleted() = DvrEntry.create(DvrEntryId(2), eventId = event.id, state = DvrEntryState.FILE_MISSING,
+        files = emptyList())
+
+    /**
+     * Deleted-recording filtering is for display: a PLAY that arrives after the entry was deleted
+     * still reaches the playback admission path, which reports the unavailable recording.
+     */
+    @Test fun playAfterTheEntryWasDeletedStillReachesPlayback() {
+        val session = at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession(
+            observation(DvrEntry.create(DvrEntryId(2), eventId = event.id, state = DvrEntryState.COMPLETED)))
+        val opening = session.observation.value
+        var played: at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection? = null
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                ProgrammeDetailsHost(event, opening, opening, { session.observation.value }, { 5000L },
+                    showContextMenu = true, onShowDetails = {},
+                    mutations = DvrMutationActions(scheduleEntry = { _, _ -> error("unexpected schedule") },
+                        stopEntry = { _, _ -> error("unexpected stop") }, cancelEntry = { _, _ -> error("unexpected cancel") },
+                        deleteEntry = { _, _ -> error("unexpected delete") },
+                        updateWatchStateCommand = { _, _, _ -> error("Unexpected watch-state update") }),
+                    notices = NoticeCenter({ 0L }) { NoticeContext(0, opening.currentSession?.generationIdentity) },
+                    mutationScope = rememberCoroutineScope(), mutationInFlight = remember { mutableStateOf(null) },
+                    onPlay = { _, _ -> }, onPlayRecording = { played = it }, onClose = {},
+                    settingsStore = UiSettingsStore(context))
+            }
+        }
+        compose.onNodeWithText("Play recording").assertIsDisplayed()
+        // The server removes the recording after the menu was presented.
+        compose.runOnIdle { session.publish(observation(deleted())) }
+        compose.onNodeWithText("Play recording").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.runOnIdle { assertEquals(DvrEntryId(2), played?.recordingId) }
+    }
+
+    /** A deleted entry is no recording for the programme: Record still creates one. */
+    @Test fun recordCreatesAProgrammeRecordingWhenTheOnlyEntryWasDeleted() {
+        val session = at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession(observation(deleted()))
+        val opening = session.observation.value
+        var scheduled = 0
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                ProgrammeDetailsHost(event, opening, opening, { session.observation.value }, { 2000L },
+                    showContextMenu = true, onShowDetails = {},
+                    mutations = DvrMutationActions(
+                        scheduleEntry = { _, _ -> scheduled++; DvrMutationResult.Confirmed(DvrEntryId(3)) },
+                        stopEntry = { _, _ -> error("unexpected stop") }, cancelEntry = { _, _ -> error("unexpected cancel") },
+                        deleteEntry = { _, _ -> error("unexpected delete") },
+                        updateWatchStateCommand = { _, _, _ -> error("Unexpected watch-state update") }),
+                    notices = NoticeCenter({ 0L }) { NoticeContext(0, opening.currentSession?.generationIdentity) },
+                    mutationScope = rememberCoroutineScope(), mutationInFlight = remember { mutableStateOf(null) },
+                    onPlay = { _, _ -> }, onPlayRecording = {}, onClose = {},
+                    settingsStore = UiSettingsStore(context))
+            }
+        }
+        compose.onNodeWithText("Record").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.waitUntil(5_000) { compose.waitForIdle(); scheduled == 1 }
+    }
+
     @Test fun rejectedServerMessageReachesNoticeWithoutEnteringDiagnostics() = rejected("No free adapter")
     @Test fun rejectedWithoutServerMessageKeepsExistingText() = rejected(null)
     @Test fun aServerMessageOnAnotherFailureKeepsTheAppText() = rejected("No free adapter", TvheadendFailure.TIMEOUT)

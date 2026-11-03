@@ -703,6 +703,9 @@ internal fun ChannelsScreenContent(
                 onFocused = {
                     didInitialRestore = true
                     relinquishContentFocus()
+                    // The wall's header scrolls away with the rows: focus on it brings it back, while the
+                    // remembered channel stays for Down.
+                    if (layout == ChannelsLayout.GRID) coroutineScope.launch { gridState.scrollToItem(0) }
                 },
                 onOpen = ::showPanel,
                 onMoveToContent = ::focusBrowseContent,
