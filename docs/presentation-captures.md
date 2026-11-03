@@ -98,16 +98,23 @@ Use `all`: not every store method is tagged as a visual capture. The script
 needs Python 3, Pillow, CairoSVG and the pinned `artwork/fonts/Outfit-550.ttf`.
 It does not run tests or check freshness, so run both commands together.
 
-It writes ignored `captures/play-store/current/`, replacing only its named files:
+It writes only graphics under ignored
+`app/src/play/play/listings/en-US/graphics/`, replacing the contents of these
+five directories and leaving everything else alone:
 
-- `plain/01-home.png`, `02-channels.png`, `03-guide.png` (Dense rows),
-  `04-player.png`, `05-recording.png`, `06-details.png`, `07-schedule.png`:
+- `tv-screenshots/01.png` through `07.png`: Home, Channels, Guide (Dense rows),
+  Player, Recordings, details and schedule, in order;
   1920×1080 RGB, with every source pixel preserved and no frame or crop.
   Home uses `store-home-onnow.png`, not the warm-playback scene.
-- `feature/final.png`: 1024×500 RGB, with the complete Channels screen in a
+- `large-tablet-screenshots/01.png` and `02.png`: copies of Channels and Guide.
+- `feature-graphic/01.png`: 1024×500 RGB, with the complete Channels screen in a
   slim frame; the background and backlight colors come from that screen.
-- `icon.png`: the app's Play Store icon as fully opaque 512×512 RGBA.
-- `banner.png`: a byte copy of `artwork/tvheadend-player-banner@4x.png`.
+- `icon/01.png`: the app's Play Store icon as fully opaque 512×512 RGBA.
+- `tv-banner/01.png`: a byte copy of `artwork/tvheadend-player-banner@4x.png`.
+
+Do not add text listing files: Gradle Play Publisher sends a PUT with nulls for
+absent text fields when text files are present. Keep listing text in Play Console.
+Upload the graphics through the [release process](release-process.md#screenshots).
 
 The script refuses missing captures, sizes other than 1920×1080 and transparency.
 These offline renders use fictional content; they do not prove playback or

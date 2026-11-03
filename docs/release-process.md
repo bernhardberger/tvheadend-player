@@ -107,10 +107,18 @@ with no visible change. Look at the changed images, copy selected README images
 to `artwork/screenshots/` as RGB per that guide, update README alt text where the
 scene changed, and include those images and text in the release commit.
 
-Upload the Play set in Play Console only after the owner has seen and approved
-it. Follow the upload-order note in [graphics §3.0](play-store/graphics.md)
-and update the date in that section when uploaded. The icon and banner are brand
-artwork and change only when the artwork does.
+After the owner has seen and approved the Play set, run:
+
+```bash
+./gradlew :app:publishPlayReleaseListing
+```
+
+This uploads graphics only and changes the listing for the whole app, separately
+from the bundle. The change goes through Play's review. Keep listing text in
+Console; do not add text listing files. Uploading replaces a whole image type's
+set when it differs. Update the date in [graphics §3.0](play-store/graphics.md)
+when uploaded. The icon and banner are brand artwork and change only when the
+artwork does.
 
 ## Unsigned preparation on the build host
 
@@ -293,8 +301,9 @@ there if it's still waiting.
 
 The service account key is
 `~/.config/tvheadend-player/play-publisher.json` on the build host, owner-only and
-outside the repository. The account can only release to testing tracks on this
-app, so moving to production stays in Play Console. A lost key needs no recovery:
+outside the repository. The account can release only to testing tracks and edit
+the store listing through Manage store presence on this app. Moving to production
+stays in Play Console. A lost key needs no recovery:
 create a new one for the service account in Google Cloud Console and delete the
 old one.
 

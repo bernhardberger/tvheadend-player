@@ -13,28 +13,33 @@ Saved as a draft on the default (en-US) listing. The 0.4.0 set now in Play Conso
 was made with an earlier version of these captures. Regenerate the feature
 graphic and screenshots with `tools/prepare-play-assets.py`, following
 [Play Store set](../presentation-captures.md#play-store-set). Its outputs are in
-ignored `captures/play-store/current/`. The icon source is
+ignored `app/src/play/play/listings/en-US/graphics/`. Upload them through the
+[release process](../release-process.md#screenshots), not manually in Console.
+Uploading replaces a whole image type's set when it differs. The icon source is
 `app/src/main/ic_launcher-playstore.png`; the banner source is
 `artwork/tvheadend-player-banner@4x.png`. Update the date above after an
 owner-approved replacement is uploaded.
 
 | Slot | File |
 |---|---|
-| App icon | `icon.png`, fully opaque RGBA from `app/src/main/ic_launcher-playstore.png` |
-| Feature graphic | `feature/final.png`: mark and name, "Built around the remote.", the Channels screen in a slim frame |
-| Android TV screenshots, in order | `plain/01-home.png`, `02-channels.png`, `03-guide.png` (Dense rows), `04-player.png`, `05-recording.png`, `06-details.png`, `07-schedule.png` |
-| TV banner | `banner.png`, byte copy of `artwork/tvheadend-player-banner@4x.png` |
+| App icon | `icon/01.png`, fully opaque RGBA from `app/src/main/ic_launcher-playstore.png` |
+| Feature graphic | `feature-graphic/01.png`: mark and name, "Built around the remote.", the Channels screen in a slim frame |
+| Android TV screenshots, in order | `tv-screenshots/01.png` through `07.png`: Home, Channels, Guide (Dense rows), Player, Recordings, details, schedule |
+| TV banner | `tv-banner/01.png`, byte copy of `artwork/tvheadend-player-banner@4x.png` |
 | Phone screenshots | none |
-| 10-inch tablet screenshots | `02-channels.png`, `03-guide.png`. A full save needs two phone or tablet screenshots, and the Android TV opt-in needs a fully saved listing, so these break the loop. After the opt-in (2026-10-29) Console still refuses to save without them ("Upload at least 2 phone or tablet screenshots"). Try again once TV is approved. Android XR has no opt-out in Console; the leanback requirement keeps phones and headsets from installing |
+| 10-inch tablet screenshots | `large-tablet-screenshots/01.png` (Channels), `02.png` (Guide). A full save needs two phone or tablet screenshots, and the Android TV opt-in needs a fully saved listing, so these break the loop. After the opt-in (2026-10-29) Console still refuses to save without them ("Upload at least 2 phone or tablet screenshots"). Try again once TV is approved. Android XR has no opt-out in Console; the leanback requirement keeps phones and headsets from installing |
 | AI asset declaration | "Don't label assets" (owner, 2026-10-29): fictional sample art inside app screens, not depicting anything real |
 | Video | none yet, see [5.2](review.md#52-demo-video-shot-list) |
+
+The AI declaration stays as chosen in Console; GPP 4.1.1 does not send
+`aiGeneratedState` and does not set it.
 
 The Android TV section of the listing only appears after adding Android TV
 under **Test and release → Advanced settings → Form factors**.
 
-Console's asset library adds several selected files in a scrambled order. Add
-the screenshots one at a time, in order, and wait for each upload to land in the
-slot before starting the next; overlapping uploads get lost.
+For manual uploads only, Console's asset library adds several selected files in
+a scrambled order. Add the screenshots one at a time, in order, and wait for each
+upload to land in the slot before starting the next; overlapping uploads get lost.
 
 Android XR shows as an active form factor that can't be removed. That's
 harmless: the manifest requires `android.software.leanback`, so XR headsets

@@ -10,18 +10,18 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageStat
 from PIL.PngImagePlugin import PngInfo
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "captures/play-store/current"
+OUT = ROOT / "app/src/play/play/listings/en-US/graphics"
 SOURCE = ROOT / "app/build/outputs/presentation"
 FONT = ROOT / "artwork/fonts/Outfit-550.ttf"
 MARK = ROOT / "artwork/tvheadend-player-symbol.svg"
 SCENES = (
-    ("store-home-onnow.png", "01-home.png"),
-    ("store-channels.png", "02-channels.png"),
-    ("store-guide.png", "03-guide.png"),
-    ("store-player.png", "04-player.png"),
-    ("store-recording.png", "05-recording.png"),
-    ("store-details.png", "06-details.png"),
-    ("store-schedule.png", "07-schedule.png"),
+    ("store-home-onnow.png", "01.png"),
+    ("store-channels.png", "02.png"),
+    ("store-guide.png", "03.png"),
+    ("store-player.png", "04.png"),
+    ("store-recording.png", "05.png"),
+    ("store-details.png", "06.png"),
+    ("store-schedule.png", "07.png"),
 )
 
 
@@ -84,7 +84,7 @@ def ambient(image, source, xy, width):
 
 
 def feature():
-    with Image.open(OUT / "plain/02-channels.png") as channels:
+    with Image.open(OUT / "tv-screenshots/02.png") as channels:
         stadium_mean = ImageStat.Stat(channels.crop((0, 0, 1920, 720))).mean
         field = tuple(round(channel * 18 / max(stadium_mean)) for channel in stadium_mean)
         image = Image.new("RGB", (1024, 500), field)
@@ -104,12 +104,12 @@ def feature():
                                fill="#111418", outline="#464F5B", width=1)
         image.paste(channels.resize((width, height), Image.Resampling.LANCZOS), (x, y))
         draw.line((x + 6, y + height + 4, x + width - 6, y + height + 4), fill="#3B424C", width=1)
-        save(image, "feature/final.png")
+        save(image, "feature-graphic/01.png")
 
 
 def main():
-    # Validate every input before replacing any of our named outputs. Leave all
-    # other files in the output directory alone.
+    # Validate inputs before replacing the five graphics directories. Leave
+    # other graphics, locales, release notes and listing text alone.
     for source, _ in SCENES:
         path = SOURCE / source
         if not path.is_file():
@@ -123,13 +123,20 @@ def main():
         if image.size != (512, 512):
             raise ValueError(f"Wrong icon size: {icon_path}: {image.size}; expected 512x512")
         opaque(image, icon_path)
+    for directory in ("icon", "feature-graphic", "tv-banner", "tv-screenshots", "large-tablet-screenshots"):
+        path = OUT / directory
+        if path.exists():
+            shutil.rmtree(path)
+        path.mkdir(parents=True)
     for source, target in SCENES:
         with Image.open(SOURCE / source) as image:
-            save(image.convert("RGB"), f"plain/{target}")
+            save(image.convert("RGB"), f"tv-screenshots/{target}")
+    for source, target in (("02.png", "01.png"), ("03.png", "02.png")):
+        shutil.copyfile(OUT / "tv-screenshots" / source, OUT / "large-tablet-screenshots" / target)
     feature()
     with Image.open(icon_path) as image:
-        save(image.convert("RGBA"), "icon.png")
-    shutil.copyfile(ROOT / "artwork/tvheadend-player-banner@4x.png", OUT / "banner.png")
+        save(image.convert("RGBA"), "icon/01.png")
+    shutil.copyfile(ROOT / "artwork/tvheadend-player-banner@4x.png", OUT / "tv-banner/01.png")
     print(OUT)
 
 
