@@ -15,6 +15,7 @@ plugins {
     alias(libs.plugins.baselineprofile) apply false
     alias(libs.plugins.compose.compiler) apply false
     alias(libs.plugins.kotlin.serialization) apply false
+    alias(libs.plugins.play.publisher) apply false
 }
 
 // Every TVHeadend SDK module (sdk-*) resolves to the catalog version, before its metadata is

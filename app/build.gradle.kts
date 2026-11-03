@@ -23,6 +23,7 @@ plugins {
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.baselineprofile)
+    alias(libs.plugins.play.publisher)
 }
 
 baselineProfile {
@@ -162,6 +163,21 @@ android {
     providers.gradleProperty("player.offlineMediaAssets").orNull?.let {
         sourceSets.getByName("androidTest").assets.srcDir(it)
     }
+}
+
+// Uploads the signed AAB to the closed testing track. Only the Play flavor reaches Google Play, and
+// the release process passes the signed bundle with --artifact-dir: this build never signs.
+play {
+    enabled.set(false)
+    track.set("alpha")
+    defaultToAppBundles.set(true)
+    serviceAccountCredentials.set(
+        file(System.getProperty("user.home") + "/.config/tvheadend-player/play-publisher.json"),
+    )
+}
+
+android.playConfigs.register("playRelease") {
+    enabled.set(true)
 }
 
 // Bundle the repository's legal sources verbatim, rather than maintaining a second list.

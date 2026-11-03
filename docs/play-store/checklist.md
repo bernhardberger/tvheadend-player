@@ -138,7 +138,7 @@ From <https://support.google.com/googleplay/android-developer/answer/9845334>:
    "Each tester needs to opt in using the link."
 6. **Create new release:** upload the AAB from [What gets uploaded](../play-store.md#what-gets-uploaded).
    Submitted as `0.3.2 (164)` on the track Closed testing - Alpha, all 179
-   countries and regions. Paste both release notes from
+   countries and regions. Paste the notes from the files named in
    [section 2.3](listing.md#23-release-notes). If Console offers an upload for the
    deobfuscation (R8 mapping) file, use the Play mapping from the same directory.
 7. **Save**, then **Review release**. Read every error and warning before going
@@ -169,7 +169,8 @@ Sent 2026-11-01: `0.4.0 (165)` on the same track, with the new Android TV and
    feedback**; "Beta feedback from users is only visible to you and can't be
    seen on Google Play"
    (<https://support.google.com/googleplay/android-developer/answer/138230>).
-4. Later releases go to the same track.
+4. Later releases go to the same track, uploaded as described in the
+   [release process](../release-process.md#google-play).
 
 ## 1.10 Production access
 

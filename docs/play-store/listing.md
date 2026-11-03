@@ -72,16 +72,9 @@ Open Source unter der GNU GPL v3, mit dem Quellcode zu jeder Version: github.com
 
 ## 2.3 Release notes
 
-Up to 500 Unicode characters per language, each language between its tags
-(<https://support.google.com/googleplay/android-developer/answer/9859348>).
-These are the 0.4.2 notes. English 452/500, German 488/500 (counted without the
-tags). Paste both into the one release-notes box.
-
-```text
-<en-US>
-Home and Channels now change more softly: programme info, pictures and the backdrop move together, and holding a key leaves them in place until you let go. A new backdrop starts right away. Cards leaving under the side menu are dimmed and their text is hidden. Right at the end of a Home row stays on the last card. While Home loads you see a spinner instead of a skeleton. All changes: github.com/bernhardberger/tvheadend-player/blob/main/CHANGELOG.md
-</en-US>
-<de-DE>
-Startseite und Sender wechseln jetzt sanfter: Programminfo, Bilder und Hintergrund ändern sich gemeinsam, und eine gehaltene Taste lässt sie stehen, bis du loslässt. Ein neuer Hintergrund startet sofort. Karten unter dem Seitenmenü werden abgedunkelt, ihr Text ausgeblendet. Rechts am Ende einer Reihe bleibt auf der letzten Karte. Beim Laden der Startseite gibt es einen Spinner statt eines Platzhalters. Alle Änderungen: github.com/bernhardberger/tvheadend-player/blob/main/CHANGELOG.md
-</de-DE>
-```
+The notes of the coming release live in
+[`app/src/play/play/release-notes`](../../app/src/play/play/release-notes), one
+`default.txt` per language, up to 500 Unicode characters each
+(<https://support.google.com/googleplay/android-developer/answer/9859348>). The
+Play upload reads them from there; see the
+[release process](../release-process.md#google-play).

@@ -254,6 +254,37 @@ repository can resolve to the upstream project on some machines.
 Do not publish before the owner approves; a published release and its assets can
 be cached or mirrored even if they are later deleted.
 
+## Google Play
+
+Write the notes for each language in
+`app/src/play/play/release-notes/<language>/default.txt` as part of the release
+commit, up to 500 characters each. After the owner approves the Play release,
+upload the signed AAB from the build host, in a clean checkout at the
+`sourceCommit` of the signed manifest:
+
+```bash
+./gradlew :app:publishPlayReleaseBundle --artifact-dir build/release/signed/<version>
+```
+
+[Gradle Play Publisher](https://github.com/Triple-T/gradle-play-publisher) uploads
+the AAB, gives the closed testing track `alpha` a full rollout with those notes,
+and sends the change for review. It fails on a `versionCode` Play has already
+seen, and it replaces any change still in review. The R8 mapping and native
+symbols travel inside the AAB.
+
+The AAB comes from the signed directory, the notes from the working tree, and
+nothing checks that they belong together. A green build doesn't prove the review
+was requested either: if Play refuses to send the change, the plugin commits it
+unsent. Check **Publishing overview** in Play Console afterwards and send it from
+there if it's still waiting.
+
+The service account key is
+`~/.config/tvheadend-player/play-publisher.json` on the build host, owner-only and
+outside the repository. The account can only release to testing tracks on this
+app, so moving to production stays in Play Console. A lost key needs no recovery:
+create a new one for the service account in Google Cloud Console and delete the
+old one.
+
 ## Test deployment
 
 Read `docs/device-targets.md` and load the `android-tv-device-testing` workflow.
