@@ -1,12 +1,20 @@
 package at.bernhardberger.tvhplayer.core
 
 import at.bernhardberger.tvheadend.sdk.core.DvrCutpoint
+import at.bernhardberger.tvheadend.sdk.core.DvrCutpointAction
 
-/** Chapter positions from the SDK's scene boundaries inside the verified recording duration. */
+/** Navigation positions from scene boundaries and commercial/cut endpoints inside the verified duration. */
 fun recordingMarkerPositions(cutpoints: List<DvrCutpoint>, verifiedDurationMs: Long): List<Long> {
     if (verifiedDurationMs <= 0L) return emptyList()
     val markers = cutpoints.asSequence()
-        .mapNotNull { it.sceneBoundary?.inWholeMilliseconds }
+        .flatMap { point ->
+            val endpoints = when (point.action) {
+                DvrCutpointAction.COMMERCIAL_BREAK, DvrCutpointAction.CUT -> listOf(point.start, point.end)
+                else -> emptyList()
+            }
+            (listOfNotNull(point.sceneBoundary) + endpoints).asSequence()
+        }
+        .map { it.inWholeMilliseconds }
         .filter { it > 0L && it < verifiedDurationMs }
         .distinct()
         .sorted()

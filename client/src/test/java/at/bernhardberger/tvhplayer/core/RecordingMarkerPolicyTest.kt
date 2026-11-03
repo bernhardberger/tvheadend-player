@@ -27,11 +27,56 @@ class RecordingMarkerPolicyTest {
     }
 
     @Test
-    fun otherActionsNeverBecomeNavigationMarkers() {
-        val points = listOf(DvrCutpointAction.CUT, DvrCutpointAction.MUTE,
-            DvrCutpointAction.COMMERCIAL_BREAK, DvrCutpointAction.UNKNOWN)
+    fun muteAndUnknownActionsNeverBecomeNavigationMarkers() {
+        val points = listOf(DvrCutpointAction.MUTE, DvrCutpointAction.UNKNOWN)
             .map { DvrCutpoint(0.milliseconds, 20.milliseconds, it) }
         assertTrue(recordingMarkerPositions(points, 100).isEmpty())
+    }
+
+    @Test
+    fun commercialAndCutIntervalsContributeBothEndpoints() {
+        val points = listOf(
+            DvrCutpoint(10.milliseconds, 20.milliseconds, DvrCutpointAction.COMMERCIAL_BREAK),
+            DvrCutpoint(30.milliseconds, 40.milliseconds, DvrCutpointAction.CUT),
+        )
+        assertEquals(listOf(0L, 10L, 20L, 30L, 40L), recordingMarkerPositions(points, 100))
+    }
+
+    @Test
+    fun commercialAndCutEndpointsStayStrictlyInsideVerifiedContent() {
+        val points = listOf(
+            DvrCutpoint(0.milliseconds, 20.milliseconds, DvrCutpointAction.COMMERCIAL_BREAK),
+            DvrCutpoint(30.milliseconds, 100.milliseconds, DvrCutpointAction.CUT),
+            DvrCutpoint(40.milliseconds, 110.milliseconds, DvrCutpointAction.COMMERCIAL_BREAK),
+        )
+        assertEquals(listOf(0L, 20L, 30L, 40L), recordingMarkerPositions(points, 100))
+        assertTrue(recordingMarkerPositions(points, 0).isEmpty())
+        assertTrue(recordingMarkerPositions(points, -1).isEmpty())
+        assertTrue(recordingMarkerPositions(points, 20).isEmpty())
+    }
+
+    @Test
+    fun duplicateMarksAndSceneBoundariesMergeOnlyAtExactPositions() {
+        val commercial = DvrCutpoint(10.milliseconds, 20.milliseconds, DvrCutpointAction.COMMERCIAL_BREAK)
+        val points = listOf(
+            commercial, commercial,
+            DvrCutpoint(20.milliseconds, 30.milliseconds, DvrCutpointAction.CUT),
+            marker(0, 20), marker(20, 21),
+        )
+        assertEquals(listOf(0L, 10L, 20L, 21L, 30L), recordingMarkerPositions(points, 100))
+    }
+
+    @Test
+    fun overlappingCommercialRangesKeepAllEndpointsWithoutMuteOrUnknown() {
+        val points = listOf(
+            DvrCutpoint(30.milliseconds, 50.milliseconds, DvrCutpointAction.COMMERCIAL_BREAK),
+            DvrCutpoint(10.milliseconds, 40.milliseconds, DvrCutpointAction.COMMERCIAL_BREAK),
+            DvrCutpoint(15.milliseconds, 35.milliseconds, DvrCutpointAction.MUTE),
+            DvrCutpoint(25.milliseconds, 45.milliseconds, DvrCutpointAction.UNKNOWN),
+            DvrCutpoint(50.milliseconds, 60.milliseconds, DvrCutpointAction.CUT),
+            marker(0, 70),
+        )
+        assertEquals(listOf(0L, 10L, 30L, 40L, 50L, 60L, 70L), recordingMarkerPositions(points, 100))
     }
 
     @Test

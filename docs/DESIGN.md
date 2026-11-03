@@ -892,7 +892,7 @@ activation, DVR eligibility, confirmations and current-session guards remain.
 ## 10. Player
 
 Player chrome owns its gradients. Play/Pause and seek semantics, programme
-window, timeshift and scene-marker behaviour follow the playback safety skill;
+window, timeshift and recording-marker behaviour follow the playback safety skill;
 only the colour and indication rules above apply here. Remote keys follow §6 and
 "Key cycles, Back and auto-hide" below.
 
@@ -1001,7 +1001,8 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   and the seekbar. Where live cannot pause (no grant, timeshift off) Play/Pause
   is dimmed but focusable and states the reason in the timeline feedback line.
   Above a recording's markers, Up from the seekbar opens the markers and Up again
-  closes them.
+  closes them. Recording markers include scene boundaries and both endpoints of
+  commercial-break and cut intervals; they only navigate and never skip content automatically.
 - The controls leave over 200 ms (standard accelerate), 100 ms when a modal
   layer replaces them.
 - Numeric entry is a state of the top identity's place: the identity's chip,
