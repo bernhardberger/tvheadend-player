@@ -41,6 +41,8 @@ import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.ListTopFadeVisible
 import at.bernhardberger.tvhplayer.ui.components.ListBottomFadeVisible
+import at.bernhardberger.tvhplayer.ui.components.PanelListTopFade
+import at.bernhardberger.tvhplayer.ui.components.PanelListBottomFade
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -172,11 +174,11 @@ class PlaybackOptionsTrackListTest {
         val bounds = list.getUnclippedBoundsInRoot()
         val row = compose.onNodeWithTag(rowTag(focusedId)).getUnclippedBoundsInRoot()
         if (bottomFade()) {
-            val bandTop = bounds.bottom - PlaybackListBottomFade
+            val bandTop = bounds.bottom - PanelListBottomFade
             assertTrue("Focused row $focusedId $row reaches into the band below $bandTop", row.bottom <= bandTop)
         }
         if (topFade()) {
-            val fadeBottom = bounds.top + PlaybackListTopFade
+            val fadeBottom = bounds.top + PanelListTopFade
             assertTrue("Focused row $focusedId $row reaches into the fade above $fadeBottom", row.top >= fadeBottom)
         }
     }

@@ -1,6 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
-import at.bernhardberger.tvhplayer.ui.components.listEdgeFadeMask
+import at.bernhardberger.tvhplayer.ui.components.PanelListEdges
 
 import at.bernhardberger.tvhplayer.ui.components.PlaybackOptionsOverlayFrame
 
@@ -14,14 +14,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
-import at.bernhardberger.tvhplayer.ui.components.InsetBringIntoViewSpec
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
@@ -786,23 +782,7 @@ private fun ColumnScope.TrackOptionsPage(
         backFocusRequester = headerFocus,
         downFocusRequester = initialContentFocus,
     )
-    // The bottom band hints that the list continues and shows only while it can
-    // scroll forward; a short top fade shows only while it can scroll back.
-    // Focus scrolling always keeps the focused row out of both fade bands. The insets
-    // stay fixed: tying them to the fades would feed each scroll back into the next.
-    // At either end of the list the scroll stops there, and that fade is off.
-    val platformBringIntoViewSpec = LocalBringIntoViewSpec.current
-    val density = LocalDensity.current
-    val bringIntoViewSpec = remember(platformBringIntoViewSpec, density) {
-        with(density) {
-            InsetBringIntoViewSpec(
-                delegate = platformBringIntoViewSpec,
-                topInsetPx = PlaybackListTopFade.toPx(),
-                bottomInsetPx = PlaybackListBottomFade.toPx(),
-            )
-        }
-    }
-    CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoViewSpec) {
+    PanelListEdges(listState) { edges ->
         LazyColumn(
             state = listState,
             verticalArrangement = Arrangement.spacedBy(TvSpacing8),
@@ -818,8 +798,7 @@ private fun ColumnScope.TrackOptionsPage(
                 .fillMaxWidth()
                 // Use the rest of the panel height rather than a fixed list height.
                 .weight(1f, fill = false)
-                .listEdgeFadeMask(PlaybackListTopFade, PlaybackListBottomFade,
-                    { listState.canScrollBackward }, { listState.canScrollForward }, exposeFades = true)
+                .then(edges)
                 .focusGroup()
                 .testTag("playback-options-track-list"),
         ) {
@@ -895,12 +874,6 @@ private fun ColumnScope.TrackOptionsPage(
         }
     }
 }
-
-/** Bottom fade band of a scrolling panel list (the kit's mask from the panel centre down). */
-internal val PlaybackListBottomFade = 128.dp
-
-/** Short fade under the header while the list can scroll back. */
-internal val PlaybackListTopFade = 24.dp
 
 private const val QUICK_LIST_OFF_ROW = "subtitles-off"
 

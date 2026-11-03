@@ -5,6 +5,7 @@ import androidx.compose.foundation.gestures.BringIntoViewSpec
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
@@ -45,6 +46,32 @@ internal val ListBottomReserve = 148.dp
 
 /** Top band kept clear of focused rows while earlier rows exist. */
 internal val ListScrolledTopReserve = ListTopFadeHeight + ListFocusBreathingRoom
+
+/** Shared readable bands for player and browse modal side-panel lists. */
+internal val PanelListTopFade = 24.dp
+internal val PanelListBottomFade = 128.dp
+
+/** Fixed focus insets avoid feeding each fade's visibility back into focus scrolling. */
+@Composable
+@OptIn(ExperimentalFoundationApi::class)
+internal fun PanelListEdges(
+    listState: LazyListState,
+    content: @Composable (Modifier) -> Unit,
+) {
+    val platform = LocalBringIntoViewSpec.current
+    val density = LocalDensity.current
+    val spec = remember(platform, density) {
+        with(density) {
+            InsetBringIntoViewSpec(platform, PanelListTopFade.toPx(), PanelListBottomFade.toPx())
+        }
+    }
+    CompositionLocalProvider(LocalBringIntoViewSpec provides spec) {
+        content(Modifier.listEdgeFadeMask(
+            PanelListTopFade, PanelListBottomFade,
+            { listState.canScrollBackward }, { listState.canScrollForward }, exposeFades = true,
+        ))
+    }
+}
 
 /**
  * Bring-into-view policy for a list between fades: the delegate (the platform's TV pivot

@@ -4,7 +4,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
-import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,7 +16,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -36,7 +34,6 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -52,16 +49,13 @@ import at.bernhardberger.tvhplayer.ui.components.LocalBrowseContentLayering
 import at.bernhardberger.tvhplayer.ui.components.PlaybackOptionsOverlayFrame
 import at.bernhardberger.tvhplayer.ui.components.browseDetailsViewport
 import at.bernhardberger.tvhplayer.ui.player.OptionsHeader
-import at.bernhardberger.tvhplayer.ui.player.PlaybackListBottomFade
-import at.bernhardberger.tvhplayer.ui.components.listEdgeFadeMask
-import at.bernhardberger.tvhplayer.ui.player.PlaybackListTopFade
+import at.bernhardberger.tvhplayer.ui.components.PanelListEdges
 import at.bernhardberger.tvhplayer.ui.player.PlaybackOptionRow
 import at.bernhardberger.tvhplayer.ui.player.PlaybackPanelHeaderTop
 import at.bernhardberger.tvhplayer.ui.player.PlaybackPanelPadding
 import at.bernhardberger.tvhplayer.ui.player.PlaybackPanelWidth
 import at.bernhardberger.tvhplayer.ui.player.containedFocus
 import kotlinx.coroutines.flow.first
-import at.bernhardberger.tvhplayer.ui.components.InsetBringIntoViewSpec
 
 /** A line of a browse side panel: a quiet section heading, a divider, a choice or a switch. */
 internal sealed interface BrowsePanelEntry {
@@ -176,18 +170,7 @@ internal fun BrowsePanelList(
         }
         runCatching { requesters[target].requestFocus() }
     }
-    val density = LocalDensity.current
-    val platformBringIntoViewSpec = LocalBringIntoViewSpec.current
-    val bringIntoViewSpec = remember(platformBringIntoViewSpec, density) {
-        with(density) {
-            InsetBringIntoViewSpec(
-                delegate = platformBringIntoViewSpec,
-                topInsetPx = PlaybackListTopFade.toPx(),
-                bottomInsetPx = PlaybackListBottomFade.toPx(),
-            )
-        }
-    }
-    CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoViewSpec) {
+    PanelListEdges(listState) { edges ->
         LazyColumn(
             state = listState,
             verticalArrangement = Arrangement.spacedBy(TvSpacing8),
@@ -200,8 +183,7 @@ internal fun BrowsePanelList(
             ),
             modifier = Modifier
                 .fillMaxWidth()
-                // The panel's end cuts the next row at full contrast, so only the top fades.
-                .listEdgeFadeMask(24.dp, 0.dp, { listState.canScrollBackward }, { false })
+                .then(edges)
                 .focusGroup(),
         ) {
             items(entries, key = { entry ->
