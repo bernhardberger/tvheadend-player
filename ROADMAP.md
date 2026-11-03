@@ -20,6 +20,8 @@ Where this is going, as of 0.4.1. No dates. What's already shipped is in the
 - **Speed.** Making it feel fast on budget Google TVs.
 - **Appliance build.** For TVs that should start straight into the app.
 - **Fire TV.** A build and an Amazon Appstore listing.
+- **Commercial-break marks in recordings** ([issue #3](https://github.com/bernhardberger/tvheadend-player/issues/3)).
+  Show the breaks that Comskip finds on the timeline and let you jump past them.
 
 ## I want these before 1.0, if they work out
 
