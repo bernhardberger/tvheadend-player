@@ -71,6 +71,8 @@ internal fun RecordingDetailsHost(
     var confirmationKey by remember { mutableStateOf<Key?>(null) }
     val latestObservation by rememberUpdatedState(currentObservation)
     val pendingCurrent = pending?.recordingStateIsCurrent(observation) == true
+    at.bernhardberger.tvhplayer.ui.player.RegisterPlayerModal(
+        backEnabled = backEnabled && pending == null && !departing, identity = opened.id)
     LaunchedEffect(capability, pendingCurrent) {
         if (pending != null && (capability == null || !pendingCurrent)) {
             pending = null

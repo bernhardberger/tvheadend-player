@@ -910,6 +910,101 @@ class LivePlayerChromeScreenTest {
         assertEquals(start, player.trackSelectionParameters)
     }
 
+    @Test fun confirmationRemovedDuringBackPressDoesNotCloseInfo() = removedConfirmation(held = false)
+
+    @Test fun confirmationRemovedDuringHeldBackDoesNotCloseInfo() = removedConfirmation(held = true)
+
+    private fun removedConfirmation(held: Boolean) {
+        var closes = 0
+        screen(onClose = { closes++ })
+        publishInfoRecording(DvrEntryState.RECORDING)
+        key(Key.Info)
+        compose.onNodeWithTag("details-stop").performSemanticsAction(SemanticsActions.RequestFocus)
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("two-column-first").assertIsFocused()
+        compose.runOnUiThread {
+            view.dispatchKeyEvent(AndroidKeyEvent(AndroidKeyEvent.ACTION_DOWN, AndroidKeyEvent.KEYCODE_BACK))
+            if (held) view.dispatchKeyEvent(AndroidKeyEvent(0, 0, AndroidKeyEvent.ACTION_DOWN,
+                AndroidKeyEvent.KEYCODE_BACK, 1, 0, 0, 0, AndroidKeyEvent.FLAG_LONG_PRESS))
+        }
+        publishInfoRecording(DvrEntryState.COMPLETED)
+        assertFalse("the DVR update removes the confirmation", exists("two-column-first"))
+        assertTrue(exists("programme-details-page"))
+        compose.runOnUiThread {
+            if (held) view.dispatchKeyEvent(AndroidKeyEvent(0, 0, AndroidKeyEvent.ACTION_DOWN,
+                AndroidKeyEvent.KEYCODE_BACK, 2))
+            view.dispatchKeyEvent(AndroidKeyEvent(AndroidKeyEvent.ACTION_UP, AndroidKeyEvent.KEYCODE_BACK))
+        }
+        settle()
+        assertTrue("the vanished confirmation's release must not close Info", exists("programme-details-page"))
+        assertEquals(0, closes)
+        assertTrue(runtime.activeTarget.value != null)
+        assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_STOP_ENTRY })
+    }
+
+    @Test fun numberEntryExpiringDuringBackPressDoesNotHideBannerOrClosePlayer() {
+        var closes = 0
+        screen(onClose = { closes++ })
+        press(Key.Nine)
+        assertTrue(compose.onAllNodesWithText("9").fetchSemanticsNodes().isNotEmpty())
+        compose.runOnUiThread {
+            view.dispatchKeyEvent(AndroidKeyEvent(AndroidKeyEvent.ACTION_DOWN, AndroidKeyEvent.KEYCODE_BACK))
+        }
+        compose.mainClock.advanceTimeBy(4_000)
+        compose.waitForIdle()
+        assertTrue("the number entry times out", compose.onAllNodesWithText("9").fetchSemanticsNodes().isEmpty())
+        val bannerBeforeRelease = exists("player-banner")
+        compose.runOnUiThread {
+            view.dispatchKeyEvent(AndroidKeyEvent(0, 0, AndroidKeyEvent.ACTION_DOWN,
+                AndroidKeyEvent.KEYCODE_BACK, 1, 0, 0, 0, AndroidKeyEvent.FLAG_LONG_PRESS))
+            view.dispatchKeyEvent(AndroidKeyEvent(AndroidKeyEvent.ACTION_UP, AndroidKeyEvent.KEYCODE_BACK))
+        }
+        settleFrames()
+        assertEquals(bannerBeforeRelease, exists("player-banner"))
+        assertEquals(0, closes)
+        assertTrue(runtime.activeTarget.value != null)
+    }
+
+    @Test fun relatedInfoPageReplacingBackOwnerDoesNotGoBackOnRelease() {
+        screen()
+        publishMatchingFutureProgramme()
+        key(Key.Info)
+        compose.runOnUiThread {
+            view.dispatchKeyEvent(AndroidKeyEvent(AndroidKeyEvent.ACTION_DOWN, AndroidKeyEvent.KEYCODE_BACK))
+        }
+        key(Key.DirectionDown)
+        compose.onNodeWithTag("details-card-12").assertIsFocused()
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("details-record").performSemanticsAction(SemanticsActions.RequestFocus)
+        compose.onNodeWithTag("details-record").assertIsFocused()
+        compose.runOnUiThread {
+            view.dispatchKeyEvent(AndroidKeyEvent(AndroidKeyEvent.ACTION_UP, AndroidKeyEvent.KEYCODE_BACK))
+        }
+        settle()
+        assertTrue(exists("programme-details-page"))
+        compose.onNodeWithTag("details-record").assertIsFocused()
+        assertTrue(runtime.activeTarget.value != null)
+    }
+
+    @Test fun watchingBackPressDoesNotStopOrCloseInfoAppearingBeforeRepeat() {
+        var closes = 0
+        screen(onClose = { closes++ })
+        compose.runOnUiThread {
+            view.dispatchKeyEvent(AndroidKeyEvent(AndroidKeyEvent.ACTION_DOWN, AndroidKeyEvent.KEYCODE_BACK))
+        }
+        key(Key.Info)
+        assertTrue(exists("programme-details-page"))
+        compose.runOnUiThread {
+            view.dispatchKeyEvent(AndroidKeyEvent(0, 0, AndroidKeyEvent.ACTION_DOWN,
+                AndroidKeyEvent.KEYCODE_BACK, 1, 0, 0, 0, AndroidKeyEvent.FLAG_LONG_PRESS))
+            view.dispatchKeyEvent(AndroidKeyEvent(AndroidKeyEvent.ACTION_UP, AndroidKeyEvent.KEYCODE_BACK))
+        }
+        settle()
+        assertTrue(exists("programme-details-page"))
+        assertEquals(0, closes)
+        assertTrue(runtime.activeTarget.value != null)
+    }
+
     @Test fun canceledBackKeepsNestedInfoConfirmationOpen() {
         screen()
         publishInfoRecording(DvrEntryState.RECORDING)

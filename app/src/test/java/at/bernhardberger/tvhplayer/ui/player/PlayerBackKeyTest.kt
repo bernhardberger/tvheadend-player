@@ -4,6 +4,7 @@ import android.app.Application
 import android.view.KeyEvent as NativeKey
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,6 +15,10 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.tv.material3.Button
+import androidx.tv.material3.Text
+import at.bernhardberger.tvhplayer.ui.components.CentredDialog
+import at.bernhardberger.tvhplayer.ui.components.TwoColumnDialog
 import at.bernhardberger.tvhplayer.core.*
 import org.junit.Assert.*
 import org.junit.Rule
@@ -79,6 +84,49 @@ class PlayerBackKeyTest {
         assertTrue(cycle.intercept(event(false, flags = NativeKey.FLAG_CANCELED), false, fail, fail))
         assertTrue(cycle.intercept(event(true, 2), true, fail, fail))
         assertTrue(cycle.intercept(event(false), true, fail, fail))
+    }
+
+    @Test fun disabledCentredDialogDoesNotBackThePageUnderneath() = disabledDialog(twoColumn = false)
+
+    @Test fun disabledTwoColumnDialogDoesNotBackThePageUnderneath() = disabledDialog(twoColumn = true)
+
+    private fun disabledDialog(twoColumn: Boolean) {
+        var underlyingBacks = 0
+        var dismissals = 0
+        var enabled by mutableStateOf(true)
+        lateinit var root: android.view.View
+        compose.setContent {
+            root = androidx.compose.ui.platform.LocalView.current
+            val cycle = remember { PlayerBackKeyCycle() }
+            val owners = remember { mutableStateListOf<PlayerModalBackOwner>() }
+            val focus = remember { FocusRequester() }
+            val dispatcher = LocalOnBackPressedDispatcherOwner.current!!.onBackPressedDispatcher
+            BackHandler { underlyingBacks++ }
+            CompositionLocalProvider(LocalPlayerModalRegistry provides owners) {
+                Box(Modifier.fillMaxSize().onPreviewKeyEvent { key ->
+                    cycle.intercept(key, owners.isEmpty(), dispatcher::onBackPressed,
+                        { fail("a dialog must not stop playback") }, backOwner = owners.lastOrNull() ?: Unit)
+                }) {
+                    if (twoColumn) TwoColumnDialog("Choice", "Wait", { dismissals++ }, backEnabled = enabled) {
+                        Button(onClick = {}, modifier = Modifier.focusRequester(focus)) { Text("Keep") }
+                        LaunchedEffect(Unit) { withFrameNanos { }; focus.requestFocus() }
+                    } else CentredDialog("Choice", "Wait", "Keep", "Cancel", {}, {},
+                        { dismissals++ }, backEnabled = enabled)
+                }
+            }
+        }
+        compose.waitForIdle()
+        fun send(key: KeyEvent) {
+            compose.runOnIdle { assertTrue(root.dispatchKeyEvent(key.nativeKeyEvent)) }
+            compose.waitForIdle()
+        }
+        // Disabling the registered owner during a press must not enable the page below it.
+        send(event(true))
+        compose.runOnIdle { enabled = false }
+        send(event(true, 1, NativeKey.FLAG_LONG_PRESS))
+        send(event(false))
+        assertEquals(0, underlyingBacks)
+        assertEquals(0, dismissals)
     }
 
     @Test fun holdClaimsActivityRemainderBeforeClosingAndCanceledUpClearsIt() {

@@ -36,7 +36,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -1335,7 +1335,7 @@ fun VideoPlayerScreen(
 
     val backCycle = remember { PlayerBackKeyCycle() }
     val activityKeyCycleOwner = at.bernhardberger.tvhplayer.ui.startup.LocalMainStartupKeyCycleOwner.current
-    val playerModals = remember { mutableStateMapOf<Any, Unit>() }
+    val playerModals = remember { mutableStateListOf<PlayerModalBackOwner>() }
     val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
 
     val onPickChannel: (Channel) -> Boolean = { tuneChannel(it, 0L) }
@@ -1354,7 +1354,13 @@ fun VideoPlayerScreen(
                             if (playerModals.isNotEmpty() || layerState.core.infoOpen || layerState.scheduleOpen) backDispatcher?.onBackPressed()
                             else handlePlaybackBack()
                         }, stopAndClose = stopAndClose,
-                        activityKeyCycleOwner = activityKeyCycleOwner)) return@onPreviewKeyEvent true
+                        activityKeyCycleOwner = activityKeyCycleOwner,
+                        backOwner = playerModals.lastOrNull() ?: (foregroundLayer to when (foregroundLayer) {
+                            PlayerForegroundLayer.INFO -> infoRailChannelId ?: currentChannelId
+                            PlayerForegroundLayer.SCHEDULE -> layerState.scheduleDetails?.id ?: currentChannelId
+                            PlayerForegroundLayer.OPTIONS_DETAIL, PlayerForegroundLayer.OPTIONS_QUICK_LIST -> layerState.core.optionsPage
+                            else -> null
+                        }))) return@onPreviewKeyEvent true
                 if (serverWait.consumesKey(event, layerState)) return@onPreviewKeyEvent true
                 val keyCode = event.nativeKeyEvent.keyCode
                 layerState.handleScheduleKey(event, foregroundLayer, ::prepareSchedule)?.let { return@onPreviewKeyEvent it }

@@ -105,7 +105,7 @@ internal fun CentredDialog(
     visibility: MutableTransitionState<Boolean> = remember { MutableTransitionState(false).apply { targetState = true } },
     actions: @Composable RowScope.() -> Unit,
 ) {
-    RegisterPlayerModal()
+    RegisterPlayerModal(backEnabled)
     var openingReleasePending by remember { mutableStateOf(true) }
     val latestDismiss by rememberUpdatedState(onDismiss)
     LaunchedEffect(visibility.isIdle, visibility.currentState, visibility.targetState) {

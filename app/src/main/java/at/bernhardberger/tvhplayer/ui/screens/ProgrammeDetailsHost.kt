@@ -112,6 +112,8 @@ internal fun ProgrammeDetailsHost(
         .filter { it != BrowseContextAction.PLAY || onPlayRecording != null && capability != null }
     val visibility = remember { MutableTransitionState(false).apply { targetState = true } }
     val closing = !visibility.targetState
+    at.bernhardberger.tvhplayer.ui.player.RegisterPlayerModal(
+        backEnabled = !closing, identity = selected.id to showContextMenu)
     val closeAnimated = { visibility.targetState = false }
     BackHandler(enabled = closing) { }
     LaunchedEffect(visibility.isIdle, visibility.currentState, closing) {

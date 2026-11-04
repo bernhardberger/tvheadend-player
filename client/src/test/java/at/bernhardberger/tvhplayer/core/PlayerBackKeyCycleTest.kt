@@ -62,4 +62,35 @@ class PlayerBackKeyCycleTest {
         down()
         assertEquals(PlayerBackKeyResult.HOLD, down(1))
     }
+
+    @Test fun vanishedOrReplacedOwnerConsumesShortAndHeldReleases() {
+        for (repeat in listOf(false, true)) {
+            val original = Any()
+            cycle.onKey(true, 0, false, false, false, original)
+            if (repeat) cycle.onKey(true, 1, true, false, false, original)
+            assertEquals(PlayerBackKeyResult.NONE,
+                cycle.onKey(false, 0, false, false, true, Any()))
+            assertEquals(PlayerBackKeyResult.NONE,
+                cycle.onKey(false, 0, false, false, false, original))
+        }
+    }
+
+    @Test fun unchangedOwnerDispatchesExactlyOneReleaseAndResetsForTheNextOwner() {
+        for (owner in listOf(Any(), Any())) {
+            cycle.onKey(true, 0, false, false, false, owner)
+            cycle.onKey(true, 1, true, false, false, owner)
+            assertEquals(PlayerBackKeyResult.BACK,
+                cycle.onKey(false, 0, false, false, false, owner))
+            assertEquals(PlayerBackKeyResult.NONE,
+                cycle.onKey(false, 0, false, false, false, owner))
+        }
+    }
+
+    @Test fun watchingPressWithPanelAppearingOnRepeatDoesNotStopOrBackThePanel() {
+        cycle.onKey(true, 0, false, false, true, "watching")
+        assertEquals(PlayerBackKeyResult.NONE,
+            cycle.onKey(true, 1, true, false, false, "panel"))
+        assertEquals(PlayerBackKeyResult.NONE,
+            cycle.onKey(false, 0, false, false, false, "panel"))
+    }
 }

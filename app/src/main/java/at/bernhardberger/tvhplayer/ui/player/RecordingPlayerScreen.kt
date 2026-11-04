@@ -23,7 +23,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -441,7 +441,7 @@ fun RecordingPlayerScreen(
     PlayerBackHandler(handlePlaybackBack)
     val backCycle = remember { PlayerBackKeyCycle() }
     val activityKeyCycleOwner = at.bernhardberger.tvhplayer.ui.startup.LocalMainStartupKeyCycleOwner.current
-    val playerModals = remember { mutableStateMapOf<Any, Unit>() }
+    val playerModals = remember { mutableStateListOf<PlayerModalBackOwner>() }
     val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
     CompositionLocalProvider(LocalPlayerModalRegistry provides playerModals) {
     Box(
@@ -455,7 +455,10 @@ fun RecordingPlayerScreen(
                         onBack = {
                             if (playerModals.isNotEmpty() || layers.infoOpen) backDispatcher?.onBackPressed() else handlePlaybackBack()
                         }, stopAndClose = ::stopAndClose,
-                        activityKeyCycleOwner = activityKeyCycleOwner)) return@onPreviewKeyEvent true
+                        activityKeyCycleOwner = activityKeyCycleOwner,
+                        backOwner = playerModals.lastOrNull() ?: if (markerNavigation.open)
+                            Triple(markerNavigation, markerNavigation.ownerRevision, markerNavigation.restoration)
+                            else foregroundLayer to layers.optionsPage)) return@onPreviewKeyEvent true
                 val keyCode = event.nativeKeyEvent.keyCode
                 if (markerNavigation.handle(event, markers, ::seekMarker)) {
                     chrome.onUserInteraction()
