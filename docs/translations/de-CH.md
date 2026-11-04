@@ -15,7 +15,7 @@ Not overridden; inherits German (`one`, `other`).
 
 ## Term decisions
 
-- Override keys: `appliance_accessibility_disclosure`, `appliance_accessibility_service_description`, `close`, `details_size`, `action_close`.
+- Override keys: `appliance_accessibility_disclosure`, `appliance_accessibility_service_description`, `close`, `details_size`, `action_close`. The two `appliance_*` keys live in the Appliance companion (`appliance/src/main/res`).
 - Each override equals the existing German text with only ß replaced by ss; no terminology or register change.
 
 ## Review status

@@ -161,12 +161,11 @@ class SettingsVisualEvidenceTest {
     private fun captureStates(locale: String, fontScale: Float) {
         var cacheState by mutableStateOf(CacheClearState.IDLE)
         var cacheCalls = 0
-        var accessibilityCalls = 0
+        var setupCalls = 0
         lateinit var navigation: DepthNavigationState
         val resources = RuntimeEnvironment.getApplication().resources
         val cacheLabel = resources.getString(at.bernhardberger.tvhplayer.R.string.clear_cache)
-        val accessLabel = resources.getString(at.bernhardberger.tvhplayer.R.string.open_accessibility_settings)
-        val disclosure = resources.getString(at.bernhardberger.tvhplayer.R.string.appliance_accessibility_disclosure)
+        val setupLabel = resources.getString(at.bernhardberger.tvhplayer.R.string.appliance_setup)
         val still = File("../artifacts/settings-c-review/approved-comparison-still.png")
             .takeIf { it.isFile }?.let { requireNotNull(BitmapFactory.decodeFile(it.path)).asImageBitmap() }
         compose.setContent {
@@ -184,7 +183,7 @@ class SettingsVisualEvidenceTest {
                                 // The status page opens only while a retry can fix the connection.
                                 listOf(settingsRootLevel(companionInstalled = true,
                                     connectionStatus = resources.getString(at.bernhardberger.tvhplayer.R.string.error_101_title)),
-                                    settingsApplianceLevel(false, { accessibilityCalls++ }),
+                                    settingsApplianceLevel(false, { setupCalls++ }),
                                     settingsConnectionOverview(resources.getString(at.bernhardberger.tvhplayer.R.string.error_101_title),
                                         "tvheadend.local", 9982, degraded = true)) +
                                     settingsGeneralLevels(UiSettings(), AppLanguage.SYSTEM, CacheStatistics.EMPTY, cacheState,
@@ -270,32 +269,11 @@ class SettingsVisualEvidenceTest {
         press(Key.Back)
         repeat(5) { press(Key.DirectionDown) } // Connection, Channel groups, Playback, Audio & subtitles, Appliance
         press(Key.DirectionCenter)
-        compose.onNodeWithText(accessLabel).assertIsFocused()
-        val accessBounds = compose.onNodeWithText(accessLabel).fetchSemanticsNode().boundsInRoot
-        val textBounds = compose.onNodeWithTag("appliance-disclosure").fetchSemanticsNode().boundsInRoot
-        assertTrue("Disclosure must be outside the focused action", textBounds.top >= accessBounds.bottom)
-        compose.onNodeWithText(disclosure).assertExists()
-        capture("$prefix-appliance-action")
-        assertEquals(0, accessibilityCalls)
+        compose.onNodeWithText(setupLabel).assertIsFocused()
+        capture("$prefix-appliance-setup")
+        assertEquals(0, setupCalls)
         press(Key.DirectionCenter)
-        assertEquals(1, accessibilityCalls) // Direct system-settings action, no extra disclosure step.
-        press(Key.DirectionDown)
-        val reading = compose.onNodeWithTag("appliance-disclosure")
-        reading.assertIsFocused()
-        assertTrue(reading.fetchSemanticsNode().boundsInRoot.bottom <= view.height - 28)
-        capture("$prefix-appliance-reading")
-        repeat(8) { press(Key.DirectionDown) }
-        reading.assertIsFocused()
-        val range = reading.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
-        assertEquals(range.maxValue(), range.value())
-        capture("$prefix-appliance-reading-end")
-        repeat(8) {
-            if (reading.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value() > 0f) press(Key.DirectionUp)
-        }
-        press(Key.DirectionUp)
-        compose.onNodeWithText(accessLabel).assertIsFocused()
-        // Scrolling the disclosure never invokes its neighboring action.
-        assertEquals(1, accessibilityCalls)
+        assertEquals(1, setupCalls) // Opens the companion directly; its screen owns the disclosure.
         press(Key.Back)
         assertEquals(SETTINGS_ROOT, navigation.stack.active.levelId)
     }

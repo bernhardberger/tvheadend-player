@@ -211,13 +211,10 @@
     <string name="audio_language">Мова звуку</string>
     <string name="subtitle_language">Мова субтитрів</string>
     <string name="settings_appliance">Режим ТВ-приставки</string>
-    <string name="appliance_section_accessibility">Служба спеціальних можливостей</string>
     <string name="auto_start_playback">Починати відтворення під час відкриття застосунку</string>
     <string name="auto_start_playback_description">Відтворює останній канал після нового запуску застосунку. Це не вмикає службу спеціальних можливостей.</string>
-    <string name="appliance_accessibility_disclosure">Коли службу спеціальних можливостей увімкнено, Tvheadend Player відкривається після запуску телевізора й пробудження екрана та перехоплює лише кнопку TV/GUIDE. Служба не читає вміст екрана й не відстежує текст. Усі інші кнопки пульта передаються без змін.</string>
     <string name="appliance_service_enabled">Служба запуску режиму ТВ-приставки: увімкнена</string>
     <string name="appliance_service_disabled">Служба запуску режиму ТВ-приставки: вимкнена</string>
-    <string name="open_accessibility_settings">Відкрити налаштування спеціальних можливостей</string>
     <string name="appliance_starting_tv">Запуск відтворення</string>
     <string name="appliance_back_for_menu">Натисніть Back для переходу до каналів і налаштувань.</string>
     <string name="main_startup_message_preparing">Підготовка застосунку</string>

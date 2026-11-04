@@ -236,13 +236,11 @@
     <string name="subtitle_language">Subtitle language</string>
 
     <string name="settings_appliance">Appliance</string>
-    <string name="appliance_section_accessibility">Accessibility service</string>
+    <string name="appliance_setup" tools:ignore="MissingTranslation">Appliance setup</string>
     <string name="auto_start_playback">Start playback when the app opens</string>
     <string name="auto_start_playback_description">Plays the last channel after a fresh app launch. This does not enable the accessibility service.</string>
-    <string name="appliance_accessibility_disclosure">When the accessibility service is enabled, Tvheadend Player opens after TV startup and screen wake, and takes over only the TV/GUIDE button. It does not read screen content or monitor text. Every other remote button passes through unchanged.</string>
     <string name="appliance_service_enabled">Appliance entry service: enabled</string>
     <string name="appliance_service_disabled">Appliance entry service: disabled</string>
-    <string name="open_accessibility_settings">Open accessibility settings</string>
     <string name="appliance_starting_tv">Starting playback</string>
     <string name="appliance_back_for_menu">Press Back for channels and settings.</string>
 

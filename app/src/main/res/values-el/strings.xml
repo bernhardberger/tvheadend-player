@@ -211,13 +211,10 @@
     <string name="audio_language">Γλώσσα ήχου</string>
     <string name="subtitle_language">Γλώσσα υποτίτλων</string>
     <string name="settings_appliance">Λειτουργία συσκευής TV</string>
-    <string name="appliance_section_accessibility">Υπηρεσία προσβασιμότητας</string>
     <string name="auto_start_playback">Έναρξη αναπαραγωγής με το άνοιγμα της εφαρμογής</string>
     <string name="auto_start_playback_description">Αναπαράγει το τελευταίο κανάλι μετά από νέα εκκίνηση της εφαρμογής. Δεν ενεργοποιεί την υπηρεσία προσβασιμότητας.</string>
-    <string name="appliance_accessibility_disclosure">Όταν η υπηρεσία προσβασιμότητας είναι ενεργή, το Tvheadend Player ανοίγει μετά την εκκίνηση της τηλεόρασης και την αφύπνιση της οθόνης και αναλαμβάνει μόνο το κουμπί TV/GUIDE. Δεν διαβάζει το περιεχόμενο της οθόνης ούτε παρακολουθεί κείμενο. Όλα τα άλλα κουμπιά του τηλεχειριστηρίου μεταβιβάζονται χωρίς αλλαγή.</string>
     <string name="appliance_service_enabled">Υπηρεσία εκκίνησης λειτουργίας συσκευής TV: ενεργή</string>
     <string name="appliance_service_disabled">Υπηρεσία εκκίνησης λειτουργίας συσκευής TV: ανενεργή</string>
-    <string name="open_accessibility_settings">Άνοιγμα ρυθμίσεων προσβασιμότητας</string>
     <string name="appliance_starting_tv">Έναρξη αναπαραγωγής</string>
     <string name="appliance_back_for_menu">Πάτησε Back για κανάλια και ρυθμίσεις.</string>
     <string name="main_startup_message_preparing">Προετοιμασία εφαρμογής</string>

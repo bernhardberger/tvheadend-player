@@ -218,13 +218,10 @@
     <string name="subtitle_language">Untertitelsprache</string>
 
     <string name="settings_appliance">TV-Start</string>
-    <string name="appliance_section_accessibility">Bedienungshilfen-Dienst</string>
     <string name="auto_start_playback">Wiedergabe beim Öffnen der App starten</string>
     <string name="auto_start_playback_description">Spielt nach einem neuen App-Start den letzten Sender ab. Dadurch wird der Bedienungshilfen-Dienst nicht aktiviert.</string>
-    <string name="appliance_accessibility_disclosure">Wenn der Bedienungshilfen-Dienst aktiviert ist, öffnet sich Tvheadend Player nach dem Starten und Aufwecken des Fernsehers und übernimmt ausschließlich die TV-/GUIDE-Taste. Er liest weder Bildschirminhalte noch Text. Alle anderen Fernbedienungstasten werden unverändert weitergegeben.</string>
     <string name="appliance_service_enabled">TV-Startdienst: aktiviert</string>
     <string name="appliance_service_disabled">TV-Startdienst: deaktiviert</string>
-    <string name="open_accessibility_settings">Bedienungshilfen öffnen</string>
     <string name="appliance_starting_tv">Wiedergabe wird gestartet</string>
     <string name="appliance_back_for_menu">Zurück öffnet Sender und Einstellungen.</string>
 

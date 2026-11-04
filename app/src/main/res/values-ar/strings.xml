@@ -211,13 +211,10 @@
     <string name="audio_language">لغة الصوت</string>
     <string name="subtitle_language">لغة الترجمة</string>
     <string name="settings_appliance">وضع الجهاز المخصّص</string>
-    <string name="appliance_section_accessibility">خدمة تسهيل الاستخدام</string>
     <string name="auto_start_playback">بدء التشغيل عند فتح التطبيق</string>
     <string name="auto_start_playback_description">يشغّل آخر قناة عند بدء جلسة جديدة للتطبيق. لا يفعّل هذا خدمة تسهيل الاستخدام.</string>
-    <string name="appliance_accessibility_disclosure">عند تفعيلها، تفتح خدمة تسهيل الاستخدام Tvheadend Player عند بدء التلفزيون واستيقاظ الشاشة، وتعالج زر TV/GUIDE فقط. لا تقرأ محتوى الشاشة ولا تراقب النصوص. تمر جميع أزرار جهاز التحكم الأخرى دون تغيير.</string>
     <string name="appliance_service_enabled">خدمة دخول الجهاز المخصّص: مفعّلة</string>
     <string name="appliance_service_disabled">خدمة دخول الجهاز المخصّص: متوقفة</string>
-    <string name="open_accessibility_settings">فتح إعدادات تسهيل الاستخدام</string>
     <string name="appliance_starting_tv">جارٍ بدء التشغيل</string>
     <string name="appliance_back_for_menu">يتيح زر Back الوصول إلى القنوات والإعدادات.</string>
     <string name="main_startup_message_preparing">جارٍ تجهيز التطبيق</string>

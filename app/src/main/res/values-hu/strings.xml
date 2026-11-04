@@ -211,13 +211,10 @@
     <string name="audio_language">Hang nyelve</string>
     <string name="subtitle_language">Felirat nyelve</string>
     <string name="settings_appliance">TV-készülék mód</string>
-    <string name="appliance_section_accessibility">Kisegítő szolgáltatás</string>
     <string name="auto_start_playback">Lejátszás indítása az alkalmazás megnyitásakor</string>
     <string name="auto_start_playback_description">Az alkalmazás új indításakor lejátssza az utolsó csatornát. Ez nem kapcsolja be a kisegítő szolgáltatást.</string>
-    <string name="appliance_accessibility_disclosure">Ha a kisegítő szolgáltatás be van kapcsolva, a Tvheadend Player megnyílik a TV indításakor és a képernyő felébresztésekor, és csak a TV/GUIDE gombot veszi át. Nem olvassa a képernyő tartalmát és nem figyeli a szöveget. A távirányító összes többi gombja változatlanul működik.</string>
     <string name="appliance_service_enabled">TV-mód indítószolgáltatása: be</string>
     <string name="appliance_service_disabled">TV-mód indítószolgáltatása: ki</string>
-    <string name="open_accessibility_settings">Kisegítő lehetőségek megnyitása</string>
     <string name="appliance_starting_tv">Lejátszás indítása</string>
     <string name="appliance_back_for_menu">A Vissza gombbal eléred a csatornákat és a beállításokat.</string>
     <string name="main_startup_message_preparing">Alkalmazás előkészítése</string>

@@ -1,21 +1,58 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en-US">
     <string name="app_name" translatable="false">Tvheadend Player Appliance</string>
-    <!-- Initial screen translations follow with the setup screen in slice 3b. -->
-    <string name="player_installed" tools:ignore="MissingTranslation">Tvheadend Player %1$s installed</string>
-    <string name="player_not_installed" tools:ignore="MissingTranslation">Tvheadend Player is not installed</string>
-    <string name="open_player" tools:ignore="MissingTranslation">Open player</string>
-    <string name="android_settings" tools:ignore="MissingTranslation">Android settings</string>
+    <!-- New setup-screen strings follow in a separate translation pass. -->
+    <string name="player_name" translatable="false">Tvheadend Player</string>
+    <string name="setup_subtitle" tools:ignore="MissingTranslation">Setup and status</string>
+    <string name="status_all_set" tools:ignore="MissingTranslation">All set</string>
+    <string name="status_player_missing" tools:ignore="MissingTranslation">Player not installed</string>
+    <string name="status_updating" tools:ignore="MissingTranslation">Updating</string>
+    <plurals name="status_things_to_fix" tools:ignore="MissingTranslation">
+        <item quantity="one">%d thing to fix</item>
+        <item quantity="other">%d things to fix</item>
+    </plurals>
+    <string name="body_all_set" tools:ignore="MissingTranslation">This TV opens Tvheadend Player at startup, on HOME and with TV/GUIDE.</string>
+    <string name="body_player_missing" tools:ignore="MissingTranslation">HOME and TV/GUIDE have nothing to open. Install Tvheadend Player from Google Play.</string>
+    <string name="body_accessibility_off" tools:ignore="MissingTranslation">Turn on the accessibility service so the player opens at startup and TV/GUIDE works.</string>
+    <string name="body_install_unknown_off" tools:ignore="MissingTranslation">Allow installing unknown apps so this app can install its own updates.</string>
+    <string name="body_several_open" tools:ignore="MissingTranslation">Fix the marked items so the player opens at startup and with TV/GUIDE, and updates install.</string>
+    <string name="update_available_pill" tools:ignore="MissingTranslation">Update %1$s is available</string>
+    <string name="body_updating" tools:ignore="MissingTranslation">The TV keeps working while the update installs. This screen may close for a moment.</string>
+    <string name="section_this_tv" tools:ignore="MissingTranslation">This TV</string>
+    <string name="section_updates" tools:ignore="MissingTranslation">Updates</string>
+    <string name="disclosure_heading" tools:ignore="MissingTranslation">About the accessibility service</string>
+    <string name="player_version" tools:ignore="MissingTranslation">Version %1$s</string>
+    <string name="player_not_installed_hint" tools:ignore="MissingTranslation">Not installed · Opens Google Play</string>
+    <string name="status_ready" tools:ignore="MissingTranslation">Ready</string>
+    <string name="status_install" tools:ignore="MissingTranslation">Install</string>
+    <string name="accessibility_title" tools:ignore="MissingTranslation">Accessibility service</string>
+    <string name="accessibility_on_hint" tools:ignore="MissingTranslation">Startup, screen wake and the TV/GUIDE button</string>
+    <string name="accessibility_off_hint" tools:ignore="MissingTranslation">Off · Opens Android accessibility settings</string>
+    <string name="status_on" tools:ignore="MissingTranslation">On</string>
+    <string name="status_turn_on" tools:ignore="MissingTranslation">Turn on</string>
+    <string name="home_title" tools:ignore="MissingTranslation">HOME app</string>
+    <string name="home_set_hint" tools:ignore="MissingTranslation">HOME goes to Tvheadend Player</string>
+    <string name="home_waiting_hint" tools:ignore="MissingTranslation">This app is HOME · waiting for the player</string>
+    <string name="home_not_set_hint" tools:ignore="MissingTranslation">Optional · Opens Android home settings</string>
+    <string name="status_set" tools:ignore="MissingTranslation">Set</string>
+    <string name="status_not_set" tools:ignore="MissingTranslation">Not set</string>
     <string name="google_tv_home" tools:ignore="MissingTranslation">Google TV home</string>
-    <string name="companion_updates" tools:ignore="MissingTranslation">Companion updates</string>
+    <string name="install_unknown_title" tools:ignore="MissingTranslation">Install unknown apps</string>
+    <string name="install_unknown_allowed_hint" tools:ignore="MissingTranslation">Lets this app install its own updates</string>
+    <string name="install_unknown_off_hint" tools:ignore="MissingTranslation">Needed for updates · Opens Android settings</string>
+    <string name="status_allowed" tools:ignore="MissingTranslation">Allowed</string>
+    <string name="status_allow" tools:ignore="MissingTranslation">Allow</string>
     <string name="automatic_updates" tools:ignore="MissingTranslation">Automatic updates</string>
-    <string name="automatic_updates_description" tools:ignore="MissingTranslation">Check and install only while the TV is in standby.</string>
-    <string name="update_now" tools:ignore="MissingTranslation">Update now</string>
-    <string name="companion_installed_version" tools:ignore="MissingTranslation">Installed companion: %1$s (%2$d)</string>
-    <string name="companion_latest_version" tools:ignore="MissingTranslation">Latest companion: %1$s</string>
-    <string name="companion_last_check" tools:ignore="MissingTranslation">Last check: %1$s</string>
-    <string name="companion_update_result" tools:ignore="MissingTranslation">Last result: %1$s</string>
-    <string name="update_unknown" tools:ignore="MissingTranslation">Not checked</string>
+    <string name="automatic_updates_description" tools:ignore="MissingTranslation">Checks GitHub and installs new releases only in standby</string>
+    <string name="update_title_check" tools:ignore="MissingTranslation">Check for updates</string>
+    <string name="update_title_could_not_check" tools:ignore="MissingTranslation">Couldn\'t check for updates</string>
+    <string name="update_title_failed" tools:ignore="MissingTranslation">Update failed</string>
+    <string name="update_title_available" tools:ignore="MissingTranslation">Update now</string>
+    <string name="update_title_checking" tools:ignore="MissingTranslation">Checking…</string>
+    <string name="update_title_installing" tools:ignore="MissingTranslation">Updating to %1$s</string>
+    <string name="update_badge_new" tools:ignore="MissingTranslation">New</string>
+    <string name="update_installed" tools:ignore="MissingTranslation">Installed %1$s</string>
+    <string name="update_latest" tools:ignore="MissingTranslation">Latest %1$s</string>
     <string name="update_never" tools:ignore="MissingTranslation">Not checked yet</string>
     <string name="update_checking" tools:ignore="MissingTranslation">Checking for an update…</string>
     <string name="update_up_to_date" tools:ignore="MissingTranslation">Up to date</string>
@@ -35,4 +72,5 @@
     <string name="update_success" tools:ignore="MissingTranslation">Companion updated successfully.</string>
     <string name="appliance_accessibility_service_label">Tvheadend Player appliance entry</string>
     <string name="appliance_accessibility_service_description">Opens Tvheadend Player at startup and wake, and maps only the TV/GUIDE button. It cannot read screen content.</string>
+    <string name="appliance_accessibility_disclosure">When the accessibility service is enabled, Tvheadend Player opens after TV startup and screen wake, and takes over only the TV/GUIDE button. It does not read screen content or monitor text. Every other remote button passes through unchanged.</string>
 </resources>

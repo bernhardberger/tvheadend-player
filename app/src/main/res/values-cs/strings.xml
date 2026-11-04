@@ -211,13 +211,10 @@
     <string name="audio_language">Jazyk zvuku</string>
     <string name="subtitle_language">Jazyk titulků</string>
     <string name="settings_appliance">Režim TV přijímače</string>
-    <string name="appliance_section_accessibility">Služba usnadnění</string>
     <string name="auto_start_playback">Spustit přehrávání při otevření aplikace</string>
     <string name="auto_start_playback_description">Po novém spuštění aplikace přehraje poslední kanál. Službu usnadnění to nezapne.</string>
-    <string name="appliance_accessibility_disclosure">Když je služba usnadnění zapnutá, Tvheadend Player se otevře po zapnutí TV a probuzení obrazovky a převezme pouze tlačítko TV/GUIDE. Nečte obsah obrazovky ani nesleduje text. Všechna ostatní tlačítka ovladače fungují beze změny.</string>
     <string name="appliance_service_enabled">Služba spuštění TV přijímače: zapnutá</string>
     <string name="appliance_service_disabled">Služba spuštění TV přijímače: vypnutá</string>
-    <string name="open_accessibility_settings">Otevřít nastavení usnadnění</string>
     <string name="appliance_starting_tv">Spouštění přehrávání</string>
     <string name="appliance_back_for_menu">Tlačítkem Zpět otevřeš kanály a nastavení.</string>
     <string name="main_startup_message_preparing">Příprava aplikace</string>

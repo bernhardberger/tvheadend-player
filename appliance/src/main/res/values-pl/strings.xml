@@ -2,4 +2,5 @@
 <resources>
     <string name="appliance_accessibility_service_label">Uruchamianie Tvheadend Player jako odbiornika TV</string>
     <string name="appliance_accessibility_service_description">Otwiera Tvheadend Player po uruchomieniu i wybudzeniu oraz przypisuje tylko przycisk TV/GUIDE. Nie może odczytywać zawartości ekranu.</string>
+    <string name="appliance_accessibility_disclosure">Gdy usługa ułatwień dostępu jest włączona, Tvheadend Player otwiera się po uruchomieniu telewizora i wybudzeniu ekranu oraz przejmuje tylko przycisk TV/GUIDE. Nie odczytuje zawartości ekranu ani nie monitoruje tekstu. Wszystkie pozostałe przyciski pilota działają bez zmian.</string>
 </resources>

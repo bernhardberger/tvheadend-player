@@ -2,4 +2,5 @@
 <resources>
     <string name="appliance_accessibility_service_label">כניסה למכשיר ייעודי של Tvheadend Player</string>
     <string name="appliance_accessibility_service_description">פותח את Tvheadend Player בהפעלה ובהתעוררות, וממפה רק את כפתור TV/GUIDE. אינו יכול לקרוא תוכן מסך.</string>
+    <string name="appliance_accessibility_disclosure">כאשר שירות הנגישות מופעל, הוא פותח את Tvheadend Player עם הפעלת הטלוויזיה והתעוררות המסך, ומטפל רק בכפתור TV/GUIDE. הוא אינו קורא תוכן מסך ואינו מנטר טקסט. כל יתר כפתורי השלט מועברים ללא שינוי.</string>
 </resources>

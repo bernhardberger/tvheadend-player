@@ -6,49 +6,36 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
 import android.provider.Settings
+import android.view.accessibility.AccessibilityManager
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Text
-import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
-import at.bernhardberger.tvhplayer.ui.TvFullScreenPadding
-import at.bernhardberger.tvhplayer.ui.TvSpacing24
+import at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService
 import at.bernhardberger.tvhplayer.appliance.update.CompanionUpdater
-import at.bernhardberger.tvhplayer.appliance.update.CompanionUpdateRows
-import at.bernhardberger.tvhplayer.appliance.update.UpdateScreenState
 import at.bernhardberger.tvhplayer.appliance.update.UpdateResult
+import at.bernhardberger.tvhplayer.appliance.update.UpdateScreenState
 import at.bernhardberger.tvhplayer.appliance.update.UpdateStore
+import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 
 class CompanionActivity : ComponentActivity() {
     private var playerVersion by mutableStateOf<String?>(null)
     private var systemHome by mutableStateOf<ComponentName?>(null)
+    private var accessibilityEnabled by mutableStateOf(false)
+    private var installAllowed by mutableStateOf(false)
+    private var defaultHome by mutableStateOf(false)
     private val updates by lazy { UpdateStore(this) }
     private var updateState by mutableStateOf(UpdateScreenState())
     private var manualUpdateRequested = false
@@ -70,23 +57,18 @@ class CompanionActivity : ComponentActivity() {
         setContent {
             TVHeadendPlayerTheme {
                 CompanionScreen(
-                    playerVersion = playerVersion,
-                    hasSystemHome = systemHome != null,
-                    updateState = updateState,
-                    onAutomaticUpdates = { updates.setAutomatic(!updates.automatic) },
-                    onUpdateNow = ::updateNow,
+                    state = CompanionScreenState(
+                        playerVersion = playerVersion,
+                        accessibilityEnabled = accessibilityEnabled,
+                        installAllowed = installAllowed,
+                        defaultHome = defaultHome,
+                        hasSystemHome = systemHome != null,
+                        update = updateState,
+                    ),
+                    onRow = ::onRow,
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background)
-                        .padding(TvFullScreenPadding),
-                    onOpenPlayer = ::openPlayer,
-                    onOpenSettings = { openScreen(Intent(Settings.ACTION_SETTINGS)) },
-                    onOpenSystemHome = {
-                        systemHome?.let { component ->
-                            openScreen(homeIntent().setComponent(component).addFlags(
-                                Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED))
-                        }
-                    },
+                        .background(MaterialTheme.colorScheme.background),
                 )
             }
         }
@@ -160,15 +142,54 @@ class CompanionActivity : ComponentActivity() {
         openScreen(launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED))
     }
 
-    private fun openScreen(intent: Intent) {
-        try {
-            startActivity(intent)
-        } catch (_: ActivityNotFoundException) {
-            refreshStatus()
-        } catch (_: SecurityException) {
-            refreshStatus()
+    private fun openScreen(intent: Intent): Boolean = try {
+        startActivity(intent)
+        true
+    } catch (_: ActivityNotFoundException) {
+        refreshStatus()
+        false
+    } catch (_: SecurityException) {
+        refreshStatus()
+        false
+    }
+
+    /** Opens the first intent the system accepts; Settings screens differ between TV builds. */
+    private fun openFirst(vararg intents: Intent) {
+        intents.any { openScreen(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+    }
+
+    private fun onRow(row: CompanionRow) {
+        when (row) {
+            CompanionRow.PLAYER ->
+                if (playerVersion != null) openPlayer()
+                else openFirst(
+                    Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=${BuildConfig.PLAYER_PACKAGE}")),
+                    Intent(Intent.ACTION_VIEW,
+                        Uri.parse("https://play.google.com/store/apps/details?id=${BuildConfig.PLAYER_PACKAGE}")),
+                )
+            CompanionRow.ACCESSIBILITY -> openFirst(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS),
+                Intent(Settings.ACTION_SETTINGS))
+            CompanionRow.HOME -> openFirst(Intent(Settings.ACTION_HOME_SETTINGS), Intent(Settings.ACTION_SETTINGS))
+            CompanionRow.SYSTEM_HOME -> systemHome?.let { component ->
+                openScreen(homeIntent().setComponent(component).addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED))
+            }
+            CompanionRow.UNKNOWN_APPS -> openFirst(
+                Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")),
+                Intent(Settings.ACTION_SETTINGS),
+            )
+            CompanionRow.AUTOMATIC -> updates.setAutomatic(!updates.automatic)
+            CompanionRow.UPDATE -> updateNow()
         }
     }
+
+    private fun isAccessibilityServiceEnabled(): Boolean =
+        getSystemService(AccessibilityManager::class.java)
+            .getEnabledAccessibilityServiceList(android.accessibilityservice.AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
+            .any {
+                it.resolveInfo.serviceInfo.packageName == packageName &&
+                    it.resolveInfo.serviceInfo.name == ApplianceEntryAccessibilityService::class.java.name
+            }
 
     @Suppress("DEPRECATION") // Integer flags also support the minimum API 28.
     private fun refreshStatus() {
@@ -187,59 +208,12 @@ class CompanionActivity : ComponentActivity() {
                 it.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM != 0
             }.thenBy { it.packageName }.thenBy { it.name })
             .firstOrNull()?.let { ComponentName(it.packageName, it.name) }
-        homeBack.isEnabled = shouldConsumeBack(
-            packageManager.resolveActivity(home, PackageManager.MATCH_DEFAULT_ONLY)
-                ?.activityInfo?.packageName == packageName)
+        accessibilityEnabled = isAccessibilityServiceEnabled()
+        installAllowed = packageManager.canRequestPackageInstalls()
+        defaultHome = packageManager.resolveActivity(home, PackageManager.MATCH_DEFAULT_ONLY)
+            ?.activityInfo?.packageName == packageName
+        homeBack.isEnabled = shouldConsumeBack(defaultHome)
     }
 
     private fun homeIntent() = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
-}
-
-@Composable
-private fun CompanionScreen(
-    playerVersion: String?,
-    hasSystemHome: Boolean,
-    updateState: UpdateScreenState,
-    modifier: Modifier = Modifier,
-    onOpenPlayer: () -> Unit,
-    onOpenSettings: () -> Unit,
-    onOpenSystemHome: () -> Unit,
-    onAutomaticUpdates: () -> Unit,
-    onUpdateNow: () -> Unit,
-) {
-    val firstButton = remember { FocusRequester() }
-    val playerInstalled = playerVersion != null
-    LaunchedEffect(playerInstalled) { firstButton.requestFocus() }
-    Column(
-        modifier = modifier.verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(TvSpacing24),
-    ) {
-        Text(
-            text = stringResource(R.string.app_name),
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.semantics { heading() },
-        )
-        Text(
-            text = if (playerVersion != null) stringResource(R.string.player_installed, playerVersion)
-                else stringResource(R.string.player_not_installed),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        if (playerInstalled) {
-            Button(onClick = onOpenPlayer, modifier = Modifier.focusRequester(firstButton)) {
-                Text(stringResource(R.string.open_player))
-            }
-        }
-        Button(onClick = onOpenSettings,
-            modifier = if (!playerInstalled) Modifier.focusRequester(firstButton) else Modifier) {
-            Text(stringResource(R.string.android_settings))
-        }
-        if (hasSystemHome) {
-            Button(onClick = onOpenSystemHome) { Text(stringResource(R.string.google_tv_home)) }
-        }
-        CompanionUpdateRows(updateState, onAutomaticUpdates, onUpdateNow)
-    }
 }

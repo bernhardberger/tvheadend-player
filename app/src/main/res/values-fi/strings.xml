@@ -211,13 +211,10 @@
     <string name="audio_language">Äänen kieli</string>
     <string name="subtitle_language">Tekstityksen kieli</string>
     <string name="settings_appliance">TV-tila</string>
-    <string name="appliance_section_accessibility">Esteettömyyspalvelu</string>
     <string name="auto_start_playback">Aloita toisto sovelluksen avautuessa</string>
     <string name="auto_start_playback_description">Toistaa viimeksi katsottua kanavaa sovelluksen käynnistyessä uudelleen. Tämä ei ota esteettömyyspalvelua käyttöön.</string>
-    <string name="appliance_accessibility_disclosure">Kun esteettömyyspalvelu on käytössä, Tvheadend Player avautuu television käynnistyksen ja näytön heräämisen jälkeen ja käsittelee vain TV/GUIDE-painikkeen. Se ei lue näytön sisältöä eikä seuraa tekstiä. Kaikki muut kaukosäätimen painikkeet välitetään muuttamattomina.</string>
     <string name="appliance_service_enabled">TV-käynnistyspalvelu: käytössä</string>
     <string name="appliance_service_disabled">TV-käynnistyspalvelu: pois käytöstä</string>
-    <string name="open_accessibility_settings">Avaa esteettömyysasetukset</string>
     <string name="appliance_starting_tv">Aloitetaan toistoa</string>
     <string name="appliance_back_for_menu">Avaa kanavat ja asetukset painamalla Back.</string>
     <string name="main_startup_message_preparing">Valmistellaan sovellusta</string>

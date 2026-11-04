@@ -211,13 +211,10 @@
     <string name="audio_language">Limba audio</string>
     <string name="subtitle_language">Limba subtitrărilor</string>
     <string name="settings_appliance">Mod aparat TV</string>
-    <string name="appliance_section_accessibility">Serviciu de accesibilitate</string>
     <string name="auto_start_playback">Pornește redarea la deschiderea aplicației</string>
     <string name="auto_start_playback_description">Redă ultimul canal după o nouă pornire a aplicației. Aceasta nu activează serviciul de accesibilitate.</string>
-    <string name="appliance_accessibility_disclosure">Când serviciul de accesibilitate este activat, Tvheadend Player se deschide după pornirea televizorului și trezirea ecranului și preia numai butonul TV/GUIDE. Nu citește conținutul ecranului și nu monitorizează textul. Toate celelalte butoane ale telecomenzii sunt transmise neschimbate.</string>
     <string name="appliance_service_enabled">Serviciu de pornire în modul aparat TV: activat</string>
     <string name="appliance_service_disabled">Serviciu de pornire în modul aparat TV: dezactivat</string>
-    <string name="open_accessibility_settings">Deschide setările de accesibilitate</string>
     <string name="appliance_starting_tv">Se pornește redarea</string>
     <string name="appliance_back_for_menu">Apasă Back pentru canale și setări.</string>
     <string name="main_startup_message_preparing">Se pregătește aplicația</string>

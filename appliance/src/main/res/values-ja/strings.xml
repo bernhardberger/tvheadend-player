@@ -2,4 +2,5 @@
 <resources>
     <string name="appliance_accessibility_service_label">Tvheadend Player専用機起動</string>
     <string name="appliance_accessibility_service_description">起動時と復帰時にTvheadend Playerを開き、TV/GUIDEボタンのみを割り当てます。画面の内容を読み取ることはできません。</string>
+    <string name="appliance_accessibility_disclosure">ユーザー補助サービスを有効にすると、テレビの起動時と画面の復帰時にTvheadend Playerが開き、TV/GUIDEボタンのみを処理します。画面の内容を読み取ったり、テキストを監視したりすることはありません。それ以外のリモコンボタンはすべて変更なく通過します。</string>
 </resources>

@@ -2,4 +2,5 @@
 <resources>
     <string name="appliance_accessibility_service_label">Запуск Tvheadend Player у режимі ТВ-приставки</string>
     <string name="appliance_accessibility_service_description">Відкриває Tvheadend Player під час запуску й пробудження та перепризначає лише кнопку TV/GUIDE. Не може читати вміст екрана.</string>
+    <string name="appliance_accessibility_disclosure">Коли службу спеціальних можливостей увімкнено, Tvheadend Player відкривається після запуску телевізора й пробудження екрана та перехоплює лише кнопку TV/GUIDE. Служба не читає вміст екрана й не відстежує текст. Усі інші кнопки пульта передаються без змін.</string>
 </resources>

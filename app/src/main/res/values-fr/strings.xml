@@ -211,13 +211,10 @@
     <string name="audio_language">Langue audio</string>
     <string name="subtitle_language">Langue des sous-titres</string>
     <string name="settings_appliance">Mode téléviseur</string>
-    <string name="appliance_section_accessibility">Service d’accessibilité</string>
     <string name="auto_start_playback">Lancer la lecture à l’ouverture de l’application</string>
     <string name="auto_start_playback_description">Lit la dernière chaîne après un nouveau lancement de l’application. Cela n’active pas le service d’accessibilité.</string>
-    <string name="appliance_accessibility_disclosure">Lorsque le service d’accessibilité est activé, Tvheadend Player s’ouvre au démarrage du téléviseur et au réveil de l’écran, et prend en charge uniquement la touche TV/GUIDE. Il ne lit pas le contenu de l’écran et ne surveille pas le texte. Toutes les autres touches de la télécommande sont transmises sans modification.</string>
     <string name="appliance_service_enabled">Service de lancement du mode téléviseur : activé</string>
     <string name="appliance_service_disabled">Service de lancement du mode téléviseur : désactivé</string>
-    <string name="open_accessibility_settings">Ouvrir les paramètres d’accessibilité</string>
     <string name="appliance_starting_tv">Démarrage de la lecture</string>
     <string name="appliance_back_for_menu">Appuie sur Back pour accéder aux chaînes et aux paramètres.</string>
     <string name="main_startup_message_preparing">Préparation de l’application</string>

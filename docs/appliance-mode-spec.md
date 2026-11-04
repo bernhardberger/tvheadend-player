@@ -57,22 +57,28 @@ silent updater.
   the warm-return rules in 7) without a launch-kind flag.
 - The HOME trampoline is the companion's own screen. A HOME press or its first
   start opens the player; returning to it after the player exits shows the
-  companion screen, with ways to open the player, Android settings and the
-  system launcher, so root Back never loops back into the player. TCL firmware
+  companion screen. Its rows open the player and the relevant Android settings,
+  and, while the companion is HOME, the system launcher, so root Back never
+  loops back into the player. TCL firmware
   does not offer third-party HOME apps (A1), so there the accessibility service
   is the way in.
 - Player-side appliance settings and behavior appear only when a companion signed
   with the same key is installed, and change only the player's own screens.
 - Debug companions (`.appliance.debug`) pair with debug players (`.debug`).
-- When the player is missing or not set up, the companion shows its setup screen
-  instead of failing silently.
+- The companion screen is a setup checklist: player installed, accessibility
+  service on and install unknown apps allowed are the items to fix; HOME is
+  optional. A missing player opens Google Play from its row.
+- Player Settings → Appliance has one row that opens the companion screen and
+  shows whether the accessibility service is on. The accessibility disclosure
+  lives on the companion screen, next to the service it describes.
 
 The companion checks GitHub's latest published release, validates `SHA256SUMS`,
 and installs only a newer APK for its own package signed by its current certificate.
 Automatic updates default on: screen-off schedules one network-constrained job,
 checks are at least six hours apart, and installation is deferred if the TV wakes.
-The companion screen offers Update now, the automatic-update switch and persisted
-version/check/result rows. Android's install-unknown-apps grant is required; any
+The companion screen offers the automatic-update switch and one update row that
+checks, shows installed and latest versions with the last result, and becomes
+Update now when a newer release is waiting. Android's install-unknown-apps grant is required; any
 installer confirmation waits for a manual Update now on that screen. A self-update
 does not launch the player when accessibility reconnects, or while the screen is off.
 Only the companion has package-install permissions; the player's existing network

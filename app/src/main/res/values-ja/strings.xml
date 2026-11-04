@@ -211,13 +211,10 @@
     <string name="audio_language">音声言語</string>
     <string name="subtitle_language">字幕言語</string>
     <string name="settings_appliance">専用機モード</string>
-    <string name="appliance_section_accessibility">ユーザー補助サービス</string>
     <string name="auto_start_playback">アプリ起動時に再生を開始</string>
     <string name="auto_start_playback_description">アプリを新たに起動したときに、最後に視聴したチャンネルを再生します。ユーザー補助サービスは有効になりません。</string>
-    <string name="appliance_accessibility_disclosure">ユーザー補助サービスを有効にすると、テレビの起動時と画面の復帰時にTvheadend Playerが開き、TV/GUIDEボタンのみを処理します。画面の内容を読み取ったり、テキストを監視したりすることはありません。それ以外のリモコンボタンはすべて変更なく通過します。</string>
     <string name="appliance_service_enabled">専用機起動サービス：有効</string>
     <string name="appliance_service_disabled">専用機起動サービス：無効</string>
-    <string name="open_accessibility_settings">ユーザー補助設定を開く</string>
     <string name="appliance_starting_tv">再生を開始中</string>
     <string name="appliance_back_for_menu">Backを押すとチャンネルと設定が表示されます。</string>
     <string name="main_startup_message_preparing">アプリを準備中</string>

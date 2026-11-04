@@ -2,4 +2,5 @@
 <resources>
     <string name="appliance_accessibility_service_label">Avvio modalità TV di Tvheadend Player</string>
     <string name="appliance_accessibility_service_description">Apre Tvheadend Player all’avvio e alla riattivazione del televisore e riassegna solo il tasto TV/GUIDE. Non può leggere il contenuto dello schermo.</string>
+    <string name="appliance_accessibility_disclosure">Quando il servizio di accessibilità è attivo, Tvheadend Player si apre all’avvio del televisore e alla riattivazione dello schermo, e gestisce solo il tasto TV/GUIDE. Non legge il contenuto dello schermo e non monitora il testo. Tutti gli altri tasti del telecomando vengono inoltrati senza modifiche.</string>
 </resources>

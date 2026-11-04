@@ -2,4 +2,5 @@
 <resources>
     <string name="appliance_accessibility_service_label">Spouštění Tvheadend Player jako TV přijímače</string>
     <string name="appliance_accessibility_service_description">Otevře Tvheadend Player při zapnutí a probuzení a přemapuje pouze tlačítko TV/GUIDE. Nemůže číst obsah obrazovky.</string>
+    <string name="appliance_accessibility_disclosure">Když je služba usnadnění zapnutá, Tvheadend Player se otevře po zapnutí TV a probuzení obrazovky a převezme pouze tlačítko TV/GUIDE. Nečte obsah obrazovky ani nesleduje text. Všechna ostatní tlačítka ovladače fungují beze změny.</string>
 </resources>

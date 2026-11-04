@@ -2,4 +2,5 @@
 <resources>
     <string name="appliance_accessibility_service_label">Pornire Tvheadend Player în modul aparat TV</string>
     <string name="appliance_accessibility_service_description">Deschide Tvheadend Player la pornire și trezire și atribuie o funcție numai butonului TV/GUIDE. Nu poate citi conținutul ecranului.</string>
+    <string name="appliance_accessibility_disclosure">Când serviciul de accesibilitate este activat, Tvheadend Player se deschide după pornirea televizorului și trezirea ecranului și preia numai butonul TV/GUIDE. Nu citește conținutul ecranului și nu monitorizează textul. Toate celelalte butoane ale telecomenzii sunt transmise neschimbate.</string>
 </resources>

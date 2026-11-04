@@ -1330,7 +1330,7 @@ class SettingsDepthNavigationTest {
         press(Key.Back)
         press(Key.DirectionDown) // Appliance.
         press(Key.DirectionCenter)
-        capture("appliance-accessibility")
+        capture("appliance-setup")
         assertEquals(2, settingsActions)
         press(Key.DirectionCenter)
         assertEquals(3, settingsActions)

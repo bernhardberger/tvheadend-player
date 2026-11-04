@@ -211,13 +211,10 @@
     <string name="audio_language">Jezik zvuka</string>
     <string name="subtitle_language">Jezik titlova</string>
     <string name="settings_appliance">Način TV prijamnika</string>
-    <string name="appliance_section_accessibility">Usluga pristupačnosti</string>
     <string name="auto_start_playback">Pokreni reprodukciju pri otvaranju aplikacije</string>
     <string name="auto_start_playback_description">Reproducira posljednji kanal nakon novog pokretanja aplikacije. Time se ne uključuje usluga pristupačnosti.</string>
-    <string name="appliance_accessibility_disclosure">Kad je usluga pristupačnosti uključena, Tvheadend Player otvara se nakon pokretanja TV-a i buđenja zaslona te preuzima samo tipku TV/GUIDE. Ne čita sadržaj zaslona niti prati tekst. Sve ostale tipke daljinskog upravljača rade nepromijenjeno.</string>
     <string name="appliance_service_enabled">Usluga pokretanja TV prijamnika: uključena</string>
     <string name="appliance_service_disabled">Usluga pokretanja TV prijamnika: isključena</string>
-    <string name="open_accessibility_settings">Otvori postavke pristupačnosti</string>
     <string name="appliance_starting_tv">Pokretanje reprodukcije</string>
     <string name="appliance_back_for_menu">Pritisni Natrag za kanale i postavke.</string>
     <string name="main_startup_message_preparing">Priprema aplikacije</string>

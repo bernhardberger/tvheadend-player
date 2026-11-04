@@ -2,4 +2,5 @@
 <resources>
     <string name="appliance_accessibility_service_label">Pokretanje Tvheadend Playera kao TV prijamnika</string>
     <string name="appliance_accessibility_service_description">Otvara Tvheadend Player pri pokretanju i buđenju te preslikava samo tipku TV/GUIDE. Ne može čitati sadržaj zaslona.</string>
+    <string name="appliance_accessibility_disclosure">Kad je usluga pristupačnosti uključena, Tvheadend Player otvara se nakon pokretanja TV-a i buđenja zaslona te preuzima samo tipku TV/GUIDE. Ne čita sadržaj zaslona niti prati tekst. Sve ostale tipke daljinskog upravljača rade nepromijenjeno.</string>
 </resources>

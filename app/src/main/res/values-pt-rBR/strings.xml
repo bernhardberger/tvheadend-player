@@ -211,13 +211,10 @@
     <string name="audio_language">Idioma do áudio</string>
     <string name="subtitle_language">Idioma das legendas</string>
     <string name="settings_appliance">Modo TV</string>
-    <string name="appliance_section_accessibility">Serviço de acessibilidade</string>
     <string name="auto_start_playback">Iniciar reprodução ao abrir o app</string>
     <string name="auto_start_playback_description">Reproduz o último canal ao iniciar o app de novo. Isso não ativa o serviço de acessibilidade.</string>
-    <string name="appliance_accessibility_disclosure">Com o serviço de acessibilidade ativado, o Tvheadend Player abre após a TV iniciar e ao reativar a tela, e assume apenas o botão TV/GUIDE. Não lê o conteúdo da tela nem monitora textos. Todos os outros botões do controle remoto continuam funcionando sem alterações.</string>
     <string name="appliance_service_enabled">Serviço de entrada do modo TV: ativado</string>
     <string name="appliance_service_disabled">Serviço de entrada do modo TV: desativado</string>
-    <string name="open_accessibility_settings">Abrir configurações de acessibilidade</string>
     <string name="appliance_starting_tv">Iniciando reprodução</string>
     <string name="appliance_back_for_menu">Pressione Back para acessar canais e configurações.</string>
     <string name="main_startup_message_preparing">Preparando app</string>

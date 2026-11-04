@@ -2,4 +2,5 @@
 <resources>
     <string name="appliance_accessibility_service_label">Tvheadend Player TV-start</string>
     <string name="appliance_accessibility_service_description">Åpner Tvheadend Player ved oppstart og vekking, og tildeler bare TV/GUIDE-knappen. Den kan ikke lese skjerminnhold.</string>
+    <string name="appliance_accessibility_disclosure">Når tilgjengelighetstjenesten er aktivert, åpnes Tvheadend Player etter TV-oppstart og skjermvekking og overtar bare TV/GUIDE-knappen. Den leser ikke skjerminnhold og overvåker ikke tekst. Alle andre fjernkontrollknapper sendes uendret videre.</string>
 </resources>

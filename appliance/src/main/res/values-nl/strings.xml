@@ -2,4 +2,5 @@
 <resources>
     <string name="appliance_accessibility_service_label">Tvheadend Player tv-startservice</string>
     <string name="appliance_accessibility_service_description">Opent Tvheadend Player bij het opstarten en ontwaken, en wijst alleen de TV/GUIDE-knop toe. De service kan geen scherminhoud lezen.</string>
+    <string name="appliance_accessibility_disclosure">Als de toegankelijkheidsservice is ingeschakeld, opent Tvheadend Player na het opstarten van de tv en het activeren van het scherm, en neemt de app alleen de TV/GUIDE-knop over. De app leest geen scherminhoud en houdt geen tekst bij. Alle andere afstandsbedieningsknoppen worden ongewijzigd doorgegeven.</string>
 </resources>

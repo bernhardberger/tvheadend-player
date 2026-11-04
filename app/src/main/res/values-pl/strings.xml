@@ -211,13 +211,10 @@
     <string name="audio_language">Język dźwięku</string>
     <string name="subtitle_language">Język napisów</string>
     <string name="settings_appliance">Tryb odbiornika TV</string>
-    <string name="appliance_section_accessibility">Usługa ułatwień dostępu</string>
     <string name="auto_start_playback">Rozpocznij odtwarzanie po otwarciu aplikacji</string>
     <string name="auto_start_playback_description">Odtwarza ostatni kanał po nowym uruchomieniu aplikacji. Nie włącza to usługi ułatwień dostępu.</string>
-    <string name="appliance_accessibility_disclosure">Gdy usługa ułatwień dostępu jest włączona, Tvheadend Player otwiera się po uruchomieniu telewizora i wybudzeniu ekranu oraz przejmuje tylko przycisk TV/GUIDE. Nie odczytuje zawartości ekranu ani nie monitoruje tekstu. Wszystkie pozostałe przyciski pilota działają bez zmian.</string>
     <string name="appliance_service_enabled">Usługa uruchamiania odbiornika TV: włączona</string>
     <string name="appliance_service_disabled">Usługa uruchamiania odbiornika TV: wyłączona</string>
-    <string name="open_accessibility_settings">Otwórz ustawienia ułatwień dostępu</string>
     <string name="appliance_starting_tv">Rozpoczynanie odtwarzania</string>
     <string name="appliance_back_for_menu">Naciśnij Wstecz, aby otworzyć kanały i ustawienia.</string>
     <string name="main_startup_message_preparing">Przygotowywanie aplikacji</string>

@@ -211,13 +211,10 @@
     <string name="audio_language">音频语言</string>
     <string name="subtitle_language">字幕语言</string>
     <string name="settings_appliance">电视模式</string>
-    <string name="appliance_section_accessibility">无障碍服务</string>
     <string name="auto_start_playback">打开应用时开始播放</string>
     <string name="auto_start_playback_description">重新启动应用后播放上次观看的频道。此功能不会启用无障碍服务。</string>
-    <string name="appliance_accessibility_disclosure">启用无障碍服务后，Tvheadend Player会在电视启动及屏幕唤醒后打开，并且仅接管TV/GUIDE按钮。不会读取屏幕内容或监控文字。遥控器上的所有其他按钮均保持原有功能。</string>
     <string name="appliance_service_enabled">电视模式入口服务：已启用</string>
     <string name="appliance_service_disabled">电视模式入口服务：已停用</string>
-    <string name="open_accessibility_settings">打开无障碍设置</string>
     <string name="appliance_starting_tv">正在开始播放</string>
     <string name="appliance_back_for_menu">按Back键查看频道和设置。</string>
     <string name="main_startup_message_preparing">正在准备应用</string>

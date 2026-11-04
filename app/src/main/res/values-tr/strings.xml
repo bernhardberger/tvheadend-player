@@ -211,13 +211,10 @@
     <string name="audio_language">Ses dili</string>
     <string name="subtitle_language">Altyazı dili</string>
     <string name="settings_appliance">TV modu</string>
-    <string name="appliance_section_accessibility">Erişilebilirlik hizmeti</string>
     <string name="auto_start_playback">Uygulama açıldığında oynatmayı başlat</string>
     <string name="auto_start_playback_description">Uygulama yeniden başlatıldığında son kanalı oynatır. Bu, erişilebilirlik hizmetini etkinleştirmez.</string>
-    <string name="appliance_accessibility_disclosure">Erişilebilirlik hizmeti etkinleştirildiğinde Tvheadend Player, TV açıldıktan ve ekran uyandıktan sonra açılır ve yalnızca TV/GUIDE düğmesini devralır. Ekran içeriğini okumaz veya metinleri izlemez. Diğer tüm kumanda düğmeleri değiştirilmeden iletilir.</string>
     <string name="appliance_service_enabled">TV başlatma hizmeti: etkin</string>
     <string name="appliance_service_disabled">TV başlatma hizmeti: devre dışı</string>
-    <string name="open_accessibility_settings">Erişilebilirlik ayarlarını aç</string>
     <string name="appliance_starting_tv">Oynatma başlatılıyor</string>
     <string name="appliance_back_for_menu">Kanallar ve ayarlar için Back düğmesine basın.</string>
     <string name="main_startup_message_preparing">Uygulama hazırlanıyor</string>

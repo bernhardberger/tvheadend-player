@@ -1,32 +1,22 @@
 package at.bernhardberger.tvhplayer.ui.screens.settings
 
 import android.accessibilityservice.AccessibilityServiceInfo
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
-import android.provider.Settings
 import android.view.accessibility.AccessibilityManager
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
-import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Text
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.ui.SettingsSection
-import at.bernhardberger.tvhplayer.ui.components.ScrollReadingBox
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthLevel
-import at.bernhardberger.tvhplayer.ui.components.depth.DepthRow
-import at.bernhardberger.tvhplayer.ui.components.depth.DepthItem
 
 @Composable
 internal fun settingsApplianceLevel(): DepthLevel {
@@ -38,45 +28,39 @@ internal fun settingsApplianceLevel(): DepthLevel {
         onPauseOrDispose { }
     }
 
-    return settingsApplianceLevel(serviceEnabled,
-        onOpenAccessibility = { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) })
+    return settingsApplianceLevel(serviceEnabled, onOpenSetup = { openApplianceSetup(context) })
 }
 
 @Composable
 internal fun settingsApplianceLevel(
     serviceEnabled: Boolean,
-    onOpenAccessibility: () -> Unit,
+    onOpenSetup: () -> Unit,
 ): DepthLevel = settingsLevel(
     SettingsSection.APPLIANCE.name,
     stringResource(R.string.settings_appliance),
     listOf(
-        settingsRow("accessibility", stringResource(R.string.open_accessibility_settings),
-            trailingIcon = R.drawable.ic_settings_accessibility,
-            section = stringResource(R.string.appliance_section_accessibility),
+        settingsRow("setup", stringResource(R.string.appliance_setup),
+            trailingIcon = R.drawable.ic_arrow_forward,
             supporting = stringResource(
                 if (serviceEnabled) R.string.appliance_service_enabled
                 else R.string.appliance_service_disabled
             ),
-            onClick = onOpenAccessibility,
+            onClick = onOpenSetup,
         ),
-        DepthRow(DepthItem("accessibility-disclosure"), {}) { modifier, _ ->
-            ApplianceDisclosure(modifier)
-        },
     ),
 )
 
-/** Always on the Appliance page, outside its action row. Uses the existing Info reading pattern. */
-@Composable
-private fun ApplianceDisclosure(modifier: Modifier) {
-    ScrollReadingBox(
-        title = stringResource(R.string.appliance_section_accessibility),
-        modifier = modifier.fillMaxWidth().heightIn(max = 168.dp),
-        readingModifier = Modifier.testTag("appliance-disclosure"),
-    ) {
-        Text(stringResource(R.string.appliance_accessibility_disclosure),
-            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+/** The companion owns the setup, status and the accessibility disclosure; the player only opens it. */
+private fun openApplianceSetup(context: Context) {
+    val launch = context.packageManager.getLeanbackLaunchIntentForPackage(BuildConfig.APPLIANCE_COMPANION_PACKAGE)
+        ?: return
+    try {
+        context.startActivity(launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    } catch (_: ActivityNotFoundException) {
+    } catch (_: SecurityException) {
     }
 }
+
 private fun isApplianceEntryServiceEnabled(context: Context): Boolean {
     val manager = context.getSystemService(AccessibilityManager::class.java)
     val serviceClassName = "at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService"

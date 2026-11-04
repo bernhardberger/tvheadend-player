@@ -211,13 +211,10 @@
     <string name="audio_language">Idioma do áudio</string>
     <string name="subtitle_language">Idioma das legendas</string>
     <string name="settings_appliance">Modo TV</string>
-    <string name="appliance_section_accessibility">Serviço de acessibilidade</string>
     <string name="auto_start_playback">Iniciar reprodução ao abrir a aplicação</string>
     <string name="auto_start_playback_description">Reproduz o último canal num novo arranque da aplicação. Isto não ativa o serviço de acessibilidade.</string>
-    <string name="appliance_accessibility_disclosure">Quando o serviço de acessibilidade está ativo, o Tvheadend Player abre após o arranque da TV e ao reativar o ecrã, e assume apenas o botão TV/GUIDE. Não lê o conteúdo do ecrã nem monitoriza texto. Todos os outros botões do comando passam sem alterações.</string>
     <string name="appliance_service_enabled">Serviço de entrada do modo TV: ativo</string>
     <string name="appliance_service_disabled">Serviço de entrada do modo TV: inativo</string>
-    <string name="open_accessibility_settings">Abrir definições de acessibilidade</string>
     <string name="appliance_starting_tv">A iniciar reprodução</string>
     <string name="appliance_back_for_menu">Prime Back para aceder aos canais e às definições.</string>
     <string name="main_startup_message_preparing">A preparar a aplicação</string>

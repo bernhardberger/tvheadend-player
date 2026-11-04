@@ -211,13 +211,10 @@
     <string name="audio_language">Ljudspråk</string>
     <string name="subtitle_language">Undertextspråk</string>
     <string name="settings_appliance">Tv-läge</string>
-    <string name="appliance_section_accessibility">Tillgänglighetstjänst</string>
     <string name="auto_start_playback">Starta uppspelning när appen öppnas</string>
     <string name="auto_start_playback_description">Spelar upp den senaste kanalen efter en ny appstart. Detta aktiverar inte tillgänglighetstjänsten.</string>
-    <string name="appliance_accessibility_disclosure">När tillgänglighetstjänsten är aktiverad öppnas Tvheadend Player efter att tv:n startats eller skärmen väckts, och tar bara över TV/GUIDE-knappen. Den läser inte skärminnehåll och övervakar inte text. Alla andra fjärrkontrollknappar skickas vidare oförändrade.</string>
     <string name="appliance_service_enabled">Tv-starttjänst: aktiverad</string>
     <string name="appliance_service_disabled">Tv-starttjänst: inaktiverad</string>
-    <string name="open_accessibility_settings">Öppna tillgänglighetsinställningar</string>
     <string name="appliance_starting_tv">Startar uppspelning</string>
     <string name="appliance_back_for_menu">Tryck på Back för kanaler och inställningar.</string>
     <string name="main_startup_message_preparing">Förbereder appen</string>

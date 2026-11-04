@@ -211,13 +211,10 @@
     <string name="audio_language">Lingua audio</string>
     <string name="subtitle_language">Lingua sottotitoli</string>
     <string name="settings_appliance">Modalità TV</string>
-    <string name="appliance_section_accessibility">Servizio di accessibilità</string>
     <string name="auto_start_playback">Avvia la riproduzione all’apertura dell’app</string>
     <string name="auto_start_playback_description">Riproduce l’ultimo canale dopo un nuovo avvio dell’app. Non attiva il servizio di accessibilità.</string>
-    <string name="appliance_accessibility_disclosure">Quando il servizio di accessibilità è attivo, Tvheadend Player si apre all’avvio del televisore e alla riattivazione dello schermo, e gestisce solo il tasto TV/GUIDE. Non legge il contenuto dello schermo e non monitora il testo. Tutti gli altri tasti del telecomando vengono inoltrati senza modifiche.</string>
     <string name="appliance_service_enabled">Servizio di avvio della modalità TV: attivo</string>
     <string name="appliance_service_disabled">Servizio di avvio della modalità TV: disattivo</string>
-    <string name="open_accessibility_settings">Apri impostazioni di accessibilità</string>
     <string name="appliance_starting_tv">Avvio della riproduzione</string>
     <string name="appliance_back_for_menu">Premi Back per accedere a canali e impostazioni.</string>
     <string name="main_startup_message_preparing">Preparazione dell’app</string>
