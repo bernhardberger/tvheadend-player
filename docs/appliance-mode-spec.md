@@ -51,10 +51,16 @@ autoplay, warm playback and every appliance-only player setting. The sideloaded
 GUIDE/TV accessibility service, boot and wake entry, a setup checklist and its own
 silent updater.
 
-- The companion opens the player through `APPLIANCE_ENTRY`, guarded by a
-  `signature` permission. The HOME trampoline must keep today's HOME launch
-  semantics (success criterion 6 and the warm-return rules in 7), so the entry
-  says which kind of launch it is: HOME, GUIDE, boot or wake.
+- GUIDE, boot and wake open the player through `APPLIANCE_ENTRY`, an exported
+  entry guarded by a `signature` permission. HOME opens the player the way the
+  launcher does, which keeps today's HOME semantics (success criterion 6 and
+  the warm-return rules in 7) without a launch-kind flag.
+- The HOME trampoline is the companion's own screen. A HOME press or its first
+  start opens the player; returning to it after the player exits shows the
+  companion screen, with ways to open the player, Android settings and the
+  system launcher, so root Back never loops back into the player. TCL firmware
+  does not offer third-party HOME apps (A1), so there the accessibility service
+  is the way in.
 - Player-side appliance settings and behavior appear only when a companion signed
   with the same key is installed, and change only the player's own screens.
 - Debug companions (`.appliance.debug`) pair with debug players (`.debug`).
