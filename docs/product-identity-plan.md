@@ -8,7 +8,7 @@ Status: approved and implemented beginning 2026-07-24
 |---|---|
 | Product boundary | Independent public Android TV live-TV client for Tvheadend, with appliance behavior as an optional profile/integration layer |
 | Public name | **Tvheadend Player** |
-| Launcher label | **Tvheadend Player** (Play build); **Tvheadend Player Appliance** (Appliance build, so both can be told apart when installed side by side) |
+| Launcher label | **Tvheadend Player** (the player); **Tvheadend Player Appliance** (the Appliance companion, with its own icon and banner so it is not mistaken for the player) |
 | Descriptor | **Live TV client for Tvheadend servers** |
 | Repository | `bernhardberger/tvheadend-player` |
 | Distribution | GitHub-first, while keeping a later Google Play path possible |
@@ -24,8 +24,8 @@ client where that distinction matters.
 
 | Surface | Value |
 |---|---|
-| Application ID (Play build) | `at.bernhardberger.tvhplayer` |
-| Application ID (Appliance build) | `at.bernhardberger.tvhplayer.appliance` |
+| Application ID (player) | `at.bernhardberger.tvhplayer`; debug and `profileServer` builds `at.bernhardberger.tvhplayer.debug` |
+| Application ID (Appliance companion) | `at.bernhardberger.tvhplayer.appliance`; debug builds `at.bernhardberger.tvhplayer.appliance.debug` |
 | Kotlin/Gradle namespace | `at.bernhardberger.tvhplayer` |
 | Root Gradle project | `TVHeadendPlayer` |
 | Compose theme API | `TVHeadendPlayerTheme` |
@@ -40,13 +40,21 @@ client where that distinction matters.
 | Local credential file | `.tvhplayer-credentials.json` |
 | Device environment prefix | `TVHPLAYER_` |
 
-Two builds come from one code path through the `distribution` flavor dimension
-(owner, 2026-10-11). `play` is the Google Play build: no HOME launcher filter and
-no GUIDE accessibility service. `appliance` is the sideloaded household build: it
-adds both, the Appliance settings section, and its own application ID, so a Play
-update can never replace an Appliance install. Both builds can be installed side
-by side and are configured separately; existing Appliance TVs are set up once
-more.
+The player ships as one build, through Google Play and as a GitHub APK (owner,
+2026-11-04, replacing the 2026-10-11 two-build split). Household integration is a
+separate sideloaded app, the **Appliance companion**: it holds the HOME launcher
+filter, the GUIDE/TV accessibility service, boot and wake entry, its setup screen
+and its own updater. None of these ever ship through Play. The companion opens the
+player through the `APPLIANCE_ENTRY` action, which the player guards with a
+`signature` permission, so only an app signed with the same key can use it; debug
+companions pair with debug players and release with release. Appliance-only
+player settings and behavior stay in the player, appear only when a companion
+signed with the same key is installed, and only change the player's own screens.
+Existing Appliance TVs are set up once more: the player from Play, the companion
+sideloaded.
+
+Debug and `profileServer` builds carry a `.debug` suffix so they install next to
+a Play release; `profile` keeps `.profile`.
 
 No compatibility code preserves the former application ID, DataStore files, or
 Keystore alias. The previous package may remain installed as a rollback client

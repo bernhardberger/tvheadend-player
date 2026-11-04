@@ -20,10 +20,11 @@ roles "build host" and "signing host".
 
 ## Builds
 
-Each release produces two builds from one commit: the Play build
-`at.bernhardberger.tvhplayer` and the Appliance build
-`at.bernhardberger.tvhplayer.appliance`. Only the Appliance build carries the HOME
-filter, the GUIDE accessibility service and the Appliance settings. Both APKs are
+Each release produces, from one commit, the player `at.bernhardberger.tvhplayer`
+and the Appliance companion `at.bernhardberger.tvhplayer.appliance` (owner,
+2026-11-04). Only the companion carries the
+HOME filter, the GUIDE accessibility service and install permissions; it updates
+itself from the GitHub release, so `SHA256SUMS` must list its APK. Both APKs are
 attached to every GitHub release. The bundle also includes a Play AAB for Google
 Play. Play App Signing must use this project's own release key ("use your own
 key" at enrollment), so a GitHub APK and a Play install update each other.

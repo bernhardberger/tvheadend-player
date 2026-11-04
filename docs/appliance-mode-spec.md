@@ -34,9 +34,32 @@ backs out to those screens.
 ```bash
 ./tools/verify
 # Mutating commands require an explicitly configured test device.
-android --no-metrics install --device="$TVHPLAYER_ADB_SERIAL" --apks=app/build/outputs/apk/appliance/debug/app-appliance-debug.apk --use-delta-install=false --install-options=-r,-t
-./tools/device --package at.bernhardberger.tvhplayer.appliance launch
+android --no-metrics install --device="$TVHPLAYER_ADB_SERIAL" --apks=<debug player APK> --use-delta-install=false --install-options=-r,-t
+android --no-metrics install --device="$TVHPLAYER_ADB_SERIAL" --apks=<debug companion APK> --use-delta-install=false --install-options=-r,-t
+./tools/device --package at.bernhardberger.tvhplayer.appliance.debug launch
 ```
+
+APK paths and `tools/device` package defaults are settled on
+`feat/appliance-companion` and filled in here when it lands.
+
+## Two apps (owner, 2026-11-04)
+
+Appliance behavior is split across two apps. The **player**
+(`at.bernhardberger.tvhplayer`, also on Google Play) keeps launch policy,
+autoplay, warm playback and every appliance-only player setting. The sideloaded
+**Appliance companion** (`at.bernhardberger.tvhplayer.appliance`) owns HOME, the
+GUIDE/TV accessibility service, boot and wake entry, a setup checklist and its own
+silent updater.
+
+- The companion opens the player through `APPLIANCE_ENTRY`, guarded by a
+  `signature` permission. The HOME trampoline must keep today's HOME launch
+  semantics (success criterion 6 and the warm-return rules in 7), so the entry
+  says which kind of launch it is: HOME, GUIDE, boot or wake.
+- Player-side appliance settings and behavior appear only when a companion signed
+  with the same key is installed, and change only the player's own screens.
+- Debug companions (`.appliance.debug`) pair with debug players (`.debug`).
+- When the player is missing or not set up, the companion shows its setup screen
+  instead of failing silently.
 
 Final release builds must use a private stable product signing key and must not rely
 on the Android debug keystore.
@@ -68,6 +91,7 @@ on the Android debug keystore.
 - `app/src/main/java/.../stores/` — persisted last-channel selection
 - `app/src/main/java/.../ui/` — launch policy and normal TV UI
 - `app/src/main/java/.../accessibility/` — GUIDE filtering and boot/wake entry
+  (moves into the Appliance companion module on `feat/appliance-companion`)
 - `app/src/main/res/xml/` — accessibility-service declaration
 - `app/src/test/` — pure launch/navigation policy tests
 - `docs/` — appliance behavior, build, and rollback documentation
@@ -113,8 +137,8 @@ fun adjacentChannelId(
   keep it unavailable in release builds and on production/unclassified devices.
 - Preserve a route to channel list, EPG, and settings through Back navigation.
 - Keep Google Basic TV and stock Headent installed until all runtime checks pass.
-- Use the Appliance build's distinct `at.bernhardberger.tvhplayer.appliance`
-  application ID and the stable product signing key.
+- Sign the player and the Appliance companion with the same stable product
+  signing key; the companion keeps `at.bernhardberger.tvhplayer.appliance`.
 - Keep the operator UI on one overscan-safe TV layout grid. Use TV Material
   navigation drawers and list items rather than hand-built focusable replicas;
   focused rows must remain unclipped, and Player details/settings panels must
