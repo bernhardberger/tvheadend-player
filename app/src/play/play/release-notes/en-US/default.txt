@@ -1,1 +1,1 @@
-CH+/− now page through Settings lists a screen at a time. Recordings → Problems no longer lists recordings you deleted, or ones whose file is gone. All changes: github.com/bernhardberger/tvheadend-player/blob/main/CHANGELOG.md
+Hold Back to stop playback while you watch. With a panel or menu open, holding Back just goes back one step. Outside the player, Back now acts when you release it. Leaving the player returns you to the card you started from instead of opening the side menu. All changes: github.com/bernhardberger/tvheadend-player/blob/main/CHANGELOG.md

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.5
 
 ### Player
 
@@ -11,6 +11,8 @@
 
 - Outside the player, Back now acts when you release it. Held presses act once,
   and canceled presses no longer move you back.
+- Leaving the player with Back no longer opens the side menu on Home; focus
+  returns to the card you played.
 
 ## 0.4.4
 
