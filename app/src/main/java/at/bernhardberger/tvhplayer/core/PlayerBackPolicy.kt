@@ -25,6 +25,25 @@ enum class PlayerForegroundLayer {
     NONE,
 }
 
+/** Only watching layers turn a held Back into Stop; panels keep their normal Back. */
+fun playerBackHoldAllowed(layer: PlayerForegroundLayer): Boolean = when (layer) {
+    PlayerForegroundLayer.NONE,
+    PlayerForegroundLayer.CONTROLS,
+    PlayerForegroundLayer.STATS,
+    PlayerForegroundLayer.PENDING_SEEK_PREVIEW,
+    PlayerForegroundLayer.DISPATCHED_SEEK_PREVIEW,
+    PlayerForegroundLayer.RECOVERY,
+    PlayerForegroundLayer.TERMINAL_ERROR -> true
+    PlayerForegroundLayer.CONFIRMATION,
+    PlayerForegroundLayer.INFO,
+    PlayerForegroundLayer.SCHEDULE,
+    PlayerForegroundLayer.OPTIONS_QUICK_LIST,
+    PlayerForegroundLayer.OPTIONS_DETAIL,
+    PlayerForegroundLayer.OPTIONS_ROOT,
+    PlayerForegroundLayer.NUMBER_ENTRY,
+    PlayerForegroundLayer.CHANNEL_DRAWER -> false
+}
+
 enum class PlayerBackAction {
     DISMISS_CONFIRMATION,
     CLOSE_INFO,

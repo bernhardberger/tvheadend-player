@@ -58,6 +58,7 @@ import at.bernhardberger.tvhplayer.core.MediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.PlaybackRetryCommand
 import at.bernhardberger.tvhplayer.core.PlayerBackAction
 import at.bernhardberger.tvhplayer.core.PlayerBackKeyCycle
+import at.bernhardberger.tvhplayer.core.playerBackHoldAllowed
 import at.bernhardberger.tvhplayer.core.PlayerAutoHideContext
 import at.bernhardberger.tvhplayer.core.PlayerForegroundContext
 import at.bernhardberger.tvhplayer.core.PlayerForegroundLayer
@@ -449,9 +450,10 @@ fun RecordingPlayerScreen(
             .onPreviewKeyEvent { event ->
                 if (event.type == KeyEventType.KeyDown) layers.onKeyDown()
                 if (backCycle.intercept(event,
-                        confirmationOpen = false, nestedDialogOpen = playerModals.isNotEmpty(),
+                        holdAllowed = playerBackHoldAllowed(foregroundLayer) &&
+                            !markerNavigation.open && playerModals.isEmpty(),
                         onBack = {
-                            if (layers.infoOpen) backDispatcher?.onBackPressed() else handlePlaybackBack()
+                            if (playerModals.isNotEmpty() || layers.infoOpen) backDispatcher?.onBackPressed() else handlePlaybackBack()
                         }, stopAndClose = ::stopAndClose,
                         activityKeyCycleOwner = activityKeyCycleOwner)) return@onPreviewKeyEvent true
                 val keyCode = event.nativeKeyEvent.keyCode

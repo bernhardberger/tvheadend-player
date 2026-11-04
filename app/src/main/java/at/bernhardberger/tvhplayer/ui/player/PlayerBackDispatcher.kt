@@ -12,7 +12,7 @@ import android.view.KeyEvent as AndroidKeyEvent
 import at.bernhardberger.tvhplayer.core.PlayerBackKeyCycle
 import at.bernhardberger.tvhplayer.core.PlayerBackKeyResult
 
-/** Only confirmation callers register here; menus and choices still allow holding Back. */
+/** Dialogs disable hold-to-stop; their BackHandler receives one Back on release. */
 internal val LocalPlayerModalRegistry = staticCompositionLocalOf<MutableMap<Any, Unit>?> { null }
 
 @Composable
@@ -27,24 +27,19 @@ internal fun RegisterPlayerModal() {
 
 internal fun PlayerBackKeyCycle.intercept(
     event: KeyEvent,
-    confirmationOpen: Boolean,
-    nestedDialogOpen: Boolean,
+    holdAllowed: Boolean,
     onBack: () -> Unit,
     stopAndClose: () -> Unit,
     activityKeyCycleOwner: at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyCycleOwner? = null,
 ): Boolean {
     val native = event.nativeKeyEvent
     if (native.keyCode != AndroidKeyEvent.KEYCODE_BACK) return false
-    if (confirmationOpen || nestedDialogOpen) {
-        onKey(false, 0, false, canceled = true, holdAllowed = false)
-        return false
-    }
     if (native.action == AndroidKeyEvent.ACTION_UP && native.isCanceled) {
         onKey(false, 0, false, canceled = true, holdAllowed = false)
         return true
     }
     when (onKey(native.action == AndroidKeyEvent.ACTION_DOWN, native.repeatCount,
-        native.isLongPress, native.isCanceled, holdAllowed = true)) {
+        native.isLongPress, native.isCanceled, holdAllowed = holdAllowed)) {
         PlayerBackKeyResult.BACK -> onBack()
         PlayerBackKeyResult.HOLD -> {
             activityKeyCycleOwner?.consumeUntilUp(AndroidKeyEvent.KEYCODE_BACK)

@@ -72,6 +72,7 @@ import at.bernhardberger.tvhplayer.core.PlaybackStatusPresentation
 import at.bernhardberger.tvhplayer.core.PlaybackRetryCommand
 import at.bernhardberger.tvhplayer.core.PlayerBackAction
 import at.bernhardberger.tvhplayer.core.PlayerBackKeyCycle
+import at.bernhardberger.tvhplayer.core.playerBackHoldAllowed
 import at.bernhardberger.tvhplayer.core.PlayerAutoHideContext
 import at.bernhardberger.tvhplayer.core.PlayerForegroundLayer
 import at.bernhardberger.tvhplayer.core.channelPickAction
@@ -1348,10 +1349,9 @@ fun VideoPlayerScreen(
             .onPreviewKeyEvent { event ->
                 if (event.nativeKeyEvent.action == AndroidKeyEvent.ACTION_DOWN) layerState.core.onKeyDown()
                 if (backCycle.intercept(event,
-                        confirmationOpen = foregroundLayer == PlayerForegroundLayer.CONFIRMATION,
-                        nestedDialogOpen = playerModals.isNotEmpty(),
+                        holdAllowed = playerBackHoldAllowed(foregroundLayer) && playerModals.isEmpty(),
                         onBack = {
-                            if (layerState.core.infoOpen || layerState.scheduleOpen) backDispatcher?.onBackPressed()
+                            if (playerModals.isNotEmpty() || layerState.core.infoOpen || layerState.scheduleOpen) backDispatcher?.onBackPressed()
                             else handlePlaybackBack()
                         }, stopAndClose = stopAndClose,
                         activityKeyCycleOwner = activityKeyCycleOwner)) return@onPreviewKeyEvent true

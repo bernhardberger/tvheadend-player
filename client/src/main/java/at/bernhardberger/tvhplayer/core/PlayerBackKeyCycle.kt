@@ -6,6 +6,8 @@ enum class PlayerBackKeyResult { NONE, BACK, HOLD }
 class PlayerBackKeyCycle {
     private var tracking = false
     private var held = false
+    // A panel disappearing mid-press must not turn its Back into Stop on a later repeat.
+    private var startedWithHoldAllowed = false
 
     fun onKey(
         isDown: Boolean,
@@ -18,7 +20,8 @@ class PlayerBackKeyCycle {
             if (repeatCount == 0 && !isLongPress) {
                 tracking = true
                 held = false
-            } else if (tracking && !held && holdAllowed) {
+                startedWithHoldAllowed = holdAllowed
+            } else if (tracking && !held && startedWithHoldAllowed && holdAllowed) {
                 held = true
                 return PlayerBackKeyResult.HOLD
             }

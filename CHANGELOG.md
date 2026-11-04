@@ -4,7 +4,8 @@
 
 ### Player
 
-- Holding Back in the player stops playback, like the Stop key (#13).
+- Holding Back stops playback while watching. With a panel or menu open, it
+  just goes back one step (#13).
 
 ### Navigation
 

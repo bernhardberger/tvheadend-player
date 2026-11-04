@@ -39,6 +39,7 @@ import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.TvTextColors
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotionFrame
+import at.bernhardberger.tvhplayer.ui.player.RegisterPlayerModal
 
 /** Safe choice first, in the same horizontal pill row as the resume prompt. */
 @Composable
@@ -104,6 +105,7 @@ internal fun CentredDialog(
     visibility: MutableTransitionState<Boolean> = remember { MutableTransitionState(false).apply { targetState = true } },
     actions: @Composable RowScope.() -> Unit,
 ) {
+    RegisterPlayerModal()
     var openingReleasePending by remember { mutableStateOf(true) }
     val latestDismiss by rememberUpdatedState(onDismiss)
     LaunchedEffect(visibility.isIdle, visibility.currentState, visibility.targetState) {

@@ -876,7 +876,7 @@ class PlayerFooterLayoutEvidenceTest {
                     endpointWidths = rememberTimelineEndpointWidths(if (recording) TimelineKind.RECORDING else TimelineKind.LIVE)
                     Box(Modifier.fillMaxSize().onPreviewKeyEvent { event ->
                         // Marker Back belongs to the recording root, not the chrome itself.
-                        recording && backCycle.intercept(event, false, false,
+                        recording && backCycle.intercept(event, false,
                             onBack = { markerNavigation.dismiss() }, stopAndClose = {})
                     }) {
                         if (backdrop() == Backdrop.TEXTURED) {

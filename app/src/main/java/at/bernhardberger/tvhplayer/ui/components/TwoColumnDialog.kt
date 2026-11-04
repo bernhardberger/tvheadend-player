@@ -45,6 +45,7 @@ internal fun TwoColumnDialog(
     val parentMotion = LocalPlayerPanelMotion.current
     val visibility = remember { MutableTransitionState(false).apply { targetState = true } }
     val closing = parentMotion == null && !visibility.targetState
+    RegisterPlayerModal()
     BackHandler(enabled = backEnabled) {
         if (!closing) {
             if (parentMotion != null) onDismiss() else visibility.targetState = false

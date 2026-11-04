@@ -928,27 +928,53 @@ class LivePlayerChromeScreenTest {
         assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_STOP_ENTRY })
     }
 
-    @Test fun holdBackOverScheduleContextMenuStopsPlayback() = holdStops {
-        key(Key.Guide)
-        key(Key.Menu)
-        assertTrue(exists("browse-context-menu"))
+    @Test fun holdBackOverScheduleContextMenuClosesOnlyTheMenu() = holdGoesBack({
+        key(Key.Guide); key(Key.Menu); assertTrue(exists("browse-context-menu"))
+    }) {
+        assertFalse(exists("browse-context-menu"))
+        assertTrue(exists("channel-schedule-panel"))
     }
     @Test fun holdBackStopsOverControls() = holdStops { key(Key.DirectionDown); assertTrue(exists("player-actions")) }
-    @Test fun holdBackStopsOverInfo() = holdStops { key(Key.Info); assertTrue(exists("programme-details-page")) }
-    @Test fun holdBackStopsOverSchedule() = holdStops { key(Key.Guide); assertTrue(exists("channel-schedule-panel")) }
-    @Test fun holdBackStopsOverOptions() = holdStops { key(Key.Menu); assertTrue(exists("playback-options-display")) }
-    @Test fun holdBackStopsOverQuickList() = holdStops {
+    @Test fun holdBackOverInfoClosesOnlyInfo() = holdGoesBack({
+        key(Key.Info); assertTrue(exists("programme-details-page"))
+    }) { assertFalse(exists("programme-details-page")); assertFalse(exists("player-actions")) }
+    @Test fun holdBackOverScheduleClosesOnlySchedule() = holdGoesBack({
+        key(Key.Guide); assertTrue(exists("channel-schedule-panel"))
+    }) { assertFalse(exists("channel-schedule-panel")); assertFalse(exists("player-actions")) }
+    @Test fun holdBackOverOptionsClosesOnlyOptions() = holdGoesBack({
+        key(Key.Menu); assertTrue(exists("playback-options-display"))
+    }) { assertFalse(exists("playback-options-display")); assertEquals(listOf("player-settings"), focused()) }
+    @Test fun holdBackOverOptionsDetailReturnsOnlyToOptionsRoot() = holdGoesBack({
+        key(Key.Menu)
+        compose.onNodeWithTag("playback-options-display").performSemanticsAction(SemanticsActions.RequestFocus)
+        key(Key.DirectionCenter)
+        assertFalse(exists("playback-options-display"))
+    }) { assertTrue(exists("playback-options-display")); assertFalse(exists("player-actions")) }
+    @Test fun holdBackOverQuickListClosesOnlyTheList() = holdGoesBack({
         playerReady()
         compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Playing }
         publishTracks(Tracks(listOf(audioTrack("a1", "en", true), audioTrack("a2", "de", false))))
         key(Key.MediaAudioTrack); assertTrue(exists("playback-options-track-list"))
-    }
-    @Test fun holdBackStopsDuringNumberEntry() = holdStops {
+    }) { assertFalse(exists("playback-options-track-list")); assertFalse(exists("player-actions")) }
+    @Test fun holdBackDuringNumberEntryOnlyClearsEntry() = holdGoesBack({
         press(Key.Nine)
         assertTrue(compose.onAllNodesWithText("9").fetchSemanticsNodes().isNotEmpty())
-    }
-    @Test fun holdBackStopsOverChannelList() = holdStops {
+    }) { assertTrue(compose.onAllNodesWithText("9").fetchSemanticsNodes().isEmpty()); assertTrue(exists("player-banner")) }
+    @Test fun holdBackOverChannelListClosesOnlyTheDrawer() = holdGoesBack({
         key(Key(android.view.KeyEvent.KEYCODE_TV_CONTENTS_MENU)); assertTrue(railOpen())
+    }) { assertFalse(railOpen()); assertFalse(exists("player-actions")) }
+    @Test fun holdBackStopsOverBanner() = holdStops { assertTrue(exists("player-banner")) }
+    @Test fun holdBackStopsOverPausedLabel() {
+        var closes = 0
+        timeshiftPlaying(onClose = { closes++ }) { pauses ->
+            key(Key.DirectionCenter)
+            compose.waitUntil(3_000) { idleMainLooper(); false in pauses }
+            key(Key.Back)
+            assertFalse(exists("player-banner")); assertFalse(exists("player-actions"))
+            assertEquals("Paused", description("player-hidden-slot"))
+            holdBack()
+            assertEquals(1, closes); assertEquals(null, runtime.activeTarget.value)
+        }
     }
     @Test fun holdBackStopsOverStats() = holdStops {
         key(Key.Menu)
@@ -1032,12 +1058,32 @@ class LivePlayerChromeScreenTest {
         assertEquals(null, runtime.activeTarget.value)
     }
 
-    private fun holdBack() {
+    private fun holdGoesBack(prepare: () -> Unit, after: () -> Unit) {
+        var closes = 0
+        screen(onClose = { closes++ })
+        prepare()
+        val target = runtime.activeTarget.value
+        val before = focused()
+        holdBack {
+            assertEquals(before, focused())
+            assertEquals(0, closes)
+            assertEquals(target, runtime.activeTarget.value)
+        }
+        assertEquals(0, closes)
+        assertEquals(target, runtime.activeTarget.value)
+        after()
+    }
+
+    private fun holdBack(beforeRelease: () -> Unit = {}) {
         compose.runOnUiThread {
             view.dispatchKeyEvent(AndroidKeyEvent(AndroidKeyEvent.ACTION_DOWN, AndroidKeyEvent.KEYCODE_BACK))
             view.dispatchKeyEvent(AndroidKeyEvent(0, 0, AndroidKeyEvent.ACTION_DOWN,
                 AndroidKeyEvent.KEYCODE_BACK, 1, 0, 0, 0, AndroidKeyEvent.FLAG_LONG_PRESS))
             view.dispatchKeyEvent(AndroidKeyEvent(0, 0, AndroidKeyEvent.ACTION_DOWN, AndroidKeyEvent.KEYCODE_BACK, 2))
+        }
+        settleFrames()
+        beforeRelease()
+        compose.runOnUiThread {
             view.dispatchKeyEvent(AndroidKeyEvent(AndroidKeyEvent.ACTION_UP, AndroidKeyEvent.KEYCODE_BACK))
         }
         settle()

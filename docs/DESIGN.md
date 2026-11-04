@@ -491,8 +491,8 @@ Anatomy per Material for TV / design kit:
   Outside the player, Back acts once on KeyUp, only if that owner saw the
   initial non-repeat KeyDown. Repeats do not act; canceled or unseen releases
   do nothing. A held Back has no extra action outside the player.
-  In the player, short Back acts on KeyUp; holding Back stops playback,
-  except on confirmations and nested dialogs.
+  In the player, short Back also acts on KeyUp. Holding Back stops playback
+  while watching. With a panel or menu open, it goes back one step on release.
 - Back unwinds local layers first (dialogs, sheets, depth stacks, scope tabs),
   then focuses the global drawer on the current destination. From a non-root
   destination the next Back goes to Home; Back from Home follows the
@@ -1083,7 +1083,8 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   just appeared (`core/PlaybackKeyPolicy.kt:103-125`,
   `ui/player/LivePlayerLayerState.kt:293-299`). Stop with no active target
   uses the same suppression (`ui/player/PlayerStop.kt:71-86`).
-  Player Back is the exception: short Back acts on KeyUp; a hold stops playback.
+  In the player, a hold stops playback while watching, including with controls
+  showing. With a panel or menu open, it acts as one short Back on release.
 - Hidden-chrome keys (`core/PlaybackKeyPolicy.kt:191-277`): Center, Enter and
   Numpad Enter toggle Play/Pause and reveal the controls on recordings and on
   live with Pause available; where live cannot pause they peek the Banner with
@@ -1100,7 +1101,10 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   when it is visible and otherwise closes the player to warm browse. A pending
   step cancels; a dispatched one only dismisses its feedback and claims no
   undo. Recovery and terminal-error Back close the player at once. Short Back is
-  not Stop. Holding Back stops playback, except on confirmations and nested dialogs.
+  not Stop. Holding Back stops playback while watching, including the passive
+  Banner, paused label, controls, Stats, seek feedback, recovery and errors.
+  With Info, schedule, options, number entry, the channel drawer, recording
+  markers or any dialog open, a hold acts as one short Back on release.
 - Controls auto-hide only when they are visible, playback is playing and ready,
   and the player is stable (`core/PlayerAutoHidePolicy.kt:13-32`). A pending
   seek, a modal layer, recovery and an actionable error each prevent it. The

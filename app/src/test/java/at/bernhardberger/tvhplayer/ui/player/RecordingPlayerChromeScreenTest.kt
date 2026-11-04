@@ -639,10 +639,27 @@ class RecordingPlayerChromeScreenTest {
         assertEquals(start, player.trackSelectionParameters)
     }
     @Test fun holdBackStopsOverControls() = holdStops { key(Key.DirectionDown); assertTrue(exists("player-actions")) }
-    @Test fun holdBackStopsOverInfo() = holdStops { key(Key.Info); assertTrue(exists("programme-details-page")) }
-    @Test fun holdBackStopsOverOptions() = holdStops { key(Key.Menu); assertTrue(exists("playback-options-display")) }
-    @Test fun holdBackStopsOverQuickList() = holdStops {
+    @Test fun holdBackOverInfoClosesOnlyInfo() = holdGoesBack({
+        key(Key.Info); assertTrue(exists("programme-details-page"))
+    }) { assertFalse(exists("programme-details-page")); assertEquals(listOf("player-info"), focused()) }
+    @Test fun holdBackOverOptionsClosesOnlyOptions() = holdGoesBack({
+        key(Key.Menu); assertTrue(exists("playback-options-display"))
+    }) { assertFalse(exists("playback-options-display")); assertEquals(listOf("player-settings"), focused()) }
+    @Test fun holdBackOverOptionsDetailReturnsOnlyToOptionsRoot() = holdGoesBack({
+        key(Key.Menu)
+        compose.onNodeWithTag("playback-options-display").performSemanticsAction(SemanticsActions.RequestFocus)
+        key(Key.DirectionCenter)
+        assertFalse(exists("playback-options-display"))
+    }) { assertTrue(exists("playback-options-display")); assertFalse(exists("player-actions")) }
+    @Test fun holdBackOverQuickListClosesOnlyTheList() = holdGoesBack({
         key(Key.MediaAudioTrack); assertTrue(exists("playback-options-track-list"))
+    }) { assertFalse(exists("playback-options-track-list")); assertFalse(exists("player-actions")) }
+    @Test fun holdBackStopsOverBanner() = holdStops { assertTrue(exists("player-banner")) }
+    @Test fun holdBackStopsOverPausedLabel() = holdStops {
+        key(Key.DirectionCenter); assertFalse(player.playWhenReady)
+        key(Key.Back)
+        assertFalse(exists("player-banner")); assertFalse(exists("player-actions"))
+        assertEquals("Paused", description("player-hidden-slot"))
     }
     @Test fun holdBackStopsDuringPendingSeek() = holdStops {
         compose.onRoot().performKeyInput { pressKey(Key.MediaRewind) }
@@ -659,7 +676,7 @@ class RecordingPlayerChromeScreenTest {
         assertTrue(texts("Stats for nerds"))
     }
 
-    @Test fun marksShortBackDismissesOnlyMarksThenHoldStopsPlayback() {
+    @Test fun marksShortBackAndHoldEachDismissOnlyTheMarkers() {
         var closes = 0
         screen(onClose = { closes++ })
         playing()
@@ -682,9 +699,12 @@ class RecordingPlayerChromeScreenTest {
         assertEquals(position, positionMs)
         key(Key.DirectionUp)
         assertEquals(listOf("recording-marker-target"), focused())
-        holdBack()
-        assertEquals(1, closes)
-        assertEquals(null, runtime.activeTarget.value)
+        holdBack { assertEquals(listOf("recording-marker-target"), focused()) }
+        assertFalse(exists("recording-marker-target"))
+        assertEquals(listOf("player-seekbar"), focused())
+        assertEquals(0, closes)
+        assertEquals(target, runtime.activeTarget.value)
+        assertEquals(position, positionMs)
     }
 
     @Test fun holdBackInNestedInfoConfirmationDoesNotStopPlayback() {
@@ -713,12 +733,34 @@ class RecordingPlayerChromeScreenTest {
         assertEquals(null, runtime.activeTarget.value)
     }
 
-    private fun holdBack() {
+    private fun holdGoesBack(prepare: () -> Unit, after: () -> Unit) {
+        var closes = 0
+        screen(onClose = { closes++ })
+        playing()
+        prepare()
+        val target = runtime.activeTarget.value
+        val before = focused()
+        holdBack {
+            assertEquals(before, focused())
+            assertEquals(0, closes)
+            assertEquals(target, runtime.activeTarget.value)
+        }
+        assertEquals(0, closes)
+        assertEquals(target, runtime.activeTarget.value)
+        after()
+    }
+
+    private fun holdBack(beforeRelease: () -> Unit = {}) {
         compose.runOnUiThread {
             rootView.dispatchKeyEvent(AndroidKeyEvent(AndroidKeyEvent.ACTION_DOWN, AndroidKeyEvent.KEYCODE_BACK))
             rootView.dispatchKeyEvent(AndroidKeyEvent(0, 0, AndroidKeyEvent.ACTION_DOWN,
                 AndroidKeyEvent.KEYCODE_BACK, 1, 0, 0, 0, AndroidKeyEvent.FLAG_LONG_PRESS))
             rootView.dispatchKeyEvent(AndroidKeyEvent(0, 0, AndroidKeyEvent.ACTION_DOWN, AndroidKeyEvent.KEYCODE_BACK, 2))
+        }
+        compose.mainClock.advanceTimeByFrame()
+        compose.waitForIdle()
+        beforeRelease()
+        compose.runOnUiThread {
             rootView.dispatchKeyEvent(AndroidKeyEvent(AndroidKeyEvent.ACTION_UP, AndroidKeyEvent.KEYCODE_BACK))
         }
         settle()

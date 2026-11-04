@@ -21,7 +21,6 @@ internal fun RecordingConfirmationDialog(
     dateAndTime: String = "",
     visibility: MutableTransitionState<Boolean> = remember { MutableTransitionState(false).apply { targetState = true } },
 ) {
-    at.bernhardberger.tvhplayer.ui.player.RegisterPlayerModal()
     at.bernhardberger.tvhplayer.ui.components.CentredDialog(
         visibility = visibility,
         title = stringResource(when (action) {

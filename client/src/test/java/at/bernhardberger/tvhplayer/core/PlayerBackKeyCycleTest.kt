@@ -48,9 +48,18 @@ class PlayerBackKeyCycleTest {
     }
 
     @Test fun disabledHoldLeavesShortBackUnchanged() {
-        down()
+        down(allowed = false)
         assertEquals(PlayerBackKeyResult.NONE, down(1, allowed = false))
         assertEquals(PlayerBackKeyResult.NONE, down(2, allowed = false))
         assertEquals(PlayerBackKeyResult.BACK, up())
+    }
+
+    @Test fun panelDisappearingDuringThePressDoesNotTurnItsBackIntoStop() {
+        down(allowed = false)
+        assertEquals(PlayerBackKeyResult.NONE, down(1, allowed = true))
+        assertEquals(PlayerBackKeyResult.NONE, down(2, allowed = true))
+        assertEquals(PlayerBackKeyResult.BACK, up())
+        down()
+        assertEquals(PlayerBackKeyResult.HOLD, down(1))
     }
 }

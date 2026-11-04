@@ -7,6 +7,16 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PlayerBackPolicyTest {
+    @Test fun onlyWatchingLayersAllowHoldToStop() {
+        val watching = setOf(PlayerForegroundLayer.NONE, PlayerForegroundLayer.CONTROLS,
+            PlayerForegroundLayer.STATS, PlayerForegroundLayer.PENDING_SEEK_PREVIEW,
+            PlayerForegroundLayer.DISPATCHED_SEEK_PREVIEW, PlayerForegroundLayer.RECOVERY,
+            PlayerForegroundLayer.TERMINAL_ERROR)
+        PlayerForegroundLayer.entries.forEach { layer ->
+            assertEquals(layer.name, layer in watching, playerBackHoldAllowed(layer))
+        }
+    }
+
     @Test
     fun visibleControlsRetainFocusWhileBackCancelsOnlyUndispatchedPreview() {
         for (surface in PlayerSurface.entries) {

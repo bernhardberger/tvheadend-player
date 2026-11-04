@@ -24,7 +24,6 @@ internal fun ConfirmProgrammeActionDialog(
         androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true }
     },
 ) {
-    at.bernhardberger.tvhplayer.ui.player.RegisterPlayerModal()
     val target = programmeConfirmationTarget(entries, configurations,
         stringResource(R.string.recording_profile_default))
     val message = stringResource(if (action == ProgrammeAction.STOP_RECORDING) R.string.stop_recording_confirm_message else R.string.cancel_recording_confirm_message,

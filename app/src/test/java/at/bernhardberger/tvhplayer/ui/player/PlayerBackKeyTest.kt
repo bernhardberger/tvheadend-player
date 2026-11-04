@@ -35,7 +35,7 @@ class PlayerBackKeyTest {
         val cycle = PlayerBackKeyCycle()
         var stops = 0
         var backs = 0
-        fun send(key: KeyEvent) = cycle.intercept(key, false, false, { backs++ }, { stops++ })
+        fun send(key: KeyEvent) = cycle.intercept(key, true, { backs++ }, { stops++ })
         assertTrue(send(event(true)))
         assertTrue(send(event(true, 1)))
         send(event(true, 2))
@@ -44,31 +44,41 @@ class PlayerBackKeyTest {
         assertEquals(0, backs)
     }
 
-    @Test fun confirmationsAndNestedDialogsKeepTheirOwnBackKeys() {
-        for ((confirmation, nested) in listOf(true to false, false to true)) {
-            val cycle = PlayerBackKeyCycle()
-            val fail = { fail("dialog Back must pass through"); Unit }
-            for (key in listOf(event(true), event(true, 1), event(false))) {
-                assertFalse(cycle.intercept(key, confirmation, nested, fail, fail))
-            }
-        }
+    @Test fun panelHoldActsOnceOnReleaseAndDoesNotBackTheExposedWatchingLayer() {
+        val cycle = PlayerBackKeyCycle()
+        var panelOpen = true
+        var backs = 0
+        fun send(key: KeyEvent) = cycle.intercept(key, !panelOpen, {
+            backs++
+            panelOpen = false
+        }, { fail("panel hold must not stop playback") })
+        send(event(true))
+        send(event(true, 1, NativeKey.FLAG_LONG_PRESS))
+        send(event(true, 2))
+        assertTrue(panelOpen)
+        assertEquals(0, backs)
+        send(event(false))
+        assertFalse(panelOpen)
+        send(event(true, 3))
+        send(event(false))
+        assertEquals(1, backs)
     }
 
     @Test fun canceledHardwareReleaseDoesNotUnwindPlayer() {
         val cycle = PlayerBackKeyCycle()
         val fail = { fail("canceled Back must do nothing"); Unit }
-        assertTrue(cycle.intercept(event(true), false, false, fail, fail))
-        assertTrue(cycle.intercept(event(false, flags = NativeKey.FLAG_CANCELED), false, false, fail, fail))
+        assertTrue(cycle.intercept(event(true), true, fail, fail))
+        assertTrue(cycle.intercept(event(false, flags = NativeKey.FLAG_CANCELED), true, fail, fail))
     }
 
-    @Test fun modalPassThroughResetsTrackingAndPassesCanceledReleaseToItsOwner() {
+    @Test fun canceledPanelReleaseDoesNotDispatchBackAndResetsTracking() {
         val cycle = PlayerBackKeyCycle()
         val fail = { fail("stale or canceled Back must do nothing"); Unit }
-        cycle.intercept(event(true), false, false, fail, fail)
-        assertFalse(cycle.intercept(event(true, 1), false, true, fail, fail))
-        assertFalse(cycle.intercept(event(false, flags = NativeKey.FLAG_CANCELED), false, true, fail, fail))
-        assertTrue(cycle.intercept(event(true, 2), false, false, fail, fail))
-        assertTrue(cycle.intercept(event(false), false, false, fail, fail))
+        cycle.intercept(event(true), false, fail, fail)
+        assertTrue(cycle.intercept(event(true, 1), false, fail, fail))
+        assertTrue(cycle.intercept(event(false, flags = NativeKey.FLAG_CANCELED), false, fail, fail))
+        assertTrue(cycle.intercept(event(true, 2), true, fail, fail))
+        assertTrue(cycle.intercept(event(false), true, fail, fail))
     }
 
     @Test fun holdClaimsActivityRemainderBeforeClosingAndCanceledUpClearsIt() {
@@ -80,8 +90,8 @@ class PlayerBackKeyTest {
         val stop = {
             assertTrue(dispatcher.dispatch(contract, event(true, 2).nativeKeyEvent))
         }
-        cycle.intercept(event(true), false, false, {}, stop, owner)
-        cycle.intercept(event(true, 1), false, false, {}, stop, owner)
+        cycle.intercept(event(true), true, {}, stop, owner)
+        cycle.intercept(event(true, 1), true, {}, stop, owner)
         assertTrue(dispatcher.dispatch(contract, event(false, flags = NativeKey.FLAG_CANCELED).nativeKeyEvent))
         assertFalse(dispatcher.dispatch(contract, event(true).nativeKeyEvent))
     }
@@ -99,7 +109,7 @@ class PlayerBackKeyTest {
             val focus = remember { FocusRequester() }
             BackHandler { systemBacks++ }
             Box(Modifier.fillMaxSize().focusRequester(focus).onPreviewKeyEvent { key ->
-                if (playing) cycle.intercept(key, false, false, { fail("short Back after hold") }, {
+                if (playing) cycle.intercept(key, true, { fail("short Back after hold") }, {
                     stops++
                     playing = false
                 }) else {
@@ -140,29 +150,4 @@ class PlayerBackKeyTest {
         assertEquals(0, systemBacks)
     }
 
-    @Test fun modalOwnerReceivesWholeCycleAndDoesNotRetainACanceledPress() {
-        for ((confirmation, nested) in listOf(true to false, false to true)) {
-            val player = PlayerBackKeyCycle()
-            val modal = BackKeyCycle()
-            var backs = 0
-            val fail = { fail("modal Back must not act on player"); Unit }
-            fun send(key: KeyEvent) {
-                assertFalse(player.intercept(key, confirmation, nested, fail, fail))
-                val native = key.nativeKeyEvent
-                assertTrue(modal.handle(native.action == NativeKey.ACTION_DOWN,
-                    native.repeatCount, native.isCanceled) { backs++ })
-            }
-            send(event(false))
-            send(event(true))
-            send(event(false, flags = NativeKey.FLAG_CANCELED))
-            send(event(false))
-            assertEquals(0, backs)
-            send(event(true))
-            send(event(true, 1, NativeKey.FLAG_LONG_PRESS))
-            send(event(true, 2))
-            assertEquals(0, backs)
-            send(event(false))
-            assertEquals(1, backs)
-        }
-    }
 }

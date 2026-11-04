@@ -294,7 +294,7 @@ class PlayerProgrammeDetailsTest {
                         checkNotNull(observation.currentSession), entry.id).takeIf { recording && warm }) {
             TVHeadendPlayerTheme {
                 Box(Modifier.onPreviewKeyEvent { event ->
-                    !browse && backCycle.intercept(event, false, false, dispatcher::onBackPressed, {})
+                    !browse && backCycle.intercept(event, false, dispatcher::onBackPressed, {})
                 }) {
                 PlayerChrome(
                     mode = PlayerChromeMode.CONTROLS,

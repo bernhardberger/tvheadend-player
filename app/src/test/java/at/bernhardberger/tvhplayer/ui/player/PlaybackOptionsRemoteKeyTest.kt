@@ -589,7 +589,7 @@ class PlaybackOptionsRemoteKeyTest {
                                     else -> Unit
                                 }
                             }
-                            if (backCycle.intercept(event, false, false, onBack, {})) {
+                            if (backCycle.intercept(event, false, onBack, {})) {
                                 return@onPreviewKeyEvent true
                             }
                             state.handleScheduleKey(event, foregroundLayer)?.let { return@onPreviewKeyEvent it }
