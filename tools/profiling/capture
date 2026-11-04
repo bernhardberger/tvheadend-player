@@ -26,7 +26,7 @@ case "$input_transport" in
 esac
 case "$mode" in atrace|causal|frames|cpu|native-allocations) ;; *) exit 2 ;; esac
 [[ "$video" == false || "$mode" == causal ]] || exit 2
-case "$package" in at.bernhardberger.tvhplayer|at.bernhardberger.tvhplayer.profile) ;; *) exit 2 ;; esac
+case "$package" in at.bernhardberger.tvhplayer.debug|at.bernhardberger.tvhplayer.profile) ;; *) exit 2 ;; esac
 [[ -n "$device" && "$runs" =~ ^[1-3]$ && $# -le 80 ]] || exit 2
 [[ $# -le 12 || "$duration" != 8 ]] || exit 2
 case "$key_delay" in 0) delay_ms=0 ;; 0.1) delay_ms=100 ;; 0.4) delay_ms=400 ;; esac

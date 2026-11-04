@@ -34,13 +34,13 @@ backs out to those screens.
 ```bash
 ./tools/verify
 # Mutating commands require an explicitly configured test device.
-android --no-metrics install --device="$TVHPLAYER_ADB_SERIAL" --apks=<debug player APK> --use-delta-install=false --install-options=-r,-t
+android --no-metrics install --device="$TVHPLAYER_ADB_SERIAL" --apks=app/build/outputs/apk/play/debug/app-play-debug.apk --use-delta-install=false --install-options=-r,-t
 android --no-metrics install --device="$TVHPLAYER_ADB_SERIAL" --apks=<debug companion APK> --use-delta-install=false --install-options=-r,-t
-./tools/device --package at.bernhardberger.tvhplayer.appliance.debug launch
+./tools/device --package at.bernhardberger.tvhplayer.debug launch
 ```
 
-APK paths and `tools/device` package defaults are settled on
-`feat/appliance-companion` and filled in here when it lands.
+The companion APK path will be filled in when its module lands on
+`feat/appliance-companion`. The player debug ID is also the `tools/device` default.
 
 ## Two apps (owner, 2026-11-04)
 

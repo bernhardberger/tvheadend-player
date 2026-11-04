@@ -260,7 +260,7 @@ class PlayerBenchmarks {
     private fun section(name: String) = TraceSectionMetric(name, TraceSectionMetric.Mode.Sum)
 
     private companion object {
-        const val PackageName = "at.bernhardberger.tvhplayer"
+        const val PackageName = "at.bernhardberger.tvhplayer.debug"
         const val ReadyTimeout = 60_000L
     }
 }

@@ -11,7 +11,7 @@ import sys
 import time
 from pathlib import Path
 
-PACKAGE = "at.bernhardberger.tvhplayer"
+PACKAGE = "at.bernhardberger.tvhplayer.debug"
 ROOT = Path(__file__).resolve().parents[2]
 
 # Start each journey in its documented state; setup isn't silently included in a
@@ -157,7 +157,7 @@ def main():
             adb("shell", "input", "keyevent", key)
             time.sleep(delay)
         if args.journey in ("cold-start", "warm-start"):
-            adb("shell", "am", "start", "-W", "-n", f"{PACKAGE}/.ui.MainActivity")
+            adb("shell", "am", "start", "-W", "-n", f"{PACKAGE}/at.bernhardberger.tvhplayer.ui.MainActivity")
             time.sleep(12)
         after = adb("shell", "dumpsys", "gfxinfo", PACKAGE)
         if trace is not None:

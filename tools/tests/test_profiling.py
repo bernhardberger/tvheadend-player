@@ -65,11 +65,11 @@ class ProfilingEvidenceTest(unittest.TestCase):
     def test_capture_rejects_exit_guide_activation_and_foreign_package_before_adb(self):
         with tempfile.TemporaryDirectory() as directory:
             for package, key, delay in (
-                ("at.bernhardberger.tvhplayer", "4", "0.4"),
-                ("at.bernhardberger.tvhplayer", "172", "0.4"),
-                ("at.bernhardberger.tvhplayer", "23", "0.4"),
+                ("at.bernhardberger.tvhplayer.debug", "4", "0.4"),
+                ("at.bernhardberger.tvhplayer.debug", "172", "0.4"),
+                ("at.bernhardberger.tvhplayer.debug", "23", "0.4"),
                 ("com.tcl.channelplus", "20", "0.4"),
-                ("at.bernhardberger.tvhplayer", "20", "0.4; exit 0"),
+                ("at.bernhardberger.tvhplayer.debug", "20", "0.4; exit 0"),
             ):
                 with self.subTest(package=package, key=key):
                     output = Path(directory) / "capture"
@@ -92,7 +92,7 @@ class ProfilingEvidenceTest(unittest.TestCase):
             ):
                 result = subprocess.run(
                     ["/bin/bash", str(ROOT / "tools/profiling/capture"), "causal", "invalid-device",
-                     "at.bernhardberger.tvhplayer", str(Path(directory) / "capture"), "1", *keys],
+                     "at.bernhardberger.tvhplayer.debug", str(Path(directory) / "capture"), "1", *keys],
                     env={"PATH": directory, **extra}, capture_output=True, text=True, timeout=5,
                 )
                 self.assertEqual(result.returncode, 2)
@@ -104,7 +104,7 @@ class ProfilingEvidenceTest(unittest.TestCase):
                 with self.subTest(count=count, duration=duration):
                     result = subprocess.run(
                         ["/bin/bash", str(ROOT / "tools/profiling/capture"), "causal", "invalid-device",
-                         "at.bernhardberger.tvhplayer", str(Path(directory) / "capture"), "1", *(["20"] * count)],
+                         "at.bernhardberger.tvhplayer.debug", str(Path(directory) / "capture"), "1", *(["20"] * count)],
                         env={"PATH": directory, "TVHPLAYER_PROFILE_DURATION_SECONDS": duration},
                         capture_output=True, text=True, timeout=5,
                     )
@@ -122,7 +122,7 @@ class ProfilingEvidenceTest(unittest.TestCase):
                 path.chmod(0o700)
 
             executable("pidof", "#!/bin/sh\nprintf '42\\n'\n")
-            executable("dumpsys", "#!/bin/sh\nprintf 'mCurrentFocus=at.bernhardberger.tvhplayer/MainActivity\\n'\n")
+            executable("dumpsys", "#!/bin/sh\nprintf 'mCurrentFocus=at.bernhardberger.tvhplayer.debug/MainActivity\\n'\n")
             executable("perfetto", "#!/bin/sh\nsleep 3\n")
             executable("screenrecord", "#!/bin/sh\nexit 7\n")
             executable("cmd", '#!/bin/sh\nprintf "%s\\n" "$*" >> "$SANDBOX/keys"\n')
@@ -136,7 +136,7 @@ if args[0] == "pull":
     pathlib.Path(args[-1]).write_bytes(b"fixture only")
     sys.exit(0)
 command = " ".join(args[1:])
-if command == "pidof at.bernhardberger.tvhplayer":
+if command == "pidof at.bernhardberger.tvhplayer.debug":
     print(42)
     sys.exit(0)
 if command.startswith("pm path "):
@@ -157,14 +157,14 @@ sys.exit(subprocess.run(["/bin/bash", "-c", command]).returncode)
             output = root / "capture"
             result = subprocess.run(
                 ["/bin/bash", str(ROOT / "tools/profiling/capture"), "causal", "fixture-device",
-                 "at.bernhardberger.tvhplayer", str(output), "1", "20", "19"],
+                 "at.bernhardberger.tvhplayer.debug", str(output), "1", "20", "19"],
                 env={**os.environ, "PATH": f"{root}:{os.defpath}", "SANDBOX": str(root),
                      "TVHPLAYER_PROFILE_VIDEO": "true", "TVHPLAYER_PROFILE_INPUT_TRANSPORT": "cmd"},
                 cwd=ROOT, capture_output=True, text=True, timeout=10,
             )
             self.assertEqual(result.returncode, 45, result.stderr)
             self.assertFalse((root / "keys").exists())
-            self.assertIn("am force-stop at.bernhardberger.tvhplayer", (root / "cleanup").read_text())
+            self.assertIn("am force-stop at.bernhardberger.tvhplayer.debug", (root / "cleanup").read_text())
             self.assertFalse((output / "run-1.mp4").exists())
 
     def test_trace_processor_is_only_used_when_it_matches_the_pinned_checksum(self):

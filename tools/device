@@ -26,8 +26,10 @@ from typing import NoReturn
 
 ROOT = Path(__file__).resolve().parents[1]
 LOCAL_CONFIG = ROOT / ".tvhplayer-device.json"
-DEFAULT_PACKAGE = "at.bernhardberger.tvhplayer"
+DEFAULT_PACKAGE = "at.bernhardberger.tvhplayer.debug"
+RELEASE_PACKAGE = "at.bernhardberger.tvhplayer"
 APPLIANCE_PACKAGE = "at.bernhardberger.tvhplayer.appliance"
+APPLIANCE_DEBUG_PACKAGE = "at.bernhardberger.tvhplayer.appliance.debug"
 LEGACY_PACKAGE = "at.leoville.tvhstream"
 DEFAULT_APK = ROOT / "app/build/outputs/apk/play/debug/app-play-debug.apk"
 DEFAULT_TEST_APK = ROOT / "app/build/outputs/apk/androidTest/play/debug/app-play-debug-androidTest.apk"
@@ -1219,7 +1221,7 @@ def require_play_replacement_safe(adb: str, serial: str) -> None:
         result = run(
             adb_command(
                 adb, serial, "shell", "cmd", "package", query,
-                "--brief", "--query-flags", "512", *intent, "-p", DEFAULT_PACKAGE,
+                "--brief", "--query-flags", "512", *intent, "-p", RELEASE_PACKAGE,
             ),
             capture=True,
             check=False,
@@ -1229,7 +1231,7 @@ def require_play_replacement_safe(adb: str, serial: str) -> None:
             fail("cannot verify installed package entry points; refusing Play release installation")
         for line in result.stdout.splitlines():
             package, separator, component = line.strip().partition("/")
-            if package != DEFAULT_PACKAGE or not separator:
+            if package != RELEASE_PACKAGE or not separator:
                 continue
             if component.startswith("."):
                 component = package + component
@@ -1242,8 +1244,8 @@ def require_play_replacement_safe(adb: str, serial: str) -> None:
                 )
 
 
-def resolve_verified_release_apk(bundle: Path, package_name: str = DEFAULT_PACKAGE) -> Path:
-    if package_name not in (DEFAULT_PACKAGE, APPLIANCE_PACKAGE):
+def resolve_verified_release_apk(bundle: Path, package_name: str = RELEASE_PACKAGE) -> Path:
+    if package_name not in (RELEASE_PACKAGE, APPLIANCE_PACKAGE):
         fail("release installation is available only for the Play or Appliance package")
     bundle = bundle.expanduser().resolve()
     subprocess.run(
@@ -1407,7 +1409,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--package",
         dest="package_name",
-        help=f"Android package name (default: {DEFAULT_PACKAGE})",
+        help=f"Android package name (default: {DEFAULT_PACKAGE}; install-release: {RELEASE_PACKAGE})",
     )
 
     subparsers = parser.add_subparsers(dest="action", required=True)
@@ -1623,7 +1625,7 @@ def main() -> int:
         args.package_name
         or os.environ.get("TVHPLAYER_ANDROID_PACKAGE")
         or config.get("package")
-        or DEFAULT_PACKAGE
+        or (RELEASE_PACKAGE if args.action == "install-release" else DEFAULT_PACKAGE)
     )
     role = config.get("role", "unclassified").strip().lower()
     if role not in VALID_ROLES:
@@ -1685,15 +1687,15 @@ def main() -> int:
 
     if args.action == "install-release":
         apk = resolve_verified_release_apk(args.bundle, package_name)
-        if package_name == DEFAULT_PACKAGE:
+        if package_name == RELEASE_PACKAGE:
             require_play_replacement_safe(adb, serial)
         run(adb_command(adb, serial, "install", "-r", str(apk)))
         show_package_info(adb, serial, package_name)
         return 0
 
     if args.action == "uninstall-legacy":
-        if not package_is_installed(adb, serial, DEFAULT_PACKAGE):
-            fail(f"replacement package {DEFAULT_PACKAGE} is not installed")
+        if not package_is_installed(adb, serial, RELEASE_PACKAGE):
+            fail(f"replacement package {RELEASE_PACKAGE} is not installed")
         if not package_is_installed(adb, serial, LEGACY_PACKAGE):
             fail(f"legacy package {LEGACY_PACKAGE} is not installed")
         run(adb_command(adb, serial, "uninstall", LEGACY_PACKAGE))
@@ -1885,8 +1887,11 @@ def main() -> int:
         return 0
 
     if args.action == "allow-appliance-autostart":
-        if package_name != APPLIANCE_PACKAGE:
-            fail(f"auto-start repair is available only for package {APPLIANCE_PACKAGE}")
+        if package_name not in (APPLIANCE_PACKAGE, APPLIANCE_DEBUG_PACKAGE):
+            fail(
+                f"auto-start repair is available only for packages {APPLIANCE_PACKAGE} "
+                f"and {APPLIANCE_DEBUG_PACKAGE}"
+            )
         run(
             adb_command(
                 adb,

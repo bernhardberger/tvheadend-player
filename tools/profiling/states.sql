@@ -8,7 +8,7 @@ WITH marked_processes AS (
   SELECT s.id, s.name, s.ts, s.dur, t.utid, p.name AS package
   FROM slice s JOIN thread_track tt ON tt.id=s.track_id
   JOIN thread t USING (utid) JOIN process p USING (upid)
-  WHERE (p.name IN ('at.bernhardberger.tvhplayer', 'at.bernhardberger.tvhplayer.profile')
+  WHERE (p.name IN ('at.bernhardberger.tvhplayer.debug', 'at.bernhardberger.tvhplayer.profile')
          OR (p.name IS NULL AND p.upid IN (SELECT upid FROM marked_processes)))
     AND (t.is_main_thread=1 OR t.name='RenderThread') AND s.dur>0
     AND (s.name GLOB '*recompose*' OR s.name GLOB '*measureAndLayout*'

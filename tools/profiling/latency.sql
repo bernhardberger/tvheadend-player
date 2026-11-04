@@ -7,7 +7,7 @@ WITH inputs AS (
          lead(s.ts) OVER (PARTITION BY t.utid ORDER BY s.ts) AS next_ts
   FROM slice s JOIN thread_track tt ON tt.id=s.track_id JOIN thread t USING (utid)
   JOIN process p USING (upid)
-  WHERE (p.name IN ('at.bernhardberger.tvhplayer','at.bernhardberger.tvhplayer.profile') OR p.name IS NULL)
+  WHERE (p.name IN ('at.bernhardberger.tvhplayer.debug','at.bernhardberger.tvhplayer.profile') OR p.name IS NULL)
     AND t.is_main_thread=1 AND s.name='P44:input:down'
 ), focuses AS (
   SELECT s.id, s.ts, s.name, t.utid

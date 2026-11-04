@@ -17,7 +17,7 @@ data_sources {
       atrace_categories: "view"
       atrace_categories: "input"
       atrace_categories: "dalvik"
-      atrace_apps: "at.bernhardberger.tvhplayer"
+      atrace_apps: "at.bernhardberger.tvhplayer.debug"
     }
   }
 }

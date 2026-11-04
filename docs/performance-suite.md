@@ -15,7 +15,7 @@ classes for instrumentation of the profile targets; ordinary release is unchange
 Assembly alone does not prove the runner works on a device.
 
 Use an authorized Android TV emulator/test target with a stored server profile
-in the same app ID (`at.bernhardberger.tvhplayer`) and debug signing key. Turn
+in the same app ID (`at.bernhardberger.tvhplayer.debug`) and debug signing key. Turn
 autoplay off. Do not uninstall the target or clear its data. Provision credentials
 through the existing approved workflow, never through benchmark arguments.
 Channels and Guide must be populated; Recordings needs permission and a populated

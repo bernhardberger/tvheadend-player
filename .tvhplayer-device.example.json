@@ -3,7 +3,7 @@
   "targets": {
     "g10": {
       "serial": "replace-with-g10-adb-serial",
-      "package": "at.bernhardberger.tvhplayer",
+      "package": "at.bernhardberger.tvhplayer.debug",
       "role": "test",
       "expected_manufacturer": "TCL",
       "expected_model": "Smart TV Pro",
@@ -13,7 +13,7 @@
     },
     "nvidia-shield": {
       "serial": "replace-with-shield-adb-serial",
-      "package": "at.bernhardberger.tvhplayer",
+      "package": "at.bernhardberger.tvhplayer.debug",
       "role": "test",
       "expected_manufacturer": "NVIDIA",
       "expected_model": "SHIELD Android TV",
@@ -23,7 +23,7 @@
     },
     "sony-bravia-8": {
       "serial": "replace-with-current-sony-wireless-adb-endpoint",
-      "package": "at.bernhardberger.tvhplayer",
+      "package": "at.bernhardberger.tvhplayer.debug",
       "role": "test",
       "expected_manufacturer": "Sony",
       "expected_model": "BRAVIA 4K AE2",

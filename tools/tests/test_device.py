@@ -96,14 +96,14 @@ class OperatorShortcutsTest(unittest.TestCase):
       metadata: size=2, description=Other title, Other subtitle, null
     Player session (userId=0)
       ownerPid=123, ownerUid=456, userId=0
-      package=at.bernhardberger.tvhplayer
+      package=at.bernhardberger.tvhplayer.debug
       active=true
       controller=OMIT_CONTROLLER
       callback=OMIT_CALLBACK
       state=PlaybackState {state=3, position=1234, buffered position=2000, speed=1.0, updated=5678, actions=123, error=null, extras=Bundle[OMIT_EXTRAS]}
       metadata: size=3, description=Programme, Channel, OMIT_DESCRIPTION
       extras=Bundle[OMIT_EXTRAS]
-        package=at.bernhardberger.tvhplayer
+        package=at.bernhardberger.tvhplayer.debug
         active=false
         metadata: size=1, description=Nested, Nested, null
     Last session (userId=0)
@@ -143,7 +143,7 @@ class OperatorShortcutsTest(unittest.TestCase):
                 with (
                     patch.dict(DEVICE_GLOBALS, fakes),
                     patch.object(DEVICE_GLOBALS["shutil"], "which", return_value="adb"),
-                    patch("sys.argv", ["device", "--package", DEVICE["DEFAULT_PACKAGE"],
+                    patch("sys.argv", ["device", "--package", DEVICE["RELEASE_PACKAGE"],
                                        "install-release", "--bundle", "bundle", "--confirm-release-install"]),
                     redirect_stderr(error),
                     self.assertRaises(SystemExit),
@@ -167,18 +167,18 @@ class OperatorShortcutsTest(unittest.TestCase):
         with (
             patch.dict(DEVICE_GLOBALS, fakes),
             patch.object(DEVICE_GLOBALS["shutil"], "which", return_value="adb"),
-            patch("sys.argv", ["device", "--package", DEVICE["DEFAULT_PACKAGE"],
-                               "install-release", "--bundle", "bundle", "--confirm-release-install"]),
+            patch("sys.argv", ["device", "install-release", "--bundle", "bundle", "--confirm-release-install"]),
         ):
             self.assertEqual(DEVICE["main"](), 0)
+        fakes["resolve_verified_release_apk"].assert_called_once_with(Path("bundle"), DEVICE["RELEASE_PACKAGE"])
         commands = [args.args[0] for args in fakes["run"].call_args_list]
         self.assertEqual(commands, [
             ["adb", "-s", "private-device", "shell", "cmd", "package", "query-services",
              "--brief", "--query-flags", "512", "-a", "android.accessibilityservice.AccessibilityService",
-             "-p", DEVICE["DEFAULT_PACKAGE"]],
+             "-p", DEVICE["RELEASE_PACKAGE"]],
             ["adb", "-s", "private-device", "shell", "cmd", "package", "query-activities",
              "--brief", "--query-flags", "512", "-a", "android.intent.action.MAIN",
-             "-c", "android.intent.category.HOME", "-p", DEVICE["DEFAULT_PACKAGE"]],
+             "-c", "android.intent.category.HOME", "-p", DEVICE["RELEASE_PACKAGE"]],
             ["adb", "-s", "private-device", "install", "-r", "play.apk"],
         ])
 
@@ -219,7 +219,12 @@ class OperatorShortcutsTest(unittest.TestCase):
                 self.assertEqual(DEVICE["video_surface_layer"](package, "ui"), f"{activity}#0")
 
     def test_auto_start_repair_accepts_only_appliance_package(self):
-        for package in (DEVICE["DEFAULT_PACKAGE"], DEVICE["APPLIANCE_PACKAGE"]):
+        for package, allowed in (
+            (DEVICE["APPLIANCE_PACKAGE"], True),
+            (DEVICE["APPLIANCE_DEBUG_PACKAGE"], True),
+            (DEVICE["RELEASE_PACKAGE"], False),
+            (DEVICE["DEFAULT_PACKAGE"], False),
+        ):
             with self.subTest(package=package):
                 fakes = self.main_fakes()
                 fakes["show_appliance_status"] = Mock()
@@ -231,7 +236,7 @@ class OperatorShortcutsTest(unittest.TestCase):
                                        "--confirm-user-enabled-accessibility"]),
                     redirect_stderr(io.StringIO()),
                 ):
-                    if package == DEVICE["DEFAULT_PACKAGE"]:
+                    if not allowed:
                         with self.assertRaises(SystemExit):
                             DEVICE["main"]()
                         fakes["run"].assert_not_called()
@@ -341,6 +346,22 @@ class OperatorShortcutsTest(unittest.TestCase):
             self.assertEqual(events[2].parent, ROOT / "captures/device")
             self.assertTrue(events[2].name.endswith("-after-pause.png"))
 
+    def test_credential_provisioning_rejects_release_package_before_reading_payload(self) -> None:
+        fakes = self.main_fakes()
+        fakes["load_credential_payload"] = Mock(side_effect=AssertionError("unexpected payload read"))
+        error = io.StringIO()
+        with (
+            patch.dict(DEVICE_GLOBALS, fakes),
+            patch.object(DEVICE_GLOBALS["shutil"], "which", return_value="adb"),
+            patch("sys.argv", ["device", "--package", DEVICE["RELEASE_PACKAGE"], "provision-test-credentials"]),
+            redirect_stderr(error),
+            self.assertRaises(SystemExit),
+        ):
+            DEVICE["main"]()
+        self.assertIn("only for the debug package", error.getvalue())
+        fakes["load_credential_payload"].assert_not_called()
+        fakes["run"].assert_not_called()
+
     def test_read_only_role_policy_is_preserved(self):
         for role in ("production", "test", "unclassified"):
             for action in ("status", "playback-state"):
@@ -351,7 +372,8 @@ class OperatorShortcutsTest(unittest.TestCase):
 class DevicePolicyTest(unittest.TestCase):
     def test_product_identity_defaults_are_current(self) -> None:
         self.assertEqual(DEVICE["LOCAL_CONFIG"].name, ".tvhplayer-device.json")
-        self.assertEqual(DEVICE["DEFAULT_PACKAGE"], "at.bernhardberger.tvhplayer")
+        self.assertEqual(DEVICE["DEFAULT_PACKAGE"], "at.bernhardberger.tvhplayer.debug")
+        self.assertEqual(DEVICE["RELEASE_PACKAGE"], "at.bernhardberger.tvhplayer")
         self.assertEqual(
             DEVICE["DEFAULT_CREDENTIAL_FILE"].name,
             ".tvhplayer-credentials.json",
@@ -371,9 +393,9 @@ class DevicePolicyTest(unittest.TestCase):
             ["adb"],
             0,
             stdout=(
-                "instrumentation:at.bernhardberger.tvhplayer.test/"
+                "instrumentation:at.bernhardberger.tvhplayer.debug.test/"
                 "androidx.test.runner.AndroidJUnitRunner "
-                "(target=at.bernhardberger.tvhplayer)\n"
+                "(target=at.bernhardberger.tvhplayer.debug)\n"
             ),
             stderr="",
         )
@@ -412,7 +434,7 @@ class DevicePolicyTest(unittest.TestCase):
                 run_connection_credential_check(
                     "adb",
                     "test-device",
-                    "at.bernhardberger.tvhplayer",
+                    "at.bernhardberger.tvhplayer.debug",
                 )
 
         commands = [call.args[0] for call in run_mock.call_args_list]
@@ -425,7 +447,7 @@ class DevicePolicyTest(unittest.TestCase):
             "shell",
             "am",
             "force-stop",
-            "at.bernhardberger.tvhplayer",
+            "at.bernhardberger.tvhplayer.debug",
         ]
         identity_index = commands.index(identity_command)
         runner_index = commands.index(runner_command)
@@ -436,8 +458,8 @@ class DevicePolicyTest(unittest.TestCase):
         self.assertLess(identity_index, force_stop_indexes[0])
         self.assertLess(force_stop_indexes[0], runner_index)
         self.assertIn(DEVICE["CONNECTION_CREDENTIAL_TEST"], runner_command)
-        self.assertEqual(commands[-2][-2:], ["uninstall", "at.bernhardberger.tvhplayer.test"])
-        self.assertEqual(commands[-1][-2:], ["force-stop", "at.bernhardberger.tvhplayer"])
+        self.assertEqual(commands[-2][-2:], ["uninstall", "at.bernhardberger.tvhplayer.debug.test"])
+        self.assertEqual(commands[-1][-2:], ["force-stop", "at.bernhardberger.tvhplayer.debug"])
 
     def test_connection_credential_check_requires_all_four_tests(self) -> None:
         completed = subprocess.CompletedProcess(["adb"], 0, stdout="", stderr="")
@@ -445,9 +467,9 @@ class DevicePolicyTest(unittest.TestCase):
             ["adb"],
             0,
             stdout=(
-                "instrumentation:at.bernhardberger.tvhplayer.test/"
+                "instrumentation:at.bernhardberger.tvhplayer.debug.test/"
                 "androidx.test.runner.AndroidJUnitRunner "
-                "(target=at.bernhardberger.tvhplayer)\n"
+                "(target=at.bernhardberger.tvhplayer.debug)\n"
             ),
             stderr="",
         )
@@ -484,11 +506,11 @@ class DevicePolicyTest(unittest.TestCase):
                     run_connection_credential_check(
                         "adb",
                         "test-device",
-                        "at.bernhardberger.tvhplayer",
+                        "at.bernhardberger.tvhplayer.debug",
                     )
         commands = [call.args[0] for call in run_mock.call_args_list]
-        self.assertEqual(commands[-2][-2:], ["uninstall", "at.bernhardberger.tvhplayer.test"])
-        self.assertEqual(commands[-1][-2:], ["force-stop", "at.bernhardberger.tvhplayer"])
+        self.assertEqual(commands[-2][-2:], ["uninstall", "at.bernhardberger.tvhplayer.debug.test"])
+        self.assertEqual(commands[-1][-2:], ["force-stop", "at.bernhardberger.tvhplayer.debug"])
 
     def test_active_named_target_is_selected_without_exposing_other_profiles(self) -> None:
         target_name, config = select_device_config(
@@ -850,7 +872,7 @@ class DevicePolicyTest(unittest.TestCase):
             debug_video_backdrop_command(
                 "adb",
                 "test-device",
-                "at.bernhardberger.tvhplayer",
+                "at.bernhardberger.tvhplayer.debug",
                 visible=True,
             ),
             [
@@ -863,7 +885,7 @@ class DevicePolicyTest(unittest.TestCase):
                 "-a",
                 DEVICE["DEBUG_VIDEO_BACKDROP_ACTION"],
                 "-p",
-                "at.bernhardberger.tvhplayer",
+                "at.bernhardberger.tvhplayer.debug",
                 "--receiver-foreground",
                 "--ez",
                 DEVICE["DEBUG_VIDEO_BACKDROP_EXTRA"],
@@ -950,9 +972,9 @@ class DevicePolicyTest(unittest.TestCase):
             ["adb"],
             0,
             stdout=(
-                "instrumentation:at.bernhardberger.tvhplayer.test/"
+                "instrumentation:at.bernhardberger.tvhplayer.debug.test/"
                 "androidx.test.runner.AndroidJUnitRunner "
-                "(target=at.bernhardberger.tvhplayer)\n"
+                "(target=at.bernhardberger.tvhplayer.debug)\n"
             ),
             stderr="",
         )
@@ -1002,7 +1024,7 @@ class DevicePolicyTest(unittest.TestCase):
                 DEVICE["run_navigation_back_check"](
                     "adb",
                     "test-device",
-                    "at.bernhardberger.tvhplayer",
+                    "at.bernhardberger.tvhplayer.debug",
                 )
 
         commands = [call.args[0] for call in run_mock.call_args_list]
@@ -1018,7 +1040,7 @@ class DevicePolicyTest(unittest.TestCase):
                 "-e",
                 "class",
                 DEVICE["NAVIGATION_BACK_TESTS"],
-                "at.bernhardberger.tvhplayer.test/"
+                "at.bernhardberger.tvhplayer.debug.test/"
                 "androidx.test.runner.AndroidJUnitRunner",
             ],
             commands,
@@ -1044,8 +1066,8 @@ class DevicePolicyTest(unittest.TestCase):
             runner_call.kwargs["timeout_seconds"],
             DEVICE["INSTRUMENTATION_TIMEOUT_SECONDS"],
         )
-        self.assertEqual(commands[-2][-2:], ["uninstall", "at.bernhardberger.tvhplayer.test"])
-        self.assertEqual(commands[-1][-2:], ["force-stop", "at.bernhardberger.tvhplayer"])
+        self.assertEqual(commands[-2][-2:], ["uninstall", "at.bernhardberger.tvhplayer.debug.test"])
+        self.assertEqual(commands[-1][-2:], ["force-stop", "at.bernhardberger.tvhplayer.debug"])
 
     def test_navigation_back_check_rejects_incomplete_runner_and_cleans_up(self) -> None:
         completed = subprocess.CompletedProcess(["adb"], 0, stdout="", stderr="")
@@ -1053,9 +1075,9 @@ class DevicePolicyTest(unittest.TestCase):
             ["adb"],
             0,
             stdout=(
-                "instrumentation:at.bernhardberger.tvhplayer.test/"
+                "instrumentation:at.bernhardberger.tvhplayer.debug.test/"
                 "androidx.test.runner.AndroidJUnitRunner "
-                "(target=at.bernhardberger.tvhplayer)\n"
+                "(target=at.bernhardberger.tvhplayer.debug)\n"
             ),
             stderr="",
         )
@@ -1091,12 +1113,12 @@ class DevicePolicyTest(unittest.TestCase):
                     DEVICE["run_navigation_back_check"](
                         "adb",
                         "test-device",
-                        "at.bernhardberger.tvhplayer",
+                        "at.bernhardberger.tvhplayer.debug",
                     )
 
         commands = [invocation.args[0] for invocation in run_mock.call_args_list]
-        self.assertEqual(commands[-2][-2:], ["uninstall", "at.bernhardberger.tvhplayer.test"])
-        self.assertEqual(commands[-1][-2:], ["force-stop", "at.bernhardberger.tvhplayer"])
+        self.assertEqual(commands[-2][-2:], ["uninstall", "at.bernhardberger.tvhplayer.debug.test"])
+        self.assertEqual(commands[-1][-2:], ["force-stop", "at.bernhardberger.tvhplayer.debug"])
 
     def test_timeshift_command_check_is_a_bounded_test_device_action(self) -> None:
         parser = DEVICE["build_parser"]()
@@ -1112,9 +1134,9 @@ class DevicePolicyTest(unittest.TestCase):
             ["adb"],
             0,
             stdout=(
-                "instrumentation:at.bernhardberger.tvhplayer.test/"
+                "instrumentation:at.bernhardberger.tvhplayer.debug.test/"
                 "androidx.test.runner.AndroidJUnitRunner "
-                "(target=at.bernhardberger.tvhplayer)\n"
+                "(target=at.bernhardberger.tvhplayer.debug)\n"
             ),
             stderr="",
         )
@@ -1143,7 +1165,7 @@ class DevicePolicyTest(unittest.TestCase):
                 run_timeshift_command_check(
                     "adb",
                     "test-device",
-                    "at.bernhardberger.tvhplayer",
+                    "at.bernhardberger.tvhplayer.debug",
                 )
 
         commands = [call.args[0] for call in run_mock.call_args_list]
@@ -1162,13 +1184,13 @@ class DevicePolicyTest(unittest.TestCase):
                 "-e",
                 DEVICE["EXTERNAL_TARGET_ACCEPTANCE_ARGUMENT"],
                 DEVICE["EXTERNAL_TARGET_ACCEPTANCE_ENABLED"],
-                "at.bernhardberger.tvhplayer.test/"
+                "at.bernhardberger.tvhplayer.debug.test/"
                 "androidx.test.runner.AndroidJUnitRunner",
             ],
             commands,
         )
-        self.assertEqual(commands[-2][-2:], ["uninstall", "at.bernhardberger.tvhplayer.test"])
-        self.assertEqual(commands[-1][-2:], ["force-stop", "at.bernhardberger.tvhplayer"])
+        self.assertEqual(commands[-2][-2:], ["uninstall", "at.bernhardberger.tvhplayer.debug.test"])
+        self.assertEqual(commands[-1][-2:], ["force-stop", "at.bernhardberger.tvhplayer.debug"])
 
     def test_timeshift_command_check_rejects_runner_failure_with_zero_exit(self) -> None:
         completed = subprocess.CompletedProcess(["adb"], 0, stdout="", stderr="")
@@ -1176,9 +1198,9 @@ class DevicePolicyTest(unittest.TestCase):
             ["adb"],
             0,
             stdout=(
-                "instrumentation:at.bernhardberger.tvhplayer.test/"
+                "instrumentation:at.bernhardberger.tvhplayer.debug.test/"
                 "androidx.test.runner.AndroidJUnitRunner "
-                "(target=at.bernhardberger.tvhplayer)\n"
+                "(target=at.bernhardberger.tvhplayer.debug)\n"
             ),
             stderr="",
         )
@@ -1221,12 +1243,12 @@ class DevicePolicyTest(unittest.TestCase):
                     run_timeshift_command_check(
                         "adb",
                         "test-device",
-                        "at.bernhardberger.tvhplayer",
+                        "at.bernhardberger.tvhplayer.debug",
                     )
 
         commands = [call.args[0] for call in run_mock.call_args_list]
-        self.assertEqual(commands[-2][-2:], ["uninstall", "at.bernhardberger.tvhplayer.test"])
-        self.assertEqual(commands[-1][-2:], ["force-stop", "at.bernhardberger.tvhplayer"])
+        self.assertEqual(commands[-2][-2:], ["uninstall", "at.bernhardberger.tvhplayer.debug.test"])
+        self.assertEqual(commands[-1][-2:], ["force-stop", "at.bernhardberger.tvhplayer.debug"])
 
     def test_external_target_checks_reject_skipped_or_ignored_tests(self) -> None:
         completed = subprocess.CompletedProcess(["adb"], 0, stdout="", stderr="")
@@ -1234,9 +1256,9 @@ class DevicePolicyTest(unittest.TestCase):
             ["adb"],
             0,
             stdout=(
-                "instrumentation:at.bernhardberger.tvhplayer.test/"
+                "instrumentation:at.bernhardberger.tvhplayer.debug.test/"
                 "androidx.test.runner.AndroidJUnitRunner "
-                "(target=at.bernhardberger.tvhplayer)\n"
+                "(target=at.bernhardberger.tvhplayer.debug)\n"
             ),
             stderr="",
         )
@@ -1287,7 +1309,7 @@ class DevicePolicyTest(unittest.TestCase):
                                 check(
                                     "adb",
                                     "test-device",
-                                    "at.bernhardberger.tvhplayer",
+                                    "at.bernhardberger.tvhplayer.debug",
                                 )
 
     def test_timeshift_command_check_requires_both_acceptance_tests(self) -> None:
@@ -1296,9 +1318,9 @@ class DevicePolicyTest(unittest.TestCase):
             ["adb"],
             0,
             stdout=(
-                "instrumentation:at.bernhardberger.tvhplayer.test/"
+                "instrumentation:at.bernhardberger.tvhplayer.debug.test/"
                 "androidx.test.runner.AndroidJUnitRunner "
-                "(target=at.bernhardberger.tvhplayer)\n"
+                "(target=at.bernhardberger.tvhplayer.debug)\n"
             ),
             stderr="",
         )
@@ -1341,12 +1363,12 @@ class DevicePolicyTest(unittest.TestCase):
                             run_timeshift_command_check(
                                 "adb",
                                 "test-device",
-                                "at.bernhardberger.tvhplayer",
+                                "at.bernhardberger.tvhplayer.debug",
                             )
 
                 commands = [call.args[0] for call in run_mock.call_args_list]
-                self.assertEqual(commands[-2][-2:], ["uninstall", "at.bernhardberger.tvhplayer.test"])
-                self.assertEqual(commands[-1][-2:], ["force-stop", "at.bernhardberger.tvhplayer"])
+                self.assertEqual(commands[-2][-2:], ["uninstall", "at.bernhardberger.tvhplayer.debug.test"])
+                self.assertEqual(commands[-1][-2:], ["force-stop", "at.bernhardberger.tvhplayer.debug"])
 
     def test_foreground_playback_lifecycle_check_uses_fixed_instrumentation_and_cleans_up(self) -> None:
         completed = subprocess.CompletedProcess(["adb"], 0, stdout="", stderr="")
@@ -1354,9 +1376,9 @@ class DevicePolicyTest(unittest.TestCase):
             ["adb"],
             0,
             stdout=(
-                "instrumentation:at.bernhardberger.tvhplayer.test/"
+                "instrumentation:at.bernhardberger.tvhplayer.debug.test/"
                 "androidx.test.runner.AndroidJUnitRunner "
-                "(target=at.bernhardberger.tvhplayer)\n"
+                "(target=at.bernhardberger.tvhplayer.debug)\n"
             ),
             stderr="",
         )
@@ -1395,7 +1417,7 @@ class DevicePolicyTest(unittest.TestCase):
                 run_foreground_playback_lifecycle_check(
                     "adb",
                     "test-device",
-                    "at.bernhardberger.tvhplayer",
+                    "at.bernhardberger.tvhplayer.debug",
                 )
 
         commands = [call.args[0] for call in run_mock.call_args_list]
@@ -1414,13 +1436,13 @@ class DevicePolicyTest(unittest.TestCase):
                 "-e",
                 DEVICE["EXTERNAL_TARGET_ACCEPTANCE_ARGUMENT"],
                 DEVICE["EXTERNAL_TARGET_ACCEPTANCE_ENABLED"],
-                "at.bernhardberger.tvhplayer.test/"
+                "at.bernhardberger.tvhplayer.debug.test/"
                 "androidx.test.runner.AndroidJUnitRunner",
             ],
             commands,
         )
-        self.assertEqual(commands[-2][-2:], ["uninstall", "at.bernhardberger.tvhplayer.test"])
-        self.assertEqual(commands[-1][-2:], ["force-stop", "at.bernhardberger.tvhplayer"])
+        self.assertEqual(commands[-2][-2:], ["uninstall", "at.bernhardberger.tvhplayer.debug.test"])
+        self.assertEqual(commands[-1][-2:], ["force-stop", "at.bernhardberger.tvhplayer.debug"])
 
     def test_channel_guide_check_requires_both_acceptance_tests(self) -> None:
         completed = subprocess.CompletedProcess(["adb"], 0, stdout="", stderr="")
@@ -1428,9 +1450,9 @@ class DevicePolicyTest(unittest.TestCase):
             ["adb"],
             0,
             stdout=(
-                "instrumentation:at.bernhardberger.tvhplayer.test/"
+                "instrumentation:at.bernhardberger.tvhplayer.debug.test/"
                 "androidx.test.runner.AndroidJUnitRunner "
-                "(target=at.bernhardberger.tvhplayer)\n"
+                "(target=at.bernhardberger.tvhplayer.debug)\n"
             ),
             stderr="",
         )
@@ -1474,7 +1496,7 @@ class DevicePolicyTest(unittest.TestCase):
                     run_channel_guide_check(
                         "adb",
                         "test-device",
-                        "at.bernhardberger.tvhplayer",
+                        "at.bernhardberger.tvhplayer.debug",
                     )
 
     def test_foreground_playback_lifecycle_check_requires_all_acceptance_tests(self) -> None:
@@ -1483,9 +1505,9 @@ class DevicePolicyTest(unittest.TestCase):
             ["adb"],
             0,
             stdout=(
-                "instrumentation:at.bernhardberger.tvhplayer.test/"
+                "instrumentation:at.bernhardberger.tvhplayer.debug.test/"
                 "androidx.test.runner.AndroidJUnitRunner "
-                "(target=at.bernhardberger.tvhplayer)\n"
+                "(target=at.bernhardberger.tvhplayer.debug)\n"
             ),
             stderr="",
         )
@@ -1525,12 +1547,12 @@ class DevicePolicyTest(unittest.TestCase):
                     run_foreground_playback_lifecycle_check(
                         "adb",
                         "test-device",
-                        "at.bernhardberger.tvhplayer",
+                        "at.bernhardberger.tvhplayer.debug",
                     )
 
         commands = [call.args[0] for call in run_mock.call_args_list]
-        self.assertEqual(commands[-2][-2:], ["uninstall", "at.bernhardberger.tvhplayer.test"])
-        self.assertEqual(commands[-1][-2:], ["force-stop", "at.bernhardberger.tvhplayer"])
+        self.assertEqual(commands[-2][-2:], ["uninstall", "at.bernhardberger.tvhplayer.debug.test"])
+        self.assertEqual(commands[-1][-2:], ["force-stop", "at.bernhardberger.tvhplayer.debug"])
 
     def test_timeshift_command_check_cleans_up_for_invalid_test_apk(self) -> None:
         completed = subprocess.CompletedProcess(["adb"], 0, stdout="", stderr="")
@@ -1557,12 +1579,12 @@ class DevicePolicyTest(unittest.TestCase):
                             run_timeshift_command_check(
                                 "adb",
                                 "test-device",
-                                "at.bernhardberger.tvhplayer",
+                                "at.bernhardberger.tvhplayer.debug",
                             )
 
                     commands = [call.args[0] for call in run_mock.call_args_list]
-                    self.assertEqual(commands[-2][-2:], ["uninstall", "at.bernhardberger.tvhplayer.test"])
-                    self.assertEqual(commands[-1][-2:], ["force-stop", "at.bernhardberger.tvhplayer"])
+                    self.assertEqual(commands[-2][-2:], ["uninstall", "at.bernhardberger.tvhplayer.debug.test"])
+                    self.assertEqual(commands[-1][-2:], ["force-stop", "at.bernhardberger.tvhplayer.debug"])
 
     def test_channel_guide_check_uses_fixed_instrumentation_and_cleans_up(self) -> None:
         completed = subprocess.CompletedProcess(["adb"], 0, stdout="", stderr="")
@@ -1570,9 +1592,9 @@ class DevicePolicyTest(unittest.TestCase):
             ["adb"],
             0,
             stdout=(
-                "instrumentation:at.bernhardberger.tvhplayer.test/"
+                "instrumentation:at.bernhardberger.tvhplayer.debug.test/"
                 "androidx.test.runner.AndroidJUnitRunner "
-                "(target=at.bernhardberger.tvhplayer)\n"
+                "(target=at.bernhardberger.tvhplayer.debug)\n"
             ),
             stderr="",
         )
@@ -1602,7 +1624,7 @@ class DevicePolicyTest(unittest.TestCase):
                 run_channel_guide_check(
                     "adb",
                     "test-device",
-                    "at.bernhardberger.tvhplayer",
+                    "at.bernhardberger.tvhplayer.debug",
                 )
 
         commands = [call.args[0] for call in run_mock.call_args_list]
@@ -1621,16 +1643,16 @@ class DevicePolicyTest(unittest.TestCase):
                 "-e",
                 DEVICE["EXTERNAL_TARGET_ACCEPTANCE_ARGUMENT"],
                 DEVICE["EXTERNAL_TARGET_ACCEPTANCE_ENABLED"],
-                "at.bernhardberger.tvhplayer.test/"
+                "at.bernhardberger.tvhplayer.debug.test/"
                 "androidx.test.runner.AndroidJUnitRunner",
             ],
             commands,
         )
-        self.assertEqual(commands[-3][-2:], ["uninstall", "at.bernhardberger.tvhplayer.test"])
-        self.assertEqual(commands[-2][-2:], ["force-stop", "at.bernhardberger.tvhplayer"])
+        self.assertEqual(commands[-3][-2:], ["uninstall", "at.bernhardberger.tvhplayer.debug.test"])
+        self.assertEqual(commands[-2][-2:], ["force-stop", "at.bernhardberger.tvhplayer.debug"])
         self.assertEqual(
             commands[-1][-3:],
-            ["pm", "clear", "at.bernhardberger.tvhplayer"],
+            ["pm", "clear", "at.bernhardberger.tvhplayer.debug"],
         )
 
     def test_configured_connection_check_runs_one_named_test_and_cleans_up(self) -> None:
@@ -1639,9 +1661,9 @@ class DevicePolicyTest(unittest.TestCase):
             ["adb"],
             0,
             stdout=(
-                "instrumentation:at.bernhardberger.tvhplayer.test/"
+                "instrumentation:at.bernhardberger.tvhplayer.debug.test/"
                 "androidx.test.runner.AndroidJUnitRunner "
-                "(target=at.bernhardberger.tvhplayer)\n"
+                "(target=at.bernhardberger.tvhplayer.debug)\n"
             ),
             stderr="",
         )
@@ -1671,17 +1693,17 @@ class DevicePolicyTest(unittest.TestCase):
                 run_channel_guide_configured_connection_check(
                     "adb",
                     "test-device",
-                    "at.bernhardberger.tvhplayer",
+                    "at.bernhardberger.tvhplayer.debug",
                 )
 
         commands = [call.args[0] for call in run_mock.call_args_list]
         runner_command = next(command for command in commands if "instrument" in command)
         self.assertIn(DEVICE["CHANNEL_GUIDE_CONFIGURED_CONNECTION_TEST"], runner_command)
-        self.assertEqual(commands[-3][-2:], ["uninstall", "at.bernhardberger.tvhplayer.test"])
-        self.assertEqual(commands[-2][-2:], ["force-stop", "at.bernhardberger.tvhplayer"])
+        self.assertEqual(commands[-3][-2:], ["uninstall", "at.bernhardberger.tvhplayer.debug.test"])
+        self.assertEqual(commands[-2][-2:], ["force-stop", "at.bernhardberger.tvhplayer.debug"])
         self.assertEqual(
             commands[-1][-3:],
-            ["pm", "clear", "at.bernhardberger.tvhplayer"],
+            ["pm", "clear", "at.bernhardberger.tvhplayer.debug"],
         )
 
     def test_configured_connection_check_accepts_g10_runner_summary_without_instrumentation_code(
@@ -1692,9 +1714,9 @@ class DevicePolicyTest(unittest.TestCase):
             ["adb"],
             0,
             stdout=(
-                "instrumentation:at.bernhardberger.tvhplayer.test/"
+                "instrumentation:at.bernhardberger.tvhplayer.debug.test/"
                 "androidx.test.runner.AndroidJUnitRunner "
-                "(target=at.bernhardberger.tvhplayer)\n"
+                "(target=at.bernhardberger.tvhplayer.debug)\n"
             ),
             stderr="",
         )
@@ -1737,7 +1759,7 @@ class DevicePolicyTest(unittest.TestCase):
                 run_channel_guide_configured_connection_check(
                     "adb",
                     "test-device",
-                    "at.bernhardberger.tvhplayer",
+                    "at.bernhardberger.tvhplayer.debug",
                 )
 
     def test_unrelated_instrumentation_check_rejects_missing_instrumentation_code(
@@ -1748,9 +1770,9 @@ class DevicePolicyTest(unittest.TestCase):
             ["adb"],
             0,
             stdout=(
-                "instrumentation:at.bernhardberger.tvhplayer.test/"
+                "instrumentation:at.bernhardberger.tvhplayer.debug.test/"
                 "androidx.test.runner.AndroidJUnitRunner "
-                "(target=at.bernhardberger.tvhplayer)\n"
+                "(target=at.bernhardberger.tvhplayer.debug)\n"
             ),
             stderr="",
         )
@@ -1791,7 +1813,7 @@ class DevicePolicyTest(unittest.TestCase):
                         run_timeshift_command_check(
                             "adb",
                             "test-device",
-                            "at.bernhardberger.tvhplayer",
+                            "at.bernhardberger.tvhplayer.debug",
                         )
         self.assertIn(
             "did not report successful instrumentation completion",
@@ -1824,13 +1846,13 @@ class DevicePolicyTest(unittest.TestCase):
                     run_channel_guide_check(
                         "adb",
                         "test-device",
-                        "at.bernhardberger.tvhplayer",
+                        "at.bernhardberger.tvhplayer.debug",
                     )
 
         commands = [call.args[0] for call in run_mock.call_args_list]
-        self.assertEqual(commands[-3][-2:], ["uninstall", "at.bernhardberger.tvhplayer.test"])
-        self.assertEqual(commands[-2][-2:], ["force-stop", "at.bernhardberger.tvhplayer"])
-        self.assertEqual(commands[-1][-3:], ["pm", "clear", "at.bernhardberger.tvhplayer"])
+        self.assertEqual(commands[-3][-2:], ["uninstall", "at.bernhardberger.tvhplayer.debug.test"])
+        self.assertEqual(commands[-2][-2:], ["force-stop", "at.bernhardberger.tvhplayer.debug"])
+        self.assertEqual(commands[-1][-3:], ["pm", "clear", "at.bernhardberger.tvhplayer.debug"])
 
     def test_channel_guide_check_cleans_up_after_stale_state_cannot_be_verified(self) -> None:
         completed = subprocess.CompletedProcess(["adb"], 0, stdout="", stderr="")
@@ -1857,13 +1879,13 @@ class DevicePolicyTest(unittest.TestCase):
                     run_channel_guide_check(
                         "adb",
                         "test-device",
-                        "at.bernhardberger.tvhplayer",
+                        "at.bernhardberger.tvhplayer.debug",
                     )
 
         commands = [call.args[0] for call in run_mock.call_args_list]
-        self.assertEqual(commands[-3][-2:], ["uninstall", "at.bernhardberger.tvhplayer.test"])
-        self.assertEqual(commands[-2][-2:], ["force-stop", "at.bernhardberger.tvhplayer"])
-        self.assertEqual(commands[-1][-3:], ["pm", "clear", "at.bernhardberger.tvhplayer"])
+        self.assertEqual(commands[-3][-2:], ["uninstall", "at.bernhardberger.tvhplayer.debug.test"])
+        self.assertEqual(commands[-2][-2:], ["force-stop", "at.bernhardberger.tvhplayer.debug"])
+        self.assertEqual(commands[-1][-3:], ["pm", "clear", "at.bernhardberger.tvhplayer.debug"])
 
     def test_channel_guide_check_fails_when_cleanup_does_not_complete(self) -> None:
         completed = subprocess.CompletedProcess(["adb"], 0, stdout="", stderr="")
@@ -1877,9 +1899,9 @@ class DevicePolicyTest(unittest.TestCase):
             ["adb"],
             0,
             stdout=(
-                "instrumentation:at.bernhardberger.tvhplayer.test/"
+                "instrumentation:at.bernhardberger.tvhplayer.debug.test/"
                 "androidx.test.runner.AndroidJUnitRunner "
-                "(target=at.bernhardberger.tvhplayer)\n"
+                "(target=at.bernhardberger.tvhplayer.debug)\n"
             ),
             stderr="",
         )
@@ -1910,7 +1932,7 @@ class DevicePolicyTest(unittest.TestCase):
                     run_channel_guide_check(
                         "adb",
                         "test-device",
-                        "at.bernhardberger.tvhplayer",
+                        "at.bernhardberger.tvhplayer.debug",
                     )
 
     def test_package_presence_query_distinguishes_absent_from_unverified(self) -> None:
@@ -1938,9 +1960,9 @@ class DevicePolicyTest(unittest.TestCase):
             ["adb"],
             0,
             stdout=(
-                "instrumentation:at.bernhardberger.tvhplayer.test/"
+                "instrumentation:at.bernhardberger.tvhplayer.debug.test/"
                 "androidx.test.runner.AndroidJUnitRunner "
-                "(target=at.bernhardberger.tvhplayer)\n"
+                "(target=at.bernhardberger.tvhplayer.debug)\n"
             ),
             stderr="",
         )
@@ -1975,12 +1997,12 @@ class DevicePolicyTest(unittest.TestCase):
                             run_channel_guide_check(
                                 "adb",
                                 "test-device",
-                                "at.bernhardberger.tvhplayer",
+                                "at.bernhardberger.tvhplayer.debug",
                             )
 
                 self.assertEqual(
                     run_mock.call_args_list[-2].args[0][-2:],
-                    ["force-stop", "at.bernhardberger.tvhplayer"],
+                    ["force-stop", "at.bernhardberger.tvhplayer.debug"],
                 )
 
     def test_package_certificate_verifies_only_base_apk_and_cleans_up(self) -> None:
@@ -2006,7 +2028,7 @@ class DevicePolicyTest(unittest.TestCase):
             patch.object(DEVICE_GLOBALS["os"], "access", return_value=True),
             redirect_stdout(output),
         ):
-            DEVICE["show_package_certificate"]("adb", "test-device", "at.bernhardberger.tvhplayer")
+            DEVICE["show_package_certificate"]("adb", "test-device", "at.bernhardberger.tvhplayer.debug")
         self.assertIn(f"certificateSha256={fingerprint}", output.getvalue())
         self.assertEqual(commands[1][-2], "/data/app/~~abc/pkg-123/base.apk")
         self.assertFalse(Path(commands[1][-1]).parent.exists())
@@ -2021,7 +2043,7 @@ class DevicePolicyTest(unittest.TestCase):
                     patch.object(DEVICE_GLOBALS["os"], "access", return_value=True),
                     self.assertRaises(SystemExit),
                 ):
-                    DEVICE["show_package_certificate"]("adb", "test-device", "at.bernhardberger.tvhplayer")
+                    DEVICE["show_package_certificate"]("adb", "test-device", "at.bernhardberger.tvhplayer.debug")
                 self.assertEqual(run_mock.call_count, 1)
 
     def test_read_only_actions_are_allowed_for_every_role(self) -> None:
@@ -2067,7 +2089,7 @@ class DevicePolicyTest(unittest.TestCase):
 
         def fake_run(command, **kwargs):
             self.assertEqual(command[-3:-1], ["SurfaceFlinger", "--latency"])
-            self.assertIn("SurfaceView[at.bernhardberger.tvhplayer/", command[-1])
+            self.assertIn("SurfaceView[at.bernhardberger.tvhplayer.debug/", command[-1])
             return subprocess.CompletedProcess(command, 0, stdout=next(samples), stderr="")
 
         output = io.StringIO()
@@ -2076,7 +2098,7 @@ class DevicePolicyTest(unittest.TestCase):
             patch.object(DEVICE_GLOBALS["time"], "sleep"),
             redirect_stdout(output),
         ):
-            DEVICE["show_video_frames"]("adb", "test-device", "at.bernhardberger.tvhplayer", 0.5)
+            DEVICE["show_video_frames"]("adb", "test-device", "at.bernhardberger.tvhplayer.debug", 0.5)
 
         self.assertIn("newFrames=1\n", output.getvalue())
         self.assertIn("approxFps=2.0\n", output.getvalue())
@@ -2089,8 +2111,8 @@ class DevicePolicyTest(unittest.TestCase):
 
         self.assertEqual(args.plane, "ui")
         self.assertEqual(
-            DEVICE["video_surface_layer"]("at.bernhardberger.tvhplayer", "ui"),
-            "at.bernhardberger.tvhplayer/at.bernhardberger.tvhplayer.ui.MainActivity#0",
+            DEVICE["video_surface_layer"]("at.bernhardberger.tvhplayer.debug", "ui"),
+            "at.bernhardberger.tvhplayer.debug/at.bernhardberger.tvhplayer.ui.MainActivity#0",
         )
         with self.assertRaises(SystemExit):
             parser.parse_args(["video-frames", "--plane", "audio"])
@@ -2121,7 +2143,7 @@ class DevicePolicyTest(unittest.TestCase):
             patch.object(DEVICE_GLOBALS["subprocess"], "run", side_effect=fake_run),
             redirect_stdout(output),
         ):
-            DEVICE["show_thread_load"]("adb", "test-device", "at.bernhardberger.tvhplayer", 2.0)
+            DEVICE["show_thread_load"]("adb", "test-device", "at.bernhardberger.tvhplayer.debug", 2.0)
 
         lines = output.getvalue().splitlines()
         self.assertIn("pid=4242", lines)
@@ -2193,20 +2215,21 @@ class DevicePolicyTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             bundle = Path(directory)
             artifacts = {
-                "signedPlayApk": {"file": "play.apk", "applicationId": DEVICE["DEFAULT_PACKAGE"]},
+                "signedPlayApk": {"file": "play.apk", "applicationId": DEVICE["RELEASE_PACKAGE"]},
                 "signedApplianceApk": {"file": "appliance.apk", "applicationId": DEVICE["APPLIANCE_PACKAGE"]},
-                "signedPlayAab": {"file": "play.aab", "applicationId": DEVICE["DEFAULT_PACKAGE"]},
+                "signedPlayAab": {"file": "play.aab", "applicationId": DEVICE["RELEASE_PACKAGE"]},
             }
             for artifact in artifacts.values():
                 (bundle / artifact["file"]).write_bytes(b"fixture")
             manifest = bundle / "release-manifest.json"
             manifest.write_text(json.dumps({"artifacts": artifacts}))
             with patch.object(DEVICE["subprocess"], "run") as verify:
-                for package, name in ((DEVICE["DEFAULT_PACKAGE"], "play.apk"), (DEVICE["APPLIANCE_PACKAGE"], "appliance.apk")):
+                for package, name in ((DEVICE["RELEASE_PACKAGE"], "play.apk"), (DEVICE["APPLIANCE_PACKAGE"], "appliance.apk")):
                     self.assertEqual(resolve_verified_release_apk(bundle, package), bundle / name)
                 self.assertEqual(verify.call_count, 2)
-                with self.assertRaises(SystemExit):
-                    resolve_verified_release_apk(bundle, "unsupported.package")
+                for package in ("unsupported.package", DEVICE["DEFAULT_PACKAGE"]):
+                    with self.subTest(package=package), self.assertRaises(SystemExit):
+                        resolve_verified_release_apk(bundle, package)
                 self.assertEqual(verify.call_count, 2)
                 artifacts["signedApplianceApk"]["file"] = "play.aab"
                 manifest.write_text(json.dumps({"artifacts": artifacts}))

@@ -118,6 +118,7 @@ android {
 
     buildTypes {
         debug {
+            applicationIdSuffix = ".debug"
             isPseudoLocalesEnabled = true
             buildConfigField("String[]", "APP_LANGUAGES", javaStringArray(appLanguages + pseudoLocales))
         }
@@ -142,7 +143,7 @@ android {
         }
         create("profileServer") {
             initWith(getByName("profile"))
-            applicationIdSuffix = null
+            applicationIdSuffix = ".debug"
         }
     }
     buildFeatures {

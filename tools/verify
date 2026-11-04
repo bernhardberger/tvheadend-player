@@ -171,7 +171,7 @@ if [[ "$play_manifest" != *'android.intent.category.LEANBACK_LAUNCHER'* ||
 fi
 
 required_badging=(
-    "package: name='at.bernhardberger.tvhplayer'"
+    "package: name='at.bernhardberger.tvhplayer.debug'"
     "sdkVersion:'28'"
     "targetSdkVersion:'36'"
     "application-label:'Tvheadend Player'"
@@ -188,7 +188,7 @@ if [[ "$release_checks" == true ]]; then
     manifest_tree="$($aapt dump xmltree "$appliance_apk" AndroidManifest.xml)"
     appliance_badging="$($aapt dump badging "$appliance_apk")"
     accessibility_tree="$($aapt dump xmltree "$appliance_apk" res/xml/appliance_entry_accessibility_service.xml)"
-    if [[ "$appliance_badging" != *"package: name='at.bernhardberger.tvhplayer.appliance'"* ||
+    if [[ "$appliance_badging" != *"package: name='at.bernhardberger.tvhplayer.appliance.debug'"* ||
           "$appliance_badging" != *"application-label:'Tvheadend Player Appliance'"* ||
           "$manifest_tree" != *'android.intent.category.LEANBACK_LAUNCHER'* ]]; then
         printf 'error: Appliance manifest contract failed\n' >&2

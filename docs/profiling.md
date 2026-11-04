@@ -30,11 +30,12 @@ inclusion in the built profile; a source rule alone does not prove it is shipped
 
 Use an authorized **Android 13 (API 33)+ or rooted** device/emulator; the LXC 119
 Google TV emulator is the usual target. The unrooted G10 (API 31) **cannot
-generate** profiles; it only consumes them. Before generation, store a reachable
-server profile using a debug-key build with application ID
-`at.bernhardberger.tvhplayer` and confirm Channels has playable
-channels. The generator's Play non-minified release target retains that ID and
-debug signing key, is non-debuggable and shell-profileable. Do not uninstall or
+generate** profiles; it only consumes them. Before generation, install the
+generator's Play non-minified release target, store a reachable server profile
+and confirm Channels has playable channels. This target uses application ID
+`at.bernhardberger.tvhplayer` and the debug signing key, is non-debuggable and
+shell-profileable; ordinary debug uses the separate `.debug` ID and does not
+share its configuration. Do not uninstall or
 clear its app data; do not use a production-signed installation as the target.
 The target version must be installable as an update over the existing version.
 
@@ -112,12 +113,16 @@ require a new attended confirmation; human motion acceptance remains separate.
   complete cached coverage and no picons. This exercises application mapping,
   not protocol decoding, network fetches or image downloads. Playback callbacks
   in this browsing fixture are intentionally inactive.
-- `profileServer`: production UID, Application, settings and configured-server
+- `profileServer`: debug app ID (`at.bernhardberger.tvhplayer.debug`), Application,
+  settings and configured-server
   behavior; nondebuggable and shell-profileable, signed with the existing local
   test certificate. It has no fixture activity or SDK-testing dependency.
   `verifyExternalSdkConsumption` checks its public dependency graph as well as
-  debug/release. Install only over a matching signer and non-newer version,
-  using official CLI `-r,-t`; never uninstall, downgrade or clear configuration.
+   debug/release. Install only over a matching signer and non-newer version,
+   using official CLI `-r,-t`; never uninstall, downgrade or clear configuration.
+   Debug and profileServer share `at.bernhardberger.tvhplayer.debug`, so installing
+   one replaces the other, and credential provisioning requires the debuggable
+   debug build.
 
 Both retain the release native dependencies. R8 is independently selectable for
 both profiling variants with `-Ptvhplayer.profileMinify=true` (default `false`);
@@ -228,7 +233,7 @@ foreground verification again.
 For an already prepared Channels first-row focus, for example:
 
 ```bash
-bash tools/profiling/capture causal "${TVHPLAYER_ADB_SERIAL:?select the authorized device}" at.bernhardberger.tvhplayer "$PRIVATE_OUTPUT" 3 20 20 20 20 19 19 19 19
+bash tools/profiling/capture causal "${TVHPLAYER_ADB_SERIAL:?select the authorized device}" at.bernhardberger.tvhplayer.debug "$PRIVATE_OUTPUT" 3 20 20 20 20 19 19 19 19
 python3 tools/profiling/analyze.py --focus-kind channel --focus-count 8 "$PRIVATE_OUTPUT"
 ```
 

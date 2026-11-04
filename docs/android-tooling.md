@@ -153,9 +153,9 @@ adb -s emulator-5556 shell 'for p in ro.product.manufacturer ro.product.model ro
 android --no-metrics install --device=emulator-5556 --apks=app/build/outputs/apk/play/debug/app-play-debug.apk --use-delta-install=false --install-options=-r,-t
 android --no-metrics install --device=emulator-5556 --apks=app/build/outputs/apk/androidTest/play/debug/app-play-debug-androidTest.apk --use-delta-install=false --install-options=-r,-t
 adb -s emulator-5556 shell pm list instrumentation
-adb -s emulator-5556 shell pm path at.bernhardberger.tvhplayer
-adb -s emulator-5556 shell pm path at.bernhardberger.tvhplayer.test
-adb -s emulator-5556 shell am instrument -w -r -e class at.bernhardberger.tvhplayer.ui.player.PlayerScreenshotTest -e playerScenarios live at.bernhardberger.tvhplayer.test/androidx.test.runner.AndroidJUnitRunner
+adb -s emulator-5556 shell pm path at.bernhardberger.tvhplayer.debug
+adb -s emulator-5556 shell pm path at.bernhardberger.tvhplayer.debug.test
+adb -s emulator-5556 shell am instrument -w -r -e class at.bernhardberger.tvhplayer.ui.player.PlayerScreenshotTest -e playerScenarios live at.bernhardberger.tvhplayer.debug.test/androidx.test.runner.AndroidJUnitRunner
 ```
 
 Before installation, confirm the intended emulator's four live properties against
@@ -180,10 +180,10 @@ After that successful run, pull the production-composable PNGs into a new privat
 evidence directory (`umask 077`, directory mode 0700):
 
 ```bash
-adb -s emulator-5556 pull /sdcard/Android/data/at.bernhardberger.tvhplayer/files/p37-player-captures/live-bright.png "$evidence/live-bright.png"
-adb -s emulator-5556 pull /sdcard/Android/data/at.bernhardberger.tvhplayer/files/p37-player-captures/live-dark.png "$evidence/live-dark.png"
-adb -s emulator-5556 shell am force-stop at.bernhardberger.tvhplayer
-adb -s emulator-5556 shell am force-stop at.bernhardberger.tvhplayer.test
+adb -s emulator-5556 pull /sdcard/Android/data/at.bernhardberger.tvhplayer.debug/files/p37-player-captures/live-bright.png "$evidence/live-bright.png"
+adb -s emulator-5556 pull /sdcard/Android/data/at.bernhardberger.tvhplayer.debug/files/p37-player-captures/live-dark.png "$evidence/live-dark.png"
+adb -s emulator-5556 shell am force-stop at.bernhardberger.tvhplayer.debug
+adb -s emulator-5556 shell am force-stop at.bernhardberger.tvhplayer.debug.test
 ```
 
 Before reusing an on-device capture filename, preserve any existing capture in a

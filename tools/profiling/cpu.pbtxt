@@ -8,7 +8,7 @@ data_sources {
       timebase { frequency: 99 }
       callstack_sampling {
         scope {
-          target_cmdline: "at.bernhardberger.tvhplayer"
+          target_cmdline: "at.bernhardberger.tvhplayer.debug"
           target_cmdline: "at.bernhardberger.tvhplayer.profile"
         }
       }

@@ -6,7 +6,7 @@ WITH owners AS (
   JOIN thread_track tt ON tt.id=s.track_id JOIN thread t USING(utid)
   WHERE s.name GLOB 'P44:tune:*' OR s.name GLOB 'P44:firstFrame:*' OR s.name GLOB 'P44:cover:*'
   UNION
-  SELECT upid FROM process WHERE name='at.bernhardberger.tvhplayer'
+  SELECT upid FROM process WHERE name='at.bernhardberger.tvhplayer.debug'
 )
 SELECT p.pid, s.id AS slice_id, s.ts AS timestamp_ns, s.dur AS duration_ns, s.name
 FROM slice s JOIN thread_track tt ON tt.id=s.track_id

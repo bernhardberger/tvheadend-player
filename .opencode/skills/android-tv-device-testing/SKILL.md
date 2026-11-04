@@ -42,8 +42,9 @@ dispatch cover. This capability does not extend a child's infrastructure access.
 4. Select the intended serial from ignored owner configuration and pass it
    explicitly as CLI `--device` (or ADB `-s`). A `tools/device` profile does not
    select the CLI target. Never commit a household address as a required default.
-5. Confirm the package under test. The appliance default is
-   `at.bernhardberger.tvhplayer`; rollback clients use different package IDs.
+5. Confirm the package under test. The `tools/device` default is
+   `at.bernhardberger.tvhplayer.debug`; Play uses `at.bernhardberger.tvhplayer`,
+   and the Appliance companion will use `at.bernhardberger.tvhplayer.appliance`.
 6. Confirm the selected role and matching live manufacturer, model, device and
    product before mutation. Only a designated development target may be `test`.
    Bounded ADB `getprop` supplies these fields; `tools/device doctor` is optional,

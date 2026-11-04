@@ -8,7 +8,7 @@ FROM slice s
 JOIN thread_track tt ON tt.id = s.track_id
 JOIN thread t ON t.utid = tt.utid
 JOIN process p ON p.upid = t.upid
-WHERE t.tid = p.pid AND p.name = 'at.bernhardberger.tvhplayer'
+WHERE t.tid = p.pid AND p.name = 'at.bernhardberger.tvhplayer.debug'
   AND s.dur >= 0 AND (
     s.name GLOB 'P46:*:guide' OR s.name GLOB 'P44:sidebarRequest:*'
     OR s.name IN ('P44:guideIndex', 'P44:measure:guide', 'P44:place:guide',
