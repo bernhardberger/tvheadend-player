@@ -150,7 +150,21 @@ class SettingsConnectionDepthTest {
         press(Key.DirectionLeft)
         assertTrue(setupOpen)
         compose.onAllNodes(hasSetTextAction()).assertCountEquals(1)
-        press(Key.Back)
+        fun backKey(down: Boolean, repeat: Int = 0, flags: Int = 0) {
+            compose.onRoot().performKeyPress(androidx.compose.ui.input.key.KeyEvent(android.view.KeyEvent(
+                0, 0, if (down) android.view.KeyEvent.ACTION_DOWN else android.view.KeyEvent.ACTION_UP,
+                android.view.KeyEvent.KEYCODE_BACK, repeat, 0, 0, 0, flags)))
+        }
+        backKey(false)
+        compose.onAllNodes(hasSetTextAction()).assertCountEquals(1)
+        backKey(true)
+        backKey(false, flags = android.view.KeyEvent.FLAG_CANCELED)
+        compose.onAllNodes(hasSetTextAction()).assertCountEquals(1)
+        backKey(true)
+        backKey(true, repeat = 1, flags = android.view.KeyEvent.FLAG_LONG_PRESS)
+        backKey(true, repeat = 2)
+        compose.onAllNodes(hasSetTextAction()).assertCountEquals(1)
+        backKey(false)
         compose.onAllNodes(hasSetTextAction()).assertCountEquals(0)
         compose.onNodeWithTag("setup-host").assertIsFocused()
         assertEquals("draft.invalid", form.host)

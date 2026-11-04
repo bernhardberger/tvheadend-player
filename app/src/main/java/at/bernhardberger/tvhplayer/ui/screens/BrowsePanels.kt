@@ -42,6 +42,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import at.bernhardberger.tvhplayer.ui.components.backKeyCycleFocus
+import at.bernhardberger.tvhplayer.ui.components.rememberBackKeyCycle
 import at.bernhardberger.tvhplayer.ui.TvScrimModalAlpha
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
@@ -107,17 +109,19 @@ internal fun BrowseSidePanel(
         onDispose { layering?.modalScrims?.remove(scrimKey) }
     }
     var openingReleasePending by remember { mutableStateOf(true) }
+    val backCycle = rememberBackKeyCycle()
     BackHandler { onClose() }
     PlaybackOptionsOverlayFrame(
         paneTitle = title,
         panelTag = panelTag,
         panelWidth = width,
         modifier = Modifier
+            .backKeyCycleFocus(backCycle)
             .browseDetailsViewport()
             .onPreviewKeyEvent { event ->
                 if (event.key == Key.Back) {
-                    if (event.type == KeyEventType.KeyUp) onClose()
-                    return@onPreviewKeyEvent true
+                    return@onPreviewKeyEvent backCycle.handle(event.type == KeyEventType.KeyDown,
+                        event.nativeKeyEvent.repeatCount, event.nativeKeyEvent.isCanceled, onBack = onClose)
                 }
                 val activation = event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter
                 if (!activation || !openingReleasePending) return@onPreviewKeyEvent false

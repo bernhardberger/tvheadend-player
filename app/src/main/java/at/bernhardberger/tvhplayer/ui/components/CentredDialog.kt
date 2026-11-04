@@ -13,7 +13,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
@@ -127,14 +126,20 @@ internal fun CentredDialog(
             layering?.modalScrims?.set(key, scrim)
             onDispose { layering?.modalScrims?.remove(key) }
         }
+        val backCycle = rememberBackKeyCycle(backEnabled && visibility.targetState)
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = TvScrimModalAlpha))
+            .backKeyCycleFocus(backCycle)
             .testTag("centred-dialog-scrim")
             .semantics { dialog(); paneTitle = title }
             .onPreviewKeyEvent { event ->
-                if (!visibility.targetState) return@onPreviewKeyEvent true
-                if (backEnabled && event.key == Key.Back) {
-                    if (event.type == KeyEventType.KeyUp) back()
+                if (!visibility.targetState) {
+                    backCycle.reset()
                     return@onPreviewKeyEvent true
+                }
+                if (!backEnabled) backCycle.reset()
+                if (backEnabled && event.key == Key.Back) {
+                    return@onPreviewKeyEvent backCycle.handle(event.type == KeyEventType.KeyDown,
+                        event.nativeKeyEvent.repeatCount, event.nativeKeyEvent.isCanceled) { back() }
                 }
                 val activation = event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter
                 if (activation && openingReleasePending) {
@@ -146,7 +151,7 @@ internal fun CentredDialog(
                     }
                 }
                 alternativeContent == null && (event.key == Key.DirectionUp || event.key == Key.DirectionDown)
-            }.focusGroup(), contentAlignment = Alignment.Center) {
+            }, contentAlignment = Alignment.Center) {
             // Keep one dimmed backdrop while a decision drills into its options. Fade through
             // rather than drawing the card and side panel visibly on top of each other.
             AnimatedContent(targetState = alternativeContent, contentKey = { it != null },

@@ -35,6 +35,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import at.bernhardberger.tvhplayer.ui.components.backKeyCycleFocus
+import at.bernhardberger.tvhplayer.ui.components.rememberBackKeyCycle
 import at.bernhardberger.tvhplayer.ui.TvPassiveAlpha
 import at.bernhardberger.tvhplayer.ui.components.BrowseContentLayer
 import at.bernhardberger.tvhplayer.ui.components.ListBottomReserve
@@ -199,6 +201,10 @@ fun DepthNavigation(
     val latestLevels by rememberUpdatedState(levels)
     val latestIsCurrent = rememberUpdatedState(isCurrent)
     val cycles = remember { DepthKeyCycle() }
+    val backCycle = rememberBackKeyCycle(isCurrent && backEnabled && level.activeContent == null &&
+        (state.stack.canPop || onRootBack != null))
+    val editorBackCycle = rememberBackKeyCycle(isCurrent && backEnabled &&
+        level.activeContent != null && state.stack.canPop)
     val focusManager = LocalFocusManager.current
     var editorLeftExit by remember { mutableStateOf(false) }
     var pendingRootBack by remember { mutableStateOf<Int?>(null) }
@@ -303,23 +309,37 @@ fun DepthNavigation(
     }
     val displayed = if (moving) unionStrip(held, desired) else desired
 
-    Box(modifier.onPreviewKeyEvent { event ->
-        if (!isCurrent) return@onPreviewKeyEvent false
+    Box(modifier.backKeyCycleFocus(backCycle, editorBackCycle).onPreviewKeyEvent { event ->
+        if (!isCurrent) {
+            backCycle.reset()
+            editorBackCycle.reset()
+            return@onPreviewKeyEvent false
+        }
         val native = event.nativeKeyEvent
         val code = native.keyCode
-        val back = code == KeyEvent.KEYCODE_BACK || code == KeyEvent.KEYCODE_DPAD_LEFT
+        if (code == KeyEvent.KEYCODE_BACK) {
+            if (level.activeContent != null) {
+                backCycle.reset()
+                return@onPreviewKeyEvent false
+            }
+            return@onPreviewKeyEvent backCycle.handle(native.action == KeyEvent.ACTION_DOWN,
+                native.repeatCount, native.isCanceled,
+                enabled = backEnabled && (state.stack.canPop || onRootBack != null)) {
+                if (state.stack.canPop) pop() else onRootBack?.invoke()
+            }
+        }
+        val back = code == KeyEvent.KEYCODE_DPAD_LEFT
         val right = code == KeyEvent.KEYCODE_DPAD_RIGHT
         val up = code == KeyEvent.KEYCODE_DPAD_UP
         if (!back && !right && !up) return@onPreviewKeyEvent false
         val exit = when (code) {
             KeyEvent.KEYCODE_DPAD_LEFT -> onRootLeft
-            KeyEvent.KEYCODE_BACK -> onRootBack
             KeyEvent.KEYCODE_DPAD_UP -> onFirstRowUp.takeIf {
                 state.stack.active.focusedItemId == level.rows.firstOrNull()?.item?.id
             }
             else -> null
         }
-        // Held Left walks out level by level; held Right and Back act once, since Right's
+        // Held Left walks out level by level; held Right acts once, since Right's
         // repeats outran the entering level on the TV and escaped to the tabs.
         val consumed = cycles.handle(code, native.action == KeyEvent.ACTION_DOWN, native.repeatCount, repeats = code == KeyEvent.KEYCODE_DPAD_LEFT) {
             when {
@@ -349,12 +369,14 @@ fun DepthNavigation(
         consumed
     }.onKeyEvent { event ->
         val native = event.nativeKeyEvent
-        if (!isCurrent || level.activeContent == null ||
-            (native.keyCode != KeyEvent.KEYCODE_BACK && native.keyCode != KeyEvent.KEYCODE_DPAD_LEFT)) return@onKeyEvent false
-        if (native.keyCode == KeyEvent.KEYCODE_DPAD_LEFT) return@onKeyEvent editorLeft(native)
-        cycles.handle(native.keyCode, native.action == KeyEvent.ACTION_DOWN, native.repeatCount) {
-            if (backEnabled && state.stack.canPop) { pop(); true } else false
+        if (!isCurrent || level.activeContent == null) {
+            editorBackCycle.reset()
+            return@onKeyEvent false
         }
+        if (native.keyCode != KeyEvent.KEYCODE_BACK && native.keyCode != KeyEvent.KEYCODE_DPAD_LEFT) return@onKeyEvent false
+        if (native.keyCode == KeyEvent.KEYCODE_DPAD_LEFT) return@onKeyEvent editorLeft(native)
+        editorBackCycle.handle(native.action == KeyEvent.ACTION_DOWN, native.repeatCount, native.isCanceled,
+            enabled = backEnabled && state.stack.canPop) { pop() }
     }) {
         Box(Modifier.fillMaxSize().padding(start = columnInset)) {
             // Offsets do not enlarge a Box. Include every placed slot in the strip's

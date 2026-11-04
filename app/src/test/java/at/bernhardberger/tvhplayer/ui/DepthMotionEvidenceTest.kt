@@ -511,6 +511,10 @@ class DepthMotionEvidenceTest {
             compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
             compose.mainClock.advanceTimeBy(delay)
             compose.onRoot().performKeyInput { pressKey(Key.Back) }
+            assertEquals("Back pops on release", 1, navigation.stack.frames.size)
+            // Back now changes the stack on KeyUp, not KeyDown. Apply that final event's
+            // composition before sampling the returning root with the clock paused.
+            compose.mainClock.advanceTimeByFrame()
             var elapsed = delay
             while (elapsed <= DepthSlideMillis) {
                 val frame = draw()

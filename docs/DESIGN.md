@@ -488,6 +488,9 @@ Anatomy per Material for TV / design kit:
   automatic initial focus until focus leaves the drawer.
 - A key that reveals, replaces or relocates UI is consumed for its whole
   KeyDown/KeyUp cycle so the same press cannot activate the new target.
+  Outside the player, Back acts once on KeyUp, only if that owner saw the
+  initial non-repeat KeyDown. Repeats do not act; canceled or unseen releases
+  do nothing. A held Back has no extra action outside the player.
   In the player, short Back acts on KeyUp; holding Back stops playback,
   except on confirmations and nested dialogs.
 - Back unwinds local layers first (dialogs, sheets, depth stacks, scope tabs),
@@ -567,8 +570,8 @@ Accepted 2026-09-15; static design in Penpot page
   the parent's item and viewport. Holding Left repeats that one level per key
   repeat, as AOSP TvSettings does (held Left at the root goes on to the drawer);
   a held Right enters one level only, because on the TV its repeats outran the
-  new level and escaped to the tabs (revised 2026-10-23). A held Back acts once,
-  and a held Left that leaves an editor stops there. Focus alone never commits a setting. Switches
+  new level and escaped to the tabs (revised 2026-10-23). Back follows the general
+  release rule in §6; a held Left that leaves an editor stops there. Focus alone never commits a setting. Switches
   act in place; choice lists (e.g. App language) are a level, not a dialog, and
   OK on a choice applies it and returns.
 - Entering a level again opens it on the row and viewport it was left on, as
@@ -1066,6 +1069,10 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
 
 ### Key cycles, Back and auto-hide
 
+- Outside the player, every local Back owner consumes KeyDown and its repeats,
+  then acts once on the uncanceled KeyUp of a press whose initial KeyDown it
+  saw. An unseen or canceled release does nothing; holding Back has no extra
+  action. Each layer keeps its existing return destination and focus restoration.
 - The Compose key dispatcher owns every player key. The `PlayerView` runs with its
   controller off and is neither focusable nor clickable
   (`ui/player/PlayerVideoSurface.kt:84-89`).

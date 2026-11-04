@@ -104,6 +104,54 @@ class GuidePlayerReturnFocusTest {
     private var playRequests = 0
     private lateinit var settingsApplication: org.koin.core.KoinApplication
 
+    @Test fun heldBackSurvivesPastWindowReplacementBeforeReturningToNow() {
+        // An out-of-scope playing channel restores the saved past-window position.
+        guide(PlayerReturnFocus(ChannelId(99), ChannelId(1)))
+        focused("Channel 1 hour -2")
+        key(Key.DirectionLeft)
+        key(Key.DirectionLeft)
+        focused("Channel 1 hour -4")
+        key(Key.DirectionRight)
+        focused("Channel 1 hour -3")
+        compose.onRoot().performKeyPress(KeyEvent(android.view.KeyEvent(0, 0,
+            android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_BACK, 0)))
+        // Moving to the next cached programme replaces the prepared window while Back is held.
+        key(Key.DirectionRight)
+        focused("Channel 1 hour -2")
+        compose.onRoot().performKeyPress(KeyEvent(android.view.KeyEvent(0, 0,
+            android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_BACK, 0)))
+        focused("Channel 1 hour 0")
+    }
+
+    @Test fun backFromFutureWaitsForItsOwnUncanceledReleaseBeforeReturningToNow() {
+        guide(PlayerReturnFocus(ChannelId(1), ChannelId(1)))
+        repeat(3) { key(Key.DirectionRight) }
+        focused("Channel 1 hour 3")
+        fun backKey(down: Boolean, repeat: Int = 0, flags: Int = 0) {
+            compose.onRoot().performKeyPress(KeyEvent(android.view.KeyEvent(0, 0,
+                if (down) android.view.KeyEvent.ACTION_DOWN else android.view.KeyEvent.ACTION_UP,
+                android.view.KeyEvent.KEYCODE_BACK, repeat, 0, 0, 0, flags)))
+        }
+        backKey(false)
+        focused("Channel 1 hour 3")
+        backKey(true)
+        backKey(false, flags = android.view.KeyEvent.FLAG_CANCELED)
+        focused("Channel 1 hour 3")
+        backKey(true)
+        backKey(true, repeat = 1, flags = android.view.KeyEvent.FLAG_LONG_PRESS)
+        backKey(true, repeat = 2)
+        focused("Channel 1 hour 3")
+        backKey(false)
+        focused("Channel 1 hour 0")
+        backKey(false)
+        focused("Channel 1 hour 0")
+        backKey(true)
+        focused("Channel 1 hour 0")
+        backKey(false)
+        // This standalone Guide has no rail requester, so its existing fallback is the header.
+        compose.onNodeWithTag("guide-date-button").assertIsFocused()
+    }
+
     @Test
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun programmeCellLooksFocusedWhenAWindowJumpComposesIt() {

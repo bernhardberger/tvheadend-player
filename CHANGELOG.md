@@ -6,6 +6,11 @@
 
 - Holding Back in the player stops playback, like the Stop key (#13).
 
+### Navigation
+
+- Outside the player, Back now acts when you release it. Held presses act once,
+  and canceled presses no longer move you back.
+
 ## 0.4.4
 
 ### Settings

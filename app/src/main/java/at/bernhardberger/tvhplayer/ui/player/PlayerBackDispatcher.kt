@@ -35,13 +35,13 @@ internal fun PlayerBackKeyCycle.intercept(
 ): Boolean {
     val native = event.nativeKeyEvent
     if (native.keyCode != AndroidKeyEvent.KEYCODE_BACK) return false
-    if (native.action == AndroidKeyEvent.ACTION_UP && native.isCanceled) {
-        onKey(false, 0, false, canceled = true, holdAllowed = false)
-        return true
-    }
     if (confirmationOpen || nestedDialogOpen) {
         onKey(false, 0, false, canceled = true, holdAllowed = false)
         return false
+    }
+    if (native.action == AndroidKeyEvent.ACTION_UP && native.isCanceled) {
+        onKey(false, 0, false, canceled = true, holdAllowed = false)
+        return true
     }
     when (onKey(native.action == AndroidKeyEvent.ACTION_DOWN, native.repeatCount,
         native.isLongPress, native.isCanceled, holdAllowed = true)) {

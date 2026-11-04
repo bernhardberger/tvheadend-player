@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.ui.components.backKeyCycleFocus
+import at.bernhardberger.tvhplayer.ui.components.rememberBackKeyCycle
 import at.bernhardberger.tvhplayer.ui.common.rememberCurrentEpochSeconds
 
 import androidx.compose.ui.graphics.graphicsLayer
@@ -20,7 +22,6 @@ import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 import at.bernhardberger.tvhplayer.profiling.ProfileCompositionLifetime
 
-import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Box
@@ -40,6 +41,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -416,8 +418,6 @@ fun EpgGridScreen(
     val gridFocus = remember { FocusRequester() }
     var scopeEntryRequested by remember { mutableStateOf(false) }
     var suppressActivationRelease by remember { mutableStateOf(false) }
-    var consumeBackRelease by remember { mutableStateOf(false) }
-    var railOnBackRelease by remember { mutableStateOf(false) }
     var pendingInitialChannelIndex by remember { mutableIntStateOf(-1) }
     var initialPositionDone by remember { mutableStateOf(false) }
     var destinationEntryPending by remember { mutableStateOf(playerReturn == null && !browseReturn) }
@@ -743,8 +743,6 @@ fun EpgGridScreen(
 
     LaunchedEffect(initialFocusEnabled) {
         if (!initialFocusEnabled) {
-            consumeBackRelease = false
-            railOnBackRelease = false
             scopeEntryRequested = false
             cancelPendingProgrammeNavigation()
         }
@@ -1558,8 +1556,11 @@ fun EpgGridScreen(
         navigationFocus?.let { runCatching { it.requestFocus() } } ?: focusGuideHeader()
     }
 
-    val programmeBackEnabled = indexCurrent && initialFocusEnabled && programmeFocusOwned &&
+    // Preparing another window does not transfer Back ownership away from this grid.
+    // Release uses the current window; jumpToNow already owns its pending focus request.
+    val programmeBackEnabled = guideActive && initialFocusEnabled && programmeFocusOwned &&
         detailsEvent == null && !showTimePanel && openPanel == null
+    val backCycle = key(channelScope.activeTagId) { rememberBackKeyCycle(programmeBackEnabled) }
     BackHandler(enabled = programmeBackEnabled) { if (!backToNow()) backToRail() }
 
     fun moveFocus(direction: EpgFocusDirection): Boolean {
@@ -1892,30 +1893,13 @@ fun EpgGridScreen(
                         if (requestedFocusDirection == awayFromNavigation) focusGuideContent()
                     }
                 }
-                .focusGroup()
+                .backKeyCycleFocus(backCycle)
                 .onPreviewKeyEvent { event ->
                     if (event.key == Key.Back) {
-                        // A release that never reached this Column (the focused cell can leave when
-                        // the window swaps) must not leave the next press dead.
-                        if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
-                            consumeBackRelease = false
-                            railOnBackRelease = false
-                        }
-                        if (consumeBackRelease) {
-                            if (event.type == KeyEventType.KeyUp) {
-                                consumeBackRelease = false
-                                // The rail takes focus on the release, so it cannot receive it.
-                                if (railOnBackRelease) {
-                                    railOnBackRelease = false
-                                    backToRail()
-                                }
-                            }
-                            return@onPreviewKeyEvent true
-                        }
-                        if (event.type == KeyEventType.KeyDown && programmeBackEnabled) {
-                            consumeBackRelease = true
-                            railOnBackRelease = !backToNow()
-                            return@onPreviewKeyEvent true
+                        return@onPreviewKeyEvent backCycle.handle(event.type == KeyEventType.KeyDown,
+                            event.nativeKeyEvent.repeatCount, event.nativeKeyEvent.isCanceled,
+                            enabled = programmeBackEnabled) {
+                            if (!backToNow()) backToRail()
                         }
                     }
                     if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false

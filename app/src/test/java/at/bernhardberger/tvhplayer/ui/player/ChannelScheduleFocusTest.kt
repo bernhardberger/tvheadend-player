@@ -158,7 +158,7 @@ class ChannelScheduleFocusTest {
             keyDown(Key.Back)
             advanceEventTime(1_200)
         }
-        compose.onNode(isSelected()).assertIsFocused()
+        compose.onNodeWithTag("schedule-row-47").assertIsFocused()
         assertEquals(0, closed)
         compose.onRoot().performKeyInput { keyUp(Key.Back) }
         compose.onNode(isSelected()).assertIsFocused()
@@ -168,6 +168,28 @@ class ChannelScheduleFocusTest {
         compose.onNodeWithText("Today").performKeyInput { pressKey(Key.DirectionDown) }
         val todayRow = scheduleInitialEvent(week, NOW, NOW)!!
         compose.onNodeWithTag("schedule-row-${todayRow.id.value}").assertIsFocused()
+    }
+
+    @Test fun scheduleIgnoresCanceledAndUnseenBackRelease() {
+        var closed = 0
+        showBackSchedule { closed++ }
+        fun key(down: Boolean, repeat: Int = 0, flags: Int = 0) {
+            compose.onRoot().performKeyPress(androidx.compose.ui.input.key.KeyEvent(android.view.KeyEvent(
+                0, 0, if (down) android.view.KeyEvent.ACTION_DOWN else android.view.KeyEvent.ACTION_UP,
+                android.view.KeyEvent.KEYCODE_BACK, repeat, 0, 0, 0, flags)))
+        }
+        key(false)
+        assertEquals(0, closed)
+        key(true)
+        key(false, flags = android.view.KeyEvent.FLAG_CANCELED)
+        assertEquals(0, closed)
+        key(true)
+        key(true, repeat = 1, flags = android.view.KeyEvent.FLAG_LONG_PRESS)
+        key(true, repeat = 2)
+        assertEquals(0, closed)
+        compose.onNodeWithTag("schedule-row-46").assertIsFocused()
+        key(false)
+        assertEquals(1, closed)
     }
 
     /** Keep the live player's parent key routing in the path; it must let the panel own Back. */
@@ -181,8 +203,7 @@ class ChannelScheduleFocusTest {
             Box(Modifier.onPreviewKeyEvent { layers.handleScheduleKey(it) ?: false }) {
                 if (layers.scheduleOpen) PlaybackOptionsOverlayFrame(panelWidth = 480.dp) {
                     ChannelSchedule(null, week, NOW, NOW, false, false, { null }, {},
-                        onClose = { layers.closeSchedule(); onClose() }, onRetry = {}, initialEvent = week[45],
-                        onBackKeyDown = { layers.core.beginOpeningKeyCycle(android.view.KeyEvent.KEYCODE_BACK) })
+                        onClose = { layers.closeSchedule(); onClose() }, onRetry = {}, initialEvent = week[45])
                 }
             }
         } }

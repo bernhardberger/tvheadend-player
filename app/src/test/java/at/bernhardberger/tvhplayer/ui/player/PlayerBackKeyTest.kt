@@ -15,7 +15,6 @@ import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import at.bernhardberger.tvhplayer.core.*
-import at.bernhardberger.tvhplayer.ui.components.depth.DepthKeyCycle
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -62,12 +61,12 @@ class PlayerBackKeyTest {
         assertTrue(cycle.intercept(event(false, flags = NativeKey.FLAG_CANCELED), false, false, fail, fail))
     }
 
-    @Test fun modalPassThroughResetsTrackingAndCanceledReleaseIsConsumed() {
+    @Test fun modalPassThroughResetsTrackingAndPassesCanceledReleaseToItsOwner() {
         val cycle = PlayerBackKeyCycle()
         val fail = { fail("stale or canceled Back must do nothing"); Unit }
         cycle.intercept(event(true), false, false, fail, fail)
         assertFalse(cycle.intercept(event(true, 1), false, true, fail, fail))
-        assertTrue(cycle.intercept(event(false, flags = NativeKey.FLAG_CANCELED), false, true, fail, fail))
+        assertFalse(cycle.intercept(event(false, flags = NativeKey.FLAG_CANCELED), false, true, fail, fail))
         assertTrue(cycle.intercept(event(true, 2), false, false, fail, fail))
         assertTrue(cycle.intercept(event(false), false, false, fail, fail))
     }
@@ -96,7 +95,7 @@ class PlayerBackKeyTest {
         compose.setContent {
             root = androidx.compose.ui.platform.LocalView.current
             val cycle = remember { PlayerBackKeyCycle() }
-            val browseCycle = remember { DepthKeyCycle() }
+            val browseCycle = remember { BackKeyCycle() }
             val focus = remember { FocusRequester() }
             BackHandler { systemBacks++ }
             Box(Modifier.fillMaxSize().focusRequester(focus).onPreviewKeyEvent { key ->
@@ -105,9 +104,8 @@ class PlayerBackKeyTest {
                     playing = false
                 }) else {
                     val native = key.nativeKeyEvent
-                    browseCycle.handle(native.keyCode, native.action == NativeKey.ACTION_DOWN, native.repeatCount) {
+                    browseCycle.handle(native.action == NativeKey.ACTION_DOWN, native.repeatCount, native.isCanceled) {
                         browseBacks++
-                        true
                     }
                 }
             }.focusable())
@@ -133,12 +131,38 @@ class PlayerBackKeyTest {
         assertEquals(0, browseBacks)
         assertEquals(0, systemBacks)
         assertFalse(compose.activity.isFinishing)
-        // A new browse press still acts on its first down and ignores its hold/release.
+        // A new browse press acts only on its own release, not on the player's held press.
         send(event(true))
-        assertEquals(1, browseBacks)
+        assertEquals(0, browseBacks)
         send(event(true, 1))
         send(event(false))
         assertEquals(1, browseBacks)
         assertEquals(0, systemBacks)
+    }
+
+    @Test fun modalOwnerReceivesWholeCycleAndDoesNotRetainACanceledPress() {
+        for ((confirmation, nested) in listOf(true to false, false to true)) {
+            val player = PlayerBackKeyCycle()
+            val modal = BackKeyCycle()
+            var backs = 0
+            val fail = { fail("modal Back must not act on player"); Unit }
+            fun send(key: KeyEvent) {
+                assertFalse(player.intercept(key, confirmation, nested, fail, fail))
+                val native = key.nativeKeyEvent
+                assertTrue(modal.handle(native.action == NativeKey.ACTION_DOWN,
+                    native.repeatCount, native.isCanceled) { backs++ })
+            }
+            send(event(false))
+            send(event(true))
+            send(event(false, flags = NativeKey.FLAG_CANCELED))
+            send(event(false))
+            assertEquals(0, backs)
+            send(event(true))
+            send(event(true, 1, NativeKey.FLAG_LONG_PRESS))
+            send(event(true, 2))
+            assertEquals(0, backs)
+            send(event(false))
+            assertEquals(1, backs)
+        }
     }
 }

@@ -96,7 +96,22 @@ class SettingsAboutTest {
         repeat(5) { press(Key.DirectionDown) }
         compose.runOnIdle { org.junit.Assert.assertTrue(scroll.value() > before) }
         compose.onNodeWithTag("player-info-reading").assertIsFocused()
-        press(Key.Back)
+        fun backKey(down: Boolean, repeat: Int = 0, flags: Int = 0) {
+            compose.onNodeWithTag("player-info-reading").performKeyPress(androidx.compose.ui.input.key.KeyEvent(
+                android.view.KeyEvent(0, 0,
+                    if (down) android.view.KeyEvent.ACTION_DOWN else android.view.KeyEvent.ACTION_UP,
+                    android.view.KeyEvent.KEYCODE_BACK, repeat, 0, 0, 0, flags)))
+        }
+        backKey(false)
+        compose.onNodeWithTag("player-info-reading").assertIsFocused()
+        backKey(true)
+        backKey(false, flags = android.view.KeyEvent.FLAG_CANCELED)
+        compose.onNodeWithTag("player-info-reading").assertIsFocused()
+        backKey(true)
+        backKey(true, repeat = 1, flags = android.view.KeyEvent.FLAG_LONG_PRESS)
+        backKey(true, repeat = 2)
+        compose.onNodeWithTag("player-info-reading").assertIsFocused()
+        backKey(false)
         compose.onNodeWithText("GNU General Public License v3").assertIsFocused()
         press(Key.DirectionDown)
         compose.onNodeWithText("Notices and third-party libraries", substring = true).assertIsFocused()

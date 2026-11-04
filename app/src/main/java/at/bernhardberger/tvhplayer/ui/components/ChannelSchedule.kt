@@ -2,7 +2,6 @@ package at.bernhardberger.tvhplayer.ui.components
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.*
@@ -83,7 +82,6 @@ internal fun ChannelSchedule(
     onFocused: (EpgEvent) -> Unit = {},
     onContextMenu: ((EpgEvent) -> Unit)? = null,
     viewerBehindMs: Long? = null,
-    onBackKeyDown: () -> Unit = {},
     /** The row the panel opened on, kept by the caller so a details round trip does not reset it. */
     openingEvent: EventId? = null,
     onOpeningEvent: (EventId) -> Unit = {},
@@ -145,13 +143,11 @@ internal fun ChannelSchedule(
             } else { entered = false; emptyFocus.requestFocus() }
         }
     }
-    Column(modifier.focusGroup().onPreviewKeyEvent { event ->
+    val backCycle = rememberBackKeyCycle()
+    Column(modifier.backKeyCycleFocus(backCycle).onPreviewKeyEvent { event ->
         if (event.key != Key.Back) return@onPreviewKeyEvent false
-        if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
-            onBackKeyDown()
-            back()
-        }
-        true
+        backCycle.handle(event.type == KeyEventType.KeyDown, event.nativeKeyEvent.repeatCount,
+            event.nativeKeyEvent.isCanceled) { back() }
     }.semantics { paneTitle = title }, verticalArrangement = Arrangement.spacedBy(TvSpacing12)) {
         // The options sheet's header: its title on the rows' text keyline, the clock as its quiet value.
         Row(Modifier.fillMaxWidth().padding(start = ScheduleTextKeyline, end = ScheduleTextKeyline, top = PlaybackPanelHeaderTop),

@@ -27,6 +27,8 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvhplayer.BuildConfig
+import at.bernhardberger.tvhplayer.ui.components.backKeyCycleFocus
+import at.bernhardberger.tvhplayer.ui.components.rememberBackKeyCycle
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsFullDescription
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthLevel
@@ -85,6 +87,7 @@ private fun aboutServerText(state: SessionState): String {
 @Composable
 private fun AboutReadingDialog(title: String, asset: String, onDismiss: () -> Unit) {
     val context = LocalContext.current
+    val backCycle = rememberBackKeyCycle()
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(
         usePlatformDefaultWidth = false, dismissOnClickOutside = false,
     )) {
@@ -94,10 +97,11 @@ private fun AboutReadingDialog(title: String, asset: String, onDismiss: () -> Un
         }
         ProgrammeDetailsFullDescription(
             modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
+                .backKeyCycleFocus(backCycle)
                 .padding(TvFullScreenPadding).onPreviewKeyEvent {
                     if (it.key == Key.Back) {
-                        if (it.type == KeyEventType.KeyUp) onDismiss()
-                        true
+                        backCycle.handle(it.type == KeyEventType.KeyDown, it.nativeKeyEvent.repeatCount,
+                            it.nativeKeyEvent.isCanceled, onBack = onDismiss)
                     } else false
                 },
             title = title,
