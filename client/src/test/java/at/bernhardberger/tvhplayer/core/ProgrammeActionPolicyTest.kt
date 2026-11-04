@@ -75,7 +75,7 @@ class ProgrammeActionPolicyTest {
             assertEquals("$state", emptyList<ProgrammeAction>(), ended(recording(state)))
         }
         assertEquals(emptyList<ProgrammeAction>(),
-            ended(recording(DvrEntryState.FILE_MISSING, files = listOf(file("/rec/a.ts")))))
+            ended(recording(DvrEntryState.REMOVED, files = listOf(file("/rec/a.ts")))))
     }
 
     @Test

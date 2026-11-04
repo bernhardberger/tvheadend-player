@@ -102,7 +102,7 @@ fun RecordingBadge(state: DvrEntryState?, modifier: Modifier = Modifier, label: 
                 modifier.testTag("recording-badge-scheduled"), icon = R.drawable.ic_schedule,
                 contentDescription = stringResource(R.string.details_status_scheduled))
         }
-        DvrEntryState.COMPLETED_ERROR, DvrEntryState.FILE_MISSING ->
+        DvrEntryState.COMPLETED_ERROR ->
             StatusBadge(stringResource(R.string.recording_state_failed), StatusBadgeTone.ERROR,
                 modifier.testTag("recording-badge-failed"), icon = R.drawable.ic_error_outlined,
                 contentDescription = stringResource(R.string.details_status_failed))

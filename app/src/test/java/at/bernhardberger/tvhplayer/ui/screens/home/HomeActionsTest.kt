@@ -833,7 +833,7 @@ class HomeActionsTest {
                     onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
                     onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> },
                     lastPlayedStore = at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore(
-                        androidx.test.core.app.ApplicationProvider.getApplicationContext()))
+                        androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()))
             }
         } }
         compose.mainClock.advanceTimeBy(1_000)
@@ -870,7 +870,7 @@ class HomeActionsTest {
                     onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
                     onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> }, focusMemory = memory,
                     lastPlayedStore = at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore(
-                        androidx.test.core.app.ApplicationProvider.getApplicationContext()))
+                        androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()))
             }
         } }
         compose.onNodeWithTag("home-view-button").assertDoesNotExist()

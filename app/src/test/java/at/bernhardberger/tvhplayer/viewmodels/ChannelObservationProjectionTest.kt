@@ -81,7 +81,7 @@ class ChannelObservationProjectionTest {
         val session = FakeTvheadendSession(connecting)
         val owner = AppProfileOwner(session,
             at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore(
-                at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult.anonymous("offline.invalid", 9982)),
+                at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult.anonymous(at.bernhardberger.tvheadend.sdk.core.ServerProfileId.generate(), "offline.invalid", 9982)),
             PlayerSettingsStore(InMemoryPreferencesDataStore()), dispatcher,
             readProfileForEditing = { at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult.Missing })
         backgroundScope.launch { owner.run() }
@@ -145,9 +145,13 @@ class ChannelObservationProjectionTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val context = contextWithoutAndroidRuntime()
         // The Context DataStore delegate is process-wide, including across JVM test classes.
-        context.dataStore.edit { it.clear() }
+        context.dataStore.edit {
+            it.clear()
+            it[androidx.datastore.preferences.core.stringPreferencesKey("activeServerProfileId")] =
+                at.bernhardberger.tvheadend.sdk.core.ServerProfileId.generate().value
+        }
         val settings = ChannelTagSettingsStore(context)
-        settings.save(ChannelTagPreferences(activeTagId = firstTag.id))
+        settings.save(settings.settings.first().copy(activeTagId = firstTag.id))
         val session = FakeTvheadendSession(observation(ChannelRepositoryState.Stale(catalog)))
         val model = ChannelsViewModel(session, settings)
         models.put("channels", model)

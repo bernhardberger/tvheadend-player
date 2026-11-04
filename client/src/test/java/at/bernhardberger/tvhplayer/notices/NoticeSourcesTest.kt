@@ -215,6 +215,33 @@ class NoticeSourcesTest {
         assertEquals(listOf(1L, 2L, 4L, 5L, 6L), center.state.value.pending.map { (it.notice as Notice.Dvr).entry.id.value })
     }
 
+    @Test fun retainedRemovalAndLaterPurgeAnnounceDeletionOnlyOnce() = runTest {
+        val session = FakeTvheadendSession(readyObservation())
+        val identity = session.observation.value.currentSession!!.generationIdentity
+        val center = NoticeCenter({ testScheduler.currentTime }, { NoticeContext(0, identity) })
+        backgroundScope.launch { DvrChangeNoticeSource(session.dvrRepository, center).run() }
+        runCurrent()
+        val previous = DvrEntry.create(DvrEntryId(1), state = DvrEntryState.COMPLETED)
+        val removed = DvrEntry.create(previous.id, state = DvrEntryState.REMOVED)
+        val origin = DvrChangeOrigin.ThisClient(DvrMutationKind.DELETE)
+        session.dvrRepository.emitChange(DvrChange.create(DvrChangeKind.REMOVED,
+            previous, removed, origin, identity))
+        runCurrent()
+        val first = center.state.value.pending.single()
+        val fact = first.notice as Notice.Dvr
+        assertEquals(DvrChangeKind.REMOVED, fact.kind)
+        assertEquals(DvrEntryState.REMOVED, fact.entry.state)
+        assertTrue(center.show(first.id, 4_000))
+        advanceTimeBy(4_001)
+        center.prune()
+        for (purgeOrigin in listOf(origin, DvrChangeOrigin.External)) {
+            session.dvrRepository.emitChange(DvrChange.create(DvrChangeKind.REMOVED,
+                removed, null, purgeOrigin, identity))
+            runCurrent()
+            assertNull(center.state.value.candidate)
+        }
+    }
+
     @Test fun seriesGroupsDistinctEntriesPerRuleAndRejectsRetiredGeneration() = runTest {
         val session = FakeTvheadendSession(readyObservation())
         val identity = session.observation.value.currentSession!!.generationIdentity

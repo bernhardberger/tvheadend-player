@@ -2,7 +2,9 @@ package at.bernhardberger.tvhplayer.debug
 
 import android.content.Context
 import at.bernhardberger.tvheadend.sdk.android.TvheadendServerProfileStore
-import at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult
+import at.bernhardberger.tvheadend.sdk.core.ServerProfileListResult
+import at.bernhardberger.tvheadend.sdk.core.ServerProfileWriteResult
+import at.bernhardberger.tvhplayer.settings.existingServerProfile
 import org.json.JSONObject
 import java.io.File
 
@@ -52,14 +54,28 @@ internal class TestCredentialProvisioner(private val context: Context) {
         try {
             val payload = readPayload(stagingFile) ?: return
             val profileStore = TvheadendServerProfileStore(context)
-            check(
-                profileStore.storePassword(
+            val profiles = profileStore.profiles() as? ServerProfileListResult.Available
+                ?: error("Profile store unavailable")
+            val existing = existingServerProfile(profiles.profiles, payload.host, payload.htspPort, payload.username)
+            if (existing == null) {
+                check(profileStore.addPassword(
                     host = payload.host,
                     port = payload.htspPort,
                     username = payload.username,
                     password = payload.password,
-                ) is ServerProfileReadResult.Available,
-            )
+                    activate = true,
+                ) is ServerProfileWriteResult.Applied)
+            } else {
+                check(profileStore.updatePassword(
+                    id = existing,
+                    host = payload.host,
+                    port = payload.htspPort,
+                    username = payload.username,
+                    password = payload.password,
+                    label = profiles.profiles.first { it.id == existing }.label,
+                ) is ServerProfileWriteResult.Applied)
+                check(profileStore.setActive(existing) is ServerProfileWriteResult.Applied)
+            }
             result = "ok"
         } finally {
             stagingFile.delete()

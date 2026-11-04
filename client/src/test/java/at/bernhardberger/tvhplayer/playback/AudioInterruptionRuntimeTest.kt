@@ -7,6 +7,7 @@
 )
 
 package at.bernhardberger.tvhplayer.playback
+
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 
 import android.app.Application
@@ -2594,7 +2595,8 @@ class AudioInterruptionRuntimeTest {
             scriptRecordingPlaybackSuccess()
         }
         var beforeSettingsRead: suspend () -> Unit = {}
-        val settings = PlayerSettingsStore(InMemoryPreferencesDataStore().let { store ->
+        private val settingsData = InMemoryPreferencesDataStore()
+        val settings = PlayerSettingsStore(settingsData.let { store ->
             object : androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences> by store {
                 override val data = kotlinx.coroutines.flow.flow {
                     beforeSettingsRead()
@@ -2695,6 +2697,11 @@ class AudioInterruptionRuntimeTest {
             // An opaque storage identity avoids any server address or credentials in this fixture.
             AppProfileOwner::class.java.getDeclaredField("audioProfileId").apply {
                 isAccessible = true; set(profiles, "test-profile")
+            }
+            runBlocking {
+                settingsData.updateData { current -> current.toMutablePreferences().apply {
+                    this[androidx.datastore.preferences.core.stringPreferencesKey("activeServerProfileId")] = "test-profile"
+                } }
             }
             val group = TrackGroup(Format.Builder().setSampleMimeType(MimeTypes.AUDIO_AAC).setLanguage("de").build())
             audioTracks = Tracks(listOf(Tracks.Group(group, false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(true))))

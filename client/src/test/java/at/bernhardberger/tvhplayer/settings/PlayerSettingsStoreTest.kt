@@ -134,7 +134,8 @@ class PlayerSettingsStoreTest {
         assertTrue(PlayerSettingsStore(dataStore).playerSettings.first().audioPassthroughEnabled)
     }
 
-    private val profileUuidKey = stringPreferencesKey("profileUuid")
+    private val serverId = at.bernhardberger.tvheadend.sdk.core.ServerProfileId.generate()
+    private val profileUuidKey = stringPreferencesKey(profilePreferencePrefix(serverId) + "streamProfile")
     private val directId = StreamProfileId("11111111111111111111111111111111")
     private val passId = StreamProfileId("22222222222222222222222222222222")
     private val staleId = StreamProfileId("33333333333333333333333333333333")
@@ -147,6 +148,7 @@ class PlayerSettingsStoreTest {
     fun serverDefaultAndExplicitSelectionPersistWithoutAFirstProfileFallback() = runTest {
         val dataStore = InMemoryPreferencesDataStore()
         val store = PlayerSettingsStore(dataStore)
+        store.useProfile(serverId)
 
         assertNull(store.resolveStreamProfileSelection(profiles) { true })
         store.setStreamProfile(passId)
@@ -163,7 +165,7 @@ class PlayerSettingsStoreTest {
     @Test
     fun resolvingThePersistedSelectionIsReadOnly() = runTest {
         val dataStore = InMemoryPreferencesDataStore(
-            initial = preferencesOf(profileUuidKey to passId.value),
+            initial = preferencesOf(activeProfileKey to serverId.value, profileUuidKey to passId.value),
             beforeUpdate = { error("Discovery must not rewrite preferences") },
         )
         assertEquals(
@@ -175,7 +177,7 @@ class PlayerSettingsStoreTest {
     @Test
     fun expiredObservationCannotReturnSelectionAfterARead() = runTest {
         var current = true
-        val base = InMemoryPreferencesDataStore(preferencesOf(profileUuidKey to passId.value))
+        val base = InMemoryPreferencesDataStore(preferencesOf(activeProfileKey to serverId.value, profileUuidKey to passId.value))
         val data = object : DataStore<Preferences> by base {
             override val data = flow {
                 current = false
@@ -189,6 +191,7 @@ class PlayerSettingsStoreTest {
     fun stalePersistedUuidRemainsDurableButInactiveUntilRediscovered() = runTest {
         val dataStore = InMemoryPreferencesDataStore(
             preferencesOf(
+                activeProfileKey to serverId.value,
                 profileUuidKey to staleId.value,
             ),
         )

@@ -93,8 +93,7 @@ data class RecordingShortfall(val recordedSeconds: Long, val plannedSeconds: Lon
  * and miss it by at least [RECORDING_STOPPED_EARLY_MIN_SHORTFALL_SECONDS], ending at least that early.
  */
 fun recordingStoppedEarly(recording: DvrEntry): RecordingShortfall? {
-    if (recording.state != DvrEntryState.COMPLETED && recording.state != DvrEntryState.COMPLETED_ERROR &&
-        recording.state != DvrEntryState.FILE_MISSING) return null
+    if (recording.state != DvrEntryState.COMPLETED && recording.state != DvrEntryState.COMPLETED_ERROR) return null
     val recorded = recordedFileSeconds(recording, nowSec = 0L)?.takeIf { it > 0L } ?: return null
     val planned = recordingPlannedSeconds(recording)?.takeIf { it > 0L } ?: return null
     val plannedStop = recording.stop ?: return null

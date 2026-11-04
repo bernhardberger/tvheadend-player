@@ -6,6 +6,12 @@ import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileAuthenticationMode
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileStore
+import at.bernhardberger.tvheadend.sdk.core.ServerProfileId
+import at.bernhardberger.tvheadend.sdk.core.ServerProfileListResult
+import at.bernhardberger.tvheadend.sdk.core.ServerProfileWriteResult
+import at.bernhardberger.tvheadend.sdk.core.ServerProfileSummary
+import at.bernhardberger.tvhplayer.notices.Notice
+import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvheadend.sdk.core.StreamProfileId
 import at.bernhardberger.tvheadend.sdk.core.StreamProfilesResult
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
@@ -57,25 +63,22 @@ class AppProfileOwner(
     private val profileStore: ServerProfileStore,
     private val playerSettings: PlayerSettingsStore,
     private val ioDispatcher: CoroutineDispatcher,
-    private val readProfileForEditing: suspend () -> ServerProfileEditReadResult,
-    private val clearAppArtwork: suspend () -> Unit = {},
-    private val clearRecentChannels: suspend () -> Unit = {},
+    private val readProfileForEditing: suspend (ServerProfileId) -> ServerProfileEditReadResult,
+    private val noticeCenter: () -> NoticeCenter? = { null },
 ) : ConnectionProfileEditor {
     constructor(
         session: TvheadendSession,
         profileStore: TvheadendServerProfileStore,
         playerSettings: PlayerSettingsStore,
         ioDispatcher: CoroutineDispatcher,
-        clearAppArtwork: suspend () -> Unit = {},
-        clearRecentChannels: suspend () -> Unit = {},
+        noticeCenter: () -> NoticeCenter? = { null },
     ) : this(
         session = session,
         profileStore = profileStore,
         playerSettings = playerSettings,
         ioDispatcher = ioDispatcher,
-        readProfileForEditing = profileStore::loadProfileForEditing,
-        clearAppArtwork = clearAppArtwork,
-        clearRecentChannels = clearRecentChannels,
+        readProfileForEditing = profileStore::loadForEditing,
+        noticeCenter = noticeCenter,
     )
 
     private val serverMutex = Mutex()
@@ -94,6 +97,15 @@ class AppProfileOwner(
     private var availableForObservation: CurrentSessionObservation? = null
 
     val serverProfile: StateFlow<ServerProfileReadResult?> = mutableServerProfile.asStateFlow()
+    private val mutableProfiles = MutableStateFlow<ServerProfileListResult?>(null)
+    val profiles: StateFlow<ServerProfileListResult?> = mutableProfiles.asStateFlow()
+    val hiddenServerProfileIds = playerSettings.hiddenServerProfileIds
+    val askAtStartup = playerSettings.askAtStartup
+    val switcherProfiles = combine(profiles, hiddenServerProfileIds) { list, hidden ->
+        val available = list as? ServerProfileListResult.Available
+        switcherProfiles(available?.profiles.orEmpty(), available?.activeId, hidden)
+    }
+    val showSwitcher = switcherProfiles.map(::showServerSwitcher)
     var audioProfileId: String? = null
         private set
     override val serverSettings: Flow<ServerSettings> = serverProfile
@@ -119,8 +131,16 @@ class AppProfileOwner(
 
     override suspend fun loadServerForEditing(
         applyAvailable: (host: String, port: Int, username: String, password: String) -> Unit,
+    ) {
+        val id = (profiles.value as? ServerProfileListResult.Available)?.activeId ?: return
+        loadServerForEditing(id, applyAvailable)
+    }
+
+    suspend fun loadServerForEditing(
+        id: ServerProfileId,
+        applyAvailable: (host: String, port: Int, username: String, password: String) -> Unit,
     ) = serverMutex.withLock {
-        when (val result = readProfileForEditing()) {
+        when (val result = readProfileForEditing(id)) {
             is ServerProfileEditReadResult.Anonymous -> applyAvailable(
                 result.host,
                 result.port,
@@ -133,13 +153,16 @@ class AppProfileOwner(
                 result.username,
                 result.password,
             )
-            ServerProfileEditReadResult.Missing,
-            ServerProfileEditReadResult.Unavailable,
-            -> Unit
+            ServerProfileEditReadResult.Missing -> Unit
+            ServerProfileEditReadResult.Unavailable -> {
+                val summary = (profiles.value as? ServerProfileListResult.Available)?.profiles?.find { it.id == id }
+                if (summary != null) applyAvailable(summary.host, summary.port, summary.username.orEmpty(), "")
+            }
         }
     }
 
     override suspend fun saveServer(host: String, htspPort: Int) {
+        validateServerAddress(host, htspPort)
         submit(SaveServerCommand(host, htspPort))
     }
 
@@ -149,6 +172,7 @@ class AppProfileOwner(
         username: String,
         password: String,
     ) {
+        validateServerAddress(host, htspPort)
         submit(SavePasswordServerCommand(host, htspPort, username, password))
     }
 
@@ -158,6 +182,140 @@ class AppProfileOwner(
 
     suspend fun selectStreamProfile(profileId: StreamProfileId?) {
         submit(SelectStreamProfileCommand(profileId))
+    }
+
+    suspend fun setShowInSwitcher(id: ServerProfileId, show: Boolean) = playerSettings.setShowInSwitcher(id, show)
+    suspend fun setAskAtStartup(ask: Boolean) = playerSettings.setAskAtStartup(ask)
+
+    suspend fun addAnonymous(host: String, port: Int, label: String? = null): SaveServerProfileResult {
+        validateServerAddress(host, port)
+        val normalizedLabel = ServerProfileSummary.normalizeLabel(label)
+        return mutate {
+            val list = profileStore.profiles() as? ServerProfileListResult.Available
+                ?: return@mutate SaveServerProfileResult.Unavailable
+            duplicate(list, host, port, null)?.let { return@mutate SaveServerProfileResult.AlreadyExists(it) }
+            saveResult(refreshAfterWrite(profileStore.addAnonymous(host, port, normalizedLabel, activate = true)))
+        }
+    }
+
+    suspend fun addPassword(host: String, port: Int, username: String, password: String, label: String? = null): SaveServerProfileResult {
+        validateServerAddress(host, port)
+        val normalizedLabel = ServerProfileSummary.normalizeLabel(label)
+        return mutate {
+            val list = profileStore.profiles() as? ServerProfileListResult.Available
+                ?: return@mutate SaveServerProfileResult.Unavailable
+            duplicate(list, host, port, username)?.let { return@mutate SaveServerProfileResult.AlreadyExists(it) }
+            saveResult(refreshAfterWrite(profileStore.addPassword(host, port, username, password, normalizedLabel, activate = true)))
+        }
+    }
+
+    suspend fun updateAnonymous(id: ServerProfileId, host: String, port: Int, label: String?): SaveServerProfileResult {
+        validateServerAddress(host, port)
+        val normalizedLabel = ServerProfileSummary.normalizeLabel(label)
+        return mutate {
+            val list = profileStore.profiles() as? ServerProfileListResult.Available ?: return@mutate SaveServerProfileResult.Unavailable
+            duplicate(list, host, port, null, excluding = id)?.let { return@mutate SaveServerProfileResult.AlreadyExists(it) }
+            saveResult(refreshAfterWrite(profileStore.updateAnonymous(id, host, port, normalizedLabel), list.activeId == id))
+        }
+    }
+
+    suspend fun updatePassword(id: ServerProfileId, host: String, port: Int, username: String, password: String, label: String?): SaveServerProfileResult {
+        validateServerAddress(host, port)
+        val normalizedLabel = ServerProfileSummary.normalizeLabel(label)
+        return mutate {
+            val list = profileStore.profiles() as? ServerProfileListResult.Available ?: return@mutate SaveServerProfileResult.Unavailable
+            duplicate(list, host, port, username, excluding = id)?.let { return@mutate SaveServerProfileResult.AlreadyExists(it) }
+            saveResult(refreshAfterWrite(profileStore.updatePassword(id, host, port, username, password, normalizedLabel), list.activeId == id))
+        }
+    }
+
+    /** Labels do not change the connection or require readable credentials. */
+    suspend fun rename(id: ServerProfileId, label: String?): ServerProfileWriteResult {
+        val normalizedLabel = ServerProfileSummary.normalizeLabel(label)
+        return mutate {
+            val result = profileStore.updateLabel(id, normalizedLabel)
+            mutableProfiles.value = profileStore.profiles()
+            result
+        }
+    }
+
+    suspend fun setActive(id: ServerProfileId): ServerProfileWriteResult = mutate {
+        if ((mutableProfiles.value as? ServerProfileListResult.Available)?.activeId == id) {
+            return@mutate ServerProfileWriteResult.Applied(id)
+        }
+        refreshAfterWrite(profileStore.setActive(id))
+    }
+
+    suspend fun remove(id: ServerProfileId): ServerProfileWriteResult = mutate { removeProfile(id) }
+
+    private fun duplicate(list: ServerProfileListResult.Available, host: String, port: Int, username: String?, excluding: ServerProfileId? = null): ServerProfileId? {
+        return existingServerProfile(list.profiles.filterNot { it.id == excluding }, host, port, username)?.also {
+            noticeCenter()?.let { center -> center.post(Notice.ServerProfileAlreadyExists, center.context()) }
+        }
+    }
+
+    private fun saveResult(result: ServerProfileWriteResult): SaveServerProfileResult {
+        return when (result) {
+            is ServerProfileWriteResult.Applied -> SaveServerProfileResult.Applied(result.id)
+            ServerProfileWriteResult.NotFound -> SaveServerProfileResult.NotFound
+            ServerProfileWriteResult.Unavailable -> SaveServerProfileResult.Unavailable
+        }
+    }
+
+    private suspend fun refreshAfterWrite(result: ServerProfileWriteResult, affectsActive: Boolean = true): ServerProfileWriteResult {
+        if (result is ServerProfileWriteResult.Applied && affectsActive) mutableConfigurationGeneration.value += 1
+        mutableProfiles.value = profileStore.profiles()
+        if (result is ServerProfileWriteResult.Applied &&
+            (mutableProfiles.value as? ServerProfileListResult.Available)?.activeId == result.id) {
+            applyServerProfile(profileStore.loadActive())
+        }
+        return result
+    }
+
+    private fun validateServerAddress(host: String, port: Int) {
+        require(host.isNotBlank() && host.none(Char::isISOControl) && port in 1..65535) { "Invalid server address" }
+    }
+
+    private suspend fun removeProfile(id: ServerProfileId): ServerProfileWriteResult {
+        val active = (mutableProfiles.value as? ServerProfileListResult.Available)?.activeId == id ||
+            (mutableServerProfile.value as? ServerProfileReadResult.Available)?.id == id
+        if (active) {
+            mutableConfigurationGeneration.value += 1
+            session.disconnect()
+            audioProfileId = null
+            playerSettings.useProfile(null)
+            mutableServerProfile.value = ServerProfileReadResult.Missing
+        }
+        val listResult = profileStore.profiles()
+        val list = listResult as? ServerProfileListResult.Available
+        val summary = list?.profiles?.find { it.id == id }
+        if (summary == null) {
+            mutableProfiles.value = listResult
+            if (active) applyServerProfile(profileStore.loadActive())
+            return if (list == null) ServerProfileWriteResult.Unavailable else ServerProfileWriteResult.NotFound
+        }
+        session.cache.clear(summary)
+        val result = profileStore.remove(id)
+        mutableProfiles.value = profileStore.profiles()
+        if (result is ServerProfileWriteResult.Applied) {
+            try {
+                playerSettings.removeProfile(id)
+            } catch (error: Exception) {
+                if (error is CancellationException) throw error
+            } finally {
+                noticeCenter()?.let { center -> center.post(Notice.ServerProfileRemoved, center.context()) }
+            }
+        } else if (active) {
+            applyServerProfile(profileStore.loadActive())
+        }
+        return result
+    }
+
+    private suspend fun <T> mutate(operation: suspend () -> T): T {
+        val command = MutateServerCommand(operation)
+        submit(command)
+        @Suppress("UNCHECKED_CAST")
+        return command.result as T
     }
 
     suspend fun selectedStreamProfileIdFor(
@@ -181,6 +339,7 @@ class AppProfileOwner(
 
     private suspend fun handleCommand(command: ProfileCommand) {
         var failure: Exception? = null
+        val generationBefore = mutableConfigurationGeneration.value
         try {
             when (command) {
                 is SaveServerCommand -> commitServer(command.host, command.port)
@@ -192,10 +351,17 @@ class AppProfileOwner(
                 )
                 is ClearServerProfileCommand -> clearServerProfile()
                 is SelectStreamProfileCommand -> commitStreamProfileSelection(command.profileId)
+                is MutateServerCommand<*> -> serverMutex.withLock { command.execute() }
             }
         } catch (error: Exception) {
             try {
-                if (command is ServerProfileCommand) recoverServerProfile()
+                if (command is ServerProfileCommand &&
+                    (command !is MutateServerCommand<*> || mutableConfigurationGeneration.value != generationBefore)) {
+                    if (mutableConfigurationGeneration.value == generationBefore) {
+                        mutableConfigurationGeneration.value += 1
+                    }
+                    recoverServerProfile()
+                }
             } catch (recoveryError: Throwable) {
                 command.releaseSensitiveMaterial()
                 command.completion.completeExceptionally(recoveryError)
@@ -216,18 +382,15 @@ class AppProfileOwner(
     }
 
     private suspend fun commitServer(host: String, htspPort: Int) = serverMutex.withLock {
-        mutableConfigurationGeneration.value += 1
-        mutableServerProfile.value = null
-        audioProfileId = null
-        playerSettings.audioChoices.profileIdentity(replace = true)
-        clearRecentChannels()
-        val profile = profileStore.storeAnonymous(host, htspPort)
-        check(profile is ServerProfileReadResult.Available)
-        try {
-            applyServerProfile(profile)
-        } finally {
-            clearAppArtwork()
+        val list = profileStore.profiles() as? ServerProfileListResult.Available ?: error("Server profiles unavailable")
+        val id = list.activeId
+        duplicate(list, host, htspPort, null, excluding = id)?.let {
+            if (id == null) check(refreshAfterWrite(profileStore.setActive(it)) is ServerProfileWriteResult.Applied)
+            return@withLock
         }
+        val result = if (id == null) profileStore.addAnonymous(host, htspPort, activate = true)
+        else profileStore.updateAnonymous(id, host, htspPort, list.profiles.find { it.id == id }?.label)
+        check(refreshAfterWrite(result) is ServerProfileWriteResult.Applied)
     }
 
     private suspend fun commitPasswordServer(
@@ -236,33 +399,20 @@ class AppProfileOwner(
         username: String,
         password: String,
     ) = serverMutex.withLock {
-        mutableConfigurationGeneration.value += 1
-        mutableServerProfile.value = null
-        audioProfileId = null
-        playerSettings.audioChoices.profileIdentity(replace = true)
-        clearRecentChannels()
-        val profile = profileStore.storePassword(host, htspPort, username, password)
-        check(profile is ServerProfileReadResult.Available)
-        try {
-            applyServerProfile(profile)
-        } finally {
-            clearAppArtwork()
+        val list = profileStore.profiles() as? ServerProfileListResult.Available ?: error("Server profiles unavailable")
+        val id = list.activeId
+        duplicate(list, host, htspPort, username, excluding = id)?.let {
+            if (id == null) check(refreshAfterWrite(profileStore.setActive(it)) is ServerProfileWriteResult.Applied)
+            return@withLock
         }
+        val result = if (id == null) profileStore.addPassword(host, htspPort, username, password, activate = true)
+        else profileStore.updatePassword(id, host, htspPort, username, password, list.profiles.find { it.id == id }?.label)
+        check(refreshAfterWrite(result) is ServerProfileWriteResult.Applied)
     }
 
     private suspend fun clearServerProfile() = serverMutex.withLock {
-        mutableConfigurationGeneration.value += 1
-        mutableServerProfile.value = null
-        audioProfileId = null
-        playerSettings.audioChoices.profileIdentity(replace = true)
-        clearRecentChannels()
-        val profile = profileStore.clearProfile()
-        check(profile == ServerProfileReadResult.Missing)
-        try {
-            applyServerProfile(profile)
-        } finally {
-            clearAppArtwork()
-        }
+        val id = (mutableProfiles.value as? ServerProfileListResult.Available)?.activeId ?: return@withLock
+        check(removeProfile(id) is ServerProfileWriteResult.Applied)
     }
 
     private suspend fun commitStreamProfileSelection(
@@ -341,7 +491,8 @@ class AppProfileOwner(
     private suspend fun initializeServerProfile() {
         try {
             serverMutex.withLock {
-                applyServerProfile(profileStore.loadProfile())
+                mutableProfiles.value = profileStore.profiles()
+                applyServerProfile(profileStore.loadActive())
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -359,7 +510,8 @@ class AppProfileOwner(
 
     private suspend fun recoverServerProfile() {
         val readback = try {
-            profileStore.loadProfile()
+            mutableProfiles.value = profileStore.profiles()
+            profileStore.loadActive()
         } catch (_: Exception) {
             null
         }
@@ -380,19 +532,16 @@ class AppProfileOwner(
     }
 
     private suspend fun applyServerProfile(profile: ServerProfileReadResult) {
-        val audioIdentity = if (profile is ServerProfileReadResult.Available) {
-            try {
-                playerSettings.audioChoices.profileIdentity()
-            } catch (_: java.io.IOException) {
-                null
-            }
-        } else null
+        val id = (profile as? ServerProfileReadResult.Available)?.id
+        audioProfileId = null
+        session.disconnect()
+        playerSettings.useProfile(id)
         when (profile) {
             is ServerProfileReadResult.Available -> session.connect(profile.profile)
             ServerProfileReadResult.Missing,
-            ServerProfileReadResult.Unavailable -> session.disconnect()
+            ServerProfileReadResult.Unavailable -> Unit
         }
-        audioProfileId = audioIdentity
+        audioProfileId = id?.value
         mutableServerProfile.value = profile
     }
 }
@@ -433,6 +582,21 @@ private class SavePasswordServerCommand(
 }
 
 private class ClearServerProfileCommand : ServerProfileCommand()
+
+private class MutateServerCommand<T>(operation: suspend () -> T) : ServerProfileCommand() {
+    private var operation: (suspend () -> T)? = operation
+    var result: T? = null
+        private set
+    suspend fun execute() { result = checkNotNull(operation).invoke() }
+    override fun releaseSensitiveMaterial() { operation = null }
+}
+
+sealed interface SaveServerProfileResult {
+    data class Applied(val id: ServerProfileId) : SaveServerProfileResult
+    data class AlreadyExists(val id: ServerProfileId) : SaveServerProfileResult
+    data object NotFound : SaveServerProfileResult
+    data object Unavailable : SaveServerProfileResult
+}
 
 private class SelectStreamProfileCommand(
     val profileId: StreamProfileId?,

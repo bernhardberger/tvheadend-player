@@ -91,7 +91,7 @@ class PlayerErrorSurfacesCaptureTest {
         capture(listOf(
             Scene("recording-301-interrupted", alert = recording(readFailed, completed, null)),
             Scene("recording-303-file-missing", alert = recording(AppPlaybackState.Idle,
-                DvrEntry.create(DvrEntryId(1), state = DvrEntryState.FILE_MISSING), RecordingPlaybackAdmission.TargetUnavailable)),
+                DvrEntry.create(DvrEntryId(1), state = DvrEntryState.RECORDING), RecordingPlaybackAdmission.TargetUnavailable)),
             Scene("recording-304-unavailable", alert = recording(AppPlaybackState.Idle, null, RecordingPlaybackAdmission.ObservationExpired)),
             Scene("recording-305-deferred", alert = recording(AppPlaybackState.Idle,
                 DvrEntry.create(DvrEntryId(1), state = DvrEntryState.RECORDING), RecordingPlaybackAdmission.GrowingDeferred)),

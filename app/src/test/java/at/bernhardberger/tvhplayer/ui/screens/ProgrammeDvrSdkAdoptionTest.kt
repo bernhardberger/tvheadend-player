@@ -208,7 +208,7 @@ class ProgrammeDvrSdkAdoptionTest {
         dvrState = DvrRepositoryState.Current(DvrSnapshot.create(listOfNotNull(entry))),
     )
 
-    private fun deleted() = DvrEntry.create(DvrEntryId(2), eventId = event.id, state = DvrEntryState.FILE_MISSING,
+    private fun deleted() = DvrEntry.create(DvrEntryId(2), eventId = event.id, state = DvrEntryState.REMOVED,
         files = emptyList())
 
     /**

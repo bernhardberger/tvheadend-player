@@ -5,7 +5,6 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
-import java.util.UUID
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
@@ -28,20 +27,6 @@ class AudioChoiceStore(private val dataStore: DataStore<Preferences>) {
 
     private val key = stringPreferencesKey("explicit_audio_choices_v1")
 
-    internal companion object {
-        private val profileKey = stringPreferencesKey("explicit_audio_profile_v1")
-
-        /** The per-server identity [profileIdentity] creates, for other stores that scope choices by server. */
-        fun profileIdentityIn(preferences: Preferences): String? = preferences[profileKey]
-    }
-
-    suspend fun profileIdentity(replace: Boolean = false): String {
-        val preferences = dataStore.edit {
-            if (replace || it[profileKey] == null) it[profileKey] = UUID.randomUUID().toString()
-        }
-        return checkNotNull(preferences[profileKey])
-    }
-
     suspend fun read(profile: String, channel: ChannelId): AudioTrackChoice? =
         decode(dataStore.data.first()[key]).lastOrNull {
             it.profile == profile && it.channel == channel.value
@@ -49,10 +34,13 @@ class AudioChoiceStore(private val dataStore: DataStore<Preferences>) {
 
     suspend fun write(profile: String, channel: ChannelId, choice: AudioTrackChoice) {
         dataStore.edit { preferences ->
+            if (preferences[activeProfileKey] != profile) return@edit
             val entries = decode(preferences[key]).filterNot {
                 it.profile == profile && it.channel == channel.value
             } + Entry(profile, channel.value, choice)
-            preferences[key] = Json.encodeToString(entries.takeLast(64))
+            preferences[key] = Json.encodeToString(
+                entries.filterNot { it.profile == profile } + entries.filter { it.profile == profile }.takeLast(64),
+            )
         }
     }
 
@@ -65,10 +53,14 @@ class AudioChoiceStore(private val dataStore: DataStore<Preferences>) {
         }
     }
 
+    internal suspend fun removeProfile(profile: String) {
+        dataStore.edit { it[key] = Json.encodeToString(decode(it[key]).filterNot { entry -> entry.profile == profile }) }
+    }
+
     private fun decode(value: String?): List<Entry> {
         if (value == null) return emptyList()
         return try {
-            Json.decodeFromString<List<Entry>>(value).takeLast(64)
+            Json.decodeFromString<List<Entry>>(value)
         } catch (_: SerializationException) {
             emptyList()
         }

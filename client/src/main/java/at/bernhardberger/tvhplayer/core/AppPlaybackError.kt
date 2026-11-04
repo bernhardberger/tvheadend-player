@@ -70,7 +70,7 @@ fun recordingErrorCondition(
     admission == RecordingPlaybackAdmission.ObservationExpired -> AppErrorCondition.RECORDING_UNAVAILABLE
     admission == RecordingPlaybackAdmission.TargetUnavailable -> when (entry?.state) {
         DvrEntryState.SCHEDULED -> AppErrorCondition.RECORDING_NOT_STARTED
-        DvrEntryState.FILE_MISSING -> AppErrorCondition.RECORDING_FILE_MISSING
+        DvrEntryState.REMOVED -> AppErrorCondition.RECORDING_UNAVAILABLE
         // A running entry, also one in an error state: no file yet is missing-file evidence; several files can
         // only play once it is finished; anything else (blank path, replaced incarnation) means it changed.
         DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR -> when {

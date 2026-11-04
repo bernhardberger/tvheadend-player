@@ -10,9 +10,12 @@ class SettingsPersistenceTest {
     @Test
     fun currentTagSettingsRestoreLosslesslyIncludingTheFullUnsignedRange() = runTest {
         val data = InMemoryPreferencesDataStore()
-        assertEquals(ChannelTagPreferences(), ChannelTagSettingsStore(data).settings.first())
+        val profileId = at.bernhardberger.tvheadend.sdk.core.ServerProfileId.generate()
+        PlayerSettingsStore(data).useProfile(profileId)
+        assertEquals(ChannelTagPreferences(profileId = profileId), ChannelTagSettingsStore(data).settings.first())
         val tag = ChannelTagId(UInt.MAX_VALUE.toLong())
         val expected = ChannelTagPreferences(
+            profileId = profileId,
             activeTagId = tag,
             visibility = ChannelScopeVisibility(
                 configured = true,

@@ -320,7 +320,7 @@ private fun GuideHeadlineContent(
     val recording = event?.let { observation.dvrEntryForEvent(it) }?.takeUnless(::recordingWasRemoved)
     val mark = recording?.state?.takeIf {
         recordingIsRunning(recording) || it == DvrEntryState.SCHEDULED || it == DvrEntryState.COMPLETED ||
-            it == DvrEntryState.COMPLETED_ERROR || it == DvrEntryState.FILE_MISSING || it == DvrEntryState.MISSED
+            it == DvrEntryState.COMPLETED_ERROR || it == DvrEntryState.MISSED
     }
     ProgrammeHeadline(
         eyebrow = {

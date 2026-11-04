@@ -1,132 +1,312 @@
 package at.bernhardberger.tvhplayer.settings
 
-import at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult
-import at.bernhardberger.tvheadend.sdk.core.ArtworkLoader
-import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
-import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
-import at.bernhardberger.tvheadend.sdk.core.ChannelId
-import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
-import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
-import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
-import at.bernhardberger.tvheadend.sdk.core.DvrRepository
-import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
-import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
-import at.bernhardberger.tvheadend.sdk.core.EpgRepository
-import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
-import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
-import at.bernhardberger.tvheadend.sdk.core.PlaybackBinding
-import at.bernhardberger.tvheadend.sdk.core.PlaybackBindingResult
-import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
-import at.bernhardberger.tvheadend.sdk.core.ServerProfile
-import at.bernhardberger.tvheadend.sdk.core.ServerProfileStore
-import at.bernhardberger.tvheadend.sdk.core.SessionCommandResult
-import at.bernhardberger.tvheadend.sdk.core.SessionObservation
-import at.bernhardberger.tvheadend.sdk.core.SessionState
-import at.bernhardberger.tvheadend.sdk.core.StreamProfile
-import at.bernhardberger.tvheadend.sdk.core.StreamProfileId
-import at.bernhardberger.tvheadend.sdk.core.StreamProfilesResult
-import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
-import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
-import androidx.datastore.preferences.core.preferencesOf
-import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import kotlin.coroutines.ContinuationInterceptor
+import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
+import at.bernhardberger.tvheadend.sdk.core.*
+import at.bernhardberger.tvheadend.sdk.testing.*
+import at.bernhardberger.tvhplayer.notices.Notice
+import at.bernhardberger.tvhplayer.notices.NoticeCenter
+import at.bernhardberger.tvhplayer.notices.NoticeContext
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.withContext
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertSame
-import org.junit.Assert.assertTrue
+import org.junit.Assert.*
 import org.junit.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class AppProfileOwnerTest {
-    @OptIn(ExperimentalCoroutinesApi::class)
-    @Test
-    fun freshSetupReadsOnlyTheCurrentStoreAndRemainsDisconnected() = runTest {
-        val store = at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore()
-        val session = at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession()
-        val events = mutableListOf<String>()
-        val owner = AppProfileOwner(
-            session = session,
-            profileStore = store,
-            playerSettings = PlayerSettingsStore(InMemoryPreferencesDataStore()),
-            ioDispatcher = StandardTestDispatcher(testScheduler),
-            readProfileForEditing = {
-                events += "edit"
-                at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult.Missing
-            },
-        )
-        val job = backgroundScope.launch { owner.run() }
+    @Test fun rejectedLabelsAndFailedRenameLeaveTheActiveSessionUntouched() = runTest {
+        val stored = FakeServerProfileStore()
+        val active = (stored.addAnonymous("first.invalid", activate = true) as ServerProfileWriteResult.Applied).id
+        val store = object : ServerProfileStore by stored {
+            override suspend fun updateLabel(id: ServerProfileId, label: String?): ServerProfileWriteResult =
+                throw IllegalStateException("Synthetic store failure")
+        }
+        val session = FakeTvheadendSession()
+        val owner = AppProfileOwner(session, store, PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Missing })
+        backgroundScope.launch { owner.run() }
+        runCurrent()
+        val calls = session.calls.toList()
+        val generation = owner.configurationGeneration.value
+        assertTrue(runCatching { owner.rename(active, "x".repeat(65)) }.isFailure)
+        assertTrue(runCatching { owner.addAnonymous("second.invalid", 9982, "x".repeat(65)) }.isFailure)
+        assertTrue(runCatching { owner.rename(active, "Changed") }.isFailure)
+        assertEquals(calls, session.calls)
+        assertEquals(generation, owner.configurationGeneration.value)
+        assertEquals(active, (owner.serverProfile.value as ServerProfileReadResult.Available).id)
+    }
+
+    @Test fun editingIntoAnotherProfileIsRejectedByEveryUpdatePath() = runTest {
+        val store = FakeServerProfileStore()
+        val active = (store.addAnonymous("first.invalid", activate = true) as ServerProfileWriteResult.Applied).id
+        val anonymous = (store.addAnonymous("second.invalid") as ServerProfileWriteResult.Applied).id
+        val account = (store.addPassword("third.invalid", username = "viewer", password = "synthetic") as ServerProfileWriteResult.Applied).id
+        val session = FakeTvheadendSession()
+        val owner = AppProfileOwner(session, store, PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Missing })
+        backgroundScope.launch { owner.run() }
+        runCurrent()
+        val calls = session.calls.toList()
+        assertEquals(SaveServerProfileResult.AlreadyExists(anonymous), owner.updateAnonymous(active, "second.invalid", 9982, null))
+        assertEquals(SaveServerProfileResult.AlreadyExists(account), owner.updatePassword(active, "third.invalid", 9982, "viewer", "synthetic", null))
+        owner.saveServer("second.invalid", 9982)
+        owner.savePasswordServer("third.invalid", 9982, "viewer", "synthetic")
+        assertFalse(FakeServerProfileStoreCall.UPDATE_ANONYMOUS in store.calls)
+        assertFalse(FakeServerProfileStoreCall.UPDATE_PASSWORD in store.calls)
+        assertEquals(calls, session.calls)
+        assertEquals("first.invalid", (owner.serverProfile.value as ServerProfileReadResult.Available).host)
+    }
+
+    @Test fun duplicateLegacyCommitsWithNoneActiveActivateTheExistingProfile() = runTest {
+        val store = FakeServerProfileStore()
+        val anonymous = (store.addAnonymous("first.invalid") as ServerProfileWriteResult.Applied).id
+        val account = (store.addPassword("second.invalid", username = "viewer", password = "synthetic") as ServerProfileWriteResult.Applied).id
+        val owner = AppProfileOwner(FakeTvheadendSession(), store, PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Missing })
+        backgroundScope.launch { owner.run() }
+        runCurrent()
+        owner.saveServer("first.invalid", 9982)
+        assertEquals(anonymous, (owner.serverProfile.value as ServerProfileReadResult.Available).id)
+        owner.remove(anonymous)
+        owner.savePasswordServer("second.invalid", 9982, "viewer", "synthetic")
+        assertEquals(account, (owner.serverProfile.value as ServerProfileReadResult.Available).id)
+        assertEquals(1, store.calls.count { it == FakeServerProfileStoreCall.ADD_ANONYMOUS })
+        assertEquals(1, store.calls.count { it == FakeServerProfileStoreCall.ADD_PASSWORD })
+    }
+
+    @Test fun successfulRemovalStillPostsNoticeWhenAppDataCleanupFails() = runTest {
+        val stored = FakeServerProfileStore()
+        stored.addAnonymous("first.invalid", activate = true)
+        val removed = (stored.addAnonymous("second.invalid") as ServerProfileWriteResult.Applied).id
+        var failCleanup = false
+        val data = InMemoryPreferencesDataStore(beforeUpdate = { if (failCleanup) throw java.io.IOException("Synthetic cleanup failure") })
+        val store = object : ServerProfileStore by stored {
+            override suspend fun remove(id: ServerProfileId): ServerProfileWriteResult = stored.remove(id).also { failCleanup = true }
+        }
+        lateinit var owner: AppProfileOwner
+        val notices = NoticeCenter({ 0 }, { NoticeContext(owner.configurationGeneration.value, null) })
+        owner = AppProfileOwner(FakeTvheadendSession(), store, PlayerSettingsStore(data),
+            StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Missing }, { notices })
+        backgroundScope.launch { owner.run() }
+        runCurrent()
+        assertEquals(ServerProfileWriteResult.Applied(removed), owner.remove(removed))
+        assertFalse((owner.profiles.value as ServerProfileListResult.Available).profiles.any { it.id == removed })
+        assertEquals(Notice.ServerProfileRemoved, notices.state.value.candidate?.notice)
+    }
+
+    @Test fun freshSetupReadsCurrentStoreAndRemainsDisconnected() = runTest {
+        val store = FakeServerProfileStore()
+        val session = FakeTvheadendSession()
+        val owner = AppProfileOwner(session, store, PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            StandardTestDispatcher(testScheduler), { error("No profile to edit") })
+        backgroundScope.launch { owner.run() }
         runCurrent()
         assertEquals(ServerProfileReadResult.Missing, owner.serverProfile.value)
-        assertEquals(listOf(
-            at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStoreCall.LOAD_PROFILE,
-        ), store.calls)
-        assertFalse(session.calls.contains(at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall.CONNECT))
-        owner.loadServerForEditing { _, _, _, _ -> error("Missing profile must not expose editing values") }
-        assertEquals(listOf("edit"), events)
-        job.cancelAndJoin()
+        assertEquals(listOf(FakeServerProfileStoreCall.PROFILES, FakeServerProfileStoreCall.LOAD_ACTIVE), store.calls)
+        assertFalse(FakeSessionCall.CONNECT in session.calls)
+        owner.loadServerForEditing { _, _, _, _ -> error("No editing values") }
     }
 
-    @OptIn(ExperimentalCoroutinesApi::class)
-    @Test
-    fun currentProfileIsLoadedAndConnectedWithoutRewritingIt() = runTest {
-        val session = at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession()
-        val profile = ServerProfileReadResult.anonymous("offline.invalid")
-        val store = at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore(
-            profile,
-        )
-        val owner = AppProfileOwner(
-            session = session, profileStore = store,
-            playerSettings = PlayerSettingsStore(InMemoryPreferencesDataStore()),
-            ioDispatcher = StandardTestDispatcher(testScheduler),
-            readProfileForEditing = { error("Unexpected editing read") },
-        )
-        val job = backgroundScope.launch { owner.run() }
+    @Test fun switchingKeepsOrderAndSelectingActiveDoesNotReconnect() = runTest {
+        val store = FakeServerProfileStore()
+        val first = (store.addAnonymous("first.invalid", activate = true) as ServerProfileWriteResult.Applied).id
+        val second = (store.addAnonymous("second.invalid") as ServerProfileWriteResult.Applied).id
+        val session = FakeTvheadendSession()
+        val settings = PlayerSettingsStore(InMemoryPreferencesDataStore())
+        val owner = AppProfileOwner(session, store, settings, StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Missing })
+        backgroundScope.launch { owner.run() }
         runCurrent()
-        assertSame(profile, owner.serverProfile.value)
-        assertEquals(listOf(
-            at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStoreCall.LOAD_PROFILE,
-        ), store.calls)
-        assertTrue(session.calls.contains(at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall.CONNECT))
-        job.cancelAndJoin()
+        val before = session.calls.count { it == FakeSessionCall.CONNECT }
+        assertEquals(ServerProfileWriteResult.Applied(first), owner.setActive(first))
+        assertEquals(before, session.calls.count { it == FakeSessionCall.CONNECT })
+        owner.setActive(second)
+        assertEquals(second, (owner.serverProfile.value as ServerProfileReadResult.Available).id)
+        assertEquals(listOf(first, second), (owner.profiles.value as ServerProfileListResult.Available).profiles.map { it.id })
+        assertEquals(second.value, owner.audioProfileId)
+        assertEquals(before + 1, session.calls.count { it == FakeSessionCall.CONNECT })
     }
 
-    @OptIn(ExperimentalCoroutinesApi::class)
-    @Test
-    fun cancellationStillWaitsForNonCancellableProfileInitialization() = runTest {
-        val entered = CompletableDeferred<Unit>()
-        val release = CompletableDeferred<Unit>()
-        val stored = at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore()
-        val profileStore = object : ServerProfileStore by stored {
-            override suspend fun loadProfile(): ServerProfileReadResult {
-                entered.complete(Unit)
-                release.await()
-                return stored.loadProfile()
+    @Test fun storedProfilesWithNoneActiveDoNotAutoplayOnStartup() = runTest {
+        val store = FakeServerProfileStore()
+        store.addAnonymous("first.invalid")
+        store.addAnonymous("second.invalid")
+        val session = FakeTvheadendSession()
+        val owner = AppProfileOwner(session, store, PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Missing })
+        backgroundScope.launch { owner.run() }
+        runCurrent()
+        assertEquals(ServerProfileReadResult.Missing, owner.serverProfile.value)
+        val list = owner.profiles.value as ServerProfileListResult.Available
+        assertNull(list.activeId)
+        assertEquals(2, list.profiles.size)
+        assertFalse(FakeSessionCall.CONNECT in session.calls)
+        assertNull(owner.audioProfileId)
+    }
+
+    @Test fun duplicateAnonymousAndPasswordAddsReturnExistingIdWithoutAddingOrSwitching() = runTest {
+        val store = FakeServerProfileStore()
+        val anonymous = (store.addAnonymous("first.invalid", activate = true) as ServerProfileWriteResult.Applied).id
+        val account = (store.addPassword("first.invalid", username = "viewer", password = "synthetic") as ServerProfileWriteResult.Applied).id
+        store.scriptCredentialsUnavailable(account)
+        val session = FakeTvheadendSession()
+        lateinit var owner: AppProfileOwner
+        val notices = NoticeCenter({ 0 }, { NoticeContext(owner.configurationGeneration.value, null) })
+        owner = AppProfileOwner(session, store, PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Unavailable }, { notices })
+        backgroundScope.launch { owner.run() }
+        runCurrent()
+        val adds = store.calls.count { it == FakeServerProfileStoreCall.ADD_ANONYMOUS || it == FakeServerProfileStoreCall.ADD_PASSWORD }
+        assertEquals(SaveServerProfileResult.AlreadyExists(anonymous), owner.addAnonymous("first.invalid", 9982))
+        assertEquals(SaveServerProfileResult.AlreadyExists(account), owner.addPassword("first.invalid", 9982, "viewer", "replacement"))
+        assertEquals(adds, store.calls.count { it == FakeServerProfileStoreCall.ADD_ANONYMOUS || it == FakeServerProfileStoreCall.ADD_PASSWORD })
+        assertEquals(anonymous, (owner.profiles.value as ServerProfileListResult.Available).activeId)
+        assertEquals(Notice.ServerProfileAlreadyExists, notices.state.value.candidate?.notice)
+        var prefilled = false
+        owner.loadServerForEditing(account) { host, port, username, password ->
+            assertEquals("first.invalid", host)
+            assertEquals(9982, port)
+            assertEquals("viewer", username)
+            assertEquals("", password)
+            prefilled = true
+        }
+        assertTrue(prefilled)
+    }
+
+    @Test fun removalDisconnectsClearsSummaryCacheRemovesAndLeavesNoneActive() = runTest {
+        val stored = FakeServerProfileStore()
+        val active = (stored.addAnonymous("first.invalid", activate = true) as ServerProfileWriteResult.Applied).id
+        val other = (stored.addAnonymous("second.invalid") as ServerProfileWriteResult.Applied).id
+        val events = mutableListOf<String>()
+        val data = InMemoryPreferencesDataStore(beforeUpdate = { events += "app-data" })
+        val settings = PlayerSettingsStore(data)
+        val fakeSession = FakeTvheadendSession()
+        val session = object : TvheadendSession by fakeSession {
+            override suspend fun disconnect() { events += "disconnect"; fakeSession.disconnect() }
+            override val cache = object : SessionCache by fakeSession.cache {
+                override suspend fun clear(profile: ServerProfileSummary) { events += "cache"; fakeSession.cache.clear(profile) }
             }
         }
-        val owner = AppProfileOwner(
-            session = at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession(),
-            profileStore = profileStore,
-            playerSettings = PlayerSettingsStore(InMemoryPreferencesDataStore()),
-            ioDispatcher = StandardTestDispatcher(testScheduler),
-            readProfileForEditing = { error("Unexpected editing read") },
-        )
+        val store = object : ServerProfileStore by stored {
+            override suspend fun profiles(): ServerProfileListResult { events += "profiles"; return stored.profiles() }
+            override suspend fun load(id: ServerProfileId): ServerProfileReadResult { events += "load"; return stored.load(id) }
+            override suspend fun remove(id: ServerProfileId): ServerProfileWriteResult { events += "remove"; return stored.remove(id) }
+        }
+        val owner = AppProfileOwner(session, store, settings, StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Missing })
+        backgroundScope.launch { owner.run() }
+        runCurrent()
+        settings.setShowInSwitcher(active, false)
+        settings.setShowInSwitcher(other, false)
+        events.clear()
+        assertEquals(ServerProfileWriteResult.Applied(active), owner.remove(active))
+        assertTrue(events.indexOf("disconnect") < events.indexOf("profiles"))
+        assertTrue(events.indexOf("profiles") < events.indexOf("cache"))
+        assertTrue(events.indexOf("cache") < events.indexOf("remove"))
+        assertTrue(events.lastIndexOf("app-data") > events.indexOf("remove"))
+        assertFalse(FakeServerProfileStoreCall.LOAD in stored.calls)
+        assertTrue(FakeSessionCall.CLEAR_PROFILE_CACHE in fakeSession.calls)
+        assertEquals(ServerProfileReadResult.Missing, owner.serverProfile.value)
+        assertNull((owner.profiles.value as ServerProfileListResult.Available).activeId)
+        assertNull(owner.audioProfileId)
+        assertEquals(listOf(other), (owner.profiles.value as ServerProfileListResult.Available).profiles.map { it.id })
+    }
+
+    @Test fun editingRetainsProfileIdAndItsAppData() = runTest {
+        val stored = FakeServerProfileStore()
+        val id = (stored.addAnonymous("first.invalid", activate = true) as ServerProfileWriteResult.Applied).id
+        val data = InMemoryPreferencesDataStore()
+        val settings = PlayerSettingsStore(data)
+        val owner = AppProfileOwner(FakeTvheadendSession(), stored, settings, StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Missing })
+        backgroundScope.launch { owner.run() }
+        runCurrent()
+        settings.channelAspects.set(id.value, ChannelId(1), AspectRatioMode.FORCE_4_3)
+        at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore(data).setChannelId(ChannelId(1))
+        assertEquals(SaveServerProfileResult.Applied(id), owner.updateAnonymous(id, "edited.invalid", 9983, "Edited"))
+        assertEquals(id, (owner.serverProfile.value as ServerProfileReadResult.Available).id)
+        assertEquals(AspectRatioMode.FORCE_4_3, settings.channelAspects.choices.first().modeFor(ChannelId(1)))
+        assertEquals(ChannelId(1), at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore(data).channelId.first())
+    }
+
+    @Test fun unreadableActiveProfileCanBeRemovedAfterClearingItsSummaryCache() = runTest {
+        val stored = FakeServerProfileStore()
+        val id = (stored.addPassword("first.invalid", username = "viewer", password = "synthetic", activate = true) as ServerProfileWriteResult.Applied).id
+        stored.scriptCredentialsUnavailable(id)
+        val events = mutableListOf<String>()
+        val fake = FakeTvheadendSession()
+        val session = object : TvheadendSession by fake {
+            override suspend fun disconnect() { events += "disconnect"; fake.disconnect() }
+            override val cache = object : SessionCache by fake.cache {
+                override suspend fun clear(profile: ServerProfileSummary) { events += "summary-cache"; fake.cache.clear(profile) }
+            }
+        }
+        val store = object : ServerProfileStore by stored {
+            override suspend fun profiles(): ServerProfileListResult { events += "profiles"; return stored.profiles() }
+            override suspend fun load(id: ServerProfileId): ServerProfileReadResult { events += "load"; return stored.load(id) }
+            override suspend fun remove(id: ServerProfileId): ServerProfileWriteResult { events += "remove"; return stored.remove(id) }
+        }
+        val data = InMemoryPreferencesDataStore(beforeUpdate = { events += "app-data" })
+        val settings = PlayerSettingsStore(data)
+        lateinit var owner: AppProfileOwner
+        val notices = NoticeCenter({ 0 }, { NoticeContext(owner.configurationGeneration.value, null) })
+        owner = AppProfileOwner(session, store, settings, StandardTestDispatcher(testScheduler),
+            { ServerProfileEditReadResult.Unavailable }, { notices })
+        backgroundScope.launch { owner.run() }
+        runCurrent()
+        assertEquals(ServerProfileReadResult.Unavailable, owner.serverProfile.value)
+        settings.setShowInSwitcher(id, false)
+        events.clear()
+        assertEquals(ServerProfileWriteResult.Applied(id), owner.remove(id))
+        assertTrue(events.indexOf("disconnect") < events.indexOf("profiles"))
+        assertTrue(events.indexOf("profiles") < events.indexOf("summary-cache"))
+        assertFalse(FakeServerProfileStoreCall.LOAD in stored.calls)
+        assertTrue(events.indexOf("summary-cache") < events.indexOf("remove"))
+        assertTrue(events.lastIndexOf("app-data") > events.indexOf("remove"))
+        assertTrue((owner.profiles.value as ServerProfileListResult.Available).profiles.isEmpty())
+        assertEquals(ServerProfileReadResult.Missing, owner.serverProfile.value)
+        assertTrue(settings.hiddenServerProfileIds.first().isEmpty())
+        assertEquals(Notice.ServerProfileRemoved, notices.state.value.candidate?.notice)
+    }
+
+    @Test fun renamePreservesUnreadableCredentialsAndDoesNotReconnect() = runTest {
+        val stored = FakeServerProfileStore()
+        val first = (stored.addAnonymous("first.invalid", activate = true) as ServerProfileWriteResult.Applied).id
+        val unreadable = (stored.addPassword("second.invalid", username = "viewer", password = "synthetic") as ServerProfileWriteResult.Applied).id
+        stored.scriptCredentialsUnavailable(unreadable)
+        val session = FakeTvheadendSession()
+        val owner = AppProfileOwner(session, stored, PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Unavailable })
+        backgroundScope.launch { owner.run() }
+        runCurrent()
+        val connections = session.calls.count { it == FakeSessionCall.CONNECT }
+        assertEquals(ServerProfileWriteResult.Applied(unreadable), owner.rename(unreadable, "Lounge"))
+        assertEquals(ServerProfileWriteResult.Applied(first), owner.rename(first, "In use"))
+        val list = owner.profiles.value as ServerProfileListResult.Available
+        assertEquals(listOf("In use", "Lounge"), list.profiles.map { it.label })
+        assertEquals(first, list.activeId)
+        assertFalse(list.profiles.last().credentialsAvailable)
+        assertEquals("viewer", list.profiles.last().username)
+        assertEquals(connections, session.calls.count { it == FakeSessionCall.CONNECT })
+    }
+
+    @Test fun cancellationStillWaitsForNonCancellableProfileInitialization() = runTest {
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val stored = FakeServerProfileStore()
+        val store = object : ServerProfileStore by stored {
+            override suspend fun loadActive(): ServerProfileReadResult {
+                entered.complete(Unit)
+                release.await()
+                return stored.loadActive()
+            }
+        }
+        val owner = AppProfileOwner(FakeTvheadendSession(), store, PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Missing })
         val job = backgroundScope.launch { owner.run() }
         runCurrent()
         assertTrue(entered.isCompleted)
@@ -139,416 +319,46 @@ class AppProfileOwnerTest {
         assertEquals(ServerProfileReadResult.Missing, owner.serverProfile.value)
     }
 
-    @OptIn(ExperimentalCoroutinesApi::class)
-    @Test
-    fun cancelledPendingPasswordSaveLeavesTheConfigurationAlone() = runTest {
-        val session = ProfileSession(
-            FakeSessionObservation(currentObservation("server")).observation,
-        ) { currentSession ->
-            available(StreamProfileId("11111111111111111111111111111111"), currentSession)
-        }
-        val owner = profileOwner(
-            session,
-            PlayerSettingsStore(InMemoryPreferencesDataStore()),
-            StandardTestDispatcher(testScheduler),
-        )
+    @Test fun cancelledPendingPasswordSaveLeavesConfigurationAlone() = runTest {
+        val stored = FakeServerProfileStore()
+        val owner = AppProfileOwner(FakeTvheadendSession(), stored, PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Missing })
         val save = backgroundScope.launch(start = CoroutineStart.UNDISPATCHED) {
-            owner.savePasswordServer(
-                host = "tvheadend.invalid",
-                htspPort = 9982,
-                username = "viewer",
-                password = "fake password",
-            )
+            owner.savePasswordServer("first.invalid", 9982, "viewer", "synthetic")
         }
         runCurrent()
-
         assertFalse(save.isCompleted)
         save.cancelAndJoin()
-        assertEquals(0L, owner.configurationGeneration.value) // An unaccepted command did not replace context.
+        assertEquals(0L, owner.configurationGeneration.value)
+        assertTrue(stored.calls.isEmpty())
     }
 
-    @OptIn(ExperimentalCoroutinesApi::class)
-    @Test
-    fun failedAcceptedPasswordSaveStillAdvancesTheConfiguration() = runTest {
-        val session = ProfileSession(
-            FakeSessionObservation(currentObservation("server")).observation,
-        ) { currentSession ->
-            available(StreamProfileId("11111111111111111111111111111111"), currentSession)
-        }
-        var artworkClears = 0
-        val owner = profileOwner(
-            session,
-            PlayerSettingsStore(InMemoryPreferencesDataStore()),
-            StandardTestDispatcher(testScheduler),
-            clearAppArtwork = { artworkClears++ },
-        )
-        backgroundScope.launch(start = CoroutineStart.UNDISPATCHED) { owner.run() }
-        runCurrent()
-        val result = runCatching {
-            owner.savePasswordServer(
-                host = "",
-                htspPort = 9982,
-                username = "viewer",
-                password = "fake password",
-            )
-        }
-
-        assertTrue(result.isFailure)
-        assertEquals(0, artworkClears) // A rejected write did not replace the profile.
-        assertEquals(1L, owner.configurationGeneration.value) // Accepted replacement invalidates old notices even on failure.
-    }
-
-    @OptIn(ExperimentalCoroutinesApi::class)
-    @Test fun acceptedServerSavesAndProfileRemovalClearAppArtworkAndRecentChannels() = runTest {
-        var artworkClears = 0
-        var recentClears = 0
-        val owner = profileOwner(
-            at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession(),
-            PlayerSettingsStore(InMemoryPreferencesDataStore()),
-            StandardTestDispatcher(testScheduler),
-            clearAppArtwork = { artworkClears++ },
-            clearRecentChannels = { recentClears++ },
-        )
-        backgroundScope.launch(start = CoroutineStart.UNDISPATCHED) { owner.run() }
-        runCurrent()
-        assertEquals(0, artworkClears) // Startup preserves the offline cache.
-        assertEquals(0, recentClears) // Startup keeps the current server's watch history.
-        owner.saveServer("offline.invalid", 9982)
-        assertEquals(1, artworkClears)
-        assertEquals(1, recentClears)
-        owner.savePasswordServer("offline.invalid", 9982, "viewer", "fake password")
-        assertEquals(2, artworkClears)
-        assertEquals(2, recentClears)
-        owner.clearProfile()
-        assertEquals(3, artworkClears)
-        assertEquals(3, recentClears)
-    }
-
-    @OptIn(ExperimentalCoroutinesApi::class)
-    @Test fun throwingConnectAfterPersistenceStillClearsBeforeRecovery() = runTest {
-        val stored = at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore()
-        val fakeSession = at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession()
+    @Test fun failedConnectionAfterPersistenceRecoversWithoutLosingProfileData() = runTest {
+        val stored = FakeServerProfileStore()
+        val fake = FakeTvheadendSession()
         var connects = 0
-        var artworkClears = 0
-        val failure = IllegalStateException("Synthetic connect failure")
-        val session = object : TvheadendSession by fakeSession {
+        val session = object : TvheadendSession by fake {
             override suspend fun connect(profile: ServerProfile): SessionCommandResult {
-                assertTrue(stored.loadProfile() is ServerProfileReadResult.Available)
-                if (++connects == 1) throw failure
-                assertEquals(1, artworkClears) // Recovery cannot reapply the new profile with old logos.
-                return fakeSession.connect(profile)
+                if (++connects == 1) error("Synthetic connect failure")
+                return fake.connect(profile)
             }
         }
-        val owner = AppProfileOwner(
-            session = session, profileStore = stored,
-            playerSettings = PlayerSettingsStore(InMemoryPreferencesDataStore()),
-            ioDispatcher = StandardTestDispatcher(testScheduler),
-            readProfileForEditing = { error("Unexpected editing read") },
-            clearAppArtwork = { artworkClears++ },
-        )
+        val owner = AppProfileOwner(session, stored, PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Missing })
         backgroundScope.launch { owner.run() }
         runCurrent()
-        val result = runCatching { owner.saveServer("offline.invalid", 9982) }.exceptionOrNull()
-        assertTrue(result is IllegalStateException)
-        assertEquals(failure.message, result?.message)
-        assertEquals(1, artworkClears)
+        assertTrue(runCatching { owner.saveServer("first.invalid", 9982) }.isFailure)
         assertEquals(2, connects)
         assertTrue(owner.serverProfile.value is ServerProfileReadResult.Available)
     }
 
-    @OptIn(ExperimentalCoroutinesApi::class)
-    @Test fun artworkClearWaitsForPersistenceAndSessionReplacement() = runTest {
-        val stored = at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore()
-        val fakeSession = at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession()
-        val replacementEntered = CompletableDeferred<Unit>()
-        val releaseReplacement = CompletableDeferred<Unit>()
-        var artworkGeneration = 0
-        val requestGenerations = mutableListOf<Int>()
-        val session = object : TvheadendSession by fakeSession {
-            override suspend fun connect(profile: ServerProfile): SessionCommandResult {
-                assertTrue(stored.loadProfile() is ServerProfileReadResult.Available)
-                replacementEntered.complete(Unit)
-                releaseReplacement.await()
-                return fakeSession.connect(profile)
-            }
-        }
-        val owner = AppProfileOwner(
-            session = session, profileStore = stored,
-            playerSettings = PlayerSettingsStore(InMemoryPreferencesDataStore()),
-            ioDispatcher = StandardTestDispatcher(testScheduler),
-            readProfileForEditing = { error("Unexpected editing read") },
-            clearAppArtwork = {
-                assertTrue(at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall.CONNECT in fakeSession.calls)
-                artworkGeneration++
-            },
-        )
+    @Test fun rejectedAddressDoesNotChangeConfiguration() = runTest {
+        val owner = AppProfileOwner(FakeTvheadendSession(), FakeServerProfileStore(),
+            PlayerSettingsStore(InMemoryPreferencesDataStore()), StandardTestDispatcher(testScheduler),
+            { ServerProfileEditReadResult.Missing })
         backgroundScope.launch { owner.run() }
         runCurrent()
-        val save = async { owner.saveServer("offline.invalid", 9982) }
-        replacementEntered.await()
-        // A request from UI during replacement still carries the old cache generation.
-        requestGenerations += artworkGeneration
-        assertEquals(0, artworkGeneration)
-        releaseReplacement.complete(Unit)
-        save.await()
-        requestGenerations += artworkGeneration
-        assertEquals(listOf(0, 1), requestGenerations)
-        assertTrue(owner.serverProfile.value is ServerProfileReadResult.Available)
-        owner.clearProfile()
-        assertEquals(ServerProfileReadResult.Missing, stored.loadProfile())
-        assertEquals(ServerProfileReadResult.Missing, owner.serverProfile.value)
-        assertEquals(2, artworkGeneration)
+        assertTrue(runCatching { owner.savePasswordServer("", 9982, "viewer", "synthetic") }.isFailure)
+        assertEquals(0L, owner.configurationGeneration.value)
     }
-
-    @OptIn(ExperimentalCoroutinesApi::class)
-    @Test
-    fun selectedProfileReadWaitsForCurrentDiscoveryToSettle() = runTest {
-        val selectedId = StreamProfileId("11111111111111111111111111111111")
-        val discoveryStarted = CompletableDeferred<Unit>()
-        val releaseDiscovery = CompletableDeferred<Unit>()
-        val observations = FakeSessionObservation(currentObservation("server"))
-        val session = ProfileSession(observations.observation) { currentSession ->
-            discoveryStarted.complete(Unit)
-            releaseDiscovery.await()
-            available(selectedId, currentSession)
-        }
-        val dataStore = InMemoryPreferencesDataStore(
-            initial = preferencesOf(stringPreferencesKey("profileUuid") to selectedId.value),
-        )
-        val owner = profileOwner(
-            session,
-            PlayerSettingsStore(dataStore),
-            StandardTestDispatcher(testScheduler),
-        )
-
-        backgroundScope.launch(start = CoroutineStart.UNDISPATCHED) { owner.run() }
-        runCurrent()
-        discoveryStarted.await()
-        val selected = async {
-            owner.selectedStreamProfileIdFor(
-                checkNotNull(observations.observation.value.currentSession),
-            )
-        }
-        runCurrent()
-
-        assertFalse(selected.isCompleted)
-        releaseDiscovery.complete(Unit)
-        runCurrent()
-        assertEquals(selectedId, selected.await())
-    }
-
-    @OptIn(ExperimentalCoroutinesApi::class)
-    @Test
-    fun selectedProfileReadSettlesWhenPersistedSelectionReadFails() = runTest {
-        val selectionReadStarted = CompletableDeferred<Unit>()
-        val releaseSelectionRead = CompletableDeferred<Unit>()
-        val observations = FakeSessionObservation(currentObservation("server"))
-        val currentSession = checkNotNull(observations.observation.value.currentSession)
-        val session = ProfileSession(observations.observation) { originatingSession ->
-            available(StreamProfileId("11111111111111111111111111111111"), originatingSession)
-        }
-        val dataStore = object : DataStore<Preferences> by InMemoryPreferencesDataStore() {
-            override val data = flow<Preferences> {
-                selectionReadStarted.complete(Unit)
-                releaseSelectionRead.await()
-                throw java.io.IOException("selection read failed")
-            }
-        }
-        val owner = profileOwner(
-            session,
-            PlayerSettingsStore(dataStore),
-            StandardTestDispatcher(testScheduler),
-        )
-
-        backgroundScope.async(start = CoroutineStart.UNDISPATCHED) {
-            runCatching { owner.run() }
-        }
-        runCurrent()
-        selectionReadStarted.await()
-        val selected = async { owner.selectedStreamProfileIdFor(currentSession) }
-        runCurrent()
-        assertFalse(selected.isCompleted)
-
-        releaseSelectionRead.complete(Unit)
-        runCurrent()
-
-        assertTrue(selected.isCompleted)
-        assertNull(selected.await())
-        assertTrue(owner.streamProfiles.value is StreamProfilesResult.Available)
-    }
-
-    @OptIn(ExperimentalCoroutinesApi::class)
-    @Test
-    fun selectedProfileReadReturnsWhenObservationExpiresDuringDiscovery() = runTest {
-        val discoveryStarted = CompletableDeferred<Unit>()
-        val releaseDiscovery = CompletableDeferred<Unit>()
-        val observations = FakeSessionObservation(currentObservation("server"))
-        val currentSession = checkNotNull(observations.observation.value.currentSession)
-        val session = ProfileSession(observations.observation) { originatingSession ->
-            discoveryStarted.complete(Unit)
-            releaseDiscovery.await()
-            available(StreamProfileId("11111111111111111111111111111111"), originatingSession)
-        }
-        val owner = profileOwner(
-            session,
-            PlayerSettingsStore(InMemoryPreferencesDataStore()),
-            StandardTestDispatcher(testScheduler),
-        )
-
-        backgroundScope.launch(start = CoroutineStart.UNDISPATCHED) { owner.run() }
-        runCurrent()
-        discoveryStarted.await()
-        val selected = async { owner.selectedStreamProfileIdFor(currentSession) }
-        runCurrent()
-
-        assertFalse(selected.isCompleted)
-        observations.retire(SessionObservation.create(sessionState = SessionState.Disconnected))
-        runCurrent()
-        assertNull(selected.await())
-    }
-
-    @OptIn(ExperimentalCoroutinesApi::class)
-    @Test
-    fun staleGenerationIsDiscardedAndReconnectDiscoversOnceOnOwnedIoDispatcher() = runTest {
-        val observations = FakeSessionObservation(currentObservation("first"))
-        val firstStarted = CompletableDeferred<Unit>()
-        val releaseFirst = CompletableDeferred<Unit>()
-        val selectionStarted = CompletableDeferred<Unit>()
-        val releaseSelection = CompletableDeferred<Unit>()
-        val ioDispatcher = StandardTestDispatcher(testScheduler, name = "profile-owner-io")
-        val secondId = StreamProfileId("22222222222222222222222222222222")
-        var discoveries = 0
-        var pauseSelectionUpdate = false
-        val session = ProfileSession(observations.observation) { originatingSession ->
-            assertSame(ioDispatcher, currentCoroutineContext()[ContinuationInterceptor])
-            discoveries += 1
-            if (discoveries == 1) {
-                withContext(NonCancellable) {
-                    firstStarted.complete(Unit)
-                    releaseFirst.await()
-                    available(
-                        StreamProfileId("11111111111111111111111111111111"),
-                        originatingSession,
-                    )
-                }
-            } else {
-                available(secondId, originatingSession)
-            }
-        }
-        val dataStore = InMemoryPreferencesDataStore(beforeUpdate = {
-            if (pauseSelectionUpdate) {
-                pauseSelectionUpdate = false
-                selectionStarted.complete(Unit)
-                withContext(NonCancellable) { releaseSelection.await() }
-            }
-        })
-        val settings = PlayerSettingsStore(dataStore)
-        val owner = profileOwner(session, settings, ioDispatcher)
-
-        val ownerJob = backgroundScope.launch(start = CoroutineStart.UNDISPATCHED) {
-            owner.run()
-        }
-        runCurrent()
-        firstStarted.await()
-        observations.retire(SessionObservation.create(sessionState = SessionState.Disconnected))
-        releaseFirst.complete(Unit)
-        runCurrent()
-        observations.publish(currentObservation("second"))
-        runCurrent()
-
-        assertEquals(2, discoveries)
-        val result = owner.streamProfiles.value as StreamProfilesResult.Available
-        assertEquals(secondId, result.profiles.single().id)
-        assertNull(owner.selectedStreamProfileId.value)
-
-        val failedMutation = async { runCatching { owner.saveServer("", 9982) } }
-        runCurrent()
-        assertTrue(failedMutation.await().isFailure)
-        assertTrue(owner.serverProfile.value != null)
-
-        pauseSelectionUpdate = true
-        val selection = async { owner.selectStreamProfile(secondId) }
-        runCurrent()
-        selectionStarted.await()
-        val close = async { ownerJob.cancelAndJoin() }
-        runCurrent()
-        assertFalse(close.isCompleted)
-        releaseSelection.complete(Unit)
-        runCurrent()
-        selection.await()
-        close.await()
-        assertEquals(secondId, owner.selectedStreamProfileId.value)
-        assertEquals(secondId, settings.resolveStreamProfileSelection(result.profiles) { true })
-    }
-
-    private fun profileOwner(
-        session: TvheadendSession,
-        settings: PlayerSettingsStore,
-        ioDispatcher: CoroutineDispatcher,
-        clearAppArtwork: suspend () -> Unit = {},
-        clearRecentChannels: suspend () -> Unit = {},
-    ): AppProfileOwner {
-        return AppProfileOwner(
-            session = session,
-            profileStore = at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore(),
-            playerSettings = settings,
-            ioDispatcher = ioDispatcher,
-            readProfileForEditing = { error("Unexpected editing read") },
-            clearAppArtwork = clearAppArtwork,
-            clearRecentChannels = clearRecentChannels,
-        )
-    }
-
-    private fun currentObservation(serverName: String): SessionObservation =
-        SessionObservation.create(
-            sessionState = SessionState.Ready(
-                ServerCapabilities.create(
-                    streaming = CapabilityAccess.ALLOWED,
-                    dvrWrite = CapabilityAccess.DENIED,
-                    serverName = serverName,
-                ),
-            ),
-            channelState = ChannelRepositoryState.Current(ChannelCatalog.create()),
-            epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
-            dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
-        )
-
-    private fun available(
-        id: StreamProfileId,
-        originatingSession: CurrentSessionObservation,
-    ): StreamProfilesResult.Available = StreamProfilesResult.Available.create(
-        profiles = listOf(StreamProfile(id, "profile", "")),
-        originatingSession = originatingSession,
-    )
-}
-
-private class ProfileSession(
-    override val observation: StateFlow<SessionObservation>,
-    private val discover: suspend (CurrentSessionObservation) -> StreamProfilesResult,
-) : TvheadendSession {
-    override val cache: at.bernhardberger.tvheadend.sdk.core.SessionCache get() = error("unused")
-    override val epgRepository: EpgRepository get() = error("unused")
-    override val dvrRepository: DvrRepository get() = error("unused")
-    override val artwork: ArtworkLoader get() = error("unused")
-
-    override suspend fun getStreamProfiles(
-        currentSession: CurrentSessionObservation,
-    ): StreamProfilesResult = discover(currentSession)
-
-    override fun bindLivePlayback(
-        currentSession: CurrentSessionObservation,
-        channelId: ChannelId,
-    ): PlaybackBindingResult<PlaybackBinding.Live> = error("unused")
-
-    override fun bindRecordingPlayback(
-        currentSession: CurrentSessionObservation,
-        recordingId: DvrEntryId,
-    ): PlaybackBindingResult<PlaybackBinding.Recording> = error("unused")
-
-    override suspend fun connect(profile: ServerProfile): SessionCommandResult =
-        SessionCommandResult.STARTED
-
-    override suspend fun retry(): SessionCommandResult = SessionCommandResult.STARTED
-    override suspend fun disconnect() = Unit
-    override suspend fun shutdown() = Unit
 }

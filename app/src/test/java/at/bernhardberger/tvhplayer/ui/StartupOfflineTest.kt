@@ -515,7 +515,7 @@ class StartupOfflineTest {
     private fun app(
         initial: SessionObservation = connecting(catalog),
         awaitRows: Boolean = true,
-        profile: ServerProfileReadResult = ServerProfileReadResult.anonymous("offline.invalid", 9982),
+        profile: ServerProfileReadResult = ServerProfileReadResult.anonymous(at.bernhardberger.tvheadend.sdk.core.ServerProfileId.generate(), "offline.invalid", 9982),
         tagData: InMemoryData = InMemoryData(),
     ) {
         session = FakeTvheadendSession(initial).apply { scriptLivePlaybackSuccess() }

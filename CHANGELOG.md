@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- A removed recording no longer hides another recording of the same program, and retention cleanup no longer repeats the “Recording deleted” notice.
+- Recent channels, channel tags, channel aspect settings, the selected stream profile and audio choices start fresh after this update; they are now kept per server.
+
 ## 0.4.5
 
 ### Player

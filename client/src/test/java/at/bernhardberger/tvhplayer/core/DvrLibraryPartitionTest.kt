@@ -11,10 +11,10 @@ import org.junit.Test
 
 class DvrLibraryPartitionTest {
     @Test fun allMissingFilesAreRemovedInsteadOfProblems() {
-        val deleted = DvrEntry.create(DvrEntryId(10), state = DvrEntryState.FILE_MISSING, files = emptyList())
-        val missing = DvrEntry.create(DvrEntryId(11), state = DvrEntryState.FILE_MISSING,
+        val deleted = DvrEntry.create(DvrEntryId(10), state = DvrEntryState.REMOVED, files = emptyList())
+        val missing = DvrEntry.create(DvrEntryId(11), state = DvrEntryState.REMOVED,
             files = listOf(DvrRecordingFile.create()))
-        val deletedAfterRestart = DvrEntry.create(DvrEntryId(12), state = DvrEntryState.FILE_MISSING)
+        val deletedAfterRestart = DvrEntry.create(DvrEntryId(12), state = DvrEntryState.REMOVED)
         val failed = DvrEntry.create(DvrEntryId(13), state = DvrEntryState.COMPLETED_ERROR, files = emptyList())
         val library = partitionDvrLibrary(listOf(deleted, missing, deletedAfterRestart, failed))
 

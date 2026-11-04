@@ -673,7 +673,7 @@ class SettingsDepthNavigationTest {
         compose.setContent {
             TVHeadendPlayerTheme {
                 status = connectionOverviewStatus(
-                    at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult.anonymous("offline.invalid", 9982),
+                    at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult.anonymous(at.bernhardberger.tvheadend.sdk.core.ServerProfileId.generate(), "offline.invalid", 9982),
                     at.bernhardberger.tvhplayer.viewmodels.AppConnectionPresentation(at.bernhardberger.tvhplayer.core.ConnectionUiState.Error(
                         at.bernhardberger.tvhplayer.data.ConnectionFailureKind.UNREACHABLE,
                         at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition.EXPLICIT_RETRY)))

@@ -84,7 +84,7 @@ fun recordingContextActions(
         DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR -> add(BrowseContextAction.STOP)
         DvrEntryState.SCHEDULED -> add(BrowseContextAction.CANCEL)
         DvrEntryState.COMPLETED, DvrEntryState.MISSED, DvrEntryState.INVALID,
-        DvrEntryState.COMPLETED_ERROR, DvrEntryState.FILE_MISSING -> add(BrowseContextAction.DELETE)
+        DvrEntryState.COMPLETED_ERROR -> add(BrowseContextAction.DELETE)
         else -> Unit
     }
 }

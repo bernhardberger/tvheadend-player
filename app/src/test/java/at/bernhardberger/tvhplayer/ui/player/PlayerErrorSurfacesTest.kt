@@ -389,7 +389,7 @@ class PlayerErrorSurfacesTest {
                 visible = true,
                 alert = recordingAlert(
                     AppPlaybackState.Idle,
-                    DvrEntry.create(DvrEntryId(1), state = DvrEntryState.FILE_MISSING),
+                    DvrEntry.create(DvrEntryId(1), state = DvrEntryState.RECORDING),
                     RecordingPlaybackAdmission.TargetUnavailable,
                 ),
                 onRetry = {},

@@ -115,7 +115,7 @@ class ProgrammeDetailsPolicyTest {
             assertFalse(CONTINUE_WATCHING in channelContextActions(null, 150, null, null, canModify))
             val entries = listOf<DvrEntry?>(null) + listOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING,
                 DvrEntryState.RECORDING_ERROR, DvrEntryState.COMPLETED, DvrEntryState.COMPLETED_ERROR,
-                DvrEntryState.MISSED, DvrEntryState.INVALID, DvrEntryState.FILE_MISSING).map { recording(it) }
+                DvrEntryState.MISSED, DvrEntryState.INVALID, DvrEntryState.REMOVED).map { recording(it) }
             for (entry in entries) {
                 val playback = entry?.let { admission(it) }
                 for (now in listOf(50L, 150L, 250L)) {
@@ -151,7 +151,7 @@ class ProgrammeDetailsPolicyTest {
     @Test fun recordingGuideActionRequiresAnUnfinishedAiringAndWatchableChannel() {
         val states = listOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR,
             DvrEntryState.COMPLETED, DvrEntryState.COMPLETED_ERROR, DvrEntryState.MISSED,
-            DvrEntryState.INVALID, DvrEntryState.FILE_MISSING)
+            DvrEntryState.INVALID, DvrEntryState.REMOVED)
         for (state in states) for (watchable in listOf(true, false)) for (now in listOf(50L, 150L, 200L)) {
             val entry = recording(state)
             val expected = watchable && now < 200 && state in listOf(DvrEntryState.SCHEDULED,
@@ -214,7 +214,7 @@ class ProgrammeDetailsPolicyTest {
         assertEquals(DetailsStatus.MISSED, detailsStatus(null, recording(DvrEntryState.MISSED), 150))
         // Canceled is neutral, as in the list, the pane and Problems; only real failures are red.
         assertEquals(DetailsStatus.CANCELLED, detailsStatus(null, recording(DvrEntryState.INVALID), 150))
-        listOf(DvrEntryState.COMPLETED_ERROR, DvrEntryState.FILE_MISSING).forEach {
+        listOf(DvrEntryState.COMPLETED_ERROR).forEach {
             assertEquals(DetailsStatus.FAILED, detailsStatus(null, recording(it), 150))
         }
         assertNull(detailsStatus(null, recording(DvrEntryState.COMPLETED), 150))
