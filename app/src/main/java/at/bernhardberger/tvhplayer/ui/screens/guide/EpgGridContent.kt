@@ -607,7 +607,7 @@ internal fun TimelineProgrammeCell(
     // A failed or missed recording is the `error` "!" alone; one still running with errors adds it
     // beside its dot.
     val failed = when (recording?.state) {
-        DvrEntryState.RECORDING_ERROR, DvrEntryState.COMPLETED_ERROR, DvrEntryState.FILE_MISSING -> R.string.recording_state_failed
+        DvrEntryState.RECORDING_ERROR, DvrEntryState.COMPLETED_ERROR -> R.string.recording_state_failed
         DvrEntryState.MISSED -> R.string.recording_notice_missed
         else -> null
     }

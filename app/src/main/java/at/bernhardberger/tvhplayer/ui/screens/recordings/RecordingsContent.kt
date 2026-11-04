@@ -507,7 +507,6 @@ internal fun RecordingMetadataPane(
 /** A failed or cancelled recording's state in the words its notice uses. */
 @Composable
 private fun problemStateLabel(state: DvrEntryState?): String? = when (state) {
-    DvrEntryState.FILE_MISSING -> R.string.error_303_title
     DvrEntryState.MISSED -> R.string.recording_notice_missed
     DvrEntryState.COMPLETED_ERROR -> R.string.recording_notice_failed
     DvrEntryState.INVALID -> R.string.recording_notice_canceled
@@ -1051,7 +1050,6 @@ private enum class RecordingOverlineMark(@DrawableRes val icon: Int, val tag: St
 /** A completed recording is the normal case and carries no mark; running and scheduled ones carry theirs at the row's end. */
 private fun recordingStateMark(state: DvrEntryState?): RecordingOverlineMark? = when (state) {
     DvrEntryState.COMPLETED_ERROR,
-    DvrEntryState.FILE_MISSING,
     DvrEntryState.MISSED -> RecordingOverlineMark.FAILED
     DvrEntryState.INVALID -> RecordingOverlineMark.CANCELLED
     else -> null
@@ -1218,8 +1216,7 @@ internal fun dvrStateLabel(state: DvrEntryState?): String = stringResource(
         DvrEntryState.MISSED -> R.string.recording_state_missed
         DvrEntryState.INVALID -> R.string.recording_state_cancelled
         DvrEntryState.RECORDING_ERROR -> R.string.recording_state_recording_errors
-        DvrEntryState.COMPLETED_ERROR,
-        DvrEntryState.FILE_MISSING -> R.string.recording_state_failed
+        DvrEntryState.COMPLETED_ERROR -> R.string.recording_state_failed
         else -> R.string.recording_state_unknown
     }
 )

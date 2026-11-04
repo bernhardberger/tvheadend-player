@@ -8,6 +8,10 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import at.bernhardberger.tvhplayer.settings.ServerSettings
+import at.bernhardberger.tvhplayer.settings.dataStore
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import at.bernhardberger.tvheadend.sdk.core.ServerProfileId
 import at.bernhardberger.tvhplayer.ui.components.awaitBrowsePreparation
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchState
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyMode
@@ -168,8 +172,11 @@ class HomeNavigationJourneyTest {
     @Test fun realBackKeyCycleFromThePlayerReturnsToTheRecentChannelCardWithTheRailClosed() {
         // Playback is not confirmed offline, so seed what a confirmed first picture records.
         runBlocking {
-            LastPlayedChannelStore(ApplicationProvider.getApplicationContext()).run {
-                setChannelId(ChannelId(3)); setChannelId(ChannelId(2))
+            val context = ApplicationProvider.getApplicationContext<Application>()
+            val profileId = ServerProfileId.generate()
+            context.dataStore.edit { it[stringPreferencesKey("activeServerProfileId")] = profileId.value }
+            LastPlayedChannelStore(context).run {
+                setChannelId(profileId, ChannelId(3)); setChannelId(profileId, ChannelId(2))
             }
         }
         fixture.app()

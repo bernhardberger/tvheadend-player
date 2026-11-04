@@ -3007,7 +3007,7 @@ class GuideVisualLayoutTest {
     @Test fun aServerDeletedRecordingHasNoGuideCellMarkOrHeadlineBadge() {
         show(headline = true, recordings = listOf(
             DvrEntry.create(DvrEntryId(1), eventId = EventId(110),
-                state = DvrEntryState.FILE_MISSING, files = emptyList()),
+                state = DvrEntryState.REMOVED, files = emptyList()),
         ))
         key(Key.DirectionDown)
         focused(title(1, 0))
@@ -3019,6 +3019,26 @@ class GuideVisualLayoutTest {
             .fetchSemanticsNode().config.getOrElseNullable(SemanticsProperties.ContentDescription) { null }
             .orEmpty().joinToString()
         assertFalse(description, description.contains(context().getString(R.string.recording_state_failed)))
+    }
+
+    @Test fun aRemovedEntryDoesNotHideTheScheduledMarkForTheSameEvent() {
+        show(headline = true, recordings = listOf(
+            DvrEntry.create(DvrEntryId(1), eventId = EventId(110),
+                state = DvrEntryState.REMOVED, files = emptyList()),
+            DvrEntry.create(DvrEntryId(2), eventId = EventId(110), state = DvrEntryState.SCHEDULED),
+        ))
+        key(Key.DirectionDown)
+        focused(title(1, 0))
+        compose.onNode(
+            hasTestTag("guide-cell-recording-mark") and hasAnyAncestor(hasContentDescription(title(1, 0), substring = true)),
+            useUnmergedTree = true,
+        ).assertIsDisplayed()
+        compose.mainClock.advanceTimeBy(GuideHeadlineSettleMs + 300)
+        compose.waitForIdle()
+        compose.onNode(
+            hasTestTag("recording-badge-scheduled") and hasAnyAncestor(hasTestTag("guide-headline")),
+            useUnmergedTree = true,
+        ).assertIsDisplayed()
     }
 
     @Test fun aFinishedRecordingIsTheDotAndAFailedOrMissedOneTheErrorMarkAndTheHeadlineBadgesThem() {
@@ -3289,8 +3309,8 @@ class GuideVisualLayoutTest {
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
         if (playingChannel != null) runtimeScope.launch { profiles.run() }
         val tagSettings = ChannelTagSettingsStore(preferences())
-        if (activeTag) runBlocking { tagSettings.save(ChannelTagPreferences(activeTagId = ChannelTagId(1))) }
-        if (activeGroup != null) runBlocking { tagSettings.save(ChannelTagPreferences(activeTagId = activeGroup)) }
+        if (activeTag) runBlocking { tagSettings.save(tagSettings.settings.first().copy(activeTagId = ChannelTagId(1))) }
+        if (activeGroup != null) runBlocking { tagSettings.save(tagSettings.settings.first().copy(activeTagId = activeGroup)) }
         model = ChannelsViewModel(session, tagSettings)
         models.put("channels", model)
         player = ExoPlayer.Builder(context()).build()
@@ -3632,7 +3652,10 @@ class GuideVisualLayoutTest {
     private fun title(channel: Int, offset: Int) = if (channel == 2 && offset == 0)
         "Wunder der Natur: Eine außergewöhnliche Reise durch die nördlichen Landschaften" else "Channel $channel • Programme $offset"
     private fun preferences() = object : DataStore<Preferences> {
-        override val data = MutableStateFlow(emptyPreferences())
+        override val data = MutableStateFlow(androidx.datastore.preferences.core.preferencesOf(
+            androidx.datastore.preferences.core.stringPreferencesKey("activeServerProfileId") to
+                at.bernhardberger.tvheadend.sdk.core.ServerProfileId.generate().value,
+        ))
         override suspend fun updateData(transform: suspend (Preferences) -> Preferences) = transform(data.value).also { data.value = it }
     }
     private fun context(): Application = ApplicationProvider.getApplicationContext()

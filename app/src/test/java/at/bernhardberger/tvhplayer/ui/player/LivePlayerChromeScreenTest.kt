@@ -56,6 +56,8 @@ import androidx.compose.ui.test.pressKey
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
@@ -217,13 +219,17 @@ class LivePlayerChromeScreenTest {
     // selected for the next screen test. There is deliberately no production reset API.
     @Suppress("UNCHECKED_CAST")
     private val lastPlayedPreferences by lazy {
-        Class.forName("at.bernhardberger.tvhplayer.stores.LastPlayedChannelStoreKt")
-            .getDeclaredMethod("getApplianceDataStore", android.content.Context::class.java)
+        Class.forName("at.bernhardberger.tvhplayer.settings.ServerSettingsKt")
+            .getDeclaredMethod("getDataStore", android.content.Context::class.java)
             .apply { isAccessible = true }.invoke(null, context) as DataStore<Preferences>
     }
     private lateinit var originalLastPlayed: Preferences
     @Before fun before() {
         originalLastPlayed = runBlocking { lastPlayedPreferences.data.first() }
+        runBlocking {
+            lastPlayedPreferences.edit { it[stringPreferencesKey("activeServerProfileId")] =
+                at.bernhardberger.tvheadend.sdk.core.ServerProfileId.generate().value }
+        }
     }
 
     @After fun after() {

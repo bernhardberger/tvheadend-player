@@ -461,7 +461,7 @@ private fun ChannelScheduleRow(
 private const val ScheduleSeparator = " • "
 private val ScheduleProgressGap = 3.dp
 private val ScheduleRunningStates = setOf(DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)
-private val ScheduleFailedStates = setOf(DvrEntryState.COMPLETED_ERROR, DvrEntryState.FILE_MISSING, DvrEntryState.MISSED)
+private val ScheduleFailedStates = setOf(DvrEntryState.COMPLETED_ERROR, DvrEntryState.MISSED)
 
 internal fun scheduleEventDay(event: EpgEvent, today: java.time.LocalDate, zone: ZoneId): java.time.LocalDate {
     val start = Instant.ofEpochSecond(event.start.epochSeconds).atZone(zone).toLocalDate()

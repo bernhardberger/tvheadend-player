@@ -273,8 +273,8 @@ class AppErrorTest {
         assertEquals(305, number(entry(DvrEntryState.RECORDING), RecordingPlaybackAdmission.GrowingDeferred))
         // Not admitted: what the entry shows decides.
         assertEquals(302, number(entry(DvrEntryState.SCHEDULED), RecordingPlaybackAdmission.TargetUnavailable))
-        // File evidence: the server marks the file missing, or a running entry has no file at all.
-        assertEquals(303, number(entry(DvrEntryState.FILE_MISSING), RecordingPlaybackAdmission.TargetUnavailable))
+        // Removed means gone; a running entry without a file still has missing-file evidence.
+        assertEquals(304, number(entry(DvrEntryState.REMOVED), RecordingPlaybackAdmission.TargetUnavailable))
         assertEquals(303, number(entry(DvrEntryState.RECORDING), RecordingPlaybackAdmission.TargetUnavailable))
         assertEquals(303, number(entry(DvrEntryState.RECORDING, files = 0), RecordingPlaybackAdmission.TargetUnavailable))
         // Several files of a running recording only play once it is finished.
@@ -299,7 +299,7 @@ class AppErrorTest {
         assertNull(number(entry(DvrEntryState.RECORDING_ERROR, files = 1), growing))
         for (state in sdkConstants<DvrEntryState>() - setOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING,
             DvrEntryState.RECORDING_ERROR, DvrEntryState.COMPLETED_ERROR, DvrEntryState.MISSED,
-            DvrEntryState.FILE_MISSING)) {
+            DvrEntryState.REMOVED)) {
             assertEquals("$state", 304, number(entry(state), RecordingPlaybackAdmission.TargetUnavailable))
         }
         assertEquals(304, number(entry(null), RecordingPlaybackAdmission.TargetUnavailable))

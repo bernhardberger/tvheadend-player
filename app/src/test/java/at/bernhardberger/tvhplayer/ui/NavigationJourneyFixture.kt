@@ -101,7 +101,7 @@ internal class NavigationJourneyFixture(
             if (withRecording) scriptRecordingPlaybackSuccess()
         }
         val settings = PlayerSettingsStore(InMemoryData())
-        val profiles = AppProfileOwner(session, FakeServerProfileStore(ServerProfileReadResult.anonymous(server.host, server.htspPort)),
+        val profiles = AppProfileOwner(session, FakeServerProfileStore(ServerProfileReadResult.anonymous(at.bernhardberger.tvheadend.sdk.core.ServerProfileId.generate(), server.host, server.htspPort)),
             settings, Dispatchers.IO, readProfileForEditing = { ServerProfileEditReadResult.Missing })
         scope.launch { profiles.run() }
         player = ExoPlayer.Builder(context).build()

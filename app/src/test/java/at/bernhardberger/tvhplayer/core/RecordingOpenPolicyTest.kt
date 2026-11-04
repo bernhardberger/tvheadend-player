@@ -85,14 +85,14 @@ class RecordingOpenPolicyTest {
     }
     @Test fun scheduledFailedWithoutAFileAndUnavailablePlaybackOpenDetails() {
         listOf(DvrEntryState.SCHEDULED, DvrEntryState.MISSED, DvrEntryState.INVALID,
-            DvrEntryState.COMPLETED_ERROR, DvrEntryState.FILE_MISSING).forEach {
+            DvrEntryState.COMPLETED_ERROR, DvrEntryState.REMOVED).forEach {
             assertEquals("$it", RecordingOpenAction.DETAILS, open(entry(it, 300)))
             assertEquals("$it", RecordingOpenAction.DETAILS, open(entry(it, 300, files = emptyList())))
         }
         for (state in listOf(DvrEntryState.MISSED, DvrEntryState.COMPLETED_ERROR)) {
             assertEquals("$state", RecordingOpenAction.DETAILS, open(entry(state, 300, files = listOf(file()), dataSize = 0)))
         }
-        assertEquals(RecordingOpenAction.DETAILS, open(entry(DvrEntryState.FILE_MISSING, 300, files = listOf(file()))))
+        assertEquals(RecordingOpenAction.DETAILS, open(entry(DvrEntryState.REMOVED, 300, files = listOf(file()))))
         assertEquals(RecordingOpenAction.DETAILS, open(entry(DvrEntryState.INVALID, 300, files = listOf(file()))))
     }
     @Test fun noAdmissionOffersNoPlaybackOrResume() {

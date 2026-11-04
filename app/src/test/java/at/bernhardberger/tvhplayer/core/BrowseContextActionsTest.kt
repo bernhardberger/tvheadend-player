@@ -142,16 +142,22 @@ class BrowseContextActionsTest {
         }
     }
 
+    @Test fun removedRecordingsOnlyOfferDetailsEvenWithoutFiles() {
+        assertEquals(listOf(DETAILS), actions(recording(DvrEntryState.REMOVED, 20)))
+        assertEquals(listOf(DETAILS), actions(recording(DvrEntryState.REMOVED, 20, files = emptyList())))
+        assertEquals(listOf(DETAILS), actions(recording(DvrEntryState.REMOVED, 20, files = listOf(file()))))
+    }
+
     @Test fun failedRecordingsWithoutAPlayableFileOnlyOfferDetailsAndDelete() {
         listOf(DvrEntryState.MISSED, DvrEntryState.INVALID,
-            DvrEntryState.COMPLETED_ERROR, DvrEntryState.FILE_MISSING).forEach {
+            DvrEntryState.COMPLETED_ERROR).forEach {
             assertEquals("$it", listOf(DETAILS, DELETE), actions(recording(it, 20)))
             assertEquals("$it", listOf(DETAILS, DELETE), actions(recording(it, 20, files = emptyList())))
         }
         listOf(DvrEntryState.MISSED, DvrEntryState.COMPLETED_ERROR).forEach {
             assertEquals("$it", listOf(DETAILS, DELETE), actions(recording(it, 20, listOf(file()), dataSize = 0)))
         }
-        listOf(DvrEntryState.INVALID, DvrEntryState.FILE_MISSING).forEach {
+        listOf(DvrEntryState.INVALID).forEach {
             assertEquals("$it", listOf(DETAILS, DELETE), actions(recording(it, 20, listOf(file()))))
         }
     }
@@ -199,7 +205,7 @@ class BrowseContextActionsTest {
     @Test fun noAdmissionRemovesPlaybackAndUnavailableAuthorityRemovesMutations() {
         listOf(DvrEntryState.COMPLETED, DvrEntryState.RECORDING, DvrEntryState.SCHEDULED,
             DvrEntryState.MISSED, DvrEntryState.INVALID, DvrEntryState.RECORDING_ERROR,
-            DvrEntryState.COMPLETED_ERROR, DvrEntryState.FILE_MISSING).forEach {
+            DvrEntryState.COMPLETED_ERROR).forEach {
             assertEquals(listOf(DETAILS), recordingContextActions(recording(it, 20, listOf(file())), null, false))
         }
     }

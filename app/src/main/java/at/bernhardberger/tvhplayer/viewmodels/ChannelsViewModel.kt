@@ -29,7 +29,6 @@ import java.io.IOException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
@@ -41,6 +40,7 @@ data class ChannelScopeState(
     val visibility: ChannelScopeVisibility = ChannelScopeVisibility(),
     /** The observation the scope was resolved from; its rows' saved logos are that profile's. */
     val observation: SessionObservation? = null,
+    val profileId: at.bernhardberger.tvheadend.sdk.core.ServerProfileId? = null,
 )
 
 class ChannelsViewModel(
@@ -76,14 +76,24 @@ class ChannelsViewModel(
     }
 
     private fun loadSettings() {
-        if (loadJob?.isActive == true || preferences != null) return
+        if (loadJob?.isActive == true) return
         loadJob = viewModelScope.launch {
             try {
-                val saved = tagSettings.settings.first()
-                preferences = if (tagSelectedBeforeLoad) saved.copy(activeTagId = initialTagId) else saved
-                mutableSettingsFailure.value = false
-                publishScope()
-                if (preferences != saved) enqueueSave()
+                tagSettings.settings.collect { saved ->
+                    val previous = preferences
+                    if (previous != null && previous.profileId == saved.profileId) {
+                        mutableSettingsFailure.value = false
+                        return@collect
+                    }
+                    saveJob?.cancel()
+                    saveJob = null
+                    unsavedPreferences = null
+                    preferences = if (previous == null && tagSelectedBeforeLoad) saved.copy(activeTagId = initialTagId) else saved
+                    tagSelectedBeforeLoad = false
+                    mutableSettingsFailure.value = false
+                    publishScope()
+                    if (preferences != saved) enqueueSave()
+                }
             } catch (_: IOException) {
                 mutableSettingsFailure.value = true
             }
@@ -151,7 +161,8 @@ class ChannelsViewModel(
             mutableUnavailableTagNotice.value = resolved.fallback == TagScopeFallback.TAG_UNAVAILABLE
         }
         preferences = effective
-        mutableScope.value = ChannelScopeState(resolved, current, visibility = effective.visibility, observation = source)
+        mutableScope.value = ChannelScopeState(resolved, current, visibility = effective.visibility, observation = source,
+            profileId = effective.profileId)
         if (effective != requested) enqueueSave()
     }
 
@@ -176,7 +187,7 @@ class ChannelsViewModel(
 
     @MainThread
     fun retrySettings() {
-        if (preferences == null) loadSettings() else enqueueSave()
+        if (loadJob?.isActive != true) loadSettings() else enqueueSave()
     }
 
     fun dismissUnavailableTagNotice() {

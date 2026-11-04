@@ -71,7 +71,7 @@ class NumericChannelReturnTest(private val tagged: Boolean, private val completi
         val originalTags = tags.settings.first()
         tags.save(originalTags.copy(activeTagId = if (tagged) tag.id else null))
         val profileStore = TvheadendServerProfileStore(context)
-        profileStore.storeAnonymous("offline.invalid", 9982)
+        profileStore.addAnonymous("offline.invalid", 9982, activate = true)
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
         val profiles = AppProfileOwner(session, profileStore, settings, Dispatchers.IO)
         val profileJob = scope.launch { profiles.run() }
@@ -124,7 +124,7 @@ class NumericChannelReturnTest(private val tagged: Boolean, private val completi
             withContext(Dispatchers.Main) { runtime.detach(); controlled.player.release() }
             scope.cancel()
             tags.save(originalTags)
-            profileStore.clearProfile()
+            profileStore.clearAll()
         }
     }
 

@@ -16,7 +16,7 @@ fun detailsStatus(event: EpgEvent?, recording: DvrEntry?, nowSec: Long): Details
         DvrEntryState.RECORDING_ERROR -> DetailsStatus.RECORDING_ERRORS
         DvrEntryState.MISSED -> DetailsStatus.MISSED
         DvrEntryState.INVALID -> DetailsStatus.CANCELLED
-        DvrEntryState.COMPLETED_ERROR, DvrEntryState.FILE_MISSING -> DetailsStatus.FAILED
+        DvrEntryState.COMPLETED_ERROR -> DetailsStatus.FAILED
         else -> DetailsStatus.ON_NOW.takeIf {
             event != null && nowSec >= event.start.epochSeconds && nowSec < event.stop.epochSeconds
         }

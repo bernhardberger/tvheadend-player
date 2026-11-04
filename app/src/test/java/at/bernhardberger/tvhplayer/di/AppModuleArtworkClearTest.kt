@@ -8,8 +8,6 @@ import at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
-import java.io.IOException
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -25,38 +23,24 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class)
 class AppModuleArtworkClearTest {
-    @Test fun throwingCacheClearDoesNotFailProfileSaveOrRemoval() = runTest {
+    @Test fun profileSaveAndRemovalWorkWithoutClearingGlobalArtwork() = runTest {
         val app = ApplicationProvider.getApplicationContext<Application>()
         val store = FakeServerProfileStore()
         val session = FakeTvheadendSession()
-        var clears = 0
         val owner = AppProfileOwner(
             session = session, profileStore = store, playerSettings = PlayerSettingsStore(app),
             ioDispatcher = StandardTestDispatcher(testScheduler),
             readProfileForEditing = { error("Unexpected editing read") },
-            clearAppArtwork = {
-                clearAppArtworkBestEffort {
-                    clears++
-                    throw IOException("Synthetic cache failure")
-                }
-            },
         )
         backgroundScope.launch { owner.run() }
         runCurrent()
         owner.saveServer("offline.invalid", 9982)
-        assertTrue(store.loadProfile() is ServerProfileReadResult.Available)
+        assertTrue(store.loadActive() is ServerProfileReadResult.Available)
         assertTrue(owner.serverProfile.value is ServerProfileReadResult.Available)
         assertTrue(FakeSessionCall.CONNECT in session.calls)
         owner.clearProfile()
-        assertEquals(ServerProfileReadResult.Missing, store.loadProfile())
+        assertEquals(ServerProfileReadResult.Missing, store.loadActive())
         assertEquals(ServerProfileReadResult.Missing, owner.serverProfile.value)
-        assertEquals(FakeSessionCall.DISCONNECT, session.calls.last())
-        assertEquals(2, clears)
-    }
-
-    @Test fun bestEffortClearRethrowsCancellation() = runTest {
-        val cancellation = CancellationException("Synthetic cancellation")
-        val failure = runCatching { clearAppArtworkBestEffort { throw cancellation } }.exceptionOrNull()
-        assertSame(cancellation, failure)
+        assertEquals(listOf(FakeSessionCall.DISCONNECT, FakeSessionCall.CLEAR_PROFILE_CACHE), session.calls.takeLast(2))
     }
 }

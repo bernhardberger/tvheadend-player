@@ -107,7 +107,7 @@ class RecordingMetadataPolicyTest {
 
     @Test fun incompleteOrMixedTimelessFilesMakeTheTotalUnknown() {
         val valid = DvrRecordingFile.create(start = at(1_000), stop = at(1_300))
-        for (state in listOf(DvrEntryState.COMPLETED, DvrEntryState.COMPLETED_ERROR, DvrEntryState.FILE_MISSING)) {
+        for (state in listOf(DvrEntryState.COMPLETED, DvrEntryState.COMPLETED_ERROR, DvrEntryState.REMOVED)) {
             for (invalid in listOf(
                 DvrRecordingFile.create(start = at(1_400)),
                 DvrRecordingFile.create(stop = at(1_500)),
@@ -165,7 +165,7 @@ class RecordingMetadataPolicyTest {
         fun file(seconds: Long) = DvrRecordingFile.create(start = at(1_000), stop = at(1_000 + seconds))
         assertEquals(RecordingShortfall(5, planned), recordingStoppedEarly(timed(DvrEntryState.COMPLETED, file(5))))
         assertEquals(RecordingShortfall(5, planned), recordingStoppedEarly(timed(DvrEntryState.COMPLETED_ERROR, file(5))))
-        assertNotNull(recordingStoppedEarly(timed(DvrEntryState.FILE_MISSING, file(threshold - 1))))
+        assertNull(recordingStoppedEarly(timed(DvrEntryState.REMOVED, file(threshold - 1))))
         assertNull(recordingStoppedEarly(timed(DvrEntryState.COMPLETED, file(threshold))))
         assertNull(recordingStoppedEarly(timed(DvrEntryState.COMPLETED, file(planned + 300))))
         // A short programme under the share but missing less than two minutes is not flagged.
@@ -183,7 +183,7 @@ class RecordingMetadataPolicyTest {
     @Test fun stoppedEarlyRequiresAnEarlyFinalStopNotALateStartOrGap() {
         val stop = 1_000 + 61L * 60
         fun file(start: Long, end: Long) = DvrRecordingFile.create(start = at(start), stop = at(end))
-        for (state in listOf(DvrEntryState.COMPLETED, DvrEntryState.COMPLETED_ERROR, DvrEntryState.FILE_MISSING)) {
+        for (state in listOf(DvrEntryState.COMPLETED, DvrEntryState.COMPLETED_ERROR)) {
             assertNull(recordingStoppedEarly(timed(state, file(1_600, stop))))
             assertNull(recordingStoppedEarly(timed(state, file(2_000, stop), file(1_000, 1_300))))
             assertNull(recordingStoppedEarly(timed(state, file(1_600, stop - 119))))

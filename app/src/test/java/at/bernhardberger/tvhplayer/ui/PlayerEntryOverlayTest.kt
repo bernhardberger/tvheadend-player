@@ -694,7 +694,7 @@ class PlayerEntryOverlayTest {
         val settings = PlayerSettingsStore(InMemoryData { beforeSettingsRead() })
         playerSettings = settings
         runBlocking { settings.setWarmPlaybackMode(mode) }
-        val profiles = AppProfileOwner(session, FakeServerProfileStore(ServerProfileReadResult.anonymous("offline.invalid", 9982)),
+        val profiles = AppProfileOwner(session, FakeServerProfileStore(ServerProfileReadResult.anonymous(at.bernhardberger.tvheadend.sdk.core.ServerProfileId.generate(), "offline.invalid", 9982)),
             settings, Dispatchers.IO, readProfileForEditing = { ServerProfileEditReadResult.Missing })
         scope.launch { profiles.run() }
         player = ExoPlayer.Builder(context).build()

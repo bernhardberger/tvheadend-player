@@ -40,7 +40,7 @@ class TargetAspectTest {
 
     private fun store(identity: Boolean) = PlayerSettingsStore(
         InMemoryPreferencesDataStore(
-            if (identity) preferencesOf(stringPreferencesKey("explicit_audio_profile_v1") to "server")
+            if (identity) preferencesOf(stringPreferencesKey("activeServerProfileId") to "server")
             else preferencesOf(),
         ),
     )
@@ -128,7 +128,7 @@ class TargetAspectTest {
     }
 
     @Test fun aDelayedChoiceCannotWriteIntoAReplacementProfileOrChangeItsDisplayedMode() {
-        val profileKey = stringPreferencesKey("explicit_audio_profile_v1")
+        val profileKey = stringPreferencesKey("activeServerProfileId")
         val data = InMemoryPreferencesDataStore(preferencesOf(profileKey to "original"))
         val entered = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
@@ -158,7 +158,7 @@ class TargetAspectTest {
     }
 
     @Test fun aTemporaryRecordingChoiceDoesNotFollowTheTargetIntoAnotherProfile() {
-        val profileKey = stringPreferencesKey("explicit_audio_profile_v1")
+        val profileKey = stringPreferencesKey("activeServerProfileId")
         val data = InMemoryPreferencesDataStore(preferencesOf(profileKey to "original"))
         val store = PlayerSettingsStore(data)
         show(store)

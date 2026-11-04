@@ -240,7 +240,7 @@ class RemoteLogoCacheTest {
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    @Test fun oldResponseDuringProfileReplacementCannotEvictNewGenerationOrSdkMemory() = runTest {
+    @Test fun profileReplacementKeepsSharedArtworkAndSdkMemory() = runTest {
         val replacementEntered = CompletableDeferred<Unit>()
         val releaseReplacement = CompletableDeferred<Unit>()
         val fakeSession = FakeTvheadendSession()
@@ -256,7 +256,6 @@ class RemoteLogoCacheTest {
             playerSettings = PlayerSettingsStore(app),
             ioDispatcher = StandardTestDispatcher(testScheduler),
             readProfileForEditing = { error("Unexpected editing read") },
-            clearAppArtwork = cache::clear,
         )
         backgroundScope.launch { owner.run() }
         runCurrent()
@@ -274,21 +273,17 @@ class RemoteLogoCacheTest {
         try {
             assertTrue(entered.await(10, TimeUnit.SECONDS))
             releaseReplacement.complete(Unit)
-            save.await() // The clear follows replacement; the request above still has the old generation.
-            val fresh = imageLoader.execute(request(memory = true)) as SuccessResult
+            save.await()
             val memory = requireNotNull(imageLoader.memoryCache)
             val sdkKey = MemoryCache.Key("sdk-artwork-fixture")
             memory[sdkKey] = MemoryCache.Value(Bitmap.createBitmap(8, 4, Bitmap.Config.ARGB_8888).asImage())
             release.countDown()
-            val stale = old.await() as ErrorResult
-            assertNotEquals(fresh.diskCacheKey, stale.request.diskCacheKey)
-            assertNull(cache.diskCache.openSnapshot(requireNotNull(stale.request.diskCacheKey)))
-            assertTrue(memory.keys.none { it.key == stale.request.memoryCacheKey })
+            val fresh = old.await() as SuccessResult
             assertNotNull(cache.diskCache.openSnapshot(requireNotNull(fresh.diskCacheKey))?.also { it.close() })
             assertNotNull(memory[requireNotNull(fresh.memoryCacheKey)])
             assertNotNull(memory[sdkKey])
             assertEquals(DataSource.MEMORY_CACHE, (imageLoader.execute(request(memory = true)) as SuccessResult).dataSource)
-            assertEquals(2, requests.get())
+            assertEquals(1, requests.get())
         } finally {
             release.countDown()
         }

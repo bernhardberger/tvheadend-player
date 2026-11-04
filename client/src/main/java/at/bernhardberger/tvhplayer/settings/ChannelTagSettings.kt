@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
+import at.bernhardberger.tvheadend.sdk.core.ServerProfileId
 import at.bernhardberger.tvhplayer.core.ChannelScopeVisibility
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -14,8 +15,6 @@ import kotlinx.coroutines.flow.map
 private const val ALL_CHANNELS_SCOPE = "all"
 private const val TAG_SCOPE_PREFIX = "tag:"
 private const val SDK_U32_MAX = 0xffff_ffffL
-
-internal val activeTagKey = longPreferencesKey("activeChannelTagIdLong")
 
 internal fun sdkU32IdOrNull(value: Long): Long? = value.takeIf { it in 0L..SDK_U32_MAX }
 
@@ -27,20 +26,28 @@ internal fun persistedTagScope(tagId: ChannelTagId): String = "$TAG_SCOPE_PREFIX
 data class ChannelTagPreferences(
     val activeTagId: ChannelTagId? = null,
     val visibility: ChannelScopeVisibility = ChannelScopeVisibility(),
+    val profileId: ServerProfileId? = null,
 )
 
 class ChannelTagSettingsStore(private val dataStore: DataStore<Preferences>) {
     constructor(context: Context) : this(context.dataStore)
-    private val visibleScopesKey = stringSetPreferencesKey("visibleChannelScopes")
     val settings: Flow<ChannelTagPreferences> = dataStore.data.map { preferences ->
+        val id = preferences.activeProfileId() ?: return@map ChannelTagPreferences()
+        val activeTagKey = longPreferencesKey(profilePreferencePrefix(id) + "activeTag")
+        val visibleScopesKey = stringSetPreferencesKey(profilePreferencePrefix(id) + "visibleScopes")
         ChannelTagPreferences(
+            profileId = id,
             activeTagId = preferences[activeTagKey]?.let(::sdkU32IdOrNull)?.let(::ChannelTagId),
             visibility = decodeVisibility(preferences[visibleScopesKey]),
         )
     }
 
     suspend fun save(settings: ChannelTagPreferences) {
+        val id = settings.profileId ?: return
         dataStore.edit { preferences ->
+            if (preferences.activeProfileId() != id) return@edit
+            val activeTagKey = longPreferencesKey(profilePreferencePrefix(id) + "activeTag")
+            val visibleScopesKey = stringSetPreferencesKey(profilePreferencePrefix(id) + "visibleScopes")
             if (settings.activeTagId == null) {
                 preferences.remove(activeTagKey)
             } else {

@@ -136,4 +136,21 @@ class NoticeFormatterTest {
             assertFalse(result.detail.orEmpty().contains("Grand Prix of Austria"))
         }
     }
+
+    @Test fun retainedRemovedEntryIsDeletedAndRealCancellationsStayCanceled() {
+        val removed = DvrEntry.create(DvrEntryId(1), title = "Show", state = DvrEntryState.REMOVED)
+        val result = formatter.format(Notice.Dvr(DvrChangeKind.REMOVED, removed,
+            DvrChangeOrigin.ThisClient(DvrMutationKind.DELETE)))
+        assertEquals("Recording deleted", result.headline)
+        assertEquals(AppNoticeIcon.DELETE, result.icon)
+        for ((state, origin) in listOf(
+            DvrEntryState.SCHEDULED to DvrChangeOrigin.External,
+            DvrEntryState.INVALID to DvrChangeOrigin.ThisClient(DvrMutationKind.CANCEL),
+        )) {
+            val canceled = formatter.format(Notice.Dvr(DvrChangeKind.REMOVED,
+                DvrEntry.create(DvrEntryId(2), state = state), origin))
+            assertEquals("Recording canceled", canceled.headline)
+            assertEquals(AppNoticeIcon.CANCEL, canceled.icon)
+        }
+    }
 }

@@ -15,6 +15,16 @@ enum class PauseUnavailableReason { SETTINGS_OFF, CHANNEL_UNAVAILABLE }
 
 /** User feedback policy, with no resources or presentation dependencies. */
 sealed interface Notice {
+    data object ServerProfileRemoved : Notice {
+        override val key = "server-profile-removed"
+        override val severity = NoticeSeverity.INFO
+    }
+
+    data object ServerProfileAlreadyExists : Notice {
+        override val key = "server-profile-already-exists"
+        override val severity = NoticeSeverity.INFO
+    }
+
     val key: String
     val severity: NoticeSeverity
 
