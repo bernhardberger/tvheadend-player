@@ -391,7 +391,8 @@ class GuidePlayerReturnFocusTest {
         val runtime = AppPlaybackRuntime(player, session, createTvheadendPlaybackCoordinator(player), settings, profiles, scope,
             at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider(context),
             at.bernhardberger.tvhplayer.playback.PlaybackAudioFocus.None,
-            at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy.fromPlayerSettings())
+            at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy.fromPlayerSettings(),
+            noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) })
         // The guide position saved when the historical programme on channel 1 was opened.
         val position = GuidePositionStore().apply {
             save(GuidePosition(ChannelId(1), event(1, -2).id, hour - 2 * 3600, hour - 2 * 3600, 0))

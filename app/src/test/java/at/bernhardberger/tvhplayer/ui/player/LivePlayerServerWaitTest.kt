@@ -346,7 +346,8 @@ class LivePlayerServerWaitTest {
         player = ExoPlayer.Builder(context).build()
         val coordinator = createTvheadendPlaybackCoordinator(player).also { it.launchIn(scope) }
         runtime = AppPlaybackRuntime(player, session, coordinator, settings, profiles, scope,
-            TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None, PlaybackRuntimePolicy.fromPlayerSettings())
+            TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None, PlaybackRuntimePolicy.fromPlayerSettings(),
+            noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) })
         val video = VideoPlayerViewModel(runtime, session)
         models.put("video", video)
         val owner = object : LifecycleOwner {

@@ -107,7 +107,7 @@ class RecordingMarkerPolicyTest {
     }
 
     @Test
-    fun overlappingCommercialRangesKeepAllEndpointsWithoutMuteOrUnknown() {
+    fun overlappingCommercialRangesMergeWithoutMuteOrUnknown() {
         val points = listOf(
             DvrCutpoint(30.milliseconds, 50.milliseconds, DvrCutpointAction.COMMERCIAL_BREAK),
             DvrCutpoint(10.milliseconds, 40.milliseconds, DvrCutpointAction.COMMERCIAL_BREAK),
@@ -116,7 +116,23 @@ class RecordingMarkerPolicyTest {
             DvrCutpoint(50.milliseconds, 60.milliseconds, DvrCutpointAction.CUT),
             marker(0, 70),
         )
-        assertEquals(listOf(0L, 10L, 30L, 40L, 50L, 60L, 70L), recordingMarkerPositions(points, 100))
+        assertEquals(listOf(0L, 10L, 50L, 60L, 70L), recordingMarkerPositions(points, 100))
+    }
+
+    @Test
+    fun namedChaptersSurviveIntervalsAndSameKindOverlapsMergeButTouchingOnesStaySeparate() {
+        val points = listOf(
+            DvrCutpoint(10.milliseconds, 30.milliseconds, DvrCutpointAction.CUT),
+            DvrCutpoint(20.milliseconds, 40.milliseconds, DvrCutpointAction.CUT),
+            DvrCutpoint(40.milliseconds, 50.milliseconds, DvrCutpointAction.CUT),
+            DvrCutpoint(15.milliseconds, 35.milliseconds, DvrCutpointAction.COMMERCIAL_BREAK),
+        )
+        assertEquals(listOf(
+            RecordingMark(RecordingMarkKind.CUT, 10, 40),
+            RecordingMark(RecordingMarkKind.AD_BREAK, 15, 35),
+            RecordingMark(RecordingMarkKind.CHAPTER, 25, name = "Story"),
+            RecordingMark(RecordingMarkKind.CUT, 40, 50),
+        ), recordingMarks(points, listOf(RecordingChapter(5), RecordingChapter(25, " Story "))))
     }
 
     @Test

@@ -65,7 +65,7 @@ class AppPlaybackRuntimeTest {
         query.use(binding)
         val job = launch { query.refresh(binding) }
         runCurrent()
-        query.updateChapters(listOf(0L, 5_000L))
+        query.updateChapters(listOf(0L, 5_000L).map { at.bernhardberger.tvhplayer.core.RecordingChapter(it) })
         val chapterRevision = query.revision.value
         response.complete(Unit)
         job.join()
@@ -97,7 +97,7 @@ class AppPlaybackRuntimeTest {
             query.use(binding)
             query.refresh(binding)
             assertEquals(points, query.cutpoints.value)
-            query.updateChapters(listOf(0L, 5_000L))
+            query.updateChapters(listOf(0L, 5_000L).map { at.bernhardberger.tvhplayer.core.RecordingChapter(it) })
             delayed = true
             val job = launch { query.refresh(binding) }
             runCurrent()
@@ -106,7 +106,7 @@ class AppPlaybackRuntimeTest {
             query.use(null)
             assertTrue(query.cutpoints.value.isEmpty())
             assertTrue(query.chapterStartsMs.value.isEmpty())
-            query.updateChapters(listOf(9_000L))
+            query.updateChapters(listOf(at.bernhardberger.tvhplayer.core.RecordingChapter(9_000L)))
             assertTrue(query.chapterStartsMs.value.isEmpty())
             when (retirement) {
                 "reinstall" -> query.use(binding) // Same object is still fenced by installation revision.
@@ -134,10 +134,10 @@ class AppPlaybackRuntimeTest {
         query.use(binding)
         val initialRevision = query.revision.value
         assertTrue(query.isCurrent(binding))
-        query.updateChapters(listOf(0L, 5_000L))
+        query.updateChapters(listOf(0L, 5_000L).map { at.bernhardberger.tvhplayer.core.RecordingChapter(it) })
         assertTrue(query.revision.value > initialRevision)
         val chapterRevision = query.revision.value
-        query.updateChapters(listOf(0L, 5_000L))
+        query.updateChapters(listOf(0L, 5_000L).map { at.bernhardberger.tvhplayer.core.RecordingChapter(it) })
         assertEquals(chapterRevision, query.revision.value)
         query.refresh(binding) // The installed SDK fake supplies NotReady: ordinary seeking remains.
         assertTrue(query.cutpoints.value.isEmpty())

@@ -882,7 +882,8 @@ class RecordingPlayerChromeScreenTest {
         }
         runtime = AppPlaybackRuntime(controlled, session, coordinator, settings, profiles, scope,
             TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None,
-            PlaybackRuntimePolicy.fromPlayerSettings(object : PlaybackTrace {}))
+            PlaybackRuntimePolicy.fromPlayerSettings(object : PlaybackTrace {}),
+            noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) })
         owner.lifecycle.currentState = Lifecycle.State.RESUMED
         // setContent synchronizes the first composition; there is no Compose root to idle yet.
         if (listed) {

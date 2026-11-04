@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Recordings skip cuts and stay silent during mute spans marked in Tvheadend's .edl files.
+
 ## 0.4.6
 
 ### Appliance companion

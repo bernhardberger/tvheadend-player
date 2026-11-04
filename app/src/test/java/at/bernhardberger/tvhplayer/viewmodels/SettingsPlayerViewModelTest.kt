@@ -51,6 +51,7 @@ class SettingsPlayerViewModelTest {
                 player, session, createTvheadendPlaybackCoordinator(player), settings, profiles,
                 backgroundScope, TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None,
                 PlaybackRuntimePolicy.fromPlayerSettings(),
+                noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) },
             )
             val model = SettingsPlayerViewModel(settings, runtime, session, profiles, uiSettings)
             models.put("player", model)

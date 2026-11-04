@@ -21,6 +21,38 @@ import org.junit.Test
 
 class PlayerSettingsStoreTest {
     @Test
+    fun recordingSkipDefaultsAndEveryChoicePersist() = runTest {
+        val dataStore = InMemoryPreferencesDataStore()
+        val store = PlayerSettingsStore(dataStore)
+        val defaults = store.playerSettings.first()
+        assertEquals(AdBreakMode.ASK, defaults.adBreakMode)
+        assertTrue(defaults.skipCuts)
+        assertEquals(SkipLanding.END, defaults.skipLanding)
+        for (mode in AdBreakMode.entries) {
+            store.setAdBreakMode(mode)
+            assertEquals(mode, PlayerSettingsStore(dataStore).playerSettings.first().adBreakMode)
+        }
+        for (landing in SkipLanding.entries) {
+            store.setSkipLanding(landing)
+            assertEquals(landing, PlayerSettingsStore(dataStore).playerSettings.first().skipLanding)
+        }
+        for (enabled in listOf(false, true)) {
+            store.setSkipCuts(enabled)
+            assertEquals(enabled, PlayerSettingsStore(dataStore).playerSettings.first().skipCuts)
+        }
+    }
+
+    @Test
+    fun invalidRecordingSkipEnumsUseDefaults() = runTest {
+        val store = PlayerSettingsStore(InMemoryPreferencesDataStore(preferencesOf(
+            stringPreferencesKey("adBreakMode") to "unknown",
+            stringPreferencesKey("skipLanding") to "unknown",
+        )))
+        assertEquals(AdBreakMode.ASK, store.playerSettings.first().adBreakMode)
+        assertEquals(SkipLanding.END, store.playerSettings.first().skipLanding)
+    }
+
+    @Test
     fun warmPlaybackDefaultsOnAndPersistsEveryChoice() = runTest {
         val dataStore = InMemoryPreferencesDataStore()
         val store = PlayerSettingsStore(dataStore)
