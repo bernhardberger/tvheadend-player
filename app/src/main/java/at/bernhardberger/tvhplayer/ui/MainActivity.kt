@@ -47,6 +47,8 @@ import at.bernhardberger.tvhplayer.viewmodels.MainStartupViewModel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import at.bernhardberger.tvhplayer.settings.AppProfileOwner
+import at.bernhardberger.tvhplayer.ui.screens.settings.serversStored
 import org.koin.android.ext.android.inject
 import androidx.compose.runtime.CompositionLocalProvider
 import at.bernhardberger.tvhplayer.images.ChannelAccents
@@ -125,6 +127,7 @@ class MainActivity : AppCompatActivity() {
     private val notices: NoticeCenter by inject()
     private val tvheadendSession: TvheadendSession by inject()
     private val channelAccents: ChannelAccents by inject()
+    private val profileOwner: AppProfileOwner by inject()
     private val mediaSessionLifecycle = ActivityMediaSessionLifecycle()
     private val playbackLifecycle = MainActivityPlaybackLifecycle(
         owners = playbackOwners,
@@ -184,6 +187,7 @@ class MainActivity : AppCompatActivity() {
             val startupState by startupViewModel.state.collectAsStateWithLifecycle()
             val runtimeServerSettings by
                 startupViewModel.runtimeServerSettings.collectAsStateWithLifecycle()
+            val serverProfiles by profileOwner.profiles.collectAsStateWithLifecycle()
             TVHeadendPlayerTheme {
                 CompositionLocalProvider(
                     LocalChannelAccents provides channelAccents,
@@ -197,6 +201,7 @@ class MainActivity : AppCompatActivity() {
                         onPlayerVisibilityChanged = { isPlayerVisible = it },
                         onRequestExit = ::requestRootExit,
                         registerActivityKeyContract = ::registerMainStartupActivityKeyContract,
+                        serversStored = serverProfiles.serversStored(),
                     )
                 }
             }

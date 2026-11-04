@@ -22,9 +22,12 @@ fun showServerSwitcher(profiles: List<ServerProfileSummary>): Boolean = profiles
 fun shouldShowStartupPicker(askAtStartup: Boolean, switcherProfiles: List<ServerProfileSummary>): Boolean =
     askAtStartup && switcherProfiles.size >= 2
 
+/** The name Settings > Connection shows: the label, else "<user> on <host>[ · port N]", else the address. */
 fun serverProfileDisplayName(profile: ServerProfileSummary): String {
-    val name = profile.label ?: profile.username?.let { "$it on ${profile.host}" } ?: profile.host
-    return if (profile.port == 9982) name else "$name · ${profile.port}"
+    profile.label?.let { return it }
+    val address = if (profile.port == 9982) profile.host else "${profile.host} · port ${profile.port}"
+    val username = profile.username.takeIf { profile.authenticationMode == ServerProfileAuthenticationMode.PASSWORD }
+    return username?.let { "$it on $address" } ?: address
 }
 
 fun existingServerProfile(

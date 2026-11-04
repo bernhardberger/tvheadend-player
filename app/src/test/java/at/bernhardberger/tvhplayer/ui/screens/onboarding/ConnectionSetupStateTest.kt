@@ -25,6 +25,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import androidx.compose.runtime.saveable.SaverScope
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -32,6 +34,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -40,6 +43,146 @@ class ConnectionSetupStateTest {
     private val profiles = FakeProfiles()
     private val form = ConnectionFormState()
     private val discovery = MutableStateFlow(discovering())
+
+    @Test fun anonymousConfirmationSurvivesARealFormRestorationAndStillPrecedesThePlaybackStop() = runTest {
+        form.updateHost(HOST)
+        val events = mutableListOf<String>()
+        val saver = ConnectionSetupState.saver(form, session, profiles, { discovery }, backgroundScope,
+            SetupMode.ADD, {}, {}, interruptsPlayback = { true }, beforeTest = { events += "stop" })
+        val state = ConnectionSetupState(form, session, profiles, { discovery }, backgroundScope,
+            SetupMode.ADD, step = SetupStep.SIGN_IN, interruptsPlayback = { true }, beforeTest = { events += "stop" })
+        state.connect()
+        assertTrue(state.confirmingSwitch)
+        assertTrue(session.calls.isEmpty())
+        val snapshot = with(saver) { object : SaverScope { override fun canBeSaved(value: Any) = true }.save(state)!! }
+        val saveScope = object : SaverScope { override fun canBeSaved(value: Any) = true }
+        val formSnapshot = with(at.bernhardberger.tvhplayer.settings.ConnectionFormStateSaver) { saveScope.save(form)!! }
+        val restoredForm = at.bernhardberger.tvhplayer.settings.ConnectionFormStateSaver.restore(formSnapshot)!!
+        assertNotSame(form, restoredForm)
+        val restored = ConnectionSetupState.saver(restoredForm, session, profiles, { discovery }, backgroundScope,
+            SetupMode.ADD, {}, {}, interruptsPlayback = { true }, beforeTest = { events += "stop" }).restore(snapshot)!!
+        assertTrue(restored.confirmingSwitch)
+        restored.keepWatching()
+        runCurrent()
+        assertTrue(events.isEmpty())
+        assertEquals(SignInFocus.CONNECT, restored.signInFocus)
+        restored.connect()
+        restored.confirmSwitch()
+        runCurrent()
+        assertEquals(listOf("stop"), events)
+        assertEquals(listOf(FakeSessionCall.DISCONNECT, FakeSessionCall.CONNECT), session.calls)
+    }
+
+    @Test fun passwordConfirmationReturnsToAccountAfterARealCredentialFreeFormRestoration() = runTest {
+        form.updateHost(HOST)
+        form.updateUsername(USERNAME)
+        form.updatePassword(PASSWORD)
+        var stopped = false
+        val state = ConnectionSetupState(form, session, profiles, { discovery }, backgroundScope,
+            SetupMode.ADD, step = SetupStep.SIGN_IN, interruptsPlayback = { true }, beforeTest = { stopped = true })
+        state.connect()
+        assertTrue(state.confirmingSwitch)
+        val saveScope = object : SaverScope { override fun canBeSaved(value: Any) = true }
+        val saver = ConnectionSetupState.saver(form, session, profiles, { discovery }, backgroundScope, SetupMode.ADD, {}, {})
+        val snapshot = with(saver) { saveScope.save(state)!! }
+        val formSnapshot = with(at.bernhardberger.tvhplayer.settings.ConnectionFormStateSaver) { saveScope.save(form)!! }
+        val restoredForm = at.bernhardberger.tvhplayer.settings.ConnectionFormStateSaver.restore(formSnapshot)!!
+        assertNotSame(form, restoredForm)
+        assertTrue(restoredForm.username.isEmpty())
+        assertTrue(restoredForm.password.isEmpty())
+        val restored = ConnectionSetupState.saver(restoredForm, session, profiles, { discovery }, backgroundScope,
+            SetupMode.ADD, {}, {}, interruptsPlayback = { true }, beforeTest = { stopped = true }).restore(snapshot)!!
+        restored.loadSaved()
+        runCurrent()
+        assertFalse(restored.confirmingSwitch)
+        assertEquals(SetupStep.SIGN_IN, restored.step)
+        assertEquals(SignInFocus.USERNAME, restored.signInFocus)
+        assertFalse(stopped)
+        assertTrue(session.calls.isEmpty())
+    }
+
+    @Test fun duplicateEditNeverAsksStopsOrConnects() = runTest {
+        form.updateHost(HOST)
+        var lookedUp = 0
+        var stopped = 0
+        val state = ConnectionSetupState(form, session, profiles, { discovery }, backgroundScope,
+            SetupMode.EDIT, step = SetupStep.SIGN_IN, existingProfile = { _, _, _ -> lookedUp++; true },
+            interruptsPlayback = { true }, beforeTest = { stopped++ })
+        state.connect()
+        runCurrent()
+        assertEquals(1, lookedUp)
+        assertFalse(state.confirmingSwitch)
+        assertEquals(0, stopped)
+        assertTrue(session.calls.isEmpty())
+    }
+
+    @Test fun aNewSetupInstanceWaitsForTheClosedInstancesCleanup() = runTest {
+        form.updateHost(HOST)
+        val lock = Mutex()
+        val gate = CompletableDeferred<Unit>()
+        val firstScope = CoroutineScope(coroutineContext + Job(backgroundScope.coroutineContext[Job]))
+        val first = ConnectionSetupState(form, session, profiles, { discovery }, firstScope,
+            SetupMode.ADD, restoreSaved = { gate.await(); session.publish(ready()) }, sessionLock = lock)
+        first.connect()
+        runCurrent()
+        firstScope.cancel()
+        runCurrent()
+        val calls = session.calls.toList()
+        val second = ConnectionSetupState(form, session, profiles, { discovery }, backgroundScope,
+            SetupMode.ADD, sessionLock = lock)
+        second.connect()
+        runCurrent()
+        assertEquals(calls, session.calls)
+        gate.complete(Unit)
+        runCurrent()
+        assertEquals(calls + listOf(FakeSessionCall.DISCONNECT, FakeSessionCall.CONNECT), session.calls)
+        assertEquals(SetupStep.CONNECTING, second.step)
+        session.publish(SessionObservation.create(sessionState = SessionState.Connecting))
+        runCurrent()
+        session.publish(ready())
+        runCurrent()
+        assertEquals(SetupStep.DONE, second.step)
+    }
+
+    @Test fun anOutcomeAfterTheSavedConnectionGenerationChangedCannotCompleteOrCleanUpTheTest() = runTest {
+        form.updateHost(HOST)
+        var generation = 1L
+        var restored = 0
+        val state = ConnectionSetupState(form, session, profiles, { discovery }, backgroundScope,
+            SetupMode.ADD, restoreSaved = { restored++ }, connectionGeneration = { generation })
+        state.connect()
+        runCurrent()
+        val calls = session.calls.toList()
+        generation++
+        session.publish(ready())
+        runCurrent()
+        assertEquals(SetupStep.FAILED, state.step)
+        assertEquals(SetupFailure.OTHER, state.failure)
+        assertEquals(calls, session.calls)
+        assertEquals(0, restored)
+    }
+
+    @Test fun cancelledAndFailedAddsWithNoneInUseLeaveTheSessionDisconnected() = runTest {
+        form.updateHost(HOST)
+        var restores = 0
+        fun add() = ConnectionSetupState(form, session, profiles, { discovery }, backgroundScope,
+            SetupMode.ADD, restoreSaved = { restores++; session.disconnect() })
+        val cancelled = add()
+        cancelled.connect()
+        runCurrent()
+        cancelled.back()
+        runCurrent()
+        assertEquals(FakeSessionCall.DISCONNECT, session.calls.last())
+        val failed = add()
+        failed.connect()
+        runCurrent()
+        session.publish(SessionObservation.create(sessionState = SessionState.Unavailable(SessionFailure.SERVER_UNREACHABLE)))
+        runCurrent()
+        assertEquals(SetupStep.FAILED, failed.step)
+        assertEquals(FakeSessionCall.DISCONNECT, session.calls.last())
+        assertEquals(2, restores)
+        assertNull(profiles.saved)
+    }
 
     @Test
     fun aSearchNeverValidatesTheAddress() = runTest {

@@ -112,8 +112,10 @@ class ProfilePreferencesTest {
         store.addAnonymous("second.invalid", port = 9983)
         store.addPassword("first.invalid", username = "viewer", password = "synthetic")
         store.addPassword("second.invalid", port = 9983, username = "viewer", password = "synthetic", label = "  Lounge  ")
+        store.addPassword("second.invalid", port = 9983, username = "guest", password = "synthetic")
         val profiles = (store.profiles() as ServerProfileListResult.Available).profiles
-        assertEquals(listOf("first.invalid", "second.invalid · 9983", "viewer on first.invalid", "Lounge · 9983"),
+        assertEquals(listOf("first.invalid", "second.invalid · port 9983", "viewer on first.invalid", "Lounge",
+            "guest on second.invalid · port 9983"),
             profiles.map(::serverProfileDisplayName))
         assertEquals(profiles[0].id, existingServerProfile(profiles, " first.invalid ", 9982, null))
         assertEquals(profiles[2].id, existingServerProfile(profiles, "first.invalid", 9982, "viewer"))

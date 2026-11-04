@@ -23,6 +23,8 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -83,8 +85,19 @@ class AppProfileOwner(
 
     private val serverMutex = Mutex()
     private val streamMutex = Mutex()
+
+    /**
+     * Serializes setup tests (including their non-cancellable cleanup) with saved-profile
+     * commands. A setup releases its test before submitting a save. Once a command is admitted,
+     * its caller holds this lock until the process-owned command has actually completed.
+     */
+    val connectionChanges = Mutex()
     private val commands = Channel<ProfileCommand>(
-        onUndeliveredElement = ProfileCommand::releaseSensitiveMaterial,
+        capacity = Channel.UNLIMITED,
+        onUndeliveredElement = { command ->
+            command.releaseSensitiveMaterial()
+            command.completion.completeExceptionally(CancellationException("Profile owner stopped before command execution"))
+        },
     )
     private val mutableServerProfile = MutableStateFlow<ServerProfileReadResult?>(null)
     private val mutableConfigurationGeneration = MutableStateFlow(0L)
@@ -124,7 +137,7 @@ class AppProfileOwner(
                 withContext(NonCancellable) { handleCommand(command) }
             }
         } finally {
-            commands.close()
+            commands.cancel()
             discoveryJob.cancelAndJoin()
         }
     }
@@ -303,7 +316,7 @@ class AppProfileOwner(
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
             } finally {
-                noticeCenter()?.let { center -> center.post(Notice.ServerProfileRemoved, center.context()) }
+                noticeCenter()?.let { center -> center.post(Notice.ServerProfileRemoved(id, serverProfileDisplayName(summary)), center.context()) }
             }
         } else if (active) {
             applyServerProfile(profileStore.loadActive())
@@ -333,8 +346,24 @@ class AppProfileOwner(
     }
 
     private suspend fun submit(command: ProfileCommand) {
-        commands.send(command)
-        command.completion.await()
+        var submitted = false
+        suspend fun submitAndAwait() {
+            currentCoroutineContext().ensureActive()
+            // Non-suspending admission has no prompt-cancellation gap between delivery and
+            // recording ownership. A cancelled sender must still await an admitted command.
+            commands.trySend(command).getOrThrow()
+            submitted = true
+            // Admission transfers ownership to run(); cancellation cannot release the session
+            // to a setup test while that command is still changing it.
+            withContext(NonCancellable) { command.completion.await() }
+        }
+        try {
+            if (command is ServerProfileCommand) connectionChanges.withLock { submitAndAwait() }
+            else submitAndAwait()
+        } finally {
+            // A caller cancelled while waiting for setup cleanup never reached the channel.
+            if (!submitted) command.releaseSensitiveMaterial()
+        }
     }
 
     private suspend fun handleCommand(command: ProfileCommand) {

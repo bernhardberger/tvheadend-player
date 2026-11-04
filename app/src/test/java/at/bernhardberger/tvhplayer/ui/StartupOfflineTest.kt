@@ -177,7 +177,8 @@ class StartupOfflineTest {
         compose.onNode(hasTestTag("tv-recovery-secondary") and hasText("Connection settings", substring = true)).assertIsFocused()
         key(Key.DirectionCenter)
         settle()
-        compose.waitUntil(10_000) { compose.onAllNodes(hasText("Set up connection"), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
+        // Connection settings show the server list.
+        compose.waitUntil(10_000) { compose.onAllNodes(hasText("Add server"), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
         assertEquals(0, compose.onAllNodes(hasTestTag("tv-recovery-overlay")).fetchSemanticsNodes().size)
         assertEquals(0, compose.onAllNodes(hasTestTag(LivePlayerServerWaitTag), useUnmergedTree = true).fetchSemanticsNodes().size)
         assertEquals(0, binds())

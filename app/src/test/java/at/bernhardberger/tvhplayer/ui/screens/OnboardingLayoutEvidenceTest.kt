@@ -138,7 +138,7 @@ class OnboardingLayoutEvidenceTest {
         assertEquals(SetupStep.SIGN_IN, state.step)
         assertEquals(SERVER.host, state.form.host)
         assertEquals(SERVER.port.toString(), state.form.port)
-        compose.onNodeWithText("${SERVER.host} • port ${SERVER.port}").assertExists()
+        compose.onNodeWithText(SERVER.host).assertExists()
         back()
         assertEquals(SetupStep.ADDRESS, state.step)
         compose.onNodeWithTag("setup-continue").assertIsFocused()

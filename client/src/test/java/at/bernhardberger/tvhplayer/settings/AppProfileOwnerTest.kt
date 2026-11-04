@@ -8,12 +8,16 @@ import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
@@ -21,6 +25,124 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppProfileOwnerTest {
+    @Test fun cancellationAtReceiveBeforeTheSubmitterResumesKeepsTheConnectionLock() = runTest {
+        val stored = FakeServerProfileStore()
+        stored.addAnonymous("first.invalid", activate = true)
+        val next = (stored.addAnonymous("second.invalid") as ServerProfileWriteResult.Applied).id
+        val gate = CompletableDeferred<Unit>()
+        lateinit var submitter: Job
+        var received = false
+        val store = object : ServerProfileStore by stored {
+            override suspend fun setActive(id: ServerProfileId): ServerProfileWriteResult {
+                received = true
+                // The unconfined actor runs as admission delivers to its waiting receive,
+                // before that admission call returns to the standard-dispatched sender.
+                submitter.cancel()
+                gate.await()
+                return stored.setActive(id)
+            }
+        }
+        val owner = AppProfileOwner(FakeTvheadendSession(), store, PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Missing })
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { owner.run() }
+        runCurrent()
+        submitter = backgroundScope.launch { owner.setActive(next) }
+        runCurrent()
+        assertTrue(received)
+        assertTrue(submitter.isCancelled)
+        assertFalse(submitter.isCompleted)
+        var entered = false
+        backgroundScope.launch { owner.connectionChanges.withLock { entered = true } }
+        runCurrent()
+        assertFalse(entered)
+        gate.complete(Unit)
+        runCurrent()
+        assertTrue(submitter.isCompleted)
+        assertTrue(entered)
+        assertEquals(next, (owner.serverProfile.value as ServerProfileReadResult.Available).id)
+    }
+
+    @Test fun cancellationOfTheReceiverBeforeDispatchReleasesTheUndeliveredCommandAndItsWaiter() = runTest {
+        val store = FakeServerProfileStore()
+        val active = (store.addAnonymous("first.invalid", activate = true) as ServerProfileWriteResult.Applied).id
+        val next = (store.addAnonymous("second.invalid") as ServerProfileWriteResult.Applied).id
+        val owner = AppProfileOwner(FakeTvheadendSession(), store, PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Missing })
+        val actor = backgroundScope.launch { owner.run() }
+        runCurrent()
+        val calls = store.calls.toList()
+        // Admission wakes the suspended receive, but its dispatched continuation has not run.
+        val submitter = backgroundScope.async(start = CoroutineStart.UNDISPATCHED) { owner.setActive(next) }
+        actor.cancel()
+        runCurrent()
+        assertTrue(submitter.isCompleted)
+        assertTrue(runCatching { submitter.await() }.exceptionOrNull() is CancellationException)
+        assertEquals(calls, store.calls)
+        assertEquals(active, (owner.serverProfile.value as ServerProfileReadResult.Available).id)
+        assertTrue(owner.connectionChanges.tryLock())
+        owner.connectionChanges.unlock()
+    }
+
+    @Test fun switchingWaitsForSetupCleanupAndCannotBeUndoneByItsRestore() = runTest {
+        val store = FakeServerProfileStore()
+        store.addAnonymous("first.invalid", activate = true)
+        val next = (store.addAnonymous("second.invalid") as ServerProfileWriteResult.Applied).id
+        val session = FakeTvheadendSession()
+        val owner = AppProfileOwner(session, store, PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Missing })
+        backgroundScope.launch { owner.run() }
+        runCurrent()
+        val previous = (store.loadActive() as ServerProfileReadResult.Available).profile
+        val restore = CompletableDeferred<Unit>()
+        val cleanup = backgroundScope.launch {
+            owner.connectionChanges.withLock {
+                session.disconnect()
+                restore.await()
+                session.connect(previous)
+            }
+        }
+        runCurrent()
+        val calls = session.calls.toList()
+        val switch = backgroundScope.async { owner.setActive(next) }
+        runCurrent()
+        assertFalse(switch.isCompleted)
+        assertEquals(calls, session.calls)
+        restore.complete(Unit)
+        runCurrent()
+        assertTrue(cleanup.isCompleted)
+        assertEquals(ServerProfileWriteResult.Applied(next), switch.await())
+        assertEquals(next, (owner.serverProfile.value as ServerProfileReadResult.Available).id)
+        assertEquals(calls + listOf(FakeSessionCall.CONNECT, FakeSessionCall.DISCONNECT, FakeSessionCall.CONNECT), session.calls)
+    }
+
+    @Test fun anAdmittedCancelledCommandKeepsTheConnectionLockUntilItFinishes() = runTest {
+        val stored = FakeServerProfileStore()
+        stored.addAnonymous("first.invalid", activate = true)
+        val next = (stored.addAnonymous("second.invalid") as ServerProfileWriteResult.Applied).id
+        val gate = CompletableDeferred<Unit>()
+        val store = object : ServerProfileStore by stored {
+            override suspend fun setActive(id: ServerProfileId): ServerProfileWriteResult {
+                gate.await()
+                return stored.setActive(id)
+            }
+        }
+        val owner = AppProfileOwner(FakeTvheadendSession(), store, PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Missing })
+        backgroundScope.launch { owner.run() }
+        runCurrent()
+        val command = backgroundScope.launch { owner.setActive(next) }
+        runCurrent()
+        command.cancel()
+        var entered = false
+        backgroundScope.launch { owner.connectionChanges.withLock { entered = true } }
+        runCurrent()
+        assertFalse(entered)
+        gate.complete(Unit)
+        runCurrent()
+        assertTrue(entered)
+        assertEquals(next, (owner.serverProfile.value as ServerProfileReadResult.Available).id)
+    }
+
     @Test fun rejectedLabelsAndFailedRenameLeaveTheActiveSessionUntouched() = runTest {
         val stored = FakeServerProfileStore()
         val active = (stored.addAnonymous("first.invalid", activate = true) as ServerProfileWriteResult.Applied).id
@@ -98,7 +220,7 @@ class AppProfileOwnerTest {
         runCurrent()
         assertEquals(ServerProfileWriteResult.Applied(removed), owner.remove(removed))
         assertFalse((owner.profiles.value as ServerProfileListResult.Available).profiles.any { it.id == removed })
-        assertEquals(Notice.ServerProfileRemoved, notices.state.value.candidate?.notice)
+        assertEquals(Notice.ServerProfileRemoved(removed, "second.invalid"), notices.state.value.candidate?.notice)
     }
 
     @Test fun freshSetupReadsCurrentStoreAndRemainsDisconnected() = runTest {
@@ -270,7 +392,7 @@ class AppProfileOwnerTest {
         assertTrue((owner.profiles.value as ServerProfileListResult.Available).profiles.isEmpty())
         assertEquals(ServerProfileReadResult.Missing, owner.serverProfile.value)
         assertTrue(settings.hiddenServerProfileIds.first().isEmpty())
-        assertEquals(Notice.ServerProfileRemoved, notices.state.value.candidate?.notice)
+        assertEquals(Notice.ServerProfileRemoved(id, "viewer on first.invalid"), notices.state.value.candidate?.notice)
     }
 
     @Test fun renamePreservesUnreadableCredentialsAndDoesNotReconnect() = runTest {
@@ -319,16 +441,18 @@ class AppProfileOwnerTest {
         assertEquals(ServerProfileReadResult.Missing, owner.serverProfile.value)
     }
 
-    @Test fun cancelledPendingPasswordSaveLeavesConfigurationAlone() = runTest {
+    @Test fun passwordSaveCancelledBeforeAdmissionLeavesConfigurationAlone() = runTest {
         val stored = FakeServerProfileStore()
         val owner = AppProfileOwner(FakeTvheadendSession(), stored, PlayerSettingsStore(InMemoryPreferencesDataStore()),
             StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Missing })
+        owner.connectionChanges.lock()
         val save = backgroundScope.launch(start = CoroutineStart.UNDISPATCHED) {
             owner.savePasswordServer("first.invalid", 9982, "viewer", "synthetic")
         }
         runCurrent()
         assertFalse(save.isCompleted)
         save.cancelAndJoin()
+        owner.connectionChanges.unlock()
         assertEquals(0L, owner.configurationGeneration.value)
         assertTrue(stored.calls.isEmpty())
     }

@@ -15,6 +15,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.ui.platform.LocalContext
 import at.bernhardberger.tvhplayer.settings.UiSettings
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
+import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import androidx.compose.ui.Modifier
@@ -51,6 +52,9 @@ internal fun SettingsScreen(
     backEnabled: Boolean = true,
     isCurrent: Boolean = true,
     settingsStore: UiSettingsStore = koinInject(),
+    profileOwner: AppProfileOwner = koinInject(),
+    playbackInterruption: () -> PlaybackInterruption = rememberPlaybackInterruption(),
+    stopPlayback: suspend () -> Unit = rememberPlaybackStop(),
 ) {
     val context = LocalContext.current
     var companionInstalled by remember(context) { mutableStateOf(isApplianceCompanionInstalled(context)) }
@@ -59,7 +63,7 @@ internal fun SettingsScreen(
         onPauseOrDispose { }
     }
     val navigation = rememberDepthNavigationState(SETTINGS_ROOT, section.name)
-    var setupOpen by rememberSaveable { mutableStateOf(false) }
+    val servers = rememberServerSettingsState(navigation, profileOwner, playbackInterruption, stopPlayback)
     val observation by channelsVm.observation.collectAsStateWithLifecycle()
     val profiles = observation.currentDvrConfigurations()
     val settings by settingsStore.settings.collectAsStateWithLifecycle(initialValue = UiSettings())
@@ -68,8 +72,12 @@ internal fun SettingsScreen(
         recordingSpaceText(observation.dvrDiskSpaceState)) { id ->
         scope.launch { settingsStore.setRecordingProfile(id); navigation.pop() }
     }
-    val levels = settingsGeneralLevels(navigation) + settingsConnectionLevels(connectionPresentation, onRetry, onSetUp = { setupOpen = true }) + settingsPlayerLevels(navigation) + listOf(
-        settingsRootLevel(companionInstalled, recordingLevels.isNotEmpty(), connectionOverviewStatus(connectionPresentation).title),
+    val connectionLevels = settingsConnectionLevels(connectionPresentation, onRetry, servers.actions, profileOwner)
+    servers.FocusPending(connectionLevels.firstOrNull())
+    val profileList by profileOwner.profiles.collectAsStateWithLifecycle()
+    val levels = settingsGeneralLevels(navigation) + connectionLevels + settingsPlayerLevels(navigation) + listOf(
+        settingsRootLevel(companionInstalled, recordingLevels.isNotEmpty(),
+            connectionRootStatus(profileList, connectionOverviewStatus(connectionPresentation, profileOwner).title)),
         settingsKeepChannelLevel(navigation),
         settingsWarmPlaybackLevel(navigation),
         settingsStreamProfileLevel(navigation),
@@ -79,10 +87,10 @@ internal fun SettingsScreen(
     ) + recordingLevels + settingsAboutLevels(observation.sessionState, companionInstalled) +
         if (companionInstalled) listOf(settingsApplianceLevel()) else emptyList()
     SettingsScreenNavigation(navigation, levels, initialFocusEnabled, contentPadding, backEnabled, isCurrent,
-        setup = if (setupOpen) {
-            { SettingsConnection(onSaved = { setupOpen = false }) }
-        } else null,
-        onCloseSetup = { setupOpen = false })
+        setup = servers.setupContent(),
+        onCloseSetup = servers::closeSetup,
+        dialog = servers.dialogContent(),
+        onCloseDialog = servers::closeDialogs)
 }
 
 /** Connection's row carries the overview's status title, the only value on the root. */
@@ -115,6 +123,9 @@ internal fun SettingsScreenNavigation(
     /** The connection setup, shown over Settings while it is open; Settings stays where it was. */
     setup: (@Composable () -> Unit)? = null,
     onCloseSetup: () -> Unit = {},
+    /** A question over Settings; it takes focus and Back, and Settings refocuses its row after it. */
+    dialog: (@Composable () -> Unit)? = null,
+    onCloseDialog: () -> Unit = {},
 ) {
     val rootFocus = LocalBrowseNavigationFocus.current
     val unavailable = stringResource(R.string.settings_unavailable)
@@ -132,6 +143,10 @@ internal fun SettingsScreenNavigation(
     val shownSetup = setup?.takeIf { isCurrent }
     if (setup != null && !isCurrent) SideEffect(onCloseSetup)
     val setupOpen = shownSetup != null
+    // A question closes the same way, so it cannot return with what it said before leaving.
+    val shownDialog = dialog?.takeIf { isCurrent }
+    if (dialog != null && !isCurrent) SideEffect(onCloseDialog)
+    val covered = setupOpen || shownDialog != null
     val layering = LocalBrowseContentLayering.current
     val pageKey = remember { Any() }
     val opacity = remember { mutableFloatStateOf(1f) }
@@ -153,10 +168,10 @@ internal fun SettingsScreenNavigation(
                 bottom = contentPadding.calculateBottomPadding()),
             modifier = Modifier.fillMaxSize()
                 .then(if (setupOpen) Modifier.clearAndSetSemantics { } else Modifier)
-                .focusProperties { onEnter = { if (setupOpen) cancelFocusChange() } }
+                .focusProperties { onEnter = { if (covered) cancelFocusChange() } }
                 .focusGroup(),
-            initialFocusEnabled = initialFocusEnabled && !setupOpen,
-            backEnabled = backEnabled && !setupOpen,
+            initialFocusEnabled = initialFocusEnabled && !covered,
+            backEnabled = backEnabled && !covered,
             isCurrent = isCurrent,
             onRootBack = rootFocus?.let { { it.requestFocus() } },
             pageKeyDirection = ChannelNavigation::pageDirectionForKeyCode,
@@ -168,5 +183,6 @@ internal fun SettingsScreenNavigation(
                 shownSetup()
             }
         }
+        shownDialog?.invoke()
     }
 }

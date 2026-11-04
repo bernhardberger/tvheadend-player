@@ -6,6 +6,7 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationKind
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
 import at.bernhardberger.tvheadend.sdk.core.DvrProgressResult
+import at.bernhardberger.tvheadend.sdk.core.ServerProfileId
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import at.bernhardberger.tvhplayer.playback.BackgroundPlaybackNotice
 
@@ -15,8 +16,12 @@ enum class PauseUnavailableReason { SETTINGS_OFF, CHANNEL_UNAVAILABLE }
 
 /** User feedback policy, with no resources or presentation dependencies. */
 sealed interface Notice {
-    data object ServerProfileRemoved : Notice {
-        override val key = "server-profile-removed"
+    data class ServerProfileRemoved(
+        val id: ServerProfileId,
+        /** Display-only name from serverProfileDisplayName; never include in diagnostics. */
+        val name: String,
+    ) : Notice {
+        override val key = "server-profile-removed:${id.value}"
         override val severity = NoticeSeverity.INFO
     }
 

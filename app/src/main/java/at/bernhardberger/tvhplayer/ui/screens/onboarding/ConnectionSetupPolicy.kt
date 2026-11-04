@@ -22,22 +22,33 @@ internal enum class SetupStep {
 }
 
 /**
- * The same wizard, either empty or prefilled from the saved connection.
+ * The same wizard: empty on first run, prefilled from a stored server to edit it, empty to add
+ * another server from Settings, or on Account alone to enter a password that can't be read.
  */
 internal enum class SetupMode {
     FIRST_RUN,
     EDIT,
+    ADD,
+    PASSWORD,
     ;
 
     val firstStep: SetupStep
-        get() = if (this == FIRST_RUN) SetupStep.WELCOME else SetupStep.ADDRESS
+        get() = when (this) {
+            FIRST_RUN -> SetupStep.WELCOME
+            PASSWORD -> SetupStep.SIGN_IN
+            EDIT, ADD -> SetupStep.ADDRESS
+        }
+
+    /** Every mode but first run tests on the session another server may be using. */
+    val keepsSavedConnection: Boolean get() = this != FIRST_RUN
 }
 
 /** Null leaves the wizard. Test cancellation and results return to the Account screen. */
 internal fun SetupStep.previous(mode: SetupMode = SetupMode.FIRST_RUN): SetupStep? = when (this) {
     SetupStep.WELCOME -> null
     SetupStep.ADDRESS -> if (mode == SetupMode.FIRST_RUN) SetupStep.WELCOME else null
-    SetupStep.FIND_SERVER, SetupStep.SIGN_IN -> SetupStep.ADDRESS
+    SetupStep.SIGN_IN -> if (mode == SetupMode.PASSWORD) null else SetupStep.ADDRESS
+    SetupStep.FIND_SERVER -> SetupStep.ADDRESS
     SetupStep.CONNECTING, SetupStep.FAILED, SetupStep.DONE -> SetupStep.SIGN_IN
 }
 
@@ -115,9 +126,15 @@ internal enum class SetupFailure(
     ),
 }
 
-/** The failure's actions in [mode]; editing saves anyway instead of continuing anyway. */
+/**
+ * The failure's actions in [mode]; editing a stored server saves anyway instead of continuing
+ * anyway. Entering a password changes neither the address nor the account name.
+ */
 internal fun SetupFailure.actionsFor(mode: SetupMode): List<SetupAction> =
-    if (mode == SetupMode.EDIT) {
+    if (mode == SetupMode.PASSWORD) {
+        actions.filter { it != SetupAction.CHANGE_ADDRESS }
+            .map { if (it == SetupAction.CONTINUE_ANYWAY) SetupAction.SAVE_ANYWAY else it }
+    } else if (mode == SetupMode.EDIT) {
         actions.map { if (it == SetupAction.CONTINUE_ANYWAY) SetupAction.SAVE_ANYWAY else it }
     } else {
         actions
