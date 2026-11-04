@@ -18,7 +18,7 @@ class RecordingSkipPolicyTest {
     @Test fun naturalEntrySkipsCutsSilentlyAndAutomaticAdsOnce() {
         val policy = RecordingSkipPolicy()
         assertNull(policy.evaluate(marks, 9_999, true, automatic).seekToMs)
-        assertEquals(RecordingSkipDecision(20_000, true), policy.evaluate(marks, 10_000, true, automatic))
+        assertEquals(RecordingSkipDecision(20_000, ad), policy.evaluate(marks, 10_000, true, automatic))
         assertEquals(RecordingSkipDecision(40_000), policy.evaluate(marks, 30_000, true, automatic))
         assertNull(policy.evaluate(marks, 15_000, true, automatic).seekToMs)
     }
@@ -84,6 +84,49 @@ class RecordingSkipPolicyTest {
         assertEquals(ad, policy.offeredAdBreak)
     }
 
+    @Test fun anEarlyLandingEndsTheBreakAsCurrentSoSkipCannotSeekBackwards() {
+        val settings = PlayerSettings(skipLanding = SkipLanding.FIVE_SECONDS_BEFORE)
+        val manual = RecordingSkipPolicy()
+        manual.evaluate(marks, 11_000, true, settings)
+        assertEquals(15_000L, manual.skipAdBreak(ad, settings))
+        assertNull(manual.currentAdBreak)
+        manual.evaluate(marks, 15_000, true, settings)
+        assertNull(manual.currentAdBreak)
+        assertNull(manual.offeredAdBreak)
+        assertNull(manual.skipAdBreak(ad, settings))
+        manual.evaluate(marks, 19_000, true, settings)
+        assertNull(manual.skipAdBreak(ad, settings))
+
+        val automatic = RecordingSkipPolicy()
+        val auto = settings.copy(adBreakMode = AdBreakMode.AUTOMATIC)
+        assertEquals(RecordingSkipDecision(15_000, ad), automatic.evaluate(marks, 10_000, true, auto))
+        assertNull(automatic.currentAdBreak)
+        assertNull(automatic.evaluate(marks, 15_000, true, auto).seekToMs)
+        assertNull(automatic.currentAdBreak)
+        assertNull(automatic.skipAdBreak(ad, auto))
+    }
+
+    @Test fun thePromptLeavesAtTheLandingPointAndIsNotOfferedPastIt() {
+        val settings = PlayerSettings(skipLanding = SkipLanding.FIVE_SECONDS_BEFORE)
+        val policy = RecordingSkipPolicy()
+        policy.evaluate(marks, 10_000, true, settings)
+        assertEquals(ad, policy.offeredAdBreak)
+        policy.evaluate(marks, 14_999, true, settings)
+        assertEquals(ad, policy.offeredAdBreak)
+        policy.evaluate(marks, 15_000, true, settings)
+        assertNull(policy.offeredAdBreak)
+        assertNull(policy.currentAdBreak)
+        // Resuming inside the break past its landing point offers nothing.
+        val late = RecordingSkipPolicy()
+        late.evaluate(marks, 16_000, true, settings)
+        assertNull(late.offeredAdBreak)
+        assertNull(late.currentAdBreak)
+        late.deliberateSeek(marks, 17_000, settings.skipLanding)
+        assertNull(late.currentAdBreak)
+        late.deliberateSeek(marks, 12_000, settings.skipLanding)
+        assertEquals(ad, late.currentAdBreak)
+    }
+
     @Test fun offAndDisabledCutsDoNothing() {
         val policy = RecordingSkipPolicy()
         val settings = PlayerSettings(adBreakMode = AdBreakMode.OFF, skipCuts = false)
@@ -126,7 +169,7 @@ class RecordingSkipPolicyTest {
         val overlap = cut.copy(startMs = 12_000, endMs = 14_000)
         val both = listOf(ad, overlap)
         assertEquals(RecordingSkipDecision(14_000), policy.evaluate(both, 12_000, true, automatic))
-        assertEquals(RecordingSkipDecision(20_000, true), policy.evaluate(both, 14_000, true, automatic))
+        assertEquals(RecordingSkipDecision(20_000, ad), policy.evaluate(both, 14_000, true, automatic))
     }
 
     @Test fun muteSpansAreHalfOpenIndependentOfMarkAndSkipSettings() {

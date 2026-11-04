@@ -11,7 +11,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -110,13 +110,13 @@ internal fun TimelineMarkLayer(
 
 /**
  * Diagonal stripes between [left] and [right]: over the played fill a darker and a brighter shade of
- * [base]; over the unplayed track the track's grey a step darker and brighter. Never black or white.
+ * [base] that keep its hue; over the unplayed track the track's grey a step darker and brighter. Never black or white.
  */
 private fun DrawScope.cutStripes(left: Float, right: Float, base: Color, selected: Boolean, playedPart: Boolean) {
     if (right <= left) return
-    val ground = if (playedPart) lerp(base, Color.Black, if (selected) 0.55f else 0.3f)
+    val ground = if (playedPart) base.shade(value = if (selected) 0.62f else 0.78f)
         else Color.Black.copy(alpha = if (selected) 0.45f else 0.25f)
-    val stripe = if (playedPart) lerp(base, Color.White, if (selected) 0.6f else 0.3f)
+    val stripe = if (playedPart) base.shade(saturation = if (selected) 0.5f else 0.7f)
         else base.copy(alpha = if (selected) 0.75f else 0.42f)
     val period = 4.dp.toPx()
     val stroke = 1.5.dp.toPx()
@@ -129,4 +129,11 @@ private fun DrawScope.cutStripes(left: Float, right: Float, base: Color, selecte
             x += period
         }
     }
+}
+
+/** The same hue with its saturation and value scaled: a darker or paler [this], never grey. */
+private fun Color.shade(saturation: Float = 1f, value: Float = 1f): Color {
+    val hsv = FloatArray(3)
+    android.graphics.Color.colorToHSV(toArgb(), hsv)
+    return Color.hsv(hsv[0], hsv[1] * saturation, hsv[2] * value, alpha)
 }

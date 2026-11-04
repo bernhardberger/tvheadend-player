@@ -7,6 +7,7 @@ import android.view.View
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -17,7 +18,11 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -43,6 +48,8 @@ import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
+import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 import java.io.File
 import java.util.TimeZone
@@ -61,7 +68,8 @@ import org.robolectric.annotation.GraphicsMode
  * Recording marks evidence: the production recording chrome over a still at the 960×540 dp
  * canvas with ad breaks, cuts and chapters on the timeline — the Banner's passive bar, the
  * focused seekbar's hint symbols, dense thinning, the marks row on each kind, a chapters-only
- * recording and a recording without a channel. English, font scale 1.0, fictional fixture art.
+ * recording, a recording without a channel, and the ad break's Skip prompt and resting Skip button.
+ * English, font scale 1.0, fictional fixture art.
  * Writes to build/outputs/recording-marks (ignored).
  */
 @RunWith(RobolectricTestRunner::class)
@@ -125,6 +133,20 @@ class RecordingMarksCaptureTest {
     /** A recording without a channel and without artwork: the dimmed recordings symbol in the picon panel. */
     @Test fun withoutChannel() = capture("without-channel", MIXED, focus = "player-pause", withoutChannel = true)
 
+    /** Controls hidden in an ad break: the focused Skip prompt bottom right, its fill half-way through ten seconds. */
+    @Test fun skipPrompt() = capture("skip-prompt", MIXED, positionMs = AD_MIDDLE, adBreak = AD, prompt = true)
+
+    /** Controls shown in an ad break: Skip rests above the info bar, Pause keeps the initial focus. */
+    @Test fun skipResting() = capture("skip-resting", MIXED, positionMs = AD_MIDDLE, focus = "player-pause", adBreak = AD)
+
+    /** Up from Settings in an ad break focuses Skip. */
+    @Test fun skipFocused() = capture("skip-focused", MIXED, positionMs = AD_MIDDLE, focus = "player-settings",
+        adBreak = AD, keys = listOf(Key.DirectionUp), focused = "recording-skip")
+
+    /** The marks row open in an ad break: Skip stays visible above it. */
+    @Test fun skipMarksOpen() = capture("skip-marks-open", MIXED, positionMs = AD_MIDDLE, focus = "player-seekbar",
+        adBreak = AD, openAt = 1_440_000L, name = "Ads end")
+
     private fun capture(
         scene: String,
         marks: List<RecordingMark>,
@@ -136,6 +158,11 @@ class RecordingMarksCaptureTest {
         withoutChannel: Boolean = false,
         /** The open pill's name line, where the capture checks it. */
         name: String? = null,
+        adBreak: RecordingMark? = null,
+        /** Renders the controls-hidden Skip prompt instead of the chrome. */
+        prompt: Boolean = false,
+        keys: List<Key> = emptyList(),
+        focused: String? = null,
     ) {
         val still = FixtureArt.art("still-ridge-light")
         val navigation = RecordingMarkerNavigation()
@@ -148,7 +175,15 @@ class RecordingMarksCaptureTest {
                     view = LocalView.current
                     Box(Modifier.fillMaxSize()) {
                         Image(still.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                        if (shown) ProvideArtworkSession(session) {
+                        if (shown && prompt) RecordingSkipPrompt(
+                            prompt = adBreak,
+                            shown = true,
+                            onSkip = {},
+                            onTimeout = {},
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(end = TvGridHorizontalMargin, bottom = TvGridVerticalMargin),
+                        ) else if (shown) ProvideArtworkSession(session) {
                             RecordingChromeFixture(
                                 mode = mode,
                                 positionMs = positionMs,
@@ -163,6 +198,7 @@ class RecordingMarksCaptureTest {
                                 marks = marks,
                                 withoutChannel = withoutChannel,
                                 markerNavigation = navigation,
+                                adBreak = adBreak,
                                 modifier = Modifier.align(Alignment.BottomCenter),
                             )
                         }
@@ -173,6 +209,19 @@ class RecordingMarksCaptureTest {
         compose.runOnIdle { shown = true }
         settle()
         if (focus != null) compose.onNodeWithTag(focus).assertIsFocused()
+        if (prompt) {
+            // Settle ran 1.5 s of the ten; the fill stands half-way at five.
+            repeat(35) {
+                compose.mainClock.advanceTimeBy(100)
+                compose.waitForIdle()
+            }
+            compose.onNodeWithTag("recording-skip-prompt").assertIsFocused()
+        }
+        keys.forEach { key ->
+            compose.onRoot().performKeyInput { pressKey(key) }
+            settle()
+        }
+        if (focused != null) compose.onNodeWithTag(focused).assertIsFocused()
         if (openAt != null) {
             compose.runOnIdle { navigation.show(recordingMarkStops(marks, durationMs).map { it.positionMs }, openAt - 1) }
             settle()
@@ -206,6 +255,7 @@ class RecordingMarksCaptureTest {
     private companion object {
         val PICON = ArtworkId(1)
         val ART = ArtworkId(2)
+        const val AD_MIDDLE = 1_290_000L
 
         /** 1:12:30 at 0:17:25: a played cut, a named chapter, two ad breaks, an unplayed cut, chapters. */
         val MIXED = listOf(
@@ -217,6 +267,7 @@ class RecordingMarksCaptureTest {
             RecordingMark(RecordingMarkKind.AD_BREAK, 3_000_000L, 3_300_000L),
             RecordingMark(RecordingMarkKind.CHAPTER, 3_600_000L, name = "Night on the ridge"),
         )
+        val AD = MIXED.first { it.kind == RecordingMarkKind.AD_BREAK }
 
         /** 4:00:00: a chapter every two minutes, an ad break every forty minutes, two cuts. */
         val DENSE = buildList {

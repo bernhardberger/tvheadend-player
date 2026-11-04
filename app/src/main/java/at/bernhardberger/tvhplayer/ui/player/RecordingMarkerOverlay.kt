@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -37,6 +38,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.findRootCoordinates
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.unit.Constraints
 import kotlin.math.roundToInt
 import androidx.compose.ui.Modifier
@@ -61,6 +64,7 @@ import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
+import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
 
 /** Shared with the screen's ancestor Back interceptor; survives focus relocation. */
 internal class RecordingMarkerNavigation {
@@ -181,7 +185,6 @@ internal fun RecordingMarkerOverlay(
             width * (if (displayDurationMs > 0) (positionMs.toDouble() / displayDurationMs).coerceIn(0.0, 1.0) else 0.0).toFloat()
         val pill = measurables.firstOrNull { it.layoutId == PillSlot }?.measure(loose)
         val selectedMs = stops.getOrNull(selectedIndex)?.positionMs
-        val pillX = pill?.let { (centre(requireNotNull(selectedMs)) - it.width / 2f).roundToInt().coerceIn(0, maxOf(0, width - it.width)) }
         val symbols = measurables.mapNotNull { measurable ->
             (measurable.layoutId as? RecordingMarkStop)?.takeIf { it.positionMs != selectedMs }?.let { it to measurable.measure(loose) }
         }
@@ -189,13 +192,23 @@ internal fun RecordingMarkerOverlay(
         val hintsPx = symbols.map { (stop, placeable) ->
             RecordingMarkHint(centre(stop.positionMs), placeable.width.toFloat(), requireNotNull(stop.mark).kind)
         }
-        val shown = visibleRecordingMarkHints(
-            hintsPx,
-            gapPx = gap,
-            trackWidthPx = width.toFloat(),
-            blockedPx = if (pill != null && pillX != null) (pillX - gap)..(pillX + pill.width + gap) else null,
-        )
+        val margin = TvGridHorizontalMargin.toPx()
         layout(width, constraints.maxHeight) {
+            // The pill centres on its tick and may reach past the track over the endpoint labels,
+            // up to the timeline row's ends at the screen's safe margins.
+            val pillX = pill?.let {
+                val left = coordinates?.let { here -> here.positionInRoot().x } ?: 0f
+                val rootWidth = coordinates?.findRootCoordinates()?.size?.width?.toFloat() ?: width.toFloat()
+                val min = minOf(0f, margin - left)
+                val max = maxOf(width - it.width.toFloat(), rootWidth - margin - left - it.width)
+                (centre(requireNotNull(selectedMs)) - it.width / 2f).coerceIn(min, maxOf(min, max)).roundToInt()
+            }
+            val shown = visibleRecordingMarkHints(
+                hintsPx,
+                gapPx = gap,
+                trackWidthPx = width.toFloat(),
+                blockedPx = if (pill != null && pillX != null) (pillX - gap)..(pillX + pill.width + gap) else null,
+            )
             val symbolCentre = constraints.maxHeight / 2 - HintLift.roundToPx()
             symbols.forEachIndexed { index, (_, placeable) ->
                 // Placed where the thinning measured it: centred on its mark, held inside the track.
@@ -245,11 +258,16 @@ private fun RecordingMarkPill(
     val description = listOfNotNull(name, position).joinToString(", ")
     // Compact: a name line and a time line stay clear of the info bar's text above the timeline.
     val shape = MaterialTheme.shapes.small
+    // Without a name the pill shrinks from the top to its time row; the Button's minimum height
+    // would otherwise centre that row higher than on every other pill.
+    val timeRowHeight = with(LocalDensity.current) { MaterialTheme.typography.labelLarge.lineHeight.toDp() }
+    val nameless = if (name == null) Modifier.heightIn(max = timeRowHeight + PillPadding.calculateTopPadding() +
+        PillPadding.calculateBottomPadding()) else Modifier
     Button(
         onClick = { onSeek(stop.positionMs); navigation.dismiss() },
         shape = ButtonDefaults.shape(shape = shape, focusedShape = shape, pressedShape = shape),
         contentPadding = PillPadding,
-        modifier = modifier.widthIn(max = PillMaxWidth).focusRequester(focus).testTag("recording-marker-target")
+        modifier = modifier.widthIn(max = PillMaxWidth).then(nameless).focusRequester(focus).testTag("recording-marker-target")
             .semantics {
                 contentDescription = description
                 customActions = buildList {

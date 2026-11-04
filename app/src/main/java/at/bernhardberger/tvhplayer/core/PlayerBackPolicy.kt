@@ -21,6 +21,8 @@ enum class PlayerForegroundLayer {
     PENDING_SEEK_PREVIEW,
     DISPATCHED_SEEK_PREVIEW,
     CONTROLS,
+    /** A recording's Skip prompt over the hidden chrome. */
+    SKIP_PROMPT,
     STATS,
     NONE,
 }
@@ -29,6 +31,7 @@ enum class PlayerForegroundLayer {
 fun playerBackHoldAllowed(layer: PlayerForegroundLayer): Boolean = when (layer) {
     PlayerForegroundLayer.NONE,
     PlayerForegroundLayer.CONTROLS,
+    PlayerForegroundLayer.SKIP_PROMPT,
     PlayerForegroundLayer.STATS,
     PlayerForegroundLayer.PENDING_SEEK_PREVIEW,
     PlayerForegroundLayer.DISPATCHED_SEEK_PREVIEW,
@@ -61,6 +64,7 @@ enum class PlayerBackAction {
     DISMISS_SEEK_FEEDBACK,
     HIDE_CONTROLS,
     HIDE_STATS,
+    DISMISS_SKIP_PROMPT,
 }
 
 data class PlayerForegroundContext(
@@ -77,6 +81,8 @@ data class PlayerForegroundContext(
     /** [optionsPage] is shown as the short list of its remote key. */
     val optionsQuickList: Boolean = false,
     val scheduleVisible: Boolean = false,
+    /** A recording offers to skip the ad break it plays, with nothing else drawn over the video. */
+    val skipPromptOffered: Boolean = false,
 )
 
 fun playerForegroundLayer(context: PlayerForegroundContext): PlayerForegroundLayer = when {
@@ -97,6 +103,7 @@ fun playerForegroundLayer(context: PlayerForegroundContext): PlayerForegroundLay
         PlayerForegroundLayer.PENDING_SEEK_PREVIEW
     context.seekPreviewPhase == PlayerSeekPreviewPhase.DISPATCHED ->
         PlayerForegroundLayer.DISPATCHED_SEEK_PREVIEW
+    context.skipPromptOffered -> PlayerForegroundLayer.SKIP_PROMPT
     context.statsEnabled -> PlayerForegroundLayer.STATS
     else -> PlayerForegroundLayer.NONE
 }
@@ -124,7 +131,8 @@ fun playerRootFocusRequired(foregroundLayer: PlayerForegroundLayer): Boolean =
         PlayerForegroundLayer.CHANNEL_DRAWER,
         PlayerForegroundLayer.RECOVERY,
         PlayerForegroundLayer.TERMINAL_ERROR,
-        PlayerForegroundLayer.CONTROLS -> false
+        PlayerForegroundLayer.CONTROLS,
+        PlayerForegroundLayer.SKIP_PROMPT -> false
     }
 
 fun playerBackAction(
@@ -153,6 +161,7 @@ fun playerBackAction(
         PlayerSeekPreviewPhase.DISPATCHED -> PlayerBackAction.DISMISS_SEEK_FEEDBACK
         PlayerSeekPreviewPhase.NONE -> PlayerBackAction.HIDE_CONTROLS
     }
+    PlayerForegroundLayer.SKIP_PROMPT -> PlayerBackAction.DISMISS_SKIP_PROMPT
     PlayerForegroundLayer.STATS -> PlayerBackAction.HIDE_STATS
 }
 

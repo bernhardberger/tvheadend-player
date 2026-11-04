@@ -67,6 +67,7 @@ import at.bernhardberger.tvhplayer.core.PlayerForegroundLayer
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.playback.TimeshiftSeekDecision
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
 import at.bernhardberger.tvhplayer.ui.TvOverlayFooterGradientRunout
 import coil3.ImageLoader
 import coil3.map.Mapper
@@ -410,9 +411,16 @@ class PlayerFooterLayoutEvidenceTest {
             val tick = bounds("recording-selected-marker")
             val position = track.left + track.width * fraction
             assertEquals(position.coerceIn(track.left + 0.5f, track.right - 0.5f), tick.center.x, 1f)
-            assertEquals(position.coerceIn(track.left + button.width / 2f, track.right - button.width / 2f), label.center.x, 1f)
-            assertTrue(label.left >= track.left && label.right <= track.right)
-            assertTrue(button.left >= track.left - 1f && button.right <= track.right + 1f)
+            // The pill centres on its tick and may reach past the track over the endpoint labels,
+            // but never past the screen's horizontal safe margins.
+            val margin = px(TvGridHorizontalMargin)
+            val screen = compose.onRoot().fetchSemanticsNode().boundsInRoot
+            val low = minOf(track.left, margin)
+            val high = maxOf(track.right - button.width, screen.right - margin - button.width)
+            val expectedLeft = (position - button.width / 2f).coerceIn(low, maxOf(low, high))
+            assertEquals(expectedLeft + button.width / 2f, label.center.x, 1f)
+            assertTrue(button.left >= margin.coerceAtMost(track.left) - 1f)
+            assertTrue(button.right <= maxOf(track.right, screen.right - margin) + 1f)
         }
         assertMarker(0.75f)
         recordPair(if (fontScale == 1f) "en-font1.0-960x540-mdpi-d1" else "de-font1.3-960x540-mdpi-d1",

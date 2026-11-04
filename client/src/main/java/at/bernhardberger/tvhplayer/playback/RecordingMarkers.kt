@@ -15,6 +15,8 @@ import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvhplayer.core.RecordingChapter
 import at.bernhardberger.tvhplayer.core.RecordingMark
+import at.bernhardberger.tvhplayer.core.RecordingMarkKind
+import at.bernhardberger.tvhplayer.core.RecordingSkipDecision
 import at.bernhardberger.tvhplayer.core.RecordingSkipPolicy
 import at.bernhardberger.tvhplayer.core.recordingMarkStops
 import at.bernhardberger.tvhplayer.core.recordingMarks
@@ -23,6 +25,7 @@ import at.bernhardberger.tvhplayer.notices.Notice
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.AdBreakMode
+import at.bernhardberger.tvhplayer.settings.SkipLanding
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -104,12 +107,18 @@ internal class RecordingMarkers(
     private fun metadataChanged() {
         publishMarks()
         val hadBoundaries = boundaryPositions.isNotEmpty()
-        val positions = recordingCutpoints.value.filter {
+        val bounds = recordingCutpoints.value.filter {
             it.action == DvrCutpointAction.CUT || it.action == DvrCutpointAction.COMMERCIAL_BREAK ||
                 it.action == DvrCutpointAction.MUTE
         }.filter { it.end > it.start && it.end.inWholeMilliseconds > 0 }.flatMap {
             listOf(it.start.inWholeMilliseconds.coerceAtLeast(0), it.end.inWholeMilliseconds)
-        }.distinct().sorted()
+        }
+        // An ad break stops being current at its landing point, which an early landing puts inside it.
+        // The policy judges the merged marks, so the landing points come from those, not raw cutpoints.
+        val landings = marks.value.filter { it.kind == RecordingMarkKind.AD_BREAK }.flatMap { mark ->
+            SkipLanding.entries.map { landing -> mark.endMs - landing.beforeEndMs }.filter { it > mark.startMs }
+        }
+        val positions = (bounds + landings).distinct().sorted()
         if (positions != boundaryPositions) {
             cancelBoundaries()
             boundaryPositions = positions
@@ -190,7 +199,7 @@ internal class RecordingMarkers(
     fun deliberateSeek(positionMs: Long) {
         invalidatePosition()
         if (!isCurrent()) return
-        skipPolicy.deliberateSeek(marks.value, positionMs)
+        skipPolicy.deliberateSeek(marks.value, positionMs, settings.skipLanding)
         publishSkipState()
     }
 
@@ -235,16 +244,25 @@ internal class RecordingMarkers(
         // Only uninterrupted forward playback may use a delivered boundary in place
         // of a later sample. Backward movement never makes a future boundary current.
         val position = positionMs?.takeIf { actualPosition >= it } ?: actualPosition
-        val decision = skipPolicy.evaluate(marks.value, position, player.isPlaying && canSeek(), settings)
-        decision.seekToMs?.let { target ->
+        // A delivered boundary can arrive late. Once its entry is recorded, the actual position
+        // is judged too: an automatic ad skip whose landing is behind it is dropped, which would
+        // only seek backwards and post a notice for a break that was not skipped.
+        var decision = RecordingSkipDecision()
+        var seekTo: Long? = null
+        for (candidate in listOf(position, actualPosition).distinct()) {
+            decision = skipPolicy.evaluate(marks.value, candidate, player.isPlaying && canSeek(), settings)
+            seekTo = decision.seekToMs?.takeIf { decision.automaticAdSkip == null || it > actualPosition }
+            if (seekTo != null) break
+        }
+        seekTo?.let { target ->
             seekPlayer(target)
-            if (decision.automaticAdSkip) skipPolicy.currentAdBreak?.let {
+            decision.automaticAdSkip?.let {
                 noticeCenter.post(Notice.AutomaticAdBreakSkip(it.startMs), noticeCenter.context())
             }
         }
         publishSkipState()
         val muted = recordingMuted(recordingCutpoints.value,
-            if (decision.seekToMs != null) player.currentPosition else actualPosition)
+            if (seekTo != null) player.currentPosition else actualPosition)
         if (muted) {
             if (savedVolume == null) savedVolume = player.volume
             player.volume = 0f

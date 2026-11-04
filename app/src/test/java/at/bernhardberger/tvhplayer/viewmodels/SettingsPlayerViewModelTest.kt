@@ -68,6 +68,23 @@ class SettingsPlayerViewModelTest {
                 assertEquals(enabled, uiSettings.settings.first().autoStartPlayback)
                 assertEquals(enabled, model.ui.value.autoStartPlayback)
             }
+
+            // Recording marks.
+            for (mode in at.bernhardberger.tvhplayer.settings.AdBreakMode.entries.reversed()) {
+                model.onAdBreakModeChanged(mode)
+                model.ui.first { it.adBreakMode == mode }
+                assertEquals(mode, settings.playerSettings.first().adBreakMode)
+            }
+            for (enabled in listOf(false, true)) {
+                model.onSkipCutsChanged(enabled)
+                model.ui.first { it.skipCuts == enabled }
+                assertEquals(enabled, settings.playerSettings.first().skipCuts)
+            }
+            for (landing in at.bernhardberger.tvhplayer.settings.SkipLanding.entries.reversed()) {
+                model.onSkipLandingChanged(landing)
+                model.ui.first { it.skipLanding == landing }
+                assertEquals(landing, settings.playerSettings.first().skipLanding)
+            }
         } finally {
             models.clear()
             player.release()

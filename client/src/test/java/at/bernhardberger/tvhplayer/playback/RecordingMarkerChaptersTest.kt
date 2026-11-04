@@ -46,6 +46,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlin.time.Duration.Companion.milliseconds
 import at.bernhardberger.tvhplayer.settings.AdBreakMode
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
+import at.bernhardberger.tvhplayer.settings.SkipLanding
 import at.bernhardberger.tvhplayer.notices.Notice
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -328,6 +329,69 @@ class RecordingMarkerChaptersTest {
             assertEquals(2, ads.notices.state.value.pending.size)
             assertEquals(2, ads.notices.state.value.pending.map { it.notice.key }.distinct().size)
         } finally { ads.markers.clearRecordingMarkersAndJoin() }
+    }
+
+    @Test
+    @OptIn(TvheadendTestingApi::class, ExperimentalCoroutinesApi::class)
+    fun aDelayedBoundaryNeverSkipsAnAdBreakBackwardsToItsEarlyLanding() = runTest {
+        // Ad 10-16 s, landing 5 s before the end = 11 s.
+        for ((actual, skips) in listOf(11_200L to false, 10_500L to true)) {
+            val fixture = MarkerFixture(backgroundScope, listOf(
+                DvrCutpoint(10_000.milliseconds, 16_000.milliseconds, DvrCutpointAction.COMMERCIAL_BREAK),
+            ))
+            try {
+                fixture.markers.applySettings(PlayerSettings(
+                    adBreakMode = AdBreakMode.AUTOMATIC, skipLanding = SkipLanding.FIVE_SECONDS_BEFORE))
+                fixture.markers.observeRecordingMarkersLocked(fixture.binding)
+                fixture.response.complete(Unit)
+                runCurrent()
+                assertTrue(fixture.seeks.isEmpty())
+                // The 10 s boundary reaches the evaluation only after playback reached `actual`.
+                fixture.position = actual
+                fixture.messages.last { !it.isCanceled && it.positionMs == 10_000L }
+                    .let { it.target.handleMessage(it.type, it.payload) }
+                runCurrent()
+                if (skips) {
+                    assertEquals(listOf(11_000L), fixture.seeks)
+                    assertEquals(1, fixture.notices.state.value.pending.size)
+                } else {
+                    assertTrue("seeks=${fixture.seeks}", fixture.seeks.isEmpty())
+                    assertTrue(fixture.notices.state.value.pending.isEmpty())
+                    assertEquals(null, fixture.markers.currentAdBreak.value)
+                }
+            } finally { fixture.markers.clearRecordingMarkersAndJoin() }
+        }
+    }
+
+    @Test
+    @OptIn(TvheadendTestingApi::class, ExperimentalCoroutinesApi::class)
+    fun overlappingAdBreaksEndAsCurrentAtTheMergedLandingPoint() = runTest {
+        // [10, 14] and [13, 16] merge to [10, 16]; with 5 s the landing is 11 s, which neither raw cutpoint names.
+        val fixture = MarkerFixture(backgroundScope, listOf(
+            DvrCutpoint(10_000.milliseconds, 14_000.milliseconds, DvrCutpointAction.COMMERCIAL_BREAK),
+            DvrCutpoint(13_000.milliseconds, 16_000.milliseconds, DvrCutpointAction.COMMERCIAL_BREAK),
+        ))
+        try {
+            fixture.markers.applySettings(PlayerSettings(skipLanding = SkipLanding.FIVE_SECONDS_BEFORE))
+            fixture.markers.observeRecordingMarkersLocked(fixture.binding)
+            fixture.response.complete(Unit)
+            runCurrent()
+            assertEquals(listOf(10_000L, 11_000L, 13_000L, 14_000L, 16_000L),
+                fixture.messages.filterNot { it.isCanceled }.map { it.positionMs })
+            fixture.position = 10_500
+            fixture.markers.onPlaybackChanged()
+            runCurrent()
+            val merged = RecordingMark(RecordingMarkKind.AD_BREAK, 10_000, 16_000)
+            assertEquals(merged, fixture.markers.currentAdBreak.value)
+            assertEquals(merged, fixture.markers.skipPrompt.value)
+            // Uninterrupted playback reaches the landing: Skip is no longer current or offered.
+            fixture.position = 11_000
+            fixture.messages.last { !it.isCanceled && it.positionMs == 11_000L }
+                .let { it.target.handleMessage(it.type, it.payload) }
+            runCurrent()
+            assertEquals(null, fixture.markers.currentAdBreak.value)
+            assertEquals(null, fixture.markers.skipPrompt.value)
+        } finally { fixture.markers.clearRecordingMarkersAndJoin() }
     }
 
     @OptIn(TvheadendTestingApi::class)
