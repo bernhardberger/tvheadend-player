@@ -107,22 +107,24 @@ android {
     productFlavors {
         create("play") {
             dimension = "distribution"
-            buildConfigField("boolean", "APPLIANCE_BUILD", "false")
         }
         create("appliance") {
             dimension = "distribution"
             applicationIdSuffix = ".appliance"
-            buildConfigField("boolean", "APPLIANCE_BUILD", "true")
         }
     }
 
     buildTypes {
         debug {
+            buildConfigField("String", "APPLIANCE_COMPANION_PACKAGE", "\"at.bernhardberger.tvhplayer.appliance.debug\"")
+            manifestPlaceholders["applianceCompanionPackage"] = "at.bernhardberger.tvhplayer.appliance.debug"
             applicationIdSuffix = ".debug"
             isPseudoLocalesEnabled = true
             buildConfigField("String[]", "APP_LANGUAGES", javaStringArray(appLanguages + pseudoLocales))
         }
         release {
+            buildConfigField("String", "APPLIANCE_COMPANION_PACKAGE", "\"at.bernhardberger.tvhplayer.appliance\"")
+            manifestPlaceholders["applianceCompanionPackage"] = "at.bernhardberger.tvhplayer.appliance"
             isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -131,6 +133,8 @@ android {
         }
         create("profile") {
             initWith(getByName("release"))
+            buildConfigField("String", "APPLIANCE_COMPANION_PACKAGE", "\"at.bernhardberger.tvhplayer.appliance.debug\"")
+            manifestPlaceholders["applianceCompanionPackage"] = "at.bernhardberger.tvhplayer.appliance.debug"
             proguardFiles("benchmark-rules.pro")
             // Controlled code-optimization comparison; identical resources and instrumentation.
             isMinifyEnabled = providers.gradleProperty("tvhplayer.profileMinify")

@@ -39,7 +39,7 @@ internal const val ABOUT_LEVEL = "settings-about"
 @Composable
 internal fun settingsAboutLevels(
     sessionState: SessionState,
-    applianceBuild: Boolean = BuildConfig.APPLIANCE_BUILD,
+    companionInstalled: Boolean = false,
     machineTranslated: Boolean = booleanResource(R.bool.language_machine_translated),
 ): List<DepthLevel> {
     val credits = stringArrayResource(R.array.about_translator_credits).filter { it.isNotBlank() }
@@ -52,7 +52,7 @@ internal fun settingsAboutLevels(
     val rows = listOf(
         settingsRow("version", stringResource(R.string.about_version), stringResource(
             R.string.about_version_value, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE,
-            stringResource(if (applianceBuild) R.string.about_build_appliance else R.string.about_build_play))),
+            stringResource(if (companionInstalled) R.string.about_build_appliance else R.string.about_build_play))),
         settingsRow("server", stringResource(R.string.about_server), aboutServerText(sessionState)),
         settingsRow("license", license, titleMaxLines = 3, trailingIcon = R.drawable.ic_arrow_forward,
             onClick = { reading = license to "LICENSE" }),

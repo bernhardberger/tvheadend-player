@@ -170,6 +170,32 @@ if [[ "$play_manifest" != *'android.intent.category.LEANBACK_LAUNCHER'* ||
     exit 1
 fi
 
+python3 - "$play_manifest" <<'PLAY_ENTRY_CONTRACT'
+import re
+import sys
+
+tree = sys.argv[1]
+permission = 'at.bernhardberger.tvhplayer.debug.permission.APPLIANCE_ENTRY'
+
+def attributes(element):
+    # Direct attributes end at the next element (including a nested intent-filter).
+    return re.findall(r'(?m)^\s*E: ' + element + r'(?: \(line=\d+\))?\s*\n((?:\s*A:.*\n?)*)', tree)
+
+def has(block, name, value):
+    return re.search(r'android:' + name + r'\([^)]*\)=' + re.escape(value) + r'(?:\s|$)', block) is not None
+
+declared = any(has(block, 'name', '"' + permission + '"') and
+               has(block, 'protectionLevel', '(type 0x11)0x2')
+               for block in attributes('permission'))
+guarded = any(has(block, 'name', '"at.bernhardberger.tvhplayer.ui.ApplianceEntryActivity"') and
+              has(block, 'targetActivity', '"at.bernhardberger.tvhplayer.ui.MainActivity"') and
+              has(block, 'exported', '(type 0x12)0xffffffff') and
+              has(block, 'permission', '"' + permission + '"')
+              for block in attributes('activity-alias'))
+if not declared or not guarded:
+    sys.exit('error: Play signature-guarded appliance entry contract failed')
+PLAY_ENTRY_CONTRACT
+
 required_badging=(
     "package: name='at.bernhardberger.tvhplayer.debug'"
     "sdkVersion:'28'"

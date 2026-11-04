@@ -35,7 +35,6 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.playback.BackgroundPlaybackNotice
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.Notice
-import at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService
 import at.bernhardberger.tvhplayer.core.ApplianceEntryPolicy
 import at.bernhardberger.tvhplayer.core.MainStartupState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
@@ -258,7 +257,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun requestApplianceEntry(intent: Intent?) {
-        if (intent?.action != ApplianceEntryAccessibilityService.ACTION_APPLIANCE_ENTRY) return
+        if (!ApplianceEntryPolicy.acceptsEntryIntent(
+                action = intent?.action,
+                componentPackage = intent?.component?.packageName,
+                componentClassName = intent?.component?.className,
+                playerPackage = packageName,
+            )) return
         if (ApplianceEntryPolicy.shouldCreateLaunchRequest(isPlayerVisible)) {
             startupViewModel.applianceLaunchRequests.request()
         }

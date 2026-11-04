@@ -634,8 +634,8 @@ class SettingsDepthNavigationTest {
         lateinit var appliance: DepthLevel
         compose.setContent {
             TVHeadendPlayerTheme {
-                play = settingsRootLevel(applianceBuild = false)
-                appliance = settingsRootLevel(applianceBuild = true)
+                play = settingsRootLevel(companionInstalled = false)
+                appliance = settingsRootLevel(companionInstalled = true)
             }
         }
         compose.runOnIdle {
@@ -653,7 +653,7 @@ class SettingsDepthNavigationTest {
             TVHeadendPlayerTheme {
                 key(section) {
                     SettingsScreenNavigation(rememberDepthNavigationState(SETTINGS_ROOT, section.name),
-                        listOf(settingsRootLevel(applianceBuild = true)))
+                        listOf(settingsRootLevel(companionInstalled = true)))
                 }
             }
         }
@@ -678,7 +678,7 @@ class SettingsDepthNavigationTest {
                         at.bernhardberger.tvhplayer.data.ConnectionFailureKind.UNREACHABLE,
                         at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition.EXPLICIT_RETRY)))
                 SettingsScreenNavigation(rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.CONNECTION.name),
-                    listOf(settingsRootLevel(applianceBuild = false, connectionStatus = status.title)))
+                    listOf(settingsRootLevel(companionInstalled = false, connectionStatus = status.title)))
             }
         }
         val reason = requireNotNull(status.reason) // The overview page shows both lines.
@@ -1284,7 +1284,7 @@ class SettingsDepthNavigationTest {
                     WarmPlaybackScrim() // This fixture explicitly models warm playback.
                     SideRail(currentRoute = AppDestination.SETTINGS,
                         onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
-                        SettingsScreenNavigation(navigation, listOf(settingsRootLevel(applianceBuild = true),
+                        SettingsScreenNavigation(navigation, listOf(settingsRootLevel(companionInstalled = true),
                             settingsChannelTagsLevel(emptyList(), ChannelScopeVisibility(), loaded, failed,
                                 { retries++ }, { toggles++ }),
                             settingsPlayerLevel(SettingsPlayerUiState(profiles = StreamProfilesResult.Failed(TvheadendFailure.ACCESS_DENIED)),

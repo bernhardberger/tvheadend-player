@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
+    <permission
+        android:name="${applicationId}.permission.APPLIANCE_ENTRY"
+        android:protectionLevel="signature" />
+    <queries>
+        <package android:name="${applianceCompanionPackage}" />
+    </queries>
 	<uses-feature
 		android:name="android.software.leanback"
 		android:required="true" />
@@ -41,6 +47,16 @@
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity-alias
+            android:name=".ui.ApplianceEntryActivity"
+            android:targetActivity=".ui.MainActivity"
+            android:exported="true"
+            android:permission="${applicationId}.permission.APPLIANCE_ENTRY">
+            <intent-filter>
+                <action android:name="at.bernhardberger.tvhplayer.action.APPLIANCE_ENTRY" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity-alias>
     </application>
 
 </manifest>

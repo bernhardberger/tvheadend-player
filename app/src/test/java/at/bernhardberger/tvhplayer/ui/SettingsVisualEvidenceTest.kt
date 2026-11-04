@@ -136,7 +136,7 @@ class SettingsVisualEvidenceTest {
                         SideRail(currentRoute = AppDestination.SETTINGS,
                             onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                             SettingsScreenNavigation(navigation, listOf(
-                                settingsRootLevel(applianceBuild = false,
+                                settingsRootLevel(companionInstalled = false,
                                     connectionStatus = resources.getString(at.bernhardberger.tvhplayer.R.string.error_101_title))) +
                                 settingsGeneralLevels(UiSettings(), AppLanguage.SYSTEM, CacheStatistics.EMPTY, CacheClearState.IDLE, {}, {}),
                                 initialFocusEnabled = !drawerActive, contentPadding = padding)
@@ -182,7 +182,7 @@ class SettingsVisualEvidenceTest {
                             onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                             SettingsScreenNavigation(navigation,
                                 // The status page opens only while a retry can fix the connection.
-                                listOf(settingsRootLevel(applianceBuild = true,
+                                listOf(settingsRootLevel(companionInstalled = true,
                                     connectionStatus = resources.getString(at.bernhardberger.tvhplayer.R.string.error_101_title)),
                                     settingsApplianceLevel(false, { accessibilityCalls++ }),
                                     settingsConnectionOverview(resources.getString(at.bernhardberger.tvhplayer.R.string.error_101_title),
@@ -312,7 +312,7 @@ class SettingsVisualEvidenceTest {
                     WarmPlaybackScrim() // This evidence set explicitly models warm playback.
                     SideRail(currentRoute = AppDestination.SETTINGS,
                         onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
-                        SettingsScreenNavigation(navigation, listOf(settingsRootLevel(applianceBuild = false, connectionStatus = "Connected"),
+                        SettingsScreenNavigation(navigation, listOf(settingsRootLevel(companionInstalled = false, connectionStatus = "Connected"),
                             settingsPlayerLevel(ui, {}), settingsKeepChannelLevel(ui.keepChannelMinutes) {},
                             settingsStreamProfileLevel(ui) {},
                             settingsStartupBufferLevel(ui.startupBufferMillis, ui.startupBufferLearnedMillis) {},
@@ -352,7 +352,7 @@ class SettingsVisualEvidenceTest {
                     WarmPlaybackScrim()
                     SideRail(currentRoute = AppDestination.SETTINGS,
                         onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
-                        SettingsScreenNavigation(navigation, listOf(settingsRootLevel(applianceBuild = false, connectionStatus = "Connected"),
+                        SettingsScreenNavigation(navigation, listOf(settingsRootLevel(companionInstalled = false, connectionStatus = "Connected"),
                             settingsPlayerLevel(ui, {})),
                             initialFocusEnabled = !drawerActive, contentPadding = padding)
                     }

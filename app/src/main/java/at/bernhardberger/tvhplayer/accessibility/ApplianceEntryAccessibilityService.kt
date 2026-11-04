@@ -13,7 +13,6 @@ import androidx.core.content.ContextCompat
 import at.bernhardberger.tvhplayer.core.ApplianceEntryLaunchGate
 import at.bernhardberger.tvhplayer.core.ApplianceEntryPolicy
 import at.bernhardberger.tvhplayer.core.ApplianceKeyDecision
-import at.bernhardberger.tvhplayer.ui.MainActivity
 
 class ApplianceEntryAccessibilityService : AccessibilityService() {
     private val launchGate = ApplianceEntryLaunchGate(minimumIntervalMillis = 1_500)
@@ -80,7 +79,7 @@ class ApplianceEntryAccessibilityService : AccessibilityService() {
     private fun launchApp() {
         if (!launchGate.shouldLaunch(SystemClock.elapsedRealtime())) return
         startActivity(
-            Intent(this, MainActivity::class.java).apply {
+            Intent().setClassName(packageName, ApplianceEntryPolicy.ENTRY_ALIAS_CLASS_NAME).apply {
                 action = ACTION_APPLIANCE_ENTRY
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or
                     Intent.FLAG_ACTIVITY_CLEAR_TOP or
@@ -91,6 +90,6 @@ class ApplianceEntryAccessibilityService : AccessibilityService() {
 
     companion object {
         const val ACTION_APPLIANCE_ENTRY =
-            "at.bernhardberger.tvhplayer.action.APPLIANCE_ENTRY"
+            ApplianceEntryPolicy.ACTION_APPLIANCE_ENTRY
     }
 }

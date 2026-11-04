@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import android.content.Context
+import android.content.pm.PackageManager
 import androidx.compose.foundation.layout.*
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -9,6 +11,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.runtime.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.compose.ui.platform.LocalContext
 import at.bernhardberger.tvhplayer.settings.UiSettings
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import kotlinx.coroutines.launch
@@ -32,6 +36,10 @@ import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 
 internal const val SETTINGS_ROOT = "settings-root"
 
+internal fun isApplianceCompanionInstalled(context: Context): Boolean =
+    context.packageManager.checkSignatures(context.packageName, BuildConfig.APPLIANCE_COMPANION_PACKAGE) ==
+        PackageManager.SIGNATURE_MATCH
+
 @Composable
 internal fun SettingsScreen(
     channelsVm: ChannelsViewModel,
@@ -42,9 +50,14 @@ internal fun SettingsScreen(
     contentPadding: PaddingValues = TvFullScreenPadding,
     backEnabled: Boolean = true,
     isCurrent: Boolean = true,
-    applianceBuild: Boolean = BuildConfig.APPLIANCE_BUILD,
     settingsStore: UiSettingsStore = koinInject(),
 ) {
+    val context = LocalContext.current
+    var companionInstalled by remember(context) { mutableStateOf(isApplianceCompanionInstalled(context)) }
+    LifecycleResumeEffect(context, isCurrent) {
+        if (isCurrent) companionInstalled = isApplianceCompanionInstalled(context)
+        onPauseOrDispose { }
+    }
     val navigation = rememberDepthNavigationState(SETTINGS_ROOT, section.name)
     var setupOpen by rememberSaveable { mutableStateOf(false) }
     val observation by channelsVm.observation.collectAsStateWithLifecycle()
@@ -56,15 +69,15 @@ internal fun SettingsScreen(
         scope.launch { settingsStore.setRecordingProfile(id); navigation.pop() }
     }
     val levels = settingsGeneralLevels(navigation) + settingsConnectionLevels(connectionPresentation, onRetry, onSetUp = { setupOpen = true }) + settingsPlayerLevels(navigation) + listOf(
-        settingsRootLevel(applianceBuild, recordingLevels.isNotEmpty(), connectionOverviewStatus(connectionPresentation).title),
+        settingsRootLevel(companionInstalled, recordingLevels.isNotEmpty(), connectionOverviewStatus(connectionPresentation).title),
         settingsKeepChannelLevel(navigation),
         settingsWarmPlaybackLevel(navigation),
         settingsStreamProfileLevel(navigation),
         settingsFrameRateLevel(navigation),
         settingsStartupBufferLevel(navigation),
         settingsChannelTagsLevel(channelsVm),
-    ) + recordingLevels + settingsAboutLevels(observation.sessionState, applianceBuild) +
-        if (applianceBuild) listOf(settingsApplianceLevel()) else emptyList()
+    ) + recordingLevels + settingsAboutLevels(observation.sessionState, companionInstalled) +
+        if (companionInstalled) listOf(settingsApplianceLevel()) else emptyList()
     SettingsScreenNavigation(navigation, levels, initialFocusEnabled, contentPadding, backEnabled, isCurrent,
         setup = if (setupOpen) {
             { SettingsConnection(onSaved = { setupOpen = false }) }
@@ -75,7 +88,7 @@ internal fun SettingsScreen(
 /** Connection's row carries the overview's status title, the only value on the root. */
 @Composable
 internal fun settingsRootLevel(
-    applianceBuild: Boolean = BuildConfig.APPLIANCE_BUILD,
+    companionInstalled: Boolean = false,
     showRecordings: Boolean = false,
     connectionStatus: String? = null,
 ): DepthLevel = settingsLevel(SETTINGS_ROOT, stringResource(R.string.nav_settings), buildList {
@@ -87,7 +100,7 @@ internal fun settingsRootLevel(
     add(settingsRow(SettingsSection.AUDIO.name, stringResource(R.string.settings_audio_nav), child = SettingsSection.AUDIO.name, icon = R.drawable.ic_subtitles))
     if (showRecordings) add(settingsRow(RECORDINGS_LEVEL, stringResource(R.string.nav_recordings), child = RECORDINGS_LEVEL,
         icon = R.drawable.ic_fiber_manual_record))
-    if (applianceBuild) add(settingsRow(SettingsSection.APPLIANCE.name, stringResource(R.string.settings_appliance), child = SettingsSection.APPLIANCE.name, icon = R.drawable.ic_home))
+    if (companionInstalled) add(settingsRow(SettingsSection.APPLIANCE.name, stringResource(R.string.settings_appliance), child = SettingsSection.APPLIANCE.name, icon = R.drawable.ic_home))
     add(settingsRow(ABOUT_LEVEL, stringResource(R.string.settings_about), child = ABOUT_LEVEL, icon = R.drawable.ic_info))
 })
 
