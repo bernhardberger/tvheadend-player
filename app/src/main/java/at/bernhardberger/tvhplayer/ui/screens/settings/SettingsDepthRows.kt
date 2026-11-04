@@ -5,7 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.state.ToggleableState
@@ -13,6 +13,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
+import kotlin.math.roundToInt
 import androidx.tv.material3.*
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.TvSpacing4
@@ -41,10 +42,21 @@ internal fun settingsLevel(
         Row(Modifier.fillMaxWidth().heightIn(min = TvBrowseHeaderHeight),
             verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             Text(title, style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.testTag("settings-level-$id").graphicsLayer {
-                    scaleX = lerp(SettingsHeadingPreviewScale, 1f, emphasis())
-                    scaleY = scaleX
-                    transformOrigin = TransformOrigin(0f, 1f)
+                maxLines = 2, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.testTag("settings-level-$id").layout { measurable, constraints ->
+                    val scale = lerp(SettingsHeadingPreviewScale, 1f, emphasis())
+                    // Measure at the visual width, not the unscaled 28sp width: a preview title
+                    // must use the whole column rather than wrapping inside its left-hand half.
+                    val placeable = measurable.measure(constraints.copy(
+                        minWidth = 0, maxWidth = (constraints.maxWidth / scale).roundToInt(),
+                    ))
+                    layout((placeable.width * scale).roundToInt(), (placeable.height * scale).roundToInt()) {
+                        placeable.placeRelativeWithLayer(0, 0) {
+                            scaleX = scale
+                            scaleY = scale
+                            transformOrigin = TransformOrigin(0f, 0f)
+                        }
+                    }
                 }.semantics { heading() })
         }
     }
@@ -77,6 +89,8 @@ internal fun settingsRow(
     trailingIcon: Int? = null,
     // Long localized titles wrap to a second line before they ellipsize.
     titleMaxLines: Int = 2,
+    /** Drawn instead of [icon], for a row that leads with more than an icon (a server's avatar). */
+    leading: (@Composable BoxScope.() -> Unit)? = null,
     onClick: () -> Unit = {},
 ) = DepthRow(DepthItem(id, child), { if (enabled) onClick() }) { modifier, activate ->
     Column {
@@ -101,8 +115,8 @@ internal fun settingsRow(
             // Keep the last visible scope reachable even when its switch cannot be turned off.
             onClick = { if (enabled) activate() },
             headlineContent = { Text(title.annotated(), style = MaterialTheme.typography.titleMedium, maxLines = titleMaxLines, overflow = TextOverflow.Ellipsis) },
-            supportingContent = supporting?.let { { Text(it.annotated()) } },
-            leadingContent = icon?.let { { Icon(painterResource(it), null, Modifier.size(ListItemDefaults.IconSize)) } },
+            supportingContent = supporting?.let { { Text(it.annotated(), maxLines = 2, overflow = TextOverflow.Ellipsis) } },
+            leadingContent = leading ?: icon?.let { { Icon(painterResource(it), null, Modifier.size(ListItemDefaults.IconSize)) } },
             trailingContent = when {
                 busy -> ({ androidx.compose.material3.CircularProgressIndicator(
                     modifier = Modifier.size(24.dp), color = LocalContentColor.current, strokeWidth = 2.dp,

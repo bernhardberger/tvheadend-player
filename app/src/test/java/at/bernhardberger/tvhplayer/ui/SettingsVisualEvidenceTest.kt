@@ -184,9 +184,9 @@ class SettingsVisualEvidenceTest {
                                 // The status page opens only while a retry can fix the connection.
                                 listOf(settingsRootLevel(applianceBuild = true,
                                     connectionStatus = resources.getString(at.bernhardberger.tvhplayer.R.string.error_101_title)),
-                                    settingsApplianceLevel(false, { accessibilityCalls++ }),
-                                    settingsConnectionOverview(resources.getString(at.bernhardberger.tvhplayer.R.string.error_101_title),
-                                        "tvheadend.local", 9982, degraded = true)) +
+                                    settingsApplianceLevel(false, { accessibilityCalls++ })) +
+                                    fixtureConnectionLevels(resources.getString(at.bernhardberger.tvhplayer.R.string.error_101_title),
+                                        showRetry = true) +
                                     settingsGeneralLevels(UiSettings(), AppLanguage.SYSTEM, CacheStatistics.EMPTY, cacheState,
                                         {}, { cacheCalls++; cacheState = CacheClearState.CLEARING }),
                                 initialFocusEnabled = !drawerActive, contentPadding = padding)
@@ -206,8 +206,10 @@ class SettingsVisualEvidenceTest {
         }
         capture("$prefix-connection-preview")
         press(Key.DirectionCenter)
-        compose.onNodeWithText(resources.getString(at.bernhardberger.tvhplayer.R.string.connection_try_again)).assertIsFocused()
-        compose.onNodeWithText(resources.getString(at.bernhardberger.tvhplayer.R.string.setup_connection)).assertIsDisplayed()
+        compose.onNodeWithTag("settings-row-${serverProfileRowId(fixtureActiveServer.id)}").assertIsFocused()
+        compose.onNodeWithText(resources.getString(at.bernhardberger.tvhplayer.R.string.connection_try_again)).assertIsDisplayed()
+        compose.onNodeWithText(resources.getString(at.bernhardberger.tvhplayer.R.string.setup_connection),
+            useUnmergedTree = true).assertIsDisplayed() // Preview of the focused server's level.
         compose.onAllNodes(hasSetTextAction()).assertCountEquals(0)
         capture("$prefix-connection-overview")
         press(Key.Back)

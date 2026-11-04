@@ -46,7 +46,7 @@ class SettingsConnectionDepthTest {
     private var setupOpen by mutableStateOf(false)
     private var degraded by mutableStateOf(false)
 
-    /** Settings with the Connection page whose Set up row opens the setup over it, as the screen does. */
+    /** Settings with the Connection list and its server's level, whose Set up row opens the setup over it. */
     @Composable
     private fun SettingsWithSetup(
         navigation: DepthNavigationState,
@@ -54,9 +54,9 @@ class SettingsConnectionDepthTest {
         contentPadding: androidx.compose.foundation.layout.PaddingValues = TvFullScreenPadding,
         initialFocusEnabled: Boolean = true,
         isCurrent: Boolean = true,
-    ) = SettingsScreenNavigation(navigation, listOf(settingsRootLevel(),
-        settingsConnectionOverview("Connected", "tvheadend.local", 9982, degraded = degraded,
-            onSetUp = { setupOpen = true })),
+    ) = SettingsScreenNavigation(navigation, listOf(settingsRootLevel()) +
+        fixtureConnectionLevels("Connected", showRetry = degraded,
+            actions = ServerProfileActions(onSetUp = { setupOpen = true })),
         initialFocusEnabled = initialFocusEnabled, contentPadding = contentPadding, isCurrent = isCurrent,
         setup = if (setupOpen) { { setup { setupOpen = false } } } else null,
         onCloseSetup = { setupOpen = false })
@@ -83,6 +83,7 @@ class SettingsConnectionDepthTest {
         press(Key.DirectionUp)
         compose.onNodeWithText("Connection").assertIsFocused()
         capture(view, "settings-entry")
+        press(Key.DirectionCenter)
         press(Key.DirectionCenter)
         compose.onNodeWithText("Set up connection").assertIsFocused()
         capture(view, "settings-connection-page")
@@ -126,6 +127,7 @@ class SettingsConnectionDepthTest {
         }
         compose.onNodeWithText("Connection").assertIsFocused()
         press(Key.DirectionCenter)
+        press(Key.DirectionCenter)
         compose.onNodeWithText("Set up connection").assertIsFocused()
         assertEquals(0, editor.loads)
         press(Key.DirectionRight) // Dedicated leaf actions do not enter on Right.
@@ -140,8 +142,8 @@ class SettingsConnectionDepthTest {
         compose.onNodeWithText("Find servers on my network").assertIsDisplayed()
         compose.onAllNodes(hasSetTextAction()).assertCountEquals(0)
         // Settings stays where it was under the setup.
-        assertEquals(2, navigation.stack.frames.size)
-        assertEquals(SettingsSection.CONNECTION.name, navigation.stack.active.levelId)
+        assertEquals(3, navigation.stack.frames.size)
+        assertEquals(serverProfileRowId(fixtureActiveServer.id), navigation.stack.active.levelId)
         repeat(2) { press(Key.DirectionUp) }
         compose.onNodeWithTag("setup-host").assertIsFocused()
         press(Key.DirectionCenter)
@@ -221,6 +223,7 @@ class SettingsConnectionDepthTest {
             assertEquals(saved, editor.serverSettings.value)
         }
         press(Key.DirectionCenter)
+        press(Key.DirectionCenter)
         compose.onNodeWithText("Set up connection").assertIsFocused()
 
         // Leaving while the test runs cancels it, which disconnects the draft and restores the saved connection.
@@ -261,8 +264,7 @@ class SettingsConnectionDepthTest {
                 }
             }
         }
-        press(Key.DirectionCenter)
-        press(Key.DirectionCenter)
+        repeat(3) { press(Key.DirectionCenter) }
         press(Key.DirectionUp)
         compose.onNodeWithTag("setup-port").assertIsFocused()
         press(Key.DirectionLeft) // A step keeps Left, so it cannot drop what was entered.
@@ -272,7 +274,7 @@ class SettingsConnectionDepthTest {
         assertFalse(setupOpen)
         compose.onNodeWithText("Set up connection").assertIsFocused()
         compose.onNodeWithTag("nav-settings").assertIsNotFocused()
-        assertEquals(2, navigation.stack.frames.size)
+        assertEquals(3, navigation.stack.frames.size)
         assertEquals("", form.password)
         assertEquals(0, editor.saves)
     }
@@ -286,8 +288,7 @@ class SettingsConnectionDepthTest {
                 SettingsWithSetup(navigation, { onSaved -> editor.Screen(form, onSaved) })
             }
         }
-        press(Key.DirectionCenter)
-        press(Key.DirectionCenter)
+        repeat(3) { press(Key.DirectionCenter) }
         connect()
         compose.runOnIdle { session.publish(unavailable()) }
         compose.onNodeWithTag("setup-action-try_again").assertIsFocused()
@@ -333,6 +334,7 @@ class SettingsConnectionDepthTest {
         }
         assertEquals(0, editor.loads)
         compose.onNodeWithText("Connection").assertIsFocused()
+        press(Key.DirectionCenter)
         press(Key.DirectionCenter)
         compose.onNodeWithText("Set up connection").assertIsFocused()
         val parent = navigation.stack.active

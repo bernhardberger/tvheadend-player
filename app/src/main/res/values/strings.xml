@@ -1,6 +1,48 @@
 <resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en">
-    <string name="server_profile_removed">Server removed</string>
+    <string name="server_profile_removed">Removed %1$s</string>
     <string name="server_profile_already_exists">This server already exists</string>
+    <string name="server_add">Add server</string>
+    <string name="server_add_description">Another server or another user</string>
+    <string name="server_in_use">In use</string>
+    <string name="server_no_sign_in">No sign-in</string>
+    <string name="server_password_needed">Password needed</string>
+    <!-- A server without a name: the account and the server address, e.g. "anna on tvheadend.home.arpa". -->
+    <string name="server_user_on_host">%1$s on %2$s</string>
+    <!-- Joins the parts of a supporting line, e.g. "In use · anna on tvheadend.home.arpa". -->
+    <string name="server_detail_separator">%1$s · %2$s</string>
+    <!-- A server address with a port other than the default, e.g. "tvheadend.home.arpa · port 9983". -->
+    <string name="server_host_port">%1$s · port %2$d</string>
+    <string name="server_use">Use this server</string>
+    <string name="server_use_sign_in">Sign in as %1$s</string>
+    <string name="server_use_anonymous">Connect without sign-in</string>
+    <string name="server_name">Name</string>
+    <string name="server_name_not_set">Not set</string>
+    <string name="server_show_in_switcher">Show in Switch server</string>
+    <string name="server_remove">Remove</string>
+    <string name="server_remove_description">Delete this server from this TV</string>
+    <string name="server_account">Account</string>
+    <string name="server_enter_password">Enter password</string>
+    <string name="server_switch_title">Switch to %1$s?</string>
+    <string name="server_switch_live">Live TV stops. The app signs in as %1$s and loads that server’s channels and guide.</string>
+    <string name="server_switch_live_anonymous">Live TV stops. The app connects without sign-in and loads that server’s channels and guide.</string>
+    <string name="server_switch_recording">The recording stops. The app signs in as %1$s and loads that server’s channels and guide.</string>
+    <string name="server_switch_recording_anonymous">The recording stops. The app connects without sign-in and loads that server’s channels and guide.</string>
+    <string name="server_keep_watching">Keep watching</string>
+    <string name="server_switch">Switch</string>
+    <string name="server_remove_title">Remove %1$s?</string>
+    <string name="server_remove_body">Recent channels, audio choices and saved pictures for %1$s are deleted from this TV. Recordings stay on the server.</string>
+    <string name="server_remove_body_active">Live TV stops and no server is in use until you choose one. Recent channels, audio choices and saved pictures for %1$s are deleted from this TV. Recordings stay on the server.</string>
+    <string name="server_add_name">Add a name</string>
+    <string name="server_name_title">Name this server</string>
+    <string name="server_name_body">Settings shows the name instead of the address. Leave it empty to show %1$s.</string>
+    <string name="server_name_field">Name (optional)</string>
+    <string name="server_name_limit">Up to 64 characters</string>
+    <string name="server_name_save">Save</string>
+    <string name="server_password_title">Enter the password again</string>
+    <string name="server_password_body">The saved password for %1$s can’t be read anymore. Enter it to use %2$s again.</string>
+    <string name="server_none_in_use">No server in use</string>
+    <string name="server_list_unavailable">The saved servers can’t be read on this TV right now.</string>
+    <string name="server_none_in_use_description">No server in use. Choose one to watch TV again.</string>
     <string name="settings_channel_numbers">Channel numbers</string>
     <string name="settings_channel_numbers_help">Turn off if your remote has no number keys</string>
     <string name="player_full_screen">Full screen</string>
@@ -184,7 +226,7 @@
     <string name="onboarding_failure_meta">%1$s • port %2$s • user %3$s</string>
     <string name="onboarding_failure_meta_anonymous">%1$s • port %2$s</string>
     <string name="onboarding_change_address">Change address</string>
-    <string name="onboarding_change_address_detail">%1$s • port %2$s</string>
+    <string name="onboarding_change_address_detail">%1$s · port %2$s</string>
     <string name="onboarding_change_sign_in">Change account</string>
     <string name="onboarding_change_sign_in_detail">User: %1$s</string>
     <string name="onboarding_change_sign_in_anonymous">Without an account</string>

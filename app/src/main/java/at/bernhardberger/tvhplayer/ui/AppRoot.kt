@@ -448,6 +448,12 @@ fun AppRoot(
     onPlayerVisibilityChanged: (Boolean) -> Unit,
     onRequestExit: () -> Unit,
     registerActivityKeyContract: (MainStartupActivityKeyContract) -> (() -> Unit) = { {} },
+    /**
+     * At least one server is stored. First-run setup is only for a TV with none; with servers
+     * stored but none usable, the app opens Settings > Connection. Judged from the stored list,
+     * not the active profile, so removing the server in use never passes through first run.
+     */
+    serversStored: Boolean = false,
 ) {
     val applianceLaunchState by applianceLaunchRequests.state.collectAsStateWithLifecycle()
     val startupLoadingTiming = remember { MainStartupLoadingTiming() }
@@ -487,7 +493,8 @@ fun AppRoot(
     val deferredBackAction = deferredResolvingBackAction(
         cancellationRequested = cancelBootstrapLaunchWhenReady,
     )
-    if (serverSettings.host.isBlank()) {
+    val noServerInUse = serversStored && serverSettings.host.isBlank()
+    if (serverSettings.host.isBlank() && !serversStored) {
         MainStartupComposition(
             state = MainStartupCompositionState(
                 presentation = MainStartupPresentation.Inactive,
@@ -506,7 +513,7 @@ fun AppRoot(
 
     var navigationStartDestination by remember {
         mutableStateOf<AppNavKey?>(
-            when (val launchState = applianceLaunchState) {
+            if (noServerInUse) SettingsKey(SettingsSection.CONNECTION) else when (val launchState = applianceLaunchState) {
                 ApplianceLaunchState.Idle -> HomeKey
                 is ApplianceLaunchState.Pending -> if (
                     deferredBackAction ==
@@ -669,7 +676,8 @@ fun AppRoot(
     } == true
     var homeContentDrawn by remember(profileGeneration) { mutableStateOf(false) }
     val coldStart = rememberColdStart(
-        launchIdle = applianceLaunchState == ApplianceLaunchState.Idle,
+        // Nothing connects while no server is in use, so there is no connection to wait for.
+        launchIdle = applianceLaunchState == ApplianceLaunchState.Idle && !noServerInUse,
         connectionState = connectionUiState,
         currentChannelReadiness = currentChannelReadiness,
         loadingTiming = startupLoadingTiming,
@@ -1212,6 +1220,17 @@ fun AppRoot(
             }
     }
 
+    // Launch, HOME, GUIDE and wake have no channel to play while no server is in use; they open
+    // the server list instead.
+    LaunchedEffect(noServerInUse, applianceLaunchState, selectRoot) {
+        if (!noServerInUse || applianceLaunchState == ApplianceLaunchState.Idle) return@LaunchedEffect
+        cancelStartupAndSelectRoot(
+            requests = applianceLaunchRequests,
+            expectedState = applianceLaunchState,
+            destination = SettingsKey(SettingsSection.CONNECTION),
+            selectRoot = selectRoot,
+        )
+    }
     val startupAction = remember(applianceLaunchState, selectRoot, appVm) {
         val expectedState = applianceLaunchState
         { action: AppErrorAction ->

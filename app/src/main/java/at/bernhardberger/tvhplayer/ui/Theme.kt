@@ -33,6 +33,19 @@ object TvSurfaceColors {
 }
 
 /**
+ * A server avatar's fill and its letter or glyph: Material 3 dark tones 30 and 90, slightly muted,
+ * in the order blue, amber, green, purple, teal, rose. The index comes from the server's address.
+ */
+val TvServerAvatarColors: List<Pair<Color, Color>> = listOf(
+    Color(0xFF0F4A64) to Color(0xFFC4E7FF),
+    Color(0xFF574100) to Color(0xFFFFDF9E),
+    Color(0xFF2B4D23) to Color(0xFFC4EFA9),
+    Color(0xFF45386A) to Color(0xFFE6DCFF),
+    Color(0xFF0E4D48) to Color(0xFFA6F0E6),
+    Color(0xFF62303B) to Color(0xFFFFD9DF),
+)
+
+/**
  * A Guide genre family's colors: [base] marks the family in the Genre panel and [tint] fills a
  * programme (12% of the base over containerHigh), focused or not. Programmes without a genre code
  * stay plain.

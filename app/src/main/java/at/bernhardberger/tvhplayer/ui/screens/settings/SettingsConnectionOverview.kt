@@ -31,28 +31,28 @@ import org.koin.compose.koinInject
 internal const val EDIT_CONNECTION = "edit-connection"
 internal const val RETRY_CONNECTION = "retry-connection"
 internal const val CONNECTION_STATUS = "connection-status"
-internal const val CONNECTION_SERVER = "connection-server"
-internal const val CONNECTION_PORT = "connection-port"
 
+/**
+ * Settings > Connection: the stored servers, adding one, and the connection's status, with
+ * "Try again" while the server in use is unreachable and the fix is not in Settings.
+ */
 @Composable
 internal fun settingsConnectionLevels(
     presentation: AppConnectionPresentation,
     onRetry: () -> Unit,
-    onSetUp: () -> Unit,
+    actions: ServerProfileActions,
     owner: AppProfileOwner = koinInject(),
 ): List<DepthLevel> {
     val profile by owner.serverProfile.collectAsStateWithLifecycle()
-    val available = profile as? ServerProfileReadResult.Available
+    val profiles by owner.profiles.collectAsStateWithLifecycle()
+    val hidden by owner.hiddenServerProfileIds.collectAsStateWithLifecycle(initialValue = emptySet())
     val connection = presentation.connection
     val status = connectionOverviewStatus(profile, presentation)
-    return listOf(
-        settingsConnectionOverview(status.text, available?.host, available?.port,
-            degraded = presentation.degraded, onRetry = onRetry,
-            connecting = connection == ConnectionUiState.Connecting || connection == ConnectionUiState.Reconnecting ||
-                connection == ConnectionUiState.SyncingChannels,
-            recoveryRequiresSettings = connection.primaryRecoveryAction() == ConnectionRecoveryAction.SETTINGS,
-            onSetUp = onSetUp),
-    )
+    return settingsServerLevels(profiles, hidden, status.text, actions,
+        showRetry = presentation.degraded && connection.primaryRecoveryAction() != ConnectionRecoveryAction.SETTINGS,
+        connecting = connection == ConnectionUiState.Connecting || connection == ConnectionUiState.Reconnecting ||
+            connection == ConnectionUiState.SyncingChannels,
+        onRetry = onRetry)
 }
 
 /** The overview's status: a failure's title and reason, or its own state with no reason. */
@@ -112,31 +112,4 @@ internal fun connectionOverviewFailure(
         connection == ConnectionUiState.NeedsConfiguration -> null
         else -> connection.toAppError()?.condition
     }
-}
-
-/** Safe endpoint fields only. No editor state, credential read, username or password reaches this API. */
-@Composable
-internal fun settingsConnectionOverview(
-    status: String, host: String?, port: Int?, degraded: Boolean = false,
-    onRetry: () -> Unit = {}, recoveryRequiresSettings: Boolean = false,
-    connecting: Boolean = false, onSetUp: () -> Unit = {},
-): DepthLevel {
-    val showRetry = degraded && !recoveryRequiresSettings
-    val retryAction: () -> Unit = { if (!connecting) onRetry() }
-    val missing = stringResource(R.string.connection_overview_unavailable)
-    val edit = settingsRow(EDIT_CONNECTION, stringResource(R.string.setup_connection),
-        supporting = stringResource(R.string.setup_connection_description), trailingIcon = R.drawable.ic_arrow_forward,
-        onClick = onSetUp)
-    val retry = settingsRow(RETRY_CONNECTION, stringResource(R.string.connection_try_again),
-        supporting = stringResource(if (connecting) R.string.connection_overview_connecting else R.string.connection_retry_description),
-        trailingIcon = R.drawable.ic_refresh, onClick = retryAction)
-    // The current connection follows its actions as focusable rows without an action, as in TV settings.
-    val info = listOf(
-        settingsRow(CONNECTION_STATUS, stringResource(R.string.connection_overview_status), status),
-        settingsRow(CONNECTION_SERVER, stringResource(R.string.connection_overview_server), host ?: missing),
-        settingsRow(CONNECTION_PORT, stringResource(R.string.port_htsp), port?.toString() ?: missing),
-    )
-    return settingsLevel(SettingsSection.CONNECTION.name, stringResource(R.string.settings_connection_nav),
-        (if (showRetry) listOf(retry) else emptyList()) + edit + info,
-        initialItemId = if (showRetry) RETRY_CONNECTION else EDIT_CONNECTION)
 }

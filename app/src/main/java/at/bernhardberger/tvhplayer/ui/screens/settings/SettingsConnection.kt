@@ -23,6 +23,7 @@ import at.bernhardberger.tvhplayer.ui.screens.onboarding.ConnectionSetupFlow
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.SetupMode
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.discoverServers
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.rememberConnectionSetupState
+import kotlinx.coroutines.sync.Mutex
 import org.koin.compose.koinInject
 
 @Composable
@@ -32,24 +33,47 @@ internal fun SettingsConnection(
     restoreSaved: suspend () -> Unit = rememberSavedConnectionRestore(session),
     form: ConnectionFormState = rememberConnectionFormState(),
     onSaved: () -> Unit = {},
+    mode: SetupMode = SetupMode.EDIT,
+    /** The stored server's name while its password is entered again. */
+    profileName: String? = null,
+    interruptsPlayback: () -> Boolean = { false },
+    existingProfile: (host: String, port: Int, username: String) -> Boolean = { _, _, _ -> false },
+    onAddName: (() -> Unit)? = null,
+    beforeTest: suspend () -> Unit = {},
+    sessionLock: Mutex = (settingsStore as? AppProfileOwner)?.connectionChanges ?: remember { Mutex() },
+    connectionGeneration: () -> Long = { (settingsStore as? AppProfileOwner)?.configurationGeneration?.value ?: 0L },
+    confirmSwitch: (@Composable (form: ConnectionFormState, onSwitch: () -> Unit, onKeep: () -> Unit) -> Unit)? = null,
 ) {
     val context = LocalContext.current.applicationContext
     val state = rememberConnectionSetupState(
         session = session,
         profiles = settingsStore,
         discovery = { discoverServers(context) },
-        mode = SetupMode.EDIT,
+        mode = mode,
         restoreSaved = restoreSaved,
         onSaved = onSaved,
         form = form,
+        interruptsPlayback = interruptsPlayback,
+        existingProfile = existingProfile,
+        onAddName = onAddName,
+        beforeTest = beforeTest,
+        sessionLock = sessionLock,
+        connectionGeneration = connectionGeneration,
     )
     LaunchedEffect(state) { state.loadSaved() }
     DisposableEffect(state) { onDispose(state.form::clearCredentials) }
+    SettingsSetupFrame { ConnectionSetupFlow(state, profileName, confirmSwitch) }
+}
+
+/**
+ * A full-screen step over Settings. The depth host pops on an editor's unhandled Back key, so the
+ * key goes to the back dispatcher here, where the step and an edited field take it first. Left
+ * remains local to the step rather than popping a Settings level.
+ */
+@Composable
+internal fun SettingsSetupFrame(content: @Composable () -> Unit) {
     val dispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
     val backCycle = rememberBackKeyCycle(dispatcher != null)
-    // The depth host pops on an editor's unhandled Back key, so the key goes to the back
-    // dispatcher here, where the wizard and an edited field take it first. Left remains local
-    // to the full-screen wizard rather than popping a Settings level.
     Box(
         Modifier
             .fillMaxSize()
@@ -69,17 +93,21 @@ internal fun SettingsConnection(
                 }
             },
     ) {
-        ConnectionSetupFlow(state)
+        content()
     }
 }
 
-/** Reconnects the saved connection after the editor's test interrupted it. */
+/**
+ * Reconnects the saved connection after the editor's test interrupted it; with no server in use the
+ * test's connection is closed instead.
+ */
 @Composable
-private fun rememberSavedConnectionRestore(
+internal fun rememberSavedConnectionRestore(
     session: TvheadendSession,
     owner: AppProfileOwner = koinInject(),
 ): suspend () -> Unit = remember(session, owner) {
     {
-        (owner.serverProfile.value as? ServerProfileReadResult.Available)?.let { session.connect(it.profile) }
+        val active = owner.serverProfile.value as? ServerProfileReadResult.Available
+        if (active != null) session.connect(active.profile) else session.disconnect()
     }
 }

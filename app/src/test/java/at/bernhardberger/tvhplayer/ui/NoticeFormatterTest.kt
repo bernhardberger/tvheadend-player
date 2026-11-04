@@ -27,6 +27,12 @@ import org.robolectric.annotation.Config
 class NoticeFormatterTest {
     private val formatter get() = NoticeFormatter(ApplicationProvider.getApplicationContext<Application>())
 
+    @Test fun removedServerNoticeNamesTheServer() {
+        val id = at.bernhardberger.tvheadend.sdk.core.ServerProfileId.from("00000000-0000-4000-8000-000000000001")
+        assertEquals("Removed kids on tvheadend.home.arpa",
+            formatter.format(Notice.ServerProfileRemoved(id, "kids on tvheadend.home.arpa")).headline)
+    }
+
     @Test fun unavailablePauseNamesTheSettingOrChannel() {
         assertEquals("Timeshift is off in Settings.",
             formatter.format(Notice.PauseUnavailable(PauseUnavailableReason.SETTINGS_OFF)).headline)

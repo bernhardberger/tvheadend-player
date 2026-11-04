@@ -47,10 +47,10 @@ class OfflinePatternTest {
         compose.setContent {
             TVHeadendPlayerTheme {
                 val navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.CONNECTION.name)
-                SettingsScreenNavigation(navigation, listOf(settingsRootLevel(),
-                    settingsConnectionOverview("Saved sign-in unavailable", null, null,
-                        degraded = true, onRetry = { retries++ }, recoveryRequiresSettings = true,
-                        onSetUp = { setupOpen = true })),
+                // A failure that needs Settings offers no Try again; the server's level sets it up.
+                SettingsScreenNavigation(navigation, listOf(settingsRootLevel()) +
+                    fixtureConnectionLevels("Saved sign-in unavailable", showRetry = false, onRetry = { retries++ },
+                        actions = ServerProfileActions(onSetUp = { setupOpen = true })),
                     setup = if (setupOpen) {
                         {
                             val server = remember { FocusRequester() }
@@ -69,6 +69,8 @@ class OfflinePatternTest {
         }
         press(Key.DirectionCenter)
         compose.onNodeWithText("Try again").assertDoesNotExist()
+        compose.onNodeWithText("fixture on tvheadend.local").assertIsFocused()
+        press(Key.DirectionCenter)
         compose.onNodeWithText("Set up connection").assertIsFocused()
         press(Key.DirectionCenter)
         compose.onNodeWithText("Server").assertIsFocused()
@@ -84,12 +86,15 @@ class OfflinePatternTest {
         compose.setContent {
             TVHeadendPlayerTheme {
                 val navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.CONNECTION.name)
-                SettingsScreenNavigation(navigation, listOf(settingsRootLevel(),
-                    settingsConnectionOverview("Connection unavailable", null, null,
-                        degraded = true, connecting = connecting, onRetry = { retries++ })))
+                SettingsScreenNavigation(navigation, listOf(settingsRootLevel()) +
+                    fixtureConnectionLevels("Connection unavailable", showRetry = true, connecting = connecting,
+                        onRetry = { retries++ }))
             }
         }
         press(Key.DirectionCenter)
+        // The list opens on the server in use; Try again follows Add server.
+        compose.onNodeWithText("fixture on tvheadend.local").assertIsFocused()
+        repeat(2) { press(Key.DirectionDown) }
         compose.onNodeWithText("Try again").assertIsFocused()
         press(Key.DirectionCenter)
         assertEquals(1, retries)
@@ -116,10 +121,10 @@ class OfflinePatternTest {
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                         SideRail(currentRoute = AppDestination.SETTINGS,
                             connectionDegraded = degraded, onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
-                            SettingsScreenNavigation(navigation, listOf(settingsRootLevel(),
-                                settingsConnectionOverview(
+                            SettingsScreenNavigation(navigation, listOf(settingsRootLevel()) +
+                                fixtureConnectionLevels(
                                     if (degraded) "Can’t reach the server • Showing saved channels" else "Connected",
-                                    null, 9982, degraded, onRetry = { retries++ })),
+                                    showRetry = degraded, onRetry = { retries++ }),
                                 contentPadding = padding, initialFocusEnabled = !drawerActive)
                         }
                     }
@@ -128,6 +133,7 @@ class OfflinePatternTest {
         }
         compose.onNodeWithText("Connection").assertIsFocused()
         press(Key.DirectionCenter)
+        repeat(2) { press(Key.DirectionDown) }
         compose.onNodeWithText("Try again").assertIsFocused()
         compose.onNodeWithText("Tvheadend Player also retries on its own").assertIsDisplayed()
         compose.onNodeWithTag("connection-problem-badge", useUnmergedTree = true).assertIsDisplayed()
@@ -143,7 +149,8 @@ class OfflinePatternTest {
         assertEquals(1, retries)
         compose.runOnIdle { degraded = false }
         compose.onNodeWithText("Try again").assertDoesNotExist()
-        compose.onNodeWithText("Set up connection").assertIsFocused()
+        // The row that takes Try again's place keeps focus.
+        compose.onNodeWithTag("settings-row-$CONNECTION_STATUS").assertIsFocused()
         compose.onNodeWithTag("connection-problem-badge", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("nav-settings").assertContentDescriptionEquals("Settings")
         press(Key.Back)

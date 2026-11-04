@@ -6,6 +6,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.Saver
@@ -30,6 +31,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.dropWhile
 import kotlinx.coroutines.flow.first
@@ -39,6 +41,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -49,9 +52,9 @@ import kotlinx.coroutines.withTimeoutOrNull
  * anything is saved, so a profile is only stored once it connected or the user chose to continue
  * anyway.
  *
- * Editing ([SetupMode.EDIT]) tests on the same session, which interrupts the saved connection, so
- * a failed or cancelled test reconnects it with [restoreSaved]; it stays the app's connection until
- * the new one passed and is saved, or the user saved anyway.
+ * Editing ([SetupMode.EDIT]), adding and entering a password test on the same session, which
+ * interrupts the saved connection, so a failed or cancelled test reconnects it with [restoreSaved];
+ * it stays the app's connection until the new one passed and is saved, or the user saved anyway.
  */
 @Stable
 internal class ConnectionSetupState(
@@ -68,8 +71,39 @@ internal class ConnectionSetupState(
     private val onSaved: () -> Unit = {},
     /** True when recreated from saved state, which keeps the address but not the sign-in. */
     private val restored: Boolean = false,
+    /** True while something plays that the test would stop; the test then asks first. */
+    private val interruptsPlayback: () -> Boolean = { false },
+    /**
+     * Adding and editing: true when another stored server already has this host, port and
+     * username. The caller then shows that server instead; nothing is stopped, tested or saved.
+     */
+    private val existingProfile: (host: String, port: Int, username: String) -> Boolean = { _, _, _ -> false },
+    /** Adding only: offers "Add a name" next to "Start watching"; runs after that save instead of [onSaved]. */
+    private val onAddName: (() -> Unit)? = null,
+    /** Runs before each test connection, which replaces the session that playback uses. */
+    private val beforeTest: suspend () -> Unit = {},
+    /**
+     * Held from a test's connect through its cleanup and restore. Settings shares one for the
+     * app, so a closed setup's restore finishes before a newer setup or a switch changes the
+     * session; the test's own save runs inside that hold and must not take it.
+     */
+    private val sessionLock: Mutex = Mutex(),
+    /**
+     * Changes whenever the app's saved connection changes. A test that sees it change before its
+     * outcome no longer owns the session, so it neither accepts that outcome nor disconnects it.
+     */
+    private val connectionGeneration: () -> Long = { 0L },
+    /** Recreated while the switch question was open. */
+    confirmingSwitch: Boolean = false,
 ) {
-    private val editing get() = mode == SetupMode.EDIT
+    private val editing get() = mode.keepsSavedConnection
+
+    /** True while the test waits for the user to confirm that it may stop what plays. */
+    var confirmingSwitch by mutableStateOf(confirmingSwitch)
+        private set
+
+    /** The done step's second action, offered only while adding. */
+    val offersName: Boolean get() = mode == SetupMode.ADD && onAddName != null
 
     var step by mutableStateOf(step)
         private set
@@ -104,8 +138,8 @@ internal class ConnectionSetupState(
         return true
     }
 
-    /** First run starts on the search; editing starts on Continue, which keeps the saved address. */
-    var addressFocus by mutableStateOf(if (editing) AddressFocus.CONTINUE else AddressFocus.SEARCH)
+    /** First run and adding start on the search; editing starts on Continue, which keeps the saved address. */
+    var addressFocus by mutableStateOf(if (mode == SetupMode.EDIT) AddressFocus.CONTINUE else AddressFocus.SEARCH)
         private set
     var signInFocus by mutableStateOf(SignInFocus.USERNAME)
         private set
@@ -117,7 +151,6 @@ internal class ConnectionSetupState(
     private var addressErrorsShown by mutableStateOf(false)
     private var signInErrorShown by mutableStateOf(false)
     private var sessionWork: Job? = null
-    private val sessionLock = Mutex()
     private var accepted = false
 
     val hostError: Boolean get() = addressErrorsShown && form.hostMissing
@@ -136,6 +169,10 @@ internal class ConnectionSetupState(
      */
     suspend fun loadSaved() {
         if (restored) form.loadSignInFrom(profiles) else form.loadFrom(profiles)
+        // Entering a password opens on Account with the stored username, so focus goes to the password.
+        if (mode == SetupMode.PASSWORD && step == SetupStep.SIGN_IN) {
+            focusSignIn(firstEmptySignInField() ?: SignInFocus.CONNECT)
+        }
     }
 
     fun enterAddress() {
@@ -231,8 +268,11 @@ internal class ConnectionSetupState(
         if (form.credentialsIncomplete && empty != null) focusSignIn(empty) else connect()
     }
 
-    /** Starts the test when the sign-in is complete; otherwise shows why and focuses the empty field. */
-    fun connect() {
+    /**
+     * Starts the test when the sign-in is complete; otherwise shows why and focuses the empty field.
+     * While something plays, the test first asks, unless the user already [confirmed] it.
+     */
+    fun connect(confirmed: Boolean = false) {
         if (step == SetupStep.CONNECTING || saving) return
         signInErrorShown = true
         val profile = form.serverProfile()
@@ -247,9 +287,29 @@ internal class ConnectionSetupState(
             }
             return
         }
+        if (mode.keepsSavedConnection &&
+            existingProfile(form.host.trim(), form.port.trim().toInt(), form.username.trim())
+        ) return
+        if (!confirmed && interruptsPlayback()) {
+            confirmingSwitch = true
+            return
+        }
+        confirmingSwitch = false
         failure = null
         step = SetupStep.CONNECTING
         replaceSessionWork { test(profile) }
+    }
+
+    /** The confirmation's "Switch": the test runs and stops what plays. */
+    fun confirmSwitch() {
+        confirmingSwitch = false
+        connect(confirmed = true)
+    }
+
+    /** The confirmation's "Keep watching" or Back: nothing changes and focus returns to Continue. */
+    fun keepWatching() {
+        confirmingSwitch = false
+        focusSignIn(SignInFocus.CONNECT)
     }
 
     /**
@@ -260,12 +320,15 @@ internal class ConnectionSetupState(
         var settled = false
         var passed = false
         accepted = false
+        val generation = connectionGeneration()
+        val owned = { connectionGeneration() == generation }
         try {
-            val result = session.connectForSetup(profile)
+            beforeTest()
+            val result = session.connectForSetup(profile, owned)
             passed = result == null
             if (result != null) {
                 // Reconnected before the failure shows, so "Save anyway" cannot land before it.
-                if (editing) withContext(NonCancellable) { restoreSaved() }
+                if (editing && owned()) withContext(NonCancellable) { restoreSaved() }
                 settled = true
                 // Back during the restore dismissed this test; a newer one may already be running.
                 currentCoroutineContext().ensureActive()
@@ -282,8 +345,8 @@ internal class ConnectionSetupState(
                 // so only the owner can say whether a profile now keeps this connection. This also
                 // waits out a save in progress; one it never took leaves nothing saved.
                 val saved = profiles.serverSettings.firstOrNull()?.host?.isNotBlank() == true
-                if (passed && (editing || !saved)) session.disconnect()
-                if (editing) restoreSaved()
+                if (passed && (editing || !saved) && owned()) session.disconnect()
+                if (editing && owned()) restoreSaved()
             }
         }
     }
@@ -302,29 +365,64 @@ internal class ConnectionSetupState(
 
     /**
      * Saves the profile ("Start watching", "Continue anyway", "Save anyway"); the app root then
-     * leaves the first-run flow, and [onSaved] the editor.
+     * leaves the first-run flow, and [onSaved] the editor. With [addName] ("Add a name") the name
+     * step follows instead.
      */
-    fun save() {
+    fun save(addName: Boolean = false) {
         if (saving) return
         saving = true
         scope.launch {
             try {
-                commit()
+                commit(addName)
             } finally {
                 saving = false
             }
         }
     }
 
-    private suspend fun commit(): Boolean {
-        val saved = form.submit(profiles) == ConnectionFormFeedback.SAVED
-        if (saved) {
-            accepted = true
-            sessionWork?.cancel()
-            form.clearPassword()
-            onSaved()
+    private suspend fun commit(addName: Boolean): Boolean {
+        val generation = connectionGeneration()
+        var saved = false
+        // Hand the tested connection to the save, releasing the shared lock before the owner's
+        // command needs it. The save's finally owns cleanup if admission or persistence fails.
+        accepted = true
+        try {
+            sessionWork?.cancelAndJoin()
+            saved = form.submit(profiles) == ConnectionFormFeedback.SAVED
+            if (saved) {
+                form.clearPassword()
+                val named = onAddName
+                if (addName && named != null) named() else onSaved()
+            }
+            return saved
+        } finally {
+            if (!saved) {
+                accepted = false
+                if (currentCoroutineContext().isActive && step == SetupStep.DONE) {
+                    // Persistence failed, not the connection. Keep the tested connection for
+                    // retry or Back, still behind the same app-wide cleanup barrier.
+                    sessionWork = scope.launch {
+                        sessionLock.withLock {
+                            try {
+                                awaitCancellation()
+                            } finally {
+                                if (!accepted) withContext(NonCancellable) { cleanupUncommitted(generation) }
+                            }
+                        }
+                    }
+                } else withContext(NonCancellable) {
+                    sessionLock.withLock { cleanupUncommitted(generation) }
+                }
+            }
         }
-        return saved
+    }
+
+    private suspend fun cleanupUncommitted(generation: Long) {
+        val configured = profiles.serverSettings.firstOrNull()?.host?.isNotBlank() == true
+        if (connectionGeneration() == generation) {
+            if (editing || !configured) session.disconnect()
+            if (editing) restoreSaved()
+        }
     }
 
     /** Draft-only, like every other edit. Back must not erase the saved connection's credentials. */
@@ -393,15 +491,31 @@ internal class ConnectionSetupState(
             mode: SetupMode,
             restoreSaved: suspend () -> Unit,
             onSaved: () -> Unit,
+            interruptsPlayback: () -> Boolean = { false },
+            existingProfile: (String, Int, String) -> Boolean = { _, _, _ -> false },
+            onAddName: (() -> Unit)? = null,
+            beforeTest: suspend () -> Unit = {},
+            sessionLock: Mutex = Mutex(),
+            connectionGeneration: () -> Long = { 0L },
         ): Saver<ConnectionSetupState, Any> = listSaver(
-            save = { listOf(it.step.resumable().name) },
+            // Only an anonymous question can survive the form's credential-free restoration.
+            // Otherwise Account reopens without the question, so sign-in must be entered again.
+            save = { listOf(it.step.resumable().name,
+                it.confirmingSwitch && it.form.username.isEmpty() && it.form.password.isEmpty() && !it.form.hasSavedPassword) },
             restore = {
                 ConnectionSetupState(
                     form, session, profiles, discovery, scope, mode,
-                    step = SetupStep.valueOf(it[0]),
+                    step = SetupStep.valueOf(it[0] as String),
                     restoreSaved = restoreSaved,
                     onSaved = onSaved,
                     restored = true,
+                    interruptsPlayback = interruptsPlayback,
+                    existingProfile = existingProfile,
+                    onAddName = onAddName,
+                    beforeTest = beforeTest,
+                    sessionLock = sessionLock,
+                    connectionGeneration = connectionGeneration,
+                    confirmingSwitch = it[1] as Boolean,
                 )
             },
         )
@@ -427,8 +541,13 @@ internal fun discoverServers(context: Context): Flow<TvheadendDiscoveryState> = 
  * Synchronizing). The first outcome after that counts.
  * [SessionCommandResult.NO_CHANGE] means someone else selected this configuration between the
  * disconnect and the connect, whose outcome may already be past; the test starts over once.
+ * Once [owned] turns false, the app's saved connection changed under the test: its outcome is not
+ * this test's, so the test fails without disconnecting the session it no longer owns.
  */
-internal suspend fun TvheadendSession.connectForSetup(profile: ServerProfile): SetupFailure? {
+internal suspend fun TvheadendSession.connectForSetup(
+    profile: ServerProfile,
+    owned: () -> Boolean = { true },
+): SetupFailure? {
     var passed = false
     try {
         repeat(2) {
@@ -443,12 +562,13 @@ internal suspend fun TvheadendSession.connectForSetup(profile: ServerProfile): S
                 .map { it.sessionState }
                 .dropWhile { stale && it.isOutcome }
                 .first { it.isOutcome }
+            if (!owned()) return SetupFailure.OTHER
             passed = outcome is SessionState.Ready
             return (outcome as? SessionState.Unavailable)?.reason?.toSetupFailure()
         }
         return SetupFailure.OTHER
     } finally {
-        if (!passed) withContext(NonCancellable) { disconnect() }
+        if (!passed && owned()) withContext(NonCancellable) { disconnect() }
     }
 }
 
@@ -464,19 +584,42 @@ internal fun rememberConnectionSetupState(
     restoreSaved: suspend () -> Unit = {},
     onSaved: () -> Unit = {},
     form: ConnectionFormState = rememberConnectionFormState(),
+    interruptsPlayback: () -> Boolean = { false },
+    existingProfile: (host: String, port: Int, username: String) -> Boolean = { _, _, _ -> false },
+    onAddName: (() -> Unit)? = null,
+    beforeTest: suspend () -> Unit = {},
+    sessionLock: Mutex = remember { Mutex() },
+    connectionGeneration: () -> Long = { 0L },
 ): ConnectionSetupState {
     val scope = rememberCoroutineScope()
     val currentRestoreSaved by rememberUpdatedState(restoreSaved)
     val currentOnSaved by rememberUpdatedState(onSaved)
+    val currentInterrupts by rememberUpdatedState(interruptsPlayback)
+    val currentExisting by rememberUpdatedState(existingProfile)
+    val currentAddName by rememberUpdatedState(onAddName)
+    val currentBeforeTest by rememberUpdatedState(beforeTest)
+    val currentGeneration by rememberUpdatedState(connectionGeneration)
+    val generation = { currentGeneration() }
+    val prepareTest: suspend () -> Unit = { currentBeforeTest() }
     val restore: suspend () -> Unit = { currentRestoreSaved() }
     val saved = { currentOnSaved() }
+    val interrupts = { currentInterrupts() }
+    val existing = { host: String, port: Int, username: String -> currentExisting(host, port, username) }
+    val addName: (() -> Unit)? = if (onAddName != null) { { currentAddName?.invoke() } } else null
     return rememberSaveable(
-        saver = ConnectionSetupState.saver(form, session, profiles, discovery, scope, mode, restore, saved),
+        saver = ConnectionSetupState.saver(form, session, profiles, discovery, scope, mode, restore, saved,
+            interrupts, existing, addName, prepareTest, sessionLock, generation),
     ) {
         ConnectionSetupState(
             form, session, profiles, discovery, scope, mode,
             restoreSaved = restore,
             onSaved = saved,
+            interruptsPlayback = interrupts,
+            existingProfile = existing,
+            onAddName = addName,
+            beforeTest = prepareTest,
+            sessionLock = sessionLock,
+            connectionGeneration = generation,
         )
     }
 }
