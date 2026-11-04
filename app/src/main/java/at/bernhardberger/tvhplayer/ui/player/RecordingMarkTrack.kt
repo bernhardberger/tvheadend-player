@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -12,6 +14,7 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.util.lerp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -72,7 +75,15 @@ internal fun TimelineMarkLayer(
     val tint = MaterialTheme.colorScheme.secondary
     val tick = with(LocalDensity.current) { 1.dp.toPx() }
     val dash = remember(tick) { PathEffect.dashPathEffect(floatArrayOf(tick * 2, tick * 2)) }
+    // One progress for the whole row opening or closing; only the draw phase reads it.
+    val opening = animateFloatAsState(
+        targetValue = if (marks.open) 1f else 0f,
+        animationSpec = if (marks.open) tween(PlayerMotion.MediumMs, easing = PlayerMotion.StandardDecelerate)
+            else tween(PlayerMotion.ShortMs, easing = PlayerMotion.StandardAccelerate),
+        label = "recording marks open",
+    )
     Canvas(modifier.testTag("recording-marks-track")) {
+        val open = opening.value
         val played = progress().coerceIn(0f, 1f) * size.width
         marks.spans.forEachIndexed { index, span ->
             val selected = index == marks.selected
@@ -80,13 +91,15 @@ internal fun TimelineMarkLayer(
             val right = span.end.coerceIn(0f, 1f) * size.width
             when (span.kind) {
                 RecordingMarkKind.AD_BREAK -> drawRect(
-                    tint.copy(alpha = if (selected) AdTintSelectedAlpha else AdTintAlpha),
+                    tint.copy(alpha = if (selected) lerp(AdTintAlpha, AdTintSelectedAlpha, open) else AdTintAlpha),
                     Offset(left, 0f), Size(right - left, size.height),
                 )
                 RecordingMarkKind.CUT -> {
-                    if (marks.open && right > left) {
-                        cutStripes(left, minOf(right, played), fillColor, selected, playedPart = true)
-                        cutStripes(maxOf(left, played), right, ink, selected, playedPart = false)
+                    // The span grows out of the start tick, its stripes fading in as it goes.
+                    val reach = left + (right - left) * open
+                    if (open > 0f && reach > left) {
+                        cutStripes(left, minOf(reach, played), fillColor, selected, playedPart = true, fade = open)
+                        cutStripes(maxOf(left, played), reach, ink, selected, playedPart = false, fade = open)
                     }
                     if (span.start > 0f && span.start < 1f) {
                         if (selected && !marks.selectedEnd) drawLine(ink, Offset(left, 0f), Offset(left, size.height), tick * 2)
@@ -112,12 +125,14 @@ internal fun TimelineMarkLayer(
  * Diagonal stripes between [left] and [right]: over the played fill a darker and a brighter shade of
  * [base] that keep its hue; over the unplayed track the track's grey a step darker and brighter. Never black or white.
  */
-private fun DrawScope.cutStripes(left: Float, right: Float, base: Color, selected: Boolean, playedPart: Boolean) {
+private fun DrawScope.cutStripes(
+    left: Float, right: Float, base: Color, selected: Boolean, playedPart: Boolean, fade: Float = 1f,
+) {
     if (right <= left) return
-    val ground = if (playedPart) base.shade(value = if (selected) 0.62f else 0.78f)
-        else Color.Black.copy(alpha = if (selected) 0.45f else 0.25f)
-    val stripe = if (playedPart) base.shade(saturation = if (selected) 0.5f else 0.7f)
-        else base.copy(alpha = if (selected) 0.75f else 0.42f)
+    val ground = (if (playedPart) base.shade(value = if (selected) 0.62f else 0.78f)
+        else Color.Black.copy(alpha = if (selected) 0.45f else 0.25f)).let { it.copy(alpha = it.alpha * fade) }
+    val stripe = (if (playedPart) base.shade(saturation = if (selected) 0.5f else 0.7f)
+        else base.copy(alpha = if (selected) 0.75f else 0.42f)).let { it.copy(alpha = it.alpha * fade) }
     val period = 4.dp.toPx()
     val stroke = 1.5.dp.toPx()
     clipRect(left, 0f, right, size.height) {

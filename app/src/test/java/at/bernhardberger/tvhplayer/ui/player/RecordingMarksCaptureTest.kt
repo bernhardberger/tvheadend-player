@@ -119,6 +119,10 @@ class RecordingMarksCaptureTest {
     @Test fun openAdBreak() = capture("open-ad-break", MIXED, focus = "player-seekbar", openAt = 1_140_000L, name = "Ad break")
     @Test fun openCut() = capture("open-cut", MIXED, focus = "player-seekbar", openAt = 2_400_000L, name = "Cut")
     /** The row on an ad break's and a cut's end: the stop to skip to by hand, the interval still selected. */
+    /** The marks row a moment after opening on a cut: the span is still growing out of its tick. */
+    @Test fun openCutGrowing() = capture("open-cut-growing", MIXED, focus = "player-seekbar", openAt = 2_400_000L,
+        name = "Cut", openedForMs = 60)
+
     @Test fun openAdBreakEnd() = capture("open-ad-break-end", MIXED, focus = "player-seekbar", openAt = 1_440_000L,
         name = "Ads end")
     @Test fun openCutEnd() = capture("open-cut-end", MIXED, focus = "player-seekbar", openAt = 2_520_000L, name = "Cut ends")
@@ -163,6 +167,8 @@ class RecordingMarksCaptureTest {
         prompt: Boolean = false,
         keys: List<Key> = emptyList(),
         focused: String? = null,
+        /** Captures this long after the marks row opens instead of once it has settled. */
+        openedForMs: Long? = null,
     ) {
         val still = FixtureArt.art("still-ridge-light")
         val navigation = RecordingMarkerNavigation()
@@ -224,7 +230,11 @@ class RecordingMarksCaptureTest {
         if (focused != null) compose.onNodeWithTag(focused).assertIsFocused()
         if (openAt != null) {
             compose.runOnIdle { navigation.show(recordingMarkStops(marks, durationMs).map { it.positionMs }, openAt - 1) }
-            settle()
+            if (openedForMs == null) settle() else {
+                compose.waitForIdle()
+                compose.mainClock.advanceTimeBy(openedForMs)
+                compose.waitForIdle()
+            }
             check(navigation.selectedMs == openAt) { "marks row opened on ${navigation.selectedMs}, not $openAt" }
             compose.onNodeWithTag("recording-marker-target").assertIsFocused()
             // A named pill is two lines tall; it stays clear of the info bar's subtitle above the timeline.
