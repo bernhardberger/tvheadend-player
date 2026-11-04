@@ -187,6 +187,8 @@ See [owner decisions](decisions.md#8-owner-decisions).
   access, `USE_EXACT_ALARM` and full-screen intents
   (<https://support.google.com/googleplay/android-developer/answer/9888170>).
 - **Answer:** none apply. The Play manifest has no foreground service, no
-  accessibility service (only the Appliance build has one, and it is never
-  uploaded) and only `INTERNET`, `ACCESS_NETWORK_STATE` and `WAKE_LOCK`. If
+  accessibility service (the separate Appliance companion has one and is never
+  uploaded to Play) and only `INTERNET`, `ACCESS_NETWORK_STATE` and `WAKE_LOCK`,
+  plus the app's own signature-level `APPLIANCE_ENTRY` permission and a package
+  query for the companion. If
   Console lists a declaration anyway, stop and check rather than answering it.

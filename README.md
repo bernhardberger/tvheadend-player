@@ -158,20 +158,19 @@ language, please
 
 ## Download and install
 
-Download one APK from the
+Download from the
 [latest release](https://github.com/bernhardberger/tvheadend-player/releases/latest):
 
 | APK | Take it when |
 |---|---|
-| `…-play.apk` | You want the normal app. That's the one most people want. |
-| `…-appliance.apk` | Your TV should start straight into the app. HOME opens it, and so does the GUIDE key once you turn on its accessibility service in Android settings. Not every TV's firmware allows this. |
+| `…-play.apk` | You want the app. That's the one most people want. |
+| `…-appliance.apk` | You watch through Tvheadend instead of the TV's built-in tuners. This optional companion makes Tvheadend Player behave like the TV's own tuner app: it starts the app when the TV turns on, catches remote buttons the manufacturer keeps for its own apps, and can replace the home screen. It needs Tvheadend Player installed and updates itself from these releases. |
 
-The Appliance build is still a work in progress, so expect rough edges and
-changes between releases. For everyday use, take the Play build.
+The companion is still a work in progress, so expect rough edges and changes
+between releases.
 
-You can install both side by side. To install an APK outside the Play Store,
-allow installs from unknown sources for the app you open it with, a file manager
-for example.
+To install an APK outside the Play Store, allow installs from unknown sources
+for the app you open it with, a file manager for example.
 
 ## Beta testing on Google Play
 

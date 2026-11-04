@@ -35,7 +35,7 @@ Section numbers stay the same, so references such as "1.9" or "3.0" still work.
 | Item | Value |
 |---|---|
 | Bundle | `build/release/signed/0.3.0/tvheadend-player-0.3.0-play.aab` in the main checkout (`/root/projects/tvheadend-player`) |
-| Application ID | `at.bernhardberger.tvhplayer` (never the `.appliance` build) |
+| Application ID | `at.bernhardberger.tvhplayer` (the Appliance companion, `at.bernhardberger.tvhplayer.appliance`, is never uploaded) |
 | Version | 0.3.0, versionCode 162, source commit 1870e331 |
 | Signing | Project release key, alias `tvhplayer-release`, certificate SHA-256 in [`release-process.md`](release-process.md#release-key) |
 | R8 mapping | `tvheadend-player-0.3.0-play-mapping.txt` in the same directory |

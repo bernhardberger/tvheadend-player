@@ -22,7 +22,7 @@ Tvheadend Player
 A Tvheadend client for Android TV, built around the remote.
 ```
 
-**Full description** (665/4000)
+**Full description** (1007/4000)
 
 ```text
 Tvheadend Player is an Android TV and Google TV app for your own Tvheadend server. Watch live TV, browse the program guide and play your recordings, all with the remote's D-pad.
@@ -33,6 +33,8 @@ It's an independent app, not an official Tvheadend product, and it has no channe
 • Made for the remote, built with Google's Material Design for TV
 • Live TV keeps playing while you browse
 • No ads, no analytics, no account to sign up for
+
+For people who watch through Tvheadend instead of the TV's built-in tuners, the optional Tvheadend Player Appliance app from the GitHub releases makes Tvheadend Player behave like the TV's own tuner app. It starts the app when the TV turns on, catches remote buttons the manufacturer keeps for its own apps, and can replace the home screen.
 
 Open source under the GNU GPL v3, with the source code for every release: github.com/bernhardberger/tvheadend-player
 ```
@@ -55,7 +57,7 @@ Tvheadend Player
 Ein Tvheadend-Client für Android TV, gemacht für die Fernbedienung.
 ```
 
-**Full description** (720/4000)
+**Full description** (1084/4000)
 
 ```text
 Tvheadend Player ist eine App für Android TV und Google TV für deinen eigenen Tvheadend-Server. Live-TV schauen, im TV-Programm stöbern und Aufnahmen abspielen, alles mit dem Steuerkreuz der Fernbedienung.
@@ -66,6 +68,8 @@ Die App ist unabhängig, keine offizielle Tvheadend-App, und bringt keine eigene
 • Gemacht für die Fernbedienung, gebaut mit Googles Material Design für TV
 • Live-TV läuft weiter, während du stöberst
 • Keine Werbung, keine Analyse, kein Konto zum Anmelden
+
+Wer über Tvheadend statt über die eingebauten Tuner fernsieht, kann mit der optionalen App Tvheadend Player Appliance aus den GitHub-Releases Tvheadend Player wie die eigene Tuner-App des Fernsehers nutzen. Sie startet die App beim Einschalten, fängt Fernbedienungstasten ab, die der Hersteller für seine eigenen Apps reserviert, und kann den Startbildschirm ersetzen.
 
 Open Source unter der GNU GPL v3, mit dem Quellcode zu jeder Version: github.com/bernhardberger/tvheadend-player
 ```

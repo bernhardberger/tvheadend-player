@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: 2026-10-28
+Last updated: 2026-11-05
 
 This policy describes Tvheadend Player, an independent open-source Android TV
 client for Tvheadend servers. It is not an official Tvheadend application.
@@ -68,16 +68,36 @@ The app uses open-source libraries bundled into the application. Those
 libraries process data locally except when participating in the configured
 Tvheadend connection or loading those logos.
 
-## Accessibility service
+## Appliance companion
 
-Only the Appliance build of the app contains an Android accessibility service;
-the Play build has none. The Appliance service is used only after the user
-enables it in system settings. The service:
+Tvheadend Player Appliance is a separate, optional app that lets Tvheadend
+Player take the place of a TV's built-in tuner app. It isn't on Google Play;
+you install it from this project's GitHub releases. Tvheadend Player itself has
+no accessibility service and can't install apps.
 
-- handles only the standard GUIDE key and the known TCL TV key
-- opens the app after service connection or display wake
-- does not subscribe to accessibility events
-- cannot retrieve window content and does not inspect text or other apps
+Tvheadend Player checks whether the companion is installed, so that it can
+offer the companion's setup in Settings. Only an app signed with the same key
+as Tvheadend Player can open Tvheadend Player through the companion's entry
+point.
+
+The companion contains an Android accessibility service, which works only after
+you turn it on in Android's accessibility settings. The companion uses it to
+open Tvheadend Player when the TV starts or wakes, and to react to remote
+buttons that the TV or box would otherwise send to its manufacturer's apps. The
+service:
+
+- sees remote button presses, acts only on the buttons it knows and passes all
+  others on unchanged
+- doesn't store or send button presses
+- doesn't subscribe to accessibility events
+- can't read window content and doesn't inspect text or other apps
+
+The companion updates itself from this project's GitHub releases. It asks
+`api.github.com` for the latest release and downloads the companion APK and its
+checksum file from GitHub; GitHub sees the TV's network address. It sends no
+other data. With automatic updates on, it checks every few hours and installs
+only while the TV is in standby. It keeps the automatic-update setting, the
+last check and its result in its app-private storage.
 
 ## Retention and deletion
 
