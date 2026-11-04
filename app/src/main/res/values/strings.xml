@@ -1,6 +1,10 @@
 <resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en">
     <string name="server_profile_removed">Removed %1$s</string>
     <string name="server_profile_already_exists">This server already exists</string>
+    <string name="server_ask_at_startup">Ask at startup</string>
+    <string name="server_profile_write_failed">The server could not be selected. Try again.</string>
+    <string name="server_picker_title">Which server do you want to use?</string>
+    <string name="nav_switch_server">Switch server</string>
     <string name="server_add">Add server</string>
     <string name="server_add_description">Another server or another user</string>
     <string name="server_in_use">In use</string>

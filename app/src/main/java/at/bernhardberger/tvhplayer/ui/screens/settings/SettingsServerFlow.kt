@@ -1,4 +1,5 @@
 package at.bernhardberger.tvhplayer.ui.screens.settings
+import at.bernhardberger.tvheadend.sdk.core.ServerProfileWriteResult
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -56,6 +57,9 @@ internal class ServerSettingsState(
     removingState: MutableState<String?>,
     pendingFocusState: MutableState<String?>,
     pendingEnterState: MutableState<Boolean>,
+    private val onUsed: (() -> Unit)? = null,
+    private val onExisting: ((ServerProfileId) -> Unit)? = null,
+    private val onRetained: (() -> Unit)? = null,
 ) {
     private var setup by setupState
     private var switching by switchingState
@@ -66,17 +70,23 @@ internal class ServerSettingsState(
     private val list get() = owner.profiles.value as? ServerProfileListResult.Available
     private fun find(id: String?): ServerProfileSummary? = id?.let { value -> list?.profiles?.firstOrNull { it.id.value == value } }
     private val activeId get() = list?.activeId
+    var switchingNow by mutableStateOf(false)
+        private set
 
     val actions = ServerProfileActions(
-        onUse = { profile ->
-            if (interruption() == PlaybackInterruption.NONE) use(profile) else switching = profile.id.value
+        onUse = use@ { profile ->
+            if (switchingNow) return@use
+            if (profile.id == activeId) (onRetained ?: onUsed)?.invoke()
+            else if (profile.authenticationMode == ServerProfileAuthenticationMode.PASSWORD && !profile.credentialsAvailable)
+                setup = PASSWORD + profile.id.value
+            else if (interruption() == PlaybackInterruption.NONE) use(profile) else switching = profile.id.value
         },
         onEnterPassword = { setup = PASSWORD + it.id.value },
         onSetUp = { setup = EDIT + it.id.value },
         onName = { setup = NAME + it.id.value },
         onShowInSwitcher = { profile, show -> scope.launch { owner.setShowInSwitcher(profile.id, show) } },
         onRemove = { removing = it.id.value },
-        onAdd = { setup = ADD },
+        onAdd = { if (!switchingNow) setup = ADD },
     )
 
     fun closeSetup() {
@@ -91,10 +101,18 @@ internal class ServerSettingsState(
     /** Switches at once and returns to the list, where the row of the server now in use keeps focus. */
     private fun use(profile: ServerProfileSummary) {
         leaveServerLevel(profile.id)
+        switchingNow = true
         scope.launch {
-            stopPlaying()
-            // Waits for a closed setup's restore, which would otherwise reconnect the old server.
-            owner.setActive(profile.id)
+            try {
+                stopPlaying()
+                // Waits for a closed setup's restore, which would otherwise reconnect the old server.
+                if (owner.setActive(profile.id) is ServerProfileWriteResult.Applied) onUsed?.invoke()
+                else notices()?.let { it.post(Notice.ServerProfileWriteFailed, it.context()) }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                notices()?.let { it.post(Notice.ServerProfileWriteFailed, it.context()) }
+            } finally { switchingNow = false }
         }
     }
 
@@ -127,6 +145,7 @@ internal class ServerSettingsState(
     /** A server that is already stored replaces the setup with its level and the notice. */
     private fun showExisting(id: ServerProfileId) {
         setup = null
+        if (onExisting != null) { onExisting.invoke(id); return }
         // Editing starts one level deeper than adding. Return to the list before selecting
         // the duplicate, otherwise the pending selection can never enter its server level.
         if (list?.profiles?.any { navigation.stack.active.levelId == serverProfileRowId(it.id) } == true) navigation.pop()
@@ -182,11 +201,11 @@ internal class ServerSettingsState(
                     onSave = { label ->
                         scope.launch { owner.rename(target.id, label) }
                         setup = null
-                        if (added) focusActiveRow()
+                        if (added) { focusActiveRow(); onUsed?.invoke() }
                     },
                     onBack = {
                         setup = null
-                        if (added) focusActiveRow()
+                        if (added) { focusActiveRow(); onUsed?.invoke() }
                     },
                 )
             })
@@ -207,6 +226,7 @@ internal class ServerSettingsState(
             onSaved = {
                 setup = null
                 focusActiveRow()
+                onUsed?.invoke()
             },
             interruptsPlayback = { interruption() != PlaybackInterruption.NONE },
             existingProfile = { host, port, username -> showIfStored(host, port, username, editing = null) },
@@ -247,6 +267,7 @@ internal class ServerSettingsState(
                 setup = null
                 // Entering the password makes it the server in use, like "Use this server".
                 if (mode == SetupMode.PASSWORD) leaveServerLevel(target.id)
+                if (mode == SetupMode.PASSWORD) onUsed?.invoke()
             },
             interruptsPlayback = { mode == SetupMode.PASSWORD && !active && interruption() != PlaybackInterruption.NONE },
             // Testing a server that isn't in use stops playback without asking (owner decision).
@@ -299,11 +320,17 @@ internal fun rememberServerSettingsState(
     owner: AppProfileOwner,
     interruption: () -> PlaybackInterruption,
     stopPlayback: suspend () -> Unit,
+    onUsed: (() -> Unit)? = null,
+    onExisting: ((ServerProfileId) -> Unit)? = null,
+    onRetained: (() -> Unit)? = null,
 ): ServerSettingsState {
     val scope = rememberCoroutineScope()
     val notices = koinInjectOrNull()
     val currentInterruption by rememberUpdatedState(interruption)
     val currentStop by rememberUpdatedState(stopPlayback)
+    val currentUsed by rememberUpdatedState(onUsed)
+    val currentExisting by rememberUpdatedState(onExisting)
+    val currentRetained by rememberUpdatedState(onRetained)
     val setup = rememberSaveable { mutableStateOf<String?>(null) }
     val switching = rememberSaveable { mutableStateOf<String?>(null) }
     val removing = rememberSaveable { mutableStateOf<String?>(null) }
@@ -311,7 +338,10 @@ internal fun rememberServerSettingsState(
     val pendingEnter = rememberSaveable { mutableStateOf(false) }
     return remember(navigation, owner, scope) {
         ServerSettingsState(navigation, owner, { currentInterruption() }, { currentStop() }, scope, { notices },
-            setup, switching, removing, pendingFocus, pendingEnter)
+            setup, switching, removing, pendingFocus, pendingEnter,
+            onUsed = onUsed?.let { { currentUsed?.invoke() } },
+            onExisting = onExisting?.let { { id -> currentExisting?.invoke(id) } },
+            onRetained = onRetained?.let { { currentRetained?.invoke() } })
     }
 }
 

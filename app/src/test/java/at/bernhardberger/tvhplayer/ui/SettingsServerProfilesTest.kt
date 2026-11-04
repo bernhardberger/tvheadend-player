@@ -53,6 +53,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -106,8 +107,11 @@ class SettingsServerProfilesTest {
     private var presentation by mutableStateOf(AppConnectionPresentation(ConnectionUiState.Ready))
     private var isCurrent by mutableStateOf(true)
     private lateinit var view: View
+    private var retained = 0
+    private var used = 0
+    private var duplicate: ServerProfileId? = null
 
-    private fun settings(rail: Boolean = false, enter: Boolean = true) {
+    private fun settings(rail: Boolean = false, enter: Boolean = true, picker: Boolean = false) {
         owner = AppProfileOwner(session, store, PlayerSettingsStore(InMemoryPreferencesDataStore()), Dispatchers.IO,
             readProfileForEditing = { if (it in unreadable) ServerProfileEditReadResult.Unavailable else ServerProfileEditReadResult.Missing },
             noticeCenter = { notices })
@@ -124,6 +128,17 @@ class SettingsServerProfilesTest {
             KoinIsolatedContext(koinApplication { modules(dependencies) }) {
                 TVHeadendPlayerTheme {
                     view = LocalView.current
+                    if (picker) {
+                        if (rail) SideRail(AppDestination.SWITCH_SERVER, {}, {},
+                            availableDestinations = setOf(AppDestination.CHANNELS, AppDestination.SWITCH_SERVER, AppDestination.SETTINGS)) { padding, drawer ->
+                            at.bernhardberger.tvhplayer.ui.screens.ServerSwitcherScreen(!drawer, isCurrent,
+                                onUsed = { used++ }, onExisting = { duplicate = it }, owner = owner,
+                                interruption = { interruption }, stopPlaying = {}, contentPadding = padding, drawerOpen = drawer)
+                        } else
+                        at.bernhardberger.tvhplayer.ui.screens.ServerSwitcherScreen(true, isCurrent,
+                            onUsed = { used++ }, onExisting = { duplicate = it }, onRetained = { retained++ }, owner = owner,
+                            interruption = { interruption }, stopPlaying = { stopsAt.add(session.calls.size) })
+                    } else
                     if (rail) {
                         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                             SideRail(currentRoute = AppDestination.SETTINGS, onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
@@ -135,6 +150,7 @@ class SettingsServerProfilesTest {
             }
         }
         compose.waitForIdle()
+        if (picker) return
         if (rail) {
             // As SettingsConnectionDepthTest settles focus on the page beside the rail.
             press(Key.DirectionDown)
@@ -160,6 +176,103 @@ class SettingsServerProfilesTest {
     }
 
     private val activeId get() = (owner.profiles.value as? ServerProfileListResult.Available)?.activeId
+
+    private fun pickerRow(index: Int) = "server-picker-${id(index).value}"
+
+    @Test fun pickerSetupInsideTheRailKeepsTypedInputAndHidesBackgroundSemantics() {
+        stored(); settings(picker = true, rail = true)
+        compose.onNodeWithTag("nav-switch-server").performSemanticsAction(SemanticsActions.RequestFocus)
+        press(Key.DirectionRight)
+        press(Key.DirectionDown)
+        press(Key.DirectionCenter)
+        type("setup-host", "new.example.invalid")
+        press(Key.DirectionUp); press(Key.DirectionDown)
+        compose.onNodeWithTag("setup-host").assertTextContains("new.example.invalid")
+        compose.onNodeWithTag("nav-settings").assertDoesNotExist()
+        compose.onNodeWithTag(pickerRow(1)).assertDoesNotExist()
+        press(Key.Back)
+        compose.onNodeWithTag("server-picker-add").assertIsFocused()
+    }
+
+    @Test fun pickerRetainsTheInUseServerWithoutAReconnectAndReturnsToOrigin() {
+        stored(); settings(picker = true)
+        compose.onNodeWithTag(pickerRow(1)).assertIsFocused()
+        val calls = session.calls.toList()
+        press(Key.DirectionCenter)
+        assertEquals(1, retained); assertEquals(0, used); assertEquals(calls, session.calls)
+    }
+
+    @Test fun pickerWithNoneInUseFocusesTheFirstServerAndCanSelectIt() {
+        stored(active = null); settings(picker = true)
+        compose.onNodeWithTag(pickerRow(1)).assertIsFocused()
+        press(Key.DirectionCenter)
+        compose.waitUntil(10_000) { used == 1 }
+        assertEquals(id(1), activeId)
+        assertEquals(0, retained)
+    }
+
+    @Test fun askAtStartupIsOffByDefaultAndTheSettingsSwitchPersistsTheChoice() {
+        stored(); settings()
+        compose.onNodeWithTag("settings-row-ask-at-startup").assertIsOff().performSemanticsAction(SemanticsActions.RequestFocus)
+        press(Key.DirectionCenter)
+        compose.waitUntil(10_000) { runBlocking { owner.askAtStartup.first() } }
+        compose.onNodeWithTag("settings-row-ask-at-startup").assertIsOn()
+        runBlocking { owner.setShowInSwitcher(id(2), false); owner.setShowInSwitcher(id(3), false) }
+        compose.waitForIdle()
+        compose.onNodeWithTag("settings-row-ask-at-startup").assertDoesNotExist()
+    }
+
+    @Test fun pickerFailedSelectionStaysOnThePageAndPostsTheTypedFailure() {
+        stored(); settings(picker = true)
+        runBlocking { store.scriptMutationUnavailable() }
+        press(Key.DirectionRight); press(Key.DirectionCenter)
+        compose.waitUntil(10_000) { notices.state.value.pending.any { it.notice == Notice.ServerProfileWriteFailed } }
+        compose.onNodeWithTag(pickerRow(2)).assertIsFocused()
+        assertEquals(id(1), activeId)
+        assertEquals(0, used)
+    }
+
+    @Test fun pickerSwitchesAndReturnsToChannelsAndHiddenProfilesAreNotChoices() {
+        stored(); settings(picker = true)
+        runBlocking { owner.setShowInSwitcher(id(3), false) }
+        compose.waitForIdle()
+        compose.onNodeWithTag(pickerRow(3)).assertDoesNotExist()
+        press(Key.DirectionRight); press(Key.DirectionCenter)
+        compose.waitUntil(10_000) { used == 1 }
+        assertEquals(id(2), activeId)
+    }
+
+    @Test fun pickerConfirmsOnlyWhilePlayingAndBackRestoresTheChosenAvatar() {
+        stored(); interruption = PlaybackInterruption.RECORDING; settings(picker = true)
+        press(Key.DirectionRight); press(Key.DirectionCenter)
+        compose.onNodeWithTag(SWITCH_KEEP).assertIsFocused()
+        press(Key.Back)
+        compose.onNodeWithTag(pickerRow(2)).assertIsFocused()
+        assertEquals(0, used); assertEquals(0, stopsAt.size)
+        press(Key.DirectionDown)
+        compose.onNodeWithTag("server-picker-add").assertIsFocused()
+        press(Key.DirectionUp)
+        compose.onNodeWithTag(pickerRow(2)).assertIsFocused()
+    }
+
+    @Test fun pickerUnreadablePasswordAndDuplicateAddReuseSettingsFlows() {
+        stored()
+        runBlocking { store.scriptCredentialsUnavailable(id(2)) }
+        unreadable.add(id(2)); settings(picker = true)
+        press(Key.DirectionRight); press(Key.DirectionCenter)
+        compose.onNodeWithTag("setup-password").assertIsFocused()
+        press(Key.Back)
+        compose.onNodeWithTag(pickerRow(2)).assertIsFocused()
+        press(Key.DirectionDown); press(Key.DirectionCenter)
+        type("setup-host", "tvheadend.home.arpa")
+        compose.onNodeWithTag("setup-continue").performSemanticsAction(SemanticsActions.RequestFocus)
+        press(Key.DirectionCenter)
+        type("setup-username", "anna"); type("setup-password", "fixture-secret")
+        compose.onNodeWithTag("setup-continue").performSemanticsAction(SemanticsActions.RequestFocus)
+        press(Key.DirectionCenter)
+        compose.waitUntil(10_000) { duplicate != null }
+        assertEquals(id(1), duplicate)
+    }
 
     @Test fun theListOpensOnTheServerInUseInStoredOrder() {
         stored(active = 2)

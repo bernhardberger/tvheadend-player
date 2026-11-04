@@ -89,6 +89,8 @@ internal fun settingsServerLevels(
     showRetry: Boolean = false,
     connecting: Boolean = false,
     onRetry: () -> Unit = {},
+    askAtStartup: Boolean? = null,
+    onAskAtStartup: (Boolean) -> Unit = {},
 ): List<DepthLevel> {
     val list = profiles as? ServerProfileListResult.Available
     val stored = list?.profiles.orEmpty()
@@ -102,6 +104,8 @@ internal fun settingsServerLevels(
         supporting = stringResource(if (connecting) R.string.connection_overview_connecting else R.string.connection_retry_description),
         icon = R.drawable.ic_refresh, onClick = { if (!connecting) onRetry() })
     val rows = buildList {
+        if (askAtStartup != null) add(settingsRow("ask-at-startup", stringResource(R.string.server_ask_at_startup),
+            checked = askAtStartup, onClick = { onAskAtStartup(!askAtStartup) }))
         stored.forEach { add(serverProfileRow(it, it.id == list?.activeId)) }
         if (profiles != null) add(add)
         if (showRetry && list?.activeId != null) add(retry)

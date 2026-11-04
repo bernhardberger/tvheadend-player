@@ -39,6 +39,7 @@ internal fun SettingsScreen(
     connectionPresentation: at.bernhardberger.tvhplayer.viewmodels.AppConnectionPresentation,
     onRetry: () -> Unit,
     section: SettingsSection = SettingsSection.GENERAL,
+    profileId: String? = null,
     initialFocusEnabled: Boolean = true,
     contentPadding: PaddingValues = TvFullScreenPadding,
     backEnabled: Boolean = true,
@@ -60,6 +61,19 @@ internal fun SettingsScreen(
         scope.launch { settingsStore.setRecordingProfile(id); navigation.pop() }
     }
     val connectionLevels = settingsConnectionLevels(connectionPresentation, onRetry, servers.actions, profileOwner)
+    var profileOpened by rememberSaveable(profileId) { mutableStateOf(false) }
+    LaunchedEffect(profileId, connectionLevels.firstOrNull()?.rows?.size) {
+        val target = profileId?.let { id -> connectionLevels.firstOrNull()?.rows?.firstOrNull { it.item.id == "server-$id" } }
+        if (!profileOpened && target != null) {
+            val item = DepthItem(SettingsSection.CONNECTION.name, SettingsSection.CONNECTION.name)
+            if (navigation.stack.active.levelId == SETTINGS_ROOT) {
+                navigation.update(navigation.stack.focus(item.id, listOf(item)).enter(item, listOf(item)))
+            }
+            val items = connectionLevels.first().rows.map { it.item }
+            navigation.update(navigation.stack.focus(target.item.id, items).enter(target.item, items))
+            profileOpened = true
+        }
+    }
     servers.FocusPending(connectionLevels.firstOrNull())
     val profileList by profileOwner.profiles.collectAsStateWithLifecycle()
     val levels = settingsGeneralLevels(navigation) + connectionLevels + settingsPlayerLevels(navigation) + listOf(

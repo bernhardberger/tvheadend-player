@@ -189,12 +189,18 @@ class MainActivity : AppCompatActivity() {
             val runtimeServerSettings by
                 startupViewModel.runtimeServerSettings.collectAsStateWithLifecycle()
             val serverProfiles by profileOwner.profiles.collectAsStateWithLifecycle()
+            val startupPicker by startupViewModel.startupPickerVisible.collectAsStateWithLifecycle()
+            val startupSelectionPending by startupViewModel.startupSelectionPending.collectAsStateWithLifecycle()
             TVHeadendPlayerTheme {
                 CompositionLocalProvider(
                     LocalChannelAccents provides channelAccents,
                     at.bernhardberger.tvhplayer.ui.startup.LocalMainStartupKeyCycleOwner provides mainStartupKeyCycleOwner,
                 ) {
-                    AppRoot(
+                    if (startupPicker) {
+                        at.bernhardberger.tvhplayer.ui.screens.StartupServerPicker(startupViewModel::finishStartupPicker,
+                            startupViewModel::openStartupProfile, startupSelectionPending,
+                            onSelect = { startupViewModel.selectStartupServer(it, notices) })
+                    } else AppRoot(
                         startupState = startupState,
                         runtimeServerSettings = runtimeServerSettings,
                         applianceLaunchRequests = startupViewModel.applianceLaunchRequests,
@@ -203,6 +209,7 @@ class MainActivity : AppCompatActivity() {
                         onRequestExit = ::requestRootExit,
                         registerActivityKeyContract = ::registerMainStartupActivityKeyContract,
                         serversStored = serverProfiles.serversStored(),
+                        initialSettingsProfileId = startupViewModel.startupSettingsProfileId,
                     )
                 }
             }

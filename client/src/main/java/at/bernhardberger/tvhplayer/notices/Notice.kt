@@ -16,6 +16,10 @@ enum class PauseUnavailableReason { SETTINGS_OFF, CHANNEL_UNAVAILABLE }
 
 /** User feedback policy, with no resources or presentation dependencies. */
 sealed interface Notice {
+    data object ServerProfileWriteFailed : Notice {
+        override val key = "server-profile-write-failed"
+        override val severity = NoticeSeverity.FAILURE
+    }
     data class ServerProfileRemoved(
         val id: ServerProfileId,
         /** Display-only name from serverProfileDisplayName; never include in diagnostics. */
