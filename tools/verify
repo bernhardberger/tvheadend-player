@@ -92,7 +92,7 @@ gradle_common=("${gradle_arguments[@]}" "-Ptvhplayer.captureTests=$capture_tests
     :client:testDebugUnitTest :decoder-ffmpeg:testDebugUnitTest :app:testPlayDebugUnitTest \
     "${gradle_common[@]}"
 ./gradlew \
-    :client:lintDebug :decoder-ffmpeg:lintDebug :app:lintPlayDebug :app:assemblePlayDebug \
+    :client:lintDebug :brand:lintDebug :decoder-ffmpeg:lintDebug :app:lintPlayDebug :app:assemblePlayDebug \
     "${appliance_tasks[@]}" "${provenance_tasks[@]}" \
     "${gradle_common[@]}"
 

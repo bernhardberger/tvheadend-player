@@ -8,7 +8,6 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Shapes
 import androidx.tv.material3.Typography
 import androidx.tv.material3.darkColorScheme
-import at.bernhardberger.tvhplayer.core.ProgrammeCategory
 
 // Recording red, picked by the surface it sits on. Tones of the Material error
 // palette, the same family as colorScheme.error (see DESIGN.md "Colour").
@@ -32,42 +31,9 @@ object TvSurfaceColors {
     val bright = Color(0xFF37393B)
 }
 
-/**
- * A Guide genre family's colors: [base] marks the family in the Genre panel and [tint] fills a
- * programme (12% of the base over containerHigh), focused or not. Programmes without a genre code
- * stay plain.
- */
-class TvGenreColors(val base: Color, val tint: Color)
-
-private val GenreFilmDrama = TvGenreColors(Color(0xFFC8B7FF), Color(0xFF3B3B45))
-private val GenreNews = TvGenreColors(Color(0xFF7699FB), Color(0xFF313745))
-private val GenreEntertainment = TvGenreColors(Color(0xFFFABECB), Color(0xFF413C3F))
-private val GenreSport = TvGenreColors(Color(0xFF73F094), Color(0xFF314238))
-private val GenreChildren = TvGenreColors(Color(0xFFFEE657), Color(0xFF424131))
-private val GenreMusic = TvGenreColors(Color(0xFFFD80C4), Color(0xFF42343E))
-private val GenreArtsCulture = TvGenreColors(Color(0xFFB872CD), Color(0xFF39333F))
-private val GenreSocietyPolitics = TvGenreColors(Color(0xFFD9B88B), Color(0xFF3D3B37))
-private val GenreEducationFactual = TvGenreColors(Color(0xFF5EC6B6), Color(0xFF2E3D3D))
-private val GenreLifestyleLeisure = TvGenreColors(Color(0xFFA9BD40), Color(0xFF373C2E))
-
-/** The family's colors, or null for a programme without a genre code. */
-fun tvGenreColors(category: ProgrammeCategory?): TvGenreColors? = when (category) {
-    ProgrammeCategory.FILM_DRAMA -> GenreFilmDrama
-    ProgrammeCategory.NEWS -> GenreNews
-    ProgrammeCategory.ENTERTAINMENT -> GenreEntertainment
-    ProgrammeCategory.SPORT -> GenreSport
-    ProgrammeCategory.CHILDREN -> GenreChildren
-    ProgrammeCategory.MUSIC -> GenreMusic
-    ProgrammeCategory.ARTS_CULTURE -> GenreArtsCulture
-    ProgrammeCategory.SOCIETY_POLITICS -> GenreSocietyPolitics
-    ProgrammeCategory.EDUCATION_FACTUAL -> GenreEducationFactual
-    ProgrammeCategory.LIFESTYLE_LEISURE -> GenreLifestyleLeisure
-    ProgrammeCategory.ALL, null -> null
-}
-
 // Material Color Utilities 0.3.0: cyan #00BCFA, orange #FA7F00.
 // Dark roles use generated tones; tertiary deliberately uses T70, not T80.
-internal val TvDarkColors = darkColorScheme(
+val TvDarkColors = darkColorScheme(
     primary = Color(0xFF79D1FF),
     onPrimary = Color(0xFF003549),
     primaryContainer = Color(0xFF004C68),
@@ -116,7 +82,7 @@ object TvTextColors {
 // TV Material 1.1.0 does not provide text fields, progress indicators, dividers,
 // or dialogs. Keep the official mobile Material implementations color-aligned
 // rather than recreating their input, semantics, and accessibility behavior.
-internal val MobileDarkColors = mobileDarkColorScheme(
+val MobileDarkColors = mobileDarkColorScheme(
     primary = TvDarkColors.primary,
     onPrimary = TvDarkColors.onPrimary,
     primaryContainer = TvDarkColors.primaryContainer,

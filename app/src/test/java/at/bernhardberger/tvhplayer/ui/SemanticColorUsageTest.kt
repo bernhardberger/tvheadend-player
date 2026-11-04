@@ -53,13 +53,18 @@ class SemanticColorUsageTest {
     fun recordingRedsAreDrawnOnlyByTheSharedBadgeAndDot() {
         // Every recording mark goes through RecordingBadge or RecordingStatusIndicator, and a mark or
         // progress bar drawn elsewhere through recordingMarkColor, so each surface gets the red picked for it.
-        val owners = setOf("ui/Theme.kt", "ui/components/RecordingStatusIndicator.kt", "ui/components/StatusBadge.kt")
+        val owners = setOf(
+            "app/src/main/java/at/bernhardberger/tvhplayer/ui/components/RecordingStatusIndicator.kt",
+            "app/src/main/java/at/bernhardberger/tvhplayer/ui/components/StatusBadge.kt",
+            "brand/src/main/java/at/bernhardberger/tvhplayer/ui/Theme.kt",
+        )
         val reds = Regex("""\bTv(OnRecordingContainer|RecordingContainer|RecordingFocused|Recording)Color\b""")
-        val sourceRoot = File(repositoryRoot, "app/src/main/java/at/bernhardberger/tvhplayer")
-        val offenders = sourceRoot.walkTopDown()
+        val offenders = listOf("app/src/main/java", "brand/src/main/java")
+            .asSequence()
+            .flatMap { File(repositoryRoot, it).walkTopDown() }
             .filter { it.isFile && it.extension == "kt" }
-            .map { it.relativeTo(sourceRoot).invariantSeparatorsPath }
-            .filter { it !in owners && reds.containsMatchIn(source(it)) }
+            .filter { it.relativeTo(repositoryRoot).invariantSeparatorsPath !in owners && reds.containsMatchIn(it.readText()) }
+            .map { it.relativeTo(repositoryRoot).invariantSeparatorsPath }
             .toList()
         assertTrue("Recording reds used outside the shared badge and dot: $offenders", offenders.isEmpty())
     }

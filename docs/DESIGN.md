@@ -30,7 +30,7 @@ authority; do not treat as normative).
 ## 2. Theme
 
 Dark-only, one static brand-derived Material scheme (accepted 2026-09-14).
-Every role is pinned in `Theme.kt`; no dynamic or wallpaper colour.
+Every role is pinned in `brand/src/main/java/at/bernhardberger/tvhplayer/ui/Theme.kt`; no dynamic or wallpaper colour.
 
 | Role | Value | Note |
 |---|---|---|
@@ -155,7 +155,7 @@ immersive list and dialog do: the title and its subtitle, which names the
 episode, in `onSurface`; descriptions in `onSurfaceVariant` at 80%; metadata (channel, times, facts,
 age rating, what follows) in `onSurfaceVariant` at 72%, where the kit uses 60%,
 which falls below 4.5:1 over our backdrops. Metadata uses the kit's 12sp
-`labelMedium`, whose Medium weight keeps it legible in that grey. `TvTextColors` in `ui/Theme.kt`
+`labelMedium`, whose Medium weight keeps it legible in that grey. `TvTextColors` in `brand/src/main/java/at/bernhardberger/tvhplayer/ui/Theme.kt`
 holds them for the browse headlines, details page, dialogs and Recordings pane.
 Focusable rows and cards keep their focus colours, and see-through panels over
 video keep `onSurface` at these alphas, because `onSurfaceVariant` at 72% falls
@@ -311,7 +311,7 @@ Any different treatment is a **global** decision recorded here and applied once
 (theme or shared defaults helper), never per screen. Until then, a per-call-site
 override is a defect.
 
-All focusable cards use the single `TvCardFocusedScale` token in `ui/TvLayout.kt`
+All focusable cards use the single `TvCardFocusedScale` token in `brand/src/main/java/at/bernhardberger/tvhplayer/ui/TvLayout.kt`
 (1.05×), including the compact channel cards, standard programme cards, recent
 channel tiles and details reading panels. `StandardCardContainer` delegates focus
 to its image card. Unfocused and pressed scales stay native. Native list rows

@@ -96,8 +96,8 @@ def find_static_rule_violations(root: Path) -> list[str]:
     violations = []
     source_root = root / "app/src/main"
     # Production sources of the UI-free :client library carry the same no-probe contract.
-    # Theme rules below stay app-only: :client has no UI, resources or theme.
-    production_roots = (source_root, root / "client/src/main")
+    # Shared brand sources retain the UI rules after moving out of :app.
+    production_roots = (source_root, root / "client/src/main", root / "brand/src/main")
     kotlin_paths = [path for production_root in production_roots
                     for path in sorted(production_root.rglob("*.kt"))]
     for path in kotlin_paths:
@@ -152,7 +152,8 @@ def find_static_rule_violations(root: Path) -> list[str]:
         ui = "app/src/main/java/at/bernhardberger/tvhplayer/ui/"
         # Recent-row expansion is a local disclosure, not movement between pages.
         slide_owners = {ui + "BrowseMotionPolicy.kt", ui + "player/PlayerTopIdentity.kt"}
-        if relative_path.startswith(ui) and relative_path not in slide_owners:
+        brand_ui = "brand/src/main/java/at/bernhardberger/tvhplayer/ui/"
+        if relative_path.startswith((ui, brand_ui)) and relative_path not in slide_owners:
             for match in re.finditer(r"\bslide(?:In|Out)(?:Vertically|Horizontally)\b", code):
                 violations.append(
                     f"SharedPageMotion: {relative_path}:"
@@ -174,7 +175,7 @@ def find_static_rule_violations(root: Path) -> list[str]:
                 f"NoConnectionProbe: {path.relative_to(root)} declares or uses test_connection"
             )
 
-    theme_path = source_root / "java/at/bernhardberger/tvhplayer/ui/Theme.kt"
+    theme_path = root / "brand/src/main/java/at/bernhardberger/tvhplayer/ui/Theme.kt"
     theme_text = theme_path.read_text(encoding="utf-8")
     theme_code = kotlin_code(theme_text)
     for identifier in LIGHT_THEME_IDENTIFIERS:

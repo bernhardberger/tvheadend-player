@@ -9,6 +9,7 @@ Normative ownership rule for the UI-free Android library `:client`
 persistence and pure domain policy. A future mobile app or another TV front end
 can reuse it without inheriting this app's UI or UX. `:app` depends on
 `project(":client")`; `:client` never depends on `:app`.
+The separate `:brand` library owns the shared Compose theme and layout tokens; `:client` stays UI-free and does not depend on it.
 
 Package names stay `at.bernhardberger.tvhplayer.*` (move-only extraction).
 Kotlin `internal` is module-scoped, so declarations `:app` uses across the

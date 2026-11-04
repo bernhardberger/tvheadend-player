@@ -15,7 +15,7 @@ class StaticRulesTest(unittest.TestCase):
         self.temporary_directory = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary_directory.name)
         self.write(
-            "app/src/main/java/at/bernhardberger/tvhplayer/ui/Theme.kt",
+            "brand/src/main/java/at/bernhardberger/tvhplayer/ui/Theme.kt",
             "package at.bernhardberger.tvhplayer.ui\nval darkOnly = true\n",
         )
         self.write(
@@ -115,7 +115,7 @@ class StaticRulesTest(unittest.TestCase):
 
     def test_finds_reachable_light_theme_identifiers(self):
         self.write(
-            "app/src/main/java/at/bernhardberger/tvhplayer/ui/Theme.kt",
+            "brand/src/main/java/at/bernhardberger/tvhplayer/ui/Theme.kt",
             "val colors = lightColorScheme()\n",
         )
 
@@ -123,6 +123,19 @@ class StaticRulesTest(unittest.TestCase):
 
         self.assertTrue(any("DarkOnlyTheme" in violation for violation in violations))
         self.assertTrue(any("Theme.kt:1" in violation for violation in violations))
+
+    def test_shared_brand_layout_retains_production_ui_rules(self):
+        path = "brand/src/main/java/at/bernhardberger/tvhplayer/ui/TvLayout.kt"
+        for source, rule in (
+            ("testConnection()", "NoConnectionProbe"),
+            ("SnackbarHost()", "TransientFeedback"),
+            ("TabRow()", "SharedTabs"),
+            ("slideInHorizontally(spec) { it }", "SharedPageMotion"),
+        ):
+            with self.subTest(rule=rule):
+                self.write(path, source)
+                self.assertTrue(any(f"{rule}: {path}:1" in violation
+                                    for violation in find_static_rule_violations(self.root)))
 
     def write(self, relative_path: str, content: str):
         destination = self.root / relative_path
