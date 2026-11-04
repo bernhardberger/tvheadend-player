@@ -454,6 +454,7 @@ fun AppRoot(
      * not the active profile, so removing the server in use never passes through first run.
      */
     serversStored: Boolean = false,
+    initialSettingsProfileId: String? = null,
 ) {
     val applianceLaunchState by applianceLaunchRequests.state.collectAsStateWithLifecycle()
     val startupLoadingTiming = remember { MainStartupLoadingTiming() }
@@ -513,7 +514,8 @@ fun AppRoot(
 
     var navigationStartDestination by remember {
         mutableStateOf<AppNavKey?>(
-            if (noServerInUse) SettingsKey(SettingsSection.CONNECTION) else when (val launchState = applianceLaunchState) {
+            if (initialSettingsProfileId != null) SettingsKey(SettingsSection.CONNECTION, initialSettingsProfileId)
+            else if (noServerInUse) SettingsKey(SettingsSection.CONNECTION) else when (val launchState = applianceLaunchState) {
                 ApplianceLaunchState.Idle -> HomeKey
                 is ApplianceLaunchState.Pending -> if (
                     deferredBackAction ==
@@ -540,6 +542,7 @@ fun AppRoot(
     val backStack = rememberAppNavBackStack(
         *listOfNotNull(navigationStartDestination).toTypedArray(),
     )
+    var switcherOrigin by remember { mutableStateOf<AppNavKey>(HomeKey) }
     LaunchedEffect(navigationStartDestination) {
         val destination = navigationStartDestination
         if (destination != null && backStack.isEmpty()) {
@@ -598,6 +601,7 @@ fun AppRoot(
     val uiSettings by uiSettingsStore.settings.collectAsStateWithLifecycle(initialValue = UiSettings())
     ApplyUiPresentationSettings(uiSettings)
     val profileOwner: AppProfileOwner = koinInject()
+    val showServerSwitcher by profileOwner.showSwitcher.collectAsStateWithLifecycle(initialValue = false)
     val profileGeneration by profileOwner.configurationGeneration.collectAsStateWithLifecycle()
     val browseFailure = at.bernhardberger.tvhplayer.ui.components.rememberBrowseConnectionFailure(
         connectionUiState, profileGeneration, appVm::reconnectNow)
@@ -677,7 +681,10 @@ fun AppRoot(
     var homeContentDrawn by remember(profileGeneration) { mutableStateOf(false) }
     val coldStart = rememberColdStart(
         // Nothing connects while no server is in use, so there is no connection to wait for.
-        launchIdle = applianceLaunchState == ApplianceLaunchState.Idle && !noServerInUse,
+        // Settings can render without a channel catalog or connection; a duplicate startup add
+        // lands there rather than on Home, so Home's readiness must not hide its recovery UI.
+        launchIdle = applianceLaunchState == ApplianceLaunchState.Idle && !noServerInUse &&
+            navigationStartDestination !is SettingsKey,
         connectionState = connectionUiState,
         currentChannelReadiness = currentChannelReadiness,
         loadingTiming = startupLoadingTiming,
@@ -1107,12 +1114,25 @@ fun AppRoot(
                             channelsVm = channelsVm,
                             connectionPresentation = connectionPresentation,
                             onRetry = { appVm.reconnectNow(allowAutomaticBackoff = true) },
-                            contentAllowed = contentAllowed,
+                            contentAllowed = contentAllowed || coldStartVisible,
                             section = destination.section,
+                            profileId = destination.profileId,
                             isCurrent = currentDestination == destination,
                             initialFocusEnabled = !drawerActive && currentDestination == destination,
                             contentPadding = contentPadding,
                             backEnabled = !applianceLaunchActive,
+                        )
+                    }
+
+                    entry<SwitchServerKey>(metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.SWITCH_SERVER)) {
+                        at.bernhardberger.tvhplayer.ui.screens.ServerSwitcherScreen(
+                            initialFocusEnabled = !drawerActive && currentDestination == SwitchServerKey,
+                            isCurrent = currentDestination == SwitchServerKey,
+                            onUsed = { navigateTopLevel(ChannelsKey) },
+                            onRetained = { navigateTopLevel(switcherOrigin) },
+                            onExisting = { id -> navigateTopLevel(SettingsKey(SettingsSection.CONNECTION, id.value)) },
+                            contentPadding = contentPadding,
+                            drawerOpen = drawerActive,
                         )
                     }
 
@@ -1353,6 +1373,7 @@ fun AppRoot(
                             add(AppDestination.GUIDE)
                             add(AppDestination.RECORDINGS)
                             add(AppDestination.SETTINGS)
+                            if (showServerSwitcher || currentDestination == SwitchServerKey) add(AppDestination.SWITCH_SERVER)
                         },
                         rootBackPriority = applianceLaunchActive,
                         onRootBack = handleRootBack,
@@ -1374,6 +1395,10 @@ fun AppRoot(
                                     ),
                                 )
                             }
+                        },
+                        onDrawerOpened = { destination ->
+                            if (destination != null && destination != AppDestination.SWITCH_SERVER)
+                                switcherOrigin = destination.toTopLevelKey(backStack.lastSettingsSection())
                         },
                         nowPlaying = nowPlaying,
                         nowPlayingPaused = at.bernhardberger.tvhplayer.ui.components.drawerControlPaused(
@@ -1449,6 +1474,7 @@ private fun AppDestination.toTopLevelKey(
     AppDestination.GUIDE -> GuideKey
     AppDestination.RECORDINGS -> RecordingsKey
     AppDestination.SETTINGS -> SettingsKey(settingsSection ?: SettingsSection.GENERAL)
+    AppDestination.SWITCH_SERVER -> SwitchServerKey
     AppDestination.LIVE_PLAYER,
     AppDestination.RECORDING_PLAYER -> error("Transient destination is not top-level")
 }

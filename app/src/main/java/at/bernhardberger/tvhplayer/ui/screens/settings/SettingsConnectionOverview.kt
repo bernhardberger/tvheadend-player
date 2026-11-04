@@ -27,6 +27,7 @@ import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.common.AppErrorText
 import at.bernhardberger.tvhplayer.ui.components.depth.*
 import org.koin.compose.koinInject
+import kotlinx.coroutines.launch
 
 internal const val EDIT_CONNECTION = "edit-connection"
 internal const val RETRY_CONNECTION = "retry-connection"
@@ -46,13 +47,18 @@ internal fun settingsConnectionLevels(
     val profile by owner.serverProfile.collectAsStateWithLifecycle()
     val profiles by owner.profiles.collectAsStateWithLifecycle()
     val hidden by owner.hiddenServerProfileIds.collectAsStateWithLifecycle(initialValue = emptySet())
+    val ask by owner.askAtStartup.collectAsStateWithLifecycle(initialValue = false)
+    val scope = rememberCoroutineScope()
+    val listed by owner.switcherProfiles.collectAsStateWithLifecycle(initialValue = emptyList())
     val connection = presentation.connection
     val status = connectionOverviewStatus(profile, presentation)
     return settingsServerLevels(profiles, hidden, status.text, actions,
         showRetry = presentation.degraded && connection.primaryRecoveryAction() != ConnectionRecoveryAction.SETTINGS,
         connecting = connection == ConnectionUiState.Connecting || connection == ConnectionUiState.Reconnecting ||
             connection == ConnectionUiState.SyncingChannels,
-        onRetry = onRetry)
+        onRetry = onRetry,
+        askAtStartup = ask.takeIf { !at.bernhardberger.tvhplayer.BuildConfig.APPLIANCE_BUILD && listed.size >= 2 },
+        onAskAtStartup = { scope.launch { owner.setAskAtStartup(it) } })
 }
 
 /** The overview's status: a failure's title and reason, or its own state with no reason. */

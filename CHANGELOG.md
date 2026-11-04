@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Switch servers from the drawer, or choose which server to use when the app starts.
 - Settings > Connection can keep several servers, or the same server with different users. Choose one to use it, give it a name, or remove it.
 - A removed recording no longer hides another recording of the same program, and retention cleanup no longer repeats the “Recording deleted” notice.
 - Recent channels, channel tags, channel aspect settings, the selected stream profile and audio choices start fresh after this update; they are now kept per server.
