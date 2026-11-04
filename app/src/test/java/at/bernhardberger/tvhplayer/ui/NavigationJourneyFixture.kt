@@ -20,6 +20,7 @@ import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.testing.*
 import at.bernhardberger.tvhplayer.core.*
 import at.bernhardberger.tvhplayer.notices.*
+import at.bernhardberger.tvhplayer.testutil.leaveTouchModeBeforeComposing
 import at.bernhardberger.tvhplayer.playback.*
 import at.bernhardberger.tvhplayer.settings.*
 import at.bernhardberger.tvhplayer.stores.*
@@ -129,6 +130,9 @@ internal class NavigationJourneyFixture(
             viewModel { SettingsPlayerViewModel(get(), get(), get(), get(), get()) }
         }
         launchRequests.requestStartup(autoStartPlayback)
+        // A TV is not in touch mode: only then does a view hand focus over as it attaches.
+        @Suppress("UNCHECKED_CAST")
+        (compose as androidx.compose.ui.test.junit4.AndroidComposeTestRule<*, androidx.activity.ComponentActivity>).leaveTouchModeBeforeComposing()
         compose.setContent {
             KoinIsolatedContext(koinApplication { modules(dependencies) }) {
                 TVHeadendPlayerTheme {
@@ -159,6 +163,39 @@ internal class NavigationJourneyFixture(
 
     fun key(key: Key) {
         compose.onRoot().performKeyInput { pressKey(key) }
+        compose.waitForIdle()
+        settle()
+    }
+
+    /** Back as the device delivers it: a press, time passing, then the release, through the root. */
+    fun backKeyCycle(framesHeld: Int = 3) {
+        compose.onRoot().performKeyInput { keyDown(Key.Back) }
+        compose.waitForIdle()
+        repeat(framesHeld) { compose.mainClock.advanceTimeByFrame() }
+        compose.onRoot().performKeyInput { keyUp(Key.Back) }
+        compose.waitForIdle()
+        settle()
+    }
+
+    /**
+     * What the platform does once nothing in the page holds focus (a closing screen's node going away):
+     * the view drops its focus and, off touch mode, searches the whole page again from the top.
+     */
+    fun viewRefocusesWithNothingFocused() {
+        compose.runOnUiThread {
+            val activity = (compose as androidx.compose.ui.test.junit4.AndroidComposeTestRule<*, androidx.activity.ComponentActivity>).activity
+            fun find(group: android.view.ViewGroup): android.view.View? {
+                for (i in 0 until group.childCount) {
+                    val child = group.getChildAt(i)
+                    if (child.javaClass.simpleName == "AndroidComposeView") return child
+                    if (child is android.view.ViewGroup) find(child)?.let { return it }
+                }
+                return null
+            }
+            val view = find(activity.window.decorView as android.view.ViewGroup)!!
+            view.clearFocus()
+            view.requestFocus(android.view.View.FOCUS_DOWN)
+        }
         compose.waitForIdle()
         settle()
     }

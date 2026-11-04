@@ -4,6 +4,7 @@ package at.bernhardberger.tvhplayer.ui
 
 import android.app.Application
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import at.bernhardberger.tvhplayer.settings.ServerSettings
@@ -14,6 +15,10 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import kotlin.time.Instant
+import androidx.test.core.app.ApplicationProvider
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -126,6 +131,56 @@ class HomeNavigationJourneyTest {
         val after = compose.onNodeWithTag("home-onnow-1").getUnclippedBoundsInRoot()
         org.junit.Assert.assertEquals(before.left.value, after.left.value, 2f)
         org.junit.Assert.assertEquals(before.top.value, after.top.value, 2f)
+    }
+
+    @Test fun aViewRefocusWithNothingFocusedEntersTheRememberedCardNotTheRail() {
+        fixture.app()
+        fixture.openDestination("nav-channels", Key.DirectionUp, "nav-home")
+        fixture.focus("home-onnow-0")
+        fixture.key(Key.DirectionRight)
+        compose.onNodeWithTag("home-onnow-1").assertIsFocused()
+        fixture.viewRefocusesWithNothingFocused()
+        compose.onNodeWithTag("nav-home").assertIsNotFocused()
+        compose.onNodeWithTag("home-onnow-1").assertIsFocused()
+        // The viewer's own way to the rail is untouched.
+        fixture.key(Key.DirectionLeft)
+        compose.onNodeWithTag("home-onnow-0").assertIsFocused()
+        fixture.key(Key.DirectionLeft)
+        compose.onNodeWithTag("nav-home").assertIsFocused()
+        fixture.key(Key.DirectionRight)
+        compose.onNodeWithTag("home-onnow-0").assertIsFocused()
+    }
+
+    @Test fun realBackKeyCycleFromThePlayerReturnsToTheOnNowCardWithTheRailClosed() {
+        fixture.app()
+        fixture.openDestination("nav-channels", Key.DirectionUp, "nav-home")
+        fixture.focus("home-onnow-0")
+        fixture.key(Key.DirectionRight)
+        compose.onNodeWithTag("home-onnow-1").assertIsFocused()
+        fixture.key(Key.Enter)
+        compose.onNodeWithTag("home-view-button").assertDoesNotExist()
+        fixture.backKeyCycle()
+        compose.onNodeWithTag("home-view-button").assertExists()
+        compose.onNodeWithTag("home-onnow-1").assertIsFocused()
+        compose.onNodeWithTag("global-drawer-wordmark").assertDoesNotExist()
+    }
+
+    @Test fun realBackKeyCycleFromThePlayerReturnsToTheRecentChannelCardWithTheRailClosed() {
+        // Playback is not confirmed offline, so seed what a confirmed first picture records.
+        runBlocking {
+            LastPlayedChannelStore(ApplicationProvider.getApplicationContext()).run {
+                setChannelId(ChannelId(3)); setChannelId(ChannelId(2))
+            }
+        }
+        fixture.app()
+        fixture.openDestination("nav-channels", Key.DirectionUp, "nav-home")
+        fixture.focus("home-recent-0")
+        fixture.key(Key.Enter)
+        compose.onNodeWithTag("home-view-button").assertDoesNotExist()
+        fixture.backKeyCycle()
+        compose.onNodeWithTag("home-view-button").assertExists()
+        compose.onNodeWithTag("home-recent-0").assertIsFocused()
+        compose.onNodeWithTag("global-drawer-wordmark").assertDoesNotExist()
     }
 
     @Test fun realRailRightRestoresTheCardLeftBehindInsteadOfUpcoming() {

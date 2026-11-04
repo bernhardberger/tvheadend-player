@@ -54,6 +54,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.zIndex
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -65,6 +66,7 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -428,11 +430,35 @@ internal fun SideRail(
         val fullWidth = maxWidth
         // What the drawer sheet leaves the browse content, as the content is measured each frame.
         val visibleWidthPx = remember { mutableIntStateOf(Int.MAX_VALUE) }
-        // Clip at the screen edge, not at the moving content's leading edge.
+        // When Compose drops focus (a closing player's node going away), the platform's non-touch
+        // re-entry searches Down from the top of the whole tree, where the rail would win and open the
+        // drawer. That entry goes to the page instead; the rail is only entered by the viewer's moves.
+        val contentFocus = remember { FocusRequester() }
+        val awayFromRail = if (LocalLayoutDirection.current == LayoutDirection.Ltr) FocusDirection.Right else FocusDirection.Left
+        var enteringContent by remember { mutableStateOf(false) }
         NavigationDrawer(
             modifier = Modifier
                 .fillMaxSize()
+                // Clip at the screen edge, not at the moving content's leading edge.
                 .clipToBounds()
+                .focusProperties {
+                    onEnter = {
+                        val direction = requestedFocusDirection
+                        val searched = direction == FocusDirection.Down || direction == FocusDirection.Up ||
+                            direction == FocusDirection.Next || direction == FocusDirection.Previous
+                        if (searched && !enteringContent && drawerState.currentValue == DrawerValue.Closed &&
+                            !detailsOpen && !modalOpen
+                        ) {
+                            enteringContent = true
+                            try {
+                                runCatching { contentFocus.requestFocus(awayFromRail) }
+                            } finally {
+                                enteringContent = false
+                            }
+                        }
+                    }
+                }
+                .focusGroup()
                 .testTag("global-navigation-shell"),
             drawerState = drawerState,
             drawerContent = { drawerValue ->
@@ -638,7 +664,7 @@ internal fun SideRail(
                 }
             },
             content = {
-                BrowseViewport(width = browseWidth, layering = layering, visibleWidthPx = visibleWidthPx) {
+                BrowseViewport(width = browseWidth, layering = layering, visibleWidthPx = visibleWidthPx, contentFocus = contentFocus) {
                     CompositionLocalProvider(
                         LocalBrowseDrawerState provides drawerState,
                         LocalBrowseNavigationFocus provides activeItemFocus.takeUnless { detailsOpen || modalOpen },
@@ -996,6 +1022,7 @@ private fun BrowseViewport(
     width: Dp,
     layering: BrowseContentLayering,
     visibleWidthPx: MutableIntState,
+    contentFocus: FocusRequester,
     content: @Composable () -> Unit,
 ) {
     SubcomposeLayout(
@@ -1015,7 +1042,7 @@ private fun BrowseViewport(
                 LocalBrowseCullWidthPx provides cullWidth,
                 LocalBrowseContentLayering provides layering,
             ) {
-                Box(Modifier.fillMaxSize()) { content() }
+                Box(Modifier.fillMaxSize().focusRequester(contentFocus).focusGroup()) { content() }
             }
         }.single().measure(
             constraints.copy(minWidth = fixedWidth, maxWidth = fixedWidth),
