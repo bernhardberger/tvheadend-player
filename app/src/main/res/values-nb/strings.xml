@@ -218,8 +218,6 @@
     <string name="appliance_service_enabled">TV-starttjeneste: aktivert</string>
     <string name="appliance_service_disabled">TV-starttjeneste: deaktivert</string>
     <string name="open_accessibility_settings">Åpne tilgjengelighetsinnstillinger</string>
-    <string name="appliance_accessibility_service_label">Tvheadend Player TV-start</string>
-    <string name="appliance_accessibility_service_description">Åpner Tvheadend Player ved oppstart og vekking, og tildeler bare TV/GUIDE-knappen. Den kan ikke lese skjerminnhold.</string>
     <string name="appliance_starting_tv">Starter avspilling</string>
     <string name="appliance_back_for_menu">Trykk på Back for kanaler og innstillinger.</string>
     <string name="main_startup_message_preparing">Forbereder appen</string>

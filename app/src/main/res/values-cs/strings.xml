@@ -218,8 +218,6 @@
     <string name="appliance_service_enabled">Služba spuštění TV přijímače: zapnutá</string>
     <string name="appliance_service_disabled">Služba spuštění TV přijímače: vypnutá</string>
     <string name="open_accessibility_settings">Otevřít nastavení usnadnění</string>
-    <string name="appliance_accessibility_service_label">Spouštění Tvheadend Player jako TV přijímače</string>
-    <string name="appliance_accessibility_service_description">Otevře Tvheadend Player při zapnutí a probuzení a přemapuje pouze tlačítko TV/GUIDE. Nemůže číst obsah obrazovky.</string>
     <string name="appliance_starting_tv">Spouštění přehrávání</string>
     <string name="appliance_back_for_menu">Tlačítkem Zpět otevřeš kanály a nastavení.</string>
     <string name="main_startup_message_preparing">Příprava aplikace</string>

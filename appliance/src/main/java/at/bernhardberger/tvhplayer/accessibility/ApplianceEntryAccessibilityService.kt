@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.accessibility
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.BroadcastReceiver
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -10,9 +11,11 @@ import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 import androidx.core.content.ContextCompat
-import at.bernhardberger.tvhplayer.core.ApplianceEntryLaunchGate
-import at.bernhardberger.tvhplayer.core.ApplianceEntryPolicy
-import at.bernhardberger.tvhplayer.core.ApplianceKeyDecision
+import at.bernhardberger.tvhplayer.appliance.BuildConfig
+import at.bernhardberger.tvhplayer.appliance.CompanionActivity
+import at.bernhardberger.tvhplayer.appliance.ApplianceEntryLaunchGate
+import at.bernhardberger.tvhplayer.appliance.ApplianceEntryPolicy
+import at.bernhardberger.tvhplayer.appliance.ApplianceKeyDecision
 
 class ApplianceEntryAccessibilityService : AccessibilityService() {
     private val launchGate = ApplianceEntryLaunchGate(minimumIntervalMillis = 1_500)
@@ -78,14 +81,23 @@ class ApplianceEntryAccessibilityService : AccessibilityService() {
 
     private fun launchApp() {
         if (!launchGate.shouldLaunch(SystemClock.elapsedRealtime())) return
-        startActivity(
-            Intent().setClassName(packageName, ApplianceEntryPolicy.ENTRY_ALIAS_CLASS_NAME).apply {
+        try {
+            startActivity(Intent().setClassName(BuildConfig.PLAYER_PACKAGE, ApplianceEntryPolicy.ENTRY_ALIAS_CLASS_NAME).apply {
                 action = ACTION_APPLIANCE_ENTRY
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or
                     Intent.FLAG_ACTIVITY_CLEAR_TOP or
                     Intent.FLAG_ACTIVITY_SINGLE_TOP
-            }
-        )
+            })
+        } catch (_: ActivityNotFoundException) {
+            openCompanion()
+        } catch (_: SecurityException) {
+            openCompanion()
+        }
+    }
+
+    private fun openCompanion() {
+        startActivity(Intent(this, CompanionActivity::class.java).addFlags(
+            Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
     }
 
     companion object {

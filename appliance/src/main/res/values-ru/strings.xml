@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="appliance_accessibility_service_label">Запуск Tvheadend Player в режиме ТВ-приставки</string>
+    <string name="appliance_accessibility_service_description">Открывает Tvheadend Player при запуске и пробуждении и переназначает только кнопку TV/GUIDE. Не может читать содержимое экрана.</string>
+</resources>

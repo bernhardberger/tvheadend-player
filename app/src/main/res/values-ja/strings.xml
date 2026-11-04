@@ -218,8 +218,6 @@
     <string name="appliance_service_enabled">専用機起動サービス：有効</string>
     <string name="appliance_service_disabled">専用機起動サービス：無効</string>
     <string name="open_accessibility_settings">ユーザー補助設定を開く</string>
-    <string name="appliance_accessibility_service_label">Tvheadend Player専用機起動</string>
-    <string name="appliance_accessibility_service_description">起動時と復帰時にTvheadend Playerを開き、TV/GUIDEボタンのみを割り当てます。画面の内容を読み取ることはできません。</string>
     <string name="appliance_starting_tv">再生を開始中</string>
     <string name="appliance_back_for_menu">Backを押すとチャンネルと設定が表示されます。</string>
     <string name="main_startup_message_preparing">アプリを準備中</string>

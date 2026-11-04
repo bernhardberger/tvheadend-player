@@ -35,12 +35,12 @@ backs out to those screens.
 ./tools/verify
 # Mutating commands require an explicitly configured test device.
 android --no-metrics install --device="$TVHPLAYER_ADB_SERIAL" --apks=app/build/outputs/apk/play/debug/app-play-debug.apk --use-delta-install=false --install-options=-r,-t
-android --no-metrics install --device="$TVHPLAYER_ADB_SERIAL" --apks=<debug companion APK> --use-delta-install=false --install-options=-r,-t
+android --no-metrics install --device="$TVHPLAYER_ADB_SERIAL" --apks=appliance/build/outputs/apk/debug/appliance-debug.apk --use-delta-install=false --install-options=-r,-t
 ./tools/device --package at.bernhardberger.tvhplayer.debug launch
 ```
 
-The companion APK path will be filled in when its module lands on
-`feat/appliance-companion`. The player debug ID is also the `tools/device` default.
+The companion debug APK pairs with the debug player using the default debug
+signing key. The player debug ID is also the `tools/device` default.
 
 ## Two apps (owner, 2026-11-04)
 
@@ -96,9 +96,9 @@ on the Android debug keystore.
 - `app/src/main/java/.../player/` — Media3 playback and channel switching
 - `app/src/main/java/.../stores/` — persisted last-channel selection
 - `app/src/main/java/.../ui/` — launch policy and normal TV UI
-- `app/src/main/java/.../accessibility/` — GUIDE filtering and boot/wake entry
-  (moves into the Appliance companion module on `feat/appliance-companion`)
-- `app/src/main/res/xml/` — accessibility-service declaration
+- `appliance/src/main/java/.../accessibility/` — GUIDE filtering and boot/wake entry
+- `appliance/src/main/java/.../appliance/` — HOME routing and companion screen
+- `appliance/src/main/res/xml/` — accessibility-service declaration
 - `app/src/test/` — pure launch/navigation policy tests
 - `docs/` — appliance behavior, build, and rollback documentation
 

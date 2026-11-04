@@ -218,8 +218,6 @@
     <string name="appliance_service_enabled">TV-käynnistyspalvelu: käytössä</string>
     <string name="appliance_service_disabled">TV-käynnistyspalvelu: pois käytöstä</string>
     <string name="open_accessibility_settings">Avaa esteettömyysasetukset</string>
-    <string name="appliance_accessibility_service_label">Tvheadend Playerin TV-käynnistys</string>
-    <string name="appliance_accessibility_service_description">Avaa Tvheadend Playerin käynnistyksen ja heräämisen yhteydessä sekä määrittää vain TV/GUIDE-painikkeen toiminnan uudelleen. Se ei voi lukea näytön sisältöä.</string>
     <string name="appliance_starting_tv">Aloitetaan toistoa</string>
     <string name="appliance_back_for_menu">Avaa kanavat ja asetukset painamalla Back.</string>
     <string name="main_startup_message_preparing">Valmistellaan sovellusta</string>

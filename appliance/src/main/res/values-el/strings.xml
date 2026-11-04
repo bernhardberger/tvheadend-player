@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="appliance_accessibility_service_label">Εκκίνηση Tvheadend Player ως συσκευής TV</string>
+    <string name="appliance_accessibility_service_description">Ανοίγει το Tvheadend Player κατά την εκκίνηση και την αφύπνιση και αντιστοιχίζει μόνο το κουμπί TV/GUIDE. Δεν μπορεί να διαβάσει το περιεχόμενο της οθόνης.</string>
+</resources>

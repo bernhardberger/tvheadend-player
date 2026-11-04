@@ -218,8 +218,6 @@
     <string name="appliance_service_enabled">Serviço de entrada do modo TV: ativado</string>
     <string name="appliance_service_disabled">Serviço de entrada do modo TV: desativado</string>
     <string name="open_accessibility_settings">Abrir configurações de acessibilidade</string>
-    <string name="appliance_accessibility_service_label">Entrada do modo TV do Tvheadend Player</string>
-    <string name="appliance_accessibility_service_description">Abre o Tvheadend Player ao iniciar e ao reativar a TV, e mapeia apenas o botão TV/GUIDE. Não pode ler o conteúdo da tela.</string>
     <string name="appliance_starting_tv">Iniciando reprodução</string>
     <string name="appliance_back_for_menu">Pressione Back para acessar canais e configurações.</string>
     <string name="main_startup_message_preparing">Preparando app</string>

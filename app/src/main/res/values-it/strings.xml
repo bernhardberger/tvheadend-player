@@ -218,8 +218,6 @@
     <string name="appliance_service_enabled">Servizio di avvio della modalità TV: attivo</string>
     <string name="appliance_service_disabled">Servizio di avvio della modalità TV: disattivo</string>
     <string name="open_accessibility_settings">Apri impostazioni di accessibilità</string>
-    <string name="appliance_accessibility_service_label">Avvio modalità TV di Tvheadend Player</string>
-    <string name="appliance_accessibility_service_description">Apre Tvheadend Player all’avvio e alla riattivazione del televisore e riassegna solo il tasto TV/GUIDE. Non può leggere il contenuto dello schermo.</string>
     <string name="appliance_starting_tv">Avvio della riproduzione</string>
     <string name="appliance_back_for_menu">Premi Back per accedere a canali e impostazioni.</string>
     <string name="main_startup_message_preparing">Preparazione dell’app</string>

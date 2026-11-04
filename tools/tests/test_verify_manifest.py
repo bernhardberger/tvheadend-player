@@ -6,6 +6,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTRACT = (ROOT / "tools/verify").read_text().split("<<'PLAY_ENTRY_CONTRACT'\n", 1)[1].split("\nPLAY_ENTRY_CONTRACT", 1)[0]
+COMPANION_CONTRACT = (ROOT / "tools/verify").read_text().split("<<'COMPANION_ENTRY_CONTRACT'\n", 1)[1].split("\nCOMPANION_ENTRY_CONTRACT", 1)[0]
 PERMISSION = "at.bernhardberger.tvhplayer.debug.permission.APPLIANCE_ENTRY"
 TREE = f'''  E: manifest (line=2)
     E: permission (line=13)
@@ -22,6 +23,17 @@ TREE = f'''  E: manifest (line=2)
 
 
 class VerifyManifestTest(unittest.TestCase):
+    def test_companion_requests_player_entry_permission(self):
+        tree = f'  E: uses-permission (line=3)\n    A: android:name(0x01010003)="{PERMISSION}"\n'
+        result = subprocess.run([sys.executable, "-c", COMPANION_CONTRACT, tree], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_companion_permission_on_another_element_or_wrong_package_fails(self):
+        for element, permission in (("permission", PERMISSION), ("uses-permission", "other.permission")):
+            tree = f'  E: {element} (line=3)\n    A: android:name(0x01010003)="{permission}"\n'
+            result = subprocess.run([sys.executable, "-c", COMPANION_CONTRACT, tree], capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+
     def check_contract(self, tree):
         return subprocess.run([sys.executable, "-c", CONTRACT, tree], capture_output=True, text=True)
 

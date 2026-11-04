@@ -218,8 +218,6 @@
     <string name="appliance_service_enabled">خدمة دخول الجهاز المخصّص: مفعّلة</string>
     <string name="appliance_service_disabled">خدمة دخول الجهاز المخصّص: متوقفة</string>
     <string name="open_accessibility_settings">فتح إعدادات تسهيل الاستخدام</string>
-    <string name="appliance_accessibility_service_label">دخول Tvheadend Player للجهاز المخصّص</string>
-    <string name="appliance_accessibility_service_description">يفتح Tvheadend Player عند البدء والاستيقاظ، ويربط زر TV/GUIDE فقط. لا يمكنه قراءة محتوى الشاشة.</string>
     <string name="appliance_starting_tv">جارٍ بدء التشغيل</string>
     <string name="appliance_back_for_menu">يتيح زر Back الوصول إلى القنوات والإعدادات.</string>
     <string name="main_startup_message_preparing">جارٍ تجهيز التطبيق</string>

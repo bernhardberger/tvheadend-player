@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="appliance_accessibility_service_label">Inicio del modo televisor de Tvheadend Player</string>
+    <string name="appliance_accessibility_service_description">Abre Tvheadend Player al encender y reactivar el televisor, y reasigna solo el botón TV/GUIDE. No puede leer el contenido de la pantalla.</string>
+</resources>

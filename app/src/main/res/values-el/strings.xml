@@ -218,8 +218,6 @@
     <string name="appliance_service_enabled">Υπηρεσία εκκίνησης λειτουργίας συσκευής TV: ενεργή</string>
     <string name="appliance_service_disabled">Υπηρεσία εκκίνησης λειτουργίας συσκευής TV: ανενεργή</string>
     <string name="open_accessibility_settings">Άνοιγμα ρυθμίσεων προσβασιμότητας</string>
-    <string name="appliance_accessibility_service_label">Εκκίνηση Tvheadend Player ως συσκευής TV</string>
-    <string name="appliance_accessibility_service_description">Ανοίγει το Tvheadend Player κατά την εκκίνηση και την αφύπνιση και αντιστοιχίζει μόνο το κουμπί TV/GUIDE. Δεν μπορεί να διαβάσει το περιεχόμενο της οθόνης.</string>
     <string name="appliance_starting_tv">Έναρξη αναπαραγωγής</string>
     <string name="appliance_back_for_menu">Πάτησε Back για κανάλια και ρυθμίσεις.</string>
     <string name="main_startup_message_preparing">Προετοιμασία εφαρμογής</string>

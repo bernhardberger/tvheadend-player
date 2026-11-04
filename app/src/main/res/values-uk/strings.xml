@@ -218,8 +218,6 @@
     <string name="appliance_service_enabled">Служба запуску режиму ТВ-приставки: увімкнена</string>
     <string name="appliance_service_disabled">Служба запуску режиму ТВ-приставки: вимкнена</string>
     <string name="open_accessibility_settings">Відкрити налаштування спеціальних можливостей</string>
-    <string name="appliance_accessibility_service_label">Запуск Tvheadend Player у режимі ТВ-приставки</string>
-    <string name="appliance_accessibility_service_description">Відкриває Tvheadend Player під час запуску й пробудження та перепризначає лише кнопку TV/GUIDE. Не може читати вміст екрана.</string>
     <string name="appliance_starting_tv">Запуск відтворення</string>
     <string name="appliance_back_for_menu">Натисніть Back для переходу до каналів і налаштувань.</string>
     <string name="main_startup_message_preparing">Підготовка застосунку</string>

@@ -218,8 +218,6 @@
     <string name="appliance_service_enabled">Tv-startservice: ingeschakeld</string>
     <string name="appliance_service_disabled">Tv-startservice: uitgeschakeld</string>
     <string name="open_accessibility_settings">Toegankelijkheidsinstellingen openen</string>
-    <string name="appliance_accessibility_service_label">Tvheadend Player tv-startservice</string>
-    <string name="appliance_accessibility_service_description">Opent Tvheadend Player bij het opstarten en ontwaken, en wijst alleen de TV/GUIDE-knop toe. De service kan geen scherminhoud lezen.</string>
     <string name="appliance_starting_tv">Afspelen starten</string>
     <string name="appliance_back_for_menu">Druk op Back voor zenders en instellingen.</string>
     <string name="main_startup_message_preparing">App voorbereiden</string>

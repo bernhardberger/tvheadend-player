@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="appliance_accessibility_service_label">Tvheadend Player電視模式入口</string>
+    <string name="appliance_accessibility_service_description">在啟動及喚醒時開啟Tvheadend Player，且僅對應TV/GUIDE按鈕。無法讀取螢幕內容。</string>
+</resources>

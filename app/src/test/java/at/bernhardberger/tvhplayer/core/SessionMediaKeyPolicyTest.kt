@@ -19,11 +19,4 @@ class SessionMediaKeyPolicyTest {
             assertFalse(playbackSuppressesRevealingKey(null, key))
         }
     }
-
-    @Test fun applianceAccessibilityDoesNotClaimMediaKeys() {
-        for (key in listOf(KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PAUSE,
-            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_MEDIA_NEXT, KeyEvent.KEYCODE_MEDIA_PREVIOUS)) {
-            assertFalse(ApplianceEntryPolicy.isApplianceEntryKey(key, KeyEvent.KEYCODE_GUIDE))
-        }
-    }
 }

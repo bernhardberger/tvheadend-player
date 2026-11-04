@@ -218,8 +218,6 @@
     <string name="appliance_service_enabled">Service de lancement du mode téléviseur : activé</string>
     <string name="appliance_service_disabled">Service de lancement du mode téléviseur : désactivé</string>
     <string name="open_accessibility_settings">Ouvrir les paramètres d’accessibilité</string>
-    <string name="appliance_accessibility_service_label">Lancement du mode téléviseur Tvheadend Player</string>
-    <string name="appliance_accessibility_service_description">Ouvre Tvheadend Player au démarrage et au réveil, et réaffecte uniquement la touche TV/GUIDE. Ne peut pas lire le contenu de l’écran.</string>
     <string name="appliance_starting_tv">Démarrage de la lecture</string>
     <string name="appliance_back_for_menu">Appuie sur Back pour accéder aux chaînes et aux paramètres.</string>
     <string name="main_startup_message_preparing">Préparation de l’application</string>

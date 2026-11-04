@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en-US">
+    <string name="app_name" translatable="false">Tvheadend Player Appliance</string>
+    <!-- Initial screen translations follow with the setup screen in slice 3b. -->
+    <string name="player_installed" tools:ignore="MissingTranslation">Tvheadend Player %1$s installed</string>
+    <string name="player_not_installed" tools:ignore="MissingTranslation">Tvheadend Player is not installed</string>
+    <string name="open_player" tools:ignore="MissingTranslation">Open player</string>
+    <string name="android_settings" tools:ignore="MissingTranslation">Android settings</string>
+    <string name="google_tv_home" tools:ignore="MissingTranslation">Google TV home</string>
+    <string name="appliance_accessibility_service_label">Tvheadend Player appliance entry</string>
+    <string name="appliance_accessibility_service_description">Opens Tvheadend Player at startup and wake, and maps only the TV/GUIDE button. It cannot read screen content.</string>
+</resources>

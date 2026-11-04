@@ -218,8 +218,6 @@
     <string name="appliance_service_enabled">Usluga pokretanja TV prijamnika: uključena</string>
     <string name="appliance_service_disabled">Usluga pokretanja TV prijamnika: isključena</string>
     <string name="open_accessibility_settings">Otvori postavke pristupačnosti</string>
-    <string name="appliance_accessibility_service_label">Pokretanje Tvheadend Playera kao TV prijamnika</string>
-    <string name="appliance_accessibility_service_description">Otvara Tvheadend Player pri pokretanju i buđenju te preslikava samo tipku TV/GUIDE. Ne može čitati sadržaj zaslona.</string>
     <string name="appliance_starting_tv">Pokretanje reprodukcije</string>
     <string name="appliance_back_for_menu">Pritisni Natrag za kanale i postavke.</string>
     <string name="main_startup_message_preparing">Priprema aplikacije</string>

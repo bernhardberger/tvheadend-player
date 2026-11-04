@@ -225,8 +225,6 @@
     <string name="appliance_service_enabled">TV-Startdienst: aktiviert</string>
     <string name="appliance_service_disabled">TV-Startdienst: deaktiviert</string>
     <string name="open_accessibility_settings">Bedienungshilfen öffnen</string>
-    <string name="appliance_accessibility_service_label">Tvheadend Player-Start</string>
-    <string name="appliance_accessibility_service_description">Öffnet Tvheadend Player nach dem Starten und Aufwecken und belegt ausschließlich die TV-/GUIDE-Taste. Der Dienst kann keine Bildschirminhalte lesen.</string>
     <string name="appliance_starting_tv">Wiedergabe wird gestartet</string>
     <string name="appliance_back_for_menu">Zurück öffnet Sender und Einstellungen.</string>
 

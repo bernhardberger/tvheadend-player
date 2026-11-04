@@ -218,8 +218,6 @@
     <string name="appliance_service_enabled">Serviciu de pornire în modul aparat TV: activat</string>
     <string name="appliance_service_disabled">Serviciu de pornire în modul aparat TV: dezactivat</string>
     <string name="open_accessibility_settings">Deschide setările de accesibilitate</string>
-    <string name="appliance_accessibility_service_label">Pornire Tvheadend Player în modul aparat TV</string>
-    <string name="appliance_accessibility_service_description">Deschide Tvheadend Player la pornire și trezire și atribuie o funcție numai butonului TV/GUIDE. Nu poate citi conținutul ecranului.</string>
     <string name="appliance_starting_tv">Se pornește redarea</string>
     <string name="appliance_back_for_menu">Apasă Back pentru canale și setări.</string>
     <string name="main_startup_message_preparing">Se pregătește aplicația</string>

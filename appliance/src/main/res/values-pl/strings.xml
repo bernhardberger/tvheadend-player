@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="appliance_accessibility_service_label">Uruchamianie Tvheadend Player jako odbiornika TV</string>
+    <string name="appliance_accessibility_service_description">Otwiera Tvheadend Player po uruchomieniu i wybudzeniu oraz przypisuje tylko przycisk TV/GUIDE. Nie może odczytywać zawartości ekranu.</string>
+</resources>

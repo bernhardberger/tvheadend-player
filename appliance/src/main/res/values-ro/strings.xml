@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="appliance_accessibility_service_label">Pornire Tvheadend Player în modul aparat TV</string>
+    <string name="appliance_accessibility_service_description">Deschide Tvheadend Player la pornire și trezire și atribuie o funcție numai butonului TV/GUIDE. Nu poate citi conținutul ecranului.</string>
+</resources>

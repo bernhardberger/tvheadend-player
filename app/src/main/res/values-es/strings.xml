@@ -218,8 +218,6 @@
     <string name="appliance_service_enabled">Servicio de inicio del modo televisor: activado</string>
     <string name="appliance_service_disabled">Servicio de inicio del modo televisor: desactivado</string>
     <string name="open_accessibility_settings">Abrir ajustes de accesibilidad</string>
-    <string name="appliance_accessibility_service_label">Inicio del modo televisor de Tvheadend Player</string>
-    <string name="appliance_accessibility_service_description">Abre Tvheadend Player al encender y reactivar el televisor, y reasigna solo el botón TV/GUIDE. No puede leer el contenido de la pantalla.</string>
     <string name="appliance_starting_tv">Iniciando reproducción</string>
     <string name="appliance_back_for_menu">Pulsa Back para ver los canales y los ajustes.</string>
     <string name="main_startup_message_preparing">Preparando la aplicación</string>

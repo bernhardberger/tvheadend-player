@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="appliance_accessibility_service_label">Tvheadend Playerin TV-käynnistys</string>
+    <string name="appliance_accessibility_service_description">Avaa Tvheadend Playerin käynnistyksen ja heräämisen yhteydessä sekä määrittää vain TV/GUIDE-painikkeen toiminnan uudelleen. Se ei voi lukea näytön sisältöä.</string>
+</resources>

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="appliance_accessibility_service_label">Spouštění Tvheadend Player jako TV přijímače</string>
+    <string name="appliance_accessibility_service_description">Otevře Tvheadend Player při zapnutí a probuzení a přemapuje pouze tlačítko TV/GUIDE. Nemůže číst obsah obrazovky.</string>
+</resources>

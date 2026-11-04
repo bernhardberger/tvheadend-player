@@ -96,8 +96,8 @@ def find_static_rule_violations(root: Path) -> list[str]:
     violations = []
     source_root = root / "app/src/main"
     # Production sources of the UI-free :client library carry the same no-probe contract.
-    # Shared brand sources retain the UI rules after moving out of :app.
-    production_roots = (source_root, root / "client/src/main", root / "brand/src/main")
+    # Shared brand and companion sources retain the UI rules outside :app.
+    production_roots = (source_root, root / "client/src/main", root / "brand/src/main", root / "appliance/src/main")
     kotlin_paths = [path for production_root in production_roots
                     for path in sorted(production_root.rglob("*.kt"))]
     for path in kotlin_paths:
@@ -153,7 +153,8 @@ def find_static_rule_violations(root: Path) -> list[str]:
         # Recent-row expansion is a local disclosure, not movement between pages.
         slide_owners = {ui + "BrowseMotionPolicy.kt", ui + "player/PlayerTopIdentity.kt"}
         brand_ui = "brand/src/main/java/at/bernhardberger/tvhplayer/ui/"
-        if relative_path.startswith((ui, brand_ui)) and relative_path not in slide_owners:
+        appliance_ui = "appliance/src/main/java/"
+        if relative_path.startswith((ui, brand_ui, appliance_ui)) and relative_path not in slide_owners:
             for match in re.finditer(r"\bslide(?:In|Out)(?:Vertically|Horizontally)\b", code):
                 violations.append(
                     f"SharedPageMotion: {relative_path}:"

@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="appliance_accessibility_service_description">Öffnet Tvheadend Player nach dem Starten und Aufwecken und belegt ausschliesslich die TV-/GUIDE-Taste. Der Dienst kann keine Bildschirminhalte lesen.</string>
+</resources>

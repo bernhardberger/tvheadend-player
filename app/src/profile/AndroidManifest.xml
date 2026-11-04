@@ -5,7 +5,6 @@
     <application android:name="android.app.Application" tools:replace="android:name">
         <profileable android:shell="true" />
         <activity android:name=".ui.MainActivity" tools:node="remove" />
-        <service android:name=".accessibility.ApplianceEntryAccessibilityService" tools:node="remove" />
         <activity android:name=".profiling.RailProfileActivity"
             android:exported="true" />
         <activity android:name=".profiling.JourneyProfileActivity"

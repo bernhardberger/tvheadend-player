@@ -7,8 +7,8 @@ cd "$ROOT_DIR"
 # --staged-sdk builds against the SDK checkout staged in ../tvheadend-sdk/build/local-maven so an
 # SDK fix can be tested before it is published. Such a run cannot prove public SDK consumption, so
 # it drops only SDK provenance and reports a weaker conclusion. It never gates a release.
-# --release adds the Appliance build: its lint, debug APK and manifest contract. Routine
-# verification covers Play only, since Appliance compiles and lints the same sources again.
+# Routine verification covers both independent applications and their manifest contracts.
+# --release also builds the unsigned, minified companion release APK.
 staged_sdk=false
 capture_tests=exclude
 release_checks=false
@@ -37,9 +37,9 @@ if [[ "${TVHPLAYER_VERIFY_ISOLATED:-}" == 1 ]]; then
     gradle_arguments+=(--no-daemon --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process)
 fi
 provenance_tasks=(:app:verifyExternalSdkConsumption)
-appliance_tasks=()
+appliance_tasks=(:appliance:lintDebug :appliance:assembleDebug)
 if [[ "$release_checks" == true ]]; then
-    appliance_tasks=(:app:lintApplianceDebug :app:assembleApplianceDebug)
+    appliance_tasks+=(:appliance:assembleRelease)
 fi
 if [[ "$staged_sdk" == true ]]; then
     gradle_arguments+=(-Ptvheadend.sdk.local=true)
@@ -89,7 +89,7 @@ gradle_common=("${gradle_arguments[@]}" "-Ptvhplayer.captureTests=$capture_tests
     :app:compilePlayDebugUnitTestSources :app:compilePlayDebugAndroidTestKotlin \
     "${gradle_common[@]}"
 ./gradlew \
-    :client:testDebugUnitTest :decoder-ffmpeg:testDebugUnitTest :app:testPlayDebugUnitTest \
+    :client:testDebugUnitTest :decoder-ffmpeg:testDebugUnitTest :app:testPlayDebugUnitTest :appliance:testDebugUnitTest \
     "${gradle_common[@]}"
 ./gradlew \
     :client:lintDebug :brand:lintDebug :decoder-ffmpeg:lintDebug :app:lintPlayDebug :app:assemblePlayDebug \
@@ -104,12 +104,12 @@ else
 fi
 
 apk="app/build/outputs/apk/play/debug/app-play-debug.apk"
-appliance_apk="app/build/outputs/apk/appliance/debug/app-appliance-debug.apk"
+appliance_apk="appliance/build/outputs/apk/debug/appliance-debug.apk"
 if [[ ! -f "$apk" ]]; then
     printf 'error: expected APK was not produced: %s\n' "$apk" >&2
     exit 1
 fi
-if [[ "$release_checks" == true && ! -f "$appliance_apk" ]]; then
+if [[ ! -f "$appliance_apk" ]]; then
     printf 'error: expected Appliance APK was not produced: %s\n' "$appliance_apk" >&2
     exit 1
 fi
@@ -154,7 +154,8 @@ if ! "$zipalign" -c -P 16 4 "$apk"; then
     printf 'error: APK native libraries are not 16 KB zip-aligned\n' >&2
     exit 1
 fi
-if [[ "$release_checks" == true ]] && ! "$zipalign" -c -P 16 4 "$appliance_apk"; then
+# Compose brings AndroidX graphics path native libraries even without playback dependencies.
+if ! "$zipalign" -c -P 16 4 "$appliance_apk"; then
     printf 'error: Appliance APK native libraries are not 16 KB zip-aligned\n' >&2
     exit 1
 fi
@@ -210,7 +211,7 @@ for expected in "${required_badging[@]}"; do
     fi
 done
 
-if [[ "$release_checks" == true ]]; then
+{
     manifest_tree="$($aapt dump xmltree "$appliance_apk" AndroidManifest.xml)"
     appliance_badging="$($aapt dump badging "$appliance_apk")"
     accessibility_tree="$($aapt dump xmltree "$appliance_apk" res/xml/appliance_entry_accessibility_service.xml)"
@@ -220,6 +221,18 @@ if [[ "$release_checks" == true ]]; then
         printf 'error: Appliance manifest contract failed\n' >&2
         exit 1
     fi
+
+    python3 - "$manifest_tree" <<'COMPANION_ENTRY_CONTRACT'
+import re
+import sys
+
+tree = sys.argv[1]
+permission = 'at.bernhardberger.tvhplayer.debug.permission.APPLIANCE_ENTRY'
+blocks = re.findall(r'(?m)^\s*E: uses-permission(?: \(line=\d+\))?\s*\n((?:\s*A:.*\n?)*)', tree)
+if not any(re.search(r'android:name\([^)]*\)="' + re.escape(permission) + r'"(?:\s|$)', block)
+           for block in blocks):
+    sys.exit('error: Companion must request the player signature entry permission')
+COMPANION_ENTRY_CONTRACT
 
     required_home_entries=(
         'android.intent.category.HOME'
@@ -259,7 +272,7 @@ if [[ "$release_checks" == true ]]; then
         printf 'error: accessibility service must not subscribe to window or content events\n' >&2
         exit 1
     fi
-fi
+}
 
 printf '==> APK identity\n'
 printf '%s\n' "$badging" | while IFS= read -r line; do

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="appliance_accessibility_service_label">Lancement du mode téléviseur Tvheadend Player</string>
+    <string name="appliance_accessibility_service_description">Ouvre Tvheadend Player au démarrage et au réveil, et réaffecte uniquement la touche TV/GUIDE. Ne peut pas lire le contenu de l’écran.</string>
+</resources>

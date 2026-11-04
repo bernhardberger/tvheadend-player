@@ -218,8 +218,6 @@
     <string name="appliance_service_enabled">שירות כניסה למכשיר ייעודי: פעיל</string>
     <string name="appliance_service_disabled">שירות כניסה למכשיר ייעודי: כבוי</string>
     <string name="open_accessibility_settings">פתיחת הגדרות הנגישות</string>
-    <string name="appliance_accessibility_service_label">כניסה למכשיר ייעודי של Tvheadend Player</string>
-    <string name="appliance_accessibility_service_description">פותח את Tvheadend Player בהפעלה ובהתעוררות, וממפה רק את כפתור TV/GUIDE. אינו יכול לקרוא תוכן מסך.</string>
     <string name="appliance_starting_tv">הניגון מתחיל</string>
     <string name="appliance_back_for_menu">לחיצה על Back מציגה ערוצים והגדרות.</string>
     <string name="main_startup_message_preparing">האפליקציה בהכנה</string>

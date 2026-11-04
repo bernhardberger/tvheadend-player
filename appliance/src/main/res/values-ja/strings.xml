@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="appliance_accessibility_service_label">Tvheadend Player専用機起動</string>
+    <string name="appliance_accessibility_service_description">起動時と復帰時にTvheadend Playerを開き、TV/GUIDEボタンのみを割り当てます。画面の内容を読み取ることはできません。</string>
+</resources>

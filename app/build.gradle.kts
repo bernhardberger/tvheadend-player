@@ -108,10 +108,6 @@ android {
         create("play") {
             dimension = "distribution"
         }
-        create("appliance") {
-            dimension = "distribution"
-            applicationIdSuffix = ".appliance"
-        }
     }
 
     buildTypes {
@@ -251,14 +247,10 @@ androidComponents.onVariants { variant ->
 }
 
 androidComponents.beforeVariants { variant ->
-    // Generate only Play release. Both shipping flavors consume the merged main profile.
+    // Generate only Play release, consuming the merged main profile.
     if (variant.buildType?.startsWith("nonMinified") == true ||
         variant.buildType?.startsWith("benchmark") == true) {
         variant.enable = variant.name == "playNonMinifiedRelease"
-    }
-    if (variant.productFlavors.any { it == "distribution" to "appliance" } &&
-        variant.buildType in setOf("profile", "profileServer")) {
-        variant.enable = false
     }
 }
 
@@ -374,11 +366,13 @@ tasks.register("verifyExternalSdkConsumption") {
         .getOrElse(false)
     evaluationDependsOn(":client")
     evaluationDependsOn(":brand")
+    evaluationDependsOn(":appliance")
     evaluationDependsOn(":decoder-ffmpeg")
-    val productionVariants = listOf("playDebug", "playRelease", "playProfile", "playProfileServer", "applianceDebug", "applianceRelease")
+    val productionVariants = listOf("playDebug", "playRelease", "playProfile", "playProfileServer")
         .map { ":app:$it" } +
         listOf("debug", "release", "profile", "profileServer").map { ":client:$it" } +
         listOf("debug", "release", "profile", "profileServer").map { ":brand:$it" } +
+        listOf(":appliance:debug", ":appliance:release") +
         listOf(":decoder-ffmpeg:debug", ":decoder-ffmpeg:release")
     val productionClasspaths = productionVariants.flatMap { variant ->
         val owner = project(variant.substringBeforeLast(":"))
@@ -401,6 +395,7 @@ tasks.register("verifyExternalSdkConsumption") {
     // Only app-owned modules are allowed; SDK projects and file fallbacks stay forbidden.
     val clientProjectPath = ":client"
     val brandProjectPath = ":brand"
+    val applianceProjectPath = ":appliance"
     val decoderProjectPath = ":decoder-ffmpeg"
     val forbiddenLocalDependencies = productionClasspaths.flatMap { (classpathName, classpath) ->
         classpath.hierarchy.flatMap { configuration ->
@@ -409,7 +404,7 @@ tasks.register("verifyExternalSdkConsumption") {
                     is ProjectDependency -> "$classpathName:${configuration.name}:project:${dependency.path}"
                         .takeIf {
                             !(classpathName.startsWith(":app:") && dependency.path == clientProjectPath) &&
-                                !(classpathName.startsWith(":app:") && dependency.path == brandProjectPath) &&
+                                !((classpathName.startsWith(":app:") || classpathName.startsWith(":appliance:")) && dependency.path == brandProjectPath) &&
                                 !(classpathName.startsWith(":app:") && dependency.path == decoderProjectPath)
                         }
                     is FileCollectionDependency -> dependency.files.files
@@ -446,7 +441,7 @@ tasks.register("verifyExternalSdkConsumption") {
                             "project=${id.displayName}".takeIf {
                                 id.projectPath != appProjectPath && id.projectPath != clientProjectPath &&
                                     id.projectPath != variant.substringBeforeLast(":") &&
-                                    !(variant.startsWith(":app:") && id.projectPath == brandProjectPath) &&
+                                    !((variant.startsWith(":app:") || variant.startsWith(":appliance:")) && id.projectPath == brandProjectPath) &&
                                     !(variant.startsWith(":app:") && id.projectPath == decoderProjectPath)
                             },
                         )
@@ -509,7 +504,7 @@ tasks.register("verifyExternalSdkConsumption") {
         }
         check(includedBuildNames.isEmpty()) { "The app must not use included builds: $includedBuildNames" }
         // :baselineprofile and :macrobenchmark are test-only modules; no shipping build depends on them.
-        check(projectPaths == setOf(":", ":app", clientProjectPath, brandProjectPath, decoderProjectPath, ":baselineprofile", ":macrobenchmark")) {
+        check(projectPaths == setOf(":", ":app", clientProjectPath, brandProjectPath, applianceProjectPath, decoderProjectPath, ":baselineprofile", ":macrobenchmark")) {
             "Unexpected Gradle projects: $projectPaths"
         }
 
@@ -547,7 +542,7 @@ tasks.register("verifyExternalSdkConsumption") {
                     val (module, version) = entry.removePrefix("tvheadend=").split(":", limit = 2)
                     module to version
                 }
-            val expectedModules = if (variant.startsWith(":decoder-ffmpeg:") || variant.startsWith(":brand:")) {
+            val expectedModules = if (variant.startsWith(":decoder-ffmpeg:") || variant.startsWith(":brand:") || variant.startsWith(":appliance:")) {
                 emptyMap()
             } else if (variant == ":app:playProfile") {
                 expectedTvheadendModules + ("sdk-testing" to sdkVersion)
@@ -564,8 +559,8 @@ tasks.register("verifyExternalSdkConsumption") {
                 "HTSP must remain runtime-only but $variant compile graph contains $compileTvheadendModules"
             }
 
-            // The shared theme has no playback stack; only its empty SDK graph is checked above.
-            if (variant.startsWith(":brand:")) return@forEach
+            // The shared theme and companion have no playback stack; check their empty SDK graphs.
+            if (variant.startsWith(":brand:") || variant.startsWith(":appliance:")) return@forEach
 
             val media3Versions = runtimeGraph.filter { it.startsWith("media3=") }
                 .map { it.removePrefix("media3=") }

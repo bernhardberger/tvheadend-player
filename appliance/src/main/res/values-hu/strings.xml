@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="appliance_accessibility_service_label">Tvheadend Player indítása TV-módban</string>
+    <string name="appliance_accessibility_service_description">Megnyitja a Tvheadend Playert indításkor és ébresztéskor, és csak a TV/GUIDE gombot rendeli át. Nem tudja olvasni a képernyő tartalmát.</string>
+</resources>

@@ -218,8 +218,6 @@
     <string name="appliance_service_enabled">TV başlatma hizmeti: etkin</string>
     <string name="appliance_service_disabled">TV başlatma hizmeti: devre dışı</string>
     <string name="open_accessibility_settings">Erişilebilirlik ayarlarını aç</string>
-    <string name="appliance_accessibility_service_label">Tvheadend Player TV başlatma</string>
-    <string name="appliance_accessibility_service_description">Başlangıçta ve uyanma sırasında Tvheadend Player uygulamasını açar ve yalnızca TV/GUIDE düğmesini yeniden atar. Ekran içeriğini okuyamaz.</string>
     <string name="appliance_starting_tv">Oynatma başlatılıyor</string>
     <string name="appliance_back_for_menu">Kanallar ve ayarlar için Back düğmesine basın.</string>
     <string name="main_startup_message_preparing">Uygulama hazırlanıyor</string>

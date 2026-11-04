@@ -137,6 +137,23 @@ class StaticRulesTest(unittest.TestCase):
                 self.assertTrue(any(f"{rule}: {path}:1" in violation
                                     for violation in find_static_rule_violations(self.root)))
 
+    def test_companion_retains_production_ui_rules(self):
+        path = "appliance/src/main/java/at/bernhardberger/tvhplayer/appliance/CompanionActivity.kt"
+        for source, rule in (
+            ("testConnection()", "NoConnectionProbe"),
+            ("SnackbarHost()", "TransientFeedback"),
+            ("TabRow()", "SharedTabs"),
+            ("slideInHorizontally(spec) { it }", "SharedPageMotion"),
+        ):
+            with self.subTest(rule=rule):
+                self.write(path, source)
+                self.assertTrue(any(f"{rule}: {path}:1" in violation
+                                    for violation in find_static_rule_violations(self.root)))
+        self.write("appliance/src/main/res/values/strings.xml",
+                   '<resources><string name="test_connection">Probe</string></resources>')
+        self.assertTrue(any("NoConnectionProbe: appliance/src/main/res/values/strings.xml" in violation
+                            for violation in find_static_rule_violations(self.root)))
+
     def write(self, relative_path: str, content: str):
         destination = self.root / relative_path
         destination.parent.mkdir(parents=True, exist_ok=True)

@@ -218,8 +218,6 @@
     <string name="appliance_service_enabled">Usługa uruchamiania odbiornika TV: włączona</string>
     <string name="appliance_service_disabled">Usługa uruchamiania odbiornika TV: wyłączona</string>
     <string name="open_accessibility_settings">Otwórz ustawienia ułatwień dostępu</string>
-    <string name="appliance_accessibility_service_label">Uruchamianie Tvheadend Player jako odbiornika TV</string>
-    <string name="appliance_accessibility_service_description">Otwiera Tvheadend Player po uruchomieniu i wybudzeniu oraz przypisuje tylko przycisk TV/GUIDE. Nie może odczytywać zawartości ekranu.</string>
     <string name="appliance_starting_tv">Rozpoczynanie odtwarzania</string>
     <string name="appliance_back_for_menu">Naciśnij Wstecz, aby otworzyć kanały i ustawienia.</string>
     <string name="main_startup_message_preparing">Przygotowywanie aplikacji</string>

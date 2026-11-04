@@ -218,8 +218,6 @@
     <string name="appliance_service_enabled">电视模式入口服务：已启用</string>
     <string name="appliance_service_disabled">电视模式入口服务：已停用</string>
     <string name="open_accessibility_settings">打开无障碍设置</string>
-    <string name="appliance_accessibility_service_label">Tvheadend Player电视模式入口</string>
-    <string name="appliance_accessibility_service_description">在启动和唤醒时打开Tvheadend Player，并且仅映射TV/GUIDE按钮。无法读取屏幕内容。</string>
     <string name="appliance_starting_tv">正在开始播放</string>
     <string name="appliance_back_for_menu">按Back键查看频道和设置。</string>
     <string name="main_startup_message_preparing">正在准备应用</string>

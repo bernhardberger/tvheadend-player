@@ -21,7 +21,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService
+import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.ui.SettingsSection
 import at.bernhardberger.tvhplayer.ui.components.ScrollReadingBox
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthLevel
@@ -79,11 +79,11 @@ private fun ApplianceDisclosure(modifier: Modifier) {
 }
 private fun isApplianceEntryServiceEnabled(context: Context): Boolean {
     val manager = context.getSystemService(AccessibilityManager::class.java)
-    val serviceClassName = ApplianceEntryAccessibilityService::class.java.name
+    val serviceClassName = "at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService"
     return manager
         .getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
         .any { info ->
-            info.resolveInfo.serviceInfo.packageName == context.packageName &&
+            info.resolveInfo.serviceInfo.packageName == BuildConfig.APPLIANCE_COMPANION_PACKAGE &&
                 info.resolveInfo.serviceInfo.name == serviceClassName
         }
 }
