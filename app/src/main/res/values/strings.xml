@@ -607,6 +607,12 @@
     <string name="recording_marker_previous">Previous marker</string>
     <string name="recording_marker_start">Beginning of recording</string>
     <string name="recording_marker_next">Next marker</string>
+    <string name="recording_mark_ad_break">Ad break</string>
+    <string name="recording_mark_ads_end">Ads end</string>
+    <string name="recording_mark_cut">Cut</string>
+    <string name="recording_mark_cut_ends">Cut ends</string>
+    <!-- The short badge marking an ad break on the recording's timeline. -->
+    <string name="recording_mark_ad_badge">Ad</string>
     <string name="pause">Pause</string>
     <string name="seek_back_30">−30 seconds</string>
     <string name="seek_forward_30">+30 seconds</string>

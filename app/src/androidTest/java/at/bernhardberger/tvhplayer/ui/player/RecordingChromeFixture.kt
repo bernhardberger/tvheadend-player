@@ -7,6 +7,9 @@ import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvhplayer.core.RecordingMark
+import at.bernhardberger.tvhplayer.core.RecordingMarkKind
+import at.bernhardberger.tvhplayer.core.RecordingMarkStop
 import at.bernhardberger.tvhplayer.core.playerStateCell
 import androidx.media3.common.C
 import kotlin.time.Instant
@@ -58,6 +61,7 @@ internal fun RecordingChromeFixture(
     restoreFocus: String? = null,
     info: PlayerInfoBarData? = null,
     picon: ArtworkId? = null,
+    /** The marks row's stops; each but the start is an unnamed chapter on the bar. */
     markers: List<Long> = emptyList(),
     markerNavigation: RecordingMarkerNavigation = remember { RecordingMarkerNavigation() },
     markerRevision: Long = 0L,
@@ -91,7 +95,8 @@ internal fun RecordingChromeFixture(
             targetMs = targetMs,
             originMs = originMs,
             stepSettled = stepSettled,
-            markers = markers,
+            marks = markers.filter { it > 0 }.map { RecordingMark(RecordingMarkKind.CHAPTER, it) },
+            markStops = markers.map { RecordingMarkStop(it, RecordingMark(RecordingMarkKind.CHAPTER, it).takeIf { _ -> it > 0 }) },
             markerRevision = markerRevision,
         ),
         actions = PlayerChromeActions(active = active, paused = paused, restoreFocus = restoreFocus),

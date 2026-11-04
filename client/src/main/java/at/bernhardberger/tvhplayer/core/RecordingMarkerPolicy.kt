@@ -54,16 +54,42 @@ fun recordingMarks(cutpoints: List<DvrCutpoint>, chapters: List<RecordingChapter
     return (merged + fileChapters + scenes).distinct().sortedWith(compareBy({ it.startMs }, { it.kind.ordinal }))
 }
 
-fun recordingMarkPositions(marks: List<RecordingMark>, verifiedDurationMs: Long): List<Long> {
-    if (verifiedDurationMs <= 0) return emptyList()
-    val positions = marks.flatMap { listOf(it.startMs, it.endMs) }
-        .filter { it > 0 && it < verifiedDurationMs }.distinct().sorted()
-    return if (positions.isEmpty()) emptyList() else listOf(0L) + positions
-}
+/**
+ * One stop of the marks row: the recording's start ([mark] null), a mark's start, or with [atEnd]
+ * the end of the ad break or cut [mark].
+ */
+data class RecordingMarkStop(val positionMs: Long, val mark: RecordingMark? = null, val atEnd: Boolean = false)
 
-/** Position-only callers derive navigation from the same typed policy. */
-fun recordingMarkerPositions(
-    cutpoints: List<DvrCutpoint>,
-    verifiedDurationMs: Long,
-    chapterStartsMs: List<Long> = emptyList(),
-): List<Long> = recordingMarkPositions(recordingMarks(cutpoints, chapterStartsMs.map { RecordingChapter(it) }), verifiedDurationMs)
+/** Which kind leads where marks meet or their symbols collide: ad break, cut, chapter. */
+val RecordingMarkKind.priority: Int
+    get() = when (this) {
+        RecordingMarkKind.AD_BREAK -> 0
+        RecordingMarkKind.CUT -> 1
+        RecordingMarkKind.CHAPTER -> 2
+    }
+
+/**
+ * The marks row's stops: the start, then every mark's start within [0, verifiedDurationMs) in order,
+ * and each ad break's and cut's end inside the duration, where one would skip to by hand; chapters
+ * are single points. A mark's end beyond a growing recording's duration does not hide its start.
+ * Marks that start together make one stop led by the higher-[priority] kind, a named one first; a mark
+ * starting where an interval ends takes that stop, and intervals ending together leave one end stop
+ * led by priority. Without a mark starting inside the duration there are no stops. These are the
+ * positions the marks row seeks.
+ */
+fun recordingMarkStops(marks: List<RecordingMark>, verifiedDurationMs: Long): List<RecordingMarkStop> {
+    val byPosition = marks.filter { it.startMs in 0 until verifiedDurationMs }
+        .groupBy { it.startMs }
+        .mapValues { (start, group) ->
+            RecordingMarkStop(start, group.minWith(compareBy<RecordingMark>({ it.kind.priority }, { it.name == null })))
+        }.toMutableMap()
+    marks.filter { it.kind != RecordingMarkKind.CHAPTER && it.startMs >= 0 && it.endMs in 1 until verifiedDurationMs }
+        .sortedBy { it.kind.priority }
+        .forEach { byPosition.putIfAbsent(it.endMs, RecordingMarkStop(it.endMs, it, atEnd = true)) }
+    val starts = byPosition.toSortedMap().values.toList()
+    return when {
+        starts.isEmpty() -> emptyList()
+        starts.first().positionMs == 0L -> starts
+        else -> listOf(RecordingMarkStop(0L)) + starts
+    }
+}

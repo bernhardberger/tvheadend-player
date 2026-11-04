@@ -16,7 +16,7 @@ import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvhplayer.core.RecordingChapter
 import at.bernhardberger.tvhplayer.core.RecordingMark
 import at.bernhardberger.tvhplayer.core.RecordingSkipPolicy
-import at.bernhardberger.tvhplayer.core.recordingMarkPositions
+import at.bernhardberger.tvhplayer.core.recordingMarkStops
 import at.bernhardberger.tvhplayer.core.recordingMarks
 import at.bernhardberger.tvhplayer.core.recordingMuted
 import at.bernhardberger.tvhplayer.notices.Notice
@@ -268,7 +268,7 @@ internal class RecordingMarkers(
                 mediaItem == null || player.currentMediaItem !== mediaItem) return@runIfOpen
             if (!player.isCurrentMediaItemSeekable ||
                 !player.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)) return@runIfOpen
-            if (positionMs in recordingMarkPositions(marks.value, player.duration)) {
+            if (recordingMarkStops(marks.value, player.duration).any { it.positionMs == positionMs }) {
                 // seekTo does not change playWhenReady: marker navigation preserves pause.
                 deliberateSeek(positionMs)
                 seekPlayer(positionMs)

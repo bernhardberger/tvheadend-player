@@ -3,6 +3,8 @@
 ## Unreleased
 
 - Recordings skip cuts and stay silent during mute spans marked in Tvheadend's .edl files.
+- The recording timeline shows ad breaks, cuts and chapters, with small symbols above the bar
+  while it is focused and each mark's name in the marks row.
 
 ## 0.4.6
 

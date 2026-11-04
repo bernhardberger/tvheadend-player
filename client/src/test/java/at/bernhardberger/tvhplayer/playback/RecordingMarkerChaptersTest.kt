@@ -5,6 +5,8 @@ package at.bernhardberger.tvhplayer.playback
 import androidx.media3.common.Format
 import androidx.media3.common.Label
 import at.bernhardberger.tvhplayer.core.RecordingChapter
+import at.bernhardberger.tvhplayer.core.RecordingMark
+import at.bernhardberger.tvhplayer.core.RecordingMarkKind
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
 import androidx.media3.common.MediaItem
@@ -597,6 +599,14 @@ class RecordingMarkerChaptersTest {
             assertTrue(seeks.isEmpty())
             markers.seekRecordingMarker(4_000L, revision)
             assertEquals(listOf(4_000L), seeks)
+
+            // A lone named chapter at the start is the marks row's only stop, and it can be sought.
+            tracks = Tracks(listOf(group("opening", Format.Builder()
+                .setMetadata(Metadata(chapter(0, name = "Opening"))).build())))
+            markers.onTracksChanged()
+            assertEquals(listOf(RecordingMark(RecordingMarkKind.CHAPTER, 0L, name = "Opening")), markers.marks.value)
+            markers.seekRecordingMarker(0L, markers.recordingMarkerRevision.value)
+            assertEquals(listOf(4_000L, 0L), seeks)
         } finally {
             markers.clearRecordingMarkersAndJoin()
         }

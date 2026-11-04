@@ -372,7 +372,7 @@ class PlayerFooterLayoutEvidenceTest {
     @Test fun pendingRecordingSeekCanOpenAndDismissMarkers() {
         var commits = 0
         show(behind = { true }, feedback = { null }, previewing = { true }, fontScale = 1.3f,
-            recording = true, markers = listOf(0L, 900_000L, 2_700_000L), onCommitSeek = { commits++ })
+            recording = true, marks = chapterMarks(900_000L, 2_700_000L), onCommitSeek = { commits++ })
         key(Key.DirectionUp)
         key(Key.DirectionUp)
         compose.onNodeWithTag("recording-marker-target").assertIsFocused()
@@ -394,7 +394,7 @@ class PlayerFooterLayoutEvidenceTest {
         val backdrop = mutableStateOf(Backdrop.WHITE)
         show(behind = { true }, feedback = { null }, previewing = { true }, fontScale = fontScale,
             recording = true, backdrop = { backdrop.value },
-            markers = listOf(0L, 900_000L, 2_700_000L, 3_599_999L),
+            marks = chapterMarks(900_000L, 2_700_000L, 3_599_999L),
             markerNavigation = navigation, markerRevision = 42L, onSeekMarker = seeks::add)
         key(Key.DirectionUp)
         key(Key.DirectionUp)
@@ -834,7 +834,7 @@ class PlayerFooterLayoutEvidenceTest {
         recording: Boolean = false,
         standalone: () -> Boolean = { false },
         onCommitSeek: () -> Unit = {},
-        markers: List<Long> = emptyList(),
+        marks: List<at.bernhardberger.tvhplayer.core.RecordingMark> = emptyList(),
         markerNavigation: RecordingMarkerNavigation = RecordingMarkerNavigation(),
         markerRevision: Long = 0L,
         onSeekMarker: (Long) -> Unit = {},
@@ -897,7 +897,7 @@ class PlayerFooterLayoutEvidenceTest {
                         } else if (recording) RecordingChromeFixture(
                             positionMs = 1_800_000, durationMs = recordingDurationMs, targetMs = 1_800_000L.takeIf { previewing() },
                             growing = growing(), paused = paused(), info = fixtureRecordingInfo(title, growing(), durationMs = recordingDurationMs),
-                            onCommitSeek = onCommitSeek, markers = markers,
+                            onCommitSeek = onCommitSeek, marks = marks,
                             markerNavigation = markerNavigation, markerRevision = markerRevision, onSeekMarker = onSeekMarker,
                         ) else ProvideArtworkSession(session) { PlayerChrome(
                             mode = PlayerChromeMode.CONTROLS,

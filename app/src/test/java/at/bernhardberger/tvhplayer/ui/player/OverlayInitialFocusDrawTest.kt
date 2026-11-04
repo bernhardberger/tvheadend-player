@@ -108,9 +108,10 @@ class OverlayInitialFocusDrawTest {
             Box(Modifier.padding(top = 200.dp).fillMaxWidth().height(8.dp)) {
                 RecordingMarkerOverlay(
                     navigation = navigation,
-                    markers = markers,
+                    stops = markers.map { at.bernhardberger.tvhplayer.core.RecordingMarkStop(it) },
                     onSeek = {},
                     displayDurationMs = 180_000L,
+                    hints = false,
                     modifier = Modifier.fillMaxSize(),
                 )
             }

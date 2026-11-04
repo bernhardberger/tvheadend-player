@@ -952,7 +952,7 @@ class PlayerChromeCaptureTest {
                          .copy(channelName = "Ridge Earth HD", channelNumber = "101"),
                     picon = LOGO,
                     artwork = programme.image,
-                    markers = listOf(0L, 900_000L, 2_700_000L).takeIf { scene == Scene.RECORDING_CONTROLS }.orEmpty(),
+                    marks = chapterMarks(900_000L, 2_700_000L).takeIf { scene == Scene.RECORDING_CONTROLS }.orEmpty(),
                     modifier = Modifier.align(Alignment.BottomCenter),
                 ) }
             }

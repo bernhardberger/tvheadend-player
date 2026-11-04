@@ -120,8 +120,7 @@ fun RecordingPlayerScreen(
     val videoPresentation by session.videoPresentation.collectAsStateWithLifecycle()
     val recordingSelection by session.recordingSelection.collectAsStateWithLifecycle()
     val recordingAdmission by session.recordingAdmission.collectAsStateWithLifecycle()
-    val cutpoints by session.recordingCutpoints.collectAsStateWithLifecycle()
-    val chapterStartsMs by session.recordingChapterStartsMs.collectAsStateWithLifecycle()
+    val recordingMarks by session.recordingMarks.collectAsStateWithLifecycle()
     val markerRevision by session.recordingMarkerRevision.collectAsStateWithLifecycle()
     val observation by tvheadendSession.observation.collectAsStateWithLifecycle()
     val currentSession = observation.currentSession
@@ -185,11 +184,12 @@ fun RecordingPlayerScreen(
     val positionMs = timelineState.positionMs
     val durationMs = timelineState.durationMs
     val displayDurationMs = timelineState.displayDurationMs
-    val markers = remember(cutpoints, chapterStartsMs, durationMs, timelineState.canSeek, retainedSelection, currentSession) {
-        if (timelineState.canSeek && retainedSelection != null && retainedSelection.currentSession === currentSession) {
-            at.bernhardberger.tvhplayer.core.recordingMarkerPositions(cutpoints, durationMs, chapterStartsMs)
-        } else emptyList()
-    }
+    // The marks of the recording this screen plays, while it can be sought by them.
+    val marks = recordingMarks.takeIf {
+        timelineState.canSeek && retainedSelection != null && retainedSelection.currentSession === currentSession
+    }.orEmpty()
+    val markStops = remember(marks, durationMs) { at.bernhardberger.tvhplayer.core.recordingMarkStops(marks, durationMs) }
+    val markers = remember(markStops) { markStops.map { it.positionMs } }
     val markerNavigation = remember { RecordingMarkerNavigation() }
     LaunchedEffect(markerRevision, recordingId, currentSession) { markerNavigation.dismiss() }
     fun seekMarker(targetMs: Long) {
@@ -557,6 +557,7 @@ fun RecordingPlayerScreen(
                     picon = channel?.icon,
                     artwork = entry.image ?: entry.fanartImage,
                     channelId = entry.channelId,
+                    withoutChannel = channel == null,
                 ),
                 timeline = PlayerChromeTimeline.Recording(
                     positionMs = timelineState.playbackPositionMs,
@@ -568,7 +569,8 @@ fun RecordingPlayerScreen(
                     originMs = timelineState.pendingOriginMs,
                     stepSettled = timelineState.seekDispatched,
                     stepId = timelineState.stepId,
-                    markers = markers,
+                    marks = marks,
+                    markStops = markStops,
                     markerRevision = markerRevision,
                     motionKey = recordingId,
                 ),

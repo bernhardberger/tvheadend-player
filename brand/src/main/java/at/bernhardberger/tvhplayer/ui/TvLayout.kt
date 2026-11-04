@@ -152,4 +152,3 @@ const val TvOverlayTextSecondaryAlpha = TvTextSecondaryAlpha
 const val TvOverlayTextTertiaryAlpha = TvTextTertiaryAlpha
 const val TvOverlayTrackAlpha = TvTrackAlpha
 const val TvOverlayGhostFillAlpha = TvGhostFillAlpha
-const val TvOverlayTimelineTickAlpha = TvTextTertiaryAlpha

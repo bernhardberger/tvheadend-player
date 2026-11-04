@@ -10,7 +10,10 @@ import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvhplayer.core.RecordingMark
+import at.bernhardberger.tvhplayer.core.RecordingMarkKind
 import at.bernhardberger.tvhplayer.core.playerStateCell
+import at.bernhardberger.tvhplayer.core.recordingMarkStops
 import kotlin.time.Instant
 
 /** A finished recording's info bar data, as the recording screen derives it from its entry. */
@@ -43,6 +46,10 @@ internal fun fixtureRecordingInfo(
         growing = growing,
     )
 
+/** Unnamed chapters at [startsMs]: the marks row's stops are the start and these. */
+internal fun chapterMarks(vararg startsMs: Long): List<RecordingMark> =
+    startsMs.filter { it > 0 }.map { RecordingMark(RecordingMarkKind.CHAPTER, it) }
+
 /** The production chrome over a recording, composed as the recording screen composes it. */
 @Composable
 internal fun RecordingChromeFixture(
@@ -64,7 +71,8 @@ internal fun RecordingChromeFixture(
     info: PlayerInfoBarData? = null,
     picon: ArtworkId? = null,
     artwork: ArtworkId? = null,
-    markers: List<Long> = emptyList(),
+    marks: List<RecordingMark> = emptyList(),
+    withoutChannel: Boolean = false,
     markerNavigation: RecordingMarkerNavigation = remember { RecordingMarkerNavigation() },
     markerRevision: Long = 0L,
     onSeekMarker: (Long) -> Unit = {},
@@ -88,6 +96,7 @@ internal fun RecordingChromeFixture(
             recordingNow = growing,
             picon = picon?.let { ChannelIcon.ImageCache(it) },
             artwork = artwork,
+            withoutChannel = withoutChannel,
         ),
         timeline = PlayerChromeTimeline.Recording(
             positionMs = positionMs,
@@ -98,7 +107,8 @@ internal fun RecordingChromeFixture(
             originMs = originMs,
             stepSettled = stepSettled,
             stepId = stepId,
-            markers = markers,
+            marks = marks,
+            markStops = durationMs?.let { recordingMarkStops(marks, it) }.orEmpty(),
             markerRevision = markerRevision,
         ),
         actions = PlayerChromeActions(active = active, paused = paused, restoreFocus = restoreFocus),

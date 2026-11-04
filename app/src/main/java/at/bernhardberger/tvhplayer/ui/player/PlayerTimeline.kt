@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.res.painterResource
 import androidx.tv.material3.Icon
-import at.bernhardberger.tvhplayer.ui.TvOverlayTimelineTickAlpha
 import at.bernhardberger.tvhplayer.ui.TvOverlayBoxAlpha
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.StepDirection
@@ -221,7 +220,8 @@ fun PlayerTimelineBar(
     programmeTargetAvailable: Boolean? = null,
     fillColor: Color = MaterialTheme.colorScheme.tertiary,
     showTrack: Boolean = true,
-    markerFractions: List<Float> = emptyList(),
+    /** A recording's marks on the bar; see [TimelineMarkLayer]. */
+    marks: TimelineMarks? = null,
     motionKey: Any? = null,
 ) {
     val currentProgress = progress?.coerceIn(0f, 1f)
@@ -310,10 +310,7 @@ fun PlayerTimelineBar(
                         .background(fillColor))
                 }
             }
-            markerFractions.filter { it > 0f && it < 1f }.forEach { fraction ->
-                Box(Modifier.offset(x = maxWidth * fraction - 0.5.dp).width(1.dp).height(barHeight)
-                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = TvOverlayTimelineTickAlpha)).testTag("recording-marker-tick"))
-            }
+            marks?.let { TimelineMarkLayer(it, { animatedProgress.value }, fillColor, Modifier.matchParentSize()) }
             rewindableStartFraction?.takeIf { !programmeWindow && it > 0f && it < 1f }?.let { fraction ->
                 val start = fraction.coerceIn(0f, 1f)
                 if (rewindableStartOverflow) {
@@ -448,7 +445,8 @@ fun PlayerTimelineBlock(
     /** Whose label widths the bar row keeps. */
     kind: TimelineKind = TimelineKind.LIVE,
     collapsed: Boolean = false,
-    markerFractions: List<Float> = emptyList(),
+    /** A recording's marks on the bar; see [TimelineMarkLayer]. */
+    marks: TimelineMarks? = null,
     trackOverlay: (@Composable BoxScope.() -> Unit)? = null,
     /**
      * Identity of what the bar measures, such as the playing channel and programme. A
@@ -494,7 +492,7 @@ fun PlayerTimelineBlock(
                 progressSemantics = progressSemantics,
                 fillColor = fillColor,
                 showTrack = showTrack,
-                markerFractions = markerFractions,
+                marks = marks,
                 motionKey = motionKey to programmeWindow?.let { Triple(it.event?.id, it.start, it.stop) },
             )
             trackOverlay?.invoke(this)
