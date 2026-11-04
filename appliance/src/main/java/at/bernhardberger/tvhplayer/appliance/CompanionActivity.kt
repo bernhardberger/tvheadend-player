@@ -3,9 +3,13 @@ package at.bernhardberger.tvhplayer.appliance
 import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.os.PowerManager
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
@@ -36,10 +40,22 @@ import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.TvFullScreenPadding
 import at.bernhardberger.tvhplayer.ui.TvSpacing24
+import at.bernhardberger.tvhplayer.appliance.update.CompanionUpdater
+import at.bernhardberger.tvhplayer.appliance.update.CompanionUpdateRows
+import at.bernhardberger.tvhplayer.appliance.update.UpdateScreenState
+import at.bernhardberger.tvhplayer.appliance.update.UpdateResult
+import at.bernhardberger.tvhplayer.appliance.update.UpdateStore
 
 class CompanionActivity : ComponentActivity() {
     private var playerVersion by mutableStateOf<String?>(null)
     private var systemHome by mutableStateOf<ComponentName?>(null)
+    private val updates by lazy { UpdateStore(this) }
+    private var updateState by mutableStateOf(UpdateScreenState())
+    private var manualUpdateRequested = false
+    private var foreground = false
+    private val updateListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+        Handler(Looper.getMainLooper()).post { refreshUpdates() }
+    }
     private val homeBack = object : OnBackPressedCallback(false) {
         override fun handleOnBackPressed() = Unit
     }
@@ -47,12 +63,18 @@ class CompanionActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         onBackPressedDispatcher.addCallback(this, homeBack)
+        updates.reconcileInstalledVersion()
+        updates.preferences.registerOnSharedPreferenceChangeListener(updateListener)
+        refreshUpdates()
         refreshStatus()
         setContent {
             TVHeadendPlayerTheme {
                 CompanionScreen(
                     playerVersion = playerVersion,
                     hasSystemHome = systemHome != null,
+                    updateState = updateState,
+                    onAutomaticUpdates = { updates.setAutomatic(!updates.automatic) },
+                    onUpdateNow = ::updateNow,
                     modifier = Modifier
                         .fillMaxSize()
                         .background(MaterialTheme.colorScheme.background)
@@ -79,10 +101,54 @@ class CompanionActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        foreground = true
+        CompanionUpdater.manualForeground = true
+        updates.reconcileInstalledVersion()
+        refreshUpdates()
         refreshStatus()
     }
 
+    override fun onPause() {
+        foreground = false
+        manualUpdateRequested = false
+        CompanionUpdater.manualForeground = false
+        super.onPause()
+    }
+
+    override fun onDestroy() {
+        updates.preferences.unregisterOnSharedPreferenceChangeListener(updateListener)
+        super.onDestroy()
+    }
+
+    private fun refreshUpdates() {
+        updateState = UpdateScreenState(updates.automatic, updates.latestVersion, updates.lastCheck,
+            updates.result, updates.installerMessage)
+        if (foreground && manualUpdateRequested && updates.result == UpdateResult.PENDING_CONFIRMATION) {
+            CompanionUpdater.takeConfirmation()?.let {
+                manualUpdateRequested = false
+                if (updates.markManualConfirmation()) openScreen(it)
+                else updates.setResult(UpdateResult.INSTALLER_FAILURE)
+            }
+        }
+    }
+
+    private fun updateNow() {
+        manualUpdateRequested = true
+        if (updates.result == UpdateResult.PENDING_CONFIRMATION) {
+            CompanionUpdater.takeConfirmation()?.let {
+                manualUpdateRequested = false
+                if (updates.markManualConfirmation()) openScreen(it)
+                else updates.setResult(UpdateResult.INSTALLER_FAILURE)
+                return
+            }
+        }
+        // If Android reclaimed a pending confirmation, a fresh session supplies a fresh confirmation intent.
+        CompanionUpdater.check(this, manual = true)
+    }
+
     private fun routeHome(intent: Intent, hasSavedState: Boolean) {
+        if (updates.consumeManualReturn()) return
+        if (!getSystemService(PowerManager::class.java).isInteractive) return
         if (shouldOpenPlayerForHome(intent.action == Intent.ACTION_MAIN,
                 intent.hasCategory(Intent.CATEGORY_HOME), hasSavedState)) openPlayer()
     }
@@ -133,10 +199,13 @@ class CompanionActivity : ComponentActivity() {
 private fun CompanionScreen(
     playerVersion: String?,
     hasSystemHome: Boolean,
+    updateState: UpdateScreenState,
     modifier: Modifier = Modifier,
     onOpenPlayer: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSystemHome: () -> Unit,
+    onAutomaticUpdates: () -> Unit,
+    onUpdateNow: () -> Unit,
 ) {
     val firstButton = remember { FocusRequester() }
     val playerInstalled = playerVersion != null
@@ -171,5 +240,6 @@ private fun CompanionScreen(
         if (hasSystemHome) {
             Button(onClick = onOpenSystemHome) { Text(stringResource(R.string.google_tv_home)) }
         }
+        CompanionUpdateRows(updateState, onAutomaticUpdates, onUpdateNow)
     }
 }

@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.SystemClock
+import android.os.PowerManager
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 import androidx.core.content.ContextCompat
@@ -16,13 +17,22 @@ import at.bernhardberger.tvhplayer.appliance.CompanionActivity
 import at.bernhardberger.tvhplayer.appliance.ApplianceEntryLaunchGate
 import at.bernhardberger.tvhplayer.appliance.ApplianceEntryPolicy
 import at.bernhardberger.tvhplayer.appliance.ApplianceKeyDecision
+import at.bernhardberger.tvhplayer.appliance.update.CompanionUpdateJob
+import at.bernhardberger.tvhplayer.appliance.update.UpdatePolicy
+import at.bernhardberger.tvhplayer.appliance.update.UpdateStore
 
 class ApplianceEntryAccessibilityService : AccessibilityService() {
     private val launchGate = ApplianceEntryLaunchGate(minimumIntervalMillis = 1_500)
     private var screenOnReceiverRegistered = false
     private val screenOnReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            if (intent.action == Intent.ACTION_SCREEN_ON) launchApp()
+            when (intent.action) {
+                Intent.ACTION_SCREEN_ON -> {
+                    CompanionUpdateJob.cancel(context)
+                    launchApp()
+                }
+                Intent.ACTION_SCREEN_OFF -> CompanionUpdateJob.schedule(context)
+            }
         }
     }
 
@@ -32,7 +42,10 @@ class ApplianceEntryAccessibilityService : AccessibilityService() {
             flags = flags or AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS
         }
         registerScreenOnReceiver()
-        launchApp()
+        val updates = UpdateStore(this)
+        updates.reconcileInstalledVersion()
+        if (UpdatePolicy.shouldLaunchOnConnect(getSystemService(PowerManager::class.java).isInteractive,
+                updates.consumeConnectSuppression())) launchApp()
     }
 
     override fun onKeyEvent(event: KeyEvent): Boolean {
@@ -67,7 +80,7 @@ class ApplianceEntryAccessibilityService : AccessibilityService() {
         ContextCompat.registerReceiver(
             this,
             screenOnReceiver,
-            IntentFilter(Intent.ACTION_SCREEN_ON),
+            IntentFilter(Intent.ACTION_SCREEN_ON).apply { addAction(Intent.ACTION_SCREEN_OFF) },
             ContextCompat.RECEIVER_NOT_EXPORTED,
         )
         screenOnReceiverRegistered = true
@@ -80,6 +93,7 @@ class ApplianceEntryAccessibilityService : AccessibilityService() {
     }
 
     private fun launchApp() {
+        if (!getSystemService(PowerManager::class.java).isInteractive) return
         if (!launchGate.shouldLaunch(SystemClock.elapsedRealtime())) return
         try {
             startActivity(Intent().setClassName(BuildConfig.PLAYER_PACKAGE, ApplianceEntryPolicy.ENTRY_ALIAS_CLASS_NAME).apply {

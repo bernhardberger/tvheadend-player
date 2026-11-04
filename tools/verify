@@ -81,7 +81,7 @@ python3 tools/static_rules.py
 
 printf '==> JVM tests, lint, Android test compilation, and debug APK\n'
 printf '    Visual capture matrix: %s (use --visual-captures to include it)\n' "$capture_tests"
-# Three invocations: on a full rebuild, compilation memory held by the Gradle
+# Separate invocations: on a full rebuild, compilation memory held by the Gradle
 # JVM plus Robolectric forks plus lint analysis exceeded the 8 GiB build slice.
 gradle_common=("${gradle_arguments[@]}" "-Ptvhplayer.captureTests=$capture_tests" --console=plain --no-scan)
 ./gradlew \
@@ -91,6 +91,28 @@ gradle_common=("${gradle_arguments[@]}" "-Ptvhplayer.captureTests=$capture_tests
 ./gradlew \
     :client:testDebugUnitTest :decoder-ffmpeg:testDebugUnitTest :app:testPlayDebugUnitTest :appliance:testDebugUnitTest \
     "${gradle_common[@]}"
+
+printf '==> Companion updater loopback E2E\n'
+./gradlew :appliance:testDebugUnitTest \
+    --tests at.bernhardberger.tvhplayer.appliance.CompanionUpdaterFeedTest \
+    -Ptvhplayer.applianceUpdateFeed=http://127.0.0.1:18764/latest \
+    "${gradle_common[@]}"
+python3 - appliance/build/test-results/testDebugUnitTest/TEST-at.bernhardberger.tvhplayer.appliance.CompanionUpdaterFeedTest.xml <<'COMPANION_UPDATE_RESULTS'
+import sys
+import xml.etree.ElementTree as ET
+
+results = ET.parse(sys.argv[1]).getroot()
+cases = results.findall('testcase')
+if not cases or int(results.get('tests', '0')) == 0:
+    sys.exit('error: Companion updater loopback tests did not run')
+if int(results.get('skipped', '0')) or any(case.find('skipped') is not None for case in cases):
+    sys.exit('error: Companion updater loopback tests must not be skipped')
+if int(results.get('failures', '0')) or int(results.get('errors', '0')):
+    sys.exit('error: Companion updater loopback tests failed')
+print('Companion updater loopback tests passed without skips')
+COMPANION_UPDATE_RESULTS
+
+# Build the final artifacts without the test-only loopback feed override.
 ./gradlew \
     :client:lintDebug :brand:lintDebug :decoder-ffmpeg:lintDebug :app:lintPlayDebug :app:assemblePlayDebug \
     "${appliance_tasks[@]}" "${provenance_tasks[@]}" \
@@ -185,6 +207,12 @@ def attributes(element):
 def has(block, name, value):
     return re.search(r'android:' + name + r'\([^)]*\)=' + re.escape(value) + r'(?:\s|$)', block) is not None
 
+for block in attributes('uses-permission(?:-sdk-23)?'):
+    for forbidden in ('android.permission.REQUEST_INSTALL_PACKAGES',
+                      'android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION'):
+        if has(block, 'name', '"' + forbidden + '"'):
+            sys.exit('error: Player must not request package-install permissions')
+
 declared = any(has(block, 'name', '"' + permission + '"') and
                has(block, 'protectionLevel', '(type 0x11)0x2')
                for block in attributes('permission'))
@@ -227,11 +255,42 @@ import re
 import sys
 
 tree = sys.argv[1]
-permission = 'at.bernhardberger.tvhplayer.debug.permission.APPLIANCE_ENTRY'
+release = len(sys.argv) > 2 and sys.argv[2] == 'release'
+permissions = (
+    'at.bernhardberger.tvhplayer' + ('' if release else '.debug') + '.permission.APPLIANCE_ENTRY',
+    'android.permission.INTERNET',
+    'android.permission.ACCESS_NETWORK_STATE',
+    'android.permission.REQUEST_INSTALL_PACKAGES',
+    'android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION',
+)
 blocks = re.findall(r'(?m)^\s*E: uses-permission(?: \(line=\d+\))?\s*\n((?:\s*A:.*\n?)*)', tree)
-if not any(re.search(r'android:name\([^)]*\)="' + re.escape(permission) + r'"(?:\s|$)', block)
-           for block in blocks):
-    sys.exit('error: Companion must request the player signature entry permission')
+for permission in permissions:
+    if not any(re.search(r'android:name\([^)]*\)="' + re.escape(permission) + r'"(?:\s|$)', block)
+               for block in blocks):
+        sys.exit('error: Companion is missing required permission ' + permission)
+
+def attributes(element):
+    return re.findall(r'(?m)^\s*E: ' + element + r'(?: \(line=\d+\))?\s*\n((?:\s*A:.*\n?)*)', tree)
+
+def has(block, name, value):
+    return re.search(r'android:' + name + r'\([^)]*\)=' + re.escape(value) + r'(?:\s|$)', block)
+
+if not any(has(block, 'name', '"at.bernhardberger.tvhplayer.appliance.update.CompanionUpdateJob"') and
+           has(block, 'permission', '"android.permission.BIND_JOB_SERVICE"')
+           for block in attributes('service')):
+    sys.exit('error: Companion update job must require BIND_JOB_SERVICE')
+if not any(has(block, 'name', '"at.bernhardberger.tvhplayer.appliance.update.UpdateInstallReceiver"') and
+           has(block, 'exported', '(type 0x12)0x0') for block in attributes('receiver')):
+    sys.exit('error: Companion install receiver must not be exported')
+applications = attributes('application')
+if len(applications) != 1:
+    sys.exit('error: Companion application declaration missing')
+application = applications[0]
+if release or not has(application, 'debuggable', '(type 0x12)0xffffffff'):
+    if (re.search(r'android:usesCleartextTraffic\(', application) and
+            not has(application, 'usesCleartextTraffic', '(type 0x12)0x0')) or \
+            re.search(r'android:networkSecurityConfig\(', application):
+        sys.exit('error: Release companion must not permit cleartext traffic')
 COMPANION_ENTRY_CONTRACT
 
     required_home_entries=(

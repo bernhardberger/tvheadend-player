@@ -1,4 +1,5 @@
 import java.time.Duration
+import java.net.URI
 
 plugins {
     alias(libs.plugins.android.application)
@@ -8,6 +9,16 @@ plugins {
 kotlin {
     jvmToolchain(21)
 }
+
+val defaultUpdateFeed = "https://api.github.com/repos/bernhardberger/tvheadend-player/releases/latest"
+val updateFeed = providers.gradleProperty("tvhplayer.applianceUpdateFeed").getOrElse(defaultUpdateFeed)
+val updateFeedUri = URI(updateFeed)
+require(updateFeedUri.userInfo == null && updateFeedUri.fragment == null &&
+    (updateFeedUri.scheme == "https" ||
+        (updateFeedUri.scheme == "http" && updateFeedUri.host in setOf("127.0.0.1", "10.0.2.2")))) {
+    "Appliance update feed must use HTTPS or a debug loopback HTTP URL"
+}
+val updateFeedLiteral = "\"${updateFeed.replace("\\", "\\\\").replace("\"", "\\\"")}\""
 
 android {
     namespace = "at.bernhardberger.tvhplayer.appliance"
@@ -25,12 +36,17 @@ android {
             applicationIdSuffix = ".debug"
             buildConfigField("String", "PLAYER_PACKAGE", "\"at.bernhardberger.tvhplayer.debug\"")
             manifestPlaceholders["playerPackage"] = "at.bernhardberger.tvhplayer.debug"
+            buildConfigField("String", "UPDATE_FEED", updateFeedLiteral)
+            manifestPlaceholders["updateCleartext"] = (updateFeedUri.scheme == "http").toString()
         }
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
             buildConfigField("String", "PLAYER_PACKAGE", "\"at.bernhardberger.tvhplayer\"")
             manifestPlaceholders["playerPackage"] = "at.bernhardberger.tvhplayer"
+            // A cleartext local fixture feed can never leak into a release artifact.
+            buildConfigField("String", "UPDATE_FEED", if (updateFeedUri.scheme == "https") updateFeedLiteral else "\"$defaultUpdateFeed\"")
+            manifestPlaceholders["updateCleartext"] = "false"
         }
     }
     buildFeatures {

@@ -67,6 +67,17 @@ silent updater.
 - When the player is missing or not set up, the companion shows its setup screen
   instead of failing silently.
 
+The companion checks GitHub's latest published release, validates `SHA256SUMS`,
+and installs only a newer APK for its own package signed by its current certificate.
+Automatic updates default on: screen-off schedules one network-constrained job,
+checks are at least six hours apart, and installation is deferred if the TV wakes.
+The companion screen offers Update now, the automatic-update switch and persisted
+version/check/result rows. Android's install-unknown-apps grant is required; any
+installer confirmation waits for a manual Update now on that screen. A self-update
+does not launch the player when accessibility reconnects, or while the screen is off.
+Only the companion has package-install permissions; the player's existing network
+permission is unchanged.
+
 Final release builds must use a private stable product signing key and must not rely
 on the Android debug keystore.
 

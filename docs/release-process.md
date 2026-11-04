@@ -29,6 +29,21 @@ attached to every GitHub release. The bundle also includes a Play AAB for Google
 Play. Play App Signing must use this project's own release key ("use your own
 key" at enrollment), so a GitHub APK and a Play install update each other.
 
+Companion updater asset contract: every published release must contain exactly one
+signed companion APK whose filename ends in `-appliance.apk`, and exactly one
+`SHA256SUMS` asset. Each nonblank checksum line is `<64 hex digits>  <filename>`
+(two spaces), with no duplicate filenames. The companion APK must have a checksum
+entry. Missing or ambiguous assets, malformed checksums and hash mismatches prevent
+installation. The updater uses GitHub's `/releases/latest` endpoint, excluding
+drafts and prereleases. Companion versions are independent: increment its
+`versionCode` in `appliance/build.gradle.kts` for each distributed companion build.
+It rejects a different package, a non-increasing version code or a different signer.
+Debug builds may use `-Ptvhplayer.applianceUpdateFeed=<URL>` for a GitHub-shaped
+fixture feed; HTTP is restricted to `127.0.0.1` or `10.0.2.2` and the same origin
+for assets/redirects. Release builds accept HTTPS overrides only; an HTTP debug
+override leaves the release on the public HTTPS feed. The fixture APK must match
+the debug package and signing key.
+
 ## Version policy
 
 `versionName` follows semantic versioning and `versionCode` increases with every

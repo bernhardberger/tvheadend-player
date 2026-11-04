@@ -7,6 +7,32 @@
     <string name="open_player" tools:ignore="MissingTranslation">Open player</string>
     <string name="android_settings" tools:ignore="MissingTranslation">Android settings</string>
     <string name="google_tv_home" tools:ignore="MissingTranslation">Google TV home</string>
+    <string name="companion_updates" tools:ignore="MissingTranslation">Companion updates</string>
+    <string name="automatic_updates" tools:ignore="MissingTranslation">Automatic updates</string>
+    <string name="automatic_updates_description" tools:ignore="MissingTranslation">Check and install only while the TV is in standby.</string>
+    <string name="update_now" tools:ignore="MissingTranslation">Update now</string>
+    <string name="companion_installed_version" tools:ignore="MissingTranslation">Installed companion: %1$s (%2$d)</string>
+    <string name="companion_latest_version" tools:ignore="MissingTranslation">Latest companion: %1$s</string>
+    <string name="companion_last_check" tools:ignore="MissingTranslation">Last check: %1$s</string>
+    <string name="companion_update_result" tools:ignore="MissingTranslation">Last result: %1$s</string>
+    <string name="update_unknown" tools:ignore="MissingTranslation">Not checked</string>
+    <string name="update_never" tools:ignore="MissingTranslation">Not checked yet</string>
+    <string name="update_checking" tools:ignore="MissingTranslation">Checking for an update…</string>
+    <string name="update_up_to_date" tools:ignore="MissingTranslation">Up to date</string>
+    <string name="update_no_network" tools:ignore="MissingTranslation">No network. Try again later.</string>
+    <string name="update_rate_limited" tools:ignore="MissingTranslation">GitHub rate limit reached. Try again later.</string>
+    <string name="update_release_problem" tools:ignore="MissingTranslation">Release problem: missing, ambiguous or invalid update files.</string>
+    <string name="update_hash_mismatch" tools:ignore="MissingTranslation">Hash mismatch. The download was deleted.</string>
+    <string name="update_wrong_package" tools:ignore="MissingTranslation">This APK is for a different app. The download was deleted.</string>
+    <string name="update_not_newer" tools:ignore="MissingTranslation">The release is not newer than the installed companion.</string>
+    <string name="update_signature_mismatch" tools:ignore="MissingTranslation">Signing certificate mismatch. The download was deleted.</string>
+    <string name="update_install_permission" tools:ignore="MissingTranslation">Allow this companion to install unknown apps in Android settings, then try again.</string>
+    <string name="update_waiting_standby" tools:ignore="MissingTranslation">Update postponed. Keep this screen open for a manual update, or let the TV enter standby.</string>
+    <string name="update_installing" tools:ignore="MissingTranslation">Installing the companion update…</string>
+    <string name="update_pending_confirmation" tools:ignore="MissingTranslation">Android needs confirmation. Choose Update now to continue.</string>
+    <string name="update_installer_failure" tools:ignore="MissingTranslation">Android could not install the update</string>
+    <string name="update_storage_failure" tools:ignore="MissingTranslation">The update could not be saved or read. Check available storage and try again.</string>
+    <string name="update_success" tools:ignore="MissingTranslation">Companion updated successfully.</string>
     <string name="appliance_accessibility_service_label">Tvheadend Player appliance entry</string>
     <string name="appliance_accessibility_service_description">Opens Tvheadend Player at startup and wake, and maps only the TV/GUIDE button. It cannot read screen content.</string>
 </resources>
