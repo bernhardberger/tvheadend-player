@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Player
+
+- Holding Back in the player stops playback, like the Stop key (#13).
+
 ## 0.4.4
 
 ### Settings

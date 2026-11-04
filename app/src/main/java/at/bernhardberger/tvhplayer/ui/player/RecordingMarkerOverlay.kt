@@ -77,7 +77,7 @@ internal class RecordingMarkerNavigation {
         }
         if (!open) return false
         if (event.key !in listOf(Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft,
-                Key.DirectionRight, Key.Back, Key.Enter, Key.NumPadEnter, Key.DirectionCenter)) return false
+                Key.DirectionRight, Key.Enter, Key.NumPadEnter, Key.DirectionCenter)) return false
         if (event.type == KeyEventType.KeyDown) {
             heldKeys.add(event.key)
             if (event.nativeKeyEvent.repeatCount == 0) {
@@ -88,7 +88,7 @@ internal class RecordingMarkerNavigation {
                         selectedMs?.takeIf { it in markers }?.let(onSeek)
                         dismiss()
                     }
-                    Key.DirectionDown, Key.Back -> dismiss()
+                    Key.DirectionDown -> dismiss()
                     Key.DirectionUp -> dismiss(upward = true)
                     else -> Unit
                 }

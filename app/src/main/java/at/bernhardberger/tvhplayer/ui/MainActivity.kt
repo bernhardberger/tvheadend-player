@@ -188,6 +188,7 @@ class MainActivity : AppCompatActivity() {
             TVHeadendPlayerTheme {
                 CompositionLocalProvider(
                     LocalChannelAccents provides channelAccents,
+                    at.bernhardberger.tvhplayer.ui.startup.LocalMainStartupKeyCycleOwner provides mainStartupKeyCycleOwner,
                 ) {
                     AppRoot(
                         startupState = startupState,

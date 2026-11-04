@@ -7,6 +7,7 @@ import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 
 import android.view.KeyEvent as AndroidKeyEvent
 import androidx.annotation.OptIn
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,11 +17,13 @@ import at.bernhardberger.tvhplayer.core.playerStateCell
 import at.bernhardberger.tvhplayer.core.recordingBarEnd
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -54,6 +57,7 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.MediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.PlaybackRetryCommand
 import at.bernhardberger.tvhplayer.core.PlayerBackAction
+import at.bernhardberger.tvhplayer.core.PlayerBackKeyCycle
 import at.bernhardberger.tvhplayer.core.PlayerAutoHideContext
 import at.bernhardberger.tvhplayer.core.PlayerForegroundContext
 import at.bernhardberger.tvhplayer.core.PlayerForegroundLayer
@@ -434,12 +438,23 @@ fun RecordingPlayerScreen(
 
 
     PlayerBackHandler(handlePlaybackBack)
+    val backCycle = remember { PlayerBackKeyCycle() }
+    val activityKeyCycleOwner = at.bernhardberger.tvhplayer.ui.startup.LocalMainStartupKeyCycleOwner.current
+    val playerModals = remember { mutableStateMapOf<Any, Unit>() }
+    val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
+    CompositionLocalProvider(LocalPlayerModalRegistry provides playerModals) {
     Box(
         modifier = Modifier
             .fillMaxSize()
             .onPreviewKeyEvent { event ->
-                val keyCode = event.nativeKeyEvent.keyCode
                 if (event.type == KeyEventType.KeyDown) layers.onKeyDown()
+                if (backCycle.intercept(event,
+                        confirmationOpen = false, nestedDialogOpen = playerModals.isNotEmpty(),
+                        onBack = {
+                            if (layers.infoOpen) backDispatcher?.onBackPressed() else handlePlaybackBack()
+                        }, stopAndClose = ::stopAndClose,
+                        activityKeyCycleOwner = activityKeyCycleOwner)) return@onPreviewKeyEvent true
+                val keyCode = event.nativeKeyEvent.keyCode
                 if (markerNavigation.handle(event, markers, ::seekMarker)) {
                     chrome.onUserInteraction()
                     return@onPreviewKeyEvent true
@@ -591,8 +606,7 @@ fun RecordingPlayerScreen(
                     onPlayRecording = { selection, start ->
                         closeInfo()
                         scope.launch { session.playRecording(selection, start) }
-                    }, onClose = ::closeInfo,
-                    onBackKeyDown = { layers.beginOpeningKeyCycle(AndroidKeyEvent.KEYCODE_BACK) })
+                    }, onClose = ::closeInfo)
             }
 
             PlaybackStatsVisibility(
@@ -667,6 +681,7 @@ fun RecordingPlayerScreen(
                 onStatsVisibleChange = layers::updateStatsVisibility,
             )
         }
+    }
     }
 }
 

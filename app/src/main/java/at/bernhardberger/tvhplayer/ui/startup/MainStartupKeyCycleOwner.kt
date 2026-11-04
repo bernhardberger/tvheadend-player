@@ -1,6 +1,9 @@
 package at.bernhardberger.tvhplayer.ui.startup
 
 import android.view.KeyEvent
+import androidx.compose.runtime.staticCompositionLocalOf
+
+internal val LocalMainStartupKeyCycleOwner = staticCompositionLocalOf<MainStartupKeyCycleOwner?> { null }
 
 enum class MainStartupKeyDecision {
     PASS_THROUGH,
@@ -14,11 +17,17 @@ sealed interface MainStartupKeyMode {
 }
 
 /**
- * Owns startup key cycles while startup state can change between their down and up events.
+ * Owns Activity key cycles that must not leak across changes of content.
  */
 class MainStartupKeyCycleOwner {
     private val consumedKeyCodes = mutableSetOf<Int>()
+    private val consumedUntilUpKeyCodes = mutableSetOf<Int>()
     private val forwardedActivationKeyCodes = mutableSetOf<Int>()
+
+    fun consumeUntilUp(keyCode: Int) {
+        forwardedActivationKeyCodes.remove(keyCode)
+        consumedUntilUpKeyCodes.add(keyCode)
+    }
 
     fun keyEvent(
         mode: MainStartupKeyMode,
@@ -26,12 +35,19 @@ class MainStartupKeyCycleOwner {
         action: Int,
         repeatCount: Int = 0,
     ): MainStartupKeyDecision {
-        if (isAlwaysSystemKey(keyCode)) return MainStartupKeyDecision.PASS_THROUGH
-
+        if (keyCode in consumedUntilUpKeyCodes) {
+            if (action == KeyEvent.ACTION_DOWN && repeatCount == 0) {
+                consumedUntilUpKeyCodes.remove(keyCode)
+            } else {
+                if (action == KeyEvent.ACTION_UP) consumedUntilUpKeyCodes.remove(keyCode)
+                return MainStartupKeyDecision.CONSUME
+            }
+        }
         if (keyCode in consumedKeyCodes) {
             if (action == KeyEvent.ACTION_UP) consumedKeyCodes.remove(keyCode)
             return MainStartupKeyDecision.CONSUME
         }
+        if (isAlwaysSystemKey(keyCode)) return MainStartupKeyDecision.PASS_THROUGH
 
         if (keyCode in forwardedActivationKeyCodes) {
             return when (action) {

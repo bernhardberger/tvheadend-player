@@ -17,6 +17,7 @@ import androidx.compose.ui.test.isFocusable
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.assertContentDescriptionEquals
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.runtime.getValue
@@ -613,6 +614,114 @@ class RecordingPlayerChromeScreenTest {
         key(Key.DirectionRight)
         key(Key.DirectionCenter)
         assertEquals(listOf(2_700_000L), seeks)
+    }
+
+    @Test fun holdBackStopsWithNoLayer() = holdStops { key(Key.Back); assertFalse(exists("player-banner")) }
+    @Test fun backDownRenewsQuickListUntilReleaseRestoresSelection() {
+        screen()
+        playing()
+        publishTracks(Tracks(listOf(audioTrack("a1", "de", true), audioTrack("a2", "en", false))))
+        val start = player.trackSelectionParameters
+        compose.onRoot().performKeyInput { pressKey(Key.MediaAudioTrack) }
+        compose.mainClock.advanceTimeByFrame()
+        compose.waitForIdle()
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.mainClock.advanceTimeBy(PLAYBACK_QUICK_LIST_AUTO_CLOSE_MS - 200)
+        compose.waitForIdle()
+        assertTrue(player.trackSelectionParameters.overrides.isNotEmpty())
+        compose.onRoot().performKeyInput { keyDown(Key.Back) }
+        compose.mainClock.advanceTimeBy(400)
+        compose.waitForIdle()
+        assertTrue("Back down renews the list across its previous deadline", exists("playback-options-track-list"))
+        compose.onRoot().performKeyInput { keyUp(Key.Back) }
+        settle()
+        assertFalse(exists("playback-options-track-list"))
+        assertEquals(start, player.trackSelectionParameters)
+    }
+    @Test fun holdBackStopsOverControls() = holdStops { key(Key.DirectionDown); assertTrue(exists("player-actions")) }
+    @Test fun holdBackStopsOverInfo() = holdStops { key(Key.Info); assertTrue(exists("programme-details-page")) }
+    @Test fun holdBackStopsOverOptions() = holdStops { key(Key.Menu); assertTrue(exists("playback-options-display")) }
+    @Test fun holdBackStopsOverQuickList() = holdStops {
+        key(Key.MediaAudioTrack); assertTrue(exists("playback-options-track-list"))
+    }
+    @Test fun holdBackStopsDuringPendingSeek() = holdStops {
+        compose.onRoot().performKeyInput { pressKey(Key.MediaRewind) }
+        compose.mainClock.advanceTimeBy(100)
+        compose.waitForIdle()
+        assertTrue(exists("recording-seek-preview"))
+    }
+    @Test fun holdBackStopsOverStats() = holdStops {
+        key(Key.Menu)
+        compose.onNodeWithTag("playback-options-stats").performSemanticsAction(SemanticsActions.RequestFocus)
+        key(Key.DirectionCenter)
+        key(Key.DirectionCenter)
+        key(Key.Back); key(Key.Back); key(Key.Back)
+        assertTrue(texts("Stats for nerds"))
+    }
+
+    @Test fun marksShortBackDismissesOnlyMarksThenHoldStopsPlayback() {
+        var closes = 0
+        screen(onClose = { closes++ })
+        playing()
+        val chapter = androidx.media3.extractor.metadata.Chapter.Builder()
+            .setStartTimeMs(900_000L).setEndTimeMs(1_000_000L).build()
+        publishTracks(Tracks(listOf(Tracks.Group(TrackGroup(Format.Builder().setId("chapters")
+            .setSampleMimeType(MimeTypes.AUDIO_AAC).setMetadata(androidx.media3.common.Metadata(chapter)).build()),
+            false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(true)))))
+        key(Key.DirectionDown)
+        key(Key.DirectionUp)
+        key(Key.DirectionUp)
+        assertEquals(listOf("recording-marker-target"), focused())
+        val target = runtime.activeTarget.value
+        val position = positionMs
+        key(Key.Back)
+        assertFalse(exists("recording-marker-target"))
+        assertEquals(listOf("player-seekbar"), focused())
+        assertEquals(0, closes)
+        assertEquals(target, runtime.activeTarget.value)
+        assertEquals(position, positionMs)
+        key(Key.DirectionUp)
+        assertEquals(listOf("recording-marker-target"), focused())
+        holdBack()
+        assertEquals(1, closes)
+        assertEquals(null, runtime.activeTarget.value)
+    }
+
+    @Test fun holdBackInNestedInfoConfirmationDoesNotStopPlayback() {
+        var closes = 0
+        screen(onClose = { closes++ })
+        playing()
+        key(Key.Info)
+        compose.onNodeWithTag("details-delete").performSemanticsAction(SemanticsActions.RequestFocus)
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("recording-confirmation-back").assertIsFocused()
+        holdBack()
+        assertEquals(0, closes)
+        assertTrue(runtime.activeTarget.value != null)
+        assertEquals(listOf("details-delete"), focused())
+    }
+
+    private fun holdStops(prepare: () -> Unit) {
+        var closes = 0
+        screen(onClose = { closes++ })
+        playing()
+        prepare()
+        assertEquals(0, closes)
+        assertTrue(runtime.activeTarget.value != null)
+        holdBack()
+        assertEquals(1, closes)
+        assertEquals(null, runtime.activeTarget.value)
+    }
+
+    private fun holdBack() {
+        compose.runOnUiThread {
+            rootView.dispatchKeyEvent(AndroidKeyEvent(AndroidKeyEvent.ACTION_DOWN, AndroidKeyEvent.KEYCODE_BACK))
+            rootView.dispatchKeyEvent(AndroidKeyEvent(0, 0, AndroidKeyEvent.ACTION_DOWN,
+                AndroidKeyEvent.KEYCODE_BACK, 1, 0, 0, 0, AndroidKeyEvent.FLAG_LONG_PRESS))
+            rootView.dispatchKeyEvent(AndroidKeyEvent(0, 0, AndroidKeyEvent.ACTION_DOWN, AndroidKeyEvent.KEYCODE_BACK, 2))
+            rootView.dispatchKeyEvent(AndroidKeyEvent(AndroidKeyEvent.ACTION_UP, AndroidKeyEvent.KEYCODE_BACK))
+        }
+        settle()
     }
 
     /** The recording plays and its first frame is presented. */

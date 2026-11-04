@@ -7,6 +7,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import android.app.Application
+import android.view.KeyEvent as AndroidKeyEvent
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -849,19 +850,32 @@ class LivePlayerChromeScreenTest {
     }
 
     /** A timeshift channel playing at the live edge with Pause ready; [block] sees the play-when-ready changes. */
-    private fun timeshiftPlaying(block: (pauses: List<Boolean>) -> Unit) {
+    private fun timeshiftPlaying(onClose: () -> Unit = {}, mapPosition: Boolean = false,
+        block: (pauses: List<Boolean>) -> Unit) {
         val connection = ScriptedSubscriptionConnection().apply {
             scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 3_600L)))
         }
         val manager = createSubscriptionManager(connection, Dispatchers.Default).apply { startAdmission() }
         try {
-            screen(opener = manager)
+            screen(opener = manager, onClose = onClose)
             startLiveSubscription(connection, height = 1080L, signal = 53739L, timeshift = true)
             playerReady()
             compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Playing }
             playerListeners.toList().forEach { it.onRenderedFirstFrame() }
             compose.waitUntil(5_000) { runtime.videoPresentation.value.visible }
             compose.waitUntil(5_000) { idleMainLooper(); runtime.livePause.value.availability == LivePauseAvailability.READY }
+            if (mapPosition) {
+                runBlocking {
+                    // A displayed-content mapping is required to select a seek target.
+                    connection.emit(SubscriptionEvent.Packet(
+                        at.bernhardberger.tvheadend.sdk.playback.MuxFrameType.I, StreamIndex(1),
+                        60_000_000L, 60_000_000L, 40_000L,
+                        at.bernhardberger.tvheadend.sdk.testing.SubscriptionBinaryFixture(byteArrayOf(0, 0, 1, 9, 0x10)),
+                    ))
+                }
+                settle()
+                assertNotNull(runBlocking { runtime.sampleTimeshiftPresentation() }.playbackTarget)
+            }
             val pauses = mutableListOf<Boolean>()
             compose.runOnIdle {
                 player.addListener(object : Player.Listener {
@@ -872,6 +886,161 @@ class LivePlayerChromeScreenTest {
         } finally {
             runBlocking { manager.closeAndJoin() }
         }
+    }
+
+    @Test fun holdBackStopsWithNoLayer() = holdStops { key(Key.Back); assertFalse(exists("player-banner")) }
+    @Test fun backDownRenewsQuickListUntilReleaseRestoresSelection() {
+        screen()
+        playerReady()
+        compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Playing }
+        publishTracks(Tracks(listOf(audioTrack("a1", "en", true), audioTrack("a2", "de", false))))
+        val start = player.trackSelectionParameters
+        press(Key.MediaAudioTrack)
+        press(Key.DirectionDown)
+        compose.mainClock.advanceTimeBy(PLAYBACK_QUICK_LIST_AUTO_CLOSE_MS - 200)
+        compose.waitForIdle()
+        assertTrue(player.trackSelectionParameters.overrides.isNotEmpty())
+        compose.onRoot().performKeyInput { keyDown(Key.Back) }
+        compose.mainClock.advanceTimeBy(400)
+        compose.waitForIdle()
+        assertTrue("Back down renews the list across its previous deadline", exists("playback-options-track-list"))
+        compose.onRoot().performKeyInput { keyUp(Key.Back) }
+        settleFrames()
+        assertFalse(exists("playback-options-track-list"))
+        assertEquals(start, player.trackSelectionParameters)
+    }
+
+    @Test fun canceledBackKeepsNestedInfoConfirmationOpen() {
+        screen()
+        publishInfoRecording(DvrEntryState.RECORDING)
+        key(Key.Info)
+        compose.onNodeWithTag("details-stop").performSemanticsAction(SemanticsActions.RequestFocus)
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("two-column-first").assertIsFocused()
+        compose.runOnUiThread {
+            view.dispatchKeyEvent(AndroidKeyEvent(AndroidKeyEvent.ACTION_DOWN, AndroidKeyEvent.KEYCODE_BACK))
+            view.dispatchKeyEvent(AndroidKeyEvent(0, 0, AndroidKeyEvent.ACTION_UP,
+                AndroidKeyEvent.KEYCODE_BACK, 0, 0, 0, 0, AndroidKeyEvent.FLAG_CANCELED))
+        }
+        settle()
+        compose.onNodeWithTag("two-column-first").assertIsFocused()
+        assertTrue(runtime.activeTarget.value != null)
+        assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_STOP_ENTRY })
+    }
+
+    @Test fun holdBackOverScheduleContextMenuStopsPlayback() = holdStops {
+        key(Key.Guide)
+        key(Key.Menu)
+        assertTrue(exists("browse-context-menu"))
+    }
+    @Test fun holdBackStopsOverControls() = holdStops { key(Key.DirectionDown); assertTrue(exists("player-actions")) }
+    @Test fun holdBackStopsOverInfo() = holdStops { key(Key.Info); assertTrue(exists("programme-details-page")) }
+    @Test fun holdBackStopsOverSchedule() = holdStops { key(Key.Guide); assertTrue(exists("channel-schedule-panel")) }
+    @Test fun holdBackStopsOverOptions() = holdStops { key(Key.Menu); assertTrue(exists("playback-options-display")) }
+    @Test fun holdBackStopsOverQuickList() = holdStops {
+        playerReady()
+        compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Playing }
+        publishTracks(Tracks(listOf(audioTrack("a1", "en", true), audioTrack("a2", "de", false))))
+        key(Key.MediaAudioTrack); assertTrue(exists("playback-options-track-list"))
+    }
+    @Test fun holdBackStopsDuringNumberEntry() = holdStops {
+        press(Key.Nine)
+        assertTrue(compose.onAllNodesWithText("9").fetchSemanticsNodes().isNotEmpty())
+    }
+    @Test fun holdBackStopsOverChannelList() = holdStops {
+        key(Key(android.view.KeyEvent.KEYCODE_TV_CONTENTS_MENU)); assertTrue(railOpen())
+    }
+    @Test fun holdBackStopsOverStats() = holdStops {
+        key(Key.Menu)
+        compose.onNodeWithTag("playback-options-stats").performSemanticsAction(SemanticsActions.RequestFocus)
+        key(Key.DirectionCenter)
+        key(Key.DirectionCenter)
+        key(Key.Back); key(Key.Back); key(Key.Back)
+        assertTrue(compose.onAllNodesWithText("Stats for nerds").fetchSemanticsNodes().isNotEmpty())
+    }
+
+    @Test fun holdBackStopsDuringPendingSeek() {
+        var closes = 0
+        timeshiftPlaying(onClose = { closes++ }, mapPosition = true) {
+            key(Key.Back)
+            press(Key.DirectionLeft)
+            assertTrue(exists("timeshift-seek-preview"))
+            holdBack()
+            assertEquals(1, closes)
+            assertEquals(null, runtime.activeTarget.value)
+        }
+    }
+
+    @Test fun holdBackInNestedInfoConfirmationOnlyTakesTheSafeBack() {
+        var closes = 0
+        screen(onClose = { closes++ })
+        publishInfoRecording(DvrEntryState.RECORDING)
+        key(Key.Info)
+        compose.onNodeWithTag("details-stop").performSemanticsAction(SemanticsActions.RequestFocus)
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("two-column-first").assertIsFocused().assertTextEquals("Keep recording")
+        holdBack()
+        assertEquals(0, closes)
+        assertTrue(runtime.activeTarget.value != null)
+        assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_STOP_ENTRY })
+        assertEquals(listOf("details-stop"), focused())
+    }
+
+    @Test fun holdBackInNestedScheduleConfirmationOnlyTakesTheSafeBack() {
+        var closes = 0
+        screen(onClose = { closes++ })
+        publishInfoRecording(DvrEntryState.RECORDING)
+        key(Key.Guide)
+        compose.onNodeWithTag("schedule-row-11").assertIsFocused()
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("details-stop").performSemanticsAction(SemanticsActions.RequestFocus)
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("two-column-first").assertIsFocused()
+        holdBack()
+        assertEquals(0, closes)
+        assertTrue(runtime.activeTarget.value != null)
+        assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_STOP_ENTRY })
+        assertEquals(listOf("details-stop"), focused())
+    }
+
+    @Test fun shortHardwareBackWaitsForReleaseBeforeHidingBanner() {
+        var closes = 0
+        screen(onClose = { closes++ })
+        assertTrue(exists("player-banner"))
+        compose.runOnUiThread {
+            view.dispatchKeyEvent(AndroidKeyEvent(AndroidKeyEvent.ACTION_DOWN, AndroidKeyEvent.KEYCODE_BACK))
+        }
+        settleFrames()
+        assertTrue(exists("player-banner"))
+        assertEquals(0, closes)
+        compose.runOnUiThread {
+            view.dispatchKeyEvent(AndroidKeyEvent(AndroidKeyEvent.ACTION_UP, AndroidKeyEvent.KEYCODE_BACK))
+        }
+        settle()
+        assertFalse(exists("player-banner"))
+        assertEquals(0, closes)
+    }
+
+    private fun holdStops(prepare: () -> Unit) {
+        var closes = 0
+        screen(onClose = { closes++ })
+        prepare()
+        assertEquals(0, closes)
+        assertTrue(runtime.activeTarget.value != null)
+        holdBack()
+        assertEquals(1, closes)
+        assertEquals(null, runtime.activeTarget.value)
+    }
+
+    private fun holdBack() {
+        compose.runOnUiThread {
+            view.dispatchKeyEvent(AndroidKeyEvent(AndroidKeyEvent.ACTION_DOWN, AndroidKeyEvent.KEYCODE_BACK))
+            view.dispatchKeyEvent(AndroidKeyEvent(0, 0, AndroidKeyEvent.ACTION_DOWN,
+                AndroidKeyEvent.KEYCODE_BACK, 1, 0, 0, 0, AndroidKeyEvent.FLAG_LONG_PRESS))
+            view.dispatchKeyEvent(AndroidKeyEvent(0, 0, AndroidKeyEvent.ACTION_DOWN, AndroidKeyEvent.KEYCODE_BACK, 2))
+            view.dispatchKeyEvent(AndroidKeyEvent(AndroidKeyEvent.ACTION_UP, AndroidKeyEvent.KEYCODE_BACK))
+        }
+        settle()
     }
 
     @Test fun pauseWithTimeshiftOffPostsOneNoticeWithoutTimelineFeedback() {

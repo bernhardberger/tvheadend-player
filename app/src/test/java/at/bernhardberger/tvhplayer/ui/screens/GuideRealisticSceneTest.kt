@@ -1,3 +1,8 @@
+@file:OptIn(
+    at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class,
+    at.bernhardberger.tvheadend.sdk.playback.SubscriptionInfrastructureApi::class,
+)
+
 package at.bernhardberger.tvhplayer.ui.screens
 
 import android.app.Application
@@ -67,6 +72,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.After
@@ -111,6 +117,8 @@ class GuideRealisticSceneTest {
     private lateinit var oldZone: TimeZone
     private var playbackRequests = 0
     private var navigationRequests = 0
+    private val activityKeyOwner = at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyCycleOwner()
+    private val activityKeyDispatcher = at.bernhardberger.tvhplayer.ui.MainStartupActivityKeyDispatcher(activityKeyOwner)
     private val fixtureBytes = checkNotNull(javaClass.getResourceAsStream("/fixture-epg/epg.json")).use { it.readBytes() }
     private val fixture = JSONObject(fixtureBytes.toString(Charsets.UTF_8))
     private val fixtureHash = MessageDigest.getInstance("SHA-256").digest(fixtureBytes).joinToString("") { "%02x".format(it) }
@@ -636,6 +644,53 @@ class GuideRealisticSceneTest {
     @Test fun guideStopConfirmReturnsDirectlyToCellEveryFrame() = guideReturnEveryFrame("Stop")
     @Test fun guideDetailsBackReturnsDirectlyToCellEveryFrame() = guideReturnEveryFrame("Back")
 
+    @Test fun holdingBackFromLivePlayerLeavesGuideFocusAndScrollUnchanged() {
+        now = LocalDateTime.parse("2026-09-15T19:40:00").atZone(ZoneId.of(fixture.getString("timezone"))).toEpochSecond()
+        assertTrue(SystemClock.setCurrentTimeMillis(now * 1000))
+        show(playerJourney = true)
+        moveToChannel(7)
+        val cell = compose.onNode(isFocused()).fetchSemanticsNode()
+        val guidePosition = position.position.value
+        val bounds = cell.boundsInRoot
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("details-watch").assertIsFocused()
+        key(Key.DirectionCenter)
+        compose.waitUntil(10_000) { playbackRequests == 1 }
+        compose.onNodeWithTag("player-banner").assertExists()
+        // This fixture hosts both production screens without AppRoot's entry handoff.
+        compose.onNode(isFocusable() and hasAnyDescendant(hasTestTag("player-banner"))).requestFocus().assertIsFocused()
+        fun send(action: Int, repeat: Int = 0, flags: Int = 0) {
+            compose.runOnIdle {
+                val event = android.view.KeyEvent(0, 0, action, android.view.KeyEvent.KEYCODE_BACK, repeat, 0, 0, 0, flags)
+                // This is MainActivity's pre-Compose dispatcher; Robolectric's host Activity
+                // does not route injected native input through the Compose root itself.
+                if (!activityKeyDispatcher.dispatch(at.bernhardberger.tvhplayer.ui.MainStartupActivityKeyContract(
+                        at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyMode.Inactive), event)) {
+                    assertTrue("Player or Guide must handle the unclaimed Back", view.dispatchKeyEvent(event))
+                }
+            }
+            compose.waitForIdle()
+        }
+        send(android.view.KeyEvent.ACTION_DOWN)
+        compose.onNode(isFocusable() and hasAnyDescendant(hasTestTag("player-banner"))).assertIsFocused()
+        send(android.view.KeyEvent.ACTION_DOWN, 1, android.view.KeyEvent.FLAG_LONG_PRESS)
+        assertEquals("HOLD claims the Activity key cycle", at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyDecision.CONSUME,
+            activityKeyOwner.keyEvent(at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyMode.Inactive,
+                android.view.KeyEvent.KEYCODE_BACK, android.view.KeyEvent.ACTION_DOWN, 2))
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("player-banner").fetchSemanticsNodes().isEmpty() }
+        // AppRoot normally restores route focus; restore that same cell in this two-screen fixture.
+        compose.onNode(SemanticsMatcher("previous Guide cell") { it.id == cell.id }).requestFocus().assertIsFocused()
+        assertEquals(guidePosition, position.position.value)
+        assertEquals(bounds, compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot)
+        send(android.view.KeyEvent.ACTION_DOWN, 2)
+        send(android.view.KeyEvent.ACTION_DOWN, 3)
+        send(android.view.KeyEvent.ACTION_UP)
+        assertEquals(cell.id, compose.onNode(isFocused()).fetchSemanticsNode().id)
+        assertEquals(bounds, compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot)
+        assertEquals(guidePosition, position.position.value)
+        assertEquals(0, navigationRequests)
+    }
+
     private fun guideReturnEveryFrame(action: String) {
         showAt("2026-09-15T19:40:00")
         if (action == "Keep" || action == "Stop") {
@@ -745,7 +800,8 @@ class GuideRealisticSceneTest {
      * [holdCoverage] keeps the Guide's coverage request pending until it completes, with no coverage cached.
      * [withoutGuideFor] leaves that channel without a single programme, as a server that never sent its guide.
      */
-    private fun show(holdCoverage: CompletableDeferred<Unit>? = null, withoutGuideFor: ChannelId? = null) {
+    private fun show(holdCoverage: CompletableDeferred<Unit>? = null, withoutGuideFor: ChannelId? = null,
+        playerJourney: Boolean = false) {
         val events = eventsByFixtureId.values.filter { it.channelId != withoutGuideFor }
         session = FakeTvheadendSession(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
@@ -764,6 +820,8 @@ class GuideRealisticSceneTest {
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(recordings)),
             dvrConfigurationsState = DvrConfigurationsState.Current.create(emptyList()),
         ))
+        if (playerJourney) session.scriptLivePlaybackSuccess(
+            at.bernhardberger.tvheadend.sdk.playback.SubscriptionOpener { _, _, _ -> kotlinx.coroutines.awaitCancellation() })
         // Only the released fake's request boundary is held; its settlements still come from the SDK.
         val guideSession = if (holdCoverage == null) session else object : TvheadendSession by session {
             override val epgRepository = object : EpgRepository by session.epgRepository {
@@ -778,11 +836,15 @@ class GuideRealisticSceneTest {
         val settings = PlayerSettingsStore(preferences())
         val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.IO,
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
+        if (playerJourney) runtimeScope.launch { profiles.run() }
         val model = ChannelsViewModel(session, ChannelTagSettingsStore(preferences()))
         models.put("channels", model)
         player = ExoPlayer.Builder(context()).build()
-        val runtime = AppPlaybackRuntime(player, session, createTvheadendPlaybackCoordinator(player), settings, profiles,
+        val coordinator = createTvheadendPlaybackCoordinator(player).also { if (playerJourney) it.launchIn(runtimeScope) }
+        val runtime = AppPlaybackRuntime(player, session, coordinator, settings, profiles,
             runtimeScope, TvheadendAudioOutputProvider(context()), PlaybackAudioFocus.None, PlaybackRuntimePolicy.fromPlayerSettings())
+        val video = if (playerJourney) at.bernhardberger.tvhplayer.viewmodels.VideoPlayerViewModel(runtime, session)
+            .also { models.put("video", it) } else null
         val selection = ChannelSelectionStore()
         val lastPlayed = LastPlayedChannelStore(context())
         val notices = NoticeCenter(SystemClock::elapsedRealtime) {
@@ -796,20 +858,32 @@ class GuideRealisticSceneTest {
         }
         compose.setContent {
             KoinIsolatedContext(koinApplication { modules(noticeModule) }) {
-                CompositionLocalProvider(LocalDensity provides Density(1f, fontScale)) {
+                CompositionLocalProvider(LocalDensity provides Density(1f, fontScale),
+                    at.bernhardberger.tvhplayer.ui.startup.LocalMainStartupKeyCycleOwner provides activityKeyOwner) {
                     TVHeadendPlayerTheme {
                         view = LocalView.current
+                        var playerChannel by remember { mutableStateOf<ChannelId?>(null) }
                         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                             SideRail(currentRoute = AppDestination.GUIDE,
                                 onRootBack = { navigationRequests++ }, onNavigate = { navigationRequests++ }) { padding, drawer ->
                                 layering = requireNotNull(at.bernhardberger.tvhplayer.ui.components.LocalBrowseContentLayering.current)
                                 val view = uiSettings.settings.collectAsState(UiSettings()).value.guideView
                                 var genre by remember { mutableStateOf(ProgrammeCategory.ALL) }
-                                EpgGridScreen(contentPadding = padding, initialFocusEnabled = !drawer, view = view,
+                                EpgGridScreen(contentPadding = padding, initialFocusEnabled = !drawer && playerChannel == null, view = view,
                                     genre = genre, onGenreChange = { genre = it }, channelViewModel = model,
                                     session = guideSession, playerSession = runtime, selection = selection, guidePositionStore = position,
-                                    lastPlayedStore = lastPlayed, onPlay = { _, _ -> playbackRequests++ },
+                                    lastPlayedStore = lastPlayed, onPlay = { id, _ -> playbackRequests++
+                                        if (playerJourney) playerChannel = id },
                                     onPlayRecording = { playbackRequests++ }, notices = notices)
+                            }
+                            playerChannel?.let { id ->
+                                at.bernhardberger.tvhplayer.ui.components.ProvideWatchingProgress(runtime) {
+                                    at.bernhardberger.tvhplayer.ui.player.VideoPlayerScreen(checkNotNull(video), selection,
+                                        lastPlayed, at.bernhardberger.tvhplayer.ui.player.TargetAspect(
+                                            at.bernhardberger.tvhplayer.settings.AspectRatioMode.FIT) {}, model, session,
+                                        id, channels.single { it.id == id }.name.orEmpty(), {}, { playerChannel = null },
+                                        runtime, notices = notices, uiSettingsStore = uiSettings)
+                                }
                             }
                         }
                     }

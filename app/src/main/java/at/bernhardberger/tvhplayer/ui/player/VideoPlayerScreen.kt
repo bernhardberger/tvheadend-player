@@ -11,6 +11,7 @@ import at.bernhardberger.tvhplayer.ui.components.rememberPlaybackIntent
 import android.os.SystemClock
 import android.view.KeyEvent as AndroidKeyEvent
 import androidx.annotation.OptIn
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Row
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -34,6 +36,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -68,6 +71,7 @@ import at.bernhardberger.tvhplayer.core.MediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.PlaybackStatusPresentation
 import at.bernhardberger.tvhplayer.core.PlaybackRetryCommand
 import at.bernhardberger.tvhplayer.core.PlayerBackAction
+import at.bernhardberger.tvhplayer.core.PlayerBackKeyCycle
 import at.bernhardberger.tvhplayer.core.PlayerAutoHideContext
 import at.bernhardberger.tvhplayer.core.PlayerForegroundLayer
 import at.bernhardberger.tvhplayer.core.channelPickAction
@@ -1328,6 +1332,11 @@ fun VideoPlayerScreen(
     }
     if (contentAllowed) PlayerBackHandler(handlePlaybackBack)
 
+    val backCycle = remember { PlayerBackKeyCycle() }
+    val activityKeyCycleOwner = at.bernhardberger.tvhplayer.ui.startup.LocalMainStartupKeyCycleOwner.current
+    val playerModals = remember { mutableStateMapOf<Any, Unit>() }
+    val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
+
     val onPickChannel: (Channel) -> Boolean = { tuneChannel(it, 0L) }
     val onTogglePause = { dispatchPlaybackAction(MediaPlaybackAction.TOGGLE) }
     val onSeek: (Long) -> Unit = { queueTimeshiftSeek(it) }
@@ -1337,6 +1346,15 @@ fun VideoPlayerScreen(
     fun playerRootModifier(): Modifier = Modifier
             .fillMaxSize()
             .onPreviewKeyEvent { event ->
+                if (event.nativeKeyEvent.action == AndroidKeyEvent.ACTION_DOWN) layerState.core.onKeyDown()
+                if (backCycle.intercept(event,
+                        confirmationOpen = foregroundLayer == PlayerForegroundLayer.CONFIRMATION,
+                        nestedDialogOpen = playerModals.isNotEmpty(),
+                        onBack = {
+                            if (layerState.core.infoOpen || layerState.scheduleOpen) backDispatcher?.onBackPressed()
+                            else handlePlaybackBack()
+                        }, stopAndClose = stopAndClose,
+                        activityKeyCycleOwner = activityKeyCycleOwner)) return@onPreviewKeyEvent true
                 if (serverWait.consumesKey(event, layerState)) return@onPreviewKeyEvent true
                 val keyCode = event.nativeKeyEvent.keyCode
                 layerState.handleScheduleKey(event, foregroundLayer, ::prepareSchedule)?.let { return@onPreviewKeyEvent it }
@@ -1371,7 +1389,6 @@ fun VideoPlayerScreen(
                     confirmationOpen = foregroundLayer == PlayerForegroundLayer.CONFIRMATION,
                     livePause = livePauseAvailability,
                 )
-                if (event.nativeKeyEvent.action == AndroidKeyEvent.ACTION_DOWN) layerState.core.onKeyDown()
                 layerState.core.handleOverlayKey(
                     event = event,
                     keyContext = keyContext,
@@ -1777,7 +1794,6 @@ fun VideoPlayerScreen(
                 settingsStore = uiSettingsStore,
                 onPlay = { id, _ -> channels.firstOrNull { it.id == id }?.let(onPickChannel) },
                 onShowGuide = onShowGuide, onClose = ::closeInfo,
-                onBackKeyDown = { layerState.core.beginOpeningKeyCycle(AndroidKeyEvent.KEYCODE_BACK) },
                 onPlayRecording = onPlayRecording,
             )
         }
@@ -1856,7 +1872,9 @@ fun VideoPlayerScreen(
         )
     } }
     }
-    PlayerContent()
+    CompositionLocalProvider(LocalPlayerModalRegistry provides playerModals) {
+        PlayerContent()
+    }
 }
 
 private fun SessionObservation.dvrEntries(): List<DvrEntry> =

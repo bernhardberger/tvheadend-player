@@ -5,6 +5,40 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class MainStartupKeyCycleOwnerTest {
+    @Test fun explicitlyOwnedBackIsConsumedUntilReleaseInInactiveMode() {
+        val owner = MainStartupKeyCycleOwner()
+        owner.consumeUntilUp(KeyEvent.KEYCODE_BACK)
+        val dispatcher = at.bernhardberger.tvhplayer.ui.MainStartupActivityKeyDispatcher(owner)
+        val contract = at.bernhardberger.tvhplayer.ui.MainStartupActivityKeyContract(MainStartupKeyMode.Inactive)
+        for (repeat in listOf(2, 3)) org.junit.Assert.assertTrue(dispatcher.dispatch(contract,
+            KeyEvent.KEYCODE_BACK, KeyEvent.ACTION_DOWN, repeat))
+        org.junit.Assert.assertTrue(dispatcher.dispatch(contract, KeyEvent.KEYCODE_BACK, KeyEvent.ACTION_UP))
+        org.junit.Assert.assertFalse(dispatcher.dispatch(contract, KeyEvent.KEYCODE_BACK, KeyEvent.ACTION_DOWN))
+        org.junit.Assert.assertFalse(dispatcher.dispatch(contract, KeyEvent.KEYCODE_BACK, KeyEvent.ACTION_UP))
+    }
+
+    @Test fun freshBackAfterMissingHeldReleasePassesItsWholeCycleThrough() {
+        for (mode in listOf(MainStartupKeyMode.Inactive, MainStartupKeyMode.Passive, MainStartupKeyMode.Actionable)) {
+            val owner = MainStartupKeyCycleOwner()
+            owner.consumeUntilUp(KeyEvent.KEYCODE_BACK)
+            assertDecision(MainStartupKeyDecision.CONSUME,
+                owner.keyEvent(mode, KeyEvent.KEYCODE_BACK, KeyEvent.ACTION_DOWN, repeatCount = 2))
+            assertDecision(MainStartupKeyDecision.PASS_THROUGH,
+                owner.keyEvent(mode, KeyEvent.KEYCODE_BACK, KeyEvent.ACTION_DOWN))
+            assertDecision(MainStartupKeyDecision.PASS_THROUGH,
+                owner.keyEvent(mode, KeyEvent.KEYCODE_BACK, KeyEvent.ACTION_UP))
+        }
+    }
+
+    @Test fun freshDownDoesNotReleaseAStartupClaim() {
+        val owner = MainStartupKeyCycleOwner()
+        assertDecision(MainStartupKeyDecision.CONSUME,
+            owner.keyEvent(MainStartupKeyMode.Passive, KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.ACTION_DOWN))
+        assertDecision(MainStartupKeyDecision.CONSUME,
+            owner.keyEvent(MainStartupKeyMode.Inactive, KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.ACTION_DOWN))
+        assertDecision(MainStartupKeyDecision.CONSUME,
+            owner.keyEvent(MainStartupKeyMode.Inactive, KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.ACTION_UP))
+    }
     @Test
     fun inactive_passesFreshKeysThrough() {
         val owner = MainStartupKeyCycleOwner()

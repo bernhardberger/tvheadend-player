@@ -488,6 +488,8 @@ Anatomy per Material for TV / design kit:
   automatic initial focus until focus leaves the drawer.
 - A key that reveals, replaces or relocates UI is consumed for its whole
   KeyDown/KeyUp cycle so the same press cannot activate the new target.
+  In the player, short Back acts on KeyUp; holding Back stops playback,
+  except on confirmations and nested dialogs.
 - Back unwinds local layers first (dialogs, sheets, depth stacks, scope tabs),
   then focuses the global drawer on the current destination. From a non-root
   destination the next Back goes to Home; Back from Home follows the
@@ -1074,6 +1076,7 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   just appeared (`core/PlaybackKeyPolicy.kt:103-125`,
   `ui/player/LivePlayerLayerState.kt:293-299`). Stop with no active target
   uses the same suppression (`ui/player/PlayerStop.kt:71-86`).
+  Player Back is the exception: short Back acts on KeyUp; a hold stops playback.
 - Hidden-chrome keys (`core/PlaybackKeyPolicy.kt:191-277`): Center, Enter and
   Numpad Enter toggle Play/Pause and reveal the controls on recordings and on
   live with Pause available; where live cannot pause they peek the Banner with
@@ -1081,7 +1084,7 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   Left/Right step on recordings and on live with timeshift, and pass through on
   live without it. Info opens Info; TV Contents Menu, TV Number Entry and
   Bookmark open the live channel shelf and pass through on recordings.
-- Back acts on the topmost foreground layer, in this order
+- Short Back acts on the topmost foreground layer, in this order
   (`core/PlayerBackPolicy.kt:60-79`, actions `:99-122`): confirmation, Info,
   the Audio/Subtitles quick list (restores the earlier selection and closes),
   options detail (returns to the options root), options root, numeric entry
@@ -1089,8 +1092,8 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   preview, dispatched seek preview, Stats. With no layer, Back hides the Banner
   when it is visible and otherwise closes the player to warm browse. A pending
   step cancels; a dispatched one only dismisses its feedback and claims no
-  undo. Recovery and terminal-error Back close the player at once. Back is not
-  Stop.
+  undo. Recovery and terminal-error Back close the player at once. Short Back is
+  not Stop. Holding Back stops playback, except on confirmations and nested dialogs.
 - Controls auto-hide only when they are visible, playback is playing and ready,
   and the player is stable (`core/PlayerAutoHidePolicy.kt:13-32`). A pending
   seek, a modal layer, recovery and an actionable error each prevent it. The

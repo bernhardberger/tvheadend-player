@@ -4,8 +4,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
-import androidx.compose.ui.input.key.*
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvhplayer.core.*
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
@@ -21,19 +19,9 @@ import kotlinx.coroutines.CoroutineScope
 /** The browse details surface over the existing player, without a playback request. */
 @Composable
 internal fun PlayerDetailsSurface(
-    onBackKeyDown: () -> Unit = {},
     content: @Composable () -> Unit,
 ) {
-    val dispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
-    Box(Modifier.fillMaxSize().onPreviewKeyEvent { key ->
-        if (key.key != Key.Back) false else {
-            if (key.type == KeyEventType.KeyDown && key.nativeKeyEvent.repeatCount == 0) {
-                onBackKeyDown()
-                dispatcher?.onBackPressed()
-            }
-            true
-        }
-    }) {
+    Box(Modifier.fillMaxSize()) {
         WarmPlaybackScrim()
         CompositionLocalProvider(LocalWarmPlayback provides true, content = content)
     }
@@ -54,7 +42,6 @@ internal fun LivePlayerProgrammeDetails(
     onPlayRecording: ((at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection) -> Unit)? = null,
     onShowGuide: (ChannelId, EpgEvent?) -> Unit,
     onClose: () -> Unit,
-    onBackKeyDown: () -> Unit = {},
     onContinueWatching: (() -> Unit)? = null,
     showContextMenu: Boolean = false,
     onShowDetails: () -> Unit = {},
@@ -64,7 +51,7 @@ internal fun LivePlayerProgrammeDetails(
     val openingObservation = remember { observation }
     val latestNow = rememberUpdatedState(nowSec)
     val inFlight = remember { mutableStateOf<DvrMutationAction?>(null) }
-    PlayerDetailsSurface(onBackKeyDown) {
+    PlayerDetailsSurface {
         if (openingEvent != null) {
             ProgrammeDetailsHost(
                 openingEvent = openingEvent,
@@ -107,9 +94,8 @@ internal fun RecordingPlayerDetails(
     onPlayRecording: (at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection, at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart) -> Unit,
     onClose: () -> Unit,
     onShowGuide: (ChannelId, EpgEvent?) -> Unit = { _, _ -> },
-    onBackKeyDown: () -> Unit = {},
 ) {
-    PlayerDetailsSurface(onBackKeyDown) {
+    PlayerDetailsSurface {
         at.bernhardberger.tvhplayer.ui.screens.RecordingDetailsHost(
             recording, openingObservation, observation, currentObservation, nowSec,
             mutations, notices, mutationScope,

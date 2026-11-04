@@ -4,6 +4,56 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.input.key.KeyEvent
+import android.view.KeyEvent as AndroidKeyEvent
+import at.bernhardberger.tvhplayer.core.PlayerBackKeyCycle
+import at.bernhardberger.tvhplayer.core.PlayerBackKeyResult
+
+/** Only confirmation callers register here; menus and choices still allow holding Back. */
+internal val LocalPlayerModalRegistry = staticCompositionLocalOf<MutableMap<Any, Unit>?> { null }
+
+@Composable
+internal fun RegisterPlayerModal() {
+    val registry = LocalPlayerModalRegistry.current
+    val key = remember { Any() }
+    DisposableEffect(registry) {
+        registry?.set(key, Unit)
+        onDispose { registry?.remove(key) }
+    }
+}
+
+internal fun PlayerBackKeyCycle.intercept(
+    event: KeyEvent,
+    confirmationOpen: Boolean,
+    nestedDialogOpen: Boolean,
+    onBack: () -> Unit,
+    stopAndClose: () -> Unit,
+    activityKeyCycleOwner: at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyCycleOwner? = null,
+): Boolean {
+    val native = event.nativeKeyEvent
+    if (native.keyCode != AndroidKeyEvent.KEYCODE_BACK) return false
+    if (native.action == AndroidKeyEvent.ACTION_UP && native.isCanceled) {
+        onKey(false, 0, false, canceled = true, holdAllowed = false)
+        return true
+    }
+    if (confirmationOpen || nestedDialogOpen) {
+        onKey(false, 0, false, canceled = true, holdAllowed = false)
+        return false
+    }
+    when (onKey(native.action == AndroidKeyEvent.ACTION_DOWN, native.repeatCount,
+        native.isLongPress, native.isCanceled, holdAllowed = true)) {
+        PlayerBackKeyResult.BACK -> onBack()
+        PlayerBackKeyResult.HOLD -> {
+            activityKeyCycleOwner?.consumeUntilUp(AndroidKeyEvent.KEYCODE_BACK)
+            stopAndClose()
+        }
+        PlayerBackKeyResult.NONE -> Unit
+    }
+    return true
+}
 
 @Composable
 internal fun PlayerBackHandler(onBack: () -> Unit) {

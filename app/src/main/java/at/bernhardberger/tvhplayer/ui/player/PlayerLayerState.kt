@@ -223,7 +223,7 @@ internal class PlayerLayerState(
     }
 
     /**
-     * The overlay keys both players route alike: the opening key's cycle, Back, the
+     * The overlay keys both players route alike: the opening key's cycle, the
      * recovery and error layers, the options keys, and Left closing Info or the options.
      * Null lets the remaining playback keys proceed. The caller reports key downs to
      * [onKeyDown] first.
@@ -239,13 +239,6 @@ internal class PlayerLayerState(
         val keyCode = event.nativeKeyEvent.keyCode
         if (consumesRevealingKey(event)) return true
         if (event.type != KeyEventType.KeyDown) return false
-        if (keyCode == AndroidKeyEvent.KEYCODE_BACK) {
-            if (event.nativeKeyEvent.repeatCount == 0) {
-                beginOpeningKeyCycle(keyCode)
-                onBack()
-            }
-            return true
-        }
         if (foregroundLayer == PlayerForegroundLayer.RECOVERY || foregroundLayer == PlayerForegroundLayer.TERMINAL_ERROR) {
             return playerParentConsumesRecoveryKey(keyCode)
         }

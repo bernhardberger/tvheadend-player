@@ -568,15 +568,31 @@ class PlaybackOptionsRemoteKeyTest {
             TVHeadendPlayerTheme {
                 val state = rememberLivePlayerLayerState()
                 layerState = state
+                val backCycle = remember { at.bernhardberger.tvhplayer.core.PlayerBackKeyCycle() }
                 val rootFocus = remember { FocusRequester() }
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .onPreviewKeyEvent { event ->
+                            if (event.type == KeyEventType.KeyDown) state.core.onKeyDown()
                             val foregroundLayer = if (recovery) PlayerForegroundLayer.RECOVERY
                                 else playerForegroundLayer(state.foregroundContext())
+                            val onBack = {
+                                when (playerBackAction(PlayerSurface.LIVE, foregroundLayer)) {
+                                    PlayerBackAction.RESTORE_AND_CLOSE_QUICK_LIST -> {
+                                        state.core.quickList.restoreStart()
+                                        state.core.closeQuickList()
+                                    }
+                                    PlayerBackAction.RETURN_TO_OPTIONS_ROOT ->
+                                        state.core.showOptionsPage(PlaybackOptionsPage.ROOT)
+                                    PlayerBackAction.CLOSE_OPTIONS -> state.core.closeOptions()
+                                    else -> Unit
+                                }
+                            }
+                            if (backCycle.intercept(event, false, false, onBack, {})) {
+                                return@onPreviewKeyEvent true
+                            }
                             state.handleScheduleKey(event, foregroundLayer)?.let { return@onPreviewKeyEvent it }
-                            if (event.type == KeyEventType.KeyDown) state.core.onKeyDown()
                             state.core.handleOverlayKey(
                                 event = event,
                                 foregroundLayer = foregroundLayer,
@@ -590,18 +606,7 @@ class PlaybackOptionsRemoteKeyTest {
                                     infoOpen = state.core.infoOpen,
                                     confirmationOpen = foregroundLayer == PlayerForegroundLayer.CONFIRMATION,
                                 ),
-                                onBack = {
-                                    when (playerBackAction(PlayerSurface.LIVE, foregroundLayer)) {
-                                        PlayerBackAction.RESTORE_AND_CLOSE_QUICK_LIST -> {
-                                            state.core.quickList.restoreStart()
-                                            state.core.closeQuickList()
-                                        }
-                                        PlayerBackAction.RETURN_TO_OPTIONS_ROOT ->
-                                            state.core.showOptionsPage(PlaybackOptionsPage.ROOT)
-                                        PlayerBackAction.CLOSE_OPTIONS -> state.core.closeOptions()
-                                        else -> Unit
-                                    }
-                                },
+                                onBack = onBack,
                                 onOptionsOpened = { optionsOpened++ },
                             ) ?: false
                         }

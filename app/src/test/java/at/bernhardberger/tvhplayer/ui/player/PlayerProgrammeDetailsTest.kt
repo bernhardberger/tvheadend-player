@@ -3,6 +3,9 @@ package at.bernhardberger.tvhplayer.ui.player
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
 import android.app.Application
 import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -270,6 +273,8 @@ class PlayerProgrammeDetailsTest {
             var restore by remember { mutableStateOf<String?>("player-info") }
             val scope = rememberCoroutineScope()
             val close = { opened = false; restore = "player-info" }
+            val backCycle = remember { at.bernhardberger.tvhplayer.core.PlayerBackKeyCycle() }
+            val dispatcher = androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current!!.onBackPressedDispatcher
             CompositionLocalProvider(at.bernhardberger.tvhplayer.ui.components.LocalWatchingTarget provides
                 (if (recording) at.bernhardberger.tvhplayer.playback.AppPlaybackTarget.Recording(entry.id)
                 else at.bernhardberger.tvhplayer.playback.AppPlaybackTarget.Live(channel.id)).takeIf { warm },
@@ -288,6 +293,9 @@ class PlayerProgrammeDetailsTest {
                     at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection(
                         checkNotNull(observation.currentSession), entry.id).takeIf { recording && warm }) {
             TVHeadendPlayerTheme {
+                Box(Modifier.onPreviewKeyEvent { event ->
+                    !browse && backCycle.intercept(event, false, false, dispatcher::onBackPressed, {})
+                }) {
                 PlayerChrome(
                     mode = PlayerChromeMode.CONTROLS,
                     content = PlayerChromeContent("20:15", PlayerInfoBarData("101", "Ridge Earth", "Chrome title", "")),
@@ -314,6 +322,7 @@ class PlayerProgrammeDetailsTest {
                         onPlay = { _, _ -> error("Unexpected playback command") },
                         onPlayRecording = {},
                         onShowGuide = onShowGuide, onClose = close)
+                }
                 }
             }
             }

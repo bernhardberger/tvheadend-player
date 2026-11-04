@@ -857,6 +857,7 @@ class PlayerFooterLayoutEvidenceTest {
         val window = ProgrammeWindow(programme, Instant.fromEpochSeconds(1_800), 0.5f, 0.2f, 0.8f, 0.8f, true)
         compose.setContent {
             view = LocalView.current
+            val backCycle = remember { at.bernhardberger.tvhplayer.core.PlayerBackKeyCycle() }
             val density = LocalDensity.current
             val context = LocalContext.current
             val session = remember {
@@ -873,7 +874,11 @@ class PlayerFooterLayoutEvidenceTest {
             CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
                 TVHeadendPlayerTheme {
                     endpointWidths = rememberTimelineEndpointWidths(if (recording) TimelineKind.RECORDING else TimelineKind.LIVE)
-                    Box(Modifier.fillMaxSize()) {
+                    Box(Modifier.fillMaxSize().onPreviewKeyEvent { event ->
+                        // Marker Back belongs to the recording root, not the chrome itself.
+                        recording && backCycle.intercept(event, false, false,
+                            onBack = { markerNavigation.dismiss() }, stopAndClose = {})
+                    }) {
                         if (backdrop() == Backdrop.TEXTURED) {
                             DebugVideoBackdrop(visible = true, modifier = Modifier.fillMaxSize())
                         } else {
