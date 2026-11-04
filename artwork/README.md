@@ -63,6 +63,15 @@ separate Android TV lockup. Family artwork has no platform suffix. The paired
 launcher composition uses a 78-unit symbol and 36-unit stacked name on 320×180;
 the horizontal family preserves the accepted 42:27 symbol/type proportions.
 
+The same generator creates badged Appliance and Debug symbols, TV banners,
+launcher fallbacks, adaptive foregrounds, and monochrome layers. Appliance uses
+the accessibility figure; Debug uses a bug. Their banners pair the small family
+name with a large cyan variant name. Debug resources live only in
+`app/src/debug/res`; the separate companion uses `appliance/src/main/res`.
+Neither variant has a Play listing icon. The full badged adaptive composition
+fits inside the circular 66dp safe zone. Comparison previews are generated under
+`artifacts/brand-preview/appliance-companion/` (ignored).
+
 Run from the repository root with Java 21:
 
 ```bash

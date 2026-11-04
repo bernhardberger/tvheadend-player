@@ -52,6 +52,28 @@ DETERMINISTIC_VECTOR_ARTWORK = (
     "artwork/github-social-preview.svg",
 )
 
+for root in ("app/src/debug/res", "appliance/src/main/res"):
+    for density, banner_size, icon_size in (
+        ("mdpi", (160, 90), 48), ("hdpi", (240, 135), 72),
+        ("xhdpi", (320, 180), 96), ("xxhdpi", (480, 270), 144),
+        ("xxxhdpi", (640, 360), 192),
+    ):
+        GENERATED_PNG_DIMENSIONS[f"{root}/drawable-{density}/banner.png"] = banner_size
+        for name in ("ic_launcher", "ic_launcher_round"):
+            GENERATED_PNG_DIMENSIONS[f"{root}/mipmap-{density}/{name}.png"] = (icon_size, icon_size)
+    GENERATED_PNG_DIMENSIONS[f"{root}/drawable/ic_launcher_foreground.png"] = (432, 432)
+    DETERMINISTIC_VECTOR_ARTWORK += (f"{root}/drawable/ic_launcher_monochrome.xml",)
+
+GENERATED_PNG_DIMENSIONS["appliance/src/main/res/drawable/ic_launcher_background.png"] = (432, 432)
+DETERMINISTIC_VECTOR_ARTWORK += (
+    "artwork/tvheadend-player-appliance-symbol.svg",
+    "artwork/tvheadend-player-debug-symbol.svg",
+) + tuple(
+    f"appliance/src/main/res/{directory}/{name}.xml"
+    for directory in ("mipmap-anydpi-v26", "mipmap-anydpi-v33")
+    for name in ("ic_launcher", "ic_launcher_round")
+)
+
 PORTABLE_SVG_ARTWORK = tuple(
     path for path in DETERMINISTIC_VECTOR_ARTWORK if path.endswith(".svg")
 )
@@ -123,6 +145,9 @@ class ArtworkTest(unittest.TestCase):
                 generated_root / "tools/RenderArtwork.java",
             )
             shutil.copytree(ROOT / "artwork/fonts", generated_root / "artwork/fonts")
+            for directory in ("mipmap-anydpi-v26", "mipmap-anydpi-v33"):
+                shutil.copytree(ROOT / "app/src/main/res" / directory,
+                                generated_root / "app/src/main/res" / directory)
             subprocess.run(
                 ["java", "tools/RenderArtwork.java"],
                 cwd=generated_root,
@@ -170,6 +195,14 @@ class ArtworkTest(unittest.TestCase):
             self.assertFalse(svg.findall(".//{http://www.w3.org/2000/svg}image"))
             title = svg.findtext("{http://www.w3.org/2000/svg}title", default="")
             self.assertEqual("for Android TV" in title, "android-tv" in relative_path)
+
+    def test_variant_resources_are_isolated_from_release_and_profile(self):
+        label = ElementTree.parse(ROOT / "app/src/debug/res/values/strings.xml")
+        self.assertEqual("Tvheadend Player Debug", label.find("string[@name='launcher_label']").text)
+        for source_set in ("release", "profile", "profileServer"):
+            root = ROOT / "app/src" / source_set / "res"
+            self.assertFalse(list(root.glob("**/ic_launcher*")))
+            self.assertFalse(list(root.glob("**/banner.png")))
 
     @staticmethod
     def _color_resources():

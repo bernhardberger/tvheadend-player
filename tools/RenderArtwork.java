@@ -83,6 +83,129 @@ public final class RenderArtwork {
         writeMonochrome();
         writeStartupResources();
         writePreview();
+        writeVariants();
+    }
+
+    /** Glyphs use the badge's local 512-canvas coordinates and 12-unit round strokes. */
+    private static Shape badgeGlyph(boolean bug) {
+        Path2D lines = new Path2D.Double();
+        Area glyph;
+        if (bug) {
+            glyph = new Area(new RoundRectangle2D.Double(-20, -15, 40, 52, 30, 30));
+            glyph.add(new Area(new Ellipse2D.Double(-14, -35, 28, 28)));
+            for (int side : new int[]{-1, 1}) {
+                for (int y : new int[]{-8, 10, 28}) {
+                    lines.moveTo(side * 17, y);
+                    lines.lineTo(side * 34, y + (y - 10) / 2.0);
+                }
+                lines.moveTo(side * 8, -28);
+                lines.lineTo(side * 20, -43);
+            }
+        } else {
+            glyph = new Area(new Ellipse2D.Double(-10, -40, 20, 20));
+            lines.moveTo(-34, -10); lines.lineTo(34, -10);
+            lines.moveTo(0, -10); lines.lineTo(0, 12);
+            lines.lineTo(-16, 38);
+            lines.moveTo(0, 12); lines.lineTo(16, 38);
+        }
+        glyph.add(new Area(new BasicStroke(12, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
+                .createStrokedShape(lines)));
+        return AffineTransform.getTranslateInstance(364, 364).createTransformedShape(glyph);
+    }
+
+    /** The single shared badged mark, preserving the canonical player geometry. */
+    private static List<Ink> badgedMark(Shape glyph) {
+        List<Ink> ink = mark(56.32, 56.32, 399.36);
+        ink.add(new Ink(new Ellipse2D.Double(286, 286, 156, 156), FIELD));
+        ink.add(new Ink(new Ellipse2D.Double(300, 300, 128, 128), ORANGE));
+        ink.add(new Ink(glyph, FIELD));
+        return ink;
+    }
+
+    private static void writeVariants() throws IOException {
+        Path preview = Path.of("artifacts/brand-preview/appliance-companion");
+        BufferedImage comparison = new BufferedImage(1536, 1024, BufferedImage.TYPE_INT_RGB);
+        Graphics2D sheet = graphics(comparison);
+        paintField(sheet, 1536, 1024);
+        sheet.drawImage(ImageIO.read(Path.of("artwork/tvheadend-player-banner.png").toFile()), 0, 0, 512, 288, null);
+        sheet.drawImage(renderLegacyIcon(96, false), 208, 320, null);
+        sheet.drawImage(ImageIO.read(Path.of("artwork/tvheadend-player-symbol.png").toFile()), 0, 464, null);
+        String[] densities = {"mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"};
+        double[] scales = {0.5, 0.75, 1, 1.5, 2};
+        int[] sizes = {48, 72, 96, 144, 192};
+        for (int variant = 0; variant < 2; variant++) {
+            boolean bug = variant == 1;
+            String name = bug ? "debug" : "appliance";
+            Path root = Path.of(bug ? "app/src/debug/res" : "appliance/src/main/res");
+            List<Ink> symbol = badgedMark(badgeGlyph(bug));
+            // Only the symbol SVG is a public variant export, never a Play listing icon.
+            StringBuilder svg = new StringBuilder("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"512\" height=\"512\" viewBox=\"0 0 512 512\">\n<title>Tvheadend Player "
+                    + (bug ? "Debug" : "Appliance") + "</title>\n<rect width=\"100%\" height=\"100%\" fill=\"#0F1014\"/>\n");
+            for (Ink item : symbol) svg.append("<path fill=\"")
+                    .append(String.format(Locale.ROOT, "#%06X", item.color().getRGB() & 0xFFFFFF))
+                    .append("\" d=\"").append(toPathData(item.shape())).append("\"/>\n");
+            Files.writeString(Path.of("artwork/tvheadend-player-" + name + "-symbol.svg"), svg.append("</svg>\n"));
+            List<Ink> banner = transformed(symbol, 0.1963, 15.35, 39.75);
+            text(banner, "Tvheadend Player", 21, 119, 76, TEXT);
+            text(banner, bug ? "Debug" : "Appliance", 36, 117, 116, CYAN);
+            for (int i = 0; i < densities.length; i++) {
+                writePng(render(320, 180, banner, scales[i]), root.resolve("drawable-" + densities[i] + "/banner.png"));
+                for (boolean round : new boolean[]{false, true}) {
+                    int size = sizes[i];
+                    BufferedImage icon = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+                    Graphics2D graphics = graphics(icon);
+                    graphics.setClip(round ? new Ellipse2D.Double(0, 0, size, size)
+                            : new RoundRectangle2D.Double(0, 0, size, size, size * .22, size * .22));
+                    graphics.drawImage(render(512, 512, symbol, 1), 0, 0, size, size, null);
+                    graphics.dispose();
+                    writePng(icon, root.resolve("mipmap-" + densities[i] + "/ic_launcher" + (round ? "_round" : "") + ".png"));
+                }
+            }
+            // The badge extends diagonally. Fit the WHOLE composition inside the
+            // circular 66dp safe zone, not merely its axis-aligned bounding square.
+            double scale = .56;
+            List<Ink> adaptive = transformed(symbol, scale, 216 - 256 * scale, 216 - 256 * scale);
+            Area monochrome = new Area();
+            BufferedImage foreground = new BufferedImage(432, 432, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D graphics = graphics(foreground);
+            for (Ink item : adaptive) {
+                Area outside = new Area(item.shape());
+                outside.subtract(new Area(new Ellipse2D.Double(84, 84, 264, 264)));
+                if (!outside.isEmpty()) throw new IllegalStateException("Variant outside circular adaptive safe zone");
+                graphics.setColor(item.color()); graphics.fill(item.shape());
+                if (item.color().equals(FIELD)) monochrome.subtract(new Area(item.shape()));
+                else monochrome.add(new Area(item.shape()));
+            }
+            graphics.dispose();
+            writePng(foreground, root.resolve("drawable/ic_launcher_foreground.png"));
+            Shape mono = AffineTransform.getScaleInstance(.25, .25).createTransformedShape(monochrome);
+            Files.writeString(root.resolve("drawable/ic_launcher_monochrome.xml"), """
+                    <?xml version="1.0" encoding="utf-8"?>
+                    <vector xmlns:android="http://schemas.android.com/apk/res/android"
+                        android:width="108dp" android:height="108dp"
+                        android:viewportWidth="108" android:viewportHeight="108">
+                        <path android:fillColor="#FFFFFFFF" android:pathData="%s" />
+                    </vector>
+                    """.formatted(toPathData(mono)));
+            if (!bug) {
+                writePng(renderAdaptiveBackground(), root.resolve("drawable/ic_launcher_background.png"));
+                for (String directory : new String[]{"mipmap-anydpi-v26", "mipmap-anydpi-v33"}) {
+                    Files.createDirectories(root.resolve(directory));
+                    for (String file : new String[]{"ic_launcher.xml", "ic_launcher_round.xml"})
+                        Files.copy(Path.of("app/src/main/res", directory, file), root.resolve(directory).resolve(file),
+                                java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
+            BufferedImage icon = render(512, 512, symbol, 1);
+            writePng(icon, preview.resolve(name + "-icon-512.png"));
+            writePng(render(320, 180, banner, 2), preview.resolve(name + "-banner-640x360.png"));
+            int x = (variant + 1) * 512;
+            sheet.drawImage(render(320, 180, banner, 1), x, 0, 512, 288, null);
+            sheet.drawImage(icon, x + 208, 320, 96, 96, null);
+            sheet.drawImage(icon, x, 464, null);
+        }
+        sheet.dispose();
+        writePng(comparison, preview.resolve("variants-compare.png"));
     }
 
     private static Graphics2D graphics(BufferedImage image) {
