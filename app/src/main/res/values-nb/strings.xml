@@ -715,4 +715,9 @@
         <item quantity="one">%1$d til planlagt</item>
         <item quantity="other">%1$d til planlagt</item>
     </plurals>
+    <string name="appliance_companion">Tilleggsapp for TV-modus</string>
+    <string name="appliance_companion_not_installed">Ikke installert</string>
+    <string name="appliance_companion_description">En valgfri tilleggsapp får Tvheadend Player til å fungere som TV-ens egen tunerapp. Den åpner spilleren når TV-en slås på, kan overta fjernkontrollknapper som TV og Guide og erstatte startskjermen. Det er en egen app fra prosjektets GitHub-utgivelser, og den oppdaterer seg selv derfra.</string>
+    <string name="appliance_companion_install_info">Skann koden eller åpne github.com/bernhardberger/tvheadend-player på en telefon eller datamaskin, og følg trinnene under «Appliance companion» for å sette den opp.</string>
+    <string name="appliance_companion_qr_description">QR-kode til oppsettstrinnene for tilleggsappen for TV-modus</string>
 </resources>

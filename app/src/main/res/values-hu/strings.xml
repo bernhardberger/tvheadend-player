@@ -715,4 +715,9 @@
         <item quantity="one">Még %1$d ütemezett</item>
         <item quantity="other">Még %1$d ütemezett</item>
     </plurals>
+    <string name="appliance_companion">TV-készülék mód kísérőalkalmazása</string>
+    <string name="appliance_companion_not_installed">Nincs telepítve</string>
+    <string name="appliance_companion_description">Egy választható kísérőalkalmazással a Tvheadend Player a tévé saját tuneralkalmazásához hasonlóan működik. A tévé bekapcsolásakor megnyitja a lejátszót, átveheti a távirányító gombjait, például a TV és a Guide gombot, és lecserélheti a kezdőképernyőt. Ez egy külön alkalmazás, amely a projekt GitHub-kiadásai között érhető el, és onnan frissíti magát.</string>
+    <string name="appliance_companion_install_info">A beállításhoz olvasd be a kódot, vagy nyisd meg a github.com/bernhardberger/tvheadend-player címet telefonon vagy számítógépen, majd kövesd az „Appliance companion” rész lépéseit.</string>
+    <string name="appliance_companion_qr_description">QR-kód a TV-készülék mód kísérőalkalmazásának beállítási lépéseihez</string>
 </resources>

@@ -358,6 +358,8 @@ fun VideoPlayerScreen(
     onShowGuide: (ChannelId, EpgEventEntry?) -> Unit = { _, _ -> },
     onPlayRecording: ((at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection) -> Unit)? = null,
     connectionUiState: at.bernhardberger.tvhplayer.core.ConnectionUiState? = null,
+    guideEntryRequestId: Long? = null,
+    consumeGuideEntry: () -> Boolean = { false },
 ) {
     val scope = rememberCoroutineScope()
     val layerState = rememberLivePlayerLayerState()
@@ -1115,6 +1117,11 @@ fun VideoPlayerScreen(
     val showDrawer = foregroundContext.channelDrawerVisible
     val seekPreviewPhase = foregroundContext.seekPreviewPhase
     val foregroundLayer = playerForegroundLayer(foregroundContext)
+    LaunchedEffect(guideEntryRequestId) {
+        if (guideEntryRequestId != null && consumeGuideEntry()) {
+            layerState.toggleSchedule(foregroundLayer, prepare = ::prepareSchedule)
+        }
+    }
     val chromeLayer = playerChromeLayer(foregroundContext)
     // The digits shown in the top identity's place; empty while another layer covers the entry.
     val numberEntry = channelNumberInput.takeIf { foregroundLayer == PlayerForegroundLayer.NUMBER_ENTRY }.orEmpty()

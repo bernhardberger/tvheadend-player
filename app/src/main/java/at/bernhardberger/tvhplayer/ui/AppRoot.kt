@@ -691,6 +691,14 @@ fun AppRoot(
     val effectiveStartupPresentation = if (coldStartVisible) coldStart.presentation else startupPresentation
     val applianceLaunchActive =
         effectiveStartupPresentation != MainStartupPresentation.Inactive || revealingTarget != null
+    // Pending Guide replaces Entering and can remove its startup cover. Route against the
+    // foreground before that request, not a live destination exposed by the request itself.
+    var guideForegroundPlayer by remember(profileGeneration) { mutableStateOf<LivePlayerKey?>(null) }
+    SideEffect {
+        if (guideRequest == null) guideForegroundPlayer = visibleLivePlayer.takeUnless { applianceLaunchActive }
+    }
+    val guideInLivePlayer = visibleLivePlayer != null && guideForegroundPlayer == visibleLivePlayer &&
+        effectiveStartupPresentation == MainStartupPresentation.Inactive && revealingTarget == null
     val navigationAllowed = when (val launchState = applianceLaunchState) {
         ApplianceLaunchState.Idle ->
             ((coldStartVisible && landingCatalogAvailable) || effectiveStartupPresentation == MainStartupPresentation.Inactive) &&
@@ -730,8 +738,10 @@ fun AppRoot(
         warm = backStack.isNotEmpty(),
         connectionSettingsVisible = currentDestination == SettingsKey(SettingsSection.CONNECTION),
     )
-    LaunchedEffect(guideRequest, guideEntryAction, currentDestination) {
+    LaunchedEffect(guideRequest, guideEntryAction, currentDestination, guideInLivePlayer) {
         val pending = guideRequest ?: return@LaunchedEffect
+        // The visible live player owns GUIDE, including its options/recovery no-op guards.
+        if (guideInLivePlayer) return@LaunchedEffect
         if (guideEntryAction == ApplianceGuideEntryAction.WAIT) return@LaunchedEffect
         if (!applianceLaunchRequests.cancel(pending)) return@LaunchedEffect
         when (guideEntryAction) {
@@ -1145,6 +1155,11 @@ fun AppRoot(
 
                     entry<LivePlayerKey> { destination ->
                         LivePlayerRouteContent(
+                            guideEntryRequestId = guideRequest?.request?.id
+                                ?.takeIf { currentDestination == destination && guideInLivePlayer },
+                            consumeGuideEntry = {
+                                guideRequest?.let(applianceLaunchRequests::cancel) == true
+                            },
                             onPlayRecording = { selection ->
                                 playerEntry.request(playbackSelectionScope) {
                                     browseStop?.join()

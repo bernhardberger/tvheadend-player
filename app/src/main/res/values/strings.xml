@@ -902,4 +902,10 @@
         <item quantity="one">%1$d more scheduled</item>
         <item quantity="other">%1$d more scheduled</item>
     </plurals>
+    <string name="appliance_companion">Appliance companion</string>
+    <string name="appliance_companion_not_installed">Not installed</string>
+    <string name="appliance_companion_description">An optional companion app makes Tvheadend Player behave like the TV\'s own tuner app. It opens the player when the TV turns on, can take over remote buttons such as TV and Guide, and can replace the home screen. It is a separate app from the project\'s GitHub releases and updates itself from there.</string>
+    <string name="appliance_companion_install_info">To set it up, scan the code or open github.com/bernhardberger/tvheadend-player on a phone or computer, then follow the steps under Appliance companion.</string>
+    <string name="appliance_companion_address" translatable="false">github.com/bernhardberger/tvheadend-player</string>
+    <string name="appliance_companion_qr_description">QR code for the appliance companion setup steps</string>
 </resources>

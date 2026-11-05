@@ -715,4 +715,9 @@
         <item quantity="one">%1$d till schemalagd</item>
         <item quantity="other">%1$d till schemalagda</item>
     </plurals>
+    <string name="appliance_companion">Kompanjonapp för tv-läge</string>
+    <string name="appliance_companion_not_installed">Inte installerad</string>
+    <string name="appliance_companion_description">En valfri kompanjonapp får Tvheadend Player att fungera som tv:ns egen tunerapp. Den öppnar spelaren när tv:n slås på, kan ta över fjärrkontrollsknappar som TV och Guide och ersätta startskärmen. Det är en separat app från projektets GitHub-utgåvor och den uppdaterar sig själv därifrån.</string>
+    <string name="appliance_companion_install_info">Skanna koden eller öppna github.com/bernhardberger/tvheadend-player på en telefon eller dator och följ stegen under ”Appliance companion” för att konfigurera appen.</string>
+    <string name="appliance_companion_qr_description">QR-kod till stegen för att konfigurera kompanjonappen för tv-läge</string>
 </resources>

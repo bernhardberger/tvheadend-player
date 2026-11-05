@@ -715,4 +715,9 @@
         <item quantity="one">%1$d kayıt daha planlandı</item>
         <item quantity="other">%1$d kayıt daha planlandı</item>
     </plurals>
+    <string name="appliance_companion">TV modu yardımcı uygulaması</string>
+    <string name="appliance_companion_not_installed">Yüklü değil</string>
+    <string name="appliance_companion_description">İsteğe bağlı bir yardımcı uygulama, Tvheadend Player\'ın TV\'nin yerleşik alıcı uygulaması gibi çalışmasını sağlar. TV açıldığında oynatıcıyı açar, TV ve Guide gibi kumanda düğmelerini devralabilir ve ana ekranın yerini alabilir. Projenin GitHub sürümlerinden edinilen ayrı bir uygulamadır ve kendini oradan günceller.</string>
+    <string name="appliance_companion_install_info">Kurulum için kodu tarayın veya bir telefon ya da bilgisayarda github.com/bernhardberger/tvheadend-player adresini açın, ardından “Appliance companion” bölümündeki adımları izleyin.</string>
+    <string name="appliance_companion_qr_description">TV modu yardımcı uygulamasının kurulum adımları için QR kodu</string>
 </resources>

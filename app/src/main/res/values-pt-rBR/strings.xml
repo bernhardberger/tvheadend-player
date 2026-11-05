@@ -672,4 +672,9 @@
         <item quantity="many">Mais %1$d agendadas</item>
         <item quantity="other">Mais %1$d agendadas</item>
     </plurals>
+    <string name="appliance_companion">App complementar do modo TV</string>
+    <string name="appliance_companion_not_installed">Não instalado</string>
+    <string name="appliance_companion_description">Um app complementar opcional faz o Tvheadend Player funcionar como o app de sintonizador integrado à TV. Ele abre o player quando a TV é ligada, pode assumir botões do controle remoto, como TV e Guide, e substituir a tela inicial. É um app separado, disponível nas versões do projeto no GitHub, de onde ele se atualiza.</string>
+    <string name="appliance_companion_install_info">Para configurar, escaneie o código ou abra github.com/bernhardberger/tvheadend-player em um celular ou computador e siga as etapas da seção “Appliance companion”.</string>
+    <string name="appliance_companion_qr_description">Código QR para as etapas de configuração do app complementar do modo TV</string>
 </resources>

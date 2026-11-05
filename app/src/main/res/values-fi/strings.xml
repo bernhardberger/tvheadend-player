@@ -715,4 +715,9 @@
         <item quantity="one">Vielä %1$d ajastettu</item>
         <item quantity="other">Vielä %1$d ajastettua</item>
     </plurals>
+    <string name="appliance_companion">TV-tilan lisäsovellus</string>
+    <string name="appliance_companion_not_installed">Ei asennettu</string>
+    <string name="appliance_companion_description">Valinnainen lisäsovellus saa Tvheadend Playerin toimimaan kuten television oma viritinsovellus. Se avaa soittimen, kun televisio käynnistyy, voi ottaa haltuunsa kaukosäätimen painikkeita, kuten TV ja Guide, ja korvata aloitusnäytön. Se on erillinen sovellus projektin GitHub-julkaisuista ja päivittää itsensä sieltä.</string>
+    <string name="appliance_companion_install_info">Ota sovellus käyttöön skannaamalla koodi tai avaamalla github.com/bernhardberger/tvheadend-player puhelimella tai tietokoneella ja seuraamalla osion ”Appliance companion” ohjeita.</string>
+    <string name="appliance_companion_qr_description">QR-koodi TV-tilan lisäsovelluksen käyttöönotto-ohjeisiin</string>
 </resources>

@@ -779,4 +779,9 @@
         <item quantity="many">%1$d تسجيلًا إضافيًا مجدولًا</item>
         <item quantity="other">%1$d تسجيل إضافي مجدول</item>
     </plurals>
+    <string name="appliance_companion">التطبيق المرافق لوضع الجهاز المخصّص</string>
+    <string name="appliance_companion_not_installed">غير مثبّت</string>
+    <string name="appliance_companion_description">يجعل تطبيق مرافق اختياري Tvheadend Player يعمل مثل تطبيق موالف القنوات الخاص بالتلفزيون. يفتح المشغّل عند تشغيل التلفزيون، ويمكنه تولّي وظائف أزرار جهاز التحكم مثل TV وGuide، واستبدال الشاشة الرئيسية. وهو تطبيق منفصل متاح ضمن إصدارات المشروع على GitHub، ويحدّث نفسه من هناك.</string>
+    <string name="appliance_companion_install_info">للإعداد، يمكن مسح الرمز أو فتح github.com/bernhardberger/tvheadend-player على هاتف أو كمبيوتر، ثم اتباع الخطوات ضمن قسم «Appliance companion».</string>
+    <string name="appliance_companion_qr_description">رمز QR لخطوات إعداد التطبيق المرافق لوضع الجهاز المخصّص</string>
 </resources>

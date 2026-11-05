@@ -715,4 +715,9 @@
         <item quantity="one">Nog %1$d gepland</item>
         <item quantity="other">Nog %1$d gepland</item>
     </plurals>
+    <string name="appliance_companion">Begeleidende app voor tv-modus</string>
+    <string name="appliance_companion_not_installed">Niet geïnstalleerd</string>
+    <string name="appliance_companion_description">Een optionele begeleidende app laat Tvheadend Player werken als de ingebouwde tunerapp van de tv. De app opent de speler wanneer de tv aangaat, kan afstandsbedieningsknoppen zoals TV en Guide overnemen en het startscherm vervangen. Het is een aparte app uit de GitHub-releases van het project die zichzelf daarvandaan bijwerkt.</string>
+    <string name="appliance_companion_install_info">Scan de code of open github.com/bernhardberger/tvheadend-player op een telefoon of computer en volg de stappen onder ‘Appliance companion’ om de app in te stellen.</string>
+    <string name="appliance_companion_qr_description">QR-code voor de instelstappen van de begeleidende app voor tv-modus</string>
 </resources>

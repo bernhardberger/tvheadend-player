@@ -731,4 +731,9 @@
         <item quantity="one">%1$d weitere geplant</item>
         <item quantity="other">%1$d weitere geplant</item>
     </plurals>
+    <string name="appliance_companion">TV-Start-Begleitapp</string>
+    <string name="appliance_companion_not_installed">Nicht installiert</string>
+    <string name="appliance_companion_description">Eine optionale Begleitapp lässt Tvheadend Player wie die eingebaute Tuner-App des Fernsehers funktionieren. Sie öffnet den Player beim Einschalten des Fernsehers, kann Fernbedienungstasten wie TV und Guide übernehmen und den Startbildschirm ersetzen. Sie ist eine separate App aus den GitHub-Veröffentlichungen des Projekts und aktualisiert sich von dort selbst.</string>
+    <string name="appliance_companion_install_info">Scanne zur Einrichtung den Code oder öffne github.com/bernhardberger/tvheadend-player auf einem Smartphone oder Computer und folge den Schritten unter „Appliance companion“.</string>
+    <string name="appliance_companion_qr_description">QR-Code zur Einrichtung der TV-Start-Begleitapp</string>
 </resources>

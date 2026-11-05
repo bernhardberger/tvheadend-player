@@ -732,4 +732,9 @@
         <item quantity="few">Još %1$d zakazana snimanja</item>
         <item quantity="other">Još %1$d zakazanih snimanja</item>
     </plurals>
+    <string name="appliance_companion">Prateća aplikacija za način TV prijamnika</string>
+    <string name="appliance_companion_not_installed">Nije instalirana</string>
+    <string name="appliance_companion_description">Neobavezna prateća aplikacija omogućuje da Tvheadend Player radi poput ugrađene aplikacije TV prijamnika. Otvara reproduktor pri uključivanju televizora, može preuzeti tipke daljinskog upravljača kao što su TV i Guide te zamijeniti početni zaslon. To je zasebna aplikacija dostupna u izdanjima projekta na GitHubu i odatle se sama ažurira.</string>
+    <string name="appliance_companion_install_info">Za postavljanje skeniraj kôd ili otvori github.com/bernhardberger/tvheadend-player na telefonu ili računalu, a zatim slijedi korake u odjeljku „Appliance companion”.</string>
+    <string name="appliance_companion_qr_description">QR kôd s koracima za postavljanje prateće aplikacije za način TV prijamnika</string>
 </resources>

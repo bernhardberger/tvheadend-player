@@ -163,7 +163,7 @@ class TvFocusArrivalLookTest {
         host {
             val navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.PLAYER.name)
             SideRail(currentRoute = AppDestination.SETTINGS, onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
-                SettingsScreenNavigation(navigation, listOf(settingsRootLevel(false),
+                SettingsScreenNavigation(navigation, listOf(settingsRootLevel(),
                     settingsPlayerLevel(SettingsPlayerUiState(), {}), settingsWarmPlaybackLevel(WarmPlaybackMode.ON) {}),
                     initialFocusEnabled = !drawerActive, contentPadding = padding)
             }

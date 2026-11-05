@@ -88,7 +88,7 @@ class SettingsDepthNavigationTest {
                 Box(Modifier.semantics { testTagsAsResourceId = true }) {
                     SideRail(currentRoute = AppDestination.SETTINGS,
                         onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
-                        SettingsScreenNavigation(navigation, listOf(settingsRootLevel(false),
+                        SettingsScreenNavigation(navigation, listOf(settingsRootLevel(),
                             settingsPlayerLevel(SettingsPlayerUiState(), {}),
                             settingsWarmPlaybackLevel(WarmPlaybackMode.ON) {}),
                             initialFocusEnabled = !drawerActive, contentPadding = padding)
@@ -198,7 +198,7 @@ class SettingsDepthNavigationTest {
                 val scope = rememberCoroutineScope()
                 ApplyUiPresentationSettings(settings)
                 Box(Modifier.semantics { testTagsAsResourceId = true }) {
-                    SettingsScreenNavigation(navigation, listOf(settingsRootLevel(false)) + settingsGeneralLevels(
+                    SettingsScreenNavigation(navigation, listOf(settingsRootLevel()) + settingsGeneralLevels(
                         settings, AppLanguage.SYSTEM, CacheStatistics.EMPTY, CacheClearState.IDLE,
                         onSelectLanguage = {}, onClearCache = {},
                         onToggleChannelNumbers = { scope.launch { store.setShowChannelNumbers(!settings.showChannelNumbers) } },
@@ -250,7 +250,7 @@ class SettingsDepthNavigationTest {
                 Box(Modifier.semantics { testTagsAsResourceId = true }) {
                     SideRail(currentRoute = AppDestination.SETTINGS,
                         onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
-                        SettingsScreenNavigation(navigation, listOf(settingsRootLevel(false),
+                        SettingsScreenNavigation(navigation, listOf(settingsRootLevel(),
                             settingsPlayerLevel(ui,
                                 onTimeshiftEnabledChanged = { ui = ui.copy(timeshiftEnabled = it) },
                                 onAutoStartPlaybackChanged = { ui = ui.copy(autoStartPlayback = it) },
@@ -458,8 +458,8 @@ class SettingsDepthNavigationTest {
                 assertTrue(settingsRecordingLevels(listOf(profile), null) {}.isEmpty())
                 val spaceOnly = settingsRecordingLevels(listOf(profile), null, "412 GB free of 2 TB") {}
                 assertTrue(spaceOnly.single().rows.map { it.item.id } == listOf(RECORDING_SPACE_ROW))
-                assertFalse(settingsRootLevel(false, showRecordings = false).rows.any { it.item.id == RECORDINGS_LEVEL })
-                assertTrue(settingsRootLevel(false, showRecordings = true).rows.any { it.item.id == RECORDINGS_LEVEL })
+                assertFalse(settingsRootLevel(showRecordings = false).rows.any { it.item.id == RECORDINGS_LEVEL })
+                assertTrue(settingsRootLevel(showRecordings = true).rows.any { it.item.id == RECORDINGS_LEVEL })
             }
         }
     }
@@ -469,7 +469,7 @@ class SettingsDepthNavigationTest {
         compose.setContent {
             TVHeadendPlayerTheme {
                 SettingsScreenNavigation(rememberDepthNavigationState(SETTINGS_ROOT, RECORDINGS_LEVEL),
-                    listOf(settingsRootLevel(false, showRecordings = true)) +
+                    listOf(settingsRootLevel(showRecordings = true)) +
                         settingsRecordingLevels(profiles, null, "412 GB free of 2 TB") {})
             }
         }
@@ -488,7 +488,7 @@ class SettingsDepthNavigationTest {
         compose.setContent {
             TVHeadendPlayerTheme {
                 SettingsScreenNavigation(rememberDepthNavigationState(SETTINGS_ROOT, RECORDINGS_LEVEL),
-                    listOf(settingsRootLevel(false, showRecordings = true)) +
+                    listOf(settingsRootLevel(showRecordings = true)) +
                         settingsRecordingLevels(profiles, null, "412 GB free of 2 TB") {})
             }
         }
@@ -515,7 +515,7 @@ class SettingsDepthNavigationTest {
                 val settings by store.settings.collectAsState(initial = UiSettings())
                 val scope = rememberCoroutineScope()
                 val navigation = rememberDepthNavigationState(SETTINGS_ROOT, RECORDINGS_LEVEL)
-                SettingsScreenNavigation(navigation, listOf(settingsRootLevel(false, showRecordings = true)) +
+                SettingsScreenNavigation(navigation, listOf(settingsRootLevel(showRecordings = true)) +
                     settingsRecordingLevels(profiles, settings.recordingProfileId) { id ->
                         scope.launch { store.setRecordingProfile(id); navigation.pop() }
                     })
@@ -629,21 +629,65 @@ class SettingsDepthNavigationTest {
         }
     }
 
-    @Test fun bothRootsEndWithAboutAndApplianceAddsItsOwnSectionBeforeIt() {
-        lateinit var play: DepthLevel
-        lateinit var appliance: DepthLevel
+    @Test fun rootAlwaysIncludesApplianceImmediatelyBeforeAbout() {
+        lateinit var root: DepthLevel
         compose.setContent {
             TVHeadendPlayerTheme {
-                play = settingsRootLevel(companionInstalled = false)
-                appliance = settingsRootLevel(companionInstalled = true)
+                root = settingsRootLevel()
             }
         }
         compose.runOnIdle {
             val sections = listOf(SettingsSection.GENERAL, SettingsSection.CONNECTION,
                 SettingsSection.CHANNEL_TAGS, SettingsSection.PLAYER, SettingsSection.AUDIO).map { it.name }
-            assertEquals(sections + ABOUT_LEVEL, play.rows.map { it.item.id })
-            assertEquals(sections + SettingsSection.APPLIANCE.name + ABOUT_LEVEL, appliance.rows.map { it.item.id })
+            assertEquals(sections + SettingsSection.APPLIANCE.name + ABOUT_LEVEL, root.rows.map { it.item.id })
         }
+    }
+
+    @Test fun missingCompanionReaderScrollsAndBackRestoresApplianceThenInstallationShowsSetup() {
+        var installed by mutableStateOf(false)
+        var setups = 0
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                SettingsScreenNavigation(rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.APPLIANCE.name),
+                    listOf(settingsRootLevel(), settingsApplianceLevel(false, { setups++ }, installed)))
+            }
+        }
+        compose.onNode(isFocused() and hasText("Appliance")).assertExists()
+        press(Key.DirectionRight)
+        compose.onNode(isFocused() and hasText("Not installed", substring = true)).assertExists()
+        repeat(14) { press(Key.DirectionDown) }
+        compose.onNodeWithContentDescription("QR code for the appliance companion download and installation information")
+            .assertIsDisplayed()
+        press(Key.Back)
+        compose.onNode(isFocused() and hasText("Appliance")).assertExists()
+        compose.runOnIdle { installed = true }
+        press(Key.DirectionCenter)
+        compose.onNode(isFocused() and hasText("Appliance setup")).assertExists()
+        compose.onNodeWithText("Not installed").assertDoesNotExist()
+        press(Key.DirectionCenter)
+        assertEquals(1, setups)
+        press(Key.Back)
+        compose.onNode(isFocused() and hasText("Appliance")).assertExists()
+    }
+
+    @Test fun installingCompanionWhileItsReaderIsOpenFocusesSetupAndKeepsBackWorking() {
+        var installed by mutableStateOf(false)
+        var setups = 0
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                SettingsScreenNavigation(rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.APPLIANCE.name),
+                    listOf(settingsRootLevel(), settingsApplianceLevel(false, { setups++ }, installed)))
+            }
+        }
+        press(Key.DirectionCenter)
+        compose.onNode(isFocused() and hasText("Not installed", substring = true)).assertExists()
+        compose.runOnIdle { installed = true }
+        compose.onNode(isFocused() and hasText("Appliance setup")).assertExists()
+        compose.onNodeWithText("Not installed").assertDoesNotExist()
+        press(Key.DirectionCenter)
+        assertEquals(1, setups)
+        press(Key.Back)
+        compose.onNode(isFocused() and hasText("Appliance")).assertExists()
     }
 
     /** A Settings link names its section; the root opens with that section's row focused, wherever it sits now. */
@@ -653,7 +697,7 @@ class SettingsDepthNavigationTest {
             TVHeadendPlayerTheme {
                 key(section) {
                     SettingsScreenNavigation(rememberDepthNavigationState(SETTINGS_ROOT, section.name),
-                        listOf(settingsRootLevel(companionInstalled = true)))
+                        listOf(settingsRootLevel()))
                 }
             }
         }
@@ -678,7 +722,7 @@ class SettingsDepthNavigationTest {
                         at.bernhardberger.tvhplayer.data.ConnectionFailureKind.UNREACHABLE,
                         at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition.EXPLICIT_RETRY)))
                 SettingsScreenNavigation(rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.CONNECTION.name),
-                    listOf(settingsRootLevel(companionInstalled = false, connectionStatus = status.title)))
+                    listOf(settingsRootLevel(connectionStatus = status.title)))
             }
         }
         val reason = requireNotNull(status.reason) // The overview page shows both lines.
@@ -694,7 +738,7 @@ class SettingsDepthNavigationTest {
         compose.setContent {
             TVHeadendPlayerTheme {
                 navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.PLAYER.name)
-                SettingsScreenNavigation(navigation, listOf(settingsRootLevel(false),
+                SettingsScreenNavigation(navigation, listOf(settingsRootLevel(),
                     settingsPlayerLevel(ui, { ui = ui.copy(timeshiftEnabled = it) }),
                     settingsKeepChannelLevel(ui.keepChannelMinutes) { ui = ui.copy(keepChannelMinutes = it); navigation.pop() }))
             }
@@ -741,7 +785,7 @@ class SettingsDepthNavigationTest {
         compose.setContent {
             TVHeadendPlayerTheme {
                 navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.PLAYER.name)
-                SettingsScreenNavigation(navigation, listOf(settingsRootLevel(false), settingsPlayerLevel(ui, {}),
+                SettingsScreenNavigation(navigation, listOf(settingsRootLevel(), settingsPlayerLevel(ui, {}),
                     settingsStreamProfileLevel(ui) { picks += it; ui = ui.copy(selectedProfileId = it); navigation.pop() }))
             }
         }
@@ -796,7 +840,7 @@ class SettingsDepthNavigationTest {
                     {}, onAutoStartPlaybackChanged = { enabled ->
                         scope.launch { store.setAutoStartPlayback(enabled) }
                     })
-                SettingsScreenNavigation(navigation, listOf(settingsRootLevel(applianceBuild), player))
+                SettingsScreenNavigation(navigation, listOf(settingsRootLevel(), player))
             }
         }
         val autoplay = "Start playback when the app opens"
@@ -1284,13 +1328,13 @@ class SettingsDepthNavigationTest {
                     WarmPlaybackScrim() // This fixture explicitly models warm playback.
                     SideRail(currentRoute = AppDestination.SETTINGS,
                         onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
-                        SettingsScreenNavigation(navigation, listOf(settingsRootLevel(companionInstalled = true),
+                        SettingsScreenNavigation(navigation, listOf(settingsRootLevel(),
                             settingsChannelTagsLevel(emptyList(), ChannelScopeVisibility(), loaded, failed,
                                 { retries++ }, { toggles++ }),
                             settingsPlayerLevel(SettingsPlayerUiState(profiles = StreamProfilesResult.Failed(TvheadendFailure.ACCESS_DENIED)),
                                 { settingsActions++ }, { settingsActions++ }, { settingsActions++ }),
                             settingsAudioLevel(SettingsPlayerUiState(), { settingsActions++ }, { settingsActions++ }),
-                            settingsApplianceLevel(false, { settingsActions++ }),
+                            settingsApplianceLevel(false, { settingsActions++ }, companionInstalled = true),
                         ), initialFocusEnabled = ready && !drawerActive, contentPadding = padding)
                     }
                 }

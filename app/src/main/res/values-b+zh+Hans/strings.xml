@@ -669,4 +669,9 @@
     <plurals name="home_upcoming_more">
         <item quantity="other">另有 %1$d 项录制计划</item>
     </plurals>
+    <string name="appliance_companion">电视模式配套应用</string>
+    <string name="appliance_companion_not_installed">未安装</string>
+    <string name="appliance_companion_description">可选的配套应用让 Tvheadend Player 像电视自带的调谐器应用一样工作。它会在电视开机时打开播放器，可以接管遥控器上的 TV、Guide 等按键，还可以替换主屏幕。它是独立应用，可从项目的 GitHub 发布页面获取，并从那里自行更新。</string>
+    <string name="appliance_companion_install_info">要进行设置，请扫描二维码，或在手机或电脑上打开 github.com/bernhardberger/tvheadend-player，然后按照“Appliance companion”部分的步骤操作。</string>
+    <string name="appliance_companion_qr_description">电视模式配套应用设置步骤的二维码</string>
 </resources>

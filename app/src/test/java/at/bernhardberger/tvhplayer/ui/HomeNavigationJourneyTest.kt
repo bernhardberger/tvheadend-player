@@ -98,18 +98,81 @@ class HomeNavigationJourneyTest {
         compose.onNodeWithTag("nav-home").assertIsFocused()
     }
 
-    @Test fun warmGuideEntryLeavesFullScreenAndRepeatedEntryKeepsGuideFocusAndPosition() {
+    @Test fun guideEntryInTheSameFrameAsPlaybackBecomesVisibleOpensFullGuide() {
+        compose.mainClock.autoAdvance = false
+        fixture.app(autoStartPlayback = true)
+        compose.runOnIdle {
+            val entering = fixture.launchRequests.state.value as ApplianceLaunchState.Entering
+            fixture.launchRequests.completePlayerVisibility(entering.target, entering.target.channelId, entering.target.channelName)
+            fixture.launchRequests.request(at.bernhardberger.tvhplayer.core.ApplianceEntryDestination.GUIDE)
+        }
+        fixture.settle()
+        compose.onNodeWithTag("epg-screen").assertExists()
+        compose.onNodeWithTag("channel-schedule-panel").assertDoesNotExist()
+        compose.runOnIdle {
+            assertFalse(fixture.playerVisible)
+            assertEquals(ApplianceLaunchState.Idle, fixture.launchRequests.state.value)
+        }
+    }
+
+    @Test fun warmGuideEntryTogglesScheduleWithoutLeavingLivePlayer() {
         compose.mainClock.autoAdvance = false
         fixture.app(autoStartPlayback = true)
         compose.runOnIdle {
             assertTrue(fixture.playerVisible)
             val entering = fixture.launchRequests.state.value as ApplianceLaunchState.Entering
             fixture.launchRequests.completePlayerVisibility(entering.target, entering.target.channelId, entering.target.channelName)
+        }
+        fixture.settle()
+        compose.runOnIdle {
             fixture.launchRequests.request(at.bernhardberger.tvhplayer.core.ApplianceEntryDestination.GUIDE)
         }
         fixture.settle()
-        compose.onNodeWithTag("guide-filter-button").assertExists()
-        compose.runOnIdle { assertFalse(fixture.playerVisible) }
+        compose.onNodeWithTag("channel-schedule-panel").assertExists()
+        compose.onNodeWithTag("epg-screen").assertDoesNotExist()
+        compose.runOnIdle { assertTrue(fixture.playerVisible) }
+        compose.runOnIdle {
+            fixture.launchRequests.request(at.bernhardberger.tvhplayer.core.ApplianceEntryDestination.GUIDE)
+        }
+        fixture.settle()
+        compose.onNodeWithTag("channel-schedule-panel").assertDoesNotExist()
+        compose.onNodeWithTag("epg-screen").assertDoesNotExist()
+        compose.runOnIdle {
+            assertTrue(fixture.playerVisible)
+            assertEquals(ApplianceLaunchState.Idle, fixture.launchRequests.state.value)
+        }
+    }
+
+    @Test fun warmGuideEntryWithOptionsOpenKeepsOptionsAndDoesNotNavigate() {
+        compose.mainClock.autoAdvance = false
+        fixture.app(autoStartPlayback = true)
+        compose.runOnIdle {
+            val entering = fixture.launchRequests.state.value as ApplianceLaunchState.Entering
+            fixture.launchRequests.completePlayerVisibility(entering.target, entering.target.channelId, entering.target.channelName)
+        }
+        fixture.settle()
+        fixture.key(Key.Menu)
+        compose.onNodeWithTag("playback-options-title").assertExists()
+        compose.runOnIdle {
+            fixture.launchRequests.request(at.bernhardberger.tvhplayer.core.ApplianceEntryDestination.GUIDE)
+        }
+        fixture.settle()
+        compose.onNodeWithTag("playback-options-title").assertExists()
+        compose.onNodeWithTag("channel-schedule-panel").assertDoesNotExist()
+        compose.onNodeWithTag("epg-screen").assertDoesNotExist()
+        compose.runOnIdle {
+            assertTrue(fixture.playerVisible)
+            assertEquals(ApplianceLaunchState.Idle, fixture.launchRequests.state.value)
+        }
+    }
+
+    @Test fun guideEntryFromChannelsOpensFullGuideAndRepeatingItKeepsFocusAndPosition() {
+        fixture.app()
+        compose.runOnIdle {
+            fixture.launchRequests.request(at.bernhardberger.tvhplayer.core.ApplianceEntryDestination.GUIDE)
+        }
+        fixture.settle()
+        compose.onNodeWithTag("epg-screen").assertExists()
         fixture.focus("guide-filter-button")
         val position = fixture.guidePosition.position.value
         compose.runOnIdle {
@@ -118,6 +181,7 @@ class HomeNavigationJourneyTest {
         fixture.settle()
         compose.onNodeWithTag("guide-filter-button").assertIsFocused()
         compose.runOnIdle {
+            assertFalse(fixture.playerVisible)
             assertEquals(position, fixture.guidePosition.position.value)
             assertEquals(ApplianceLaunchState.Idle, fixture.launchRequests.state.value)
         }

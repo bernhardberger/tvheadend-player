@@ -98,6 +98,23 @@ internal class LivePlayerLayerState(
         } else { core.restoreControl = null; core.chrome.hideControls() }
     }
 
+    /** Shared GUIDE action for the remote key and a companion entry on the visible live player. */
+    fun toggleSchedule(
+        foregroundLayer: PlayerForegroundLayer = at.bernhardberger.tvhplayer.core.playerForegroundLayer(foregroundContext()),
+        openingKeyCode: Int? = null,
+        prepare: () -> Unit = {},
+    ) {
+        // Options own a preview/undo session; do not dispose it to cover it with Schedule.
+        if (core.optionsPage != null) return
+        if (foregroundLayer in setOf(PlayerForegroundLayer.RECOVERY, PlayerForegroundLayer.TERMINAL_ERROR,
+                PlayerForegroundLayer.CONFIRMATION)) return
+        openingKeyCode?.let(core::beginOpeningKeyCycle)
+        if (scheduleOpen) closeSchedule() else {
+            prepare()
+            openSchedule(fromKey = true)
+        }
+    }
+
     /** Own GUIDE's whole cycle; navigation in the sheet must not become a player seek/reveal. */
     fun handleScheduleKey(
         event: KeyEvent,
@@ -107,16 +124,8 @@ internal class LivePlayerLayerState(
         val code = event.nativeKeyEvent.keyCode
         if (scheduleOpen && core.consumesRevealingKey(event)) return true
         if (code == AndroidKeyEvent.KEYCODE_GUIDE) {
-            // Options own a preview/undo session; do not dispose it to cover it with Schedule.
-            if (core.optionsPage != null) return true
-            if (foregroundLayer in setOf(PlayerForegroundLayer.RECOVERY, PlayerForegroundLayer.TERMINAL_ERROR,
-                    PlayerForegroundLayer.CONFIRMATION)) return true
             if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
-                core.beginOpeningKeyCycle(code)
-                if (scheduleOpen) closeSchedule() else {
-                    prepare()
-                    openSchedule(fromKey = true)
-                }
+                toggleSchedule(foregroundLayer, code, prepare)
             }
             if (event.type == KeyEventType.KeyUp) core.endOpeningKeyCycle(code)
             return true
