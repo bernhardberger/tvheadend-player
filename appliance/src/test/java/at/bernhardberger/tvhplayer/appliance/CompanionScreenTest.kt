@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.appliance
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.os.SystemClock
 import android.view.View
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,6 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -19,6 +21,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.isFocusable
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -34,6 +37,7 @@ import at.bernhardberger.tvhplayer.appliance.update.UpdateScreenState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import java.io.File
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -52,6 +56,7 @@ import org.robolectric.annotation.GraphicsMode
 class CompanionScreenTest {
     @get:Rule val compose = createComposeRule()
     private lateinit var view: View
+    private lateinit var backDispatcher: androidx.activity.OnBackPressedDispatcher
     private val activated = mutableListOf<CompanionRow>()
 
     private val ready = CompanionScreenState(
@@ -146,21 +151,21 @@ class CompanionScreenTest {
         show(failed)
         focused("Tvheadend Player")
         // The message lives in the update row, below the fold; walk to it as the remote would.
-        repeat(6) { press(Key.DirectionDown) }
+        repeat(9) { press(Key.DirectionDown) }
         focused("Couldn't check for updates")
         save("en-font1.0-update-error")
     }
 
     @Test fun automaticUpdatesFocused() {
         show(ready)
-        repeat(5) { press(Key.DirectionDown) }
+        repeat(8) { press(Key.DirectionDown) }
         focused("Automatic updates")
         save("en-font1.0-automatic-updates-focused")
     }
 
     @Test fun updateUpToDate() {
         show(ready)
-        repeat(6) { press(Key.DirectionDown) }
+        repeat(9) { press(Key.DirectionDown) }
         focused("Check for updates")
         save("en-font1.0-update-up-to-date-focused")
         // Focus back up keeps the list scrolled, so the resting update row shows in full.
@@ -185,7 +190,8 @@ class CompanionScreenTest {
     @Test fun downReachesEveryRowInOrderAndUpComesBack() {
         show(toFix.copy(playerVersion = "0.4.2", installAllowed = true))
         focused("Accessibility service")
-        for (title in listOf("HOME app", "Install unknown apps", "Automatic updates", "Check for updates")) {
+        for (title in listOf("HOME app", "Open when the TV turns on", "Open live TV", "Open the Guide",
+            "Install unknown apps", "Automatic updates", "Check for updates")) {
             press(Key.DirectionDown)
             focused(title)
         }
@@ -239,9 +245,350 @@ class CompanionScreenTest {
 
     @Test fun anIdleUpdateRowReportsTheClick() {
         show(ready.copy(hasSystemHome = false))
-        repeat(5) { press(Key.DirectionDown) }
+        repeat(8) { press(Key.DirectionDown) }
         focused("Check for updates")
         press(Key.DirectionCenter)
         assertEquals(listOf(CompanionRow.UPDATE), activated)
+    }
+
+    // ---- Functions: the section on the main screen, the function pages and the capture ----
+
+    private var content by mutableStateOf(ready)
+    private var capture by mutableStateOf<CaptureState>(CaptureState.Idle)
+    private val capturesStarted = mutableListOf<CompanionFunction>()
+    private var capturesCancelled = 0
+
+    private fun withButtons(
+        liveTv: ButtonBinding = ButtonBinding.Default,
+        guide: ButtonBinding = ButtonBinding.Default,
+        service: CompanionServiceStatus = CompanionServiceStatus.ON,
+    ) = ready.copy(accessibilityStatus = service, functions = CompanionFunctions(true, liveTv, guide))
+
+    /** The whole content, with the service and the store replaced by in-memory stand-ins. */
+    private fun showContent(initial: CompanionScreenState) {
+        content = initial
+        capture = CaptureState.Idle
+        compose.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(1f, 1f)) {
+                TVHeadendPlayerTheme {
+                    view = LocalView.current
+                    backDispatcher = LocalOnBackPressedDispatcherOwner.current!!.onBackPressedDispatcher
+                    CompanionContent(
+                        state = content,
+                        capture = capture,
+                        onRow = { activated += it },
+                        onStartCapture = {
+                            capturesStarted += it
+                            capture = CaptureState.Waiting(it, SystemClock.elapsedRealtime() + ButtonCapture.TIMEOUT_MILLIS)
+                            true
+                        },
+                        onCancelCapture = {
+                            capturesCancelled++
+                            capture = CaptureState.Cancelled
+                        },
+                        onAssign = { function, binding ->
+                            content.functions.assign(function, binding).also {
+                                content = content.copy(functions = it.functions)
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
+                    )
+                }
+            }
+        }
+        compose.waitForIdle()
+    }
+
+    /** Back reaches the screen through the activity's dispatcher, as the system delivers it. */
+    private fun back() {
+        compose.runOnIdle { backDispatcher.onBackPressed() }
+        compose.waitForIdle()
+    }
+
+    private fun down(times: Int) = repeat(times) { press(Key.DirectionDown) }
+
+    /** The remote's Down presses from the first row to the live TV or Guide row. */
+    private fun openFunction(function: CompanionFunction, from: Int = 0) {
+        down((if (function == CompanionFunction.LIVE_TV) 5 else 6) - from)
+        focused(if (function == CompanionFunction.LIVE_TV) "Open live TV" else "Open the Guide")
+        press(Key.DirectionCenter)
+    }
+
+    /** Shows [next] with the clock stopped, so the capture card's countdown starts at its deadline. */
+    private fun setWhileFrozen(next: CaptureState) {
+        compose.mainClock.autoAdvance = false
+        compose.runOnUiThread {
+            capture = next
+            androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications()
+        }
+        compose.mainClock.advanceTimeBy(48)
+    }
+
+    private fun nothingIsFocusable() = compose.onAllNodes(isFocusable()).assertCountEquals(0)
+
+    @Test fun functionsAllSetTop() {
+        showContent(withButtons())
+        focused("Tvheadend Player")
+        compose.onNodeWithText("This TV opens Tvheadend Player at startup, on HOME and with the TV and Guide buttons.")
+            .assertExists()
+        save("functions-01-all-set-top")
+    }
+
+    @Test fun functionsDefault() {
+        showContent(withButtons())
+        down(6)
+        focused("Open the Guide")
+        compose.onNodeWithText("Open when the TV turns on").assertExists()
+        compose.onAllNodesWithText("Paused until the service is on").assertCountEquals(0)
+        save("functions-02-functions-default")
+    }
+
+    @Test fun anAccessibilityServiceBlockedByTheTvIsFixedOverAdbAndCheckedAgainWithOk() {
+        showContent(withButtons(service = CompanionServiceStatus.BLOCKED))
+        compose.onNodeWithText("Blocked by this TV").assertExists()
+        compose.onNodeWithText("Paused until the service can run").assertExists()
+        focused("Accessibility service")
+        compose.onNodeWithText("Blocked").assertExists()
+        press(Key.DirectionCenter)
+        assertEquals(listOf(CompanionRow.ACCESSIBILITY), activated)
+        save("functions-03-accessibility-blocked")
+    }
+
+    @Test fun anOffServiceNamesTheFunctionsAsPaused() {
+        showContent(withButtons(service = CompanionServiceStatus.OFF))
+        compose.onNodeWithText("Paused until the service is on").assertExists()
+    }
+
+    @Test fun functionStatesShowAChangedButtonAndAFunctionThatIsOff() {
+        showContent(withButtons(liveTv = ButtonBinding.Custom(4001), guide = ButtonBinding.NotSet))
+        down(6)
+        focused("Open the Guide")
+        compose.onNodeWithText("Button 4001").assertExists()
+        compose.onNodeWithText("Default: TV button").assertExists()
+        compose.onNodeWithText("Function off").assertExists()
+        assertEquals("Not set", compose.onNodeWithText("Open the Guide")
+            .fetchSemanticsNode().config[SemanticsProperties.StateDescription])
+        save("functions-04-function-states")
+    }
+
+    @Test fun theStartupSwitchReportsItsRowAndKeepsItsState() {
+        showContent(withButtons())
+        down(4)
+        focused("Open when the TV turns on")
+        val config = compose.onNodeWithText("Open when the TV turns on").fetchSemanticsNode().config
+        assertEquals(Role.Switch, config[SemanticsProperties.Role])
+        assertEquals(ToggleableState.On, config[SemanticsProperties.ToggleableState])
+        press(Key.DirectionCenter)
+        assertEquals(listOf(CompanionRow.STARTUP), activated)
+        content = content.copy(functions = content.functions.copy(startup = false))
+        compose.waitForIdle()
+        focused("Open when the TV turns on")
+        assertEquals(ToggleableState.Off, compose.onNodeWithText("Open when the TV turns on")
+            .fetchSemanticsNode().config[SemanticsProperties.ToggleableState])
+    }
+
+    @Test fun aChangedFunctionPageOffersChangeRestoreAndRemoveAndBackReturnsToItsRow() {
+        showContent(withButtons(liveTv = ButtonBinding.Custom(4001)))
+        openFunction(CompanionFunction.LIVE_TV)
+        compose.onNodeWithText("Functions · Open live TV").assertExists()
+        compose.onNodeWithText("Button 4001 opens live TV in Tvheadend Player. The default is the TV button.").assertExists()
+        compose.onNodeWithText("What changes").assertExists()
+        focused("Change button")
+        compose.onNodeWithText("Current: Button 4001").assertExists()
+        compose.onNodeWithText("Restore default").assertExists()
+        compose.onNodeWithText("Remove button").assertExists()
+        assertTrue(activated.isEmpty())
+        save("functions-05-function-page-changed")
+        back()
+        focused("Open live TV")
+        compose.onNodeWithText("Open when the TV turns on").assertExists()
+    }
+
+    @Test fun aFunctionWithoutAButtonOffersSetAndRestoreOnly() {
+        showContent(withButtons(guide = ButtonBinding.NotSet))
+        openFunction(CompanionFunction.GUIDE)
+        compose.onNodeWithText("No button is set, so this function is off.").assertExists()
+        compose.onNodeWithText("How it works").assertExists()
+        focused("Set a button")
+        compose.onNodeWithText("Restore default").assertExists()
+        compose.onAllNodesWithText("Remove button").assertCountEquals(0)
+        save("functions-06-function-page-not-set")
+        back()
+        focused("Open the Guide")
+    }
+
+    @Test fun aDefaultFunctionPageHidesRestore() {
+        showContent(withButtons())
+        openFunction(CompanionFunction.LIVE_TV)
+        focused("Change button")
+        compose.onNodeWithText("Current: TV button").assertExists()
+        compose.onAllNodesWithText("Restore default").assertCountEquals(0)
+        compose.onNodeWithText("Remove button").assertExists()
+    }
+
+    @Test fun restoreActsAtOnceConfirmsOnTheLeftAndFocusesTheFirstRow() {
+        showContent(withButtons(liveTv = ButtonBinding.Custom(4001)))
+        openFunction(CompanionFunction.LIVE_TV)
+        down(1)
+        focused("Restore default")
+        press(Key.DirectionCenter)
+        assertEquals(ButtonBinding.Default, content.functions.liveTv)
+        compose.onNodeWithText("Default restored").assertExists()
+        focused("Change button")
+        compose.onAllNodesWithText("Restore default").assertCountEquals(0)
+    }
+
+    @Test fun removeActsAtOnceConfirmsOnTheLeftAndFocusesTheFirstRow() {
+        showContent(withButtons(liveTv = ButtonBinding.Custom(4001)))
+        openFunction(CompanionFunction.LIVE_TV)
+        down(2)
+        focused("Remove button")
+        press(Key.DirectionCenter)
+        assertEquals(ButtonBinding.NotSet, content.functions.liveTv)
+        compose.onNodeWithText("Button removed").assertExists()
+        focused("Set a button")
+        compose.onAllNodesWithText("Remove button").assertCountEquals(0)
+        back()
+        compose.onNodeWithText("Not set").assertExists()
+        focused("Open live TV")
+    }
+
+    private fun assertSetIsOffWhenTheService(service: CompanionServiceStatus) {
+        showContent(withButtons(guide = ButtonBinding.NotSet, service = service))
+        // A service that is not on takes the initial focus: the Accessibility row, one below the first.
+        openFunction(CompanionFunction.GUIDE, from = 1)
+        focused("Set a button")
+        compose.onNodeWithText("Needs the accessibility service").assertExists()
+        assertTrue(SemanticsProperties.Disabled in compose.onNodeWithText("Set a button").fetchSemanticsNode().config)
+        press(Key.DirectionCenter)
+        assertTrue(capturesStarted.isEmpty())
+        focused("Set a button")
+    }
+
+    @Test fun setIsOffWhileTheServiceIsOff() = assertSetIsOffWhenTheService(CompanionServiceStatus.OFF)
+
+    @Test fun setIsOffWhileTheServiceIsBlocked() = assertSetIsOffWhenTheService(CompanionServiceStatus.BLOCKED)
+
+    @Test fun waitingForAButtonLeavesNothingFocusableAndBackCancelsToThePage() {
+        showContent(withButtons())
+        openFunction(CompanionFunction.LIVE_TV)
+        focused("Change button")
+        press(Key.DirectionCenter)
+        assertEquals(listOf(CompanionFunction.LIVE_TV), capturesStarted)
+        compose.onNodeWithText("Waiting for a button…").assertExists()
+        compose.onNodeWithText("Press a button").assertExists()
+        nothingIsFocusable()
+        press(Key.DirectionCenter)
+        assertEquals(1, capturesStarted.size)
+        back()
+        assertEquals(1, capturesCancelled)
+        focused("Change button")
+        compose.onNodeWithText("Functions · Open live TV").assertExists()
+        back()
+        focused("Open live TV")
+    }
+
+    @Test fun theCaptureCardIsALiveRegion() {
+        showContent(withButtons())
+        openFunction(CompanionFunction.LIVE_TV)
+        press(Key.DirectionCenter)
+        val config = compose.onNodeWithText("Waiting for a button…").fetchSemanticsNode().config
+        assertEquals(LiveRegionMode.Polite, config[SemanticsProperties.LiveRegion])
+    }
+
+    @Test fun captureWaiting() {
+        showContent(withButtons())
+        openFunction(CompanionFunction.LIVE_TV)
+        press(Key.DirectionCenter)
+        // 7.3 s left, so the bar reads about 63% after the capture's one second of settling.
+        // The frozen clock keeps the idle wait from running the bar's countdown to its end.
+        setWhileFrozen(CaptureState.Waiting(CompanionFunction.LIVE_TV, SystemClock.elapsedRealtime() + 7_300))
+        compose.onNodeWithText("Waiting for a button…").assertExists()
+        nothingIsFocusable()
+        save("functions-07-capture-waiting")
+    }
+
+    @Test fun captureRefused() {
+        showContent(withButtons())
+        openFunction(CompanionFunction.LIVE_TV)
+        press(Key.DirectionCenter)
+        setWhileFrozen(CaptureState.Refused(CompanionFunction.LIVE_TV, "OK", SystemClock.elapsedRealtime() + 10_000))
+        compose.onNodeWithText("OK can't be used").assertExists()
+        compose.onNodeWithText("Press a different button.").assertExists()
+        nothingIsFocusable()
+        save("functions-08-capture-refused")
+    }
+
+    @Test fun captureTimedOutOffersTryAgainFirstAndCancel() {
+        showContent(withButtons())
+        openFunction(CompanionFunction.LIVE_TV)
+        press(Key.DirectionCenter)
+        capture = CaptureState.TimedOut(CompanionFunction.LIVE_TV)
+        compose.waitForIdle()
+        compose.onNodeWithText("No button arrived").assertExists()
+        focused("Try again")
+        save("functions-09-capture-timed-out")
+        press(Key.DirectionCenter)
+        assertEquals(2, capturesStarted.size)
+        compose.onNodeWithText("Waiting for a button…").assertExists()
+        capture = CaptureState.TimedOut(CompanionFunction.LIVE_TV)
+        compose.waitForIdle()
+        down(1)
+        focused("Cancel")
+        press(Key.DirectionCenter)
+        focused("Change button")
+    }
+
+    @Test fun aCapturedButtonThatMovedSaysWhatLostItAndFocusesChange() {
+        showContent(withButtons())
+        openFunction(CompanionFunction.GUIDE)
+        press(Key.DirectionCenter)
+        // The service stores the capture before it reports it.
+        val change = content.functions.assign(CompanionFunction.GUIDE, ButtonBinding.Custom(170))
+        content = content.copy(functions = change.functions)
+        capture = CaptureState.Captured(CompanionFunction.GUIDE, 170, change.moved.single())
+        compose.waitForIdle()
+        compose.onNodeWithText("Button moved").assertExists()
+        compose.onNodeWithText("The TV button now opens the Guide.").assertExists()
+        compose.onNodeWithText("Open live TV is off now").assertExists()
+        focused("Change button")
+        compose.onNodeWithText("Current: TV button").assertExists()
+        save("functions-10-capture-moved")
+    }
+
+    @Test fun aPlainCapturedButtonSaysSaved() {
+        showContent(withButtons())
+        openFunction(CompanionFunction.LIVE_TV)
+        press(Key.DirectionCenter)
+        val change = content.functions.assign(CompanionFunction.LIVE_TV, ButtonBinding.Custom(4001))
+        content = content.copy(functions = change.functions)
+        capture = CaptureState.Captured(CompanionFunction.LIVE_TV, 4001, null)
+        compose.waitForIdle()
+        compose.onNodeWithText("Button saved").assertExists()
+        compose.onNodeWithText("Button 4001 now opens live TV.").assertExists()
+        focused("Change button")
+    }
+
+    @Test fun aCaptureTheServiceCancelsReturnsToThePageAndBackThenLeavesIt() {
+        showContent(withButtons())
+        openFunction(CompanionFunction.LIVE_TV)
+        press(Key.DirectionCenter)
+        capture = CaptureState.Cancelled
+        compose.waitForIdle()
+        focused("Change button")
+        back()
+        assertEquals(0, capturesCancelled)
+        focused("Open live TV")
+    }
+
+    @Test fun aCaptureAfterAnEarlierCancelIsNotMistakenForTheEarlierOne() {
+        showContent(withButtons())
+        openFunction(CompanionFunction.LIVE_TV)
+        press(Key.DirectionCenter)
+        back()
+        // Cancelled is a shared value: the second capture must still show its own waiting state.
+        press(Key.DirectionCenter)
+        compose.onNodeWithText("Waiting for a button…").assertExists()
+        assertFalse(capture is CaptureState.Cancelled)
     }
 }

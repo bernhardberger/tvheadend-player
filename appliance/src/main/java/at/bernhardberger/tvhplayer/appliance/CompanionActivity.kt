@@ -17,6 +17,8 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -56,7 +58,12 @@ class CompanionActivity : ComponentActivity() {
         refreshStatus()
         setContent {
             TVHeadendPlayerTheme {
-                CompanionScreen(
+                val capture by CompanionServiceState.captureState.collectAsState()
+                // The service stores a captured button; the rows read it from the store again.
+                LaunchedEffect(capture) {
+                    if (capture is CaptureState.Captured) functions = FunctionStore(this@CompanionActivity).functions
+                }
+                CompanionContent(
                     state = CompanionScreenState(
                         playerVersion = playerVersion,
                         accessibilityStatus = accessibilityStatus,
@@ -66,7 +73,11 @@ class CompanionActivity : ComponentActivity() {
                         update = updateState,
                         functions = functions,
                     ),
+                    capture = capture,
                     onRow = ::onRow,
+                    onStartCapture = CompanionServiceState::startCapture,
+                    onCancelCapture = CompanionServiceState::cancelCapture,
+                    onAssign = ::assign,
                     modifier = Modifier
                         .fillMaxSize()
                         .background(MaterialTheme.colorScheme.background),
@@ -164,7 +175,14 @@ class CompanionActivity : ComponentActivity() {
         intents.any { openScreen(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
     }
 
+    private fun assign(function: CompanionFunction, binding: ButtonBinding): FunctionChange {
+        val change = FunctionStore(this).assign(function, binding)
+        functions = change.functions
+        return change
+    }
+
     private fun onRow(row: CompanionRow) {
+        val blockedBefore = accessibilityStatus == CompanionServiceStatus.BLOCKED
         refreshStatus()
         when (row) {
             CompanionRow.PLAYER ->
@@ -174,8 +192,11 @@ class CompanionActivity : ComponentActivity() {
                     Intent(Intent.ACTION_VIEW,
                         Uri.parse("https://play.google.com/store/apps/details?id=${BuildConfig.PLAYER_PACKAGE}")),
                 )
-            CompanionRow.ACCESSIBILITY -> openFirst(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS),
-                Intent(Settings.ACTION_SETTINGS))
+            // A blocked service is not fixed in settings: OK only checks it again.
+            CompanionRow.ACCESSIBILITY -> if (!blockedBefore) openFirst(
+                Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS), Intent(Settings.ACTION_SETTINGS))
+            CompanionRow.STARTUP -> FunctionStore(this).setStartup(!functions.startup).also { refreshStatus() }
+            CompanionRow.LIVE_TV, CompanionRow.GUIDE -> Unit // Opened as pages by the screen.
             CompanionRow.HOME -> openFirst(Intent(Settings.ACTION_HOME_SETTINGS), Intent(Settings.ACTION_SETTINGS))
             CompanionRow.SYSTEM_HOME -> systemHome?.let { component ->
                 openScreen(homeIntent().setComponent(component).addFlags(

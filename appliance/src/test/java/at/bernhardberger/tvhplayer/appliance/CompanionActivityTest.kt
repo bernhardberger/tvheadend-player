@@ -50,6 +50,52 @@ class CompanionActivityTest {
         controller.pause().stop().destroy()
         CompanionServiceState.setConnected(false)
     }
+    private fun onRow(activity: CompanionActivity, row: CompanionRow) {
+        ReflectionHelpers.callInstanceMethod<Unit>(activity, "onRow",
+            ReflectionHelpers.ClassParameter.from(CompanionRow::class.java, row))
+    }
+
+    @Test fun theStartupRowTogglesTheStoredSwitch() {
+        val context = RuntimeEnvironment.getApplication()
+        val controller = Robolectric.buildActivity(CompanionActivity::class.java).create().start().resume()
+        assertTrue(FunctionStore(context).functions.startup)
+        onRow(controller.get(), CompanionRow.STARTUP)
+        assertFalse(FunctionStore(context).functions.startup)
+        onRow(controller.get(), CompanionRow.STARTUP)
+        assertTrue(FunctionStore(context).functions.startup)
+        controller.pause().stop().destroy()
+    }
+
+    @Test fun okOnABlockedServiceChecksAgainWithoutLeavingForSettings() {
+        val context = RuntimeEnvironment.getApplication()
+        val component = ComponentName(context, at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService::class.java)
+        android.provider.Settings.Secure.putString(context.contentResolver,
+            android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, component.flattenToShortString())
+        CompanionServiceState.setConnected(false)
+        val controller = Robolectric.buildActivity(CompanionActivity::class.java).create().start().resume()
+        val activity = controller.get()
+        fun status() = ReflectionHelpers.callInstanceMethod<CompanionServiceStatus>(activity, "getAccessibilityStatus")
+        assertEquals(CompanionServiceStatus.BLOCKED, status())
+        onRow(activity, CompanionRow.ACCESSIBILITY)
+        assertNull(shadowOf(activity).nextStartedActivity)
+        assertEquals(CompanionServiceStatus.BLOCKED, status())
+        CompanionServiceState.setConnected(true)
+        onRow(activity, CompanionRow.ACCESSIBILITY)
+        assertNull(shadowOf(activity).nextStartedActivity)
+        assertEquals(CompanionServiceStatus.ON, status())
+        controller.pause().stop().destroy()
+        CompanionServiceState.setConnected(false)
+    }
+
+    @Test fun okOnAnOffServiceOpensAndroidSettings() {
+        CompanionServiceState.setConnected(false)
+        val controller = Robolectric.buildActivity(CompanionActivity::class.java).create().start().resume()
+        onRow(controller.get(), CompanionRow.ACCESSIBILITY)
+        assertEquals(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS,
+            shadowOf(controller.get()).nextStartedActivity.action)
+        controller.pause().stop().destroy()
+    }
+
     private val playerActivity = ComponentName(BuildConfig.PLAYER_PACKAGE, "player.Launcher")
 
     @Test

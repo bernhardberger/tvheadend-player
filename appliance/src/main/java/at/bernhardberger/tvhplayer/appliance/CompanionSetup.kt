@@ -4,7 +4,7 @@ import at.bernhardberger.tvhplayer.appliance.update.UpdateResult
 import at.bernhardberger.tvhplayer.appliance.update.UpdateScreenState
 
 /** The focusable rows of the setup screen, top to bottom. */
-enum class CompanionRow { PLAYER, ACCESSIBILITY, HOME, SYSTEM_HOME, UNKNOWN_APPS, AUTOMATIC, UPDATE }
+enum class CompanionRow { PLAYER, ACCESSIBILITY, HOME, SYSTEM_HOME, STARTUP, LIVE_TV, GUIDE, UNKNOWN_APPS, AUTOMATIC, UPDATE }
 
 enum class UpdateRowMode { CHECK, AVAILABLE, CHECKING, INSTALLING }
 
