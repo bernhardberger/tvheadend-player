@@ -32,13 +32,34 @@ class ButtonCaptureTest {
         assertFalse(capture.up(85, 110))
     }
 
-    @Test fun startingAgainDropsKeysHeldByThePreviousCapture() {
-        val capture = ButtonCapture()
-        capture.start(CompanionFunction.LIVE_TV, 0)
-        assertTrue(capture.down(85))
-        capture.start(CompanionFunction.GUIDE, 100)
-        capture.cancel()
-        assertFalse(capture.up(85, 110))
+    @Test fun startingAgainKeepsConsumedKeysUntilTheirOriginalUp() {
+        for (code in listOf(19, 85)) {
+            val capture = ButtonCapture()
+            capture.start(CompanionFunction.LIVE_TV, 0)
+            assertTrue(capture.down(code))
+            capture.start(CompanionFunction.GUIDE, 100)
+            capture.cancel()
+            assertTrue(capture.down(code, 105, repeat = 1))
+            assertTrue(capture.up(code, 110))
+            assertFalse(capture.up(code, 120))
+        }
+    }
+
+    @Test fun aFreshPressOfAStaleKeyIsCapturedOrRefusedNormallyDuringANewCapture() {
+        for (code in listOf(19, 85)) {
+            val capture = ButtonCapture()
+            capture.start(CompanionFunction.LIVE_TV, 0)
+            assertTrue(capture.down(code)) // Its UP never arrives.
+            capture.start(CompanionFunction.GUIDE, 100)
+            assertTrue(capture.down(code, 110))
+            assertEquals(if (code == 19) CaptureState.Refused(CompanionFunction.GUIDE, "Arrows", 10_110)
+                else CaptureState.Captured(CompanionFunction.GUIDE, code, null), capture.state.value)
+            capture.cancel()
+            assertTrue(capture.down(code, 115, repeat = 1))
+            assertTrue(capture.up(code, 120))
+            assertFalse(capture.down(code, 130))
+            assertFalse(capture.up(code, 140))
+        }
     }
 
     @Test fun anActionOtherThanDownDoesNotCreateAHeldKey() {

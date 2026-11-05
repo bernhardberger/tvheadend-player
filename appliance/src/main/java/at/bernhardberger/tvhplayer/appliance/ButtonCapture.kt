@@ -25,7 +25,6 @@ class ButtonCapture {
 
     fun start(function: CompanionFunction, now: Long) {
         require(function != CompanionFunction.STARTUP)
-        heldKeys.clear()
         mutableState.value = CaptureState.Waiting(function, now + TIMEOUT_MILLIS)
     }
 

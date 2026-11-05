@@ -38,8 +38,6 @@ import org.robolectric.util.ReflectionHelpers
 @Config(sdk = [28], shadows = [ApplianceEntryAccessibilityServiceTest.ConnectedServiceShadow::class])
 class ApplianceEntryAccessibilityServiceTest {
     @Before fun resetServiceState() {
-        CompanionServiceState.setConnected(true)
-        CompanionServiceState.startCapture(CompanionFunction.GUIDE) // Also clears held keys from the previous test.
         CompanionServiceState.setConnected(false)
         CompanionServiceState.dismissCapture()
     }
@@ -157,6 +155,8 @@ class ApplianceEntryAccessibilityServiceTest {
         CompanionServiceState.dismissCapture()
         shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(10))
         assertEquals(CaptureState.Idle, CompanionServiceState.captureState.value)
+        assertTrue(CompanionServiceState.captureKey(RuntimeEnvironment.getApplication(),
+            KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_UNKNOWN)))
         CompanionServiceState.setConnected(false)
     }
 

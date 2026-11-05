@@ -26,8 +26,6 @@ import org.robolectric.util.ReflectionHelpers
 @Config(sdk = [28])
 class CompanionActivityTest {
     @Before fun resetServiceState() {
-        CompanionServiceState.setConnected(true)
-        CompanionServiceState.startCapture(CompanionFunction.GUIDE) // Also clears held keys from the previous test.
         CompanionServiceState.setConnected(false)
         CompanionServiceState.dismissCapture()
     }
