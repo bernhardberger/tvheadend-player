@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.4.7
+
+### Player
+
+- With *Match content frame rate* set to Always, the TV now switches its
+  refresh rate on Android 11 and older too, for example on the NVIDIA Shield
+  (#14).
+- A Guide press from the appliance companion opens the channel schedule beside
+  the picture during live TV, and the full Guide everywhere else.
+
+### Settings
+
+- Settings → Appliance is always there. Without the companion, it explains what
+  the companion does and shows a QR code that leads to its setup steps.
+
+### Appliance companion 0.2.0
+
+- New Functions section: choose which remote button opens live TV and which
+  opens the Guide, or set none. Choose a function, then press the button on
+  the remote.
+- Opening the player when the TV turns on can be switched off, if you only
+  want the buttons.
+- The TV button still opens live TV. The Guide button now opens the Guide.
+- The companion now tells you when the TV keeps its accessibility service from
+  running, and how to fix that.
+- A downloaded update now says it installs in standby, or you can pick
+  Update now.
+- Setup steps and TV notes are in the README under Appliance companion.
+
 ## 0.4.6
 
 ### Appliance companion
