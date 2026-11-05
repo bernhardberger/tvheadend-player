@@ -11,6 +11,94 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class NoticeSourcesTest {
+    @Test fun cancelledBeforeHandoverRestartsTheOriginalLossTimeoutWithoutReady() =
+        cancelledBeforeHandoverRestartsLoss(SessionState.Connecting)
+
+    @Test fun cancelledBeforeHandoverRestartsTheSynchronizingLossTimeoutWithoutReady() =
+        cancelledBeforeHandoverRestartsLoss(SessionState.Synchronizing)
+
+    private fun cancelledBeforeHandoverRestartsLoss(resumedState: SessionState) = runTest {
+        val observation = MutableStateFlow(readyObservation())
+        val profile = MutableStateFlow(0L)
+        val switching = MutableStateFlow(false)
+        val center = NoticeCenter({ testScheduler.currentTime }) {
+            NoticeContext(profile.value, observation.value.currentSession?.generationIdentity)
+        }
+        val source = ConnectionNoticeSource(observation, profile, center, switching)
+        backgroundScope.launch { source.run() }; runCurrent()
+        observation.value = SessionObservation.create(sessionState = SessionState.Connecting)
+        runCurrent(); advanceTimeBy(2_000)
+        switching.value = true; runCurrent()
+        observation.value = SessionObservation.create(sessionState = resumedState); runCurrent()
+        advanceTimeBy(4_000); runCurrent()
+        assertNull(center.state.value.candidate)
+        switching.value = false; runCurrent()
+        advanceTimeBy(2_999); runCurrent()
+        assertNull(center.state.value.candidate)
+        advanceTimeBy(1); runCurrent()
+        assertEquals(ConnectionNoticeKind.LOST, (center.state.value.candidate!!.notice as Notice.Connection).kind)
+        assertTrue(source.lossAnnounced.value)
+        switching.value = true; runCurrent()
+        advanceTimeBy(4_000); runCurrent()
+        assertTrue(source.lossAnnounced.value)
+        switching.value = false; runCurrent()
+        assertTrue(source.lossAnnounced.value)
+    }
+
+    @Test fun committedTargetDoesNotInheritTheOriginalConnectionsOwedLoss() = runTest {
+        val observation = MutableStateFlow(readyObservation())
+        val profile = MutableStateFlow(0L)
+        val switching = MutableStateFlow(false)
+        val center = NoticeCenter({ testScheduler.currentTime }) {
+            NoticeContext(profile.value, observation.value.currentSession?.generationIdentity)
+        }
+        val source = ConnectionNoticeSource(observation, profile, center, switching)
+        backgroundScope.launch { source.run() }; runCurrent()
+        observation.value = SessionObservation.create(sessionState = SessionState.Connecting)
+        runCurrent(); advanceTimeBy(2_000)
+        switching.value = true; runCurrent()
+        observation.value = SessionObservation.create(sessionState = SessionState.Synchronizing)
+        runCurrent(); advanceTimeBy(4_000); runCurrent()
+        assertNull(center.state.value.candidate)
+        profile.value = 1; runCurrent()
+        switching.value = false; runCurrent()
+        advanceTimeBy(4_000); runCurrent()
+        assertNull(center.state.value.candidate)
+        assertFalse(source.lossAnnounced.value)
+        observation.value = readyObservation(); runCurrent()
+        assertNull(center.state.value.candidate)
+    }
+
+    @Test fun trialAndFallbackSuppressConnectionNoticesAndCancelPendingLoss() = runTest {
+        val observation = MutableStateFlow(readyObservation())
+        val profile = MutableStateFlow(0L)
+        val switching = MutableStateFlow(false)
+        val center = NoticeCenter({ testScheduler.currentTime }) {
+            NoticeContext(profile.value, observation.value.currentSession?.generationIdentity)
+        }
+        val source = ConnectionNoticeSource(observation, profile, center, switching)
+        backgroundScope.launch { source.run() }
+        runCurrent()
+        observation.value = SessionObservation.create(sessionState = SessionState.Connecting)
+        runCurrent(); advanceTimeBy(2_000)
+        switching.value = true
+        runCurrent()
+        observation.value = SessionObservation.create(sessionState = SessionState.Unavailable(SessionFailure.AUTHENTICATION_REJECTED))
+        runCurrent(); advanceTimeBy(4_000); runCurrent()
+        assertNull(center.state.value.candidate)
+        assertFalse(source.lossAnnounced.value)
+        observation.value = readyObservation(); runCurrent()
+        observation.value = SessionObservation.create(sessionState = SessionState.Connecting)
+        runCurrent(); advanceTimeBy(4_000); runCurrent()
+        assertNull(center.state.value.candidate)
+        observation.value = readyObservation(); runCurrent()
+        switching.value = false; runCurrent()
+        assertNull(center.state.value.candidate)
+        // Normal in-use failures still announce after the attempt ends.
+        observation.value = SessionObservation.create(sessionState = SessionState.Unavailable(SessionFailure.AUTHENTICATION_REJECTED))
+        runCurrent()
+        assertEquals(Notice.Connection(ConnectionNoticeKind.LOGIN_REJECTED), center.state.value.candidate!!.notice)
+    }
     @Test fun announcedLossPersistsAfterNoticeExpiryAndClearsOnRecoveryOrProfileChange() = runTest {
         val observation = MutableStateFlow(readyObservation())
         val profile = MutableStateFlow(0L)

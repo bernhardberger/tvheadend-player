@@ -21,6 +21,7 @@ import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
@@ -91,6 +92,12 @@ class AppProfileOwner(
     // Taken only after playback has stopped: discovery must remain able to settle a
     // reconnect retune while stop waits for the playback command serializer.
     private val switchIdentity = Mutex()
+    private val mutableSwitchInProgress = MutableStateFlow(false)
+    private val switchLifecycle = Any()
+    private var switchOwnerClosed = false
+    private var activeSwitch: Job? = null
+    /** Trial and fallback share a session, but neither is the in-use connection's status. */
+    val switchInProgress: StateFlow<Boolean> = mutableSwitchInProgress.asStateFlow()
 
     /**
      * Serializes setup tests (including their non-cancellable cleanup) with saved-profile
@@ -136,8 +143,16 @@ class AppProfileOwner(
                 withContext(NonCancellable) { handleCommand(command) }
             }
         } finally {
-            commands.cancel()
-            discoveryJob.cancelAndJoin()
+            val attempt = synchronized(switchLifecycle) {
+                switchOwnerClosed = true
+                activeSwitch
+            }
+            withContext(NonCancellable) {
+                commands.cancel()
+                attempt?.cancelAndJoin()
+                discoveryJob.cancelAndJoin()
+                mutableSwitchInProgress.value = false
+            }
         }
     }
 
@@ -270,59 +285,71 @@ class AppProfileOwner(
             var persisted = false
             var committed = false
             var failureNotice: Notice? = null
-            beforeConnect()
-            switchIdentity.lock()
+            synchronized(switchLifecycle) {
+                if (switchOwnerClosed) throw CancellationException("Profile owner stopped before switch execution")
+                activeSwitch = caller[Job]
+                mutableSwitchInProgress.value = true
+            }
             try {
-                session.disconnect()
-                val before = session.observation.value
-                if (session.connect(target.profile) != SessionCommandResult.STARTED) {
-                    failureNotice = Notice.ServerConnectionFailed(serverProfileDisplayName(list.profiles.first { it.id == id }))
-                    return@withLock ServerProfileWriteResult.Unavailable
-                }
-                val outcome = session.observation.first {
-                    it !== before && (it.sessionState is at.bernhardberger.tvheadend.sdk.core.SessionState.Ready ||
-                        it.sessionState is at.bernhardberger.tvheadend.sdk.core.SessionState.Unavailable)
-                }.sessionState
-                currentCoroutineContext().ensureActive()
-                if (configurationGeneration.value != generation) return@withLock ServerProfileWriteResult.Unavailable
-                if (outcome is at.bernhardberger.tvheadend.sdk.core.SessionState.Unavailable) {
-                    val name = list.profiles.first { it.id == id }.let(::serverProfileDisplayName)
-                    failureNotice = if (outcome.reason == at.bernhardberger.tvheadend.sdk.core.SessionFailure.AUTHENTICATION_REJECTED)
-                        Notice.ServerSignInRejected(name) else Notice.ServerConnectionFailed(name)
-                    return@withLock ServerProfileWriteResult.Unavailable
-                }
-                withContext(NonCancellable) {
-                    val result = profileStore.setActive(id)
-                    if (result is ServerProfileWriteResult.Applied) {
-                        persisted = true
-                        // With no previous selection there is no rollback API or connection to
-                        // return to: once persistence starts, that successful selection wins.
-                        if (previousId != null) caller.ensureActive()
-                        mutableConfigurationGeneration.value += 1
-                        playerSettings.useProfile(id)
-                        audioProfileId = id.value
-                        mutableProfiles.value = profileStore.profiles()
-                        mutableServerProfile.value = target
-                        committed = true
-                    } else {
-                        noticeCenter()?.let { it.post(Notice.ServerProfileWriteFailed, it.context()) }
-                    }
-                    result
-                }
-            } finally {
+                beforeConnect()
+                switchIdentity.lock()
                 try {
-                    if ((!committed || !caller.isActive) &&
-                        (!persisted || previousId != null) &&
-                        (configurationGeneration.value == generation || committed && configurationGeneration.value == generation + 1)) withContext(NonCancellable) {
-                        if (persisted && previousId != null) {
-                            profileStore.setActive(previousId)
+                    session.disconnect()
+                    val before = session.observation.value
+                    if (session.connect(target.profile) != SessionCommandResult.STARTED) {
+                        failureNotice = Notice.ServerConnectionFailed(serverProfileDisplayName(list.profiles.first { it.id == id }))
+                        return@withLock ServerProfileWriteResult.Unavailable
+                    }
+                    val outcome = session.observation.first {
+                        it !== before && (it.sessionState is at.bernhardberger.tvheadend.sdk.core.SessionState.Ready ||
+                            it.sessionState is at.bernhardberger.tvheadend.sdk.core.SessionState.Unavailable)
+                    }.sessionState
+                    currentCoroutineContext().ensureActive()
+                    if (configurationGeneration.value != generation) return@withLock ServerProfileWriteResult.Unavailable
+                    if (outcome is at.bernhardberger.tvheadend.sdk.core.SessionState.Unavailable) {
+                        val name = list.profiles.first { it.id == id }.let(::serverProfileDisplayName)
+                        failureNotice = if (outcome.reason == at.bernhardberger.tvheadend.sdk.core.SessionFailure.AUTHENTICATION_REJECTED)
+                            Notice.ServerSignInRejected(name) else Notice.ServerConnectionFailed(name)
+                        return@withLock ServerProfileWriteResult.Unavailable
+                    }
+                    withContext(NonCancellable) {
+                        val result = profileStore.setActive(id)
+                        if (result is ServerProfileWriteResult.Applied) {
+                            persisted = true
+                            // With no previous selection there is no rollback API or connection to
+                            // return to: once persistence starts, that successful selection wins.
+                            if (previousId != null) caller.ensureActive()
+                            mutableConfigurationGeneration.value += 1
+                            playerSettings.useProfile(id)
+                            audioProfileId = id.value
                             mutableProfiles.value = profileStore.profiles()
+                            mutableServerProfile.value = target
+                            committed = true
+                        } else {
+                            noticeCenter()?.let { it.post(Notice.ServerProfileWriteFailed, it.context()) }
                         }
-                        applyServerProfile(previous)
-                        failureNotice?.let { notice -> noticeCenter()?.let { it.post(notice, it.context()) } }
+                        result
                     }
                 } finally {
-                    switchIdentity.unlock()
+                    try {
+                        if ((!committed || !caller.isActive) &&
+                            (!persisted || previousId != null) &&
+                            (configurationGeneration.value == generation || committed && configurationGeneration.value == generation + 1)) withContext(NonCancellable) {
+                            if (persisted && previousId != null) {
+                                profileStore.setActive(previousId)
+                                mutableProfiles.value = profileStore.profiles()
+                            }
+                            applyServerProfile(previous)
+                            failureNotice?.let { notice -> noticeCenter()?.let { it.post(notice, it.context()) } }
+                        }
+                    } finally {
+                        switchIdentity.unlock()
+                    }
+                }
+            } finally {
+                synchronized(switchLifecycle) {
+                    activeSwitch = null
+                    mutableSwitchInProgress.value = false
                 }
             }
         }

@@ -48,9 +48,10 @@ internal fun settingsConnectionLevels(
     val profile by owner.serverProfile.collectAsStateWithLifecycle()
     val profiles by owner.profiles.collectAsStateWithLifecycle()
     val connection = presentation.connection
-    val status = connectionOverviewStatus(profile, presentation)
+    val status = if (switching) ConnectionOverviewStatus(stringResource(R.string.connection_overview_connecting))
+        else connectionOverviewStatus(profile, presentation)
     return settingsServerLevels(profiles, status.text, actions, switching = switching,
-        showRetry = presentation.degraded && connection.primaryRecoveryAction() != ConnectionRecoveryAction.SETTINGS,
+        showRetry = !switching && presentation.degraded && connection.primaryRecoveryAction() != ConnectionRecoveryAction.SETTINGS,
         connecting = connection == ConnectionUiState.Connecting || connection == ConnectionUiState.Reconnecting ||
             connection == ConnectionUiState.SyncingChannels,
         onRetry = onRetry)

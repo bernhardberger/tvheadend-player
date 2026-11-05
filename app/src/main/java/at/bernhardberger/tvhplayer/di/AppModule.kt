@@ -74,6 +74,7 @@ val appModule = module {
     single(createdAtStart = true) {
         at.bernhardberger.tvhplayer.notices.ConnectionNoticeSource(
             get<SdkRuntimeOwner>().session.observation, get<AppProfileOwner>().configurationGeneration, get(),
+            get<AppProfileOwner>().switchInProgress,
         ).also { source ->
             get<CoroutineScope>(qualifier = named("application")).launch { source.run() }
         }

@@ -48,8 +48,9 @@ class AppConnectionViewModel(
         profileOwner.serverProfile,
         session.observation,
         connectionNotices.lossAnnounced,
-    ) { profile, observation, lossAnnounced ->
-        val connection = when (profile) {
+        profileOwner.switchInProgress,
+    ) { profile, observation, lossAnnounced, switching ->
+        val connection = if (switching) ConnectionUiState.Connecting else when (profile) {
             null -> ConnectionUiState.Connecting
             ServerProfileReadResult.Missing -> ConnectionUiState.NeedsConfiguration
             ServerProfileReadResult.Unavailable -> ConnectionUiState.CredentialUnavailable
@@ -57,20 +58,20 @@ class AppConnectionViewModel(
         }
         AppConnectionPresentation(
             connection = connection,
-            degraded = profile != null && connection.isDegraded(lossAnnounced),
+            degraded = !switching && profile != null && connection.isDegraded(lossAnnounced),
             currentChannelReadiness = deriveCurrentChannelReadiness(
                 connected = observation.sessionState is SessionState.Ready,
                 authority = observation.channelCatalogAuthority,
                 channels = observation.channelCatalogForDisplay?.channels.orEmpty(),
             ),
-        )
-    }.scan(AppConnectionPresentation()) { previous, next ->
-        // A failure keeps its warning through the automatic attempts after it, until one succeeds.
-        next.copy(
-            degraded = next.degraded ||
-                next.connection.isDegraded(lossAnnounced = false, degradedBefore = previous.degraded),
-        )
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, AppConnectionPresentation())
+        ) to switching
+    }.scan(AppConnectionPresentation() to false) { (_, degradedBefore), (next, switching) ->
+        // Hide the warning during a trial, but retain it if cancellation/fallback returns
+        // to the same still-reconnecting connection. Only a real recovery clears it.
+        val degraded = if (switching) degradedBefore else next.degraded ||
+            next.connection.isDegraded(lossAnnounced = false, degradedBefore = degradedBefore)
+        next.copy(degraded = !switching && degraded) to degraded
+    }.map { it.first }.stateIn(viewModelScope, SharingStarted.Eagerly, AppConnectionPresentation())
 
     init {
         if (at.bernhardberger.tvhplayer.client.BuildConfig.PROFILE_TRACE) {

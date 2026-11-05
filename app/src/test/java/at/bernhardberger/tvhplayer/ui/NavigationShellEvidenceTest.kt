@@ -164,6 +164,37 @@ class NavigationShellEvidenceTest {
     @get:Rule val compose = createComposeRule()
     private lateinit var view: View
 
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
+    fun stoppingPlaybackFromSettingsContentDoesNotFocusOrSelectHome() {
+        settingsShell(1f, withHome = true)
+        playLive()
+        openDrawer()
+        compose.onNodeWithTag("nav-home").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+        compose.waitForIdle()
+        compose.onNodeWithTag("nav-settings").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+        compose.waitForIdle()
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
+        compose.waitForIdle()
+        navigations.clear()
+        val before = drawShell()
+        val home = bounds("nav-home")
+        val x = (home.right - 8f).toInt()
+        val y = home.center.y.toInt()
+        // Switching is confirmed from a modal, not by stopping via the drawer controls.
+        compose.runOnIdle { switchDialog = true }
+        compose.waitForIdle()
+        compose.runOnIdle { switchDialog = false; nowPlaying = null }
+        compose.mainClock.advanceTimeBy(1_000)
+        compose.waitForIdle()
+        compose.onNodeWithTag("nav-home").assert(SemanticsMatcher.expectValue(SemanticsProperties.Focused, false))
+        compose.onNodeWithTag("nav-settings").assert(SemanticsMatcher.expectValue(SemanticsProperties.Selected, true))
+        assertTrue("stopping from content must not navigate", navigations.isEmpty())
+        val after = drawShell()
+        val newHome = bounds("nav-home")
+        assertTrue("Home must not acquire a white focus container",
+            channelDistance(Color(before.getPixel(x, y)), Color(after.getPixel((newHome.right - 8f).toInt(), newHome.center.y.toInt()))) < .04f)
+    }
+
     @Category(VisualCapture::class)
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi") fun englishNormal() = captureShell("en", 1f)
     @Category(VisualCapture::class)
@@ -1154,6 +1185,7 @@ class NavigationShellEvidenceTest {
         dvrState = DvrRepositoryState.Current(DvrSnapshot.create(listOf(fixtureRecording))),
     )).observation.value
     private var nowPlaying by mutableStateOf<RailNowPlaying?>(null)
+    private var switchDialog by mutableStateOf(false)
     /** What the watching locals describe when an entry hold keeps an earlier target; else what plays. */
     private var heldTarget by mutableStateOf<AppPlaybackTarget?>(null)
     private var watchingIndicator by mutableStateOf(ChannelPlaybackIndicator.PLAYING)
@@ -1263,6 +1295,12 @@ class NavigationShellEvidenceTest {
                             onStopNowPlaying = { stopped++; nowPlaying = null },
                             nowSecProvider = { clock },
                         ) { padding, drawerActive ->
+                            if (switchDialog) at.bernhardberger.tvhplayer.ui.components.CentredDialog(
+                                title = "Change connection", message = "Stop watching?",
+                                firstLabel = "Keep watching", secondLabel = "Change connection",
+                                onFirst = { switchDialog = false }, onSecond = { switchDialog = false },
+                                onDismiss = { switchDialog = false },
+                            )
                             SettingsScreenNavigation(
                                 navigation,
                                 listOf(settingsRootLevel()) + settingsGeneralLevels(

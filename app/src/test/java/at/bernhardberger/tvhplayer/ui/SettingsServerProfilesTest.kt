@@ -33,6 +33,8 @@ import at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
+import at.bernhardberger.tvheadend.sdk.core.SessionObservation
+import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.notices.Notice
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
@@ -326,6 +328,71 @@ class SettingsServerProfilesTest {
         compose.onNodeWithText("Couldn’t sign in to kids on tvheadend.home.arpa. Check the username and password.").assertIsDisplayed()
         assertEquals(id(1), activeId)
         compose.onNodeWithTag(row(2)).assertIsFocused()
+    }
+
+    @Test fun cancellingBeforeHandoverRestoresTheInUseConnectionsDegradedWarning() {
+        stored(); settings()
+        lateinit var connection: at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
+        compose.runOnIdle {
+            connection = at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel(session, owner,
+                at.bernhardberger.tvhplayer.notices.ConnectionNoticeSource(session.observation,
+                    owner.configurationGeneration, notices, owner.switchInProgress))
+        }
+        compose.waitUntil(10_000) { connection.uiState.value.connection == ConnectionUiState.Ready }
+        compose.runOnIdle {
+            session.publish(SessionObservation.create(sessionState = SessionState.Unavailable(
+                at.bernhardberger.tvheadend.sdk.core.SessionFailure.AUTHENTICATION_REJECTED)))
+        }
+        compose.waitUntil(10_000) { connection.uiState.value.degraded }
+        compose.runOnIdle { session.publish(SessionObservation.create(sessionState = SessionState.Connecting)) }
+        compose.waitUntil(10_000) { connection.uiState.value.connection == ConnectionUiState.Connecting }
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val attempt = scope.launch { owner.switchActive(id(2)) { gate.await() } }
+        compose.waitUntil(10_000) { owner.switchInProgress.value }
+        compose.waitForIdle()
+        compose.waitUntil(10_000) { !connection.uiState.value.degraded }
+        attempt.cancel()
+        compose.waitUntil(10_000) { attempt.isCompleted }
+        compose.waitForIdle()
+        compose.waitUntil(10_000) { connection.uiState.value.connection == ConnectionUiState.Connecting &&
+            connection.uiState.value.degraded }
+        compose.runOnIdle { session.publish(ready()) }
+        compose.waitUntil(10_000) { connection.uiState.value.connection == ConnectionUiState.Ready &&
+            !connection.uiState.value.degraded }
+    }
+
+    @Test fun attemptHidesRetryAndRefreshesTheUnmovedRowsAndPreviewAfterFallback() {
+        stored(); settings()
+        lateinit var connection: at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
+        compose.runOnIdle {
+            connection = at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel(session, owner,
+                at.bernhardberger.tvhplayer.notices.ConnectionNoticeSource(session.observation,
+                    owner.configurationGeneration, notices, owner.switchInProgress))
+        }
+        compose.waitUntil(10_000) { connection.uiState.value.connection == ConnectionUiState.Ready }
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        connectionGate = gate
+        rejectNextConnection = true
+        press(Key.DirectionDown); press(Key.DirectionCenter); press(Key.DirectionCenter)
+        compose.waitUntil(10_000) { trialStarted }
+        compose.runOnIdle {
+            presentation = AppConnectionPresentation(ConnectionUiState.Reconnecting, degraded = true)
+            session.publish(SessionObservation.create(sessionState = SessionState.Unavailable(
+                at.bernhardberger.tvheadend.sdk.core.SessionFailure.AUTHENTICATION_REJECTED)))
+        }
+        compose.waitUntil(10_000) { connection.uiState.value.connection == ConnectionUiState.Connecting }
+        assertTrue(!connection.uiState.value.degraded)
+        compose.onNodeWithText("Try again").assertDoesNotExist()
+        compose.onNodeWithText("Connecting…", substring = true).assertExists()
+        compose.runOnIdle { gate.complete(Unit) }
+        compose.waitUntil(10_000) { !owner.connectionChanges.isLocked }
+        compose.waitForIdle()
+        compose.waitUntil(10_000) { connection.uiState.value.connection == ConnectionUiState.Ready }
+        assertTrue(!connection.uiState.value.degraded)
+        compose.onNodeWithTag(row(2)).assertIsFocused()
+        // No focus move: the same preview must now expose the restored profile's actions.
+        compose.onNodeWithText("Use this connection", useUnmergedTree = true).assertExists()
+        assertEquals(id(1), activeId)
     }
 
     @Test @Category(VisualCapture::class) fun captureFailedSwitchNotice() {

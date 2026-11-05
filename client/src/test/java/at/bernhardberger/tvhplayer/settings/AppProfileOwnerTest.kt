@@ -25,6 +25,39 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppProfileOwnerTest {
+    @Test fun closingTheOwnerCancelsAndJoinsTheCallersPendingSwitch() = runTest {
+        val store = FakeServerProfileStore()
+        val first = (store.addAnonymous("first.invalid", activate = true) as ServerProfileWriteResult.Applied).id
+        val second = (store.addAnonymous("second.invalid") as ServerProfileWriteResult.Applied).id
+        val fake = FakeTvheadendSession()
+        val restore = CompletableDeferred<Unit>()
+        var disconnects = 0
+        val session = object : TvheadendSession by fake {
+            override suspend fun disconnect() {
+                if (++disconnects == 3) restore.await()
+                fake.disconnect()
+            }
+        }
+        val owner = AppProfileOwner(session, store, PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Missing })
+        val ownerRun = backgroundScope.launch { owner.run() }
+        runCurrent()
+        val caller = backgroundScope.launch { owner.switchActive(second) }
+        runCurrent()
+        assertTrue(owner.switchInProgress.value)
+        ownerRun.cancel(); runCurrent()
+        assertFalse(ownerRun.isCompleted)
+        assertTrue(owner.switchInProgress.value)
+        restore.complete(Unit); runCurrent()
+        assertTrue(caller.isCancelled)
+        assertTrue(ownerRun.isCompleted)
+        assertFalse(owner.switchInProgress.value)
+        assertFalse(owner.connectionChanges.isLocked)
+        assertEquals(first, (owner.serverProfile.value as ServerProfileReadResult.Available).id)
+        // The caller's enclosing scope remains usable, independently of the owner's lifetime.
+        assertEquals(42, backgroundScope.async { 42 }.await())
+    }
+
     @Test fun unavailableSwitchListAndUnreadableTargetPostWriteFailureWithoutConnecting() = runTest {
         val store = FakeServerProfileStore()
         val id = (store.addPassword("second.invalid", username = "viewer", password = "synthetic") as ServerProfileWriteResult.Applied).id
@@ -158,6 +191,7 @@ class AppProfileOwnerTest {
         old.cancel()
         runCurrent()
         assertEquals(3, disconnects)
+        assertTrue(owner.switchInProgress.value) // Cancellation still owns the fallback reconnect.
         val replacement = backgroundScope.async { owner.switchActive(third) }
         runCurrent()
         assertFalse(old.isCompleted)
@@ -172,6 +206,7 @@ class AppProfileOwnerTest {
         runCurrent()
         assertEquals(ServerProfileWriteResult.Applied(third), replacement.await())
         assertEquals(third, (stored.profiles() as ServerProfileListResult.Available).activeId)
+        assertFalse(owner.switchInProgress.value)
     }
     @Test fun userSwitchCommitsOnlyAfterSignInAndCancellationRestoresThePreviousProfile() = runTest {
         val stored = FakeServerProfileStore()
@@ -203,8 +238,15 @@ class AppProfileOwnerTest {
         val first = (stored.addAnonymous("first.invalid", activate = true) as ServerProfileWriteResult.Applied).id
         val next = (stored.addAnonymous("second.invalid") as ServerProfileWriteResult.Applied).id
         val session = FakeTvheadendSession()
-        val owner = AppProfileOwner(session, stored, PlayerSettingsStore(InMemoryPreferencesDataStore()),
-            StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Missing })
+        lateinit var owner: AppProfileOwner
+        var noticePosts = 0
+        val notices = NoticeCenter({
+            assertTrue("The typed outcome is posted before suppression ends", owner.switchInProgress.value)
+            noticePosts++
+            0L
+        }, { NoticeContext(0, null) })
+        owner = AppProfileOwner(session, stored, PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Missing }, { notices })
         backgroundScope.launch { owner.run() }
         runCurrent()
         val attempt = backgroundScope.async { owner.switchActive(next) }
@@ -215,6 +257,9 @@ class AppProfileOwnerTest {
         assertEquals(first, (stored.profiles() as ServerProfileListResult.Available).activeId)
         assertEquals(first, (owner.serverProfile.value as ServerProfileReadResult.Available).id)
         assertFalse(owner.connectionChanges.isLocked)
+        assertTrue(noticePosts > 0)
+        assertTrue(notices.state.value.candidate!!.notice is Notice.ServerSignInRejected)
+        assertFalse(owner.switchInProgress.value)
     }
 
     @Test fun cancellationAtReceiveBeforeTheSubmitterResumesKeepsTheConnectionLock() = runTest {
