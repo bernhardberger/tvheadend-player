@@ -124,8 +124,10 @@ internal fun declaredDisplayRate(duration: Duration): Float? {
     return standardFrameRate((1.0 / seconds).toFloat())?.let(::displayCadence)
 }
 
-/** Which Surface.setFrameRate call carries the app's vote. */
+/** How the app requests the display cadence: a surface vote or a window display mode. */
 enum class SurfaceFrameRateChange {
+    /** Before Android 12: preferredDisplayModeId permits non-seamless TV mode changes. */
+    DISPLAY_MODE,
     /** Android 12 or later: CHANGE_FRAME_RATE_ALWAYS, also when the switch is not seamless. */
     ALWAYS,
     /** Android 12 or later: CHANGE_FRAME_RATE_ONLY_IF_SEAMLESS. */
@@ -142,11 +144,15 @@ data class SurfaceFrameRateRequest(
 
 /**
  * The app's vote for [rate] under [switching]. Media3's own change strategy stays Off, so this is
- * the surface's only vote: none while Off or before Android 11, which clears an earlier one.
+ * the surface's only vote. Before Android 12, Always uses a window display mode instead;
+ * seamless-only needs Android 11. Off or no rate clears an earlier request.
  */
 internal fun surfaceFrameRateRequest(switching: FrameRateSwitching, sdkInt: Int, rate: Float?): SurfaceFrameRateRequest =
     when {
-        rate == null || switching == FrameRateSwitching.OFF || sdkInt < ANDROID_R -> SurfaceFrameRateRequest()
+        rate == null || switching == FrameRateSwitching.OFF -> SurfaceFrameRateRequest()
+        sdkInt < ANDROID_S && switching == FrameRateSwitching.ALWAYS ->
+            SurfaceFrameRateRequest(rate, SurfaceFrameRateChange.DISPLAY_MODE)
+        sdkInt < ANDROID_R -> SurfaceFrameRateRequest()
         sdkInt < ANDROID_S -> SurfaceFrameRateRequest(rate, SurfaceFrameRateChange.SEAMLESS_DEFAULT)
         switching == FrameRateSwitching.ALWAYS -> SurfaceFrameRateRequest(rate, SurfaceFrameRateChange.ALWAYS)
         else -> SurfaceFrameRateRequest(rate, SurfaceFrameRateChange.ONLY_IF_SEAMLESS)
