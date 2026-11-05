@@ -244,7 +244,7 @@ done
     appliance_badging="$($aapt dump badging "$appliance_apk")"
     accessibility_tree="$($aapt dump xmltree "$appliance_apk" res/xml/appliance_entry_accessibility_service.xml)"
     if [[ "$appliance_badging" != *"package: name='at.bernhardberger.tvhplayer.appliance.debug'"* ||
-          "$appliance_badging" != *"application-label:'Tvheadend Player Appliance'"* ||
+          "$appliance_badging" != *"application-label:'Tvheadend Player Appliance Debug'"* ||
           "$manifest_tree" != *'android.intent.category.LEANBACK_LAUNCHER'* ]]; then
         printf 'error: Appliance manifest contract failed\n' >&2
         exit 1
