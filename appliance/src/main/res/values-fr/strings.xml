@@ -2,5 +2,4 @@
 <resources>
     <string name="appliance_accessibility_service_label">Lancement du mode téléviseur Tvheadend Player</string>
     <string name="appliance_accessibility_service_description">Ouvre Tvheadend Player au démarrage et au réveil, et réaffecte uniquement la touche TV/GUIDE. Ne peut pas lire le contenu de l’écran.</string>
-    <string name="appliance_accessibility_disclosure">Lorsque le service d’accessibilité est activé, Tvheadend Player s’ouvre au démarrage du téléviseur et au réveil de l’écran, et prend en charge uniquement la touche TV/GUIDE. Il ne lit pas le contenu de l’écran et ne surveille pas le texte. Toutes les autres touches de la télécommande sont transmises sans modification.</string>
 </resources>

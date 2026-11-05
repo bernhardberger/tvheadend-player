@@ -218,6 +218,7 @@
     <string name="subtitle_language">Untertitelsprache</string>
 
     <string name="settings_appliance">TV-Start</string>
+    <string name="appliance_setup">TV-Start einrichten</string>
     <string name="auto_start_playback">Wiedergabe beim Öffnen der App starten</string>
     <string name="auto_start_playback_description">Spielt nach einem neuen App-Start den letzten Sender ab. Dadurch wird der Bedienungshilfen-Dienst nicht aktiviert.</string>
     <string name="appliance_service_enabled">TV-Startdienst: aktiviert</string>

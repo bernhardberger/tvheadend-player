@@ -2,5 +2,4 @@
 <resources>
     <string name="appliance_accessibility_service_label">دخول Tvheadend Player للجهاز المخصّص</string>
     <string name="appliance_accessibility_service_description">يفتح Tvheadend Player عند البدء والاستيقاظ، ويربط زر TV/GUIDE فقط. لا يمكنه قراءة محتوى الشاشة.</string>
-    <string name="appliance_accessibility_disclosure">عند تفعيلها، تفتح خدمة تسهيل الاستخدام Tvheadend Player عند بدء التلفزيون واستيقاظ الشاشة، وتعالج زر TV/GUIDE فقط. لا تقرأ محتوى الشاشة ولا تراقب النصوص. تمر جميع أزرار جهاز التحكم الأخرى دون تغيير.</string>
 </resources>

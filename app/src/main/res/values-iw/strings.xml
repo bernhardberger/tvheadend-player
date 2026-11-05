@@ -211,6 +211,7 @@
     <string name="audio_language">שפת שמע</string>
     <string name="subtitle_language">שפת כתוביות</string>
     <string name="settings_appliance">מצב מכשיר ייעודי</string>
+    <string name="appliance_setup">הגדרת מצב מכשיר ייעודי</string>
     <string name="auto_start_playback">התחלת ניגון בפתיחת האפליקציה</string>
     <string name="auto_start_playback_description">מפעיל את הערוץ האחרון בעת פתיחה חדשה של האפליקציה. הגדרה זו אינה מפעילה את שירות הנגישות.</string>
     <string name="appliance_service_enabled">שירות כניסה למכשיר ייעודי: פעיל</string>

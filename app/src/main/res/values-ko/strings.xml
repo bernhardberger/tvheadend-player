@@ -211,6 +211,7 @@
     <string name="audio_language">오디오 언어</string>
     <string name="subtitle_language">자막 언어</string>
     <string name="settings_appliance">전용 기기 모드</string>
+    <string name="appliance_setup">전용 기기 모드 설정</string>
     <string name="auto_start_playback">앱을 열 때 재생 시작</string>
     <string name="auto_start_playback_description">앱을 새로 실행하면 마지막 채널을 재생합니다. 이 설정은 접근성 서비스를 활성화하지 않습니다.</string>
     <string name="appliance_service_enabled">전용 기기 진입 서비스: 활성화됨</string>

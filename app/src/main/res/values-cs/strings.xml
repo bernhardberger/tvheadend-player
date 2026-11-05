@@ -211,6 +211,7 @@
     <string name="audio_language">Jazyk zvuku</string>
     <string name="subtitle_language">Jazyk titulků</string>
     <string name="settings_appliance">Režim TV přijímače</string>
+    <string name="appliance_setup">Nastavit režim TV přijímače</string>
     <string name="auto_start_playback">Spustit přehrávání při otevření aplikace</string>
     <string name="auto_start_playback_description">Po novém spuštění aplikace přehraje poslední kanál. Službu usnadnění to nezapne.</string>
     <string name="appliance_service_enabled">Služba spuštění TV přijímače: zapnutá</string>

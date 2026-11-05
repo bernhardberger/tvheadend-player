@@ -211,6 +211,7 @@
     <string name="audio_language">Γλώσσα ήχου</string>
     <string name="subtitle_language">Γλώσσα υποτίτλων</string>
     <string name="settings_appliance">Λειτουργία συσκευής TV</string>
+    <string name="appliance_setup">Ρύθμιση λειτουργίας συσκευής TV</string>
     <string name="auto_start_playback">Έναρξη αναπαραγωγής με το άνοιγμα της εφαρμογής</string>
     <string name="auto_start_playback_description">Αναπαράγει το τελευταίο κανάλι μετά από νέα εκκίνηση της εφαρμογής. Δεν ενεργοποιεί την υπηρεσία προσβασιμότητας.</string>
     <string name="appliance_service_enabled">Υπηρεσία εκκίνησης λειτουργίας συσκευής TV: ενεργή</string>

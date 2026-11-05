@@ -2,5 +2,4 @@
 <resources>
     <string name="appliance_accessibility_service_label">Tvheadend Player-Start</string>
     <string name="appliance_accessibility_service_description">Öffnet Tvheadend Player nach dem Starten und Aufwecken und belegt ausschließlich die TV-/GUIDE-Taste. Der Dienst kann keine Bildschirminhalte lesen.</string>
-    <string name="appliance_accessibility_disclosure">Wenn der Bedienungshilfen-Dienst aktiviert ist, öffnet sich Tvheadend Player nach dem Starten und Aufwecken des Fernsehers und übernimmt ausschließlich die TV-/GUIDE-Taste. Er liest weder Bildschirminhalte noch Text. Alle anderen Fernbedienungstasten werden unverändert weitergegeben.</string>
 </resources>

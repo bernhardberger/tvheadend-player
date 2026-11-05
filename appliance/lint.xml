@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <!-- Companion screens stay en-US; only system accessibility text is translated. -->
+    <issue id="MissingTranslation" severity="ignore" />
+</lint>

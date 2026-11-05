@@ -2,5 +2,4 @@
 <resources>
     <string name="appliance_accessibility_service_label">Tvheadend Playerin TV-käynnistys</string>
     <string name="appliance_accessibility_service_description">Avaa Tvheadend Playerin käynnistyksen ja heräämisen yhteydessä sekä määrittää vain TV/GUIDE-painikkeen toiminnan uudelleen. Se ei voi lukea näytön sisältöä.</string>
-    <string name="appliance_accessibility_disclosure">Kun esteettömyyspalvelu on käytössä, Tvheadend Player avautuu television käynnistyksen ja näytön heräämisen jälkeen ja käsittelee vain TV/GUIDE-painikkeen. Se ei lue näytön sisältöä eikä seuraa tekstiä. Kaikki muut kaukosäätimen painikkeet välitetään muuttamattomina.</string>
 </resources>

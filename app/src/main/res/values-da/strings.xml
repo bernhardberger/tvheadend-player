@@ -211,6 +211,7 @@
     <string name="audio_language">Lydsprog</string>
     <string name="subtitle_language">Undertekstsprog</string>
     <string name="settings_appliance">Tv-tilstand</string>
+    <string name="appliance_setup">Opsæt tv-tilstand</string>
     <string name="auto_start_playback">Start afspilning, når appen åbnes</string>
     <string name="auto_start_playback_description">Afspiller den seneste kanal efter en ny appstart. Dette aktiverer ikke tilgængelighedstjenesten.</string>
     <string name="appliance_service_enabled">Tv-starttjeneste: aktiveret</string>

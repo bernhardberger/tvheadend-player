@@ -211,6 +211,7 @@
     <string name="audio_language">Jezik zvuka</string>
     <string name="subtitle_language">Jezik titlova</string>
     <string name="settings_appliance">Način TV prijamnika</string>
+    <string name="appliance_setup">Postavi način TV prijamnika</string>
     <string name="auto_start_playback">Pokreni reprodukciju pri otvaranju aplikacije</string>
     <string name="auto_start_playback_description">Reproducira posljednji kanal nakon novog pokretanja aplikacije. Time se ne uključuje usluga pristupačnosti.</string>
     <string name="appliance_service_enabled">Usluga pokretanja TV prijamnika: uključena</string>

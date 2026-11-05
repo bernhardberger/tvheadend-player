@@ -211,6 +211,7 @@
     <string name="audio_language">Idioma do áudio</string>
     <string name="subtitle_language">Idioma das legendas</string>
     <string name="settings_appliance">Modo TV</string>
+    <string name="appliance_setup">Configurar o modo TV</string>
     <string name="auto_start_playback">Iniciar reprodução ao abrir a aplicação</string>
     <string name="auto_start_playback_description">Reproduz o último canal num novo arranque da aplicação. Isto não ativa o serviço de acessibilidade.</string>
     <string name="appliance_service_enabled">Serviço de entrada do modo TV: ativo</string>

@@ -211,6 +211,7 @@
     <string name="audio_language">Язык звука</string>
     <string name="subtitle_language">Язык субтитров</string>
     <string name="settings_appliance">Режим ТВ-приставки</string>
+    <string name="appliance_setup">Настройка режима ТВ-приставки</string>
     <string name="auto_start_playback">Начинать воспроизведение при открытии приложения</string>
     <string name="auto_start_playback_description">Воспроизводит последний канал после нового запуска приложения. Это не включает службу специальных возможностей.</string>
     <string name="appliance_service_enabled">Служба запуска режима ТВ-приставки: включена</string>

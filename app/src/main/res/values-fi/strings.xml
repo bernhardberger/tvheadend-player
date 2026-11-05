@@ -211,6 +211,7 @@
     <string name="audio_language">Äänen kieli</string>
     <string name="subtitle_language">Tekstityksen kieli</string>
     <string name="settings_appliance">TV-tila</string>
+    <string name="appliance_setup">Määritä TV-tila</string>
     <string name="auto_start_playback">Aloita toisto sovelluksen avautuessa</string>
     <string name="auto_start_playback_description">Toistaa viimeksi katsottua kanavaa sovelluksen käynnistyessä uudelleen. Tämä ei ota esteettömyyspalvelua käyttöön.</string>
     <string name="appliance_service_enabled">TV-käynnistyspalvelu: käytössä</string>

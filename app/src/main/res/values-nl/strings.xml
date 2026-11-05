@@ -211,6 +211,7 @@
     <string name="audio_language">Audiotaal</string>
     <string name="subtitle_language">Ondertiteltaal</string>
     <string name="settings_appliance">Tv-modus</string>
+    <string name="appliance_setup">Tv-modus instellen</string>
     <string name="auto_start_playback">Afspelen wanneer de app opent</string>
     <string name="auto_start_playback_description">Speelt de laatste zender af nadat de app opnieuw is gestart. Dit schakelt de toegankelijkheidsservice niet in.</string>
     <string name="appliance_service_enabled">Tv-startservice: ingeschakeld</string>

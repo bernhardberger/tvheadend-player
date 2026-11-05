@@ -2,5 +2,4 @@
 <resources>
     <string name="appliance_accessibility_service_label">Tvheadend Player電視模式入口</string>
     <string name="appliance_accessibility_service_description">在啟動及喚醒時開啟Tvheadend Player，且僅對應TV/GUIDE按鈕。無法讀取螢幕內容。</string>
-    <string name="appliance_accessibility_disclosure">啟用無障礙服務後，Tvheadend Player會在電視啟動及螢幕喚醒後開啟，且僅接管TV/GUIDE按鈕。不會讀取螢幕內容或監控文字。遙控器上的所有其他按鈕均維持原有功能。</string>
 </resources>

@@ -211,6 +211,7 @@
     <string name="audio_language">Ses dili</string>
     <string name="subtitle_language">Altyazı dili</string>
     <string name="settings_appliance">TV modu</string>
+    <string name="appliance_setup">TV modu kurulumu</string>
     <string name="auto_start_playback">Uygulama açıldığında oynatmayı başlat</string>
     <string name="auto_start_playback_description">Uygulama yeniden başlatıldığında son kanalı oynatır. Bu, erişilebilirlik hizmetini etkinleştirmez.</string>
     <string name="appliance_service_enabled">TV başlatma hizmeti: etkin</string>

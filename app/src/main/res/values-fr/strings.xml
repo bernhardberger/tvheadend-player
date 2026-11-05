@@ -211,6 +211,7 @@
     <string name="audio_language">Langue audio</string>
     <string name="subtitle_language">Langue des sous-titres</string>
     <string name="settings_appliance">Mode téléviseur</string>
+    <string name="appliance_setup">Configurer le mode téléviseur</string>
     <string name="auto_start_playback">Lancer la lecture à l’ouverture de l’application</string>
     <string name="auto_start_playback_description">Lit la dernière chaîne après un nouveau lancement de l’application. Cela n’active pas le service d’accessibilité.</string>
     <string name="appliance_service_enabled">Service de lancement du mode téléviseur : activé</string>

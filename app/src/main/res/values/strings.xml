@@ -236,7 +236,7 @@
     <string name="subtitle_language">Subtitle language</string>
 
     <string name="settings_appliance">Appliance</string>
-    <string name="appliance_setup" tools:ignore="MissingTranslation">Appliance setup</string>
+    <string name="appliance_setup">Appliance setup</string>
     <string name="auto_start_playback">Start playback when the app opens</string>
     <string name="auto_start_playback_description">Plays the last channel after a fresh app launch. This does not enable the accessibility service.</string>
     <string name="appliance_service_enabled">Appliance entry service: enabled</string>

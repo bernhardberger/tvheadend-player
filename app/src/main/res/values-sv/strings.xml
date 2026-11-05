@@ -211,6 +211,7 @@
     <string name="audio_language">Ljudspråk</string>
     <string name="subtitle_language">Undertextspråk</string>
     <string name="settings_appliance">Tv-läge</string>
+    <string name="appliance_setup">Konfigurera tv-läge</string>
     <string name="auto_start_playback">Starta uppspelning när appen öppnas</string>
     <string name="auto_start_playback_description">Spelar upp den senaste kanalen efter en ny appstart. Detta aktiverar inte tillgänglighetstjänsten.</string>
     <string name="appliance_service_enabled">Tv-starttjänst: aktiverad</string>

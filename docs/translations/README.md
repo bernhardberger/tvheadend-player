@@ -4,6 +4,12 @@ The [approved plan](../translations-plan.md) defines the release slate. English
 resources in `app/src/main/res/values/strings.xml` are the source of truth. Keep
 accepted German and human corrections; do not regenerate them for style.
 
+The Appliance companion screen stays en-US only to keep maintenance low;
+translations will be added on request. Its accessibility service label and
+description remain translated because Android shows them in system accessibility
+settings in the system language. Drafts are kept in ignored
+`artifacts/translations/companion/`.
+
 Arabic and Hebrew are deferred to a later release and are not shipped in 0.3.0.
 Their reviewed resources remain in `values-ar` and `values-iw`, but are excluded
 from `appLanguages` and filtered out of the APK. The release has 28 language-picker

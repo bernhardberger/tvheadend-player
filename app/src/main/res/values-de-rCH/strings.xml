@@ -1,6 +1,7 @@
 <resources>
     <string name="settings_channel_numbers">Kanalnummern</string>
     <string name="settings_channel_numbers_help">Ausschalten, wenn die Fernbedienung keine Zifferntasten hat</string>
+    <string name="appliance_setup">TV-Start einrichten</string>
     <string name="close">Schliessen</string>
     <string name="details_size">Grösse</string>
     <string name="action_close">Schliessen</string>

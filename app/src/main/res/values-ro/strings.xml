@@ -211,6 +211,7 @@
     <string name="audio_language">Limba audio</string>
     <string name="subtitle_language">Limba subtitrărilor</string>
     <string name="settings_appliance">Mod aparat TV</string>
+    <string name="appliance_setup">Configurare mod aparat TV</string>
     <string name="auto_start_playback">Pornește redarea la deschiderea aplicației</string>
     <string name="auto_start_playback_description">Redă ultimul canal după o nouă pornire a aplicației. Aceasta nu activează serviciul de accesibilitate.</string>
     <string name="appliance_service_enabled">Serviciu de pornire în modul aparat TV: activat</string>

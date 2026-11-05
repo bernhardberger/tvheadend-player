@@ -211,6 +211,7 @@
     <string name="audio_language">لغة الصوت</string>
     <string name="subtitle_language">لغة الترجمة</string>
     <string name="settings_appliance">وضع الجهاز المخصّص</string>
+    <string name="appliance_setup">إعداد وضع الجهاز المخصّص</string>
     <string name="auto_start_playback">بدء التشغيل عند فتح التطبيق</string>
     <string name="auto_start_playback_description">يشغّل آخر قناة عند بدء جلسة جديدة للتطبيق. لا يفعّل هذا خدمة تسهيل الاستخدام.</string>
     <string name="appliance_service_enabled">خدمة دخول الجهاز المخصّص: مفعّلة</string>

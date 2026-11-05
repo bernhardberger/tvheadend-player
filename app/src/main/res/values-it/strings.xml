@@ -211,6 +211,7 @@
     <string name="audio_language">Lingua audio</string>
     <string name="subtitle_language">Lingua sottotitoli</string>
     <string name="settings_appliance">Modalità TV</string>
+    <string name="appliance_setup">Configura la modalità TV</string>
     <string name="auto_start_playback">Avvia la riproduzione all’apertura dell’app</string>
     <string name="auto_start_playback_description">Riproduce l’ultimo canale dopo un nuovo avvio dell’app. Non attiva il servizio di accessibilità.</string>
     <string name="appliance_service_enabled">Servizio di avvio della modalità TV: attivo</string>

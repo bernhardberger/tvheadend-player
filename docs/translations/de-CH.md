@@ -7,7 +7,7 @@ Inherits German informal **du**. Swiss Standard German spelling, not a dialect t
 ## Typography
 
 - Android folder: `values-de-rCH`, partial by design; other strings fall back to `values-de`.
-- Spelling only: ß becomes ss in the five affected keys.
+- Spelling only: ß becomes ss in the affected keys.
 
 ## Plurals
 
@@ -15,7 +15,7 @@ Not overridden; inherits German (`one`, `other`).
 
 ## Term decisions
 
-- Override keys: `appliance_accessibility_disclosure`, `appliance_accessibility_service_description`, `close`, `details_size`, `action_close`. The two `appliance_*` keys live in the Appliance companion (`appliance/src/main/res`).
+- Spelling override keys: `appliance_accessibility_service_description`, `close`, `details_size`, `action_close`. The `appliance_accessibility_service_description` key lives in the Appliance companion (`appliance/src/main/res`); its screen-only disclosure now stays en-US. The Player also explicitly includes the reviewed `appliance_setup` translation, identical to German.
 - Each override equals the existing German text with only ß replaced by ss; no terminology or register change.
 
 ## Review status

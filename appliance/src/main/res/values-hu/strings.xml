@@ -2,5 +2,4 @@
 <resources>
     <string name="appliance_accessibility_service_label">Tvheadend Player indítása TV-módban</string>
     <string name="appliance_accessibility_service_description">Megnyitja a Tvheadend Playert indításkor és ébresztéskor, és csak a TV/GUIDE gombot rendeli át. Nem tudja olvasni a képernyő tartalmát.</string>
-    <string name="appliance_accessibility_disclosure">Ha a kisegítő szolgáltatás be van kapcsolva, a Tvheadend Player megnyílik a TV indításakor és a képernyő felébresztésekor, és csak a TV/GUIDE gombot veszi át. Nem olvassa a képernyő tartalmát és nem figyeli a szöveget. A távirányító összes többi gombja változatlanul működik.</string>
 </resources>

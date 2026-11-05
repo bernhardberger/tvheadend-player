@@ -211,6 +211,7 @@
     <string name="audio_language">Lydspråk</string>
     <string name="subtitle_language">Undertekstspråk</string>
     <string name="settings_appliance">TV-modus</string>
+    <string name="appliance_setup">Konfigurer TV-modus</string>
     <string name="auto_start_playback">Start avspilling når appen åpnes</string>
     <string name="auto_start_playback_description">Spiller av den siste kanalen etter en ny appstart. Dette aktiverer ikke tilgjengelighetstjenesten.</string>
     <string name="appliance_service_enabled">TV-starttjeneste: aktivert</string>

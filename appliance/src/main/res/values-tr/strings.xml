@@ -2,5 +2,4 @@
 <resources>
     <string name="appliance_accessibility_service_label">Tvheadend Player TV başlatma</string>
     <string name="appliance_accessibility_service_description">Başlangıçta ve uyanma sırasında Tvheadend Player uygulamasını açar ve yalnızca TV/GUIDE düğmesini yeniden atar. Ekran içeriğini okuyamaz.</string>
-    <string name="appliance_accessibility_disclosure">Erişilebilirlik hizmeti etkinleştirildiğinde Tvheadend Player, TV açıldıktan ve ekran uyandıktan sonra açılır ve yalnızca TV/GUIDE düğmesini devralır. Ekran içeriğini okumaz veya metinleri izlemez. Diğer tüm kumanda düğmeleri değiştirilmeden iletilir.</string>
 </resources>

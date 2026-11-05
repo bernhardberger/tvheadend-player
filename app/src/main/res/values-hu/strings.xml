@@ -211,6 +211,7 @@
     <string name="audio_language">Hang nyelve</string>
     <string name="subtitle_language">Felirat nyelve</string>
     <string name="settings_appliance">TV-készülék mód</string>
+    <string name="appliance_setup">TV-készülék mód beállítása</string>
     <string name="auto_start_playback">Lejátszás indítása az alkalmazás megnyitásakor</string>
     <string name="auto_start_playback_description">Az alkalmazás új indításakor lejátssza az utolsó csatornát. Ez nem kapcsolja be a kisegítő szolgáltatást.</string>
     <string name="appliance_service_enabled">TV-mód indítószolgáltatása: be</string>

@@ -211,6 +211,7 @@
     <string name="audio_language">Język dźwięku</string>
     <string name="subtitle_language">Język napisów</string>
     <string name="settings_appliance">Tryb odbiornika TV</string>
+    <string name="appliance_setup">Konfiguracja trybu TV</string>
     <string name="auto_start_playback">Rozpocznij odtwarzanie po otwarciu aplikacji</string>
     <string name="auto_start_playback_description">Odtwarza ostatni kanał po nowym uruchomieniu aplikacji. Nie włącza to usługi ułatwień dostępu.</string>
     <string name="appliance_service_enabled">Usługa uruchamiania odbiornika TV: włączona</string>

@@ -211,6 +211,7 @@
     <string name="audio_language">音声言語</string>
     <string name="subtitle_language">字幕言語</string>
     <string name="settings_appliance">専用機モード</string>
+    <string name="appliance_setup">専用機モードの設定</string>
     <string name="auto_start_playback">アプリ起動時に再生を開始</string>
     <string name="auto_start_playback_description">アプリを新たに起動したときに、最後に視聴したチャンネルを再生します。ユーザー補助サービスは有効になりません。</string>
     <string name="appliance_service_enabled">専用機起動サービス：有効</string>

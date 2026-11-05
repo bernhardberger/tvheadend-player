@@ -211,6 +211,7 @@
     <string name="audio_language">音訊語言</string>
     <string name="subtitle_language">字幕語言</string>
     <string name="settings_appliance">電視模式</string>
+    <string name="appliance_setup">電視模式設定</string>
     <string name="auto_start_playback">開啟應用程式時開始播放</string>
     <string name="auto_start_playback_description">重新啟動應用程式後播放上次觀看的頻道。這不會啟用無障礙服務。</string>
     <string name="appliance_service_enabled">電視模式入口服務：已啟用</string>
