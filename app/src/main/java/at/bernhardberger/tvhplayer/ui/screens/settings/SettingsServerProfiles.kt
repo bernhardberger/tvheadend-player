@@ -3,6 +3,11 @@ package at.bernhardberger.tvhplayer.ui.screens.settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.res.stringResource
+import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.tv.material3.LocalContentColor
+import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileAuthenticationMode
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileId
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileListResult
@@ -19,7 +24,6 @@ internal const val ADD_SERVER = "add-server"
 internal const val SERVER_USE = "server-use"
 internal const val SERVER_PASSWORD = "server-password"
 internal const val SERVER_NAME = "server-name"
-internal const val SERVER_SWITCHER = "server-switcher"
 internal const val SERVER_REMOVE = "server-remove"
 internal const val SERVER_ADDRESS = "server-address"
 internal const val SERVER_ACCOUNT = "server-account"
@@ -36,7 +40,6 @@ internal class ServerProfileActions(
     val onEnterPassword: (ServerProfileSummary) -> Unit = {},
     val onSetUp: (ServerProfileSummary) -> Unit = {},
     val onName: (ServerProfileSummary) -> Unit = {},
-    val onShowInSwitcher: (ServerProfileSummary, Boolean) -> Unit = { _, _ -> },
     val onRemove: (ServerProfileSummary) -> Unit = {},
     val onAdd: () -> Unit = {},
 )
@@ -83,14 +86,12 @@ private fun ServerProfileSummary.passwordNeeded(): Boolean =
 @Composable
 internal fun settingsServerLevels(
     profiles: ServerProfileListResult?,
-    hidden: Set<ServerProfileId>,
     status: String,
     actions: ServerProfileActions,
     showRetry: Boolean = false,
     connecting: Boolean = false,
     onRetry: () -> Unit = {},
-    askAtStartup: Boolean? = null,
-    onAskAtStartup: (Boolean) -> Unit = {},
+    switching: Boolean = false,
 ): List<DepthLevel> {
     val list = profiles as? ServerProfileListResult.Available
     val stored = list?.profiles.orEmpty()
@@ -104,26 +105,25 @@ internal fun settingsServerLevels(
         supporting = stringResource(if (connecting) R.string.connection_overview_connecting else R.string.connection_retry_description),
         icon = R.drawable.ic_refresh, onClick = { if (!connecting) onRetry() })
     val rows = buildList {
-        if (askAtStartup != null) add(settingsRow("ask-at-startup", stringResource(R.string.server_ask_at_startup),
-            checked = askAtStartup, onClick = { onAskAtStartup(!askAtStartup) }))
-        stored.forEach { add(serverProfileRow(it, it.id == list?.activeId)) }
+        stored.forEach { profile -> add(serverProfileRow(profile, profile.id == list?.activeId,
+            cancelSwitch = if (switching && profile.id == list?.activeId) ({ actions.onUse(profile) }) else null)) }
         if (profiles != null) add(add)
         if (showRetry && list?.activeId != null) add(retry)
         add(statusRow)
     }
     val initial = stored.firstOrNull { it.id == list?.activeId } ?: stored.firstOrNull()
-    val connection = settingsLevel(SettingsSection.CONNECTION.name, stringResource(R.string.settings_connection_nav), rows,
+    val connection = settingsLevel(SettingsSection.CONNECTION.name, stringResource(R.string.server_list_title), rows,
         initialItemId = initial?.let { serverProfileRowId(it.id) },
         description = when {
             noneInUse -> stringResource(R.string.server_none_in_use_description)
             profiles == ServerProfileListResult.Unavailable -> stringResource(R.string.server_list_unavailable)
             else -> null
         })
-    return listOf(connection) + stored.map { settingsServerLevel(it, it.id == list?.activeId, it.id !in hidden, actions) }
+    return listOf(connection) + stored.map { settingsServerLevel(it, it.id == list?.activeId, actions) }
 }
 
 @Composable
-private fun serverProfileRow(profile: ServerProfileSummary, active: Boolean): DepthRow {
+private fun serverProfileRow(profile: ServerProfileSummary, active: Boolean, cancelSwitch: (() -> Unit)? = null): DepthRow {
     val state = listOfNotNull(
         stringResource(R.string.server_in_use).takeIf { active },
         stringResource(R.string.server_password_needed).takeIf { profile.passwordNeeded() },
@@ -133,11 +133,21 @@ private fun serverProfileRow(profile: ServerProfileSummary, active: Boolean): De
         profile.accountName() == null -> stringResource(R.string.server_no_sign_in)
         else -> null
     }
-    val supporting = (state + listOfNotNull(detail)).reduceOrNull { first, second -> stringResource(R.string.server_detail_separator, first, second) }
+    val supporting = (listOfNotNull(detail) + state).joinToString("\n").takeIf { it.isNotEmpty() }
     val look = serverAvatarLook(profile)
     val rowId = serverProfileRowId(profile.id)
-    return settingsRow(rowId, profile.label ?: serverProfileUnnamed(profile), supporting, child = rowId,
-        leading = { ServerAvatar(look, ServerAvatarRowSize) })
+    return settingsRow(rowId, profile.label ?: serverProfileUnnamed(profile), supporting,
+        child = rowId.takeIf { cancelSwitch == null }, onClick = { cancelSwitch?.invoke() },
+        leading = { ServerAvatar(look, ServerAvatarRowSize) },
+        supportingContent = supporting?.let { {
+            Column {
+                if (detail != null) Text(detail, style = MaterialTheme.typography.bodySmall,
+                    color = LocalContentColor.current.copy(alpha = .75f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                state.forEach { text -> Text(text, style = MaterialTheme.typography.labelSmall,
+                    color = if (profile.passwordNeeded()) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            }
+        } })
 }
 
 /** One server's level: its actions first, then what it connects to, as focusable rows without an action. */
@@ -145,7 +155,6 @@ private fun serverProfileRow(profile: ServerProfileSummary, active: Boolean): De
 internal fun settingsServerLevel(
     profile: ServerProfileSummary,
     active: Boolean,
-    shownInSwitcher: Boolean,
     actions: ServerProfileActions,
 ): DepthLevel {
     val username = profile.accountName()
@@ -164,8 +173,6 @@ internal fun settingsServerLevel(
         add(settingsRow(SERVER_NAME, stringResource(R.string.server_name),
             supporting = profile.label ?: stringResource(R.string.server_name_not_set),
             trailingIcon = R.drawable.ic_arrow_forward, onClick = { actions.onName(profile) }))
-        add(settingsRow(SERVER_SWITCHER, stringResource(R.string.server_show_in_switcher), checked = shownInSwitcher,
-            onClick = { actions.onShowInSwitcher(profile, !shownInSwitcher) }))
         add(settingsRow(SERVER_REMOVE, stringResource(R.string.server_remove),
             supporting = stringResource(R.string.server_remove_description),
             trailingIcon = R.drawable.ic_delete_outlined, onClick = { actions.onRemove(profile) }))

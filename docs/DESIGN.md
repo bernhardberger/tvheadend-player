@@ -453,8 +453,7 @@ Anatomy per Material for TV / design kit:
   moves to Channels, also when the focused Pause control disappears. The *Stop*
   browse setting never shows it. Nothing is reserved when nothing plays.
 - Destinations (Channels, Guide, Recordings) are centred between the top section
-  and the bottom section; Settings is at the bottom, with Switch server above it
-  when at least two servers are available in the switcher. Nothing in the rail
+  and the bottom section; Settings is at the bottom. Nothing in the rail
   moves when it expands: rows keep their positions and icons and the brand mark
   stay on the kit's fixed icon column (12 + 16dp; the library's 4dp leading-slot
   growth is cancelled). Only the sheet widens and labels/wordmark reveal.

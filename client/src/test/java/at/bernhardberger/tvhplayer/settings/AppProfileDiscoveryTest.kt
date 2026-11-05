@@ -20,6 +20,39 @@ import org.junit.Test
 class AppProfileDiscoveryTest {
     private val streamId = StreamProfileId("11111111111111111111111111111111")
 
+    @Test fun targetDiscoveryDuringPersistenceResolvesTheTargetsPreferenceAfterCommit() = runTest {
+        val stored = FakeServerProfileStore()
+        val first = (stored.addAnonymous("first.invalid", activate = true) as ServerProfileWriteResult.Applied).id
+        val target = (stored.addAnonymous("target.invalid") as ServerProfileWriteResult.Applied).id
+        val settings = PlayerSettingsStore(InMemoryPreferencesDataStore())
+        settings.useProfile(target); settings.setStreamProfile(streamId); settings.useProfile(first)
+        val gate = CompletableDeferred<Unit>()
+        var writing = false
+        var discovered = false
+        val store = object : ServerProfileStore by stored {
+            override suspend fun setActive(id: ServerProfileId): ServerProfileWriteResult {
+                writing = true; gate.await(); return stored.setActive(id)
+            }
+        }
+        val observations = FakeSessionObservation(SessionObservation.create())
+        val session = object : TvheadendSession by FakeTvheadendSession() {
+            override val observation = observations.observation
+            override suspend fun getStreamProfiles(currentSession: CurrentSessionObservation): StreamProfilesResult {
+                discovered = true
+                return available(streamId, currentSession)
+            }
+        }
+        val owner = AppProfileOwner(session, store, settings, StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Missing })
+        backgroundScope.launch { owner.run() }; runCurrent()
+        val attempt = backgroundScope.async { owner.switchActive(target) }; runCurrent()
+        observations.publish(currentObservation("target")); runCurrent()
+        assertTrue(writing); assertTrue(discovered)
+        assertNull(owner.selectedStreamProfileId.value)
+        gate.complete(Unit); runCurrent()
+        assertEquals(ServerProfileWriteResult.Applied(target), attempt.await())
+        assertEquals(streamId, owner.selectedStreamProfileId.value)
+    }
+
     @Test fun selectedProfileReadWaitsForCurrentDiscoveryToSettle() = runTest {
         val started = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()

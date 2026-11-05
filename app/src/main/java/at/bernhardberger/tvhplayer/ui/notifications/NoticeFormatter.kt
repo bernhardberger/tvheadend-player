@@ -39,6 +39,8 @@ internal class NoticeFormatter(private val context: Context) {
         is Notice.ServerProfileRemoved -> FormattedNotice(context.getString(R.string.server_profile_removed, notice.name))
         Notice.ServerProfileAlreadyExists -> FormattedNotice(context.getString(R.string.server_profile_already_exists))
         Notice.ServerProfileWriteFailed -> FormattedNotice(context.getString(R.string.server_profile_write_failed))
+        is Notice.ServerConnectionFailed -> FormattedNotice(context.getString(R.string.server_connection_failed, notice.name))
+        is Notice.ServerSignInRejected -> FormattedNotice(context.getString(R.string.server_sign_in_rejected, notice.name))
         is Notice.Dvr -> formatDvr(notice, now)
         is Notice.DvrActionFailed -> FormattedNotice(context.getString(when (notice.failure) {
             DvrMutationFeedback.TIMEOUT, DvrMutationFeedback.UNKNOWN_OUTCOME -> R.string.recording_action_not_confirmed

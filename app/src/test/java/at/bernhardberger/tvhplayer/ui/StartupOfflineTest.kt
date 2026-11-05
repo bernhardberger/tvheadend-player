@@ -178,7 +178,7 @@ class StartupOfflineTest {
         key(Key.DirectionCenter)
         settle()
         // Connection settings show the server list.
-        compose.waitUntil(10_000) { compose.onAllNodes(hasText("Add server"), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(10_000) { compose.onAllNodes(hasText("Add connection"), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
         assertEquals(0, compose.onAllNodes(hasTestTag("tv-recovery-overlay")).fetchSemanticsNodes().size)
         assertEquals(0, compose.onAllNodes(hasTestTag(LivePlayerServerWaitTag), useUnmergedTree = true).fetchSemanticsNodes().size)
         assertEquals(0, binds())

@@ -16,58 +16,13 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.CompletableDeferred
-import at.bernhardberger.tvhplayer.BuildConfig
-import at.bernhardberger.tvhplayer.settings.shouldShowStartupPicker
-import at.bernhardberger.tvheadend.sdk.core.ServerProfileId
-import at.bernhardberger.tvheadend.sdk.core.ServerProfileWriteResult
-import at.bernhardberger.tvhplayer.notices.Notice
-import at.bernhardberger.tvhplayer.notices.NoticeCenter
-import kotlinx.coroutines.CancellationException
 
 class MainStartupViewModel(
-    private val profileOwner: AppProfileOwner,
+    profileOwner: AppProfileOwner,
     uiSettingsStore: UiSettingsStore,
     savedStateHandle: SavedStateHandle,
     noteViewingIntent: () -> Unit = {},
-    applianceBuild: Boolean = BuildConfig.APPLIANCE_BUILD,
 ) : ViewModel() {
-    private val choice = CompletableDeferred<Unit>()
-    private val _startupPickerVisible = MutableStateFlow(false)
-    val startupPickerVisible = _startupPickerVisible.asStateFlow()
-    private val _startupSelectionPending = MutableStateFlow(false)
-    val startupSelectionPending = _startupSelectionPending.asStateFlow()
-    private var completionRequested = false
-    var startupSettingsProfileId: String? = null
-        private set
-    fun openStartupProfile(id: String) { startupSettingsProfileId = id; finishStartupPicker() }
-    fun finishStartupPicker() {
-        completionRequested = true
-        if (!_startupSelectionPending.value) {
-            _startupPickerVisible.value = false
-            choice.complete(Unit)
-        }
-    }
-
-    /** The retained cold-launch decision owns an admitted selection, not the Activity's page. */
-    fun selectStartupServer(id: ServerProfileId, notices: NoticeCenter) {
-        if (_startupSelectionPending.value) return
-        _startupSelectionPending.value = true
-        viewModelScope.launch {
-            try {
-                if (profileOwner.setActive(id) is ServerProfileWriteResult.Applied)
-                    completionRequested = true
-                else notices.post(Notice.ServerProfileWriteFailed, notices.context())
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                notices.post(Notice.ServerProfileWriteFailed, notices.context())
-            } finally {
-                _startupSelectionPending.value = false
-                if (completionRequested) finishStartupPicker()
-            }
-        }
-    }
     private val createStartupRequest = shouldCreateStartupRequest(savedStateHandle)
     private val initialActivityIntentPolicy = InitialActivityIntentPolicy(
         allowRestoredIntent = createStartupRequest,
@@ -84,11 +39,7 @@ class MainStartupViewModel(
                 applianceLaunchRequests.observeProfile(it)
             }.toServerSettings()
         },
-        loadUiSettings = {
-            uiSettingsStore.settings.first().let { settings ->
-                if (startupSettingsProfileId == null) settings else settings.copy(autoStartPlayback = false)
-            }
-        },
+        loadUiSettings = { uiSettingsStore.settings.first() },
         createStartupRequest = createStartupRequest,
         onStartupRequestCreationHandled = {
             markStartupRequestCreationHandled(savedStateHandle)
@@ -98,14 +49,6 @@ class MainStartupViewModel(
 
     init {
         viewModelScope.launch {
-            // Admission to autoplay is held here, before bootstrap can publish Ready or request
-            // playback. The retained ViewModel owns this cold-launch decision, never onResume.
-            profileOwner.profiles.filterNotNull().first()
-            if (createStartupRequest && !applianceBuild && shouldShowStartupPicker(
-                    profileOwner.askAtStartup.first(), profileOwner.switcherProfiles.first())) {
-                _startupPickerVisible.value = true
-                choice.await()
-            }
             bootstrapCoordinator.bootstrap()
             // Ready keeps the immutable startup decision; this observation only
             // refreshes the configured/onboarding branch after bootstrap.

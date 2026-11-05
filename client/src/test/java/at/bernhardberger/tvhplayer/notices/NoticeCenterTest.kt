@@ -6,6 +6,18 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class NoticeCenterTest {
+    @Test fun failedSwitchNoticeSurvivesTheRetainedConnectionsReconnectButNotAnotherSelection() {
+        context = NoticeContext(0, readyObservation().currentSession!!.generationIdentity)
+        center.post(Notice.ServerConnectionFailed("Cabin"), context)
+        context = NoticeContext(0, readyObservation().currentSession!!.generationIdentity)
+        center.prune()
+        val pending = center.state.value.pending.single()
+        assertTrue(pending.matches(context))
+        assertTrue(center.show(pending.id, 6_000))
+        context = NoticeContext(1, null)
+        center.prune()
+        assertNull(center.state.value.candidate)
+    }
     private var time = 0L
     private var context = NoticeContext(0, null)
     private val center = NoticeCenter({ time }, { context })

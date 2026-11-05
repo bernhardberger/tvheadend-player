@@ -12,6 +12,10 @@ class NoticeContext(val profileGeneration: Long, val session: SessionGenerationI
 }
 
 data class QueuedNotice(val id: Long, val notice: Notice, val context: NoticeContext, val pendingUntil: Long)
+/** A failed trial belongs to the retained connection, including its reconnecting session. */
+fun QueuedNotice.matches(current: NoticeContext): Boolean =
+    context == current || (context.profileGeneration == current.profileGeneration &&
+        (notice is Notice.ServerConnectionFailed || notice is Notice.ServerSignInRejected))
 data class PresentedNotice(val notice: QueuedNotice, val expiresAt: Long)
 data class NoticeState(val active: PresentedNotice? = null, val pending: List<QueuedNotice> = emptyList()) {
     val candidate: QueuedNotice? get() = active?.notice ?: pending.firstOrNull()
@@ -56,8 +60,8 @@ class NoticeCenter(private val now: () -> Long, private val currentContext: () -
         val time = now()
         val state = mutableState.value
         mutableState.value = NoticeState(
-            active = state.active?.takeIf { it.notice.context == context && time < it.expiresAt },
-            pending = state.pending.filter { it.context == context && time < it.pendingUntil },
+            active = state.active?.takeIf { it.notice.matches(context) && time < it.expiresAt },
+            pending = state.pending.filter { it.matches(context) && time < it.pendingUntil },
         )
     }
 }

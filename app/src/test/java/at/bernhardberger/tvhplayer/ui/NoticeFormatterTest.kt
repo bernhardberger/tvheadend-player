@@ -25,6 +25,11 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en")
 class NoticeFormatterTest {
+    @Test fun failedServerSwitchDistinguishesConnectionAndSignIn() {
+        assertEquals("Can’t connect to Cabin", formatter.format(Notice.ServerConnectionFailed("Cabin")).headline)
+        assertEquals("Couldn’t sign in to Cabin. Check the username and password.",
+            formatter.format(Notice.ServerSignInRejected("Cabin")).headline)
+    }
     private val formatter get() = NoticeFormatter(ApplicationProvider.getApplicationContext<Application>())
 
     @Test fun removedServerNoticeNamesTheServer() {

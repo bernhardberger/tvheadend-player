@@ -38,4 +38,4 @@ internal fun fixtureConnectionLevels(
     showRetry: Boolean = false,
     connecting: Boolean = false,
     onRetry: () -> Unit = {},
-): List<DepthLevel> = settingsServerLevels(profiles, emptySet(), status, actions, showRetry, connecting, onRetry)
+): List<DepthLevel> = settingsServerLevels(profiles, status, actions, showRetry, connecting, onRetry)

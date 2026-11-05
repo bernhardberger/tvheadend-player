@@ -246,7 +246,6 @@ internal fun SettingsRouteContent(
     contentPadding: PaddingValues,
     backEnabled: Boolean,
     isCurrent: Boolean,
-    profileId: String? = null,
 ) {
     if (contentAllowed) {
         ContentContainer {
@@ -255,7 +254,6 @@ internal fun SettingsRouteContent(
                 connectionPresentation = connectionPresentation,
                 onRetry = onRetry,
                 section = section,
-                profileId = profileId,
                 initialFocusEnabled = initialFocusEnabled,
                 contentPadding = contentPadding,
                 backEnabled = backEnabled,

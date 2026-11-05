@@ -16,6 +16,14 @@ enum class PauseUnavailableReason { SETTINGS_OFF, CHANNEL_UNAVAILABLE }
 
 /** User feedback policy, with no resources or presentation dependencies. */
 sealed interface Notice {
+    data class ServerConnectionFailed(val name: String) : Notice {
+        override val key = "server-connection-failed"
+        override val severity = NoticeSeverity.FAILURE
+    }
+    data class ServerSignInRejected(val name: String) : Notice {
+        override val key = "server-sign-in-rejected"
+        override val severity = NoticeSeverity.FAILURE
+    }
     data object ServerProfileWriteFailed : Notice {
         override val key = "server-profile-write-failed"
         override val severity = NoticeSeverity.FAILURE

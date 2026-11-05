@@ -25,6 +25,198 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppProfileOwnerTest {
+    @Test fun unavailableSwitchListAndUnreadableTargetPostWriteFailureWithoutConnecting() = runTest {
+        val store = FakeServerProfileStore()
+        val id = (store.addPassword("second.invalid", username = "viewer", password = "synthetic") as ServerProfileWriteResult.Applied).id
+        store.scriptCredentialsUnavailable(id)
+        val session = FakeTvheadendSession()
+        val notices = NoticeCenter({ 0 }, { NoticeContext(0, null) })
+        val owner = AppProfileOwner(session, store, PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Unavailable }, { notices })
+        assertEquals(ServerProfileWriteResult.Unavailable, owner.switchActive(id))
+        assertEquals(Notice.ServerProfileWriteFailed, notices.state.value.candidate?.notice)
+        backgroundScope.launch { owner.run() }; runCurrent()
+        val connects = session.calls.count { it == FakeSessionCall.CONNECT }
+        assertEquals(ServerProfileWriteResult.Unavailable, owner.switchActive(id))
+        assertEquals(Notice.ServerProfileWriteFailed, notices.state.value.candidate?.notice)
+        assertEquals(connects, session.calls.count { it == FakeSessionCall.CONNECT })
+        assertFalse(owner.connectionChanges.isLocked)
+    }
+    @Test fun cancellationDuringPersistenceRestoresTheOriginalBeforeAReplacementTrials() = runTest {
+        val stored = FakeServerProfileStore()
+        val first = (stored.addAnonymous("first.invalid", activate = true) as ServerProfileWriteResult.Applied).id
+        val second = (stored.addAnonymous("second.invalid") as ServerProfileWriteResult.Applied).id
+        val third = (stored.addAnonymous("third.invalid") as ServerProfileWriteResult.Applied).id
+        val gate = CompletableDeferred<Unit>()
+        val writes = mutableListOf<ServerProfileId>()
+        val store = object : ServerProfileStore by stored {
+            override suspend fun setActive(id: ServerProfileId): ServerProfileWriteResult {
+                writes += id
+                if (id == second) gate.await()
+                return stored.setActive(id)
+            }
+        }
+        val session = FakeTvheadendSession()
+        val owner = AppProfileOwner(session, store, PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Missing })
+        backgroundScope.launch { owner.run() }; runCurrent()
+        val old = backgroundScope.launch { owner.switchActive(second) }; runCurrent()
+        session.publish(SessionObservation.create(sessionState = SessionState.Ready(ServerCapabilities.create(
+            streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED))))
+        runCurrent()
+        assertEquals(listOf(second), writes)
+        old.cancel()
+        val replacement = backgroundScope.launch { owner.switchActive(third) }; runCurrent()
+        assertFalse(old.isCompleted)
+        gate.complete(Unit); runCurrent()
+        assertEquals(listOf(second, first), writes)
+        assertEquals(first, (stored.profiles() as ServerProfileListResult.Available).activeId)
+        assertEquals(first, (owner.serverProfile.value as ServerProfileReadResult.Available).id)
+        replacement.cancelAndJoin()
+        assertEquals(first, (stored.profiles() as ServerProfileListResult.Available).activeId)
+        assertFalse(owner.connectionChanges.isLocked)
+    }
+
+    @Test fun cancellationDuringPersistenceRestoresAnUnreadablePreviousActiveId() = runTest {
+        val stored = FakeServerProfileStore()
+        val previous = (stored.addPassword("first.invalid", username = "viewer", password = "synthetic", activate = true) as ServerProfileWriteResult.Applied).id
+        val next = (stored.addAnonymous("second.invalid") as ServerProfileWriteResult.Applied).id
+        stored.scriptCredentialsUnavailable(previous)
+        val gate = CompletableDeferred<Unit>()
+        val writes = mutableListOf<ServerProfileId>()
+        val store = object : ServerProfileStore by stored {
+            override suspend fun setActive(id: ServerProfileId): ServerProfileWriteResult {
+                writes += id
+                if (id == next) gate.await()
+                return stored.setActive(id)
+            }
+        }
+        val session = FakeTvheadendSession()
+        val owner = AppProfileOwner(session, store, PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Unavailable })
+        backgroundScope.launch { owner.run() }; runCurrent()
+        assertTrue(owner.serverProfile.value is ServerProfileReadResult.Unavailable)
+        val attempt = backgroundScope.launch { owner.switchActive(next) }; runCurrent()
+        session.publish(SessionObservation.create(sessionState = SessionState.Ready(ServerCapabilities.create(
+            streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED))))
+        runCurrent(); assertEquals(listOf(next), writes)
+        attempt.cancel(); gate.complete(Unit); runCurrent()
+        assertTrue(attempt.isCompleted)
+        assertEquals(listOf(next, previous), writes)
+        assertEquals(previous, (stored.profiles() as ServerProfileListResult.Available).activeId)
+        assertEquals(previous, (owner.profiles.value as ServerProfileListResult.Available).activeId)
+        assertTrue(owner.serverProfile.value is ServerProfileReadResult.Unavailable)
+        assertFalse(owner.connectionChanges.isLocked)
+    }
+
+    @Test fun cancellationDuringPersistenceWithNothingToReturnToCompletesTheSelection() = runTest {
+        val stored = FakeServerProfileStore()
+        val next = (stored.addAnonymous("second.invalid") as ServerProfileWriteResult.Applied).id
+        val gate = CompletableDeferred<Unit>()
+        var writing = false
+        val store = object : ServerProfileStore by stored {
+            override suspend fun setActive(id: ServerProfileId): ServerProfileWriteResult {
+                writing = true; gate.await()
+                return stored.setActive(id)
+            }
+        }
+        val session = FakeTvheadendSession()
+        val owner = AppProfileOwner(session, store, PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Missing })
+        backgroundScope.launch { owner.run() }; runCurrent()
+        val attempt = backgroundScope.launch { owner.switchActive(next) }; runCurrent()
+        session.publish(SessionObservation.create(sessionState = SessionState.Ready(ServerCapabilities.create(
+            streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED))))
+        runCurrent(); assertTrue(writing)
+        attempt.cancel(); gate.complete(Unit); runCurrent()
+        assertEquals(next, (stored.profiles() as ServerProfileListResult.Available).activeId)
+        assertEquals(next, (owner.profiles.value as ServerProfileListResult.Available).activeId)
+        assertEquals(next, (owner.serverProfile.value as ServerProfileReadResult.Available).id)
+        assertFalse(owner.connectionChanges.isLocked)
+    }
+
+    @Test fun aNewUserChoiceWaitsForTheCancelledChoicesRestore() = runTest {
+        val stored = FakeServerProfileStore()
+        val first = (stored.addAnonymous("first.invalid", activate = true) as ServerProfileWriteResult.Applied).id
+        val second = (stored.addAnonymous("second.invalid") as ServerProfileWriteResult.Applied).id
+        val third = (stored.addAnonymous("third.invalid") as ServerProfileWriteResult.Applied).id
+        val fake = FakeTvheadendSession()
+        val restore = CompletableDeferred<Unit>()
+        var disconnects = 0
+        val session = object : TvheadendSession by fake {
+            override suspend fun disconnect() {
+                if (++disconnects == 3) restore.await()
+                fake.disconnect()
+            }
+        }
+        val owner = AppProfileOwner(session, stored, PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Missing })
+        backgroundScope.launch { owner.run() }
+        runCurrent()
+        val old = backgroundScope.launch { owner.switchActive(second) }
+        runCurrent()
+        old.cancel()
+        runCurrent()
+        assertEquals(3, disconnects)
+        val replacement = backgroundScope.async { owner.switchActive(third) }
+        runCurrent()
+        assertFalse(old.isCompleted)
+        assertEquals(3, disconnects)
+        assertEquals(first, (stored.profiles() as ServerProfileListResult.Available).activeId)
+        restore.complete(Unit)
+        runCurrent()
+        assertTrue(old.isCompleted)
+        assertEquals(4, disconnects)
+        fake.publish(SessionObservation.create(sessionState = SessionState.Ready(ServerCapabilities.create(
+            streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED))))
+        runCurrent()
+        assertEquals(ServerProfileWriteResult.Applied(third), replacement.await())
+        assertEquals(third, (stored.profiles() as ServerProfileListResult.Available).activeId)
+    }
+    @Test fun userSwitchCommitsOnlyAfterSignInAndCancellationRestoresThePreviousProfile() = runTest {
+        val stored = FakeServerProfileStore()
+        val first = (stored.addAnonymous("first.invalid", activate = true) as ServerProfileWriteResult.Applied).id
+        val next = (stored.addAnonymous("second.invalid") as ServerProfileWriteResult.Applied).id
+        val session = FakeTvheadendSession()
+        val owner = AppProfileOwner(session, stored, PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Missing })
+        backgroundScope.launch { owner.run() }
+        runCurrent()
+        val cancelled = backgroundScope.launch { owner.switchActive(next) }
+        runCurrent()
+        assertEquals(first, (stored.profiles() as ServerProfileListResult.Available).activeId)
+        cancelled.cancelAndJoin()
+        assertEquals(first, (owner.serverProfile.value as ServerProfileReadResult.Available).id)
+        assertFalse(owner.connectionChanges.isLocked)
+        val attempt = backgroundScope.async { owner.switchActive(next) }
+        runCurrent()
+        assertEquals(first, (stored.profiles() as ServerProfileListResult.Available).activeId)
+        session.publish(SessionObservation.create(sessionState = SessionState.Ready(ServerCapabilities.create(
+            streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED))))
+        runCurrent()
+        assertEquals(ServerProfileWriteResult.Applied(next), attempt.await())
+        assertEquals(next, (stored.profiles() as ServerProfileListResult.Available).activeId)
+    }
+
+    @Test fun rejectedUserSwitchKeepsThePreviousProfileAndRestoresItsConnection() = runTest {
+        val stored = FakeServerProfileStore()
+        val first = (stored.addAnonymous("first.invalid", activate = true) as ServerProfileWriteResult.Applied).id
+        val next = (stored.addAnonymous("second.invalid") as ServerProfileWriteResult.Applied).id
+        val session = FakeTvheadendSession()
+        val owner = AppProfileOwner(session, stored, PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Missing })
+        backgroundScope.launch { owner.run() }
+        runCurrent()
+        val attempt = backgroundScope.async { owner.switchActive(next) }
+        runCurrent()
+        session.publish(SessionObservation.create(sessionState = SessionState.Unavailable(SessionFailure.AUTHENTICATION_REJECTED)))
+        runCurrent()
+        assertEquals(ServerProfileWriteResult.Unavailable, attempt.await())
+        assertEquals(first, (stored.profiles() as ServerProfileListResult.Available).activeId)
+        assertEquals(first, (owner.serverProfile.value as ServerProfileReadResult.Available).id)
+        assertFalse(owner.connectionChanges.isLocked)
+    }
+
     @Test fun cancellationAtReceiveBeforeTheSubmitterResumesKeepsTheConnectionLock() = runTest {
         val stored = FakeServerProfileStore()
         stored.addAnonymous("first.invalid", activate = true)
@@ -323,8 +515,6 @@ class AppProfileOwnerTest {
         val owner = AppProfileOwner(session, store, settings, StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Missing })
         backgroundScope.launch { owner.run() }
         runCurrent()
-        settings.setShowInSwitcher(active, false)
-        settings.setShowInSwitcher(other, false)
         events.clear()
         assertEquals(ServerProfileWriteResult.Applied(active), owner.remove(active))
         assertTrue(events.indexOf("disconnect") < events.indexOf("profiles"))
@@ -381,7 +571,6 @@ class AppProfileOwnerTest {
         backgroundScope.launch { owner.run() }
         runCurrent()
         assertEquals(ServerProfileReadResult.Unavailable, owner.serverProfile.value)
-        settings.setShowInSwitcher(id, false)
         events.clear()
         assertEquals(ServerProfileWriteResult.Applied(id), owner.remove(id))
         assertTrue(events.indexOf("disconnect") < events.indexOf("profiles"))
@@ -391,7 +580,6 @@ class AppProfileOwnerTest {
         assertTrue(events.lastIndexOf("app-data") > events.indexOf("remove"))
         assertTrue((owner.profiles.value as ServerProfileListResult.Available).profiles.isEmpty())
         assertEquals(ServerProfileReadResult.Missing, owner.serverProfile.value)
-        assertTrue(settings.hiddenServerProfileIds.first().isEmpty())
         assertEquals(Notice.ServerProfileRemoved(id, "viewer on first.invalid"), notices.state.value.candidate?.notice)
     }
 

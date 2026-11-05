@@ -78,34 +78,6 @@ class ProfilePreferencesTest {
         assertEquals(audio.copy(language = "en"), settings.audioChoices.read(remaining.value, ChannelId(1)))
     }
 
-    @Test fun visibilityAlwaysIncludesInUseAndColdLaunchRequiresTwoVisibleProfilesAndOptIn() = runTest {
-        val store = FakeServerProfileStore()
-        store.addAnonymous("first.invalid", activate = true)
-        store.addAnonymous("second.invalid")
-        store.addAnonymous("third.invalid")
-        val list = store.profiles() as ServerProfileListResult.Available
-        val first = list.profiles[0].id
-        val second = list.profiles[1].id
-        val third = list.profiles[2].id
-        val data = InMemoryPreferencesDataStore()
-        val settings = PlayerSettingsStore(data)
-        assertFalse(settings.askAtStartup.first())
-        assertTrue(settings.hiddenServerProfileIds.first().isEmpty())
-        settings.setShowInSwitcher(first, false)
-        settings.setShowInSwitcher(second, false)
-        val filtered = switcherProfiles(list.profiles, first, settings.hiddenServerProfileIds.first())
-        assertEquals(listOf(first, third), filtered.map { it.id })
-        assertTrue(showServerSwitcher(filtered))
-        assertFalse(shouldShowStartupPicker(false, filtered))
-        settings.setAskAtStartup(true)
-        assertTrue(shouldShowStartupPicker(settings.askAtStartup.first(), filtered))
-        settings.setShowInSwitcher(third, false)
-        val single = switcherProfiles(list.profiles, first, settings.hiddenServerProfileIds.first())
-        assertFalse(showServerSwitcher(single))
-        assertFalse(shouldShowStartupPicker(true, single))
-        assertTrue(switcherProfiles(list.profiles, null, settings.hiddenServerProfileIds.first()).isEmpty())
-    }
-
     @Test fun displayNameUsesLabelOrAccountHostAndOnlyNonDefaultPortWithMiddleDot() = runTest {
         val store = FakeServerProfileStore()
         store.addAnonymous("first.invalid")
@@ -151,7 +123,6 @@ class ProfilePreferencesTest {
         settings.audioChoices.write(first.value, channel, audio)
         settings.setStreamProfile(stream)
         tags.save(tags.settings.first().copy(activeTagId = at.bernhardberger.tvheadend.sdk.core.ChannelTagId(7)))
-        settings.setShowInSwitcher(first, false)
         settings.useProfile(second)
         assertTrue(recents.recentChannelIds.first().isEmpty())
         assertNull(recents.channelId.first())
@@ -176,7 +147,6 @@ class ProfilePreferencesTest {
         assertEquals(AspectRatioMode.FIT, settings.channelAspects.choices.first().modeFor(channel))
         assertNull(settings.audioChoices.read(first.value, channel))
         assertNull(settings.resolveStreamProfileSelection(streams) { true })
-        assertFalse(first in settings.hiddenServerProfileIds.first())
         settings.useProfile(second)
         assertEquals(listOf(ChannelId(2)), recents.recentChannelIds.first())
         assertEquals(AspectRatioMode.FORCE_16_9, settings.channelAspects.choices.first().modeFor(channel))

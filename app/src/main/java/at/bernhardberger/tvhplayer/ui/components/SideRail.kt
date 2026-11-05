@@ -249,7 +249,6 @@ internal fun SideRail(
     currentRoute: AppDestination?,
     onRootBack: () -> Unit,
     onNavigate: (AppDestination) -> Unit,
-    onDrawerOpened: (AppDestination?) -> Unit = {},
     modifier: Modifier = Modifier,
     rootRoute: AppDestination = AppDestination.CHANNELS,
     availableDestinations: Set<AppDestination> = setOf(
@@ -283,7 +282,6 @@ internal fun SideRail(
     val epgLabel = stringResource(R.string.nav_epg)
     val recordingsLabel = stringResource(R.string.nav_recordings)
     val settingsLabel = stringResource(R.string.nav_settings)
-    val switchServerLabel = stringResource(R.string.nav_switch_server)
     val settingsDescription = if (connectionDegraded) stringResource(R.string.connection_problem_label) else settingsLabel
     val mainItems = remember(
         homeLabel,
@@ -333,15 +331,9 @@ internal fun SideRail(
     }
     val footerItems = remember(
         settingsLabel,
-        switchServerLabel,
         availableDestinations,
     ) {
         buildList {
-            if (AppDestination.SWITCH_SERVER in availableDestinations) {
-                add(RailItem(AppDestination.SWITCH_SERVER, switchServerLabel) {
-                    Icon(painterResource(R.drawable.ic_swap_horiz), null, Modifier.size(24.dp))
-                })
-            }
             if (AppDestination.SETTINGS in availableDestinations) {
                 add(RailItem(AppDestination.SETTINGS, settingsLabel) {
                     Icon(
@@ -356,11 +348,6 @@ internal fun SideRail(
     val items = mainItems + footerItems
     val itemFocus = remember(items) { items.associate { it.route to FocusRequester() } }
     val drawerState = rememberDrawerState(DrawerValue.Closed)
-    var contentRoute by remember { mutableStateOf(currentRoute) }
-    SideEffect { if (drawerState.currentValue == DrawerValue.Closed) contentRoute = currentRoute }
-    LaunchedEffect(drawerState.currentValue) {
-        if (drawerState.currentValue == DrawerValue.Open) onDrawerOpened(contentRoute)
-    }
     val layering = remember { BrowseContentLayering() }
     val detailsOpen = layering.details.isNotEmpty()
     val modalOpen = layering.modalScrims.isNotEmpty()
@@ -1006,7 +993,6 @@ private val AppDestination.testTag: String
         AppDestination.GUIDE -> "nav-epg"
         AppDestination.RECORDINGS -> "nav-recordings"
         AppDestination.SETTINGS -> "nav-settings"
-        AppDestination.SWITCH_SERVER -> "nav-switch-server"
         AppDestination.LIVE_PLAYER -> "nav-player"
         AppDestination.RECORDING_PLAYER -> "nav-recording-player"
     }

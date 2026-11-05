@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.settings
 
+import at.bernhardberger.tvheadend.sdk.core.SessionCommandResult
+
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
 import at.bernhardberger.tvheadend.sdk.android.TvheadendServerProfileStore
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
@@ -25,6 +27,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -85,6 +88,9 @@ class AppProfileOwner(
 
     private val serverMutex = Mutex()
     private val streamMutex = Mutex()
+    // Taken only after playback has stopped: discovery must remain able to settle a
+    // reconnect retune while stop waits for the playback command serializer.
+    private val switchIdentity = Mutex()
 
     /**
      * Serializes setup tests (including their non-cancellable cleanup) with saved-profile
@@ -112,13 +118,6 @@ class AppProfileOwner(
     val serverProfile: StateFlow<ServerProfileReadResult?> = mutableServerProfile.asStateFlow()
     private val mutableProfiles = MutableStateFlow<ServerProfileListResult?>(null)
     val profiles: StateFlow<ServerProfileListResult?> = mutableProfiles.asStateFlow()
-    val hiddenServerProfileIds = playerSettings.hiddenServerProfileIds
-    val askAtStartup = playerSettings.askAtStartup
-    val switcherProfiles = combine(profiles, hiddenServerProfileIds) { list, hidden ->
-        val available = list as? ServerProfileListResult.Available
-        switcherProfiles(available?.profiles.orEmpty(), available?.activeId, hidden)
-    }
-    val showSwitcher = switcherProfiles.map(::showServerSwitcher)
     var audioProfileId: String? = null
         private set
     override val serverSettings: Flow<ServerSettings> = serverProfile
@@ -197,9 +196,6 @@ class AppProfileOwner(
         submit(SelectStreamProfileCommand(profileId))
     }
 
-    suspend fun setShowInSwitcher(id: ServerProfileId, show: Boolean) = playerSettings.setShowInSwitcher(id, show)
-    suspend fun setAskAtStartup(ask: Boolean) = playerSettings.setAskAtStartup(ask)
-
     suspend fun addAnonymous(host: String, port: Int, label: String? = null): SaveServerProfileResult {
         validateServerAddress(host, port)
         val normalizedLabel = ServerProfileSummary.normalizeLabel(label)
@@ -257,6 +253,83 @@ class AppProfileOwner(
             return@mutate ServerProfileWriteResult.Applied(id)
         }
         refreshAfterWrite(profileStore.setActive(id))
+    }
+
+    /** Tests the target on the shared connection; persistence changes only after sign-in succeeds. */
+    suspend fun switchActive(id: ServerProfileId, beforeConnect: suspend () -> Unit = {}): ServerProfileWriteResult =
+        connectionChanges.withLock {
+            val list = profiles.value as? ServerProfileListResult.Available
+                ?: return@withLock unavailableSwitch()
+            if (list.activeId == id) return@withLock ServerProfileWriteResult.Applied(id)
+            val target = profileStore.load(id) as? ServerProfileReadResult.Available
+                ?: return@withLock unavailableSwitch()
+            val previous = profileStore.loadActive()
+            val previousId = list.activeId
+            val generation = configurationGeneration.value
+            val caller = currentCoroutineContext()
+            var persisted = false
+            var committed = false
+            var failureNotice: Notice? = null
+            beforeConnect()
+            switchIdentity.lock()
+            try {
+                session.disconnect()
+                val before = session.observation.value
+                if (session.connect(target.profile) != SessionCommandResult.STARTED) {
+                    failureNotice = Notice.ServerConnectionFailed(serverProfileDisplayName(list.profiles.first { it.id == id }))
+                    return@withLock ServerProfileWriteResult.Unavailable
+                }
+                val outcome = session.observation.first {
+                    it !== before && (it.sessionState is at.bernhardberger.tvheadend.sdk.core.SessionState.Ready ||
+                        it.sessionState is at.bernhardberger.tvheadend.sdk.core.SessionState.Unavailable)
+                }.sessionState
+                currentCoroutineContext().ensureActive()
+                if (configurationGeneration.value != generation) return@withLock ServerProfileWriteResult.Unavailable
+                if (outcome is at.bernhardberger.tvheadend.sdk.core.SessionState.Unavailable) {
+                    val name = list.profiles.first { it.id == id }.let(::serverProfileDisplayName)
+                    failureNotice = if (outcome.reason == at.bernhardberger.tvheadend.sdk.core.SessionFailure.AUTHENTICATION_REJECTED)
+                        Notice.ServerSignInRejected(name) else Notice.ServerConnectionFailed(name)
+                    return@withLock ServerProfileWriteResult.Unavailable
+                }
+                withContext(NonCancellable) {
+                    val result = profileStore.setActive(id)
+                    if (result is ServerProfileWriteResult.Applied) {
+                        persisted = true
+                        // With no previous selection there is no rollback API or connection to
+                        // return to: once persistence starts, that successful selection wins.
+                        if (previousId != null) caller.ensureActive()
+                        mutableConfigurationGeneration.value += 1
+                        playerSettings.useProfile(id)
+                        audioProfileId = id.value
+                        mutableProfiles.value = profileStore.profiles()
+                        mutableServerProfile.value = target
+                        committed = true
+                    } else {
+                        noticeCenter()?.let { it.post(Notice.ServerProfileWriteFailed, it.context()) }
+                    }
+                    result
+                }
+            } finally {
+                try {
+                    if ((!committed || !caller.isActive) &&
+                        (!persisted || previousId != null) &&
+                        (configurationGeneration.value == generation || committed && configurationGeneration.value == generation + 1)) withContext(NonCancellable) {
+                        if (persisted && previousId != null) {
+                            profileStore.setActive(previousId)
+                            mutableProfiles.value = profileStore.profiles()
+                        }
+                        applyServerProfile(previous)
+                        failureNotice?.let { notice -> noticeCenter()?.let { it.post(notice, it.context()) } }
+                    }
+                } finally {
+                    switchIdentity.unlock()
+                }
+            }
+        }
+
+    private fun unavailableSwitch(): ServerProfileWriteResult.Unavailable {
+        noticeCenter()?.let { it.post(Notice.ServerProfileWriteFailed, it.context()) }
+        return ServerProfileWriteResult.Unavailable
     }
 
     suspend fun remove(id: ServerProfileId): ServerProfileWriteResult = mutate { removeProfile(id) }
@@ -487,7 +560,9 @@ class AppProfileOwner(
                     return@collectLatest
                 }
 
-                streamMutex.withLock {
+                // Discovery may finish during a trial connection. Resolve preferences only once
+                // its identity has committed (or the previous connection has been restored).
+                switchIdentity.withLock { streamMutex.withLock {
                     if (session.observation.value.currentSession !== observation) {
                         return@withLock
                     }
@@ -513,7 +588,7 @@ class AppProfileOwner(
                     mutableSelectedStreamProfileId.value = selected
                     mutableStreamProfiles.value = result
                     mutableSettledStreamProfilesFor.value = observation
-                }
+                } }
             }
     }
 

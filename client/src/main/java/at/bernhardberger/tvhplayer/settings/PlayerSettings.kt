@@ -127,22 +127,6 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
     internal val audioChoices = AudioChoiceStore(dataStore)
     val channelAspects = ChannelAspectStore(dataStore)
 
-    val hiddenServerProfileIds: Flow<Set<ServerProfileId>> = dataStore.data.map { p ->
-        p.asMap().filter { (key, value) -> key.name.startsWith("server:") &&
-            key.name.endsWith(":showInSwitcher") && value == false }
-            .keys.mapTo(mutableSetOf()) { ServerProfileId.from(it.name.removePrefix("server:").removeSuffix(":showInSwitcher")) }
-    }
-    private val askAtStartupKey = booleanPreferencesKey("askForServerAtStartup")
-    val askAtStartup: Flow<Boolean> = dataStore.data.map { it[askAtStartupKey] ?: false }
-
-    suspend fun setAskAtStartup(ask: Boolean) {
-        dataStore.edit { it[askAtStartupKey] = ask }
-    }
-
-    suspend fun setShowInSwitcher(id: ServerProfileId, show: Boolean) {
-        dataStore.edit { it[booleanPreferencesKey(profilePreferencePrefix(id) + "showInSwitcher")] = show }
-    }
-
     internal suspend fun useProfile(id: ServerProfileId?) {
         dataStore.edit { if (id == null) it.remove(activeProfileKey) else it[activeProfileKey] = id.value }
     }

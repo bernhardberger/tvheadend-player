@@ -19,6 +19,7 @@ import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
@@ -47,7 +48,6 @@ internal fun SettingsScreen(
     connectionPresentation: at.bernhardberger.tvhplayer.viewmodels.AppConnectionPresentation,
     onRetry: () -> Unit,
     section: SettingsSection = SettingsSection.GENERAL,
-    profileId: String? = null,
     initialFocusEnabled: Boolean = true,
     contentPadding: PaddingValues = TvFullScreenPadding,
     backEnabled: Boolean = true,
@@ -73,20 +73,7 @@ internal fun SettingsScreen(
         recordingSpaceText(observation.dvrDiskSpaceState)) { id ->
         scope.launch { settingsStore.setRecordingProfile(id); navigation.pop() }
     }
-    val connectionLevels = settingsConnectionLevels(connectionPresentation, onRetry, servers.actions, profileOwner)
-    var profileOpened by rememberSaveable(profileId) { mutableStateOf(false) }
-    LaunchedEffect(profileId, connectionLevels.firstOrNull()?.rows?.size) {
-        val target = profileId?.let { id -> connectionLevels.firstOrNull()?.rows?.firstOrNull { it.item.id == "server-$id" } }
-        if (!profileOpened && target != null) {
-            val item = DepthItem(SettingsSection.CONNECTION.name, SettingsSection.CONNECTION.name)
-            if (navigation.stack.active.levelId == SETTINGS_ROOT) {
-                navigation.update(navigation.stack.focus(item.id, listOf(item)).enter(item, listOf(item)))
-            }
-            val items = connectionLevels.first().rows.map { it.item }
-            navigation.update(navigation.stack.focus(target.item.id, items).enter(target.item, items))
-            profileOpened = true
-        }
-    }
+    val connectionLevels = settingsConnectionLevels(connectionPresentation, onRetry, servers.actions, profileOwner, servers.switchingNow)
     servers.FocusPending(connectionLevels.firstOrNull())
     val profileList by profileOwner.profiles.collectAsStateWithLifecycle()
     val levels = settingsGeneralLevels(navigation) + connectionLevels + settingsPlayerLevels(navigation) + listOf(
@@ -104,7 +91,8 @@ internal fun SettingsScreen(
         setup = servers.setupContent(),
         onCloseSetup = servers::closeSetup,
         dialog = servers.dialogContent(),
-        onCloseDialog = servers::closeDialogs)
+        onCloseDialog = servers::closeDialogs,
+        onCancelSwitch = servers::cancelSwitch.takeIf { servers.switchingNow })
 }
 
 /** Connection's row carries the overview's status title, the only value on the root. */
@@ -140,7 +128,9 @@ internal fun SettingsScreenNavigation(
     /** A question over Settings; it takes focus and Back, and Settings refocuses its row after it. */
     dialog: (@Composable () -> Unit)? = null,
     onCloseDialog: () -> Unit = {},
+    onCancelSwitch: (() -> Unit)? = null,
 ) {
+    val switchBack = at.bernhardberger.tvhplayer.ui.components.rememberBackKeyCycle()
     val rootFocus = LocalBrowseNavigationFocus.current
     val unavailable = stringResource(R.string.settings_unavailable)
     val layoutDirection = LocalLayoutDirection.current
@@ -168,7 +158,15 @@ internal fun SettingsScreenNavigation(
         if (setupOpen && isCurrent) layering?.details?.set(pageKey, opacity)
         onDispose { layering?.details?.remove(pageKey) }
     }
-    Box(Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize().onPreviewKeyEvent { event ->
+        val native = event.nativeKeyEvent
+        if (onCancelSwitch == null || covered || !isCurrent || !backEnabled ||
+            native.keyCode != android.view.KeyEvent.KEYCODE_BACK) {
+            switchBack.reset()
+            false
+        } else switchBack.handle(native.action == android.view.KeyEvent.ACTION_DOWN,
+            native.repeatCount, native.isCanceled) { onCancelSwitch() }
+    }) {
         // Settings keeps its columns and focus under the setup; nothing behind it takes focus or
         // Back, and closing the setup returns focus to the row that opened it.
         DepthNavigation(
@@ -190,6 +188,7 @@ internal fun SettingsScreenNavigation(
             onRootBack = rootFocus?.let { { it.requestFocus() } },
             pageKeyDirection = ChannelNavigation::pageDirectionForKeyCode,
         )
+        BackHandler(enabled = backEnabled && isCurrent && !covered && onCancelSwitch != null) { onCancelSwitch?.invoke() }
         if (shownSetup != null) {
             // Registered before the setup's own handler, so its steps go back first.
             BackHandler(backEnabled, onCloseSetup)

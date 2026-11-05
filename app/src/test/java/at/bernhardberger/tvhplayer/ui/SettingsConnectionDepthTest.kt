@@ -20,6 +20,7 @@ import at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.settings.*
 import at.bernhardberger.tvhplayer.testutil.VisualCapture
+import at.bernhardberger.tvhplayer.testutil.leaveTouchModeBeforeComposing
 import at.bernhardberger.tvhplayer.ui.components.depth.*
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.ui.screens.*
@@ -54,12 +55,59 @@ class SettingsConnectionDepthTest {
         contentPadding: androidx.compose.foundation.layout.PaddingValues = TvFullScreenPadding,
         initialFocusEnabled: Boolean = true,
         isCurrent: Boolean = true,
+        onCancelSwitch: (() -> Unit)? = null,
     ) = SettingsScreenNavigation(navigation, listOf(settingsRootLevel()) +
         fixtureConnectionLevels("Connected", showRetry = degraded,
             actions = ServerProfileActions(onSetUp = { setupOpen = true })),
         initialFocusEnabled = initialFocusEnabled, contentPadding = contentPadding, isCurrent = isCurrent,
         setup = if (setupOpen) { { setup { setupOpen = false } } } else null,
-        onCloseSetup = { setupOpen = false })
+        onCloseSetup = { setupOpen = false }, onCancelSwitch = onCancelSwitch)
+
+    @Test fun setupBackTakesPrecedenceOverPendingSwitchCancellation() {
+        var cancellations = 0
+        val editor = Editor()
+        setupOpen = true
+        compose.leaveTouchModeBeforeComposing()
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                SettingsSetupFrame {
+                    SettingsWithSetup(rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.CONNECTION.name),
+                        { saved -> editor.Screen(ConnectionFormState(), saved) }, onCancelSwitch = { cancellations++ })
+                }
+            }
+        }
+        compose.onNodeWithTag("setup-continue").assertIsFocused()
+        press(Key.Back)
+        assertFalse(setupOpen)
+        assertEquals(0, cancellations)
+        press(Key.Back)
+        assertEquals(1, cancellations)
+    }
+
+    @Test fun dialogBackTakesPrecedenceOverPendingSwitchCancellation() {
+        var cancellations = 0
+        var question by mutableStateOf(true)
+        compose.leaveTouchModeBeforeComposing()
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                SettingsSetupFrame {
+                    SettingsScreenNavigation(
+                        rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.CONNECTION.name),
+                        listOf(settingsRootLevel()),
+                        dialog = if (question) ({ RemoveServerDialog("Living room", false, {}, { question = false }) }) else null,
+                        onCancelSwitch = { cancellations++ })
+                }
+            }
+        }
+        compose.onNodeWithTag(REMOVE_KEEP).assertIsFocused()
+        press(Key.Back)
+        compose.mainClock.advanceTimeBy(1_000)
+        compose.waitForIdle()
+        assertFalse(question)
+        assertEquals(0, cancellations)
+        press(Key.Back)
+        assertEquals(1, cancellations)
+    }
 
     @Test @Category(VisualCapture::class)
     fun captureSettingsConnectionEntryAndPrefilledWizard() {

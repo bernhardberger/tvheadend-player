@@ -91,6 +91,8 @@ internal fun settingsRow(
     titleMaxLines: Int = 2,
     /** Drawn instead of [icon], for a row that leads with more than an icon (a server's avatar). */
     leading: (@Composable BoxScope.() -> Unit)? = null,
+    /** Connection rows split their address and status into distinct text styles. */
+    supportingContent: (@Composable () -> Unit)? = null,
     onClick: () -> Unit = {},
 ) = DepthRow(DepthItem(id, child), { if (enabled) onClick() }) { modifier, activate ->
     Column {
@@ -115,7 +117,7 @@ internal fun settingsRow(
             // Keep the last visible scope reachable even when its switch cannot be turned off.
             onClick = { if (enabled) activate() },
             headlineContent = { Text(title.annotated(), style = MaterialTheme.typography.titleMedium, maxLines = titleMaxLines, overflow = TextOverflow.Ellipsis) },
-            supportingContent = supporting?.let { { Text(it.annotated(), maxLines = 2, overflow = TextOverflow.Ellipsis) } },
+            supportingContent = supportingContent ?: supporting?.let { { Text(it.annotated(), maxLines = 2, overflow = TextOverflow.Ellipsis) } },
             leadingContent = leading ?: icon?.let { { Icon(painterResource(it), null, Modifier.size(ListItemDefaults.IconSize)) } },
             trailingContent = when {
                 busy -> ({ androidx.compose.material3.CircularProgressIndicator(

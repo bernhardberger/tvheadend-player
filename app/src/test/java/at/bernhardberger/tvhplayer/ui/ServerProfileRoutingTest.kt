@@ -4,8 +4,6 @@
 package at.bernhardberger.tvhplayer.ui
 
 import android.app.Application
-import androidx.activity.compose.setContent
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
@@ -86,6 +84,7 @@ import org.robolectric.annotation.Config
  * instead of playing, and removing the last server returns to Welcome. Hosts are fictional.
  */
 @RunWith(RobolectricTestRunner::class)
+@org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
 class ServerProfileRoutingTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
@@ -93,52 +92,51 @@ class ServerProfileRoutingTest {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     // Saved channels, so Home shows its rows and the rail at once.
     private val session = FakeTvheadendSession(SessionObservation.create(
-        sessionState = SessionState.Connecting,
-        channelState = ChannelRepositoryState.Stale(ChannelCatalog.create(listOf(Channel.create(ChannelId(1), name = "Name 1", number = 1)))),
+        sessionState = SessionState.Ready(at.bernhardberger.tvheadend.sdk.core.ServerCapabilities.create(
+            streaming = at.bernhardberger.tvheadend.sdk.core.CapabilityAccess.ALLOWED,
+            dvrWrite = at.bernhardberger.tvheadend.sdk.core.CapabilityAccess.ALLOWED)),
+        channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(Channel.create(ChannelId(1), name = "Name 1", number = 1)))),
     )).apply { scriptLivePlaybackSuccess() }
     private val store = FakeServerProfileStore()
     private var removalGate: CompletableDeferred<Unit>? = null
-    private var selectionGate: CompletableDeferred<Unit>? = null
-    private var selectionStarted = false
-    private var selectionThrows = false
-    private lateinit var startupVm: at.bernhardberger.tvhplayer.viewmodels.MainStartupViewModel
-    private lateinit var appContent: @Composable () -> Unit
-    private val startupModels = androidx.lifecycle.ViewModelStore()
+    private var connectionGate: CompletableDeferred<Unit>? = null
+    private var trialStarted = false
     private val launchRequests = ApplianceLaunchRequests()
     private lateinit var player: ExoPlayer
     private lateinit var owner: AppProfileOwner
     private lateinit var runtime: AppPlaybackRuntime
+    private lateinit var view: android.view.View
 
     @After fun after() {
-        startupModels.clear()
         scope.cancel()
         if (::player.isInitialized) player.release()
     }
 
-    private fun app(startup: ServerSettings, picker: Boolean = false) {
+    private fun app(startup: ServerSettings) {
         val settings = PlayerSettingsStore(InMemoryData())
         val gatedStore = object : ServerProfileStore by store {
-            override suspend fun setActive(id: ServerProfileId): ServerProfileWriteResult {
-                selectionStarted = true
-                selectionGate?.await()
-                if (selectionThrows) error("Synthetic selection failure")
-                return store.setActive(id)
-            }
             override suspend fun remove(id: ServerProfileId): ServerProfileWriteResult {
                 removalGate?.await()
                 return store.remove(id)
             }
         }
-        owner = AppProfileOwner(session, gatedStore, settings, Dispatchers.IO,
+        val initialObservation = session.observation.value
+        val connectingSession = object : TvheadendSession by session {
+            override suspend fun disconnect() {
+                session.disconnect()
+                session.publish(SessionObservation.create(sessionState = SessionState.Disconnected))
+            }
+            override suspend fun connect(profile: at.bernhardberger.tvheadend.sdk.core.ServerProfile): at.bernhardberger.tvheadend.sdk.core.SessionCommandResult {
+                connectionGate?.let { connectionGate = null; trialStarted = true; it.await() }
+                val result = session.connect(profile)
+                session.publish(initialObservation)
+                return result
+            }
+        }
+        owner = AppProfileOwner(connectingSession, gatedStore, settings, Dispatchers.IO,
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
         scope.launch { owner.run() }
         compose.waitUntil(10_000) { owner.profiles.value != null && owner.serverProfile.value != null }
-        if (picker) {
-            runBlocking { owner.setAskAtStartup(true) }
-            startupVm = at.bernhardberger.tvhplayer.viewmodels.MainStartupViewModel(owner,
-                UiSettingsStore(InMemoryData()), androidx.lifecycle.SavedStateHandle(), applianceBuild = false)
-            startupModels.put("startup", startupVm)
-        }
         player = ExoPlayer.Builder(context).build()
         val coordinator = createTvheadendPlaybackCoordinator(player).also { it.launchIn(scope) }
         runtime = AppPlaybackRuntime(player, session, coordinator, settings, owner, scope,
@@ -165,29 +163,23 @@ class ServerProfileRoutingTest {
             viewModel { SettingsPlayerViewModel(get(), get(), get(), get(), get()) }
         }
         compose.leaveTouchModeBeforeComposing()
-        appContent = {
+        compose.setContent {
             KoinIsolatedContext(koinApplication { modules(dependencies) }) {
                 TVHeadendPlayerTheme {
+                    view = androidx.compose.ui.platform.LocalView.current
                     val profile by owner.serverProfile.collectAsStateWithLifecycle()
                     val profiles by owner.profiles.collectAsStateWithLifecycle()
-                    val pickerVisible = if (picker) startupVm.startupPickerVisible.collectAsStateWithLifecycle().value else false
-                    if (pickerVisible) at.bernhardberger.tvhplayer.ui.screens.StartupServerPicker(
-                        startupVm::finishStartupPicker, startupVm::openStartupProfile,
-                        startupVm.startupSelectionPending.collectAsStateWithLifecycle().value,
-                        onSelect = { startupVm.selectStartupServer(it, notices) }) else
                     AppRoot(
-                        startupState = if (picker) startupVm.state.collectAsStateWithLifecycle().value else MainStartupState.Ready(startup, autoStartPlayback = launchRequests.state.value != ApplianceLaunchState.Idle),
+                        startupState = MainStartupState.Ready(startup, autoStartPlayback = launchRequests.state.value != ApplianceLaunchState.Idle),
                         runtimeServerSettings = profile?.toServerSettings(),
                         applianceLaunchRequests = launchRequests,
                         onPlayerVisibilityChanged = {},
                         onRequestExit = {},
                         serversStored = profiles.serversStored(),
-                        initialSettingsProfileId = if (picker) startupVm.startupSettingsProfileId else null,
                     )
                 }
             }
         }
-        compose.setContent(appContent)
         settle()
     }
 
@@ -196,117 +188,27 @@ class ServerProfileRoutingTest {
         store.addAnonymous("cabin.example.invalid", 9982, null, activate = false)
     }
 
-    private fun coldPicker(): Pair<ServerProfileId, ServerProfileId> {
-        val ids = runBlocking {
-            val first = store.addAnonymous("living.example.invalid", 9982, "Living room", true) as ServerProfileWriteResult.Applied
-            val second = store.addAnonymous("cabin.example.invalid", 9982, "Cabin", false) as ServerProfileWriteResult.Applied
-            first.id to second.id
-        }
-        app(ServerSettings(host = "living.example.invalid"), picker = true)
-        compose.waitUntil(10_000) { startupVm.startupPickerVisible.value }
+    @Test fun productionSettingsBackCancelsThePendingConnectionRatherThanLeavingTheList() {
+        storedWithNoneInUse()
+        app(ServerSettings())
+        val first = runBlocking { (store.profiles() as ServerProfileListResult.Available).profiles.first().id }
+        click("settings-row-${SettingsSection.CONNECTION.name}")
+        connectionGate = CompletableDeferred()
+        click("settings-row-${serverProfileRowId(first)}")
+        click("settings-row-${at.bernhardberger.tvhplayer.ui.screens.settings.SERVER_USE}")
+        compose.waitUntil(10_000) { trialStarted }
+        compose.onRoot().performKeyInput { pressKey(androidx.compose.ui.input.key.Key.Back) }
+        compose.waitUntil(10_000) { !owner.connectionChanges.isLocked }
         settle()
-        return ids
-    }
-
-    @Test fun startupBackWaitsForTheAdmittedSelectionBeforeBootstrap() {
-        val (_, second) = coldPicker()
-        selectionGate = CompletableDeferred()
-        click("server-picker-${second.value}")
-        compose.waitUntil(10_000) { selectionStarted }
-        press(androidx.compose.ui.input.key.Key.Back)
-        assertEquals(true, startupVm.startupPickerVisible.value)
-        assertEquals(MainStartupState.ResolvingLocal, startupVm.state.value)
-        assertNull(runtime.activeTarget.value)
-        selectionGate!!.complete(Unit)
-        compose.waitUntil(10_000) { startupVm.state.value is MainStartupState.Ready }
-        assertEquals("cabin.example.invalid", (startupVm.state.value as MainStartupState.Ready).server.host)
-    }
-
-    @Test fun recreatedStartupPickerBackWaitsForTheRetainedSelection() {
-        val (_, second) = coldPicker()
-        selectionGate = CompletableDeferred()
-        click("server-picker-${second.value}")
-        compose.waitUntil(10_000) { selectionStarted }
-        compose.activityRule.scenario.recreate()
-        compose.activityRule.scenario.onActivity { activity -> activity.setContent(content = appContent) }
-        settle()
-        press(androidx.compose.ui.input.key.Key.Back)
-        assertEquals(true, startupVm.startupSelectionPending.value)
-        assertEquals(true, startupVm.startupPickerVisible.value)
-        assertEquals(MainStartupState.ResolvingLocal, startupVm.state.value)
-        selectionGate!!.complete(Unit)
-        compose.waitUntil(10_000) { startupVm.state.value is MainStartupState.Ready }
-        assertEquals("cabin.example.invalid", (startupVm.state.value as MainStartupState.Ready).server.host)
-    }
-
-    @Test fun pendingStartupSelectionBlocksAddAndDefersDuplicateCompletion() {
-        val (first, second) = coldPicker()
-        selectionGate = CompletableDeferred()
-        click("server-picker-${second.value}")
-        compose.waitUntil(10_000) { selectionStarted }
-        // Even a semantic click cannot start setup while the retained decision is pending.
-        compose.onNodeWithTag("server-picker-add").performSemanticsAction(SemanticsActions.OnClick)
-        settle()
-        compose.onNodeWithTag("setup-host").assertDoesNotExist()
-        // All completion paths are fenced too, including a duplicate callback already in flight.
-        compose.runOnIdle { startupVm.openStartupProfile(first.value) }
-        assertEquals(true, startupVm.startupPickerVisible.value)
-        assertEquals(MainStartupState.ResolvingLocal, startupVm.state.value)
-        selectionGate!!.complete(Unit)
-        compose.waitUntil(10_000) { startupVm.state.value is MainStartupState.Ready }
-        assertEquals("cabin.example.invalid", (startupVm.state.value as MainStartupState.Ready).server.host)
-        assertEquals(first.value, startupVm.startupSettingsProfileId)
-        assertEquals(false, (startupVm.state.value as MainStartupState.Ready).autoStartPlayback)
-    }
-
-    @Test fun startupSelectionExceptionIsShownWhileThePickerRemainsOpen() {
-        val (_, second) = coldPicker()
-        selectionThrows = true
-        click("server-picker-${second.value}")
-        compose.waitUntil(10_000) { compose.onAllNodesWithTag("app-notice").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("The server could not be selected. Try again.").assertIsDisplayed()
-        assertEquals(true, startupVm.startupPickerVisible.value)
-        press(androidx.compose.ui.input.key.Key.Back)
-        compose.waitUntil(10_000) { !startupVm.startupPickerVisible.value }
-    }
-
-    @Test fun startupDuplicateAddReachesVisibleSettingsInsteadOfWaitingForHome() {
-        val (first, _) = coldPicker()
-        click("server-picker-add")
-        compose.onNodeWithTag("setup-host").performSemanticsAction(SemanticsActions.RequestFocus)
-        press(androidx.compose.ui.input.key.Key.DirectionCenter)
-        compose.onNodeWithTag("setup-host").performTextReplacement("living.example.invalid")
-        press(androidx.compose.ui.input.key.Key.Back)
-        click("setup-continue")
-        click("setup-continue")
-        compose.waitUntil(10_000) { !startupVm.startupPickerVisible.value }
-        settle()
-        compose.onNodeWithTag("settings-row-$SERVER_REMOVE").assertIsDisplayed()
-        assertEquals(first.value, startupVm.startupSettingsProfileId)
-        assertNull(runtime.activeTarget.value)
-    }
-
-    @Test fun switchingAwayFromAHiddenInUseServerKeepsTheDestinationUntilChannels() {
-        val (first, second) = runBlocking {
-            val a = store.addAnonymous("living.example.invalid", 9982, "Living room", true) as ServerProfileWriteResult.Applied
-            val b = store.addAnonymous("cabin.example.invalid", 9982, "Cabin", false) as ServerProfileWriteResult.Applied
-            a.id to b.id
-        }
-        app(ServerSettings(host = "living.example.invalid"))
-        runBlocking { owner.setShowInSwitcher(first, false) }
-        click("nav-switch-server")
-        press(androidx.compose.ui.input.key.Key.DirectionRight)
-        click("server-picker-${second.value}")
-        compose.waitUntil(10_000) { (owner.profiles.value as? ServerProfileListResult.Available)?.activeId == second }
-        settle()
-        compose.onNodeWithTag("nav-channels").assertIsSelected()
-        compose.onNodeWithText("Which server do you want to use?").assertDoesNotExist()
+        compose.onNodeWithTag("settings-row-${serverProfileRowId(first)}").assertIsFocused()
+        assertNull((owner.profiles.value as ServerProfileListResult.Available).activeId)
+        compose.onNodeWithTag("setup-welcome-continue").assertDoesNotExist()
     }
 
     private fun assertSettingsConnection() {
         compose.onNodeWithTag("setup-welcome-continue").assertDoesNotExist()
         compose.onNodeWithTag("settings-row-${SettingsSection.CONNECTION.name}").assertIsFocused()
-        compose.onNode(hasText("No server in use. Choose one to watch TV again."), useUnmergedTree = true).assertExists()
+        compose.onNode(hasText("No connection in use. Choose one to watch TV again."), useUnmergedTree = true).assertExists()
         assertNull(runtime.activeTarget.value)
     }
 
@@ -376,7 +278,7 @@ class ServerProfileRoutingTest {
         compose.waitUntil(10_000) { (owner.profiles.value as? ServerProfileListResult.Available)?.profiles?.size == 1 }
         settle()
         compose.onNodeWithTag("setup-welcome-continue").assertDoesNotExist()
-        compose.onNodeWithText("No server in use. Choose one to watch TV again.").assertExists()
+        compose.onNodeWithText("No connection in use. Choose one to watch TV again.").assertExists()
     }
 
     private fun click(tag: String) {
@@ -386,15 +288,15 @@ class ServerProfileRoutingTest {
         settle()
     }
 
-    private fun press(key: androidx.compose.ui.input.key.Key) {
-        compose.onRoot().performKeyInput { keyDown(key); keyUp(key) }
-        settle()
-    }
-
     private fun settle() {
         repeat(10) {
             compose.mainClock.advanceTimeBy(100)
             compose.waitForIdle()
+            compose.runOnIdle {
+                val bitmap = android.graphics.Bitmap.createBitmap(view.width, view.height, android.graphics.Bitmap.Config.ARGB_8888)
+                view.draw(android.graphics.Canvas(bitmap))
+                bitmap.recycle()
+            }
         }
     }
 
