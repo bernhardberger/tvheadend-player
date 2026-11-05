@@ -75,7 +75,7 @@ class ApplianceEntryPolicyTest {
     fun androidGuideAndCapturedTclTvCodes_areApplianceEntryKeys() {
         val functions = CompanionFunctions()
         assertEquals(CompanionFunction.GUIDE, functions.owner(172))
-        assertEquals(CompanionFunction.GUIDE, functions.owner(ApplianceEntryPolicy.TCL_TV_KEY_CODE))
+        assertEquals(CompanionFunction.GUIDE, functions.owner(ApplianceEntryPolicy.TCL_GUIDE_KEY_CODE))
         assertEquals(null, functions.owner(4))
     }
 
@@ -93,5 +93,43 @@ class ApplianceEntryPolicyTest {
         assertTrue(gate.shouldLaunch(nowMillis = 10_000))
         assertFalse(gate.shouldLaunch(nowMillis = 10_500))
         assertTrue(gate.shouldLaunch(nowMillis = 11_500))
+    }
+
+    @Test
+    fun launchGate_wakeLiveThenGuideAcceptsBothWithinTheWindow() {
+        val gate = ApplianceEntryLaunchGate(minimumIntervalMillis = 1_500)
+        assertTrue(gate.shouldLaunch(10_000))
+        assertTrue(gate.shouldLaunch(10_100, ApplianceEntryPolicy.DESTINATION_GUIDE, explicit = true))
+    }
+
+    @Test
+    fun launchGate_guideThenLiveAcceptsBothWithinTheWindow() {
+        val gate = ApplianceEntryLaunchGate(minimumIntervalMillis = 1_500)
+        assertTrue(gate.shouldLaunch(10_000, ApplianceEntryPolicy.DESTINATION_GUIDE, explicit = true))
+        assertTrue(gate.shouldLaunch(10_100, ApplianceEntryPolicy.DESTINATION_LIVE, explicit = true))
+    }
+
+    @Test
+    fun launchGate_sameDestinationButtonBurstIsDeduplicated() {
+        val gate = ApplianceEntryLaunchGate(minimumIntervalMillis = 1_500)
+        assertTrue(gate.shouldLaunch(10_000, ApplianceEntryPolicy.DESTINATION_GUIDE, explicit = true))
+        assertFalse(gate.shouldLaunch(10_100, ApplianceEntryPolicy.DESTINATION_GUIDE, explicit = true))
+    }
+
+    @Test
+    fun launchGate_explicitLiveIsNotSwallowedByAutomaticLive() {
+        val gate = ApplianceEntryLaunchGate(minimumIntervalMillis = 1_500)
+        assertTrue(gate.shouldLaunch(10_000))
+        assertTrue(gate.shouldLaunch(10_100, explicit = true))
+        assertFalse(gate.shouldLaunch(10_200, explicit = true))
+        assertFalse(gate.shouldLaunch(10_300))
+    }
+
+    @Test
+    fun launchGate_automaticLiveCannotOverrideExplicitGuideWithinTheWindow() {
+        val gate = ApplianceEntryLaunchGate(minimumIntervalMillis = 1_500)
+        assertTrue(gate.shouldLaunch(10_000, ApplianceEntryPolicy.DESTINATION_GUIDE, explicit = true))
+        assertFalse(gate.shouldLaunch(10_100))
+        assertTrue(gate.shouldLaunch(11_500))
     }
 }

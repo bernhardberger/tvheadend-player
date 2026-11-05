@@ -403,6 +403,39 @@ class ApplianceLaunchRequestsTest {
     }
 
     @Test
+    fun visibleLiveEntryCancelsPendingGuideWithoutCreatingAnAutoplayRequest() {
+        var playbackIntents = 0
+        val requests = ApplianceLaunchRequests(onLaunchRequested = { playbackIntents++ })
+        requests.requestEntry(ApplianceEntryDestination.GUIDE, isPlayerVisible = true)
+        val guide = requests.state.value as ApplianceLaunchState.Pending
+        assertEquals(ApplianceEntryDestination.GUIDE, guide.request.destination)
+
+        requests.requestEntry(ApplianceEntryDestination.LIVE, isPlayerVisible = true)
+
+        assertEquals(ApplianceLaunchState.Idle, requests.state.value)
+        assertEquals(0, playbackIntents)
+        assertFalse(requests.cancel(guide))
+    }
+
+    @Test
+    fun visibleLiveEntryWithNothingPendingStaysIdle() {
+        var playbackIntents = 0
+        val requests = ApplianceLaunchRequests(onLaunchRequested = { playbackIntents++ })
+        requests.requestEntry(ApplianceEntryDestination.LIVE, isPlayerVisible = true)
+        assertEquals(ApplianceLaunchState.Idle, requests.state.value)
+        assertEquals(0, playbackIntents)
+    }
+
+    @Test
+    fun hiddenLiveEntrySupersedesPendingGuideWithLive() {
+        val requests = ApplianceLaunchRequests()
+        requests.requestEntry(ApplianceEntryDestination.GUIDE, isPlayerVisible = false)
+        requests.requestEntry(ApplianceEntryDestination.LIVE, isPlayerVisible = false)
+        val pending = requests.state.value as ApplianceLaunchState.Pending
+        assertEquals(ApplianceEntryDestination.LIVE, pending.request.destination)
+    }
+
+    @Test
     fun mismatchedPlayerArguments_doNotCompleteEntering() {
         val requests = ApplianceLaunchRequests()
         requests.request()

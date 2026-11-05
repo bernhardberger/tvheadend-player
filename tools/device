@@ -822,22 +822,21 @@ def show_package_info(adb: str, serial: str, package_name: str) -> None:
 
 
 def accessibility_service_binding(state: str, component: str) -> str:
-    # Only the accessibility manager's current-user bound list is authoritative.
-    users = re.split(r"(?m)^\s*User state\[attributes:\{", state)
-    current = [user for user in users[1:]
-               if re.search(r"\bcurrentUser=true\b", user.split("}", 1)[0])]
-    if len(current) != 1:
-        return "unknown"
-    bound = re.search(r"Bound services:\s*\{([^{}]*)\}", current[0])
-    if not bound:
-        return "unknown"
-    if not bound[1].strip():
-        return "false"
+    # Input is component-scoped AMS output. A record alone survives blocked starts.
     package, service = component.split("/", 1)
     short = f"{package}/.{service[len(package) + 1:]}" if service.startswith(package + ".") else component
-    components = re.findall(r"[\w.]+/[\w.]+", bound[1])
-    if component in components or short in components:
-        return "true"
+    records = re.finditer(
+        r"(?ms)^\s*\* ServiceRecord\{[^\n}]*\bu\d+ ([\w.]+/[\w.]+)\}[^\n]*\n"
+        r"(.*?)(?=^\s*\* ServiceRecord\{|^\s*Connection bindings to services:|\Z)", state)
+    matched = False
+    for record in records:
+        if record[1] not in (component, short):
+            continue
+        matched = True
+        if re.search(r"(?m)^\s*app=ProcessRecord\{", record[2]) and re.search(r"\bhasBound=true\b", record[2]):
+            return "true"
+    if matched or re.search(r"(?m)^\s*\(nothing\)\s*$", state):
+        return "false"
     return "unknown"
 
 
@@ -876,7 +875,9 @@ def show_appliance_status(adb: str, serial: str, package_name: str) -> None:
             serial,
             "shell",
             "dumpsys",
-            "accessibility",
+            "activity",
+            "services",
+            component,
         ),
         capture=True,
         sensitive=True,

@@ -66,7 +66,7 @@ class ApplianceEntryAccessibilityService : AccessibilityService() {
         )
         if (decision == ApplianceKeyDecision.LAUNCH_AND_CONSUME) launchApp(
             if (function == CompanionFunction.GUIDE) ApplianceEntryPolicy.DESTINATION_GUIDE
-            else ApplianceEntryPolicy.DESTINATION_LIVE)
+            else ApplianceEntryPolicy.DESTINATION_LIVE, explicit = true)
         return decision != ApplianceKeyDecision.PASS_THROUGH
     }
 
@@ -103,9 +103,9 @@ class ApplianceEntryAccessibilityService : AccessibilityService() {
         screenOnReceiverRegistered = false
     }
 
-    private fun launchApp(destination: String = ApplianceEntryPolicy.DESTINATION_LIVE) {
+    private fun launchApp(destination: String = ApplianceEntryPolicy.DESTINATION_LIVE, explicit: Boolean = false) {
         if (!getSystemService(PowerManager::class.java).isInteractive) return
-        if (!launchGate.shouldLaunch(SystemClock.elapsedRealtime())) return
+        if (!launchGate.shouldLaunch(SystemClock.elapsedRealtime(), destination, explicit)) return
         try {
             startActivity(Intent().setClassName(BuildConfig.PLAYER_PACKAGE, ApplianceEntryPolicy.ENTRY_ALIAS_CLASS_NAME).apply {
                 action = ACTION_APPLIANCE_ENTRY

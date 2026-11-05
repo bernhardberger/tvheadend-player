@@ -12,7 +12,7 @@ sealed interface ButtonBinding {
 fun CompanionFunction.defaultKeys(): Set<Int> = when (this) {
     CompanionFunction.STARTUP -> emptySet()
     CompanionFunction.LIVE_TV -> setOf(170)
-    CompanionFunction.GUIDE -> setOf(172, ApplianceEntryPolicy.TCL_TV_KEY_CODE)
+    CompanionFunction.GUIDE -> setOf(172, ApplianceEntryPolicy.TCL_GUIDE_KEY_CODE)
 }
 
 data class MovedButton(val function: CompanionFunction, val keyCode: Int)

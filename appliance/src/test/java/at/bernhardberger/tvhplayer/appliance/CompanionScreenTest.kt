@@ -141,6 +141,16 @@ class CompanionScreenTest {
         save("en-font1.0-update-available")
     }
 
+    @Test fun updateAvailableWithAutomaticUpdatesOffOffersAManualRetry() {
+        show(available.copy(update = available.update.copy(automatic = false)))
+        compose.onNodeWithText("Update ready. Choose Update now and keep this screen open, or turn on automatic updates.", substring = true)
+            .assertExists()
+        compose.onAllNodesWithText("installs while the TV is in standby", substring = true)
+            .assertCountEquals(0)
+        focused("Update now")
+        save("en-font1.0-update-available-manual")
+    }
+
     @Test fun updateInstalling() {
         show(installing)
         compose.onNodeWithText("Updating").assertExists()
@@ -347,12 +357,15 @@ class CompanionScreenTest {
         save("functions-02-functions-default")
     }
 
-    @Test fun anAccessibilityServiceBlockedByTheTvIsFixedOverAdbAndCheckedAgainWithOk() {
+    @Test fun aBlockedAccessibilityServiceOffersAndroidSettingsAndAToggleBeforeAdb() {
         showContent(withButtons(service = CompanionServiceStatus.BLOCKED))
         compose.onNodeWithText("Blocked by this TV").assertExists()
         compose.onNodeWithText("Paused until the service can run").assertExists()
         focused("Accessibility service")
         compose.onNodeWithText("Blocked").assertExists()
+        compose.onNodeWithText("On, but not running · Opens Android accessibility settings").assertExists()
+        compose.onNodeWithText("Switch the service off and on in Android settings. If that does not help, this TV may need a one-time auto-start permission over ADB.")
+            .assertExists()
         press(Key.DirectionCenter)
         assertEquals(listOf(CompanionRow.ACCESSIBILITY), activated)
         save("functions-03-accessibility-blocked")

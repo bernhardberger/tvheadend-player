@@ -82,6 +82,16 @@ class ApplianceLaunchRequests(
     }
 
     @Synchronized
+    fun requestEntry(destination: ApplianceEntryDestination, isPlayerVisible: Boolean) {
+        if (destination == ApplianceEntryDestination.LIVE && isPlayerVisible) {
+            val pending = _state.value as? ApplianceLaunchState.Pending
+            if (pending?.request?.destination == ApplianceEntryDestination.GUIDE) cancel(pending)
+            return
+        }
+        request(destination)
+    }
+
+    @Synchronized
     fun requestStartup(autoStartPlayback: Boolean) {
         val pending = _state.value as? ApplianceLaunchState.Pending
         if (pending?.request?.destination == ApplianceEntryDestination.GUIDE) return

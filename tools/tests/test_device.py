@@ -243,49 +243,58 @@ class OperatorShortcutsTest(unittest.TestCase):
                 runner = Mock(side_effect=[
                     subprocess.CompletedProcess([], 0, stdout=output, stderr="")
                     for output in ("1\n", component,
-                                   f"User state[attributes:{{id=0, currentUser=true}}\n  Bound services:{{{component}}}\n]",
+                                   f"* ServiceRecord{{abc u0 {component}}}\n  app=ProcessRecord{{def}}\n  requested=true received=true hasBound=true\n",
                                    "APP_AUTO_START: allow\n")
                 ])
                 output = io.StringIO()
                 with patch.dict(DEVICE_GLOBALS, {"run": runner}), redirect_stdout(output):
                     DEVICE["show_appliance_status"]("adb", "private-device", package)
                 self.assertIn("serviceEnabled=true\nserviceBound=true", output.getvalue())
-                self.assertEqual(runner.call_args_list[2].args[0][-2:], ["dumpsys", "accessibility"])
+                self.assertEqual(runner.call_args_list[2].args[0][-4:], ["dumpsys", "activity", "services", component])
+                self.assertFalse(any(call.args[0][-2:] == ["dumpsys", "accessibility"]
+                                     for call in runner.call_args_list))
                 self.assertEqual(runner.call_args_list[2].kwargs,
                                  dict(capture=True, sensitive=True, announce=False))
                 activity = f"{package}/at.bernhardberger.tvhplayer.ui.MainActivity"
                 self.assertEqual(DEVICE["video_surface_layer"](package), f"SurfaceView[{activity}](BLAST)#0")
                 self.assertEqual(DEVICE["video_surface_layer"](package, "ui"), f"{activity}#0")
 
-    def test_appliance_status_binding_requires_current_user_bound_list(self):
-        package = DEVICE["APPLIANCE_PACKAGE"]
+    def test_appliance_status_binding_uses_g10_component_scoped_activity_fixtures(self):
+        package = DEVICE["APPLIANCE_DEBUG_PACKAGE"]
         component = f"{package}/at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService"
-        current = "User state[attributes:{id=0, currentUser=true}\n"
-        other = "User state[attributes:{id=10, currentUser=false}\n"
-        for state, expected in (
-            (current + f"  Bound services:{{Service[componentName={component}]}}\n]", "true"),
-            (current + "  Bound services:{}\n]", "false"),
-            (current + "  Bound services:{Service[label=Appliance, feedbackType[FEEDBACK_GENERIC], capabilities=1]}\n]", "unknown"),
-            (component, "unknown"),
-            (current + f"  Enabled services:{{{component}}}\n]", "unknown"),
-            (current + "  Bound services:{}\n]\n" + other + f"  Bound services:{{{component}}}\n]", "false"),
-            (other + f"  Bound services:{{{component}}}\n]", "unknown"),
-            (current + f"  Bound services:{{{component}Extra}}\n]", "unknown"),
-            (current + "  Bound services:{other.package/.OtherService}\n]", "unknown"),
-        ):
-            with self.subTest(state=state):
+        fixtures = Path(__file__).parent / "fixtures"
+        for name, expected in (("ams-bound.txt", "true"), ("ams-blocked.txt", "false"), ("ams-nothing.txt", "false")):
+            with self.subTest(fixture=name):
                 runner = Mock(side_effect=[
                     subprocess.CompletedProcess([], 0, stdout=value, stderr="")
-                    for value in ("1\n", component, state, "APP_AUTO_START: allow\n")
+                    for value in ("1\n", component, (fixtures / name).read_text(), "APP_AUTO_START: allow\n")
                 ])
                 output = io.StringIO()
                 with patch.dict(DEVICE_GLOBALS, {"run": runner}), redirect_stdout(output):
                     DEVICE["show_appliance_status"]("adb", "private-device", package)
                 self.assertIn(f"serviceBound={expected}\n", output.getvalue())
 
+    def test_accessibility_binding_requires_exact_record_with_process_and_bound_intent(self):
+        component = "example.package/example.package.AccessibilityService"
+        record = f"* ServiceRecord{{abc u0 {component}}}\n"
+        for state, expected in (
+            (record + "  app=ProcessRecord{def}\n  hasBound=true\n", "true"),
+            (record + "  app=null\n  hasBound=true\n", "false"),
+            (record + "  app=ProcessRecord{def}\n", "false"),
+            (record + "  app=ProcessRecord{def}\n  hasBound=false\n", "false"),
+            (record, "false"),
+            (record.replace(component, component + "Extra") + "  app=ProcessRecord{def}\n  hasBound=true\n", "unknown"),
+            (record + "  app=null\n* ServiceRecord{abc u0 other.package/.OtherService}\n  app=ProcessRecord{def}\n  hasBound=true\n", "false"),
+            (record + "  app=null\n  Connection bindings to services:\n  app=ProcessRecord{def}\n  hasBound=true\n", "false"),
+            (component, "unknown"),
+            ("Permission Denial", "unknown"),
+        ):
+            with self.subTest(state=state):
+                self.assertEqual(DEVICE["accessibility_service_binding"](state, component), expected)
+
     def test_accessibility_binding_accepts_short_component_name(self):
         component = "example.package/example.package.AccessibilityService"
-        state = "User state[attributes:{id=0, currentUser=true}\n  Bound services:{example.package/.AccessibilityService}\n]"
+        state = "* ServiceRecord{abc u0 example.package/.AccessibilityService}\n  app=ProcessRecord{def}\n  hasBound=true\n"
         self.assertEqual(DEVICE["accessibility_service_binding"](state, component), "true")
 
     def test_auto_start_repair_accepts_only_appliance_package(self):

@@ -72,6 +72,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Switch
 import androidx.tv.material3.Text
 import android.os.SystemClock
+import at.bernhardberger.tvhplayer.appliance.update.UpdateResult
 import at.bernhardberger.tvhplayer.appliance.update.UpdateScreenState
 import at.bernhardberger.tvhplayer.appliance.update.messageResource
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
@@ -506,7 +507,7 @@ private fun AutomaticUpdatesRow(automatic: Boolean, modifier: Modifier, onClick:
 private fun UpdateRow(state: CompanionScreenState, modifier: Modifier, onClick: () -> Unit) {
     val update = state.update
     val mode = state.updateMode
-    val message = stringResource(update.result.messageResource()).let {
+    val message = stringResource(update.messageResource()).let {
         if (update.installerMessage.isBlank()) it else "$it: ${update.installerMessage}"
     }
     val busy = mode == UpdateRowMode.CHECKING || mode == UpdateRowMode.INSTALLING
@@ -523,10 +524,11 @@ private fun UpdateRow(state: CompanionScreenState, modifier: Modifier, onClick: 
                 if (update.latestVersion.isEmpty()) stringResource(R.string.status_updating)
                 else stringResource(R.string.update_title_installing, update.latestVersion)
         },
-        // Available reads only the versions: the waiting result adds nothing the badge and pill omit.
+        // Manual updates need a foreground retry; the New badge alone cannot explain that.
         subtitle = when (mode) {
             UpdateRowMode.CHECKING, UpdateRowMode.INSTALLING -> message
-            UpdateRowMode.AVAILABLE -> updateVersions(update, null)
+            UpdateRowMode.AVAILABLE -> updateVersions(update,
+                message.takeIf { !update.automatic && update.result == UpdateResult.WAITING_STANDBY })
             UpdateRowMode.CHECK -> updateVersions(update, message)
         },
         onClick = if (busy) ({}) else onClick,

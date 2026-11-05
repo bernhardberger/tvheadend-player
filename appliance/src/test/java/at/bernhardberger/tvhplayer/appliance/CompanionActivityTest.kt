@@ -90,7 +90,7 @@ class CompanionActivityTest {
         controller.pause().stop().destroy()
     }
 
-    @Test fun okOnABlockedServiceChecksAgainWithoutLeavingForSettings() {
+    @Test fun okOnABlockedServiceOpensAndroidAccessibilitySettings() {
         val context = RuntimeEnvironment.getApplication()
         val component = ComponentName(context, at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService::class.java)
         android.provider.Settings.Secure.putString(context.contentResolver,
@@ -101,7 +101,8 @@ class CompanionActivityTest {
         fun status() = ReflectionHelpers.callInstanceMethod<CompanionServiceStatus>(activity, "getAccessibilityStatus")
         assertEquals(CompanionServiceStatus.BLOCKED, status())
         onRow(activity, CompanionRow.ACCESSIBILITY)
-        assertNull(shadowOf(activity).nextStartedActivity)
+        assertEquals(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS,
+            shadowOf(activity).nextStartedActivity.action)
         assertEquals(CompanionServiceStatus.BLOCKED, status())
         CompanionServiceState.setConnected(true)
         shadowOf(Looper.getMainLooper()).idle()

@@ -194,7 +194,6 @@ class CompanionActivity : ComponentActivity() {
     }
 
     private fun onRow(row: CompanionRow) {
-        val blockedBefore = accessibilityStatus == CompanionServiceStatus.BLOCKED
         refreshStatus()
         when (row) {
             CompanionRow.PLAYER ->
@@ -204,8 +203,7 @@ class CompanionActivity : ComponentActivity() {
                     Intent(Intent.ACTION_VIEW,
                         Uri.parse("https://play.google.com/store/apps/details?id=${BuildConfig.PLAYER_PACKAGE}")),
                 )
-            // A blocked service is not fixed in settings: OK only checks it again.
-            CompanionRow.ACCESSIBILITY -> if (!blockedBefore) openFirst(
+            CompanionRow.ACCESSIBILITY -> openFirst(
                 Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS), Intent(Settings.ACTION_SETTINGS))
             CompanionRow.STARTUP -> FunctionStore(this).setStartup(!functions.startup).also { refreshStatus() }
             CompanionRow.LIVE_TV, CompanionRow.GUIDE -> Unit // Opened as pages by the screen.

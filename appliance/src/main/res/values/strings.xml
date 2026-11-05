@@ -14,7 +14,7 @@
     <string name="body_player_missing">The functions have nothing to open. Install Tvheadend Player from Google Play.</string>
     <string name="body_accessibility_off">Turn on the accessibility service to use the functions set in this app.</string>
     <string name="status_blocked_by_tv">Blocked by this TV</string>
-    <string name="body_accessibility_blocked">The service is on, but this TV keeps it from starting. Grant its hidden auto-start permission from a computer over ADB.</string>
+    <string name="body_accessibility_blocked">Switch the service off and on in Android settings. If that does not help, this TV may need a one-time auto-start permission over ADB.</string>
     <string name="body_install_unknown_off">Allow installing unknown apps so this app can install its own updates.</string>
     <string name="body_several_open">Fix the marked items so the functions work and updates install.</string>
     <string name="update_available_pill">Update %1$s is available</string>
@@ -84,7 +84,7 @@
     <string name="status_install">Install</string>
     <string name="accessibility_title">Accessibility service</string>
     <string name="accessibility_on_hint">Needed for every function</string>
-    <string name="accessibility_blocked_hint">On, but blocked by this TV\nFix over ADB · OK checks again</string>
+    <string name="accessibility_blocked_hint">On, but not running · Opens Android accessibility settings</string>
     <string name="status_blocked">Blocked</string>
     <string name="accessibility_off_hint">Off · Opens Android accessibility settings</string>
     <string name="status_on">On</string>
@@ -124,6 +124,7 @@
     <string name="update_signature_mismatch">Signing certificate mismatch. The download was deleted.</string>
     <string name="update_install_permission">Allow this companion to install unknown apps in Android settings, then try again.</string>
     <string name="update_waiting_standby">Update ready. It installs while the TV is in standby, or choose Update now.</string>
+    <string name="update_waiting_manual">Update ready. Choose Update now and keep this screen open, or turn on automatic updates.</string>
     <string name="update_installing">Installing the companion update…</string>
     <string name="update_pending_confirmation">Android needs confirmation. Choose Update now to continue.</string>
     <string name="update_installer_failure">Android could not install the update</string>
