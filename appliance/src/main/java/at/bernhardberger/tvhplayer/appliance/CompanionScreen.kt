@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
@@ -47,6 +48,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -61,6 +63,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.state.ToggleableState
+import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
@@ -848,21 +851,30 @@ private fun CaptureCard(state: CaptureState) {
                 }
             }
         }
-        Text(
-            if (refused == null) stringResource(R.string.capture_waiting)
-            else stringResource(R.string.capture_refused, refused),
-            style = MaterialTheme.typography.titleLarge,
-            color = if (refused == null) colors.onSurface else colors.error,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = TvSpacing12),
-        )
-        if (refused != null) {
+        // Sized for the refused layout, so a refusal does not move the bar, the hint or the card's edge.
+        val typography = MaterialTheme.typography
+        val statusHeight = with(LocalDensity.current) {
+            typography.titleLarge.lineHeight.toDp() + typography.titleMedium.lineHeight.toDp()
+        }
+        Column(
+            Modifier.padding(top = TvSpacing12).heightIn(min = statusHeight),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
             Text(
-                stringResource(R.string.capture_refused_detail),
-                style = MaterialTheme.typography.titleMedium,
-                color = colors.onSurface,
+                if (refused == null) stringResource(R.string.capture_waiting)
+                else stringResource(R.string.capture_refused, refused),
+                style = typography.titleLarge,
+                color = if (refused == null) colors.onSurface else colors.error,
                 textAlign = TextAlign.Center,
             )
+            if (refused != null) {
+                Text(
+                    stringResource(R.string.capture_refused_detail),
+                    style = typography.titleMedium,
+                    color = colors.onSurface,
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
         LinearProgressIndicator(
             progress = { timeLeft.value },
@@ -875,7 +887,10 @@ private fun CaptureCard(state: CaptureState) {
         )
         Text(
             stringResource(if (refused == null) R.string.capture_waiting_hint else R.string.capture_refused_hint),
-            style = MaterialTheme.typography.bodyMedium,
+            // One step above the row subtitles. The waiting hint needs three lines at this size, so both
+            // states reserve three and the card keeps its height; balanced breaks avoid a lone last word.
+            style = MaterialTheme.typography.bodyLarge.copy(lineBreak = LineBreak.Heading),
+            minLines = 3,
             color = colors.onSurfaceVariant,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(bottom = 12.dp),

@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.isFocusable
@@ -522,6 +523,20 @@ class CompanionScreenTest {
         compose.onNodeWithText("Press a different button.").assertExists()
         nothingIsFocusable()
         save("functions-08-capture-refused")
+    }
+
+    @Test fun aRefusalDoesNotChangeTheCaptureCardsHeight() {
+        showContent(withButtons())
+        openFunction(CompanionFunction.LIVE_TV)
+        press(Key.DirectionCenter)
+        fun card() = compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion))
+            .fetchSemanticsNode().boundsInRoot
+        setWhileFrozen(CaptureState.Waiting(CompanionFunction.LIVE_TV, SystemClock.elapsedRealtime() + 10_000))
+        val waiting = card()
+        setWhileFrozen(CaptureState.Refused(CompanionFunction.LIVE_TV, "OK", SystemClock.elapsedRealtime() + 10_000))
+        compose.onNodeWithText("OK can't be used").assertExists()
+        assertEquals(waiting.height, card().height, 0f)
+        assertEquals(waiting.bottom, card().bottom, 0f)
     }
 
     @Test fun captureTimedOutOffersTryAgainFirstAndCancel() {
