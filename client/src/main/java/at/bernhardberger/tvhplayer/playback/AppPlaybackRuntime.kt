@@ -73,6 +73,7 @@ class AppPlaybackRuntime(
     private val policy: PlaybackRuntimePolicy,
     private val elapsedRealtime: () -> Long = android.os.SystemClock::elapsedRealtime,
     private val startupBuffer: StartupBufferController? = null,
+    private val audioOutputs: PlaybackAudioOutputs = PlaybackAudioOutputs.None,
 ) {
     private val targetCommands = PlaybackTargetCommandSerialization()
     private val foregroundPlaybackLifecycle = ForegroundPlaybackLifecycle()
@@ -345,11 +346,28 @@ class AppPlaybackRuntime(
     val videoPresentation = presentation.videoPresentation
 
     private val settingsJob = scope.launch {
-        settings.playerSettings.distinctUntilChanged().collect {
-            targetCommands.serialize(onClosed = {}) {
-                val latest = settings.playerSettings.first()
-                audioTracks.applyPlayerSettingsLocked(latest)
-                audioTracks.applyAudioPassthroughLocked(latest.audioPassthroughEnabled)
+        launch {
+            settings.playerSettings.distinctUntilChanged().collect {
+                targetCommands.serialize(onClosed = {}) {
+                    val latest = settings.playerSettings.first()
+                    audioTracks.applyPlayerSettingsLocked(latest)
+                    audioTracks.applyAudioPassthroughLocked(effectiveAudioPassthrough(
+                        latest.audioPassthroughEnabled, audioOutputs.personalOutputConnected.value,
+                    ))
+                }
+            }
+        }
+        launch {
+            audioOutputs.personalOutputConnected.collect {
+                targetCommands.serialize(onClosed = {}) {
+                    // Read both sources after acquiring the lock; output changes must not
+                    // reapply unrelated track preferences. The tracks owner deduplicates
+                    // applied modes while still allowing later inputs to retry a failure.
+                    val latest = settings.playerSettings.first()
+                    audioTracks.applyAudioPassthroughLocked(effectiveAudioPassthrough(
+                        latest.audioPassthroughEnabled, audioOutputs.personalOutputConnected.value,
+                    ))
+                }
             }
         }
     }
@@ -642,7 +660,9 @@ class AppPlaybackRuntime(
         if (recoveryFence != null && !canContinueRecoveryLocked(recoveryFence)) return null
         // An explicit first request configures persisted output even when its target is
         // unavailable. Recovery defers all Player configuration until its reads are rechecked.
-        if (recoveryFence == null) audioTracks.configureAudioOutputBeforeFirstTargetLocked(playerSettings)
+        if (recoveryFence == null) audioTracks.configureAudioOutputBeforeFirstTargetLocked(effectiveAudioPassthrough(
+            playerSettings.audioPassthroughEnabled, audioOutputs.personalOutputConnected.value,
+        ))
         // A server save counts its generation before it replaces the session: until the profile is
         // applied again, the session read below may still be the previous server's.
         val profileGeneration = profileOwner.configurationGeneration.value
@@ -696,7 +716,9 @@ class AppPlaybackRuntime(
             )
         }
         val retainInterruptionMute = recovering && !viewerRetry && audioInterruptions.interruptionMuted
-        if (recoveryFence != null) audioTracks.configureAudioOutputBeforeFirstTargetLocked(playerSettings)
+        if (recoveryFence != null) audioTracks.configureAudioOutputBeforeFirstTargetLocked(effectiveAudioPassthrough(
+            playerSettings.audioPassthroughEnabled, audioOutputs.personalOutputConnected.value,
+        ))
         val timeshiftPeriod = policy.liveTimeshiftPeriod(playerSettings)
         var committed = false
         // The viewer paused this channel before it started: that Pause replaces the startup Play.
@@ -1079,7 +1101,9 @@ class AppPlaybackRuntime(
         if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
         val playerSettings = settings.playerSettings.first()
         if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
-        audioTracks.configureAudioOutputBeforeFirstTargetLocked(playerSettings)
+        audioTracks.configureAudioOutputBeforeFirstTargetLocked(effectiveAudioPassthrough(
+            playerSettings.audioPassthroughEnabled, audioOutputs.personalOutputConnected.value,
+        ))
         val expectedPresentationEpoch = presentationEpoch.snapshot()
         lastRecordingRequest = recordingId to start
         presentationEpoch.publishIfCurrent(expectedPresentationEpoch) {
@@ -2366,6 +2390,7 @@ class AppPlaybackRuntime(
 
     suspend fun detach() {
         if (!targetCommands.close()) return
+        audioOutputs.close()
         cancelKeepTimer()
         recordingMarkers.clearRecordingMarkersAndJoin()
         val pendingRecovery = liveRecovery.cancelOnDetach()

@@ -27,20 +27,7 @@ interface PlaybackAudioFocus {
 }
 
 /** HDMI mode switches can emit NOISY too; only personal listening outputs should pause. */
-internal fun noisyPausesPlayback(outputTypes: Collection<Int>): Boolean = outputTypes.any { type ->
-    when (type) {
-        AudioDeviceInfo.TYPE_WIRED_HEADSET,
-        AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
-        AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
-        AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
-        AudioDeviceInfo.TYPE_USB_HEADSET,
-        AudioDeviceInfo.TYPE_USB_DEVICE,
-        AudioDeviceInfo.TYPE_HEARING_AID,
-        // These integer constants are inlined, including on Android versions predating BLE audio.
-        AudioDeviceInfo.TYPE_BLE_HEADSET -> true
-        else -> false
-    }
-}
+internal fun noisyPausesPlayback(outputTypes: Collection<Int>): Boolean = outputTypes.any(::isPersonalAudioOutput)
 
 internal const val PERSONAL_OUTPUT_REMOVAL_WINDOW_MS = 5_000L
 
@@ -111,7 +98,7 @@ class AndroidPlaybackAudioFocus(context: Context, looper: Looper) : PlaybackAudi
         val devices = object : AudioDeviceCallback() {
             override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>) {
                 if (deviceCallback !== this || request !== current) return
-                addedDevices.filter { it.isSink && noisyPausesPlayback(listOf(it.type)) }
+                addedDevices.filter { it.isSink && isPersonalAudioOutput(it.type) }
                     .forEach { personalOutputIds.add(it.id) }
             }
 

@@ -21,6 +21,7 @@ import at.bernhardberger.tvhplayer.images.buildImageLoader
 import at.bernhardberger.tvhplayer.images.RemoteLogoCache
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AndroidPlaybackAudioFocus
+import at.bernhardberger.tvhplayer.playback.AndroidPlaybackAudioOutputs
 import at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy
 import at.bernhardberger.tvhplayer.playback.StartupBufferController
 import at.bernhardberger.tvhplayer.playback.startupBufferIdentity
@@ -82,6 +83,7 @@ val appModule = module {
 
     single(qualifier = named("application")) { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
 
+    // The eager ConnectionNoticeSource resolves this graph from Application.onCreate on main.
     single {
         val applicationScope = get<CoroutineScope>(qualifier = named("application"))
         val cacheRoot = androidContext().cacheDir
@@ -131,6 +133,7 @@ val appModule = module {
             scope = applicationScope,
             audioOutput = audioOutput,
             audioFocus = AndroidPlaybackAudioFocus(androidContext(), player.applicationLooper),
+            audioOutputs = AndroidPlaybackAudioOutputs(androidContext()),
             policy = PlaybackRuntimePolicy.fromPlayerSettings(
                 trace = ProfilePlaybackTrace,
                 seekDiagnostics = BuildConfig.DEBUG,
