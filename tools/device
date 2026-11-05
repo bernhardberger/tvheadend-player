@@ -821,6 +821,26 @@ def show_package_info(adb: str, serial: str, package_name: str) -> None:
     print("\n".join(dict.fromkeys(lines)))
 
 
+def accessibility_service_binding(state: str, component: str) -> str:
+    # Only the accessibility manager's current-user bound list is authoritative.
+    users = re.split(r"(?m)^\s*User state\[attributes:\{", state)
+    current = [user for user in users[1:]
+               if re.search(r"\bcurrentUser=true\b", user.split("}", 1)[0])]
+    if len(current) != 1:
+        return "unknown"
+    bound = re.search(r"Bound services:\s*\{([^{}]*)\}", current[0])
+    if not bound:
+        return "unknown"
+    if not bound[1].strip():
+        return "false"
+    package, service = component.split("/", 1)
+    short = f"{package}/.{service[len(package) + 1:]}" if service.startswith(package + ".") else component
+    components = re.findall(r"[\w.]+/[\w.]+", bound[1])
+    if component in components or short in components:
+        return "true"
+    return "unknown"
+
+
 def show_appliance_status(adb: str, serial: str, package_name: str) -> None:
     package_name = APPLIANCE_DEBUG_PACKAGE if package_name in (DEFAULT_PACKAGE, APPLIANCE_DEBUG_PACKAGE) else APPLIANCE_PACKAGE
     service_class = "at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService"
@@ -856,11 +876,11 @@ def show_appliance_status(adb: str, serial: str, package_name: str) -> None:
             serial,
             "shell",
             "dumpsys",
-            "activity",
-            "services",
-            component,
+            "accessibility",
         ),
         capture=True,
+        sensitive=True,
+        announce=False,
     ).stdout
     app_op = run(
         adb_command(
@@ -887,7 +907,7 @@ def show_appliance_status(adb: str, serial: str, package_name: str) -> None:
 
     print(f"accessibilityEnabled={str(accessibility_enabled == '1').lower()}")
     print(f"serviceEnabled={str(component in enabled_components).lower()}")
-    print(f"serviceBound={str(component in service_state).lower()}")
+    print(f"serviceBound={accessibility_service_binding(service_state, component)}")
     print(f"autoStart={auto_start}")
 
 
@@ -1245,16 +1265,26 @@ def resolve_verified_release_apk(bundle: Path, package_name: str = RELEASE_PACKA
 def refuse_retired_appliance_player(adb: str, serial: str, package_name: str) -> None:
     if package_name not in (APPLIANCE_PACKAGE, APPLIANCE_DEBUG_PACKAGE):
         return
-    if not package_is_installed(adb, serial, package_name):
-        return
     metadata = run(adb_command(adb, serial, "shell", "dumpsys", "package", package_name),
                    capture=True, sensitive=True, announce=False)
     code = re.search(r"^\s*versionCode=([0-9]+)\b", metadata.stdout, re.MULTILINE)
+    record = re.search(r"Package \[" + re.escape(package_name) + r"\]", metadata.stdout)
+    users = re.findall(r"^\s*User (\d+):[^\n]*\binstalled=true\b", metadata.stdout, re.MULTILINE)
+    if not code and not record and not users and (
+        not metadata.stdout.strip() or "Unable to find package:" in metadata.stdout
+    ):
+        return
+    location = ""
+    if users:
+        location = "; installed for user(s) " + ", ".join(users) + "; remove with "
+        location += "; ".join(f"pm uninstall --user {user} {package_name}" for user in users)
     if not code:
-        fail(f"cannot verify installed versionCode for {package_name}; companion not installed")
+        fail(f"cannot verify installed versionCode for {package_name}; companion not installed" + location)
+    # Retained package records can still impose an update/signature identity even
+    # when every user is marked uninstalled. Do not attempt an in-place update.
     if int(code[1]) <= RETIRED_APPLIANCE_VERSION_CODE:
         fail(f"uninstall the old Appliance player ({package_name}) first; "
-             "installing the companion in place would keep the old player's app-private data")
+             "installing the companion in place would keep the old player's app-private data" + location)
 
 
 def sanitize_screenshot_name(value: str) -> str:
