@@ -656,7 +656,7 @@ class SettingsDepthNavigationTest {
         press(Key.DirectionRight)
         compose.onNode(isFocused() and hasText("Not installed", substring = true)).assertExists()
         repeat(14) { press(Key.DirectionDown) }
-        compose.onNodeWithContentDescription("QR code for the appliance companion download and installation information")
+        compose.onNodeWithContentDescription("QR code for the appliance companion setup steps")
             .assertIsDisplayed()
         press(Key.Back)
         compose.onNode(isFocused() and hasText("Appliance")).assertExists()
