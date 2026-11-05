@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.4.6
+
+### Appliance companion
+
+- The appliance build is now a separate app, Tvheadend Player Appliance, that
+  works alongside the regular player from Google Play or GitHub. It makes the
+  player behave like the TV's own tuner app: it starts the player when the TV
+  turns on, catches remote buttons the manufacturer keeps for its own apps, and
+  can replace the home screen.
+- The companion updates itself from GitHub releases while the TV is in standby.
+- Settings → Appliance in the player opens the companion's setup screen when
+  the companion is installed.
+- On a TV with the old appliance build, uninstall it before installing the
+  player and the companion. Otherwise Android turns the old app into the
+  companion and keeps its data.
+
+### Building
+
+- Debug builds now install as `at.bernhardberger.tvhplayer.debug`, next to the
+  release app, with their own icon and name.
+
 ## 0.4.5
 
 ### Player
