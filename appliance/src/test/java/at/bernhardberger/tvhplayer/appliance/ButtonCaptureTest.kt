@@ -23,8 +23,66 @@ class ButtonCaptureTest {
         assertFalse(capture.down(85))
     }
 
+    @Test fun aFreshPressAfterALostUpPassesThroughWithoutAnActiveCapture() {
+        val capture = ButtonCapture()
+        capture.start(CompanionFunction.LIVE_TV, 0)
+        assertTrue(capture.down(85))
+        capture.cancel() // Disconnect before the captured press's UP.
+        assertFalse(capture.down(85, 100))
+        assertFalse(capture.up(85, 110))
+    }
+
+    @Test fun startingAgainDropsKeysHeldByThePreviousCapture() {
+        val capture = ButtonCapture()
+        capture.start(CompanionFunction.LIVE_TV, 0)
+        assertTrue(capture.down(85))
+        capture.start(CompanionFunction.GUIDE, 100)
+        capture.cancel()
+        assertFalse(capture.up(85, 110))
+    }
+
+    @Test fun anActionOtherThanDownDoesNotCreateAHeldKey() {
+        val capture = ButtonCapture()
+        capture.start(CompanionFunction.GUIDE, 0)
+        assertTrue(capture.keyEvent(85, false, false, 0, 0, functions))
+        capture.cancel()
+        assertFalse(capture.up(85))
+    }
+
+    @Test fun dismissClearsEveryResultButNeverInterruptsWaiting() {
+        val waiting = ButtonCapture()
+        waiting.start(CompanionFunction.GUIDE, 100)
+        waiting.dismiss()
+        assertEquals(CaptureState.Waiting(CompanionFunction.GUIDE, 10_100), waiting.state.value)
+        for (outcome in 0..3) {
+            val capture = ButtonCapture()
+            capture.start(CompanionFunction.GUIDE, 0)
+            when (outcome) {
+                0 -> capture.down(19)
+                1 -> capture.expire(ButtonCapture.TIMEOUT_MILLIS)
+                2 -> capture.down(85)
+                3 -> capture.cancel()
+            }
+            capture.dismiss()
+            assertEquals(CaptureState.Idle, capture.state.value)
+            assertNull(capture.deadline)
+        }
+    }
+
+    @Test fun dismissStillConsumesTheCapturedPressTailButNotTheNextPress() {
+        val capture = ButtonCapture()
+        capture.start(CompanionFunction.GUIDE, 0)
+        assertTrue(capture.down(85))
+        capture.dismiss()
+        assertTrue(capture.down(85, repeat = 1))
+        assertTrue(capture.up(85))
+        assertFalse(capture.down(85, 100))
+        assertFalse(capture.up(85, 110))
+        assertEquals(CaptureState.Idle, capture.state.value)
+    }
+
     @Test fun everyRefusalRestartsTheSameTenSecondTimerAndStaysWaiting() {
-        val refused = mapOf(19 to "Arrows", 20 to "Arrows", 21 to "Arrows", 22 to "Arrows", 23 to "OK",
+        val refused = mapOf(0 to "Button 0", 19 to "Arrows", 20 to "Arrows", 21 to "Arrows", 22 to "Arrows", 23 to "OK",
             66 to "OK", 160 to "OK", 3 to "HOME", 24 to "Volume", 25 to "Volume", 164 to "Volume",
             26 to "Power", 223 to "Power", 224 to "Power")
         for ((code, name) in refused) {

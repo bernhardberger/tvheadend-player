@@ -28,6 +28,16 @@ import org.robolectric.util.ReflectionHelpers
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], shadows = [CompanionUpdateTest.ConnectedServiceShadow::class])
 class CompanionUpdateTest {
+    @Test fun interruptedCheckAfterAPastSuccessDoesNotReportAnotherInstallationSuccess() {
+        val context = RuntimeEnvironment.getApplication()
+        val store = UpdateStore(context)
+        store.setResult(UpdateResult.SUCCESS)
+        store.recordCheck()
+        assertEquals(UpdateResult.NEVER, UpdateStore(context).interruptedCheckResult())
+        UpdateStore(context).reconcileInstalledVersion()
+        assertEquals(UpdateResult.NEVER, store.result)
+    }
+
     @Test fun interruptedCheckRestoresItsDurableStartingResultUnlessANewerArchiveWasVerified() {
         val context = RuntimeEnvironment.getApplication()
         val store = UpdateStore(context)

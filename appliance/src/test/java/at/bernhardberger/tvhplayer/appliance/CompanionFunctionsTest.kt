@@ -4,6 +4,20 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class CompanionFunctionsTest {
+    @Test fun assigningItsSingleDefaultKeyNormalizesToDefaultButDoesNotExpandGuide() {
+        val functions = CompanionFunctions(liveTv = ButtonBinding.NotSet)
+            .assign(CompanionFunction.GUIDE, ButtonBinding.Custom(170)).functions
+        val restored = functions.assign(CompanionFunction.LIVE_TV, ButtonBinding.Custom(170))
+        assertEquals(ButtonBinding.Default, restored.functions.liveTv)
+        assertEquals(ButtonBinding.NotSet, restored.functions.guide)
+        assertEquals(listOf(MovedButton(CompanionFunction.GUIDE, 170)), restored.moved)
+        for (key in listOf(172, 4001)) {
+            val guide = restored.functions.assign(CompanionFunction.GUIDE, ButtonBinding.Custom(key)).functions
+            assertEquals(ButtonBinding.Custom(key), guide.guide)
+            assertEquals(setOf(key), guide.keys(CompanionFunction.GUIDE))
+        }
+    }
+
     @Test fun defaultsCustomAndRemovedKeysRouteOnlyToTheirOwner() {
         val defaults = CompanionFunctions()
         assertTrue(defaults.startup)

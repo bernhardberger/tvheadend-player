@@ -7,10 +7,12 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInfo
 import android.content.pm.ResolveInfo
 import android.os.Bundle
+import android.os.Looper
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
@@ -23,6 +25,13 @@ import org.robolectric.util.ReflectionHelpers
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
 class CompanionActivityTest {
+    @Before fun resetServiceState() {
+        CompanionServiceState.setConnected(true)
+        CompanionServiceState.startCapture(CompanionFunction.GUIDE) // Also clears held keys from the previous test.
+        CompanionServiceState.setConnected(false)
+        CompanionServiceState.dismissCapture()
+    }
+
     @Test fun stoppingTheActivityCancelsAnActiveCapture() {
         val controller = Robolectric.buildActivity(CompanionActivity::class.java).create().start().resume()
         CompanionServiceState.setConnected(true)
@@ -44,11 +53,28 @@ class CompanionActivityTest {
         assertEquals(CompanionServiceStatus.BLOCKED,
             ReflectionHelpers.callInstanceMethod<CompanionServiceStatus>(controller.get(), "getAccessibilityStatus"))
         CompanionServiceState.setConnected(true)
-        controller.pause().resume()
+        shadowOf(Looper.getMainLooper()).idle()
         assertEquals(CompanionServiceStatus.ON,
             ReflectionHelpers.callInstanceMethod<CompanionServiceStatus>(controller.get(), "getAccessibilityStatus"))
         controller.pause().stop().destroy()
         CompanionServiceState.setConnected(false)
+    }
+
+    @Test fun disconnectingWhileResumedChangesOnToBlockedWithoutAResumeOrClick() {
+        val context = RuntimeEnvironment.getApplication()
+        val component = ComponentName(context, at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService::class.java)
+        android.provider.Settings.Secure.putString(context.contentResolver,
+            android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, component.flattenToShortString())
+        CompanionServiceState.setConnected(true)
+        val controller = Robolectric.buildActivity(CompanionActivity::class.java).create().start().resume()
+        assertEquals(CompanionServiceStatus.ON,
+            ReflectionHelpers.callInstanceMethod<CompanionServiceStatus>(controller.get(), "getAccessibilityStatus"))
+        shadowOf(Looper.getMainLooper()).idle()
+        CompanionServiceState.setConnected(false)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(CompanionServiceStatus.BLOCKED,
+            ReflectionHelpers.callInstanceMethod<CompanionServiceStatus>(controller.get(), "getAccessibilityStatus"))
+        controller.pause().stop().destroy()
     }
     private fun onRow(activity: CompanionActivity, row: CompanionRow) {
         ReflectionHelpers.callInstanceMethod<Unit>(activity, "onRow",
@@ -80,7 +106,7 @@ class CompanionActivityTest {
         assertNull(shadowOf(activity).nextStartedActivity)
         assertEquals(CompanionServiceStatus.BLOCKED, status())
         CompanionServiceState.setConnected(true)
-        onRow(activity, CompanionRow.ACCESSIBILITY)
+        shadowOf(Looper.getMainLooper()).idle()
         assertNull(shadowOf(activity).nextStartedActivity)
         assertEquals(CompanionServiceStatus.ON, status())
         controller.pause().stop().destroy()

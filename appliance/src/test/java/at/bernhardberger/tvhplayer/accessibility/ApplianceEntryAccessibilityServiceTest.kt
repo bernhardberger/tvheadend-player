@@ -21,6 +21,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -36,6 +37,13 @@ import org.robolectric.util.ReflectionHelpers
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], shadows = [ApplianceEntryAccessibilityServiceTest.ConnectedServiceShadow::class])
 class ApplianceEntryAccessibilityServiceTest {
+    @Before fun resetServiceState() {
+        CompanionServiceState.setConnected(true)
+        CompanionServiceState.startCapture(CompanionFunction.GUIDE) // Also clears held keys from the previous test.
+        CompanionServiceState.setConnected(false)
+        CompanionServiceState.dismissCapture()
+    }
+
     // Robolectric has no system accessibility connection from which getServiceInfo can fetch its manifest info.
     @Implements(AccessibilityService::class)
     class ConnectedServiceShadow : ShadowAccessibilityService() {
@@ -108,11 +116,47 @@ class ApplianceEntryAccessibilityServiceTest {
         assertEquals(CaptureState.Cancelled, CompanionServiceState.captureState.value)
     }
 
+    @Test fun aLostCaptureUpBeforeReconnectDoesNotSwallowAFreshUnassignedPress() {
+        val controller = Robolectric.buildService(ApplianceEntryAccessibilityService::class.java).create()
+        val service = controller.get()
+        val store = FunctionStore(service)
+        store.setStartup(false)
+        connect(service)
+        assertTrue(CompanionServiceState.startCapture(CompanionFunction.LIVE_TV))
+        assertTrue(dispatch(service, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_INFO))
+        service.onUnbind(Intent()) // No UP reaches the filter before it reconnects.
+        store.assign(CompanionFunction.LIVE_TV, ButtonBinding.NotSet)
+        connect(service)
+        assertFalse(dispatch(service, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_INFO))
+        assertFalse(dispatch(service, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_INFO))
+        assertNull(shadowOf(service).nextStartedActivity)
+        controller.destroy()
+    }
+
     @Test fun captureTimerExpiresWithoutAnyMoreKeyEvents() {
         CompanionServiceState.setConnected(true)
         assertTrue(CompanionServiceState.startCapture(CompanionFunction.GUIDE))
         shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(10))
         assertEquals(CaptureState.TimedOut(CompanionFunction.GUIDE), CompanionServiceState.captureState.value)
+        CompanionServiceState.setConnected(false)
+    }
+
+    @Test fun dismissCaptureKeepsWaitingAndItsTimerButClearsTheResultAndRefusalTimer() {
+        CompanionServiceState.setConnected(true)
+        assertTrue(CompanionServiceState.startCapture(CompanionFunction.GUIDE))
+        val waiting = CompanionServiceState.captureState.value
+        CompanionServiceState.dismissCapture()
+        assertEquals(waiting, CompanionServiceState.captureState.value)
+        shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(10))
+        assertEquals(CaptureState.TimedOut(CompanionFunction.GUIDE), CompanionServiceState.captureState.value)
+        CompanionServiceState.dismissCapture()
+        assertEquals(CaptureState.Idle, CompanionServiceState.captureState.value)
+        assertTrue(CompanionServiceState.startCapture(CompanionFunction.GUIDE))
+        CompanionServiceState.captureKey(RuntimeEnvironment.getApplication(), KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_UNKNOWN))
+        assertTrue(CompanionServiceState.captureState.value is CaptureState.Refused)
+        CompanionServiceState.dismissCapture()
+        shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(10))
+        assertEquals(CaptureState.Idle, CompanionServiceState.captureState.value)
         CompanionServiceState.setConnected(false)
     }
 

@@ -286,6 +286,9 @@ class CompanionScreenTest {
                             capturesCancelled++
                             capture = CaptureState.Cancelled
                         },
+                        onDismissCapture = {
+                            if (capture !is CaptureState.Waiting) capture = CaptureState.Idle
+                        },
                         onAssign = { function, binding ->
                             content.functions.assign(function, binding).also {
                                 content = content.copy(functions = it.functions)
@@ -401,6 +404,7 @@ class CompanionScreenTest {
         save("functions-05-function-page-changed")
         back()
         focused("Open live TV")
+        assertEquals(CaptureState.Idle, capture)
         compose.onNodeWithText("Open when the TV turns on").assertExists()
     }
 
@@ -482,6 +486,7 @@ class CompanionScreenTest {
         assertEquals(1, capturesStarted.size)
         back()
         assertEquals(1, capturesCancelled)
+        assertEquals(CaptureState.Idle, capture)
         focused("Change button")
         compose.onNodeWithText("Functions · Open live TV").assertExists()
         back()
@@ -537,6 +542,7 @@ class CompanionScreenTest {
         focused("Cancel")
         press(Key.DirectionCenter)
         focused("Change button")
+        assertEquals(CaptureState.Idle, capture)
     }
 
     @Test fun aCapturedButtonThatMovedSaysWhatLostItAndFocusesChange() {
@@ -553,6 +559,7 @@ class CompanionScreenTest {
         compose.onNodeWithText("Open live TV is off now").assertExists()
         focused("Change button")
         compose.onNodeWithText("Current: TV button").assertExists()
+        assertEquals(CaptureState.Idle, capture)
         save("functions-10-capture-moved")
     }
 
@@ -567,6 +574,7 @@ class CompanionScreenTest {
         compose.onNodeWithText("Button saved").assertExists()
         compose.onNodeWithText("Button 4001 now opens live TV.").assertExists()
         focused("Change button")
+        assertEquals(CaptureState.Idle, capture)
     }
 
     @Test fun aCaptureTheServiceCancelsReturnsToThePageAndBackThenLeavesIt() {
@@ -576,6 +584,7 @@ class CompanionScreenTest {
         capture = CaptureState.Cancelled
         compose.waitForIdle()
         focused("Change button")
+        assertEquals(CaptureState.Idle, capture)
         back()
         assertEquals(0, capturesCancelled)
         focused("Open live TV")
@@ -586,7 +595,8 @@ class CompanionScreenTest {
         openFunction(CompanionFunction.LIVE_TV)
         press(Key.DirectionCenter)
         back()
-        // Cancelled is a shared value: the second capture must still show its own waiting state.
+        assertEquals(CaptureState.Idle, capture)
+        // Dismissed results cannot be mistaken for the second capture's waiting state.
         press(Key.DirectionCenter)
         compose.onNodeWithText("Waiting for a button…").assertExists()
         assertFalse(capture is CaptureState.Cancelled)

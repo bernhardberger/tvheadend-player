@@ -25,10 +25,15 @@ class ButtonCapture {
 
     fun start(function: CompanionFunction, now: Long) {
         require(function != CompanionFunction.STARTUP)
+        heldKeys.clear()
         mutableState.value = CaptureState.Waiting(function, now + TIMEOUT_MILLIS)
     }
 
     fun cancel() { if (deadline != null) mutableState.value = CaptureState.Cancelled }
+
+    fun dismiss() {
+        if (state.value !is CaptureState.Waiting) mutableState.value = CaptureState.Idle
+    }
 
     fun expire(now: Long) {
         val current = state.value
@@ -47,10 +52,16 @@ class ButtonCapture {
         // Retain the whole cycle even after capture, cancel or timeout changes the screen.
         if (deadline == null) {
             if (keyCode !in heldKeys) return false
+            // A fresh DOWN starts a new press, even if the previous UP never reached this filter.
+            if (isDown && repeatCount == 0) {
+                heldKeys.remove(keyCode)
+                return false
+            }
             if (isUp) heldKeys.remove(keyCode)
             return true
         }
-        if (isUp) heldKeys.remove(keyCode) else heldKeys.add(keyCode)
+        if (isUp) heldKeys.remove(keyCode)
+        if (isDown) heldKeys.add(keyCode)
         if (!isDown || repeatCount != 0) return true
         val function = when (val current = state.value) {
             is CaptureState.Waiting -> current.function
@@ -62,6 +73,7 @@ class ButtonCapture {
             return true
         }
         val refused = when (keyCode) {
+            0 -> buttonName(keyCode)
             19, 20, 21, 22 -> "Arrows"
             23, 66, 160 -> "OK"
             3 -> "HOME"

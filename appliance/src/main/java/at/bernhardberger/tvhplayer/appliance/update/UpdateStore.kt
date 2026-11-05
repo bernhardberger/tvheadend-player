@@ -32,7 +32,7 @@ class UpdateStore(private val context: Context) {
     fun recordCheck() {
         val from = when (result) {
             UpdateResult.CHECKING, UpdateResult.INSTALLING, UpdateResult.WAITING_STANDBY,
-            UpdateResult.PENDING_CONFIRMATION -> UpdateResult.NEVER
+            UpdateResult.PENDING_CONFIRMATION, UpdateResult.SUCCESS -> UpdateResult.NEVER
             else -> result
         }
         preferences.edit().putLong("last_check", System.currentTimeMillis())

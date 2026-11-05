@@ -28,11 +28,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
@@ -122,6 +124,7 @@ fun CompanionContent(
     onRow: (CompanionRow) -> Unit,
     onStartCapture: (CompanionFunction) -> Boolean,
     onCancelCapture: () -> Unit,
+    onDismissCapture: () -> Unit,
     onAssign: (CompanionFunction, ButtonBinding) -> FunctionChange,
     modifier: Modifier = Modifier,
 ) {
@@ -143,6 +146,7 @@ fun CompanionContent(
             capture = capture,
             onStartCapture = onStartCapture,
             onCancelCapture = onCancelCapture,
+            onDismissCapture = onDismissCapture,
             onAssign = onAssign,
             onClose = { returnedFrom = open; page = null },
             modifier = modifier,
@@ -576,6 +580,7 @@ private fun FunctionPage(
     capture: CaptureState,
     onStartCapture: (CompanionFunction) -> Boolean,
     onCancelCapture: () -> Unit,
+    onDismissCapture: () -> Unit,
     onAssign: (CompanionFunction, ButtonBinding) -> FunctionChange,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
@@ -584,13 +589,11 @@ private fun FunctionPage(
     val binding = functions.binding(function)
     val serviceOn = state.accessibilityStatus == CompanionServiceStatus.ON
     var started by remember { mutableStateOf(false) }
-    // The capture state shown when listening began: it is stale until the service reports its own.
-    var stale by remember { mutableStateOf<CaptureState?>(null) }
     var result by remember { mutableStateOf<PageResult?>(null) }
     var focusTick by remember { mutableIntStateOf(0) }
     val first = remember { FocusRequester() }
 
-    val live = if (started && capture !== stale) capture else null
+    val live = if (started) capture else null
     val phase = when (live) {
         is CaptureState.Waiting, is CaptureState.Refused -> PagePhase.Capturing
         is CaptureState.TimedOut -> PagePhase.TimedOut
@@ -598,17 +601,21 @@ private fun FunctionPage(
     }
     val shown = (live as? CaptureState.Captured)?.let { PageResult.Saved(it.keyCode, it.moved) } ?: result
 
-    LaunchedEffect(capture, started) {
-        // From the first state of its own on, the service's reports are current, even a repeated Cancelled.
-        if (started && capture !== stale) stale = null
+    val dismissCapture by rememberUpdatedState(onDismissCapture)
+    DisposableEffect(function) {
+        onDispose { dismissCapture() }
     }
     LaunchedEffect(live) {
         when (live) {
             is CaptureState.Captured -> {
                 result = PageResult.Saved(live.keyCode, live.moved)
                 started = false
+                onDismissCapture()
             }
-            CaptureState.Cancelled -> started = false
+            CaptureState.Cancelled -> {
+                started = false
+                onDismissCapture()
+            }
             else -> Unit
         }
     }
@@ -622,6 +629,7 @@ private fun FunctionPage(
     BackHandler {
         if (started) {
             onCancelCapture()
+            onDismissCapture()
             started = false
             focusTick++
         } else {
@@ -630,9 +638,7 @@ private fun FunctionPage(
     }
 
     fun startCapture() {
-        val before = capture
         if (onStartCapture(function)) {
-            stale = before
             started = true
             result = null
         } else {
@@ -659,7 +665,7 @@ private fun FunctionPage(
                 GuidedStepAction(
                     title = stringResource(R.string.row_cancel),
                     subtitle = stringResource(R.string.row_cancel_hint),
-                    onClick = { started = false; focusTick++ },
+                    onClick = { onDismissCapture(); started = false; focusTick++ },
                     icon = R.drawable.ic_close,
                 )
             }

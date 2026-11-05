@@ -42,6 +42,11 @@ object CompanionServiceState {
         handler.removeCallbacks(timeout)
     }
 
+    fun dismissCapture() {
+        capture.dismiss()
+        scheduleTimeout()
+    }
+
     fun captureKey(context: Context, event: KeyEvent): Boolean {
         val store = FunctionStore(context)
         val before = captureState.value

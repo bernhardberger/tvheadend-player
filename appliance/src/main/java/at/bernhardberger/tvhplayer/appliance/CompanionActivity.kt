@@ -23,6 +23,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService
 import at.bernhardberger.tvhplayer.appliance.update.CompanionUpdater
@@ -30,6 +33,7 @@ import at.bernhardberger.tvhplayer.appliance.update.UpdateResult
 import at.bernhardberger.tvhplayer.appliance.update.UpdateScreenState
 import at.bernhardberger.tvhplayer.appliance.update.UpdateStore
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import kotlinx.coroutines.launch
 
 class CompanionActivity : ComponentActivity() {
     private var playerVersion by mutableStateOf<String?>(null)
@@ -56,6 +60,13 @@ class CompanionActivity : ComponentActivity() {
         updates.preferences.registerOnSharedPreferenceChangeListener(updateListener)
         refreshUpdates()
         refreshStatus()
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                CompanionServiceState.connected.collect { connected ->
+                    accessibilityStatus = companionServiceStatus(isAccessibilityServiceEnabled(), connected)
+                }
+            }
+        }
         setContent {
             TVHeadendPlayerTheme {
                 val capture by CompanionServiceState.captureState.collectAsState()
@@ -77,6 +88,7 @@ class CompanionActivity : ComponentActivity() {
                     onRow = ::onRow,
                     onStartCapture = CompanionServiceState::startCapture,
                     onCancelCapture = CompanionServiceState::cancelCapture,
+                    onDismissCapture = CompanionServiceState::dismissCapture,
                     onAssign = ::assign,
                     modifier = Modifier
                         .fillMaxSize()

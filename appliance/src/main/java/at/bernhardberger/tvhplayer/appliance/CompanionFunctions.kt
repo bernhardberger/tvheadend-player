@@ -40,7 +40,9 @@ data class CompanionFunctions(
 
     /** Capture and restore both move keys, never duplicate them. */
     fun assign(function: CompanionFunction, binding: ButtonBinding): FunctionChange {
-        var next = withBinding(function, binding)
+        val normalized = if (binding is ButtonBinding.Custom && function.defaultKeys().singleOrNull() == binding.keyCode)
+            ButtonBinding.Default else binding
+        var next = withBinding(function, normalized)
         val moved = mutableListOf<MovedButton>()
         for (other in CompanionFunction.entries.filter { it != CompanionFunction.STARTUP && it != function }) {
             val removed = keys(other).intersect(next.keys(function))
