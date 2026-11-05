@@ -515,9 +515,6 @@ fun VideoPlayerScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val timeshiftUnavailableText = stringResource(R.string.timeshift_unavailable)
     val timeshiftReconnectLiveText = stringResource(R.string.timeshift_reconnect_live)
-    val timeshiftExpiredText = stringResource(R.string.timeshift_target_expired)
-    val timeshiftReplacedText = stringResource(R.string.timeshift_target_replaced)
-    val timeshiftUncertainText = stringResource(R.string.timeshift_seek_uncertain)
     LaunchedEffect(timelineState, effectiveTimeshiftState.timeline) {
         timelineState.updateTimeline(effectiveTimeshiftState.timeline)
     }
@@ -853,17 +850,24 @@ fun VideoPlayerScreen(
         layerState.openChannelDrawer(fromKey)
     }
 
-    fun queueTimeshiftSeek(deltaMs: Long) {
-        timelineState.queueRelativeSeek(
-            state = effectiveTimeshiftState,
-            requestedDeltaMs = deltaMs,
-            unavailableText = timeshiftUnavailableText,
-            expiredText = timeshiftExpiredText,
-            replacedText = timeshiftReplacedText,
-            uncertainText = timeshiftUncertainText,
-            seekContent = videoPlayerViewModel::seekTimeshift,
-        )
+    @Composable
+    fun timeshiftSeekAction(): (Long) -> Unit {
+        val expiredText = stringResource(R.string.timeshift_target_expired)
+        val replacedText = stringResource(R.string.timeshift_target_replaced)
+        val uncertainText = stringResource(R.string.timeshift_seek_uncertain)
+        return { deltaMs ->
+            timelineState.queueRelativeSeek(
+                state = effectiveTimeshiftState,
+                requestedDeltaMs = deltaMs,
+                unavailableText = timeshiftUnavailableText,
+                expiredText = expiredText,
+                replacedText = replacedText,
+                uncertainText = uncertainText,
+                seekContent = videoPlayerViewModel::seekTimeshift,
+            )
+        }
     }
+    val queueTimeshiftSeek = timeshiftSeekAction()
 
     /**
      * Runs a key's start now, before this key's recomposition or controls reveal. It
@@ -1122,9 +1126,6 @@ fun VideoPlayerScreen(
             layerState.toggleSchedule(foregroundLayer, prepare = ::prepareSchedule)
         }
     }
-    val chromeLayer = playerChromeLayer(foregroundContext)
-    // The digits shown in the top identity's place; empty while another layer covers the entry.
-    val numberEntry = channelNumberInput.takeIf { foregroundLayer == PlayerForegroundLayer.NUMBER_ENTRY }.orEmpty()
     val numberEntryUp = foregroundLayer == PlayerForegroundLayer.NUMBER_ENTRY
     LaunchedEffect(numberEntryUp, layerState.core.chrome.controlsVisible) {
         if (!layerState.core.chrome.controlsVisible) numberEntryReturnAction = null
@@ -1222,7 +1223,6 @@ fun VideoPlayerScreen(
     return busyStatus
     }
     val busyStatus = rememberBusyStatus()
-    val compactTuning = busyStatus == PlayerBusyStatus.TUNING && statusPresentation == PlaybackStatusPresentation.COMPACT_TUNING
     @Composable
     fun ProgrammeChangeBanner() {
     val airingEventId = nowEvent?.id?.value
@@ -1344,11 +1344,6 @@ fun VideoPlayerScreen(
     val activityKeyCycleOwner = at.bernhardberger.tvhplayer.ui.startup.LocalMainStartupKeyCycleOwner.current
     val playerModals = remember { mutableStateListOf<PlayerModalBackOwner>() }
     val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
-
-    val onPickChannel: (Channel) -> Boolean = { tuneChannel(it, 0L) }
-    val onTogglePause = { dispatchPlaybackAction(MediaPlaybackAction.TOGGLE) }
-    val onSeek: (Long) -> Unit = { queueTimeshiftSeek(it) }
-    val onRecoveryRetry: (PlaybackRetryCommand) -> Unit = { dispatchRecoveryRetry(it) }
 
     @Composable
     fun playerRootModifier(): Modifier = Modifier
@@ -1546,9 +1541,17 @@ fun VideoPlayerScreen(
             }
             .focusRequester(rootFocus)
             .livePlayerRoot(stringResource(R.string.player_live_tv_surface), contentAllowed)
-    val rootModifier = playerRootModifier()
     @Composable
     fun PlayerContent() {
+    val rootModifier = playerRootModifier()
+    val onPickChannel: (Channel) -> Boolean = { tuneChannel(it, 0L) }
+    val onTogglePause = { dispatchPlaybackAction(MediaPlaybackAction.TOGGLE) }
+    val onSeek: (Long) -> Unit = { queueTimeshiftSeek(it) }
+    val onRecoveryRetry: (PlaybackRetryCommand) -> Unit = { dispatchRecoveryRetry(it) }
+    val chromeLayer = playerChromeLayer(foregroundContext)
+    // The digits shown in the top identity's place; empty while another layer covers the entry.
+    val numberEntry = channelNumberInput.takeIf { foregroundLayer == PlayerForegroundLayer.NUMBER_ENTRY }.orEmpty()
+    val compactTuning = busyStatus == PlayerBusyStatus.TUNING && statusPresentation == PlaybackStatusPresentation.COMPACT_TUNING
     val dvrEntries = observation.dvrEntries()
     val recordingChannelIds = remember(dvrEntries) { activeRecordingChannelIds(dvrEntries) }
     val aspectRatio = targetAspect.mode
