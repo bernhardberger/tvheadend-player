@@ -12,7 +12,7 @@ object ApplianceEntryPolicy {
     const val DESTINATION_LIVE = "live"
     const val DESTINATION_GUIDE = "guide"
     const val ENTRY_ALIAS_CLASS_NAME = "at.bernhardberger.tvhplayer.ui.ApplianceEntryActivity"
-    const val TCL_GUIDE_KEY_CODE = 4001
+    const val TCL_TV_KEY_CODE = 4001
 
     fun keyEvent(
         isApplianceEntryKey: Boolean,

@@ -416,8 +416,12 @@ fun adjacentChannelId(
 - TCL Safety Guard must allow the appliance package's hidden `APP_AUTO_START`
   app-op before the user-approved accessibility service will bind.
 - The physical TV button emits Linux `KEY_EPG`, but this firmware delivers TCL
-  private Android key code `4001` to accessibility services. The service also
-  accepts standard Android `KEYCODE_GUIDE` for non-TCL input paths.
+  private Android key code `4001` to accessibility services. By default, this and
+  standard Android `KEYCODE_TV` (`170`) open live TV; `KEYCODE_GUIDE` (`172`)
+  opens the Guide for non-TCL input paths.
+- The G10 remote has no Guide button. Its LIST button arrives as `174`
+  (`KEYCODE_BOOKMARK`), which is not a companion default: it remains available
+  to the player's channel drawer.
 - Dated deployment observations are in
   [appliance-tcl-findings-2026-07-27.md](appliance-tcl-findings-2026-07-27.md).
 

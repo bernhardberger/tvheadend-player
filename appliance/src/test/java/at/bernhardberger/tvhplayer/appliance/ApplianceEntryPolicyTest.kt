@@ -75,7 +75,7 @@ class ApplianceEntryPolicyTest {
     fun androidGuideAndCapturedTclTvCodes_areApplianceEntryKeys() {
         val functions = CompanionFunctions()
         assertEquals(CompanionFunction.GUIDE, functions.owner(172))
-        assertEquals(CompanionFunction.GUIDE, functions.owner(ApplianceEntryPolicy.TCL_GUIDE_KEY_CODE))
+        assertEquals(CompanionFunction.LIVE_TV, functions.owner(ApplianceEntryPolicy.TCL_TV_KEY_CODE))
         assertEquals(null, functions.owner(4))
     }
 

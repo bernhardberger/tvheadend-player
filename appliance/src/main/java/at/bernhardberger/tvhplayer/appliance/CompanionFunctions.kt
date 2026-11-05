@@ -11,8 +11,8 @@ sealed interface ButtonBinding {
 
 fun CompanionFunction.defaultKeys(): Set<Int> = when (this) {
     CompanionFunction.STARTUP -> emptySet()
-    CompanionFunction.LIVE_TV -> setOf(170)
-    CompanionFunction.GUIDE -> setOf(172, ApplianceEntryPolicy.TCL_GUIDE_KEY_CODE)
+    CompanionFunction.LIVE_TV -> setOf(170, ApplianceEntryPolicy.TCL_TV_KEY_CODE)
+    CompanionFunction.GUIDE -> setOf(172)
 }
 
 data class MovedButton(val function: CompanionFunction, val keyCode: Int)
@@ -49,7 +49,7 @@ data class CompanionFunctions(
             moved += removed.map { MovedButton(other, it) }
             if (removed.isNotEmpty()) {
                 val remaining = keys(other) - removed
-                // GUIDE is the only multi-key default. Losing either leaves one custom key.
+                // LIVE_TV is the only multi-key default. Losing either leaves one custom key.
                 next = next.withBinding(other, remaining.singleOrNull()?.let { ButtonBinding.Custom(it) }
                     ?: ButtonBinding.NotSet)
             }
@@ -66,7 +66,7 @@ data class CompanionFunctions(
 
 /** Deliberately small en-US table; private/vendor keys are not guessed. */
 fun buttonName(keyCode: Int): String = when (keyCode) {
-    170 -> "TV button"
+    170, ApplianceEntryPolicy.TCL_TV_KEY_CODE -> "TV button"
     172 -> "Guide button"
     183 -> "Red button"
     184 -> "Green button"
@@ -84,7 +84,7 @@ fun buttonName(keyCode: Int): String = when (keyCode) {
 }
 
 fun CompanionFunctions.buttonLabel(function: CompanionFunction): String =
-    if (binding(function) == ButtonBinding.Default && function == CompanionFunction.GUIDE) "Guide button"
+    if (binding(function) == ButtonBinding.Default && function == CompanionFunction.LIVE_TV) "TV button"
     else keys(function).singleOrNull()?.let(::buttonName) ?: "Not set"
 
 fun CompanionFunctions.allSetBody(defaultHome: Boolean): String {

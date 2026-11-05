@@ -64,12 +64,17 @@ class ApplianceEntryAccessibilityServiceTest {
         val controller = Robolectric.buildService(ApplianceEntryAccessibilityService::class.java).create()
         val service = controller.get()
         assertFalse(dispatch(service, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_INFO))
-        assertTrue(dispatch(service, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_TV))
-        val launch = shadowOf(service).nextStartedActivity
-        assertEquals(ApplianceEntryPolicy.DESTINATION_LIVE,
-            launch.getStringExtra(ApplianceEntryPolicy.EXTRA_APPLIANCE_DESTINATION))
-        assertTrue(dispatch(service, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_TV))
-        assertNull(shadowOf(service).nextStartedActivity)
+        assertFalse(dispatch(service, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_BOOKMARK))
+        assertFalse(dispatch(service, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_BOOKMARK))
+        for (code in listOf(KeyEvent.KEYCODE_TV, ApplianceEntryPolicy.TCL_TV_KEY_CODE)) {
+            assertTrue(dispatch(service, KeyEvent.ACTION_DOWN, code))
+            val launch = shadowOf(service).nextStartedActivity
+            assertEquals(ApplianceEntryPolicy.DESTINATION_LIVE,
+                launch.getStringExtra(ApplianceEntryPolicy.EXTRA_APPLIANCE_DESTINATION))
+            assertTrue(dispatch(service, KeyEvent.ACTION_UP, code))
+            assertNull(shadowOf(service).nextStartedActivity)
+            shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(1_500))
+        }
         controller.destroy()
     }
 
@@ -85,7 +90,7 @@ class ApplianceEntryAccessibilityServiceTest {
             at.bernhardberger.tvhplayer.appliance.MovedButton(CompanionFunction.GUIDE, 172)),
             CompanionServiceState.captureState.value)
         assertEquals(ButtonBinding.Custom(172), FunctionStore(service).functions.liveTv)
-        assertEquals(ButtonBinding.Custom(4001), FunctionStore(service).functions.guide)
+        assertEquals(ButtonBinding.NotSet, FunctionStore(service).functions.guide)
         assertTrue(dispatch(service, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_GUIDE))
         assertNull(shadowOf(service).nextStartedActivity)
         controller.destroy()

@@ -4,18 +4,27 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class CompanionFunctionsTest {
-    @Test fun assigningItsSingleDefaultKeyNormalizesToDefaultButDoesNotExpandGuide() {
-        val functions = CompanionFunctions(liveTv = ButtonBinding.NotSet)
-            .assign(CompanionFunction.GUIDE, ButtonBinding.Custom(170)).functions
-        val restored = functions.assign(CompanionFunction.LIVE_TV, ButtonBinding.Custom(170))
-        assertEquals(ButtonBinding.Default, restored.functions.liveTv)
-        assertEquals(ButtonBinding.NotSet, restored.functions.guide)
-        assertEquals(listOf(MovedButton(CompanionFunction.GUIDE, 170)), restored.moved)
-        for (key in listOf(172, 4001)) {
-            val guide = restored.functions.assign(CompanionFunction.GUIDE, ButtonBinding.Custom(key)).functions
-            assertEquals(ButtonBinding.Custom(key), guide.guide)
-            assertEquals(setOf(key), guide.keys(CompanionFunction.GUIDE))
+    @Test fun assigningItsSingleDefaultKeyNormalizesToDefaultButDoesNotExpandLiveTv() {
+        val functions = CompanionFunctions(guide = ButtonBinding.NotSet)
+            .assign(CompanionFunction.LIVE_TV, ButtonBinding.Custom(172)).functions
+        val restored = functions.assign(CompanionFunction.GUIDE, ButtonBinding.Custom(172))
+        assertEquals(ButtonBinding.Default, restored.functions.guide)
+        assertEquals(ButtonBinding.NotSet, restored.functions.liveTv)
+        assertEquals(listOf(MovedButton(CompanionFunction.LIVE_TV, 172)), restored.moved)
+        for (key in listOf(170, 4001)) {
+            val live = restored.functions.assign(CompanionFunction.LIVE_TV, ButtonBinding.Custom(key)).functions
+            assertEquals(ButtonBinding.Custom(key), live.liveTv)
+            assertEquals(setOf(key), live.keys(CompanionFunction.LIVE_TV))
         }
+    }
+
+    @Test fun defaultBindingsRouteTclTvToLiveAndStandardGuideToGuideWithoutClaimingList() {
+        val defaults = CompanionFunctions()
+        assertEquals(setOf(170, 4001), defaults.keys(CompanionFunction.LIVE_TV))
+        assertEquals(setOf(172), defaults.keys(CompanionFunction.GUIDE))
+        assertEquals(CompanionFunction.LIVE_TV, defaults.owner(4001))
+        assertEquals(CompanionFunction.GUIDE, defaults.owner(172))
+        assertNull(defaults.owner(174))
     }
 
     @Test fun defaultsCustomAndRemovedKeysRouteOnlyToTheirOwner() {
@@ -23,7 +32,7 @@ class CompanionFunctionsTest {
         assertTrue(defaults.startup)
         assertEquals(CompanionFunction.LIVE_TV, defaults.owner(170))
         assertEquals(CompanionFunction.GUIDE, defaults.owner(172))
-        assertEquals(CompanionFunction.GUIDE, defaults.owner(4001))
+        assertEquals(CompanionFunction.LIVE_TV, defaults.owner(4001))
         assertNull(defaults.owner(85))
         val custom = defaults.assign(CompanionFunction.GUIDE, ButtonBinding.Custom(85)).functions
             .assign(CompanionFunction.LIVE_TV, ButtonBinding.NotSet).functions
@@ -43,19 +52,22 @@ class CompanionFunctionsTest {
     }
 
     @Test fun captureMovesOneDefaultKeyAndRestoringDefaultMovesItBack() {
-        val moved = CompanionFunctions().assign(CompanionFunction.LIVE_TV, ButtonBinding.Custom(172))
-        assertEquals(listOf(MovedButton(CompanionFunction.GUIDE, 172)), moved.moved)
-        assertEquals(ButtonBinding.Custom(4001), moved.functions.guide)
-        assertEquals("Button 4001", moved.functions.buttonLabel(CompanionFunction.GUIDE))
-        val restored = moved.functions.assign(CompanionFunction.GUIDE, ButtonBinding.Default)
-        assertEquals(listOf(MovedButton(CompanionFunction.LIVE_TV, 172)), restored.moved)
-        assertEquals(ButtonBinding.NotSet, restored.functions.liveTv)
-        assertEquals(setOf(172, 4001), restored.functions.keys(CompanionFunction.GUIDE))
-        assertEquals("Guide button", restored.functions.buttonLabel(CompanionFunction.GUIDE))
+        for ((key, remaining) in listOf(170 to 4001, 4001 to 170)) {
+            val moved = CompanionFunctions().assign(CompanionFunction.GUIDE, ButtonBinding.Custom(key))
+            assertEquals(listOf(MovedButton(CompanionFunction.LIVE_TV, key)), moved.moved)
+            assertEquals(ButtonBinding.Custom(remaining), moved.functions.liveTv)
+            assertEquals("TV button", moved.functions.buttonLabel(CompanionFunction.LIVE_TV))
+            val restored = moved.functions.assign(CompanionFunction.LIVE_TV, ButtonBinding.Default)
+            assertEquals(listOf(MovedButton(CompanionFunction.GUIDE, key)), restored.moved)
+            assertEquals(ButtonBinding.NotSet, restored.functions.guide)
+            assertEquals(setOf(170, 4001), restored.functions.keys(CompanionFunction.LIVE_TV))
+            assertEquals("TV button", restored.functions.buttonLabel(CompanionFunction.LIVE_TV))
+        }
     }
 
     @Test fun movingTheLastCustomKeyTurnsThePreviousFunctionOff() {
-        val change = CompanionFunctions().assign(CompanionFunction.GUIDE, ButtonBinding.Custom(170))
+        val change = CompanionFunctions(liveTv = ButtonBinding.Custom(170))
+            .assign(CompanionFunction.GUIDE, ButtonBinding.Custom(170))
         assertEquals(ButtonBinding.NotSet, change.functions.liveTv)
         assertEquals(listOf(MovedButton(CompanionFunction.LIVE_TV, 170)), change.moved)
     }
@@ -64,7 +76,7 @@ class CompanionFunctionsTest {
         val names = mapOf(170 to "TV button", 172 to "Guide button", 183 to "Red button", 184 to "Green button",
             185 to "Yellow button", 186 to "Blue button", 165 to "Info button", 166 to "Channel up button",
             167 to "Channel down button", 85 to "Play/pause button", 178 to "Input button", 82 to "Menu button",
-            176 to "Settings button", 173 to "Recordings button", 4001 to "Button 4001", 174 to "Button 174")
+            176 to "Settings button", 173 to "Recordings button", 4001 to "TV button", 174 to "Button 174")
         names.forEach { (code, name) -> assertEquals(name, buttonName(code)) }
     }
 
@@ -76,7 +88,7 @@ class CompanionFunctionsTest {
         val noButtons = CompanionFunctions(false, ButtonBinding.NotSet, ButtonBinding.NotSet)
         assertEquals("Nothing is set to open Tvheadend Player.", noButtons.allSetBody(false))
         assertEquals("This TV opens Tvheadend Player on HOME.", noButtons.allSetBody(true))
-        assertEquals("This TV opens Tvheadend Player on HOME and with Button 4001.",
+        assertEquals("This TV opens Tvheadend Player on HOME and with TV button.",
             noButtons.copy(guide = ButtonBinding.Custom(4001)).allSetBody(true))
         assertEquals("This TV opens Tvheadend Player at startup.", noButtons.copy(startup = true).allSetBody(false))
     }
