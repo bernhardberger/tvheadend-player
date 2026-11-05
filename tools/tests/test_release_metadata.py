@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
+import runpy
 import subprocess
 import struct
 import tempfile
@@ -21,11 +23,18 @@ release_metadata = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(release_metadata)
 SDK_VERSION, SDK_SOURCE_COMMIT = release_metadata.released_sdk_pin()
 COMPANION = {"applicationId": "at.bernhardberger.tvhplayer.appliance", "versionCode": 2, "versionName": "0.2.0"}
+RETIRED_APPLIANCE_VERSION_CODE = runpy.run_path(str(ROOT / "tools/device"), run_name="device_tool")["RETIRED_APPLIANCE_VERSION_CODE"]
 
 
 class ReleaseMetadataTest(unittest.TestCase):
+    def test_companion_version_stays_above_retired_appliance_player(self):
+        source = (ROOT / "appliance/build.gradle.kts").read_text(encoding="utf-8")
+        code = int(re.search(r"^\s*versionCode\s*=\s*([0-9]+)\s*$", source, re.MULTILINE)[1])
+        self.assertGreater(code, RETIRED_APPLIANCE_VERSION_CODE)
+
     def test_companion_version_guard_requires_increase_for_module_or_brand_changes(self):
-        for changed in ("appliance/src/main/AndroidManifest.xml", "brand/src/main/res/values/strings.xml"):
+        inputs = ("appliance/", "brand/", "gradle/", "build.gradle.kts", "settings.gradle.kts", "gradle.properties")
+        for changed in inputs:
             for current, accepted in ((1, False), (2, False), (3, True)):
                 with self.subTest(changed=changed, current=current), tempfile.TemporaryDirectory() as directory:
                     root = Path(directory)
@@ -39,6 +48,7 @@ class ReleaseMetadataTest(unittest.TestCase):
                             with self.assertRaisesRegex(ValueError, "changed since v0.4.5; increase companion versionCode"):
                                 release_metadata.check_companion_version(root)
                         self.assertIn("v0.4.5:appliance/build.gradle.kts", runner.call_args.args[0])
+                        self.assertEqual(runner.call_args_list[2].args[0][-len(inputs):], list(inputs))
 
     def test_companion_version_guard_skips_no_tag_pre_module_and_unchanged(self):
         for outputs in (("",), ("v0.4.5", ""), ("v0.4.5", "fixture", "")):

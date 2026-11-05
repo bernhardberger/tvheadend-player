@@ -129,6 +129,31 @@ class CompanionUpdateTest {
         assertFalse(store.consumeConnectSuppression())
     }
 
+    @Test fun interruptedCheckingAndMissingOrUnsealedInstallBecomeRetryableButLiveInstallStaysBusy() {
+        val context = RuntimeEnvironment.getApplication()
+        val store = UpdateStore(context)
+        store.recordCheck()
+        UpdateStore(context).reconcileInstalledVersion()
+        assertEquals(UpdateResult.NEVER, store.result)
+
+        store.beforeCommit(9876, manual = false)
+        UpdateStore(context).reconcileInstalledVersion()
+        assertEquals(UpdateResult.INSTALLER_FAILURE, store.result)
+        assertEquals(-1, store.sessionId)
+
+        val installer = context.packageManager.packageInstaller
+        val id = installer.createSession(PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL))
+        store.beforeCommit(id, manual = false)
+        UpdateStore(context).reconcileInstalledVersion()
+        assertEquals(UpdateResult.INSTALLER_FAILURE, store.result)
+
+        ReflectionHelpers.setField(installer.getSessionInfo(id), "sealed", true)
+        store.beforeCommit(id, manual = false)
+        UpdateStore(context).reconcileInstalledVersion()
+        assertEquals(UpdateResult.INSTALLING, store.result)
+        assertEquals(id, store.sessionId)
+    }
+
     @Test fun automaticConfirmationBecomesManualBeforeSuccessAndHomeRecreation() {
         val context = RuntimeEnvironment.getApplication()
         val store = UpdateStore(context)

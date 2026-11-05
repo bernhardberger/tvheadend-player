@@ -1,7 +1,11 @@
 package at.bernhardberger.tvhplayer.appliance
 
 import android.content.Context
+import android.content.SharedPreferences
+import android.content.pm.PackageInfo
 import android.content.pm.PackageInstaller
+import android.content.pm.Signature
+import android.content.pm.SigningInfo
 import android.os.PowerManager
 import at.bernhardberger.tvhplayer.appliance.update.CompanionUpdater
 import at.bernhardberger.tvhplayer.appliance.update.UpdateResult
@@ -44,11 +48,25 @@ class CompanionUpdaterFeedTest {
     private fun hash(bytes: ByteArray) = MessageDigest.getInstance("SHA-256").digest(bytes)
         .joinToString("") { "%02x".format(it.toInt() and 0xff) }
 
-    private fun performCheck(context: Context) {
+    private fun performCheck(context: Context, manual: Boolean = true, cancelled: AtomicBoolean = AtomicBoolean(false)) {
         val method = CompanionUpdater::class.java.getDeclaredMethod("performCheck",
             Context::class.java, Boolean::class.javaPrimitiveType, AtomicBoolean::class.java)
         method.isAccessible = true
-        method.invoke(CompanionUpdater, context, true, AtomicBoolean(false))
+        method.invoke(CompanionUpdater, context, manual, cancelled)
+    }
+
+    private fun prepareArchive(context: Context, newer: Boolean) {
+        val signing = SigningInfo()
+        shadowOf(signing).setSignatures(arrayOf(Signature("fixture signer".toByteArray())))
+        val installed = context.packageManager.getPackageInfo(context.packageName, 0).apply { signingInfo = signing }
+        shadowOf(context.packageManager).installPackage(installed)
+        shadowOf(context.packageManager).setPackageArchiveInfo(File(context.cacheDir, "companion-update.apk").path,
+            PackageInfo().apply {
+                packageName = context.packageName
+                setLongVersionCode(installed.longVersionCode + if (newer) 1 else 0)
+                versionName = "fixture"
+                signingInfo = signing
+            })
     }
 
     private fun prepare(context: Context): ByteArray {
@@ -124,6 +142,67 @@ class CompanionUpdaterFeedTest {
                 server.releaseApk.countDown()
                 CompanionUpdater.cancelAutomatic()
             }
+        }
+    }
+
+    @Test fun knownNotNewerAssetIsNotDownloadedAgainUntilInstalledApkChanges() {
+        val feed = localFeed()
+        val context = RuntimeEnvironment.getApplication()
+        prepare(context)
+        prepareArchive(context, newer = false)
+        Feed(feed).use { server ->
+            server.expected = hash(ByteArray(64) { 7 })
+            performCheck(context)
+            assertEquals(UpdateResult.NOT_NEWER, UpdateStore(context).result)
+            assertEquals(server.expected, UpdateStore(context).notNewerHash)
+            assertEquals(1, server.count("/apk"))
+            performCheck(context)
+            assertEquals(UpdateResult.NOT_NEWER, UpdateStore(context).result)
+            assertEquals(1, server.count("/apk"))
+            File(context.applicationInfo.sourceDir).writeText("changed installed fixture APK")
+            performCheck(context)
+            assertEquals(UpdateResult.NOT_NEWER, UpdateStore(context).result)
+            assertEquals(2, server.count("/apk"))
+            server.failure.get()?.let { throw AssertionError("Fixture server failed", it) }
+        }
+    }
+
+    @Test fun wakeCancellationAndToggleOffAfterPersistenceAbandonInsteadOfCommitting() {
+        val feed = localFeed()
+        val context = RuntimeEnvironment.getApplication()
+        val power = context.getSystemService(PowerManager::class.java)
+        Feed(feed).use { server ->
+            for (change in listOf("wake", "cancel", "toggle")) {
+                prepare(context)
+                prepareArchive(context, newer = true)
+                shadowOf(power).setIsInteractive(false)
+                server.expected = hash(ByteArray(64) { 7 })
+                val store = UpdateStore(context)
+                val cancelled = AtomicBoolean(false)
+                var reachedPersistence = false
+                val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+                    if (key == "result" && store.result == UpdateResult.INSTALLING) {
+                        reachedPersistence = true
+                        when (change) {
+                            "wake" -> shadowOf(power).setIsInteractive(true)
+                            "cancel" -> cancelled.set(true)
+                            "toggle" -> store.setAutomatic(false)
+                        }
+                    }
+                }
+                store.preferences.registerOnSharedPreferenceChangeListener(listener)
+                try {
+                    performCheck(context, manual = false, cancelled)
+                    assertTrue("Must reach pre-commit persistence for $change", reachedPersistence)
+                    assertEquals(change, UpdateResult.WAITING_STANDBY, store.result)
+                    assertEquals(-1, store.sessionId)
+                    assertTrue(context.packageManager.packageInstaller.mySessions.isEmpty())
+                    assertFalse(File(context.cacheDir, "companion-update.apk").exists())
+                } finally {
+                    store.preferences.unregisterOnSharedPreferenceChangeListener(listener)
+                }
+            }
+            server.failure.get()?.let { throw AssertionError("Fixture server failed", it) }
         }
     }
 

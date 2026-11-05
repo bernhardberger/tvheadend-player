@@ -146,6 +146,7 @@ class OperatorShortcutsTest(unittest.TestCase):
             for explicit in (False, True):
                 with self.subTest(package=package, explicit=explicit):
                     fakes = self.main_fakes()
+                    fakes["package_is_installed"] = Mock(return_value=False)
                     fakes["run"] = Mock(return_value=CLEAR_SUCCESS)
                     expected = Path("explicit.apk").resolve() if explicit else DEVICE["DEFAULT_APK" if package == DEVICE["DEFAULT_PACKAGE"] else "DEFAULT_COMPANION_APK"]
                     arguments = ["device", "--package", package, "install-debug"]
@@ -159,6 +160,52 @@ class OperatorShortcutsTest(unittest.TestCase):
                     ):
                         self.assertEqual(DEVICE["main"](), 0)
                     fakes["run"].assert_called_once_with(["adb", "-s", "private-device", "install", "-r", str(expected)])
+                    if package == DEVICE["APPLIANCE_DEBUG_PACKAGE"]:
+                        fakes["package_is_installed"].assert_called_once_with("adb", "private-device", package)
+                    else:
+                        fakes["package_is_installed"].assert_not_called()
+
+    def test_companion_install_paths_refuse_retired_player_and_unknown_version(self):
+        floor = DEVICE["RETIRED_APPLIANCE_VERSION_CODE"]
+        for action, package in (("install-release", DEVICE["APPLIANCE_PACKAGE"]),
+                                ("install-debug", DEVICE["APPLIANCE_PACKAGE"]),
+                                ("install-debug", DEVICE["APPLIANCE_DEBUG_PACKAGE"])):
+            for installed in (None, 0, floor - 1, floor, floor + 1, 1000, "unknown"):
+                with self.subTest(action=action, package=package, installed=installed):
+                    fakes = self.main_fakes(role="production" if action == "install-release" else "test")
+                    fakes["resolve_verified_release_apk"] = Mock(return_value=Path("companion-appliance.apk"))
+                    fakes["show_package_info"] = Mock()
+                    fakes["package_is_installed"] = Mock(return_value=installed is not None)
+                    metadata = "missing version\n" if installed == "unknown" else f"  versionCode={installed} minSdk=28\n"
+                    fakes["run"] = Mock(return_value=subprocess.CompletedProcess([], 0, stdout=metadata))
+                    args = ["device", "--package", package, action]
+                    if action == "install-release":
+                        args += ["--bundle", "bundle", "--confirm-release-install"]
+                    error = io.StringIO()
+                    refused = installed == "unknown" or (installed is not None and installed <= floor)
+                    with (
+                        patch.dict(DEVICE_GLOBALS, fakes),
+                        patch.object(DEVICE_GLOBALS["shutil"], "which", return_value="adb"),
+                        patch.object(Path, "is_file", return_value=True),
+                        patch("sys.argv", args),
+                        redirect_stderr(error),
+                    ):
+                        if refused:
+                            with self.assertRaises(SystemExit):
+                                DEVICE["main"]()
+                        else:
+                            self.assertEqual(DEVICE["main"](), 0)
+                    fakes["package_is_installed"].assert_called_once_with("adb", "private-device", package)
+                    commands = [call.args[0] for call in fakes["run"].call_args_list]
+                    self.assertFalse(any("uninstall" in command for command in commands))
+                    self.assertEqual(any("install" in command for command in commands), not refused)
+                    if installed is not None:
+                        self.assertEqual(commands[0], ["adb", "-s", "private-device", "shell", "dumpsys", "package", package])
+                        self.assertEqual(fakes["run"].call_args_list[0].kwargs,
+                                         dict(capture=True, sensitive=True, announce=False))
+                    if refused:
+                        self.assertIn("cannot verify installed versionCode" if installed == "unknown" else
+                                      "uninstall the old Appliance player", error.getvalue())
 
     def test_appliance_status_uses_kotlin_namespace_for_both_package_identities(self):
         for package in (DEVICE["DEFAULT_PACKAGE"], DEVICE["RELEASE_PACKAGE"], DEVICE["APPLIANCE_PACKAGE"], DEVICE["APPLIANCE_DEBUG_PACKAGE"]):

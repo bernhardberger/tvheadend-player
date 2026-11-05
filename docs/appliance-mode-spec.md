@@ -51,6 +51,11 @@ autoplay, warm playback and every appliance-only player setting. The sideloaded
 GUIDE/TV accessibility service, boot and wake entry, a setup checklist and its own
 silent updater.
 
+Before installing the companion on a TV with the retired appliance-flavored
+player, uninstall `at.bernhardberger.tvhplayer.appliance` first and install the
+player separately. Without uninstalling first, Android upgrades the old player
+in place to the companion and keeps its app-private data.
+
 - GUIDE, boot and wake open the player through `APPLIANCE_ENTRY`, an exported
   entry guarded by a `signature` permission. HOME opens the player the way the
   launcher does, which keeps today's HOME semantics (success criterion 6 and

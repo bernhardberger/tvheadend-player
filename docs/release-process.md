@@ -29,6 +29,12 @@ attached to every GitHub release. The bundle also includes a Play AAB for Google
 Play. Play App Signing must use this project's own release key ("use your own
 key" at enrollment), so a GitHub APK and a Play install update each other.
 
+On a TV with the retired appliance-flavored player, uninstall
+`at.bernhardberger.tvhplayer.appliance` before sideloading the companion and install
+the player separately. The retired player and companion share a package ID and
+signing key. Without uninstalling first, Android upgrades the old player in place
+to the companion and keeps its app-private data.
+
 Companion updater asset contract: every published release must contain exactly one
 signed companion APK whose filename ends in `-appliance.apk`, and exactly one
 `SHA256SUMS` asset. Each nonblank checksum line is `<64 hex digits>  <filename>`
@@ -37,8 +43,9 @@ entry. Missing or ambiguous assets, malformed checksums and hash mismatches prev
 installation. The updater uses GitHub's `/releases/latest` endpoint, excluding
 drafts and prereleases. Companion versions are independent: increment its
 `versionCode` in `appliance/build.gradle.kts` for each distributed companion build.
-`prepare-release` requires a higher companion `versionCode` when `appliance/` or
-`brand/` changed since the latest merged `v<versionName>` release tag. It skips
+`prepare-release` requires a higher companion `versionCode` when `appliance/`,
+`brand/`, `gradle/`, root `build.gradle.kts`, `settings.gradle.kts` or
+`gradle.properties` changed since the latest merged `v<versionName>` release tag. It skips
 this check if no release tag exists or that tag predates the companion module.
 An unchanged companion is attached to every player release without a version bump.
 The companion rejects a different package, a non-increasing version code or a different signer.

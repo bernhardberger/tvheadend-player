@@ -129,7 +129,7 @@ android {
         }
         create("profile") {
             initWith(getByName("release"))
-            buildConfigField("String", "APPLIANCE_COMPANION_PACKAGE", "\"at.bernhardberger.tvhplayer.appliance.debug\"")
+            buildConfigField("String", "APPLIANCE_COMPANION_PACKAGE", "\"\"")
             manifestPlaceholders["applianceCompanionPackage"] = "at.bernhardberger.tvhplayer.appliance.debug"
             proguardFiles("benchmark-rules.pro")
             // Controlled code-optimization comparison; identical resources and instrumentation.
@@ -143,6 +143,7 @@ android {
         }
         create("profileServer") {
             initWith(getByName("profile"))
+            buildConfigField("String", "APPLIANCE_COMPANION_PACKAGE", "\"at.bernhardberger.tvhplayer.appliance.debug\"")
             applicationIdSuffix = ".debug"
         }
     }

@@ -467,6 +467,7 @@ Already met:
 - Backup disabled.
 - `LICENSE`, `NOTICE.md` and `privacy-policy.md` present.
 
+Historical note — superseded by the companion split (owner, 2026-11-04; see S1):
 Done since the audit: the `play` and `appliance` flavors
 (`app/build.gradle.kts:67-77`; the Appliance build adds `.appliance` to the
 application ID and `APPLIANCE_BUILD`) and the Play bundle in the release pipeline

@@ -14,6 +14,15 @@ class UpdateStore(private val context: Context) {
     }.getOrDefault(UpdateResult.NEVER)
     val installerMessage: String get() = preferences.getString("installer_message", "").orEmpty()
     val sessionId: Int get() = preferences.getInt("session_id", -1)
+    val notNewerHash: String get() = preferences.getString("not_newer_hash", "").orEmpty()
+
+    fun reconcileInstalledApk(hash: String) {
+        if (preferences.getString("installed_hash", "") != hash) {
+            preferences.edit().putString("installed_hash", hash).remove("not_newer_hash").commit()
+        }
+    }
+
+    fun recordNotNewer(hash: String) { preferences.edit().putString("not_newer_hash", hash).commit() }
 
     fun setAutomatic(enabled: Boolean) { preferences.edit().putBoolean("automatic", enabled).apply() }
     fun setResult(result: UpdateResult, message: String = "") {
@@ -47,8 +56,23 @@ class UpdateStore(private val context: Context) {
     }
 
     fun reconcileInstalledVersion() {
-        if (UpdatePolicy.completedSelfUpdate(preferences.getLong("commit_from", -1), BuildConfig.VERSION_CODE.toLong())) {
-            finishInstall(UpdateResult.SUCCESS)
+        // The idle snapshot and its persisted rewrite must be atomic with check() worker activation.
+        synchronized(CompanionUpdater) {
+            if (UpdatePolicy.completedSelfUpdate(preferences.getLong("commit_from", -1), BuildConfig.VERSION_CODE.toLong())) {
+                preferences.edit().remove("not_newer_hash").remove("installed_hash").commit()
+                finishInstall(UpdateResult.SUCCESS)
+            } else if (!CompanionUpdater.isChecking) {
+                when (result) {
+                    UpdateResult.CHECKING -> setResult(UpdateResult.NEVER)
+                    UpdateResult.INSTALLING -> {
+                        val liveSession = try {
+                            context.packageManager.packageInstaller.mySessions.any { it.sessionId == sessionId && it.isSealed }
+                        } catch (_: RuntimeException) { false }
+                        if (!liveSession) finishInstall(UpdateResult.INSTALLER_FAILURE)
+                    }
+                    else -> Unit
+                }
+            }
         }
     }
 

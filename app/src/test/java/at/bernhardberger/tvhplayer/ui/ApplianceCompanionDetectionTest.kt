@@ -34,19 +34,24 @@ class ApplianceCompanionDetectionTest {
 
     @Test fun sameCertificateCompanionIsInstalled() {
         install(context.packageName, "player")
-        install(BuildConfig.APPLIANCE_COMPANION_PACKAGE, "player")
-        assertTrue(isApplianceCompanionInstalled(context))
+        install(BuildConfig.APPLIANCE_COMPANION_PACKAGE.ifEmpty { "at.bernhardberger.tvhplayer.appliance.debug" }, "player")
+        if (BuildConfig.BUILD_TYPE == "profile") {
+            assertTrue(BuildConfig.APPLIANCE_COMPANION_PACKAGE.isEmpty())
+            assertFalse(isApplianceCompanionInstalled(context))
+        } else {
+            assertTrue(isApplianceCompanionInstalled(context))
+        }
     }
 
     @Test fun differentCertificateCompanionIsNotInstalled() {
         install(context.packageName, "player")
-        install(BuildConfig.APPLIANCE_COMPANION_PACKAGE, "other")
+        install(BuildConfig.APPLIANCE_COMPANION_PACKAGE.ifEmpty { "at.bernhardberger.tvhplayer.appliance.debug" }, "other")
         assertFalse(isApplianceCompanionInstalled(context))
     }
 
     @Test fun unsignedPackagesDoNotCountAsMatchingCertificates() {
         install(context.packageName, null)
-        install(BuildConfig.APPLIANCE_COMPANION_PACKAGE, null)
+        install(BuildConfig.APPLIANCE_COMPANION_PACKAGE.ifEmpty { "at.bernhardberger.tvhplayer.appliance.debug" }, null)
         assertFalse(isApplianceCompanionInstalled(context))
     }
 }

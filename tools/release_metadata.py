@@ -530,7 +530,8 @@ def check_companion_version(repository: Path) -> None:
     path = "appliance/build.gradle.kts"
     if not git("ls-tree", previous, "--", path):
         return
-    if not git("diff", "--name-only", previous, "--", "appliance/", "brand/"):
+    if not git("diff", "--name-only", previous, "--", "appliance/", "brand/", "gradle/",
+               "build.gradle.kts", "settings.gradle.kts", "gradle.properties"):
         return
     old = git("show", f"{previous}:{path}")
     current = (repository / path).read_text(encoding="utf-8")
@@ -540,7 +541,7 @@ def check_companion_version(repository: Path) -> None:
             raise ValueError("unable to read companion versionCode")
         return int(match[1])
     if code(current) <= code(old):
-        raise ValueError(f"appliance/ or brand/ changed since {previous}; increase companion versionCode in {path}")
+        raise ValueError(f"companion sources or build inputs changed since {previous}; increase companion versionCode in {path}")
 
 
 def validate_entry_points(manifest: ET.Element, role: str) -> None:

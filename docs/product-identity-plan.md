@@ -50,8 +50,10 @@ player through the `APPLIANCE_ENTRY` action, which the player guards with a
 companions pair with debug players and release with release. Appliance-only
 player settings and behavior stay in the player, appear only when a companion
 signed with the same key is installed, and only change the player's own screens.
-Existing Appliance TVs are set up once more: the player from Play, the companion
-sideloaded.
+Existing Appliance TVs are set up once more: uninstall the retired appliance-flavored
+player (`at.bernhardberger.tvhplayer.appliance`) first, then install the player from
+Play and sideload the companion. Without uninstalling first, Android upgrades the
+old player in place to the companion and keeps its app-private data.
 
 Debug and `profileServer` builds carry a `.debug` suffix so they install next to
 a Play release; `profile` keeps `.profile`.

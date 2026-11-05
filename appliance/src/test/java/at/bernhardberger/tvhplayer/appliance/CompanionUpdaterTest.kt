@@ -1,7 +1,10 @@
 package at.bernhardberger.tvhplayer.appliance
 
 import android.content.Context
+import android.content.ContextWrapper
+import android.content.SharedPreferences
 import android.content.pm.PackageInstaller
+import android.os.PowerManager
 import at.bernhardberger.tvhplayer.appliance.update.CompanionUpdater
 import at.bernhardberger.tvhplayer.appliance.update.UpdateResult
 import at.bernhardberger.tvhplayer.appliance.update.UpdateStore
@@ -21,10 +24,12 @@ import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
 import java.lang.reflect.InvocationTargetException
+import java.lang.management.ManagementFactory
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -159,12 +164,15 @@ class CompanionUpdaterTest {
             ReflectionHelpers.setStaticField(CompanionUpdater::class.java, "activeCancellation", cancelled)
             ReflectionHelpers.setStaticField(CompanionUpdater::class.java, "activeManual", false)
             ReflectionHelpers.setStaticField(CompanionUpdater::class.java, "activeConnection", connection)
+            UpdateStore(context).recordCheck()
             entered.countDown()
             check(unwind.await(5, TimeUnit.SECONDS))
             ReflectionHelpers.setStaticField(CompanionUpdater::class.java, "activeConnection", null)
         }
         try {
             assertTrue(entered.await(5, TimeUnit.SECONDS))
+            UpdateStore(context).reconcileInstalledVersion()
+            assertEquals(UpdateResult.CHECKING, UpdateStore(context).result)
             CompanionUpdater.cancelAutomatic()
             assertTrue(cancelled.get())
             assertTrue(disconnected.get())
@@ -177,6 +185,58 @@ class CompanionUpdaterTest {
         } finally {
             unwind.countDown()
             ReflectionHelpers.setStaticField(CompanionUpdater::class.java, "activeCancellation", null)
+        }
+    }
+
+    @Test fun workerActivationBetweenReconciliationSnapshotAndRewriteWaitsForReconciliation() {
+        val context = RuntimeEnvironment.getApplication()
+        shadowOf(context.packageManager).setCanRequestPackageInstalls(false)
+        shadowOf(context.getSystemService(PowerManager::class.java)).setIsInteractive(false)
+        val store = UpdateStore(context)
+        store.setResult(UpdateResult.CHECKING)
+        val snapshotRead = CountDownLatch(1)
+        val resumeRead = CountDownLatch(1)
+        val finished = CountDownLatch(1)
+        val preferences = object : SharedPreferences by store.preferences {
+            override fun getString(key: String?, default: String?): String? {
+                val snapshot = store.preferences.getString(key, default)
+                if (key == "result") {
+                    snapshotRead.countDown()
+                    check(resumeRead.await(5, TimeUnit.SECONDS))
+                }
+                return snapshot
+            }
+        }
+        val wrapped = object : ContextWrapper(context) {
+            override fun getSharedPreferences(name: String?, mode: Int): SharedPreferences = preferences
+        }
+        val worker: ExecutorService = ReflectionHelpers.getStaticField(CompanionUpdater::class.java, "worker")
+        val workerThread = worker.submit<Thread> { Thread.currentThread() }.get(5, TimeUnit.SECONDS)
+        val reconciler = Executors.newSingleThreadExecutor()
+        val reconciliation = reconciler.submit { UpdateStore(wrapped).reconcileInstalledVersion() }
+        try {
+            assertTrue(snapshotRead.await(5, TimeUnit.SECONDS))
+            // Request real production activation while reconciliation is paused after the idle snapshot.
+            CompanionUpdater.check(context, manual = false) { finished.countDown() }
+            val threads = ManagementFactory.getThreadMXBean()
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+            var blockedOnUpdater = false
+            while (finished.count != 0L && System.nanoTime() < deadline) {
+                val info = threads.getThreadInfo(workerThread.id)
+                blockedOnUpdater = info?.threadState == Thread.State.BLOCKED &&
+                    info.lockInfo?.identityHashCode == System.identityHashCode(CompanionUpdater)
+                if (blockedOnUpdater) break
+                Thread.yield()
+            }
+            assertTrue("Worker activation must wait on the reconciliation monitor", blockedOnUpdater)
+            resumeRead.countDown()
+            reconciliation.get(5, TimeUnit.SECONDS)
+            assertTrue(finished.await(5, TimeUnit.SECONDS))
+            assertEquals(UpdateResult.INSTALL_PERMISSION, store.result)
+        } finally {
+            resumeRead.countDown()
+            reconciler.shutdownNow()
+            assertTrue(finished.await(5, TimeUnit.SECONDS))
         }
     }
 }

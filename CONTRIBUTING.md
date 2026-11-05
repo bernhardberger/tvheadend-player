@@ -42,21 +42,22 @@ configured Tvheadend account.
 
 ## Builds
 
-Each release provides two builds from one commit. They share the same screens and
-playback, and update independently because their application IDs differ.
+Each release provides the player and a separate Appliance companion from one
+commit. There is one player build, available through Play or as a GitHub APK;
+the companion is sideloaded and updates only itself from GitHub releases.
 
-| Build | Launcher name | Application ID | What it adds |
+| App | Launcher name | Application ID | Purpose |
 |---|---|---|---|
-| **Play** | Tvheadend Player | `at.bernhardberger.tvhplayer` | The store build for ordinary TVs. It has no HOME entry point and no accessibility service. |
-| **Appliance** | Tvheadend Player Appliance | `at.bernhardberger.tvhplayer.appliance` | A HOME launcher entry, an optional accessibility service and an **Appliance** section in Settings, for a TV that should start straight into the app. |
+| **Player** | Tvheadend Player | `at.bernhardberger.tvhplayer` | All screens and playback. It has no HOME entry point or accessibility service. |
+| **Appliance companion** | Tvheadend Player Appliance | `at.bernhardberger.tvhplayer.appliance` | Opens the player at startup and wake, maps supported vendor keys and GUIDE, can be HOME, and updates itself. |
 
-Only the Appliance build can open the app after TV startup or display wake and
+The companion can open the player after TV startup or display wake and
 act on the Android GUIDE key and one captured TCL TV key. That is done by an
 accessibility service the user must enable in Android settings. The service
 subscribes to no accessibility events, cannot inspect screen content, and passes
 every other key through unchanged. Appliance entry and special remote-key
 behavior are device-dependent; direct HOME replacement is not claimed on TCL
-firmware that gives its system launcher priority. The Appliance build is not
+firmware that gives its system launcher priority. The companion is not
 Android lock-task or device-owner kiosk mode.
 
 ## Requirements

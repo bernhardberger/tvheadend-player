@@ -91,7 +91,7 @@ documentation site or toolchain.
 - [`README.md`](../README.md) is the entry point for people who use the app: what
   it is, requirements, features, which APK to install, privacy, and license.
 - [`CONTRIBUTING.md`](../CONTRIBUTING.md) is for people who build or contribute:
-  the technical overview, the Play and Appliance builds, building from source,
+  the technical overview, the player and Appliance companion, building from source,
   release integrity, the engineering harness, and upstream contributions.
 - [`CHANGELOG.md`](../CHANGELOG.md) records user-visible changes per release;
   GitHub release notes are taken from its section for that version.

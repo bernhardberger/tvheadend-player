@@ -30,6 +30,8 @@ DEFAULT_PACKAGE = "at.bernhardberger.tvhplayer.debug"
 RELEASE_PACKAGE = "at.bernhardberger.tvhplayer"
 APPLIANCE_PACKAGE = "at.bernhardberger.tvhplayer.appliance"
 APPLIANCE_DEBUG_PACKAGE = "at.bernhardberger.tvhplayer.appliance.debug"
+# Last versionCode shipped by the retired Appliance player with the companion's package and key.
+RETIRED_APPLIANCE_VERSION_CODE = 170
 LEGACY_PACKAGE = "at.leoville.tvhstream"
 DEFAULT_APK = ROOT / "app/build/outputs/apk/play/debug/app-play-debug.apk"
 DEFAULT_COMPANION_APK = ROOT / "appliance/build/outputs/apk/debug/appliance-debug.apk"
@@ -1240,6 +1242,21 @@ def resolve_verified_release_apk(bundle: Path, package_name: str = RELEASE_PACKA
         fail(f"cannot read verified release manifest: {exc}")
 
 
+def refuse_retired_appliance_player(adb: str, serial: str, package_name: str) -> None:
+    if package_name not in (APPLIANCE_PACKAGE, APPLIANCE_DEBUG_PACKAGE):
+        return
+    if not package_is_installed(adb, serial, package_name):
+        return
+    metadata = run(adb_command(adb, serial, "shell", "dumpsys", "package", package_name),
+                   capture=True, sensitive=True, announce=False)
+    code = re.search(r"^\s*versionCode=([0-9]+)\b", metadata.stdout, re.MULTILINE)
+    if not code:
+        fail(f"cannot verify installed versionCode for {package_name}; companion not installed")
+    if int(code[1]) <= RETIRED_APPLIANCE_VERSION_CODE:
+        fail(f"uninstall the old Appliance player ({package_name}) first; "
+             "installing the companion in place would keep the old player's app-private data")
+
+
 def sanitize_screenshot_name(value: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", value.strip().lower()).strip("-")
     return slug[:80].rstrip("-") or DEFAULT_SCREENSHOT_NAME
@@ -1654,11 +1671,13 @@ def main() -> int:
         apk = (args.apk or default_apk).expanduser().resolve()
         if not apk.is_file():
             fail(f"APK does not exist: {apk}")
+        refuse_retired_appliance_player(adb, serial, package_name)
         run(adb_command(adb, serial, "install", "-r", str(apk)))
         return 0
 
     if args.action == "install-release":
         apk = resolve_verified_release_apk(args.bundle, package_name)
+        refuse_retired_appliance_player(adb, serial, package_name)
         run(adb_command(adb, serial, "install", "-r", str(apk)))
         show_package_info(adb, serial, package_name)
         return 0

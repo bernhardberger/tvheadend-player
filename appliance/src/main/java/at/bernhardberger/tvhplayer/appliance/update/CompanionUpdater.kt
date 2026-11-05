@@ -30,6 +30,8 @@ object CompanionUpdater {
     @Volatile var manualForeground = false
     @Volatile private var confirmation: Intent? = null
 
+    internal val isChecking: Boolean get() = synchronized(this) { activeCancellation != null }
+
     fun takeConfirmation(): Intent? = synchronized(this) {
         confirmation.also { confirmation = null }
     }
@@ -110,10 +112,13 @@ object CompanionUpdater {
             val expected = try { UpdatePolicy.parseChecksums(sums)[asset] }
                 catch (_: IllegalArgumentException) { fail(UpdateResult.RELEASE_PROBLEM) }
             if (expected == null) fail(UpdateResult.RELEASE_PROBLEM)
-            if (UpdatePolicy.isUpToDate(expected, sha256(File(context.applicationInfo.sourceDir)))) {
+            val installedHash = sha256(File(context.applicationInfo.sourceDir))
+            store.reconcileInstalledApk(installedHash)
+            if (UpdatePolicy.isUpToDate(expected, installedHash)) {
                 store.setResult(UpdateResult.UP_TO_DATE)
                 return
             }
+            if (expected.equals(store.notNewerHash, ignoreCase = true)) fail(UpdateResult.NOT_NEWER)
             if (cancelled.get()) fail(UpdateResult.WAITING_STANDBY)
             apk.outputStream().use { output -> download(assetUrl(asset), output, 128L * 1024 * 1024, cancelled, deadline) }
             val actual = sha256(apk)
@@ -123,7 +128,10 @@ object CompanionUpdater {
                 ?: fail(UpdateResult.RELEASE_PROBLEM)
             val installed = pm.getPackageInfo(context.packageName, PackageManager.GET_SIGNING_CERTIFICATES)
             UpdatePolicy.archiveRejection(expected, actual, context.packageName, archive.packageName,
-                installed.longVersionCode, archive.longVersionCode, signers(installed), signers(archive))?.let { fail(it) }
+                installed.longVersionCode, archive.longVersionCode, signers(installed), signers(archive))?.let {
+                if (it == UpdateResult.NOT_NEWER) store.recordNotNewer(expected)
+                fail(it)
+            }
             store.setLatest(archive.versionName.orEmpty().ifEmpty { archive.longVersionCode.toString() })
             if (!mayCommit(store, power, manual, cancelled)) fail(UpdateResult.WAITING_STANDBY)
             val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
@@ -145,6 +153,8 @@ object CompanionUpdater {
                 val pending = PendingIntent.getBroadcast(context, sessionId, callback,
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE)
                 store.beforeCommit(sessionId, manual)
+                // Persistence and PendingIntent creation can race a wake, cancellation or toggle-off too.
+                if (!mayCommit(store, power, manual, cancelled)) fail(UpdateResult.WAITING_STANDBY)
                 session.commit(pending.intentSender)
                 committed = true
             }
