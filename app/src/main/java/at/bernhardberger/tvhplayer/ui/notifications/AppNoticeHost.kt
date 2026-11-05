@@ -140,6 +140,7 @@ internal fun AppNoticePresentation(
                         AppNoticeIcon.DELETE -> R.drawable.ic_delete_outlined
                         AppNoticeIcon.CONNECTED -> R.drawable.ic_power
                         AppNoticeIcon.DISCONNECTED -> R.drawable.ic_power_off
+                        AppNoticeIcon.SIGN_IN_REJECTED -> R.drawable.ic_lock
                     }), contentDescription = null, modifier = Modifier.size(16.dp),
                         tint = if (icon == AppNoticeIcon.RECORDING) recordingMarkColor(focused = false) else LocalContentColor.current)
                 }

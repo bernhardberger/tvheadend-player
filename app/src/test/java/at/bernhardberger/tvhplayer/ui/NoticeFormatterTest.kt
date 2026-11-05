@@ -62,7 +62,12 @@ class NoticeFormatterTest {
     @Test fun connectionNoticesShowWhetherThePlugIsIn() {
         assertEquals(AppNoticeIcon.DISCONNECTED, formatter.format(Notice.Connection(ConnectionNoticeKind.LOST)).icon)
         assertEquals(AppNoticeIcon.CONNECTED, formatter.format(Notice.Connection(ConnectionNoticeKind.RESTORED)).icon)
-        assertEquals(AppNoticeIcon.WARNING, formatter.format(Notice.Connection(ConnectionNoticeKind.LOGIN_REJECTED)).icon)
+        assertEquals(AppNoticeIcon.SIGN_IN_REJECTED, formatter.format(Notice.Connection(ConnectionNoticeKind.LOGIN_REJECTED)).icon)
+    }
+
+    @Test fun aFailedSwitchShowsItsOwnIconForUnreachableAndRejected() {
+        assertEquals(AppNoticeIcon.DISCONNECTED, formatter.format(Notice.ServerConnectionFailed("Cabin")).icon)
+        assertEquals(AppNoticeIcon.SIGN_IN_REJECTED, formatter.format(Notice.ServerSignInRejected("Cabin")).icon)
     }
 
     @Test @Config(qualifiers = "de") fun lostNoticeWithAndWithoutSavedChannelsInGerman() {

@@ -20,7 +20,7 @@ import java.time.format.TextStyle
 import kotlin.time.Clock
 import kotlin.time.Instant
 
-internal enum class AppNoticeIcon { SCHEDULE, RECORDING, CHECK, STOP, WARNING, CANCEL, DELETE, CONNECTED, DISCONNECTED }
+internal enum class AppNoticeIcon { SCHEDULE, RECORDING, CHECK, STOP, WARNING, CANCEL, DELETE, CONNECTED, DISCONNECTED, SIGN_IN_REJECTED }
 internal data class FormattedNotice(val headline: String, val detail: String? = null, val icon: AppNoticeIcon? = null)
 
 private fun dvrFailureReason(failure: DvrMutationFeedback): Int = when (failure) {
@@ -39,8 +39,10 @@ internal class NoticeFormatter(private val context: Context) {
         is Notice.ServerProfileRemoved -> FormattedNotice(context.getString(R.string.server_profile_removed, notice.name))
         Notice.ServerProfileAlreadyExists -> FormattedNotice(context.getString(R.string.server_profile_already_exists))
         Notice.ServerProfileWriteFailed -> FormattedNotice(context.getString(R.string.server_profile_write_failed))
-        is Notice.ServerConnectionFailed -> FormattedNotice(context.getString(R.string.server_connection_failed, notice.name))
-        is Notice.ServerSignInRejected -> FormattedNotice(context.getString(R.string.server_sign_in_rejected, notice.name))
+        is Notice.ServerConnectionFailed -> FormattedNotice(context.getString(R.string.server_connection_failed, notice.name),
+            icon = AppNoticeIcon.DISCONNECTED)
+        is Notice.ServerSignInRejected -> FormattedNotice(context.getString(R.string.server_sign_in_rejected, notice.name),
+            icon = AppNoticeIcon.SIGN_IN_REJECTED)
         is Notice.Dvr -> formatDvr(notice, now)
         is Notice.DvrActionFailed -> FormattedNotice(context.getString(when (notice.failure) {
             DvrMutationFeedback.TIMEOUT, DvrMutationFeedback.UNKNOWN_OUTCOME -> R.string.recording_action_not_confirmed
@@ -66,7 +68,7 @@ internal class NoticeFormatter(private val context: Context) {
         }), icon = when (notice.kind) {
             ConnectionNoticeKind.RESTORED -> AppNoticeIcon.CONNECTED
             ConnectionNoticeKind.LOST -> AppNoticeIcon.DISCONNECTED
-            ConnectionNoticeKind.LOGIN_REJECTED -> AppNoticeIcon.WARNING
+            ConnectionNoticeKind.LOGIN_REJECTED -> AppNoticeIcon.SIGN_IN_REJECTED
         })
         is Notice.CacheClear -> FormattedNotice(context.getString(
             if (notice.success) R.string.cache_notice_cleared else R.string.cache_notice_failed))

@@ -395,6 +395,46 @@ class SettingsServerProfilesTest {
         assertEquals(id(1), activeId)
     }
 
+    /**
+     * Opening a connection's level hands the list's focus on row by row; the Status row's pass used
+     * to scroll the list, leaving the connection in use partly under the top fade (looking dimmed)
+     * until focus moved over it.
+     */
+    @Test fun theConnectionInUseLooksTheSameAfterAFailedAttemptWithoutAFocusPass() {
+        stored(); settings()
+        press(Key.DirectionDown)
+        compose.onNodeWithTag(row(2)).assertIsFocused()
+        val before = rowPixels(row(1))
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        connectionGate = gate
+        rejectNextConnection = true
+        press(Key.DirectionCenter); press(Key.DirectionCenter)
+        compose.waitUntil(10_000) { trialStarted }
+        compose.runOnIdle { gate.complete(Unit) }
+        compose.waitUntil(10_000) { !owner.connectionChanges.isLocked }
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeBy(2_000)
+        compose.onNodeWithTag(row(2)).assertIsFocused()
+        assertEquals(id(1), activeId)
+        assertTrue("the connection in use keeps its enabled look", before.contentEquals(rowPixels(row(1))))
+        compose.onNodeWithTag(row(1)).assertIsEnabled()
+    }
+
+    private fun rowPixels(tag: String): IntArray {
+        compose.mainClock.advanceTimeBy(1_000)
+        val bounds = compose.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
+        lateinit var pixels: IntArray
+        compose.runOnIdle {
+            val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+            view.draw(Canvas(bitmap))
+            val width = bounds.width.toInt(); val height = bounds.height.toInt()
+            pixels = IntArray(width * height)
+            bitmap.getPixels(pixels, 0, width, bounds.left.toInt(), bounds.top.toInt(), width, height)
+            bitmap.recycle()
+        }
+        return pixels
+    }
+
     @Test @Category(VisualCapture::class) fun captureFailedSwitchNotice() {
         frameScene(); settings(rail = true)
         rejectNextConnection = true

@@ -46,6 +46,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.BringIntoViewSpec
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -672,7 +673,15 @@ private fun DepthStripPane(
                 return@Column
             }
             // The list runs to the bottom of the host and fades out where rows continue.
-            CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoViewSpec) {
+            // A level that stops being the active one hands its focused row on row by row, as each
+            // row turns unfocusable; those passing focuses must not scroll a list that is leaving.
+            val focusScrollSpec = remember(bringIntoViewSpec) {
+                object : BringIntoViewSpec {
+                    override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float =
+                        if (latestActive.value) bringIntoViewSpec.calculateScrollDistance(offset, size, containerSize) else 0f
+                }
+            }
+            CompositionLocalProvider(LocalBringIntoViewSpec provides focusScrollSpec) {
                 LazyColumn(
                     state = list,
                     contentPadding = PaddingValues(top = DepthListTopReserve, bottom = ListBottomReserve),
