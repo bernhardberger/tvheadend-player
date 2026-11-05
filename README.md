@@ -164,13 +164,90 @@ Download from the
 | APK | Take it when |
 |---|---|
 | `…-play.apk` | You want the app. That's the one most people want. |
-| `…-appliance.apk` | You watch through Tvheadend instead of the TV's built-in tuners. This optional companion makes Tvheadend Player behave like the TV's own tuner app: it starts the app when the TV turns on, catches remote buttons the manufacturer keeps for its own apps, and can replace the home screen. It needs Tvheadend Player installed and updates itself from these releases. |
-
-The companion is still a work in progress, so expect rough edges and changes
-between releases.
+| `…-appliance.apk` | You watch through Tvheadend instead of the TV's built-in tuners. This optional companion makes Tvheadend Player behave like the TV's own tuner app: it starts the app when the TV turns on, catches remote buttons the manufacturer keeps for its own apps, and can replace the home screen. It needs Tvheadend Player installed and updates itself from these releases. See [Appliance companion](#appliance-companion) for setup. |
 
 To install an APK outside the Play Store, allow installs from unknown sources
 for the app you open it with, a file manager for example.
+
+## Appliance companion
+
+<img src="artwork/tvheadend-player-appliance-symbol.svg" alt="The Tvheadend Player Appliance icon: the Tvheadend Player mark with an orange accessibility badge" width="96">
+
+Tvheadend Player Appliance is a separate, optional app for people who watch TV
+through Tvheadend instead of the TV's built-in tuners. It makes Tvheadend Player
+behave like the TV's own tuner app:
+
+- It opens Tvheadend Player when the TV turns on or wakes from standby.
+- It takes over remote buttons the manufacturer keeps for its own apps. Out of
+  the box the TV button opens live TV and the Guide button opens the guide. You
+  can pick other buttons, or none, in the companion.
+- It can be the TV's home app, so HOME goes to Tvheadend Player. Not every TV
+  allows that.
+
+It works with Tvheadend Player from Google Play or from the releases here. It
+updates itself from the GitHub releases and installs updates only while the TV
+is in standby. Its screens are in English only. I built it for my mum's TVs and
+have only tested it on TCL Google TVs so far. The companion is still a work in
+progress, so expect rough edges and changes between releases.
+
+| | |
+|---|---|
+| ![The companion saying All set, with Tvheadend Player, the accessibility service and the home app ready, and the start of Functions below](artwork/screenshots/companion-all-set.png) | ![The companion waiting for a button to open live TV, with a countdown bar and a note that arrows, OK, Back and HOME can't be used](artwork/screenshots/companion-capture-waiting.png) |
+| A finished setup | Choosing the button that opens live TV |
+
+### Setup
+
+1. If you installed the Appliance build of Tvheadend Player from 0.4.5 or older,
+   uninstall it first. The companion took over its app ID, and installing over
+   it would keep the old app's data.
+2. Install Tvheadend Player and connect it to your server.
+3. Get `…-appliance.apk` from the
+   [latest release](https://github.com/bernhardberger/tvheadend-player/releases/latest)
+   onto the TV and install it, with a downloader app, a file manager or
+   `adb install` from a computer.
+4. Open Tvheadend Player Appliance from the app list. It shows what's still
+   missing, and each row opens the Android settings page you need.
+5. Turn on the accessibility service *Tvheadend Player appliance entry*.
+6. Allow the companion to install unknown apps, so it can install its own
+   updates.
+7. Optionally, make it the home app.
+8. Under Functions, check that the buttons do what you want. To use a different
+   button, choose it and press the button on the remote. Some buttons, like
+   power, never reach apps.
+
+When the companion says All set, you're done.
+
+The accessibility service only opens Tvheadend Player when the TV turns on or
+wakes, and reacts to the buttons set under Functions. It doesn't read what's on
+the screen, and every other button works as before.
+
+### If the companion says Blocked
+
+The service is on in Android settings but isn't running. Switch it off and on
+once. If it still says Blocked, the TV is stopping it from starting. On TCL TVs
+that's Safety Guard, and it has no switch for it, so it takes one ADB command
+from a computer. Turn on debugging in the TV's developer options, then run:
+
+```sh
+adb connect <tv-address>
+adb shell cmd appops set at.bernhardberger.tvhplayer.appliance APP_AUTO_START allow
+```
+
+Switch the service off and on again. The setting stays when the companion
+updates itself.
+
+### TV notes
+
+**TCL (G08, G10)**
+
+- The TV ignores other home apps, so HOME keeps going to Google TV. Startup
+  and the remote buttons still work through the accessibility service.
+- The TV button (the one with the TV symbol) sends its own code, 4001. The
+  companion knows it, so it opens live TV out of the box.
+- The remote has no Guide button. To open the guide with a button, set one
+  under Functions, LIST for example. LIST then no longer opens the channel list
+  in Tvheadend Player.
+- Safety Guard blocks the service until you run the ADB command above.
 
 ## Beta testing on Google Play
 

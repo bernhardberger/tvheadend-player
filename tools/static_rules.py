@@ -94,6 +94,13 @@ def line_number(text: str, offset: int) -> int:
 
 def find_static_rule_violations(root: Path) -> list[str]:
     violations = []
+    readme_path = root / "README.md"
+    required_heading = "## Appliance companion"
+    if not readme_path.is_file() or required_heading not in readme_path.read_text(encoding="utf-8").splitlines():
+        violations.append(
+            f"CompanionReadmeAnchor: README.md must contain the exact heading {required_heading!r}; "
+            "the player's QR code links to #appliance-companion"
+        )
     source_root = root / "app/src/main"
     # Production sources of the UI-free :client library carry the same no-probe contract.
     # Shared brand and companion sources retain the UI rules outside :app.

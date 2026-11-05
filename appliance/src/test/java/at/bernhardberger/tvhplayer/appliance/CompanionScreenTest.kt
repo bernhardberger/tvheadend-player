@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.appliance
 
 import android.app.Application
+import android.content.res.Resources
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.os.SystemClock
@@ -15,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -99,13 +101,17 @@ class CompanionScreenTest {
         compose.waitForIdle()
     }
 
-    private fun save(name: String) {
+    private fun save(name: String, output: String = "companion-captures") {
         compose.mainClock.advanceTimeBy(1000)
         compose.waitForIdle()
         compose.runOnIdle {
             val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
             view.draw(Canvas(bitmap))
-            val file = File("build/outputs/companion-captures/$name.png").apply { parentFile!!.mkdirs() }
+            if (output == "presentation") {
+                assertEquals(1920, bitmap.width)
+                assertEquals(1080, bitmap.height)
+            }
+            val file = File("build/outputs/$output/$name.png").apply { parentFile!!.mkdirs() }
             file.outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
             bitmap.recycle()
         }
@@ -276,11 +282,23 @@ class CompanionScreenTest {
     ) = ready.copy(accessibilityStatus = service, functions = CompanionFunctions(true, liveTv, guide))
 
     /** The whole content, with the service and the store replaced by in-memory stand-ins. */
-    private fun showContent(initial: CompanionScreenState) {
+    private fun showContent(initial: CompanionScreenState, presentation: Boolean = false) {
         content = initial
         capture = CaptureState.Idle
         compose.setContent {
-            CompositionLocalProvider(LocalDensity provides Density(1f, 1f)) {
+            val resources = LocalResources.current
+            // Release unit tests are not exposed by this build. Replace only the debug name,
+            // inside these presentation compositions; existing evidence keeps its debug resources.
+            val sceneResources = if (presentation) object : Resources(
+                resources.assets, resources.displayMetrics, resources.configuration,
+            ) {
+                override fun getText(id: Int): CharSequence =
+                    if (id == R.string.app_name) "Tvheadend Player Appliance" else resources.getText(id)
+            } else resources
+            CompositionLocalProvider(
+                LocalDensity provides if (presentation) LocalDensity.current else Density(1f, 1f),
+                LocalResources provides sceneResources,
+            ) {
                 TVHeadendPlayerTheme {
                     view = LocalView.current
                     backDispatcher = LocalOnBackPressedDispatcherOwner.current!!.onBackPressedDispatcher
@@ -346,6 +364,27 @@ class CompanionScreenTest {
         compose.onNodeWithText("This TV opens Tvheadend Player at startup, on HOME and with the TV and Guide buttons.")
             .assertExists()
         save("functions-01-all-set-top")
+    }
+
+    @Test
+    @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
+    fun presentationAllSet() {
+        showContent(withButtons().copy(playerVersion = "0.4.7"), presentation = true)
+        compose.onNodeWithText("Tvheadend Player Appliance").assertExists()
+        focused("Tvheadend Player")
+        save("companion-all-set", output = "presentation")
+    }
+
+    @Test
+    @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
+    fun presentationCaptureWaiting() {
+        showContent(withButtons().copy(playerVersion = "0.4.7"), presentation = true)
+        openFunction(CompanionFunction.LIVE_TV)
+        press(Key.DirectionCenter)
+        setWhileFrozen(CaptureState.Waiting(CompanionFunction.LIVE_TV, SystemClock.elapsedRealtime() + 7_300))
+        compose.onNodeWithText("Waiting for a button…").assertExists()
+        nothingIsFocusable()
+        save("companion-capture-waiting", output = "presentation")
     }
 
     @Test fun functionsDefault() {

@@ -14,6 +14,7 @@ class StaticRulesTest(unittest.TestCase):
     def setUp(self):
         self.temporary_directory = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary_directory.name)
+        self.write("README.md", (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8"))
         self.write(
             "brand/src/main/java/at/bernhardberger/tvhplayer/ui/Theme.kt",
             "package at.bernhardberger.tvhplayer.ui\nval darkOnly = true\n",
@@ -29,6 +30,32 @@ class StaticRulesTest(unittest.TestCase):
 
     def test_accepts_current_static_contract(self):
         self.assertEqual([], find_static_rule_violations(self.root))
+
+    def test_requires_exact_companion_readme_heading(self):
+        for heading in (
+            "## Companion",
+            "### Appliance companion",
+            "Appliance companion",
+            " ## Appliance companion",
+            "## Appliance companion ",
+        ):
+            with self.subTest(heading=heading):
+                self.write("README.md", f"# Player\n\n{heading}\n")
+
+                violations = find_static_rule_violations(self.root)
+
+                self.assertEqual(1, len(violations))
+                self.assertIn("CompanionReadmeAnchor: README.md", violations[0])
+                self.assertIn("## Appliance companion", violations[0])
+                self.assertIn("the player's QR code links to #appliance-companion", violations[0])
+
+    def test_missing_readme_reports_companion_anchor_violation(self):
+        (self.root / "README.md").unlink()
+
+        violations = find_static_rule_violations(self.root)
+
+        self.assertEqual(1, len(violations))
+        self.assertIn("CompanionReadmeAnchor: README.md", violations[0])
 
     def test_finds_connection_probe_symbols_anywhere_in_production(self):
         self.write(
