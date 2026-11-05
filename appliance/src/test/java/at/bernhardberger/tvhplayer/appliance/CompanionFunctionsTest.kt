@@ -56,7 +56,8 @@ class CompanionFunctionsTest {
             val moved = CompanionFunctions().assign(CompanionFunction.GUIDE, ButtonBinding.Custom(key))
             assertEquals(listOf(MovedButton(CompanionFunction.LIVE_TV, key)), moved.moved)
             assertEquals(ButtonBinding.Custom(remaining), moved.functions.liveTv)
-            assertEquals("TV button", moved.functions.buttonLabel(CompanionFunction.LIVE_TV))
+            assertEquals("TV button ($remaining)", moved.functions.buttonLabel(CompanionFunction.LIVE_TV))
+            assertEquals("TV button ($key)", moved.functions.buttonLabel(CompanionFunction.GUIDE))
             val restored = moved.functions.assign(CompanionFunction.LIVE_TV, ButtonBinding.Default)
             assertEquals(listOf(MovedButton(CompanionFunction.GUIDE, key)), restored.moved)
             assertEquals(ButtonBinding.NotSet, restored.functions.guide)
@@ -91,5 +92,18 @@ class CompanionFunctionsTest {
         assertEquals("This TV opens Tvheadend Player on HOME and with TV button.",
             noButtons.copy(guide = ButtonBinding.Custom(4001)).allSetBody(true))
         assertEquals("This TV opens Tvheadend Player at startup.", noButtons.copy(startup = true).allSetBody(false))
+    }
+
+    @Test fun twoTvButtonCodesShowTheirCodesOnlyWhereTheNamesWouldMatch() {
+        val split = CompanionFunctions().assign(CompanionFunction.GUIDE, ButtonBinding.Custom(4001)).functions
+        assertEquals(ButtonBinding.Custom(170), split.liveTv)
+        assertEquals("TV button (170)", split.buttonLabel(CompanionFunction.LIVE_TV))
+        assertEquals("TV button (4001)", split.buttonLabel(CompanionFunction.GUIDE))
+        assertEquals("This TV opens Tvheadend Player at startup and with TV button (170) and TV button (4001).",
+            split.allSetBody(false))
+        assertEquals("TV button", buttonName(170))
+        assertEquals("TV button (4001)", buttonNameWithCode(4001))
+        assertEquals("TV button", CompanionFunctions().buttonLabel(CompanionFunction.LIVE_TV))
+        assertEquals("Guide button", CompanionFunctions().buttonLabel(CompanionFunction.GUIDE))
     }
 }

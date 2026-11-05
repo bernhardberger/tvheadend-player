@@ -806,10 +806,15 @@ private fun MovedCard(moved: MovedButton, functions: CompanionFunctions) {
             titleColor = MaterialTheme.colorScheme.tertiary,
         )
     } else {
+        val leftKey = left.first()
+        // Two codes with one name (the TV button) read as one button unless the codes are shown.
+        val shared = buttonName(leftKey) == name
+        val movedName = if (shared) buttonNameWithCode(moved.keyCode) else name
+        val leftName = if (shared) buttonNameWithCode(leftKey) else buttonName(leftKey)
         InfoCard(
             title = stringResource(R.string.moved_partial_title, from),
-            body = stringResource(R.string.moved_partial_body, subject(name, true), from,
-                subject(buttonName(left.first()), false), subject(name, false)),
+            body = stringResource(R.string.moved_partial_body, subject(movedName, true), from,
+                subject(leftName, false), subject(movedName, false)),
             titleColor = MaterialTheme.colorScheme.tertiary,
         )
     }

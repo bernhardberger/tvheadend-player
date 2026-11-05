@@ -83,9 +83,20 @@ fun buttonName(keyCode: Int): String = when (keyCode) {
     else -> "Button $keyCode"
 }
 
-fun CompanionFunctions.buttonLabel(function: CompanionFunction): String =
+/** The key code tells apart two keys that share a name, like the two TV button codes. */
+fun buttonNameWithCode(keyCode: Int): String = "${buttonName(keyCode)} ($keyCode)"
+
+private fun CompanionFunctions.plainButtonLabel(function: CompanionFunction): String =
     if (binding(function) == ButtonBinding.Default && function == CompanionFunction.LIVE_TV) "TV button"
     else keys(function).singleOrNull()?.let(::buttonName) ?: "Not set"
+
+/** Adds the key code only when the other function would show the same name. */
+fun CompanionFunctions.buttonLabel(function: CompanionFunction): String {
+    val label = plainButtonLabel(function)
+    val key = keys(function).singleOrNull() ?: return label
+    val other = if (function == CompanionFunction.LIVE_TV) CompanionFunction.GUIDE else CompanionFunction.LIVE_TV
+    return if (plainButtonLabel(other) == label) buttonNameWithCode(key) else label
+}
 
 fun CompanionFunctions.allSetBody(defaultHome: Boolean): String {
     val ways = buildList {

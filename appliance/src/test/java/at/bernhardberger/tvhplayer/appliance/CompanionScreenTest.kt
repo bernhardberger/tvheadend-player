@@ -626,7 +626,9 @@ class CompanionScreenTest {
         compose.onNodeWithText("Open live TV lost a button").assertExists()
         assertEquals(ButtonBinding.Custom(4001), content.functions.liveTv)
         focused("Change button")
-        compose.onNodeWithText("Current: TV button").assertExists()
+        compose.onNodeWithText("The TV button (170) belonged to Open live TV too. That function now uses only " +
+            "the TV button (4001). Restore its default to move the TV button (170) back.").assertExists()
+        compose.onNodeWithText("Current: TV button (170)").assertExists()
         assertEquals(CaptureState.Idle, capture)
         save("functions-10-capture-moved")
     }
