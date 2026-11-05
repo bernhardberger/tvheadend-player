@@ -251,7 +251,8 @@ def verify_signed_bundle(path: Path) -> dict[str, Any]:
             capture=True,
         ).stdout
         release_metadata.verify_apk_certificate(signature)
-        release_metadata.validate_apk_entry_points(apk, artifact["flavor"], aapt)
+        release_metadata.validate_apk_entry_points(apk, artifact["role"], aapt)
+        expected_identity = manifest["companion"] if artifact["role"] == "companion" else manifest
         badging = _run([str(aapt), "dump", "badging", str(apk)], capture=True).stdout
         identity = re.search(r"package: name='([^']+)' versionCode='([0-9]+)' versionName='([^']+)'", badging)
         if identity is None:
@@ -259,8 +260,8 @@ def verify_signed_bundle(path: Path) -> dict[str, Any]:
         application_id, version_code, version_name = identity.groups()
         if (
             application_id != artifact["applicationId"]
-            or int(version_code) != manifest["versionCode"]
-            or version_name != manifest["versionName"]
+            or int(version_code) != expected_identity["versionCode"]
+            or version_name != expected_identity["versionName"]
         ):
             raise ValueError("signed APK identity does not match release manifest")
     aab = path / manifest["artifacts"]["signedPlayAab"]["file"]

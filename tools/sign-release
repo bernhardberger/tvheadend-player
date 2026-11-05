@@ -104,17 +104,13 @@ python3 "$ROOT_DIR/tools/release_metadata.py" validate-unsigned \
     --application-id "$application_id" \
     --version-code "$version_code" \
     --version-name "$version_name"
-appliance_badging="$($aapt dump badging "$INCOMING_DIR/$unsigned_appliance_name")"
-if [[ "$appliance_badging" != *"package: name='${APPLICATION_ID}.appliance' versionCode='$version_code' versionName='$version_name'"* ]]; then
-    printf 'error: Appliance APK identity or version does not match the release\n' >&2
-    exit 1
-fi
+python3 "$ROOT_DIR/tools/release_metadata.py" validate-companion-apk "$INCOMING_DIR/$unsigned_appliance_name" --manifest "$manifest" --aapt "$aapt"
 for apk in "$unsigned_apk" "$INCOMING_DIR/$unsigned_appliance_name"; do
     "$zipalign" -c -P 16 4 "$apk"
     python3 "$ROOT_DIR/tools/release_metadata.py" assert-unsigned-apk "$apk"
 done
-python3 "$ROOT_DIR/tools/release_metadata.py" validate-apk-entry-points "$unsigned_apk" --flavor play --aapt "$aapt"
-python3 "$ROOT_DIR/tools/release_metadata.py" validate-apk-entry-points "$INCOMING_DIR/$unsigned_appliance_name" --flavor appliance --aapt "$aapt"
+python3 "$ROOT_DIR/tools/release_metadata.py" validate-apk-entry-points "$unsigned_apk" --role player --aapt "$aapt"
+python3 "$ROOT_DIR/tools/release_metadata.py" validate-apk-entry-points "$INCOMING_DIR/$unsigned_appliance_name" --role companion --aapt "$aapt"
 python3 "$ROOT_DIR/tools/release_metadata.py" validate-aab \
     --aab "$INCOMING_DIR/$unsigned_aab_name" --play-apk "$unsigned_apk" \
     --version-code "$version_code" --version-name "$version_name" --unsigned
@@ -170,10 +166,10 @@ fi
 signed_apk_name="tvheadend-player-${version_name}-play.apk"
 signed_appliance_name="tvheadend-player-${version_name}-appliance.apk"
 signed_aab_name="tvheadend-player-${version_name}-play.aab"
-for flavor in play appliance; do
+for role in player companion; do
     input="$unsigned_apk"
     output="$temporary_dir/$signed_apk_name"
-    if [[ "$flavor" == appliance ]]; then
+    if [[ "$role" == companion ]]; then
         input="$INCOMING_DIR/$unsigned_appliance_name"
         output="$temporary_dir/$signed_appliance_name"
     fi
@@ -185,9 +181,11 @@ for flavor in play appliance; do
         --out "$output" \
         "$input"
     "$zipalign" -c -P 16 4 "$output"
-    "$apksigner" verify --verbose --print-certs "$output" > "$temporary_dir/$flavor-verify.txt"
-    certificate_sha256="$(python3 "$ROOT_DIR/tools/release_metadata.py" verify-apk-certificate "$temporary_dir/$flavor-verify.txt")"
+    "$apksigner" verify --verbose --print-certs "$output" > "$temporary_dir/$role-verify.txt"
+    certificate_sha256="$(python3 "$ROOT_DIR/tools/release_metadata.py" verify-apk-certificate "$temporary_dir/$role-verify.txt")"
+    python3 "$ROOT_DIR/tools/release_metadata.py" validate-apk-entry-points "$output" --role "$role" --aapt "$aapt"
 done
+python3 "$ROOT_DIR/tools/release_metadata.py" validate-companion-apk "$temporary_dir/$signed_appliance_name" --manifest "$manifest" --aapt "$aapt"
 jarsigner -keystore "$KEYSTORE" \
     -storepass:file "$store_password_file" \
     -keypass:file "$key_password_file" \
@@ -214,7 +212,7 @@ cp "$INCOMING_DIR/$sdk_source_name" "$staged_output/$sdk_source_name"
 cp "$INCOMING_DIR/$play_mapping_name" "$staged_output/$play_mapping_name"
 cp "$INCOMING_DIR/$appliance_mapping_name" "$staged_output/$appliance_mapping_name"
 cp "$manifest" "$staged_output/unsigned-release-manifest.json"
-cat "$temporary_dir/play-verify.txt" "$temporary_dir/appliance-verify.txt" > "$staged_output/APKSIGNER-VERIFY.txt"
+cat "$temporary_dir/player-verify.txt" "$temporary_dir/companion-verify.txt" > "$staged_output/APKSIGNER-VERIFY.txt"
 cp "$temporary_dir/aab-verify.txt" "$staged_output/JARSIGNER-VERIFY.txt"
 
 python3 "$ROOT_DIR/tools/release_metadata.py" create-signed \

@@ -52,15 +52,16 @@ temporary_dir="$(mktemp -d)"
 trap 'rm -rf "$temporary_dir"' EXIT
 
 cd "$ROOT_DIR"
+python3 tools/release_metadata.py check-companion-version "$ROOT_DIR"
 ./tools/verify --release
 # Release bytes are always built from scratch: a fresh JVM and no outputs restored from the build cache.
-./gradlew clean :app:syncReleasedSdkEvidence :app:assemblePlayRelease :app:assembleApplianceRelease :app:bundlePlayRelease --no-daemon --no-build-cache
+./gradlew clean :app:syncReleasedSdkEvidence :app:assemblePlayRelease :appliance:assembleRelease :app:bundlePlayRelease --no-daemon --no-build-cache
 
 built_apk="app/build/outputs/apk/play/release/app-play-release-unsigned.apk"
-built_appliance_apk="app/build/outputs/apk/appliance/release/app-appliance-release-unsigned.apk"
+built_appliance_apk="appliance/build/outputs/apk/release/appliance-release-unsigned.apk"
 built_aab="app/build/outputs/bundle/playRelease/app-play-release.aab"
 built_play_mapping="app/build/outputs/mapping/playRelease/mapping.txt"
-built_appliance_mapping="app/build/outputs/mapping/applianceRelease/mapping.txt"
+built_appliance_mapping="appliance/build/outputs/mapping/release/mapping.txt"
 for artifact in "$built_apk" "$built_appliance_apk" "$built_aab"; do
     if [[ ! -f "$artifact" ]]; then
         printf 'error: expected release artifact was not produced: %s\n' "$artifact" >&2
@@ -73,9 +74,7 @@ for mapping in "$built_play_mapping" "$built_appliance_mapping"; do
         exit 1
     fi
 done
-for apk in "$built_apk" "$built_appliance_apk"; do
-    ./tools/check-native-libs --release --apk "$apk"
-done
+./tools/check-native-libs --release --apk "$built_apk"
 
 for source_file in "${SDK_SOURCE_FILES[@]}"; do
     if [[ ! -f "$EVIDENCE_DIR/$source_file" || -L "$EVIDENCE_DIR/$source_file" ]]; then
@@ -95,14 +94,18 @@ tar \
 cp "$ROOT_DIR/decoder-ffmpeg/$NATIVE_SOURCE_NAME" "$temporary_dir/$NATIVE_SOURCE_NAME"
 
 # Prove signing material is absent before and after alignment for both APKs.
-for flavor in play appliance; do
-    apk="app/build/outputs/apk/$flavor/release/app-$flavor-release-unsigned.apk"
-    aligned="$temporary_dir/$flavor-unsigned.apk"
+for role in player companion; do
+    apk="$built_apk"
+    aligned="$temporary_dir/play-unsigned.apk"
+    if [[ "$role" == companion ]]; then
+        apk="$built_appliance_apk"
+        aligned="$temporary_dir/appliance-unsigned.apk"
+    fi
     python3 tools/release_metadata.py assert-unsigned-apk "$apk"
     "$zipalign" -f -P 16 4 "$apk" "$aligned"
     "$zipalign" -c -P 16 4 "$aligned"
     python3 tools/release_metadata.py assert-unsigned-apk "$aligned"
-    python3 tools/release_metadata.py validate-apk-entry-points "$aligned" --flavor "$flavor" --aapt "$aapt"
+    python3 tools/release_metadata.py validate-apk-entry-points "$aligned" --role "$role" --aapt "$aapt"
 done
 aligned_apk="$temporary_dir/play-unsigned.apk"
 
@@ -126,11 +129,6 @@ if [[ ! "$badging" =~ versionName=\'([^\']+)\' ]]; then
     exit 1
 fi
 version_name="${BASH_REMATCH[1]}"
-appliance_badging="$($aapt dump badging "$temporary_dir/appliance-unsigned.apk")"
-if [[ "$appliance_badging" != *"package: name='${APPLICATION_ID}.appliance' versionCode='$version_code' versionName='$version_name'"* ]]; then
-    printf 'error: Appliance APK identity or version does not match the release\n' >&2
-    exit 1
-fi
 python3 tools/release_metadata.py validate-aab \
     --aab "$built_aab" --play-apk "$aligned_apk" \
     --version-code "$version_code" --version-name "$version_name" --unsigned
@@ -163,6 +161,7 @@ git archive --format=zip --prefix="tvheadend-player-${version_name}/" \
     -o "$release_dir/$source_zip_name" HEAD
 
 python3 tools/release_metadata.py create-unsigned \
+    --aapt "$aapt" \
     --application-id "$application_id" \
     --version-code "$version_code" \
     --version-name "$version_name" \

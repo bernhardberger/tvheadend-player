@@ -17,7 +17,7 @@ SPEC.loader.exec_module(metadata)
 class ReleaseScriptsTest(unittest.TestCase):
     def test_prepare_requires_nonempty_regular_mapping_for_each_flavor(self):
         script = (ROOT / "tools/prepare-release").read_text()
-        guard = script[script.index('for mapping in '):script.index('for apk in ')]
+        guard = script[script.index('for mapping in '):script.index('./tools/check-native-libs --release --apk')]
         for flavor in ("play", "appliance"):
             for kind in ("present", "missing", "empty", "symlink", "directory"):
                 with self.subTest(flavor=flavor, kind=kind), tempfile.TemporaryDirectory() as directory:
@@ -105,7 +105,7 @@ class ReleaseScriptsTest(unittest.TestCase):
 
     def test_prepare_and_signed_staging_preserve_artifacts_and_mappings(self):
         script = (ROOT / "tools/prepare-release").read_text()
-        self.assertIn(":app:assemblePlayRelease :app:assembleApplianceRelease :app:bundlePlayRelease", script)
+        self.assertIn(":app:assemblePlayRelease :appliance:assembleRelease :app:bundlePlayRelease", script)
         staging = script[script.index('release_dir="'):]
         with tempfile.TemporaryDirectory() as directory:
             temporary = Path(directory)
@@ -122,10 +122,15 @@ class ReleaseScriptsTest(unittest.TestCase):
                 "SDK_VERSION": metadata.released_sdk_pin()[0], "SDK_SOURCE_COMMIT": metadata.released_sdk_pin()[1],
                 "application_id": "at.bernhardberger.tvhplayer",
                 "version_code": "1", "version_name": "0.1.0",
+                "aapt": "fake_aapt",
             }
             preamble = "\n".join(f"{name}={shlex.quote(value)}" for name, value in variables.items())
             # Only Git archive output is faked; run the production staging and metadata code.
             preamble += '\ngit() { if [[ "$1" == rev-parse ]]; then printf "%040d\\n" 0; else while [[ "$1" != -o ]]; do shift; done; printf source > "$2"; fi; }\n'
+            aapt = temporary / "aapt"
+            aapt.write_text("#!/bin/sh\nprintf \"package: name='at.bernhardberger.tvhplayer.appliance' versionCode='2' versionName='0.2.0'\\n\"\n")
+            aapt.chmod(0o755)
+            preamble += f"\naapt={shlex.quote(str(aapt))}\n"
             subprocess.run(["bash", "-eu", "-c", preamble + staging, "staging-test", str(output)], cwd=ROOT, check=True, capture_output=True, text=True)
             manifest = metadata._load_manifest(output / "release-manifest.json")
             metadata.validate_unsigned_manifest(manifest, application_id=variables["application_id"], version_code=1, version_name="0.1.0")
@@ -150,7 +155,7 @@ class ReleaseScriptsTest(unittest.TestCase):
                                   ("native_source_name", "nativeSourceTarGz"), ("sdk_source_name", "sdkSourceTarGz"),
                                   ("play_mapping_name", "playR8Mapping"), ("appliance_mapping_name", "applianceR8Mapping")):
                 variables[variable] = manifest["artifacts"][key]["file"]
-            for name in ("play.apk", "appliance.apk", "play.aab", "play-verify.txt", "appliance-verify.txt", "aab-verify.txt"):
+            for name in ("play.apk", "appliance.apk", "play.aab", "player-verify.txt", "companion-verify.txt", "aab-verify.txt"):
                 (temporary / name).write_bytes(name.encode())
             preamble = "\n".join(f"{name}={shlex.quote(value)}" for name, value in variables.items())
             subprocess.run(["bash", "-eu", "-c", preamble + "\n" + staging], cwd=ROOT, check=True, capture_output=True, text=True)
@@ -190,6 +195,7 @@ class ReleaseScriptsTest(unittest.TestCase):
                 "unsigned_apk": str(temporary / "play-unsigned.apk"),
                 "unsigned_appliance_name": "appliance-unsigned.apk", "unsigned_aab_name": "play-unsigned.aab",
                 "apksigner": "fake_apksigner", "zipalign": "fake_zipalign", "calls": str(temporary / "calls"),
+                "aapt": "fake_aapt", "manifest": str(temporary / "release-manifest.json"),
             }
             preamble = "\n".join(f"{name}={shlex.quote(value)}" for name, value in variables.items())
             # Shell functions intercept every external command in this section. No key or password

@@ -37,7 +37,11 @@ entry. Missing or ambiguous assets, malformed checksums and hash mismatches prev
 installation. The updater uses GitHub's `/releases/latest` endpoint, excluding
 drafts and prereleases. Companion versions are independent: increment its
 `versionCode` in `appliance/build.gradle.kts` for each distributed companion build.
-It rejects a different package, a non-increasing version code or a different signer.
+`prepare-release` requires a higher companion `versionCode` when `appliance/` or
+`brand/` changed since the latest merged `v<versionName>` release tag. It skips
+this check if no release tag exists or that tag predates the companion module.
+An unchanged companion is attached to every player release without a version bump.
+The companion rejects a different package, a non-increasing version code or a different signer.
 Debug builds may use `-Ptvhplayer.applianceUpdateFeed=<URL>` for a GitHub-shaped
 fixture feed; HTTP is restricted to `127.0.0.1` or `10.0.2.2` and the same origin
 for assets/redirects. Release builds accept HTTPS overrides only; an HTTP debug
@@ -190,12 +194,13 @@ creates `build/release/unsigned/<version>/` containing:
 - `tvheadend-player-<version>-appliance-unsigned.apk`;
 - `tvheadend-player-<version>-play-unsigned.aab`;
 - `tvheadend-player-<version>-play-mapping.txt` and `-appliance-mapping.txt`, the R8
-  mapping for each flavor (the Play APK and AAB share one), needed to retrace crash
-  reports;
+  mapping for the player and companion (the Play APK and AAB share one), needed
+  to retrace crash reports;
 - `.tar.gz` and `.zip` application corresponding-source archives;
 - exact released SDK source classifiers and the app-owned Media3/FFmpeg
   corresponding-source archive (see `decoder-ffmpeg/README.md`);
-- `release-manifest.json` with per-artifact application ID/flavor, version, source commit, and hashes;
+- `release-manifest.json` with per-artifact application ID and role (`player` or
+  `companion`), independent player and companion versions, source commit, and hashes;
 - `SHA256SUMS` covering the complete unsigned bundle.
 
 Transfer that directory to the signing host over an authenticated channel. Verify the
@@ -253,10 +258,10 @@ The signed output contains:
 
 Publish that set together; the mapping files are published with it (they reveal
 nothing beyond the corresponding source). Release builds are R8-minified, so before
-publishing smoke both a debug-key-signed `playRelease` and `applianceRelease` on the
-a test TV; for Appliance include HOME launch, the accessibility service and Settings →
-Appliance. Review it for private data before upload. The signing
-fingerprint is public verification material; the private key and passwords are
+publishing smoke both a debug-key-signed `:app:assemblePlayRelease` player and
+`:appliance:assembleRelease` companion on a test TV; for the companion include HOME
+launch, the accessibility service and companion settings. Review it for private
+data before upload. The signing fingerprint is public verification material; the private key and passwords are
 never release artifacts.
 
 ## Publish
@@ -363,10 +368,9 @@ through the bounded wrapper:
 
 The wrapper verifies all three artifacts, then selects the APK using the target's
 configured package (overridden by `--package` or `TVHPLAYER_ANDROID_PACKAGE`).
-The Appliance package selects the Appliance APK; it never installs the AAB.
-Play installation refuses to replace an installed package with Appliance HOME
-or GUIDE entry points. It verifies bundle checksums, source continuity, artifact
-identity, alignment, and the pinned signing certificate before rechecking all
+The companion package selects the APK ending in `-appliance.apk`; it never installs
+the AAB. The player and companion update separate packages. The wrapper verifies
+bundle checksums, source continuity, artifact identity, alignment, and the pinned signing certificate before rechecking all
 four live identity properties and invoking the Android package installer. It
 does not launch the app, inject input, provision credentials, or remove other
 installed clients. Record only the bounded package metadata printed after

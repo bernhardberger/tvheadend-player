@@ -2,8 +2,9 @@
 
 This workflow exists only to make repeatable development setup possible on an
 explicitly designated Android TV test device. It applies to any designated test
-device and to the debug build of either flavor, not only to Appliance devices. It
-is development tooling, not a release feature or a general credential-import API.
+device and only to the debug player `at.bernhardberger.tvhplayer.debug`, not the
+companion. It is development tooling, not a release feature or a general
+credential-import API.
 
 ## Policy
 

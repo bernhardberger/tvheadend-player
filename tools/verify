@@ -348,5 +348,5 @@ if [[ "$staged_sdk" == true ]]; then
 elif [[ "$release_checks" == true ]]; then
     printf '==> Verification passed (Play and Appliance)\n'
 else
-    printf '==> Verification passed (Play; the release path adds Appliance with --release)\n'
+    printf '==> Verification passed (Play and companion; --release also assembles the companion release APK)\n'
 fi

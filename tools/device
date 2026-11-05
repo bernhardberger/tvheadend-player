@@ -32,6 +32,7 @@ APPLIANCE_PACKAGE = "at.bernhardberger.tvhplayer.appliance"
 APPLIANCE_DEBUG_PACKAGE = "at.bernhardberger.tvhplayer.appliance.debug"
 LEGACY_PACKAGE = "at.leoville.tvhstream"
 DEFAULT_APK = ROOT / "app/build/outputs/apk/play/debug/app-play-debug.apk"
+DEFAULT_COMPANION_APK = ROOT / "appliance/build/outputs/apk/debug/appliance-debug.apk"
 DEFAULT_TEST_APK = ROOT / "app/build/outputs/apk/androidTest/play/debug/app-play-debug-androidTest.apk"
 CHANNEL_GUIDE_TEST = (
     "at.bernhardberger.tvhplayer.ui.ChannelGuideDeviceAcceptanceTest"
@@ -819,6 +820,7 @@ def show_package_info(adb: str, serial: str, package_name: str) -> None:
 
 
 def show_appliance_status(adb: str, serial: str, package_name: str) -> None:
+    package_name = APPLIANCE_DEBUG_PACKAGE if package_name in (DEFAULT_PACKAGE, APPLIANCE_DEBUG_PACKAGE) else APPLIANCE_PACKAGE
     service_class = "at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService"
     component = f"{package_name}/{service_class}"
 
@@ -1211,39 +1213,6 @@ def run_navigation_back_check(adb: str, serial: str, package_name: str) -> None:
     )
 
 
-def require_play_replacement_safe(adb: str, serial: str) -> None:
-    # Include disabled components: the manifest contract, not current enablement,
-    # determines whether replacing this package would remove Appliance entry points.
-    for query, intent in (
-        ("query-services", ("-a", "android.accessibilityservice.AccessibilityService")),
-        ("query-activities", ("-a", "android.intent.action.MAIN", "-c", "android.intent.category.HOME")),
-    ):
-        result = run(
-            adb_command(
-                adb, serial, "shell", "cmd", "package", query,
-                "--brief", "--query-flags", "512", *intent, "-p", RELEASE_PACKAGE,
-            ),
-            capture=True,
-            check=False,
-        )
-        output = (result.stdout + result.stderr).lower()
-        if result.returncode != 0 or "error" in output or "unknown command" in output:
-            fail("cannot verify installed package entry points; refusing Play release installation")
-        for line in result.stdout.splitlines():
-            package, separator, component = line.strip().partition("/")
-            if package != RELEASE_PACKAGE or not separator:
-                continue
-            if component.startswith("."):
-                component = package + component
-            if query == "query-activities" or component == (
-                "at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService"
-            ):
-                fail(
-                    "installed package has Appliance entry points; refusing Play release installation. "
-                    f"Use the Appliance build ({APPLIANCE_PACKAGE}) for this target."
-                )
-
-
 def resolve_verified_release_apk(bundle: Path, package_name: str = RELEASE_PACKAGE) -> Path:
     if package_name not in (RELEASE_PACKAGE, APPLIANCE_PACKAGE):
         fail("release installation is available only for the Play or Appliance package")
@@ -1261,6 +1230,8 @@ def resolve_verified_release_apk(bundle: Path, package_name: str = RELEASE_PACKA
         apk_name = artifact["file"]
         if not isinstance(apk_name, str) or Path(apk_name).name != apk_name or not apk_name.endswith(".apk"):
             fail("release bundle has an invalid signed APK path")
+        if package_name == APPLIANCE_PACKAGE and not apk_name.endswith("-appliance.apk"):
+            fail("companion release APK must end in -appliance.apk")
         apk = bundle / apk_name
         if apk.is_symlink() or not apk.is_file():
             fail("verified signed APK is missing or is not a regular file")
@@ -1422,8 +1393,8 @@ def build_parser() -> argparse.ArgumentParser:
     install_parser.add_argument(
         "--apk",
         type=Path,
-        default=DEFAULT_APK,
-        help=f"APK path (default: {DEFAULT_APK.relative_to(ROOT)})",
+        default=None,
+        help="APK path (default: selected package's debug APK)",
     )
 
     release_parser = subparsers.add_parser(
@@ -1679,7 +1650,8 @@ def main() -> int:
         verify_configured_identity(properties, config, require_expected=True)
 
     if args.action == "install-debug":
-        apk = args.apk.expanduser().resolve()
+        default_apk = DEFAULT_COMPANION_APK if package_name in (APPLIANCE_PACKAGE, APPLIANCE_DEBUG_PACKAGE) else DEFAULT_APK
+        apk = (args.apk or default_apk).expanduser().resolve()
         if not apk.is_file():
             fail(f"APK does not exist: {apk}")
         run(adb_command(adb, serial, "install", "-r", str(apk)))
@@ -1687,8 +1659,6 @@ def main() -> int:
 
     if args.action == "install-release":
         apk = resolve_verified_release_apk(args.bundle, package_name)
-        if package_name == RELEASE_PACKAGE:
-            require_play_replacement_safe(adb, serial)
         run(adb_command(adb, serial, "install", "-r", str(apk)))
         show_package_info(adb, serial, package_name)
         return 0

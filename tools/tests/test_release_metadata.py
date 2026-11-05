@@ -7,6 +7,7 @@ import struct
 import tempfile
 import unittest
 import zipfile
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from unittest.mock import patch
 
@@ -19,11 +20,56 @@ if SPEC is None or SPEC.loader is None:
 release_metadata = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(release_metadata)
 SDK_VERSION, SDK_SOURCE_COMMIT = release_metadata.released_sdk_pin()
+COMPANION = {"applicationId": "at.bernhardberger.tvhplayer.appliance", "versionCode": 2, "versionName": "0.2.0"}
 
 
 class ReleaseMetadataTest(unittest.TestCase):
+    def test_companion_version_guard_requires_increase_for_module_or_brand_changes(self):
+        for changed in ("appliance/src/main/AndroidManifest.xml", "brand/src/main/res/values/strings.xml"):
+            for current, accepted in ((1, False), (2, False), (3, True)):
+                with self.subTest(changed=changed, current=current), tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    (root / "appliance").mkdir()
+                    (root / "appliance/build.gradle.kts").write_text(f"    versionCode = {current}\n")
+                    results = ["not-a-release\nv0.4.5\nv0.4.4", "fixture", changed, "    versionCode = 2\n"]
+                    with patch.object(release_metadata.subprocess, "run", side_effect=[subprocess.CompletedProcess([], 0, stdout=value) for value in results]) as runner:
+                        if accepted:
+                            release_metadata.check_companion_version(root)
+                        else:
+                            with self.assertRaisesRegex(ValueError, "changed since v0.4.5; increase companion versionCode"):
+                                release_metadata.check_companion_version(root)
+                        self.assertIn("v0.4.5:appliance/build.gradle.kts", runner.call_args.args[0])
+
+    def test_companion_version_guard_skips_no_tag_pre_module_and_unchanged(self):
+        for outputs in (("",), ("v0.4.5", ""), ("v0.4.5", "fixture", "")):
+            with self.subTest(outputs=outputs), patch.object(release_metadata.subprocess, "run", side_effect=[subprocess.CompletedProcess([], 0, stdout=value) for value in outputs]) as runner:
+                release_metadata.check_companion_version(Path("unused"))
+                self.assertEqual(runner.call_count, len(outputs))
+
+    def test_companion_apk_requires_recorded_independent_identity(self):
+        for identity in (COMPANION, {**COMPANION, "versionCode": 1}, {**COMPANION, "versionName": "0.1.0"}, {**COMPANION, "applicationId": "at.bernhardberger.tvhplayer"}):
+            with self.subTest(identity=identity), patch.object(release_metadata, "apk_identity", return_value=identity):
+                if identity == COMPANION:
+                    release_metadata.validate_companion_apk(Path("companion.apk"), Path("aapt"), {"companion": COMPANION})
+                else:
+                    with self.assertRaisesRegex(ValueError, "companion APK identity does not match"):
+                        release_metadata.validate_companion_apk(Path("companion.apk"), Path("aapt"), {"companion": COMPANION})
+
+    def test_install_permissions_are_required_only_for_companion(self):
+        for role in ("player", "companion"):
+            for permission in ("REQUEST_INSTALL_PACKAGES", "UPDATE_PACKAGES_WITHOUT_USER_ACTION"):
+                for tag in ("uses-permission", "uses-permission-sdk-23"):
+                    with self.subTest(role=role, permission=permission, tag=tag):
+                        entry = '<activity><intent-filter><category android:name="android.intent.category.HOME"/></intent-filter></activity><service android:name="at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService"/>' if role == "companion" else ''
+                        permissions = {"REQUEST_INSTALL_PACKAGES", "UPDATE_PACKAGES_WITHOUT_USER_ACTION"} - {permission} if role == "companion" else {permission}
+                        declarations = ''.join(f'<{tag} android:name="android.permission.{value}"/>' for value in permissions)
+                        manifest = ET.fromstring(f'<manifest xmlns:android="http://schemas.android.com/apk/res/android">{declarations}<application>{entry}</application></manifest>')
+                        with self.assertRaisesRegex(ValueError, "install permission contract"):
+                            release_metadata.validate_entry_points(manifest, role)
+
     def unsigned_manifest(self):
         return release_metadata.build_unsigned_manifest(
+            companion=COMPANION,
             application_id="at.bernhardberger.tvhplayer", version_code=1, version_name="0.1.0",
             source_commit="a" * 40, sdk_version=SDK_VERSION, sdk_source_commit=SDK_SOURCE_COMMIT, artifacts=self._artifacts("unsigned"),
         )
@@ -31,7 +77,7 @@ class ReleaseMetadataTest(unittest.TestCase):
     def test_binary_artifacts_require_exact_identity_flavor_and_file_type(self) -> None:
         for stage in ("unsigned", "signed"):
             for binary in ("PlayApk", "ApplianceApk", "PlayAab"):
-                for field, wrong in (("applicationId", "wrong.package"), ("flavor", "wrong"), ("file", "wrong.zip")):
+                for field, wrong in (("applicationId", "wrong.package"), ("role", "wrong"), ("file", "wrong.zip")):
                     with self.subTest(stage=stage, binary=binary, field=field):
                         manifest = self.unsigned_manifest()
                         manifest["stage"] = stage
@@ -45,7 +91,7 @@ class ReleaseMetadataTest(unittest.TestCase):
                                 release_metadata.validate_signed_manifest(manifest)
                         validate()
                         manifest["artifacts"][stage + binary][field] = wrong
-                        message = {"applicationId": "application ID", "flavor": "flavor", "file": "extension"}[field]
+                        message = {"applicationId": "application ID", "role": "role", "file": "extension"}[field]
                         with self.assertRaisesRegex(ValueError, f"^artifact {message} does not match {stage}{binary}$"):
                             validate()
 
@@ -69,7 +115,7 @@ class ReleaseMetadataTest(unittest.TestCase):
             for missing in ("playR8Mapping", "applianceR8Mapping", "oldSchema"):
                 with self.subTest(stage=stage, missing=missing):
                     manifest = self.unsigned_manifest()
-                    self.assertEqual(manifest["schemaVersion"], 5)
+                    self.assertEqual(manifest["schemaVersion"], 6)
                     manifest["stage"] = stage
                     manifest["artifacts"] = self._artifacts(stage)
                     manifest["signing"] = {"keyAlias": release_metadata.CANONICAL_KEY_ALIAS, "certificateSha256": release_metadata.CANONICAL_CERTIFICATE_SHA256}
@@ -199,28 +245,54 @@ class ReleaseMetadataTest(unittest.TestCase):
                 self.assertEqual(release_metadata.bundletool_command(), ["java", "-jar", str(standalone)])
 
     def test_apk_entry_point_split_for_each_flavor(self):
-        for flavor in ("play", "appliance"):
+        for flavor in ("player", "companion"):
             for home, service in ((False, False), (True, False), (False, True), (True, True)):
-                with self.subTest(flavor=flavor, home=home, service=service):
-                    tree = "  E: manifest\n    E: application\n"
+                with self.subTest(flavor=flavor, home=home, service=service), tempfile.TemporaryDirectory() as directory:
+                    apk = Path(directory) / "fixture.apk"
+                    with zipfile.ZipFile(apk, "w"):
+                        pass
+                    tree = "  E: manifest\n"
+                    if flavor == "companion":
+                        for permission in ("REQUEST_INSTALL_PACKAGES", "UPDATE_PACKAGES_WITHOUT_USER_ACTION"):
+                            tree += f'    E: uses-permission\n      A: android:name(0x01010003)="android.permission.{permission}"\n'
+                    tree += '    E: application\n'
                     if home:
                         tree += '      E: activity\n        E: intent-filter\n          E: category\n            A: android:name(0x01010003)="android.intent.category.HOME"\n'
                     if service:
-                        tree += '      E: service\n        A: android:name(0x01010003)=".accessibility.ApplianceEntryAccessibilityService"\n'
+                        tree += '      E: service\n        A: android:name(0x01010003)="at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService"\n'
                     with patch.object(release_metadata.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, stdout=tree)):
-                        if (home, service) == ((True, True) if flavor == "appliance" else (False, False)):
-                            release_metadata.validate_apk_entry_points(Path("fixture.apk"), flavor, Path("aapt"))
+                        if (home, service) == ((True, True) if flavor == "companion" else (False, False)):
+                            release_metadata.validate_apk_entry_points(apk, flavor, Path("aapt"))
                         else:
                             with self.assertRaisesRegex(ValueError, f"{flavor} entry-point split is invalid"):
-                                release_metadata.validate_apk_entry_points(Path("fixture.apk"), flavor, Path("aapt"))
+                                release_metadata.validate_apk_entry_points(apk, flavor, Path("aapt"))
+
+    def test_companion_native_libraries_require_provenance_decision_except_androidx_path(self):
+        tree = "  E: manifest\n    E: application\n"
+        for extra in (None, "lib/arm64-v8a/libffmpegJNI.so", "lib/x86/libunexpected.so", "lib/unknown/libandroidx.graphics.path.so"):
+            with self.subTest(extra=extra), tempfile.TemporaryDirectory() as directory:
+                apk = Path(directory) / "companion.apk"
+                with zipfile.ZipFile(apk, "w") as archive:
+                    for abi in ("arm64-v8a", "armeabi-v7a", "x86", "x86_64"):
+                        archive.writestr(f"lib/{abi}/libandroidx.graphics.path.so", b"fixture")
+                    if extra:
+                        archive.writestr(extra, b"unexpected")
+                with patch.object(release_metadata.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, stdout=tree)), patch.object(release_metadata, "validate_entry_points") as entry_points:
+                    if extra:
+                        with self.assertRaisesRegex(ValueError, "new native library in the companion needs a provenance decision"):
+                            release_metadata.validate_apk_entry_points(apk, "companion", Path("aapt"))
+                        entry_points.assert_not_called()
+                    else:
+                        release_metadata.validate_apk_entry_points(apk, "companion", Path("aapt"))
+                        entry_points.assert_called_once()
 
     def test_apk_manifest_tool_failure_is_not_an_absent_entry_point(self):
         with patch.object(release_metadata.subprocess, "run", side_effect=subprocess.CalledProcessError(1, ["aapt"])):
             with self.assertRaises(subprocess.CalledProcessError):
-                release_metadata.validate_apk_entry_points(Path("fixture.apk"), "play", Path("aapt"))
+                release_metadata.validate_apk_entry_points(Path("fixture.apk"), "player", Path("aapt"))
         with patch.object(release_metadata.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, stdout="")):
             with self.assertRaisesRegex(ValueError, "invalid APK manifest tree"):
-                release_metadata.validate_apk_entry_points(Path("fixture.apk"), "play", Path("aapt"))
+                release_metadata.validate_apk_entry_points(Path("fixture.apk"), "player", Path("aapt"))
 
     def test_canonical_signing_identity_is_pinned(self) -> None:
         self.assertEqual(release_metadata.CANONICAL_KEY_ALIAS, "tvhplayer-release")
@@ -239,6 +311,7 @@ class ReleaseMetadataTest(unittest.TestCase):
 
     def test_unsigned_manifest_rejects_identity_mismatch(self) -> None:
         manifest = release_metadata.build_unsigned_manifest(
+            companion=COMPANION,
             application_id="at.bernhardberger.tvhplayer",
             version_code=1,
             version_name="0.1.0",
@@ -262,6 +335,7 @@ class ReleaseMetadataTest(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "safe file name"):
             release_metadata.build_unsigned_manifest(
+                companion=COMPANION,
                 application_id="at.bernhardberger.tvhplayer",
                 version_code=1,
                 version_name="0.1.0",
@@ -286,6 +360,7 @@ class ReleaseMetadataTest(unittest.TestCase):
             signed_apk = Path(directory) / "signed.apk"
             signed_apk.write_bytes(b"signed")
             unsigned = release_metadata.build_unsigned_manifest(
+                companion=COMPANION,
                 application_id="at.bernhardberger.tvhplayer",
                 version_code=1,
                 version_name="0.1.0",
@@ -316,6 +391,7 @@ class ReleaseMetadataTest(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "sdkSourceTarGz"):
             release_metadata.build_unsigned_manifest(
+                companion=COMPANION,
                 application_id="at.bernhardberger.tvhplayer",
                 version_code=1,
                 version_name="0.1.0",
@@ -327,6 +403,7 @@ class ReleaseMetadataTest(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "SDK source commit"):
             release_metadata.build_unsigned_manifest(
+                companion=COMPANION,
                 application_id="at.bernhardberger.tvhplayer",
                 version_code=1,
                 version_name="0.1.0",
@@ -343,6 +420,7 @@ class ReleaseMetadataTest(unittest.TestCase):
                 files[name] = Path(directory) / name
                 files[name].write_bytes(name.encode())
             unsigned = release_metadata.build_unsigned_manifest(
+                companion=COMPANION,
                 application_id="at.bernhardberger.tvhplayer",
                 version_code=1,
                 version_name="0.1.0",
@@ -419,7 +497,7 @@ class ReleaseMetadataTest(unittest.TestCase):
         self.assertEqual(prepare.count("assert-unsigned-apk"), 2)
         self.assertEqual(sign.count("assert-unsigned-apk"), 1)
         self.assertIn("validate-apk-entry-points", prepare)
-        self.assertEqual(sign.count("validate-apk-entry-points"), 2)
+        self.assertEqual(sign.count("validate-apk-entry-points"), 3)
         self.assertNotIn('if "$apksigner" verify', prepare + sign)
         self.assertIn("--ks-pass", sign)
         self.assertIn("file:", sign)
@@ -482,6 +560,7 @@ class ReleaseMetadataTest(unittest.TestCase):
             if "sdkVersion" in change and change["sdkVersion"] is not None:
                 with self.subTest(change=change, stage="create"), self.assertRaisesRegex(ValueError, error):
                     release_metadata.build_unsigned_manifest(
+                        companion=COMPANION,
                         application_id="at.bernhardberger.tvhplayer", version_code=1, version_name="0.1.0",
                         source_commit="a" * 40, sdk_version=change["sdkVersion"], sdk_source_commit=SDK_SOURCE_COMMIT,
                         artifacts=self._artifacts("unsigned"),
@@ -518,9 +597,9 @@ class ReleaseMetadataTest(unittest.TestCase):
     @staticmethod
     def _artifacts(stage: str) -> dict[str, dict[str, str]]:
         return {
-            f"{stage}PlayApk": {"file": f"{stage}-play.apk", "sha256": "1" * 64, "flavor": "play", "applicationId": "at.bernhardberger.tvhplayer"},
-            f"{stage}ApplianceApk": {"file": f"{stage}-appliance.apk", "sha256": "6" * 64, "flavor": "appliance", "applicationId": "at.bernhardberger.tvhplayer.appliance"},
-            f"{stage}PlayAab": {"file": f"{stage}-play.aab", "sha256": "7" * 64, "flavor": "play", "applicationId": "at.bernhardberger.tvhplayer"},
+            f"{stage}PlayApk": {"file": f"{stage}-play.apk", "sha256": "1" * 64, "role": "player", "applicationId": "at.bernhardberger.tvhplayer"},
+            f"{stage}ApplianceApk": {"file": f"{stage}-appliance.apk", "sha256": "6" * 64, "role": "companion", "applicationId": "at.bernhardberger.tvhplayer.appliance"},
+            f"{stage}PlayAab": {"file": f"{stage}-play.aab", "sha256": "7" * 64, "role": "player", "applicationId": "at.bernhardberger.tvhplayer"},
             "playR8Mapping": {"file": "play-mapping.txt", "sha256": "8" * 64},
             "applianceR8Mapping": {"file": "appliance-mapping.txt", "sha256": "9" * 64},
             "sourceTarGz": {"file": "source.tar.gz", "sha256": "2" * 64},

@@ -22,11 +22,12 @@ CANONICAL_CERTIFICATE_SHA256 = (
     "1E:18:48:62:F5:BB:A2:D1:C8:40:6D:6A:7A:79:65:7F:"
     "F3:A7:3D:25:8C:1E:1B:75:FA:25:02:58:75:E5:AB:C9"
 )
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 BUNDLETOOL_VERSION = "1.18.3"
+COMPANION_NATIVE_LIBRARY = "libandroidx.graphics.path.so"
 APPLICATION_IDS = {
-    "play": "at.bernhardberger.tvhplayer",
-    "appliance": "at.bernhardberger.tvhplayer.appliance",
+    "player": "at.bernhardberger.tvhplayer",
+    "companion": "at.bernhardberger.tvhplayer.appliance",
 }
 _SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 _COMMIT_PATTERN = re.compile(r"[0-9a-f]{40}")
@@ -127,11 +128,11 @@ def _validate_artifacts(artifacts: dict[str, dict[str, str]], required: set[str]
             raise ValueError("manifest contains duplicate artifact file names")
         file_names.add(file_name)
         if name.endswith(("Apk", "Aab")):
-            flavor = "appliance" if "Appliance" in name else "play"
-            if artifact.get("applicationId") != APPLICATION_IDS[flavor]:
+            role = "companion" if "Appliance" in name else "player"
+            if artifact.get("applicationId") != APPLICATION_IDS[role]:
                 raise ValueError(f"artifact application ID does not match {name}")
-            if artifact.get("flavor") != flavor:
-                raise ValueError(f"artifact flavor does not match {name}")
+            if artifact.get("role") != role:
+                raise ValueError(f"artifact role does not match {name}")
             if not file_name.endswith(".aab" if name.endswith("Aab") else ".apk"):
                 raise ValueError(f"artifact extension does not match {name}")
         digest_value = artifact.get("sha256", "")
@@ -149,12 +150,13 @@ def _build_manifest(
     application_id: str,
     version_code: int,
     version_name: str,
+    companion: dict[str, Any],
     source_commit: str,
     sdk_version: str,
     sdk_source_commit: str,
     artifacts: dict[str, dict[str, str]],
 ) -> dict[str, Any]:
-    if application_id != APPLICATION_IDS["play"]:
+    if application_id != APPLICATION_IDS["player"]:
         raise ValueError("release application ID must be the Play application ID")
     if version_code < 1:
         raise ValueError("versionCode must be positive")
@@ -164,12 +166,14 @@ def _build_manifest(
         raise ValueError("source commit must be a full 40-digit Git object ID")
     if not _COMMIT_PATTERN.fullmatch(sdk_source_commit.lower()):
         raise ValueError("SDK source commit must be a full 40-digit Git object ID")
+    validate_companion_identity(companion)
     manifest = {
         "schemaVersion": SCHEMA_VERSION,
         "stage": stage,
         "applicationId": application_id,
         "versionCode": version_code,
         "versionName": version_name,
+        "companion": companion,
         "sourceCommit": source_commit.lower(),
         "sdkVersion": sdk_version,
         "sdkSourceCommit": sdk_source_commit.lower(),
@@ -184,6 +188,7 @@ def build_unsigned_manifest(
     application_id: str,
     version_code: int,
     version_name: str,
+    companion: dict[str, Any],
     source_commit: str,
     sdk_version: str,
     sdk_source_commit: str,
@@ -205,6 +210,7 @@ def build_unsigned_manifest(
     )
     return _build_manifest(
         stage="unsigned",
+        companion=companion,
         application_id=application_id,
         version_code=version_code,
         version_name=version_name,
@@ -224,7 +230,8 @@ def validate_unsigned_manifest(
 ) -> None:
     if manifest.get("schemaVersion") != SCHEMA_VERSION or manifest.get("stage") != "unsigned":
         raise ValueError("not a supported unsigned release manifest")
-    if manifest.get("applicationId") != APPLICATION_IDS["play"]:
+    validate_companion_identity(manifest.get("companion"))
+    if manifest.get("applicationId") != APPLICATION_IDS["player"]:
         raise ValueError("manifest application ID is invalid")
     if not isinstance(manifest.get("versionCode"), int) or manifest["versionCode"] < 1:
         raise ValueError("manifest versionCode is invalid")
@@ -262,7 +269,8 @@ def validate_unsigned_manifest(
 def validate_signed_manifest(manifest: dict[str, Any]) -> None:
     if manifest.get("schemaVersion") != SCHEMA_VERSION or manifest.get("stage") != "signed":
         raise ValueError("not a supported signed release manifest")
-    if manifest.get("applicationId") != APPLICATION_IDS["play"]:
+    validate_companion_identity(manifest.get("companion"))
+    if manifest.get("applicationId") != APPLICATION_IDS["player"]:
         raise ValueError("signed manifest application ID is invalid")
     if not isinstance(manifest.get("versionCode"), int) or manifest["versionCode"] < 1:
         raise ValueError("signed manifest versionCode is invalid")
@@ -320,9 +328,9 @@ def build_signed_manifest(
     if certificate != CANONICAL_CERTIFICATE_SHA256:
         raise ValueError("signing certificate does not match the canonical fingerprint")
     artifacts = {
-        "signedPlayApk": _binary_artifact(signed_play_apk, "play"),
-        "signedApplianceApk": _binary_artifact(signed_appliance_apk, "appliance"),
-        "signedPlayAab": _binary_artifact(signed_play_aab, "play"),
+        "signedPlayApk": _binary_artifact(signed_play_apk, "player"),
+        "signedApplianceApk": _binary_artifact(signed_appliance_apk, "companion"),
+        "signedPlayAab": _binary_artifact(signed_play_aab, "player"),
         "playR8Mapping": _artifact(play_r8_mapping),
         "applianceR8Mapping": _artifact(appliance_r8_mapping),
         "sourceTarGz": _artifact(source_tar_gz),
@@ -349,6 +357,7 @@ def build_signed_manifest(
             raise ValueError(f"signed bundle changed mapping artifact: {name}")
     manifest = _build_manifest(
         stage="signed",
+        companion=unsigned_manifest["companion"],
         application_id=unsigned_manifest["applicationId"],
         version_code=unsigned_manifest["versionCode"],
         version_name=unsigned_manifest["versionName"],
@@ -368,7 +377,7 @@ def validate_source_lineage(
     unsigned_manifest: dict[str, Any],
     signed_manifest: dict[str, Any],
 ) -> None:
-    for field in ("sourceCommit", "sdkVersion", "sdkSourceCommit"):
+    for field in ("sourceCommit", "sdkVersion", "sdkSourceCommit", "companion"):
         if unsigned_manifest.get(field) != signed_manifest.get(field):
             raise ValueError(f"signed and unsigned manifests have different {field}")
     for name in (
@@ -391,8 +400,8 @@ def _artifact(path: Path) -> dict[str, str]:
     return {"file": path.name, "sha256": sha256_file(path)}
 
 
-def _binary_artifact(path: Path, flavor: str) -> dict[str, str]:
-    return {**_artifact(path), "flavor": flavor, "applicationId": APPLICATION_IDS[flavor]}
+def _binary_artifact(path: Path, role: str) -> dict[str, str]:
+    return {**_artifact(path), "role": role, "applicationId": APPLICATION_IDS[role]}
 
 
 def _write_manifest(path: Path, manifest: dict[str, Any]) -> None:
@@ -485,22 +494,89 @@ def assert_unsigned_apk(apk: Path) -> None:
         raise ValueError("APK contains an APK Signing Block")
 
 
-def validate_entry_points(manifest: ET.Element, flavor: str) -> None:
+def validate_companion_identity(identity: Any) -> None:
+    if (not isinstance(identity, dict)
+            or identity.get("applicationId") != APPLICATION_IDS["companion"]
+            or type(identity.get("versionCode")) is not int or identity["versionCode"] < 1
+            or not isinstance(identity.get("versionName"), str) or not identity["versionName"]):
+        raise ValueError("companion identity is invalid")
+
+
+def apk_identity(apk: Path, aapt: Path) -> dict[str, Any]:
+    badging = subprocess.run([str(aapt), "dump", "badging", str(apk)],
+                             check=True, capture_output=True, text=True).stdout
+    match = re.search(r"package: name='([^']+)' versionCode='([0-9]+)' versionName='([^']+)'", badging)
+    if match is None:
+        raise ValueError("unable to read APK identity")
+    return dict(applicationId=match[1], versionCode=int(match[2]), versionName=match[3])
+
+
+def validate_companion_apk(apk: Path, aapt: Path, manifest: dict[str, Any]) -> None:
+    validate_companion_identity(manifest.get("companion"))
+    if apk_identity(apk, aapt) != manifest["companion"]:
+        raise ValueError("companion APK identity does not match release manifest")
+
+
+def check_companion_version(repository: Path) -> None:
+    def git(*arguments: str) -> str:
+        return subprocess.run(["git", "-C", str(repository), *arguments], check=True,
+                              capture_output=True, text=True).stdout.strip()
+
+    tags = git("tag", "--merged", "HEAD", "--sort=-version:refname", "--list", "v*").splitlines()
+    tags = [tag for tag in tags if re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+", tag)]
+    if not tags:
+        return
+    previous = tags[0]
+    path = "appliance/build.gradle.kts"
+    if not git("ls-tree", previous, "--", path):
+        return
+    if not git("diff", "--name-only", previous, "--", "appliance/", "brand/"):
+        return
+    old = git("show", f"{previous}:{path}")
+    current = (repository / path).read_text(encoding="utf-8")
+    def code(source: str) -> int:
+        match = re.search(r"^\s*versionCode\s*=\s*([0-9]+)\s*$", source, re.MULTILINE)
+        if match is None:
+            raise ValueError("unable to read companion versionCode")
+        return int(match[1])
+    if code(current) <= code(old):
+        raise ValueError(f"appliance/ or brand/ changed since {previous}; increase companion versionCode in {path}")
+
+
+def validate_entry_points(manifest: ET.Element, role: str) -> None:
+    if role not in APPLICATION_IDS:
+        raise ValueError("unknown APK role")
     name = "{http://schemas.android.com/apk/res/android}name"
     home = any(category.get(name) == "android.intent.category.HOME"
                for tag in ("activity", "activity-alias")
                for category in manifest.findall(f"./application/{tag}/intent-filter/category"))
-    service = any(node.get(name, "").split(".")[-1] == "ApplianceEntryAccessibilityService"
-                  for node in manifest.findall("./application/service"))
-    expected = flavor == "appliance"
+    services = manifest.findall("./application/service")
+    service = any((manifest.get("package", "") + node.get(name, "") if node.get(name, "").startswith(".") else node.get(name, ""))
+                  == "at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService"
+                  for node in services)
+    accessibility = service or any(node.get(name) == "android.accessibilityservice.AccessibilityService"
+                                   for node in manifest.findall("./application/service/intent-filter/action"))
+    expected = role == "companion"
     if home != expected or service != expected:
-        raise ValueError(f"{flavor} entry-point split is invalid: HOME and ApplianceEntryAccessibilityService must both be {'present' if expected else 'absent'}")
+        raise ValueError(f"{role} entry-point split is invalid: HOME and ApplianceEntryAccessibilityService must both be {'present' if expected else 'absent'}")
+    if not expected and accessibility:
+        raise ValueError("player must not declare an accessibility service")
+    permissions = {node.get(name) for tag in ("uses-permission", "uses-permission-sdk-23")
+                   for node in manifest.findall(tag)}
+    for permission in ("android.permission.REQUEST_INSTALL_PACKAGES", "android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION"):
+        if (permission in permissions) != expected:
+            raise ValueError(f"{role} install permission contract is invalid: {permission}")
 
 
-def validate_apk_entry_points(apk: Path, flavor: str, aapt: Path) -> None:
+def validate_apk_entry_points(apk: Path, role: str, aapt: Path) -> None:
+    if role == "companion":
+        with zipfile.ZipFile(apk) as archive:
+            allowed = {f"lib/{abi}/{COMPANION_NATIVE_LIBRARY}" for abi in ("arm64-v8a", "armeabi-v7a", "x86", "x86_64")}
+            if any(name.startswith("lib/") and name not in allowed for name in archive.namelist()):
+                raise ValueError("a new native library in the companion needs a provenance decision")
     tree = subprocess.run([str(aapt), "dump", "xmltree", str(apk), "AndroidManifest.xml"],
                           check=True, capture_output=True, text=True).stdout
-    # aapt's indentation encodes the binary XML hierarchy. Only android:name is needed.
+    # aapt's indentation encodes the binary XML hierarchy.
     stack: list[tuple[int, ET.Element]] = []
     root = None
     for line in tree.splitlines():
@@ -520,9 +596,12 @@ def validate_apk_entry_points(apk: Path, flavor: str, aapt: Path) -> None:
         attribute = re.match(r'\s*A: android:name\([^)]*\)="([^"]+)"', line)
         if attribute and stack:
             stack[-1][1].set("{http://schemas.android.com/apk/res/android}name", attribute[1])
+        package = re.match(r'\s*A: package="([^"]+)"', line)
+        if package and stack:
+            stack[-1][1].set("package", package[1])
     if root is None or root.tag != "manifest" or root.find("application") is None:
         raise ValueError("invalid APK manifest tree")
-    validate_entry_points(root, flavor)
+    validate_entry_points(root, role)
 
 
 def validate_aab(aab: Path, play_apk: Path, version_code: int, version_name: str, *, unsigned: bool = False) -> None:
@@ -550,9 +629,9 @@ def validate_aab(aab: Path, play_apk: Path, version_code: int, version_name: str
         raise ValueError("AAB must request uncompressed, 16 KB aligned native libraries in generated APKs")
     xml = subprocess.run(command + ["dump", "manifest", f"--bundle={aab}", "--module=base"], check=True, capture_output=True, text=True).stdout
     manifest = ET.fromstring(xml)
-    validate_entry_points(manifest, "play")
+    validate_entry_points(manifest, "player")
     android = "{http://schemas.android.com/apk/res/android}"
-    if (manifest.get("package"), manifest.get(android + "versionCode"), manifest.get(android + "versionName")) != (APPLICATION_IDS["play"], str(version_code), version_name):
+    if (manifest.get("package"), manifest.get(android + "versionCode"), manifest.get(android + "versionName")) != (APPLICATION_IDS["player"], str(version_code), version_name):
         raise ValueError("AAB identity does not match the Play release")
 
 
@@ -584,9 +663,9 @@ def verify_aab_signature(aab: Path) -> str:
 
 def _create_unsigned(args: argparse.Namespace) -> None:
     artifacts = {
-        "unsignedPlayApk": _binary_artifact(args.unsigned_play_apk, "play"),
-        "unsignedApplianceApk": _binary_artifact(args.unsigned_appliance_apk, "appliance"),
-        "unsignedPlayAab": _binary_artifact(args.unsigned_play_aab, "play"),
+        "unsignedPlayApk": _binary_artifact(args.unsigned_play_apk, "player"),
+        "unsignedApplianceApk": _binary_artifact(args.unsigned_appliance_apk, "companion"),
+        "unsignedPlayAab": _binary_artifact(args.unsigned_play_aab, "player"),
         "playR8Mapping": _artifact(args.play_r8_mapping),
         "applianceR8Mapping": _artifact(args.appliance_r8_mapping),
         "sourceTarGz": _artifact(args.source_tar_gz),
@@ -600,6 +679,7 @@ def _create_unsigned(args: argparse.Namespace) -> None:
             application_id=args.application_id,
             version_code=args.version_code,
             version_name=args.version_name,
+            companion=apk_identity(args.unsigned_appliance_apk, args.aapt),
             source_commit=args.source_commit,
             sdk_version=args.sdk_version,
             sdk_source_commit=args.sdk_source_commit,
@@ -672,6 +752,7 @@ def _parser() -> argparse.ArgumentParser:
         command.add_argument("--version-name", required=True)
 
     create_unsigned = subparsers.add_parser("create-unsigned")
+    create_unsigned.add_argument("--aapt", required=True, type=Path)
     add_identity_arguments(create_unsigned)
     create_unsigned.add_argument("--source-commit", required=True)
     create_unsigned.add_argument("--sdk-version", required=True)
@@ -740,9 +821,21 @@ def _parser() -> argparse.ArgumentParser:
     unsigned_apk.set_defaults(handler=lambda args: assert_unsigned_apk(args.apk))
     entry_points = subparsers.add_parser("validate-apk-entry-points")
     entry_points.add_argument("apk", type=Path)
-    entry_points.add_argument("--flavor", choices=APPLICATION_IDS, required=True)
+    entry_points.add_argument("--role", choices=APPLICATION_IDS, required=True)
     entry_points.add_argument("--aapt", type=Path, required=True)
-    entry_points.set_defaults(handler=lambda args: validate_apk_entry_points(args.apk, args.flavor, args.aapt))
+    entry_points.set_defaults(handler=lambda args: validate_apk_entry_points(args.apk, args.role, args.aapt))
+    identity = subparsers.add_parser("apk-identity")
+    identity.add_argument("apk", type=Path)
+    identity.add_argument("--aapt", required=True, type=Path)
+    identity.set_defaults(handler=lambda args: print(json.dumps(apk_identity(args.apk, args.aapt))))
+    companion = subparsers.add_parser("validate-companion-apk")
+    companion.add_argument("apk", type=Path)
+    companion.add_argument("--aapt", required=True, type=Path)
+    companion.add_argument("--manifest", required=True, type=Path)
+    companion.set_defaults(handler=lambda args: validate_companion_apk(args.apk, args.aapt, _load_manifest(args.manifest)))
+    version = subparsers.add_parser("check-companion-version")
+    version.add_argument("repository", type=Path)
+    version.set_defaults(handler=lambda args: check_companion_version(args.repository))
     return parser
 
 

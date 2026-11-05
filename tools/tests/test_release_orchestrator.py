@@ -31,9 +31,9 @@ class ReleaseOrchestratorTest(unittest.TestCase):
                 for flavor, kind in (("play", "Apk"), ("appliance", "Apk"), ("play", "Aab")):
                     name = f"{flavor}.{kind.lower()}"
                     (bundle / name).write_bytes(b"signed fixture")
-                    artifacts[f"unsigned{flavor.title()}{kind}"] = {**metadata._binary_artifact(bundle / name, flavor), "file": "unsigned-" + name}
+                    artifacts[f"unsigned{flavor.title()}{kind}"] = {**metadata._binary_artifact(bundle / name, "companion" if flavor == "appliance" else "player"), "file": "unsigned-" + name}
                 sdk_version, sdk_source_commit = metadata.released_sdk_pin()
-                unsigned = metadata.build_unsigned_manifest(application_id=RELEASE["APPLICATION_ID"], version_code=1, version_name="0.1.0", source_commit="a" * 40, sdk_version=sdk_version, sdk_source_commit=sdk_source_commit, artifacts=artifacts)
+                unsigned = metadata.build_unsigned_manifest(companion={"applicationId": "at.bernhardberger.tvhplayer.appliance", "versionCode": 2, "versionName": "0.2.0"}, application_id=RELEASE["APPLICATION_ID"], version_code=1, version_name="0.1.0", source_commit="a" * 40, sdk_version=sdk_version, sdk_source_commit=sdk_source_commit, artifacts=artifacts)
                 signed = metadata.build_signed_manifest(
                     unsigned_manifest=unsigned, signed_play_apk=bundle / "play.apk", signed_appliance_apk=bundle / "appliance.apk", signed_play_aab=bundle / "play.aab",
                     play_r8_mapping=bundle / "play-mapping.txt", appliance_r8_mapping=bundle / "appliance-mapping.txt",
@@ -53,7 +53,8 @@ class ReleaseOrchestratorTest(unittest.TestCase):
                         application = RELEASE["APPLICATION_ID"]
                         if Path(command[-1]).name == "appliance.apk" and not wrong_appliance_id:
                             application += ".appliance"
-                        output = f"package: name='{application}' versionCode='1' versionName='0.1.0'"
+                        code, version = (2, "0.2.0") if Path(command[-1]).name == "appliance.apk" else (1, "0.1.0")
+                        output = f"package: name='{application}' versionCode='{code}' versionName='{version}'"
                     else:
                         output = ""
                     return subprocess.CompletedProcess(command, 0, stdout=output)
@@ -67,7 +68,7 @@ class ReleaseOrchestratorTest(unittest.TestCase):
                         self.assertEqual(RELEASE["verify_signed_bundle"](bundle), signed)
                         aab_signature.assert_called_once_with(bundle / "play.aab")
                         aab_content.assert_called_once_with(bundle / "play.aab", bundle / "play.apk", 1, "0.1.0")
-                        self.assertEqual([call.args for call in entry_points.call_args_list], [(bundle / "play.apk", "play", Path("aapt")), (bundle / "appliance.apk", "appliance", Path("aapt"))])
+                        self.assertEqual([call.args for call in entry_points.call_args_list], [(bundle / "play.apk", "player", Path("aapt")), (bundle / "appliance.apk", "companion", Path("aapt"))])
 
     def test_signed_verification_refuses_a_development_sdk_before_any_tool(self) -> None:
         metadata = RELEASE["release_metadata"]
@@ -78,6 +79,7 @@ class ReleaseOrchestratorTest(unittest.TestCase):
             metadata._write_manifest(bundle / "release-manifest.json", {
                 "schemaVersion": metadata.SCHEMA_VERSION, "stage": "signed", "applicationId": RELEASE["APPLICATION_ID"],
                 "versionCode": 1, "versionName": "0.1.0", "sourceCommit": "a" * 40,
+                "companion": {"applicationId": "at.bernhardberger.tvhplayer.appliance", "versionCode": 2, "versionName": "0.2.0"},
                 "sdkVersion": "0.36.0-20261024.143000-1", "sdkSourceCommit": metadata.released_sdk_pin()[1], "artifacts": {},
             })
             with patch.dict(RELEASE["verify_signed_bundle"].__globals__, {"_find_android_tools": lambda: self.fail("reached Android tools")}):

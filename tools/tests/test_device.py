@@ -124,46 +124,11 @@ class OperatorShortcutsTest(unittest.TestCase):
             "run": Mock(side_effect=AssertionError("unexpected device operation")),
         }
 
-    def test_play_release_refuses_installed_appliance_entry_points(self):
-        service = "at.bernhardberger.tvhplayer/.accessibility.ApplianceEntryAccessibilityService\n"
-        home = "at.bernhardberger.tvhplayer/at.bernhardberger.tvhplayer.ui.MainActivity\n"
-        for service_output, home_output in (
-            (service, ""),
-            (service.replace("/.accessibility", "/at.bernhardberger.tvhplayer.accessibility"), ""),
-            ("", home),
-        ):
-            with self.subTest(service=bool(service_output), home=bool(home_output)):
-                fakes = self.main_fakes(role="production")
-                fakes["resolve_verified_release_apk"] = Mock(return_value=Path("play.apk"))
-                fakes["run"] = Mock(side_effect=[
-                    subprocess.CompletedProcess([], 0, stdout=output, stderr="")
-                    for output in (service_output, home_output)
-                ])
-                error = io.StringIO()
-                with (
-                    patch.dict(DEVICE_GLOBALS, fakes),
-                    patch.object(DEVICE_GLOBALS["shutil"], "which", return_value="adb"),
-                    patch("sys.argv", ["device", "--package", DEVICE["RELEASE_PACKAGE"],
-                                       "install-release", "--bundle", "bundle", "--confirm-release-install"]),
-                    redirect_stderr(error),
-                    self.assertRaises(SystemExit),
-                ):
-                    DEVICE["main"]()
-                self.assertIn("Use the Appliance build", error.getvalue())
-                self.assertFalse(any("install" in args.args[0] for args in fakes["run"].call_args_list))
-
-    def test_play_release_proceeds_without_installed_appliance_entry_points(self):
+    def test_play_release_installs_without_obsolete_entry_point_queries(self):
         fakes = self.main_fakes(role="production")
         fakes["resolve_verified_release_apk"] = Mock(return_value=Path("play.apk"))
         fakes["show_package_info"] = Mock()
-        # A different package's entry points must never block a Play update.
-        fakes["run"] = Mock(side_effect=[
-            subprocess.CompletedProcess([], 0, stdout=output, stderr="")
-            for output in (
-                "at.bernhardberger.tvhplayer.appliance/at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService\n",
-                "other.launcher/.Home\n", "Success\n",
-            )
-        ])
+        fakes["run"] = Mock(return_value=subprocess.CompletedProcess([], 0, stdout="Success\n"))
         with (
             patch.dict(DEVICE_GLOBALS, fakes),
             patch.object(DEVICE_GLOBALS["shutil"], "which", return_value="adb"),
@@ -173,38 +138,33 @@ class OperatorShortcutsTest(unittest.TestCase):
         fakes["resolve_verified_release_apk"].assert_called_once_with(Path("bundle"), DEVICE["RELEASE_PACKAGE"])
         commands = [args.args[0] for args in fakes["run"].call_args_list]
         self.assertEqual(commands, [
-            ["adb", "-s", "private-device", "shell", "cmd", "package", "query-services",
-             "--brief", "--query-flags", "512", "-a", "android.accessibilityservice.AccessibilityService",
-             "-p", DEVICE["RELEASE_PACKAGE"]],
-            ["adb", "-s", "private-device", "shell", "cmd", "package", "query-activities",
-             "--brief", "--query-flags", "512", "-a", "android.intent.action.MAIN",
-             "-c", "android.intent.category.HOME", "-p", DEVICE["RELEASE_PACKAGE"]],
             ["adb", "-s", "private-device", "install", "-r", "play.apk"],
         ])
 
-    def test_play_release_entry_point_check_fails_closed_on_query_failure(self):
-        for result in (
-            subprocess.CompletedProcess([], 1, stdout="", stderr="query failed"),
-            subprocess.CompletedProcess([], 0, stdout="Error: unavailable", stderr=""),
-            subprocess.CompletedProcess([], 0, stdout="Unknown command: query-services", stderr=""),
-        ):
-            with self.subTest(result=result), patch.dict(DEVICE_GLOBALS, {"run": Mock(return_value=result)}):
-                with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
-                    DEVICE["require_play_replacement_safe"]("adb", "private-device")
-
-    def test_play_release_entry_point_check_accepts_no_matches(self):
-        runner = Mock(side_effect=[
-            subprocess.CompletedProcess([], 0, stdout=output, stderr="")
-            for output in ("No services found\n", "No activities found\n")
-        ])
-        with patch.dict(DEVICE_GLOBALS, {"run": runner}):
-            DEVICE["require_play_replacement_safe"]("adb", "private-device")
-        self.assertEqual(runner.call_count, 2)
+    def test_debug_install_uses_selected_modules_output_and_preserves_explicit_apk(self):
+        for package in (DEVICE["DEFAULT_PACKAGE"], DEVICE["APPLIANCE_DEBUG_PACKAGE"]):
+            for explicit in (False, True):
+                with self.subTest(package=package, explicit=explicit):
+                    fakes = self.main_fakes()
+                    fakes["run"] = Mock(return_value=CLEAR_SUCCESS)
+                    expected = Path("explicit.apk").resolve() if explicit else DEVICE["DEFAULT_APK" if package == DEVICE["DEFAULT_PACKAGE"] else "DEFAULT_COMPANION_APK"]
+                    arguments = ["device", "--package", package, "install-debug"]
+                    if explicit:
+                        arguments += ["--apk", "explicit.apk"]
+                    with (
+                        patch.dict(DEVICE_GLOBALS, fakes),
+                        patch.object(DEVICE_GLOBALS["shutil"], "which", return_value="adb"),
+                        patch.object(Path, "is_file", return_value=True),
+                        patch("sys.argv", arguments),
+                    ):
+                        self.assertEqual(DEVICE["main"](), 0)
+                    fakes["run"].assert_called_once_with(["adb", "-s", "private-device", "install", "-r", str(expected)])
 
     def test_appliance_status_uses_kotlin_namespace_for_both_package_identities(self):
-        for package in (DEVICE["DEFAULT_PACKAGE"], DEVICE["APPLIANCE_PACKAGE"]):
+        for package in (DEVICE["DEFAULT_PACKAGE"], DEVICE["RELEASE_PACKAGE"], DEVICE["APPLIANCE_PACKAGE"], DEVICE["APPLIANCE_DEBUG_PACKAGE"]):
             with self.subTest(package=package):
-                component = f"{package}/at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService"
+                companion = DEVICE["APPLIANCE_DEBUG_PACKAGE"] if package in (DEVICE["DEFAULT_PACKAGE"], DEVICE["APPLIANCE_DEBUG_PACKAGE"]) else DEVICE["APPLIANCE_PACKAGE"]
+                component = f"{companion}/at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService"
                 runner = Mock(side_effect=[
                     subprocess.CompletedProcess([], 0, stdout=output, stderr="")
                     for output in ("1\n", component, component, "APP_AUTO_START: allow\n")
@@ -2216,7 +2176,7 @@ class DevicePolicyTest(unittest.TestCase):
             bundle = Path(directory)
             artifacts = {
                 "signedPlayApk": {"file": "play.apk", "applicationId": DEVICE["RELEASE_PACKAGE"]},
-                "signedApplianceApk": {"file": "appliance.apk", "applicationId": DEVICE["APPLIANCE_PACKAGE"]},
+                "signedApplianceApk": {"file": "product-appliance.apk", "applicationId": DEVICE["APPLIANCE_PACKAGE"]},
                 "signedPlayAab": {"file": "play.aab", "applicationId": DEVICE["RELEASE_PACKAGE"]},
             }
             for artifact in artifacts.values():
@@ -2224,17 +2184,18 @@ class DevicePolicyTest(unittest.TestCase):
             manifest = bundle / "release-manifest.json"
             manifest.write_text(json.dumps({"artifacts": artifacts}))
             with patch.object(DEVICE["subprocess"], "run") as verify:
-                for package, name in ((DEVICE["RELEASE_PACKAGE"], "play.apk"), (DEVICE["APPLIANCE_PACKAGE"], "appliance.apk")):
+                for package, name in ((DEVICE["RELEASE_PACKAGE"], "play.apk"), (DEVICE["APPLIANCE_PACKAGE"], "product-appliance.apk")):
                     self.assertEqual(resolve_verified_release_apk(bundle, package), bundle / name)
                 self.assertEqual(verify.call_count, 2)
                 for package in ("unsupported.package", DEVICE["DEFAULT_PACKAGE"]):
                     with self.subTest(package=package), self.assertRaises(SystemExit):
                         resolve_verified_release_apk(bundle, package)
                 self.assertEqual(verify.call_count, 2)
-                artifacts["signedApplianceApk"]["file"] = "play.aab"
-                manifest.write_text(json.dumps({"artifacts": artifacts}))
-                with self.assertRaises(SystemExit):
-                    resolve_verified_release_apk(bundle, DEVICE["APPLIANCE_PACKAGE"])
+                for invalid in ("play.aab", "appliance.apk", "play.apk"):
+                    artifacts["signedApplianceApk"]["file"] = invalid
+                    manifest.write_text(json.dumps({"artifacts": artifacts}))
+                    with self.subTest(invalid=invalid), self.assertRaises(SystemExit):
+                        resolve_verified_release_apk(bundle, DEVICE["APPLIANCE_PACKAGE"])
 
     def test_release_apk_selection_stops_when_bundle_verification_fails(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
