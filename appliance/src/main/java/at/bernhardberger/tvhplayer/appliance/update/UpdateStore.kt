@@ -30,10 +30,21 @@ class UpdateStore(private val context: Context) {
     }
 
     fun recordCheck() {
+        val from = when (result) {
+            UpdateResult.CHECKING, UpdateResult.INSTALLING, UpdateResult.WAITING_STANDBY,
+            UpdateResult.PENDING_CONFIRMATION -> UpdateResult.NEVER
+            else -> result
+        }
         preferences.edit().putLong("last_check", System.currentTimeMillis())
+            .putString("check_from", from.name)
             .putString("latest_version", "").putString("installer_message", "")
             .putString("result", UpdateResult.CHECKING.name).commit()
     }
+
+    /** A wake is not an available update until the newer archive has passed every check. */
+    fun interruptedCheckResult(): UpdateResult = if (latestVersion.isNotEmpty()) UpdateResult.WAITING_STANDBY
+        else runCatching { UpdateResult.valueOf(preferences.getString("check_from", UpdateResult.NEVER.name)!!) }
+            .getOrDefault(UpdateResult.NEVER)
 
     fun setLatest(version: String) { preferences.edit().putString("latest_version", version).commit() }
 
@@ -63,7 +74,7 @@ class UpdateStore(private val context: Context) {
                 finishInstall(UpdateResult.SUCCESS)
             } else if (!CompanionUpdater.isChecking) {
                 when (result) {
-                    UpdateResult.CHECKING -> setResult(UpdateResult.NEVER)
+                    UpdateResult.CHECKING -> setResult(interruptedCheckResult())
                     UpdateResult.INSTALLING -> {
                         val liveSession = try {
                             context.packageManager.packageInstaller.mySessions.any { it.sessionId == sessionId && it.isSealed }

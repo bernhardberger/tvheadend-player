@@ -23,6 +23,33 @@ import org.robolectric.util.ReflectionHelpers
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
 class CompanionActivityTest {
+    @Test fun stoppingTheActivityCancelsAnActiveCapture() {
+        val controller = Robolectric.buildActivity(CompanionActivity::class.java).create().start().resume()
+        CompanionServiceState.setConnected(true)
+        assertTrue(CompanionServiceState.startCapture(CompanionFunction.GUIDE))
+        controller.pause().stop()
+        assertEquals(CaptureState.Cancelled, CompanionServiceState.captureState.value)
+        controller.destroy()
+        CompanionServiceState.setConnected(false)
+    }
+
+    @Test fun blockedDetectionUsesTheEnabledComponentEvenWhenTheGlobalAccessibilityFlagIsOff() {
+        val context = RuntimeEnvironment.getApplication()
+        val component = ComponentName(context, at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService::class.java)
+        android.provider.Settings.Secure.putString(context.contentResolver,
+            android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, component.flattenToShortString())
+        android.provider.Settings.Secure.putInt(context.contentResolver, android.provider.Settings.Secure.ACCESSIBILITY_ENABLED, 0)
+        CompanionServiceState.setConnected(false)
+        val controller = Robolectric.buildActivity(CompanionActivity::class.java).create().start().resume()
+        assertEquals(CompanionServiceStatus.BLOCKED,
+            ReflectionHelpers.callInstanceMethod<CompanionServiceStatus>(controller.get(), "getAccessibilityStatus"))
+        CompanionServiceState.setConnected(true)
+        controller.pause().resume()
+        assertEquals(CompanionServiceStatus.ON,
+            ReflectionHelpers.callInstanceMethod<CompanionServiceStatus>(controller.get(), "getAccessibilityStatus"))
+        controller.pause().stop().destroy()
+        CompanionServiceState.setConnected(false)
+    }
     private val playerActivity = ComponentName(BuildConfig.PLAYER_PACKAGE, "player.Launcher")
 
     @Test

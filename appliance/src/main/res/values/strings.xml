@@ -11,11 +11,12 @@
         <item quantity="one">%d thing to fix</item>
         <item quantity="other">%d things to fix</item>
     </plurals>
-    <string name="body_all_set">This TV opens Tvheadend Player at startup, on HOME and with TV/GUIDE.</string>
-    <string name="body_player_missing">HOME and TV/GUIDE have nothing to open. Install Tvheadend Player from Google Play.</string>
-    <string name="body_accessibility_off">Turn on the accessibility service so the player opens at startup and TV/GUIDE works.</string>
+    <string name="body_all_set">This TV opens Tvheadend Player using the functions set in this app.</string>
+    <string name="body_player_missing">The functions have nothing to open. Install Tvheadend Player from Google Play.</string>
+    <string name="body_accessibility_off">Turn on the accessibility service to use the functions set in this app.</string>
+    <string name="body_accessibility_blocked">The accessibility service is enabled, but has not connected. Check whether this TV allows the app to start automatically, then check again.</string>
     <string name="body_install_unknown_off">Allow installing unknown apps so this app can install its own updates.</string>
-    <string name="body_several_open">Fix the marked items so the player opens at startup and with TV/GUIDE, and updates install.</string>
+    <string name="body_several_open">Fix the marked items so the functions work and updates install.</string>
     <string name="update_available_pill">Update %1$s is available</string>
     <string name="body_updating">The TV keeps working while the update installs. This screen may close for a moment.</string>
     <string name="section_this_tv">This TV</string>
@@ -26,7 +27,9 @@
     <string name="status_ready">Ready</string>
     <string name="status_install">Install</string>
     <string name="accessibility_title">Accessibility service</string>
-    <string name="accessibility_on_hint">Startup, screen wake and the TV/GUIDE button</string>
+    <string name="accessibility_on_hint">Needed for every function</string>
+    <string name="accessibility_blocked_hint">Enabled but not connected · Opens Android accessibility settings</string>
+    <string name="status_blocked">Blocked</string>
     <string name="accessibility_off_hint">Off · Opens Android accessibility settings</string>
     <string name="status_on">On</string>
     <string name="status_turn_on">Turn on</string>
@@ -64,13 +67,13 @@
     <string name="update_not_newer">The release is not newer than the installed companion.</string>
     <string name="update_signature_mismatch">Signing certificate mismatch. The download was deleted.</string>
     <string name="update_install_permission">Allow this companion to install unknown apps in Android settings, then try again.</string>
-    <string name="update_waiting_standby">Update postponed. Keep this screen open for a manual update, or let the TV enter standby.</string>
+    <string name="update_waiting_standby">Update ready. It installs while the TV is in standby, or choose Update now.</string>
     <string name="update_installing">Installing the companion update…</string>
     <string name="update_pending_confirmation">Android needs confirmation. Choose Update now to continue.</string>
     <string name="update_installer_failure">Android could not install the update</string>
     <string name="update_storage_failure">The update could not be saved or read. Check available storage and try again.</string>
     <string name="update_success">Companion updated successfully.</string>
     <string name="appliance_accessibility_service_label">Tvheadend Player appliance entry</string>
-    <string name="appliance_accessibility_service_description">Opens Tvheadend Player at startup and wake, and maps only the TV/GUIDE button. It cannot read screen content.</string>
-    <string name="appliance_accessibility_disclosure">When the accessibility service is enabled, Tvheadend Player opens after TV startup and screen wake, and takes over only the TV/GUIDE button. It does not read screen content or monitor text. Every other remote button passes through unchanged.</string>
+    <string name="appliance_accessibility_service_description">Opens Tvheadend Player at startup and wake, and takes over only the remote buttons set in this app. It cannot read screen content.</string>
+    <string name="appliance_accessibility_disclosure">When the accessibility service is enabled, it can open Tvheadend Player after TV startup and screen wake, and it takes over only the remote buttons set under Functions. It does not read screen content or monitor text. Every other remote button passes through unchanged.</string>
 </resources>

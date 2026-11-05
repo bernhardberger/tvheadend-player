@@ -73,32 +73,16 @@ class ApplianceEntryPolicyTest {
 
     @Test
     fun androidGuideAndCapturedTclTvCodes_areApplianceEntryKeys() {
-        val androidGuideKeyCode = 172
-
-        assertTrue(
-            ApplianceEntryPolicy.isApplianceEntryKey(
-                keyCode = androidGuideKeyCode,
-                androidGuideKeyCode = androidGuideKeyCode,
-            )
-        )
-        assertTrue(
-            ApplianceEntryPolicy.isApplianceEntryKey(
-                keyCode = ApplianceEntryPolicy.TCL_TV_KEY_CODE,
-                androidGuideKeyCode = androidGuideKeyCode,
-            )
-        )
-        assertFalse(
-            ApplianceEntryPolicy.isApplianceEntryKey(
-                keyCode = 4,
-                androidGuideKeyCode = androidGuideKeyCode,
-            )
-        )
+        val functions = CompanionFunctions()
+        assertEquals(CompanionFunction.GUIDE, functions.owner(172))
+        assertEquals(CompanionFunction.GUIDE, functions.owner(ApplianceEntryPolicy.TCL_TV_KEY_CODE))
+        assertEquals(null, functions.owner(4))
     }
 
     @Test
     fun applianceAccessibilityDoesNotClaimMediaKeys() {
         for (key in listOf(126, 127, 85, 87, 88)) {
-            assertFalse(ApplianceEntryPolicy.isApplianceEntryKey(key, androidGuideKeyCode = 172))
+            assertEquals(null, CompanionFunctions().owner(key))
         }
     }
 

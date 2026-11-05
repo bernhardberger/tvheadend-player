@@ -133,7 +133,7 @@ class CompanionUpdaterFeedTest {
                 server.expected = hash(installed)
                 CompanionUpdater.check(context, manual = true) { manualFinished.countDown() }
                 assertTrue(automaticFinished.await(10, TimeUnit.SECONDS))
-                assertEquals(UpdateResult.WAITING_STANDBY, automaticResult.get())
+                assertEquals(UpdateResult.NEVER, automaticResult.get())
                 assertTrue(partialRemoved.get())
                 assertTrue(manualFinished.await(10, TimeUnit.SECONDS))
                 assertEquals(UpdateResult.UP_TO_DATE, UpdateStore(context).result)
@@ -206,6 +206,33 @@ class CompanionUpdaterFeedTest {
         }
     }
 
+    @Test fun wakeBeforeLatestAnsweredRestoresThePreviousResultWithoutAPostponedMessage() {
+        val feed = localFeed()
+        val context = RuntimeEnvironment.getApplication()
+        prepare(context)
+        val store = UpdateStore(context)
+        store.setResult(UpdateResult.UP_TO_DATE)
+        shadowOf(context.getSystemService(PowerManager::class.java)).setIsInteractive(false)
+        Feed(feed).use { server ->
+            server.pauseLatest = true
+            val finished = CountDownLatch(1)
+            CompanionUpdater.check(context, manual = false) { finished.countDown() }
+            try {
+                assertTrue(server.latestStarted.await(10, TimeUnit.SECONDS))
+                assertEquals(UpdateResult.CHECKING, store.result)
+                shadowOf(context.getSystemService(PowerManager::class.java)).setIsInteractive(true)
+                CompanionUpdater.cancelAutomatic()
+                assertTrue(finished.await(10, TimeUnit.SECONDS))
+                assertEquals(UpdateResult.UP_TO_DATE, store.result)
+                assertEquals("", store.latestVersion)
+                assertEquals(0, server.count("/apk"))
+            } finally {
+                server.releaseLatest.countDown()
+                CompanionUpdater.cancelAutomatic()
+            }
+        }
+    }
+
     private class Feed(private val feed: URI) : Closeable {
         private val server = ServerSocket(feed.port, 8, InetAddress.getByAddress(byteArrayOf(127, 0, 0, 1)))
         private val workers = Executors.newCachedThreadPool()
@@ -215,6 +242,9 @@ class CompanionUpdaterFeedTest {
         @Volatile var expected = "ab".repeat(32)
         @Volatile var apkNames = listOf("fixture-appliance.apk")
         @Volatile var pauseApk = false
+        @Volatile var pauseLatest = false
+        val latestStarted = CountDownLatch(1)
+        val releaseLatest = CountDownLatch(1)
         val apkStarted = CountDownLatch(1)
         val releaseApk = CountDownLatch(1)
         private val origin = "http://127.0.0.1:${feed.port}"
@@ -225,7 +255,7 @@ class CompanionUpdaterFeedTest {
                     sockets.add(socket)
                     workers.execute {
                         try { respond(socket) } catch (error: Exception) {
-                            if (!server.isClosed && !pauseApk) failure.compareAndSet(null, error)
+                            if (!server.isClosed && !pauseApk && !pauseLatest) failure.compareAndSet(null, error)
                         } finally { sockets.remove(socket); socket.close() }
                     }
                 }
@@ -244,6 +274,8 @@ class CompanionUpdaterFeedTest {
             requests.merge(path, 1, Int::plus)
             val body = when (path) {
                 feed.rawPath -> {
+                    latestStarted.countDown()
+                    if (pauseLatest) check(releaseLatest.await(10, TimeUnit.SECONDS))
                     val assets = JSONArray()
                     for (name in apkNames + "SHA256SUMS") assets.put(JSONObject()
                         .put("name", name).put("browser_download_url", origin + if (name == "SHA256SUMS") "/sums" else "/apk"))

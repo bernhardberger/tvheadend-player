@@ -56,13 +56,13 @@ class CompanionScreenTest {
 
     private val ready = CompanionScreenState(
         playerVersion = "0.4.2",
-        accessibilityEnabled = true,
+        accessibilityStatus = CompanionServiceStatus.ON,
         installAllowed = true,
         defaultHome = true,
         hasSystemHome = true,
         update = UpdateScreenState(result = UpdateResult.UP_TO_DATE),
     )
-    private val toFix = ready.copy(accessibilityEnabled = false, installAllowed = false, defaultHome = false)
+    private val toFix = ready.copy(accessibilityStatus = CompanionServiceStatus.OFF, installAllowed = false, defaultHome = false)
     private val playerMissing = toFix.copy(playerVersion = null)
     private val available = ready.copy(
         update = UpdateScreenState(latestVersion = "0.5.0", result = UpdateResult.WAITING_STANDBY))
@@ -205,7 +205,7 @@ class CompanionScreenTest {
         val set = show(toFix.copy(playerVersion = "0.4.2"))
         focused("Accessibility service")
         // Returning from Android settings with the service now on.
-        set(toFix.copy(playerVersion = "0.4.2", accessibilityEnabled = true))
+        set(toFix.copy(playerVersion = "0.4.2", accessibilityStatus = CompanionServiceStatus.ON))
         compose.waitForIdle()
         focused("Accessibility service")
     }

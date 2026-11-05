@@ -14,9 +14,6 @@ object ApplianceEntryPolicy {
     const val ENTRY_ALIAS_CLASS_NAME = "at.bernhardberger.tvhplayer.ui.ApplianceEntryActivity"
     const val TCL_TV_KEY_CODE = 4001
 
-    fun isApplianceEntryKey(keyCode: Int, androidGuideKeyCode: Int): Boolean =
-        keyCode == androidGuideKeyCode || keyCode == TCL_TV_KEY_CODE
-
     fun keyEvent(
         isApplianceEntryKey: Boolean,
         isDown: Boolean,

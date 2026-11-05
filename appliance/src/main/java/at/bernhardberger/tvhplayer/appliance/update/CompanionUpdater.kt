@@ -159,13 +159,13 @@ object CompanionUpdater {
                 committed = true
             }
         } catch (failure: UpdateFailure) {
-            store.setResult(failure.result)
+            store.setResult(if (failure.result == UpdateResult.WAITING_STANDBY) store.interruptedCheckResult() else failure.result)
         } catch (_: JSONException) {
             store.setResult(UpdateResult.RELEASE_PROBLEM)
         } catch (_: IOException) {
-            store.setResult(if (cancelled.get()) UpdateResult.WAITING_STANDBY else UpdateResult.STORAGE_FAILURE)
+            store.setResult(if (cancelled.get()) store.interruptedCheckResult() else UpdateResult.STORAGE_FAILURE)
         } catch (_: RuntimeException) {
-            store.setResult(if (cancelled.get()) UpdateResult.WAITING_STANDBY else UpdateResult.INSTALLER_FAILURE)
+            store.setResult(if (cancelled.get()) store.interruptedCheckResult() else UpdateResult.INSTALLER_FAILURE)
         } finally {
             apk.delete()
             val failedSession = if (sessionId != -1) sessionId else store.sessionId

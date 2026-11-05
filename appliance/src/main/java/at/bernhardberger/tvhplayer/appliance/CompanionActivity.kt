@@ -12,7 +12,6 @@ import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
 import android.provider.Settings
-import android.view.accessibility.AccessibilityManager
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
@@ -33,7 +32,8 @@ import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 class CompanionActivity : ComponentActivity() {
     private var playerVersion by mutableStateOf<String?>(null)
     private var systemHome by mutableStateOf<ComponentName?>(null)
-    private var accessibilityEnabled by mutableStateOf(false)
+    private var accessibilityStatus by mutableStateOf(CompanionServiceStatus.OFF)
+    private var functions by mutableStateOf(CompanionFunctions())
     private var installAllowed by mutableStateOf(false)
     private var defaultHome by mutableStateOf(false)
     private val updates by lazy { UpdateStore(this) }
@@ -59,11 +59,12 @@ class CompanionActivity : ComponentActivity() {
                 CompanionScreen(
                     state = CompanionScreenState(
                         playerVersion = playerVersion,
-                        accessibilityEnabled = accessibilityEnabled,
+                        accessibilityStatus = accessibilityStatus,
                         installAllowed = installAllowed,
                         defaultHome = defaultHome,
                         hasSystemHome = systemHome != null,
                         update = updateState,
+                        functions = functions,
                     ),
                     onRow = ::onRow,
                     modifier = Modifier
@@ -100,6 +101,11 @@ class CompanionActivity : ComponentActivity() {
     override fun onDestroy() {
         updates.preferences.unregisterOnSharedPreferenceChangeListener(updateListener)
         super.onDestroy()
+    }
+
+    override fun onStop() {
+        CompanionServiceState.cancelCapture()
+        super.onStop()
     }
 
     private fun refreshUpdates() {
@@ -159,6 +165,7 @@ class CompanionActivity : ComponentActivity() {
     }
 
     private fun onRow(row: CompanionRow) {
+        refreshStatus()
         when (row) {
             CompanionRow.PLAYER ->
                 if (playerVersion != null) openPlayer()
@@ -183,13 +190,11 @@ class CompanionActivity : ComponentActivity() {
         }
     }
 
-    private fun isAccessibilityServiceEnabled(): Boolean =
-        getSystemService(AccessibilityManager::class.java)
-            .getEnabledAccessibilityServiceList(android.accessibilityservice.AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
-            .any {
-                it.resolveInfo.serviceInfo.packageName == packageName &&
-                    it.resolveInfo.serviceInfo.name == ApplianceEntryAccessibilityService::class.java.name
-            }
+    private fun isAccessibilityServiceEnabled(): Boolean {
+        val component = ComponentName(this, ApplianceEntryAccessibilityService::class.java)
+        return Settings.Secure.getString(contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
+            .orEmpty().split(':').any { ComponentName.unflattenFromString(it) == component }
+    }
 
     @Suppress("DEPRECATION") // Integer flags also support the minimum API 28.
     private fun refreshStatus() {
@@ -208,7 +213,8 @@ class CompanionActivity : ComponentActivity() {
                 it.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM != 0
             }.thenBy { it.packageName }.thenBy { it.name })
             .firstOrNull()?.let { ComponentName(it.packageName, it.name) }
-        accessibilityEnabled = isAccessibilityServiceEnabled()
+        accessibilityStatus = companionServiceStatus(isAccessibilityServiceEnabled(), CompanionServiceState.connected.value)
+        functions = FunctionStore(this).functions
         installAllowed = packageManager.canRequestPackageInstalls()
         defaultHome = packageManager.resolveActivity(home, PackageManager.MATCH_DEFAULT_ONLY)
             ?.activityInfo?.packageName == packageName

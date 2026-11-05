@@ -4,10 +4,20 @@ import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.ContextWrapper
 import android.content.Intent
+import android.accessibilityservice.AccessibilityServiceInfo
+import android.accessibilityservice.AccessibilityService
+import android.os.Looper
+import android.os.PowerManager
 import android.view.KeyEvent
 import at.bernhardberger.tvhplayer.appliance.ApplianceEntryPolicy
 import at.bernhardberger.tvhplayer.appliance.BuildConfig
 import at.bernhardberger.tvhplayer.appliance.CompanionActivity
+import at.bernhardberger.tvhplayer.appliance.CompanionFunction
+import at.bernhardberger.tvhplayer.appliance.CompanionServiceState
+import at.bernhardberger.tvhplayer.appliance.ButtonBinding
+import at.bernhardberger.tvhplayer.appliance.CaptureState
+import at.bernhardberger.tvhplayer.appliance.FunctionStore
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -16,21 +26,127 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Robolectric
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.Implementation
+import org.robolectric.annotation.Implements
+import org.robolectric.shadows.ShadowAccessibilityService
 import org.robolectric.util.ReflectionHelpers
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [28])
+@Config(sdk = [28], shadows = [ApplianceEntryAccessibilityServiceTest.ConnectedServiceShadow::class])
 class ApplianceEntryAccessibilityServiceTest {
+    // Robolectric has no system accessibility connection from which getServiceInfo can fetch its manifest info.
+    @Implements(AccessibilityService::class)
+    class ConnectedServiceShadow : ShadowAccessibilityService() {
+        private val info = AccessibilityServiceInfo()
+        @Implementation fun getServiceInfo(): AccessibilityServiceInfo = info
+    }
     @Test
     fun guideTargetsPlayerGuardedEntryWithOriginalFlags() {
         val starts = dispatchGuide()
         assertEquals(1, starts.size)
         assertEquals(ComponentName(BuildConfig.PLAYER_PACKAGE, ApplianceEntryPolicy.ENTRY_ALIAS_CLASS_NAME), starts[0].component)
         assertEquals(ApplianceEntryPolicy.ACTION_APPLIANCE_ENTRY, starts[0].action)
+        assertEquals(ApplianceEntryPolicy.DESTINATION_GUIDE,
+            starts[0].getStringExtra(ApplianceEntryPolicy.EXTRA_APPLIANCE_DESTINATION))
         assertEquals(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP,
             starts[0].flags)
     }
+
+    @Test fun tvUsesLiveDestinationAndUnassignedKeysPassThrough() {
+        val controller = Robolectric.buildService(ApplianceEntryAccessibilityService::class.java).create()
+        val service = controller.get()
+        assertFalse(dispatch(service, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_INFO))
+        assertTrue(dispatch(service, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_TV))
+        val launch = shadowOf(service).nextStartedActivity
+        assertEquals(ApplianceEntryPolicy.DESTINATION_LIVE,
+            launch.getStringExtra(ApplianceEntryPolicy.EXTRA_APPLIANCE_DESTINATION))
+        assertTrue(dispatch(service, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_TV))
+        assertNull(shadowOf(service).nextStartedActivity)
+        controller.destroy()
+    }
+
+    @Test fun captureUsesTheServiceFilterPersistsTheMoveAndSwallowsUpWithoutLaunching() {
+        val controller = Robolectric.buildService(ApplianceEntryAccessibilityService::class.java).create()
+        val service = controller.get()
+        FunctionStore(service).setStartup(false)
+        connect(service)
+        assertNull(shadowOf(service).nextStartedActivity)
+        assertTrue(CompanionServiceState.startCapture(CompanionFunction.LIVE_TV))
+        assertTrue(dispatch(service, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_GUIDE))
+        assertEquals(CaptureState.Captured(CompanionFunction.LIVE_TV, 172,
+            at.bernhardberger.tvhplayer.appliance.MovedButton(CompanionFunction.GUIDE, 172)),
+            CompanionServiceState.captureState.value)
+        assertEquals(ButtonBinding.Custom(172), FunctionStore(service).functions.liveTv)
+        assertEquals(ButtonBinding.Custom(4001), FunctionStore(service).functions.guide)
+        assertTrue(dispatch(service, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_GUIDE))
+        assertNull(shadowOf(service).nextStartedActivity)
+        controller.destroy()
+    }
+
+    @Test fun captureRequiresConnectionAndUnbindDestroyAndScreenOffCancelIt() {
+        CompanionServiceState.setConnected(false)
+        assertFalse(CompanionServiceState.startCapture(CompanionFunction.GUIDE))
+        val controller = Robolectric.buildService(ApplianceEntryAccessibilityService::class.java).create()
+        val service = controller.get()
+        FunctionStore(service).setStartup(false)
+        connect(service)
+        assertTrue(CompanionServiceState.connected.value)
+        assertTrue(CompanionServiceState.startCapture(CompanionFunction.GUIDE))
+        service.sendBroadcast(Intent(Intent.ACTION_SCREEN_OFF))
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(CaptureState.Cancelled, CompanionServiceState.captureState.value)
+        assertTrue(CompanionServiceState.startCapture(CompanionFunction.GUIDE))
+        service.onUnbind(Intent())
+        assertFalse(CompanionServiceState.connected.value)
+        assertEquals(CaptureState.Cancelled, CompanionServiceState.captureState.value)
+        connect(service)
+        assertTrue(CompanionServiceState.startCapture(CompanionFunction.GUIDE))
+        controller.destroy()
+        assertFalse(CompanionServiceState.connected.value)
+        assertEquals(CaptureState.Cancelled, CompanionServiceState.captureState.value)
+    }
+
+    @Test fun captureTimerExpiresWithoutAnyMoreKeyEvents() {
+        CompanionServiceState.setConnected(true)
+        assertTrue(CompanionServiceState.startCapture(CompanionFunction.GUIDE))
+        shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(10))
+        assertEquals(CaptureState.TimedOut(CompanionFunction.GUIDE), CompanionServiceState.captureState.value)
+        CompanionServiceState.setConnected(false)
+    }
+
+    @Test fun startupOffPreventsConnectAndWakeLaunchAndStandbyNeverLaunches() {
+        val controller = Robolectric.buildService(ApplianceEntryAccessibilityService::class.java).create()
+        val service = controller.get()
+        FunctionStore(service).setStartup(false)
+        connect(service)
+        service.sendBroadcast(Intent(Intent.ACTION_SCREEN_ON))
+        shadowOf(Looper.getMainLooper()).idle()
+        assertNull(shadowOf(service).nextStartedActivity)
+        FunctionStore(service).setStartup(true)
+        shadowOf(service.getSystemService(PowerManager::class.java)).setIsInteractive(false)
+        service.sendBroadcast(Intent(Intent.ACTION_SCREEN_ON))
+        shadowOf(Looper.getMainLooper()).idle()
+        assertNull(shadowOf(service).nextStartedActivity)
+        shadowOf(service.getSystemService(PowerManager::class.java)).setIsInteractive(true)
+        service.sendBroadcast(Intent(Intent.ACTION_SCREEN_ON))
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(ApplianceEntryPolicy.DESTINATION_LIVE,
+            shadowOf(service).nextStartedActivity.getStringExtra(ApplianceEntryPolicy.EXTRA_APPLIANCE_DESTINATION))
+        controller.destroy()
+    }
+
+    private fun connect(service: ApplianceEntryAccessibilityService) {
+        shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(
+            "${BuildConfig.APPLICATION_ID}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION")
+        service.serviceInfo = AccessibilityServiceInfo()
+        ReflectionHelpers.callInstanceMethod<Unit>(service, "onServiceConnected")
+    }
+
+    private fun dispatch(service: ApplianceEntryAccessibilityService, action: Int, code: Int): Boolean =
+        ReflectionHelpers.callInstanceMethod(service, "onKeyEvent",
+            ReflectionHelpers.ClassParameter.from(KeyEvent::class.java, KeyEvent(action, code)))
 
     @Test
     fun missingOrInaccessiblePlayerFallsBackToCompanionInsteadOfCrashing() {

@@ -81,7 +81,7 @@ fun CompanionScreen(
     GuidedStepLayout(guidance = { Guidance(state) }, modifier = modifier) {
         SectionHeading(R.string.section_this_tv)
         PlayerRow(state, row(CompanionRow.PLAYER)) { onRow(CompanionRow.PLAYER) }
-        AccessibilityRow(state.accessibilityEnabled, row(CompanionRow.ACCESSIBILITY)) { onRow(CompanionRow.ACCESSIBILITY) }
+        AccessibilityRow(state.accessibilityStatus, row(CompanionRow.ACCESSIBILITY)) { onRow(CompanionRow.ACCESSIBILITY) }
         HomeRow(state, row(CompanionRow.HOME)) { onRow(CompanionRow.HOME) }
         if (state.showSystemHome) {
             GuidedStepAction(
@@ -110,10 +110,11 @@ private fun Guidance(state: CompanionScreenState) {
                 pluralStringResource(R.plurals.status_things_to_fix, overall.count, overall.count)
             CompanionOverall.AllSet -> stringResource(R.string.status_all_set)
         },
-        body = stringResource(when (state.body) {
+        body = if (state.body == CompanionBody.ALL_SET) state.functions.allSetBody(state.defaultHome) else stringResource(when (state.body) {
             CompanionBody.PLAYER_MISSING -> R.string.body_player_missing
             CompanionBody.UPDATING -> R.string.body_updating
             CompanionBody.ACCESSIBILITY_OFF -> R.string.body_accessibility_off
+            CompanionBody.BLOCKED -> R.string.body_accessibility_blocked
             CompanionBody.INSTALL_UNKNOWN_OFF -> R.string.body_install_unknown_off
             CompanionBody.SEVERAL_OPEN -> R.string.body_several_open
             CompanionBody.ALL_SET -> R.string.body_all_set
@@ -230,16 +231,25 @@ private fun PlayerRow(state: CompanionScreenState, modifier: Modifier, onClick: 
 }
 
 @Composable
-private fun AccessibilityRow(enabled: Boolean, modifier: Modifier, onClick: () -> Unit) {
+private fun AccessibilityRow(status: CompanionServiceStatus, modifier: Modifier, onClick: () -> Unit) {
+    val enabled = status == CompanionServiceStatus.ON
     val (rowModifier, focused) = rememberRowFocus(modifier)
     GuidedStepAction(
         title = stringResource(R.string.accessibility_title),
-        subtitle = stringResource(if (enabled) R.string.accessibility_on_hint else R.string.accessibility_off_hint),
+        subtitle = stringResource(when (status) {
+            CompanionServiceStatus.ON -> R.string.accessibility_on_hint
+            CompanionServiceStatus.OFF -> R.string.accessibility_off_hint
+            CompanionServiceStatus.BLOCKED -> R.string.accessibility_blocked_hint
+        }),
         onClick = onClick,
         modifier = rowModifier,
         leadingIcon = { StatusIcon(statusIcon(enabled), enabled, focused) },
         trailingIcon = if (enabled) null else R.drawable.ic_chevron_right,
-        trailingContent = { StatusText(stringResource(if (enabled) R.string.status_on else R.string.status_turn_on)) },
+        trailingContent = { StatusText(stringResource(when (status) {
+            CompanionServiceStatus.ON -> R.string.status_on
+            CompanionServiceStatus.OFF -> R.string.status_turn_on
+            CompanionServiceStatus.BLOCKED -> R.string.status_blocked
+        })) },
     )
 }
 
