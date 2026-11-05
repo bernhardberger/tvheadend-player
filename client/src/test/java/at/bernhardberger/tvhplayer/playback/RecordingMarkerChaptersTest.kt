@@ -40,6 +40,7 @@ import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.core.TvheadendTestResultFactory
 import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
+import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import java.lang.reflect.Proxy
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.CompletableDeferred
@@ -50,6 +51,9 @@ import at.bernhardberger.tvhplayer.settings.SkipLanding
 import at.bernhardberger.tvhplayer.notices.Notice
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.plus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertTrue
@@ -61,6 +65,233 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
 class RecordingMarkerChaptersTest {
+    @Test
+    @OptIn(TvheadendTestingApi::class, ExperimentalCoroutinesApi::class)
+    fun transientCutpointFailuresAndExceptionsRetryThenPublishWithoutAnAdmissionChange() = runTest {
+        val points = listOf(DvrCutpoint(600_000.milliseconds, 660_000.milliseconds, DvrCutpointAction.CUT))
+        for (failure in listOf(TvheadendFailure.TIMEOUT, TvheadendFailure.NOT_READY,
+            TvheadendFailure.TRANSPORT_UNAVAILABLE, TvheadendFailure.CONNECTION_LIMIT, null)) {
+            var calls = 0
+            val fixture = MarkerFixture(backgroundScope, cutpoints = {
+                if (++calls == 1) {
+                    if (failure == null) throw IllegalStateException("optional metadata unavailable")
+                    DvrCutpointsResult.Failed(failure)
+                } else DvrCutpointsResult.Available.create(points)
+            })
+            try {
+                fixture.response.complete(Unit)
+                fixture.markers.observeRecordingMarkersLocked(fixture.binding)
+                runCurrent()
+                assertEquals(1, calls)
+                assertTrue(fixture.markers.marks.value.isEmpty())
+                advanceTimeBy(2_999)
+                runCurrent()
+                assertEquals(1, calls)
+                advanceTimeBy(1)
+                runCurrent()
+                assertEquals(2, calls)
+                assertEquals(listOf(RecordingMark(RecordingMarkKind.CUT, 600_000, 660_000)), fixture.markers.marks.value)
+                assertEquals(listOf(600_000L, 660_000L), fixture.messages.filterNot { it.isCanceled }.map { it.positionMs })
+                advanceTimeBy(30_000)
+                runCurrent()
+                assertEquals(2, calls)
+            } finally { fixture.markers.clearRecordingMarkersAndJoin() }
+        }
+    }
+
+    @Test
+    @OptIn(TvheadendTestingApi::class, ExperimentalCoroutinesApi::class)
+    fun successfullyEmptyAndPermanentOrFreshObservationFailuresAreFinal() = runTest {
+        val results = listOf(DvrCutpointsResult.Available.create(emptyList())) + listOf(
+            TvheadendFailure.NOT_SUPPORTED, TvheadendFailure.ACCESS_DENIED, TvheadendFailure.MALFORMED_RESPONSE,
+            TvheadendFailure.SERVER_REJECTED, TvheadendFailure.CONNECTION_CHANGED,
+        ).map { DvrCutpointsResult.Failed(it) }
+        for (result in results) {
+            var calls = 0
+            val fixture = MarkerFixture(backgroundScope, cutpoints = { calls++; result })
+            try {
+                fixture.response.complete(Unit)
+                fixture.markers.observeRecordingMarkersLocked(fixture.binding)
+                runCurrent()
+                advanceTimeBy(60_000)
+                runCurrent()
+                assertEquals("result=$result", 1, calls)
+                assertTrue(fixture.markers.marks.value.isEmpty())
+                assertTrue(fixture.messages.isEmpty())
+            } finally { fixture.markers.clearRecordingMarkersAndJoin() }
+        }
+    }
+
+    @Test
+    @OptIn(TvheadendTestingApi::class, ExperimentalCoroutinesApi::class)
+    fun cutpointRetriesStopAfterThreeAttemptsAndANewInstallationGetsAFreshCycle() = runTest {
+        var calls = 0
+        val fixture = MarkerFixture(backgroundScope, cutpoints = { calls++; DvrCutpointsResult.Failed(TvheadendFailure.TIMEOUT) })
+        try {
+            fixture.response.complete(Unit)
+            fixture.markers.observeRecordingMarkersLocked(fixture.binding)
+            runCurrent()
+            assertEquals(1, calls)
+            advanceTimeBy(3_000)
+            runCurrent()
+            assertEquals(2, calls)
+            advanceTimeBy(6_999)
+            runCurrent()
+            assertEquals(2, calls)
+            advanceTimeBy(1)
+            runCurrent()
+            assertEquals(3, calls)
+            advanceTimeBy(60_000)
+            runCurrent()
+            assertEquals(3, calls)
+            fixture.markers.observeRecordingMarkersLocked(fixture.binding, continuesTarget = true)
+            runCurrent()
+            assertEquals(4, calls)
+        } finally { fixture.markers.clearRecordingMarkersAndJoin() }
+    }
+
+    @Test
+    @OptIn(TvheadendTestingApi::class, ExperimentalCoroutinesApi::class)
+    fun retriesDoNotQueryARetiredClearedOrReplacedTarget() = runTest {
+        for (end in listOf("retired", "cleared", "replaced")) {
+            var calls = 0
+            val fixture = MarkerFixture(backgroundScope, cutpoints = { calls++; DvrCutpointsResult.Failed(TvheadendFailure.TIMEOUT) })
+            try {
+                fixture.response.complete(Unit)
+                fixture.markers.observeRecordingMarkersLocked(fixture.binding)
+                runCurrent()
+                assertEquals(1, calls)
+                when (end) {
+                    "retired" -> fixture.session.replaceGeneration(fixture.session.observation.value)
+                    "cleared" -> fixture.markers.clearRecordingMarkers()
+                    "replaced" -> fixture.currentItem = MediaItem.Builder().setMediaId("replacement").build()
+                }
+                advanceTimeBy(60_000)
+                runCurrent()
+                assertEquals(end, 1, calls)
+                assertTrue(fixture.markers.marks.value.isEmpty())
+            } finally { fixture.markers.clearRecordingMarkersAndJoin() }
+        }
+    }
+
+    @Test
+    @OptIn(TvheadendTestingApi::class, ExperimentalCoroutinesApi::class)
+    fun observationStartedInlineDuringInstallationFetchesAndRetriesDuringInstallationToo() = runTest {
+        for (retry in listOf(false, true)) {
+            var calls = 0
+            val fixture = MarkerFixture(backgroundScope + UnconfinedTestDispatcher(testScheduler), cutpoints = {
+                if (++calls == 1 && retry) DvrCutpointsResult.Failed(TvheadendFailure.TIMEOUT)
+                else DvrCutpointsResult.Available.create(listOf(DvrCutpoint(
+                    600_000.milliseconds, 660_000.milliseconds, DvrCutpointAction.CUT)))
+            })
+            try {
+                fixture.response.complete(Unit)
+                fixture.installing = true
+                fixture.markers.observeRecordingMarkersLocked(fixture.binding)
+                // Unconfined dispatch executes the production observer inline, like Main.immediate.
+                assertEquals(1, calls)
+                fixture.installing = false
+                runCurrent()
+                if (retry) {
+                    fixture.installing = true
+                    advanceTimeBy(3_000)
+                    runCurrent()
+                    assertEquals(2, calls)
+                    fixture.installing = false
+                }
+                assertEquals(listOf(RecordingMark(RecordingMarkKind.CUT, 600_000, 660_000)), fixture.markers.marks.value)
+            } finally { fixture.markers.clearRecordingMarkersAndJoin() }
+        }
+    }
+
+    @Test
+    @OptIn(TvheadendTestingApi::class, ExperimentalCoroutinesApi::class)
+    fun retriesSurviveTheEndAndLateMarksActNormallyAfterSeekingBack() = runTest {
+        for (seekBackBeforeResponse in listOf(false, true)) {
+            var calls = 0
+            val retryResponse = CompletableDeferred<Unit>()
+            val fixture = MarkerFixture(backgroundScope, cutpoints = {
+                if (++calls == 1) DvrCutpointsResult.Failed(TvheadendFailure.TIMEOUT)
+                else {
+                    retryResponse.await()
+                    DvrCutpointsResult.Available.create(listOf(DvrCutpoint(
+                        600_000.milliseconds, 660_000.milliseconds, DvrCutpointAction.CUT)))
+                }
+            })
+            try {
+                fixture.response.complete(Unit)
+                fixture.markers.observeRecordingMarkersLocked(fixture.binding)
+                runCurrent()
+                fixture.position = 900_000
+                fixture.playbackState = Player.STATE_ENDED
+                fixture.markers.onPlaybackChanged()
+                advanceTimeBy(3_000)
+                runCurrent()
+                assertEquals(2, calls)
+                if (seekBackBeforeResponse) {
+                    fixture.markers.deliberateSeek(590_000)
+                    fixture.position = 590_000
+                    fixture.playbackState = Player.STATE_READY
+                    fixture.markers.onPositionDiscontinuity()
+                }
+                retryResponse.complete(Unit)
+                runCurrent()
+                assertEquals(2, calls)
+                assertEquals(listOf(RecordingMark(RecordingMarkKind.CUT, 600_000, 660_000)), fixture.markers.marks.value)
+                assertTrue(fixture.seeks.isEmpty())
+                if (!seekBackBeforeResponse) {
+                    fixture.markers.deliberateSeek(590_000)
+                    fixture.position = 590_000
+                    fixture.playbackState = Player.STATE_READY
+                    fixture.markers.onPositionDiscontinuity()
+                    runCurrent()
+                }
+                fixture.position = 600_000
+                fixture.messages.last { !it.isCanceled && it.positionMs == 600_000L }
+                    .let { it.target.handleMessage(it.type, it.payload) }
+                runCurrent()
+                assertEquals(listOf(660_000L), fixture.seeks)
+                // Reaching the end must not have killed the admission collector's retirement path.
+                fixture.session.replaceGeneration(fixture.session.observation.value)
+                runCurrent()
+                assertTrue(fixture.markers.marks.value.isEmpty())
+            } finally { fixture.markers.clearRecordingMarkersAndJoin() }
+        }
+    }
+
+    @Test
+    @OptIn(TvheadendTestingApi::class, ExperimentalCoroutinesApi::class)
+    fun retryDeliveredSpansUseLateMetadataPolicyAndRespectDeliberateEntry() = runTest {
+        for (deliberate in listOf(false, true)) {
+            for (mode in listOf(AdBreakMode.ASK, AdBreakMode.AUTOMATIC)) {
+                for (action in listOf(DvrCutpointAction.CUT, DvrCutpointAction.COMMERCIAL_BREAK)) {
+                    var calls = 0
+                    val fixture = MarkerFixture(backgroundScope, cutpoints = {
+                        if (++calls == 1) DvrCutpointsResult.Failed(TvheadendFailure.TIMEOUT)
+                        else DvrCutpointsResult.Available.create(listOf(DvrCutpoint(
+                            600_000.milliseconds, 660_000.milliseconds, action)))
+                    })
+                    try {
+                        fixture.markers.applySettings(PlayerSettings(adBreakMode = mode))
+                        fixture.response.complete(Unit)
+                        fixture.markers.observeRecordingMarkersLocked(fixture.binding)
+                        runCurrent()
+                        if (deliberate) fixture.markers.deliberateSeek(620_000)
+                        fixture.position = 630_000
+                        advanceTimeBy(3_000)
+                        runCurrent()
+                        assertEquals(2, calls)
+                        assertEquals(1, fixture.markers.marks.value.size)
+                        val ask = action == DvrCutpointAction.COMMERCIAL_BREAK && mode == AdBreakMode.ASK
+                        if (deliberate || ask) assertTrue(fixture.seeks.isEmpty())
+                        else assertEquals(listOf(660_000L), fixture.seeks)
+                        assertEquals(!deliberate && ask, fixture.markers.skipPrompt.value != null)
+                    } finally { fixture.markers.clearRecordingMarkersAndJoin() }
+                }
+            }
+        }
+    }
+
     @Test
     @OptIn(TvheadendTestingApi::class, ExperimentalCoroutinesApi::class)
     fun delayedCutpointsRespectInterveningDeliberateSeeksForCutsAskAndAutomatic() = runTest {
@@ -395,9 +626,13 @@ class RecordingMarkerChaptersTest {
     }
 
     @OptIn(TvheadendTestingApi::class)
-    private class MarkerFixture(scope: kotlinx.coroutines.CoroutineScope, points: List<DvrCutpoint>) {
+    private class MarkerFixture(
+        scope: kotlinx.coroutines.CoroutineScope,
+        points: List<DvrCutpoint> = emptyList(),
+        cutpoints: (suspend () -> DvrCutpointsResult)? = null,
+    ) {
         private val entry = DvrEntry.create(id = DvrEntryId(4), state = DvrEntryState.COMPLETED)
-        private val session = FakeTvheadendSession(SessionObservation.create(
+        val session = FakeTvheadendSession(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(
                 streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED,
             )),
@@ -408,11 +643,13 @@ class RecordingMarkerChaptersTest {
         val response = CompletableDeferred<Unit>()
         val binding = (TvheadendTestResultFactory.boundCompletedRecordingPlayback(
             session, session.captureCurrentSession(), entry.id,
-            cutpoints = { response.await(); DvrCutpointsResult.Available.create(points) },
+            cutpoints = { response.await(); cutpoints?.invoke() ?: DvrCutpointsResult.Available.create(points) },
         ) as PlaybackBindingResult.Bound).binding
         var currentItem = MediaItem.Builder().setMediaId("recording").build()
         var tracks = Tracks.EMPTY
         var position = 0L
+        var playbackState = Player.STATE_READY
+        var installing = false
         var positionReads = 0
         var volume = 0.65f
         val seeks = mutableListOf<Long>()
@@ -422,6 +659,7 @@ class RecordingMarkerChaptersTest {
                 "getCurrentMediaItem" -> currentItem
                 "getCurrentTracks" -> tracks
                 "getCurrentPosition" -> { positionReads++; position }
+                "getPlaybackState" -> playbackState
                 "getApplicationLooper" -> Looper.getMainLooper()
                 "createMessage" -> PlayerMessage({ messages.add(it) }, args!![0] as PlayerMessage.Target,
                     Timeline.EMPTY, 0, Clock.DEFAULT, Looper.getMainLooper())
@@ -435,7 +673,7 @@ class RecordingMarkerChaptersTest {
         } as ExoPlayer
         val notices = NoticeCenter({ 0L }) { NoticeContext(0, null) }
         val pendingRecoveryPosition = kotlinx.coroutines.flow.MutableStateFlow<kotlin.time.Duration?>(null)
-        val markers = RecordingMarkers(player, session, scope, PlaybackTargetCommandSerialization(), notices, pendingRecoveryPosition) { false }
+        val markers = RecordingMarkers(player, session, scope, PlaybackTargetCommandSerialization(), notices, pendingRecoveryPosition) { installing }
     }
 
     @Test
@@ -474,6 +712,7 @@ class RecordingMarkerChaptersTest {
             when (method.name) {
                 "getCurrentMediaItem" -> currentItem
                 "getCurrentTracks" -> Tracks.EMPTY
+                "getPlaybackState" -> Player.STATE_READY
                 "getDuration" -> 10_000L
                 "getCurrentPosition" -> position
                 "getApplicationLooper" -> Looper.getMainLooper()
@@ -612,6 +851,7 @@ class RecordingMarkerChaptersTest {
             when (method.name) {
                 "getCurrentMediaItem" -> currentItem
                 "getCurrentTracks" -> { trackReads++; tracks }
+                "getPlaybackState" -> Player.STATE_READY
                 "getDuration" -> 20_000L
                 "getCurrentPosition" -> 0L
                 "isPlaying" -> false

@@ -28,6 +28,7 @@ import at.bernhardberger.tvhplayer.settings.AdBreakMode
 import at.bernhardberger.tvhplayer.settings.SkipLanding
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -314,6 +315,17 @@ internal class RecordingMarkers(
         pendingMarkers?.join()
     }
 
+    /** At most three attempts per admission phase; teardown cancels this job and every wait. */
+    private suspend fun refreshMarkers(binding: PlaybackBinding.Recording) {
+        for (waitMs in listOf(0L, 3_000L, 7_000L)) {
+            delay(waitMs)
+            // Installation can invoke this observer inline before its temporary flag clears.
+            // Only retirement/replacement ends a fetch cycle, not that flag or the playhead position.
+            if (mediaItem == null || player.currentMediaItem !== mediaItem || !markerQuery.isCurrent(binding)) return
+            if (!markerQuery.refresh(binding)) return
+        }
+    }
+
     @OptIn(ExperimentalTvheadendApi::class)
     fun observeRecordingMarkersLocked(binding: PlaybackBinding.Recording, continuesTarget: Boolean = false) {
         clearRecordingMarkers(preserveHistory = continuesTarget)
@@ -323,7 +335,7 @@ internal class RecordingMarkers(
         markerQuery.updateChapters(recordingChapters(player.currentTracks))
         publishMarks()
         markerJob = scope.launch {
-            // Admission changes, not position samples: at most initial + growing completion.
+            // Admission changes, not position samples: one bounded fetch cycle per phase.
             var completionFetched = false
             var initialFetched = false
             session.observation.map { binding.admission::class }.distinctUntilChanged().collectLatest {
@@ -331,11 +343,11 @@ internal class RecordingMarkers(
                 when (binding.admission) {
                     is RecordingPlaybackAdmission.Growing -> if (!initialFetched) {
                         initialFetched = true
-                        markerQuery.refresh(binding)
+                        refreshMarkers(binding)
                     }
                     is RecordingPlaybackAdmission.Completed -> if (!completionFetched) {
                         completionFetched = true
-                        markerQuery.refresh(binding)
+                        refreshMarkers(binding)
                     }
                     else -> {
                         targetCommands.serialize(onClosed = {}, countsAsArrival = false) {

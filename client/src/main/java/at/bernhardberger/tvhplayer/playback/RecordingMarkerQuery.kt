@@ -56,8 +56,9 @@ internal class RecordingMarkerQuery {
         if (binding === value) use(null)
     }
 
-    suspend fun refresh(value: PlaybackBinding.Recording) {
-        if (!isCurrent(value)) return
+    /** True only for a transient failure that may be retried on this same installation. */
+    suspend fun refresh(value: PlaybackBinding.Recording): Boolean {
+        if (!isCurrent(value)) return false
         val expectedInstallation = installation
         val result = try {
             value.cutpoints()
@@ -68,12 +69,19 @@ internal class RecordingMarkerQuery {
             null
         }
         currentCoroutineContext().ensureActive()
-        if (expectedInstallation == installation && isCurrent(value)) {
-            val points = (result as? DvrCutpointsResult.Available)?.cutpoints.orEmpty()
-            if (points != _cutpoints.value) {
-                _cutpoints.value = points
-                _revision.value++
+        if (expectedInstallation != installation || !isCurrent(value)) return false
+        return when (result) {
+            is DvrCutpointsResult.Available -> {
+                if (result.cutpoints != _cutpoints.value) {
+                    _cutpoints.value = result.cutpoints
+                    _revision.value++
+                }
+                false // Successfully empty is final too; failures never erase known marks.
             }
+            is DvrCutpointsResult.Failed -> result.failure.let {
+                it.isTransient && !it.requiresFreshObservation && !it.isUnsupported
+            }
+            null -> true // An exception is an optional-metadata failure, not an empty response.
         }
     }
 }
