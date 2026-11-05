@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="appliance_accessibility_service_label">כניסה למכשיר ייעודי של Tvheadend Player</string>
-    <string name="appliance_accessibility_service_description">פותח את Tvheadend Player בהפעלה ובהתעוררות, וממפה רק את כפתור TV/GUIDE. אינו יכול לקרוא תוכן מסך.</string>
+    <string name="appliance_accessibility_service_description">פותח את Tvheadend Player בהפעלה ובהתעוררות, ומקבל שליטה רק על כפתורי השלט שהוגדרו באפליקציה זו. אינו יכול לקרוא תוכן מסך.</string>
 </resources>

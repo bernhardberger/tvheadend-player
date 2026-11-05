@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="appliance_accessibility_service_label">Tvheadend Player TV başlatma</string>
-    <string name="appliance_accessibility_service_description">Başlangıçta ve uyanma sırasında Tvheadend Player uygulamasını açar ve yalnızca TV/GUIDE düğmesini yeniden atar. Ekran içeriğini okuyamaz.</string>
+    <string name="appliance_accessibility_service_description">Başlangıçta ve uyanma sırasında Tvheadend Player uygulamasını açar ve yalnızca bu uygulamada ayarlanan uzaktan kumanda düğmelerinin kontrolünü devralır. Ekran içeriğini okuyamaz.</string>
 </resources>
