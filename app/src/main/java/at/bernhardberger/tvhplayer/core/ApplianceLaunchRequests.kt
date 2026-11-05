@@ -6,7 +6,10 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-data class ApplianceLaunchRequest(val id: Long)
+data class ApplianceLaunchRequest(
+    val id: Long,
+    val destination: ApplianceEntryDestination = ApplianceEntryDestination.LIVE,
+)
 
 data class ApplianceLaunchTarget(
     val request: ApplianceLaunchRequest,
@@ -54,24 +57,34 @@ class ApplianceLaunchRequests(
     }
 
     @Synchronized
-    fun request() {
-        onLaunchRequested()
+    fun request(destination: ApplianceEntryDestination = ApplianceEntryDestination.LIVE) {
+        if (destination == ApplianceEntryDestination.LIVE) onLaunchRequested()
         while (true) {
-            if (_state.value != ApplianceLaunchState.Idle) return
+            val previous = _state.value
+            val pendingGuide = previous is ApplianceLaunchState.Pending &&
+                previous.request.destination == ApplianceEntryDestination.GUIDE
+            if (previous != ApplianceLaunchState.Idle && destination != ApplianceEntryDestination.GUIDE && !pendingGuide) return
 
             val pending = ApplianceLaunchState.Pending(
                 ApplianceLaunchRequest(
                     nextRequestId.updateAndGet { currentId ->
                         check(currentId < Long.MAX_VALUE) { "Launch request ID exhausted" }
                         currentId + 1L
-                    }
+                    },
+                    destination = destination,
                 )
             )
-            if (transition(ApplianceLaunchState.Idle, pending, pending.request.id)) return
+            // Guide navigation is activity/ViewModel-local, not a retained autoplay request.
+            // Restoring a consumed entry intent must never reopen the Guide.
+            val retainedId = pending.request.id.takeIf { destination == ApplianceEntryDestination.LIVE }
+            if (transition(previous, pending, retainedId)) return
         }
     }
 
+    @Synchronized
     fun requestStartup(autoStartPlayback: Boolean) {
+        val pending = _state.value as? ApplianceLaunchState.Pending
+        if (pending?.request?.destination == ApplianceEntryDestination.GUIDE) return
         if (autoStartPlayback) request()
     }
 
@@ -81,6 +94,7 @@ class ApplianceLaunchRequests(
         readiness: CurrentChannelReadiness,
         persistedId: ChannelId?,
     ): ApplianceLaunchTarget? {
+        if (request.destination != ApplianceEntryDestination.LIVE) return null
         val ready = readiness as? CurrentChannelReadiness.Ready ?: return null
         val channelId = LastPlayedChannelPolicy.resolve(
             orderedIds = ready.channels.map { it.id },

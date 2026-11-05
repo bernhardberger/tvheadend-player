@@ -7,6 +7,13 @@ import org.junit.Test
 
 class ApplianceEntryPolicyTest {
     @Test
+    fun destinationContractLiteralsArePinned() {
+        assertEquals("at.bernhardberger.tvhplayer.extra.APPLIANCE_DESTINATION", ApplianceEntryPolicy.EXTRA_APPLIANCE_DESTINATION)
+        assertEquals("live", ApplianceEntryPolicy.DESTINATION_LIVE)
+        assertEquals("guide", ApplianceEntryPolicy.DESTINATION_GUIDE)
+    }
+
+    @Test
     fun playerEntryContractLiteralsArePinned() {
         assertEquals("at.bernhardberger.tvhplayer.action.APPLIANCE_ENTRY", ApplianceEntryPolicy.ACTION_APPLIANCE_ENTRY)
         assertEquals("at.bernhardberger.tvhplayer.ui.ApplianceEntryActivity", ApplianceEntryPolicy.ENTRY_ALIAS_CLASS_NAME)

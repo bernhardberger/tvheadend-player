@@ -17,6 +17,55 @@ class ApplianceLaunchRequestsTest {
     private val ready = CurrentChannelReadiness.Ready(channels)
 
     @Test
+    fun liveEntrySupersedesPendingGuideButStartupAutoplayDoesNot() {
+        val requests = ApplianceLaunchRequests()
+        requests.request(ApplianceEntryDestination.GUIDE)
+        val guide = requests.state.value
+        requests.requestStartup(autoStartPlayback = true)
+        assertEquals(guide, requests.state.value)
+        requests.request(ApplianceEntryDestination.LIVE)
+        val live = requests.state.value as ApplianceLaunchState.Pending
+        assertEquals(ApplianceEntryDestination.LIVE, live.request.destination)
+        assertTrue(requests.resolve(live.request, ready, persistedId = null) != null)
+    }
+
+    @Test
+    fun guideSupersedesEnteringAutoplayAndClearsItsRetention() {
+        var retainedId: Long? = null
+        val requests = ApplianceLaunchRequests(onRetainedRequestIdChanged = { retainedId = it })
+        requests.requestStartup(autoStartPlayback = true)
+        val live = requests.state.value as ApplianceLaunchState.Pending
+        val target = requireNotNull(requests.resolve(live.request, ready, persistedId = null))
+        assertEquals(ApplianceLaunchState.Entering(target), requests.state.value)
+        requests.request(ApplianceEntryDestination.GUIDE)
+        assertNull(retainedId)
+        val guide = requests.state.value as ApplianceLaunchState.Pending
+        assertEquals(ApplianceEntryDestination.GUIDE, guide.request.destination)
+        assertTrue(requests.cancel(guide))
+        assertEquals(ApplianceLaunchState.Idle, requests.state.value)
+        assertNull(retainedId)
+        assertFalse(requests.completePlayerVisibility(target, target.channelId, target.channelName))
+    }
+
+    @Test
+    fun guideOverridesAutoplayAndIsNeverRetainedOrResolvedAsPlayback() {
+        var retainedId: Long? = null
+        val requests = ApplianceLaunchRequests(onRetainedRequestIdChanged = { retainedId = it })
+        requests.request()
+        assertTrue(retainedId != null)
+        requests.request(ApplianceEntryDestination.GUIDE)
+        val guide = requests.state.value as ApplianceLaunchState.Pending
+        requests.requestStartup(autoStartPlayback = true)
+        assertEquals(guide, requests.state.value)
+        assertNull(retainedId)
+        assertNull(requests.resolve(guide.request, ready, persistedId = null))
+        assertTrue(requests.cancel(guide))
+        // The same owner survives configuration; a fresh owner receives no retained Guide entry.
+        assertEquals(ApplianceLaunchState.Idle, requests.state.value)
+        assertEquals(ApplianceLaunchState.Idle, ApplianceLaunchRequests(restoredRequestId = retainedId).state.value)
+    }
+
+    @Test
     fun request_transitionsIdleToPendingWithMonotonicIds() {
         val requests = ApplianceLaunchRequests()
 

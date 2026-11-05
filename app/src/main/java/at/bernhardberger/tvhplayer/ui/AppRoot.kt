@@ -53,6 +53,9 @@ import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchRequests
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchState
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget
+import at.bernhardberger.tvhplayer.core.ApplianceEntryDestination
+import at.bernhardberger.tvhplayer.core.ApplianceEntryPolicy
+import at.bernhardberger.tvhplayer.core.ApplianceGuideEntryAction
 import at.bernhardberger.tvhplayer.core.BackAction
 import at.bernhardberger.tvhplayer.core.CurrentChannelReadiness
 import at.bernhardberger.tvhplayer.core.AppErrorAction
@@ -450,6 +453,8 @@ fun AppRoot(
     registerActivityKeyContract: (MainStartupActivityKeyContract) -> (() -> Unit) = { {} },
 ) {
     val applianceLaunchState by applianceLaunchRequests.state.collectAsStateWithLifecycle()
+    val guideRequest = (applianceLaunchState as? ApplianceLaunchState.Pending)
+        ?.takeIf { it.request.destination == ApplianceEntryDestination.GUIDE }
     val startupLoadingTiming = remember { MainStartupLoadingTiming() }
     var cancelBootstrapLaunchWhenReady by rememberSaveable { mutableStateOf(false) }
     val serverSettings = when (startupState) {
@@ -488,6 +493,9 @@ fun AppRoot(
         cancellationRequested = cancelBootstrapLaunchWhenReady,
     )
     if (serverSettings.host.isBlank()) {
+        LaunchedEffect(guideRequest) {
+            guideRequest?.let { applianceLaunchRequests.cancel(it) }
+        }
         MainStartupComposition(
             state = MainStartupCompositionState(
                 presentation = MainStartupPresentation.Inactive,
@@ -537,6 +545,8 @@ fun AppRoot(
         val destination = navigationStartDestination
         if (destination != null && backStack.isEmpty()) {
             backStack.add(destination)
+        } else if (destination == null && backStack.isNotEmpty()) {
+            navigationStartDestination = backStack.first()
         }
     }
     LaunchedEffect(deferredBackAction, applianceLaunchState) {
@@ -602,7 +612,8 @@ fun AppRoot(
     val revealingTarget = startupReveal?.targetFor(profileGeneration)
     val startupPresentation = mainStartupPresentation(
         startupState = startupState,
-        launchState = applianceLaunchState,
+        // A warm Guide entry does not obscure or steal focus from the current screen.
+        launchState = if (guideRequest != null && backStack.isNotEmpty()) ApplianceLaunchState.Idle else applianceLaunchState,
         connectionState = connectionUiState,
         currentChannelReadiness = currentChannelReadiness,
     )
@@ -685,7 +696,7 @@ fun AppRoot(
             ((coldStartVisible && landingCatalogAvailable) || effectiveStartupPresentation == MainStartupPresentation.Inactive) &&
                 navigationStartDestination != null &&
                 backStack.isNotEmpty()
-        is ApplianceLaunchState.Pending -> false
+        is ApplianceLaunchState.Pending -> guideRequest != null && backStack.isNotEmpty()
         is ApplianceLaunchState.Entering -> {
             val exactStart = LivePlayerKey(
                 channelId = launchState.target.channelId.value,
@@ -713,6 +724,29 @@ fun AppRoot(
     // before returning to the player so root Back cannot loop. Player Back alone
     // does not re-arm.
     val warmReturn = playbackOrchestrator.warmReturn
+    val guideEntryAction = ApplianceEntryPolicy.guideEntryAction(
+        connectionState = connectionUiState,
+        readiness = currentChannelReadiness,
+        warm = backStack.isNotEmpty(),
+        connectionSettingsVisible = currentDestination == SettingsKey(SettingsSection.CONNECTION),
+    )
+    LaunchedEffect(guideRequest, guideEntryAction, currentDestination) {
+        val pending = guideRequest ?: return@LaunchedEffect
+        if (guideEntryAction == ApplianceGuideEntryAction.WAIT) return@LaunchedEffect
+        if (!applianceLaunchRequests.cancel(pending)) return@LaunchedEffect
+        when (guideEntryAction) {
+            ApplianceGuideEntryAction.OPEN_GUIDE -> {
+                coldStart.settle()
+                if (currentDestination != GuideKey) {
+                    playbackOrchestrator.browseNavigationSelected(activeChannelId, activeRecordingId)
+                    if (backStack.isEmpty()) navigationStartDestination = GuideKey
+                    navigateTopLevel(GuideKey)
+                }
+            }
+            ApplianceGuideEntryAction.DROP,
+            ApplianceGuideEntryAction.WAIT -> Unit
+        }
+    }
     LaunchedEffect(activeChannelId, activeRecordingId) {
         playbackOrchestrator.activePlaybackChanged(activeChannelId, activeRecordingId)
     }
@@ -752,7 +786,8 @@ fun AppRoot(
     val enterDirective = startupPresentation as? MainStartupPresentation.Enter
     LaunchedEffect(applianceLaunchState, navigationStartDestination) {
         if (applianceLaunchState == ApplianceLaunchState.Idle && navigationStartDestination == null) {
-            selectRoot(HomeKey)
+            if (backStack.isNotEmpty()) navigationStartDestination = backStack.first()
+            else selectRoot(HomeKey)
         }
     }
     LaunchedEffect(enterDirective, currentChannelReadiness) {
@@ -1231,7 +1266,7 @@ fun AppRoot(
     }
     val startupRequestId = when (val launch = applianceLaunchState) {
         ApplianceLaunchState.Idle -> revealingTarget?.request?.id
-        is ApplianceLaunchState.Pending -> launch.request.id
+        is ApplianceLaunchState.Pending -> launch.request.id.takeIf { guideRequest == null }
         is ApplianceLaunchState.Entering -> launch.target.request.id
     }
     // Capture the existing service at request entry, not the autoplay it subsequently starts.
@@ -1252,7 +1287,7 @@ fun AppRoot(
             navigationStartDestination = navigationStartDestination,
             navigationAllowed = navigationAllowed,
             contentAllowed =
-                applianceLaunchState == ApplianceLaunchState.Idle &&
+                (applianceLaunchState == ApplianceLaunchState.Idle || guideRequest != null && backStack.isNotEmpty()) &&
                     effectiveStartupPresentation == MainStartupPresentation.Inactive &&
                     revealingTarget == null,
             requestId = startupRequestId,

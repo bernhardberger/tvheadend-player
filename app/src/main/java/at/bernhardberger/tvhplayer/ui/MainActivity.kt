@@ -36,6 +36,7 @@ import at.bernhardberger.tvhplayer.playback.BackgroundPlaybackNotice
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.Notice
 import at.bernhardberger.tvhplayer.core.ApplianceEntryPolicy
+import at.bernhardberger.tvhplayer.core.ApplianceEntryDestination
 import at.bernhardberger.tvhplayer.core.MainStartupState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.ui.common.AppClock
@@ -263,8 +264,12 @@ class MainActivity : AppCompatActivity() {
                 componentClassName = intent?.component?.className,
                 playerPackage = packageName,
             )) return
-        if (ApplianceEntryPolicy.shouldCreateLaunchRequest(isPlayerVisible)) {
-            startupViewModel.applianceLaunchRequests.request()
+        val destination = ApplianceEntryPolicy.destination(
+            intent?.getStringExtra(ApplianceEntryPolicy.EXTRA_APPLIANCE_DESTINATION),
+        )
+        if (destination == ApplianceEntryDestination.GUIDE ||
+            ApplianceEntryPolicy.shouldCreateLaunchRequest(isPlayerVisible)) {
+            startupViewModel.applianceLaunchRequests.request(destination)
         }
     }
 
