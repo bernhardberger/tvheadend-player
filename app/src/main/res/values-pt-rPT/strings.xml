@@ -421,10 +421,11 @@
     <string name="recording_mark_cut">Corte</string>
     <string name="recording_mark_cut_ends">Fim do corte</string>
     <string name="recording_mark_ad_badge">Pub</string>
+    <string name="recording_mark_program_starts">Início do programa</string>
+    <string name="recording_mark_program_ends">Fim do programa</string>
     <string name="skip_ad_break">Saltar intervalo publicitário</string>
     <string name="settings_section_recording_marks">Marcadores de gravação</string>
     <string name="ad_breaks_setting">Intervalos publicitários</string>
-    <string name="ad_breaks_description">O que acontece quando uma gravação chega a um intervalo publicitário.</string>
     <string name="ad_breaks_ask">Perguntar</string>
     <string name="ad_breaks_ask_help">Quando começa um intervalo, mostra sobre o vídeo um botão para o saltar.</string>
     <string name="ad_breaks_automatic">Saltar automaticamente</string>

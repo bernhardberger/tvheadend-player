@@ -466,10 +466,11 @@
     <string name="recording_mark_cut">Вирізаний фрагмент</string>
     <string name="recording_mark_cut_ends">Кінець вирізаного фрагмента</string>
     <string name="recording_mark_ad_badge">Рек.</string>
+    <string name="recording_mark_program_starts">Початок передачі</string>
+    <string name="recording_mark_program_ends">Кінець передачі</string>
     <string name="skip_ad_break">Пропустити рекламу</string>
     <string name="settings_section_recording_marks">Мітки запису</string>
     <string name="ad_breaks_setting">Рекламні паузи</string>
-    <string name="ad_breaks_description">Що відбувається, коли запис доходить до рекламної паузи.</string>
     <string name="ad_breaks_ask">Запитувати</string>
     <string name="ad_breaks_ask_help">На початку паузи поверх відео з’являється кнопка пропуску.</string>
     <string name="ad_breaks_automatic">Пропускати автоматично</string>

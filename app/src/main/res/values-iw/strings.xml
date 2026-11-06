@@ -457,10 +457,11 @@
     <string name="recording_mark_cut">קטע לחיתוך</string>
     <string name="recording_mark_cut_ends">סוף הקטע לחיתוך</string>
     <string name="recording_mark_ad_badge">פרסומת</string>
+    <string name="recording_mark_program_starts">תחילת התוכנית</string>
+    <string name="recording_mark_program_ends">סוף התוכנית</string>
     <string name="skip_ad_break">דילוג על הפסקת הפרסומות</string>
     <string name="settings_section_recording_marks">סמני ההקלטה</string>
     <string name="ad_breaks_setting">הפסקות פרסומות</string>
-    <string name="ad_breaks_description">מה קורה כשההקלטה מגיעה להפסקת פרסומות.</string>
     <string name="ad_breaks_ask">לשאול</string>
     <string name="ad_breaks_ask_help">בתחילת הפסקה מופיע כפתור דילוג מעל הווידאו.</string>
     <string name="ad_breaks_automatic">דילוג אוטומטי</string>

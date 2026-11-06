@@ -448,10 +448,11 @@
     <string name="recording_mark_cut">Leikkaus</string>
     <string name="recording_mark_cut_ends">Leikkaus päättyy</string>
     <string name="recording_mark_ad_badge">Mainos</string>
+    <string name="recording_mark_program_starts">Ohjelma alkaa</string>
+    <string name="recording_mark_program_ends">Ohjelma päättyy</string>
     <string name="skip_ad_break">Ohita mainoskatko</string>
     <string name="settings_section_recording_marks">Tallenteen merkit</string>
     <string name="ad_breaks_setting">Mainoskatkot</string>
-    <string name="ad_breaks_description">Mitä tapahtuu, kun tallenne saavuttaa mainoskatkon.</string>
     <string name="ad_breaks_ask">Kysy</string>
     <string name="ad_breaks_ask_help">Näyttää ohituspainikkeen videon päällä katkon alkaessa.</string>
     <string name="ad_breaks_automatic">Ohita automaattisesti</string>

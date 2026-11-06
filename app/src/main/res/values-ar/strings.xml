@@ -484,10 +484,11 @@
     <string name="recording_mark_cut">مقطع مستبعد</string>
     <string name="recording_mark_cut_ends">نهاية المقطع المستبعد</string>
     <string name="recording_mark_ad_badge">إعلان</string>
+    <string name="recording_mark_program_starts">بداية البرنامج</string>
+    <string name="recording_mark_program_ends">نهاية البرنامج</string>
     <string name="skip_ad_break">تخطي الفاصل الإعلاني</string>
     <string name="settings_section_recording_marks">علامات التسجيل</string>
     <string name="ad_breaks_setting">الفواصل الإعلانية</string>
-    <string name="ad_breaks_description">ما يحدث عندما يصل التسجيل إلى فاصل إعلاني.</string>
     <string name="ad_breaks_ask">السؤال أولًا</string>
     <string name="ad_breaks_ask_help">يظهر زر للتخطي فوق الفيديو عند بدء الفاصل.</string>
     <string name="ad_breaks_automatic">التخطي تلقائيًا</string>

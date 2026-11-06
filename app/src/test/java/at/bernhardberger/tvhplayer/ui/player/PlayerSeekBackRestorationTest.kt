@@ -37,7 +37,7 @@ class PlayerSeekBackRestorationTest {
             if (action == PlayerBackAction.CANCEL_PENDING_SEEK) owner.cancelPendingSeek() else owner.dismissDispatchedFeedback()
             assertNull(owner.previewForTimeline(state.timeline))
             assertEquals(PlayerSeekPreviewPhase.NONE, owner.seekPreviewPhase(true))
-            assertEquals(0.55f, playerChromeAlpha(timelineFocused = true, previewing = owner.preview != null), 0f)
+            assertEquals(1f, playerChromeAlpha(timelineFocused = true, previewing = owner.preview != null), 0f)
             advanceTimeBy(2_000L); runCurrent()
             owner.sampleTimeshiftPresentation { state }
             assertNull(owner.preview)
@@ -63,7 +63,7 @@ class PlayerSeekBackRestorationTest {
             assertNull(owner.pendingTargetMs)
             assertNull(owner.pendingOriginMs)
             assertEquals(PlayerSeekPreviewPhase.NONE, owner.seekPreviewPhase(true))
-            assertEquals(0.55f, playerChromeAlpha(timelineFocused = true, previewing = owner.pendingTargetMs != null), 0f)
+            assertEquals(1f, playerChromeAlpha(timelineFocused = true, previewing = owner.pendingTargetMs != null), 0f)
             advanceTimeBy(2_000L); runCurrent()
             assertNull(owner.pendingTargetMs)
             assertEquals(if (dispatched) listOf(30_000L) else emptyList<Long>(), seeks)

@@ -2,10 +2,30 @@ package at.bernhardberger.tvhplayer.core
 
 import at.bernhardberger.tvheadend.sdk.core.DvrCutpoint
 import at.bernhardberger.tvheadend.sdk.core.DvrCutpointAction
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 
-enum class RecordingMarkKind { AD_BREAK, CUT, CHAPTER }
+enum class RecordingMarkKind { AD_BREAK, CUT, CHAPTER, PROGRAM_START, PROGRAM_END }
 
-/** Chapters are points (end == start); interval ends are exclusive. Names are file text only. */
+/** Scheduled programme boundaries relative to the padded recording start, never outside verified content. */
+fun recordingProgramMarks(recording: DvrEntry, verifiedDurationMs: Long): List<RecordingMark> {
+    val origin = recordingPaddedStart(recording) ?: return emptyList()
+    return buildList {
+        if (recording.startExtraMinutes?.isPositive() == true) {
+            recording.start?.let { start ->
+                val position = (start - origin).inWholeMilliseconds
+                if (position > 0 && position < verifiedDurationMs) add(RecordingMark(RecordingMarkKind.PROGRAM_START, position))
+            }
+        }
+        if (recording.stopExtraMinutes?.isPositive() == true) {
+            recording.stop?.let { stop ->
+                val position = (stop - origin).inWholeMilliseconds
+                if (position > 0 && position < verifiedDurationMs) add(RecordingMark(RecordingMarkKind.PROGRAM_END, position))
+            }
+        }
+    }
+}
+
+/** Chapters and programme boundaries are points (end == start); interval ends are exclusive. Names are file text only. */
 data class RecordingMark(
     val kind: RecordingMarkKind,
     val startMs: Long,
@@ -60,12 +80,13 @@ fun recordingMarks(cutpoints: List<DvrCutpoint>, chapters: List<RecordingChapter
  */
 data class RecordingMarkStop(val positionMs: Long, val mark: RecordingMark? = null, val atEnd: Boolean = false)
 
-/** Which kind leads where marks meet or their symbols collide: ad break, cut, chapter. */
+/** Which kind leads where marks meet or their symbols collide: ad break, cut, chapter, programme. */
 val RecordingMarkKind.priority: Int
     get() = when (this) {
         RecordingMarkKind.AD_BREAK -> 0
         RecordingMarkKind.CUT -> 1
         RecordingMarkKind.CHAPTER -> 2
+        RecordingMarkKind.PROGRAM_START, RecordingMarkKind.PROGRAM_END -> 3
     }
 
 /**
@@ -73,7 +94,7 @@ val RecordingMarkKind.priority: Int
  * and each ad break's and cut's end inside the duration, where one would skip to by hand; chapters
  * are single points. A mark's end beyond a growing recording's duration does not hide its start.
  * Marks that start together make one stop led by the higher-[priority] kind, a named one first; a mark
- * starting where an interval ends takes that stop, and intervals ending together leave one end stop
+ * starting where an interval ends takes that stop (except programme boundaries), and intervals ending together leave one end stop
  * led by priority. Without a mark starting inside the duration there are no stops. These are the
  * positions the marks row seeks.
  */
@@ -83,9 +104,14 @@ fun recordingMarkStops(marks: List<RecordingMark>, verifiedDurationMs: Long): Li
         .mapValues { (start, group) ->
             RecordingMarkStop(start, group.minWith(compareBy<RecordingMark>({ it.kind.priority }, { it.name == null })))
         }.toMutableMap()
-    marks.filter { it.kind != RecordingMarkKind.CHAPTER && it.startMs >= 0 && it.endMs in 1 until verifiedDurationMs }
+    marks.filter { it.kind in listOf(RecordingMarkKind.AD_BREAK, RecordingMarkKind.CUT) && it.startMs >= 0 && it.endMs in 1 until verifiedDurationMs }
         .sortedBy { it.kind.priority }
-        .forEach { byPosition.putIfAbsent(it.endMs, RecordingMarkStop(it.endMs, it, atEnd = true)) }
+        .forEach { mark ->
+            val existing = byPosition[mark.endMs]
+            if (existing == null || existing.mark?.kind in listOf(RecordingMarkKind.PROGRAM_START, RecordingMarkKind.PROGRAM_END)) {
+                byPosition[mark.endMs] = RecordingMarkStop(mark.endMs, mark, atEnd = true)
+            }
+        }
     val starts = byPosition.toSortedMap().values.toList()
     return when {
         starts.isEmpty() -> emptyList()

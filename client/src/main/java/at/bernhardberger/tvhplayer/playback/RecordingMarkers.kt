@@ -287,14 +287,17 @@ internal class RecordingMarkers(
         savedVolume = null
     }
 
-    fun seekRecordingMarker(positionMs: Long, expectedRevision: Long) {
+    fun seekRecordingMarker(positionMs: Long, expectedRevision: Long, programMarks: List<RecordingMark> = emptyList()) {
         targetCommands.runIfOpen {
             if (expectedRevision != recordingMarkerRevision.value ||
                 !markerQuery.isCurrent() || targetInstallationInProgress() ||
                 mediaItem == null || player.currentMediaItem !== mediaItem) return@runIfOpen
             if (!player.isCurrentMediaItemSeekable ||
                 !player.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)) return@runIfOpen
-            if (recordingMarkStops(marks.value, player.duration).any { it.positionMs == positionMs }) {
+            val programme = programMarks.filter {
+                it.kind == RecordingMarkKind.PROGRAM_START || it.kind == RecordingMarkKind.PROGRAM_END
+            }
+            if (recordingMarkStops(marks.value + programme, player.duration).any { it.positionMs == positionMs }) {
                 // seekTo does not change playWhenReady: marker navigation preserves pause.
                 deliberateSeek(positionMs)
                 seekPlayer(positionMs)

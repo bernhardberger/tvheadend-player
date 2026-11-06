@@ -448,10 +448,11 @@
     <string name="recording_mark_cut">Vágás</string>
     <string name="recording_mark_cut_ends">Vágás vége</string>
     <string name="recording_mark_ad_badge">Rek.</string>
+    <string name="recording_mark_program_starts">Műsor kezdete</string>
+    <string name="recording_mark_program_ends">Műsor vége</string>
     <string name="skip_ad_break">Reklámszünet átugrása</string>
     <string name="settings_section_recording_marks">Felvételjelölők</string>
     <string name="ad_breaks_setting">Reklámszünetek</string>
-    <string name="ad_breaks_description">Mi történjen, ha a felvétel reklámszünethez ér.</string>
     <string name="ad_breaks_ask">Rákérdezés</string>
     <string name="ad_breaks_ask_help">A szünet kezdetekor átugrási gombot jelenít meg a videó fölött.</string>
     <string name="ad_breaks_automatic">Automatikus átugrás</string>

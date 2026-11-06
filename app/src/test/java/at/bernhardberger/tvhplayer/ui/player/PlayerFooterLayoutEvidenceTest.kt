@@ -517,9 +517,9 @@ class PlayerFooterLayoutEvidenceTest {
         compose.waitForIdle()
         compose.mainClock.advanceTimeByFrame()
         compose.mainClock.advanceTimeBy(96)
-        assertTrue("intermediate alpha=${alpha.value}", alpha.value > 0.55f && alpha.value < 1f)
+        assertEquals(1f, alpha.value, 0.001f)
         compose.mainClock.advanceTimeBy(240)
-        assertEquals(0.55f, alpha.value, 0.001f)
+        assertEquals(1f, alpha.value, 0.001f)
         compose.runOnIdle { preview = true }
         compose.waitForIdle()
         compose.mainClock.advanceTimeByFrame()
@@ -797,7 +797,7 @@ class PlayerFooterLayoutEvidenceTest {
     }
 
     @Test
-    fun focusGrowthSurvivesIntermediateActionFadeAndSettledFrame() {
+    fun focusGrowthSurvivesSeekbarReturnAndSettledFrame() {
         show({ false }, { null }, { false }, 1f)
         val nominalActions = bounds("player-actions")
         val track = bounds("player-timeline-track")
@@ -821,8 +821,7 @@ class PlayerFooterLayoutEvidenceTest {
         val settledInterior = android.graphics.Color.red(settled.getPixel(x, nominalActions.top.toInt() + 7))
         assertTrue("mid-fade overflow cropped: $midOverflow", midOverflow > 90)
         assertTrue("settled overflow cropped: $settledOverflow", settledOverflow > 150)
-        assertTrue("capture must be between alpha .55 and 1: $midInterior / $settledInterior",
-            midInterior in 91 until settledInterior)
+        assertEquals("the action row stays fully opaque across seekbar focus", settledInterior, midInterior)
         assertEquals(nominalActions, bounds("player-actions"))
         assertEquals(track, bounds("player-timeline-track"))
         capture("en-font1.0-960x540-mdpi-d1-white-focus-settled")

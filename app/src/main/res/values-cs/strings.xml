@@ -466,10 +466,11 @@
     <string name="recording_mark_cut">Střih</string>
     <string name="recording_mark_cut_ends">Konec střihu</string>
     <string name="recording_mark_ad_badge">Rekl.</string>
+    <string name="recording_mark_program_starts">Začátek pořadu</string>
+    <string name="recording_mark_program_ends">Konec pořadu</string>
     <string name="skip_ad_break">Přeskočit reklamní přestávku</string>
     <string name="settings_section_recording_marks">Značky nahrávky</string>
     <string name="ad_breaks_setting">Reklamní přestávky</string>
-    <string name="ad_breaks_description">Co se stane, když nahrávka dosáhne reklamní přestávky.</string>
     <string name="ad_breaks_ask">Zeptat se</string>
     <string name="ad_breaks_ask_help">Na začátku přestávky zobrazí nad videem tlačítko pro přeskočení.</string>
     <string name="ad_breaks_automatic">Přeskakovat automaticky</string>

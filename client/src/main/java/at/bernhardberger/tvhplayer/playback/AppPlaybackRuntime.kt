@@ -1913,8 +1913,8 @@ class AppPlaybackRuntime(
     fun dismissRecordingSkipPrompt(mark: at.bernhardberger.tvhplayer.core.RecordingMark, expectedRevision: Long) {
         recordingMarkers.dismissSkipPrompt(mark, expectedRevision)
     }
-    fun seekRecordingMarker(positionMs: Long, expectedRevision: Long) {
-        recordingMarkers.seekRecordingMarker(positionMs, expectedRevision)
+    fun seekRecordingMarker(positionMs: Long, expectedRevision: Long, programMarks: List<at.bernhardberger.tvhplayer.core.RecordingMark> = emptyList()) {
+        recordingMarkers.seekRecordingMarker(positionMs, expectedRevision, programMarks)
     }
     fun setDiagnosticsEnabled(enabled: Boolean) {
         presentation.setDiagnosticsEnabled(enabled)

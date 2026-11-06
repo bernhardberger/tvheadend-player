@@ -457,10 +457,11 @@
     <string name="recording_mark_cut">Tăietură</string>
     <string name="recording_mark_cut_ends">Sfârșitul tăieturii</string>
     <string name="recording_mark_ad_badge">Reclamă</string>
+    <string name="recording_mark_program_starts">Începutul emisiunii</string>
+    <string name="recording_mark_program_ends">Sfârșitul emisiunii</string>
     <string name="skip_ad_break">Sari peste pauza publicitară</string>
     <string name="settings_section_recording_marks">Marcajele înregistrării</string>
     <string name="ad_breaks_setting">Pauze publicitare</string>
-    <string name="ad_breaks_description">Ce se întâmplă când o înregistrare ajunge la o pauză publicitară.</string>
     <string name="ad_breaks_ask">Întreabă</string>
     <string name="ad_breaks_ask_help">La începutul unei pauze, afișează peste videoclip un buton pentru a o sări.</string>
     <string name="ad_breaks_automatic">Sari automat</string>

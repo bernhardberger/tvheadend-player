@@ -2,12 +2,47 @@ package at.bernhardberger.tvhplayer.core
 
 import at.bernhardberger.tvheadend.sdk.core.DvrCutpoint
 import at.bernhardberger.tvheadend.sdk.core.DvrCutpointAction
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import kotlin.time.Instant
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.milliseconds
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RecordingMarkerPolicyTest {
+    @Test fun programmeBoundariesUsePaddingAndStayStrictlyInsideVerifiedContent() {
+        fun entry(pre: Int? = 2, post: Int? = 3) = DvrEntry.create(DvrEntryId(1),
+            start = Instant.fromEpochSeconds(1_000), stop = Instant.fromEpochSeconds(1_600),
+            startExtraMinutes = pre?.minutes, stopExtraMinutes = post?.minutes)
+        val start = RecordingMark(RecordingMarkKind.PROGRAM_START, 120_000)
+        val end = RecordingMark(RecordingMarkKind.PROGRAM_END, 720_000)
+        assertEquals(listOf(start, end), recordingProgramMarks(entry(), 900_000))
+        assertEquals(listOf(start), recordingProgramMarks(entry(), 720_000))
+        assertEquals(emptyList<RecordingMark>(), recordingProgramMarks(entry(), 120_000))
+        assertEquals(emptyList<RecordingMark>(), recordingProgramMarks(entry(), 0))
+        assertEquals(listOf(RecordingMark(RecordingMarkKind.PROGRAM_END, 600_000)), recordingProgramMarks(entry(pre = null), 900_000))
+        assertEquals(listOf(start), recordingProgramMarks(entry(post = 0), 900_000))
+        assertTrue(recordingProgramMarks(entry(0, 0), 900_000).isEmpty())
+        assertTrue(recordingProgramMarks(entry(null, null), 900_000).isEmpty())
+        assertTrue(recordingProgramMarks(DvrEntry.create(DvrEntryId(1)), 900_000).isEmpty())
+    }
+
+    @Test fun programmePointsRankLastAndMergeOnlyAtExactStartsOrEnds() {
+        val program = RecordingMark(RecordingMarkKind.PROGRAM_START, 20)
+        for (kind in listOf(RecordingMarkKind.AD_BREAK, RecordingMarkKind.CUT, RecordingMarkKind.CHAPTER)) {
+            assertTrue(program.kind.priority > kind.priority)
+            val other = RecordingMark(kind, 20, if (kind == RecordingMarkKind.CHAPTER) 20 else 30)
+            assertEquals(other, recordingMarkStops(listOf(program, other), 100).first { it.positionMs == 20L }.mark)
+        }
+        val interval = RecordingMark(RecordingMarkKind.AD_BREAK, 10, 20)
+        val stops = recordingMarkStops(listOf(program, interval, RecordingMark(RecordingMarkKind.PROGRAM_END, 21)), 100)
+        assertEquals(listOf(0L, 10L, 20L, 21L), stops.map { it.positionMs })
+        assertEquals(RecordingMarkStop(20, interval, atEnd = true), stops[2])
+        assertEquals(listOf(0L, 20L), recordingMarkStops(listOf(program), 100).map { it.positionMs })
+    }
+
     @Test
     fun chaptersMergeWithScenesAndAreSortedDistinctAndInsideDuration() {
         assertEquals(listOf(0L, 20L, 30L, 90L), stops(

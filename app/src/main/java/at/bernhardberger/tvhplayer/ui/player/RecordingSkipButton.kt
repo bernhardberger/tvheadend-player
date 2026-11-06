@@ -1,16 +1,15 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -18,6 +17,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.SideEffect
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -26,31 +31,40 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.Icon
 import androidx.tv.material3.LocalContentColor
-import androidx.tv.material3.OutlinedButton
-import androidx.tv.material3.OutlinedButtonDefaults
 import androidx.tv.material3.Text
+import androidx.tv.material3.Surface
+import androidx.tv.material3.ClickableSurfaceDefaults
+import androidx.tv.material3.Border
+import androidx.tv.material3.Glow
+import androidx.tv.material3.MaterialTheme
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.platform.LocalDensity
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.RecordingMark
 import kotlin.math.roundToInt
@@ -66,17 +80,29 @@ internal const val SKIP_PROMPT_MS = 10_000L
 internal fun recordingSkipPromptShown(offered: Boolean, playing: Boolean, canSeek: Boolean, bannerVisible: Boolean): Boolean =
     offered && playing && canSeek && !bannerVisible
 
-/** Above the info strip, the resting Skip keeps the gap the action row keeps below it, doubled. */
-private val SkipRestGap = 16.dp
-
 /** The button's focused scale, which the prompt's corner placement allows for. */
 private const val SkipFocusScale = 1.1f
 
 internal val RecordingSkipActivationKeys = setOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter)
 
+private val SkipGhost = Color(0xA83C3C3C)
+private val SkipFilled = Color(0xDEC7C7C7)
+private val SkipDarkLabel = Color(0xFF1F1F1F)
+
+/** The actual label metrics and the same icon, spacing and padding as the Surface below. */
+@Composable
+internal fun recordingSkipWidth(): Dp {
+    val text = stringResource(R.string.skip_ad_break)
+    val style = MaterialTheme.typography.labelLarge.copy(
+        fontSize = MaterialTheme.typography.titleMedium.fontSize, fontWeight = FontWeight.Medium,
+    )
+    val measured = rememberTextMeasurer().measure(text, style = style, maxLines = 1)
+    return with(LocalDensity.current) { measured.size.width.toDp() } + 18.dp + 6.dp + 25.dp
+}
+
 /**
  * The "Skip ad break" button, over the hidden chrome as the prompt, with the time it stays as a
- * thin fill, and resting above the controls' info strip. A one-off: [PlayerActionRow] holds the
+ * full-height fill, and resting beside the controls' info strip. A one-off: [PlayerActionRow] holds the
  * row's icon-only actions, and no shared component draws a labelled button over the video.
  */
 @Composable
@@ -88,9 +114,9 @@ private fun RecordingSkipButton(
 ) {
     // Only a press it saw begin activates it, never one that started before it appeared or took focus.
     val pressed = remember { mutableSetOf<Key>() }
-    OutlinedButton(
+    Surface(
         onClick = onSkip,
-        modifier = modifier.onPreviewKeyEvent { event ->
+        modifier = modifier.semantics { role = Role.Button }.onPreviewKeyEvent { event ->
             if (event.key !in RecordingSkipActivationKeys) return@onPreviewKeyEvent false
             when (event.type) {
                 KeyEventType.KeyDown -> {
@@ -101,25 +127,53 @@ private fun RecordingSkipButton(
                 else -> false
             }
         },
-        colors = OutlinedButtonDefaults.colors(containerColor = PlayerChromeTokens.chipScrim),
-        scale = OutlinedButtonDefaults.scale(focusedScale = SkipFocusScale),
-        contentPadding = OutlinedButtonDefaults.ButtonWithIconContentPadding,
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = SkipGhost, contentColor = Color.White,
+            focusedContainerColor = if (elapsed == null) SkipFilled else SkipGhost,
+            focusedContentColor = if (elapsed == null) SkipDarkLabel else Color.White,
+            pressedContainerColor = if (elapsed == null) SkipFilled else SkipGhost,
+            pressedContentColor = if (elapsed == null) SkipDarkLabel else Color.White,
+        ),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = if (elapsed == null) SkipFocusScale else 1f, pressedScale = 1f),
+        border = ClickableSurfaceDefaults.border(border = Border.None, focusedBorder = Border.None, pressedBorder = Border.None),
+        glow = ClickableSurfaceDefaults.glow(glow = Glow.None, focusedGlow = Glow.None, pressedGlow = Glow.None),
+        shape = ClickableSurfaceDefaults.shape(shape = CircleShape),
     ) {
-        Column(Modifier.width(IntrinsicSize.Max)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(painterResource(R.drawable.ic_skip_next), contentDescription = null,
-                    modifier = Modifier.size(OutlinedButtonDefaults.IconSize))
-                Spacer(Modifier.width(OutlinedButtonDefaults.IconSpacing))
-                Text(stringResource(R.string.skip_ad_break), maxLines = 1, softWrap = false)
-            }
-            if (elapsed != null) {
-                val color = LocalContentColor.current
-                Box(Modifier.padding(top = 4.dp).fillMaxWidth().height(2.dp).testTag("recording-skip-fill").drawBehind {
-                    drawRect(color.copy(alpha = 0.24f))
-                    drawRect(color, size = Size(size.width * elapsed().coerceIn(0f, 1f), size.height))
-                })
-            }
+        Box {
+            if (elapsed != null) Box(Modifier.matchParentSize().testTag("recording-skip-fill").drawBehind {
+                drawRect(Color.White.copy(alpha = 0.62f), size = Size(size.width * elapsed().coerceIn(0f, 1f), size.height))
+            })
+            SkipLabel(LocalContentColor.current)
+            if (elapsed != null) SkipLabel(SkipDarkLabel, Modifier.matchParentSize().drawWithContent {
+                val content = this
+                clipRect(right = size.width * elapsed().coerceIn(0f, 1f)) { content.drawContent() }
+            }.clearAndSetSemantics { })
         }
+    }
+}
+
+@Composable
+private fun SkipLabel(color: Color, modifier: Modifier = Modifier) {
+    // Reference 28: ~12 dp caps, 12.5 dp glyph ink, 16 dp ink inset and 10 dp ink gap in a 150×40 dp pill.
+    // Use the same content for prompt and resting Skip; retain labelLarge's 20 sp line height.
+    val style = MaterialTheme.typography.labelLarge.copy(fontSize = MaterialTheme.typography.titleMedium.fontSize)
+    Row(modifier.padding(start = 13.dp, end = 12.dp, top = 10.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        // Reference ink: 9.5×12.5 dp triangle, 1 dp gap, 2.5 dp bar. The stock icon's bar is thinner.
+        Box(Modifier.size(18.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(13.dp, 12.5.dp).drawBehind {
+                val triangle = Path().apply {
+                    moveTo(0f, 0f)
+                    lineTo(9.5.dp.toPx(), size.height / 2f)
+                    lineTo(0f, size.height)
+                    close()
+                }
+                drawPath(triangle, color)
+                drawRect(color, topLeft = Offset(10.5.dp.toPx(), 0f), size = Size(2.5.dp.toPx(), size.height))
+            })
+        }
+        Spacer(Modifier.width(6.dp))
+        Text(stringResource(R.string.skip_ad_break), color = color, style = style,
+            fontWeight = FontWeight.Medium, maxLines = 1, softWrap = false)
     }
 }
 
@@ -136,31 +190,40 @@ internal fun RecordingSkipPrompt(
     onTimeout: (RecordingMark) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var elapsedMs by remember(prompt) { mutableLongStateOf(0L) }
+    var departing by remember { mutableStateOf(prompt) }
+    SideEffect { if (prompt != null) departing = prompt }
+    // Clearing the offer must not replace the presentation still leaving the screen.
+    val presentation = prompt ?: departing
+    var elapsedMs by remember(presentation) { mutableLongStateOf(0L) }
     val timeout by rememberUpdatedState(onTimeout)
     LaunchedEffect(prompt) {
         val offered = prompt ?: return@LaunchedEffect
+        elapsedMs = 0L
         // Frame time, so the prompt's time does not follow the animator duration scale.
         val start = withFrameMillis { it }
         while (elapsedMs < SKIP_PROMPT_MS) elapsedMs = withFrameMillis { it } - start
         timeout(offered)
     }
     val visible = prompt != null && shown
+    val visibility = remember { MutableTransitionState(false) }
+    SideEffect { visibility.targetState = visible }
+    LaunchedEffect(prompt, visibility.isIdle, visibility.currentState) {
+        if (prompt == null && visibility.isIdle && !visibility.currentState) departing = null
+    }
+    val rise = with(LocalDensity.current) { PlayerMotion.ChromeOffset.roundToPx() }
     AnimatedVisibility(
-        visible = visible,
-        enter = fadeIn(tween(PlayerMotion.ShortMs, easing = PlayerMotion.Standard)),
-        exit = fadeOut(tween(PlayerMotion.ShortMs, easing = PlayerMotion.StandardAccelerate)),
-        // The focused prompt grows about its centre; reserve that growth so it stays inside the
-        // safe margins the caller places it at.
-        modifier = modifier.layout { measurable, constraints ->
-            val placeable = measurable.measure(constraints)
-            val growth = (SkipFocusScale - 1f) / 2f
-            layout(
-                placeable.width + (placeable.width * growth).roundToInt(),
-                placeable.height + (placeable.height * growth).roundToInt(),
-            ) { placeable.placeRelative(0, 0) }
-        },
+        visibleState = visibility,
+        enter = EnterTransition.None,
+        exit = ExitTransition.None,
+        modifier = modifier,
     ) {
+        val enter = tween<Float>(PlayerMotion.MediumMs, easing = PlayerMotion.EmphasizedDecelerate)
+        val exit = tween<Float>(PlayerMotion.ShortMs, easing = PlayerMotion.EmphasizedAccelerate)
+        val opacity = animateShown(enter, exit, "skip prompt opacity")
+        val travel = transition.animateFloat(
+            transitionSpec = { if (targetState == EnterExitState.Visible) enter else exit },
+            label = "skip prompt rise",
+        ) { if (it == EnterExitState.PreEnter) rise.toFloat() else 0f }
         val focus = remember { FocusRequester() }
         LaunchedEffect(visible) {
             if (visible) {
@@ -171,7 +234,10 @@ internal fun RecordingSkipPrompt(
         RecordingSkipButton(
             onSkip = { prompt?.let(onSkip) },
             elapsed = { elapsedMs / SKIP_PROMPT_MS.toFloat() },
-            modifier = Modifier.testTag("recording-skip-prompt").focusRequester(focus)
+            modifier = Modifier.graphicsLayer {
+                alpha = opacity.value
+                translationY = travel.value.roundToInt().toFloat()
+            }.testTag("recording-skip-prompt").focusRequester(focus)
                 .focusProperties { canFocus = visible }
                 .semantics { liveRegion = LiveRegionMode.Polite },
         )
@@ -192,16 +258,14 @@ internal fun RecordingSkipRest(
     alpha: () -> Float,
     onFocused: () -> Unit,
     modifier: Modifier = Modifier,
-    gap: Dp = SkipRestGap,
+    marksOpen: Boolean = false,
 ) {
+    val lift = animateFloatAsState(if (marksOpen) 1f else 0f,
+        tween(if (marksOpen) PlayerMotion.MediumMs else PlayerMotion.ShortMs, easing = PlayerMotion.Standard), label = "skip marks lift")
     RecordingSkipButton(
         onSkip = onSkip,
         modifier = modifier
-            .layout { measurable, constraints ->
-                val placeable = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0))
-                layout(placeable.width, 0) { placeable.placeRelative(0, -placeable.height - gap.roundToPx()) }
-            }
-            .graphicsLayer { this.alpha = alpha() }
+            .graphicsLayer { this.alpha = alpha(); translationY = -32.dp.toPx() * lift.value }
             .testTag("recording-skip")
             .focusRequester(focus)
             .focusProperties {

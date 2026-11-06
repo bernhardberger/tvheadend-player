@@ -448,10 +448,11 @@
     <string name="recording_mark_cut">Klipp</string>
     <string name="recording_mark_cut_ends">Klipp slutar</string>
     <string name="recording_mark_ad_badge">Rekl.</string>
+    <string name="recording_mark_program_starts">Programmet börjar</string>
+    <string name="recording_mark_program_ends">Programmet slutar</string>
     <string name="skip_ad_break">Hoppa över reklampaus</string>
     <string name="settings_section_recording_marks">Inspelningsmarkörer</string>
     <string name="ad_breaks_setting">Reklampauser</string>
-    <string name="ad_breaks_description">Vad som händer när en inspelning når en reklampaus.</string>
     <string name="ad_breaks_ask">Fråga</string>
     <string name="ad_breaks_ask_help">Visar en knapp för att hoppa över ovanpå videon när en paus börjar.</string>
     <string name="ad_breaks_automatic">Hoppa över automatiskt</string>

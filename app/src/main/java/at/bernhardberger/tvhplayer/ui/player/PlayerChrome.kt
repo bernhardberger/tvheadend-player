@@ -4,6 +4,7 @@ import at.bernhardberger.tvhplayer.ui.TvGridColumnWidth
 import at.bernhardberger.tvhplayer.ui.TvGridGutter
 import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -138,6 +139,9 @@ internal fun PlayerChrome(
             is PlayerChromeTimeline.Recording -> timeline.growing
         }
         val lastLineEndReserve = if (liveEnd) liveDistanceReserve() else 0.dp
+        val skipReserve by animateDpAsState(if ((timeline as? PlayerChromeTimeline.Recording)?.marks.orEmpty()
+                .any { it.kind == at.bernhardberger.tvhplayer.core.RecordingMarkKind.AD_BREAK }) recordingSkipWidth() + 24.dp else 0.dp,
+            tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard), label = "recording Skip reserve")
         val header: @Composable (Modifier) -> Unit = { PlayerChromeHeader(content.clock, it.testTag("player-header")) }
         // One chrome for every source: the channel at the top, the info bar leading with the programme's
         // artwork, and the [timelineRow] the full width below it.
@@ -151,6 +155,7 @@ internal fun PlayerChrome(
                     modifier = Modifier.testTag("player-info-bar"),
                     contentAlpha = contentAlpha,
                     lastLineEndReserve = lastLineEndReserve,
+                    textEndReserve = skipReserve,
                 ) { faded ->
                     ProgrammeArtworkTile(content.artwork, content.picon, content.channelId,
                         content.info.channelNumber, faded, content.withoutChannel)

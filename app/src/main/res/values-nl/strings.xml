@@ -448,10 +448,11 @@
     <string name="recording_mark_cut">Knip</string>
     <string name="recording_mark_cut_ends">Einde knip</string>
     <string name="recording_mark_ad_badge">Rec.</string>
+    <string name="recording_mark_program_starts">Begin programma</string>
+    <string name="recording_mark_program_ends">Einde programma</string>
     <string name="skip_ad_break">Reclameblok overslaan</string>
     <string name="settings_section_recording_marks">Opnamemarkeringen</string>
     <string name="ad_breaks_setting">Reclameblokken</string>
-    <string name="ad_breaks_description">Wat er gebeurt als een opname een reclameblok bereikt.</string>
     <string name="ad_breaks_ask">Vragen</string>
     <string name="ad_breaks_ask_help">Toont bij het begin van een reclameblok een knop om over te slaan boven de video.</string>
     <string name="ad_breaks_automatic">Automatisch overslaan</string>

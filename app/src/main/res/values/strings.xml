@@ -615,7 +615,8 @@
     <string name="skip_ad_break">Skip ad break</string>
     <string name="settings_section_recording_marks">Recording marks</string>
     <string name="ad_breaks_setting">Ad breaks</string>
-    <string name="ad_breaks_description">What happens when a recording reaches an ad break.</string>
+    <string name="recording_mark_program_starts">Program starts</string>
+    <string name="recording_mark_program_ends">Program ends</string>
     <string name="ad_breaks_ask">Ask</string>
     <string name="ad_breaks_ask_help">Shows a Skip button over the video when a break starts.</string>
     <string name="ad_breaks_automatic">Skip automatically</string>

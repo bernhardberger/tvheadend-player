@@ -15,6 +15,16 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalDensity
+import at.bernhardberger.tvhplayer.ui.components.depth.DepthLevel
+import at.bernhardberger.tvhplayer.ui.screens.settings.settingsKeepChannelLevel
+import at.bernhardberger.tvhplayer.ui.screens.settings.settingsStartupBufferLevel
+import at.bernhardberger.tvhplayer.ui.screens.settings.settingsStreamProfileLevel
+import at.bernhardberger.tvhplayer.ui.screens.settings.settingsChannelTagsLevel
+import at.bernhardberger.tvhplayer.ui.screens.settings.AD_BREAKS_LEVEL
+import at.bernhardberger.tvhplayer.core.ChannelScopeVisibility
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import at.bernhardberger.tvhplayer.settings.AdBreakMode
@@ -44,6 +54,38 @@ import org.robolectric.annotation.GraphicsMode
 @OptIn(ExperimentalTestApi::class)
 class RecordingMarksSettingsUiTest {
     @get:Rule val compose = createComposeRule()
+
+    @Test fun skipLandsDescriptionBounds() = descriptionBounds { settingsSkipLandingLevel(SkipLanding.END) {} }
+    @Test fun keepTunedDescriptionBounds() = descriptionBounds { settingsKeepChannelLevel(5) {} }
+    @Test fun startupBufferDescriptionBounds() = descriptionBounds { settingsStartupBufferLevel(0, 0) {} }
+    @Test fun streamProfileDescriptionBounds() = descriptionBounds { settingsStreamProfileLevel(SettingsPlayerUiState()) {} }
+    @Test fun channelGroupsDescriptionBounds() = descriptionBounds {
+        settingsChannelTagsLevel(emptyList(), ChannelScopeVisibility(), true, false, {}, {})
+    }
+
+    private fun descriptionBounds(levelFactory: @Composable () -> DepthLevel) {
+        var id = ""
+        var row = ""
+        var density = 1f
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                val level = levelFactory()
+                id = level.id
+                row = level.rows.first().item.id
+                density = LocalDensity.current.density
+                val navigation = rememberDepthNavigationState(level.id)
+                Box(Modifier.fillMaxSize()) { SettingsScreenNavigation(navigation, listOf(level)) }
+            }
+        }
+        compose.waitForIdle()
+        val title = compose.onNodeWithTag("settings-level-$id").fetchSemanticsNode().boundsInRoot
+        val description = compose.onNodeWithTag("settings-description-$id").fetchSemanticsNode().boundsInRoot
+        val first = compose.onNodeWithTag("settings-row-$row").fetchSemanticsNode().boundsInRoot
+        assertEquals(title.left, description.left, 0.5f)
+        assertEquals(4f * density, description.top - title.bottom, 0.5f)
+        assertEquals(24f * density, first.top - description.bottom, 0.5f)
+        assertEquals(first.width, description.width, 0.5f)
+    }
 
     @Before
     fun televisionFeature() {
@@ -87,6 +129,7 @@ class RecordingMarksSettingsUiTest {
 
         key(Key.DirectionCenter)
         compose.onNode(isFocused() and hasText("Ask")).assertIsSelected()
+        compose.onNodeWithTag("settings-description-$AD_BREAKS_LEVEL").assertDoesNotExist()
         compose.onNode(hasText("Skip automatically")).assertIsNotSelected()
         compose.onNode(hasText("Off") and hasText("Ad breaks play like the rest. They still show on the timeline."))
             .assertExists()

@@ -189,16 +189,23 @@ fun RecordingPlayerScreen(
     val durationMs = timelineState.durationMs
     val displayDurationMs = timelineState.displayDurationMs
     // The marks of the recording this screen plays, while it can be sought by them.
-    val marks = recordingMarks.takeIf {
-        timelineState.canSeek && retainedSelection != null && retainedSelection.currentSession === currentSession
-    }.orEmpty()
+    val canSeekMarks = timelineState.canSeek && retainedSelection != null && retainedSelection.currentSession === currentSession
+    val programMarks = remember(entry, durationMs, canSeekMarks) {
+        if (canSeekMarks) entry?.let {
+            at.bernhardberger.tvhplayer.core.recordingProgramMarks(it, durationMs)
+        }.orEmpty() else emptyList()
+    }
+    val marks = remember(recordingMarks, programMarks, canSeekMarks) {
+        if (!canSeekMarks) emptyList()
+        else if (programMarks.isEmpty()) recordingMarks else recordingMarks + programMarks
+    }
     val markStops = remember(marks, durationMs) { at.bernhardberger.tvhplayer.core.recordingMarkStops(marks, durationMs) }
     val markers = remember(markStops) { markStops.map { it.positionMs } }
     val markerNavigation = remember { RecordingMarkerNavigation() }
     LaunchedEffect(markerRevision, recordingId, currentSession) { markerNavigation.dismiss() }
     fun seekMarker(targetMs: Long) {
         timelineState.cancelPendingSeek()
-        session.seekRecordingMarker(targetMs, markerNavigation.ownerRevision)
+        session.seekRecordingMarker(targetMs, markerNavigation.ownerRevision, programMarks)
     }
     val skipAdBreak: (at.bernhardberger.tvhplayer.core.RecordingMark) -> Unit = remember(markerRevision) {
         { mark ->

@@ -466,10 +466,11 @@
     <string name="recording_mark_cut">Cięcie</string>
     <string name="recording_mark_cut_ends">Koniec cięcia</string>
     <string name="recording_mark_ad_badge">Rekl.</string>
+    <string name="recording_mark_program_starts">Początek programu</string>
+    <string name="recording_mark_program_ends">Koniec programu</string>
     <string name="skip_ad_break">Pomiń przerwę reklamową</string>
     <string name="settings_section_recording_marks">Znaczniki nagrania</string>
     <string name="ad_breaks_setting">Przerwy reklamowe</string>
-    <string name="ad_breaks_description">Co się dzieje, gdy nagranie dociera do przerwy reklamowej.</string>
     <string name="ad_breaks_ask">Pytaj</string>
     <string name="ad_breaks_ask_help">Wyświetla na obrazie przycisk pomijania, gdy zaczyna się przerwa.</string>
     <string name="ad_breaks_automatic">Pomijaj automatycznie</string>

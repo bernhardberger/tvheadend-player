@@ -457,10 +457,11 @@
     <string name="recording_mark_cut">Rez</string>
     <string name="recording_mark_cut_ends">Kraj reza</string>
     <string name="recording_mark_ad_badge">Rekl.</string>
+    <string name="recording_mark_program_starts">Početak emisije</string>
+    <string name="recording_mark_program_ends">Kraj emisije</string>
     <string name="skip_ad_break">Preskoči reklamni blok</string>
     <string name="settings_section_recording_marks">Oznake snimke</string>
     <string name="ad_breaks_setting">Reklamni blokovi</string>
-    <string name="ad_breaks_description">Što se događa kada snimka dođe do reklamnog bloka.</string>
     <string name="ad_breaks_ask">Pitaj</string>
     <string name="ad_breaks_ask_help">Prikazuje gumb za preskakanje preko videozapisa kada počne reklamni blok.</string>
     <string name="ad_breaks_automatic">Preskoči automatski</string>

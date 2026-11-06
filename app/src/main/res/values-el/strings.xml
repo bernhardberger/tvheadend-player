@@ -448,10 +448,11 @@
     <string name="recording_mark_cut">Περικοπή</string>
     <string name="recording_mark_cut_ends">Τέλος περικοπής</string>
     <string name="recording_mark_ad_badge">Διαφ.</string>
+    <string name="recording_mark_program_starts">Αρχή εκπομπής</string>
+    <string name="recording_mark_program_ends">Τέλος εκπομπής</string>
     <string name="skip_ad_break">Παράλειψη διαλείμματος</string>
     <string name="settings_section_recording_marks">Δείκτες εγγραφής</string>
     <string name="ad_breaks_setting">Διαφημιστικά διαλείμματα</string>
-    <string name="ad_breaks_description">Τι συμβαίνει όταν μια εγγραφή φτάνει σε διαφημιστικό διάλειμμα.</string>
     <string name="ad_breaks_ask">Ερώτηση</string>
     <string name="ad_breaks_ask_help">Εμφανίζει κουμπί παράλειψης πάνω στο βίντεο όταν ξεκινά ένα διάλειμμα.</string>
     <string name="ad_breaks_automatic">Αυτόματη παράλειψη</string>

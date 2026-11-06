@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
@@ -37,8 +38,12 @@ internal fun settingsLevel(
     // back chevron. It uses the browse header band, so the title sits where the
     // Channels, Guide and Recordings titles sit. In the preview slot it reads at the
     // row title size and grows to full size as its column slides into the active slot.
+    val titleTop = with(LocalDensity.current) {
+        ((TvBrowseHeaderHeight - MaterialTheme.typography.headlineMedium.lineHeight.toDp()) / 2).coerceAtLeast(0.dp)
+    }
     val titleBand = @Composable {
-        Row(Modifier.fillMaxWidth().heightIn(min = TvBrowseHeaderHeight),
+        Row(Modifier.fillMaxWidth().then(if (description == null) Modifier.heightIn(min = TvBrowseHeaderHeight)
+            else Modifier.padding(top = titleTop)),
             verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             Text(title, style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.testTag("settings-level-$id").graphicsLayer {
@@ -51,13 +56,12 @@ internal fun settingsLevel(
     if (description == null) {
         Box(Modifier.padding(bottom = TvSpacing4)) { titleBand() }
     } else {
-        // A level-wide explanation sits under the title, outside every row, so no
-        // single option carries it. It aligns with the option text and wraps.
-        Column(Modifier.fillMaxWidth().padding(bottom = TvSpacing4)) {
+        // One heading block: description aligns with the title, not the rows' inset text.
+        Column(Modifier.fillMaxWidth().padding(bottom = 24.dp - DepthListTopReserve)) {
             titleBand()
             Text(description, style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = TvSpacing16))
+                modifier = Modifier.fillMaxWidth().padding(top = TvSpacing4).testTag("settings-description-$id"))
         }
     }
 }, activeContent = activeContent, initialItemId = initialItemId)

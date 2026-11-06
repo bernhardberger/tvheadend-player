@@ -7,6 +7,27 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class RecordingMarkTrackTest {
+    @Test fun programmePointsStaySingleTickSpans() {
+        val points = listOf(RecordingMark(RecordingMarkKind.PROGRAM_START, 2_000),
+            RecordingMark(RecordingMarkKind.PROGRAM_END, 8_000))
+        assertEquals(listOf(TimelineMarkSpan(RecordingMarkKind.PROGRAM_START, 0.2f, 0.2f),
+            TimelineMarkSpan(RecordingMarkKind.PROGRAM_END, 0.8f, 0.8f)), timelineMarks(points, 10_000)?.spans)
+    }
+    @Test fun programmeTicksYieldOnlyAtExactBoundariesAndKeepSelectionIndex() {
+        val ad = RecordingMark(RecordingMarkKind.AD_BREAK, 1_000, 2_000)
+        val chapter = RecordingMark(RecordingMarkKind.CHAPTER, 8_000)
+        val marks = listOf(
+            RecordingMark(RecordingMarkKind.PROGRAM_START, 1_000), ad,
+            RecordingMark(RecordingMarkKind.PROGRAM_END, 2_000),
+            RecordingMark(RecordingMarkKind.PROGRAM_START, 8_000), chapter,
+            RecordingMark(RecordingMarkKind.PROGRAM_END, 8_001),
+            RecordingMark(RecordingMarkKind.PROGRAM_START, 8_001),
+        )
+        val track = requireNotNull(timelineMarks(marks, 10_000, selected = chapter, open = true))
+        assertEquals(listOf(ad.kind, chapter.kind, RecordingMarkKind.PROGRAM_END), track.spans.map { it.kind })
+        assertEquals(0.8001f, track.spans.last().start)
+        assertEquals(1, track.selected)
+    }
     private val ad = RecordingMark(RecordingMarkKind.AD_BREAK, 1_000, 2_000)
     private val cut = RecordingMark(RecordingMarkKind.CUT, 5_000, 6_000)
     private val chapter = RecordingMark(RecordingMarkKind.CHAPTER, 8_000, name = "Finale")

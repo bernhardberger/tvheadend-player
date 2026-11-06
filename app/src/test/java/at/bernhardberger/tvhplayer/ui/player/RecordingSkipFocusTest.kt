@@ -1,7 +1,14 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import android.app.Application
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.view.View
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.LaunchedEffect
@@ -35,6 +42,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /**
  * Skip over an ad break: the prompt over the hidden chrome, and the resting Skip the controls
@@ -42,6 +50,7 @@ import org.robolectric.annotation.Config
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class RecordingSkipFocusTest {
     @get:Rule val compose = createComposeRule()
 
@@ -55,6 +64,9 @@ class RecordingSkipFocusTest {
         assertEquals(listOf("recording-skip-prompt"), focused())
         val node = compose.onNodeWithTag("recording-skip-prompt", useUnmergedTree = true).fetchSemanticsNode()
         assertEquals(LiveRegionMode.Polite, node.config[SemanticsProperties.LiveRegion])
+        assertEquals(Role.Button, node.config[SemanticsProperties.Role])
+        assertEquals("reference prompt width at font scale 1", 150f, node.boundsInRoot.width, .5f)
+        assertEquals("content growth keeps the existing height", 39f, node.boundsInRoot.height, .5f)
         assertTrue(compose.onNodeWithTag("recording-skip-prompt").fetchSemanticsNode()
             .config[SemanticsProperties.Text].any { it.text == "Skip ad break" })
         assertTrue(exists("recording-skip-fill"))
@@ -88,6 +100,53 @@ class RecordingSkipFocusTest {
         advance(3_200L)
         assertEquals(listOf(ad), prompt.timeouts)
         assertFalse(exists("recording-skip-prompt"))
+    }
+
+    @Test fun clearingTheTimedOutOfferKeepsTheFullFillDuringExit() {
+        val state = prompt()
+        state.offer(ad)
+        val bounds = compose.onNodeWithTag("recording-skip-prompt").fetchSemanticsNode().boundsInRoot
+        compose.mainClock.advanceTimeBy(SKIP_PROMPT_MS - 3_000L, ignoreFrameDuration = true)
+        compose.waitForIdle()
+        while (state.timeouts.isEmpty()) advance(16L)
+        assertEquals(null, state.prompt) // the real callback clears, not merely hides, the offer
+        advance(48L)
+        val bitmap = Bitmap.createBitmap(state.view.width, state.view.height, Bitmap.Config.ARGB_8888)
+        compose.runOnIdle { state.view.draw(Canvas(bitmap)) }
+        val y = bounds.top.toInt() + 6
+        val left = android.graphics.Color.red(bitmap.getPixel((bounds.left + bounds.width * .25f).toInt(), y)) / 255f
+        val right = android.graphics.Color.red(bitmap.getPixel((bounds.left + bounds.width * .75f).toInt(), y)) / 255f
+        bitmap.recycle()
+        assertTrue("full light fill survives mid-exit, not reset ghost: $left; $bounds", left > 0.45f)
+        assertEquals("the fill still reaches the right edge", left, right, 0.03f)
+        advance(200L)
+        assertFalse(exists("recording-skip-prompt"))
+    }
+
+    @Test fun anEqualMarkReofferedDuringTheExitStartsANewFullTimeout() {
+        val state = prompt()
+        state.offer(ad)
+        compose.mainClock.advanceTimeBy(SKIP_PROMPT_MS - 3_000L, ignoreFrameDuration = true)
+        compose.waitForIdle()
+        while (state.timeouts.isEmpty()) advance(16L)
+        assertEquals(null, state.prompt)
+        advance(32L) // re-offer before the 150 ms exit disposes the presentation
+        compose.runOnIdle { state.prompt = ad.copy() }
+        advance(64L)
+        assertEquals("the equal mark does not time out immediately", listOf(ad), state.timeouts)
+        val bounds = compose.onNodeWithTag("recording-skip-prompt").fetchSemanticsNode().boundsInRoot
+        val bitmap = Bitmap.createBitmap(state.view.width, state.view.height, Bitmap.Config.ARGB_8888)
+        compose.runOnIdle { state.view.draw(Canvas(bitmap)) }
+        val y = bounds.top.toInt() + 6
+        val left = android.graphics.Color.red(bitmap.getPixel((bounds.left + bounds.width * .25f).toInt(), y)) / 255f
+        val right = android.graphics.Color.red(bitmap.getPixel((bounds.left + bounds.width * .75f).toInt(), y)) / 255f
+        bitmap.recycle()
+        assertTrue("the new offer restarts near empty, not the departing full fill: $left / $right", left < .3f && right < .3f)
+        compose.mainClock.advanceTimeBy(SKIP_PROMPT_MS - 1_000L, ignoreFrameDuration = true)
+        compose.waitForIdle()
+        assertEquals("the new offer gets its own ten-second clock", listOf(ad), state.timeouts)
+        advance(1_200L)
+        assertEquals(listOf(ad, ad), state.timeouts)
     }
 
     @Test fun anotherLayerHidesThePromptWhileItsTimeRunsOn() {
@@ -141,6 +200,9 @@ class RecordingSkipFocusTest {
         controls(breakPlaying = true)
         assertEquals(listOf("player-pause"), focused())
         assertTrue(exists("recording-skip"))
+        val node = compose.onNodeWithTag("recording-skip").fetchSemanticsNode()
+        assertEquals(Role.Button, node.config[SemanticsProperties.Role])
+        assertTrue(node.config[SemanticsProperties.Text].any { it.text == "Skip ad break" })
     }
 
     @Test fun upFromSettingsReachesSkipAndOkSkipsOntoPause() {
@@ -221,21 +283,41 @@ class RecordingSkipFocusTest {
         assertEquals(listOf("player-settings"), focused())
     }
 
+    @Test fun closingMarksReturnsFocusImmediatelyAndCanReopenDuringTheExit() {
+        val state = controls(breakPlaying = false)
+        key(Key.DirectionUp)
+        key(Key.DirectionUp)
+        assertEquals(listOf("recording-marker-target"), focused())
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.runOnIdle { assertFalse("Down closes the marks", state.navigation.open) }
+        advance(32L) // apply the close and the focus restoration, well before the 150 ms exit
+        compose.waitForIdle()
+        assertEquals(listOf("player-seekbar"), focused())
+        assertFalse("the exiting pill is no longer interactive", exists("recording-marker-target"))
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
+        advance(48L)
+        assertEquals(listOf("recording-marker-target"), focused())
+        settle()
+        assertEquals(listOf("recording-marker-target"), focused())
+    }
+
     private class PromptState {
         var prompt by mutableStateOf<RecordingMark?>(null)
         var shown by mutableStateOf(true)
         val skips = mutableListOf<RecordingMark>()
         val timeouts = mutableListOf<RecordingMark>()
         lateinit var offer: (RecordingMark) -> Unit
+        lateinit var view: View
     }
 
     private fun prompt(): PromptState {
         val state = PromptState()
         compose.mainClock.autoAdvance = false
         compose.setContent {
+            state.view = LocalView.current
             TVHeadendPlayerTheme {
                 val root = remember { FocusRequester() }
-                Box(Modifier.fillMaxSize().focusRequester(root).focusable()) {
+                Box(Modifier.fillMaxSize().background(Color.Black).focusRequester(root).focusable()) {
                     RecordingSkipPrompt(
                         prompt = state.prompt,
                         shown = state.shown,
@@ -257,6 +339,7 @@ class RecordingSkipFocusTest {
 
     private class ControlsState {
         var adBreak by mutableStateOf<RecordingMark?>(null)
+        val navigation = RecordingMarkerNavigation()
         val skips = mutableListOf<RecordingMark>()
     }
 
@@ -269,6 +352,7 @@ class RecordingSkipFocusTest {
                     positionMs = 1_800_000L,
                     marks = listOf(ad) + chapterMarks(900_000L),
                     adBreak = state.adBreak,
+                    markerNavigation = state.navigation,
                     onSkipAdBreak = { state.skips += it; state.adBreak = null },
                 )
             }

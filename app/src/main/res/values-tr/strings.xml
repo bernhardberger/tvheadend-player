@@ -448,10 +448,11 @@
     <string name="recording_mark_cut">Kesilecek bölüm</string>
     <string name="recording_mark_cut_ends">Kesilecek bölümün sonu</string>
     <string name="recording_mark_ad_badge">Reklam</string>
+    <string name="recording_mark_program_starts">Program başlangıcı</string>
+    <string name="recording_mark_program_ends">Program sonu</string>
     <string name="skip_ad_break">Reklam arasını atla</string>
     <string name="settings_section_recording_marks">Kayıt işaretleri</string>
     <string name="ad_breaks_setting">Reklam araları</string>
-    <string name="ad_breaks_description">Kayıt bir reklam arasına ulaştığında ne olacağı.</string>
     <string name="ad_breaks_ask">Sor</string>
     <string name="ad_breaks_ask_help">Reklam arası başladığında videonun üzerinde bir atlama düğmesi gösterir.</string>
     <string name="ad_breaks_automatic">Otomatik atla</string>

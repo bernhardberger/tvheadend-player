@@ -31,4 +31,6 @@
     <string name="appliance_companion_description">An optional companion app makes Tvheadend Player behave like the TV\'s own tuner app. It opens the player when the TV turns on, can take over remote buttons such as TV and Guide, and can replace the home screen. It is a separate app from the project\'s GitHub releases and updates itself from there.</string>
     <string name="appliance_companion_install_info">To set it up, scan the code or open github.com/bernhardberger/tvheadend-player on a phone or computer, then follow the steps under Appliance companion.</string>
     <string name="appliance_companion_qr_description">QR code for the appliance companion setup steps</string>
+    <string name="recording_mark_program_starts">Programme starts</string>
+    <string name="recording_mark_program_ends">Programme ends</string>
 </resources>

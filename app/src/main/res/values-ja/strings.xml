@@ -439,10 +439,11 @@
     <string name="recording_mark_cut">カット区間</string>
     <string name="recording_mark_cut_ends">カット区間終了</string>
     <string name="recording_mark_ad_badge">CM</string>
+    <string name="recording_mark_program_starts">番組開始</string>
+    <string name="recording_mark_program_ends">番組終了</string>
     <string name="skip_ad_break">CMをスキップ</string>
     <string name="settings_section_recording_marks">録画のマーカー</string>
     <string name="ad_breaks_setting">CM区間</string>
-    <string name="ad_breaks_description">録画の再生がCM区間に達したときの動作です。</string>
     <string name="ad_breaks_ask">確認する</string>
     <string name="ad_breaks_ask_help">CM区間の開始時に、映像の上にスキップボタンを表示します。</string>
     <string name="ad_breaks_automatic">自動でスキップ</string>

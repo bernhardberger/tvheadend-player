@@ -1127,13 +1127,23 @@ class RecordingMarkerChaptersTest {
             markers.seekRecordingMarker(4_000L, revision)
             assertEquals(listOf(4_000L), seeks)
 
+            val programme = listOf(RecordingMark(RecordingMarkKind.PROGRAM_START, 2_000))
+            for (kind in listOf(RecordingMarkKind.CHAPTER, RecordingMarkKind.CUT, RecordingMarkKind.AD_BREAK)) {
+                markers.seekRecordingMarker(3_000L, revision, listOf(RecordingMark(kind, 3_000)))
+            }
+            markers.seekRecordingMarker(2_001L, revision, programme)
+            markers.seekRecordingMarker(2_000L, emptyRevision, programme)
+            assertEquals(listOf(4_000L), seeks)
+            markers.seekRecordingMarker(2_000L, revision, programme)
+            assertEquals(listOf(4_000L, 2_000L), seeks)
+
             // A lone named chapter at the start is the marks row's only stop, and it can be sought.
             tracks = Tracks(listOf(group("opening", Format.Builder()
                 .setMetadata(Metadata(chapter(0, name = "Opening"))).build())))
             markers.onTracksChanged()
             assertEquals(listOf(RecordingMark(RecordingMarkKind.CHAPTER, 0L, name = "Opening")), markers.marks.value)
             markers.seekRecordingMarker(0L, markers.recordingMarkerRevision.value)
-            assertEquals(listOf(4_000L, 0L), seeks)
+            assertEquals(listOf(4_000L, 2_000L, 0L), seeks)
         } finally {
             markers.clearRecordingMarkersAndJoin()
         }

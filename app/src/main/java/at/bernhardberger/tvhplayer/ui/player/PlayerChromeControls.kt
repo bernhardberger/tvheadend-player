@@ -2,6 +2,14 @@ package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.layout.layout
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -154,6 +162,24 @@ internal fun PlayerChromeControls(
     var lastFocusedControl by remember { mutableStateOf<String?>(null) }
     var relocatingKey by remember { mutableStateOf<Key?>(null) }
     var timelineFocused by remember { mutableStateOf(false) }
+    val repeatInterval = remember { mutableStateOf<Int?>(null) }
+    val settlingHold = remember { mutableStateOf(false) }
+    val positionSpec = remember { mutableStateOf<AnimationSpec<Float>>(tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard)) }
+    LaunchedEffect(timelineFocused, actions.active, covered) {
+        if (!timelineFocused || !actions.active || covered) {
+            repeatInterval.value = null
+            settlingHold.value = false
+            positionSpec.value = tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard)
+        }
+    }
+    LaunchedEffect(settlingHold.value) {
+        if (settlingHold.value) {
+            kotlinx.coroutines.delay(PlayerMotion.MediumMs.toLong())
+            settlingHold.value = false
+            positionSpec.value = tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard)
+        }
+    }
+    val keyTimes = remember { longArrayOf(0L) }
     val chromeAlpha = rememberPlayerChromeAlpha(timelineFocused, previewing)
     val chromeHidden = timelineFocused && previewing
     // Capture ownership before the timeline's focus node goes. Compose may automatically focus a
@@ -242,6 +268,7 @@ internal fun PlayerChromeControls(
         belowIdentity.requestFocus()
     }
     // The decoration follows the action row, which fades in last when taken over from the Banner.
+    CompositionLocalProvider(LocalTimelinePositionSpec provides positionSpec) {
     decoration({ actionsAlpha() * chromeAlpha.value }) {
     PlayerOverlayChrome(
         bannerDrop = bannerDrop,
@@ -273,7 +300,22 @@ internal fun PlayerChromeControls(
                     .onPreviewKeyEvent { event ->
                         when (event.key) {
                             Key.DirectionLeft, Key.DirectionRight -> {
+                                if (event.type == KeyEventType.KeyUp) {
+                                    settlingHold.value = repeatInterval.value != null
+                                    repeatInterval.value = null
+                                    positionSpec.value = tween(PlayerMotion.MediumMs, easing =
+                                        if (settlingHold.value) PlayerMotion.StandardDecelerate else PlayerMotion.Standard)
+                                }
                                 if (actions.active && seekable && event.type == KeyEventType.KeyDown) {
+                                    val time = event.nativeKeyEvent.eventTime
+                                    if (event.nativeKeyEvent.repeatCount > 0) {
+                                        repeatInterval.value = (time - keyTimes[0]).coerceIn(33L, 100L).toInt()
+                                        positionSpec.value = tween(requireNotNull(repeatInterval.value), easing = LinearEasing)
+                                    } else {
+                                        repeatInterval.value = null; settlingHold.value = false
+                                        positionSpec.value = tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard)
+                                    }
+                                    keyTimes[0] = time
                                     onInteraction()
                                     val step = at.bernhardberger.tvhplayer.core.seekStepMs(event.nativeKeyEvent.repeatCount)
                                     val delta = if (event.key == Key.DirectionLeft) -step else step
@@ -322,37 +364,58 @@ internal fun PlayerChromeControls(
                 Box(Modifier.graphicsLayer { alpha = infoAlpha }) {
                     infoBar({ 1f }, Modifier) {}
                 }
-                if (adBreak != null) RecordingSkipRest(
+            }
+            Box(Modifier.fillMaxWidth()) {
+                RecordingControlsTimeline(
+                    timeline = recording,
+                    range = recordingRange.takeIf { seekable },
+                    previewing = showPreview,
+                    paused = paused,
+                    state = state,
+                    markerNavigation = markerNavigation,
+                    onSeekMarker = onSeekMarker,
+                    onOpenMarkers = {
+                        onCommitSeek(); onInteraction()
+                        markerNavigation.show(recording.markers, recording.targetMs ?: recording.positionMs,
+                            revision = recording.markerRevision)
+                    },
+                    onSeekTo = { onInteraction(); onSeek(it - (recording.targetMs ?: recording.positionMs)) },
+                    modifier = timelineModifier,
+                )
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = adBreak != null,
+                    enter = fadeIn(tween(PlayerMotion.MediumMs, easing = PlayerMotion.EmphasizedDecelerate)) +
+                        scaleIn(tween(PlayerMotion.MediumMs, easing = PlayerMotion.EmphasizedDecelerate), initialScale = 0.9f,
+                            transformOrigin = TransformOrigin(1f, 1f)),
+                    exit = fadeOut(tween(PlayerMotion.ShortMs, easing = PlayerMotion.EmphasizedAccelerate)),
+                    modifier = Modifier.align(Alignment.TopEnd).layout { measurable, constraints ->
+                        val child = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0))
+                        layout((child.width - 16.dp.roundToPx()).coerceAtLeast(0), 0) {
+                            child.placeRelative(-8.dp.roundToPx(), -child.height - 4.dp.roundToPx())
+                        }
+                    },
+                ) {
+                // Retain the focused scale inside AnimatedVisibility's fading layer.
+                Box(Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
+                val shownBreak = rememberLastShown(adBreak)
+                RecordingSkipRest(
                     onSkip = {
                         // Focus moves first: the button goes with the break it skips.
                         (if (skipEntry == "player-seekbar" && timelineFocusable) timelineFocus else pauseFocus).requestFocus()
                         onInteraction()
-                        recording.onSkipAdBreak(adBreak)
+                        shownBreak?.let(recording.onSkipAdBreak)
                     },
                     focus = skipFocus,
                     onDown = { onInteraction(); skipReturn.requestFocus() },
-                    canFocus = !covered,
+                    canFocus = !covered && adBreak != null,
                     alpha = { actionsAlpha() * chromeAlpha.value },
                     onFocused = { lastFocusedControl = "player-skip" },
-                    modifier = Modifier.align(Alignment.TopEnd),
+                    marksOpen = markerNavigation.open,
+                    modifier = Modifier.semanticsWhileShown(adBreak != null),
                 )
+                }
+                }
             }
-            RecordingControlsTimeline(
-                timeline = recording,
-                range = recordingRange.takeIf { seekable },
-                previewing = showPreview,
-                paused = paused,
-                state = state,
-                markerNavigation = markerNavigation,
-                onSeekMarker = onSeekMarker,
-                onOpenMarkers = {
-                    onCommitSeek(); onInteraction()
-                    markerNavigation.show(recording.markers, recording.targetMs ?: recording.positionMs,
-                        revision = recording.markerRevision)
-                },
-                onSeekTo = { onInteraction(); onSeek(it - (recording.targetMs ?: recording.positionMs)) },
-                modifier = timelineModifier,
-            )
         } else if (live != null) {
         val timeshiftState = live.timeshift
         val programmeWindow = live.programmeWindow
@@ -493,6 +556,7 @@ internal fun PlayerChromeControls(
                 entering = false, inheritedFade = 0..220)
             .graphicsLayer { alpha = actionsAlpha() * chromeAlpha.value }.testTag("player-down-hint"))
         }
+    }
     }
     }
 }

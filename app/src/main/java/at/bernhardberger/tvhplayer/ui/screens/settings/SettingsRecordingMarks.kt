@@ -20,7 +20,7 @@ internal fun settingsAdBreaksLevel(mode: AdBreakMode, onSelect: (AdBreakMode) ->
             AdBreakMode.AUTOMATIC -> R.string.ad_breaks_automatic_help
             AdBreakMode.OFF -> R.string.ad_breaks_off_help
         }), selected = mode == value, onClick = { onSelect(value) })
-    }, initialItemId = mode.name, description = stringResource(R.string.ad_breaks_description))
+    }, initialItemId = mode.name)
 
 @Composable
 internal fun settingsSkipLandingLevel(landing: SkipLanding, onSelect: (SkipLanding) -> Unit): DepthLevel =

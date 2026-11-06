@@ -457,10 +457,11 @@
     <string name="recording_mark_cut">Taglio</string>
     <string name="recording_mark_cut_ends">Fine taglio</string>
     <string name="recording_mark_ad_badge">Pubbl.</string>
+    <string name="recording_mark_program_starts">Inizio programma</string>
+    <string name="recording_mark_program_ends">Fine programma</string>
     <string name="skip_ad_break">Salta pausa pubblicitaria</string>
     <string name="settings_section_recording_marks">Marcatori di registrazione</string>
     <string name="ad_breaks_setting">Pause pubblicitarie</string>
-    <string name="ad_breaks_description">Cosa succede quando una registrazione raggiunge una pausa pubblicitaria.</string>
     <string name="ad_breaks_ask">Chiedi</string>
     <string name="ad_breaks_ask_help">All’inizio di una pausa mostra sul video un pulsante per saltarla.</string>
     <string name="ad_breaks_automatic">Salta automaticamente</string>

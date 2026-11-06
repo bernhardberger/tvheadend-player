@@ -741,10 +741,11 @@
     <string name="recording_mark_cut">Schnitt</string>
     <string name="recording_mark_cut_ends">Schnitt endet</string>
     <string name="recording_mark_ad_badge">Werbung</string>
+    <string name="recording_mark_program_starts">Sendung beginnt</string>
+    <string name="recording_mark_program_ends">Sendung endet</string>
     <string name="skip_ad_break">Werbepause überspringen</string>
     <string name="settings_section_recording_marks">Aufnahmemarken</string>
     <string name="ad_breaks_setting">Werbepausen</string>
-    <string name="ad_breaks_description">Was passiert, wenn eine Aufnahme eine Werbepause erreicht.</string>
     <string name="ad_breaks_ask">Fragen</string>
     <string name="ad_breaks_ask_help">Zeigt zu Beginn einer Werbepause eine Schaltfläche zum Überspringen über dem Video.</string>
     <string name="ad_breaks_automatic">Automatisch überspringen</string>

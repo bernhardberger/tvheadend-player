@@ -421,10 +421,11 @@
     <string name="recording_mark_cut">剪切片段</string>
     <string name="recording_mark_cut_ends">剪切片段结束</string>
     <string name="recording_mark_ad_badge">广告</string>
+    <string name="recording_mark_program_starts">节目开始</string>
+    <string name="recording_mark_program_ends">节目结束</string>
     <string name="skip_ad_break">跳过广告时段</string>
     <string name="settings_section_recording_marks">录制标记</string>
     <string name="ad_breaks_setting">广告时段</string>
-    <string name="ad_breaks_description">录制内容播放到广告时段时的处理方式。</string>
     <string name="ad_breaks_ask">询问</string>
     <string name="ad_breaks_ask_help">广告时段开始时，在视频上方显示跳过按钮。</string>
     <string name="ad_breaks_automatic">自动跳过</string>

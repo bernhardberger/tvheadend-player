@@ -439,10 +439,11 @@
     <string name="recording_mark_cut">잘라낼 구간</string>
     <string name="recording_mark_cut_ends">잘라낼 구간 끝</string>
     <string name="recording_mark_ad_badge">광고</string>
+    <string name="recording_mark_program_starts">프로그램 시작</string>
+    <string name="recording_mark_program_ends">프로그램 끝</string>
     <string name="skip_ad_break">광고 구간 건너뛰기</string>
     <string name="settings_section_recording_marks">녹화 마커</string>
     <string name="ad_breaks_setting">광고 구간</string>
-    <string name="ad_breaks_description">녹화 재생 중 광고 구간에 도달했을 때의 동작입니다.</string>
     <string name="ad_breaks_ask">물어보기</string>
     <string name="ad_breaks_ask_help">광고 구간이 시작되면 영상 위에 건너뛰기 버튼을 표시합니다.</string>
     <string name="ad_breaks_automatic">자동으로 건너뛰기</string>

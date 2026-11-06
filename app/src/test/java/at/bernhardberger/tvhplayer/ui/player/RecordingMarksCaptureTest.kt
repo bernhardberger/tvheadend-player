@@ -24,6 +24,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -44,6 +45,7 @@ import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
 import at.bernhardberger.tvhplayer.core.RecordingMark
 import at.bernhardberger.tvhplayer.core.RecordingMarkKind
 import at.bernhardberger.tvhplayer.core.recordingMarkStops
+import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.testutil.VisualCapture
@@ -118,6 +120,11 @@ class RecordingMarksCaptureTest {
 
     @Test fun openAdBreak() = capture("open-ad-break", MIXED, focus = "player-seekbar", openAt = 1_140_000L, name = "Ad break")
     @Test fun openCut() = capture("open-cut", MIXED, focus = "player-seekbar", openAt = 2_400_000L, name = "Cut")
+    @Test fun programStarts() = capture("program-starts", PROGRAM, focus = "player-seekbar", openAt = 120_000L,
+        name = "Program starts")
+    @Test fun programEnds() = capture("program-ends", PROGRAM, focus = "player-seekbar", openAt = 4_200_000L,
+        name = "Program ends")
+    @Test fun programTicks() = capture("program-ticks", PROGRAM, focus = "player-seekbar")
     /** The row on an ad break's and a cut's end: the stop to skip to by hand, the interval still selected. */
     /** The marks row a moment after opening on a cut: the span is still growing out of its tick. */
     @Test fun openCutGrowing() = capture("open-cut-growing", MIXED, focus = "player-seekbar", openAt = 2_400_000L,
@@ -237,6 +244,10 @@ class RecordingMarksCaptureTest {
             }
             check(navigation.selectedMs == openAt) { "marks row opened on ${navigation.selectedMs}, not $openAt" }
             compose.onNodeWithTag("recording-marker-target").assertIsFocused()
+            if (name == "Program starts" || name == "Program ends") {
+                compose.onNodeWithTag("recording-marker-target")
+                    .assertContentDescriptionEquals("$name, Marker ${recordingMarkStops(marks, durationMs).indexOfFirst { it.positionMs == openAt }} • ${formatPlaybackDuration(openAt)}")
+            }
             // A named pill is two lines tall; it stays clear of the info bar's subtitle above the timeline.
             val selected = requireNotNull(recordingMarkStops(marks, durationMs).first { it.positionMs == openAt }.mark)
             if (selected.kind != RecordingMarkKind.CHAPTER || selected.name != null) {
@@ -278,6 +289,10 @@ class RecordingMarksCaptureTest {
             RecordingMark(RecordingMarkKind.CHAPTER, 3_600_000L, name = "Night on the ridge"),
         )
         val AD = MIXED.first { it.kind == RecordingMarkKind.AD_BREAK }
+        val PROGRAM = (MIXED + listOf(
+            RecordingMark(RecordingMarkKind.PROGRAM_START, 120_000L),
+            RecordingMark(RecordingMarkKind.PROGRAM_END, 4_200_000L),
+        )).sortedBy { it.startMs }
 
         /** 4:00:00: a chapter every two minutes, an ad break every forty minutes, two cuts. */
         val DENSE = buildList {

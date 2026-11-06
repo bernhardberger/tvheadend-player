@@ -448,10 +448,11 @@
     <string name="recording_mark_cut">Klip</string>
     <string name="recording_mark_cut_ends">Klip slutter</string>
     <string name="recording_mark_ad_badge">Rekl.</string>
+    <string name="recording_mark_program_starts">Programmet starter</string>
+    <string name="recording_mark_program_ends">Programmet slutter</string>
     <string name="skip_ad_break">Spring reklamepause over</string>
     <string name="settings_section_recording_marks">Optagelsesmarkører</string>
     <string name="ad_breaks_setting">Reklamepauser</string>
-    <string name="ad_breaks_description">Hvad der sker, når en optagelse når en reklamepause.</string>
     <string name="ad_breaks_ask">Spørg</string>
     <string name="ad_breaks_ask_help">Viser en knap til at springe over oven på videoen, når en pause starter.</string>
     <string name="ad_breaks_automatic">Spring automatisk over</string>

@@ -457,10 +457,11 @@
     <string name="recording_mark_cut">Coupure</string>
     <string name="recording_mark_cut_ends">Fin de la coupure</string>
     <string name="recording_mark_ad_badge">Pub</string>
+    <string name="recording_mark_program_starts">Début du programme</string>
+    <string name="recording_mark_program_ends">Fin du programme</string>
     <string name="skip_ad_break">Passer la pause publicitaire</string>
     <string name="settings_section_recording_marks">Repères d’enregistrement</string>
     <string name="ad_breaks_setting">Pauses publicitaires</string>
-    <string name="ad_breaks_description">Ce qui se passe quand un enregistrement atteint une pause publicitaire.</string>
     <string name="ad_breaks_ask">Demander</string>
     <string name="ad_breaks_ask_help">Au début d’une pause, affiche sur la vidéo un bouton pour la passer.</string>
     <string name="ad_breaks_automatic">Passer automatiquement</string>

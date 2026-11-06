@@ -6,6 +6,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -47,10 +48,19 @@ internal fun timelineMarks(
     selectedEnd: Boolean = false,
 ): TimelineMarks? {
     if (marks.isEmpty() || displayEndMs <= 0) return null
-    val spans = marks.map {
+    // Programme ticks yield at exact millisecond boundaries, before conversion to bar fractions.
+    val visibleMarks = marks.filterIndexed { index, mark ->
+        (mark.kind != RecordingMarkKind.PROGRAM_START && mark.kind != RecordingMarkKind.PROGRAM_END) ||
+            marks.withIndex().none { (otherIndex, other) ->
+                otherIndex != index &&
+                    (other.kind != RecordingMarkKind.PROGRAM_START && other.kind != RecordingMarkKind.PROGRAM_END || otherIndex < index) &&
+                    (other.startMs == mark.startMs || other.endMs == mark.startMs)
+            }
+    }
+    val spans = visibleMarks.map {
         TimelineMarkSpan(it.kind, it.startMs.toFloat() / displayEndMs, it.endMs.toFloat() / displayEndMs)
     }
-    val index = marks.indexOf(selected).takeIf { it >= 0 }
+    val index = visibleMarks.indexOf(selected).takeIf { it >= 0 }
     return TimelineMarks(spans, index, open, selectedEnd = index != null && selectedEnd)
 }
 
@@ -82,24 +92,29 @@ internal fun TimelineMarkLayer(
             else tween(PlayerMotion.ShortMs, easing = PlayerMotion.StandardAccelerate),
         label = "recording marks open",
     )
+    val selections = marks.spans.mapIndexed { index, span ->
+        key(span) { animateFloatAsState(if (index == marks.selected) 1f else 0f,
+            tween(PlayerMotion.ShortMs, easing = PlayerMotion.Standard), label = "mark selection") }
+    }
     Canvas(modifier.testTag("recording-marks-track")) {
         val open = opening.value
         val played = progress().coerceIn(0f, 1f) * size.width
         marks.spans.forEachIndexed { index, span ->
             val selected = index == marks.selected
+            val emphasis = selections[index].value
             val left = span.start.coerceIn(0f, 1f) * size.width
             val right = span.end.coerceIn(0f, 1f) * size.width
             when (span.kind) {
                 RecordingMarkKind.AD_BREAK -> drawRect(
-                    tint.copy(alpha = if (selected) lerp(AdTintAlpha, AdTintSelectedAlpha, open) else AdTintAlpha),
+                    tint.copy(alpha = lerp(AdTintAlpha, AdTintSelectedAlpha, open * emphasis)),
                     Offset(left, 0f), Size(right - left, size.height),
                 )
                 RecordingMarkKind.CUT -> {
                     // The span grows out of the start tick, its stripes fading in as it goes.
                     val reach = left + (right - left) * open
                     if (open > 0f && reach > left) {
-                        cutStripes(left, minOf(reach, played), fillColor, selected, playedPart = true, fade = open)
-                        cutStripes(maxOf(left, played), reach, ink, selected, playedPart = false, fade = open)
+                        cutStripes(left, minOf(reach, played), fillColor, emphasis, playedPart = true, fade = open)
+                        cutStripes(maxOf(left, played), reach, ink, emphasis, playedPart = false, fade = open)
                     }
                     if (span.start > 0f && span.start < 1f) {
                         if (selected && !marks.selectedEnd) drawLine(ink, Offset(left, 0f), Offset(left, size.height), tick * 2)
@@ -113,7 +128,7 @@ internal fun TimelineMarkLayer(
                         drawLine(ink, Offset(right, 0f), Offset(right, size.height), tick * 2)
                     }
                 }
-                RecordingMarkKind.CHAPTER -> if (span.start > 0f && span.start < 1f) {
+                RecordingMarkKind.CHAPTER, RecordingMarkKind.PROGRAM_START, RecordingMarkKind.PROGRAM_END -> if (span.start > 0f && span.start < 1f) {
                     drawLine(ink.copy(alpha = TickAlpha), Offset(left, 0f), Offset(left, size.height), tick)
                 }
             }
@@ -126,13 +141,13 @@ internal fun TimelineMarkLayer(
  * [base] that keep its hue; over the unplayed track the track's grey a step darker and brighter. Never black or white.
  */
 private fun DrawScope.cutStripes(
-    left: Float, right: Float, base: Color, selected: Boolean, playedPart: Boolean, fade: Float = 1f,
+    left: Float, right: Float, base: Color, selected: Float, playedPart: Boolean, fade: Float = 1f,
 ) {
     if (right <= left) return
-    val ground = (if (playedPart) base.shade(value = if (selected) 0.62f else 0.78f)
-        else Color.Black.copy(alpha = if (selected) 0.45f else 0.25f)).let { it.copy(alpha = it.alpha * fade) }
-    val stripe = (if (playedPart) base.shade(saturation = if (selected) 0.5f else 0.7f)
-        else base.copy(alpha = if (selected) 0.75f else 0.42f)).let { it.copy(alpha = it.alpha * fade) }
+    val ground = (if (playedPart) base.shade(value = lerp(0.78f, 0.62f, selected))
+        else Color.Black.copy(alpha = lerp(0.25f, 0.45f, selected))).let { it.copy(alpha = it.alpha * fade) }
+    val stripe = (if (playedPart) base.shade(saturation = lerp(0.7f, 0.5f, selected))
+        else base.copy(alpha = lerp(0.42f, 0.75f, selected))).let { it.copy(alpha = it.alpha * fade) }
     val period = 4.dp.toPx()
     val stroke = 1.5.dp.toPx()
     clipRect(left, 0f, right, size.height) {
