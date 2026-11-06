@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.8
+
+### Player
+
+- Playback no longer pauses when the TV switches its refresh rate, for example
+  on an NVIDIA Shield with *Match content frame rate* (#15).
+- With *Audio passthrough* on, the sound now moves to headphones when you
+  connect them, and back to the AV receiver when you disconnect them (#16).
+
+### Settings
+
+- The password field no longer suggests or learns words from the keyboard, and
+  a *Show password* checkbox below it replaces the eye button.
+
 ## 0.4.7
 
 ### Player
