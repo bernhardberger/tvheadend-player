@@ -276,18 +276,15 @@ internal fun rememberPlaybackTrackChoices(player: Player): PlaybackTrackChoices 
     }
 }
 
-/** The action row's track buttons, while their quick lists can open over what plays. */
+/** The action row's Audio button, while its list can open over what plays. */
 @Composable
 internal fun rememberPlayerTrackButtons(player: Player, available: Boolean): PlayerTrackButtons {
     val choices = rememberPlaybackTrackChoices(player)
     val unselected = stringResource(R.string.audio_track_unselected)
-    val off = stringResource(R.string.subtitles_off)
     if (!available) return PlayerTrackButtons()
     return PlayerTrackButtons(
         audio = choices.audioTracks.takeIf { playbackQuickListOffered(PlaybackOptionsPage.AUDIO, it.size) }
             ?.let { tracks -> tracks.firstOrNull(PlaybackOptionTrack::selected)?.label ?: unselected },
-        subtitles = choices.subtitleTracks.takeIf { playbackQuickListOffered(PlaybackOptionsPage.SUBTITLES, it.size) }
-            ?.let { tracks -> tracks.firstOrNull(PlaybackOptionTrack::selected)?.label ?: off },
     )
 }
 
@@ -703,6 +700,10 @@ private fun ColumnScope.TrackOptionsPage(
     }
 
     if (quickList != null) {
+        // Opened from the Audio button, the list is a picker: only OK applies a row, and
+        // browsing neither previews, applies on close, nor times out. The list key turns
+        // it into the hotkey list while this group lives, so the effects read the latest.
+        val picker by rememberUpdatedState(quickList.picker)
         val restore by rememberUpdatedState(onQuickListRestore)
         DisposableEffect(quickList) {
             val handler = {
@@ -713,18 +714,19 @@ private fun ColumnScope.TrackOptionsPage(
             onDispose {
                 quickList.unbindRestore(handler)
                 // Closing applies the row focus rests on unless Back undid the list.
-                if (!session.cancelled) session.focusedRow?.let(session::applyIfPending)
+                if (!picker && !session.cancelled) session.focusedRow?.let(session::applyIfPending)
             }
         }
         // Focus switches the track once it has rested on a row; passing rows do not.
-        LaunchedEffect(focusedRow) {
+        LaunchedEffect(focusedRow, picker) {
             val row = focusedRow ?: return@LaunchedEffect
-            if (session.isApplied(row)) return@LaunchedEffect
+            if (picker || session.isApplied(row)) return@LaunchedEffect
             delay(PLAYBACK_QUICK_LIST_SETTLE_MS)
             if (!session.cancelled) session.applyIfPending(row)
         }
         // Every key press restarts the auto-close; closing keeps what is playing.
-        LaunchedEffect(quickList.keyPresses) {
+        LaunchedEffect(quickList.keyPresses, picker) {
+            if (picker) return@LaunchedEffect
             delay(PLAYBACK_QUICK_LIST_AUTO_CLOSE_MS)
             closeQuickList()
         }

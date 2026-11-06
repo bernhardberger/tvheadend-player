@@ -591,10 +591,10 @@ fun RecordingPlayerScreen(
                 onStop = ::stopAndClose,
                 onInfo = layers::openInfo,
                 onOptions = layers::openOptions,
-                onTrackList = { page ->
-                    // Unlike the live player, a track button forgets a pending return to the gear.
+                onAudioList = {
+                    // Unlike the live player, the Audio button forgets a pending return to the gear.
                     layers.restoreOptionsFocus = false
-                    layers.showQuickList(page)
+                    layers.showAudioPicker()
                 },
                 onInteraction = chrome::onUserInteraction,
                 onCommitSeek = timelineState::commitPendingSeek,

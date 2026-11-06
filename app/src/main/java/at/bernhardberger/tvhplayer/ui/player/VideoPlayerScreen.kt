@@ -1703,7 +1703,7 @@ fun VideoPlayerScreen(
             },
             scheduleAvailable = rememberScheduleAvailable(observation, currentChannelId, nowSec),
             onOptions = layerState.core::openOptions,
-            onTrackList = layerState.core::showQuickList,
+            onAudioList = layerState.core::showAudioPicker,
             onInteraction = layerState.core.chrome::onUserInteraction,
             onActionFocused = { lastChromeAction = it; layerState.onActionFocused(it) },
             onControlFocused = { lastChromeControl = it },

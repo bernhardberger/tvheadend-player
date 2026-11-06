@@ -62,12 +62,11 @@ fun playbackTrackFocusTarget(
 }
 
 /**
- * Whether the action row offers [page]'s quick list, which it does only with a choice to make:
- * another audio track, or a subtitle track besides Off.
+ * Whether the action row offers [page]'s list, which it does only for Audio and only with a
+ * choice to make: another audio track.
  */
 fun playbackQuickListOffered(page: PlaybackOptionsPage, trackCount: Int): Boolean = when (page) {
     PlaybackOptionsPage.AUDIO -> trackCount > 1
-    PlaybackOptionsPage.SUBTITLES -> trackCount > 0
     else -> false
 }
 

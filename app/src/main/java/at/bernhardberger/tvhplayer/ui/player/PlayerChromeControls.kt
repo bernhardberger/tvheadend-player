@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.tv.material3.LocalContentColor
 import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
-import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.core.PlayerStateCell
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
@@ -84,8 +83,8 @@ internal fun PlayerChromeControls(
     onStop: () -> Unit,
     onInfo: () -> Unit,
     onOptions: () -> Unit,
-    /** Opens the Audio or Subtitles quick list from its action-row button. */
-    onTrackList: (PlaybackOptionsPage) -> Unit,
+    /** Opens the Audio list from its action-row button. */
+    onAudioList: () -> Unit,
     onInteraction: () -> Unit,
     onCommitSeek: () -> Unit,
     onPauseUnavailable: () -> Unit,
@@ -118,7 +117,6 @@ internal fun PlayerChromeControls(
     val infoFocus = remember { FocusRequester() }
     val scheduleFocus = remember { FocusRequester() }
     val audioFocus = remember { FocusRequester() }
-    val subtitlesFocus = remember { FocusRequester() }
     val settingsFocus = remember { FocusRequester() }
     val timelineFocus = remember { FocusRequester() }
     val stopFocus = remember { FocusRequester() }
@@ -160,23 +158,20 @@ internal fun PlayerChromeControls(
     // surviving action during apply; that must not erase the disappearing node's fallback.
     val removedFocusTarget = when (lastFocusedControl) {
         "player-seekbar" -> if (timelineFocusable) timelineFocus else initialFocus
-        // A track button goes with its choice (zap pending, failure, fewer tracks); its neighbour Info takes over.
+        // The Audio button goes with its choice (zap pending, failure, fewer tracks); its neighbour Info takes over.
         "player-audio" -> if (actions.tracks.audio != null) audioFocus else infoFocus
-        "player-subtitles" -> if (actions.tracks.subtitles != null) subtitlesFocus else infoFocus
         else -> null
     }
     val pageActive = LocalPlayerPageActive.current
     val audioShown = actions.tracks.audio != null
-    val subtitlesShown = actions.tracks.subtitles != null
-    LaunchedEffect(actions.active, restoreFocus, seekable, pausable, pageActive, audioShown, subtitlesShown) {
+    LaunchedEffect(actions.active, restoreFocus, seekable, pausable, pageActive, audioShown) {
         if (actions.active && pageActive) {
             val target = when (restoreFocus) {
                 null -> null
                 "player-info" -> infoFocus
                 "player-schedule" -> scheduleFocus
-                // A track button gone with its choice hands focus to its neighbour, Info.
+                // The Audio button gone with its choice hands focus to its neighbour, Info.
                 "player-audio" -> if (actions.tracks.audio != null) audioFocus else infoFocus
-                "player-subtitles" -> if (actions.tracks.subtitles != null) subtitlesFocus else infoFocus
                 "player-settings" -> settingsFocus
                 "player-stop" -> stopFocus
                 "player-seekbar" -> timelineFocus.takeIf { timelineFocusable }
@@ -220,7 +215,6 @@ internal fun PlayerChromeControls(
         "player-info" -> infoFocus
         "player-schedule" -> scheduleFocus
         "player-audio" -> if (actions.tracks.audio != null) audioFocus else infoFocus
-        "player-subtitles" -> if (actions.tracks.subtitles != null) subtitlesFocus else infoFocus
         else -> pauseFocus
     }
     val belowIdentity = if (timelineFocusable) timelineFocus else actionFocus
@@ -413,9 +407,8 @@ internal fun PlayerChromeControls(
             scheduleFocus = scheduleFocus,
             infoFocus = infoFocus,
             tracks = actions.tracks,
-            onTrackList = onTrackList,
+            onAudioList = onAudioList,
             audioFocus = audioFocus,
-            subtitlesFocus = subtitlesFocus,
             onInteraction = onInteraction,
             onActionFocused = {
                 lastFocusedControl = it; lastAction = it; onActionFocused(it); onControlFocused(it)

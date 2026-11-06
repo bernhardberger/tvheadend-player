@@ -133,5 +133,5 @@ internal data class PlayerChromeActions(
     val tracks: PlayerTrackButtons = PlayerTrackButtons(),
 )
 
-/** The action row's Audio and Subtitles buttons, each the current choice of its list; null leaves it out. */
-internal data class PlayerTrackButtons(val audio: String? = null, val subtitles: String? = null)
+/** The action row's Audio button, the playing track of its list; null leaves it out. */
+internal data class PlayerTrackButtons(val audio: String? = null)

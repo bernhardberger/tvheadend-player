@@ -23,7 +23,7 @@ private const val LIVE_PLAYER_AUTO_HIDE_MS = 5_000L
 
 /** Actions Back from the rail returns to: every action-row button the rail can be entered from. */
 private val RailReturnActions = setOf(
-    "player-pause", "player-stop", "player-audio", "player-subtitles", "player-info", "player-schedule", "player-settings",
+    "player-pause", "player-stop", "player-audio", "player-info", "player-schedule", "player-settings",
 )
 
 /**

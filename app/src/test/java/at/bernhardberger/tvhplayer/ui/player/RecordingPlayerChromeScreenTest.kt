@@ -461,7 +461,7 @@ class RecordingPlayerChromeScreenTest {
         }
     }
 
-    @Test fun trackButtonsOpenTheirListReturnFocusAndHandItToInfoWhenTheyGo() {
+    @Test fun theAudioButtonOpensItsListReturnsFocusAndHandsItToInfoWhenItGoes() {
         screen()
         playing()
         key(Key.DirectionDown)

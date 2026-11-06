@@ -41,7 +41,6 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
 import at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
-import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.core.PlayerStateCell
 import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
 import at.bernhardberger.tvhplayer.ui.TvOverlayFooterGradientRunout
@@ -81,8 +80,8 @@ internal fun PlayerChrome(
     onCommitSeek: () -> Unit = {},
     onPauseUnavailable: () -> Unit = {},
     onActionFocused: (String) -> Unit = {},
-    /** Opens the Audio or Subtitles quick list from its button, shown per [PlayerChromeActions.tracks]. */
-    onTrackList: (PlaybackOptionsPage) -> Unit = {},
+    /** Opens the Audio list from its button, shown per [PlayerChromeActions.tracks]. */
+    onAudioList: () -> Unit = {},
     onSchedule: (() -> Unit)? = null,
     scheduleAvailable: Boolean = true,
     /** Any control that takes focus, the timeline included: where focus returns after number entry. */
@@ -174,7 +173,7 @@ internal fun PlayerChrome(
                 onSchedule = onSchedule,
                 scheduleAvailable = scheduleAvailable,
                 onOptions = onOptions,
-                onTrackList = onTrackList,
+                onAudioList = onAudioList,
                 onInteraction = onInteraction,
                 onCommitSeek = onCommitSeek,
                 onPauseUnavailable = onPauseUnavailable,
