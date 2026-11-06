@@ -450,6 +450,94 @@ class SettingsDepthNavigationTest {
         compose.onNode(isFocused() and hasText("While browsing") and hasText("Stop")).assertExists()
     }
 
+    @Test fun recordingMarksChoiceLevelsBackToTheRowThatOpenedThem() {
+        // The native TV pivot is what scrolls a focused row to the list's reading band on the TV.
+        val app = androidx.test.core.app.ApplicationProvider.getApplicationContext<Application>()
+        org.robolectric.Shadows.shadowOf(app.packageManager).setSystemFeature("android.software.leanback", true)
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                val navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.PLAYER.name)
+                SettingsScreenNavigation(navigation, listOf(
+                    settingsRootLevel(),
+                    settingsPlayerLevel(SettingsPlayerUiState(), {}),
+                    settingsAdBreaksLevel(at.bernhardberger.tvhplayer.settings.AdBreakMode.ASK) { navigation.pop() },
+                    settingsSkipLandingLevel(at.bernhardberger.tvhplayer.settings.SkipLanding.END) { navigation.pop() }))
+            }
+        }
+        press(Key.DirectionCenter)
+        for (title in listOf("Ad breaks", "Skip lands")) {
+            var downs = 0
+            while (compose.onAllNodes(isFocused() and hasText(title)).fetchSemanticsNodes().isEmpty()) {
+                check(++downs < 20) { "$title row not reachable" }
+                press(Key.DirectionDown)
+            }
+            val before = compose.onNode(isFocused() and hasText(title) and hasClickAction()).fetchSemanticsNode().boundsInRoot
+            press(Key.DirectionCenter)
+            press(Key.Back)
+            val after = compose.onNode(isFocused() and hasText(title) and hasClickAction()).fetchSemanticsNode().boundsInRoot
+            assertEquals("$title keeps its place in the list", before, after)
+        }
+    }
+
+    @Test fun aMoveInTheFrameBackRestoredFocusIsTheRowOkActsOn() {
+        val app = androidx.test.core.app.ApplicationProvider.getApplicationContext<Application>()
+        org.robolectric.Shadows.shadowOf(app.packageManager).setSystemFeature("android.software.leanback", true)
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                val navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.PLAYER.name)
+                SettingsScreenNavigation(navigation, listOf(
+                    settingsRootLevel(),
+                    settingsPlayerLevel(SettingsPlayerUiState(), {}),
+                    settingsKeepChannelLevel(20) { navigation.pop() },
+                    settingsAdBreaksLevel(at.bernhardberger.tvhplayer.settings.AdBreakMode.ASK) { navigation.pop() }))
+            }
+        }
+        press(Key.DirectionCenter)
+        var downs = 0
+        while (compose.onAllNodes(isFocused() and hasText("Ad breaks")).fetchSemanticsNodes().isEmpty()) {
+            check(++downs < 20) { "Ad breaks row not reachable" }
+            press(Key.DirectionDown)
+        }
+        press(Key.DirectionCenter)
+        compose.mainClock.autoAdvance = false
+        compose.onRoot().performKeyInput { pressKey(Key.Back) }
+        var frames = 0
+        while (compose.onAllNodes(isFocused() and hasText("Ad breaks") and hasClickAction()).fetchSemanticsNodes().isEmpty()) {
+            check(++frames < 60) { "Back never restored the row" }
+            compose.mainClock.advanceTimeByFrame()
+        }
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        compose.onNode(isFocused() and hasText("Keep paused TV tuned")).assertExists()
+        press(Key.DirectionCenter)
+        compose.onAllNodes(hasText("Keep paused TV tuned") and hasClickAction()).assertCountEquals(0)
+    }
+
+    @Test fun reopeningALevelLeftAtItsLastRowFocusesARowInIt() {
+        val app = androidx.test.core.app.ApplicationProvider.getApplicationContext<Application>()
+        org.robolectric.Shadows.shadowOf(app.packageManager).setSystemFeature("android.software.leanback", true)
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                val navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.PLAYER.name)
+                SettingsScreenNavigation(navigation, listOf(
+                    settingsRootLevel(),
+                    settingsPlayerLevel(SettingsPlayerUiState(), {}),
+                    settingsAdBreaksLevel(at.bernhardberger.tvhplayer.settings.AdBreakMode.ASK) { navigation.pop() },
+                    settingsSkipLandingLevel(at.bernhardberger.tvhplayer.settings.SkipLanding.END) { navigation.pop() }))
+            }
+        }
+        press(Key.DirectionCenter)
+        var downs = 0
+        while (compose.onAllNodes(isFocused() and hasText("Tunneled playback")).fetchSemanticsNodes().isEmpty()) {
+            check(++downs < 30) { "last row not reachable" }
+            press(Key.DirectionDown)
+        }
+        press(Key.Back)
+        press(Key.DirectionCenter)
+        compose.onNode(isFocused() and hasText("Tunneled playback") and hasClickAction()).assertExists()
+    }
+
     @Test fun recordingsLevelNeedsAProfileChoiceOrRecordingSpace() {
         val profile = at.bernhardberger.tvheadend.sdk.core.DvrConfiguration(
             at.bernhardberger.tvheadend.sdk.core.DvrConfigId("default"), "", "")
@@ -600,6 +688,10 @@ class SettingsDepthNavigationTest {
             assertProfileListKeepsFocusEveryFrame()
         }
         compose.onNodeWithText("Profile 25").assertIsFocused().assertIsSelected().assertIsDisplayed()
+        // Restoring an off-screen row from the list top places it in the readable band, not under the top fade.
+        val row = compose.onNodeWithText("Profile 25").fetchSemanticsNode().boundsInRoot
+        val pane = compose.onNodeWithTag("depth-active").fetchSemanticsNode().boundsInRoot
+        assertTrue("Profile 25 sits at the list top: $row in $pane", row.top >= pane.top + row.height)
         compose.mainClock.autoAdvance = true
         press(Key.DirectionDown)
         compose.onNodeWithText("Profile 26").assertIsFocused().assertIsNotSelected()
@@ -851,6 +943,8 @@ class SettingsDepthNavigationTest {
             assertFalse(runBlocking { store.settings.first().autoStartPlayback })
             press(Key.DirectionCenter)
             compose.waitUntil { runBlocking { store.settings.first().autoStartPlayback } }
+            // DataStore emits off the Compose idling resource: wait for the row to show the stored value.
+            compose.waitUntil { compose.onAllNodes(hasText(autoplay) and isOn()).fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithText(autoplay).assertIsFocused().assertIsOn()
             press(Key.Back)
             compose.onNode(isFocused() and hasText("Playback") and hasClickAction()).assertExists()
@@ -858,6 +952,7 @@ class SettingsDepthNavigationTest {
             compose.onNodeWithText(autoplay).assertIsFocused().assertIsOn()
             press(Key.DirectionCenter)
             compose.waitUntil { !runBlocking { store.settings.first().autoStartPlayback } }
+            compose.waitUntil { compose.onAllNodes(hasText(autoplay) and isOff()).fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithText(autoplay).assertIsFocused().assertIsOff()
             press(Key.Back)
         }
