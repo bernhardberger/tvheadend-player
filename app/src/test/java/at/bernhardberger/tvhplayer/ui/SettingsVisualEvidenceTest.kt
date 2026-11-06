@@ -368,7 +368,7 @@ class SettingsVisualEvidenceTest {
                     WarmPlaybackScrim()
                     SideRail(currentRoute = AppDestination.SETTINGS,
                         onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
-                        SettingsScreenNavigation(navigation, listOf(settingsRootLevel(companionInstalled = false, connectionStatus = "Connected"),
+                        SettingsScreenNavigation(navigation, listOf(settingsRootLevel(connectionStatus = "Connected"),
                             settingsPlayerLevel(ui, {}), settingsAdBreaksLevel(ui.adBreakMode) {},
                             settingsSkipLandingLevel(ui.skipLanding) {}),
                             initialFocusEnabled = !drawerActive, contentPadding = padding)
