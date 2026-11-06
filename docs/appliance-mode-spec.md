@@ -414,7 +414,8 @@ fun adjacentChannelId(
 ## TCL firmware behavior
 
 - TCL Safety Guard must allow the appliance package's hidden `APP_AUTO_START`
-  app-op before the user-approved accessibility service will bind.
+  (G10) or `AUTO_START` (G08) app-op before the user-approved accessibility
+  service will bind.
 - The physical TV button emits Linux `KEY_EPG`, but this firmware delivers TCL
   private Android key code `4001` to accessibility services. By default, this and
   standard Android `KEYCODE_TV` (`170`) open live TV; `KEYCODE_GUIDE` (`172`)

@@ -883,28 +883,23 @@ def show_appliance_status(adb: str, serial: str, package_name: str) -> None:
         sensitive=True,
         announce=False,
     ).stdout
-    app_op = run(
-        adb_command(
-            adb,
-            serial,
-            "shell",
-            "cmd",
-            "appops",
-            "get",
-            package_name,
-            "APP_AUTO_START",
-        ),
-        capture=True,
-        check=False,
-    )
+    auto_start = "unsupported"
+    for operation in ("APP_AUTO_START", "AUTO_START"):
+        app_op = run(
+            adb_command(adb, serial, "shell", "cmd", "appops", "get", package_name, operation),
+            capture=True,
+            check=False,
+        )
+        if app_op.returncode == 0 and "unknown operation" not in (app_op.stdout + app_op.stderr).lower():
+            auto_start = "default"
+            for line in app_op.stdout.splitlines():
+                name, separator, value = line.strip().partition(":")
+                if separator and name in {"AUTO_START", "APP_AUTO_START"}:
+                    auto_start = value.strip().split(maxsplit=1)[0].rstrip(";")
+                    break
+            break
 
     enabled_components = set(enabled_services.split(":"))
-    auto_start = "unsupported" if app_op.returncode != 0 else "default"
-    for line in app_op.stdout.splitlines():
-        name, separator, value = line.strip().partition(":")
-        if separator and name in {"AUTO_START", "APP_AUTO_START"}:
-            auto_start = value.strip().split(maxsplit=1)[0].rstrip(";")
-            break
 
     print(f"accessibilityEnabled={str(accessibility_enabled == '1').lower()}")
     print(f"serviceEnabled={str(component in enabled_components).lower()}")
@@ -1912,19 +1907,16 @@ def main() -> int:
                 f"auto-start repair is available only for packages {APPLIANCE_PACKAGE} "
                 f"and {APPLIANCE_DEBUG_PACKAGE}"
             )
-        run(
-            adb_command(
-                adb,
-                serial,
-                "shell",
-                "cmd",
-                "appops",
-                "set",
-                package_name,
-                "APP_AUTO_START",
-                "allow",
+        for operation in ("APP_AUTO_START", "AUTO_START"):
+            result = run(
+                adb_command(adb, serial, "shell", "cmd", "appops", "set", package_name, operation, "allow"),
+                capture=True,
+                check=False,
             )
-        )
+            if result.returncode == 0 and "unknown operation" not in (result.stdout + result.stderr).lower():
+                break
+        else:
+            fail("could not allow appliance auto-start: neither APP_AUTO_START nor AUTO_START was accepted")
         show_appliance_status(adb, serial, package_name)
         return 0
 

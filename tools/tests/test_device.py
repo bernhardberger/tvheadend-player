@@ -292,6 +292,32 @@ class OperatorShortcutsTest(unittest.TestCase):
             with self.subTest(state=state):
                 self.assertEqual(DEVICE["accessibility_service_binding"](state, component), expected)
 
+    def test_appliance_status_falls_back_to_g08_auto_start_or_reports_unsupported(self):
+        package = DEVICE["APPLIANCE_PACKAGE"]
+        for rejected in (
+            subprocess.CompletedProcess([], 1, stdout="", stderr="operation failed"),
+            subprocess.CompletedProcess([], 0, stdout="Error: Unknown operation string: APP_AUTO_START\n", stderr=""),
+            subprocess.CompletedProcess([], 0, stdout="", stderr="Error: Unknown operation string: APP_AUTO_START\n"),
+        ):
+            for fallback, expected in (
+                (subprocess.CompletedProcess([], 0, stdout="AUTO_START: allow\n", stderr=""), "allow"),
+                (subprocess.CompletedProcess([], 0, stdout="No operations.\n", stderr=""), "default"),
+                (rejected, "unsupported"),
+            ):
+                with self.subTest(rejected=rejected, expected=expected):
+                    runner = Mock(side_effect=[
+                        subprocess.CompletedProcess([], 0, stdout=value, stderr="")
+                        for value in ("0\n", "", "(nothing)\n")
+                    ] + [rejected, fallback])
+                    output = io.StringIO()
+                    with patch.dict(DEVICE_GLOBALS, {"run": runner}), redirect_stdout(output):
+                        DEVICE["show_appliance_status"]("adb", "private-device", package)
+                    self.assertIn(f"autoStart={expected}\n", output.getvalue())
+                    self.assertEqual([entry.args[0][-2:] for entry in runner.call_args_list[3:]],
+                                     [[package, "APP_AUTO_START"], [package, "AUTO_START"]])
+                    for entry in runner.call_args_list[3:]:
+                        self.assertEqual(entry.kwargs, dict(capture=True, check=False))
+
     def test_accessibility_binding_accepts_short_component_name(self):
         component = "example.package/example.package.AccessibilityService"
         state = "* ServiceRecord{abc u0 example.package/.AccessibilityService}\n  app=ProcessRecord{def}\n  hasBound=true\n"
@@ -307,7 +333,7 @@ class OperatorShortcutsTest(unittest.TestCase):
             with self.subTest(package=package):
                 fakes = self.main_fakes()
                 fakes["show_appliance_status"] = Mock()
-                fakes["run"] = Mock()
+                fakes["run"] = Mock(return_value=subprocess.CompletedProcess([], 0, stdout="", stderr=""))
                 with (
                     patch.dict(DEVICE_GLOBALS, fakes),
                     patch.object(DEVICE_GLOBALS["shutil"], "which", return_value="adb"),
@@ -322,7 +348,47 @@ class OperatorShortcutsTest(unittest.TestCase):
                     else:
                         self.assertEqual(DEVICE["main"](), 0)
                         self.assertEqual(fakes["run"].call_args.args[0][-3:], [package, "APP_AUTO_START", "allow"])
+                        fakes["run"].assert_called_once()
                         fakes["show_appliance_status"].assert_called_once_with("adb", "private-device", package)
+
+    def test_auto_start_repair_falls_back_to_g08_or_fails_when_neither_is_accepted(self):
+        for package in (DEVICE["APPLIANCE_PACKAGE"], DEVICE["APPLIANCE_DEBUG_PACKAGE"]):
+            for rejected in (
+                subprocess.CompletedProcess([], 1, stdout="", stderr="operation failed"),
+                subprocess.CompletedProcess([], 0, stdout="Error: Unknown operation string: APP_AUTO_START\n", stderr=""),
+                subprocess.CompletedProcess([], 0, stdout="", stderr="Error: Unknown operation string: APP_AUTO_START\n"),
+            ):
+                for accepted in (True, False):
+                    with self.subTest(package=package, rejected=rejected, accepted=accepted):
+                        fakes = self.main_fakes()
+                        fakes["show_appliance_status"] = Mock()
+                        fakes["run"] = Mock(side_effect=[rejected,
+                            subprocess.CompletedProcess([], 0, stdout="", stderr="") if accepted else rejected])
+                        error = io.StringIO()
+                        with (
+                            patch.dict(DEVICE_GLOBALS, fakes),
+                            patch.object(DEVICE_GLOBALS["shutil"], "which", return_value="adb"),
+                            patch("sys.argv", ["device", "--package", package, "allow-appliance-autostart",
+                                               "--confirm-user-enabled-accessibility"]),
+                            redirect_stderr(error),
+                        ):
+                            if accepted:
+                                self.assertEqual(DEVICE["main"](), 0)
+                            else:
+                                with self.assertRaises(SystemExit) as raised:
+                                    DEVICE["main"]()
+                                self.assertEqual(raised.exception.code, 2)
+                        self.assertEqual([entry.args[0] for entry in fakes["run"].call_args_list], [
+                            ["adb", "-s", "private-device", "shell", "cmd", "appops", "set", package, operation, "allow"]
+                            for operation in ("APP_AUTO_START", "AUTO_START")
+                        ])
+                        for entry in fakes["run"].call_args_list:
+                            self.assertEqual(entry.kwargs, dict(capture=True, check=False))
+                        if accepted:
+                            fakes["show_appliance_status"].assert_called_once_with("adb", "private-device", package)
+                        else:
+                            self.assertIn("neither APP_AUTO_START nor AUTO_START was accepted", error.getvalue())
+                            fakes["show_appliance_status"].assert_not_called()
 
     def test_appliance_package_cannot_use_play_instrumentation_apk(self):
         runner = Mock()

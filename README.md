@@ -233,6 +233,13 @@ adb connect <tv-address>
 adb shell cmd appops set at.bernhardberger.tvhplayer.appliance APP_AUTO_START allow
 ```
 
+Some TCL models, like the G08, call it `AUTO_START`. If the command says
+Unknown operation string, use this instead:
+
+```sh
+adb shell cmd appops set at.bernhardberger.tvhplayer.appliance AUTO_START allow
+```
+
 Switch the service off and on again. The setting stays when the companion
 updates itself.
 
