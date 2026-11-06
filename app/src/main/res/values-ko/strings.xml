@@ -1,4 +1,5 @@
 <resources>
+    <string name="recording_ad_break_skipped">광고 구간을 건너뛰었습니다</string>
     <string name="player_full_screen">전체 화면</string>
     <string name="stop">재생 중지</string>
     <string name="warm_playback_setting">탐색 중 재생</string>
@@ -433,6 +434,28 @@
     <string name="recording_marker_previous">이전 마커</string>
     <string name="recording_marker_start">녹화 시작 부분</string>
     <string name="recording_marker_next">다음 마커</string>
+    <string name="recording_mark_ad_break">광고 구간</string>
+    <string name="recording_mark_ads_end">광고 끝</string>
+    <string name="recording_mark_cut">잘라낼 구간</string>
+    <string name="recording_mark_cut_ends">잘라낼 구간 끝</string>
+    <string name="recording_mark_ad_badge">광고</string>
+    <string name="skip_ad_break">광고 구간 건너뛰기</string>
+    <string name="settings_section_recording_marks">녹화 마커</string>
+    <string name="ad_breaks_setting">광고 구간</string>
+    <string name="ad_breaks_description">녹화 재생 중 광고 구간에 도달했을 때의 동작입니다.</string>
+    <string name="ad_breaks_ask">물어보기</string>
+    <string name="ad_breaks_ask_help">광고 구간이 시작되면 영상 위에 건너뛰기 버튼을 표시합니다.</string>
+    <string name="ad_breaks_automatic">자동으로 건너뛰기</string>
+    <string name="ad_breaks_automatic_help">각 광고 구간을 한 번씩 건너뜁니다. 되감기로 해당 구간 안으로 돌아가면 광고가 재생됩니다.</string>
+    <string name="ad_breaks_off">꺼짐</string>
+    <string name="ad_breaks_off_help">광고 구간도 나머지 부분처럼 재생됩니다. 타임라인에는 계속 표시됩니다.</string>
+    <string name="skip_cuts_setting">잘라낼 구간 건너뛰기</string>
+    <string name="skip_cuts_setting_description">잘라낼 구간으로 표시된 부분을 건너뜁니다. 녹화 자체가 짧아지지는 않습니다.</string>
+    <string name="skip_landing_setting">건너뛴 후 재생 위치</string>
+    <string name="skip_landing_description">잘라낼 구간이나 광고 구간을 건너뛴 후 재생을 계속할 위치입니다.</string>
+    <string name="skip_landing_end">구간 끝</string>
+    <string name="skip_landing_two_seconds">구간 끝 2초 전</string>
+    <string name="skip_landing_five_seconds">구간 끝 5초 전</string>
     <string name="pause">일시정지</string>
     <string name="seek_back_30">−30초</string>
     <string name="seek_forward_30">+30초</string>

@@ -1,4 +1,5 @@
 <resources>
+    <string name="recording_ad_break_skipped">已略過廣告時段</string>
     <string name="player_full_screen">全螢幕</string>
     <string name="stop">停止播放</string>
     <string name="warm_playback_setting">瀏覽時</string>
@@ -415,6 +416,28 @@
     <string name="recording_marker_previous">上一個標記</string>
     <string name="recording_marker_start">錄影開頭</string>
     <string name="recording_marker_next">下一個標記</string>
+    <string name="recording_mark_ad_break">廣告時段</string>
+    <string name="recording_mark_ads_end">廣告結束</string>
+    <string name="recording_mark_cut">剪除片段</string>
+    <string name="recording_mark_cut_ends">剪除片段結束</string>
+    <string name="recording_mark_ad_badge">廣告</string>
+    <string name="skip_ad_break">略過廣告時段</string>
+    <string name="settings_section_recording_marks">錄影標記</string>
+    <string name="ad_breaks_setting">廣告時段</string>
+    <string name="ad_breaks_description">錄影播放到廣告時段時的處理方式。</string>
+    <string name="ad_breaks_ask">詢問</string>
+    <string name="ad_breaks_ask_help">廣告時段開始時，在影片上方顯示略過按鈕。</string>
+    <string name="ad_breaks_automatic">自動略過</string>
+    <string name="ad_breaks_automatic_help">每個廣告時段只略過一次。倒轉回該時段內即可播放。</string>
+    <string name="ad_breaks_off">關閉</string>
+    <string name="ad_breaks_off_help">廣告時段與其他內容一樣正常播放，仍會顯示在時間軸上。</string>
+    <string name="skip_cuts_setting">略過剪除片段</string>
+    <string name="skip_cuts_setting_description">略過標記為剪除的片段。錄影本身不會縮短。</string>
+    <string name="skip_landing_setting">略過後的位置</string>
+    <string name="skip_landing_description">略過剪除片段或廣告時段後繼續播放的位置。</string>
+    <string name="skip_landing_end">結束處</string>
+    <string name="skip_landing_two_seconds">結束前 2 秒</string>
+    <string name="skip_landing_five_seconds">結束前 5 秒</string>
     <string name="pause">暫停</string>
     <string name="seek_back_30">−30秒</string>
     <string name="seek_forward_30">+30秒</string>

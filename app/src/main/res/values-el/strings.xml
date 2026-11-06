@@ -1,4 +1,5 @@
 <resources>
+    <string name="recording_ad_break_skipped">Το διαφημιστικό διάλειμμα παραλείφθηκε</string>
     <string name="player_full_screen">Πλήρης οθόνη</string>
     <string name="stop">Διακοπή</string>
     <string name="warm_playback_setting">Κατά την περιήγηση</string>
@@ -442,6 +443,28 @@
     <string name="recording_marker_previous">Προηγούμενος δείκτης</string>
     <string name="recording_marker_start">Αρχή εγγραφής</string>
     <string name="recording_marker_next">Επόμενος δείκτης</string>
+    <string name="recording_mark_ad_break">Διαφημιστικό διάλειμμα</string>
+    <string name="recording_mark_ads_end">Τέλος διαφημίσεων</string>
+    <string name="recording_mark_cut">Περικοπή</string>
+    <string name="recording_mark_cut_ends">Τέλος περικοπής</string>
+    <string name="recording_mark_ad_badge">Διαφ.</string>
+    <string name="skip_ad_break">Παράλειψη διαλείμματος</string>
+    <string name="settings_section_recording_marks">Δείκτες εγγραφής</string>
+    <string name="ad_breaks_setting">Διαφημιστικά διαλείμματα</string>
+    <string name="ad_breaks_description">Τι συμβαίνει όταν μια εγγραφή φτάνει σε διαφημιστικό διάλειμμα.</string>
+    <string name="ad_breaks_ask">Ερώτηση</string>
+    <string name="ad_breaks_ask_help">Εμφανίζει κουμπί παράλειψης πάνω στο βίντεο όταν ξεκινά ένα διάλειμμα.</string>
+    <string name="ad_breaks_automatic">Αυτόματη παράλειψη</string>
+    <string name="ad_breaks_automatic_help">Παραλείπει κάθε διάλειμμα μία φορά. Αν επιστρέψεις σε αυτό με μετακίνηση προς τα πίσω, αναπαράγεται.</string>
+    <string name="ad_breaks_off">Ανενεργό</string>
+    <string name="ad_breaks_off_help">Τα διαφημιστικά διαλείμματα αναπαράγονται όπως το υπόλοιπο περιεχόμενο. Παραμένουν ορατά στη γραμμή χρόνου.</string>
+    <string name="skip_cuts_setting">Παράλειψη περικοπών</string>
+    <string name="skip_cuts_setting_description">Παραλείπει τα τμήματα που έχουν σημειωθεί ως περικοπές. Η ίδια η εγγραφή δεν συντομεύεται.</string>
+    <string name="skip_landing_setting">Σημείο συνέχισης</string>
+    <string name="skip_landing_description">Πού συνεχίζεται η αναπαραγωγή μετά την παράλειψη περικοπής ή διαφημιστικού διαλείμματος.</string>
+    <string name="skip_landing_end">Στο τέλος</string>
+    <string name="skip_landing_two_seconds">2 δ. πριν από το τέλος</string>
+    <string name="skip_landing_five_seconds">5 δ. πριν από το τέλος</string>
     <string name="pause">Παύση</string>
     <string name="seek_back_30">−30 δευτερόλεπτα</string>
     <string name="seek_forward_30">+30 δευτερόλεπτα</string>

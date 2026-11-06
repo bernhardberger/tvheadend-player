@@ -1,4 +1,5 @@
 <resources>
+    <string name="recording_ad_break_skipped">Reklam arası atlandı</string>
     <string name="player_full_screen">Tam ekran</string>
     <string name="stop">Durdur</string>
     <string name="warm_playback_setting">Gezinirken</string>
@@ -442,6 +443,28 @@
     <string name="recording_marker_previous">Önceki işaret</string>
     <string name="recording_marker_start">Kaydın başlangıcı</string>
     <string name="recording_marker_next">Sonraki işaret</string>
+    <string name="recording_mark_ad_break">Reklam arası</string>
+    <string name="recording_mark_ads_end">Reklam sonu</string>
+    <string name="recording_mark_cut">Kesilecek bölüm</string>
+    <string name="recording_mark_cut_ends">Kesilecek bölümün sonu</string>
+    <string name="recording_mark_ad_badge">Reklam</string>
+    <string name="skip_ad_break">Reklam arasını atla</string>
+    <string name="settings_section_recording_marks">Kayıt işaretleri</string>
+    <string name="ad_breaks_setting">Reklam araları</string>
+    <string name="ad_breaks_description">Kayıt bir reklam arasına ulaştığında ne olacağı.</string>
+    <string name="ad_breaks_ask">Sor</string>
+    <string name="ad_breaks_ask_help">Reklam arası başladığında videonun üzerinde bir atlama düğmesi gösterir.</string>
+    <string name="ad_breaks_automatic">Otomatik atla</string>
+    <string name="ad_breaks_automatic_help">Her reklam arasını bir kez atlar. Geri sararak reklam arasına dönerseniz reklamlar oynatılır.</string>
+    <string name="ad_breaks_off">Kapalı</string>
+    <string name="ad_breaks_off_help">Reklam araları kaydın geri kalanı gibi oynatılır. Zaman çizelgesinde görünmeye devam eder.</string>
+    <string name="skip_cuts_setting">Kesilecek bölümleri atla</string>
+    <string name="skip_cuts_setting_description">Kesilecek olarak işaretlenen bölümleri atlar. Kaydın kendisi kısaltılmaz.</string>
+    <string name="skip_landing_setting">Devam noktası</string>
+    <string name="skip_landing_description">Kesilecek bölüm veya reklam arası atlandıktan sonra oynatmanın nereden devam edeceği.</string>
+    <string name="skip_landing_end">Sonunda</string>
+    <string name="skip_landing_two_seconds">Bitmeden 2 sn önce</string>
+    <string name="skip_landing_five_seconds">Bitmeden 5 sn önce</string>
     <string name="pause">Duraklat</string>
     <string name="seek_back_30">−30 saniye</string>
     <string name="seek_forward_30">+30 saniye</string>

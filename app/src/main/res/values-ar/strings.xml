@@ -1,4 +1,5 @@
 <resources>
+    <string name="recording_ad_break_skipped">تم تخطي الفاصل الإعلاني</string>
     <string name="player_full_screen">ملء الشاشة</string>
     <string name="stop">إيقاف التشغيل</string>
     <string name="warm_playback_setting">أثناء التصفح</string>
@@ -478,6 +479,28 @@
     <string name="recording_marker_previous">العلامة السابقة</string>
     <string name="recording_marker_start">بداية التسجيل</string>
     <string name="recording_marker_next">العلامة التالية</string>
+    <string name="recording_mark_ad_break">فاصل إعلاني</string>
+    <string name="recording_mark_ads_end">نهاية الإعلانات</string>
+    <string name="recording_mark_cut">مقطع مستبعد</string>
+    <string name="recording_mark_cut_ends">نهاية المقطع المستبعد</string>
+    <string name="recording_mark_ad_badge">إعلان</string>
+    <string name="skip_ad_break">تخطي الفاصل الإعلاني</string>
+    <string name="settings_section_recording_marks">علامات التسجيل</string>
+    <string name="ad_breaks_setting">الفواصل الإعلانية</string>
+    <string name="ad_breaks_description">ما يحدث عندما يصل التسجيل إلى فاصل إعلاني.</string>
+    <string name="ad_breaks_ask">السؤال أولًا</string>
+    <string name="ad_breaks_ask_help">يظهر زر للتخطي فوق الفيديو عند بدء الفاصل.</string>
+    <string name="ad_breaks_automatic">التخطي تلقائيًا</string>
+    <string name="ad_breaks_automatic_help">يتم تخطي كل فاصل مرة واحدة. عند الرجوع إلى موضع داخل الفاصل، يتم تشغيله.</string>
+    <string name="ad_breaks_off">إيقاف</string>
+    <string name="ad_breaks_off_help">يتم تشغيل الفواصل الإعلانية مثل بقية التسجيل. وتظل ظاهرة على المخطط الزمني.</string>
+    <string name="skip_cuts_setting">تخطي المقاطع المستبعدة</string>
+    <string name="skip_cuts_setting_description">يتم تخطي الأجزاء المحددة كمقاطع مستبعدة. ولا يتم تقصير التسجيل نفسه.</string>
+    <string name="skip_landing_setting">موضع الاستئناف</string>
+    <string name="skip_landing_description">موضع استمرار التشغيل بعد تخطي مقطع مستبعد أو فاصل إعلاني.</string>
+    <string name="skip_landing_end">عند النهاية</string>
+    <string name="skip_landing_two_seconds">قبل النهاية بثانيتين</string>
+    <string name="skip_landing_five_seconds">قبل النهاية بـ 5 ثوانٍ</string>
     <string name="pause">إيقاف مؤقت</string>
     <string name="seek_back_30">−30 ثانية</string>
     <string name="seek_forward_30">+30 ثانية</string>

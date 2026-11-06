@@ -1,4 +1,5 @@
 <resources>
+    <string name="recording_ad_break_skipped">Reklámszünet átugorva</string>
     <string name="player_full_screen">Teljes képernyő</string>
     <string name="stop">Leállítás</string>
     <string name="warm_playback_setting">Böngészés közben</string>
@@ -442,6 +443,28 @@
     <string name="recording_marker_previous">Előző jelölő</string>
     <string name="recording_marker_start">Felvétel eleje</string>
     <string name="recording_marker_next">Következő jelölő</string>
+    <string name="recording_mark_ad_break">Reklámszünet</string>
+    <string name="recording_mark_ads_end">Reklámok vége</string>
+    <string name="recording_mark_cut">Vágás</string>
+    <string name="recording_mark_cut_ends">Vágás vége</string>
+    <string name="recording_mark_ad_badge">Rek.</string>
+    <string name="skip_ad_break">Reklámszünet átugrása</string>
+    <string name="settings_section_recording_marks">Felvételjelölők</string>
+    <string name="ad_breaks_setting">Reklámszünetek</string>
+    <string name="ad_breaks_description">Mi történjen, ha a felvétel reklámszünethez ér.</string>
+    <string name="ad_breaks_ask">Rákérdezés</string>
+    <string name="ad_breaks_ask_help">A szünet kezdetekor átugrási gombot jelenít meg a videó fölött.</string>
+    <string name="ad_breaks_automatic">Automatikus átugrás</string>
+    <string name="ad_breaks_automatic_help">Minden szünetet egyszer ugrik át. Ha visszatekercselsz a szünetbe, lejátssza.</string>
+    <string name="ad_breaks_off">Ki</string>
+    <string name="ad_breaks_off_help">A reklámszüneteket a többi részhez hasonlóan lejátssza. Az idővonalon továbbra is láthatók.</string>
+    <string name="skip_cuts_setting">Vágások átugrása</string>
+    <string name="skip_cuts_setting_description">Átugorja a vágásként megjelölt részeket. Maga a felvétel nem rövidül meg.</string>
+    <string name="skip_landing_setting">Folytatási pont</string>
+    <string name="skip_landing_description">Hol folytatódjon a lejátszás egy vágás vagy reklámszünet átugrása után.</string>
+    <string name="skip_landing_end">A végén</string>
+    <string name="skip_landing_two_seconds">2 mp-cel a vége előtt</string>
+    <string name="skip_landing_five_seconds">5 mp-cel a vége előtt</string>
     <string name="pause">Szünet</string>
     <string name="seek_back_30">−30 másodperc</string>
     <string name="seek_forward_30">+30 másodperc</string>

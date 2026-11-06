@@ -1,4 +1,5 @@
 <resources>
+    <string name="recording_ad_break_skipped">Mainoskatko ohitettu</string>
     <string name="player_full_screen">Koko näyttö</string>
     <string name="stop">Pysäytä</string>
     <string name="warm_playback_setting">Selatessa</string>
@@ -442,6 +443,28 @@
     <string name="recording_marker_previous">Edellinen merkki</string>
     <string name="recording_marker_start">Tallenteen alku</string>
     <string name="recording_marker_next">Seuraava merkki</string>
+    <string name="recording_mark_ad_break">Mainoskatko</string>
+    <string name="recording_mark_ads_end">Mainokset päättyvät</string>
+    <string name="recording_mark_cut">Leikkaus</string>
+    <string name="recording_mark_cut_ends">Leikkaus päättyy</string>
+    <string name="recording_mark_ad_badge">Mainos</string>
+    <string name="skip_ad_break">Ohita mainoskatko</string>
+    <string name="settings_section_recording_marks">Tallenteen merkit</string>
+    <string name="ad_breaks_setting">Mainoskatkot</string>
+    <string name="ad_breaks_description">Mitä tapahtuu, kun tallenne saavuttaa mainoskatkon.</string>
+    <string name="ad_breaks_ask">Kysy</string>
+    <string name="ad_breaks_ask_help">Näyttää ohituspainikkeen videon päällä katkon alkaessa.</string>
+    <string name="ad_breaks_automatic">Ohita automaattisesti</string>
+    <string name="ad_breaks_automatic_help">Ohittaa jokaisen katkon kerran. Jos kelaat takaisin katkon kohdalle, se toistetaan.</string>
+    <string name="ad_breaks_off">Pois</string>
+    <string name="ad_breaks_off_help">Mainoskatkot toistetaan kuten muukin sisältö. Ne näkyvät edelleen aikajanalla.</string>
+    <string name="skip_cuts_setting">Ohita leikkaukset</string>
+    <string name="skip_cuts_setting_description">Ohittaa leikkauksiksi merkityt osat. Itse tallennetta ei lyhennetä.</string>
+    <string name="skip_landing_setting">Toiston jatkokohta</string>
+    <string name="skip_landing_description">Mistä toisto jatkuu ohitetun leikkauksen tai mainoskatkon jälkeen.</string>
+    <string name="skip_landing_end">Lopussa</string>
+    <string name="skip_landing_two_seconds">2 s ennen loppua</string>
+    <string name="skip_landing_five_seconds">5 s ennen loppua</string>
     <string name="pause">Keskeytä</string>
     <string name="seek_back_30">−30 sekuntia</string>
     <string name="seek_forward_30">+30 sekuntia</string>

@@ -1,4 +1,5 @@
 <resources>
+    <string name="recording_ad_break_skipped">Reclameblok overgeslagen</string>
     <string name="player_full_screen">Volledig scherm</string>
     <string name="stop">Stoppen</string>
     <string name="warm_playback_setting">Tijdens het bladeren</string>
@@ -442,6 +443,28 @@
     <string name="recording_marker_previous">Vorige markering</string>
     <string name="recording_marker_start">Begin van de opname</string>
     <string name="recording_marker_next">Volgende markering</string>
+    <string name="recording_mark_ad_break">Reclameblok</string>
+    <string name="recording_mark_ads_end">Einde reclame</string>
+    <string name="recording_mark_cut">Knip</string>
+    <string name="recording_mark_cut_ends">Einde knip</string>
+    <string name="recording_mark_ad_badge">Rec.</string>
+    <string name="skip_ad_break">Reclameblok overslaan</string>
+    <string name="settings_section_recording_marks">Opnamemarkeringen</string>
+    <string name="ad_breaks_setting">Reclameblokken</string>
+    <string name="ad_breaks_description">Wat er gebeurt als een opname een reclameblok bereikt.</string>
+    <string name="ad_breaks_ask">Vragen</string>
+    <string name="ad_breaks_ask_help">Toont bij het begin van een reclameblok een knop om over te slaan boven de video.</string>
+    <string name="ad_breaks_automatic">Automatisch overslaan</string>
+    <string name="ad_breaks_automatic_help">Slaat elk reclameblok één keer over. Als je erin terugspoelt, wordt het afgespeeld.</string>
+    <string name="ad_breaks_off">Uit</string>
+    <string name="ad_breaks_off_help">Reclameblokken worden net als de rest afgespeeld. Ze blijven zichtbaar op de tijdlijn.</string>
+    <string name="skip_cuts_setting">Knippen overslaan</string>
+    <string name="skip_cuts_setting_description">Slaat delen over die als knip zijn gemarkeerd. De opname zelf wordt niet ingekort.</string>
+    <string name="skip_landing_setting">Hervatpunt</string>
+    <string name="skip_landing_description">Waar het afspelen verdergaat na een overgeslagen knip of reclameblok.</string>
+    <string name="skip_landing_end">Aan het einde</string>
+    <string name="skip_landing_two_seconds">2 s voor het einde</string>
+    <string name="skip_landing_five_seconds">5 s voor het einde</string>
     <string name="pause">Pauzeren</string>
     <string name="seek_back_30">−30 seconden</string>
     <string name="seek_forward_30">+30 seconden</string>

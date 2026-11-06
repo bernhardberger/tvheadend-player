@@ -1,4 +1,5 @@
 <resources>
+    <string name="recording_ad_break_skipped">CMをスキップしました</string>
     <string name="player_full_screen">全画面表示</string>
     <string name="stop">再生を停止</string>
     <string name="warm_playback_setting">閲覧中の再生</string>
@@ -433,6 +434,28 @@
     <string name="recording_marker_previous">前のマーカー</string>
     <string name="recording_marker_start">録画の先頭</string>
     <string name="recording_marker_next">次のマーカー</string>
+    <string name="recording_mark_ad_break">CM区間</string>
+    <string name="recording_mark_ads_end">CM終了</string>
+    <string name="recording_mark_cut">カット区間</string>
+    <string name="recording_mark_cut_ends">カット区間終了</string>
+    <string name="recording_mark_ad_badge">CM</string>
+    <string name="skip_ad_break">CMをスキップ</string>
+    <string name="settings_section_recording_marks">録画のマーカー</string>
+    <string name="ad_breaks_setting">CM区間</string>
+    <string name="ad_breaks_description">録画の再生がCM区間に達したときの動作です。</string>
+    <string name="ad_breaks_ask">確認する</string>
+    <string name="ad_breaks_ask_help">CM区間の開始時に、映像の上にスキップボタンを表示します。</string>
+    <string name="ad_breaks_automatic">自動でスキップ</string>
+    <string name="ad_breaks_automatic_help">各CM区間を1回だけスキップします。巻き戻して区間内に戻ると、そのCMが再生されます。</string>
+    <string name="ad_breaks_off">オフ</string>
+    <string name="ad_breaks_off_help">CM区間も他の部分と同じように再生します。タイムライン上の表示は残ります。</string>
+    <string name="skip_cuts_setting">カット区間をスキップ</string>
+    <string name="skip_cuts_setting_description">カットとしてマークされた部分をスキップします。録画自体は短くなりません。</string>
+    <string name="skip_landing_setting">スキップ後の再生位置</string>
+    <string name="skip_landing_description">カット区間やCM区間をスキップした後、再生を続ける位置です。</string>
+    <string name="skip_landing_end">区間の終わり</string>
+    <string name="skip_landing_two_seconds">区間の終わりの2秒前</string>
+    <string name="skip_landing_five_seconds">区間の終わりの5秒前</string>
     <string name="pause">一時停止</string>
     <string name="seek_back_30">−30秒</string>
     <string name="seek_forward_30">+30秒</string>

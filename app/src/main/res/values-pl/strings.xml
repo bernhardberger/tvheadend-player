@@ -1,4 +1,5 @@
 <resources>
+    <string name="recording_ad_break_skipped">Przerwa reklamowa pominięta</string>
     <string name="player_full_screen">Pełny ekran</string>
     <string name="stop">Zatrzymaj</string>
     <string name="warm_playback_setting">Podczas przeglądania</string>
@@ -460,6 +461,28 @@
     <string name="recording_marker_previous">Poprzedni znacznik</string>
     <string name="recording_marker_start">Początek nagrania</string>
     <string name="recording_marker_next">Następny znacznik</string>
+    <string name="recording_mark_ad_break">Przerwa reklamowa</string>
+    <string name="recording_mark_ads_end">Koniec reklam</string>
+    <string name="recording_mark_cut">Cięcie</string>
+    <string name="recording_mark_cut_ends">Koniec cięcia</string>
+    <string name="recording_mark_ad_badge">Rekl.</string>
+    <string name="skip_ad_break">Pomiń przerwę reklamową</string>
+    <string name="settings_section_recording_marks">Znaczniki nagrania</string>
+    <string name="ad_breaks_setting">Przerwy reklamowe</string>
+    <string name="ad_breaks_description">Co się dzieje, gdy nagranie dociera do przerwy reklamowej.</string>
+    <string name="ad_breaks_ask">Pytaj</string>
+    <string name="ad_breaks_ask_help">Wyświetla na obrazie przycisk pomijania, gdy zaczyna się przerwa.</string>
+    <string name="ad_breaks_automatic">Pomijaj automatycznie</string>
+    <string name="ad_breaks_automatic_help">Pomija każdą przerwę raz. Jeśli przewiniesz z powrotem do przerwy, zostanie odtworzona.</string>
+    <string name="ad_breaks_off">Wyłączone</string>
+    <string name="ad_breaks_off_help">Przerwy reklamowe są odtwarzane tak jak reszta. Nadal są widoczne na osi czasu.</string>
+    <string name="skip_cuts_setting">Pomijaj cięcia</string>
+    <string name="skip_cuts_setting_description">Pomija części oznaczone jako cięcia. Samo nagranie nie jest skracane.</string>
+    <string name="skip_landing_setting">Punkt wznowienia</string>
+    <string name="skip_landing_description">Gdzie odtwarzanie jest kontynuowane po pominięciu cięcia lub przerwy reklamowej.</string>
+    <string name="skip_landing_end">Na końcu</string>
+    <string name="skip_landing_two_seconds">2 s przed końcem</string>
+    <string name="skip_landing_five_seconds">5 s przed końcem</string>
     <string name="pause">Wstrzymaj</string>
     <string name="seek_back_30">−30 sekund</string>
     <string name="seek_forward_30">+30 sekund</string>

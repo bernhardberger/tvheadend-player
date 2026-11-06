@@ -1,4 +1,5 @@
 <resources>
+    <string name="recording_ad_break_skipped">Pauză publicitară sărită</string>
     <string name="player_full_screen">Ecran complet</string>
     <string name="stop">Oprește</string>
     <string name="warm_playback_setting">În timpul navigării</string>
@@ -451,6 +452,28 @@
     <string name="recording_marker_previous">Marcajul anterior</string>
     <string name="recording_marker_start">Începutul înregistrării</string>
     <string name="recording_marker_next">Marcajul următor</string>
+    <string name="recording_mark_ad_break">Pauză publicitară</string>
+    <string name="recording_mark_ads_end">Sfârșitul reclamelor</string>
+    <string name="recording_mark_cut">Tăietură</string>
+    <string name="recording_mark_cut_ends">Sfârșitul tăieturii</string>
+    <string name="recording_mark_ad_badge">Reclamă</string>
+    <string name="skip_ad_break">Sari peste pauza publicitară</string>
+    <string name="settings_section_recording_marks">Marcajele înregistrării</string>
+    <string name="ad_breaks_setting">Pauze publicitare</string>
+    <string name="ad_breaks_description">Ce se întâmplă când o înregistrare ajunge la o pauză publicitară.</string>
+    <string name="ad_breaks_ask">Întreabă</string>
+    <string name="ad_breaks_ask_help">La începutul unei pauze, afișează peste videoclip un buton pentru a o sări.</string>
+    <string name="ad_breaks_automatic">Sari automat</string>
+    <string name="ad_breaks_automatic_help">Sare peste fiecare pauză o dată. Dacă derulezi înapoi în pauză, aceasta este redată.</string>
+    <string name="ad_breaks_off">Dezactivat</string>
+    <string name="ad_breaks_off_help">Pauzele publicitare sunt redate ca restul înregistrării. Rămân vizibile pe cronologie.</string>
+    <string name="skip_cuts_setting">Sari peste tăieturi</string>
+    <string name="skip_cuts_setting_description">Sare peste părțile marcate ca tăieturi. Înregistrarea în sine nu este scurtată.</string>
+    <string name="skip_landing_setting">Punct de reluare</string>
+    <string name="skip_landing_description">Unde continuă redarea după saltul peste o tăietură sau o pauză publicitară.</string>
+    <string name="skip_landing_end">La sfârșit</string>
+    <string name="skip_landing_two_seconds">Cu 2 s înainte de sfârșit</string>
+    <string name="skip_landing_five_seconds">Cu 5 s înainte de sfârșit</string>
     <string name="pause">Pauză</string>
     <string name="seek_back_30">−30 de secunde</string>
     <string name="seek_forward_30">+30 de secunde</string>

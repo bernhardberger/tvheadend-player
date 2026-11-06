@@ -1,4 +1,5 @@
 <resources>
+    <string name="recording_ad_break_skipped">Reklamepause hoppet over</string>
     <string name="player_full_screen">Fullskjerm</string>
     <string name="stop">Stopp</string>
     <string name="warm_playback_setting">Mens du blar</string>
@@ -442,6 +443,28 @@
     <string name="recording_marker_previous">Forrige markør</string>
     <string name="recording_marker_start">Opptakets begynnelse</string>
     <string name="recording_marker_next">Neste markør</string>
+    <string name="recording_mark_ad_break">Reklamepause</string>
+    <string name="recording_mark_ads_end">Reklame slutter</string>
+    <string name="recording_mark_cut">Klipp</string>
+    <string name="recording_mark_cut_ends">Klipp slutter</string>
+    <string name="recording_mark_ad_badge">Rekl.</string>
+    <string name="skip_ad_break">Hopp over reklamepause</string>
+    <string name="settings_section_recording_marks">Opptaksmarkører</string>
+    <string name="ad_breaks_setting">Reklamepauser</string>
+    <string name="ad_breaks_description">Hva som skjer når et opptak når en reklamepause.</string>
+    <string name="ad_breaks_ask">Spør</string>
+    <string name="ad_breaks_ask_help">Viser en knapp for å hoppe over oppå videoen når en pause starter.</string>
+    <string name="ad_breaks_automatic">Hopp over automatisk</string>
+    <string name="ad_breaks_automatic_help">Hopper over hver pause én gang. Spoler du tilbake inn i den, spilles den av.</string>
+    <string name="ad_breaks_off">Av</string>
+    <string name="ad_breaks_off_help">Reklamepauser spilles av som resten. De vises fortsatt på tidslinjen.</string>
+    <string name="skip_cuts_setting">Hopp over klipp</string>
+    <string name="skip_cuts_setting_description">Hopper over deler merket som klipp. Selve opptaket forkortes ikke.</string>
+    <string name="skip_landing_setting">Fortsett etter hopp</string>
+    <string name="skip_landing_description">Hvor avspillingen fortsetter etter et klipp eller en reklamepause som er hoppet over.</string>
+    <string name="skip_landing_end">Ved slutten</string>
+    <string name="skip_landing_two_seconds">2 s før slutten</string>
+    <string name="skip_landing_five_seconds">5 s før slutten</string>
     <string name="pause">Pause</string>
     <string name="seek_back_30">−30 sekunder</string>
     <string name="seek_forward_30">+30 sekunder</string>
