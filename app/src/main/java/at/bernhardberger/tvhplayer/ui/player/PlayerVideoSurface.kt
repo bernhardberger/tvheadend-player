@@ -52,8 +52,10 @@ fun PlayerVideoSurface(
     debugVideoBackdropVisible: Boolean = false,
     /** How long the black cover takes to clear a first picture; 0 removes it at once. */
     coverFadeMillis: Int = 0,
-    /** Display rate to ask for while the player is shown; one without a rate asks for none. */
+    /** Full playback request; non-seamless changes are retained even over browse screens. */
     frameRate: SurfaceFrameRateRequest = SurfaceFrameRateRequest(),
+    /** Whether player chrome, rather than a browse screen over warm playback, is shown. */
+    playerShown: Boolean = true,
 ) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val surfaceFrameRate = remember { VideoSurfaceFrameRate() }
@@ -187,7 +189,7 @@ fun PlayerVideoSurface(
             update = { view ->
                 view.player = player
                 view.keepScreenOn = keepScreenOn
-                surfaceFrameRate.request(frameRate)
+                surfaceFrameRate.request(frameRate, playerShown)
                 view.alpha = if (videoVisible) 1f else 0f
                 view.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL
             },

@@ -1352,8 +1352,9 @@ fun AppRoot(
                         videoVisible = videoPresentation.visible,
                         instant = applianceLaunchActive || !ValueAnimator.areAnimatorsEnabled(),
                     ),
-                    // Browse screens over warm playback leave the TV in its own mode.
-                    frameRate = if (isPlayer) requestedFrameRate else SurfaceFrameRateRequest(),
+                    // Browse drops seamless requests, but avoids another HDMI blank for non-seamless ones.
+                    frameRate = requestedFrameRate,
+                    playerShown = isPlayer,
                 )
             }
         },

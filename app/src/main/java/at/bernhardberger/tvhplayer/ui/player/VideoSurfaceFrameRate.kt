@@ -17,7 +17,9 @@ import at.bernhardberger.tvhplayer.playback.SurfaceFrameRateVote
  * (Media3's change strategy is Off). Main thread only: [request] from composition, the holder
  * callbacks from the view. A recreated surface gets the request again; a destroyed one clears
  * its surface vote. Display-mode requests use the hosting window instead and stay through
- * surface recreation during a mode switch. [release] clears both kinds of request.
+ * surface recreation during a mode switch. Browse retains non-seamless requests, comparing
+ * against a latched clean observation without an app request, not a previously switched channel.
+ * [release] clears both kinds of request and forgets that base mode.
  */
 internal class VideoSurfaceFrameRate : SurfaceHolder.Callback {
     private val vote = SurfaceFrameRateVote()
@@ -25,6 +27,8 @@ internal class VideoSurfaceFrameRate : SurfaceHolder.Callback {
     private var view: SurfaceView? = null
     private var window: Window? = null
     private var target = SurfaceFrameRateRequest()
+    private var baseMode: DisplayModeSpec? = null
+    private var lastRequestedRate: Float? = null
 
     fun attach(view: SurfaceView) {
         this.view = view
@@ -37,11 +41,22 @@ internal class VideoSurfaceFrameRate : SurfaceHolder.Callback {
         if (surfaceHolder.surface?.isValid == true) apply(surfaceHolder, vote.surfaceCreated())
     }
 
-    fun request(request: SurfaceFrameRateRequest) {
-        target = request
+    fun request(request: SurfaceFrameRateRequest, playerShown: Boolean) {
+        baseMode = nextBaseMode(
+            baseMode,
+            (view?.display ?: window?.decorView?.display)?.mode?.toSpec(),
+            unrequested = target.rate == null,
+            lastRequestedRate = lastRequestedRate,
+        )
+        target = if (playerShown || keepVideoFrameRateInBrowse(request.change, request.rate, baseMode)) {
+            request
+        } else {
+            SurfaceFrameRateRequest()
+        }
         applyDisplayMode()
-        val surfaceRequest = if (request.change == SurfaceFrameRateChange.DISPLAY_MODE) SurfaceFrameRateRequest() else request
+        val surfaceRequest = if (target.change == SurfaceFrameRateChange.DISPLAY_MODE) SurfaceFrameRateRequest() else target
         holder?.let { apply(it, vote.request(surfaceRequest)) }
+        target.rate?.let { lastRequestedRate = it }
     }
 
     fun release() {
@@ -49,6 +64,8 @@ internal class VideoSurfaceFrameRate : SurfaceHolder.Callback {
         window = null
         view = null
         target = SurfaceFrameRateRequest()
+        baseMode = null
+        lastRequestedRate = null
         val surfaceHolder = holder ?: return
         apply(surfaceHolder, vote.release())
         surfaceHolder.removeCallback(this)
@@ -85,7 +102,10 @@ internal class VideoSurfaceFrameRate : SurfaceHolder.Callback {
         window.attributes = attributes
     }
 
-    private fun Display.Mode.toSpec() = DisplayModeSpec(physicalWidth, physicalHeight, refreshRate, modeId)
+    private fun Display.Mode.toSpec() = DisplayModeSpec(
+        physicalWidth, physicalHeight, refreshRate, modeId,
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) alternativeRefreshRates.toList() else emptyList(),
+    )
 
     /** Sets [request] on the surface; one without a rate clears the vote. */
     private fun apply(holder: SurfaceHolder, request: SurfaceFrameRateRequest?) {
