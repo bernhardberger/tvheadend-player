@@ -18,6 +18,11 @@ sealed interface Notice {
     val key: String
     val severity: NoticeSeverity
 
+    data class AutomaticAdBreakSkip(val startMs: Long) : Notice {
+        override val key = "automatic-ad-break-skip:$startMs"
+        override val severity = NoticeSeverity.INFO
+    }
+
     data class Dvr(
         val kind: DvrChangeKind,
         val entry: DvrEntry,

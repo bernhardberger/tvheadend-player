@@ -32,8 +32,6 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onAllNodesWithTag
-import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
@@ -94,9 +92,10 @@ class RecordingOverlayCompositionTest {
         val ordinaryTrack = track()
         val ordinaryActions = bounds("player-actions")
         captureMarkerState("markers-absent-en-1.5x.png")
+        composeRule.onNodeWithTag("recording-marks-track", useUnmergedTree = true).assertDoesNotExist()
         composeRule.runOnIdle { markers.value = listOf(10_000L, 60_000L, 100_000L) }
         assertEquals(ordinaryTrack, track())
-        composeRule.onAllNodesWithTag("recording-marker-tick", useUnmergedTree = true).assertCountEquals(3)
+        composeRule.onNodeWithTag("recording-marks-track", useUnmergedTree = true).assertExists()
         composeRule.onNodeWithTag("player-pause").performKeyInput { pressKey(Key.DirectionUp) }
         composeRule.onNodeWithTag("player-seekbar").assertIsFocused()
         captureMarkerState("markers-ticks-en-1.5x.png")

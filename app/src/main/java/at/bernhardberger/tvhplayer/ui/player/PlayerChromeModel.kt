@@ -39,6 +39,8 @@ internal data class PlayerChromeContent(
     val artwork: ArtworkId? = null,
     /** The channel whose colour is the identity card's backdrop without [artwork]. */
     val channelId: at.bernhardberger.tvheadend.sdk.core.ChannelId? = null,
+    /** A recording with no channel: the artwork's place shows the recordings symbol instead of an empty channel. */
+    val withoutChannel: Boolean = false,
 )
 
 /** Facts the chrome's timeline shows. */
@@ -112,10 +114,19 @@ internal sealed interface PlayerChromeTimeline {
         val stepSettled: Boolean = false,
         /** The step's identity, as for the live timeline. */
         val stepId: Any? = null,
-        val markers: List<Long> = emptyList(),
+        /** The recording's marks, drawn on the bar. */
+        val marks: List<at.bernhardberger.tvhplayer.core.RecordingMark> = emptyList(),
+        /** The marks row's stops; empty while the recording cannot be sought by mark. */
+        val markStops: List<at.bernhardberger.tvhplayer.core.RecordingMarkStop> = emptyList(),
         val markerRevision: Long = 0L,
         val motionKey: Any? = null,
-    ) : PlayerChromeTimeline
+        /** The ad break playing now, which the controls offer to skip; null outside one or with breaks off. */
+        val adBreak: at.bernhardberger.tvhplayer.core.RecordingMark? = null,
+        val onSkipAdBreak: (at.bernhardberger.tvhplayer.core.RecordingMark) -> Unit = {},
+    ) : PlayerChromeTimeline {
+        /** The stops' positions, as the marks row steps and seeks them. */
+        val markers: List<Long> = markStops.map { it.positionMs }
+    }
 }
 
 /** The action row's actions and where focus goes. */

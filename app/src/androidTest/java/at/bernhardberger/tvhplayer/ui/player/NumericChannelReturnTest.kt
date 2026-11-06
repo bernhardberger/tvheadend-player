@@ -84,7 +84,8 @@ class NumericChannelReturnTest(private val tagged: Boolean, private val completi
             AppPlaybackRuntime(controlled.player, session, coordinator, settings, profiles, scope,
                 at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider(context),
                 at.bernhardberger.tvhplayer.playback.PlaybackAudioFocus.None,
-                at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy.fromPlayerSettings())
+                at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy.fromPlayerSettings(),
+                noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) })
         }
         val video = withContext(Dispatchers.Main) { VideoPlayerViewModel(runtime, session) }
         val catalog = withContext(Dispatchers.Main) { ChannelsViewModel(session, tags) }

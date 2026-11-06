@@ -61,16 +61,17 @@ val appModule = module {
     single { ChannelTagSettingsStore(androidContext()) }
     single { UiSettingsStore(androidContext()) }
     single {
-        val owner = get<AppProfileOwner>()
-        val session = get<SdkRuntimeOwner>().session
-        val scope = get<CoroutineScope>(qualifier = named("application"))
         at.bernhardberger.tvhplayer.notices.NoticeCenter(android.os.SystemClock::elapsedRealtime) {
             at.bernhardberger.tvhplayer.notices.NoticeContext(
-                owner.configurationGeneration.value, session.observation.value.currentSession?.generationIdentity,
+                get<AppProfileOwner>().configurationGeneration.value,
+                get<SdkRuntimeOwner>().session.observation.value.currentSession?.generationIdentity,
             )
-        }.also { center ->
-            scope.launch { at.bernhardberger.tvhplayer.notices.DvrChangeNoticeSource(session.dvrRepository, center).run() }
         }
+    }
+
+    single(createdAtStart = true) {
+        at.bernhardberger.tvhplayer.notices.DvrChangeNoticeSource(get<SdkRuntimeOwner>().session.dvrRepository, get())
+            .also { source -> get<CoroutineScope>(qualifier = named("application")).launch { source.run() } }
     }
 
     single(createdAtStart = true) {
@@ -139,6 +140,7 @@ val appModule = module {
                 seekDiagnostics = BuildConfig.DEBUG,
             ),
             startupBuffer = startupBuffer,
+            noticeCenter = get(),
         )
         // Application scope outlives a stopped/destroyed activity while a tuner is kept.
         val context = androidContext()

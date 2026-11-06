@@ -71,6 +71,7 @@ class AppPlaybackRuntime(
     private val audioOutput: TvheadendAudioOutputProvider,
     private val audioFocus: PlaybackAudioFocus,
     private val policy: PlaybackRuntimePolicy,
+    private val noticeCenter: at.bernhardberger.tvhplayer.notices.NoticeCenter,
     private val elapsedRealtime: () -> Long = android.os.SystemClock::elapsedRealtime,
     private val startupBuffer: StartupBufferController? = null,
     private val audioOutputs: PlaybackAudioOutputs = PlaybackAudioOutputs.None,
@@ -227,16 +228,23 @@ class AppPlaybackRuntime(
     val audioAutomatic = audioTracks.audioAutomatic
     private val _recordingSelection = MutableStateFlow<RecordingPlaybackSelection?>(null)
     private val _recordingAdmission = MutableStateFlow<RecordingPlaybackAdmission?>(null)
+    @OptIn(ExperimentalTvheadendApi::class)
     private val recordingMarkers = RecordingMarkers(
         player = player,
         session = session,
         scope = scope,
         targetCommands = targetCommands,
+        noticeCenter = noticeCenter,
+        pendingRecordingRecoveryPosition = coordinator.pendingRecordingRecoveryPosition,
         targetInstallationInProgress = { targetInstallationInProgress },
     )
     val recordingCutpoints = recordingMarkers.recordingCutpoints
     val recordingChapterStartsMs = recordingMarkers.recordingChapterStartsMs
     val recordingMarkerRevision = recordingMarkers.recordingMarkerRevision
+    val recordingMarks = recordingMarkers.marks
+    val recordingChapters = recordingMarkers.recordingChapters
+    val recordingSkipPrompt = recordingMarkers.skipPrompt
+    val recordingAdBreak = recordingMarkers.currentAdBreak
     @Volatile
     private var activeTargetEpoch: Long? = null
     @Volatile
@@ -350,6 +358,7 @@ class AppPlaybackRuntime(
             settings.playerSettings.distinctUntilChanged().collect {
                 targetCommands.serialize(onClosed = {}) {
                     val latest = settings.playerSettings.first()
+                    recordingMarkers.applySettings(latest)
                     audioTracks.applyPlayerSettingsLocked(latest)
                     audioTracks.applyAudioPassthroughLocked(effectiveAudioPassthrough(
                         latest.audioPassthroughEnabled, audioOutputs.personalOutputConnected.value,
@@ -446,6 +455,7 @@ class AppPlaybackRuntime(
             reason: Int,
         ) {
             stallWatch.reset()
+            recordingMarkers.onPositionDiscontinuity()
         }
 
         override fun onPlaybackSuppressionReasonChanged(playbackSuppressionReason: Int) {
@@ -492,6 +502,7 @@ class AppPlaybackRuntime(
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
+            recordingMarkers.onPlaybackChanged()
             watchForStall()
             if (!targetInstallationInProgress && !coordinator.playerCleanupPending.value && targetCommands.isOpen()) {
                 presentation.publishPlayerState()
@@ -1177,13 +1188,17 @@ class AppPlaybackRuntime(
                     audioInterruptions.clearAudioInterruptionLocked()
                     val continues = continuesTarget && activeTargetEpoch == expectedPresentationEpoch &&
                         _activeTarget.value == AppPlaybackTarget.Recording(selection.recordingId)
+                    val preservesMarkerHistory = (continuesTarget || recoverAt?.recordingId == selection.recordingId) &&
+                        activeTargetEpoch == expectedPresentationEpoch &&
+                        _activeTarget.value == AppPlaybackTarget.Recording(selection.recordingId)
                     activeTargetEpoch = epoch
                     if (!continues) targetContinuity = epoch
                     livePauseController.dropPendingLivePauseLocked()
                     _activeTarget.value = AppPlaybackTarget.Recording(selection.recordingId)
                     _recordingSelection.value = selection
                     _recordingAdmission.value = admission
-                    recordingMarkers.observeRecordingMarkersLocked(requireNotNull(installedBinding))
+                    recordingMarkers.applySettings(playerSettings)
+                    recordingMarkers.observeRecordingMarkersLocked(requireNotNull(installedBinding), continuesTarget = preservesMarkerHistory)
                     presentation.publishStarting()
                     presentation.beginTargetPresentationLocked(epoch)
                     presentation.publishInstalledPlayerStateLocked()
@@ -1878,12 +1893,24 @@ class AppPlaybackRuntime(
                 if (!isAttached() || !foreground || epoch == null || epoch != activeTargetEpoch ||
                     _activeTarget.value !is AppPlaybackTarget.Recording) return@serialize
                 if (player.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM) &&
-                    player.isCurrentMediaItemSeekable) player.seekTo(positionMs)
+                    player.isCurrentMediaItemSeekable) {
+                    recordingMarkers.deliberateSeek(positionMs)
+                    player.seekTo(positionMs)
+                }
             }
         }
     }
 
-    fun seekTo(positionMs: Long) { targetCommands.runIfOpen { player.seekTo(positionMs) } }
+    fun seekTo(positionMs: Long) { targetCommands.runIfOpen {
+        recordingMarkers.deliberateSeek(positionMs)
+        player.seekTo(positionMs)
+    } }
+    fun skipRecordingAdBreak(mark: at.bernhardberger.tvhplayer.core.RecordingMark, expectedRevision: Long) {
+        recordingMarkers.skipAdBreak(mark, expectedRevision)
+    }
+    fun dismissRecordingSkipPrompt(mark: at.bernhardberger.tvhplayer.core.RecordingMark, expectedRevision: Long) {
+        recordingMarkers.dismissSkipPrompt(mark, expectedRevision)
+    }
     fun seekRecordingMarker(positionMs: Long, expectedRevision: Long) {
         recordingMarkers.seekRecordingMarker(positionMs, expectedRevision)
     }

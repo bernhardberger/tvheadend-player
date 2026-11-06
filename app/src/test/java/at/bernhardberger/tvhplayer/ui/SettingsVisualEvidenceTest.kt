@@ -341,7 +341,7 @@ class SettingsVisualEvidenceTest {
         }
         press(Key.DirectionCenter)
         capture("en-font1.0-playback")
-        repeat(4) { press(Key.DirectionDown) }
+        repeat(7) { press(Key.DirectionDown) } // Past the Recording marks group to Profile.
         press(Key.DirectionCenter)
         compose.onNode(isFocused() and hasText("Direct streaming")).assertIsSelected()
         capture("en-font1.0-stream-profile")
@@ -353,6 +353,36 @@ class SettingsVisualEvidenceTest {
         press(Key.DirectionCenter)
         compose.onNodeWithText("Audio language").assertIsFocused()
         capture("en-font1.0-audio-subtitles")
+    }
+
+    /** Playback with the Recording marks group focused on Ad breaks, then the Ad breaks choice. */
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi") fun englishRecordingMarksPages() {
+        val ui = connectedPlaybackUi()
+        lateinit var navigation: DepthNavigationState
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                view = LocalView.current
+                navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.PLAYER.name)
+                Box(Modifier.fillMaxSize().background(Color.Black)) {
+                    DebugVideoBackdrop(true, Modifier.fillMaxSize())
+                    WarmPlaybackScrim()
+                    SideRail(currentRoute = AppDestination.SETTINGS,
+                        onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
+                        SettingsScreenNavigation(navigation, listOf(settingsRootLevel(companionInstalled = false, connectionStatus = "Connected"),
+                            settingsPlayerLevel(ui, {}), settingsAdBreaksLevel(ui.adBreakMode) {},
+                            settingsSkipLandingLevel(ui.skipLanding) {}),
+                            initialFocusEnabled = !drawerActive, contentPadding = padding)
+                    }
+                }
+            }
+        }
+        press(Key.DirectionCenter)
+        repeat(4) { press(Key.DirectionDown) }
+        compose.onNode(isFocused() and hasText("Ad breaks")).assertExists()
+        capture("en-font1.0-playback-recording-marks")
+        press(Key.DirectionCenter)
+        compose.onNode(isFocused() and hasText("Ask")).assertIsSelected()
+        capture("en-font1.0-ad-breaks")
     }
 
     /** README scene: Playback settings over the warm Ridge Light picture, 1920×1080. */

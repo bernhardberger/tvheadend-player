@@ -62,6 +62,69 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class)
 class RecordingRecoveryPositionTest {
+    @Test fun runtimeAndSessionSeeksRemainDeliberateWhenCutpointsArriveLater() {
+        for (sessionSeek in listOf(false, true)) {
+            for ((action, mode) in listOf(
+                DvrCutpointAction.CUT to at.bernhardberger.tvhplayer.settings.AdBreakMode.ASK,
+                DvrCutpointAction.COMMERCIAL_BREAK to at.bernhardberger.tvhplayer.settings.AdBreakMode.ASK,
+                DvrCutpointAction.COMMERCIAL_BREAK to at.bernhardberger.tvhplayer.settings.AdBreakMode.AUTOMATIC,
+            )) {
+                val response = CompletableDeferred<Unit>()
+                val points = listOf(DvrCutpoint(20.minutes, 25.minutes, action))
+                exercise(cutpoints = { response.await(); DvrCutpointsResult.Available.create(points) }) {
+                    settings.setAdBreakMode(mode)
+                    play(FIRST)
+                    if (sessionSeek) {
+                        val seek = runtime.seekRecordingFromSession(TWENTY_MINUTES) { true }
+                        awaitMain { seek.isCompleted }
+                    } else runtime.seekTo(TWENTY_MINUTES)
+                    awaitMain { player.currentPosition >= TWENTY_MINUTES }
+                    response.complete(Unit)
+                    awaitMain { runtime.recordingCutpoints.value == points }
+                    settleMain()
+                    assertTrue("deliberate destination: ${player.currentPosition}", player.currentPosition < 25 * ONE_MINUTE)
+                    assertNull(runtime.recordingSkipPrompt.value)
+                }
+            }
+        }
+    }
+
+    @Test fun sameRecordingRecoveryDoesNotForgetADeliberatelyEnteredCut() {
+        for ((action, mode) in listOf(
+            DvrCutpointAction.CUT to at.bernhardberger.tvhplayer.settings.AdBreakMode.ASK,
+            DvrCutpointAction.COMMERCIAL_BREAK to at.bernhardberger.tvhplayer.settings.AdBreakMode.ASK,
+            DvrCutpointAction.COMMERCIAL_BREAK to at.bernhardberger.tvhplayer.settings.AdBreakMode.AUTOMATIC,
+        )) {
+            val points = listOf(DvrCutpoint(20.minutes, 25.minutes, action))
+            exercise(cutpoints = { DvrCutpointsResult.Available.create(points) }) {
+                settings.setAdBreakMode(mode)
+                play(FIRST)
+                awaitMain { runtime.recordingCutpoints.value == points }
+                failAtTwentyMinutes()
+                media.failFromByte = Long.MAX_VALUE
+                media.seekable = false
+                assertTrue(runtime.retryRecording()?.isStarted == true)
+                awaitUnseekablePlayback()
+                awaitMain { runtime.recordingCutpoints.value == points }
+                settleMain()
+                assertTrue(player.currentPosition < ONE_MINUTE)
+                media.openSeeking()
+                awaitMain { player.isCurrentMediaItemSeekable && player.currentPosition >= TWENTY_MINUTES }
+                settleMain()
+                assertTrue("recovered deliberate destination: ${player.currentPosition}", player.currentPosition < 25 * ONE_MINUTE)
+                assertNull(runtime.recordingSkipPrompt.value)
+            }
+        }
+    }
+
+    @Test fun savedPositionResumeInsideACutStillSkips() {
+        val points = listOf(DvrCutpoint(20.minutes, 25.minutes, DvrCutpointAction.CUT))
+        exercise(bookmark = 20.minutes, cutpoints = { DvrCutpointsResult.Available.create(points) }) {
+            play(FIRST, RecordingPlaybackStart.RESUME)
+            awaitMain { runtime.recordingCutpoints.value == points && player.currentPosition >= 25 * ONE_MINUTE }
+        }
+    }
+
     @Test fun retryAfterAReadErrorContinuesWhereTheRecordingStood() = exercise {
         play(FIRST)
         failAtTwentyMinutes()
@@ -340,9 +403,10 @@ class RecordingRecoveryPositionTest {
     private fun exercise(
         bookmark: kotlin.time.Duration? = null,
         growing: Boolean = false,
+        cutpoints: (suspend () -> DvrCutpointsResult)? = null,
         block: suspend Fixture.() -> Unit,
     ) = runBlocking {
-        val fixture = Fixture(CoroutineScope(coroutineContext + SupervisorJob()), bookmark, growing)
+        val fixture = Fixture(CoroutineScope(coroutineContext + SupervisorJob()), bookmark, growing, cutpoints)
         try { withTimeout(120_000) { fixture.block() } }
         finally {
             fixture.scope.cancel()
@@ -356,6 +420,7 @@ class RecordingRecoveryPositionTest {
         val scope: CoroutineScope,
         private val bookmark: kotlin.time.Duration?,
         private val growing: Boolean,
+        cutpoints: (suspend () -> DvrCutpointsResult)?,
     ) {
         private val context = ApplicationProvider.getApplicationContext<Application>()
         private val focus = object : PlaybackAudioFocus {
@@ -368,7 +433,7 @@ class RecordingRecoveryPositionTest {
             scriptLivePlaybackSuccess(manager)
             scriptRecordingPlaybackSuccess()
         }
-        private val settings = PlayerSettingsStore(InMemoryPreferencesDataStore())
+        val settings = PlayerSettingsStore(InMemoryPreferencesDataStore())
         private val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.IO,
             readProfileForEditing = { ServerProfileEditReadResult.Missing }).also { owner -> scope.launch { owner.run() } }
         val media = ControlledRecording()
@@ -387,9 +452,19 @@ class RecordingRecoveryPositionTest {
             }
         }).also { it.launchIn(scope) }
 
-        val runtime = AppPlaybackRuntime(player, if (growing) GrowingRecordingSession(session) else session,
+        private val playbackSession = when {
+            growing -> GrowingRecordingSession(session)
+            cutpoints == null -> session
+            else -> object : TvheadendSession by session {
+                @OptIn(TvheadendTestingApi::class)
+                override fun bindRecordingPlayback(currentSession: CurrentSessionObservation, recordingId: DvrEntryId) =
+                    TvheadendTestResultFactory.boundCompletedRecordingPlayback(session, currentSession, recordingId, cutpoints = cutpoints)
+            }
+        }
+        val runtime = AppPlaybackRuntime(player, playbackSession,
             coordinator, settings, profiles, scope, TvheadendAudioOutputProvider(context), focus,
-            PlaybackRuntimePolicy.fromPlayerSettings())
+            PlaybackRuntimePolicy.fromPlayerSettings(),
+            noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) })
 
         fun observation(entries: List<DvrEntryId> = listOf(FIRST, SECOND)) = recordings(
             entries, bookmark, if (growing) DvrEntryState.RECORDING else DvrEntryState.COMPLETED, growing,

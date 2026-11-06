@@ -15,6 +15,8 @@ import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.settings.AudioFormatPreference
 import at.bernhardberger.tvhplayer.settings.FrameRateSwitching
 import at.bernhardberger.tvhplayer.settings.WarmPlaybackMode
+import at.bernhardberger.tvhplayer.settings.AdBreakMode
+import at.bernhardberger.tvhplayer.settings.SkipLanding
 import at.bernhardberger.tvhplayer.settings.STARTUP_BUFFER_AUTOMATIC
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
@@ -40,6 +42,9 @@ data class SettingsPlayerUiState(
     val startupBufferMillis: Int = STARTUP_BUFFER_AUTOMATIC,
     /** Level Automatic currently uses for this server. */
     val startupBufferLearnedMillis: Int = 500,
+    val adBreakMode: AdBreakMode = AdBreakMode.ASK,
+    val skipCuts: Boolean = true,
+    val skipLanding: SkipLanding = SkipLanding.END,
 )
 
 class SettingsPlayerViewModel(
@@ -72,6 +77,9 @@ class SettingsPlayerViewModel(
             keepChannelMinutes = settings.keepChannelMinutes,
             warmPlaybackMode = settings.warmPlaybackMode,
             startupBufferMillis = settings.startupBufferMillis,
+            adBreakMode = settings.adBreakMode,
+            skipCuts = settings.skipCuts,
+            skipLanding = settings.skipLanding,
         )
     }.combine(
         combine(settingsStore.startupBufferLearning, profileOwner.startupBufferIdentity()) { learning, identity ->
@@ -140,5 +148,17 @@ class SettingsPlayerViewModel(
 
     fun onStartupBufferMillisChanged(millis: Int) {
         viewModelScope.launch { settingsStore.setStartupBufferMillis(millis) }
+    }
+
+    fun onAdBreakModeChanged(mode: AdBreakMode) {
+        viewModelScope.launch { settingsStore.setAdBreakMode(mode) }
+    }
+
+    fun onSkipCutsChanged(enabled: Boolean) {
+        viewModelScope.launch { settingsStore.setSkipCuts(enabled) }
+    }
+
+    fun onSkipLandingChanged(landing: SkipLanding) {
+        viewModelScope.launch { settingsStore.setSkipLanding(landing) }
     }
 }

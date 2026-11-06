@@ -2778,7 +2778,8 @@ class AudioInterruptionRuntimeTest {
         val runtime = AppPlaybackRuntime(runtimePlayer, runtimeSession, coordinator, settings, profiles, scope, output, focus,
             PlaybackRuntimePolicy.fromPlayerSettings(),
             elapsedRealtime = { scheduler?.currentTime ?: android.os.SystemClock.elapsedRealtime() },
-            startupBuffer = startupBuffer, audioOutputs = outputs)
+            startupBuffer = startupBuffer, audioOutputs = outputs,
+            noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) })
         val commands: PlaybackTargetCommandSerialization get() = AppPlaybackRuntime::class.java.getDeclaredField("targetCommands").let {
             it.isAccessible = true; it.get(runtime) as PlaybackTargetCommandSerialization
         }

@@ -252,7 +252,8 @@ class LiveZapStartOwnershipTest {
             PlaybackRuntimePolicy.fromPlayerSettings(object : PlaybackTrace {
                 override val enabled = true
                 override fun tuneAdmitted() { admissions.incrementAndGet() }
-            }))
+            }),
+            noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) })
         val video = VideoPlayerViewModel(runtime, session)
         models.put("video", video)
         val owner = object : LifecycleOwner {

@@ -9,7 +9,7 @@ import org.junit.Test
 class PlayerBackPolicyTest {
     @Test fun onlyWatchingLayersAllowHoldToStop() {
         val watching = setOf(PlayerForegroundLayer.NONE, PlayerForegroundLayer.CONTROLS,
-            PlayerForegroundLayer.STATS, PlayerForegroundLayer.PENDING_SEEK_PREVIEW,
+            PlayerForegroundLayer.SKIP_PROMPT, PlayerForegroundLayer.STATS, PlayerForegroundLayer.PENDING_SEEK_PREVIEW,
             PlayerForegroundLayer.DISPATCHED_SEEK_PREVIEW, PlayerForegroundLayer.RECOVERY,
             PlayerForegroundLayer.TERMINAL_ERROR)
         PlayerForegroundLayer.entries.forEach { layer ->
@@ -50,6 +50,8 @@ class PlayerBackPolicyTest {
             PlayerForegroundLayer.RECOVERY,
             PlayerForegroundLayer.TERMINAL_ERROR,
             PlayerForegroundLayer.CONTROLS,
+            // The prompt holds focus itself.
+            PlayerForegroundLayer.SKIP_PROMPT,
         ).forEach { layer ->
             assertFalse(layer.name, playerRootFocusRequired(layer))
         }
@@ -266,7 +268,29 @@ class PlayerBackPolicyTest {
         assertEquals(PlayerBackAction.CANCEL_PENDING_SEEK, actions[PlayerForegroundLayer.PENDING_SEEK_PREVIEW])
         assertEquals(PlayerBackAction.DISMISS_SEEK_FEEDBACK, actions[PlayerForegroundLayer.DISPATCHED_SEEK_PREVIEW])
         assertEquals(PlayerBackAction.HIDE_CONTROLS, actions[PlayerForegroundLayer.CONTROLS])
+        assertEquals(PlayerBackAction.DISMISS_SKIP_PROMPT, actions[PlayerForegroundLayer.SKIP_PROMPT])
         assertEquals(PlayerBackAction.HIDE_STATS, actions[PlayerForegroundLayer.STATS])
+    }
+
+    @Test
+    fun theSkipPromptIsAboveStatsAndBelowEveryOtherLayer() {
+        val prompt = baseContext().copy(skipPromptOffered = true)
+        assertEquals(PlayerForegroundLayer.SKIP_PROMPT, playerForegroundLayer(prompt))
+        assertEquals(PlayerForegroundLayer.SKIP_PROMPT, playerForegroundLayer(prompt.copy(statsEnabled = true)))
+        listOf(
+            prompt.copy(infoVisible = true),
+            prompt.copy(optionsPage = PlaybackOptionsPage.ROOT),
+            prompt.copy(recoveryVisible = true),
+            prompt.copy(terminalErrorVisible = true),
+            prompt.copy(controlsVisible = true),
+            prompt.copy(seekPreviewPhase = PlayerSeekPreviewPhase.PENDING),
+            prompt.copy(seekPreviewPhase = PlayerSeekPreviewPhase.DISPATCHED),
+        ).forEach { context ->
+            assertNotEquals(context.toString(), PlayerForegroundLayer.SKIP_PROMPT, playerForegroundLayer(context))
+        }
+        // A short Back dismisses the prompt, never the player, whatever the Banner state.
+        assertEquals(PlayerBackAction.DISMISS_SKIP_PROMPT,
+            playerBackAction(PlayerSurface.RECORDING, prompt, bannerVisible = false))
     }
 
     @Test

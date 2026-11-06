@@ -145,7 +145,8 @@ class LivePlayerArtworkSessionTest {
         val coordinator = createTvheadendPlaybackCoordinator(player).also { it.launchIn(scope) }
         val runtime = AppPlaybackRuntime(player, playerSession, coordinator, settings, profiles, scope,
             TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None,
-            PlaybackRuntimePolicy.fromPlayerSettings())
+            PlaybackRuntimePolicy.fromPlayerSettings(),
+            noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) })
         val video = VideoPlayerViewModel(runtime, playerSession)
         models.put("video", video)
         val owner = object : LifecycleOwner {

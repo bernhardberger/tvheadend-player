@@ -178,7 +178,7 @@ class SettingsDepthNavigationTest {
         switchAccessibilityCheckedStateTracksCenterAndReentry("timeshift", downCount = 2)
 
     @Test fun tunnelingAccessibilityCheckedStateTracksCenterAndReentry() =
-        switchAccessibilityCheckedStateTracksCenterAndReentry("tunneling", downCount = 7)
+        switchAccessibilityCheckedStateTracksCenterAndReentry("tunneling", downCount = 10)
 
     @Test fun passthroughAccessibilityCheckedStateTracksCenterAndReentry() =
         switchAccessibilityCheckedStateTracksCenterAndReentry("audio-passthrough", 2, SettingsSection.AUDIO)
@@ -790,7 +790,7 @@ class SettingsDepthNavigationTest {
             }
         }
         press(Key.DirectionCenter)
-        repeat(4) { press(Key.DirectionDown) }
+        repeat(7) { press(Key.DirectionDown) }
         val row = "Stream profile"
         compose.onNode(isFocused() and hasText(row) and hasText("pass")).assertIsEnabled()
         press(Key.DirectionCenter)

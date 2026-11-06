@@ -36,6 +36,7 @@ private fun dvrFailureReason(failure: DvrMutationFeedback): Int = when (failure)
 /** The only resource/wording boundary for transient feedback. */
 internal class NoticeFormatter(private val context: Context) {
     fun format(notice: Notice, now: Instant = Clock.System.now()): FormattedNotice = when (notice) {
+        is Notice.AutomaticAdBreakSkip -> FormattedNotice(context.getString(R.string.recording_ad_break_skipped))
         is Notice.Dvr -> formatDvr(notice, now)
         is Notice.DvrActionFailed -> FormattedNotice(context.getString(when (notice.failure) {
             DvrMutationFeedback.TIMEOUT, DvrMutationFeedback.UNKNOWN_OUTCOME -> R.string.recording_action_not_confirmed

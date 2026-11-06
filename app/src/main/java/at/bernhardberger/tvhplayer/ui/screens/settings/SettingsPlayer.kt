@@ -193,8 +193,11 @@ private fun streamProfileLabel(ui: SettingsPlayerUiState): String {
 internal fun settingsPlayerLevels(navigation: DepthNavigationState, vm: SettingsPlayerViewModel = koinViewModel()): List<DepthLevel> {
     val ui by vm.ui.collectAsStateWithLifecycle()
     return listOf(
-        settingsPlayerLevel(ui, vm::onTimeshiftEnabledChanged, vm::onAutoStartPlaybackChanged, vm::onTunnelingEnabledChanged),
+        settingsPlayerLevel(ui, vm::onTimeshiftEnabledChanged, vm::onAutoStartPlaybackChanged, vm::onTunnelingEnabledChanged,
+            vm::onSkipCutsChanged),
         settingsAudioLevel(ui, vm::onAudioPassthroughEnabledChanged, vm::onAudioDescriptionChanged),
+        settingsAdBreaksLevel(ui.adBreakMode) { vm.onAdBreakModeChanged(it); navigation.pop() },
+        settingsSkipLandingLevel(ui.skipLanding) { vm.onSkipLandingChanged(it); navigation.pop() },
     ) + settingsAudioPreferenceLevels(ui,
         onAudioLanguageSelected = { slot, language -> vm.onAudioLanguageSelected(slot, language); navigation.pop() },
         onAudioFormatSelected = { vm.onAudioFormatSelected(it); navigation.pop() },
@@ -207,6 +210,7 @@ internal fun settingsPlayerLevel(
     onTimeshiftEnabledChanged: (Boolean) -> Unit,
     onAutoStartPlaybackChanged: (Boolean) -> Unit = {},
     onTunnelingEnabledChanged: (Boolean) -> Unit = {},
+    onSkipCutsChanged: (Boolean) -> Unit = {},
 ): DepthLevel {
     val profilesStatus = streamProfilesStatus(ui)
     return settingsLevel(SettingsSection.PLAYER.name, stringResource(R.string.settings_player), listOf(
@@ -222,6 +226,7 @@ internal fun settingsPlayerLevel(
             if (ui.timeshiftEnabled) keepChannelLabel(ui.keepChannelMinutes)
                 else stringResource(R.string.keep_channel_needs_timeshift, stringResource(R.string.timeshift_setting)),
             child = KEEP_CHANNEL_LEVEL.takeIf { ui.timeshiftEnabled }, enabled = ui.timeshiftEnabled),
+    ) + settingsRecordingMarksRows(ui, onSkipCutsChanged) + listOf(
         settingsRow(STREAM_PROFILE_LEVEL, stringResource(R.string.profile), profilesStatus ?: streamProfileLabel(ui),
             child = STREAM_PROFILE_LEVEL.takeIf { profilesStatus == null }, enabled = profilesStatus == null,
             section = stringResource(R.string.settings_section_streaming)),

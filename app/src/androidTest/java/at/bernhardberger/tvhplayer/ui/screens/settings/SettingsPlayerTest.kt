@@ -65,7 +65,7 @@ class SettingsPlayerTest(private val language: String) {
         val autoplay = context.getString(R.string.auto_start_playback)
         val profileRow = context.getString(R.string.profile)
         val pageRows = listOf(R.string.auto_start_playback, R.string.timeshift_setting, R.string.keep_channel_setting,
-            R.string.profile, R.string.startup_buffer_setting, R.string.refresh_rate_matching_setting,
+            R.string.ad_breaks_setting, R.string.skip_cuts_setting, R.string.skip_landing_setting, R.string.profile, R.string.startup_buffer_setting, R.string.refresh_rate_matching_setting,
             R.string.tunneling_setting).map(context::getString)
         val serverDefault = context.getString(R.string.profile_server_default)
         val profiles = List(24) { index ->

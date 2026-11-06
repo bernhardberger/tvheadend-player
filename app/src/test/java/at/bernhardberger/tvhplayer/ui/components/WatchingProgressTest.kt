@@ -473,7 +473,8 @@ class WatchingProgressTest {
         }).also { it.launchIn(scope) }
         val runtime = AppPlaybackRuntime(player, session, coordinator, settings, profiles, scope,
             TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None,
-            PlaybackRuntimePolicy.fromPlayerSettings(object : PlaybackTrace {}))
+            PlaybackRuntimePolicy.fromPlayerSettings(object : PlaybackTrace {}),
+            noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) })
         val seen = mutableListOf<Pair<AppPlaybackTarget?, RecordingViewerPosition?>>()
         var publishedIndicator = ChannelPlaybackIndicator.NONE
         var publishedColor: Color? = null

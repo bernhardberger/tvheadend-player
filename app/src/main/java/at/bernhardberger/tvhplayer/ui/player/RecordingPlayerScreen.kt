@@ -12,6 +12,8 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
+import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import androidx.compose.ui.platform.testTag
 import at.bernhardberger.tvhplayer.core.playerStateCell
 import at.bernhardberger.tvhplayer.core.recordingBarEnd
@@ -120,9 +122,10 @@ fun RecordingPlayerScreen(
     val videoPresentation by session.videoPresentation.collectAsStateWithLifecycle()
     val recordingSelection by session.recordingSelection.collectAsStateWithLifecycle()
     val recordingAdmission by session.recordingAdmission.collectAsStateWithLifecycle()
-    val cutpoints by session.recordingCutpoints.collectAsStateWithLifecycle()
-    val chapterStartsMs by session.recordingChapterStartsMs.collectAsStateWithLifecycle()
+    val recordingMarks by session.recordingMarks.collectAsStateWithLifecycle()
     val markerRevision by session.recordingMarkerRevision.collectAsStateWithLifecycle()
+    val skipPrompt by session.recordingSkipPrompt.collectAsStateWithLifecycle()
+    val adBreak by session.recordingAdBreak.collectAsStateWithLifecycle()
     val observation by tvheadendSession.observation.collectAsStateWithLifecycle()
     val currentSession = observation.currentSession
     val routeSelection = currentRecordingPlaybackSelection(observation, recordingId)
@@ -185,16 +188,23 @@ fun RecordingPlayerScreen(
     val positionMs = timelineState.positionMs
     val durationMs = timelineState.durationMs
     val displayDurationMs = timelineState.displayDurationMs
-    val markers = remember(cutpoints, chapterStartsMs, durationMs, timelineState.canSeek, retainedSelection, currentSession) {
-        if (timelineState.canSeek && retainedSelection != null && retainedSelection.currentSession === currentSession) {
-            at.bernhardberger.tvhplayer.core.recordingMarkerPositions(cutpoints, durationMs, chapterStartsMs)
-        } else emptyList()
-    }
+    // The marks of the recording this screen plays, while it can be sought by them.
+    val marks = recordingMarks.takeIf {
+        timelineState.canSeek && retainedSelection != null && retainedSelection.currentSession === currentSession
+    }.orEmpty()
+    val markStops = remember(marks, durationMs) { at.bernhardberger.tvhplayer.core.recordingMarkStops(marks, durationMs) }
+    val markers = remember(markStops) { markStops.map { it.positionMs } }
     val markerNavigation = remember { RecordingMarkerNavigation() }
     LaunchedEffect(markerRevision, recordingId, currentSession) { markerNavigation.dismiss() }
     fun seekMarker(targetMs: Long) {
         timelineState.cancelPendingSeek()
         session.seekRecordingMarker(targetMs, markerNavigation.ownerRevision)
+    }
+    val skipAdBreak: (at.bernhardberger.tvhplayer.core.RecordingMark) -> Unit = remember(markerRevision) {
+        { mark ->
+            timelineState.cancelPendingSeek()
+            session.skipRecordingAdBreak(mark, markerRevision)
+        }
     }
     val nowSec = timelineState.nowEpochSec
     val isPlaying = timelineState.isPlaying
@@ -345,6 +355,12 @@ fun RecordingPlayerScreen(
             seekPreviewPhase = timelineState.seekPreviewPhase(chrome.controlsVisible),
             controlsVisible = chrome.controlsVisible && playbackAvailable,
             statsEnabled = layers.statsVisible,
+            skipPromptOffered = recordingSkipPromptShown(
+                offered = skipPrompt != null && playbackAvailable,
+                playing = isPlaying,
+                canSeek = timelineState.canSeek,
+                bannerVisible = chrome.bannerVisible,
+            ),
         )
     val foregroundContext = currentPlayerForegroundContext()
     val seekPreviewPhase = foregroundContext.seekPreviewPhase
@@ -431,6 +447,8 @@ fun RecordingPlayerScreen(
             PlayerBackAction.CANCEL_PENDING_SEEK -> timelineState.cancelPendingSeek()
             PlayerBackAction.DISMISS_SEEK_FEEDBACK ->
                 timelineState.dismissDispatchedFeedback()
+            PlayerBackAction.DISMISS_SKIP_PROMPT ->
+                skipPrompt?.let { session.dismissRecordingSkipPrompt(it, markerRevision) }
             else -> Unit
         }
     }
@@ -460,6 +478,10 @@ fun RecordingPlayerScreen(
                             Triple(markerNavigation, markerNavigation.ownerRevision, markerNavigation.restoration)
                             else foregroundLayer to layers.optionsPage)) return@onPreviewKeyEvent true
                 val keyCode = event.nativeKeyEvent.keyCode
+                // OK belongs to the focused prompt; everywhere else it keeps pausing.
+                if (foregroundLayer == PlayerForegroundLayer.SKIP_PROMPT && event.key in RecordingSkipActivationKeys) {
+                    return@onPreviewKeyEvent false
+                }
                 if (markerNavigation.handle(event, markers, ::seekMarker)) {
                     chrome.onUserInteraction()
                     return@onPreviewKeyEvent true
@@ -557,6 +579,7 @@ fun RecordingPlayerScreen(
                     picon = channel?.icon,
                     artwork = entry.image ?: entry.fanartImage,
                     channelId = entry.channelId,
+                    withoutChannel = channel == null,
                 ),
                 timeline = PlayerChromeTimeline.Recording(
                     positionMs = timelineState.playbackPositionMs,
@@ -568,9 +591,12 @@ fun RecordingPlayerScreen(
                     originMs = timelineState.pendingOriginMs,
                     stepSettled = timelineState.seekDispatched,
                     stepId = timelineState.stepId,
-                    markers = markers,
+                    marks = marks,
+                    markStops = markStops,
                     markerRevision = markerRevision,
                     motionKey = recordingId,
+                    adBreak = adBreak.takeIf { timelineState.canSeek },
+                    onSkipAdBreak = skipAdBreak,
                 ),
                 actions = PlayerChromeActions(
                     active = chrome.controlsVisible && layers.optionsPage == null,
@@ -614,8 +640,20 @@ fun RecordingPlayerScreen(
                     }, onClose = ::closeInfo)
             }
 
+            RecordingSkipPrompt(
+                prompt = skipPrompt,
+                shown = foregroundLayer == PlayerForegroundLayer.SKIP_PROMPT,
+                onSkip = skipAdBreak,
+                onTimeout = { session.dismissRecordingSkipPrompt(it, markerRevision) },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = TvGridHorizontalMargin, bottom = TvGridVerticalMargin),
+            )
+
             PlaybackStatsVisibility(
-                visible = foregroundLayer == PlayerForegroundLayer.STATS,
+                // Stats stay up under the Skip prompt, which Back dismisses first.
+                visible = foregroundLayer == PlayerForegroundLayer.STATS ||
+                    foregroundLayer == PlayerForegroundLayer.SKIP_PROMPT && layers.statsVisible,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(top = 36.dp, end = 48.dp),
@@ -633,7 +671,8 @@ fun RecordingPlayerScreen(
         }
         PlayerHiddenStatusChip(
             state = hiddenChipState(
-                chromeState, hidden = foregroundLayer == PlayerForegroundLayer.NONE && !chrome.bannerVisible,
+                chromeState, hidden = (foregroundLayer == PlayerForegroundLayer.NONE ||
+                    foregroundLayer == PlayerForegroundLayer.SKIP_PROMPT) && !chrome.bannerVisible,
                 available = playbackAvailable,
             ),
             end = recordingBarEnd(timelineState.playbackPositionMs, recordedLengthMs, growing),

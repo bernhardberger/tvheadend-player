@@ -2647,7 +2647,8 @@ class LivePlayerChromeScreenTest {
         }
         runtime = AppPlaybackRuntime(controlled, session, coordinator, settings, profiles, scope,
             TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None,
-            PlaybackRuntimePolicy.fromPlayerSettings(object : PlaybackTrace {}))
+            PlaybackRuntimePolicy.fromPlayerSettings(object : PlaybackTrace {}),
+            noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) })
         video = VideoPlayerViewModel(runtime, session)
         models.put("video", video)
         owner.lifecycle.currentState = Lifecycle.State.RESUMED
