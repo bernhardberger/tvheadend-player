@@ -233,7 +233,6 @@
     <string name="error_prefix">Błąd:</string>
     <string name="back">Wstecz</string>
     <string name="show_password">Pokaż hasło</string>
-    <string name="hide_password">Ukryj hasło</string>
     <string name="audio_track">Ścieżka dźwiękowa</string>
     <string name="audio_track_unselected">Wybierz ścieżkę dźwiękową</string>
     <string name="no_audio_tracks">Brak dostępnych ścieżek dźwiękowych.</string>

@@ -233,7 +233,6 @@
     <string name="error_prefix">Fejl:</string>
     <string name="back">Tilbage</string>
     <string name="show_password">Vis adgangskode</string>
-    <string name="hide_password">Skjul adgangskode</string>
     <string name="audio_track">Lydspor</string>
     <string name="audio_track_unselected">Vælg lydspor</string>
     <string name="no_audio_tracks">Ingen lydspor tilgængelige.</string>

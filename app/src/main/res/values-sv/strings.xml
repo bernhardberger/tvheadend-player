@@ -233,7 +233,6 @@
     <string name="error_prefix">Fel:</string>
     <string name="back">Bakåt</string>
     <string name="show_password">Visa lösenord</string>
-    <string name="hide_password">Dölj lösenord</string>
     <string name="audio_track">Ljudspår</string>
     <string name="audio_track_unselected">Välj ljudspår</string>
     <string name="no_audio_tracks">Inga ljudspår tillgängliga.</string>

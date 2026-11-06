@@ -233,7 +233,6 @@
     <string name="error_prefix">Chyba:</string>
     <string name="back">Zpět</string>
     <string name="show_password">Zobrazit heslo</string>
-    <string name="hide_password">Skrýt heslo</string>
     <string name="audio_track">Zvuková stopa</string>
     <string name="audio_track_unselected">Vybrat zvukovou stopu</string>
     <string name="no_audio_tracks">Nejsou dostupné zvukové stopy.</string>

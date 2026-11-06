@@ -233,7 +233,6 @@
     <string name="error_prefix">Virhe:</string>
     <string name="back">Takaisin</string>
     <string name="show_password">Näytä salasana</string>
-    <string name="hide_password">Piilota salasana</string>
     <string name="audio_track">Ääniraita</string>
     <string name="audio_track_unselected">Valitse ääniraita</string>
     <string name="no_audio_tracks">Ääniraitoja ei ole saatavilla.</string>

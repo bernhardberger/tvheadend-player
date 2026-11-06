@@ -233,7 +233,6 @@
     <string name="error_prefix">Hiba:</string>
     <string name="back">Vissza</string>
     <string name="show_password">Jelszó megjelenítése</string>
-    <string name="hide_password">Jelszó elrejtése</string>
     <string name="audio_track">Hangsáv</string>
     <string name="audio_track_unselected">Hangsáv választása</string>
     <string name="no_audio_tracks">Nincs elérhető hangsáv.</string>

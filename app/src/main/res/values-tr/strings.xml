@@ -233,7 +233,6 @@
     <string name="error_prefix">Hata:</string>
     <string name="back">Geri</string>
     <string name="show_password">Parolayı göster</string>
-    <string name="hide_password">Parolayı gizle</string>
     <string name="audio_track">Ses parçası</string>
     <string name="audio_track_unselected">Ses parçası seçin</string>
     <string name="no_audio_tracks">Kullanılabilir ses parçası yok.</string>

@@ -233,7 +233,6 @@
     <string name="error_prefix">خطأ:</string>
     <string name="back">رجوع</string>
     <string name="show_password">إظهار كلمة المرور</string>
-    <string name="hide_password">إخفاء كلمة المرور</string>
     <string name="audio_track">المسارات الصوتية</string>
     <string name="audio_track_unselected">اختيار المسار الصوتي</string>
     <string name="no_audio_tracks">لا توجد مسارات صوتية متاحة.</string>

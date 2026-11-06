@@ -233,7 +233,6 @@
     <string name="error_prefix">Errore:</string>
     <string name="back">Indietro</string>
     <string name="show_password">Mostra password</string>
-    <string name="hide_password">Nascondi password</string>
     <string name="audio_track">Traccia audio</string>
     <string name="audio_track_unselected">Scegli traccia audio</string>
     <string name="no_audio_tracks">Nessuna traccia audio disponibile.</string>

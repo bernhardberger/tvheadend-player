@@ -233,7 +233,6 @@
     <string name="error_prefix">Erreur :</string>
     <string name="back">Retour</string>
     <string name="show_password">Afficher le mot de passe</string>
-    <string name="hide_password">Masquer le mot de passe</string>
     <string name="audio_track">Piste audio</string>
     <string name="audio_track_unselected">Choisir une piste audio</string>
     <string name="no_audio_tracks">Aucune piste audio disponible.</string>

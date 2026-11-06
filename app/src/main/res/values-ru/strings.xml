@@ -233,7 +233,6 @@
     <string name="error_prefix">Ошибка:</string>
     <string name="back">Назад</string>
     <string name="show_password">Показать пароль</string>
-    <string name="hide_password">Скрыть пароль</string>
     <string name="audio_track">Звуковая дорожка</string>
     <string name="audio_track_unselected">Выбрать звуковую дорожку</string>
     <string name="no_audio_tracks">Нет доступных звуковых дорожек.</string>

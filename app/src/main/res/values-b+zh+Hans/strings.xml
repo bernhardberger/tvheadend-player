@@ -233,7 +233,6 @@
     <string name="error_prefix">错误：</string>
     <string name="back">返回</string>
     <string name="show_password">显示密码</string>
-    <string name="hide_password">隐藏密码</string>
     <string name="audio_track">音轨</string>
     <string name="audio_track_unselected">选择音轨</string>
     <string name="no_audio_tracks">没有可用音轨。</string>

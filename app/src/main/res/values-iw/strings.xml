@@ -233,7 +233,6 @@
     <string name="error_prefix">שגיאה:</string>
     <string name="back">חזרה</string>
     <string name="show_password">הצגת הסיסמה</string>
-    <string name="hide_password">הסתרת הסיסמה</string>
     <string name="audio_track">רצועות שמע</string>
     <string name="audio_track_unselected">בחירת רצועת שמע</string>
     <string name="no_audio_tracks">אין רצועות שמע זמינות.</string>

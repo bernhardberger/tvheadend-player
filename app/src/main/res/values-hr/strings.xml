@@ -233,7 +233,6 @@
     <string name="error_prefix">Pogreška:</string>
     <string name="back">Natrag</string>
     <string name="show_password">Prikaži lozinku</string>
-    <string name="hide_password">Sakrij lozinku</string>
     <string name="audio_track">Zvučni zapis</string>
     <string name="audio_track_unselected">Odaberi zvučni zapis</string>
     <string name="no_audio_tracks">Nema dostupnih zvučnih zapisa.</string>

@@ -233,7 +233,6 @@
     <string name="error_prefix">오류:</string>
     <string name="back">뒤로</string>
     <string name="show_password">비밀번호 표시</string>
-    <string name="hide_password">비밀번호 숨기기</string>
     <string name="audio_track">오디오 트랙</string>
     <string name="audio_track_unselected">오디오 트랙 선택</string>
     <string name="no_audio_tracks">사용 가능한 오디오 트랙이 없습니다.</string>

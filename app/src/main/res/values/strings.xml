@@ -266,7 +266,6 @@
 
     <!-- Password visibility -->
     <string name="show_password">Show password</string>
-    <string name="hide_password">Hide password</string>
 
     <!-- Audio -->
     <string name="audio_track">Audio track</string>

@@ -233,7 +233,6 @@
     <string name="error_prefix">Помилка:</string>
     <string name="back">Назад</string>
     <string name="show_password">Показати пароль</string>
-    <string name="hide_password">Приховати пароль</string>
     <string name="audio_track">Звукова доріжка</string>
     <string name="audio_track_unselected">Вибрати звукову доріжку</string>
     <string name="no_audio_tracks">Немає доступних звукових доріжок.</string>

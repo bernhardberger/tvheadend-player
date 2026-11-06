@@ -233,7 +233,6 @@
     <string name="error_prefix">Σφάλμα:</string>
     <string name="back">Πίσω</string>
     <string name="show_password">Εμφάνιση κωδικού πρόσβασης</string>
-    <string name="hide_password">Απόκρυψη κωδικού πρόσβασης</string>
     <string name="audio_track">Κομμάτι ήχου</string>
     <string name="audio_track_unselected">Επιλογή κομματιού ήχου</string>
     <string name="no_audio_tracks">Δεν υπάρχουν διαθέσιμα κομμάτια ήχου.</string>

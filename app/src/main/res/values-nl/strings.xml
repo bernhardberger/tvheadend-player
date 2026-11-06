@@ -233,7 +233,6 @@
     <string name="error_prefix">Fout:</string>
     <string name="back">Terug</string>
     <string name="show_password">Wachtwoord tonen</string>
-    <string name="hide_password">Wachtwoord verbergen</string>
     <string name="audio_track">Audiospoor</string>
     <string name="audio_track_unselected">Audiospoor kiezen</string>
     <string name="no_audio_tracks">Geen audiosporen beschikbaar.</string>

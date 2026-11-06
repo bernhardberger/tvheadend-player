@@ -233,7 +233,6 @@
     <string name="error_prefix">エラー：</string>
     <string name="back">戻る</string>
     <string name="show_password">パスワードを表示</string>
-    <string name="hide_password">パスワードを隠す</string>
     <string name="audio_track">音声トラック</string>
     <string name="audio_track_unselected">音声トラックを選択</string>
     <string name="no_audio_tracks">利用可能な音声トラックはありません。</string>

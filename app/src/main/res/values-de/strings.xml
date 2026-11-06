@@ -245,7 +245,6 @@
     <string name="error_prefix">Fehler:</string>
     <string name="back">Zurück</string>
     <string name="show_password">Passwort anzeigen</string>
-    <string name="hide_password">Passwort ausblenden</string>
 
     <string name="audio_track">Tonspur</string>
     <string name="audio_track_unselected">Tonspur auswählen</string>

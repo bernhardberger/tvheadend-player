@@ -233,7 +233,6 @@
     <string name="error_prefix">Eroare:</string>
     <string name="back">Înapoi</string>
     <string name="show_password">Arată parola</string>
-    <string name="hide_password">Ascunde parola</string>
     <string name="audio_track">Pistă audio</string>
     <string name="audio_track_unselected">Alege pista audio</string>
     <string name="no_audio_tracks">Nu există piste audio disponibile.</string>
