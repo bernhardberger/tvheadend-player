@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.9
+
+### Player
+
+- The *Audio* button in the player controls now opens a list where moving
+  through the tracks no longer switches the sound; OK picks the track. The
+  remote's own Audio button still switches as you move. The *Subtitles* button
+  is gone from the controls; subtitles stay under *Playback options*.
+- Leaving the player for a browse screen while the channel keeps playing no
+  longer makes the TV switch its refresh rate back and forth, for example on an
+  NVIDIA Shield with *Match content frame rate* (#14).
+
 ## 0.4.8
 
 ### Player
