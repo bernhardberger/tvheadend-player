@@ -54,6 +54,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.plus
+import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertTrue
@@ -148,6 +149,186 @@ class RecordingMarkerChaptersTest {
             runCurrent()
             assertEquals(4, calls)
         } finally { fixture.markers.clearRecordingMarkersAndJoin() }
+    }
+
+    @Test
+    @OptIn(TvheadendTestingApi::class, ExperimentalCoroutinesApi::class)
+    fun backgroundDuringBackoffCancelsRetriesAndForegroundResumesMissingMarks() = runTest {
+        var calls = 0
+        val fixture = MarkerFixture(backgroundScope, cutpoints = {
+            if (++calls == 1) DvrCutpointsResult.Failed(TvheadendFailure.TIMEOUT)
+            else DvrCutpointsResult.Available.create(listOf(
+                DvrCutpoint(600_000.milliseconds, 660_000.milliseconds, DvrCutpointAction.CUT),
+            ))
+        })
+        try {
+            fixture.response.complete(Unit)
+            fixture.markers.observeRecordingMarkersLocked(fixture.binding)
+            runCurrent()
+            assertEquals(1, calls)
+            advanceTimeBy(1_000)
+            fixture.markers.setForeground(false)
+            runCurrent()
+            advanceTimeBy(60_000)
+            runCurrent()
+            assertEquals(1, calls)
+            assertTrue(fixture.markers.marks.value.isEmpty())
+            fixture.markers.setForeground(true)
+            runCurrent()
+            assertEquals(2, calls)
+            assertEquals(listOf(RecordingMark(RecordingMarkKind.CUT, 600_000, 660_000)), fixture.markers.marks.value)
+        } finally { fixture.markers.clearRecordingMarkersAndJoin() }
+    }
+
+    @Test
+    @OptIn(TvheadendTestingApi::class, ExperimentalCoroutinesApi::class)
+    fun backgroundAtRunnableRetryDeadlineKeepsTheInterruptedCycleEligible() = runTest {
+        var calls = 0
+        val fixture = MarkerFixture(backgroundScope, cutpoints = {
+            if (++calls == 1) DvrCutpointsResult.Failed(TvheadendFailure.TIMEOUT)
+            else DvrCutpointsResult.Available.create(listOf(
+                DvrCutpoint(600_000.milliseconds, 660_000.milliseconds, DvrCutpointAction.CUT),
+            ))
+        })
+        try {
+            fixture.response.complete(Unit)
+            fixture.markers.observeRecordingMarkersLocked(fixture.binding)
+            runCurrent()
+            assertEquals(1, calls)
+            // Leave the retry continuation queued at its deadline, ahead of the foreground emission.
+            advanceTimeBy(3_000)
+            fixture.markers.setForeground(false)
+            runCurrent()
+            assertEquals(1, calls)
+            assertTrue(fixture.markers.marks.value.isEmpty())
+            fixture.markers.setForeground(true)
+            runCurrent()
+            assertEquals(2, calls)
+            assertEquals(listOf(RecordingMark(RecordingMarkKind.CUT, 600_000, 660_000)), fixture.markers.marks.value)
+        } finally { fixture.markers.clearRecordingMarkersAndJoin() }
+    }
+
+    @Test
+    @OptIn(TvheadendTestingApi::class, ExperimentalCoroutinesApi::class)
+    fun stoppedInstallationDoesNotFetchAndBackgroundCancelsAnInFlightFetch() = runTest {
+        var calls = 0
+        var cancellations = 0
+        val heldResponse = CompletableDeferred<Unit>()
+        val fixture = MarkerFixture(backgroundScope, cutpoints = {
+            calls++
+            try { heldResponse.await() }
+            finally { cancellations++ }
+            DvrCutpointsResult.Available.create(emptyList())
+        })
+        try {
+            fixture.response.complete(Unit)
+            fixture.markers.setForeground(false)
+            fixture.markers.observeRecordingMarkersLocked(fixture.binding)
+            runCurrent()
+            assertEquals(0, calls)
+            fixture.markers.setForeground(true)
+            runCurrent()
+            assertEquals(1, calls)
+            fixture.markers.setForeground(false)
+            runCurrent()
+            assertEquals(1, cancellations)
+            heldResponse.complete(Unit)
+            runCurrent()
+            assertEquals(1, calls)
+        } finally { fixture.markers.clearRecordingMarkersAndJoin() }
+    }
+
+    @Test
+    @OptIn(TvheadendTestingApi::class, ExperimentalCoroutinesApi::class)
+    fun foregroundKeepsLoadedMarksAndHandledSkipOrPromptHistoryWithoutRefetching() = runTest {
+        for (mode in listOf(AdBreakMode.ASK, AdBreakMode.AUTOMATIC)) {
+            var calls = 0
+            val fixture = MarkerFixture(backgroundScope, cutpoints = {
+                calls++
+                DvrCutpointsResult.Available.create(listOf(
+                    DvrCutpoint(1_000.milliseconds, 2_000.milliseconds, DvrCutpointAction.COMMERCIAL_BREAK),
+                ))
+            })
+            try {
+                fixture.markers.applySettings(PlayerSettings(adBreakMode = mode))
+                fixture.position = 1_500
+                fixture.response.complete(Unit)
+                fixture.markers.observeRecordingMarkersLocked(fixture.binding)
+                runCurrent()
+                if (mode == AdBreakMode.ASK) fixture.markers.dismissSkipPrompt(
+                    requireNotNull(fixture.markers.skipPrompt.value), fixture.markers.recordingMarkerRevision.value)
+                val loaded = fixture.markers.marks.value
+                val seeks = fixture.seeks.toList()
+                fixture.markers.setForeground(false)
+                runCurrent()
+                assertEquals(loaded, fixture.markers.marks.value)
+                fixture.position = 1_500
+                fixture.markers.setForeground(true)
+                fixture.markers.onPlaybackChanged()
+                runCurrent()
+                assertEquals(1, calls)
+                assertEquals(loaded, fixture.markers.marks.value)
+                assertEquals(seeks, fixture.seeks)
+                assertEquals(null, fixture.markers.skipPrompt.value)
+            } finally { fixture.markers.clearRecordingMarkersAndJoin() }
+        }
+    }
+
+    @Test
+    @OptIn(TvheadendTestingApi::class, ExperimentalCoroutinesApi::class)
+    fun fetchedRevisionStillArmsBoundariesWhenItsFirstSerializedApplicationWasCancelled() = runTest {
+        var calls = 0
+        val fixture = MarkerFixture(backgroundScope, cutpoints = {
+            calls++
+            DvrCutpointsResult.Available.create(listOf(
+                DvrCutpoint(1_000.milliseconds, 2_000.milliseconds, DvrCutpointAction.COMMERCIAL_BREAK),
+                DvrCutpoint(3_000.milliseconds, 4_000.milliseconds, DvrCutpointAction.CUT),
+                DvrCutpoint(5_000.milliseconds, 6_000.milliseconds, DvrCutpointAction.MUTE),
+            ))
+        })
+        val releaseCommands = CompletableDeferred<Unit>()
+        try {
+            fixture.markers.observeRecordingMarkersLocked(fixture.binding)
+            runCurrent()
+            val beforeFetch = fixture.markers.recordingMarkerRevision.value
+            val heldCommand = backgroundScope.launch {
+                fixture.commands.serialize(onClosed = {}) { releaseCommands.await() }
+            }
+            runCurrent()
+            fixture.response.complete(Unit)
+            runCurrent()
+            assertTrue(fixture.markers.recordingMarkerRevision.value > beforeFetch)
+            assertEquals(1, calls)
+            assertTrue(fixture.messages.isEmpty())
+            // The metadata response is installed, but its serialized application is still queued.
+            // A collectLatest interruption must not make that unapplied revision look applied.
+            fixture.markers.setForeground(false)
+            runCurrent()
+            releaseCommands.complete(Unit)
+            heldCommand.join()
+            runCurrent()
+            assertTrue(fixture.messages.isEmpty())
+            fixture.markers.setForeground(true)
+            runCurrent()
+            assertEquals(1, calls)
+            assertEquals(listOf(1_000L, 2_000L, 3_000L, 4_000L, 5_000L, 6_000L),
+                fixture.messages.filterNot { it.isCanceled }.map { it.positionMs })
+            fixture.position = 1_500
+            fixture.markers.onPlaybackChanged()
+            runCurrent()
+            assertEquals(RecordingMark(RecordingMarkKind.AD_BREAK, 1_000, 2_000), fixture.markers.skipPrompt.value)
+            fixture.position = 3_000
+            fixture.markers.onPlaybackChanged()
+            runCurrent()
+            assertEquals(listOf(4_000L), fixture.seeks)
+            fixture.position = 5_500
+            fixture.markers.onPlaybackChanged()
+            runCurrent()
+            assertEquals(0f, fixture.volume)
+        } finally {
+            releaseCommands.complete(Unit)
+            fixture.markers.clearRecordingMarkersAndJoin()
+        }
     }
 
     @Test
@@ -407,7 +588,7 @@ class RecordingMarkerChaptersTest {
             fixture.response.complete(Unit)
             fixture.markers.observeRecordingMarkersLocked(fixture.binding)
             runCurrent()
-            fixture.position = 5_000
+            fixture.position = 4_025
             val held = fixture.messages.single { it.positionMs == 3_000L }
             for (at in listOf(4_000L, 3_000L)) {
                 fixture.messages.single { it.positionMs == at }.let { it.target.handleMessage(it.type, it.payload) }
@@ -418,6 +599,47 @@ class RecordingMarkerChaptersTest {
             held.target.handleMessage(held.type, held.payload)
             runCurrent()
             assertEquals(listOf(4_050L), fixture.seeks)
+        } finally { fixture.markers.clearRecordingMarkersAndJoin() }
+    }
+
+    @Test
+    @OptIn(TvheadendTestingApi::class, ExperimentalCoroutinesApi::class)
+    fun delayedCutBoundariesNeverSeekBackwardsOrToTheCurrentPosition() = runTest {
+        for (actual in listOf(3_050L, 5_000L)) {
+            val fixture = MarkerFixture(backgroundScope, listOf(
+                DvrCutpoint(3_000.milliseconds, 3_050.milliseconds, DvrCutpointAction.CUT),
+            ))
+            try {
+                fixture.response.complete(Unit)
+                fixture.markers.observeRecordingMarkersLocked(fixture.binding)
+                runCurrent()
+                fixture.position = actual
+                fixture.messages.single { it.positionMs == 3_000L }
+                    .let { it.target.handleMessage(it.type, it.payload) }
+                runCurrent()
+                assertEquals(emptyList<Long>(), fixture.seeks)
+                assertEquals(actual, fixture.position)
+            } finally { fixture.markers.clearRecordingMarkersAndJoin() }
+        }
+    }
+
+    @Test
+    @OptIn(TvheadendTestingApi::class, ExperimentalCoroutinesApi::class)
+    fun automaticCutNeverSeeksBackwardsToAnEarlyLanding() = runTest {
+        val fixture = MarkerFixture(backgroundScope, listOf(
+            DvrCutpoint(10_000.milliseconds, 16_000.milliseconds, DvrCutpointAction.CUT),
+        ))
+        try {
+            fixture.markers.applySettings(PlayerSettings(skipLanding = SkipLanding.FIVE_SECONDS_BEFORE))
+            fixture.response.complete(Unit)
+            fixture.markers.observeRecordingMarkersLocked(fixture.binding)
+            runCurrent()
+            fixture.position = 11_200
+            fixture.messages.single { it.positionMs == 10_000L }
+                .let { it.target.handleMessage(it.type, it.payload) }
+            runCurrent()
+            assertEquals(emptyList<Long>(), fixture.seeks)
+            assertEquals(11_200L, fixture.position)
         } finally { fixture.markers.clearRecordingMarkersAndJoin() }
     }
 
@@ -673,7 +895,8 @@ class RecordingMarkerChaptersTest {
         } as ExoPlayer
         val notices = NoticeCenter({ 0L }) { NoticeContext(0, null) }
         val pendingRecoveryPosition = kotlinx.coroutines.flow.MutableStateFlow<kotlin.time.Duration?>(null)
-        val markers = RecordingMarkers(player, session, scope, PlaybackTargetCommandSerialization(), notices, pendingRecoveryPosition) { installing }
+        val commands = PlaybackTargetCommandSerialization()
+        val markers = RecordingMarkers(player, session, scope, commands, notices, pendingRecoveryPosition) { installing }
     }
 
     @Test
@@ -769,7 +992,7 @@ class RecordingMarkerChaptersTest {
             sample()
             assertEquals(listOf(2_000L), seeks)
             playing = true
-            boundary(3_000, positionAtEvaluation = 3_100)
+            boundary(3_000, positionAtEvaluation = 3_025)
             assertEquals(listOf(2_000L, 3_050L), seeks)
             assertEquals(noticeId, notices.state.value.pending.single().id)
 

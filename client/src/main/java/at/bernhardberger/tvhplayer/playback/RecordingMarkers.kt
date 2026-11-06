@@ -34,6 +34,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -64,6 +65,8 @@ internal class RecordingMarkers(
 ) {
     private val markerQuery = RecordingMarkerQuery()
     private var markerJob: Job? = null
+    private val foreground = MutableStateFlow(true)
+    private var appliedRevision = -1L
     private val boundaryMessages = mutableListOf<PlayerMessage>()
     private var boundaryPositions = emptyList<Long>()
     private var boundaryGeneration = 0L
@@ -83,6 +86,10 @@ internal class RecordingMarkers(
     val recordingChapters = markerQuery.chapters
     val recordingChapterStartsMs = markerQuery.chapterStartsMs
     val recordingMarkerRevision = markerQuery.revision
+
+    fun setForeground(value: Boolean) {
+        foreground.value = value
+    }
 
     fun onTracksChanged() {
         if (targetInstallationInProgress() || mediaItem == null ||
@@ -144,6 +151,7 @@ internal class RecordingMarkers(
             }
             restoreVolume()
         }
+        appliedRevision = recordingMarkerRevision.value
     }
 
     private fun cancelBoundaries() {
@@ -246,13 +254,12 @@ internal class RecordingMarkers(
         // of a later sample. Backward movement never makes a future boundary current.
         val position = positionMs?.takeIf { actualPosition >= it } ?: actualPosition
         // A delivered boundary can arrive late. Once its entry is recorded, the actual position
-        // is judged too: an automatic ad skip whose landing is behind it is dropped, which would
-        // only seek backwards and post a notice for a break that was not skipped.
+        // is judged too: every automatic skip whose landing is not ahead is dropped.
         var decision = RecordingSkipDecision()
         var seekTo: Long? = null
         for (candidate in listOf(position, actualPosition).distinct()) {
             decision = skipPolicy.evaluate(marks.value, candidate, player.isPlaying && canSeek(), settings)
-            seekTo = decision.seekToMs?.takeIf { decision.automaticAdSkip == null || it > actualPosition }
+            seekTo = decision.seekToMs?.takeIf { it > actualPosition }
             if (seekTo != null) break
         }
         seekTo?.let { target ->
@@ -315,15 +322,19 @@ internal class RecordingMarkers(
         pendingMarkers?.join()
     }
 
-    /** At most three attempts per admission phase; teardown cancels this job and every wait. */
-    private suspend fun refreshMarkers(binding: PlaybackBinding.Recording) {
-        for (waitMs in listOf(0L, 3_000L, 7_000L)) {
-            delay(waitMs)
+    /** Returns true only for a terminal result or an exhausted three-completed-attempt budget. */
+    private suspend fun refreshMarkers(binding: PlaybackBinding.Recording, attempts: Int, attempted: () -> Unit): Boolean {
+        for (attempt in attempts until 3) {
+            // Resume an interrupted cycle immediately, retaining its remaining attempt budget.
+            delay(if (attempt == attempts) 0L else if (attempt == 1) 3_000L else 7_000L)
             // Installation can invoke this observer inline before its temporary flag clears.
-            // Only retirement/replacement ends a fetch cycle, not that flag or the playhead position.
-            if (mediaItem == null || player.currentMediaItem !== mediaItem || !markerQuery.isCurrent(binding)) return
-            if (!markerQuery.refresh(binding)) return
+            // That flag and the playhead position must not end an otherwise eligible fetch cycle.
+            if (!foreground.value || mediaItem == null || player.currentMediaItem !== mediaItem || !markerQuery.isCurrent(binding)) return false
+            val retry = markerQuery.refresh(binding)
+            attempted()
+            if (!retry) return true
         }
+        return true
     }
 
     @OptIn(ExperimentalTvheadendApi::class)
@@ -338,32 +349,33 @@ internal class RecordingMarkers(
             // Admission changes, not position samples: one bounded fetch cycle per phase.
             var completionFetched = false
             var initialFetched = false
-            session.observation.map { binding.admission::class }.distinctUntilChanged().collectLatest {
-                val revision = recordingMarkerRevision.value
-                when (binding.admission) {
-                    is RecordingPlaybackAdmission.Growing -> if (!initialFetched) {
-                        initialFetched = true
-                        refreshMarkers(binding)
-                    }
-                    is RecordingPlaybackAdmission.Completed -> if (!completionFetched) {
-                        completionFetched = true
-                        refreshMarkers(binding)
-                    }
-                    else -> {
-                        targetCommands.serialize(onClosed = {}, countsAsArrival = false) {
-                            markerQuery.retire(binding)
-                            cancelBoundaries()
-                            restoreVolume()
-                            skipPolicy = RecordingSkipPolicy()
-                            publishMarks()
-                            publishSkipState()
+            var initialAttempts = 0
+            var completionAttempts = 0
+            session.observation.map { binding.admission::class }.distinctUntilChanged()
+                .combine(foreground) { admission, active -> admission to active }
+                .collectLatest { (_, active) ->
+                    when (binding.admission) {
+                        is RecordingPlaybackAdmission.Growing -> if (active && !initialFetched) {
+                            initialFetched = refreshMarkers(binding, initialAttempts) { initialAttempts++ }
+                        }
+                        is RecordingPlaybackAdmission.Completed -> if (active && !completionFetched) {
+                            completionFetched = refreshMarkers(binding, completionAttempts) { completionAttempts++ }
+                        }
+                        else -> {
+                            targetCommands.serialize(onClosed = {}, countsAsArrival = false) {
+                                markerQuery.retire(binding)
+                                cancelBoundaries()
+                                restoreVolume()
+                                skipPolicy = RecordingSkipPolicy()
+                                publishMarks()
+                                publishSkipState()
+                            }
                         }
                     }
+                    targetCommands.serialize(onClosed = {}, countsAsArrival = false) {
+                        if (active && foreground.value && markerQuery.isCurrent(binding) && recordingMarkerRevision.value != appliedRevision) metadataChanged()
+                    }
                 }
-                targetCommands.serialize(onClosed = {}, countsAsArrival = false) {
-                    if (markerQuery.isCurrent(binding) && recordingMarkerRevision.value != revision) metadataChanged()
-                }
-            }
         }
     }
 }

@@ -1290,6 +1290,7 @@ class AppPlaybackRuntime(
                     return@serialize
                 }
                 foreground = false
+                recordingMarkers.setForeground(false)
                 val currentJob = currentCoroutineContext().job
                 val recoveryPending = liveRecovery.cancelOnBackgroundLocked(currentJob, activeTargetEpoch)
                 val recordingPlayWhenReady = targetCommands.readIfOpen { player.playWhenReady }
@@ -1324,6 +1325,7 @@ class AppPlaybackRuntime(
         scope.launch {
             targetCommands.serialize(onClosed = {}) {
                 foreground = true
+                recordingMarkers.setForeground(true)
                 cancelKeepTimer()
                 applyForegroundPlaybackAction(
                     foregroundPlaybackLifecycle.onForegrounded(
