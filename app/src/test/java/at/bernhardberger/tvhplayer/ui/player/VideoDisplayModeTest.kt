@@ -1,11 +1,96 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.playback.SurfaceFrameRateChange
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class VideoDisplayModeTest {
     private val current = DisplayModeSpec(1920, 1080, 60f, 1)
+
+    @Test
+    fun displayModeRequestsStayInBrowseEvenAtTheBaseRate() {
+        assertTrue(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.DISPLAY_MODE, 60f, current))
+    }
+
+    @Test
+    fun android11SeamlessRequestsDropInBrowse() {
+        assertFalse(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.SEAMLESS_DEFAULT, 24f, null))
+    }
+
+    @Test
+    fun seamlessOnlyRequestsDropInBrowse() {
+        assertFalse(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.ONLY_IF_SEAMLESS, 24f, null))
+    }
+
+    @Test
+    fun alwaysDropsWhenTheBaseOrItsAlternativeMatches() {
+        assertFalse(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.ALWAYS, 60f, current))
+        val seamless = current.copy(alternativeRefreshRates = listOf(24f, 50f))
+        assertFalse(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.ALWAYS, 24.0001f, seamless))
+        assertFalse(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.ALWAYS, 50f, seamless))
+    }
+
+    @Test
+    fun alwaysKeepsNonSeamlessAndUnknownBaseRequests() {
+        assertTrue(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.ALWAYS, 24f, current))
+        assertTrue(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.ALWAYS, 24f, null))
+        // Matching multiples do not count, and NTSC is distinct from whole cadence.
+        assertTrue(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.ALWAYS, 30f, current))
+        assertTrue(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.ALWAYS, 59.94f, current))
+        assertTrue(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.ALWAYS, 23.976f,
+            current.copy(alternativeRefreshRates = listOf(24f))))
+    }
+
+    @Test
+    fun browseRetentionComparesTheBaseRatherThanTheMatchingCurrentMode() {
+        val switched = current.copy(refreshRate = 24f, modeId = 2)
+        assertEquals(switched, videoDisplayMode(24f, switched, listOf(current, switched)))
+        assertTrue(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.ALWAYS, 24f, current))
+    }
+
+    @Test
+    fun baseSurvivesClearStaleObservationRenewedRequestAndBrowse() {
+        var base = nextBaseMode(null, current, unrequested = true, lastRequestedRate = null)
+        val switched = current.copy(refreshRate = 24f, modeId = 2)
+        base = nextBaseMode(base, switched, unrequested = false, lastRequestedRate = 24f)
+        // Radio or a settings toggle clears the request, but the display has not returned yet.
+        base = nextBaseMode(base, switched, unrequested = true, lastRequestedRate = 24f)
+        assertEquals(current, base)
+        // A renewed 24 Hz request and then browse must still compare against the original 60 Hz.
+        base = nextBaseMode(base, switched, unrequested = false, lastRequestedRate = 24f)
+        assertTrue(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.ALWAYS, 24f, base))
+        assertEquals(current, nextBaseMode(base, current.copy(refreshRate = 50f), true, 24f))
+    }
+
+    @Test
+    fun staleLastRequestedRateIsRejectedAndUnknownBaseKeepsTheRequest() {
+        val stale = current.copy(refreshRate = 24.0001f, modeId = 2)
+        val base = nextBaseMode(null, stale, unrequested = true, lastRequestedRate = 24f)
+        assertNull(base)
+        assertTrue(keepVideoFrameRateInBrowse(SurfaceFrameRateChange.ALWAYS, 24f, base))
+        assertEquals(current, nextBaseMode(base, current, unrequested = true, lastRequestedRate = 24f))
+    }
+
+    @Test
+    fun firstCleanObservationIsAcceptedOnlyWithoutARequest() {
+        assertNull(nextBaseMode(null, current, unrequested = false, lastRequestedRate = null))
+        assertNull(nextBaseMode(null, null, unrequested = true, lastRequestedRate = null))
+        assertEquals(current, nextBaseMode(null, current, unrequested = true, lastRequestedRate = null))
+        // Whole and NTSC rates remain distinct in the observation guard, too.
+        assertEquals(current, nextBaseMode(null, current, unrequested = true, lastRequestedRate = 59.94f))
+    }
+
+    @Test
+    fun absentOrInvalidVideoNeverKeepsARequest() {
+        for (change in SurfaceFrameRateChange.entries) {
+            for (rate in listOf(null, 0f, -1f, Float.NaN, Float.POSITIVE_INFINITY)) {
+                assertFalse(keepVideoFrameRateInBrowse(change, rate, null))
+            }
+        }
+    }
 
     @Test
     fun selectsTheRequestedCadenceAtTheCurrentResolution() {
