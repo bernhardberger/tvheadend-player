@@ -763,4 +763,5 @@
     <string name="whats_new">Nouveautés</string>
     <string name="whats_new_badge">Nouveau</string>
     <string name="whats_new_updated">Mis à jour : %1$s</string>
+    <string name="settings_about_version_summary">Version %1$s</string>
 </resources>

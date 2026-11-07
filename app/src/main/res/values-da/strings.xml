@@ -746,4 +746,5 @@
     <string name="whats_new">Hvad er nyt?</string>
     <string name="whats_new_badge">Nyt</string>
     <string name="whats_new_updated">Opdateret til %1$s</string>
+    <string name="settings_about_version_summary">Version %1$s</string>
 </resources>

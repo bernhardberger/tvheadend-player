@@ -1161,7 +1161,6 @@ fun AppRoot(
                         metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.SETTINGS),
                     ) { destination ->
                         SettingsRouteContent(
-                            lastUpdateTime = lastUpdateTime,
                             channelsVm = channelsVm,
                             connectionPresentation = connectionPresentation,
                             onRetry = { appVm.reconnectNow(allowAutomaticBackoff = true) },

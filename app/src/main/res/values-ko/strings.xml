@@ -730,4 +730,5 @@
     <string name="whats_new">새로운 기능</string>
     <string name="whats_new_badge">새 소식</string>
     <string name="whats_new_updated">%1$s 버전으로 업데이트됨</string>
+    <string name="settings_about_version_summary">버전 %1$s</string>
 </resources>

@@ -239,7 +239,6 @@ internal fun RecordingsRouteContent(
 
 @Composable
 internal fun SettingsRouteContent(
-    lastUpdateTime: Long?,
     channelsVm: ChannelsViewModel,
     connectionPresentation: at.bernhardberger.tvhplayer.viewmodels.AppConnectionPresentation,
     onRetry: () -> Unit,
@@ -253,7 +252,6 @@ internal fun SettingsRouteContent(
     if (contentAllowed) {
         ContentContainer {
             SettingsScreen(
-                lastUpdateTime = lastUpdateTime,
                 channelsVm = channelsVm,
                 connectionPresentation = connectionPresentation,
                 onRetry = onRetry,

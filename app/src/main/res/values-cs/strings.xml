@@ -778,4 +778,5 @@
     <string name="whats_new">Co je nového</string>
     <string name="whats_new_badge">Nové</string>
     <string name="whats_new_updated">Aktualizováno na %1$s</string>
+    <string name="settings_about_version_summary">Verze %1$s</string>
 </resources>

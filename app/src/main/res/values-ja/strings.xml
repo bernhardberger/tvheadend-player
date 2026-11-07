@@ -730,4 +730,5 @@
     <string name="whats_new">更新内容</string>
     <string name="whats_new_badge">新着</string>
     <string name="whats_new_updated">%1$s に更新済み</string>
+    <string name="settings_about_version_summary">バージョン %1$s</string>
 </resources>

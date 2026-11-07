@@ -763,4 +763,5 @@
     <string name="whats_new">Što je novo</string>
     <string name="whats_new_badge">Novo</string>
     <string name="whats_new_updated">Ažurirano na %1$s</string>
+    <string name="settings_about_version_summary">Verzija %1$s</string>
 </resources>

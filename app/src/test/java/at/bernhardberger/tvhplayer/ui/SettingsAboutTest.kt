@@ -8,7 +8,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,9 +27,7 @@ import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.ui.components.depth.rememberDepthNavigationState
 import at.bernhardberger.tvhplayer.ui.components.SideRail
-import at.bernhardberger.tvhplayer.settings.UiSettings
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
-import at.bernhardberger.tvhplayer.settings.hasUnseenWhatsNew
 import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -195,7 +192,7 @@ class SettingsAboutTest {
 
     private var captureScale = 1f
 
-    @Test fun updateSupportingTextClearsAndOnlyConnectionHasRailBadge() = whatsNewJourney(false)
+    @Test fun versionSummaryStaysAndOnlyConnectionHasRailBadge() = whatsNewJourney(false)
 
     @Test @Category(VisualCapture::class)
     fun whatsNewEnglishCaptures() = whatsNewJourney(true)
@@ -209,15 +206,13 @@ class SettingsAboutTest {
             CompositionLocalProvider(LocalDensity provides Density(1f, 1f)) {
                 TVHeadendPlayerTheme {
                     view = LocalView.current
-                    val settings by store.settings.collectAsState(initial = UiSettings())
-                    val unseen = hasUnseenWhatsNew(settings.whatsNewSeenVersion, version)
                     val scope = rememberCoroutineScope()
                     val navigation = rememberDepthNavigationState(SETTINGS_ROOT, ABOUT_LEVEL)
                     Box(Modifier.fillMaxSize().background(Color.Black)) {
                         SideRail(currentRoute = AppDestination.SETTINGS, connectionDegraded = degraded,
                             onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                             SettingsScreenNavigation(navigation,
-                                listOf(settingsRootLevel(updateHintShown = unseen)) +
+                                listOf(settingsRootLevel()) +
                                     settingsAboutLevels(sessionState, machineTranslated = false,
                                         onWhatsNewOpened = { scope.launch { store.markWhatsNewSeen(version) } }),
                                 contentPadding = padding, initialFocusEnabled = !drawerActive)
@@ -227,7 +222,8 @@ class SettingsAboutTest {
             }
         }
         compose.onNodeWithTag("settings-row-$ABOUT_LEVEL").assertIsFocused()
-        compose.onNodeWithText("Updated to ${at.bernhardberger.tvhplayer.BuildConfig.VERSION_NAME}", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithText("Version ${at.bernhardberger.tvhplayer.BuildConfig.VERSION_NAME}", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithText("Updated to ${at.bernhardberger.tvhplayer.BuildConfig.VERSION_NAME}").assertDoesNotExist()
         compose.onNodeWithTag("whats-new-badge", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("nav-settings").assertContentDescriptionEquals("Settings")
         if (captures) save("whats-new-rail-collapsed-en-font1.0")
@@ -274,7 +270,7 @@ class SettingsAboutTest {
         press(Key.Back)
         compose.onNodeWithTag("settings-row-$ABOUT_LEVEL").assertIsFocused()
             .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.ContentDescription))
-        compose.onNodeWithText(at.bernhardberger.tvhplayer.BuildConfig.VERSION_NAME, useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithText("Version ${at.bernhardberger.tvhplayer.BuildConfig.VERSION_NAME}", useUnmergedTree = true).assertIsDisplayed()
         compose.onNodeWithText("Updated to ${at.bernhardberger.tvhplayer.BuildConfig.VERSION_NAME}").assertDoesNotExist()
         if (captures) save("whats-new-settings-version-en-font1.0")
         compose.onNodeWithTag("whats-new-badge", useUnmergedTree = true).assertDoesNotExist()

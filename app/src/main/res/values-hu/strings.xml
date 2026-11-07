@@ -746,4 +746,5 @@
     <string name="whats_new">Újdonságok</string>
     <string name="whats_new_badge">Új</string>
     <string name="whats_new_updated">Frissítve: %1$s</string>
+    <string name="settings_about_version_summary">Verzió %1$s</string>
 </resources>

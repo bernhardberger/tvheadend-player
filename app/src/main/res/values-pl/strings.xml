@@ -778,4 +778,5 @@
     <string name="whats_new">Co nowego</string>
     <string name="whats_new_badge">Nowe</string>
     <string name="whats_new_updated">Zaktualizowano do %1$s</string>
+    <string name="settings_about_version_summary">Wersja %1$s</string>
 </resources>

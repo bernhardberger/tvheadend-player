@@ -15,7 +15,6 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.ui.platform.LocalContext
 import at.bernhardberger.tvhplayer.settings.UiSettings
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
-import at.bernhardberger.tvhplayer.settings.whatsNewHintShown
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import androidx.compose.ui.Modifier
@@ -43,7 +42,6 @@ internal fun isApplianceCompanionInstalled(context: Context): Boolean =
 
 @Composable
 internal fun SettingsScreen(
-    lastUpdateTime: Long?,
     channelsVm: ChannelsViewModel,
     connectionPresentation: at.bernhardberger.tvhplayer.viewmodels.AppConnectionPresentation,
     onRetry: () -> Unit,
@@ -66,18 +64,12 @@ internal fun SettingsScreen(
     val profiles = observation.currentDvrConfigurations()
     val settings by settingsStore.settings.collectAsStateWithLifecycle(initialValue = UiSettings())
     val scope = rememberCoroutineScope()
-    var hintNow by remember { mutableStateOf(System.currentTimeMillis()) }
-    LifecycleResumeEffect(isCurrent) {
-        if (isCurrent) hintNow = System.currentTimeMillis()
-        onPauseOrDispose { }
-    }
-    val updateHintShown = whatsNewHintShown(settings.whatsNewSeenVersion, BuildConfig.VERSION_CODE, lastUpdateTime, hintNow)
     val recordingLevels = settingsRecordingLevels(profiles, settings.recordingProfileId,
         recordingSpaceText(observation.dvrDiskSpaceState)) { id ->
         scope.launch { settingsStore.setRecordingProfile(id); navigation.pop() }
     }
     val levels = settingsGeneralLevels(navigation) + settingsConnectionLevels(connectionPresentation, onRetry, onSetUp = { setupOpen = true }) + settingsPlayerLevels(navigation) + listOf(
-        settingsRootLevel(recordingLevels.isNotEmpty(), connectionOverviewStatus(connectionPresentation).title, updateHintShown),
+        settingsRootLevel(recordingLevels.isNotEmpty(), connectionOverviewStatus(connectionPresentation).title),
         settingsKeepChannelLevel(navigation),
         settingsWarmPlaybackLevel(navigation),
         settingsStreamProfileLevel(navigation),
@@ -99,7 +91,6 @@ internal fun SettingsScreen(
 internal fun settingsRootLevel(
     showRecordings: Boolean = false,
     connectionStatus: String? = null,
-    updateHintShown: Boolean = false,
 ): DepthLevel = settingsLevel(SETTINGS_ROOT, stringResource(R.string.nav_settings), buildList {
     add(settingsRow(SettingsSection.GENERAL.name, stringResource(R.string.settings_general), child = SettingsSection.GENERAL.name, icon = R.drawable.ic_tune))
     add(settingsRow(SettingsSection.CONNECTION.name, stringResource(R.string.settings_connection_nav), connectionStatus,
@@ -111,7 +102,7 @@ internal fun settingsRootLevel(
         icon = R.drawable.ic_fiber_manual_record))
     add(settingsRow(SettingsSection.APPLIANCE.name, stringResource(R.string.settings_appliance), child = SettingsSection.APPLIANCE.name, icon = R.drawable.ic_home))
     add(settingsRow(ABOUT_LEVEL, stringResource(R.string.settings_about),
-        supporting = if (updateHintShown) stringResource(R.string.whats_new_updated, BuildConfig.VERSION_NAME) else BuildConfig.VERSION_NAME,
+        supporting = stringResource(R.string.settings_about_version_summary, BuildConfig.VERSION_NAME),
         child = ABOUT_LEVEL, icon = R.drawable.ic_info))
 })
 
