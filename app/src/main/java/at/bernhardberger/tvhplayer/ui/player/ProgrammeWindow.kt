@@ -9,6 +9,7 @@ import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.core.TIMESHIFT_LIVE_EDGE_TOLERANCE_MS
 import at.bernhardberger.tvhplayer.core.nowDescribesPlayback
 import at.bernhardberger.tvhplayer.core.committedProgrammeEvent
+import at.bernhardberger.tvhplayer.core.nextProgrammeEvent
 import at.bernhardberger.tvhplayer.core.programmePositionWindow
 import at.bernhardberger.tvhplayer.core.halfHourSlot
 import java.time.ZoneId
@@ -69,9 +70,8 @@ internal fun displayedNextEvent(
     liveStart: Boolean,
     currentProgramme: EpgEvent?,
     nextAt: (Instant) -> EpgEvent?,
-): EpgEvent? = if (displayedWindow != null) {
-    displayedWindow.event?.let { nextAt(displayedWindow.estimatedPosition) }
-} else nextAtNow.takeIf { currentProgramme != null && !previewing && nowDescribesPlayback(committedState, liveStart) }
+): EpgEvent? = nextProgrammeEvent(displayedWindow?.estimatedPosition, displayedWindow?.event,
+    previewing, committedState, nextAtNow, liveStart, currentProgramme, nextAt)
 
 internal fun programmeWindow(
     state: AppTimeshiftState,

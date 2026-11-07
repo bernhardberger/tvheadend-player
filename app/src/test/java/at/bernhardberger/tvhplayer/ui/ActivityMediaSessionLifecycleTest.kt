@@ -4,6 +4,7 @@ package at.bernhardberger.tvhplayer.ui
 
 import android.app.Application
 import android.os.Looper
+import androidx.media3.session.MediaSession
 import androidx.media3.common.SimpleBasePlayer
 import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.Job
@@ -13,6 +14,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.Shadows.shadowOf
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class)
@@ -28,6 +30,25 @@ class ActivityMediaSessionLifecycleTest {
             val observation = Job()
             // Media3 rejects duplicate active session IDs, so the second start also proves release.
             lifecycle.start(context, player, observation) { releases++ }
+            val session = ActivityMediaSessionLifecycle::class.java.getDeclaredField("session").let { field ->
+                field.isAccessible = true
+                field.get(lifecycle) as MediaSession
+            }
+            val activity = requireNotNull(session.sessionActivity)
+            val intent = shadowOf(activity).savedIntent
+            assertTrue(activity.isImmutable)
+            assertEquals(MainActivity::class.java.name, intent.component?.className)
+            assertEquals(context.packageName, intent.`package`)
+            assertEquals(ACTION_SESSION_ACTIVITY, intent.action)
+            assertTrue(intent.extras == null || intent.extras!!.isEmpty)
+            val labels = AppSessionMetadataLabels(context)
+            for ((kind, resource) in listOf(
+                at.bernhardberger.tvhplayer.playback.SessionPlaybackErrorKind.RECORDING_READ to at.bernhardberger.tvhplayer.R.string.session_recording_read_failed,
+                at.bernhardberger.tvhplayer.playback.SessionPlaybackErrorKind.CHANNEL_UNAVAILABLE to at.bernhardberger.tvhplayer.R.string.session_channel_unavailable,
+                at.bernhardberger.tvhplayer.playback.SessionPlaybackErrorKind.PLAYBACK to at.bernhardberger.tvhplayer.R.string.session_playback_failed,
+            )) assertEquals(context.getString(resource), labels.error(kind))
+            assertEquals("12.3", labels.channelNumber(at.bernhardberger.tvheadend.sdk.core.Channel.create(
+                at.bernhardberger.tvheadend.sdk.core.ChannelId(1), number = 12, numberMinor = 3)))
             lifecycle.stop()
             lifecycle.stop()
             assertTrue(observation.isCancelled)

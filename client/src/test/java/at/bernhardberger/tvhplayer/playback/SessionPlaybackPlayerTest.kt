@@ -3,6 +3,7 @@
     at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class,
     at.bernhardberger.tvheadend.sdk.playback.SubscriptionInfrastructureApi::class,
     at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi::class,
+    at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class,
 )
 
 package at.bernhardberger.tvhplayer.playback
@@ -37,9 +38,256 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
+private val labels = object : SessionMetadataLabels {
+    override fun genre(genre: ContentGenre): String = "Category"
+    override fun channelNumber(channel: Channel): String = "Test number"
+    override fun error(kind: SessionPlaybackErrorKind): String = when (kind) {
+        SessionPlaybackErrorKind.RECORDING_READ -> "Recording can't be read"
+        SessionPlaybackErrorKind.CHANNEL_UNAVAILABLE -> "Channel unavailable"
+        SessionPlaybackErrorKind.PLAYBACK -> "Playback failed"
+    }
+}
+
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class)
 class SessionPlaybackPlayerTest {
+    @Test fun liveMetadataUsesChannelAsTitleAndProgrammeAsSubtitle() {
+        val now = Instant.parse("2026-09-07T20:30:00Z")
+        val episode = EpgEpisode(null, null, 2, 3, 4, 5, 6, 7, "S2 E4")
+        val event = EpgEvent.create(EventId(1), ChannelId(1), now - 30.minutes, now + 30.minutes,
+            title = "Programme", subtitle = "Episode", summary = " A\n short  summary ", genre = "Drama",
+            description = "Not the summary", episode = episode, contentGenre = ContentGenre.fromContentType(0x10))
+        val next = EpgEvent.create(EventId(2), ChannelId(1), now + 30.minutes, now + 90.minutes, title = "Next")
+        val snapshot = SessionObservation.create(
+            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(Channel.create(ChannelId(1), name = "Station",
+                number = 12, numberMinor = 3, services = listOf(ChannelService("", "", 1, null, null, null)))))),
+            epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = listOf(event, next))))
+        val metadata = sessionPlaybackMetadata(AppPlaybackTarget.Live(ChannelId(1)), snapshot, now,
+            AppTimeshiftState(), liveStart = true, programmeWindowEnabled = true, labels = labels)
+        assertEquals("Station", metadata.title)
+        assertEquals("Station", metadata.displayTitle)
+        assertEquals("Station", metadata.artist)
+        assertEquals("Station", metadata.station)
+        assertEquals("Programme", metadata.subtitle)
+        assertEquals("Drama", metadata.genre)
+        assertEquals(MediaMetadata.MEDIA_TYPE_TV_CHANNEL, metadata.mediaType)
+        val expected = mapOf(
+            "schemaVersion" to 1L, "contentKind" to "live", "channelMediaKind" to "tv",
+            "channelName" to "Station", "channelNumber" to "Test number", "programmeTitle" to "Programme",
+            "episodeSubtitle" to "Episode", "episodeOnscreen" to "S2 E4", "seasonNumber" to 2L,
+            "seasonCount" to 3L, "episodeNumber" to 4L, "episodeCount" to 5L, "partNumber" to 6L, "partCount" to 7L,
+            "programmeStartEpochMs" to event.start.toEpochMilliseconds(), "programmeStopEpochMs" to event.stop.toEpochMilliseconds(),
+            "programmeDurationMs" to 60.minutes.inWholeMilliseconds, "genre" to "Drama", "contentGenreCode" to 16L,
+            "shortDescription" to "A short summary", "nextProgrammeTitle" to "Next",
+            "nextProgrammeStartEpochMs" to next.start.toEpochMilliseconds(), "nextProgrammeStopEpochMs" to next.stop.toEpochMilliseconds(),
+        ).mapKeys { "at.bernhardberger.tvhplayer.session.${it.key}" } + ("android.media.metadata.GENRE" to "Drama")
+        val extras = requireNotNull(metadata.extras)
+        assertEquals(expected, extras.keySet().associateWith { extras.get(it) })
+        assertNull(metadata.durationMs)
+
+        for ((content, kind) in listOf(2L to "radio", 0L to "other")) {
+            val channel = Channel.create(ChannelId(1), name = "Station",
+                services = listOf(ChannelService("", "", content, null, null, null)))
+            val observation = SessionObservation.create(
+                channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(channel))),
+                dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = listOf(
+                    DvrEntry.create(DvrEntryId(1), channelId = ChannelId(1))))))
+            for ((target, type) in listOf(AppPlaybackTarget.Live(ChannelId(1)) to
+                if (content == 2L) MediaMetadata.MEDIA_TYPE_RADIO_STATION else null,
+                AppPlaybackTarget.Recording(DvrEntryId(1)) to null)) {
+                val mapped = sessionPlaybackMetadata(target, observation, now, AppTimeshiftState(), true, true, labels)
+                assertEquals(type, mapped.mediaType)
+                assertEquals(kind, mapped.extras?.getString("at.bernhardberger.tvhplayer.session.channelMediaKind"))
+            }
+        }
+        assertNull(metadata.description)
+        assertNull(metadata.artworkUri)
+
+        // The committed position is in an EPG gap: do not publish either broadcast Now or Next.
+        val fixture = TimeshiftTestFixture(120.minutes).apply { updateHistory(50.minutes, 90.minutes, estimatedLiveEdgeTime = now) }
+        val slot = sessionPlaybackMetadata(AppPlaybackTarget.Live(ChannelId(1)), snapshot, now,
+            fixture.state.value.toAppPresentation(fixture.playbackPosition(55.minutes)).copy(paused = true),
+            liveStart = false, programmeWindowEnabled = true, labels = labels)
+        assertNull(slot.subtitle)
+        assertFalse(requireNotNull(slot.extras).containsKey("at.bernhardberger.tvhplayer.session.nextProgrammeTitle"))
+    }
+
+    @Test fun recordingMetadataMapsScheduledProgrammeAndSparseValuesWithoutSentinels() {
+        val now = Instant.parse("2026-09-07T20:30:00Z")
+        val entry = DvrEntry.create(DvrEntryId(1), channelId = ChannelId(1), channelName = "Fallback",
+            title = "Recording", subtitle = "Episode", summary = " ", description = " Full\n description ",
+            start = now, stop = now + 60.minutes, episode = EpgEpisode(null, null, 1, 2, 3, 4, 5, 6, "Episode 3"),
+            contentGenre = ContentGenre.fromContentType(0x40))
+        val snapshot = SessionObservation.create(
+            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(Channel.create(ChannelId(1), name = "Station",
+                number = 8, services = listOf(ChannelService("", "", 1, null, null, null)))))),
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = listOf(entry))))
+        val metadata = sessionPlaybackMetadata(AppPlaybackTarget.Recording(DvrEntryId(1)), snapshot, now,
+            AppTimeshiftState(), false, true, labels)
+        assertEquals("Recording", metadata.title)
+        assertEquals("Recording", metadata.displayTitle)
+        assertEquals("Episode", metadata.subtitle)
+        assertEquals("Station", metadata.artist)
+        assertEquals("Station", metadata.station)
+        assertEquals("Category", metadata.genre)
+        assertEquals(MediaMetadata.MEDIA_TYPE_TV_SHOW, metadata.mediaType)
+        val expected = mapOf("schemaVersion" to 1L, "contentKind" to "recording", "channelMediaKind" to "tv",
+            "channelName" to "Station", "channelNumber" to "Test number", "programmeTitle" to "Recording", "episodeSubtitle" to "Episode",
+            "episodeOnscreen" to "Episode 3", "seasonNumber" to 1L, "seasonCount" to 2L, "episodeNumber" to 3L,
+            "episodeCount" to 4L, "partNumber" to 5L, "partCount" to 6L, "programmeStartEpochMs" to now.toEpochMilliseconds(),
+            "programmeStopEpochMs" to (now + 60.minutes).toEpochMilliseconds(), "programmeDurationMs" to 60.minutes.inWholeMilliseconds,
+            "genre" to "Category", "contentGenreCode" to 64L, "shortDescription" to "Full description")
+            .mapKeys { "at.bernhardberger.tvhplayer.session.${it.key}" } + ("android.media.metadata.GENRE" to "Category")
+        val extras = requireNotNull(metadata.extras)
+        assertEquals(expected, extras.keySet().associateWith { extras.get(it) })
+        assertNull(metadata.description)
+        assertNull(metadata.durationMs)
+
+        val sparse = sessionPlaybackMetadata(AppPlaybackTarget.Recording(DvrEntryId(2)), snapshot, now,
+            AppTimeshiftState(), false, true, labels)
+        assertNull(sparse.title)
+        assertNull(sparse.subtitle)
+        assertNull(sparse.mediaType)
+        val sparseExtras = requireNotNull(sparse.extras)
+        assertEquals(mapOf("at.bernhardberger.tvhplayer.session.schemaVersion" to 1L,
+            "at.bernhardberger.tvhplayer.session.contentKind" to "recording",
+            "at.bernhardberger.tvhplayer.session.channelMediaKind" to "unknown"), sparseExtras.keySet().associateWith { sparseExtras.get(it) })
+        // The SDK rejects reversed bounds at construction; equal and missing bounds are admitted.
+        for ((start, stop) in listOf(now to null, null to now, now to now)) {
+            val observation = SessionObservation.create(dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = listOf(
+                DvrEntry.create(DvrEntryId(1), start = start, stop = stop)))))
+            val metadata = sessionPlaybackMetadata(AppPlaybackTarget.Recording(DvrEntryId(1)), observation, now,
+                AppTimeshiftState(), false, true, labels)
+            for (key in listOf("programmeStartEpochMs", "programmeStopEpochMs", "programmeDurationMs")) {
+                assertFalse(key, requireNotNull(metadata.extras).containsKey("at.bernhardberger.tvhplayer.session.$key"))
+            }
+        }
+    }
+
+    @Test fun displayAndDescriptionLimitsCountCodePointsWithoutSplittingPairs() {
+        val now = Instant.parse("2026-09-07T20:30:00Z")
+        for (length in listOf(255, 256, 257)) {
+            val text = "x".repeat(length - 1) + "\uD83D\uDCFA" + "z"
+            val event = EpgEvent.create(EventId(1), ChannelId(1), now - 30.minutes, now + 30.minutes,
+                title = text, summary = "x".repeat(1_023) + "\uD83D\uDCFA" + "z",
+                episode = EpgEpisode(null, null, null, null, null, null, null, null, text))
+            val snapshot = SessionObservation.create(epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = listOf(event))))
+            val metadata = sessionPlaybackMetadata(AppPlaybackTarget.Live(ChannelId(1)), snapshot, now,
+                AppTimeshiftState(), true, true, labels)
+            val value = requireNotNull(metadata.subtitle).toString()
+            assertEquals(text.substring(0, text.offsetByCodePoints(0, 256)), value)
+            assertEquals(value, requireNotNull(metadata.extras).getString("at.bernhardberger.tvhplayer.session.episodeOnscreen"))
+            val summary = requireNotNull(metadata.extras).getString("at.bernhardberger.tvhplayer.session.shortDescription")!!
+            assertEquals(1_024, summary.codePointCount(0, summary.length))
+            assertTrue(summary.endsWith("\uD83D\uDCFA"))
+        }
+        val event = EpgEvent.create(EventId(1), ChannelId(1), now, now + 1.minutes,
+            title = "x".repeat(255) + " y", summary = "x".repeat(1_023) + " y")
+        val snapshot = SessionObservation.create(epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = listOf(event))))
+        val metadata = sessionPlaybackMetadata(AppPlaybackTarget.Live(ChannelId(1)), snapshot, now,
+            AppTimeshiftState(), true, true, labels)
+        assertEquals("x".repeat(255), metadata.subtitle)
+        assertEquals("x".repeat(1_023), requireNotNull(metadata.extras).getString("at.bernhardberger.tvhplayer.session.shortDescription"))
+    }
+
+    @Test fun terminalFailureRetainsTheRetiredItemAndSanitizesTheError() {
+        val cases = listOf(
+            Triple(AppPlaybackState.Failed(AppPlaybackFailureReason.RECORDING_READ_FAILED,
+                playerErrorClassification = "private diagnostic"), "Recording can't be read", androidx.media3.common.PlaybackException.ERROR_CODE_IO_UNSPECIFIED),
+            Triple(AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER, targetResult = PlaybackTargetResult.TARGET_UNAVAILABLE),
+                "Channel unavailable", androidx.media3.common.PlaybackException.ERROR_CODE_REMOTE_ERROR),
+            Triple(AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER, subscriptionIssue = SubscriptionIssue.NO_INPUT),
+                "Channel unavailable", androidx.media3.common.PlaybackException.ERROR_CODE_REMOTE_ERROR),
+            Triple(AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER, subscriptionIssue = SubscriptionIssue.NO_INPUT, deviceFault = true),
+                "Channel unavailable", androidx.media3.common.PlaybackException.ERROR_CODE_REMOTE_ERROR),
+            Triple(AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER, deviceFault = true),
+                "Playback failed", androidx.media3.common.PlaybackException.ERROR_CODE_DECODING_FAILED),
+            Triple(AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER),
+                "Playback failed", androidx.media3.common.PlaybackException.ERROR_CODE_REMOTE_ERROR),
+        )
+        exercise {
+            val stops = collectSessionStops()
+            retireWithState(cases.first().first)
+            await { wrapper.playerError != null }
+            assertNull(wrapper.currentMediaItem)
+            val recreated = SessionPlaybackPlayer(runtime, true, labels)
+            val observing = scope.launch { recreated.observe(session.observation) }
+            try {
+                await { recreated.playerError != null }
+                assertNull(recreated.currentMediaItem)
+            } finally {
+                observing.cancel()
+                recreated.close()
+            }
+            wrapper.stop()
+            await { wrapper.playerError == null }
+            settle()
+            assertEquals(AppPlaybackState.Idle, runtime.state.value)
+            assertEquals(1, stops.size)
+            for ((failure, text, code) in cases) {
+                recording()
+                await { wrapper.mediaMetadata.title == "Recording" }
+                var errorEvents = 0
+                val listener = object : Player.Listener {
+                    override fun onPlayerError(error: androidx.media3.common.PlaybackException) { errorEvents++ }
+                }
+                wrapper.addListener(listener)
+                retireWithState(failure)
+                await { wrapper.playerError != null }
+                assertEquals("Recording", wrapper.mediaMetadata.title)
+                assertEquals(text, wrapper.playerError?.message)
+                assertEquals(code, wrapper.playerError?.errorCode)
+                assertNull(wrapper.playerError?.cause)
+                assertTrue(requireNotNull(wrapper.playerError).extras.isEmpty)
+                assertTrue(wrapper.isCommandAvailable(Player.COMMAND_STOP))
+                assertFalse(wrapper.isCommandAvailable(Player.COMMAND_PLAY_PAUSE))
+                assertFalse(wrapper.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM))
+                val error = wrapper.playerError
+                repeat(2) { index ->
+                    // Raw player events force forwarding-state invalidation while failure is unchanged.
+                    player.volume = if (index == 0) 0.5f else 1f
+                    settle()
+                }
+                assertSame(error, wrapper.playerError)
+                assertEquals(1, errorEvents)
+                wrapper.removeListener(listener)
+                for (state in listOf(AppPlaybackState.Recovering(PlaybackRecoveryReason.LIVE_ENDED, 1_000), AppPlaybackState.Buffering)) {
+                    publishState(state)
+                    await { wrapper.playerError == null }
+                    retireWithState(failure)
+                    await { wrapper.playerError != null }
+                }
+                recording()
+                await { wrapper.playerError == null && wrapper.currentMediaItem != null }
+                retireWithState(failure)
+                await { wrapper.playerError != null }
+                val stopsBefore = stops.size
+                wrapper.stop()
+                await { wrapper.currentMediaItem == null && wrapper.playerError == null }
+                settle()
+                assertEquals(AppPlaybackState.Idle, runtime.state.value)
+                assertEquals(stopsBefore + 1, stops.size)
+                val afterStop = SessionPlaybackPlayer(runtime, true, labels)
+                val afterStopObservation = scope.launch { afterStop.observe(session.observation) }
+                try {
+                    settle()
+                    assertNull(afterStop.playerError)
+                    assertNull(afterStop.currentMediaItem)
+                } finally {
+                    afterStopObservation.cancel()
+                    afterStop.close()
+                }
+            }
+            recording()
+            await { wrapper.mediaMetadata.title == "Recording" }
+            retireWithState(AppPlaybackState.Starting)
+            settle()
+            retireWithState(cases.first().first)
+            await { wrapper.playerError != null }
+            assertNull(wrapper.currentMediaItem)
+        }
+    }
+
     @Test fun pausedLiveMetadataUsesTheProgrammeAtPlaybackInsteadOfTheBroadcast() {
         val now = Instant.parse("2026-09-07T20:30:00Z")
         val earlier = EpgEvent.create(id = EventId(1), channelId = ChannelId(1),
@@ -53,9 +301,9 @@ class SessionPlaybackPlayerTest {
         }
         val state = fixture.state.value.toAppPresentation(fixture.playbackPosition(55.minutes)).copy(paused = true)
         assertEquals("Earlier programme", sessionPlaybackMetadata(
-            AppPlaybackTarget.Live(ChannelId(1)), observation, now, state, liveStart = false, programmeWindowEnabled = true).title)
+            AppPlaybackTarget.Live(ChannelId(1)), observation, now, state, liveStart = false, programmeWindowEnabled = true, labels = labels).subtitle)
         assertNull(sessionPlaybackMetadata(AppPlaybackTarget.Live(ChannelId(1)), observation, now,
-            state, liveStart = false, programmeWindowEnabled = false).title)
+            state, liveStart = false, programmeWindowEnabled = false, labels = labels).subtitle)
     }
 
     @Test fun commandsAreAnExactAllowlistForEachTarget() {
@@ -1266,6 +1514,10 @@ class SessionPlaybackPlayerTest {
         assertEquals(Player.Commands.EMPTY, wrapper.availableCommands)
         live(true)
         await { wrapper.mediaMetadata.title == "Channel One" }
+        assertTrue(wrapper.isCurrentMediaItemLive)
+        assertTrue(wrapper.isCurrentMediaItemDynamic)
+        // A finite raw-player duration must never leak into the live session timeline.
+        reportedDuration = 60_000
         assertEquals("Channel One", wrapper.mediaMetadata.artist)
         val now = Clock.System.now()
         val previous = session.observation.value
@@ -1275,20 +1527,34 @@ class SessionPlaybackPlayerTest {
             events = listOf(EpgEvent.create(EventId(1), ChannelId(1), start = now - 1.hours,
                 stop = now + 1.hours, title = "Programme")),
         ))))
-        await { wrapper.mediaMetadata.title == "Programme" }
+        await { wrapper.mediaMetadata.subtitle == "Programme" }
+        assertEquals(androidx.media3.common.C.TIME_UNSET, wrapper.duration)
         // The fake stream has no rendered wall-clock mapping: after Pause it cannot borrow Now.
         wrapper.pause()
-        await { wrapper.mediaMetadata.title == "Channel One" }
+        await { wrapper.mediaMetadata.subtitle == null }
+        assertTrue(wrapper.isCurrentMediaItemLive)
+        assertTrue(wrapper.isCurrentMediaItemDynamic)
         assertFalse(runtime.liveStartUndisturbed.value)
         recording()
         assertFalse(runtime.liveStartUndisturbed.value)
         await { wrapper.mediaMetadata.title == "Recording" }
         assertEquals("Recorded Channel", wrapper.mediaMetadata.subtitle)
-        assertTrue(titles.containsAll(listOf("Channel One", "Programme", "Recording")))
+        assertTrue(titles.containsAll(listOf("Channel One", "Recording")))
         assertNull(wrapper.currentMediaItem?.localConfiguration)
         assertNull(wrapper.mediaMetadata.artworkUri)
-        assertNull(wrapper.mediaMetadata.extras)
-        assertEquals("", wrapper.currentMediaItem?.mediaId)
+        assertEquals("Recording", requireNotNull(wrapper.mediaMetadata.extras).getString("at.bernhardberger.tvhplayer.session.programmeTitle"))
+        assertFalse(wrapper.isCurrentMediaItemLive)
+        assertFalse(wrapper.isCurrentMediaItemDynamic)
+        assertEquals(60_000L, wrapper.duration)
+        val admissionField = AppPlaybackRuntime::class.java.getDeclaredField("_recordingAdmission").apply { isAccessible = true }
+        @Suppress("UNCHECKED_CAST")
+        val admission = admissionField.get(runtime) as kotlinx.coroutines.flow.MutableStateFlow<RecordingPlaybackAdmission?>
+        admission.value = at.bernhardberger.tvheadend.sdk.core.TvheadendTestResultFactory.growingRecordingAdmission(
+            null, RecordingProgressCapability.SUPPORTED)
+        await { wrapper.isCurrentMediaItemDynamic }
+        assertFalse(wrapper.isCurrentMediaItemLive)
+        assertFalse(requireNotNull(wrapper.mediaMetadata.extras).containsKey("at.bernhardberger.tvhplayer.session.nextProgrammeTitle"))
+        assertEquals("", requireNotNull(wrapper.currentMediaItem).mediaId)
         val stop = scope.async { runtime.stop() }
         await { stop.isCompleted && wrapper.availableCommands == Player.Commands.EMPTY }
         assertNull(wrapper.currentMediaItem)
@@ -1404,7 +1670,9 @@ class SessionPlaybackPlayerTest {
         }
         /** Runtime listeners, so tests can drive STATE_READY, which the fake stream never reaches. */
         private val playerListeners = mutableListOf<Player.Listener>()
+        var reportedDuration: Long? = null
         val runtime = AppPlaybackRuntime(object : ExoPlayer by player {
+            override fun getDuration(): Long = reportedDuration ?: player.duration
             override fun addListener(listener: Player.Listener) {
                 playerListeners += listener
                 player.addListener(listener)
@@ -1416,8 +1684,39 @@ class SessionPlaybackPlayerTest {
         }, session, coordinator, settings, profiles, scope, TvheadendAudioOutputProvider(context), focus,
             PlaybackRuntimePolicy.fromPlayerSettings(),
             noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) })
-        val wrapper = SessionPlaybackPlayer(runtime, programmeWindowEnabled = true)
+        val wrapper = SessionPlaybackPlayer(runtime, programmeWindowEnabled = true, labels = labels)
         val observation = scope.launch { wrapper.observe(session.observation) }
+
+        @Suppress("UNCHECKED_CAST")
+        fun retireWithState(state: AppPlaybackState) {
+            AppPlaybackRuntime::class.java.getDeclaredField("activeTargetEpoch").let {
+                it.isAccessible = true
+                it.set(runtime, null)
+            }
+            AppPlaybackRuntime::class.java.getDeclaredField("_activeTarget").let {
+                it.isAccessible = true
+                (it.get(runtime) as kotlinx.coroutines.flow.MutableStateFlow<AppPlaybackTarget?>).value = null
+            }
+            publishState(state)
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        fun publishState(state: AppPlaybackState) {
+            AppPlaybackRuntime::class.java.getDeclaredField("presentation").let {
+                it.isAccessible = true
+                val publisher = it.get(runtime) as PlaybackPresentationPublisher
+                when (state) {
+                    is AppPlaybackState.Failed -> publisher.publishFailed(state)
+                    is AppPlaybackState.Recovering -> publisher.publishRecovering(state.reason, state.retryDelayMillis)
+                    AppPlaybackState.Starting -> publisher.publishStarting()
+                    AppPlaybackState.Buffering -> PlaybackPresentationPublisher::class.java.getDeclaredField("_state").let { field ->
+                        field.isAccessible = true
+                        (field.get(publisher) as kotlinx.coroutines.flow.MutableStateFlow<AppPlaybackState>).value = state
+                    }
+                    else -> error("Unsupported fixture state")
+                }
+            }
+        }
 
         suspend fun live(timeshift: Boolean, firstPicture: Boolean = true) {
             settings.setTimeshiftEnabled(timeshift)

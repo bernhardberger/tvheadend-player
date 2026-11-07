@@ -28,6 +28,10 @@ class ApplianceEntryPolicyTest {
             ApplianceEntryPolicy.ENTRY_ALIAS_CLASS_NAME))
         assertFalse(accepts("android.intent.action.MAIN", player,
             ApplianceEntryPolicy.ENTRY_ALIAS_CLASS_NAME))
+        assertFalse(accepts(at.bernhardberger.tvhplayer.ui.ACTION_SESSION_ACTIVITY, player,
+            "at.bernhardberger.tvhplayer.ui.MainActivity"))
+        assertFalse(accepts(at.bernhardberger.tvhplayer.ui.ACTION_SESSION_ACTIVITY, player,
+            ApplianceEntryPolicy.ENTRY_ALIAS_CLASS_NAME))
         assertFalse(accepts(null, player, ApplianceEntryPolicy.ENTRY_ALIAS_CLASS_NAME))
         assertFalse(accepts(ApplianceEntryPolicy.ACTION_APPLIANCE_ENTRY, null, null))
     }

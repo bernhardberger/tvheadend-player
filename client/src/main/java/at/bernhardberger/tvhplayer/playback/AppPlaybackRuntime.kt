@@ -1880,7 +1880,8 @@ class AppPlaybackRuntime(
      * after it arrived cancels it outright. While it is still the viewer's latest action it
      * stops whatever target is active when it runs (a channel or recording still starting
      * when it arrived included), provided the session is attached and the app is in the
-     * foreground. Registered as pending from arrival until its check (see
+     * foreground. Also clears a terminal failure after its target has retired.
+     * Registered as pending from arrival until its check (see
      * [enterPlayerScreen]). Announces itself on [sessionStops] together with the intent
      * generation current when it arrived.
      */
@@ -1906,7 +1907,8 @@ class AppPlaybackRuntime(
             targetCommands.serialize(onClosed = {}) {
                 val current = synchronized(intentLock) {
                     endPendingLocked()
-                    (isAttached() && foreground && activeTargetEpoch != null &&
+                    (isAttached() && foreground &&
+                        (activeTargetEpoch != null || (_activeTarget.value == null && state.value is AppPlaybackState.Failed)) &&
                         request == playbackRequests.get())
                         .also { if (it) userStopIntent = maxOf(userStopIntent, request) }
                 }

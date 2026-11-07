@@ -103,6 +103,20 @@ fun committedProgrammeEvent(
 ): EpgEvent? = if (hasWindow) windowEvent
     else currentBroadcast.takeIf { nowDescribesPlayback(state, liveStart) }
 
+/** Shared by the info bar and session metadata; a slot never borrows broadcast Next. */
+fun nextProgrammeEvent(
+    windowPosition: Instant?,
+    windowEvent: EpgEvent?,
+    previewing: Boolean,
+    state: AppTimeshiftState,
+    nextAtNow: EpgEvent?,
+    liveStart: Boolean,
+    currentProgramme: EpgEvent?,
+    nextAt: (Instant) -> EpgEvent?,
+): EpgEvent? = if (windowPosition != null) {
+    windowEvent?.let { nextAt(windowPosition) }
+} else nextAtNow.takeIf { currentProgramme != null && !previewing && nowDescribesPlayback(state, liveStart) }
+
 /** Wall-clock identity and bounds only; display fractions and labels belong to the UI. */
 data class ProgrammePositionWindow(
     val event: EpgEvent?,

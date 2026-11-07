@@ -6,6 +6,7 @@ import at.bernhardberger.tvheadend.sdk.core.channelCatalogForDisplay
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 
 import android.app.Activity
+import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -29,6 +30,13 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.session.MediaSession
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.playback.SessionPlaybackPlayer
+import at.bernhardberger.tvhplayer.playback.SessionMetadataLabels
+import at.bernhardberger.tvhplayer.playback.SessionPlaybackErrorKind
+import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ContentGenre
+import at.bernhardberger.tvhplayer.core.visibleChannelNumber
+import at.bernhardberger.tvhplayer.core.programmeCategory
+import at.bernhardberger.tvhplayer.ui.common.programmeCategoryLabelRes
 import kotlinx.coroutines.Job
 import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.R
@@ -206,7 +214,7 @@ class MainActivity : AppCompatActivity() {
     override fun onStart() {
         super.onStart()
         playbackLifecycle.onActivityStarted()
-        val sessionPlayer = SessionPlaybackPlayer(playbackRuntime, BuildConfig.PROGRAMME_WINDOW_B)
+        val sessionPlayer = SessionPlaybackPlayer(playbackRuntime, BuildConfig.PROGRAMME_WINDOW_B, AppSessionMetadataLabels(this))
         mediaSessionLifecycle.start(this, sessionPlayer, lifecycleScope.launch {
             sessionPlayer.observe(tvheadendSession.observation)
         }, sessionPlayer::close)
@@ -309,7 +317,10 @@ internal class ActivityMediaSessionLifecycle {
         check(session == null)
         this.observation = observation
         this.releasePlayer = releasePlayer
-        session = MediaSession.Builder(context, player).setId(sessionId).build()
+        val activity = PendingIntent.getActivity(context, 0,
+            Intent(context, MainActivity::class.java).setAction(ACTION_SESSION_ACTIVITY).setPackage(context.packageName),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        session = MediaSession.Builder(context, player).setId(sessionId).setSessionActivity(activity).build()
     }
 
     fun stop() {
@@ -321,6 +332,24 @@ internal class ActivityMediaSessionLifecycle {
         releasePlayer?.invoke()
         releasePlayer = null
     }
+}
+
+internal const val ACTION_SESSION_ACTIVITY = "at.bernhardberger.tvhplayer.action.SESSION_ACTIVITY"
+
+internal class AppSessionMetadataLabels(private val context: Context) : SessionMetadataLabels {
+    override fun genre(genre: ContentGenre): String? = programmeCategory(genre)?.let {
+        context.getString(programmeCategoryLabelRes(it))
+    }
+
+    override fun channelNumber(channel: Channel): String? = channel.visibleChannelNumber?.let {
+        "$it" + (channel.numberMinor?.takeIf { minor -> minor > 0 }?.let { minor -> ".$minor" } ?: "")
+    }
+
+    override fun error(kind: SessionPlaybackErrorKind): String = context.getString(when (kind) {
+        SessionPlaybackErrorKind.RECORDING_READ -> R.string.session_recording_read_failed
+        SessionPlaybackErrorKind.CHANNEL_UNAVAILABLE -> R.string.session_channel_unavailable
+        SessionPlaybackErrorKind.PLAYBACK -> R.string.session_playback_failed
+    })
 }
 
 internal class MainActivityPlaybackLifecycle(
