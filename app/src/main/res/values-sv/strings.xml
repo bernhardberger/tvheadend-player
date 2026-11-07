@@ -1,4 +1,5 @@
 <resources>
+    <string name="recording_ad_break_skipped">Reklampaus överhoppad</string>
     <string name="player_full_screen">Helskärm</string>
     <string name="stop">Stoppa</string>
     <string name="warm_playback_setting">När du bläddrar</string>
@@ -233,7 +234,6 @@
     <string name="error_prefix">Fel:</string>
     <string name="back">Bakåt</string>
     <string name="show_password">Visa lösenord</string>
-    <string name="hide_password">Dölj lösenord</string>
     <string name="audio_track">Ljudspår</string>
     <string name="audio_track_unselected">Välj ljudspår</string>
     <string name="no_audio_tracks">Inga ljudspår tillgängliga.</string>
@@ -443,6 +443,29 @@
     <string name="recording_marker_previous">Föregående markör</string>
     <string name="recording_marker_start">Inspelningens början</string>
     <string name="recording_marker_next">Nästa markör</string>
+    <string name="recording_mark_ad_break">Reklampaus</string>
+    <string name="recording_mark_ads_end">Reklam slutar</string>
+    <string name="recording_mark_cut">Klipp</string>
+    <string name="recording_mark_cut_ends">Klipp slutar</string>
+    <string name="recording_mark_ad_badge">Rekl.</string>
+    <string name="recording_mark_program_starts">Programmet börjar</string>
+    <string name="recording_mark_program_ends">Programmet slutar</string>
+    <string name="skip_ad_break">Hoppa över reklampaus</string>
+    <string name="settings_section_recording_marks">Inspelningsmarkörer</string>
+    <string name="ad_breaks_setting">Reklampauser</string>
+    <string name="ad_breaks_ask">Fråga</string>
+    <string name="ad_breaks_ask_help">Visar en knapp för att hoppa över ovanpå videon när en paus börjar.</string>
+    <string name="ad_breaks_automatic">Hoppa över automatiskt</string>
+    <string name="ad_breaks_automatic_help">Hoppar över varje paus en gång. Spolar du tillbaka in i den spelas den upp.</string>
+    <string name="ad_breaks_off">Av</string>
+    <string name="ad_breaks_off_help">Reklampauser spelas upp som resten. De visas fortfarande på tidslinjen.</string>
+    <string name="skip_cuts_setting">Hoppa över klipp</string>
+    <string name="skip_cuts_setting_description">Hoppar över delar markerade som klipp. Själva inspelningen kortas inte.</string>
+    <string name="skip_landing_setting">Fortsätt efter hopp</string>
+    <string name="skip_landing_description">Var uppspelningen fortsätter efter ett överhoppat klipp eller en reklampaus.</string>
+    <string name="skip_landing_end">Vid slutet</string>
+    <string name="skip_landing_two_seconds">2 s före slutet</string>
+    <string name="skip_landing_five_seconds">5 s före slutet</string>
     <string name="pause">Pausa</string>
     <string name="seek_back_30">−30 sekunder</string>
     <string name="seek_forward_30">+30 sekunder</string>
@@ -715,4 +738,9 @@
         <item quantity="one">%1$d till schemalagd</item>
         <item quantity="other">%1$d till schemalagda</item>
     </plurals>
+    <string name="appliance_companion">Kompanjonapp för tv-läge</string>
+    <string name="appliance_companion_not_installed">Inte installerad</string>
+    <string name="appliance_companion_description">En valfri kompanjonapp får Tvheadend Player att fungera som tv:ns egen tunerapp. Den öppnar spelaren när tv:n slås på, kan ta över fjärrkontrollsknappar som TV och Guide och ersätta startskärmen. Det är en separat app från projektets GitHub-utgåvor och den uppdaterar sig själv därifrån.</string>
+    <string name="appliance_companion_install_info">Skanna koden eller öppna github.com/bernhardberger/tvheadend-player på en telefon eller dator och följ stegen under ”Appliance companion” för att konfigurera appen.</string>
+    <string name="appliance_companion_qr_description">QR-kod till stegen för att konfigurera kompanjonappen för tv-läge</string>
 </resources>

@@ -7,6 +7,13 @@ import org.junit.Test
 
 class ApplianceEntryPolicyTest {
     @Test
+    fun destinationContractLiteralsArePinned() {
+        assertEquals("at.bernhardberger.tvhplayer.extra.APPLIANCE_DESTINATION", ApplianceEntryPolicy.EXTRA_APPLIANCE_DESTINATION)
+        assertEquals("live", ApplianceEntryPolicy.DESTINATION_LIVE)
+        assertEquals("guide", ApplianceEntryPolicy.DESTINATION_GUIDE)
+    }
+
+    @Test
     fun playerEntryContractLiteralsArePinned() {
         assertEquals("at.bernhardberger.tvhplayer.action.APPLIANCE_ENTRY", ApplianceEntryPolicy.ACTION_APPLIANCE_ENTRY)
         assertEquals("at.bernhardberger.tvhplayer.ui.ApplianceEntryActivity", ApplianceEntryPolicy.ENTRY_ALIAS_CLASS_NAME)
@@ -66,32 +73,16 @@ class ApplianceEntryPolicyTest {
 
     @Test
     fun androidGuideAndCapturedTclTvCodes_areApplianceEntryKeys() {
-        val androidGuideKeyCode = 172
-
-        assertTrue(
-            ApplianceEntryPolicy.isApplianceEntryKey(
-                keyCode = androidGuideKeyCode,
-                androidGuideKeyCode = androidGuideKeyCode,
-            )
-        )
-        assertTrue(
-            ApplianceEntryPolicy.isApplianceEntryKey(
-                keyCode = ApplianceEntryPolicy.TCL_TV_KEY_CODE,
-                androidGuideKeyCode = androidGuideKeyCode,
-            )
-        )
-        assertFalse(
-            ApplianceEntryPolicy.isApplianceEntryKey(
-                keyCode = 4,
-                androidGuideKeyCode = androidGuideKeyCode,
-            )
-        )
+        val functions = CompanionFunctions()
+        assertEquals(CompanionFunction.GUIDE, functions.owner(172))
+        assertEquals(CompanionFunction.LIVE_TV, functions.owner(ApplianceEntryPolicy.TCL_TV_KEY_CODE))
+        assertEquals(null, functions.owner(4))
     }
 
     @Test
     fun applianceAccessibilityDoesNotClaimMediaKeys() {
         for (key in listOf(126, 127, 85, 87, 88)) {
-            assertFalse(ApplianceEntryPolicy.isApplianceEntryKey(key, androidGuideKeyCode = 172))
+            assertEquals(null, CompanionFunctions().owner(key))
         }
     }
 
@@ -102,5 +93,43 @@ class ApplianceEntryPolicyTest {
         assertTrue(gate.shouldLaunch(nowMillis = 10_000))
         assertFalse(gate.shouldLaunch(nowMillis = 10_500))
         assertTrue(gate.shouldLaunch(nowMillis = 11_500))
+    }
+
+    @Test
+    fun launchGate_wakeLiveThenGuideAcceptsBothWithinTheWindow() {
+        val gate = ApplianceEntryLaunchGate(minimumIntervalMillis = 1_500)
+        assertTrue(gate.shouldLaunch(10_000))
+        assertTrue(gate.shouldLaunch(10_100, ApplianceEntryPolicy.DESTINATION_GUIDE, explicit = true))
+    }
+
+    @Test
+    fun launchGate_guideThenLiveAcceptsBothWithinTheWindow() {
+        val gate = ApplianceEntryLaunchGate(minimumIntervalMillis = 1_500)
+        assertTrue(gate.shouldLaunch(10_000, ApplianceEntryPolicy.DESTINATION_GUIDE, explicit = true))
+        assertTrue(gate.shouldLaunch(10_100, ApplianceEntryPolicy.DESTINATION_LIVE, explicit = true))
+    }
+
+    @Test
+    fun launchGate_sameDestinationButtonBurstIsDeduplicated() {
+        val gate = ApplianceEntryLaunchGate(minimumIntervalMillis = 1_500)
+        assertTrue(gate.shouldLaunch(10_000, ApplianceEntryPolicy.DESTINATION_GUIDE, explicit = true))
+        assertFalse(gate.shouldLaunch(10_100, ApplianceEntryPolicy.DESTINATION_GUIDE, explicit = true))
+    }
+
+    @Test
+    fun launchGate_explicitLiveIsNotSwallowedByAutomaticLive() {
+        val gate = ApplianceEntryLaunchGate(minimumIntervalMillis = 1_500)
+        assertTrue(gate.shouldLaunch(10_000))
+        assertTrue(gate.shouldLaunch(10_100, explicit = true))
+        assertFalse(gate.shouldLaunch(10_200, explicit = true))
+        assertFalse(gate.shouldLaunch(10_300))
+    }
+
+    @Test
+    fun launchGate_automaticLiveCannotOverrideExplicitGuideWithinTheWindow() {
+        val gate = ApplianceEntryLaunchGate(minimumIntervalMillis = 1_500)
+        assertTrue(gate.shouldLaunch(10_000, ApplianceEntryPolicy.DESTINATION_GUIDE, explicit = true))
+        assertFalse(gate.shouldLaunch(10_100))
+        assertTrue(gate.shouldLaunch(11_500))
     }
 }

@@ -25,8 +25,6 @@ import kotlinx.coroutines.delay
 
 internal enum class MatchFrameRatePreference { NEVER, SEAMLESS_ONLY, ALWAYS }
 
-internal data class DisplayModeSpec(val width: Int, val height: Int, val refreshRate: Float)
-
 /** The active display mode and what the panel offers at its resolution, already formatted. */
 internal data class DisplayOutput(
     val width: Int,

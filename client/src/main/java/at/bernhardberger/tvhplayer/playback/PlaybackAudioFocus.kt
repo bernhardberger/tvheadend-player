@@ -5,11 +5,14 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.media.AudioAttributes
+import android.media.AudioDeviceCallback
+import android.media.AudioDeviceInfo
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 
 /** Call on the player's application looper. Each request replaces the previous callback. */
 interface PlaybackAudioFocus {
@@ -23,12 +26,24 @@ interface PlaybackAudioFocus {
     }
 }
 
+/** HDMI mode switches can emit NOISY too; only personal listening outputs should pause. */
+internal fun noisyPausesPlayback(outputTypes: Collection<Int>): Boolean = outputTypes.any(::isPersonalAudioOutput)
+
+internal const val PERSONAL_OUTPUT_REMOVAL_WINDOW_MS = 5_000L
+
+internal fun recentPersonalOutputRemoval(lastRemovalMs: Long?, nowMs: Long): Boolean =
+    lastRemovalMs != null && nowMs >= lastRemovalMs &&
+        nowMs - lastRemovalMs <= PERSONAL_OUTPUT_REMOVAL_WINDOW_MS
+
 class AndroidPlaybackAudioFocus(context: Context, looper: Looper) : PlaybackAudioFocus {
     private val context = context.applicationContext
     private val manager = this.context.getSystemService(AudioManager::class.java)
     private val handler = Handler(looper)
     private var request: AudioFocusRequest? = null
     private var receiver: BroadcastReceiver? = null
+    private var deviceCallback: AudioDeviceCallback? = null
+    private val personalOutputIds = mutableSetOf<Int>()
+    private var lastPersonalOutputRemovalMs: Long? = null
     private var held = false
     private var callback: ((AudioInterruption) -> Unit)? = null
 
@@ -80,10 +95,32 @@ class AndroidPlaybackAudioFocus(context: Context, looper: Looper) : PlaybackAudi
 
     private fun registerNoisy(current: AudioFocusRequest) {
         if (receiver != null) return
+        val devices = object : AudioDeviceCallback() {
+            override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>) {
+                if (deviceCallback !== this || request !== current) return
+                addedDevices.filter { it.isSink && isPersonalAudioOutput(it.type) }
+                    .forEach { personalOutputIds.add(it.id) }
+            }
+
+            override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>) {
+                if (deviceCallback !== this || request !== current) return
+                removedDevices.forEach { personalOutputIds.remove(it.id) }
+                if (noisyPausesPlayback(removedDevices.filter { it.isSink }.map { it.type })) {
+                    lastPersonalOutputRemovalMs = SystemClock.elapsedRealtime()
+                }
+            }
+        }
+        deviceCallback = devices
+        manager.registerAudioDeviceCallback(devices, handler)
         val next = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 if (request === current && intent?.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY) {
-                    callback?.invoke(AudioInterruption.NOISY)
+                    val outputTypes = manager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).map { it.type }
+                    // The device-list change can precede its callback queued behind this broadcast.
+                    if (noisyPausesPlayback(outputTypes) || personalOutputIds.isNotEmpty() ||
+                        recentPersonalOutputRemoval(lastPersonalOutputRemovalMs, SystemClock.elapsedRealtime())) {
+                        callback?.invoke(AudioInterruption.NOISY)
+                    }
                 }
             }
         }
@@ -97,6 +134,10 @@ class AndroidPlaybackAudioFocus(context: Context, looper: Looper) : PlaybackAudi
     }
 
     private fun unregisterNoisy() {
+        deviceCallback?.let(manager::unregisterAudioDeviceCallback)
+        deviceCallback = null
+        personalOutputIds.clear()
+        lastPersonalOutputRemovalMs = null
         receiver?.let(context::unregisterReceiver)
         receiver = null
     }

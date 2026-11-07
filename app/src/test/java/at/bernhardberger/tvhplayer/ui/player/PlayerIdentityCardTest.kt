@@ -282,7 +282,7 @@ class PlayerIdentityCardTest {
         val navigation = RecordingMarkerNavigation()
         compose.setContent {
             TVHeadendPlayerTheme {
-                RecordingChromeFixture(markers = listOf(0L, 900_000L, 2_700_000L), markerNavigation = navigation, onInfo = { infos++ })
+                RecordingChromeFixture(marks = chapterMarks(900_000L, 2_700_000L), markerNavigation = navigation, onInfo = { infos++ })
             }
         }
         compose.mainClock.autoAdvance = false

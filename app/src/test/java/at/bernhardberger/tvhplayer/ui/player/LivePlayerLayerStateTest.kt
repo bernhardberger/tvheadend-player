@@ -18,6 +18,38 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class LivePlayerLayerStateTest {
+    @Test fun companionScheduleTogglePreparesOnlyOnOpenAndPreservesTheReturnTarget() = runTest {
+        val state = LivePlayerLayerState(this, 5_000L)
+        state.showControls()
+        state.onActionFocused("player-settings")
+        var preparations = 0
+        state.toggleSchedule { preparations++ }
+        assertTrue(state.scheduleOpen)
+        assertNull(state.core.revealingKeyCode)
+        state.toggleSchedule { preparations++ }
+        assertFalse(state.scheduleOpen)
+        assertEquals(1, preparations)
+        assertEquals("player-settings", state.core.restoreControl)
+        state.dispose()
+    }
+
+    @Test fun companionScheduleToggleKeepsOptionsRecoveryErrorsAndConfirmationUntouched() = runTest {
+        val state = LivePlayerLayerState(this, 5_000L)
+        var preparations = 0
+        state.core.showOptionsPage(PlaybackOptionsPage.AUDIO)
+        state.toggleSchedule { preparations++ }
+        assertFalse(state.scheduleOpen)
+        assertEquals(PlaybackOptionsPage.AUDIO, state.core.optionsPage)
+        state.core.closeOptions()
+        for (layer in listOf(PlayerForegroundLayer.RECOVERY, PlayerForegroundLayer.TERMINAL_ERROR,
+                PlayerForegroundLayer.CONFIRMATION)) {
+            state.toggleSchedule(layer) { preparations++ }
+            assertFalse(state.scheduleOpen)
+        }
+        assertEquals(0, preparations)
+        state.dispose()
+    }
+
     @Test
     fun quickZapKeepsTheTrayUntilExplicitDismissalAndDoesNotAutoHide() = runTest {
         val state = LivePlayerLayerState(this, 5_000L)

@@ -842,7 +842,8 @@ class GuideRealisticSceneTest {
         player = ExoPlayer.Builder(context()).build()
         val coordinator = createTvheadendPlaybackCoordinator(player).also { if (playerJourney) it.launchIn(runtimeScope) }
         val runtime = AppPlaybackRuntime(player, session, coordinator, settings, profiles,
-            runtimeScope, TvheadendAudioOutputProvider(context()), PlaybackAudioFocus.None, PlaybackRuntimePolicy.fromPlayerSettings())
+            runtimeScope, TvheadendAudioOutputProvider(context()), PlaybackAudioFocus.None, PlaybackRuntimePolicy.fromPlayerSettings(),
+            noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) })
         val video = if (playerJourney) at.bernhardberger.tvhplayer.viewmodels.VideoPlayerViewModel(runtime, session)
             .also { models.put("video", it) } else null
         val selection = ChannelSelectionStore()

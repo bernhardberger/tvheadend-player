@@ -12,16 +12,20 @@ import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
 import android.provider.Settings
-import android.view.accessibility.AccessibilityManager
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService
 import at.bernhardberger.tvhplayer.appliance.update.CompanionUpdater
@@ -29,11 +33,13 @@ import at.bernhardberger.tvhplayer.appliance.update.UpdateResult
 import at.bernhardberger.tvhplayer.appliance.update.UpdateScreenState
 import at.bernhardberger.tvhplayer.appliance.update.UpdateStore
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import kotlinx.coroutines.launch
 
 class CompanionActivity : ComponentActivity() {
     private var playerVersion by mutableStateOf<String?>(null)
     private var systemHome by mutableStateOf<ComponentName?>(null)
-    private var accessibilityEnabled by mutableStateOf(false)
+    private var accessibilityStatus by mutableStateOf(CompanionServiceStatus.OFF)
+    private var functions by mutableStateOf(CompanionFunctions())
     private var installAllowed by mutableStateOf(false)
     private var defaultHome by mutableStateOf(false)
     private val updates by lazy { UpdateStore(this) }
@@ -54,18 +60,36 @@ class CompanionActivity : ComponentActivity() {
         updates.preferences.registerOnSharedPreferenceChangeListener(updateListener)
         refreshUpdates()
         refreshStatus()
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                CompanionServiceState.connected.collect { connected ->
+                    accessibilityStatus = companionServiceStatus(isAccessibilityServiceEnabled(), connected)
+                }
+            }
+        }
         setContent {
             TVHeadendPlayerTheme {
-                CompanionScreen(
+                val capture by CompanionServiceState.captureState.collectAsState()
+                // The service stores a captured button; the rows read it from the store again.
+                LaunchedEffect(capture) {
+                    if (capture is CaptureState.Captured) functions = FunctionStore(this@CompanionActivity).functions
+                }
+                CompanionContent(
                     state = CompanionScreenState(
                         playerVersion = playerVersion,
-                        accessibilityEnabled = accessibilityEnabled,
+                        accessibilityStatus = accessibilityStatus,
                         installAllowed = installAllowed,
                         defaultHome = defaultHome,
                         hasSystemHome = systemHome != null,
                         update = updateState,
+                        functions = functions,
                     ),
+                    capture = capture,
                     onRow = ::onRow,
+                    onStartCapture = CompanionServiceState::startCapture,
+                    onCancelCapture = CompanionServiceState::cancelCapture,
+                    onDismissCapture = CompanionServiceState::dismissCapture,
+                    onAssign = ::assign,
                     modifier = Modifier
                         .fillMaxSize()
                         .background(MaterialTheme.colorScheme.background),
@@ -100,6 +124,11 @@ class CompanionActivity : ComponentActivity() {
     override fun onDestroy() {
         updates.preferences.unregisterOnSharedPreferenceChangeListener(updateListener)
         super.onDestroy()
+    }
+
+    override fun onStop() {
+        CompanionServiceState.cancelCapture()
+        super.onStop()
     }
 
     private fun refreshUpdates() {
@@ -158,7 +187,14 @@ class CompanionActivity : ComponentActivity() {
         intents.any { openScreen(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
     }
 
+    private fun assign(function: CompanionFunction, binding: ButtonBinding): FunctionChange {
+        val change = FunctionStore(this).assign(function, binding)
+        functions = change.functions
+        return change
+    }
+
     private fun onRow(row: CompanionRow) {
+        refreshStatus()
         when (row) {
             CompanionRow.PLAYER ->
                 if (playerVersion != null) openPlayer()
@@ -167,8 +203,10 @@ class CompanionActivity : ComponentActivity() {
                     Intent(Intent.ACTION_VIEW,
                         Uri.parse("https://play.google.com/store/apps/details?id=${BuildConfig.PLAYER_PACKAGE}")),
                 )
-            CompanionRow.ACCESSIBILITY -> openFirst(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS),
-                Intent(Settings.ACTION_SETTINGS))
+            CompanionRow.ACCESSIBILITY -> openFirst(
+                Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS), Intent(Settings.ACTION_SETTINGS))
+            CompanionRow.STARTUP -> FunctionStore(this).setStartup(!functions.startup).also { refreshStatus() }
+            CompanionRow.LIVE_TV, CompanionRow.GUIDE -> Unit // Opened as pages by the screen.
             CompanionRow.HOME -> openFirst(Intent(Settings.ACTION_HOME_SETTINGS), Intent(Settings.ACTION_SETTINGS))
             CompanionRow.SYSTEM_HOME -> systemHome?.let { component ->
                 openScreen(homeIntent().setComponent(component).addFlags(
@@ -183,13 +221,11 @@ class CompanionActivity : ComponentActivity() {
         }
     }
 
-    private fun isAccessibilityServiceEnabled(): Boolean =
-        getSystemService(AccessibilityManager::class.java)
-            .getEnabledAccessibilityServiceList(android.accessibilityservice.AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
-            .any {
-                it.resolveInfo.serviceInfo.packageName == packageName &&
-                    it.resolveInfo.serviceInfo.name == ApplianceEntryAccessibilityService::class.java.name
-            }
+    private fun isAccessibilityServiceEnabled(): Boolean {
+        val component = ComponentName(this, ApplianceEntryAccessibilityService::class.java)
+        return Settings.Secure.getString(contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
+            .orEmpty().split(':').any { ComponentName.unflattenFromString(it) == component }
+    }
 
     @Suppress("DEPRECATION") // Integer flags also support the minimum API 28.
     private fun refreshStatus() {
@@ -208,7 +244,8 @@ class CompanionActivity : ComponentActivity() {
                 it.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM != 0
             }.thenBy { it.packageName }.thenBy { it.name })
             .firstOrNull()?.let { ComponentName(it.packageName, it.name) }
-        accessibilityEnabled = isAccessibilityServiceEnabled()
+        accessibilityStatus = companionServiceStatus(isAccessibilityServiceEnabled(), CompanionServiceState.connected.value)
+        functions = FunctionStore(this).functions
         installAllowed = packageManager.canRequestPackageInstalls()
         defaultHome = packageManager.resolveActivity(home, PackageManager.MATCH_DEFAULT_ONLY)
             ?.activityInfo?.packageName == packageName

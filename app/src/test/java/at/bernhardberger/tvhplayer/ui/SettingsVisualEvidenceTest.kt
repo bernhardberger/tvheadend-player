@@ -136,7 +136,7 @@ class SettingsVisualEvidenceTest {
                         SideRail(currentRoute = AppDestination.SETTINGS,
                             onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                             SettingsScreenNavigation(navigation, listOf(
-                                settingsRootLevel(companionInstalled = false,
+                                settingsRootLevel(
                                     connectionStatus = resources.getString(at.bernhardberger.tvhplayer.R.string.error_101_title))) +
                                 settingsGeneralLevels(UiSettings(), AppLanguage.SYSTEM, CacheStatistics.EMPTY, CacheClearState.IDLE, {}, {}),
                                 initialFocusEnabled = !drawerActive, contentPadding = padding)
@@ -156,6 +156,44 @@ class SettingsVisualEvidenceTest {
         capture("$prefix-general")
         press(Key.DirectionRight)
         capture("$prefix-language")
+    }
+
+    @Category(VisualCapture::class)
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi") fun applianceCompanionMissing() = captureAppliance(false)
+
+    @Category(VisualCapture::class)
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi") fun applianceCompanionInstalled() = captureAppliance(true)
+
+    private fun captureAppliance(installed: Boolean) {
+        compose.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(1f, 1f)) {
+                TVHeadendPlayerTheme {
+                    view = LocalView.current
+                    val navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.APPLIANCE.name)
+                    Box(Modifier.fillMaxSize().background(Color.Black)) {
+                        DebugVideoBackdrop(true, Modifier.fillMaxSize())
+                        WarmPlaybackScrim()
+                        SideRail(currentRoute = AppDestination.SETTINGS, onRootBack = {}, onNavigate = {}) { padding, active ->
+                            SettingsScreenNavigation(navigation,
+                                listOf(settingsRootLevel(), settingsApplianceLevel(false, {}, installed)),
+                                initialFocusEnabled = !active, contentPadding = padding)
+                        }
+                    }
+                }
+            }
+        }
+        compose.runOnIdle {
+            assertEquals(960, view.width)
+            assertEquals(540, view.height)
+        }
+        val state = if (installed) "installed" else "missing"
+        capture("en-font1.0-appliance-$state-root")
+        press(Key.DirectionCenter)
+        capture("en-font1.0-appliance-$state", reader = !installed)
+        if (!installed) {
+            repeat(14) { press(Key.DirectionDown) }
+            capture("en-font1.0-appliance-missing-qr", reader = true)
+        }
     }
 
     private fun captureStates(locale: String, fontScale: Float) {
@@ -181,9 +219,9 @@ class SettingsVisualEvidenceTest {
                             onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                             SettingsScreenNavigation(navigation,
                                 // The status page opens only while a retry can fix the connection.
-                                listOf(settingsRootLevel(companionInstalled = true,
+                                listOf(settingsRootLevel(
                                     connectionStatus = resources.getString(at.bernhardberger.tvhplayer.R.string.error_101_title)),
-                                    settingsApplianceLevel(false, { setupCalls++ })) +
+                                    settingsApplianceLevel(false, { setupCalls++ }, companionInstalled = true)) +
                                     fixtureConnectionLevels(resources.getString(at.bernhardberger.tvhplayer.R.string.error_101_title),
                                         showRetry = true) +
                                     settingsGeneralLevels(UiSettings(), AppLanguage.SYSTEM, CacheStatistics.EMPTY, cacheState,
@@ -292,7 +330,7 @@ class SettingsVisualEvidenceTest {
                     WarmPlaybackScrim() // This evidence set explicitly models warm playback.
                     SideRail(currentRoute = AppDestination.SETTINGS,
                         onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
-                        SettingsScreenNavigation(navigation, listOf(settingsRootLevel(companionInstalled = false, connectionStatus = "Connected"),
+                        SettingsScreenNavigation(navigation, listOf(settingsRootLevel(connectionStatus = "Connected"),
                             settingsPlayerLevel(ui, {}), settingsKeepChannelLevel(ui.keepChannelMinutes) {},
                             settingsStreamProfileLevel(ui) {},
                             settingsStartupBufferLevel(ui.startupBufferMillis, ui.startupBufferLearnedMillis) {},
@@ -305,7 +343,7 @@ class SettingsVisualEvidenceTest {
         }
         press(Key.DirectionCenter)
         capture("en-font1.0-playback")
-        repeat(4) { press(Key.DirectionDown) }
+        repeat(7) { press(Key.DirectionDown) } // Past the Recording marks group to Profile.
         press(Key.DirectionCenter)
         compose.onNode(isFocused() and hasText("Direct streaming")).assertIsSelected()
         capture("en-font1.0-stream-profile")
@@ -317,6 +355,36 @@ class SettingsVisualEvidenceTest {
         press(Key.DirectionCenter)
         compose.onNodeWithText("Audio language").assertIsFocused()
         capture("en-font1.0-audio-subtitles")
+    }
+
+    /** Playback with the Recording marks group focused on Ad breaks, then the Ad breaks choice. */
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi") fun englishRecordingMarksPages() {
+        val ui = connectedPlaybackUi()
+        lateinit var navigation: DepthNavigationState
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                view = LocalView.current
+                navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.PLAYER.name)
+                Box(Modifier.fillMaxSize().background(Color.Black)) {
+                    DebugVideoBackdrop(true, Modifier.fillMaxSize())
+                    WarmPlaybackScrim()
+                    SideRail(currentRoute = AppDestination.SETTINGS,
+                        onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
+                        SettingsScreenNavigation(navigation, listOf(settingsRootLevel(connectionStatus = "Connected"),
+                            settingsPlayerLevel(ui, {}), settingsAdBreaksLevel(ui.adBreakMode) {},
+                            settingsSkipLandingLevel(ui.skipLanding) {}),
+                            initialFocusEnabled = !drawerActive, contentPadding = padding)
+                    }
+                }
+            }
+        }
+        press(Key.DirectionCenter)
+        repeat(4) { press(Key.DirectionDown) }
+        compose.onNode(isFocused() and hasText("Ad breaks")).assertExists()
+        capture("en-font1.0-playback-recording-marks")
+        press(Key.DirectionCenter)
+        compose.onNode(isFocused() and hasText("Ask")).assertIsSelected()
+        capture("en-font1.0-ad-breaks")
     }
 
     /** README scene: Playback settings over the warm Ridge Light picture, 1920×1080. */
@@ -332,7 +400,7 @@ class SettingsVisualEvidenceTest {
                     WarmPlaybackScrim()
                     SideRail(currentRoute = AppDestination.SETTINGS,
                         onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
-                        SettingsScreenNavigation(navigation, listOf(settingsRootLevel(companionInstalled = false, connectionStatus = "Connected"),
+                        SettingsScreenNavigation(navigation, listOf(settingsRootLevel(connectionStatus = "Connected"),
                             settingsPlayerLevel(ui, {})),
                             initialFocusEnabled = !drawerActive, contentPadding = padding)
                     }
@@ -388,9 +456,10 @@ class SettingsVisualEvidenceTest {
         tops.zip(rows).forEach { (top, row) -> assertEquals(top, row.top, .5f) }
     }
 
-    private fun capture(name: String, middleFocus: Boolean = false) {
-        val activeColumn = compose.onNodeWithTag("depth-active").fetchSemanticsNode().boundsInRoot
-        val rows = activeRows()
+    private fun capture(name: String, middleFocus: Boolean = false, reader: Boolean = false) {
+        val activeColumn = (if (reader) compose.onNode(isFocused()) else compose.onNodeWithTag("depth-active"))
+            .fetchSemanticsNode().boundsInRoot
+        val rows = if (reader) emptyList() else activeRows()
         lateinit var bitmap: Bitmap
         compose.runOnIdle {
             bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)

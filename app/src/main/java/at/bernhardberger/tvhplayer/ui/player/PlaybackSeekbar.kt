@@ -55,6 +55,8 @@ fun PlaybackSeekbar(
     feedbackIsError: Boolean = feedback != null,
     collapsed: Boolean = false,
     recordingMarkers: List<Long> = emptyList(),
+    /** The recording's marks on the bar; see [TimelineMarkLayer]. */
+    recordingMarks: TimelineMarks? = null,
     onOpenRecordingMarkers: (() -> Unit)? = null,
     trackOverlay: (@Composable BoxScope.() -> Unit)? = null,
     /** Identity of what the bar measures; see [PlayerTimelineBlock]. */
@@ -266,7 +268,7 @@ fun PlaybackSeekbar(
             kind = kind,
             fillColor = if (schedule != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.tertiary,
             selectedMarkerFraction = markerPreview?.let { range.copy(positionMs = it).displayProgress },
-            markerFractions = recordingMarkers.map { it.toFloat() / range.displayEndMs },
+            marks = recordingMarks,
             collapsed = collapsed,
             tone = when {
                 focused && !collapsed -> PlayerTimelineTone.ACTIVE

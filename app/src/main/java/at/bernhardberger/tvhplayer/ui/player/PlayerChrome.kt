@@ -31,7 +31,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.Icon
 import androidx.tv.material3.Text
+import androidx.compose.ui.res.painterResource
+import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
@@ -41,7 +44,6 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
 import at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
-import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.core.PlayerStateCell
 import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
 import at.bernhardberger.tvhplayer.ui.TvOverlayFooterGradientRunout
@@ -81,8 +83,8 @@ internal fun PlayerChrome(
     onCommitSeek: () -> Unit = {},
     onPauseUnavailable: () -> Unit = {},
     onActionFocused: (String) -> Unit = {},
-    /** Opens the Audio or Subtitles quick list from its button, shown per [PlayerChromeActions.tracks]. */
-    onTrackList: (PlaybackOptionsPage) -> Unit = {},
+    /** Opens the Audio list from its button, shown per [PlayerChromeActions.tracks]. */
+    onAudioList: () -> Unit = {},
     onSchedule: (() -> Unit)? = null,
     scheduleAvailable: Boolean = true,
     /** Any control that takes focus, the timeline included: where focus returns after number entry. */
@@ -151,7 +153,7 @@ internal fun PlayerChrome(
                     lastLineEndReserve = lastLineEndReserve,
                 ) { faded ->
                     ProgrammeArtworkTile(content.artwork, content.picon, content.channelId,
-                        content.info.channelNumber, faded)
+                        content.info.channelNumber, faded, content.withoutChannel)
                 }
                 timelineRow()
             }
@@ -174,7 +176,7 @@ internal fun PlayerChrome(
                 onSchedule = onSchedule,
                 scheduleAvailable = scheduleAvailable,
                 onOptions = onOptions,
-                onTrackList = onTrackList,
+                onAudioList = onAudioList,
                 onInteraction = onInteraction,
                 onCommitSeek = onCommitSeek,
                 onPauseUnavailable = onPauseUnavailable,
@@ -325,6 +327,7 @@ private fun ProgrammeArtworkTile(
     channelId: ChannelId?,
     channelNumber: String,
     modifier: Modifier,
+    withoutChannel: Boolean,
 ) {
     val id = artwork
     val currentSession = LocalArtworkContext.current.currentSession
@@ -332,7 +335,7 @@ private fun ProgrammeArtworkTile(
     Box(modifier.size(ArtworkTileWidth, ArtworkTileHeight).clip(ArtworkTileShape)
         .focusProperties { canFocus = false }.testTag("player-info-artwork-tile")) {
         // Under the picture too, so loading shows the same channel ground as a missing picture.
-        ChannelArtworkFallback(picon, channelId, channelNumber)
+        if (withoutChannel) RecordingArtworkFallback() else ChannelArtworkFallback(picon, channelId, channelNumber)
         if (id != null && currentSession != null && !failed) {
             AsyncImage(AppArtworkSource(currentSession, id), null,
                 Modifier.fillMaxSize().testTag("player-info-artwork"), contentScale = ContentScale.Crop, onError = { failed = true })
@@ -357,6 +360,17 @@ private fun ChannelArtworkFallback(
             PiconBox(null, Modifier.padding(horizontal = 24.dp, vertical = 16.dp), ground = null)
         } else Text(channelNumber, style = MaterialTheme.typography.headlineMedium, maxLines = 1,
             color = MaterialTheme.colorScheme.onSurface)
+    }
+}
+
+/** A recording with no channel in the artwork's place: the recordings symbol, dimmed, on the plain ground. */
+@Composable
+private fun RecordingArtworkFallback() {
+    Box(Modifier.fillMaxSize().background(channelFallbackGround(null, null)).testTag("player-info-artwork-fallback"),
+        contentAlignment = Alignment.Center) {
+        Icon(painterResource(R.drawable.ic_video_library), contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextTertiaryAlpha),
+            modifier = Modifier.size(48.dp).testTag("player-info-recording-symbol"))
     }
 }
 

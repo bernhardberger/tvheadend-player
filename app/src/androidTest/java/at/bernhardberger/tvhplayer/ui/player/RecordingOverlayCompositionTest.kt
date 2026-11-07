@@ -32,8 +32,6 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onAllNodesWithTag
-import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
@@ -93,10 +91,12 @@ class RecordingOverlayCompositionTest {
         fun track() = composeRule.onNodeWithTag("player-timeline-track", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val ordinaryTrack = track()
         val ordinaryActions = bounds("player-actions")
+        composeRule.onNodeWithTag("recording-skip").assertDoesNotExist()
         captureMarkerState("markers-absent-en-1.5x.png")
+        composeRule.onNodeWithTag("recording-marks-track", useUnmergedTree = true).assertDoesNotExist()
         composeRule.runOnIdle { markers.value = listOf(10_000L, 60_000L, 100_000L) }
         assertEquals(ordinaryTrack, track())
-        composeRule.onAllNodesWithTag("recording-marker-tick", useUnmergedTree = true).assertCountEquals(3)
+        composeRule.onNodeWithTag("recording-marks-track", useUnmergedTree = true).assertExists()
         composeRule.onNodeWithTag("player-pause").performKeyInput { pressKey(Key.DirectionUp) }
         composeRule.onNodeWithTag("player-seekbar").assertIsFocused()
         captureMarkerState("markers-ticks-en-1.5x.png")
@@ -112,6 +112,8 @@ class RecordingOverlayCompositionTest {
         dispatch(up, android.view.KeyEvent.ACTION_DOWN, 1)
         dispatch(up, android.view.KeyEvent.ACTION_UP)
         composeRule.onNodeWithTag("recording-marker-target").assertIsFocused()
+        composeRule.onNodeWithText("0:10").assertIsDisplayed() // nearest is before 0:30, not the next mark
+        composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
         composeRule.onNodeWithText("1:00").assertIsDisplayed()
         val selectedLabel = bounds("recording-marker-target")
         assertTrue(kotlin.math.abs(selectedLabel.center.x - ordinaryTrack.center.x) < 2f)
@@ -138,7 +140,8 @@ class RecordingOverlayCompositionTest {
         dispatch(enter, android.view.KeyEvent.ACTION_UP)
         assertEquals(listOf(60_000L), seeks)
         assertEquals(0, toggles)
-        for (close in listOf(android.view.KeyEvent.KEYCODE_BACK, android.view.KeyEvent.KEYCODE_DPAD_DOWN)) {
+        for (close in listOf(android.view.KeyEvent.KEYCODE_BACK, android.view.KeyEvent.KEYCODE_DPAD_DOWN,
+            android.view.KeyEvent.KEYCODE_DPAD_UP)) {
             composeRule.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
             composeRule.onNodeWithTag("recording-marker-target").assertIsFocused()
             composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
@@ -148,6 +151,7 @@ class RecordingOverlayCompositionTest {
             dispatch(close, android.view.KeyEvent.ACTION_UP)
             composeRule.onNodeWithTag("player-seekbar").assertIsFocused()
             composeRule.onNodeWithTag("recording-marker-overlay").assertDoesNotExist()
+            composeRule.onNodeWithTag("recording-skip").assertDoesNotExist()
         }
         assertEquals(listOf(60_000L), seeks)
         assertEquals(0, ancestorBacks)
@@ -181,11 +185,11 @@ class RecordingOverlayCompositionTest {
     }
 
     @Test
-    fun markerEntryPrefersStrictlyNextThenFallsBackToLast() {
+    fun markerEntryPrefersNearestWithEarlierTiesAndIncludesExactPositions() {
         val navigation = RecordingMarkerNavigation()
         val markers = listOf(0L, 10_000L, 60_000L)
-        for ((position, expected) in listOf(0L to 10_000L, 11_000L to 60_000L,
-            10_000L to 60_000L, 60_000L to 60_000L, 90_000L to 60_000L)) {
+        for ((position, expected) in listOf(-1L to 0L, 0L to 0L, 11_000L to 10_000L,
+            40_000L to 60_000L, 35_000L to 10_000L, 10_000L to 10_000L, 60_000L to 60_000L, 90_000L to 60_000L)) {
             navigation.show(markers, position)
             assertEquals(expected, navigation.selectedMs)
             navigation.dismiss()
@@ -233,7 +237,7 @@ class RecordingOverlayCompositionTest {
         }
         composeRule.onRoot().performKeyInput { pressKey(Key.DirectionUp); pressKey(Key.DirectionUp) }
         composeRule.onNodeWithTag("recording-marker-target").assertIsFocused()
-        composeRule.onNodeWithText("1:40").assertIsDisplayed()
+        composeRule.onNodeWithText("1:00").assertIsDisplayed()
         val overlay = bounds("recording-marker-target")
         val root = composeRule.onRoot().fetchSemanticsNode().boundsInRoot
         assertTrue(overlay.left >= root.left && overlay.right <= root.right && overlay.top >= root.top)

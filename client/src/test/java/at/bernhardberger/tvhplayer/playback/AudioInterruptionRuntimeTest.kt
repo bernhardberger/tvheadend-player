@@ -45,7 +45,9 @@ import java.util.concurrent.CountDownLatch
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestCoroutineScheduler
 import org.junit.Assert.*
@@ -58,6 +60,94 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class)
 class AudioInterruptionRuntimeTest {
+    @Test fun personalOutputDisconnectRestoresPassthroughWithoutResumingNoisyPausedPlayback() = exercise {
+        live(timeshift = true)
+        outputs.personalOutputConnected.value = true
+        await { !output.isPassthroughEnabled }
+        val target = runtime.activeTarget.value
+        focus.send(AudioInterruption.NOISY)
+        await { !player.playWhenReady }
+        outputs.personalOutputConnected.value = false
+        await { output.isPassthroughEnabled }
+        settle()
+        assertFalse(player.playWhenReady)
+        assertEquals(target, runtime.activeTarget.value)
+        assertEquals(1, connection.subscribeCount)
+        assertTrue(settings.playerSettings.first().audioPassthroughEnabled)
+    }
+
+    @Test fun personalOutputChangesDoNotReapplyStoredTrackPreferences() = exercise {
+        live(timeshift = false)
+        // Wait for a known settings application before changing a session-local preference.
+        settings.setSubtitleLanguage("de")
+        await { player.trackSelectionParameters.preferredTextLanguages.toList() == listOf("de") }
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .setPreferredTextLanguages("fr").build()
+        outputs.personalOutputConnected.value = true
+        await { !output.isPassthroughEnabled }
+        assertEquals(listOf("fr"), player.trackSelectionParameters.preferredTextLanguages.toList())
+        outputs.personalOutputConnected.value = false
+        await { output.isPassthroughEnabled }
+        assertEquals(listOf("fr"), player.trackSelectionParameters.preferredTextLanguages.toList())
+    }
+
+    @Test fun headphonesSwitchOnlyAudioThroughTheCommandSerializerAndDisconnectRestoresTheSetting() = exercise {
+        live(timeshift = false)
+        val target = runtime.activeTarget.value
+        val item = player.currentMediaItem
+        assertTrue(output.isPassthroughEnabled)
+        val release = CompletableDeferred<Unit>()
+        val entered = CompletableDeferred<Unit>()
+        val blocker = scope.launch { commands.serialize(onClosed = {}) { entered.complete(Unit); release.await() } }
+        try {
+            entered.await()
+            outputs.personalOutputConnected.value = true
+            settle()
+            assertTrue("Output switch must wait for the target command", output.isPassthroughEnabled)
+        } finally {
+            release.complete(Unit)
+            blocker.join()
+        }
+        await { !output.isPassthroughEnabled }
+        assertTrue(settings.playerSettings.first().audioPassthroughEnabled)
+        assertEquals(target, runtime.activeTarget.value)
+        assertSame(item, player.currentMediaItem)
+        assertTrue(player.playWhenReady)
+        outputs.personalOutputConnected.value = false
+        await { output.isPassthroughEnabled }
+        assertEquals(1, connection.subscribeCount)
+        assertFalse(runtime.audioPassthroughChangeFailed.value)
+        runtime.detach()
+        assertEquals(1, outputs.closes)
+    }
+
+    @Test fun settingsChangesWithHeadphonesKeepPcmAndQueuedSwitchReadsLatestOutputs() = exercise {
+        live(timeshift = false)
+        outputs.personalOutputConnected.value = true
+        await { !output.isPassthroughEnabled }
+        settings.setAudioPassthroughEnabled(false)
+        settle()
+        settings.setAudioPassthroughEnabled(true)
+        settle()
+        assertFalse(output.isPassthroughEnabled)
+        val release = CompletableDeferred<Unit>()
+        val entered = CompletableDeferred<Unit>()
+        val blocker = scope.launch { commands.serialize(onClosed = {}) { entered.complete(Unit); release.await() } }
+        try {
+            entered.await()
+            outputs.personalOutputConnected.value = false
+            settle()
+            outputs.personalOutputConnected.value = true
+        } finally {
+            release.complete(Unit)
+            blocker.join()
+        }
+        settle()
+        assertFalse(output.isPassthroughEnabled)
+        assertTrue(settings.playerSettings.first().audioPassthroughEnabled)
+        assertEquals(1, connection.subscribeCount)
+    }
+
     @Test fun timeshiftTransientPausesServerOnceAndGainResumesWithoutRetune() = exercise {
         live(timeshift = true)
         assertEquals(1, focus.requests.size)
@@ -2548,9 +2638,16 @@ class AudioInterruptionRuntimeTest {
         fun send(event: AudioInterruption) { callback?.invoke(event) }
     }
 
+    private class FakeOutputs : PlaybackAudioOutputs {
+        override val personalOutputConnected = MutableStateFlow(false)
+        var closes = 0
+        override fun close() { closes++ }
+    }
+
     private class Fixture(val scope: CoroutineScope, granted: Boolean, private val scheduler: TestCoroutineScheduler?) {
         private val context = ApplicationProvider.getApplicationContext<Application>()
         val focus = FakeFocus(granted)
+        val outputs = FakeOutputs()
         val connection = ScriptedSubscriptionConnection().apply {
             scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 120)))
         }
@@ -2683,7 +2780,8 @@ class AudioInterruptionRuntimeTest {
         val runtime = AppPlaybackRuntime(runtimePlayer, runtimeSession, coordinator, settings, profiles, scope, output, focus,
             PlaybackRuntimePolicy.fromPlayerSettings(),
             elapsedRealtime = { scheduler?.currentTime ?: android.os.SystemClock.elapsedRealtime() },
-            startupBuffer = startupBuffer)
+            startupBuffer = startupBuffer, audioOutputs = outputs,
+            noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) })
         val commands: PlaybackTargetCommandSerialization get() = AppPlaybackRuntime::class.java.getDeclaredField("targetCommands").let {
             it.isAccessible = true; it.get(runtime) as PlaybackTargetCommandSerialization
         }

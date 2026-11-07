@@ -1,4 +1,5 @@
 <resources>
+    <string name="recording_ad_break_skipped">Reklamepause hoppet over</string>
     <string name="player_full_screen">Fullskjerm</string>
     <string name="stop">Stopp</string>
     <string name="warm_playback_setting">Mens du blar</string>
@@ -233,7 +234,6 @@
     <string name="error_prefix">Feil:</string>
     <string name="back">Tilbake</string>
     <string name="show_password">Vis passord</string>
-    <string name="hide_password">Skjul passord</string>
     <string name="audio_track">Lydspor</string>
     <string name="audio_track_unselected">Velg lydspor</string>
     <string name="no_audio_tracks">Ingen lydspor tilgjengelig.</string>
@@ -443,6 +443,29 @@
     <string name="recording_marker_previous">Forrige markør</string>
     <string name="recording_marker_start">Opptakets begynnelse</string>
     <string name="recording_marker_next">Neste markør</string>
+    <string name="recording_mark_ad_break">Reklamepause</string>
+    <string name="recording_mark_ads_end">Reklame slutter</string>
+    <string name="recording_mark_cut">Klipp</string>
+    <string name="recording_mark_cut_ends">Klipp slutter</string>
+    <string name="recording_mark_ad_badge">Rekl.</string>
+    <string name="recording_mark_program_starts">Programmet starter</string>
+    <string name="recording_mark_program_ends">Programmet slutter</string>
+    <string name="skip_ad_break">Hopp over reklamepause</string>
+    <string name="settings_section_recording_marks">Opptaksmarkører</string>
+    <string name="ad_breaks_setting">Reklamepauser</string>
+    <string name="ad_breaks_ask">Spør</string>
+    <string name="ad_breaks_ask_help">Viser en knapp for å hoppe over oppå videoen når en pause starter.</string>
+    <string name="ad_breaks_automatic">Hopp over automatisk</string>
+    <string name="ad_breaks_automatic_help">Hopper over hver pause én gang. Spoler du tilbake inn i den, spilles den av.</string>
+    <string name="ad_breaks_off">Av</string>
+    <string name="ad_breaks_off_help">Reklamepauser spilles av som resten. De vises fortsatt på tidslinjen.</string>
+    <string name="skip_cuts_setting">Hopp over klipp</string>
+    <string name="skip_cuts_setting_description">Hopper over deler merket som klipp. Selve opptaket forkortes ikke.</string>
+    <string name="skip_landing_setting">Fortsett etter hopp</string>
+    <string name="skip_landing_description">Hvor avspillingen fortsetter etter et klipp eller en reklamepause som er hoppet over.</string>
+    <string name="skip_landing_end">Ved slutten</string>
+    <string name="skip_landing_two_seconds">2 s før slutten</string>
+    <string name="skip_landing_five_seconds">5 s før slutten</string>
     <string name="pause">Pause</string>
     <string name="seek_back_30">−30 sekunder</string>
     <string name="seek_forward_30">+30 sekunder</string>
@@ -715,4 +738,9 @@
         <item quantity="one">%1$d til planlagt</item>
         <item quantity="other">%1$d til planlagt</item>
     </plurals>
+    <string name="appliance_companion">Tilleggsapp for TV-modus</string>
+    <string name="appliance_companion_not_installed">Ikke installert</string>
+    <string name="appliance_companion_description">En valgfri tilleggsapp får Tvheadend Player til å fungere som TV-ens egen tunerapp. Den åpner spilleren når TV-en slås på, kan overta fjernkontrollknapper som TV og Guide og erstatte startskjermen. Det er en egen app fra prosjektets GitHub-utgivelser, og den oppdaterer seg selv derfra.</string>
+    <string name="appliance_companion_install_info">Skann koden eller åpne github.com/bernhardberger/tvheadend-player på en telefon eller datamaskin, og følg trinnene under «Appliance companion» for å sette den opp.</string>
+    <string name="appliance_companion_qr_description">QR-kode til oppsettstrinnene for tilleggsappen for TV-modus</string>
 </resources>

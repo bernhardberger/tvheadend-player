@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="appliance_accessibility_service_label">Tvheadend Player tv-startservice</string>
-    <string name="appliance_accessibility_service_description">Opent Tvheadend Player bij het opstarten en ontwaken, en wijst alleen de TV/GUIDE-knop toe. De service kan geen scherminhoud lezen.</string>
+    <string name="appliance_accessibility_service_description">Opent Tvheadend Player bij het opstarten en ontwaken, en neemt alleen de afstandsbedieningsknoppen over die in deze app zijn ingesteld. De service kan geen scherminhoud lezen.</string>
 </resources>

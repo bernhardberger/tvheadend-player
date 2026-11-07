@@ -1,4 +1,5 @@
 <resources>
+    <string name="recording_ad_break_skipped">Reklámszünet átugorva</string>
     <string name="player_full_screen">Teljes képernyő</string>
     <string name="stop">Leállítás</string>
     <string name="warm_playback_setting">Böngészés közben</string>
@@ -233,7 +234,6 @@
     <string name="error_prefix">Hiba:</string>
     <string name="back">Vissza</string>
     <string name="show_password">Jelszó megjelenítése</string>
-    <string name="hide_password">Jelszó elrejtése</string>
     <string name="audio_track">Hangsáv</string>
     <string name="audio_track_unselected">Hangsáv választása</string>
     <string name="no_audio_tracks">Nincs elérhető hangsáv.</string>
@@ -443,6 +443,29 @@
     <string name="recording_marker_previous">Előző jelölő</string>
     <string name="recording_marker_start">Felvétel eleje</string>
     <string name="recording_marker_next">Következő jelölő</string>
+    <string name="recording_mark_ad_break">Reklámszünet</string>
+    <string name="recording_mark_ads_end">Reklámok vége</string>
+    <string name="recording_mark_cut">Vágás</string>
+    <string name="recording_mark_cut_ends">Vágás vége</string>
+    <string name="recording_mark_ad_badge">Rek.</string>
+    <string name="recording_mark_program_starts">Műsor kezdete</string>
+    <string name="recording_mark_program_ends">Műsor vége</string>
+    <string name="skip_ad_break">Reklámszünet átugrása</string>
+    <string name="settings_section_recording_marks">Felvételjelölők</string>
+    <string name="ad_breaks_setting">Reklámszünetek</string>
+    <string name="ad_breaks_ask">Rákérdezés</string>
+    <string name="ad_breaks_ask_help">A szünet kezdetekor átugrási gombot jelenít meg a videó fölött.</string>
+    <string name="ad_breaks_automatic">Automatikus átugrás</string>
+    <string name="ad_breaks_automatic_help">Minden szünetet egyszer ugrik át. Ha visszatekercselsz a szünetbe, lejátssza.</string>
+    <string name="ad_breaks_off">Ki</string>
+    <string name="ad_breaks_off_help">A reklámszüneteket a többi részhez hasonlóan lejátssza. Az idővonalon továbbra is láthatók.</string>
+    <string name="skip_cuts_setting">Vágások átugrása</string>
+    <string name="skip_cuts_setting_description">Átugorja a vágásként megjelölt részeket. Maga a felvétel nem rövidül meg.</string>
+    <string name="skip_landing_setting">Folytatási pont</string>
+    <string name="skip_landing_description">Hol folytatódjon a lejátszás egy vágás vagy reklámszünet átugrása után.</string>
+    <string name="skip_landing_end">A végén</string>
+    <string name="skip_landing_two_seconds">2 mp-cel a vége előtt</string>
+    <string name="skip_landing_five_seconds">5 mp-cel a vége előtt</string>
     <string name="pause">Szünet</string>
     <string name="seek_back_30">−30 másodperc</string>
     <string name="seek_forward_30">+30 másodperc</string>
@@ -715,4 +738,9 @@
         <item quantity="one">Még %1$d ütemezett</item>
         <item quantity="other">Még %1$d ütemezett</item>
     </plurals>
+    <string name="appliance_companion">TV-készülék mód kísérőalkalmazása</string>
+    <string name="appliance_companion_not_installed">Nincs telepítve</string>
+    <string name="appliance_companion_description">Egy választható kísérőalkalmazással a Tvheadend Player a tévé saját tuneralkalmazásához hasonlóan működik. A tévé bekapcsolásakor megnyitja a lejátszót, átveheti a távirányító gombjait, például a TV és a Guide gombot, és lecserélheti a kezdőképernyőt. Ez egy külön alkalmazás, amely a projekt GitHub-kiadásai között érhető el, és onnan frissíti magát.</string>
+    <string name="appliance_companion_install_info">A beállításhoz olvasd be a kódot, vagy nyisd meg a github.com/bernhardberger/tvheadend-player címet telefonon vagy számítógépen, majd kövesd az „Appliance companion” rész lépéseit.</string>
+    <string name="appliance_companion_qr_description">QR-kód a TV-készülék mód kísérőalkalmazásának beállítási lépéseihez</string>
 </resources>

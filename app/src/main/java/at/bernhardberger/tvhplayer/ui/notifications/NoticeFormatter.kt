@@ -43,6 +43,7 @@ internal class NoticeFormatter(private val context: Context) {
             icon = AppNoticeIcon.DISCONNECTED)
         is Notice.ServerSignInRejected -> FormattedNotice(context.getString(R.string.server_sign_in_rejected, notice.name),
             icon = AppNoticeIcon.SIGN_IN_REJECTED)
+        is Notice.AutomaticAdBreakSkip -> FormattedNotice(context.getString(R.string.recording_ad_break_skipped))
         is Notice.Dvr -> formatDvr(notice, now)
         is Notice.DvrActionFailed -> FormattedNotice(context.getString(when (notice.failure) {
             DvrMutationFeedback.TIMEOUT, DvrMutationFeedback.UNKNOWN_OUTCOME -> R.string.recording_action_not_confirmed

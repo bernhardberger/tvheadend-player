@@ -10,7 +10,7 @@ data class UpdateScreenState(
     val installerMessage: String = "",
 )
 
-internal fun UpdateResult.messageResource(): Int = when (this) {
+internal fun UpdateScreenState.messageResource(): Int = when (result) {
     UpdateResult.NEVER -> R.string.update_never
     UpdateResult.CHECKING -> R.string.update_checking
     UpdateResult.UP_TO_DATE -> R.string.update_up_to_date
@@ -22,7 +22,7 @@ internal fun UpdateResult.messageResource(): Int = when (this) {
     UpdateResult.NOT_NEWER -> R.string.update_not_newer
     UpdateResult.SIGNATURE_MISMATCH -> R.string.update_signature_mismatch
     UpdateResult.INSTALL_PERMISSION -> R.string.update_install_permission
-    UpdateResult.WAITING_STANDBY -> R.string.update_waiting_standby
+    UpdateResult.WAITING_STANDBY -> if (automatic) R.string.update_waiting_standby else R.string.update_waiting_manual
     UpdateResult.INSTALLING -> R.string.update_installing
     UpdateResult.PENDING_CONFIRMATION -> R.string.update_pending_confirmation
     UpdateResult.INSTALLER_FAILURE -> R.string.update_installer_failure

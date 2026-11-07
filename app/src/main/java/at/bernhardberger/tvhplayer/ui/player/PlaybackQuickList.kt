@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.ui.player
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.media3.common.C
 import androidx.media3.common.Player
@@ -27,6 +28,14 @@ internal class PlaybackQuickListSignals {
 
     var moveDownRequests by mutableIntStateOf(0)
         private set
+
+    /**
+     * The list was opened from the Audio button, not a remote key: browsing applies
+     * nothing, OK applies the focused row, and no timer closes it. The list's own
+     * remote key switches it back to the hotkey list.
+     */
+    var picker by mutableStateOf(false)
+        internal set
 
     private var restoreHandler: (() -> Unit)? = null
 

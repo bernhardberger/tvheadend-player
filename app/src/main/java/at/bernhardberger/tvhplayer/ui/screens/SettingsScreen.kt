@@ -77,7 +77,7 @@ internal fun SettingsScreen(
     servers.FocusPending(connectionLevels.firstOrNull())
     val profileList by profileOwner.profiles.collectAsStateWithLifecycle()
     val levels = settingsGeneralLevels(navigation) + connectionLevels + settingsPlayerLevels(navigation) + listOf(
-        settingsRootLevel(companionInstalled, recordingLevels.isNotEmpty(),
+        settingsRootLevel(recordingLevels.isNotEmpty(),
             connectionRootStatus(profileList, connectionOverviewStatus(connectionPresentation, profileOwner).title)),
         settingsKeepChannelLevel(navigation),
         settingsWarmPlaybackLevel(navigation),
@@ -86,7 +86,7 @@ internal fun SettingsScreen(
         settingsStartupBufferLevel(navigation),
         settingsChannelTagsLevel(channelsVm),
     ) + recordingLevels + settingsAboutLevels(observation.sessionState, companionInstalled) +
-        if (companionInstalled) listOf(settingsApplianceLevel()) else emptyList()
+        listOf(settingsApplianceLevel(companionInstalled))
     SettingsScreenNavigation(navigation, levels, initialFocusEnabled, contentPadding, backEnabled, isCurrent,
         setup = servers.setupContent(),
         onCloseSetup = servers::closeSetup,
@@ -98,7 +98,6 @@ internal fun SettingsScreen(
 /** Connection's row carries the overview's status title, the only value on the root. */
 @Composable
 internal fun settingsRootLevel(
-    companionInstalled: Boolean = false,
     showRecordings: Boolean = false,
     connectionStatus: String? = null,
 ): DepthLevel = settingsLevel(SETTINGS_ROOT, stringResource(R.string.nav_settings), buildList {
@@ -110,7 +109,7 @@ internal fun settingsRootLevel(
     add(settingsRow(SettingsSection.AUDIO.name, stringResource(R.string.settings_audio_nav), child = SettingsSection.AUDIO.name, icon = R.drawable.ic_subtitles))
     if (showRecordings) add(settingsRow(RECORDINGS_LEVEL, stringResource(R.string.nav_recordings), child = RECORDINGS_LEVEL,
         icon = R.drawable.ic_fiber_manual_record))
-    if (companionInstalled) add(settingsRow(SettingsSection.APPLIANCE.name, stringResource(R.string.settings_appliance), child = SettingsSection.APPLIANCE.name, icon = R.drawable.ic_home))
+    add(settingsRow(SettingsSection.APPLIANCE.name, stringResource(R.string.settings_appliance), child = SettingsSection.APPLIANCE.name, icon = R.drawable.ic_home))
     add(settingsRow(ABOUT_LEVEL, stringResource(R.string.settings_about), child = ABOUT_LEVEL, icon = R.drawable.ic_info))
 })
 

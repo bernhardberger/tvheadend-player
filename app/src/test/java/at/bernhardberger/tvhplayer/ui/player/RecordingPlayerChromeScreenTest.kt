@@ -461,7 +461,7 @@ class RecordingPlayerChromeScreenTest {
         }
     }
 
-    @Test fun trackButtonsOpenTheirListReturnFocusAndHandItToInfoWhenTheyGo() {
+    @Test fun theAudioButtonOpensItsListReturnsFocusAndHandsItToInfoWhenItGoes() {
         screen()
         playing()
         key(Key.DirectionDown)
@@ -601,7 +601,7 @@ class RecordingPlayerChromeScreenTest {
         val seeks = mutableListOf<Long>()
         compose.setContent {
             TVHeadendPlayerTheme {
-                RecordingChromeFixture(markers = listOf(0L, 900_000L, 2_700_000L), onSeekMarker = seeks::add)
+                RecordingChromeFixture(marks = chapterMarks(900_000L, 2_700_000L), onSeekMarker = seeks::add)
             }
         }
         compose.mainClock.autoAdvance = false
@@ -615,6 +615,65 @@ class RecordingPlayerChromeScreenTest {
         key(Key.DirectionCenter)
         assertEquals(listOf(2_700_000L), seeks)
     }
+
+    @Test fun markSymbolsShowOnlyWhileTheSeekbarIsFocused() {
+        compose.setContent {
+            TVHeadendPlayerTheme { RecordingChromeFixture(marks = chapterMarks(900_000L, 2_700_000L)) }
+        }
+        compose.mainClock.autoAdvance = false
+        settle()
+        assertEquals(listOf("player-pause"), focused())
+        assertEquals(0, hints())
+        key(Key.DirectionUp)
+        assertEquals(listOf("player-seekbar"), focused())
+        assertEquals(2, hints())
+        key(Key.DirectionDown)
+        assertEquals(listOf("player-pause"), focused())
+        assertEquals(0, hints())
+    }
+
+    @Test fun marksReplacedUnderTheOpenRowDropTheSelectionWithoutAPill() {
+        var marks by mutableStateOf(chapterMarks(900_000L, 2_700_000L))
+        compose.setContent {
+            TVHeadendPlayerTheme { RecordingChromeFixture(marks = marks) }
+        }
+        compose.mainClock.autoAdvance = false
+        settle()
+        key(Key.DirectionUp)
+        key(Key.DirectionUp)
+        key(Key.DirectionRight)
+        assertEquals(listOf("recording-marker-target"), focused())
+        assertTrue(exists("recording-selected-marker"))
+        compose.runOnIdle { marks = chapterMarks(900_000L) }
+        settle()
+        assertFalse(exists("recording-marker-target"))
+        assertFalse(exists("recording-selected-marker"))
+        assertTrue(exists("recording-marks-track"))
+    }
+
+    @Test fun anIntervalsEndIsAStopNamedForItsEnd() {
+        val ad = at.bernhardberger.tvhplayer.core.RecordingMark(
+            at.bernhardberger.tvhplayer.core.RecordingMarkKind.AD_BREAK, 2_000_000L, 2_600_000L,
+        )
+        val seeks = mutableListOf<Long>()
+        compose.setContent {
+            TVHeadendPlayerTheme { RecordingChromeFixture(marks = listOf(ad), onSeekMarker = seeks::add) }
+        }
+        compose.mainClock.autoAdvance = false
+        settle()
+        key(Key.DirectionUp)
+        key(Key.DirectionUp)
+        assertEquals("Ad break, Marker 1 • 33:20", description("recording-marker-target"))
+        key(Key.DirectionRight)
+        assertEquals("Ads end, Marker 2 • 43:20", description("recording-marker-target"))
+        // The end has no symbol of its own; the break's start keeps its symbol beside the pill.
+        assertEquals(1, hints())
+        key(Key.DirectionCenter)
+        assertEquals(listOf(2_600_000L), seeks)
+    }
+
+    private fun hints() =
+        compose.onAllNodes(hasTestTag("recording-mark-hint"), useUnmergedTree = true).fetchSemanticsNodes().size
 
     @Test fun holdBackStopsWithNoLayer() = holdStops { key(Key.Back); assertFalse(exists("player-banner")) }
     @Test fun backDownRenewsQuickListUntilReleaseRestoresSelection() {
@@ -882,7 +941,8 @@ class RecordingPlayerChromeScreenTest {
         }
         runtime = AppPlaybackRuntime(controlled, session, coordinator, settings, profiles, scope,
             TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None,
-            PlaybackRuntimePolicy.fromPlayerSettings(object : PlaybackTrace {}))
+            PlaybackRuntimePolicy.fromPlayerSettings(object : PlaybackTrace {}),
+            noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) })
         owner.lifecycle.currentState = Lifecycle.State.RESUMED
         // setContent synchronizes the first composition; there is no Compose root to idle yet.
         if (listed) {

@@ -8,9 +8,20 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CompanionSetupTest {
+    @Test fun blockedIsEnabledButNotConnectedAndRemainsAnUnresolvedAccessibilityRow() {
+        assertEquals(CompanionServiceStatus.OFF, companionServiceStatus(false, false))
+        assertEquals(CompanionServiceStatus.OFF, companionServiceStatus(false, true))
+        assertEquals(CompanionServiceStatus.ON, companionServiceStatus(true, true))
+        assertEquals(CompanionServiceStatus.BLOCKED, companionServiceStatus(true, false))
+        val blocked = ready.copy(accessibilityStatus = CompanionServiceStatus.BLOCKED)
+        assertEquals(listOf(CompanionRow.ACCESSIBILITY), blocked.unresolved)
+        assertEquals(CompanionRow.ACCESSIBILITY, blocked.initialFocus)
+        assertEquals(CompanionBody.BLOCKED, blocked.body)
+        assertEquals(CompanionOverall.NeedsFix(1, CompanionRow.ACCESSIBILITY), blocked.overall)
+    }
     private val ready = CompanionScreenState(
         playerVersion = "0.4.2",
-        accessibilityEnabled = true,
+        accessibilityStatus = CompanionServiceStatus.ON,
         installAllowed = true,
         defaultHome = true,
         hasSystemHome = true,
@@ -23,20 +34,20 @@ class CompanionSetupTest {
     }
 
     @Test fun missingPlayerOutranksEveryOtherState() {
-        val state = ready.copy(playerVersion = null, accessibilityEnabled = false,
+        val state = ready.copy(playerVersion = null, accessibilityStatus = CompanionServiceStatus.OFF,
             update = UpdateScreenState(result = UpdateResult.INSTALLING))
         assertEquals(CompanionOverall.PlayerMissing, state.overall)
         assertEquals(CompanionRow.PLAYER, state.initialFocus)
     }
 
     @Test fun runningInstallOutranksThingsToFix() {
-        val state = ready.copy(accessibilityEnabled = false,
+        val state = ready.copy(accessibilityStatus = CompanionServiceStatus.OFF,
             update = UpdateScreenState(result = UpdateResult.INSTALLING))
         assertEquals(CompanionOverall.Updating, state.overall)
     }
 
     @Test fun countsOnlyThePlayerAccessibilityAndUnknownApps() {
-        val state = ready.copy(accessibilityEnabled = false, installAllowed = false, defaultHome = false)
+        val state = ready.copy(accessibilityStatus = CompanionServiceStatus.OFF, installAllowed = false, defaultHome = false)
         assertEquals(CompanionOverall.NeedsFix(2, CompanionRow.ACCESSIBILITY), state.overall)
         assertEquals(CompanionRow.ACCESSIBILITY, state.initialFocus)
     }
@@ -55,10 +66,10 @@ class CompanionSetupTest {
     @Test fun bodyNamesTheSingleOpenItemAndStaysGenericForSeveral() {
         assertEquals(CompanionBody.ALL_SET, ready.body)
         assertEquals(CompanionBody.PLAYER_MISSING, ready.copy(playerVersion = null).body)
-        assertEquals(CompanionBody.ACCESSIBILITY_OFF, ready.copy(accessibilityEnabled = false).body)
+        assertEquals(CompanionBody.ACCESSIBILITY_OFF, ready.copy(accessibilityStatus = CompanionServiceStatus.OFF).body)
         assertEquals(CompanionBody.INSTALL_UNKNOWN_OFF, ready.copy(installAllowed = false).body)
         assertEquals(CompanionBody.SEVERAL_OPEN,
-            ready.copy(accessibilityEnabled = false, installAllowed = false).body)
+            ready.copy(accessibilityStatus = CompanionServiceStatus.OFF, installAllowed = false).body)
         assertEquals(CompanionBody.UPDATING,
             ready.copy(installAllowed = false, update = UpdateScreenState(result = UpdateResult.INSTALLING)).body)
     }

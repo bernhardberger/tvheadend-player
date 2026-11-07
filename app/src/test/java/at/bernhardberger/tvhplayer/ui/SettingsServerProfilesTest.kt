@@ -192,7 +192,7 @@ class SettingsServerProfilesTest {
         servers.FocusPending(connection.firstOrNull())
         val profiles by owner.profiles.collectAsStateWithLifecycle()
         SettingsScreenNavigation(navigation,
-            listOf(settingsRootLevel(companionInstalled = false,
+            listOf(settingsRootLevel(
                 connectionStatus = connectionRootStatus(profiles, connectionOverviewStatus(presentation, owner).title))) + connection,
             initialFocusEnabled = initialFocusEnabled, contentPadding = contentPadding,
             setup = servers.setupContent(), onCloseSetup = servers::closeSetup, dialog = servers.dialogContent(),

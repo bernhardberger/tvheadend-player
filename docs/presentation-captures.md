@@ -19,16 +19,27 @@ Use the normal Java and Android SDK setup from
   --tests '*.ChannelScheduleCaptureTest.presentation' \
   --tests '*.SettingsVisualEvidenceTest.presentation' \
   --console=plain --no-scan
+./gradlew :appliance:testDebugUnitTest \
+  --tests '*.CompanionScreenTest.presentation*' \
+  --console=plain --no-scan
 python3 tools/prepare-presentation.py
 ```
 
-The tests write `app/build/outputs/presentation/`. The packaging script needs
-Python 3 and Pillow. It copies the thirteen PNGs into ignored `captures/presentation/`
+The tests write `app/build/outputs/presentation/` and
+`appliance/build/outputs/presentation/`. The packaging script needs
+Python 3 and Pillow. It copies the fifteen PNGs into ignored `captures/presentation/`
 without cropping or resizing, refuses any frame that is not 1920×1080, and writes
 `manifest.json` (commit, tracked-diff hash, source paths and SHA-256 values) and
 `review.html`, which shows one image at a time at 830 CSS pixels, about the
 README's desktop width. It does not run the tests or check that their outputs are
 fresh, so run both steps together.
+
+To package only the companion captures without the player outputs, use
+`python3 tools/prepare-presentation.py --companion-only` after the appliance test
+command. This writes a manifest and review page for just those two images.
+The build does not expose `:appliance:testReleaseUnitTest`, so the presentation
+tests replace only the debug app name with the release name in their test-local
+resources. Other companion tests keep their original resources and density.
 
 Pixel-exact reproduction also depends on the same JDK, Robolectric native graphics
 and fonts. Copy only owner-selected images into a tracked artwork directory and
@@ -41,6 +52,8 @@ and the side menu over warm playback, then Recordings folders and a recording
 inside a folder. The Settings capture is not used. The tracked copies in
 [`artwork/screenshots/`](../artwork/screenshots/) are the same pixels saved
 without the fully opaque alpha channel.
+The README's Appliance companion section uses `companion-all-set` and
+`companion-capture-waiting`, with fictional player version 0.4.7.
 
 ## Scene contract
 
@@ -70,6 +83,8 @@ previous evening's airing with a saved position of 00:20:23.
 | `player-schedule`: Channel schedule | 20:15; one full day on Ridge Earth, repeated for a week | Ridge Light row |
 | `drawer`: Side menu over warm playback | 20:15; back from the player, Northline News live at the live edge behind Channels | Channels in the menu: from Northline News, Left past Ridge Earth's card |
 | `settings`: Settings | Playback page over the playing picture | First row |
+| `companion-all-set`: Appliance companion | All set; This TV and the top of Functions visible | Tvheadend Player |
+| `companion-capture-waiting`: Appliance companion | Open live TV waiting for a button; countdown part-way | No focusable controls during capture |
 
 Channels, Guide and Recordings set the Robolectric wall clock; programme details,
 the player and the channel schedule pass the time as arguments. The player, schedule and Settings

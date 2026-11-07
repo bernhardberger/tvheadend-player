@@ -16,14 +16,14 @@ import androidx.compose.ui.unit.offset
 internal fun playerChromeAlpha(timelineFocused: Boolean, previewing: Boolean): Float = when {
     !timelineFocused -> 1f
     previewing -> 0f
-    else -> 0.55f
+    else -> 1f
 }
 
 @Composable
 internal fun rememberPlayerChromeAlpha(timelineFocused: Boolean, previewing: Boolean): State<Float> =
     animateFloatAsState(
         playerChromeAlpha(timelineFocused, previewing),
-        animationSpec = tween(PlayerMotion.EmphasisMs, easing = PlayerMotion.Standard),
+        animationSpec = tween(PlayerMotion.ShortMs, easing = PlayerMotion.Standard),
         label = "player-surrounding-chrome",
     )
 

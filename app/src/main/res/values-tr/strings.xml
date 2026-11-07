@@ -1,4 +1,5 @@
 <resources>
+    <string name="recording_ad_break_skipped">Reklam arası atlandı</string>
     <string name="player_full_screen">Tam ekran</string>
     <string name="stop">Durdur</string>
     <string name="warm_playback_setting">Gezinirken</string>
@@ -233,7 +234,6 @@
     <string name="error_prefix">Hata:</string>
     <string name="back">Geri</string>
     <string name="show_password">Parolayı göster</string>
-    <string name="hide_password">Parolayı gizle</string>
     <string name="audio_track">Ses parçası</string>
     <string name="audio_track_unselected">Ses parçası seçin</string>
     <string name="no_audio_tracks">Kullanılabilir ses parçası yok.</string>
@@ -443,6 +443,29 @@
     <string name="recording_marker_previous">Önceki işaret</string>
     <string name="recording_marker_start">Kaydın başlangıcı</string>
     <string name="recording_marker_next">Sonraki işaret</string>
+    <string name="recording_mark_ad_break">Reklam arası</string>
+    <string name="recording_mark_ads_end">Reklam sonu</string>
+    <string name="recording_mark_cut">Kesilecek bölüm</string>
+    <string name="recording_mark_cut_ends">Kesilecek bölümün sonu</string>
+    <string name="recording_mark_ad_badge">Reklam</string>
+    <string name="recording_mark_program_starts">Program başlangıcı</string>
+    <string name="recording_mark_program_ends">Program sonu</string>
+    <string name="skip_ad_break">Reklam arasını atla</string>
+    <string name="settings_section_recording_marks">Kayıt işaretleri</string>
+    <string name="ad_breaks_setting">Reklam araları</string>
+    <string name="ad_breaks_ask">Sor</string>
+    <string name="ad_breaks_ask_help">Reklam arası başladığında videonun üzerinde bir atlama düğmesi gösterir.</string>
+    <string name="ad_breaks_automatic">Otomatik atla</string>
+    <string name="ad_breaks_automatic_help">Her reklam arasını bir kez atlar. Geri sararak reklam arasına dönerseniz reklamlar oynatılır.</string>
+    <string name="ad_breaks_off">Kapalı</string>
+    <string name="ad_breaks_off_help">Reklam araları kaydın geri kalanı gibi oynatılır. Zaman çizelgesinde görünmeye devam eder.</string>
+    <string name="skip_cuts_setting">Kesilecek bölümleri atla</string>
+    <string name="skip_cuts_setting_description">Kesilecek olarak işaretlenen bölümleri atlar. Kaydın kendisi kısaltılmaz.</string>
+    <string name="skip_landing_setting">Devam noktası</string>
+    <string name="skip_landing_description">Kesilecek bölüm veya reklam arası atlandıktan sonra oynatmanın nereden devam edeceği.</string>
+    <string name="skip_landing_end">Sonunda</string>
+    <string name="skip_landing_two_seconds">Bitmeden 2 sn önce</string>
+    <string name="skip_landing_five_seconds">Bitmeden 5 sn önce</string>
     <string name="pause">Duraklat</string>
     <string name="seek_back_30">−30 saniye</string>
     <string name="seek_forward_30">+30 saniye</string>
@@ -715,4 +738,9 @@
         <item quantity="one">%1$d kayıt daha planlandı</item>
         <item quantity="other">%1$d kayıt daha planlandı</item>
     </plurals>
+    <string name="appliance_companion">TV modu yardımcı uygulaması</string>
+    <string name="appliance_companion_not_installed">Yüklü değil</string>
+    <string name="appliance_companion_description">İsteğe bağlı bir yardımcı uygulama, Tvheadend Player\'ın TV\'nin yerleşik alıcı uygulaması gibi çalışmasını sağlar. TV açıldığında oynatıcıyı açar, TV ve Guide gibi kumanda düğmelerini devralabilir ve ana ekranın yerini alabilir. Projenin GitHub sürümlerinden edinilen ayrı bir uygulamadır ve kendini oradan günceller.</string>
+    <string name="appliance_companion_install_info">Kurulum için kodu tarayın veya bir telefon ya da bilgisayarda github.com/bernhardberger/tvheadend-player adresini açın, ardından “Appliance companion” bölümündeki adımları izleyin.</string>
+    <string name="appliance_companion_qr_description">TV modu yardımcı uygulamasının kurulum adımları için QR kodu</string>
 </resources>

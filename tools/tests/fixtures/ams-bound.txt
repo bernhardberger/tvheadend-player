@@ -1,0 +1,46 @@
+ACTIVITY MANAGER SERVICES (dumpsys activity services)
+  User 0 active services:
+  * ServiceRecord{ed1135a u0 at.bernhardberger.tvhplayer.appliance.debug/at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService}
+    intent={cmp=at.bernhardberger.tvhplayer.appliance.debug/at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService}
+    packageName=at.bernhardberger.tvhplayer.appliance.debug
+    processName=at.bernhardberger.tvhplayer.appliance.debug
+    permission=android.permission.BIND_ACCESSIBILITY_SERVICE
+    baseDir=/data/app/~~Sa2DK4fM5TcHXhuB1Kezmw==/at.bernhardberger.tvhplayer.appliance.debug-hZCw-bkyfzHMHctOE1TPjw==/base.apk
+    dataDir=/data/user/0/at.bernhardberger.tvhplayer.appliance.debug
+    app=ProcessRecord{c6e6baa 24325:at.bernhardberger.tvhplayer.appliance.debug/u0a502}
+    mIsAllowedBgActivityStartsByBinding=true
+    allowWhileInUsePermissionInFgs=true
+    recentCallingPackage=android
+    recentCallingUid=1000
+    allowStartForeground=10
+    startForegroundCount=0
+    infoAllowStartForeground=[callingPackage: android; callingUid: 1000; uidState: PER ; intent: Intent { cmp=at.bernhardberger.tvhplayer.appliance.debug/at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService }; code:PROC_STATE_PERSISTENT; tempAllowListReason:<null>; targetSdkVersion:36; callerTargetSdkVersion:31; startForegroundCount:0; bindFromPackage:null]
+    createTime=-38s726ms startingBgTimeout=--
+    lastActivity=-38s583ms restartTime=-38s583ms createdFromFg=true
+    Bindings:
+    * IntentBindRecord{a88893 CREATE}:
+      intent={cmp=at.bernhardberger.tvhplayer.appliance.debug/at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService}
+      binder=android.os.BinderProxy@61120d0
+      requested=true received=true hasBound=true doRebind=false
+      * Client AppBindRecord{e2a88c9 ProcessRecord{a79cda5 724:system/1000}}
+        Per-process Connections:
+          ConnectionRecord{ab72e95 u0 CR FGSA CAPS at.bernhardberger.tvhplayer.appliance.debug/at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService:@e2cce4c}
+    All Connections:
+      ConnectionRecord{ab72e95 u0 CR FGSA CAPS at.bernhardberger.tvhplayer.appliance.debug/at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService:@e2cce4c}
+
+  Connection bindings to services:
+  * ConnectionRecord{5e0217 u0 CR FGSA CAPS at.bernhardberger.tvhplayer.appliance.debug/at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService:@2189696}
+    binding=AppBindRecord{2c4bd82 at.bernhardberger.tvhplayer.appliance.debug/at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService:system}
+    conn=android.app.LoadedApk$ServiceDispatcher$InnerConnection@2189696 flags=0x2101001
+  * ConnectionRecord{32cb2e3 u0 CR FGSA CAPS at.bernhardberger.tvhplayer.appliance.debug/at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService:@55b9b12}
+    binding=AppBindRecord{6cb1a1b at.bernhardberger.tvhplayer.appliance.debug/at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService:system}
+    conn=android.app.LoadedApk$ServiceDispatcher$InnerConnection@55b9b12 flags=0x2101001
+  * ConnectionRecord{a0ee42b u0 CR FGSA CAPS at.bernhardberger.tvhplayer.appliance.debug/at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService:@cde247a}
+    binding=AppBindRecord{ec6b983 at.bernhardberger.tvhplayer.appliance.debug/at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService:system}
+    conn=android.app.LoadedApk$ServiceDispatcher$InnerConnection@cde247a flags=0x2101001
+  * ConnectionRecord{da79f9d u0 CR FGSA CAPS DEAD at.bernhardberger.tvhplayer.appliance.debug/at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService:@d93be74}
+    binding=AppBindRecord{23fabce at.bernhardberger.tvhplayer.appliance.debug/at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService:system}
+    conn=android.app.LoadedApk$ServiceDispatcher$InnerConnection@d93be74 flags=0x2101001
+  * ConnectionRecord{ab72e95 u0 CR FGSA CAPS at.bernhardberger.tvhplayer.appliance.debug/at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService:@e2cce4c}
+    binding=AppBindRecord{e2a88c9 at.bernhardberger.tvhplayer.appliance.debug/at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService:system}
+    conn=android.app.LoadedApk$ServiceDispatcher$InnerConnection@e2cce4c flags=0x2101001

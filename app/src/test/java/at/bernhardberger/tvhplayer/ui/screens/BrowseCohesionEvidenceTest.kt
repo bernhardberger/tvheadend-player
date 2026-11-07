@@ -484,6 +484,7 @@ class BrowseCohesionEvidenceTest {
             player, session, createTvheadendPlaybackCoordinator(player), settings, profiles,
             runtimeScope, TvheadendAudioOutputProvider(context()), PlaybackAudioFocus.None,
             PlaybackRuntimePolicy.fromPlayerSettings(),
+            noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) },
         )
         val selection = ChannelSelectionStore()
         val position = GuidePositionStore()

@@ -1,4 +1,5 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="recording_ad_break_skipped">Intervalo comercial pulado</string>
     <string name="player_full_screen">Tela cheia</string>
     <string name="stop">Parar</string>
     <string name="warm_playback_setting">Durante a navegação</string>
@@ -233,7 +234,6 @@
     <string name="error_prefix">Erro:</string>
     <string name="back">Voltar</string>
     <string name="show_password">Mostrar senha</string>
-    <string name="hide_password">Ocultar senha</string>
     <string name="audio_track">Faixa de áudio</string>
     <string name="audio_track_unselected">Escolher faixa de áudio</string>
     <string name="no_audio_tracks">Nenhuma faixa de áudio disponível.</string>
@@ -416,6 +416,29 @@
     <string name="recording_marker_previous">Marcador anterior</string>
     <string name="recording_marker_start">Início da gravação</string>
     <string name="recording_marker_next">Próximo marcador</string>
+    <string name="recording_mark_ad_break">Intervalo comercial</string>
+    <string name="recording_mark_ads_end">Fim dos comerciais</string>
+    <string name="recording_mark_cut">Corte</string>
+    <string name="recording_mark_cut_ends">Fim do corte</string>
+    <string name="recording_mark_ad_badge">Pub</string>
+    <string name="recording_mark_program_starts">Início do programa</string>
+    <string name="recording_mark_program_ends">Fim do programa</string>
+    <string name="skip_ad_break">Pular intervalo comercial</string>
+    <string name="settings_section_recording_marks">Marcadores de gravação</string>
+    <string name="ad_breaks_setting">Intervalos comerciais</string>
+    <string name="ad_breaks_ask">Perguntar</string>
+    <string name="ad_breaks_ask_help">Quando um intervalo começa, mostra sobre o vídeo um botão para pular o intervalo.</string>
+    <string name="ad_breaks_automatic">Pular automaticamente</string>
+    <string name="ad_breaks_automatic_help">Pula cada intervalo uma vez. Se você voltar para dentro dele, ele será reproduzido.</string>
+    <string name="ad_breaks_off">Desativado</string>
+    <string name="ad_breaks_off_help">Os intervalos comerciais são reproduzidos como o restante. Eles continuam aparecendo na linha do tempo.</string>
+    <string name="skip_cuts_setting">Pular cortes</string>
+    <string name="skip_cuts_setting_description">Pula as partes marcadas como cortes. A gravação em si não é encurtada.</string>
+    <string name="skip_landing_setting">Ponto de retomada</string>
+    <string name="skip_landing_description">Onde a reprodução continua após pular um corte ou intervalo comercial.</string>
+    <string name="skip_landing_end">No final</string>
+    <string name="skip_landing_two_seconds">2 s antes do final</string>
+    <string name="skip_landing_five_seconds">5 s antes do final</string>
     <string name="pause">Pausar</string>
     <string name="seek_back_30">−30 segundos</string>
     <string name="seek_forward_30">+30 segundos</string>
@@ -672,4 +695,9 @@
         <item quantity="many">Mais %1$d agendadas</item>
         <item quantity="other">Mais %1$d agendadas</item>
     </plurals>
+    <string name="appliance_companion">App complementar do modo TV</string>
+    <string name="appliance_companion_not_installed">Não instalado</string>
+    <string name="appliance_companion_description">Um app complementar opcional faz o Tvheadend Player funcionar como o app de sintonizador integrado à TV. Ele abre o player quando a TV é ligada, pode assumir botões do controle remoto, como TV e Guide, e substituir a tela inicial. É um app separado, disponível nas versões do projeto no GitHub, de onde ele se atualiza.</string>
+    <string name="appliance_companion_install_info">Para configurar, escaneie o código ou abra github.com/bernhardberger/tvheadend-player em um celular ou computador e siga as etapas da seção “Appliance companion”.</string>
+    <string name="appliance_companion_qr_description">Código QR para as etapas de configuração do app complementar do modo TV</string>
 </resources>

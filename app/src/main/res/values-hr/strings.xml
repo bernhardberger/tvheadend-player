@@ -1,4 +1,5 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="recording_ad_break_skipped">Reklamni blok preskočen</string>
     <string name="player_full_screen">Cijeli zaslon</string>
     <string name="stop">Zaustavi</string>
     <string name="warm_playback_setting">Tijekom pregledavanja</string>
@@ -233,7 +234,6 @@
     <string name="error_prefix">Pogreška:</string>
     <string name="back">Natrag</string>
     <string name="show_password">Prikaži lozinku</string>
-    <string name="hide_password">Sakrij lozinku</string>
     <string name="audio_track">Zvučni zapis</string>
     <string name="audio_track_unselected">Odaberi zvučni zapis</string>
     <string name="no_audio_tracks">Nema dostupnih zvučnih zapisa.</string>
@@ -452,6 +452,29 @@
     <string name="recording_marker_previous">Prethodna oznaka</string>
     <string name="recording_marker_start">Početak snimke</string>
     <string name="recording_marker_next">Sljedeća oznaka</string>
+    <string name="recording_mark_ad_break">Reklamni blok</string>
+    <string name="recording_mark_ads_end">Kraj reklama</string>
+    <string name="recording_mark_cut">Rez</string>
+    <string name="recording_mark_cut_ends">Kraj reza</string>
+    <string name="recording_mark_ad_badge">Rekl.</string>
+    <string name="recording_mark_program_starts">Početak emisije</string>
+    <string name="recording_mark_program_ends">Kraj emisije</string>
+    <string name="skip_ad_break">Preskoči reklamni blok</string>
+    <string name="settings_section_recording_marks">Oznake snimke</string>
+    <string name="ad_breaks_setting">Reklamni blokovi</string>
+    <string name="ad_breaks_ask">Pitaj</string>
+    <string name="ad_breaks_ask_help">Prikazuje gumb za preskakanje preko videozapisa kada počne reklamni blok.</string>
+    <string name="ad_breaks_automatic">Preskoči automatski</string>
+    <string name="ad_breaks_automatic_help">Svaki reklamni blok preskače jednom. Ako premotaš natrag u njega, reproducirat će se.</string>
+    <string name="ad_breaks_off">Isključeno</string>
+    <string name="ad_breaks_off_help">Reklamni blokovi reproduciraju se kao i ostatak. I dalje su vidljivi na vremenskoj crti.</string>
+    <string name="skip_cuts_setting">Preskoči rezove</string>
+    <string name="skip_cuts_setting_description">Preskače dijelove označene kao rezovi. Sama snimka ne skraćuje se.</string>
+    <string name="skip_landing_setting">Mjesto nastavka</string>
+    <string name="skip_landing_description">Gdje se reprodukcija nastavlja nakon preskočenog reza ili reklamnog bloka.</string>
+    <string name="skip_landing_end">Na kraju</string>
+    <string name="skip_landing_two_seconds">2 s prije kraja</string>
+    <string name="skip_landing_five_seconds">5 s prije kraja</string>
     <string name="pause">Pauziraj</string>
     <string name="seek_back_30">−30 sekundi</string>
     <string name="seek_forward_30">+30 sekundi</string>
@@ -732,4 +755,9 @@
         <item quantity="few">Još %1$d zakazana snimanja</item>
         <item quantity="other">Još %1$d zakazanih snimanja</item>
     </plurals>
+    <string name="appliance_companion">Prateća aplikacija za način TV prijamnika</string>
+    <string name="appliance_companion_not_installed">Nije instalirana</string>
+    <string name="appliance_companion_description">Neobavezna prateća aplikacija omogućuje da Tvheadend Player radi poput ugrađene aplikacije TV prijamnika. Otvara reproduktor pri uključivanju televizora, može preuzeti tipke daljinskog upravljača kao što su TV i Guide te zamijeniti početni zaslon. To je zasebna aplikacija dostupna u izdanjima projekta na GitHubu i odatle se sama ažurira.</string>
+    <string name="appliance_companion_install_info">Za postavljanje skeniraj kôd ili otvori github.com/bernhardberger/tvheadend-player na telefonu ili računalu, a zatim slijedi korake u odjeljku „Appliance companion”.</string>
+    <string name="appliance_companion_qr_description">QR kôd s koracima za postavljanje prateće aplikacije za način TV prijamnika</string>
 </resources>

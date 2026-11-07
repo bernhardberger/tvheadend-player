@@ -68,7 +68,8 @@ class ConnectionSwitchPlaybackTest {
         val player = ExoPlayer.Builder(context).build()
         val coordinator = createTvheadendPlaybackCoordinator(player).also { it.launchIn(backgroundScope) }
         val runtime = AppPlaybackRuntime(player, session, coordinator, settings, owner, backgroundScope,
-            TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None, PlaybackRuntimePolicy.fromPlayerSettings())
+            TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None, PlaybackRuntimePolicy.fromPlayerSettings(),
+            noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) })
         try {
             val start = async { runtime.playLive(checkNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(1)))) }
             runCurrent()

@@ -1133,7 +1133,8 @@ class BackgroundPlaybackRuntimeTest {
                 player.clearVideoFrameMetadataListener(listener)
             }
         }, runtimeSession, coordinator, settings, profiles, scope,
-            audioOutput = TvheadendAudioOutputProvider(context), audioFocus = focus, policy = policy, elapsedRealtime = { scheduler.currentTime })
+            audioOutput = TvheadendAudioOutputProvider(context), audioFocus = focus, policy = policy, elapsedRealtime = { scheduler.currentTime },
+            noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) })
         private fun recover(reason: PlaybackRecoveryReason) { runtime.onRecoveryRequired(reason) }
 
         fun controlCalls(from: Int) = connection.calls.drop(from).filter {

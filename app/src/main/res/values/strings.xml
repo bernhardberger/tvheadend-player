@@ -46,6 +46,7 @@
     <string name="server_none_in_use">No connection in use</string>
     <string name="server_list_unavailable">The saved connections can’t be read on this TV right now.</string>
     <string name="server_none_in_use_description">No connection in use. Choose one to watch TV again.</string>
+    <string name="recording_ad_break_skipped">Ad break skipped</string>
     <string name="settings_channel_numbers">Channel numbers</string>
     <string name="settings_channel_numbers_help">Turn off if your remote has no number keys</string>
     <string name="player_full_screen">Full screen</string>
@@ -313,7 +314,6 @@
 
     <!-- Password visibility -->
     <string name="show_password">Show password</string>
-    <string name="hide_password">Hide password</string>
 
     <!-- Audio -->
     <string name="audio_track">Audio track</string>
@@ -653,6 +653,30 @@
     <string name="recording_marker_previous">Previous marker</string>
     <string name="recording_marker_start">Beginning of recording</string>
     <string name="recording_marker_next">Next marker</string>
+    <string name="recording_mark_ad_break">Ad break</string>
+    <string name="recording_mark_ads_end">Ads end</string>
+    <string name="recording_mark_cut">Cut</string>
+    <string name="recording_mark_cut_ends">Cut ends</string>
+    <!-- The short badge marking an ad break on the recording's timeline. -->
+    <string name="recording_mark_ad_badge">Ad</string>
+    <string name="skip_ad_break">Skip ad break</string>
+    <string name="settings_section_recording_marks">Recording marks</string>
+    <string name="ad_breaks_setting">Ad breaks</string>
+    <string name="recording_mark_program_starts">Program starts</string>
+    <string name="recording_mark_program_ends">Program ends</string>
+    <string name="ad_breaks_ask">Ask</string>
+    <string name="ad_breaks_ask_help">Shows a Skip button over the video when a break starts.</string>
+    <string name="ad_breaks_automatic">Skip automatically</string>
+    <string name="ad_breaks_automatic_help">Jumps over each break once. Seeking back into it plays it.</string>
+    <string name="ad_breaks_off">Off</string>
+    <string name="ad_breaks_off_help">Ad breaks play like the rest. They still show on the timeline.</string>
+    <string name="skip_cuts_setting">Skip cuts</string>
+    <string name="skip_cuts_setting_description">Skips parts marked as cuts. The recording itself is not shortened.</string>
+    <string name="skip_landing_setting">Skip lands</string>
+    <string name="skip_landing_description">Where playback continues after a skipped cut or ad break.</string>
+    <string name="skip_landing_end">At the end</string>
+    <string name="skip_landing_two_seconds">2 s before the end</string>
+    <string name="skip_landing_five_seconds">5 s before the end</string>
     <string name="pause">Pause</string>
     <string name="seek_back_30">−30 seconds</string>
     <string name="seek_forward_30">+30 seconds</string>
@@ -949,4 +973,10 @@
         <item quantity="one">%1$d more scheduled</item>
         <item quantity="other">%1$d more scheduled</item>
     </plurals>
+    <string name="appliance_companion">Appliance companion</string>
+    <string name="appliance_companion_not_installed">Not installed</string>
+    <string name="appliance_companion_description">An optional companion app makes Tvheadend Player behave like the TV\'s own tuner app. It opens the player when the TV turns on, can take over remote buttons such as TV and Guide, and can replace the home screen. It is a separate app from the project\'s GitHub releases and updates itself from there.</string>
+    <string name="appliance_companion_install_info">To set it up, scan the code or open github.com/bernhardberger/tvheadend-player on a phone or computer, then follow the steps under Appliance companion.</string>
+    <string name="appliance_companion_address" translatable="false">github.com/bernhardberger/tvheadend-player</string>
+    <string name="appliance_companion_qr_description">QR code for the appliance companion setup steps</string>
 </resources>

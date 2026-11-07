@@ -1,4 +1,5 @@
 <resources>
+    <string name="recording_ad_break_skipped">광고 구간을 건너뛰었습니다</string>
     <string name="player_full_screen">전체 화면</string>
     <string name="stop">재생 중지</string>
     <string name="warm_playback_setting">탐색 중 재생</string>
@@ -233,7 +234,6 @@
     <string name="error_prefix">오류:</string>
     <string name="back">뒤로</string>
     <string name="show_password">비밀번호 표시</string>
-    <string name="hide_password">비밀번호 숨기기</string>
     <string name="audio_track">오디오 트랙</string>
     <string name="audio_track_unselected">오디오 트랙 선택</string>
     <string name="no_audio_tracks">사용 가능한 오디오 트랙이 없습니다.</string>
@@ -434,6 +434,29 @@
     <string name="recording_marker_previous">이전 마커</string>
     <string name="recording_marker_start">녹화 시작 부분</string>
     <string name="recording_marker_next">다음 마커</string>
+    <string name="recording_mark_ad_break">광고 구간</string>
+    <string name="recording_mark_ads_end">광고 끝</string>
+    <string name="recording_mark_cut">잘라낼 구간</string>
+    <string name="recording_mark_cut_ends">잘라낼 구간 끝</string>
+    <string name="recording_mark_ad_badge">광고</string>
+    <string name="recording_mark_program_starts">프로그램 시작</string>
+    <string name="recording_mark_program_ends">프로그램 끝</string>
+    <string name="skip_ad_break">광고 구간 건너뛰기</string>
+    <string name="settings_section_recording_marks">녹화 마커</string>
+    <string name="ad_breaks_setting">광고 구간</string>
+    <string name="ad_breaks_ask">물어보기</string>
+    <string name="ad_breaks_ask_help">광고 구간이 시작되면 영상 위에 건너뛰기 버튼을 표시합니다.</string>
+    <string name="ad_breaks_automatic">자동으로 건너뛰기</string>
+    <string name="ad_breaks_automatic_help">각 광고 구간을 한 번씩 건너뜁니다. 되감기로 해당 구간 안으로 돌아가면 광고가 재생됩니다.</string>
+    <string name="ad_breaks_off">꺼짐</string>
+    <string name="ad_breaks_off_help">광고 구간도 나머지 부분처럼 재생됩니다. 타임라인에는 계속 표시됩니다.</string>
+    <string name="skip_cuts_setting">잘라낼 구간 건너뛰기</string>
+    <string name="skip_cuts_setting_description">잘라낼 구간으로 표시된 부분을 건너뜁니다. 녹화 자체가 짧아지지는 않습니다.</string>
+    <string name="skip_landing_setting">건너뛴 후 재생 위치</string>
+    <string name="skip_landing_description">잘라낼 구간이나 광고 구간을 건너뛴 후 재생을 계속할 위치입니다.</string>
+    <string name="skip_landing_end">구간 끝</string>
+    <string name="skip_landing_two_seconds">구간 끝 2초 전</string>
+    <string name="skip_landing_five_seconds">구간 끝 5초 전</string>
     <string name="pause">일시정지</string>
     <string name="seek_back_30">−30초</string>
     <string name="seek_forward_30">+30초</string>
@@ -699,4 +722,9 @@
     <plurals name="home_upcoming_more">
         <item quantity="other">예약 %1$d개 더 있음</item>
     </plurals>
+    <string name="appliance_companion">전용 기기 모드 보조 앱</string>
+    <string name="appliance_companion_not_installed">설치되지 않음</string>
+    <string name="appliance_companion_description">선택 사항인 보조 앱을 사용하면 Tvheadend Player가 TV에 내장된 튜너 앱처럼 작동합니다. TV를 켜면 플레이어를 열고, TV 및 Guide 같은 리모컨 버튼을 대신 처리하며 홈 화면을 대체할 수 있습니다. 프로젝트의 GitHub 릴리스에서 제공하는 별도 앱이며, 해당 릴리스에서 자동으로 업데이트됩니다.</string>
+    <string name="appliance_companion_install_info">설정하려면 코드를 스캔하거나 휴대전화 또는 컴퓨터에서 github.com/bernhardberger/tvheadend-player를 연 다음 ‘Appliance companion’ 섹션의 단계를 따라 주세요.</string>
+    <string name="appliance_companion_qr_description">전용 기기 모드 보조 앱 설정 단계를 여는 QR 코드</string>
 </resources>

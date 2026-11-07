@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.map
 
 enum class AspectRatioMode { FIT, FORCE_16_9, FORCE_4_3 }
 enum class AudioFormatPreference { AUTOMATIC, PREFER_DOLBY, PREFER_STEREO }
+enum class AdBreakMode { ASK, AUTOMATIC, OFF }
+enum class SkipLanding(val beforeEndMs: Long) { END(0), TWO_SECONDS_BEFORE(2_000), FIVE_SECONDS_BEFORE(5_000) }
 
 /** Presentation while browsing; AUDIO_ONLY keeps the same player and video decoding. */
 enum class WarmPlaybackMode { ON, AUDIO_ONLY, OFF }
@@ -89,6 +91,9 @@ data class PlayerSettings(
     val warmPlaybackMode: WarmPlaybackMode = WarmPlaybackMode.ON,
     /** Live start-up buffer in milliseconds; [STARTUP_BUFFER_AUTOMATIC] learns it per server. */
     val startupBufferMillis: Int = STARTUP_BUFFER_AUTOMATIC,
+    val adBreakMode: AdBreakMode = AdBreakMode.ASK,
+    val skipCuts: Boolean = true,
+    val skipLanding: SkipLanding = SkipLanding.END,
 )
 
 /** Stored [PlayerSettings.startupBufferMillis] value for the learned, per-server buffer. */
@@ -140,6 +145,9 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
     }
 
     private object Keys {
+        val AD_BREAK_MODE = stringPreferencesKey("adBreakMode")
+        val SKIP_CUTS = booleanPreferencesKey("skipCuts")
+        val SKIP_LANDING = stringPreferencesKey("skipLanding")
         val AUDIO_LANGUAGES = stringPreferencesKey("audioLanguages")
         val AUDIO_FORMAT = stringPreferencesKey("audioFormat")
         val AUDIO_DESCRIPTION = booleanPreferencesKey("audioDescription")
@@ -159,6 +167,18 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
 
     val playerSettings: Flow<PlayerSettings> =
         dataStore.data.map(::playerSettingsFromPreferences)
+
+    suspend fun setAdBreakMode(mode: AdBreakMode) {
+        dataStore.edit { it[Keys.AD_BREAK_MODE] = mode.name }
+    }
+
+    suspend fun setSkipCuts(enabled: Boolean) {
+        dataStore.edit { it[Keys.SKIP_CUTS] = enabled }
+    }
+
+    suspend fun setSkipLanding(landing: SkipLanding) {
+        dataStore.edit { it[Keys.SKIP_LANDING] = landing.name }
+    }
 
     suspend fun setAudioLanguages(languages: List<String>) {
         dataStore.edit { it[Keys.AUDIO_LANGUAGES] = normalizeAudioLanguages(languages).joinToString(",") }
@@ -303,6 +323,9 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
 
         fun decodePlayerSettings(p: Preferences): PlayerSettings {
             return PlayerSettings(
+                adBreakMode = AdBreakMode.entries.firstOrNull { it.name == p[Keys.AD_BREAK_MODE] } ?: AdBreakMode.ASK,
+                skipCuts = p[Keys.SKIP_CUTS] ?: true,
+                skipLanding = SkipLanding.entries.firstOrNull { it.name == p[Keys.SKIP_LANDING] } ?: SkipLanding.END,
                 audioLanguages = normalizeAudioLanguages(p[Keys.AUDIO_LANGUAGES]?.split(',').orEmpty()),
                 audioFormat = runCatching { p[Keys.AUDIO_FORMAT]?.let(AudioFormatPreference::valueOf) }
                     .getOrNull() ?: AudioFormatPreference.AUTOMATIC,

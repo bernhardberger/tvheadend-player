@@ -7,6 +7,7 @@ import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.ui.screens.isApplianceCompanionInstalled
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -41,6 +42,13 @@ class ApplianceCompanionDetectionTest {
         } else {
             assertTrue(isApplianceCompanionInstalled(context))
         }
+    }
+
+    @Test fun signatureDetectionIsReevaluatedAfterCompanionInstallation() {
+        install(context.packageName, "player")
+        assertFalse(isApplianceCompanionInstalled(context))
+        install(BuildConfig.APPLIANCE_COMPANION_PACKAGE.ifEmpty { "at.bernhardberger.tvhplayer.appliance.debug" }, "player")
+        assertEquals(BuildConfig.APPLIANCE_COMPANION_PACKAGE.isNotEmpty(), isApplianceCompanionInstalled(context))
     }
 
     @Test fun differentCertificateCompanionIsNotInstalled() {

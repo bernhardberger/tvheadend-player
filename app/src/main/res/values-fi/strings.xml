@@ -1,4 +1,5 @@
 <resources>
+    <string name="recording_ad_break_skipped">Mainoskatko ohitettu</string>
     <string name="player_full_screen">Koko näyttö</string>
     <string name="stop">Pysäytä</string>
     <string name="warm_playback_setting">Selatessa</string>
@@ -233,7 +234,6 @@
     <string name="error_prefix">Virhe:</string>
     <string name="back">Takaisin</string>
     <string name="show_password">Näytä salasana</string>
-    <string name="hide_password">Piilota salasana</string>
     <string name="audio_track">Ääniraita</string>
     <string name="audio_track_unselected">Valitse ääniraita</string>
     <string name="no_audio_tracks">Ääniraitoja ei ole saatavilla.</string>
@@ -443,6 +443,29 @@
     <string name="recording_marker_previous">Edellinen merkki</string>
     <string name="recording_marker_start">Tallenteen alku</string>
     <string name="recording_marker_next">Seuraava merkki</string>
+    <string name="recording_mark_ad_break">Mainoskatko</string>
+    <string name="recording_mark_ads_end">Mainokset päättyvät</string>
+    <string name="recording_mark_cut">Leikkaus</string>
+    <string name="recording_mark_cut_ends">Leikkaus päättyy</string>
+    <string name="recording_mark_ad_badge">Mainos</string>
+    <string name="recording_mark_program_starts">Ohjelma alkaa</string>
+    <string name="recording_mark_program_ends">Ohjelma päättyy</string>
+    <string name="skip_ad_break">Ohita mainoskatko</string>
+    <string name="settings_section_recording_marks">Tallenteen merkit</string>
+    <string name="ad_breaks_setting">Mainoskatkot</string>
+    <string name="ad_breaks_ask">Kysy</string>
+    <string name="ad_breaks_ask_help">Näyttää ohituspainikkeen videon päällä katkon alkaessa.</string>
+    <string name="ad_breaks_automatic">Ohita automaattisesti</string>
+    <string name="ad_breaks_automatic_help">Ohittaa jokaisen katkon kerran. Jos kelaat takaisin katkon kohdalle, se toistetaan.</string>
+    <string name="ad_breaks_off">Pois</string>
+    <string name="ad_breaks_off_help">Mainoskatkot toistetaan kuten muukin sisältö. Ne näkyvät edelleen aikajanalla.</string>
+    <string name="skip_cuts_setting">Ohita leikkaukset</string>
+    <string name="skip_cuts_setting_description">Ohittaa leikkauksiksi merkityt osat. Itse tallennetta ei lyhennetä.</string>
+    <string name="skip_landing_setting">Toiston jatkokohta</string>
+    <string name="skip_landing_description">Mistä toisto jatkuu ohitetun leikkauksen tai mainoskatkon jälkeen.</string>
+    <string name="skip_landing_end">Lopussa</string>
+    <string name="skip_landing_two_seconds">2 s ennen loppua</string>
+    <string name="skip_landing_five_seconds">5 s ennen loppua</string>
     <string name="pause">Keskeytä</string>
     <string name="seek_back_30">−30 sekuntia</string>
     <string name="seek_forward_30">+30 sekuntia</string>
@@ -715,4 +738,9 @@
         <item quantity="one">Vielä %1$d ajastettu</item>
         <item quantity="other">Vielä %1$d ajastettua</item>
     </plurals>
+    <string name="appliance_companion">TV-tilan lisäsovellus</string>
+    <string name="appliance_companion_not_installed">Ei asennettu</string>
+    <string name="appliance_companion_description">Valinnainen lisäsovellus saa Tvheadend Playerin toimimaan kuten television oma viritinsovellus. Se avaa soittimen, kun televisio käynnistyy, voi ottaa haltuunsa kaukosäätimen painikkeita, kuten TV ja Guide, ja korvata aloitusnäytön. Se on erillinen sovellus projektin GitHub-julkaisuista ja päivittää itsensä sieltä.</string>
+    <string name="appliance_companion_install_info">Ota sovellus käyttöön skannaamalla koodi tai avaamalla github.com/bernhardberger/tvheadend-player puhelimella tai tietokoneella ja seuraamalla osion ”Appliance companion” ohjeita.</string>
+    <string name="appliance_companion_qr_description">QR-koodi TV-tilan lisäsovelluksen käyttöönotto-ohjeisiin</string>
 </resources>

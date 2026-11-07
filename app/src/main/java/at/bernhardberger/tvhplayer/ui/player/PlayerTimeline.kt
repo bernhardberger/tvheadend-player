@@ -1,18 +1,29 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.runtime.State
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.animation.core.Animatable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.res.painterResource
 import androidx.tv.material3.Icon
-import at.bernhardberger.tvhplayer.ui.TvOverlayTimelineTickAlpha
 import at.bernhardberger.tvhplayer.ui.TvOverlayBoxAlpha
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.StepDirection
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
@@ -73,6 +84,10 @@ import at.bernhardberger.tvhplayer.ui.TvOverlayTimelineRowHeight
 import at.bernhardberger.tvhplayer.ui.TvOverlayTimelineThumbSize
 import at.bernhardberger.tvhplayer.ui.TvOverlayTrackAlpha
 import kotlin.math.roundToInt
+
+internal val LocalTimelinePositionSpec = staticCompositionLocalOf<State<AnimationSpec<Float>>> {
+    mutableStateOf(tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard))
+}
 
 /** Plain status text sits in the light end of the footer gradient, so it needs its own backing. */
 @Composable
@@ -153,11 +168,14 @@ private fun TimelineTargetLabel(
     cover: ReadoutCover,
 ) {
     val color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (available) 1f else TvOverlayTextTertiaryAlpha)
+    val reveal = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { reveal.animateTo(1f, tween(PlayerMotion.FastMs, easing = PlayerMotion.StandardDecelerate)) }
     DisposableEffect(cover) { onDispose { cover.chip = null } }
     Row(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
+            .graphicsLayer { alpha = reveal.value }
             .layout { measurable, constraints ->
                 val label = measurable.measure(constraints.copy(minWidth = 0))
                 val thumbTop = (TvOverlayTimelineRowHeight - TvOverlayTimelineThumbSize) / 2
@@ -221,22 +239,30 @@ fun PlayerTimelineBar(
     programmeTargetAvailable: Boolean? = null,
     fillColor: Color = MaterialTheme.colorScheme.tertiary,
     showTrack: Boolean = true,
-    markerFractions: List<Float> = emptyList(),
+    /** A recording's marks on the bar; see [TimelineMarkLayer]. */
+    marks: TimelineMarks? = null,
     motionKey: Any? = null,
 ) {
     val currentProgress = progress?.coerceIn(0f, 1f)
     // The axis is part of the identity: schedule, buffer, programme window. A fraction on another axis
     // is another quantity, so a change of axis snaps to it instead of sliding through a value between.
     val animatedProgress = key(motionKey, programmeWindow, rewindableStartFraction != null, currentProgress != null, programmeTargetAvailable) {
-        animateFloatAsState(currentProgress ?: 0f,
-            animationSpec = tween(durationMillis = PlayerMotion.EmphasisMs, easing = LinearOutSlowInEasing),
-            label = "player-timeline-position")
+        val position = remember { Animatable(currentProgress ?: 0f) }
+        val spec = LocalTimelinePositionSpec.current.value
+        // A key-up changes only the spec, not the target: restart from the current position
+        // for the final decelerating settle as well as for every new repeated target.
+        LaunchedEffect(currentProgress, spec) { position.animateTo(currentProgress ?: 0f, spec) }
+        position
     }
-    val barHeight = if (tone == PlayerTimelineTone.ACTIVE) {
-        TvOverlayTimelineBarFocusedHeight
-    } else {
-        TvOverlayTimelineBarHeight
-    }
+    val active = tone == PlayerTimelineTone.ACTIVE
+    val thickness = animateFloatAsState(if (active) 1f else 0f,
+        tween(PlayerMotion.ShortMs, easing = PlayerMotion.Standard), label = "timeline thickness")
+    val thumbScale = animateFloatAsState(if (active) 1f else 0.5f,
+        tween(if (active) PlayerMotion.MediumMs else PlayerMotion.FastMs,
+            easing = if (active) PlayerMotion.EmphasizedDecelerate else PlayerMotion.StandardAccelerate), label = "timeline thumb scale")
+    val thumbAlpha = animateFloatAsState(if (active) 1f else 0f,
+        tween(PlayerMotion.FastMs, easing = if (active) PlayerMotion.StandardDecelerate else PlayerMotion.StandardAccelerate), label = "timeline thumb alpha")
+    val barHeight = TvOverlayTimelineBarFocusedHeight
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -256,7 +282,16 @@ fun PlayerTimelineBar(
                 .align(Alignment.Center)
                 .fillMaxWidth()
                 .height(barHeight)
-                .clip(MaterialTheme.shapes.small)
+                .drawWithContent {
+                    val height = TvOverlayTimelineBarHeight.toPx() +
+                        (TvOverlayTimelineBarFocusedHeight - TvOverlayTimelineBarHeight).toPx() * thickness.value
+                    val top = (size.height - height) / 2f
+                    val path = Path().apply {
+                        addRoundRect(RoundRect(Rect(0f, top, size.width, top + height), CornerRadius(height / 2f)))
+                    }
+                    val content = this
+                    clipPath(path) { content.drawContent() }
+                }
                 .background(MaterialTheme.colorScheme.onSurface.copy(alpha = if (rewindableStartFraction != null) 0.10f else TvOverlayTrackAlpha)),
         ) {
             ghostProgress?.takeUnless { programmeWindow }?.coerceIn(0f, 1f)?.let { ghost ->
@@ -310,10 +345,7 @@ fun PlayerTimelineBar(
                         .background(fillColor))
                 }
             }
-            markerFractions.filter { it > 0f && it < 1f }.forEach { fraction ->
-                Box(Modifier.offset(x = maxWidth * fraction - 0.5.dp).width(1.dp).height(barHeight)
-                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = TvOverlayTimelineTickAlpha)).testTag("recording-marker-tick"))
-            }
+            marks?.let { TimelineMarkLayer(it, { animatedProgress.value }, fillColor, Modifier.matchParentSize()) }
             rewindableStartFraction?.takeIf { !programmeWindow && it > 0f && it < 1f }?.let { fraction ->
                 val start = fraction.coerceIn(0f, 1f)
                 if (rewindableStartOverflow) {
@@ -381,7 +413,11 @@ fun PlayerTimelineBar(
                 )
             }
         }
-        selectedMarkerFraction?.let { fraction ->
+        AnimatedContent(selectedMarkerFraction, modifier = Modifier.align(Alignment.Center),
+            transitionSpec = { (fadeIn(tween(PlayerMotion.ShortMs, easing = PlayerMotion.Standard)) togetherWith
+                fadeOut(tween(PlayerMotion.ShortMs, easing = PlayerMotion.Standard))).using(null) },
+            label = "selected mark tick") { selected ->
+        selected?.let { fraction ->
             BoxWithConstraints(Modifier.fillMaxWidth().align(Alignment.Center)) {
                 Box(Modifier
                     .offset(x = (maxWidth * fraction.coerceIn(0f, 1f) - 0.5.dp).coerceIn(0.dp, maxWidth - 1.dp))
@@ -390,16 +426,18 @@ fun PlayerTimelineBar(
                     .testTag("recording-selected-marker"))
             }
         }
-        if (tone == PlayerTimelineTone.ACTIVE && currentProgress != null) {
+        }
+        if (currentProgress != null) {
             val thumbSize = TvOverlayTimelineThumbSize
             BoxWithConstraints(Modifier.fillMaxWidth().align(Alignment.Center)) {
                 Box(
                     modifier = Modifier
                         .offset { IntOffset((maxWidth.toPx() * animatedProgress.value - thumbSize.toPx() / 2).roundToInt(), 0) }
                         .size(thumbSize)
+                        .graphicsLayer { alpha = thumbAlpha.value; scaleX = thumbScale.value; scaleY = thumbScale.value }
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.onSurface)
-                        .then(thumbTestTag?.let { Modifier.testTag(it) } ?: Modifier),
+                        .then(if (active) thumbTestTag?.let { Modifier.testTag(it) } ?: Modifier else Modifier.clearAndSetSemantics { }),
                 )
             }
         }
@@ -448,7 +486,8 @@ fun PlayerTimelineBlock(
     /** Whose label widths the bar row keeps. */
     kind: TimelineKind = TimelineKind.LIVE,
     collapsed: Boolean = false,
-    markerFractions: List<Float> = emptyList(),
+    /** A recording's marks on the bar; see [TimelineMarkLayer]. */
+    marks: TimelineMarks? = null,
     trackOverlay: (@Composable BoxScope.() -> Unit)? = null,
     /**
      * Identity of what the bar measures, such as the playing channel and programme. A
@@ -461,9 +500,10 @@ fun PlayerTimelineBlock(
     val previewProgress = programmeWindow?.positionFraction ?: progress ?: 0f
     val previewAvailable = programmeWindow?.targetAvailable != false
     val endpointColor = MaterialTheme.colorScheme.onSurface
+    val emphasized = tone == PlayerTimelineTone.ACTIVE || tone == PlayerTimelineTone.PREVIEW
     val endpointEmphasis = animateFloatAsState(
-        if (tone == PlayerTimelineTone.ACTIVE || tone == PlayerTimelineTone.PREVIEW) 1f else TvOverlayTextTertiaryAlpha,
-        animationSpec = tween(PlayerMotion.EmphasisMs), label = "player-endpoint-emphasis",
+        if (emphasized) 1f else TvOverlayTextTertiaryAlpha,
+        animationSpec = tween(if (emphasized) PlayerMotion.MediumMs else PlayerMotion.ShortMs, easing = PlayerMotion.Standard), label = "player-endpoint-emphasis",
     )
     val leadingColor = leadingLabelColor ?: endpointColor
     val trailingColor = trailingLabelColor ?: endpointColor
@@ -494,7 +534,7 @@ fun PlayerTimelineBlock(
                 progressSemantics = progressSemantics,
                 fillColor = fillColor,
                 showTrack = showTrack,
-                markerFractions = markerFractions,
+                marks = marks,
                 motionKey = motionKey to programmeWindow?.let { Triple(it.event?.id, it.start, it.stop) },
             )
             trackOverlay?.invoke(this)

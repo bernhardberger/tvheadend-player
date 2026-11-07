@@ -55,7 +55,7 @@ class SettingsAboutTest {
                     view = LocalView.current
                     Box(Modifier.fillMaxSize().background(Color.Black)) {
                         SettingsScreenNavigation(rememberDepthNavigationState(SETTINGS_ROOT, ABOUT_LEVEL),
-                            listOf(settingsRootLevel(false)) + (
+                            listOf(settingsRootLevel()) + (
                                 if (machineTranslated == null) settingsAboutLevels(sessionState)
                                 else settingsAboutLevels(sessionState, machineTranslated = machineTranslated)))
                     }

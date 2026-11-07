@@ -9,6 +9,8 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
+import androidx.compose.ui.test.junit4.StateRestorationTester
+import androidx.compose.runtime.DisposableEffect
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
 import androidx.media3.exoplayer.ExoPlayer
@@ -53,6 +55,15 @@ internal class NavigationJourneyFixture(
     var startupKeyMode: MainStartupKeyMode = MainStartupKeyMode.Inactive
         private set
     val launchRequests = ApplianceLaunchRequests()
+    private val restoration = StateRestorationTester(compose)
+    private var guideOnNextDispose = false
+
+    fun restoreWithPendingGuide() {
+        // Match a retained ViewModel request arriving between graph save and recomposition.
+        guideOnNextDispose = true
+        restoration.emulateSavedInstanceStateRestore()
+        settle()
+    }
 
     fun close() {
         scope.cancel()
@@ -73,9 +84,10 @@ internal class NavigationJourneyFixture(
         key(Key.Enter)
     }
 
-    fun app(withRecording: Boolean = false, emptyEpg: Boolean = false, scheduled: List<DvrEntry> = emptyList(), autoStartPlayback: Boolean = false) {
+    fun app(withRecording: Boolean = false, emptyEpg: Boolean = false, scheduled: List<DvrEntry> = emptyList(), autoStartPlayback: Boolean = false,
+        guideEntry: Boolean = false, emptyChannels: Boolean = false) {
         val now = kotlin.time.Clock.System.now().epochSeconds
-        val catalog = ChannelCatalog.create((1..if (withRecording) 8L else 3L).map {
+        val catalog = ChannelCatalog.create((1..if (emptyChannels) 0L else if (withRecording) 8L else 3L).map {
             Channel.create(ChannelId(it), name = "Name $it", number = it)
         })
         fun event(channel: Long, genre: Long) = EpgEvent.create(EventId(channel), ChannelId(channel), AIRS_FROM, AIRS_UNTIL,
@@ -107,7 +119,8 @@ internal class NavigationJourneyFixture(
         player = ExoPlayer.Builder(context).build()
         val coordinator = createTvheadendPlaybackCoordinator(player).also { it.launchIn(scope) }
         val runtime = AppPlaybackRuntime(player, session, coordinator, settings, profiles, scope,
-            TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None, PlaybackRuntimePolicy.fromPlayerSettings())
+            TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None, PlaybackRuntimePolicy.fromPlayerSettings(),
+            noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) })
         val notices = NoticeCenter(android.os.SystemClock::elapsedRealtime) {
             NoticeContext(profiles.configurationGeneration.value, session.observation.value.currentSession?.generationIdentity)
         }
@@ -129,11 +142,20 @@ internal class NavigationJourneyFixture(
             viewModel { SettingsStorageViewModel(session.cache, get(), ChannelAccentStore()) {} }
             viewModel { SettingsPlayerViewModel(get(), get(), get(), get(), get()) }
         }
+        if (guideEntry) launchRequests.request(at.bernhardberger.tvhplayer.core.ApplianceEntryDestination.GUIDE)
         launchRequests.requestStartup(autoStartPlayback)
         // A TV is not in touch mode: only then does a view hand focus over as it attaches.
         @Suppress("UNCHECKED_CAST")
         (compose as androidx.compose.ui.test.junit4.AndroidComposeTestRule<*, androidx.activity.ComponentActivity>).leaveTouchModeBeforeComposing()
-        compose.setContent {
+        restoration.setContent {
+            DisposableEffect(Unit) {
+                onDispose {
+                    if (guideOnNextDispose) {
+                        guideOnNextDispose = false
+                        launchRequests.request(ApplianceEntryDestination.GUIDE)
+                    }
+                }
+            }
             KoinIsolatedContext(koinApplication { modules(dependencies) }) {
                 TVHeadendPlayerTheme {
                     back = requireNotNull(androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
@@ -147,6 +169,15 @@ internal class NavigationJourneyFixture(
                 }
             }
         }
+        if (guideEntry) {
+            compose.waitUntil(15_000) {
+                compose.mainClock.advanceTimeByFrame()
+                compose.awaitBrowsePreparation()
+                compose.onAllNodes(hasTestTag("epg-screen")).fetchSemanticsNodes().isNotEmpty()
+            }
+            settle()
+            return
+        }
         if (autoStartPlayback) {
             compose.waitUntil(15_000) {
                 compose.mainClock.advanceTimeByFrame()
@@ -156,6 +187,10 @@ internal class NavigationJourneyFixture(
             return
         }
         compose.waitUntil(15_000) { compose.onAllNodes(hasTestTag("nav-channels")).fetchSemanticsNodes().isNotEmpty() }
+        if (emptyChannels) {
+            settle()
+            return
+        }
         compose.onNodeWithTag("nav-channels").performSemanticsAction(SemanticsActions.OnClick)
         compose.waitUntil(15_000) { compose.onAllNodes(hasTestTag("channel-row-1")).fetchSemanticsNodes().isNotEmpty() }
         settle()

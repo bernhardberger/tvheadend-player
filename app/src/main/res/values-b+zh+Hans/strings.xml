@@ -1,4 +1,5 @@
 <resources>
+    <string name="recording_ad_break_skipped">已跳过广告时段</string>
     <string name="player_full_screen">全屏</string>
     <string name="stop">停止播放</string>
     <string name="warm_playback_setting">浏览时</string>
@@ -233,7 +234,6 @@
     <string name="error_prefix">错误：</string>
     <string name="back">返回</string>
     <string name="show_password">显示密码</string>
-    <string name="hide_password">隐藏密码</string>
     <string name="audio_track">音轨</string>
     <string name="audio_track_unselected">选择音轨</string>
     <string name="no_audio_tracks">没有可用音轨。</string>
@@ -416,6 +416,29 @@
     <string name="recording_marker_previous">上一个标记</string>
     <string name="recording_marker_start">录制开头</string>
     <string name="recording_marker_next">下一个标记</string>
+    <string name="recording_mark_ad_break">广告时段</string>
+    <string name="recording_mark_ads_end">广告结束</string>
+    <string name="recording_mark_cut">剪切片段</string>
+    <string name="recording_mark_cut_ends">剪切片段结束</string>
+    <string name="recording_mark_ad_badge">广告</string>
+    <string name="recording_mark_program_starts">节目开始</string>
+    <string name="recording_mark_program_ends">节目结束</string>
+    <string name="skip_ad_break">跳过广告时段</string>
+    <string name="settings_section_recording_marks">录制标记</string>
+    <string name="ad_breaks_setting">广告时段</string>
+    <string name="ad_breaks_ask">询问</string>
+    <string name="ad_breaks_ask_help">广告时段开始时，在视频上方显示跳过按钮。</string>
+    <string name="ad_breaks_automatic">自动跳过</string>
+    <string name="ad_breaks_automatic_help">每个广告时段只跳过一次。回退到该时段内即可播放。</string>
+    <string name="ad_breaks_off">关闭</string>
+    <string name="ad_breaks_off_help">广告时段与其他内容一样正常播放，仍会显示在时间轴上。</string>
+    <string name="skip_cuts_setting">跳过剪切片段</string>
+    <string name="skip_cuts_setting_description">跳过标记为剪切的片段。录制内容本身不会缩短。</string>
+    <string name="skip_landing_setting">跳过后的位置</string>
+    <string name="skip_landing_description">跳过剪切片段或广告时段后继续播放的位置。</string>
+    <string name="skip_landing_end">结束处</string>
+    <string name="skip_landing_two_seconds">结束前 2 秒</string>
+    <string name="skip_landing_five_seconds">结束前 5 秒</string>
     <string name="pause">暂停</string>
     <string name="seek_back_30">−30秒</string>
     <string name="seek_forward_30">+30秒</string>
@@ -669,4 +692,9 @@
     <plurals name="home_upcoming_more">
         <item quantity="other">另有 %1$d 项录制计划</item>
     </plurals>
+    <string name="appliance_companion">电视模式配套应用</string>
+    <string name="appliance_companion_not_installed">未安装</string>
+    <string name="appliance_companion_description">可选的配套应用让 Tvheadend Player 像电视自带的调谐器应用一样工作。它会在电视开机时打开播放器，可以接管遥控器上的 TV、Guide 等按键，还可以替换主屏幕。它是独立应用，可从项目的 GitHub 发布页面获取，并从那里自行更新。</string>
+    <string name="appliance_companion_install_info">要进行设置，请扫描二维码，或在手机或电脑上打开 github.com/bernhardberger/tvheadend-player，然后按照“Appliance companion”部分的步骤操作。</string>
+    <string name="appliance_companion_qr_description">电视模式配套应用设置步骤的二维码</string>
 </resources>

@@ -134,15 +134,25 @@ class VideoFrameRateTest {
             SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.ONLY_IF_SEAMLESS),
             surfaceFrameRateRequest(FrameRateSwitching.SEAMLESS_ONLY, 34, 50f),
         )
-        // Android 11 has only the seamless two-argument call, whatever the setting.
-        assertEquals(SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.SEAMLESS_DEFAULT), surfaceFrameRateRequest(FrameRateSwitching.ALWAYS, 30, 50f))
+        // Before Android 12, Always requests a display mode, not a seamless surface vote.
+        for (sdkInt in 28..30) {
+            assertEquals(
+                SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.DISPLAY_MODE),
+                surfaceFrameRateRequest(FrameRateSwitching.ALWAYS, sdkInt, 50f),
+            )
+            assertEquals(SurfaceFrameRateRequest(), surfaceFrameRateRequest(FrameRateSwitching.OFF, sdkInt, 50f))
+            assertEquals(SurfaceFrameRateRequest(), surfaceFrameRateRequest(FrameRateSwitching.ALWAYS, sdkInt, null))
+        }
         assertEquals(
             SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.SEAMLESS_DEFAULT),
             surfaceFrameRateRequest(FrameRateSwitching.SEAMLESS_ONLY, 30, 50f),
         )
-        // Off, Android 9 and no rate: no vote.
+        // Before Android 11, seamless-only has no supported request.
+        for (sdkInt in 28..29) {
+            assertEquals(SurfaceFrameRateRequest(), surfaceFrameRateRequest(FrameRateSwitching.SEAMLESS_ONLY, sdkInt, 50f))
+        }
+        // Off and no rate: no vote.
         assertEquals(SurfaceFrameRateRequest(), surfaceFrameRateRequest(FrameRateSwitching.OFF, 34, 50f))
-        assertEquals(SurfaceFrameRateRequest(), surfaceFrameRateRequest(FrameRateSwitching.ALWAYS, 28, 50f))
         assertEquals(SurfaceFrameRateRequest(), surfaceFrameRateRequest(FrameRateSwitching.ALWAYS, 34, null))
     }
 
@@ -191,9 +201,9 @@ class VideoFrameRateTest {
         assertEquals(SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.ALWAYS), frameRate.requested.value)
 
         val android11 = PlaybackFrameRate(sdkInt = 30).apply { onDeclared(40.milliseconds) }
-        assertEquals(SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.SEAMLESS_DEFAULT), android11.requested.value)
+        assertEquals(SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.DISPLAY_MODE), android11.requested.value)
         val android9 = PlaybackFrameRate(sdkInt = 28).apply { onDeclared(40.milliseconds) }
-        assertEquals(SurfaceFrameRateRequest(), android9.requested.value)
+        assertEquals(SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.DISPLAY_MODE), android9.requested.value)
     }
 
     @Test

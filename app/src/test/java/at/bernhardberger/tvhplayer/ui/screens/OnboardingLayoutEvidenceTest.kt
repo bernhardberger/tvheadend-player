@@ -104,8 +104,7 @@ class OnboardingLayoutEvidenceTest {
         press(Key.DirectionCenter)
         assertEquals(SetupStep.SIGN_IN, state.step)
         compose.onNodeWithTag("setup-username").assertIsFocused()
-        press(Key.DirectionDown)
-        press(Key.DirectionDown)
+        repeat(3) { press(Key.DirectionDown) }
         compose.onNodeWithTag("setup-continue").assertIsFocused()
         press(Key.DirectionCenter)
         assertEquals(SetupStep.CONNECTING, state.step)
@@ -221,7 +220,7 @@ class OnboardingLayoutEvidenceTest {
         show(form = ConnectionFormState(host = "192.0.2.10"))
         repeat(3) { press(Key.DirectionDown) }
         press(Key.DirectionCenter)
-        repeat(2) { press(Key.DirectionDown) }
+        repeat(3) { press(Key.DirectionDown) }
         press(Key.DirectionCenter)
         compose.runOnIdle { session.publish(SessionObservation.create(sessionState = SessionState.Unavailable(SessionFailure.SERVER_UNREACHABLE))) }
         compose.onNodeWithTag("setup-action-change_address").requestFocus()
@@ -375,19 +374,22 @@ class OnboardingLayoutEvidenceTest {
         capture("welcome-de-font1.3")
     }
 
-    @Test fun eyeTogglesItsLabelWithoutOpeningTextEditing() {
+    @Test fun showPasswordRowSitsBetweenThePasswordAndContinue() {
         show(SetupStep.SIGN_IN, ConnectionFormState(host = "192.0.2.10"))
         press(Key.DirectionDown)
         compose.onNodeWithTag("setup-password").assertIsFocused()
         press(Key.DirectionRight)
-        compose.onNodeWithContentDescription("Show password").assertIsFocused()
+        compose.onNodeWithTag("setup-password").assertIsFocused()
+        press(Key.DirectionDown)
+        compose.onNodeWithText("Show password").assertIsFocused().assertIsOff()
         press(Key.DirectionCenter)
-        compose.onNodeWithContentDescription("Hide password").assertIsFocused()
+        compose.onNodeWithText("Show password").assertIsFocused().assertIsOn()
         compose.onAllNodes(hasSetTextAction()).assertCountEquals(0)
-        press(Key.DirectionCenter)
-        compose.onNodeWithContentDescription("Show password").assertIsFocused()
-        compose.onAllNodes(hasSetTextAction()).assertCountEquals(0)
-        press(Key.DirectionLeft)
+        press(Key.DirectionDown)
+        compose.onNodeWithTag("setup-continue").assertIsFocused()
+        press(Key.DirectionUp)
+        compose.onNodeWithText("Show password").assertIsFocused()
+        press(Key.DirectionUp)
         compose.onNodeWithTag("setup-password").assertIsFocused()
         press(Key.DirectionCenter)
         compose.onAllNodes(hasSetTextAction()).assertCountEquals(1)
@@ -412,7 +414,7 @@ class OnboardingLayoutEvidenceTest {
         repeat(3) { press(Key.DirectionDown) }
         assertLabelled("setup-continue")
         press(Key.DirectionCenter)
-        repeat(2) { press(Key.DirectionDown) }
+        repeat(3) { press(Key.DirectionDown) }
         assertLabelled("setup-continue")
         press(Key.DirectionCenter)
         compose.onNodeWithTag("setup-connecting").assertIsFocused().assertIsDisplayed()
@@ -430,32 +432,33 @@ class OnboardingLayoutEvidenceTest {
         compose.onNodeWithTag("setup-username").assertIsFocused()
     }
 
-    @Test fun savedPasswordEyeAppearsOnlyAfterTypingAReplacement() {
+    @Test fun savedPasswordShowRowIsEnabledOnlyAfterTypingAReplacement() {
         showEdit()
         compose.runOnIdle { state.continueFromAddress() }
-        compose.onNodeWithContentDescription("Show password").assertDoesNotExist()
+        compose.onNodeWithText("Show password").assertExists().assertIsNotEnabled()
         press(Key.DirectionUp)
         compose.onNodeWithTag("setup-password").assertIsFocused()
-        press(Key.DirectionRight)
-        compose.onNodeWithTag("setup-password").assertIsFocused()
+        press(Key.DirectionDown)
+        compose.onNodeWithTag("setup-continue").assertIsFocused()
+        press(Key.DirectionUp)
         press(Key.DirectionCenter)
-        compose.onNodeWithContentDescription("Show password").assertDoesNotExist()
+        compose.onNodeWithText("Show password").assertIsNotEnabled()
         back()
         compose.onNodeWithText("Password saved").assertExists()
         press(Key.DirectionCenter)
         compose.onNodeWithTag("setup-password").performTextInput("replacement")
-        compose.onNodeWithContentDescription("Show password").assertExists()
+        compose.onNodeWithText("Show password").assertIsEnabled()
         compose.onNodeWithTag("setup-password").performTextClearance()
-        compose.onNodeWithContentDescription("Show password").assertDoesNotExist()
+        compose.onNodeWithText("Show password").assertIsNotEnabled()
         back()
         compose.onNodeWithText("Password saved").assertExists()
         press(Key.DirectionCenter)
         compose.onNodeWithTag("setup-password").performTextInput("replacement")
         back()
-        press(Key.DirectionRight)
-        compose.onNodeWithContentDescription("Show password").assertIsFocused()
+        press(Key.DirectionDown)
+        compose.onNodeWithText("Show password").assertIsFocused().assertIsOff()
         press(Key.DirectionCenter)
-        compose.onNodeWithContentDescription("Hide password").assertIsFocused()
+        compose.onNodeWithText("Show password").assertIsFocused().assertIsOn()
     }
 
     @Test
@@ -543,6 +546,21 @@ class OnboardingLayoutEvidenceTest {
         capture("edit-account-saved-password")
         compose.runOnIdle { state.continueFromSignIn() }
         capture("edit-connect")
+    }
+
+    @Test @Category(VisualCapture::class)
+    fun captureAccountShowPasswordRow() {
+        show(SetupStep.SIGN_IN, ConnectionFormState(host = "192.0.2.10"))
+        press(Key.DirectionDown)
+        press(Key.DirectionCenter)
+        compose.onNodeWithTag("setup-password").performTextInput("fictional-pass")
+        back()
+        press(Key.DirectionDown)
+        compose.onNodeWithText("Show password").assertIsFocused().assertIsOff()
+        capture("account-show-password-off")
+        press(Key.DirectionCenter)
+        compose.onNodeWithText("Show password").assertIsFocused().assertIsOn()
+        capture("account-show-password-on")
     }
 
     @Test @Category(VisualCapture::class)
@@ -771,7 +789,7 @@ class OnboardingLayoutEvidenceTest {
     private fun capture(name: String) {
         compose.mainClock.advanceTimeBy(1_000)
         val focused = compose.onAllNodes(isFocused()).fetchSemanticsNodes().single()
-        val focus = focused.config[SemanticsProperties.TestTag]
+        val focus = if (SemanticsProperties.TestTag in focused.config) focused.config[SemanticsProperties.TestTag] else "show-password-row"
         compose.runOnIdle {
             val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
             view.draw(Canvas(bitmap))

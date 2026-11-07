@@ -3317,7 +3317,8 @@ class GuideVisualLayoutTest {
         val runtime = AppPlaybackRuntime(player, session, createTvheadendPlaybackCoordinator(player).also {
             if (playingChannel != null) it.launchIn(runtimeScope)
         }, settings, profiles,
-            runtimeScope, TvheadendAudioOutputProvider(context()), PlaybackAudioFocus.None, PlaybackRuntimePolicy.fromPlayerSettings())
+            runtimeScope, TvheadendAudioOutputProvider(context()), PlaybackAudioFocus.None, PlaybackRuntimePolicy.fromPlayerSettings(),
+            noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) })
         if (playingChannel != null) {
             @OptIn(at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class)
             session.scriptLivePlaybackSuccess()

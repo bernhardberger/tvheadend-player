@@ -7,10 +7,12 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInfo
 import android.content.pm.ResolveInfo
 import android.os.Bundle
+import android.os.Looper
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
@@ -23,6 +25,102 @@ import org.robolectric.util.ReflectionHelpers
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
 class CompanionActivityTest {
+    @Before fun resetServiceState() {
+        CompanionServiceState.setConnected(false)
+        CompanionServiceState.dismissCapture()
+    }
+
+    @Test fun stoppingTheActivityCancelsAnActiveCapture() {
+        val controller = Robolectric.buildActivity(CompanionActivity::class.java).create().start().resume()
+        CompanionServiceState.setConnected(true)
+        assertTrue(CompanionServiceState.startCapture(CompanionFunction.GUIDE))
+        controller.pause().stop()
+        assertEquals(CaptureState.Cancelled, CompanionServiceState.captureState.value)
+        controller.destroy()
+        CompanionServiceState.setConnected(false)
+    }
+
+    @Test fun blockedDetectionUsesTheEnabledComponentEvenWhenTheGlobalAccessibilityFlagIsOff() {
+        val context = RuntimeEnvironment.getApplication()
+        val component = ComponentName(context, at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService::class.java)
+        android.provider.Settings.Secure.putString(context.contentResolver,
+            android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, component.flattenToShortString())
+        android.provider.Settings.Secure.putInt(context.contentResolver, android.provider.Settings.Secure.ACCESSIBILITY_ENABLED, 0)
+        CompanionServiceState.setConnected(false)
+        val controller = Robolectric.buildActivity(CompanionActivity::class.java).create().start().resume()
+        assertEquals(CompanionServiceStatus.BLOCKED,
+            ReflectionHelpers.callInstanceMethod<CompanionServiceStatus>(controller.get(), "getAccessibilityStatus"))
+        CompanionServiceState.setConnected(true)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(CompanionServiceStatus.ON,
+            ReflectionHelpers.callInstanceMethod<CompanionServiceStatus>(controller.get(), "getAccessibilityStatus"))
+        controller.pause().stop().destroy()
+        CompanionServiceState.setConnected(false)
+    }
+
+    @Test fun disconnectingWhileResumedChangesOnToBlockedWithoutAResumeOrClick() {
+        val context = RuntimeEnvironment.getApplication()
+        val component = ComponentName(context, at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService::class.java)
+        android.provider.Settings.Secure.putString(context.contentResolver,
+            android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, component.flattenToShortString())
+        CompanionServiceState.setConnected(true)
+        val controller = Robolectric.buildActivity(CompanionActivity::class.java).create().start().resume()
+        assertEquals(CompanionServiceStatus.ON,
+            ReflectionHelpers.callInstanceMethod<CompanionServiceStatus>(controller.get(), "getAccessibilityStatus"))
+        shadowOf(Looper.getMainLooper()).idle()
+        CompanionServiceState.setConnected(false)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(CompanionServiceStatus.BLOCKED,
+            ReflectionHelpers.callInstanceMethod<CompanionServiceStatus>(controller.get(), "getAccessibilityStatus"))
+        controller.pause().stop().destroy()
+    }
+    private fun onRow(activity: CompanionActivity, row: CompanionRow) {
+        ReflectionHelpers.callInstanceMethod<Unit>(activity, "onRow",
+            ReflectionHelpers.ClassParameter.from(CompanionRow::class.java, row))
+    }
+
+    @Test fun theStartupRowTogglesTheStoredSwitch() {
+        val context = RuntimeEnvironment.getApplication()
+        val controller = Robolectric.buildActivity(CompanionActivity::class.java).create().start().resume()
+        assertTrue(FunctionStore(context).functions.startup)
+        onRow(controller.get(), CompanionRow.STARTUP)
+        assertFalse(FunctionStore(context).functions.startup)
+        onRow(controller.get(), CompanionRow.STARTUP)
+        assertTrue(FunctionStore(context).functions.startup)
+        controller.pause().stop().destroy()
+    }
+
+    @Test fun okOnABlockedServiceOpensAndroidAccessibilitySettings() {
+        val context = RuntimeEnvironment.getApplication()
+        val component = ComponentName(context, at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService::class.java)
+        android.provider.Settings.Secure.putString(context.contentResolver,
+            android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, component.flattenToShortString())
+        CompanionServiceState.setConnected(false)
+        val controller = Robolectric.buildActivity(CompanionActivity::class.java).create().start().resume()
+        val activity = controller.get()
+        fun status() = ReflectionHelpers.callInstanceMethod<CompanionServiceStatus>(activity, "getAccessibilityStatus")
+        assertEquals(CompanionServiceStatus.BLOCKED, status())
+        onRow(activity, CompanionRow.ACCESSIBILITY)
+        assertEquals(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS,
+            shadowOf(activity).nextStartedActivity.action)
+        assertEquals(CompanionServiceStatus.BLOCKED, status())
+        CompanionServiceState.setConnected(true)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertNull(shadowOf(activity).nextStartedActivity)
+        assertEquals(CompanionServiceStatus.ON, status())
+        controller.pause().stop().destroy()
+        CompanionServiceState.setConnected(false)
+    }
+
+    @Test fun okOnAnOffServiceOpensAndroidSettings() {
+        CompanionServiceState.setConnected(false)
+        val controller = Robolectric.buildActivity(CompanionActivity::class.java).create().start().resume()
+        onRow(controller.get(), CompanionRow.ACCESSIBILITY)
+        assertEquals(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS,
+            shadowOf(controller.get()).nextStartedActivity.action)
+        controller.pause().stop().destroy()
+    }
+
     private val playerActivity = ComponentName(BuildConfig.PLAYER_PACKAGE, "player.Launcher")
 
     @Test

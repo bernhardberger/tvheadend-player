@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Package the README presentation captures for local review; never publishes."""
+import argparse
 import hashlib
 import html
 import json
@@ -11,6 +12,7 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "app/build/outputs/presentation"
+COMPANION_SOURCE = ROOT / "appliance/build/outputs/presentation"
 OUT = ROOT / "captures/presentation"
 SIZE = (1920, 1080)
 
@@ -28,7 +30,15 @@ notes = {
     "recordings": "Recordings: the previous evening's Ridge Light inside Documentaries, partly watched.",
     "recordings-folders": "Recordings at the Archive's top level: the server's folders, then recordings with channel logos.",
     "settings": "Playback settings over the playing picture. Supporting image.",
+    "companion-all-set": "Appliance companion: All set, with Tvheadend Player focused and the TV's startup and button functions below.",
+    "companion-capture-waiting": "Appliance companion: waiting for a remote button to open live TV, with the countdown part-way through.",
 }
+
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--companion-only", action="store_true", help="Package only the two companion captures.")
+args = parser.parse_args()
+if args.companion_only:
+    notes = {name: note for name, note in notes.items() if name.startswith("companion-")}
 
 OUT.mkdir(parents=True, exist_ok=True)
 manifest = {
@@ -39,7 +49,8 @@ manifest = {
     "captures": {},
 }
 for name in notes:
-    path = SOURCE / f"{name}.png"
+    source = COMPANION_SOURCE if name.startswith("companion-") else SOURCE
+    path = source / f"{name}.png"
     with Image.open(path) as image:
         # Full frames at their captured size: never crop, repaint, resize or upscale.
         if image.size != SIZE:
@@ -61,5 +72,5 @@ img{{display:block;width:100%;height:auto}}button{{background:#21262d;color:inhe
 <p>Local draft. Full 1920×1080 frames shown at 830 CSS pixels, about the README's desktop width. The owner picks the lead.</p>
 <nav>{buttons}</nav><p id="caption"></p><img id="capture" alt="Capture of the production screen">
 <p>Fictional fixtures. The player shows a still picture, not decoded video.</p>
-<script>const notes={json.dumps(notes)};function show(name){{document.getElementById('capture').src=name+'.png';document.getElementById('caption').textContent=notes[name];}}show('channels');</script></html>''')
+<script>const notes={json.dumps(notes)};function show(name){{document.getElementById('capture').src=name+'.png';document.getElementById('caption').textContent=notes[name];}}show({json.dumps(next(iter(notes)))});</script></html>''')
 print(OUT / "review.html")

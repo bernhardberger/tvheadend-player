@@ -1,4 +1,5 @@
 <resources>
+    <string name="recording_ad_break_skipped">Pausa publicitaria omitida</string>
     <string name="player_full_screen">Pantalla completa</string>
     <string name="stop">Detener</string>
     <string name="warm_playback_setting">Al navegar</string>
@@ -233,7 +234,6 @@
     <string name="error_prefix">Error:</string>
     <string name="back">Atrás</string>
     <string name="show_password">Mostrar contraseña</string>
-    <string name="hide_password">Ocultar contraseña</string>
     <string name="audio_track">Pista de audio</string>
     <string name="audio_track_unselected">Elegir pista de audio</string>
     <string name="no_audio_tracks">No hay pistas de audio disponibles.</string>
@@ -452,6 +452,29 @@
     <string name="recording_marker_previous">Marcador anterior</string>
     <string name="recording_marker_start">Inicio de la grabación</string>
     <string name="recording_marker_next">Marcador siguiente</string>
+    <string name="recording_mark_ad_break">Pausa publicitaria</string>
+    <string name="recording_mark_ads_end">Fin de los anuncios</string>
+    <string name="recording_mark_cut">Corte</string>
+    <string name="recording_mark_cut_ends">Fin del corte</string>
+    <string name="recording_mark_ad_badge">Pub</string>
+    <string name="recording_mark_program_starts">Inicio del programa</string>
+    <string name="recording_mark_program_ends">Fin del programa</string>
+    <string name="skip_ad_break">Saltar pausa publicitaria</string>
+    <string name="settings_section_recording_marks">Marcadores de grabación</string>
+    <string name="ad_breaks_setting">Pausas publicitarias</string>
+    <string name="ad_breaks_ask">Preguntar</string>
+    <string name="ad_breaks_ask_help">Cuando empieza una pausa, muestra sobre el vídeo un botón para saltarla.</string>
+    <string name="ad_breaks_automatic">Saltar automáticamente</string>
+    <string name="ad_breaks_automatic_help">Salta cada pausa una vez. Si retrocedes hasta ella, se reproduce.</string>
+    <string name="ad_breaks_off">Desactivado</string>
+    <string name="ad_breaks_off_help">Las pausas publicitarias se reproducen como el resto. Siguen apareciendo en la línea de tiempo.</string>
+    <string name="skip_cuts_setting">Saltar cortes</string>
+    <string name="skip_cuts_setting_description">Salta las partes marcadas como cortes. La grabación en sí no se acorta.</string>
+    <string name="skip_landing_setting">Punto de reanudación</string>
+    <string name="skip_landing_description">Dónde continúa la reproducción tras saltar un corte o una pausa publicitaria.</string>
+    <string name="skip_landing_end">Al final</string>
+    <string name="skip_landing_two_seconds">2 s antes del final</string>
+    <string name="skip_landing_five_seconds">5 s antes del final</string>
     <string name="pause">Pausa</string>
     <string name="seek_back_30">−30 segundos</string>
     <string name="seek_forward_30">+30 segundos</string>
@@ -731,4 +754,9 @@
         <item quantity="many">%1$d más programadas</item>
         <item quantity="other">%1$d más programadas</item>
     </plurals>
+    <string name="appliance_companion">Aplicación complementaria del modo televisor</string>
+    <string name="appliance_companion_not_installed">No instalada</string>
+    <string name="appliance_companion_description">Una aplicación complementaria opcional permite que Tvheadend Player funcione como la aplicación de sintonizador integrada del televisor. Abre el reproductor al encender el televisor, puede hacerse cargo de botones del mando como TV y Guide y sustituir la pantalla de inicio. Es una aplicación independiente disponible en las versiones del proyecto en GitHub y se actualiza desde allí.</string>
+    <string name="appliance_companion_install_info">Para configurarla, escanea el código o abre github.com/bernhardberger/tvheadend-player en un teléfono u ordenador y sigue los pasos del apartado «Appliance companion».</string>
+    <string name="appliance_companion_qr_description">Código QR con los pasos para configurar la aplicación complementaria del modo televisor</string>
 </resources>

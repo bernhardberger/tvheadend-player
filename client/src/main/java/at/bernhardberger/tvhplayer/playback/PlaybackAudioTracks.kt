@@ -141,10 +141,10 @@ internal class PlaybackAudioTracks(
         targetCommands.runIfOpen { frameRate.setSwitching(switching) }
     }
 
-    fun configureAudioOutputBeforeFirstTargetLocked(value: PlayerSettings) {
+    fun configureAudioOutputBeforeFirstTargetLocked(enabled: Boolean) {
         targetCommands.runIfOpen {
             if (!audioOutputConfigured) {
-                audioOutput.configurePassthrough(value.audioPassthroughEnabled)
+                audioOutput.configurePassthrough(enabled)
                 audioOutputConfigured = true
             }
         }

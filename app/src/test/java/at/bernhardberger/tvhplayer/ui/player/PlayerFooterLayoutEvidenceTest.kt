@@ -67,6 +67,7 @@ import at.bernhardberger.tvhplayer.core.PlayerForegroundLayer
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.playback.TimeshiftSeekDecision
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
 import at.bernhardberger.tvhplayer.ui.TvOverlayFooterGradientRunout
 import coil3.ImageLoader
 import coil3.map.Mapper
@@ -372,7 +373,7 @@ class PlayerFooterLayoutEvidenceTest {
     @Test fun pendingRecordingSeekCanOpenAndDismissMarkers() {
         var commits = 0
         show(behind = { true }, feedback = { null }, previewing = { true }, fontScale = 1.3f,
-            recording = true, markers = listOf(0L, 900_000L, 2_700_000L), onCommitSeek = { commits++ })
+            recording = true, marks = chapterMarks(900_000L, 2_700_000L), onCommitSeek = { commits++ })
         key(Key.DirectionUp)
         key(Key.DirectionUp)
         compose.onNodeWithTag("recording-marker-target").assertIsFocused()
@@ -394,7 +395,7 @@ class PlayerFooterLayoutEvidenceTest {
         val backdrop = mutableStateOf(Backdrop.WHITE)
         show(behind = { true }, feedback = { null }, previewing = { true }, fontScale = fontScale,
             recording = true, backdrop = { backdrop.value },
-            markers = listOf(0L, 900_000L, 2_700_000L, 3_599_999L),
+            marks = chapterMarks(900_000L, 2_700_000L, 3_599_999L),
             markerNavigation = navigation, markerRevision = 42L, onSeekMarker = seeks::add)
         key(Key.DirectionUp)
         key(Key.DirectionUp)
@@ -410,10 +411,19 @@ class PlayerFooterLayoutEvidenceTest {
             val tick = bounds("recording-selected-marker")
             val position = track.left + track.width * fraction
             assertEquals(position.coerceIn(track.left + 0.5f, track.right - 0.5f), tick.center.x, 1f)
-            assertEquals(position.coerceIn(track.left + button.width / 2f, track.right - button.width / 2f), label.center.x, 1f)
-            assertTrue(label.left >= track.left && label.right <= track.right)
-            assertTrue(button.left >= track.left - 1f && button.right <= track.right + 1f)
+            // The pill centres on its tick and may reach past the track over the endpoint labels,
+            // but never past the screen's horizontal safe margins.
+            val margin = px(TvGridHorizontalMargin)
+            val screen = compose.onRoot().fetchSemanticsNode().boundsInRoot
+            val low = minOf(track.left, margin)
+            val high = maxOf(track.right - button.width, screen.right - margin - button.width)
+            val expectedLeft = (position - button.width / 2f).coerceIn(low, maxOf(low, high))
+            assertEquals(expectedLeft + button.width / 2f, label.center.x, 1f)
+            assertTrue(button.left >= margin.coerceAtMost(track.left) - 1f)
+            assertTrue(button.right <= maxOf(track.right, screen.right - margin) + 1f)
         }
+        assertMarker(0.25f) // midpoint entry chooses the earlier of the two equally distant marks
+        key(Key.DirectionRight)
         assertMarker(0.75f)
         recordPair(if (fontScale == 1f) "en-font1.0-960x540-mdpi-d1" else "de-font1.3-960x540-mdpi-d1",
             "recording-marker-selected-75", "recording-marker-target", backdrop)
@@ -430,16 +440,16 @@ class PlayerFooterLayoutEvidenceTest {
         assertFalse(navigation.open)
         compose.onNodeWithTag("player-seekbar").assertIsFocused()
         key(Key.DirectionUp)
-        assertMarker(0.75f)
+        assertMarker(0.25f)
         key(Key.Back)
         compose.onNodeWithTag("player-seekbar").assertIsFocused()
         key(Key.DirectionUp)
-        assertMarker(0.75f)
+        assertMarker(0.25f)
         key(Key.DirectionDown)
         compose.onNodeWithTag("player-seekbar").assertIsFocused()
         key(Key.DirectionUp)
         key(Key.DirectionCenter)
-        assertEquals(listOf(2_700_000L), seeks)
+        assertEquals(listOf(900_000L), seeks)
         compose.onNodeWithTag("player-seekbar").assertIsFocused()
     }
 
@@ -509,9 +519,9 @@ class PlayerFooterLayoutEvidenceTest {
         compose.waitForIdle()
         compose.mainClock.advanceTimeByFrame()
         compose.mainClock.advanceTimeBy(96)
-        assertTrue("intermediate alpha=${alpha.value}", alpha.value > 0.55f && alpha.value < 1f)
+        assertEquals(1f, alpha.value, 0.001f)
         compose.mainClock.advanceTimeBy(240)
-        assertEquals(0.55f, alpha.value, 0.001f)
+        assertEquals(1f, alpha.value, 0.001f)
         compose.runOnIdle { preview = true }
         compose.waitForIdle()
         compose.mainClock.advanceTimeByFrame()
@@ -789,7 +799,7 @@ class PlayerFooterLayoutEvidenceTest {
     }
 
     @Test
-    fun focusGrowthSurvivesIntermediateActionFadeAndSettledFrame() {
+    fun focusGrowthSurvivesSeekbarReturnAndSettledFrame() {
         show({ false }, { null }, { false }, 1f)
         val nominalActions = bounds("player-actions")
         val track = bounds("player-timeline-track")
@@ -813,8 +823,7 @@ class PlayerFooterLayoutEvidenceTest {
         val settledInterior = android.graphics.Color.red(settled.getPixel(x, nominalActions.top.toInt() + 7))
         assertTrue("mid-fade overflow cropped: $midOverflow", midOverflow > 90)
         assertTrue("settled overflow cropped: $settledOverflow", settledOverflow > 150)
-        assertTrue("capture must be between alpha .55 and 1: $midInterior / $settledInterior",
-            midInterior in 91 until settledInterior)
+        assertEquals("the action row stays fully opaque across seekbar focus", settledInterior, midInterior)
         assertEquals(nominalActions, bounds("player-actions"))
         assertEquals(track, bounds("player-timeline-track"))
         capture("en-font1.0-960x540-mdpi-d1-white-focus-settled")
@@ -834,7 +843,7 @@ class PlayerFooterLayoutEvidenceTest {
         recording: Boolean = false,
         standalone: () -> Boolean = { false },
         onCommitSeek: () -> Unit = {},
-        markers: List<Long> = emptyList(),
+        marks: List<at.bernhardberger.tvhplayer.core.RecordingMark> = emptyList(),
         markerNavigation: RecordingMarkerNavigation = RecordingMarkerNavigation(),
         markerRevision: Long = 0L,
         onSeekMarker: (Long) -> Unit = {},
@@ -897,7 +906,7 @@ class PlayerFooterLayoutEvidenceTest {
                         } else if (recording) RecordingChromeFixture(
                             positionMs = 1_800_000, durationMs = recordingDurationMs, targetMs = 1_800_000L.takeIf { previewing() },
                             growing = growing(), paused = paused(), info = fixtureRecordingInfo(title, growing(), durationMs = recordingDurationMs),
-                            onCommitSeek = onCommitSeek, markers = markers,
+                            onCommitSeek = onCommitSeek, marks = marks,
                             markerNavigation = markerNavigation, markerRevision = markerRevision, onSeekMarker = onSeekMarker,
                         ) else ProvideArtworkSession(session) { PlayerChrome(
                             mode = PlayerChromeMode.CONTROLS,

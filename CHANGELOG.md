@@ -7,6 +7,83 @@
 - A removed recording no longer hides another recording of the same program, and retention cleanup no longer repeats the “Recording deleted” notice.
 - Recent channels, channel tags, channel aspect settings, the selected stream profile and audio choices start fresh after this update; they are now kept per connection.
 
+## 0.4.10
+
+### Recordings
+
+- The timeline shows ad breaks, cuts and chapters from Tvheadend's .txt and
+  .edl files or the recording itself, and where the program starts and ends
+  inside the recording's padding. Small symbols above the bar show them while
+  the seekbar is focused (#8).
+- Up from the seekbar opens the marks at the nearest one, Left and Right move
+  between them, and each shows its name, such as *Ad break*, *Ads end* or
+  *Program starts*. OK jumps there (#10).
+- When playback reaches an ad break, a *Skip ad break* button counts down for
+  10 seconds. OK jumps to the end of the break, Back dismisses it (#9).
+- Settings → Playback has a new *Recording marks* group: skip ad breaks
+  automatically or turn the button off, skip cuts, and choose where playback
+  continues after a skip.
+- Cuts marked in .edl files are skipped, and mute spans stay silent.
+
+### Settings
+
+- Back from a settings page now returns focus to the row that opened it.
+
+## 0.4.9
+
+### Player
+
+- The *Audio* button in the player controls now opens a list where moving
+  through the tracks no longer switches the sound; OK picks the track. The
+  remote's own Audio button still switches as you move. The *Subtitles* button
+  is gone from the controls; subtitles stay under *Playback options*.
+- Leaving the player for a browse screen while the channel keeps playing no
+  longer makes the TV switch its refresh rate back and forth, for example on an
+  NVIDIA Shield with *Match content frame rate* (#14).
+
+## 0.4.8
+
+### Player
+
+- Playback no longer pauses when the TV switches its refresh rate, for example
+  on an NVIDIA Shield with *Match content frame rate* (#15).
+- With *Audio passthrough* on, the sound now moves to headphones when you
+  connect them, and back to the AV receiver when you disconnect them (#16).
+
+### Settings
+
+- The password field no longer suggests or learns words from the keyboard, and
+  a *Show password* checkbox below it replaces the eye button.
+
+## 0.4.7
+
+### Player
+
+- With *Match content frame rate* set to Always, the TV now switches its
+  refresh rate on Android 11 and older too, for example on the NVIDIA Shield
+  (#14).
+- A Guide press from the appliance companion opens the channel schedule beside
+  the picture during live TV, and the full Guide everywhere else.
+
+### Settings
+
+- Settings → Appliance is always there. Without the companion, it explains what
+  the companion does and shows a QR code that leads to its setup steps.
+
+### Appliance companion 0.2.0
+
+- New Functions section: choose which remote button opens live TV and which
+  opens the Guide, or set none. Choose a function, then press the button on
+  the remote.
+- Opening the player when the TV turns on can be switched off, if you only
+  want the buttons.
+- The TV button still opens live TV. The Guide button now opens the Guide.
+- The companion now tells you when the TV keeps its accessibility service from
+  running, and how to fix that.
+- A downloaded update now says it installs in standby, or you can pick
+  Update now.
+- Setup steps and TV notes are in the README under Appliance companion.
+
 ## 0.4.6
 
 ### Appliance companion

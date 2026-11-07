@@ -1,4 +1,5 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="recording_ad_break_skipped">Рекламну паузу пропущено</string>
     <string name="player_full_screen">Повний екран</string>
     <string name="stop">Зупинити</string>
     <string name="warm_playback_setting">Під час перегляду меню</string>
@@ -233,7 +234,6 @@
     <string name="error_prefix">Помилка:</string>
     <string name="back">Назад</string>
     <string name="show_password">Показати пароль</string>
-    <string name="hide_password">Приховати пароль</string>
     <string name="audio_track">Звукова доріжка</string>
     <string name="audio_track_unselected">Вибрати звукову доріжку</string>
     <string name="no_audio_tracks">Немає доступних звукових доріжок.</string>
@@ -461,6 +461,29 @@
     <string name="recording_marker_previous">Попередня мітка</string>
     <string name="recording_marker_start">Початок запису</string>
     <string name="recording_marker_next">Наступна мітка</string>
+    <string name="recording_mark_ad_break">Рекламна пауза</string>
+    <string name="recording_mark_ads_end">Кінець реклами</string>
+    <string name="recording_mark_cut">Вирізаний фрагмент</string>
+    <string name="recording_mark_cut_ends">Кінець вирізаного фрагмента</string>
+    <string name="recording_mark_ad_badge">Рек.</string>
+    <string name="recording_mark_program_starts">Початок передачі</string>
+    <string name="recording_mark_program_ends">Кінець передачі</string>
+    <string name="skip_ad_break">Пропустити рекламу</string>
+    <string name="settings_section_recording_marks">Мітки запису</string>
+    <string name="ad_breaks_setting">Рекламні паузи</string>
+    <string name="ad_breaks_ask">Запитувати</string>
+    <string name="ad_breaks_ask_help">На початку паузи поверх відео з’являється кнопка пропуску.</string>
+    <string name="ad_breaks_automatic">Пропускати автоматично</string>
+    <string name="ad_breaks_automatic_help">Пропускає кожну паузу один раз. Якщо перемотати назад усередину паузи, вона відтворюватиметься.</string>
+    <string name="ad_breaks_off">Вимк.</string>
+    <string name="ad_breaks_off_help">Рекламні паузи відтворюються як решта запису. Вони й далі відображаються на часовій шкалі.</string>
+    <string name="skip_cuts_setting">Пропускати вирізані фрагменти</string>
+    <string name="skip_cuts_setting_description">Пропускає частини, позначені як вирізані. Сам запис не скорочується.</string>
+    <string name="skip_landing_setting">Точка продовження</string>
+    <string name="skip_landing_description">Де продовжується відтворення після пропуску вирізаного фрагмента або рекламної паузи.</string>
+    <string name="skip_landing_end">У кінці</string>
+    <string name="skip_landing_two_seconds">За 2 с до кінця</string>
+    <string name="skip_landing_five_seconds">За 5 с до кінця</string>
     <string name="pause">Пауза</string>
     <string name="seek_back_30">−30 секунд</string>
     <string name="seek_forward_30">+30 секунд</string>
@@ -748,4 +771,9 @@
         <item quantity="many">Ще %1$d запланованих записів</item>
         <item quantity="other">Ще %1$d запланованого запису</item>
     </plurals>
+    <string name="appliance_companion">Застосунок-компаньйон для режиму ТВ-приставки</string>
+    <string name="appliance_companion_not_installed">Не встановлено</string>
+    <string name="appliance_companion_description">Необов\'язковий застосунок-компаньйон дає змогу Tvheadend Player працювати як вбудований застосунок ТВ-тюнера. Він відкриває програвач після ввімкнення телевізора, може перехоплювати кнопки пульта, як-от TV і Guide, та замінювати головний екран. Це окремий застосунок із випусків проєкту на GitHub, звідки він самостійно оновлюється.</string>
+    <string name="appliance_companion_install_info">Для налаштування відскануйте код або відкрийте github.com/bernhardberger/tvheadend-player на телефоні чи комп\'ютері, а потім виконайте кроки з розділу «Appliance companion».</string>
+    <string name="appliance_companion_qr_description">QR-код з інструкціями з налаштування застосунку-компаньйона для режиму ТВ-приставки</string>
 </resources>

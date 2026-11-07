@@ -28,6 +28,31 @@ import org.robolectric.util.ReflectionHelpers
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], shadows = [CompanionUpdateTest.ConnectedServiceShadow::class])
 class CompanionUpdateTest {
+    @Test fun interruptedCheckAfterAPastSuccessDoesNotReportAnotherInstallationSuccess() {
+        val context = RuntimeEnvironment.getApplication()
+        val store = UpdateStore(context)
+        store.setResult(UpdateResult.SUCCESS)
+        store.recordCheck()
+        assertEquals(UpdateResult.NEVER, UpdateStore(context).interruptedCheckResult())
+        UpdateStore(context).reconcileInstalledVersion()
+        assertEquals(UpdateResult.NEVER, store.result)
+    }
+
+    @Test fun interruptedCheckRestoresItsDurableStartingResultUnlessANewerArchiveWasVerified() {
+        val context = RuntimeEnvironment.getApplication()
+        val store = UpdateStore(context)
+        store.setResult(UpdateResult.UP_TO_DATE)
+        store.recordCheck()
+        val restarted = UpdateStore(context)
+        assertEquals(UpdateResult.UP_TO_DATE, restarted.interruptedCheckResult())
+        restarted.reconcileInstalledVersion()
+        assertEquals(UpdateResult.UP_TO_DATE, restarted.result)
+        store.setResult(UpdateResult.WAITING_STANDBY)
+        store.recordCheck()
+        assertEquals(UpdateResult.NEVER, store.interruptedCheckResult())
+        store.setLatest("verified newer fixture")
+        assertEquals(UpdateResult.WAITING_STANDBY, store.interruptedCheckResult())
+    }
     // Robolectric has no accessibility-system IPC connection. Supply only its service-info calls.
     @Implements(AccessibilityService::class)
     class ConnectedServiceShadow : ShadowAccessibilityService() {

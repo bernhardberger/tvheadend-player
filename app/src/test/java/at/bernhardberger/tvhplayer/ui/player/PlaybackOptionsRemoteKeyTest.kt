@@ -553,6 +553,133 @@ class PlaybackOptionsRemoteKeyTest {
         assertTrue(player.audioOverrides().isEmpty())
     }
 
+    @Test
+    fun theAudioButtonPickerOpensOnTheCheckedRowAndAppliesNothingWhileFocusMoves() {
+        show()
+        openPicker()
+        assertEquals(PlaybackOptionsPage.AUDIO, layerState.core.optionsPage)
+        compose.onNodeWithTag(AUTOMATIC_ROW).assertIsFocused()
+
+        press(Key.DirectionDown)
+        press(Key.DirectionDown)
+        compose.onNodeWithTag(SECOND_ROW).assertIsFocused()
+        advance(PLAYBACK_QUICK_LIST_SETTLE_MS + 500)
+        assertEquals(0, player.selectionChanges)
+        assertTrue(player.audioOverrides().isEmpty())
+        assertEquals(PlaybackOptionsPage.AUDIO, layerState.core.optionsPage)
+    }
+
+    @Test
+    fun okInTheAudioButtonPickerAppliesTheFocusedRowAndCloses() {
+        show()
+        openPicker()
+        press(Key.DirectionDown)
+        press(Key.DirectionDown)
+        advance(PLAYBACK_QUICK_LIST_SETTLE_MS + 50)
+        assertEquals(0, player.selectionChanges)
+
+        press(Key.DirectionCenter)
+        assertNull(layerState.core.optionsPage)
+        assertFalse(layerState.core.optionsQuickList)
+        assertEquals(listOf("second"), player.audioOverrides())
+        assertEquals(1, player.selectionChanges)
+    }
+
+    @Test
+    fun backInTheAudioButtonPickerClosesWithoutChangingTheAudio() {
+        show()
+        openPicker()
+        press(Key.DirectionDown)
+        advance(PLAYBACK_QUICK_LIST_SETTLE_MS + 50)
+
+        press(Key.Back)
+        assertNull(layerState.core.optionsPage)
+        assertEquals(0, player.selectionChanges)
+        assertEquals(0, automaticAudioRequests)
+        assertTrue(player.audioOverrides().isEmpty())
+    }
+
+    @Test
+    fun theAudioButtonPickerStaysOpenPastTheQuickListAutoClose() {
+        show()
+        openPicker()
+        press(Key.DirectionDown)
+        advance(PLAYBACK_QUICK_LIST_AUTO_CLOSE_MS + 1000)
+        assertEquals(PlaybackOptionsPage.AUDIO, layerState.core.optionsPage)
+        compose.onNodeWithTag(MAIN_ROW).assertIsFocused()
+        assertEquals(0, player.selectionChanges)
+    }
+
+    @Test
+    fun theHotkeyListPreviewsAgainAfterAPickerWasUsed() {
+        show()
+        openPicker()
+        press(Key.Back)
+        assertNull(layerState.core.optionsPage)
+
+        press(Key.MediaAudioTrack)
+        press(Key.DirectionDown)
+        advance(PLAYBACK_QUICK_LIST_SETTLE_MS + 50)
+        assertEquals(listOf("main"), player.audioOverrides())
+        assertEquals(1, player.selectionChanges)
+    }
+
+    @Test
+    fun aPickerClosedByOtherMeansAppliesNothingOfWhatItBrowsed() {
+        show()
+        openPicker()
+        press(Key.DirectionDown)
+        press(Key.DirectionDown)
+        advance(PLAYBACK_QUICK_LIST_SETTLE_MS + 50)
+        compose.runOnIdle { layerState.core.closeQuickList() }
+        frames()
+        assertNull(layerState.core.optionsPage)
+        assertEquals(0, player.selectionChanges)
+        assertTrue(player.audioOverrides().isEmpty())
+    }
+
+    @Test
+    fun theAudioHotkeyTurnsAnOpenPickerIntoTheHotkeyList() {
+        show()
+        openPicker()
+        compose.onNodeWithTag(AUTOMATIC_ROW).assertIsFocused()
+
+        press(Key.MediaAudioTrack)
+        compose.onNodeWithTag(MAIN_ROW).assertIsFocused()
+        assertEquals(0, player.selectionChanges)
+        advance(PLAYBACK_QUICK_LIST_SETTLE_MS + 50)
+        assertEquals(listOf("main"), player.audioOverrides())
+        assertEquals(1, player.selectionChanges)
+
+        advance(PLAYBACK_QUICK_LIST_AUTO_CLOSE_MS + 100)
+        assertNull(layerState.core.optionsPage)
+        assertEquals(listOf("main"), player.audioOverrides())
+        assertEquals(1, player.selectionChanges)
+    }
+
+    @Test
+    fun theSubtitlesHotkeyOnAnOpenPickerOpensThePreviewingSubtitlesList() {
+        show()
+        openPicker()
+        press(Key.DirectionDown)
+        advance(PLAYBACK_QUICK_LIST_SETTLE_MS + 50)
+        assertEquals(0, player.selectionChanges)
+
+        press(Key.Captions)
+        assertEquals(PlaybackOptionsPage.SUBTITLES, layerState.core.optionsPage)
+        compose.onNodeWithTag(OFF_ROW).assertIsFocused()
+        press(Key.DirectionDown)
+        compose.onNodeWithTag(SUBTITLE_ROW).assertIsFocused()
+        advance(PLAYBACK_QUICK_LIST_SETTLE_MS + 50)
+        assertEquals(listOf("dvb"), player.textOverrides())
+        assertTrue("the audio the picker only browsed stays unapplied", player.audioOverrides().isEmpty())
+    }
+
+    private fun openPicker() {
+        compose.runOnIdle { layerState.core.showAudioPicker() }
+        frames()
+    }
+
     private fun queuedAudio() = quickAudioQueue.map { (epoch, override) -> epoch to override?.mediaTrackGroup?.id }
 
     private fun show(

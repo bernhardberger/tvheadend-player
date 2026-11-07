@@ -1,4 +1,5 @@
 <resources>
+    <string name="recording_ad_break_skipped">Pausa pubblicitaria saltata</string>
     <string name="player_full_screen">Schermo intero</string>
     <string name="stop">Interrompi</string>
     <string name="warm_playback_setting">Durante la navigazione</string>
@@ -233,7 +234,6 @@
     <string name="error_prefix">Errore:</string>
     <string name="back">Indietro</string>
     <string name="show_password">Mostra password</string>
-    <string name="hide_password">Nascondi password</string>
     <string name="audio_track">Traccia audio</string>
     <string name="audio_track_unselected">Scegli traccia audio</string>
     <string name="no_audio_tracks">Nessuna traccia audio disponibile.</string>
@@ -452,6 +452,29 @@
     <string name="recording_marker_previous">Marcatore precedente</string>
     <string name="recording_marker_start">Inizio della registrazione</string>
     <string name="recording_marker_next">Marcatore successivo</string>
+    <string name="recording_mark_ad_break">Pausa pubblicitaria</string>
+    <string name="recording_mark_ads_end">Fine pubblicità</string>
+    <string name="recording_mark_cut">Taglio</string>
+    <string name="recording_mark_cut_ends">Fine taglio</string>
+    <string name="recording_mark_ad_badge">Pubbl.</string>
+    <string name="recording_mark_program_starts">Inizio programma</string>
+    <string name="recording_mark_program_ends">Fine programma</string>
+    <string name="skip_ad_break">Salta pausa pubblicitaria</string>
+    <string name="settings_section_recording_marks">Marcatori di registrazione</string>
+    <string name="ad_breaks_setting">Pause pubblicitarie</string>
+    <string name="ad_breaks_ask">Chiedi</string>
+    <string name="ad_breaks_ask_help">All’inizio di una pausa mostra sul video un pulsante per saltarla.</string>
+    <string name="ad_breaks_automatic">Salta automaticamente</string>
+    <string name="ad_breaks_automatic_help">Salta ogni pausa una volta. Se torni indietro nella pausa, viene riprodotta.</string>
+    <string name="ad_breaks_off">Disattivo</string>
+    <string name="ad_breaks_off_help">Le pause pubblicitarie vengono riprodotte come il resto. Restano visibili sulla sequenza temporale.</string>
+    <string name="skip_cuts_setting">Salta tagli</string>
+    <string name="skip_cuts_setting_description">Salta le parti segnate come tagli. La registrazione stessa non viene accorciata.</string>
+    <string name="skip_landing_setting">Punto di ripresa</string>
+    <string name="skip_landing_description">Dove continua la riproduzione dopo aver saltato un taglio o una pausa pubblicitaria.</string>
+    <string name="skip_landing_end">Alla fine</string>
+    <string name="skip_landing_two_seconds">2 s prima della fine</string>
+    <string name="skip_landing_five_seconds">5 s prima della fine</string>
     <string name="pause">Pausa</string>
     <string name="seek_back_30">−30 secondi</string>
     <string name="seek_forward_30">+30 secondi</string>
@@ -731,4 +754,9 @@
         <item quantity="many">%1$d altre programmate</item>
         <item quantity="other">%1$d altre programmate</item>
     </plurals>
+    <string name="appliance_companion">App complementare per la modalità TV</string>
+    <string name="appliance_companion_not_installed">Non installata</string>
+    <string name="appliance_companion_description">Un\'app complementare facoltativa permette a Tvheadend Player di funzionare come l\'app del sintonizzatore integrato nel televisore. Apre il lettore all\'accensione del televisore, può gestire i tasti del telecomando come TV e Guide e sostituire la schermata iniziale. È un\'app separata disponibile nelle release GitHub del progetto e si aggiorna da lì.</string>
+    <string name="appliance_companion_install_info">Per configurarla, scansiona il codice o apri github.com/bernhardberger/tvheadend-player su un telefono o un computer, poi segui i passaggi nella sezione «Appliance companion».</string>
+    <string name="appliance_companion_qr_description">Codice QR per i passaggi di configurazione dell\'app complementare per la modalità TV</string>
 </resources>

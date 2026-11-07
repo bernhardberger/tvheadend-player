@@ -28,7 +28,6 @@ import androidx.tv.material3.IconButton
 import androidx.tv.material3.IconButtonDefaults
 import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.ui.TvOverlayActionGap
 
 /** Material disabled content alpha, used for a pause control that stays focusable. */
@@ -64,28 +63,21 @@ internal fun PlayerActionRow(
     onSchedule: (() -> Unit)? = null,
     scheduleAvailable: Boolean = true,
     scheduleFocus: FocusRequester? = null,
-    /** Audio and Subtitles stand beside Info only while their list has a choice to make. */
+    /** Audio stands beside Info only while its list has a choice to make. */
     tracks: PlayerTrackButtons = PlayerTrackButtons(),
-    onTrackList: (PlaybackOptionsPage) -> Unit = {},
+    onAudioList: () -> Unit = {},
     audioFocus: FocusRequester? = null,
-    subtitlesFocus: FocusRequester? = null,
 ) {
     val playPause = stringResource(if (paused) R.string.play else R.string.pause)
     val settings = stringResource(R.string.nav_settings)
     val stop = stringResource(R.string.stop_playback)
     val audio = stringResource(R.string.audio_quick_list)
-    val subtitles = stringResource(R.string.subtitles)
     val actions = listOfNotNull(
         PlayerAction("player-pause", playPause,
             if (paused) R.drawable.ic_play_arrow else R.drawable.ic_pause, onTogglePause, pauseFocus),
         PlayerAction("player-stop", stop, R.drawable.ic_stop, onStop, stopFocus),
         tracks.audio?.let {
-            PlayerAction("player-audio", audio, R.drawable.ic_audiotrack,
-                { onTrackList(PlaybackOptionsPage.AUDIO) }, audioFocus, it)
-        },
-        tracks.subtitles?.let {
-            PlayerAction("player-subtitles", subtitles, R.drawable.ic_subtitles,
-                { onTrackList(PlaybackOptionsPage.SUBTITLES) }, subtitlesFocus, it)
+            PlayerAction("player-audio", audio, R.drawable.ic_audiotrack, onAudioList, audioFocus, it)
         },
         PlayerAction("player-info", stringResource(R.string.details_program), R.drawable.ic_info, onInfo, infoFocus),
         onSchedule?.let { PlayerAction("player-schedule", stringResource(R.string.channel_schedule), R.drawable.ic_event_list, it, scheduleFocus) },

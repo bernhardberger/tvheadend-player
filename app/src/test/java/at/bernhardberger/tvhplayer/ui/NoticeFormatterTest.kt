@@ -38,6 +38,12 @@ class NoticeFormatterTest {
             formatter.format(Notice.ServerProfileRemoved(id, "kids on tvheadend.home.arpa")).headline)
     }
 
+    @Test fun automaticAdSkipUsesInformationalEnglishText() {
+        assertEquals("Ad break skipped", formatter.format(Notice.AutomaticAdBreakSkip(1_000)).headline)
+        assertEquals(at.bernhardberger.tvhplayer.notices.NoticeSeverity.INFO, Notice.AutomaticAdBreakSkip(1_000).severity)
+        assertFalse(Notice.AutomaticAdBreakSkip(1_000).key == Notice.AutomaticAdBreakSkip(3_000).key)
+    }
+
     @Test fun unavailablePauseNamesTheSettingOrChannel() {
         assertEquals("Timeshift is off in Settings.",
             formatter.format(Notice.PauseUnavailable(PauseUnavailableReason.SETTINGS_OFF)).headline)

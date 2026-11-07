@@ -2,6 +2,9 @@ package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -10,11 +13,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.tv.material3.LocalContentColor
 import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
-import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.core.PlayerStateCell
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
@@ -22,6 +23,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
@@ -84,8 +86,8 @@ internal fun PlayerChromeControls(
     onStop: () -> Unit,
     onInfo: () -> Unit,
     onOptions: () -> Unit,
-    /** Opens the Audio or Subtitles quick list from its action-row button. */
-    onTrackList: (PlaybackOptionsPage) -> Unit,
+    /** Opens the Audio list from its action-row button. */
+    onAudioList: () -> Unit,
     onInteraction: () -> Unit,
     onCommitSeek: () -> Unit,
     onPauseUnavailable: () -> Unit,
@@ -118,7 +120,6 @@ internal fun PlayerChromeControls(
     val infoFocus = remember { FocusRequester() }
     val scheduleFocus = remember { FocusRequester() }
     val audioFocus = remember { FocusRequester() }
-    val subtitlesFocus = remember { FocusRequester() }
     val settingsFocus = remember { FocusRequester() }
     val timelineFocus = remember { FocusRequester() }
     val stopFocus = remember { FocusRequester() }
@@ -154,29 +155,44 @@ internal fun PlayerChromeControls(
     var lastFocusedControl by remember { mutableStateOf<String?>(null) }
     var relocatingKey by remember { mutableStateOf<Key?>(null) }
     var timelineFocused by remember { mutableStateOf(false) }
+    val repeatInterval = remember { mutableStateOf<Int?>(null) }
+    val settlingHold = remember { mutableStateOf(false) }
+    val positionSpec = remember { mutableStateOf<AnimationSpec<Float>>(tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard)) }
+    LaunchedEffect(timelineFocused, actions.active, covered) {
+        if (!timelineFocused || !actions.active || covered) {
+            repeatInterval.value = null
+            settlingHold.value = false
+            positionSpec.value = tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard)
+        }
+    }
+    LaunchedEffect(settlingHold.value) {
+        if (settlingHold.value) {
+            kotlinx.coroutines.delay(PlayerMotion.MediumMs.toLong())
+            settlingHold.value = false
+            positionSpec.value = tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard)
+        }
+    }
+    val keyTimes = remember { longArrayOf(0L) }
     val chromeAlpha = rememberPlayerChromeAlpha(timelineFocused, previewing)
     val chromeHidden = timelineFocused && previewing
     // Capture ownership before the timeline's focus node goes. Compose may automatically focus a
     // surviving action during apply; that must not erase the disappearing node's fallback.
     val removedFocusTarget = when (lastFocusedControl) {
         "player-seekbar" -> if (timelineFocusable) timelineFocus else initialFocus
-        // A track button goes with its choice (zap pending, failure, fewer tracks); its neighbour Info takes over.
+        // The Audio button goes with its choice (zap pending, failure, fewer tracks); its neighbour Info takes over.
         "player-audio" -> if (actions.tracks.audio != null) audioFocus else infoFocus
-        "player-subtitles" -> if (actions.tracks.subtitles != null) subtitlesFocus else infoFocus
         else -> null
     }
     val pageActive = LocalPlayerPageActive.current
     val audioShown = actions.tracks.audio != null
-    val subtitlesShown = actions.tracks.subtitles != null
-    LaunchedEffect(actions.active, restoreFocus, seekable, pausable, pageActive, audioShown, subtitlesShown) {
+    LaunchedEffect(actions.active, restoreFocus, seekable, pausable, pageActive, audioShown) {
         if (actions.active && pageActive) {
             val target = when (restoreFocus) {
                 null -> null
                 "player-info" -> infoFocus
                 "player-schedule" -> scheduleFocus
-                // A track button gone with its choice hands focus to its neighbour, Info.
+                // The Audio button gone with its choice hands focus to its neighbour, Info.
                 "player-audio" -> if (actions.tracks.audio != null) audioFocus else infoFocus
-                "player-subtitles" -> if (actions.tracks.subtitles != null) subtitlesFocus else infoFocus
                 "player-settings" -> settingsFocus
                 "player-stop" -> stopFocus
                 "player-seekbar" -> timelineFocus.takeIf { timelineFocusable }
@@ -202,10 +218,7 @@ internal fun PlayerChromeControls(
         val restorationBaseline = remember { markerNavigation.restoration }
         LaunchedEffect(markerNavigation.restoration) {
             if (markerNavigation.restoration > restorationBaseline && actions.active) {
-                when {
-                    seekable -> timelineFocus.requestFocus()
-                    else -> initialFocus.requestFocus()
-                }
+                if (seekable) timelineFocus.requestFocus() else initialFocus.requestFocus()
             }
         }
         LaunchedEffect(recording.markers, seekable, actions.active) {
@@ -220,7 +233,6 @@ internal fun PlayerChromeControls(
         "player-info" -> infoFocus
         "player-schedule" -> scheduleFocus
         "player-audio" -> if (actions.tracks.audio != null) audioFocus else infoFocus
-        "player-subtitles" -> if (actions.tracks.subtitles != null) subtitlesFocus else infoFocus
         else -> pauseFocus
     }
     val belowIdentity = if (timelineFocusable) timelineFocus else actionFocus
@@ -229,6 +241,7 @@ internal fun PlayerChromeControls(
         belowIdentity.requestFocus()
     }
     // The decoration follows the action row, which fades in last when taken over from the Banner.
+    CompositionLocalProvider(LocalTimelinePositionSpec provides positionSpec) {
     decoration({ actionsAlpha() * chromeAlpha.value }) {
     PlayerOverlayChrome(
         bannerDrop = bannerDrop,
@@ -260,7 +273,22 @@ internal fun PlayerChromeControls(
                     .onPreviewKeyEvent { event ->
                         when (event.key) {
                             Key.DirectionLeft, Key.DirectionRight -> {
+                                if (event.type == KeyEventType.KeyUp) {
+                                    settlingHold.value = repeatInterval.value != null
+                                    repeatInterval.value = null
+                                    positionSpec.value = tween(PlayerMotion.MediumMs, easing =
+                                        if (settlingHold.value) PlayerMotion.StandardDecelerate else PlayerMotion.Standard)
+                                }
                                 if (actions.active && seekable && event.type == KeyEventType.KeyDown) {
+                                    val time = event.nativeKeyEvent.eventTime
+                                    if (event.nativeKeyEvent.repeatCount > 0) {
+                                        repeatInterval.value = (time - keyTimes[0]).coerceIn(33L, 100L).toInt()
+                                        positionSpec.value = tween(requireNotNull(repeatInterval.value), easing = LinearEasing)
+                                    } else {
+                                        repeatInterval.value = null; settlingHold.value = false
+                                        positionSpec.value = tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard)
+                                    }
+                                    keyTimes[0] = time
                                     onInteraction()
                                     val step = at.bernhardberger.tvhplayer.core.seekStepMs(event.nativeKeyEvent.repeatCount)
                                     val delta = if (event.key == Key.DirectionLeft) -step else step
@@ -305,25 +333,29 @@ internal fun PlayerChromeControls(
             val showPreview = previewing && !markerNavigation.open
             val infoAlpha by animateFloatAsState(if (showPreview) 0f else 1f,
                 tween(PlayerMotion.ShortMs, easing = PlayerMotion.Standard), label = "player-info-bar-seek")
-            Box(Modifier.graphicsLayer { alpha = infoAlpha }) {
-                infoBar({ 1f }, Modifier) {}
+            Box(Modifier.fillMaxWidth()) {
+                Box(Modifier.graphicsLayer { alpha = infoAlpha }) {
+                    infoBar({ 1f }, Modifier) {}
+                }
             }
-            RecordingControlsTimeline(
-                timeline = recording,
-                range = recordingRange.takeIf { seekable },
-                previewing = showPreview,
-                paused = paused,
-                state = state,
-                markerNavigation = markerNavigation,
-                onSeekMarker = onSeekMarker,
-                onOpenMarkers = {
-                    onCommitSeek(); onInteraction()
-                    markerNavigation.show(recording.markers, recording.targetMs ?: recording.positionMs,
-                        revision = recording.markerRevision)
-                },
-                onSeekTo = { onInteraction(); onSeek(it - (recording.targetMs ?: recording.positionMs)) },
-                modifier = timelineModifier,
-            )
+            Box(Modifier.fillMaxWidth()) {
+                RecordingControlsTimeline(
+                    timeline = recording,
+                    range = recordingRange.takeIf { seekable },
+                    previewing = showPreview,
+                    paused = paused,
+                    state = state,
+                    markerNavigation = markerNavigation,
+                    onSeekMarker = onSeekMarker,
+                    onOpenMarkers = {
+                        onCommitSeek(); onInteraction()
+                        markerNavigation.show(recording.markers, recording.targetMs ?: recording.positionMs,
+                            revision = recording.markerRevision)
+                    },
+                    onSeekTo = { onInteraction(); onSeek(it - (recording.targetMs ?: recording.positionMs)) },
+                    modifier = timelineModifier,
+                )
+            }
         } else if (live != null) {
         val timeshiftState = live.timeshift
         val programmeWindow = live.programmeWindow
@@ -413,9 +445,8 @@ internal fun PlayerChromeControls(
             scheduleFocus = scheduleFocus,
             infoFocus = infoFocus,
             tracks = actions.tracks,
-            onTrackList = onTrackList,
+            onAudioList = onAudioList,
             audioFocus = audioFocus,
-            subtitlesFocus = subtitlesFocus,
             onInteraction = onInteraction,
             onActionFocused = {
                 lastFocusedControl = it; lastAction = it; onActionFocused(it); onControlFocused(it)
@@ -462,6 +493,7 @@ internal fun PlayerChromeControls(
                 entering = false, inheritedFade = 0..220)
             .graphicsLayer { alpha = actionsAlpha() * chromeAlpha.value }.testTag("player-down-hint"))
         }
+    }
     }
     }
 }

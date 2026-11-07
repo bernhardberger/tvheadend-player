@@ -1,4 +1,5 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="recording_ad_break_skipped">Intervalo publicitário saltado</string>
     <string name="player_full_screen">Ecrã inteiro</string>
     <string name="stop">Parar</string>
     <string name="warm_playback_setting">Durante a navegação</string>
@@ -233,7 +234,6 @@
     <string name="error_prefix">Erro:</string>
     <string name="back">Voltar</string>
     <string name="show_password">Mostrar palavra-passe</string>
-    <string name="hide_password">Ocultar palavra-passe</string>
     <string name="audio_track">Faixa de áudio</string>
     <string name="audio_track_unselected">Escolher faixa de áudio</string>
     <string name="no_audio_tracks">Não há faixas de áudio disponíveis.</string>
@@ -416,6 +416,29 @@
     <string name="recording_marker_previous">Marcador anterior</string>
     <string name="recording_marker_start">Início da gravação</string>
     <string name="recording_marker_next">Marcador seguinte</string>
+    <string name="recording_mark_ad_break">Intervalo publicitário</string>
+    <string name="recording_mark_ads_end">Fim da publicidade</string>
+    <string name="recording_mark_cut">Corte</string>
+    <string name="recording_mark_cut_ends">Fim do corte</string>
+    <string name="recording_mark_ad_badge">Pub</string>
+    <string name="recording_mark_program_starts">Início do programa</string>
+    <string name="recording_mark_program_ends">Fim do programa</string>
+    <string name="skip_ad_break">Saltar intervalo publicitário</string>
+    <string name="settings_section_recording_marks">Marcadores de gravação</string>
+    <string name="ad_breaks_setting">Intervalos publicitários</string>
+    <string name="ad_breaks_ask">Perguntar</string>
+    <string name="ad_breaks_ask_help">Quando começa um intervalo, mostra sobre o vídeo um botão para o saltar.</string>
+    <string name="ad_breaks_automatic">Saltar automaticamente</string>
+    <string name="ad_breaks_automatic_help">Salta cada intervalo uma vez. Se recuares para dentro dele, o intervalo é reproduzido.</string>
+    <string name="ad_breaks_off">Desativado</string>
+    <string name="ad_breaks_off_help">Os intervalos publicitários são reproduzidos como o resto. Continuam visíveis na linha temporal.</string>
+    <string name="skip_cuts_setting">Saltar cortes</string>
+    <string name="skip_cuts_setting_description">Salta as partes marcadas como cortes. A gravação em si não é encurtada.</string>
+    <string name="skip_landing_setting">Ponto de retoma</string>
+    <string name="skip_landing_description">Onde a reprodução continua depois de saltar um corte ou intervalo publicitário.</string>
+    <string name="skip_landing_end">No fim</string>
+    <string name="skip_landing_two_seconds">2 s antes do fim</string>
+    <string name="skip_landing_five_seconds">5 s antes do fim</string>
     <string name="pause">Pausar</string>
     <string name="seek_back_30">−30 segundos</string>
     <string name="seek_forward_30">+30 segundos</string>
@@ -672,4 +695,9 @@
         <item quantity="many">Mais %1$d agendadas</item>
         <item quantity="other">Mais %1$d agendadas</item>
     </plurals>
+    <string name="appliance_companion">Aplicação complementar do modo TV</string>
+    <string name="appliance_companion_not_installed">Não instalada</string>
+    <string name="appliance_companion_description">Uma aplicação complementar opcional faz o Tvheadend Player funcionar como a aplicação de sintonizador integrada na TV. Abre o leitor quando a TV é ligada, pode assumir botões do comando, como TV e Guide, e substituir o ecrã inicial. É uma aplicação separada, disponível nas versões do projeto no GitHub, a partir das quais se atualiza.</string>
+    <string name="appliance_companion_install_info">Para configurar, lê o código ou abre github.com/bernhardberger/tvheadend-player num telemóvel ou computador e segue os passos da secção «Appliance companion».</string>
+    <string name="appliance_companion_qr_description">Código QR para os passos de configuração da aplicação complementar do modo TV</string>
 </resources>

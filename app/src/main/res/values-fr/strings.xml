@@ -1,4 +1,5 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="recording_ad_break_skipped">Pause publicitaire passée</string>
     <string name="player_full_screen">Plein écran</string>
     <string name="stop">Arrêter</string>
     <string name="warm_playback_setting">Pendant la navigation</string>
@@ -233,7 +234,6 @@
     <string name="error_prefix">Erreur :</string>
     <string name="back">Retour</string>
     <string name="show_password">Afficher le mot de passe</string>
-    <string name="hide_password">Masquer le mot de passe</string>
     <string name="audio_track">Piste audio</string>
     <string name="audio_track_unselected">Choisir une piste audio</string>
     <string name="no_audio_tracks">Aucune piste audio disponible.</string>
@@ -452,6 +452,29 @@
     <string name="recording_marker_previous">Repère précédent</string>
     <string name="recording_marker_start">Début de l’enregistrement</string>
     <string name="recording_marker_next">Repère suivant</string>
+    <string name="recording_mark_ad_break">Pause publicitaire</string>
+    <string name="recording_mark_ads_end">Fin des publicités</string>
+    <string name="recording_mark_cut">Coupure</string>
+    <string name="recording_mark_cut_ends">Fin de la coupure</string>
+    <string name="recording_mark_ad_badge">Pub</string>
+    <string name="recording_mark_program_starts">Début du programme</string>
+    <string name="recording_mark_program_ends">Fin du programme</string>
+    <string name="skip_ad_break">Passer la pause publicitaire</string>
+    <string name="settings_section_recording_marks">Repères d’enregistrement</string>
+    <string name="ad_breaks_setting">Pauses publicitaires</string>
+    <string name="ad_breaks_ask">Demander</string>
+    <string name="ad_breaks_ask_help">Au début d’une pause, affiche sur la vidéo un bouton pour la passer.</string>
+    <string name="ad_breaks_automatic">Passer automatiquement</string>
+    <string name="ad_breaks_automatic_help">Passe chaque pause une fois. Si tu reviens en arrière dans la pause, elle est lue.</string>
+    <string name="ad_breaks_off">Désactivé</string>
+    <string name="ad_breaks_off_help">Les pauses publicitaires sont lues comme le reste. Elles restent visibles sur la chronologie.</string>
+    <string name="skip_cuts_setting">Passer les coupures</string>
+    <string name="skip_cuts_setting_description">Passe les parties marquées comme coupures. L’enregistrement lui-même n’est pas raccourci.</string>
+    <string name="skip_landing_setting">Point de reprise</string>
+    <string name="skip_landing_description">Où la lecture reprend après une coupure ou une pause publicitaire passée.</string>
+    <string name="skip_landing_end">À la fin</string>
+    <string name="skip_landing_two_seconds">2 s avant la fin</string>
+    <string name="skip_landing_five_seconds">5 s avant la fin</string>
     <string name="pause">Pause</string>
     <string name="seek_back_30">−30 secondes</string>
     <string name="seek_forward_30">+30 secondes</string>
@@ -732,4 +755,9 @@
         <item quantity="many">%1$d autres programmés</item>
         <item quantity="other">%1$d autres programmés</item>
     </plurals>
+    <string name="appliance_companion">Application compagnon du mode téléviseur</string>
+    <string name="appliance_companion_not_installed">Non installée</string>
+    <string name="appliance_companion_description">Une application compagnon facultative permet à Tvheadend Player de fonctionner comme l\'application de tuner intégrée au téléviseur. Elle ouvre le lecteur à l\'allumage du téléviseur, peut prendre en charge les boutons de la télécommande comme TV et Guide et remplacer l\'écran d\'accueil. Il s\'agit d\'une application distincte disponible dans les versions du projet sur GitHub, depuis lesquelles elle se met à jour.</string>
+    <string name="appliance_companion_install_info">Pour la configurer, scanne le code ou ouvre github.com/bernhardberger/tvheadend-player sur un téléphone ou un ordinateur, puis suis les étapes de la section « Appliance companion ».</string>
+    <string name="appliance_companion_qr_description">Code QR vers les étapes de configuration de l\'application compagnon du mode téléviseur</string>
 </resources>

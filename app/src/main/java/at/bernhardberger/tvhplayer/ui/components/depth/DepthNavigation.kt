@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -45,6 +46,7 @@ import at.bernhardberger.tvhplayer.ui.components.rememberListEdgeBringIntoView
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.BringIntoViewSpec
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
@@ -119,6 +121,10 @@ internal const val DepthParentSlideAlpha = 0.25f
 
 /** Top content reserve inside a depth list so the first focused row's scale is not clipped. */
 internal val DepthListTopReserve = 4.dp
+
+/** How long a restore waits for its row to compose before it lets the pane go. */
+private const val RestoreFocusWaitMillis = 1000L
+
 private val DepthBrowseEasing = CubicBezierEasing(0.18f, 1f, 0.22f, 1f)
 private fun depthStripSpec() = tween<Float>(DepthSlideMillis, easing = DepthBrowseEasing)
 
@@ -595,6 +601,20 @@ private fun DepthStripPane(
     val focus = remember { mutableStateMapOf<String, FocusRequester>() }
     val scope = rememberCoroutineScope()
     val bringIntoViewSpec = rememberListEdgeBringIntoView(list, DepthListTopReserve)
+    // Where focus scrolling would place a row, as the item offset from the list's top. For a row
+    // the list is about to be scrolled to, [destinationIndex] says whether rows will lie before
+    // it, which the list as it stands now may not tell.
+    fun pivotOffset(destinationIndex: Int? = null): Int {
+        val layout = list.layoutInfo
+        val offset = layout.beforeContentPadding.toFloat()
+        val size = (layout.visibleItemsInfo.firstOrNull()?.size ?: 0).toFloat()
+        val container = layout.viewportSize.height.toFloat()
+        return when {
+            destinationIndex == null -> bringIntoViewSpec.calculateScrollDistance(offset, size, container)
+            destinationIndex == 0 -> 0f
+            else -> bringIntoViewSpec.calculateScrollDistance(offset, size, container, Float.POSITIVE_INFINITY)
+        }.roundToInt()
+    }
     var pageJob by remember { mutableStateOf<Job?>(null) }
     var pageTarget by remember { mutableStateOf<String?>(null) }
     DisposableEffect(active, capturedVisit, initialFocusEnabled, identities) {
@@ -608,30 +628,86 @@ private fun DepthStripPane(
         SideEffect { list.requestScrollToItem(list.firstVisibleItemIndex) }
     }
     val targetId = if (active) focusedItemId else column.level.initialItemId
+    // A pane that has just become active owns its restore target until the restore has asked for
+    // it, or the viewer presses a key. Focus landing on another row before then is the system
+    // re-seating focus, because the level that held it stopped being focusable, not the viewer's
+    // choice; it must not replace the stored row, or the restore below gives way to it.
+    var restoring by remember(capturedVisit, active, initialFocusEnabled) {
+        mutableStateOf(active && initialFocusEnabled && focusedItemId != null)
+    }
+    // Scrolling from focus is held a little longer than the ownership above: a queued scroll for
+    // a row the system re-seated is decided only after the restore has asked for its row. Read
+    // live, as the animation that asks is not composition.
+    val scrollHeld = remember(capturedVisit, active, initialFocusEnabled) {
+        mutableStateOf(restoring && column.level.initialItemId == null)
+    }
+    // Where the list stands as the level becomes active, before focus the system re-seats can
+    // scroll it. A list still settling when the level was left has settled by now, so this, not
+    // the position saved when the child opened, is the one to return to.
+    val entryViewport = remember(capturedVisit, active, initialFocusEnabled) {
+        Snapshot.withoutReadObservation { list.firstVisibleItemIndex to list.firstVisibleItemScrollOffset }
+    }
+    // Focus the system moves onto a row while this pane is inactive or restoring queues a scroll
+    // to that row. A queued scroll outlives the focus: it runs on, as far as the row that holds
+    // focus stays in view, after the list has been put back. No row of such a pane scrolls the
+    // list; the restore places the one that matters.
+    val latestScrollHeld = rememberUpdatedState(scrollHeld)
+    val focusScrollSpec = remember(bringIntoViewSpec) {
+        object : BringIntoViewSpec by bringIntoViewSpec {
+            override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float =
+                if (!latestActive.value || latestScrollHeld.value.value) 0f else bringIntoViewSpec.calculateScrollDistance(offset, size, containerSize)
+        }
+    }
     LaunchedEffect(capturedVisit, active, initialFocusEnabled, targetId, column.level.rows.map { it.item.id }) {
-        if (targetId == null) return@LaunchedEffect
-        val targetIndex = column.level.rows.indexOfFirst { it.item.id == targetId }
-        if (targetIndex < 0) return@LaunchedEffect
-        if (!active) {
-            // Reused choice previews can outlive a preference change. Prepare the selected
-            // row while inert, so entering never waits for an off-screen focus target.
-            if (isCurrent && column.path.dropLast(1) == activePath &&
-                list.layoutInfo.visibleItemsInfo.none { it.key == targetId }) list.scrollToItem(targetIndex)
-            return@LaunchedEffect
-        }
-        if (!initialFocusEnabled) return@LaunchedEffect
-        suspend fun stillThisTarget() =
-            latestStillOwning.value(capturedVisit) && latestFocusEnabled.value && latestFocusedId.value == targetId
-        if (list.layoutInfo.visibleItemsInfo.none { it.key == targetId }) {
-            if (!stillThisTarget()) return@LaunchedEffect
-            list.scrollToItem(viewportIndex, viewportOffset)
-            withFrameNanos { }
-            if (!stillThisTarget()) return@LaunchedEffect
-            if (list.layoutInfo.visibleItemsInfo.none { it.key == targetId }) list.scrollToItem(targetIndex)
-        }
-        snapshotFlow { focus[targetId] }.first { it != null }
-        if (stillThisTarget() && initialFocusEnabled) {
-            focus[targetId]?.requestFocus()
+        try {
+            if (targetId == null) return@LaunchedEffect
+            val targetIndex = column.level.rows.indexOfFirst { it.item.id == targetId }
+            if (targetIndex < 0) return@LaunchedEffect
+            if (!active) {
+                // Reused choice previews can outlive a preference change. Prepare the selected
+                // row while inert, so entering never waits for an off-screen focus target.
+                if (isCurrent && column.path.dropLast(1) == activePath &&
+                    list.layoutInfo.visibleItemsInfo.none { it.key == targetId }) list.scrollToItem(targetIndex)
+                return@LaunchedEffect
+            }
+            if (!initialFocusEnabled) return@LaunchedEffect
+            suspend fun stillThisTarget() =
+                latestStillOwning.value(capturedVisit) && latestFocusEnabled.value && latestFocusedId.value == targetId
+            // Focus the system re-seats while the level that held it goes away can scroll this list
+            // to its own row. A browse level returns to where it stood on becoming active, whatever
+            // moved it since, before focus returns to its row; a choice level opens on its selection.
+            if (restoring && column.level.initialItemId == null) {
+                val (index, offset) = entryViewport
+                if (index in column.level.rows.indices &&
+                    (list.firstVisibleItemIndex != index || list.firstVisibleItemScrollOffset != offset)) {
+                    // No frame to wait for: the scroll remeasures at once, and a pause before
+                    // focus is requested lets the system settle it on the rail instead.
+                    list.scrollToItem(index, offset)
+                }
+            }
+            if (list.layoutInfo.visibleItemsInfo.none { it.key == targetId }) {
+                if (!stillThisTarget()) return@LaunchedEffect
+                list.scrollToItem(viewportIndex, viewportOffset)
+                withFrameNanos { }
+                if (!stillThisTarget()) return@LaunchedEffect
+                // Place the row where focus scrolling would, not at the top under the fade.
+                if (list.layoutInfo.visibleItemsInfo.none { it.key == targetId }) {
+                    list.scrollToItem(targetIndex, pivotOffset(destinationIndex = targetIndex))
+                }
+            }
+            // A row that never composes ends the restore instead of holding the pane.
+            withTimeoutOrNull(RestoreFocusWaitMillis) { snapshotFlow { focus[targetId] }.first { it != null } }
+                ?: return@LaunchedEffect
+            if (stillThisTarget() && initialFocusEnabled) {
+                focus[targetId]?.requestFocus()
+                // The stored row has focus: what moves it next is the viewer.
+                restoring = false
+                // Scrolls queued by focus the system re-seated are decided in the frames after.
+                withFrameNanos { }
+            }
+        } finally {
+            restoring = false
+            scrollHeld.value = false
         }
     }
     if (active) {
@@ -673,14 +749,6 @@ private fun DepthStripPane(
                 return@Column
             }
             // The list runs to the bottom of the host and fades out where rows continue.
-            // A level that stops being the active one hands its focused row on row by row, as each
-            // row turns unfocusable; those passing focuses must not scroll a list that is leaving.
-            val focusScrollSpec = remember(bringIntoViewSpec) {
-                object : BringIntoViewSpec {
-                    override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float =
-                        if (latestActive.value) bringIntoViewSpec.calculateScrollDistance(offset, size, containerSize) else 0f
-                }
-            }
             CompositionLocalProvider(LocalBringIntoViewSpec provides focusScrollSpec) {
                 LazyColumn(
                     state = list,
@@ -694,6 +762,8 @@ private fun DepthStripPane(
                         .onPreviewKeyEvent { event ->
                             if (!active) return@onPreviewKeyEvent false
                             val native = event.nativeKeyEvent
+                            // A key is the viewer's: whatever moves focus next is theirs to keep.
+                            if (native.action == KeyEvent.ACTION_DOWN) { restoring = false; scrollHeld.value = false }
                             val direction = pageKeyDirection?.invoke(native.keyCode)
                             if (direction == null) {
                                 if (native.action == KeyEvent.ACTION_DOWN) { pageJob?.cancel(); pageTarget = null }
@@ -707,13 +777,7 @@ private fun DepthStripPane(
                                 pageJob?.cancel()
                                 pageTarget = id
                                 pageJob = scope.launch {
-                                    val layout = list.layoutInfo
-                                    val focusOffset = bringIntoViewSpec.calculateScrollDistance(
-                                        layout.beforeContentPadding.toFloat(),
-                                        (layout.visibleItemsInfo.firstOrNull()?.size ?: 0).toFloat(),
-                                        layout.viewportSize.height.toFloat(),
-                                    ).roundToInt()
-                                    list.animateScrollToItem(target, focusOffset)
+                                    list.animateScrollToItem(target, pivotOffset())
                                     snapshotFlow { focus[id] }.first { it != null }
                                     if (latestStillOwning.value(capturedVisit) && latestFocusEnabled.value && pageTarget == id) {
                                         focus[id]?.requestFocus()
@@ -744,7 +808,8 @@ private fun DepthStripPane(
                                 }
                                 .onFocusChanged {
                                     if (it.isFocused && latestActive.value &&
-                                        latestStillOwning.value(capturedVisit)) {
+                                        latestStillOwning.value(capturedVisit) &&
+                                        !(restoring && row.item.id != latestFocusedId.value)) {
                                         onFocusItem(row.item.id, identities, capturedVisit)
                                     }
                                 },

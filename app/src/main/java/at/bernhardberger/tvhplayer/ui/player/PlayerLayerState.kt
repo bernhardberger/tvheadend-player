@@ -146,17 +146,21 @@ internal class PlayerLayerState(
      * controls are neither revealed nor hidden, and closing the list returns focus to
      * the control that had it.
      */
-    fun showQuickList(page: PlaybackOptionsPage) {
+    fun showQuickList(page: PlaybackOptionsPage, picker: Boolean = false) {
         if (!optionsQuickList) {
             quickListReturnControl = (optionsPage?.let { quickListOverMenuReturn } ?: lastFocusedControl)
                 .takeIf { chrome.controlsVisible }
         }
+        quickList.picker = picker
         chrome.yieldToLayer()
         closeScreenLayers()
         infoOpen = false
         optionsQuickList = true
         optionsPage = page
     }
+
+    /** The Audio list from its action-row button: a picker, applying only the row OK chooses. */
+    fun showAudioPicker() = showQuickList(PlaybackOptionsPage.AUDIO, picker = true)
 
     /** Closes the quick list, keeping what is playing. */
     fun closeQuickList() {
@@ -216,7 +220,11 @@ internal class PlayerLayerState(
         restoreOptionsFocus = false
         when (outcome) {
             PlaybackOptionsKeyOutcome.OpenMenu -> showOptionsPage(PlaybackOptionsPage.ROOT)
-            PlaybackOptionsKeyOutcome.MoveDown -> quickList.moveDown()
+            PlaybackOptionsKeyOutcome.MoveDown -> {
+                // The key turns an open Audio-button picker into the hotkey list.
+                quickList.picker = false
+                quickList.moveDown()
+            }
             is PlaybackOptionsKeyOutcome.OpenQuickList -> showQuickList(outcome.page)
         }
         return true

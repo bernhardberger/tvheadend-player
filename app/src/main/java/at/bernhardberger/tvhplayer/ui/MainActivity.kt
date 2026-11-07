@@ -268,9 +268,10 @@ class MainActivity : AppCompatActivity() {
                 componentClassName = intent?.component?.className,
                 playerPackage = packageName,
             )) return
-        if (ApplianceEntryPolicy.shouldCreateLaunchRequest(isPlayerVisible)) {
-            startupViewModel.applianceLaunchRequests.request()
-        }
+        val destination = ApplianceEntryPolicy.destination(
+            intent?.getStringExtra(ApplianceEntryPolicy.EXTRA_APPLIANCE_DESTINATION),
+        )
+        startupViewModel.applianceLaunchRequests.requestEntry(destination, isPlayerVisible)
     }
 
     private fun registerMainStartupActivityKeyContract(

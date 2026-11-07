@@ -3,6 +3,11 @@ package at.bernhardberger.tvhplayer.ui.player
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -129,6 +134,18 @@ internal fun RecordingControlsTimeline(
         )
         return
     }
+    var focused by remember { mutableStateOf(false) }
+    val selectedMs = markerNavigation.selectedMs
+    // Keyed on the marks and selection, so position ticks reuse the bar's marks.
+    val selectedStop = remember(timeline.markStops, selectedMs) {
+        timeline.markStops.firstOrNull { it.positionMs == selectedMs }
+    }
+    val marks = remember(timeline.marks, range.displayEndMs, selectedStop) {
+        timelineMarks(
+            timeline.marks, range.displayEndMs, selectedStop?.mark,
+            open = selectedStop != null, selectedEnd = selectedStop?.atEnd == true,
+        )
+    }
     PlaybackSeekbar(
         range = range,
         playbackPositionMs = timeline.positionMs,
@@ -138,12 +155,14 @@ internal fun RecordingControlsTimeline(
         paused = paused,
         previewing = previewing,
         recordingMarkers = timeline.markers,
-        recordingMarkerPreviewMs = markerNavigation.selectedMs?.takeIf { it in timeline.markers },
+        recordingMarkerPreviewMs = selectedStop?.positionMs,
+        recordingMarks = marks,
         onOpenRecordingMarkers = onOpenMarkers,
         trackOverlay = {
             RecordingMarkerOverlay(
-                navigation = markerNavigation, markers = timeline.markers, onSeek = onSeekMarker,
+                navigation = markerNavigation, stops = timeline.markStops, onSeek = onSeekMarker,
                 displayDurationMs = range.displayEndMs,
+                hints = focused,
                 modifier = Modifier.matchParentSize(),
             )
         },
@@ -151,7 +170,8 @@ internal fun RecordingControlsTimeline(
         barStatus = recordingBarStatus(timeline, state, range),
         growing = timeline.growing,
         motionKey = timeline.motionKey,
-        modifier = modifier,
+        // The seekbar itself, not the open marks row inside it: that shows the symbols anyway.
+        modifier = modifier.onFocusChanged { focused = it.isFocused },
     )
 }
 
@@ -180,7 +200,7 @@ private fun RecordingTimelineBlock(
         previewDirection = previewDirection,
         previewAtLive = previewAtLive,
         previewTarget = previewTarget,
-        markerFractions = range?.let { r -> timeline.markers.map { it.toFloat() / r.displayEndMs } }.orEmpty(),
+        marks = remember(timeline.marks, range?.displayEndMs) { range?.let { timelineMarks(timeline.marks, it.displayEndMs) } },
         reserveLabelSpace = true,
         progressSemantics = false,
         motionKey = timeline.motionKey,

@@ -1,4 +1,5 @@
 <resources>
+    <string name="recording_ad_break_skipped">הפסקת הפרסומות דולגה</string>
     <string name="player_full_screen">מסך מלא</string>
     <string name="stop">עצירת הניגון</string>
     <string name="warm_playback_setting">בזמן עיון</string>
@@ -233,7 +234,6 @@
     <string name="error_prefix">שגיאה:</string>
     <string name="back">חזרה</string>
     <string name="show_password">הצגת הסיסמה</string>
-    <string name="hide_password">הסתרת הסיסמה</string>
     <string name="audio_track">רצועות שמע</string>
     <string name="audio_track_unselected">בחירת רצועת שמע</string>
     <string name="no_audio_tracks">אין רצועות שמע זמינות.</string>
@@ -452,6 +452,29 @@
     <string name="recording_marker_previous">הסמן הקודם</string>
     <string name="recording_marker_start">תחילת ההקלטה</string>
     <string name="recording_marker_next">הסמן הבא</string>
+    <string name="recording_mark_ad_break">הפסקת פרסומות</string>
+    <string name="recording_mark_ads_end">סוף הפרסומות</string>
+    <string name="recording_mark_cut">קטע לחיתוך</string>
+    <string name="recording_mark_cut_ends">סוף הקטע לחיתוך</string>
+    <string name="recording_mark_ad_badge">פרסומת</string>
+    <string name="recording_mark_program_starts">תחילת התוכנית</string>
+    <string name="recording_mark_program_ends">סוף התוכנית</string>
+    <string name="skip_ad_break">דילוג על הפסקת הפרסומות</string>
+    <string name="settings_section_recording_marks">סמני ההקלטה</string>
+    <string name="ad_breaks_setting">הפסקות פרסומות</string>
+    <string name="ad_breaks_ask">לשאול</string>
+    <string name="ad_breaks_ask_help">בתחילת הפסקה מופיע כפתור דילוג מעל הווידאו.</string>
+    <string name="ad_breaks_automatic">דילוג אוטומטי</string>
+    <string name="ad_breaks_automatic_help">כל הפסקה מדולגת פעם אחת. חזרה לאחור לתוך ההפסקה תפעיל את הניגון שלה.</string>
+    <string name="ad_breaks_off">כבוי</string>
+    <string name="ad_breaks_off_help">הפסקות פרסומות מנוגנות כמו שאר ההקלטה. הן עדיין מופיעות בציר הזמן.</string>
+    <string name="skip_cuts_setting">דילוג על קטעים לחיתוך</string>
+    <string name="skip_cuts_setting_description">דילוג על חלקים שסומנו לחיתוך. ההקלטה עצמה אינה מתקצרת.</string>
+    <string name="skip_landing_setting">נקודת המשך הניגון</string>
+    <string name="skip_landing_description">היכן הניגון נמשך לאחר דילוג על קטע לחיתוך או על הפסקת פרסומות.</string>
+    <string name="skip_landing_end">בסוף</string>
+    <string name="skip_landing_two_seconds">2 שניות לפני הסוף</string>
+    <string name="skip_landing_five_seconds">5 שניות לפני הסוף</string>
     <string name="pause">השהיה</string>
     <string name="seek_back_30">−30 שניות</string>
     <string name="seek_forward_30">+30 שניות</string>
@@ -731,4 +754,9 @@
         <item quantity="two">עוד %1$d הקלטות מתוזמנות</item>
         <item quantity="other">עוד %1$d הקלטות מתוזמנות</item>
     </plurals>
+    <string name="appliance_companion">יישום נלווה למצב מכשיר ייעודי</string>
+    <string name="appliance_companion_not_installed">לא מותקן</string>
+    <string name="appliance_companion_description">יישום נלווה אופציונלי מאפשר ל־Tvheadend Player לפעול כמו יישום מקלט הטלוויזיה המובנה. הוא פותח את הנגן כשהטלוויזיה נדלקת, יכול להשתלט על לחצני שלט כמו TV ו־Guide ולהחליף את מסך הבית. זהו יישום נפרד הזמין במהדורות הפרויקט ב־GitHub ומתעדכן משם בעצמו.</string>
+    <string name="appliance_companion_install_info">להגדרה, יש לסרוק את הקוד או לפתוח את github.com/bernhardberger/tvheadend-player בטלפון או במחשב, ואז לפעול לפי השלבים בסעיף ״Appliance companion״.</string>
+    <string name="appliance_companion_qr_description">קוד QR לשלבי הגדרת היישום הנלווה למצב מכשיר ייעודי</string>
 </resources>

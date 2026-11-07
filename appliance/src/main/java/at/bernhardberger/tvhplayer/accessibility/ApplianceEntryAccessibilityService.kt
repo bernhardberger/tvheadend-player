@@ -17,6 +17,9 @@ import at.bernhardberger.tvhplayer.appliance.CompanionActivity
 import at.bernhardberger.tvhplayer.appliance.ApplianceEntryLaunchGate
 import at.bernhardberger.tvhplayer.appliance.ApplianceEntryPolicy
 import at.bernhardberger.tvhplayer.appliance.ApplianceKeyDecision
+import at.bernhardberger.tvhplayer.appliance.CompanionFunction
+import at.bernhardberger.tvhplayer.appliance.CompanionServiceState
+import at.bernhardberger.tvhplayer.appliance.FunctionStore
 import at.bernhardberger.tvhplayer.appliance.update.CompanionUpdateJob
 import at.bernhardberger.tvhplayer.appliance.update.UpdatePolicy
 import at.bernhardberger.tvhplayer.appliance.update.UpdateStore
@@ -29,35 +32,41 @@ class ApplianceEntryAccessibilityService : AccessibilityService() {
             when (intent.action) {
                 Intent.ACTION_SCREEN_ON -> {
                     CompanionUpdateJob.cancel(context)
-                    launchApp()
+                    if (FunctionStore(context).functions.startup) launchApp()
                 }
-                Intent.ACTION_SCREEN_OFF -> CompanionUpdateJob.schedule(context)
+                Intent.ACTION_SCREEN_OFF -> {
+                    CompanionServiceState.cancelCapture()
+                    CompanionUpdateJob.schedule(context)
+                }
             }
         }
     }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        CompanionServiceState.setConnected(true)
         serviceInfo = serviceInfo.apply {
             flags = flags or AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS
         }
         registerScreenOnReceiver()
         val updates = UpdateStore(this)
         updates.reconcileInstalledVersion()
-        if (UpdatePolicy.shouldLaunchOnConnect(getSystemService(PowerManager::class.java).isInteractive,
-                updates.consumeConnectSuppression())) launchApp()
+        val launchOnConnect = UpdatePolicy.shouldLaunchOnConnect(getSystemService(PowerManager::class.java).isInteractive,
+            updates.consumeConnectSuppression())
+        if (launchOnConnect && FunctionStore(this).functions.startup) launchApp()
     }
 
     override fun onKeyEvent(event: KeyEvent): Boolean {
+        if (CompanionServiceState.captureKey(this, event)) return true
+        val function = FunctionStore(this).functions.owner(event.keyCode)
         val decision = ApplianceEntryPolicy.keyEvent(
-            isApplianceEntryKey = ApplianceEntryPolicy.isApplianceEntryKey(
-                keyCode = event.keyCode,
-                androidGuideKeyCode = KeyEvent.KEYCODE_GUIDE,
-            ),
+            isApplianceEntryKey = function != null,
             isDown = event.action == KeyEvent.ACTION_DOWN,
             repeatCount = event.repeatCount,
         )
-        if (decision == ApplianceKeyDecision.LAUNCH_AND_CONSUME) launchApp()
+        if (decision == ApplianceKeyDecision.LAUNCH_AND_CONSUME) launchApp(
+            if (function == CompanionFunction.GUIDE) ApplianceEntryPolicy.DESTINATION_GUIDE
+            else ApplianceEntryPolicy.DESTINATION_LIVE, explicit = true)
         return decision != ApplianceKeyDecision.PASS_THROUGH
     }
 
@@ -66,11 +75,13 @@ class ApplianceEntryAccessibilityService : AccessibilityService() {
     override fun onInterrupt() = Unit
 
     override fun onUnbind(intent: Intent?): Boolean {
+        CompanionServiceState.setConnected(false)
         unregisterScreenOnReceiver()
         return super.onUnbind(intent)
     }
 
     override fun onDestroy() {
+        CompanionServiceState.setConnected(false)
         unregisterScreenOnReceiver()
         super.onDestroy()
     }
@@ -92,12 +103,13 @@ class ApplianceEntryAccessibilityService : AccessibilityService() {
         screenOnReceiverRegistered = false
     }
 
-    private fun launchApp() {
+    private fun launchApp(destination: String = ApplianceEntryPolicy.DESTINATION_LIVE, explicit: Boolean = false) {
         if (!getSystemService(PowerManager::class.java).isInteractive) return
-        if (!launchGate.shouldLaunch(SystemClock.elapsedRealtime())) return
+        if (!launchGate.shouldLaunch(SystemClock.elapsedRealtime(), destination, explicit)) return
         try {
             startActivity(Intent().setClassName(BuildConfig.PLAYER_PACKAGE, ApplianceEntryPolicy.ENTRY_ALIAS_CLASS_NAME).apply {
                 action = ACTION_APPLIANCE_ENTRY
+                putExtra(ApplianceEntryPolicy.EXTRA_APPLIANCE_DESTINATION, destination)
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or
                     Intent.FLAG_ACTIVITY_CLEAR_TOP or
                     Intent.FLAG_ACTIVITY_SINGLE_TOP

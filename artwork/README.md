@@ -27,6 +27,24 @@ and brand plates retain their separate dark background.
 Orange is the accent, not a second primary. Measured as a share of the mark's own
 ink it is 13.2%, against 18.9% for the upstream emblem.
 
+## Appliance companion QR
+
+`app/src/main/res/drawable/qr_appliance_companion.xml` encodes
+`https://github.com/bernhardberger/tvheadend-player#appliance-companion`.
+The static drawable was generated from segno's matrix: segno, version 5,
+error M, quiet zone 4. At 270dp, each module is 6dp, including a white
+four-module quiet zone on all sides. Black runs are merged per row.
+
+Authoring command (segno installed in an isolated authoring environment):
+
+```python
+import segno
+qr = segno.make('https://github.com/bernhardberger/tvheadend-player#appliance-companion',
+                version=5, error='M', boost_error=False)
+# For each row y and dark run [x, end), emit M{x+4},{y+4}h{end-x}v1h{x-end}z.
+# Use a 45x45 viewport with a white background and 270dp intrinsic size.
+```
+
 ## Palette
 
 - Field: `#0F1014`

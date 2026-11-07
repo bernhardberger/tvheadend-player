@@ -1387,7 +1387,8 @@ class SessionPlaybackPlayerTest {
                 player.removeListener(listener)
             }
         }, session, coordinator, settings, profiles, scope, TvheadendAudioOutputProvider(context), focus,
-            PlaybackRuntimePolicy.fromPlayerSettings())
+            PlaybackRuntimePolicy.fromPlayerSettings(),
+            noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) })
         val wrapper = SessionPlaybackPlayer(runtime)
         val observation = scope.launch { wrapper.observe(session.observation) }
 

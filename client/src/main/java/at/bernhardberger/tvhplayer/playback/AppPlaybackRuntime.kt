@@ -71,8 +71,10 @@ class AppPlaybackRuntime(
     private val audioOutput: TvheadendAudioOutputProvider,
     private val audioFocus: PlaybackAudioFocus,
     private val policy: PlaybackRuntimePolicy,
+    private val noticeCenter: at.bernhardberger.tvhplayer.notices.NoticeCenter,
     private val elapsedRealtime: () -> Long = android.os.SystemClock::elapsedRealtime,
     private val startupBuffer: StartupBufferController? = null,
+    private val audioOutputs: PlaybackAudioOutputs = PlaybackAudioOutputs.None,
 ) {
     private val targetCommands = PlaybackTargetCommandSerialization()
     private val foregroundPlaybackLifecycle = ForegroundPlaybackLifecycle()
@@ -226,16 +228,22 @@ class AppPlaybackRuntime(
     val audioAutomatic = audioTracks.audioAutomatic
     private val _recordingSelection = MutableStateFlow<RecordingPlaybackSelection?>(null)
     private val _recordingAdmission = MutableStateFlow<RecordingPlaybackAdmission?>(null)
+    @OptIn(ExperimentalTvheadendApi::class)
     private val recordingMarkers = RecordingMarkers(
         player = player,
         session = session,
         scope = scope,
         targetCommands = targetCommands,
+        noticeCenter = noticeCenter,
+        pendingRecordingRecoveryPosition = coordinator.pendingRecordingRecoveryPosition,
         targetInstallationInProgress = { targetInstallationInProgress },
     )
     val recordingCutpoints = recordingMarkers.recordingCutpoints
     val recordingChapterStartsMs = recordingMarkers.recordingChapterStartsMs
     val recordingMarkerRevision = recordingMarkers.recordingMarkerRevision
+    val recordingMarks = recordingMarkers.marks
+    val recordingChapters = recordingMarkers.recordingChapters
+    val recordingSkipPrompt = recordingMarkers.skipPrompt
     @Volatile
     private var activeTargetEpoch: Long? = null
     @Volatile
@@ -345,11 +353,29 @@ class AppPlaybackRuntime(
     val videoPresentation = presentation.videoPresentation
 
     private val settingsJob = scope.launch {
-        settings.playerSettings.distinctUntilChanged().collect {
-            targetCommands.serialize(onClosed = {}) {
-                val latest = settings.playerSettings.first()
-                audioTracks.applyPlayerSettingsLocked(latest)
-                audioTracks.applyAudioPassthroughLocked(latest.audioPassthroughEnabled)
+        launch {
+            settings.playerSettings.distinctUntilChanged().collect {
+                targetCommands.serialize(onClosed = {}) {
+                    val latest = settings.playerSettings.first()
+                    recordingMarkers.applySettings(latest)
+                    audioTracks.applyPlayerSettingsLocked(latest)
+                    audioTracks.applyAudioPassthroughLocked(effectiveAudioPassthrough(
+                        latest.audioPassthroughEnabled, audioOutputs.personalOutputConnected.value,
+                    ))
+                }
+            }
+        }
+        launch {
+            audioOutputs.personalOutputConnected.collect {
+                targetCommands.serialize(onClosed = {}) {
+                    // Read both sources after acquiring the lock; output changes must not
+                    // reapply unrelated track preferences. The tracks owner deduplicates
+                    // applied modes while still allowing later inputs to retry a failure.
+                    val latest = settings.playerSettings.first()
+                    audioTracks.applyAudioPassthroughLocked(effectiveAudioPassthrough(
+                        latest.audioPassthroughEnabled, audioOutputs.personalOutputConnected.value,
+                    ))
+                }
             }
         }
     }
@@ -428,6 +454,7 @@ class AppPlaybackRuntime(
             reason: Int,
         ) {
             stallWatch.reset()
+            recordingMarkers.onPositionDiscontinuity()
         }
 
         override fun onPlaybackSuppressionReasonChanged(playbackSuppressionReason: Int) {
@@ -474,6 +501,7 @@ class AppPlaybackRuntime(
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
+            recordingMarkers.onPlaybackChanged()
             watchForStall()
             if (!targetInstallationInProgress && !coordinator.playerCleanupPending.value && targetCommands.isOpen()) {
                 presentation.publishPlayerState()
@@ -642,7 +670,9 @@ class AppPlaybackRuntime(
         if (recoveryFence != null && !canContinueRecoveryLocked(recoveryFence)) return null
         // An explicit first request configures persisted output even when its target is
         // unavailable. Recovery defers all Player configuration until its reads are rechecked.
-        if (recoveryFence == null) audioTracks.configureAudioOutputBeforeFirstTargetLocked(playerSettings)
+        if (recoveryFence == null) audioTracks.configureAudioOutputBeforeFirstTargetLocked(effectiveAudioPassthrough(
+            playerSettings.audioPassthroughEnabled, audioOutputs.personalOutputConnected.value,
+        ))
         // A server save counts its generation before it replaces the session: until the profile is
         // applied again, the session read below may still be the previous server's.
         val profileGeneration = profileOwner.configurationGeneration.value
@@ -696,7 +726,9 @@ class AppPlaybackRuntime(
             )
         }
         val retainInterruptionMute = recovering && !viewerRetry && audioInterruptions.interruptionMuted
-        if (recoveryFence != null) audioTracks.configureAudioOutputBeforeFirstTargetLocked(playerSettings)
+        if (recoveryFence != null) audioTracks.configureAudioOutputBeforeFirstTargetLocked(effectiveAudioPassthrough(
+            playerSettings.audioPassthroughEnabled, audioOutputs.personalOutputConnected.value,
+        ))
         val timeshiftPeriod = policy.liveTimeshiftPeriod(playerSettings)
         var committed = false
         // The viewer paused this channel before it started: that Pause replaces the startup Play.
@@ -1079,7 +1111,9 @@ class AppPlaybackRuntime(
         if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
         val playerSettings = settings.playerSettings.first()
         if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
-        audioTracks.configureAudioOutputBeforeFirstTargetLocked(playerSettings)
+        audioTracks.configureAudioOutputBeforeFirstTargetLocked(effectiveAudioPassthrough(
+            playerSettings.audioPassthroughEnabled, audioOutputs.personalOutputConnected.value,
+        ))
         val expectedPresentationEpoch = presentationEpoch.snapshot()
         lastRecordingRequest = recordingId to start
         presentationEpoch.publishIfCurrent(expectedPresentationEpoch) {
@@ -1153,13 +1187,17 @@ class AppPlaybackRuntime(
                     audioInterruptions.clearAudioInterruptionLocked()
                     val continues = continuesTarget && activeTargetEpoch == expectedPresentationEpoch &&
                         _activeTarget.value == AppPlaybackTarget.Recording(selection.recordingId)
+                    val preservesMarkerHistory = (continuesTarget || recoverAt?.recordingId == selection.recordingId) &&
+                        activeTargetEpoch == expectedPresentationEpoch &&
+                        _activeTarget.value == AppPlaybackTarget.Recording(selection.recordingId)
                     activeTargetEpoch = epoch
                     if (!continues) targetContinuity = epoch
                     livePauseController.dropPendingLivePauseLocked()
                     _activeTarget.value = AppPlaybackTarget.Recording(selection.recordingId)
                     _recordingSelection.value = selection
                     _recordingAdmission.value = admission
-                    recordingMarkers.observeRecordingMarkersLocked(requireNotNull(installedBinding))
+                    recordingMarkers.applySettings(playerSettings)
+                    recordingMarkers.observeRecordingMarkersLocked(requireNotNull(installedBinding), continuesTarget = preservesMarkerHistory)
                     presentation.publishStarting()
                     presentation.beginTargetPresentationLocked(epoch)
                     presentation.publishInstalledPlayerStateLocked()
@@ -1251,6 +1289,7 @@ class AppPlaybackRuntime(
                     return@serialize
                 }
                 foreground = false
+                recordingMarkers.setForeground(false)
                 val currentJob = currentCoroutineContext().job
                 val recoveryPending = liveRecovery.cancelOnBackgroundLocked(currentJob, activeTargetEpoch)
                 val recordingPlayWhenReady = targetCommands.readIfOpen { player.playWhenReady }
@@ -1285,6 +1324,7 @@ class AppPlaybackRuntime(
         scope.launch {
             targetCommands.serialize(onClosed = {}) {
                 foreground = true
+                recordingMarkers.setForeground(true)
                 cancelKeepTimer()
                 applyForegroundPlaybackAction(
                     foregroundPlaybackLifecycle.onForegrounded(
@@ -1854,14 +1894,26 @@ class AppPlaybackRuntime(
                 if (!isAttached() || !foreground || epoch == null || epoch != activeTargetEpoch ||
                     _activeTarget.value !is AppPlaybackTarget.Recording) return@serialize
                 if (player.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM) &&
-                    player.isCurrentMediaItemSeekable) player.seekTo(positionMs)
+                    player.isCurrentMediaItemSeekable) {
+                    recordingMarkers.deliberateSeek(positionMs)
+                    player.seekTo(positionMs)
+                }
             }
         }
     }
 
-    fun seekTo(positionMs: Long) { targetCommands.runIfOpen { player.seekTo(positionMs) } }
-    fun seekRecordingMarker(positionMs: Long, expectedRevision: Long) {
-        recordingMarkers.seekRecordingMarker(positionMs, expectedRevision)
+    fun seekTo(positionMs: Long) { targetCommands.runIfOpen {
+        recordingMarkers.deliberateSeek(positionMs)
+        player.seekTo(positionMs)
+    } }
+    fun skipRecordingAdBreak(mark: at.bernhardberger.tvhplayer.core.RecordingMark, expectedRevision: Long) {
+        recordingMarkers.skipAdBreak(mark, expectedRevision)
+    }
+    fun dismissRecordingSkipPrompt(mark: at.bernhardberger.tvhplayer.core.RecordingMark, expectedRevision: Long) {
+        recordingMarkers.dismissSkipPrompt(mark, expectedRevision)
+    }
+    fun seekRecordingMarker(positionMs: Long, expectedRevision: Long, programMarks: List<at.bernhardberger.tvhplayer.core.RecordingMark> = emptyList()) {
+        recordingMarkers.seekRecordingMarker(positionMs, expectedRevision, programMarks)
     }
     fun setDiagnosticsEnabled(enabled: Boolean) {
         presentation.setDiagnosticsEnabled(enabled)
@@ -2366,6 +2418,7 @@ class AppPlaybackRuntime(
 
     suspend fun detach() {
         if (!targetCommands.close()) return
+        audioOutputs.close()
         cancelKeepTimer()
         recordingMarkers.clearRecordingMarkersAndJoin()
         val pendingRecovery = liveRecovery.cancelOnDetach()

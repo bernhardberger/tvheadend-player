@@ -4,13 +4,13 @@ import at.bernhardberger.tvhplayer.appliance.update.UpdateResult
 import at.bernhardberger.tvhplayer.appliance.update.UpdateScreenState
 
 /** The focusable rows of the setup screen, top to bottom. */
-enum class CompanionRow { PLAYER, ACCESSIBILITY, HOME, SYSTEM_HOME, UNKNOWN_APPS, AUTOMATIC, UPDATE }
+enum class CompanionRow { PLAYER, ACCESSIBILITY, HOME, SYSTEM_HOME, STARTUP, LIVE_TV, GUIDE, UNKNOWN_APPS, AUTOMATIC, UPDATE }
 
 enum class UpdateRowMode { CHECK, AVAILABLE, CHECKING, INSTALLING }
 
 enum class UpdateFailure { COULD_NOT_CHECK, UPDATE_FAILED }
 
-enum class CompanionBody { PLAYER_MISSING, UPDATING, ACCESSIBILITY_OFF, INSTALL_UNKNOWN_OFF, SEVERAL_OPEN, ALL_SET }
+enum class CompanionBody { PLAYER_MISSING, UPDATING, ACCESSIBILITY_OFF, BLOCKED, INSTALL_UNKNOWN_OFF, SEVERAL_OPEN, ALL_SET }
 
 sealed interface CompanionOverall {
     data object PlayerMissing : CompanionOverall
@@ -22,11 +22,12 @@ sealed interface CompanionOverall {
 /** Everything the setup screen shows. Plain data, so JVM tests cover the derivations below. */
 data class CompanionScreenState(
     val playerVersion: String?,
-    val accessibilityEnabled: Boolean,
+    val accessibilityStatus: CompanionServiceStatus,
     val installAllowed: Boolean,
     val defaultHome: Boolean,
     val hasSystemHome: Boolean,
     val update: UpdateScreenState,
+    val functions: CompanionFunctions = CompanionFunctions(),
 ) {
     val playerInstalled: Boolean get() = playerVersion != null
 
@@ -58,7 +59,7 @@ data class CompanionScreenState(
     val unresolved: List<CompanionRow>
         get() = buildList {
             if (!playerInstalled) add(CompanionRow.PLAYER)
-            if (!accessibilityEnabled) add(CompanionRow.ACCESSIBILITY)
+            if (accessibilityStatus != CompanionServiceStatus.ON) add(CompanionRow.ACCESSIBILITY)
             if (!installAllowed) add(CompanionRow.UNKNOWN_APPS)
         }
 
@@ -78,7 +79,8 @@ data class CompanionScreenState(
             CompanionOverall.AllSet -> CompanionBody.ALL_SET
             is CompanionOverall.NeedsFix -> when {
                 overall.count > 1 -> CompanionBody.SEVERAL_OPEN
-                overall.first == CompanionRow.ACCESSIBILITY -> CompanionBody.ACCESSIBILITY_OFF
+                overall.first == CompanionRow.ACCESSIBILITY ->
+                    if (accessibilityStatus == CompanionServiceStatus.BLOCKED) CompanionBody.BLOCKED else CompanionBody.ACCESSIBILITY_OFF
                 else -> CompanionBody.INSTALL_UNKNOWN_OFF
             }
         }

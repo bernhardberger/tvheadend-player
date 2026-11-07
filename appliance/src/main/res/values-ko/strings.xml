@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="appliance_accessibility_service_label">Tvheadend Player 전용 기기 진입</string>
-    <string name="appliance_accessibility_service_description">시작 및 절전 해제 시 Tvheadend Player를 열고 TV/GUIDE 버튼만 매핑합니다. 화면 내용을 읽을 수 없습니다.</string>
+    <string name="appliance_accessibility_service_description">시작 및 절전 해제 시 Tvheadend Player를 열고 이 앱에서 설정한 리모컨 버튼만 제어합니다. 화면 내용을 읽을 수 없습니다.</string>
 </resources>

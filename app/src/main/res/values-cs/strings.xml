@@ -1,4 +1,5 @@
 <resources>
+    <string name="recording_ad_break_skipped">Reklamní přestávka přeskočena</string>
     <string name="player_full_screen">Celá obrazovka</string>
     <string name="stop">Zastavit</string>
     <string name="warm_playback_setting">Při procházení</string>
@@ -233,7 +234,6 @@
     <string name="error_prefix">Chyba:</string>
     <string name="back">Zpět</string>
     <string name="show_password">Zobrazit heslo</string>
-    <string name="hide_password">Skrýt heslo</string>
     <string name="audio_track">Zvuková stopa</string>
     <string name="audio_track_unselected">Vybrat zvukovou stopu</string>
     <string name="no_audio_tracks">Nejsou dostupné zvukové stopy.</string>
@@ -461,6 +461,29 @@
     <string name="recording_marker_previous">Předchozí značka</string>
     <string name="recording_marker_start">Začátek nahrávky</string>
     <string name="recording_marker_next">Další značka</string>
+    <string name="recording_mark_ad_break">Reklamní přestávka</string>
+    <string name="recording_mark_ads_end">Konec reklam</string>
+    <string name="recording_mark_cut">Střih</string>
+    <string name="recording_mark_cut_ends">Konec střihu</string>
+    <string name="recording_mark_ad_badge">Rekl.</string>
+    <string name="recording_mark_program_starts">Začátek pořadu</string>
+    <string name="recording_mark_program_ends">Konec pořadu</string>
+    <string name="skip_ad_break">Přeskočit reklamní přestávku</string>
+    <string name="settings_section_recording_marks">Značky nahrávky</string>
+    <string name="ad_breaks_setting">Reklamní přestávky</string>
+    <string name="ad_breaks_ask">Zeptat se</string>
+    <string name="ad_breaks_ask_help">Na začátku přestávky zobrazí nad videem tlačítko pro přeskočení.</string>
+    <string name="ad_breaks_automatic">Přeskakovat automaticky</string>
+    <string name="ad_breaks_automatic_help">Každou přestávku přeskočí jednou. Když se vrátíš zpět do přestávky, přehraje se.</string>
+    <string name="ad_breaks_off">Vypnuto</string>
+    <string name="ad_breaks_off_help">Reklamní přestávky se přehrávají jako zbytek nahrávky. Na časové ose zůstávají viditelné.</string>
+    <string name="skip_cuts_setting">Přeskakovat střihy</string>
+    <string name="skip_cuts_setting_description">Přeskakuje části označené jako střihy. Samotná nahrávka se nezkrátí.</string>
+    <string name="skip_landing_setting">Místo pokračování</string>
+    <string name="skip_landing_description">Kde přehrávání pokračuje po přeskočení střihu nebo reklamní přestávky.</string>
+    <string name="skip_landing_end">Na konci</string>
+    <string name="skip_landing_two_seconds">2 s před koncem</string>
+    <string name="skip_landing_five_seconds">5 s před koncem</string>
     <string name="pause">Pozastavit</string>
     <string name="seek_back_30">−30 sekund</string>
     <string name="seek_forward_30">+30 sekund</string>
@@ -747,4 +770,9 @@
         <item quantity="many">Ještě %1$d plánovaného nahrávání</item>
         <item quantity="other">Ještě %1$d plánovaných nahrávání</item>
     </plurals>
+    <string name="appliance_companion">Doprovodná aplikace pro režim TV přijímače</string>
+    <string name="appliance_companion_not_installed">Nenainstalováno</string>
+    <string name="appliance_companion_description">Volitelná doprovodná aplikace umožní Tvheadend Player fungovat jako vestavěná aplikace TV přijímače. Otevře přehrávač při zapnutí televize, může převzít tlačítka ovladače, například TV a Guide, a nahradit domovskou obrazovku. Jde o samostatnou aplikaci z vydání projektu na GitHubu, odkud se sama aktualizuje.</string>
+    <string name="appliance_companion_install_info">Pro nastavení naskenuj kód nebo na telefonu či počítači otevři github.com/bernhardberger/tvheadend-player a postupuj podle kroků v části „Appliance companion“.</string>
+    <string name="appliance_companion_qr_description">QR kód s postupem nastavení doprovodné aplikace pro režim TV přijímače</string>
 </resources>

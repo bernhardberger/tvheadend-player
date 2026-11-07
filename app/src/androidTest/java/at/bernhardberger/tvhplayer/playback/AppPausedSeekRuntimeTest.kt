@@ -114,7 +114,8 @@ class AppPausedSeekRuntimeTest {
             val coordinator = withContext(Dispatchers.Main) { createTvheadendPlaybackCoordinator(player, loadControl) }
             val lifetime = coordinator.launchIn(scope)
             val runtime = withContext(Dispatchers.Main) { AppPlaybackRuntime(player, session, coordinator, settings, profiles, scope, audioOutput, PlaybackAudioFocus.None,
-                at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy.fromPlayerSettings()) }
+                at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy.fromPlayerSettings(),
+                noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) }) }
             suspend fun await(message: String, predicate: suspend () -> Boolean) {
                 withTimeout(15.seconds) {
                     while (!predicate()) {

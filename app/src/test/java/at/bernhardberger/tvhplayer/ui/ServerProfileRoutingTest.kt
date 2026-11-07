@@ -139,11 +139,12 @@ class ServerProfileRoutingTest {
         compose.waitUntil(10_000) { owner.profiles.value != null && owner.serverProfile.value != null }
         player = ExoPlayer.Builder(context).build()
         val coordinator = createTvheadendPlaybackCoordinator(player).also { it.launchIn(scope) }
-        runtime = AppPlaybackRuntime(player, session, coordinator, settings, owner, scope,
-            TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None, PlaybackRuntimePolicy.fromPlayerSettings())
         val notices = NoticeCenter(android.os.SystemClock::elapsedRealtime) {
             NoticeContext(owner.configurationGeneration.value, session.observation.value.currentSession?.generationIdentity)
         }
+        runtime = AppPlaybackRuntime(player, session, coordinator, settings, owner, scope,
+            TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None, PlaybackRuntimePolicy.fromPlayerSettings(),
+            noticeCenter = notices)
         val dependencies = module {
             single<TvheadendSession> { session }
             single { runtime }

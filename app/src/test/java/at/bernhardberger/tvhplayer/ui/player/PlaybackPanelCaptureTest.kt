@@ -314,7 +314,7 @@ class PlaybackPanelCaptureTest {
         MENU("playback-options-overlay"),
         AUDIO_QUICK_LIST("playback-options-overlay"),
         SUBTITLES_QUICK_LIST("playback-options-overlay"),
-        // As the Subtitles button opens it on a programme with subtitles.
+        // As the captions key opens it on a programme with subtitles.
         SUBTITLES_QUICK_LIST_TRACKS("playback-options-overlay"),
         RECORDING_MENU("playback-options-overlay"),
     }

@@ -245,7 +245,6 @@
     <string name="error_prefix">Fehler:</string>
     <string name="back">Zurück</string>
     <string name="show_password">Passwort anzeigen</string>
-    <string name="hide_password">Passwort ausblenden</string>
 
     <string name="audio_track">Tonspur</string>
     <string name="audio_track_unselected">Tonspur auswählen</string>
@@ -731,4 +730,33 @@
         <item quantity="one">%1$d weitere geplant</item>
         <item quantity="other">%1$d weitere geplant</item>
     </plurals>
+    <string name="appliance_companion">TV-Start-Begleitapp</string>
+    <string name="appliance_companion_not_installed">Nicht installiert</string>
+    <string name="appliance_companion_description">Eine optionale Begleitapp lässt Tvheadend Player wie die eingebaute Tuner-App des Fernsehers funktionieren. Sie öffnet den Player beim Einschalten des Fernsehers, kann Fernbedienungstasten wie TV und Guide übernehmen und den Startbildschirm ersetzen. Sie ist eine separate App aus den GitHub-Veröffentlichungen des Projekts und aktualisiert sich von dort selbst.</string>
+    <string name="appliance_companion_install_info">Scanne zur Einrichtung den Code oder öffne github.com/bernhardberger/tvheadend-player auf einem Smartphone oder Computer und folge den Schritten unter „Appliance companion“.</string>
+    <string name="appliance_companion_qr_description">QR-Code zur Einrichtung der TV-Start-Begleitapp</string>
+    <string name="recording_ad_break_skipped">Werbepause übersprungen</string>
+    <string name="recording_mark_ad_break">Werbepause</string>
+    <string name="recording_mark_ads_end">Werbung endet</string>
+    <string name="recording_mark_cut">Schnitt</string>
+    <string name="recording_mark_cut_ends">Schnitt endet</string>
+    <string name="recording_mark_ad_badge">Werbung</string>
+    <string name="recording_mark_program_starts">Sendung beginnt</string>
+    <string name="recording_mark_program_ends">Sendung endet</string>
+    <string name="skip_ad_break">Werbepause überspringen</string>
+    <string name="settings_section_recording_marks">Aufnahmemarken</string>
+    <string name="ad_breaks_setting">Werbepausen</string>
+    <string name="ad_breaks_ask">Fragen</string>
+    <string name="ad_breaks_ask_help">Zeigt zu Beginn einer Werbepause eine Schaltfläche zum Überspringen über dem Video.</string>
+    <string name="ad_breaks_automatic">Automatisch überspringen</string>
+    <string name="ad_breaks_automatic_help">Überspringt jede Werbepause einmal. Wenn du in die Pause zurückspulst, wird sie abgespielt.</string>
+    <string name="ad_breaks_off">Aus</string>
+    <string name="ad_breaks_off_help">Werbepausen werden wie der Rest abgespielt. Sie bleiben in der Zeitleiste sichtbar.</string>
+    <string name="skip_cuts_setting">Schnitte überspringen</string>
+    <string name="skip_cuts_setting_description">Überspringt als Schnitte markierte Abschnitte. Die Aufnahme selbst wird nicht gekürzt.</string>
+    <string name="skip_landing_setting">Sprungziel</string>
+    <string name="skip_landing_description">Wo die Wiedergabe nach einem übersprungenen Schnitt oder einer Werbepause weitergeht.</string>
+    <string name="skip_landing_end">Am Ende</string>
+    <string name="skip_landing_two_seconds">2 s vor dem Ende</string>
+    <string name="skip_landing_five_seconds">5 s vor dem Ende</string>
 </resources>

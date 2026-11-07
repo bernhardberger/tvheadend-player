@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="appliance_accessibility_service_label">دخول Tvheadend Player للجهاز المخصّص</string>
-    <string name="appliance_accessibility_service_description">يفتح Tvheadend Player عند البدء والاستيقاظ، ويربط زر TV/GUIDE فقط. لا يمكنه قراءة محتوى الشاشة.</string>
+    <string name="appliance_accessibility_service_description">يفتح Tvheadend Player عند البدء والاستيقاظ، ويتولى التحكم فقط في أزرار جهاز التحكم عن بُعد المحددة في هذا التطبيق. لا يمكنه قراءة محتوى الشاشة.</string>
 </resources>

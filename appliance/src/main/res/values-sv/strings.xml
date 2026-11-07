@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="appliance_accessibility_service_label">Tvheadend Player tv-start</string>
-    <string name="appliance_accessibility_service_description">Öppnar Tvheadend Player vid start och väckning och tilldelar bara TV/GUIDE-knappen. Den kan inte läsa skärminnehåll.</string>
+    <string name="appliance_accessibility_service_description">Öppnar Tvheadend Player vid start och väckning och tar bara över de fjärrkontrollsknappar som har ställts in i den här appen. Den kan inte läsa skärminnehåll.</string>
 </resources>

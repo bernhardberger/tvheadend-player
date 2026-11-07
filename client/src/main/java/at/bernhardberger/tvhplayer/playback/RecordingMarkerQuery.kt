@@ -6,6 +6,7 @@ import at.bernhardberger.tvheadend.sdk.core.DvrCutpoint
 import at.bernhardberger.tvheadend.sdk.core.DvrCutpointsResult
 import at.bernhardberger.tvheadend.sdk.core.PlaybackBinding
 import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
+import at.bernhardberger.tvhplayer.core.RecordingChapter
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
@@ -24,18 +25,22 @@ internal class RecordingMarkerQuery {
     val cutpoints = _cutpoints.asStateFlow()
     private val _chapterStartsMs = MutableStateFlow<List<Long>>(emptyList())
     val chapterStartsMs = _chapterStartsMs.asStateFlow()
+    private val _chapters = MutableStateFlow<List<RecordingChapter>>(emptyList())
+    val chapters = _chapters.asStateFlow()
 
     fun use(value: PlaybackBinding.Recording?) {
         installation++
         binding = value
         _cutpoints.value = emptyList()
         _chapterStartsMs.value = emptyList()
+        _chapters.value = emptyList()
         _revision.value++
     }
 
-    fun updateChapters(startsMs: List<Long>) {
-        if (!isCurrent() || startsMs == _chapterStartsMs.value) return
-        _chapterStartsMs.value = startsMs
+    fun updateChapters(chapters: List<RecordingChapter>) {
+        if (!isCurrent() || chapters == _chapters.value) return
+        _chapters.value = chapters
+        _chapterStartsMs.value = chapters.map { it.startMs }.distinct().sorted()
         _revision.value++
     }
 
@@ -51,8 +56,9 @@ internal class RecordingMarkerQuery {
         if (binding === value) use(null)
     }
 
-    suspend fun refresh(value: PlaybackBinding.Recording) {
-        if (!isCurrent(value)) return
+    /** True only for a transient failure that may be retried on this same installation. */
+    suspend fun refresh(value: PlaybackBinding.Recording): Boolean {
+        if (!isCurrent(value)) return false
         val expectedInstallation = installation
         val result = try {
             value.cutpoints()
@@ -63,12 +69,19 @@ internal class RecordingMarkerQuery {
             null
         }
         currentCoroutineContext().ensureActive()
-        if (expectedInstallation == installation && isCurrent(value)) {
-            val points = (result as? DvrCutpointsResult.Available)?.cutpoints.orEmpty()
-            if (points != _cutpoints.value) {
-                _cutpoints.value = points
-                _revision.value++
+        if (expectedInstallation != installation || !isCurrent(value)) return false
+        return when (result) {
+            is DvrCutpointsResult.Available -> {
+                if (result.cutpoints != _cutpoints.value) {
+                    _cutpoints.value = result.cutpoints
+                    _revision.value++
+                }
+                false // Successfully empty is final too; failures never erase known marks.
             }
+            is DvrCutpointsResult.Failed -> result.failure.let {
+                it.isTransient && !it.requiresFreshObservation && !it.isUnsupported
+            }
+            null -> true // An exception is an optional-metadata failure, not an empty response.
         }
     }
 }

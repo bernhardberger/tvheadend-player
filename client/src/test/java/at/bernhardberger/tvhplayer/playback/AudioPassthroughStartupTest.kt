@@ -35,6 +35,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.*
@@ -48,13 +50,21 @@ import org.robolectric.annotation.Config
 class AudioPassthroughStartupTest {
     @Test fun liveFirstStartupLoadsPersistedOffBeforeAnyFormatQuery() = exercise(recordingFirst = false)
     @Test fun recordingFirstStartupLoadsPersistedOffBeforeAnyFormatQuery() = exercise(recordingFirst = true)
+    @Test fun liveFirstStartupWithHeadphonesConfiguresPcmWithoutChangingStoredSetting() =
+        exercise(recordingFirst = false, headphones = true)
+    @Test fun recordingFirstStartupWithHeadphonesConfiguresPcmWithoutChangingStoredSetting() =
+        exercise(recordingFirst = true, headphones = true)
 
     // Media3's real playback thread and this timeout must use the same wall-clock domain.
-    private fun exercise(recordingFirst: Boolean) = runBlocking {
+    private fun exercise(recordingFirst: Boolean, headphones: Boolean = false) = runBlocking {
         val runtimeScope = CoroutineScope(coroutineContext + SupervisorJob())
         val context = ApplicationProvider.getApplicationContext<Application>()
         val settings = PlayerSettingsStore(InMemoryPreferencesDataStore())
-        settings.setAudioPassthroughEnabled(false)
+        settings.setAudioPassthroughEnabled(headphones)
+        val outputs = object : PlaybackAudioOutputs {
+            override val personalOutputConnected = MutableStateFlow(headphones)
+            override fun close() = Unit
+        }
         val session = FakeTvheadendSession()
         val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.IO,
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
@@ -62,7 +72,9 @@ class AudioPassthroughStartupTest {
         val player = ExoPlayer.Builder(context)
             .setRenderersFactory(createTvheadendRenderersFactory(context, output)).build()
         val runtime = AppPlaybackRuntime(player, session, createTvheadendPlaybackCoordinator(player),
-            settings, profiles, runtimeScope, output, PlaybackAudioFocus.None, PlaybackRuntimePolicy.fromPlayerSettings())
+            settings, profiles, runtimeScope, output, PlaybackAudioFocus.None, PlaybackRuntimePolicy.fromPlayerSettings(),
+            audioOutputs = outputs,
+            noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) })
         val selection = requireNotNull(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(
                 streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED,
@@ -78,9 +90,12 @@ class AudioPassthroughStartupTest {
         }
         try {
             requestTarget()
+            assertFalse("First target must start in PCM mode", output.isPassthroughEnabled)
+            assertEquals(headphones, settings.playerSettings.first().audioPassthroughEnabled)
             val ac3 = AudioOutputProvider.FormatConfig.Builder(Format.Builder().setSampleMimeType(MimeTypes.AUDIO_AC3).build()).build()
             assertEquals(AudioOutputProvider.FORMAT_UNSUPPORTED, output.getFormatSupport(ac3).supportLevel)
             assertThrows(IllegalStateException::class.java) { output.configurePassthrough(true) }
+            outputs.personalOutputConnected.value = false
             settings.setAudioPassthroughEnabled(true)
             withTimeout(5_000) {
                 while (!output.isPassthroughEnabled) delay(10)
