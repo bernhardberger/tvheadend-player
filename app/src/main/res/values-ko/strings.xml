@@ -729,4 +729,5 @@
     <string name="appliance_companion_qr_description">전용 기기 모드 보조 앱 설정 단계를 여는 QR 코드</string>
     <string name="whats_new">새로운 기능</string>
     <string name="whats_new_badge">새 소식</string>
+    <string name="whats_new_updated">%1$s 버전으로 업데이트됨</string>
 </resources>

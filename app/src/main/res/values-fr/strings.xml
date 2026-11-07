@@ -762,4 +762,5 @@
     <string name="appliance_companion_qr_description">Code QR vers les étapes de configuration de l\'application compagnon du mode téléviseur</string>
     <string name="whats_new">Nouveautés</string>
     <string name="whats_new_badge">Nouveau</string>
+    <string name="whats_new_updated">Mis à jour : %1$s</string>
 </resources>

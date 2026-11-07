@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens.home
 
+import androidx.compose.ui.test.assertIsDisplayed
+
 import androidx.compose.ui.test.onNodeWithText
 
 import android.app.Application
@@ -781,7 +783,23 @@ class HomeCaptureTest {
         val nowSec: Long,
     )
 
-    private fun show(kind: Kind, activityItems: Int = 2, longOnNow: Boolean = false, screen: Boolean = false, fontScale: Float = 1f, noArtwork: Boolean = false, infoLineCounts: Boolean = false) {
+    @Test @Category(VisualCapture::class) fun updateHintHeaderCaptures() = atEvening {
+        show(Kind.BROWSE, updateHint = true)
+        capture("update-hint-unfocused-en-font1.0", "home-recent-0")
+        key(Key.DirectionUp)
+        key(Key.DirectionLeft)
+        capture("update-hint-focused-en-font1.0", "home-update-hint")
+    }
+
+    @Test fun updateHintWithLongTagFitsHeader() = atEvening {
+        show(Kind.BROWSE, updateHint = true, headerTag = "International documentary channels")
+        capture("update-hint-long-tag-en-font1.0", "home-recent-0")
+        compose.onNodeWithTag("home-update-hint").assertIsDisplayed()
+        compose.onNodeWithTag("home-tags-button").assertIsDisplayed()
+        compose.onNodeWithTag("home-view-button").assertIsDisplayed()
+    }
+
+    private fun show(kind: Kind, activityItems: Int = 2, longOnNow: Boolean = false, screen: Boolean = false, fontScale: Float = 1f, noArtwork: Boolean = false, infoLineCounts: Boolean = false, updateHint: Boolean = false, headerTag: String? = null) {
         isDebugInspectorInfoEnabled = true
         val base = scene(kind, activityItems, longOnNow, noArtwork, infoLineCounts)
         val scene = if (kind in setOf(Kind.LOADING, Kind.EMPTY, Kind.OFFLINE)) base.copy(
@@ -866,6 +884,8 @@ class HomeCaptureTest {
                                         at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition.EXPLICIT_RETRY,
                                     ) else at.bernhardberger.tvhplayer.core.ConnectionUiState.Ready,
                                 ) else HomeContent(
+                                    updateHintShown = updateHint,
+                                    tag = headerTag,
                                     sections = sections,
                                     contentPadding = padding,
                                     initialFocus = homeInitialFocus(sections),

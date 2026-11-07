@@ -41,6 +41,7 @@ import kotlinx.coroutines.delay
 @Composable
 @OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
 internal fun HomeScreen(
+    lastUpdateTime: Long?,
     contentPadding: PaddingValues,
     initialFocusEnabled: Boolean,
     channelsVm: ChannelsViewModel,
@@ -67,6 +68,11 @@ internal fun HomeScreen(
     val settingsStore: UiSettingsStore = koinInject()
     val settings by settingsStore.settings.collectAsStateWithLifecycle<UiSettings?>(null)
     val saveScope = rememberCoroutineScope()
+    var hintNow by remember { mutableStateOf(System.currentTimeMillis()) }
+    androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
+        hintNow = System.currentTimeMillis()
+        onPauseOrDispose { }
+    }
     val owner = remember(scope.scope, observation.currentSession, scope.observation?.currentSession) {
         val frameScope = scope.scope
         val frameSession = observation.currentSession
@@ -108,6 +114,9 @@ internal fun HomeScreen(
     CompositionLocalProvider(LocalTabOwner provides owner) {
         ProvideArtworkSession(frame.second.currentSession, frame.third) {
         HomeScreenContent(frame.first.copy(hiddenSections = loadedSettings.hiddenHomeSections), frame.second, contentPadding, initialFocusEnabled,
+            updateHintShown = at.bernhardberger.tvhplayer.settings.whatsNewHintShown(
+                loadedSettings.whatsNewSeenVersion, at.bernhardberger.tvhplayer.BuildConfig.VERSION_CODE, lastUpdateTime, hintNow),
+            onWhatsNewOpened = { saveScope.launch { settingsStore.markWhatsNewSeen(at.bernhardberger.tvhplayer.BuildConfig.VERSION_CODE) } },
             focusMemory = focusMemory,
             onPlay = { id, name -> if (current(id)) onPlay(id, name) },
             onPlayRecording = { selection, start ->
@@ -183,6 +192,8 @@ internal fun HomeScreenContent(
     catalogCurrent: Boolean = observation.channelState.channelCatalogAuthority == RetainedMetadataAuthority.CURRENT,
     hasChannelsOutsideScope: Boolean = observation.channelState.channelCatalogForDisplay?.channels?.isNotEmpty() == true,
     focusMemory: MutableState<HomeFocusKey?> = remember { mutableStateOf(null) },
+    updateHintShown: Boolean = false,
+    onWhatsNewOpened: () -> Unit = {},
 ) {
     val nowSec = input.nowSec
     val owner = LocalTabOwner.current
@@ -283,6 +294,8 @@ internal fun HomeScreenContent(
         else if (hadFocusOwnership) followInitialFocus = false
     }
     HomeContent(
+        updateHintShown = updateHintShown,
+        onWhatsNewOpened = onWhatsNewOpened,
         sections = sections,
         contentPadding = contentPadding,
         initialFocus = if (followInitialFocus) homeInitialFocus(sections) else focused?.let { previous ->

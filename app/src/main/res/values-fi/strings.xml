@@ -745,4 +745,5 @@
     <string name="appliance_companion_qr_description">QR-koodi TV-tilan lisäsovelluksen käyttöönotto-ohjeisiin</string>
     <string name="whats_new">Uutta</string>
     <string name="whats_new_badge">Uusi</string>
+    <string name="whats_new_updated">Päivitetty: %1$s</string>
 </resources>

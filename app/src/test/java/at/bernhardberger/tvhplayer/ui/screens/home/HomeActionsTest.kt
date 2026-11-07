@@ -263,6 +263,84 @@ class HomeActionsTest {
         EpgEvent.create(EventId(1), channel.id, Instant.fromEpochSeconds(now - 60),
             Instant.fromEpochSeconds(now + 600), title = "Programme")))))
 
+    @Test fun updateHintKeepsInitialFocusAndDirectionalPaths() = updateHintPaths(false)
+
+    @Test fun updateHintMirrorsDirectionalPathsInRtl() = updateHintPaths(true)
+
+    private fun updateHintPaths(rtl: Boolean) {
+        leaveTouchMode()
+        var shown by mutableStateOf(true)
+        val rail = androidx.compose.ui.focus.FocusRequester()
+        val leading = if (rtl) Key.DirectionRight else Key.DirectionLeft
+        val trailing = if (rtl) Key.DirectionLeft else Key.DirectionRight
+        compose.setContent { TVHeadendPlayerTheme {
+            CompositionLocalProvider(LocalBrowseNavigationFocus provides rail,
+                androidx.compose.ui.platform.LocalLayoutDirection provides
+                    if (rtl) androidx.compose.ui.unit.LayoutDirection.Rtl else androidx.compose.ui.unit.LayoutDirection.Ltr) {
+                androidx.compose.foundation.layout.Box {
+                    HomeContent(onNowSections(), PaddingValues(), homeInitialFocus(onNowSections()), {},
+                        updateHintShown = shown)
+                    androidx.tv.material3.Button({}, modifier = androidx.compose.ui.Modifier.focusRequester(rail)
+                        .testTag("test-rail")) { androidx.tv.material3.Text("Home") }
+                }
+            }
+        } }
+        fun press(tag: String, key: Key) = compose.onNodeWithTag(tag).assertIsFocused().performKeyInput { pressKey(key) }
+        press("home-onnow-0", Key.DirectionUp)
+        press("home-tags-button", leading)
+        press("home-update-hint", Key.DirectionUp)
+        press("home-update-hint", trailing)
+        press("home-tags-button", leading)
+        press("home-update-hint", Key.DirectionDown)
+        press("home-onnow-0", Key.DirectionUp)
+        press("home-tags-button", leading)
+        press("home-update-hint", leading)
+        compose.onNodeWithTag("test-rail").assertIsFocused()
+        compose.runOnIdle { shown = false }
+        compose.onNodeWithTag("home-update-hint").assertDoesNotExist()
+        compose.onNodeWithTag("home-onnow-0").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.RequestFocus)
+        press("home-onnow-0", Key.DirectionUp)
+        press("home-tags-button", leading)
+        compose.onNodeWithTag("test-rail").assertIsFocused()
+    }
+
+    @Test fun openingUpdateHintMarksSeenAndBackRestoresTags() {
+        leaveTouchMode()
+        var shown by mutableStateOf(true)
+        var opened = 0
+        compose.setContent { TVHeadendPlayerTheme {
+            HomeContent(onNowSections(), PaddingValues(), homeInitialFocus(onNowSections()), {},
+                updateHintShown = shown, onWhatsNewOpened = { opened++ })
+        } }
+        compose.onNodeWithTag("home-onnow-0").performKeyInput { pressKey(Key.DirectionUp) }
+        compose.onNodeWithTag("home-tags-button").performKeyInput { pressKey(Key.DirectionLeft) }
+        compose.onNodeWithTag("home-update-hint").assertIsFocused()
+            .assertContentDescriptionEquals("What's new, Updated to ${at.bernhardberger.tvhplayer.BuildConfig.VERSION_NAME}")
+            .performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("player-info-reading").assertIsDisplayed()
+        // DataStore emits the seen version after the reader has opened, not in its click callback.
+        compose.runOnIdle { assertEquals(1, opened); shown = false }
+        compose.onNodeWithTag("home-update-hint").assertDoesNotExist()
+        compose.onNodeWithTag("player-info-reading").performKeyInput { pressKey(Key.Back) }
+        compose.onNodeWithTag("player-info-reading").assertDoesNotExist()
+        compose.onNodeWithTag("home-update-hint").assertDoesNotExist()
+        compose.onNodeWithTag("home-tags-button").assertIsFocused()
+    }
+
+    @Test fun focusedUpdateHintExpiryRestoresTags() {
+        leaveTouchMode()
+        var shown by mutableStateOf(true)
+        compose.setContent { TVHeadendPlayerTheme {
+            HomeContent(onNowSections(), PaddingValues(), homeInitialFocus(onNowSections()), {}, updateHintShown = shown)
+        } }
+        compose.onNodeWithTag("home-onnow-0").performKeyInput { pressKey(Key.DirectionUp) }
+        compose.onNodeWithTag("home-tags-button").performKeyInput { pressKey(Key.DirectionLeft) }
+        compose.onNodeWithTag("home-update-hint").assertIsFocused()
+        compose.runOnIdle { shown = false }
+        compose.onNodeWithTag("home-update-hint").assertDoesNotExist()
+        compose.onNodeWithTag("home-tags-button").assertIsFocused()
+    }
+
     @Test fun aHandOffThatNeverLandsCannotBePressedAndMovesFocusToTheHeader() {
         leaveTouchMode()
         var sections by mutableStateOf(emptyList<HomeSection>())
@@ -859,7 +937,7 @@ class HomeActionsTest {
         compose.setContent { org.koin.compose.KoinIsolatedContext(dependencies) {
             DisposableEffect(Unit) { onDispose { viewModels.clear(); dependencies.close() } }
             TVHeadendPlayerTheme {
-                HomeScreen(PaddingValues(), true, vm, null, null,
+                HomeScreen(null, PaddingValues(), true, vm, null, null,
                     onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
                     onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> },
                     lastPlayedStore = at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore(
@@ -896,7 +974,7 @@ class HomeActionsTest {
         compose.setContent { org.koin.compose.KoinIsolatedContext(dependencies) {
             DisposableEffect(Unit) { onDispose { viewModels.clear(); dependencies.close() } }
             TVHeadendPlayerTheme {
-                HomeScreen(PaddingValues(), true, vm, channel.id, null,
+                HomeScreen(null, PaddingValues(), true, vm, channel.id, null,
                     onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
                     onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> }, focusMemory = memory,
                     lastPlayedStore = at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore(

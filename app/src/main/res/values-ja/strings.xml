@@ -729,4 +729,5 @@
     <string name="appliance_companion_qr_description">専用機モードの補助アプリの設定手順を開くQRコード</string>
     <string name="whats_new">更新内容</string>
     <string name="whats_new_badge">新着</string>
+    <string name="whats_new_updated">%1$s に更新済み</string>
 </resources>

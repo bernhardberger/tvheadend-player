@@ -809,4 +809,5 @@
     <string name="appliance_companion_qr_description">رمز QR لخطوات إعداد التطبيق المرافق لوضع الجهاز المخصّص</string>
     <string name="whats_new">ما الجديد</string>
     <string name="whats_new_badge">جديد</string>
+    <string name="whats_new_updated">تم التحديث إلى %1$s</string>
 </resources>

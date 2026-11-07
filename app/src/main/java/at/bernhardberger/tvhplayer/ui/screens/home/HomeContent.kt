@@ -166,6 +166,7 @@ import java.util.Locale
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import kotlin.math.roundToInt
 import androidx.compose.ui.text.rememberTextMeasurer
 
@@ -345,7 +346,27 @@ internal fun HomeContent(
     restoreHeader: Boolean = false,
     emptyFocus: FocusRequester? = null,
     emptyContent: @Composable () -> Unit = {},
+    updateHintShown: Boolean = false,
+    onWhatsNewOpened: () -> Unit = {},
 ) {
+    var readingWhatsNew by remember { mutableStateOf(false) }
+    var hintFocused by remember { mutableStateOf(false) }
+    val hintRequester = remember { FocusRequester() }
+    val readerScope = rememberCoroutineScope()
+    LaunchedEffect(updateHintShown) {
+        if (!updateHintShown && hintFocused && !readingWhatsNew) tagsRequester.requestFocus()
+    }
+    if (readingWhatsNew) {
+        at.bernhardberger.tvhplayer.ui.screens.settings.AboutReadingDialog(
+            stringResource(R.string.whats_new), "CHANGELOG.md",
+        ) {
+            readingWhatsNew = false
+            readerScope.launch {
+                withFrameNanos { }
+                tagsRequester.requestFocus()
+            }
+        }
+    }
     val direction = LocalLayoutDirection.current
     val ltr = direction == LayoutDirection.Ltr
     val startPadding = contentPadding.calculateStartPadding(direction)
@@ -564,6 +585,11 @@ internal fun HomeContent(
                     },
             ) {
                 HomeHeader(
+                    // Keep a focused hint attached until the tag accepts the hand-off.
+                    updateHintShown = updateHintShown || (hintFocused && !readingWhatsNew),
+                    hintRequester = hintRequester,
+                    onHintFocusChanged = { hintFocused = it },
+                    onWhatsNew = { hintFocused = false; readingWhatsNew = true; onWhatsNewOpened() },
                     nowSec = nowSec,
                     locale = locale,
                     zone = zone,
@@ -842,6 +868,10 @@ internal fun homeRowCardWidth(contentWidth: Dp, columns: Int, gap: Dp): Dp =
 /** The existing date, clock and View options header, now the page's first scrolling item. */
 @Composable
 private fun HomeHeader(
+    updateHintShown: Boolean,
+    hintRequester: FocusRequester,
+    onHintFocusChanged: (Boolean) -> Unit,
+    onWhatsNew: () -> Unit,
     nowSec: Long,
     locale: Locale,
     zone: ZoneId,
@@ -866,6 +896,22 @@ private fun HomeHeader(
         horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.End),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (updateHintShown) {
+            RoundIconButton(
+                icon = painterResource(R.drawable.ic_auto_awesome),
+                label = stringResource(R.string.whats_new),
+                value = stringResource(R.string.whats_new_updated, at.bernhardberger.tvhplayer.BuildConfig.VERSION_NAME),
+                active = true,
+                onClick = onWhatsNew,
+                focusRequester = hintRequester,
+                onFocused = onFocused,
+                modifier = Modifier.onFocusChanged { onHintFocusChanged(it.isFocused) }.focusProperties {
+                    up = FocusRequester.Cancel
+                    down = firstSectionRequester ?: FocusRequester.Cancel
+                    if (ltr) { left = rail; right = tagsRequester } else { right = rail; left = tagsRequester }
+                }.testTag("home-update-hint"),
+            )
+        }
         Column(horizontalAlignment = Alignment.End) {
         Text(
             text = formatClock(Instant.ofEpochSecond(nowSec).atZone(zone), locale),
@@ -882,7 +928,8 @@ private fun HomeHeader(
             modifier = Modifier.focusProperties {
                 up = FocusRequester.Cancel
                 down = firstSectionRequester ?: FocusRequester.Cancel
-                if (ltr) { left = rail; right = viewRequester } else { right = rail; left = viewRequester }
+                val leading = if (updateHintShown) hintRequester else rail
+                if (ltr) { left = leading; right = viewRequester } else { right = leading; left = viewRequester }
             }.testTag("home-tags-button"))
         RoundIconButton(
             icon = painterResource(R.drawable.ic_tune),

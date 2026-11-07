@@ -699,4 +699,5 @@
     <string name="appliance_companion_qr_description">电视模式配套应用设置步骤的二维码</string>
     <string name="whats_new">更新内容</string>
     <string name="whats_new_badge">新</string>
+    <string name="whats_new_updated">已更新至 %1$s</string>
 </resources>

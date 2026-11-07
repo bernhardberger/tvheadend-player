@@ -762,4 +762,5 @@
     <string name="appliance_companion_qr_description">QR kôd s koracima za postavljanje prateće aplikacije za način TV prijamnika</string>
     <string name="whats_new">Što je novo</string>
     <string name="whats_new_badge">Novo</string>
+    <string name="whats_new_updated">Ažurirano na %1$s</string>
 </resources>

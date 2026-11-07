@@ -195,7 +195,7 @@ class SettingsAboutTest {
 
     private var captureScale = 1f
 
-    @Test fun whatsNewMarkersClearTogetherAndConnectionProblemWins() = whatsNewJourney(false)
+    @Test fun updateSupportingTextClearsAndOnlyConnectionHasRailBadge() = whatsNewJourney(false)
 
     @Test @Category(VisualCapture::class)
     fun whatsNewEnglishCaptures() = whatsNewJourney(true)
@@ -215,11 +215,10 @@ class SettingsAboutTest {
                     val navigation = rememberDepthNavigationState(SETTINGS_ROOT, ABOUT_LEVEL)
                     Box(Modifier.fillMaxSize().background(Color.Black)) {
                         SideRail(currentRoute = AppDestination.SETTINGS, connectionDegraded = degraded,
-                            whatsNewUnseen = unseen, onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
+                            onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                             SettingsScreenNavigation(navigation,
-                                listOf(settingsRootLevel(whatsNewUnseen = unseen)) +
+                                listOf(settingsRootLevel(updateHintShown = unseen)) +
                                     settingsAboutLevels(sessionState, machineTranslated = false,
-                                        whatsNewUnseen = unseen,
                                         onWhatsNewOpened = { scope.launch { store.markWhatsNewSeen(version) } }),
                                 contentPadding = padding, initialFocusEnabled = !drawerActive)
                         }
@@ -228,9 +227,9 @@ class SettingsAboutTest {
             }
         }
         compose.onNodeWithTag("settings-row-$ABOUT_LEVEL").assertIsFocused()
-            .assertContentDescriptionEquals("About, New")
-        compose.onNodeWithTag("whats-new-badge", useUnmergedTree = true).assertIsDisplayed()
-        compose.onNodeWithTag("nav-settings").assertContentDescriptionEquals("Settings, New")
+        compose.onNodeWithText("Updated to ${at.bernhardberger.tvhplayer.BuildConfig.VERSION_NAME}", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithTag("whats-new-badge", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("nav-settings").assertContentDescriptionEquals("Settings")
         if (captures) save("whats-new-rail-collapsed-en-font1.0")
         compose.runOnIdle { degraded = true }
         compose.onNodeWithTag("whats-new-badge", useUnmergedTree = true).assertDoesNotExist()
@@ -240,7 +239,7 @@ class SettingsAboutTest {
         press(Key.Back)
         compose.onNodeWithTag("nav-settings").assertIsFocused()
         compose.onNode(hasText("New") and hasAnyAncestor(hasTestTag("nav-settings")), useUnmergedTree = true)
-            .assertIsDisplayed()
+            .assertDoesNotExist()
         if (captures) save("whats-new-rail-expanded-focused-en-font1.0")
         compose.runOnIdle { degraded = true }
         compose.onNode(hasText("New") and hasAnyAncestor(hasTestTag("nav-settings")), useUnmergedTree = true).assertDoesNotExist()
@@ -254,7 +253,8 @@ class SettingsAboutTest {
         compose.onNodeWithTag("settings-row-$ABOUT_LEVEL").assertIsFocused()
         press(Key.DirectionCenter)
         compose.onNodeWithTag("settings-row-version").assertIsFocused()
-        compose.onNodeWithTag("settings-row-whats-new").assertContentDescriptionEquals("What's new, New")
+        compose.onNodeWithTag("settings-row-whats-new")
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.ContentDescription))
         press(Key.DirectionDown)
         compose.onNodeWithTag("settings-row-whats-new").assertIsFocused()
         if (captures) save("whats-new-about-en-font1.0")
@@ -274,6 +274,9 @@ class SettingsAboutTest {
         press(Key.Back)
         compose.onNodeWithTag("settings-row-$ABOUT_LEVEL").assertIsFocused()
             .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.ContentDescription))
+        compose.onNodeWithText(at.bernhardberger.tvhplayer.BuildConfig.VERSION_NAME, useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithText("Updated to ${at.bernhardberger.tvhplayer.BuildConfig.VERSION_NAME}").assertDoesNotExist()
+        if (captures) save("whats-new-settings-version-en-font1.0")
         compose.onNodeWithTag("whats-new-badge", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("nav-settings").assertContentDescriptionEquals("Settings")
         press(Key.Back)

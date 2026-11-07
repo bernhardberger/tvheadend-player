@@ -745,4 +745,5 @@
     <string name="appliance_companion_qr_description">Κωδικός QR για τα βήματα ρύθμισης της συνοδευτικής εφαρμογής λειτουργίας συσκευής TV</string>
     <string name="whats_new">Τι νέο υπάρχει</string>
     <string name="whats_new_badge">Νέο</string>
+    <string name="whats_new_updated">Ενημερώθηκε σε %1$s</string>
 </resources>

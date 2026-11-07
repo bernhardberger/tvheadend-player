@@ -745,4 +745,5 @@
     <string name="appliance_companion_qr_description">QR-code voor de instelstappen van de begeleidende app voor tv-modus</string>
     <string name="whats_new">Wat is er nieuw?</string>
     <string name="whats_new_badge">Nieuw</string>
+    <string name="whats_new_updated">Bijgewerkt naar %1$s</string>
 </resources>

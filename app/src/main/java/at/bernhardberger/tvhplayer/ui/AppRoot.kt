@@ -11,7 +11,6 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.compose.ui.platform.LocalContext
 import at.bernhardberger.tvhplayer.BuildConfig
-import at.bernhardberger.tvhplayer.settings.hasUnseenWhatsNew
 import kotlinx.coroutines.Dispatchers
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterTransition
@@ -606,6 +605,7 @@ fun AppRoot(
     val uiSettingsStore: UiSettingsStore = koinInject()
     val context = LocalContext.current
     val uiSettings by uiSettingsStore.settings.collectAsStateWithLifecycle(initialValue = UiSettings())
+    var lastUpdateTime by remember { mutableStateOf<Long?>(null) }
     LaunchedEffect(uiSettingsStore) {
         val packageInfo = withContext(Dispatchers.IO) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -616,6 +616,7 @@ fun AppRoot(
             }
         }
         uiSettingsStore.initializeWhatsNew(BuildConfig.VERSION_CODE, packageInfo.firstInstallTime, packageInfo.lastUpdateTime)
+        lastUpdateTime = packageInfo.lastUpdateTime
     }
     ApplyUiPresentationSettings(uiSettings)
     val profileOwner: AppProfileOwner = koinInject()
@@ -980,6 +981,7 @@ fun AppRoot(
                         metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.HOME),
                     ) {
                         HomeRouteContent(
+                            lastUpdateTime = lastUpdateTime,
                             homeFocus = homeFocus,
                             contentAllowed = contentAllowed || coldStartVisible,
                             contentPadding = contentPadding,
@@ -1159,6 +1161,7 @@ fun AppRoot(
                         metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.SETTINGS),
                     ) { destination ->
                         SettingsRouteContent(
+                            lastUpdateTime = lastUpdateTime,
                             channelsVm = channelsVm,
                             connectionPresentation = connectionPresentation,
                             onRetry = { appVm.reconnectNow(allowAutomaticBackoff = true) },
@@ -1396,7 +1399,6 @@ fun AppRoot(
                         // A fading rail keeps marking the page it fades with.
                         currentRoute = (railBackStack.lastOrNull() ?: currentDestination)?.destination,
                         connectionDegraded = connectionPresentation.degraded,
-                        whatsNewUnseen = hasUnseenWhatsNew(uiSettings.whatsNewSeenVersion, BuildConfig.VERSION_CODE),
                         rootRoute = AppDestination.HOME,
                         availableDestinations = buildSet {
                             add(AppDestination.HOME)

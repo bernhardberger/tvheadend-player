@@ -699,4 +699,5 @@
     <string name="appliance_companion_qr_description">電視模式配套應用程式設定步驟的 QR 碼</string>
     <string name="whats_new">更新內容</string>
     <string name="whats_new_badge">新</string>
+    <string name="whats_new_updated">已更新至 %1$s</string>
 </resources>

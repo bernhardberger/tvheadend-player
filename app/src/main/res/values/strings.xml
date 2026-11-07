@@ -934,4 +934,5 @@
     <string name="appliance_companion_qr_description">QR code for the appliance companion setup steps</string>
     <string name="whats_new">What\'s new</string>
     <string name="whats_new_badge">New</string>
+    <string name="whats_new_updated">Updated to %1$s</string>
 </resources>

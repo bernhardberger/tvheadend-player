@@ -43,7 +43,6 @@ internal fun settingsAboutLevels(
     sessionState: SessionState,
     companionInstalled: Boolean = false,
     machineTranslated: Boolean = booleanResource(R.bool.language_machine_translated),
-    whatsNewUnseen: Boolean = false,
     onWhatsNewOpened: () -> Unit = {},
 ): List<DepthLevel> {
     val credits = stringArrayResource(R.array.about_translator_credits).filter { it.isNotBlank() }
@@ -59,7 +58,6 @@ internal fun settingsAboutLevels(
             R.string.about_version_value, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE,
             stringResource(if (companionInstalled) R.string.about_build_appliance else R.string.about_build_play))),
         settingsRow("whats-new", whatsNew, titleMaxLines = 3, trailingIcon = R.drawable.ic_arrow_forward,
-            newMarker = whatsNewUnseen,
             onClick = { reading = whatsNew to "CHANGELOG.md"; onWhatsNewOpened() }),
         settingsRow("server", stringResource(R.string.about_server), aboutServerText(sessionState)),
         settingsRow("license", license, titleMaxLines = 3, trailingIcon = R.drawable.ic_arrow_forward,
@@ -93,7 +91,7 @@ private fun aboutServerText(state: SessionState): String {
 }
 
 @Composable
-private fun AboutReadingDialog(title: String, asset: String, onDismiss: () -> Unit) {
+internal fun AboutReadingDialog(title: String, asset: String, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val source = remember(asset) {
         context.assets.open("licenses/$asset").bufferedReader().use { it.readText() }
