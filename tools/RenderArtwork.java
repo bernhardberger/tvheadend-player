@@ -6,6 +6,7 @@ import java.awt.RenderingHints;
 import java.awt.Shape;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Area;
+import java.awt.geom.Arc2D;
 import java.awt.geom.Ellipse2D;
 import java.awt.geom.Path2D;
 import java.awt.geom.PathIterator;
@@ -86,11 +87,27 @@ public final class RenderArtwork {
         writeVariants();
     }
 
+    private enum Variant {
+        APPLIANCE("appliance", "Appliance", "appliance/src/main/res"),
+        DEBUG("debug", "Debug", "app/src/debug/res"),
+        PROFILE("profile", "Profile", "app/src/profileServer/res");
+
+        final String name;
+        final String label;
+        final Path root;
+
+        Variant(String name, String label, String root) {
+            this.name = name;
+            this.label = label;
+            this.root = Path.of(root);
+        }
+    }
+
     /** Glyphs use the badge's local 512-canvas coordinates and 12-unit round strokes. */
-    private static Shape badgeGlyph(boolean bug) {
+    private static Shape badgeGlyph(Variant variant) {
         Path2D lines = new Path2D.Double();
         Area glyph;
-        if (bug) {
+        if (variant == Variant.DEBUG) {
             glyph = new Area(new RoundRectangle2D.Double(-20, -15, 40, 52, 30, 30));
             glyph.add(new Area(new Ellipse2D.Double(-14, -35, 28, 28)));
             for (int side : new int[]{-1, 1}) {
@@ -101,12 +118,16 @@ public final class RenderArtwork {
                 lines.moveTo(side * 8, -28);
                 lines.lineTo(side * 20, -43);
             }
-        } else {
+        } else if (variant == Variant.APPLIANCE) {
             glyph = new Area(new Ellipse2D.Double(-10, -40, 20, 20));
             lines.moveTo(-34, -10); lines.lineTo(34, -10);
             lines.moveTo(0, -10); lines.lineTo(0, 12);
             lines.lineTo(-16, 38);
             lines.moveTo(0, 12); lines.lineTo(16, 38);
+        } else {
+            glyph = new Area(new Ellipse2D.Double(-10, -10, 20, 20));
+            lines.append(new Arc2D.Double(-38, -38, 76, 76, -30, 240, Arc2D.OPEN), false);
+            lines.moveTo(0, 0); lines.lineTo(23, -23);
         }
         glyph.add(new Area(new BasicStroke(12, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
                 .createStrokedShape(lines)));
@@ -124,30 +145,30 @@ public final class RenderArtwork {
 
     private static void writeVariants() throws IOException {
         Path preview = Path.of("artifacts/brand-preview/appliance-companion");
-        BufferedImage comparison = new BufferedImage(1536, 1024, BufferedImage.TYPE_INT_RGB);
+        int comparisonWidth = (Variant.values().length + 1) * 512;
+        BufferedImage comparison = new BufferedImage(comparisonWidth, 1024, BufferedImage.TYPE_INT_RGB);
         Graphics2D sheet = graphics(comparison);
-        paintField(sheet, 1536, 1024);
+        paintField(sheet, comparisonWidth, 1024);
         sheet.drawImage(ImageIO.read(Path.of("artwork/tvheadend-player-banner.png").toFile()), 0, 0, 512, 288, null);
         sheet.drawImage(renderLegacyIcon(96, false), 208, 320, null);
         sheet.drawImage(ImageIO.read(Path.of("artwork/tvheadend-player-symbol.png").toFile()), 0, 464, null);
         String[] densities = {"mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"};
         double[] scales = {0.5, 0.75, 1, 1.5, 2};
         int[] sizes = {48, 72, 96, 144, 192};
-        for (int variant = 0; variant < 2; variant++) {
-            boolean bug = variant == 1;
-            String name = bug ? "debug" : "appliance";
-            Path root = Path.of(bug ? "app/src/debug/res" : "appliance/src/main/res");
-            List<Ink> symbol = badgedMark(badgeGlyph(bug));
+        for (Variant variant : Variant.values()) {
+            String name = variant.name;
+            Path root = variant.root;
+            List<Ink> symbol = badgedMark(badgeGlyph(variant));
             // Only the symbol SVG is a public variant export, never a Play listing icon.
             StringBuilder svg = new StringBuilder("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"512\" height=\"512\" viewBox=\"0 0 512 512\">\n<title>Tvheadend Player "
-                    + (bug ? "Debug" : "Appliance") + "</title>\n<rect width=\"100%\" height=\"100%\" fill=\"#0F1014\"/>\n");
+                    + variant.label + "</title>\n<rect width=\"100%\" height=\"100%\" fill=\"#0F1014\"/>\n");
             for (Ink item : symbol) svg.append("<path fill=\"")
                     .append(String.format(Locale.ROOT, "#%06X", item.color().getRGB() & 0xFFFFFF))
                     .append("\" d=\"").append(toPathData(item.shape())).append("\"/>\n");
             Files.writeString(Path.of("artwork/tvheadend-player-" + name + "-symbol.svg"), svg.append("</svg>\n"));
             List<Ink> banner = transformed(symbol, 0.1963, 15.35, 39.75);
             text(banner, "Tvheadend Player", 21, 119, 76, TEXT);
-            text(banner, bug ? "Debug" : "Appliance", 36, 117, 116, CYAN);
+            text(banner, variant.label, 36, 117, 116, CYAN);
             for (int i = 0; i < densities.length; i++) {
                 writePng(render(320, 180, banner, scales[i]), root.resolve("drawable-" + densities[i] + "/banner.png"));
                 for (boolean round : new boolean[]{false, true}) {
@@ -187,7 +208,7 @@ public final class RenderArtwork {
                         <path android:fillColor="#FFFFFFFF" android:pathData="%s" />
                     </vector>
                     """.formatted(toPathData(mono)));
-            if (!bug) {
+            if (variant == Variant.APPLIANCE) {
                 writePng(renderAdaptiveBackground(), root.resolve("drawable/ic_launcher_background.png"));
                 for (String directory : new String[]{"mipmap-anydpi-v26", "mipmap-anydpi-v33"}) {
                     Files.createDirectories(root.resolve(directory));
@@ -199,7 +220,7 @@ public final class RenderArtwork {
             BufferedImage icon = render(512, 512, symbol, 1);
             writePng(icon, preview.resolve(name + "-icon-512.png"));
             writePng(render(320, 180, banner, 2), preview.resolve(name + "-banner-640x360.png"));
-            int x = (variant + 1) * 512;
+            int x = (variant.ordinal() + 1) * 512;
             sheet.drawImage(render(320, 180, banner, 1), x, 0, 512, 288, null);
             sheet.drawImage(icon, x + 208, 320, 96, 96, null);
             sheet.drawImage(icon, x, 464, null);

@@ -52,7 +52,7 @@ DETERMINISTIC_VECTOR_ARTWORK = (
     "artwork/github-social-preview.svg",
 )
 
-for root in ("app/src/debug/res", "appliance/src/main/res"):
+for root in ("app/src/debug/res", "app/src/profileServer/res", "appliance/src/main/res"):
     for density, banner_size, icon_size in (
         ("mdpi", (160, 90), 48), ("hdpi", (240, 135), 72),
         ("xhdpi", (320, 180), 96), ("xxhdpi", (480, 270), 144),
@@ -68,6 +68,7 @@ GENERATED_PNG_DIMENSIONS["appliance/src/main/res/drawable/ic_launcher_background
 DETERMINISTIC_VECTOR_ARTWORK += (
     "artwork/tvheadend-player-appliance-symbol.svg",
     "artwork/tvheadend-player-debug-symbol.svg",
+    "artwork/tvheadend-player-profile-symbol.svg",
 ) + tuple(
     f"appliance/src/main/res/{directory}/{name}.xml"
     for directory in ("mipmap-anydpi-v26", "mipmap-anydpi-v33")
@@ -197,9 +198,12 @@ class ArtworkTest(unittest.TestCase):
             self.assertEqual("for Android TV" in title, "android-tv" in relative_path)
 
     def test_variant_resources_are_isolated_from_release_and_profile(self):
-        label = ElementTree.parse(ROOT / "app/src/debug/res/values/strings.xml")
-        self.assertEqual("Tvheadend Player Debug", label.find("string[@name='launcher_label']").text)
-        for source_set in ("release", "profile", "profileServer"):
+        for source_set, variant in (("debug", "Debug"), ("profileServer", "Profile")):
+            label = ElementTree.parse(ROOT / f"app/src/{source_set}/res/values/strings.xml")
+            launcher_label = label.find("string[@name='launcher_label']")
+            self.assertEqual(f"Tvheadend Player {variant}", launcher_label.text)
+            self.assertEqual("false", launcher_label.attrib["translatable"])
+        for source_set in ("release", "profile"):
             root = ROOT / "app/src" / source_set / "res"
             self.assertFalse(list(root.glob("**/ic_launcher*")))
             self.assertFalse(list(root.glob("**/banner.png")))
