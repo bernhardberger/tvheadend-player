@@ -156,6 +156,18 @@ class HomeCaptureTest {
         capture("4b-upcoming", "home-upcoming-0")
     }
 
+    /** The recent-channels row's tiles and its "All channels" end card, the card unfocused and then focused. */
+    @Category(VisualCapture::class)
+    @Test
+    fun recentChannelsEndCard() = atEvening {
+        show(Kind.BROWSE)
+        settle("home-recent-0")
+        repeat(7) { key(Key.DirectionRight) }
+        capture("recent-end-card-unfocused", "home-recent-7")
+        key(Key.DirectionRight)
+        capture("recent-end-card-focused", "home-all-channels")
+    }
+
     /** Store listing candidates: the same page as the mockup states, under the store's locale and output folder. */
     @Category(VisualCapture::class)
     @Test @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi")

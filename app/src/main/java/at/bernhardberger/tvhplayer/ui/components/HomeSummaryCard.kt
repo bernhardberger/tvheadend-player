@@ -62,13 +62,17 @@ internal fun HomeAllRecordingsCard(
         picon = null,
         title = {
             AnimatedVisibility(visible = textShown, enter = RowTextEnter, exit = RowTextExit) {
-                Text(
-                    label,
-                    Modifier.fillMaxWidth().padding(top = StandardCardTextGap),
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                if (allChannels) {
+                    HomeRowCaption(label)
+                } else {
+                    Text(
+                        label,
+                        Modifier.fillMaxWidth().padding(top = StandardCardTextGap),
+                        style = MaterialTheme.typography.titleSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         },
         subtitle = {},

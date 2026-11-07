@@ -57,6 +57,36 @@ class HomeActionsTest {
         compose.runOnIdle { assertTrue(opened) }
     }
 
+    @Test fun recentChannelsEndCardCaptionMatchesTheTileNames() {
+        val input = HomeInput(listOf(channel), emptyMap(), emptyList(), listOf(channel.id), emptyList(), { null }, null, now)
+        compose.setContent { TVHeadendPlayerTheme {
+            HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
+                onPlay = { _, _ -> }, onPlayRecording = { _, _ -> },
+                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
+        } }
+        compose.onNodeWithTag("home-recent-0").assertIsFocused()
+        fun caption(text: String): Triple<androidx.compose.ui.text.TextLayoutInput, Float, Float> {
+            val node = compose.onNode(hasText(text) and hasAnyAncestor(hasTestTag("home-section-RECENT_CHANNELS")),
+                useUnmergedTree = true)
+            val results = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+            node.fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult]
+                .action?.invoke(results)
+            val bounds = node.getUnclippedBoundsInRoot()
+            return Triple(results.single().layoutInput, (bounds.bottom - bounds.top).value, bounds.top.value)
+        }
+        val tile = caption("Test channel")
+        val end = caption("All channels")
+        assertEquals(tile.first.style.fontSize, end.first.style.fontSize)
+        assertEquals(tile.first.style.fontWeight, end.first.style.fontWeight)
+        assertEquals(tile.first.style.lineHeight, end.first.style.lineHeight)
+        assertEquals(tile.first.style.letterSpacing, end.first.style.letterSpacing)
+        assertEquals(androidx.compose.ui.text.style.TextAlign.Center, end.first.style.textAlign)
+        assertEquals(tile.first.style.textAlign, end.first.style.textAlign)
+        assertEquals(2, end.first.maxLines)
+        assertEquals(tile.second, end.second, 0.5f)
+        assertEquals("captions start at the same line under equal pictures", tile.third, end.third, 0.5f)
+    }
+
     @Test fun rowReentryRestoresItemIdentityAfterAnEarlierItemLeaves() = recentRowRefresh(false)
 
     @Test fun rowReentryUsesClampedPreviousIndexWhenItsItemLeaves() = recentRowRefresh(true)

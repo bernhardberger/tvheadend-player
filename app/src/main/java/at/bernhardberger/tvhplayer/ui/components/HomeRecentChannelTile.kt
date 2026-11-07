@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -19,15 +18,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvhplayer.core.visibleChannelNumber
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
@@ -86,15 +81,10 @@ internal fun HomeRecentChannelTile(
             }
         }
         AnimatedVisibility(visible = nameShown, enter = RowTextEnter, exit = RowTextExit) {
-            Text(
+            HomeRowCaption(
                 name,
-                style = channelCaptionStyle().copy(fontWeight = FontWeight.Normal),
-                textAlign = TextAlign.Center,
+                Modifier.mutedTextPastRowStart(),
                 color = if (focused) TvTextColors.primary else TvTextColors.secondary,
-                maxLines = 2,
-                minLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth().padding(top = StandardCardTextGap).mutedTextPastRowStart(),
             )
         }
     }
