@@ -7,6 +7,12 @@ import at.bernhardberger.tvhplayer.profiling.profileRouteDraw
 
 import androidx.activity.compose.BackHandler
 import android.animation.ValueAnimator
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.compose.ui.platform.LocalContext
+import at.bernhardberger.tvhplayer.BuildConfig
+import at.bernhardberger.tvhplayer.settings.hasUnseenWhatsNew
+import kotlinx.coroutines.Dispatchers
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -607,7 +613,19 @@ fun AppRoot(
         playbackObservation.dvrEntry(it)?.channelId
     }
     val uiSettingsStore: UiSettingsStore = koinInject()
+    val context = LocalContext.current
     val uiSettings by uiSettingsStore.settings.collectAsStateWithLifecycle(initialValue = UiSettings())
+    LaunchedEffect(uiSettingsStore) {
+        val packageInfo = withContext(Dispatchers.IO) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.packageManager.getPackageInfo(context.packageName, PackageManager.PackageInfoFlags.of(0L))
+            } else {
+                @Suppress("DEPRECATION")
+                context.packageManager.getPackageInfo(context.packageName, 0)
+            }
+        }
+        uiSettingsStore.initializeWhatsNew(BuildConfig.VERSION_CODE, packageInfo.firstInstallTime, packageInfo.lastUpdateTime)
+    }
     ApplyUiPresentationSettings(uiSettings)
     val profileOwner: AppProfileOwner = koinInject()
     val profileGeneration by profileOwner.configurationGeneration.collectAsStateWithLifecycle()
@@ -1399,6 +1417,7 @@ fun AppRoot(
                         // A fading rail keeps marking the page it fades with.
                         currentRoute = (railBackStack.lastOrNull() ?: currentDestination)?.destination,
                         connectionDegraded = connectionPresentation.degraded,
+                        whatsNewUnseen = hasUnseenWhatsNew(uiSettings.whatsNewSeenVersion, BuildConfig.VERSION_CODE),
                         rootRoute = AppDestination.HOME,
                         availableDestinations = buildSet {
                             add(AppDestination.HOME)

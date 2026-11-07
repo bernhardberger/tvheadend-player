@@ -748,4 +748,6 @@
     <string name="appliance_companion_description">Μια προαιρετική συνοδευτική εφαρμογή κάνει το Tvheadend Player να λειτουργεί όπως η ενσωματωμένη εφαρμογή τηλεοπτικού δέκτη της τηλεόρασης. Ανοίγει το πρόγραμμα αναπαραγωγής όταν ανάβει η τηλεόραση, μπορεί να αναλάβει κουμπιά του τηλεχειριστηρίου όπως TV και Guide και να αντικαταστήσει την αρχική οθόνη. Είναι ξεχωριστή εφαρμογή από τις εκδόσεις του έργου στο GitHub και ενημερώνεται αυτόματα από εκεί.</string>
     <string name="appliance_companion_install_info">Για τη ρύθμιση, σάρωσε τον κωδικό ή άνοιξε το github.com/bernhardberger/tvheadend-player σε τηλέφωνο ή υπολογιστή και ακολούθησε τα βήματα στην ενότητα «Appliance companion».</string>
     <string name="appliance_companion_qr_description">Κωδικός QR για τα βήματα ρύθμισης της συνοδευτικής εφαρμογής λειτουργίας συσκευής TV</string>
+    <string name="whats_new">Τι νέο υπάρχει</string>
+    <string name="whats_new_badge">Νέο</string>
 </resources>

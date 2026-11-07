@@ -732,4 +732,6 @@
     <string name="appliance_companion_description">任意の補助アプリを使うと、Tvheadend Playerがテレビ内蔵のチューナーアプリのように動作します。テレビの電源が入るとプレーヤーを開き、TVやGuideなどのリモコンボタンの操作を引き継いだり、ホーム画面を置き換えたりできます。プロジェクトのGitHubリリースで配布される別アプリで、そこから自動更新します。</string>
     <string name="appliance_companion_install_info">設定するには、コードを読み取るか、スマートフォンやパソコンでgithub.com/bernhardberger/tvheadend-playerを開き、「Appliance companion」の手順に従ってください。</string>
     <string name="appliance_companion_qr_description">専用機モードの補助アプリの設定手順を開くQRコード</string>
+    <string name="whats_new">更新内容</string>
+    <string name="whats_new_badge">新着</string>
 </resources>

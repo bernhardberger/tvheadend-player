@@ -780,4 +780,6 @@
     <string name="appliance_companion_description">Volitelná doprovodná aplikace umožní Tvheadend Player fungovat jako vestavěná aplikace TV přijímače. Otevře přehrávač při zapnutí televize, může převzít tlačítka ovladače, například TV a Guide, a nahradit domovskou obrazovku. Jde o samostatnou aplikaci z vydání projektu na GitHubu, odkud se sama aktualizuje.</string>
     <string name="appliance_companion_install_info">Pro nastavení naskenuj kód nebo na telefonu či počítači otevři github.com/bernhardberger/tvheadend-player a postupuj podle kroků v části „Appliance companion“.</string>
     <string name="appliance_companion_qr_description">QR kód s postupem nastavení doprovodné aplikace pro režim TV přijímače</string>
+    <string name="whats_new">Co je nového</string>
+    <string name="whats_new_badge">Nové</string>
 </resources>

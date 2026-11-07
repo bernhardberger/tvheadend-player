@@ -94,8 +94,8 @@ android {
         applicationId = "at.bernhardberger.tvhplayer"
         minSdk = 28
         targetSdk = 36
-        versionCode = 176
-        versionName = "0.4.11"
+        versionCode = 177
+        versionName = "0.4.12"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "PROFILE_TRACE", "false")
@@ -239,7 +239,7 @@ androidComponents.onVariants { variant ->
     val aboutLegalAssets = tasks.register<GenerateAboutLegalAssets>(
         "generate${variant.name.replaceFirstChar { it.uppercase() }}AboutLegalAssets",
     ) {
-        legalFiles.from(rootProject.file("LICENSE"), rootProject.file("NOTICE.md"), rootProject.file("privacy-policy.md"))
+        legalFiles.from(rootProject.file("LICENSE"), rootProject.file("NOTICE.md"), rootProject.file("privacy-policy.md"), rootProject.file("CHANGELOG.md"))
     }
     variant.sources.assets?.addGeneratedSourceDirectory(
         aboutLegalAssets,

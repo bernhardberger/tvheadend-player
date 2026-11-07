@@ -702,4 +702,6 @@
     <string name="appliance_companion_description">選用的配套應用程式可讓 Tvheadend Player 像電視內建的調諧器應用程式一樣運作。它會在電視開機時開啟播放器，可以接管遙控器上的 TV、Guide 等按鍵，還可以取代主畫面。它是獨立的應用程式，可從專案的 GitHub 發行頁面取得，並從該處自行更新。</string>
     <string name="appliance_companion_install_info">若要設定，請掃描 QR 碼，或在手機或電腦上開啟 github.com/bernhardberger/tvheadend-player，然後按照「Appliance companion」章節的步驟操作。</string>
     <string name="appliance_companion_qr_description">電視模式配套應用程式設定步驟的 QR 碼</string>
+    <string name="whats_new">更新內容</string>
+    <string name="whats_new_badge">新</string>
 </resources>

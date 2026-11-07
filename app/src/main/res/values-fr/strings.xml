@@ -765,4 +765,6 @@
     <string name="appliance_companion_description">Une application compagnon facultative permet à Tvheadend Player de fonctionner comme l\'application de tuner intégrée au téléviseur. Elle ouvre le lecteur à l\'allumage du téléviseur, peut prendre en charge les boutons de la télécommande comme TV et Guide et remplacer l\'écran d\'accueil. Il s\'agit d\'une application distincte disponible dans les versions du projet sur GitHub, depuis lesquelles elle se met à jour.</string>
     <string name="appliance_companion_install_info">Pour la configurer, scanne le code ou ouvre github.com/bernhardberger/tvheadend-player sur un téléphone ou un ordinateur, puis suis les étapes de la section « Appliance companion ».</string>
     <string name="appliance_companion_qr_description">Code QR vers les étapes de configuration de l\'application compagnon du mode téléviseur</string>
+    <string name="whats_new">Nouveautés</string>
+    <string name="whats_new_badge">Nouveau</string>
 </resources>

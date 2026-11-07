@@ -9,6 +9,14 @@
 - A removed recording no longer hides another recording of the same program, and retention cleanup no longer repeats the “Recording deleted” notice.
 - Recent channels, the *Continue watching* order, channel tags, channel aspect settings, the selected stream profile and audio choices start fresh after this update; they are now kept per connection.
 
+## 0.4.12
+
+### Settings
+
+- *Settings → About → What's new* shows the changes of the last few versions.
+  After an update, a dot on Settings in the side menu, and *New* on *About*
+  and *What's new*, point you there until you open it once.
+
 ## 0.4.11
 
 ### Home
