@@ -28,6 +28,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isFocused
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
@@ -59,6 +60,8 @@ import java.io.File
 import java.util.TimeZone
 import org.junit.After
 import org.junit.Before
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.experimental.categories.Category
@@ -95,13 +98,50 @@ class PlayerMarksMotionCaptureTest {
     private val navigation = RecordingMarkerNavigation()
     private var mode by mutableStateOf(PlayerChromeMode.CONTROLS)
     private var position by mutableStateOf(POSITION)
-    private var adBreak by mutableStateOf<RecordingMark?>(null)
     private var target by mutableStateOf<Long?>(null)
     private var origin by mutableStateOf<Long?>(null)
     private var stepId by mutableStateOf(0)
     private var promptMark by mutableStateOf<RecordingMark?>(null)
     private var promptShown by mutableStateOf(false)
     private val steps = mutableListOf<Long>()
+
+    @Test fun t10StandardRecordingPlayButton() {
+        val now = 1_800_000_000L
+        val entry = at.bernhardberger.tvheadend.sdk.core.DvrEntry.create(
+            at.bernhardberger.tvheadend.sdk.core.DvrEntryId(1), title = "Fixture recording",
+            state = at.bernhardberger.tvheadend.sdk.core.DvrEntryState.RECORDING,
+            start = kotlin.time.Instant.fromEpochSeconds(now - 1800),
+            stop = kotlin.time.Instant.fromEpochSeconds(now + 1800),
+        )
+        val observation = SessionObservation.create(
+            sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = listOf(entry))),
+        )
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            view = LocalView.current
+            CompositionLocalProvider(LocalDensity provides Density(2f, 1f)) {
+                TVHeadendPlayerTheme {
+                    at.bernhardberger.tvhplayer.ui.screens.RecordingPlaybackChoice(
+                        entry, null, observation, null, now, {}, {},
+                    )
+                }
+            }
+        }
+        settle()
+        assertFocused("recording-start-over")
+        val bounds = compose.onNodeWithTag("recording-start-over").fetchSemanticsNode().boundsInRoot
+        val full = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
+        compose.runOnIdle { view.draw(Canvas(full)) }
+        val left = (bounds.left - 20).toInt().coerceAtLeast(0)
+        val top = (bounds.top - 20).toInt().coerceAtLeast(0)
+        val crop = Bitmap.createBitmap(full, left, top, (bounds.width + 40).toInt(), (bounds.height + 40).toInt())
+        val output = File(OUT, "standard-play.png")
+        output.parentFile.mkdirs()
+        output.outputStream().use { crop.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        crop.recycle()
+        full.recycle()
+    }
 
     @Before fun setup() {
         defaultZone = TimeZone.getDefault()
@@ -174,8 +214,11 @@ class PlayerMarksMotionCaptureTest {
     // 5. Open the marks row from the seekbar (Up): the cut at 40:00 is the first stop.
     @Test fun t05OpenMarksOnCut() = openMarks("05", "open-marks-cut", pos = 2_300_000L)
 
-    // 5b. The same on an ad break.
-    @Test fun t05bOpenMarksOnAdBreak() = openMarks("05b", "open-marks-ad-break", pos = 1_000_000L)
+    // 5b. Inside an ad break, the nearer start before playback wins over its upcoming end.
+    @Test fun t05bOpenMarksOnAdBreak() {
+        openMarks("05b", "open-marks-ad-break", pos = 1_200_000L)
+        assertEquals(1_140_000L, navigation.selectedMs)
+    }
 
     private fun openMarks(number: String, slug: String, pos: Long) {
         scene(position = pos)
@@ -225,44 +268,64 @@ class PlayerMarksMotionCaptureTest {
         record(number, slug, cropBottom = true) { r ->
             change { promptMark = AD; promptShown = true }
             val shownAt = compose.mainClock.currentTime
-            r.run(tag = "appear", maxMs = 400L, stopWhenStill = false)
+            r.run(tag = "appear", maxMs = 400L, stopWhenStill = false, beforeSnap = { ms ->
+                if (ms == 64L) r.snap("ring-00000", "0%: first visible entry frame (64 ms)")
+            })
             r.note("focused after appear: ${focused()}")
-            // Fill samples, measured from the offer (the prompt's own clock starts at its first frame).
-            for (second in listOf(1_000L, 2_500L, 5_000L, 7_500L, 9_500L, 10_000L)) {
+            val bounds = compose.onNodeWithTag("recording-skip-prompt").fetchSemanticsNode().boundsInRoot
+            assertTrue("prompt stays at most 44 dp high", bounds.height / 2f <= 44f)
+            val ring = compose.onNodeWithTag("recording-skip-countdown", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+            assertEquals("20 dp ring with native 1.1 focus scale", 22f, ring.height / 2f, .1f)
+            r.note("prompt layout bounds at density 2: ${bounds.width / 2f} x ${bounds.height / 2f} dp; native focus scale is drawn inside the Surface")
+            // The zero sample is the first visible entry frame, not a fabricated paused countdown.
+            // The remaining samples are measured from the offer; the clock starts at its first frame.
+            for (second in listOf(2_500L, 5_000L, 9_000L, 10_000L)) {
                 val delta = second - (compose.mainClock.currentTime - shownAt)
                 compose.mainClock.advanceTimeBy(delta, ignoreFrameDuration = true)
                 compose.waitForIdle()
-                r.snap("fill-${second.toString().padStart(5, '0')}", "fill ${second / 1000.0} s")
+                r.snap("ring-${second.toString().padStart(5, '0')}", "elapsed ${second / 100f}%")
             }
             while (promptMark != null) {
                 compose.mainClock.advanceTimeByFrame()
                 compose.waitForIdle()
             }
-            r.note("onTimeout cleared the offer; departing fill is retained during exit")
+            r.note("onTimeout cleared the offer; departing ring is retained during exit")
             r.run(tag = "exit", maxMs = 400L, stopWhenStill = false)
         }
     }
 
-    // 9. Resting Skip with controls up during an ad break.
-    @Test fun t09RestingSkip() {
-        scene(mode = PlayerChromeMode.HIDDEN, position = AD_MIDDLE, adBreak = AD)
+    // 9. Controls up during an ad break: no resting Skip, including Settings/marks transitions.
+    @Test fun t09AdBreakControlsWithoutRestingSkip() {
+        scene(mode = PlayerChromeMode.HIDDEN, position = AD_MIDDLE)
         record("09", "resting-skip", cropBottom = false) { r ->
             // A: controls appear while the break plays.
             change { mode = PlayerChromeMode.CONTROLS }
             r.run(tag = "A-reveal")
             settle()
             // B: the break starts while the controls are up.
-            change { adBreak = null }
+            change { position = AD.startMs - 30_000L }
             settle()
-            change { adBreak = AD }
+            change { position = AD_MIDDLE }
             r.run(tag = "B-break-starts")
             settle()
-            // C: Up from Settings focuses Skip.
+            // C: Up from Settings reaches the seekbar, with no extra Skip focus stop.
             repeat(6) { if (focused() != listOf("player-settings")) pressSettled(Key.DirectionRight) }
             assertFocused("player-settings")
             press(Key.DirectionUp)
             r.run(tag = "C-up-from-settings")
+            assertFocused("player-seekbar")
             r.note("focused after C: ${focused()}")
+            // D: closing the marks with Up returns to the seekbar.
+            pressSettled(Key.DirectionUp)
+            assertFocused("recording-marker-target")
+            r.snap("D-pill-before", "pill before Up")
+            press(Key.DirectionUp)
+            r.run(tag = "D-pill-to-seekbar", maxMs = 400L, stopWhenStill = false)
+            assertFocused("player-seekbar")
+            // E: Down returns from the seekbar to the last action, Settings.
+            press(Key.DirectionDown)
+            r.run(tag = "E-seekbar-to-settings")
+            assertFocused("player-settings")
         }
     }
 
@@ -271,12 +334,10 @@ class PlayerMarksMotionCaptureTest {
     private fun scene(
         mode: PlayerChromeMode = PlayerChromeMode.CONTROLS,
         position: Long = POSITION,
-        adBreak: RecordingMark? = null,
         darkVideo: Boolean = false,
     ) {
         this.mode = mode
         this.position = position
-        this.adBreak = adBreak
         val still = FixtureArt.art("still-ridge-light")
         compose.mainClock.autoAdvance = false
         compose.setContent {
@@ -301,7 +362,6 @@ class PlayerMarksMotionCaptureTest {
                                 artwork = ART,
                                 marks = MIXED,
                                 markerNavigation = navigation,
-                                adBreak = this@PlayerMarksMotionCaptureTest.adBreak,
                                 onSeek = { delta ->
                                     steps += delta
                                     origin = origin ?: this@PlayerMarksMotionCaptureTest.position
@@ -390,6 +450,7 @@ class PlayerMarksMotionCaptureTest {
 
         /** Saves the current draw; returns whether it equals the previous snap. */
         fun snap(fileLabel: String, caption: String): Boolean {
+            check(!exists("recording-skip")) { "resting Skip must never be composed: $number $fileLabel" }
             val full = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
             compose.runOnIdle { view.draw(Canvas(full)) }
             if (number == "06") {

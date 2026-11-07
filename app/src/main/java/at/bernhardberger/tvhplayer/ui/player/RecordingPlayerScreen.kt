@@ -125,7 +125,6 @@ fun RecordingPlayerScreen(
     val recordingMarks by session.recordingMarks.collectAsStateWithLifecycle()
     val markerRevision by session.recordingMarkerRevision.collectAsStateWithLifecycle()
     val skipPrompt by session.recordingSkipPrompt.collectAsStateWithLifecycle()
-    val adBreak by session.recordingAdBreak.collectAsStateWithLifecycle()
     val observation by tvheadendSession.observation.collectAsStateWithLifecycle()
     val currentSession = observation.currentSession
     val routeSelection = currentRecordingPlaybackSelection(observation, recordingId)
@@ -602,8 +601,6 @@ fun RecordingPlayerScreen(
                     markStops = markStops,
                     markerRevision = markerRevision,
                     motionKey = recordingId,
-                    adBreak = adBreak.takeIf { timelineState.canSeek },
-                    onSkipAdBreak = skipAdBreak,
                 ),
                 actions = PlayerChromeActions(
                     active = chrome.controlsVisible && layers.optionsPage == null,

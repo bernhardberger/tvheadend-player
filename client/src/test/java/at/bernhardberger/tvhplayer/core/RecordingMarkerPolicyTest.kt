@@ -12,6 +12,33 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RecordingMarkerPolicyTest {
+    @Test fun unnamedFileChaptersAtProgramBoundariesYieldTheirStopToTheProgramLabel() {
+        val program = listOf(RecordingMark(RecordingMarkKind.PROGRAM_START, 900_000),
+            RecordingMark(RecordingMarkKind.PROGRAM_END, 4_500_000))
+        val chapters = recordingMarks(emptyList(), listOf(RecordingChapter(900_000), RecordingChapter(4_500_000)))
+        assertEquals(listOf(RecordingMarkStop(0), RecordingMarkStop(900_000, program[0]),
+            RecordingMarkStop(4_500_000, program[1])), recordingMarkStops(chapters + program, 5_400_000))
+    }
+
+    @Test fun tsSidecarScenesAtZeroAndNineHundredSecondsKeepTheFifteenMinuteProgramLabel() {
+        val entry = DvrEntry.create(DvrEntryId(1), start = Instant.fromEpochSeconds(10_000),
+            stop = Instant.fromEpochSeconds(15_340), startExtraMinutes = 15.minutes)
+        val scenes = recordingMarks(listOf(marker(0, 900_000), marker(900_000, 7_140_000)))
+        val program = recordingProgramMarks(entry, 7_140_000)
+        // SDK sceneBoundary is each EDL interval's end; the row adds recording-start 0.
+        assertEquals(listOf(900_000L, 7_140_000L), scenes.map { it.startMs })
+        val stops = recordingMarkStops(scenes + program, 7_140_000)
+        assertEquals(listOf(0L, 900_000L), stops.map { it.positionMs })
+        assertEquals(RecordingMarkKind.PROGRAM_START, stops[1].mark?.kind)
+    }
+
+    @Test fun namedAndNearbyChaptersKeepTheirIdentityAtProgramBoundaries() {
+        val program = RecordingMark(RecordingMarkKind.PROGRAM_START, 900_000)
+        val named = RecordingMark(RecordingMarkKind.CHAPTER, 900_000, name = "A real chapter")
+        assertEquals(named, recordingMarkStops(listOf(program, named), 5_400_000)[1].mark)
+        val nearby = RecordingMark(RecordingMarkKind.CHAPTER, 900_001)
+        assertEquals(listOf(0L, 900_000L, 900_001L), recordingMarkStops(listOf(program, nearby), 5_400_000).map { it.positionMs })
+    }
     @Test fun programmeBoundariesUsePaddingAndStayStrictlyInsideVerifiedContent() {
         fun entry(pre: Int? = 2, post: Int? = 3) = DvrEntry.create(DvrEntryId(1),
             start = Instant.fromEpochSeconds(1_000), stop = Instant.fromEpochSeconds(1_600),
@@ -31,9 +58,9 @@ class RecordingMarkerPolicyTest {
 
     @Test fun programmePointsRankLastAndMergeOnlyAtExactStartsOrEnds() {
         val program = RecordingMark(RecordingMarkKind.PROGRAM_START, 20)
-        for (kind in listOf(RecordingMarkKind.AD_BREAK, RecordingMarkKind.CUT, RecordingMarkKind.CHAPTER)) {
+        for (kind in listOf(RecordingMarkKind.AD_BREAK, RecordingMarkKind.CUT)) {
             assertTrue(program.kind.priority > kind.priority)
-            val other = RecordingMark(kind, 20, if (kind == RecordingMarkKind.CHAPTER) 20 else 30)
+            val other = RecordingMark(kind, 20, 30)
             assertEquals(other, recordingMarkStops(listOf(program, other), 100).first { it.positionMs == 20L }.mark)
         }
         val interval = RecordingMark(RecordingMarkKind.AD_BREAK, 10, 20)

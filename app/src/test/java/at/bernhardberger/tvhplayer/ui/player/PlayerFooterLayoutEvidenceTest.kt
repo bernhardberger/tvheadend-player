@@ -422,6 +422,8 @@ class PlayerFooterLayoutEvidenceTest {
             assertTrue(button.left >= margin.coerceAtMost(track.left) - 1f)
             assertTrue(button.right <= maxOf(track.right, screen.right - margin) + 1f)
         }
+        assertMarker(0.25f) // midpoint entry chooses the earlier of the two equally distant marks
+        key(Key.DirectionRight)
         assertMarker(0.75f)
         recordPair(if (fontScale == 1f) "en-font1.0-960x540-mdpi-d1" else "de-font1.3-960x540-mdpi-d1",
             "recording-marker-selected-75", "recording-marker-target", backdrop)
@@ -438,16 +440,16 @@ class PlayerFooterLayoutEvidenceTest {
         assertFalse(navigation.open)
         compose.onNodeWithTag("player-seekbar").assertIsFocused()
         key(Key.DirectionUp)
-        assertMarker(0.75f)
+        assertMarker(0.25f)
         key(Key.Back)
         compose.onNodeWithTag("player-seekbar").assertIsFocused()
         key(Key.DirectionUp)
-        assertMarker(0.75f)
+        assertMarker(0.25f)
         key(Key.DirectionDown)
         compose.onNodeWithTag("player-seekbar").assertIsFocused()
         key(Key.DirectionUp)
         key(Key.DirectionCenter)
-        assertEquals(listOf(2_700_000L), seeks)
+        assertEquals(listOf(900_000L), seeks)
         compose.onNodeWithTag("player-seekbar").assertIsFocused()
     }
 

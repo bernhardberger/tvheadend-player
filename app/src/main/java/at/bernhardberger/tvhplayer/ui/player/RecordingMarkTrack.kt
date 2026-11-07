@@ -49,9 +49,13 @@ internal fun timelineMarks(
 ): TimelineMarks? {
     if (marks.isEmpty() || displayEndMs <= 0) return null
     // Programme ticks yield at exact millisecond boundaries, before conversion to bar fractions.
-    val visibleMarks = marks.filterIndexed { index, mark ->
+    val ledMarks = marks.filter { mark ->
+        mark.kind != RecordingMarkKind.CHAPTER || !mark.name.isNullOrBlank() ||
+            marks.none { it.startMs == mark.startMs && it.kind in listOf(RecordingMarkKind.PROGRAM_START, RecordingMarkKind.PROGRAM_END) }
+    }
+    val visibleMarks = ledMarks.filterIndexed { index, mark ->
         (mark.kind != RecordingMarkKind.PROGRAM_START && mark.kind != RecordingMarkKind.PROGRAM_END) ||
-            marks.withIndex().none { (otherIndex, other) ->
+            ledMarks.withIndex().none { (otherIndex, other) ->
                 otherIndex != index &&
                     (other.kind != RecordingMarkKind.PROGRAM_START && other.kind != RecordingMarkKind.PROGRAM_END || otherIndex < index) &&
                     (other.startMs == mark.startMs || other.endMs == mark.startMs)

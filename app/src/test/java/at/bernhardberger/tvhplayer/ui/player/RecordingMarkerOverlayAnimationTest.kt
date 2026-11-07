@@ -49,21 +49,56 @@ class RecordingMarkerOverlayAnimationTest {
     private var stops = listOf(1_000L, 7_000L).map { time ->
         RecordingMarkStop(time, RecordingMark(RecordingMarkKind.CHAPTER, time))
     }
+    private var trackWidth = 800
+    private var durationMs = 10_000L
 
     private fun show() {
         compose.mainClock.autoAdvance = false
         compose.setContent {
             TVHeadendPlayerTheme {
-                Box(Modifier.width(800.dp).height(160.dp).background(Color.Black).testTag("hint-scene")
+                Box(Modifier.width(trackWidth.dp).height(160.dp).background(Color.Black).testTag("hint-scene")
                     .onPreviewKeyEvent {
                         navigation.handle(it, stops.map { stop -> stop.positionMs }, {})
                     }) {
-                    RecordingMarkerOverlay(navigation, stops, {}, 10_000L, hints,
+                    RecordingMarkerOverlay(navigation, stops, {}, durationMs, hints,
                         Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(32.dp))
                 }
             }
         }
         advance(300)
+    }
+
+    @Test fun aFifteenMinuteHintBesideTheStartPillKeepsItsInk() = paddedStartHint(119 * 60_000L)
+
+    @Test fun aFifteenMinuteHintAlsoFitsOnANinetyMinuteRecording() = paddedStartHint(90 * 60_000L, 960)
+
+    private fun paddedStartHint(duration: Long, width: Int = 720) {
+        // A 960 dp canvas leaves the track narrower after the endpoint labels/insets.
+        trackWidth = width
+        durationMs = duration
+        stops = listOf(RecordingMarkStop(0), RecordingMarkStop(900_000,
+            RecordingMark(RecordingMarkKind.CHAPTER, 900_000)))
+        hints = true
+        show()
+        compose.runOnIdle { navigation.show(stops.map { it.positionMs }, 0) }
+        repeat(30) { advance(16); drawFrame() }
+        val pill = compose.onNodeWithTag("recording-marker-target").fetchSemanticsNode().boundsInRoot
+        val centre = (trackWidth * 900_000L / durationMs).toInt()
+        assertTrue("the dot fits beyond the drawn pill plus 5 dp: $pill", pill.right + 5 < centre - 3)
+        assertTrue("15:00 dot must not be hidden by transparent overflow padding", ink(centre) > 0f)
+    }
+
+    @Test fun openHintsUseSeventyPercentInkAndProgramBoundariesHaveDots() {
+        stops = listOf(RecordingMarkStop(1_000, RecordingMark(RecordingMarkKind.CHAPTER, 1_000)),
+            RecordingMarkStop(7_000, RecordingMark(RecordingMarkKind.PROGRAM_START, 7_000)))
+        hints = true
+        show()
+        assertTrue("program boundary has a resting dot", ink() > 0f)
+        compose.runOnIdle { navigation.show(stops.map { it.positionMs }, 0) }
+        repeat(30) { advance(16); drawFrame() }
+        val pixels = compose.onNodeWithTag("hint-scene").captureToImage().toPixelMap()
+        // Theme onSurface is #E1E2E5, not pure white.
+        assertEquals("open dot alpha", .70f * 225 / 255, pixels[560, 128].red, .02f)
     }
 
     private fun advance(ms: Long) {
@@ -164,7 +199,7 @@ class RecordingMarkerOverlayAnimationTest {
         assertEquals(small.second, closed.second, .01f)
     }
 
-    @Test fun aNeighbourThinsUnderThePillAndRetargetsDuringTravel() {
+    @Test fun aNeighbourOutsideTheDrawnPillStaysVisibleDuringTravel() {
         stops = listOf(1_000L, 1_500L, 7_000L).map { time ->
             RecordingMarkStop(time, RecordingMark(RecordingMarkKind.CHAPTER, time))
         }
@@ -178,15 +213,15 @@ class RecordingMarkerOverlayAnimationTest {
         val unblocked = ink()
         // Opening crossfades to a larger symbol: compare peers at the same animated size,
         // not the smaller pre-opening symbol whose ink can be lower even without thinning.
-        assertTrue("the departing neighbour still draws during its fade: $thinning / $unblocked", thinning > 0f && thinning < unblocked)
+        assertEquals("transparent overflow must not thin a neighbour", unblocked, thinning, .1f)
         advance(250)
-        assertEquals(0f, ink(120), 0.01f)
+        assertTrue(ink(120) > 0f)
         compose.runOnIdle { navigation.move(stops.map { it.positionMs }, 2) }
         advance(96)
-        assertTrue("moving the pill away reveals the neighbour", ink(120) > 0f)
+        assertTrue("moving the pill away keeps the neighbour", ink(120) > 0f)
         compose.runOnIdle { navigation.move(stops.map { it.positionMs }, -2) }
         advance(350)
-        assertEquals("reversing travel thins it again", 0f, ink(120), 0.01f)
+        assertTrue("reversing travel does not hide a fitting neighbour", ink(120) > 0f)
     }
 
     /** The incoming name has a blank centre, so its ink cannot masquerade as the outgoing bar. */

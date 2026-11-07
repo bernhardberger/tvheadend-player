@@ -120,9 +120,6 @@ internal sealed interface PlayerChromeTimeline {
         val markStops: List<at.bernhardberger.tvhplayer.core.RecordingMarkStop> = emptyList(),
         val markerRevision: Long = 0L,
         val motionKey: Any? = null,
-        /** The ad break playing now, which the controls offer to skip; null outside one or with breaks off. */
-        val adBreak: at.bernhardberger.tvhplayer.core.RecordingMark? = null,
-        val onSkipAdBreak: (at.bernhardberger.tvhplayer.core.RecordingMark) -> Unit = {},
     ) : PlayerChromeTimeline {
         /** The stops' positions, as the marks row steps and seeks them. */
         val markers: List<Long> = markStops.map { it.positionMs }

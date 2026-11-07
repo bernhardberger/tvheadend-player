@@ -244,7 +244,6 @@ class AppPlaybackRuntime(
     val recordingMarks = recordingMarkers.marks
     val recordingChapters = recordingMarkers.recordingChapters
     val recordingSkipPrompt = recordingMarkers.skipPrompt
-    val recordingAdBreak = recordingMarkers.currentAdBreak
     @Volatile
     private var activeTargetEpoch: Long? = null
     @Volatile

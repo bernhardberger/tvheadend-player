@@ -4,12 +4,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.AnimationSpec
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.layout.layout
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -18,7 +13,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.tv.material3.LocalContentColor
 import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
@@ -129,7 +123,6 @@ internal fun PlayerChromeControls(
     val settingsFocus = remember { FocusRequester() }
     val timelineFocus = remember { FocusRequester() }
     val stopFocus = remember { FocusRequester() }
-    val skipFocus = remember { FocusRequester() }
     val seekable = when (timeline) {
         is PlayerChromeTimeline.Live -> timeline.timeshift.available && (timeline.timeshift.timingKnown || previewing)
         is PlayerChromeTimeline.Recording -> timeline.canSeek && recordingRange != null
@@ -220,32 +213,12 @@ internal fun PlayerChromeControls(
             focusInitialized = false
         }
     }
-    // Skip, resting during an ad break, is entered from Settings or the marks row and returns there.
-    val adBreak = recording?.adBreak
-    var skipEntry by remember { mutableStateOf("player-settings") }
-    val skipReturn = if (skipEntry == "player-seekbar" && timelineFocusable) timelineFocus else settingsFocus
-    // Captured before the ended break's Skip goes, as the timeline's fallback is.
-    val skipRemovalTarget = skipReturn.takeIf { lastFocusedControl == "player-skip" }
-    LaunchedEffect(adBreak == null) {
-        if (adBreak == null && skipRemovalTarget != null && actions.active) {
-            androidx.compose.runtime.withFrameNanos { }
-            skipRemovalTarget.requestFocus()
-        }
-    }
     if (recording != null) {
         // Closing the markers returns focus to the timeline; a later reveal starts on Pause.
-        // Up out of them during an ad break goes on to Skip.
         val restorationBaseline = remember { markerNavigation.restoration }
         LaunchedEffect(markerNavigation.restoration) {
             if (markerNavigation.restoration > restorationBaseline && actions.active) {
-                when {
-                    markerNavigation.closedUpward && recording.adBreak != null && !covered -> {
-                        skipEntry = "player-seekbar"
-                        skipFocus.requestFocus()
-                    }
-                    seekable -> timelineFocus.requestFocus()
-                    else -> initialFocus.requestFocus()
-                }
+                if (seekable) timelineFocus.requestFocus() else initialFocus.requestFocus()
             }
         }
         LaunchedEffect(recording.markers, seekable, actions.active) {
@@ -382,39 +355,6 @@ internal fun PlayerChromeControls(
                     onSeekTo = { onInteraction(); onSeek(it - (recording.targetMs ?: recording.positionMs)) },
                     modifier = timelineModifier,
                 )
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = adBreak != null,
-                    enter = fadeIn(tween(PlayerMotion.MediumMs, easing = PlayerMotion.EmphasizedDecelerate)) +
-                        scaleIn(tween(PlayerMotion.MediumMs, easing = PlayerMotion.EmphasizedDecelerate), initialScale = 0.9f,
-                            transformOrigin = TransformOrigin(1f, 1f)),
-                    exit = fadeOut(tween(PlayerMotion.ShortMs, easing = PlayerMotion.EmphasizedAccelerate)),
-                    modifier = Modifier.align(Alignment.TopEnd).layout { measurable, constraints ->
-                        val child = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0))
-                        layout((child.width - 16.dp.roundToPx()).coerceAtLeast(0), 0) {
-                            child.placeRelative(-8.dp.roundToPx(), -child.height - 4.dp.roundToPx())
-                        }
-                    },
-                ) {
-                // Retain the focused scale inside AnimatedVisibility's fading layer.
-                Box(Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
-                val shownBreak = rememberLastShown(adBreak)
-                RecordingSkipRest(
-                    onSkip = {
-                        // Focus moves first: the button goes with the break it skips.
-                        (if (skipEntry == "player-seekbar" && timelineFocusable) timelineFocus else pauseFocus).requestFocus()
-                        onInteraction()
-                        shownBreak?.let(recording.onSkipAdBreak)
-                    },
-                    focus = skipFocus,
-                    onDown = { onInteraction(); skipReturn.requestFocus() },
-                    canFocus = !covered && adBreak != null,
-                    alpha = { actionsAlpha() * chromeAlpha.value },
-                    onFocused = { lastFocusedControl = "player-skip" },
-                    marksOpen = markerNavigation.open,
-                    modifier = Modifier.semanticsWhileShown(adBreak != null),
-                )
-                }
-                }
             }
         } else if (live != null) {
         val timeshiftState = live.timeshift
@@ -535,10 +475,7 @@ internal fun PlayerChromeControls(
                             if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
                                 if (event.key == Key.DirectionUp) {
                                     relocatingKey = event.key
-                                    if (adBreak != null && lastFocusedControl == "player-settings" && !covered) {
-                                        skipEntry = "player-settings"
-                                        skipFocus.requestFocus()
-                                    } else if (timelineFocusable) timelineFocus.requestFocus()
+                                    if (timelineFocusable) timelineFocus.requestFocus()
                                 } else {
                                     // The screen owns this cross-layer cycle, including its release.
                                     onDownFromActions()

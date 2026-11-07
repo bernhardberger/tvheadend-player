@@ -57,6 +57,7 @@ import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.unit.Constraints
 import kotlin.math.roundToInt
+import kotlin.math.abs
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
@@ -90,21 +91,17 @@ internal class RecordingMarkerNavigation {
         private set
     var ownerRevision: Long = 0L
         private set
-    /** The last close was Up's: focus moves on to what stands above the timeline. */
-    var closedUpward: Boolean = false
-        private set
     private val heldKeys = mutableSetOf<Key>()
 
     fun show(markers: List<Long>, positionMs: Long, openingKey: Key? = null, revision: Long = 0L) {
-        selectedMs = markers.firstOrNull { it > positionMs } ?: markers.lastOrNull() ?: return
+        selectedMs = markers.minWithOrNull(compareBy<Long> { abs(it - positionMs) }.thenBy { it }) ?: return
         ownerRevision = revision
         openingKey?.let(heldKeys::add)
     }
 
-    fun dismiss(upward: Boolean = false) {
+    fun dismiss() {
         if (!open) return
         selectedMs = null
-        closedUpward = upward
         restoration++
     }
 
@@ -140,8 +137,7 @@ internal class RecordingMarkerNavigation {
                         selectedMs?.takeIf { it in markers }?.let(onSeek)
                         dismiss()
                     }
-                    Key.DirectionDown -> dismiss()
-                    Key.DirectionUp -> dismiss(upward = true)
+                    Key.DirectionDown, Key.DirectionUp -> dismiss()
                     else -> Unit
                 }
             }
@@ -153,8 +149,9 @@ internal class RecordingMarkerNavigation {
 /** The pill's slot in the overlay's layout; the symbols' slots are their stops. */
 private object PillSlot
 
-/** Symbols at rest stand faint above the bar; with the marks row open they are opaque. */
+/** Symbols stay dimmed so the selected pill remains the row's full-white element. */
 private const val HintAlpha = 0.47f
+private const val OpenHintAlpha = 0.70f
 /**
  * A symbol's centre above the bar row's centre: the open row's larger symbols clear the info
  * bar's artwork, the resting ones the focused thumb.
@@ -211,7 +208,7 @@ internal fun RecordingMarkerOverlay(
     // Symbols stand at mark starts only; an ad break's end stop has none.
     val marked = stops.filter {
         val kind = it.mark?.kind
-        kind != null && !it.atEnd && kind != RecordingMarkKind.PROGRAM_START && kind != RecordingMarkKind.PROGRAM_END
+        kind != null && !it.atEnd
     }
     // The timeline's track slot supplies the measured width after endpoint insets.
     // Position in that coordinate space; no endpoint measurement or UI-state feedback.
@@ -292,7 +289,13 @@ internal fun RecordingMarkerOverlay(
                 hintsPx,
                 gapPx = gap,
                 trackWidthPx = width.toFloat(),
-                blockedPx = if (pill.height > 0) (pillX - gap)..(pillX + pill.width + gap) else null,
+                // The measured slot includes 16 dp transparent overflow on either side.
+                // Block the Button's painted 1.1 focused width, not that reservation.
+                blockedPx = if (pill.height > 0) {
+                    val padding = 16.dp.toPx()
+                    val focusOverflow = (pill.width - padding * 2).coerceAtLeast(0f) * .05f
+                    (pillX + padding - focusOverflow - gap)..(pillX + pill.width - padding + focusOverflow + gap)
+                } else null,
             )
             val shownStops = shown.map { eligible[it].first.positionMs }.toSet()
             val symbolCentre = constraints.maxHeight / 2 - HintLift.roundToPx()
@@ -330,7 +333,7 @@ private fun RecordingMarkHintSymbol(kind: RecordingMarkKind, large: Boolean, vis
             Crossfade(large, modifier = Modifier.matchParentSize(),
                 animationSpec = tween(PlayerMotion.ShortMs, easing = PlayerMotion.Standard), label = "mark hint size") { open ->
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    RecordingMarkSymbol(kind, open, MaterialTheme.colorScheme.onSurface.copy(alpha = if (open) 1f else HintAlpha),
+                    RecordingMarkSymbol(kind, open, MaterialTheme.colorScheme.onSurface.copy(alpha = if (open) OpenHintAlpha else HintAlpha),
                         Modifier.graphicsLayer { alpha = thinning.value })
                 }
             }
@@ -453,7 +456,7 @@ private fun RecordingMarkPill(
 @Composable
 private fun RecordingMarkSymbol(kind: RecordingMarkKind, large: Boolean, tint: Color, modifier: Modifier = Modifier) {
     when (kind) {
-        RecordingMarkKind.PROGRAM_START, RecordingMarkKind.PROGRAM_END -> Unit
+        RecordingMarkKind.PROGRAM_START, RecordingMarkKind.PROGRAM_END,
         RecordingMarkKind.CHAPTER -> Box(modifier.size(if (large) 6.dp else 4.dp).background(tint, CircleShape))
         RecordingMarkKind.CUT -> Icon(painterResource(R.drawable.ic_content_cut), contentDescription = null, tint = tint,
             modifier = modifier.size(if (large) 14.dp else 10.dp))

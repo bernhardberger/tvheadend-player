@@ -94,15 +94,20 @@ val RecordingMarkKind.priority: Int
  * and each ad break's and cut's end inside the duration, where one would skip to by hand; chapters
  * are single points. A mark's end beyond a growing recording's duration does not hide its start.
  * Marks that start together make one stop led by the higher-[priority] kind, a named one first; a mark
- * starting where an interval ends takes that stop (except programme boundaries), and intervals ending together leave one end stop
- * led by priority. Without a mark starting inside the duration there are no stops. These are the
+ * starting where an interval ends takes that stop (except programme boundaries), and intervals ending
+ * together leave one end stop led by priority.
+ * At an exact programme boundary an unnamed chapter yields to the programme label; named chapters still lead.
+ * Without a mark starting inside the duration there are no stops. These are the
  * positions the marks row seeks.
  */
 fun recordingMarkStops(marks: List<RecordingMark>, verifiedDurationMs: Long): List<RecordingMarkStop> {
     val byPosition = marks.filter { it.startMs in 0 until verifiedDurationMs }
         .groupBy { it.startMs }
         .mapValues { (start, group) ->
-            RecordingMarkStop(start, group.minWith(compareBy<RecordingMark>({ it.kind.priority }, { it.name == null })))
+            RecordingMarkStop(start, group.minWith(compareBy<RecordingMark>(
+                { if (it.kind == RecordingMarkKind.CHAPTER && it.name.isNullOrBlank()) 4 else it.kind.priority },
+                { it.name == null },
+            )))
         }.toMutableMap()
     marks.filter { it.kind in listOf(RecordingMarkKind.AD_BREAK, RecordingMarkKind.CUT) && it.startMs >= 0 && it.endMs in 1 until verifiedDurationMs }
         .sortedBy { it.kind.priority }

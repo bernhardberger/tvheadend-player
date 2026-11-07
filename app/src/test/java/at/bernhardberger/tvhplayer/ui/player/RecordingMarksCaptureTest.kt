@@ -70,7 +70,7 @@ import org.robolectric.annotation.GraphicsMode
  * Recording marks evidence: the production recording chrome over a still at the 960×540 dp
  * canvas with ad breaks, cuts and chapters on the timeline — the Banner's passive bar, the
  * focused seekbar's hint symbols, dense thinning, the marks row on each kind, a chapters-only
- * recording, a recording without a channel, and the ad break's Skip prompt and resting Skip button.
+ * recording, a recording without a channel, and ad-break controls without a resting Skip plus the hidden-controls prompt.
  * English, font scale 1.0, fictional fixture art.
  * Writes to build/outputs/recording-marks (ignored).
  */
@@ -125,6 +125,13 @@ class RecordingMarksCaptureTest {
     @Test fun programEnds() = capture("program-ends", PROGRAM, focus = "player-seekbar", openAt = 4_200_000L,
         name = "Program ends")
     @Test fun programTicks() = capture("program-ticks", PROGRAM, focus = "player-seekbar")
+    @Test fun paddedStartHints() = capture("padded-start-hints", PADDED, durationMs = 7_140_000,
+        positionMs = 0, focus = "player-seekbar", openAt = 0)
+    @Test fun paddedProgramLabel() = capture("padded-program-label", PADDED, durationMs = 7_140_000,
+        positionMs = 900_000, focus = "player-seekbar", openAt = 900_000,
+        name = "Program starts")
+    @Test fun paddedOpenHints() = capture("padded-open-hints", PADDED, durationMs = 7_140_000,
+        positionMs = 3_600_000, focus = "player-seekbar", openAt = 3_600_000)
     /** The row on an ad break's and a cut's end: the stop to skip to by hand, the interval still selected. */
     /** The marks row a moment after opening on a cut: the span is still growing out of its tick. */
     @Test fun openCutGrowing() = capture("open-cut-growing", MIXED, focus = "player-seekbar", openAt = 2_400_000L,
@@ -145,18 +152,18 @@ class RecordingMarksCaptureTest {
     @Test fun withoutChannel() = capture("without-channel", MIXED, focus = "player-pause", withoutChannel = true)
 
     /** Controls hidden in an ad break: the focused Skip prompt bottom right, its fill half-way through ten seconds. */
-    @Test fun skipPrompt() = capture("skip-prompt", MIXED, positionMs = AD_MIDDLE, adBreak = AD, prompt = true)
+    @Test fun skipPrompt() = capture("skip-prompt", MIXED, positionMs = AD_MIDDLE, promptMark = AD, prompt = true)
 
-    /** Controls shown in an ad break: Skip rests above the info bar, Pause keeps the initial focus. */
-    @Test fun skipResting() = capture("skip-resting", MIXED, positionMs = AD_MIDDLE, focus = "player-pause", adBreak = AD)
+    /** Controls shown in an ad break: Pause keeps focus and no resting Skip exists. */
+    @Test fun adBreakControls() = capture("ad-break-controls", MIXED, positionMs = AD_MIDDLE, focus = "player-pause")
 
-    /** Up from Settings in an ad break focuses Skip. */
-    @Test fun skipFocused() = capture("skip-focused", MIXED, positionMs = AD_MIDDLE, focus = "player-settings",
-        adBreak = AD, keys = listOf(Key.DirectionUp), focused = "recording-skip")
+    /** Up from Settings in an ad break reaches the seekbar, not a separate Skip. */
+    @Test fun adBreakSeekbar() = capture("ad-break-seekbar", MIXED, positionMs = AD_MIDDLE, focus = "player-settings",
+        keys = listOf(Key.DirectionUp), focused = "player-seekbar")
 
-    /** The marks row open in an ad break: Skip stays visible above it. */
-    @Test fun skipMarksOpen() = capture("skip-marks-open", MIXED, positionMs = AD_MIDDLE, focus = "player-seekbar",
-        adBreak = AD, openAt = 1_440_000L, name = "Ads end")
+    /** The marks row open in an ad break: its ad-end stop is the controls-up way to skip. */
+    @Test fun adBreakMarksOpen() = capture("ad-break-marks-open", MIXED, positionMs = AD_MIDDLE, focus = "player-seekbar",
+        openAt = 1_440_000L, name = "Ads end")
 
     private fun capture(
         scene: String,
@@ -169,7 +176,7 @@ class RecordingMarksCaptureTest {
         withoutChannel: Boolean = false,
         /** The open pill's name line, where the capture checks it. */
         name: String? = null,
-        adBreak: RecordingMark? = null,
+        promptMark: RecordingMark? = null,
         /** Renders the controls-hidden Skip prompt instead of the chrome. */
         prompt: Boolean = false,
         keys: List<Key> = emptyList(),
@@ -189,7 +196,7 @@ class RecordingMarksCaptureTest {
                     Box(Modifier.fillMaxSize()) {
                         Image(still.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                         if (shown && prompt) RecordingSkipPrompt(
-                            prompt = adBreak,
+                            prompt = promptMark,
                             shown = true,
                             onSkip = {},
                             onTimeout = {},
@@ -211,7 +218,6 @@ class RecordingMarksCaptureTest {
                                 marks = marks,
                                 withoutChannel = withoutChannel,
                                 markerNavigation = navigation,
-                                adBreak = adBreak,
                                 modifier = Modifier.align(Alignment.BottomCenter),
                             )
                         }
@@ -235,6 +241,7 @@ class RecordingMarksCaptureTest {
             settle()
         }
         if (focused != null) compose.onNodeWithTag(focused).assertIsFocused()
+        compose.onNodeWithTag("recording-skip").assertDoesNotExist()
         if (openAt != null) {
             compose.runOnIdle { navigation.show(recordingMarkStops(marks, durationMs).map { it.positionMs }, openAt - 1) }
             if (openedForMs == null) settle() else {
@@ -249,8 +256,8 @@ class RecordingMarksCaptureTest {
                     .assertContentDescriptionEquals("$name, Marker ${recordingMarkStops(marks, durationMs).indexOfFirst { it.positionMs == openAt }} • ${formatPlaybackDuration(openAt)}")
             }
             // A named pill is two lines tall; it stays clear of the info bar's subtitle above the timeline.
-            val selected = requireNotNull(recordingMarkStops(marks, durationMs).first { it.positionMs == openAt }.mark)
-            if (selected.kind != RecordingMarkKind.CHAPTER || selected.name != null) {
+            val selected = recordingMarkStops(marks, durationMs).first { it.positionMs == openAt }.mark
+            if (selected != null && (selected.kind != RecordingMarkKind.CHAPTER || selected.name != null)) {
                 val line = compose.onNodeWithTag("recording-marker-name", useUnmergedTree = true)
                 if (name != null) line.assertTextEquals(name) else line.assertExists()
                 val pill = compose.onNodeWithTag("recording-marker-target").getBoundsInRoot()
@@ -277,6 +284,12 @@ class RecordingMarksCaptureTest {
         val PICON = ArtworkId(1)
         val ART = ArtworkId(2)
         const val AD_MIDDLE = 1_290_000L
+        val PADDED = listOf(
+            RecordingMark(RecordingMarkKind.CHAPTER, 900_000),
+            RecordingMark(RecordingMarkKind.PROGRAM_START, 900_000),
+            RecordingMark(RecordingMarkKind.CHAPTER, 3_600_000, name = "The race"),
+            RecordingMark(RecordingMarkKind.PROGRAM_END, 6_900_000),
+        )
 
         /** 1:12:30 at 0:17:25: a played cut, a named chapter, two ad breaks, an unplayed cut, chapters. */
         val MIXED = listOf(

@@ -62,7 +62,6 @@ fun PlayerInfoBar(
     modifier: Modifier = Modifier,
     contentAlpha: () -> Float = { 1f },
     lastLineEndReserve: Dp = 0.dp,
-    textEndReserve: Dp = 0.dp,
     identity: @Composable (Modifier) -> Unit,
 ) {
     val recorded = data.recordedDate != null
@@ -102,7 +101,7 @@ fun PlayerInfoBar(
     Row(modifier.height(IntrinsicSize.Min).semantics(mergeDescendants = true) { contentDescription = description },
         horizontalArrangement = Arrangement.spacedBy(TvGridGutter), verticalAlignment = Alignment.Top) {
         identity(faded)
-        Column(Modifier.weight(1f).fillMaxHeight().padding(end = textEndReserve)) {
+        Column(Modifier.weight(1f).fillMaxHeight()) {
             factsLine(MaterialTheme.typography.labelLarge)
             Spacer(Modifier.height(4.dp))
             Text(data.title, style = MaterialTheme.typography.headlineMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,

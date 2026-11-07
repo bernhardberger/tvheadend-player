@@ -23,10 +23,13 @@ class RecordingMarkTrackTest {
             RecordingMark(RecordingMarkKind.PROGRAM_END, 8_001),
             RecordingMark(RecordingMarkKind.PROGRAM_START, 8_001),
         )
-        val track = requireNotNull(timelineMarks(marks, 10_000, selected = chapter, open = true))
-        assertEquals(listOf(ad.kind, chapter.kind, RecordingMarkKind.PROGRAM_END), track.spans.map { it.kind })
+        val track = requireNotNull(timelineMarks(marks, 10_000, selected = marks[3], open = true))
+        assertEquals(listOf(ad.kind, RecordingMarkKind.PROGRAM_START, RecordingMarkKind.PROGRAM_END), track.spans.map { it.kind })
         assertEquals(0.8001f, track.spans.last().start)
         assertEquals(1, track.selected)
+        val named = chapter.copy(name = "A chapter")
+        val namedTrack = requireNotNull(timelineMarks(marks - chapter + named, 10_000, selected = named))
+        assertEquals(RecordingMarkKind.CHAPTER, namedTrack.spans[requireNotNull(namedTrack.selected)].kind)
     }
     private val ad = RecordingMark(RecordingMarkKind.AD_BREAK, 1_000, 2_000)
     private val cut = RecordingMark(RecordingMarkKind.CUT, 5_000, 6_000)
