@@ -1,13 +1,26 @@
 # Changelog
 
-## Unreleased
+## 0.4.10
 
-- Recordings skip cuts and stay silent during mute spans marked in Tvheadend's .edl files.
-- The recording timeline shows ad breaks, cuts and chapters, with small symbols above the bar
-  while it is focused and each mark's name in the marks row.
-- When a recording reaches an ad break, a Skip button offers to jump over it. Settings > Playback
-  has a new Recording marks group to skip breaks automatically or turn them off, skip cuts, and
-  choose where playback continues after a skip.
+### Recordings
+
+- The timeline shows ad breaks, cuts and chapters from Tvheadend's .txt and
+  .edl files or the recording itself, and where the program starts and ends
+  inside the recording's padding. Small symbols above the bar show them while
+  the seekbar is focused (#8).
+- Up from the seekbar opens the marks at the nearest one, Left and Right move
+  between them, and each shows its name, such as *Ad break*, *Ads end* or
+  *Program starts*. OK jumps there (#10).
+- When playback reaches an ad break, a *Skip ad break* button counts down for
+  10 seconds. OK jumps to the end of the break, Back dismisses it (#9).
+- Settings → Playback has a new *Recording marks* group: skip ad breaks
+  automatically or turn the button off, skip cuts, and choose where playback
+  continues after a skip.
+- Cuts marked in .edl files are skipped, and mute spans stay silent.
+
+### Settings
+
+- Back from a settings page now returns focus to the row that opened it.
 
 ## 0.4.9
 
