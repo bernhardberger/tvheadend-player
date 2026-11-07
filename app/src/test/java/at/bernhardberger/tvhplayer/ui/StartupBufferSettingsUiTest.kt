@@ -15,6 +15,7 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.Density
 import at.bernhardberger.tvhplayer.settings.STARTUP_BUFFER_AUTOMATIC
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.ui.components.depth.rememberDepthNavigationState
 import at.bernhardberger.tvhplayer.ui.screens.SettingsScreenNavigation
 import at.bernhardberger.tvhplayer.ui.screens.settings.*
@@ -178,8 +179,7 @@ class StartupBufferSettingsUiTest {
         assertEquals(1080, view.height)
         val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
         view.draw(Canvas(bitmap))
-        val directory = File("build/outputs/startup-buffer-captures").apply { mkdirs() }
-        File(directory, "$name.png").outputStream().use { check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+        CaptureOutput.writePng(File("build/outputs/startup-buffer-captures", "$name.png"), bitmap)
         bitmap.recycle()
     }
 }

@@ -66,6 +66,7 @@ import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.core.PlayerForegroundLayer
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.playback.TimeshiftSeekDecision
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
 import at.bernhardberger.tvhplayer.ui.TvOverlayFooterGradientRunout
@@ -1015,7 +1016,7 @@ class PlayerFooterLayoutEvidenceTest {
                 appendLine("focusedBottomPx=${bounds(focusedTag).bottom}")
             }
             for (directory in captureDirectories()) {
-                File(directory, "$name.txt").writeText(note)
+                CaptureOutput.writeText(File(directory, "$name.txt")) { note }
             }
         }
     }
@@ -1023,23 +1024,21 @@ class PlayerFooterLayoutEvidenceTest {
     private fun capture(name: String, focus: String = "player-pause") {
         val bitmap = draw()
         for (directory in captureDirectories()) {
-            File(directory, "$name.png").outputStream().use {
-                assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
-            }
-            File(directory, "$name.txt").writeText(
+            CaptureOutput.writePng(File(directory, "$name.png"), bitmap)
+            CaptureOutput.writeText(File(directory, "$name.txt")) {
                 "file=$name.png\ncanvas=${bitmap.width}x${bitmap.height}\ndensity=1.0\n" +
                     "locale=${if (name.startsWith("de")) "de" else "en"}\n" +
                     "fontScale=${if (name.contains("font1.3")) "1.3" else "1.0"}\n" +
                     "fixture=PlayerFooterLayoutEvidenceTest; production composables, offline fake state\n" +
-                    "focus=$focus\n",
-            )
+                    "focus=$focus\n"
+            }
         }
         bitmap.recycle()
     }
 
     private fun captureDirectories() = listOf(
-        File("build/outputs/player-footer-captures").apply { mkdirs() },
-        File("/tmp/opencode/player-footer").apply { mkdirs() },
+        File("build/outputs/player-footer-captures"),
+        File("/tmp/opencode/player-footer"),
     )
 
     private fun zapImageLoader(context: android.content.Context) = ImageLoader.Builder(context)

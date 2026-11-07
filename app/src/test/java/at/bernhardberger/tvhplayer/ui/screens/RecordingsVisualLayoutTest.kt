@@ -4,6 +4,7 @@ import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
 
 import android.app.Application
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import android.graphics.Bitmap
@@ -1762,7 +1763,7 @@ class RecordingsVisualLayoutTest {
 
     private fun capture(name: String, scale: Float, focusEvidence: String? = null,
         outputs: String = "build/outputs/browse-cohesion/archive-depth") {
-        if (System.getProperty("tvhplayer.writeMotionCaptures") == "false") return
+        if (!CaptureOutput.enabled) return
         assertNoCommands()
         val rows = visibleListRows()
         compose.runOnIdle {

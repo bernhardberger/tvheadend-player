@@ -19,6 +19,7 @@ import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performKeyPress
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import org.junit.Assert.assertEquals
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
@@ -221,8 +222,7 @@ class GuidePlayerReturnFocusTest {
         assertEquals(0, playRequests)
         val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
         compose.runOnIdle { view.draw(Canvas(bitmap)) }
-        val directory = File("build/outputs/u15-context").apply { mkdirs() }
-        File(directory, "guide.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        CaptureOutput.writePng(File("build/outputs/u15-context", "guide.png"), bitmap)
         bitmap.recycle()
         compose.runOnIdle { back.onBackPressed() }
         compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()

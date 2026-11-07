@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.Density
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.ui.components.depth.rememberDepthNavigationState
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.settings.UiSettings
@@ -312,8 +313,7 @@ class SettingsAboutTest {
             val bitmap = Bitmap.createBitmap(captureView.width, captureView.height, Bitmap.Config.ARGB_8888)
             captureView.draw(Canvas(bitmap))
             val target = File("../build/review/about/$name.png")
-            target.parentFile.mkdirs()
-            target.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            CaptureOutput.writePng(target, bitmap)
             PseudoLocaleEvidence.mirror("about", name, bitmap, captureView, captureScale, "mdpi 1.0",
                 "native D-pad focus", "Settings About, licence, notices and privacy policy; production SettingsScreenNavigation")
             bitmap.recycle()

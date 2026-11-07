@@ -21,6 +21,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.ui.components.RowChangeMs
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -184,8 +185,7 @@ class ProgrammeDetailsPageTest {
     private fun saveBackdropCapture(name: String, text: List<SemanticsNodeInteraction>) {
         val full = snapshot()
         val bitmap = Bitmap.createScaledBitmap(full, 960, 540, true)
-        val directory = File("../build/review/details-bright-art").apply { mkdirs() }
-        File(directory, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        CaptureOutput.writePng(File("../build/review/details-bright-art", "$name.png"), bitmap)
         val ratios = text.map { node ->
             val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
             val semantics = node.fetchSemanticsNode()
@@ -218,7 +218,7 @@ class ProgrammeDetailsPageTest {
             "${layout?.layoutInput?.text ?: semantics.config.getOrNull(SemanticsProperties.TestTag)}: $ratio"
                 .also { Assert.assertTrue("$name $it fg=$foreground bg=$background bounds=$bounds", ratio >= 4.5) }
         }
-        File(directory, "$name-contrast.txt").writeText(ratios.joinToString("\n", postfix = "\n"))
+        CaptureOutput.writeText(File("../build/review/details-bright-art", "$name-contrast.txt")) { ratios.joinToString("\n", postfix = "\n") }
         bitmap.recycle()
         full.recycle()
     }
@@ -348,8 +348,7 @@ class ProgrammeDetailsPageTest {
         val x = ((card.left.value - 8f) * 2).toInt()
         val y = ((card.top.value + (card.bottom - card.top).value / 2) * 2).toInt()
         Assert.assertTrue("focused overflow at $x,$y", android.graphics.Color.red(bitmap.getPixel(x, y)) > 35)
-        val directory = File("build/outputs/u15-about").apply { mkdirs() }
-        File(directory, "airings-focused-mid-transition.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        CaptureOutput.writePng(File("build/outputs/u15-about", "airings-focused-mid-transition.png"), bitmap)
         bitmap.recycle()
         compose.mainClock.autoAdvance = true
     }
@@ -1529,8 +1528,7 @@ class ProgrammeDetailsPageTest {
 
     private fun capture(name: String, folder: String = "u15-about", settle: Boolean = true) {
         val bitmap = snapshot(settle)
-        val directory = File("build/outputs/$folder").apply { mkdirs() }
-        File(directory, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        CaptureOutput.writePng(File("build/outputs/$folder", "$name.png"), bitmap)
         bitmap.recycle()
     }
 

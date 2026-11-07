@@ -45,6 +45,7 @@ import at.bernhardberger.tvhplayer.settings.ClockFormat
 import at.bernhardberger.tvhplayer.settings.UiSettings
 import at.bernhardberger.tvhplayer.settings.GuideView
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.ui.common.AppClock
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore
@@ -948,10 +949,10 @@ class GuideRealisticSceneTest {
         }
         assertEquals(960, bitmap.width)
         assertEquals(540, bitmap.height)
-        val directory = File("build/outputs/browse-cohesion/guide/epg-fixture").apply { mkdirs() }
-        File(directory, "$name.png").outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+        val directory = File("build/outputs/browse-cohesion/guide/epg-fixture")
+        CaptureOutput.writePng(File(directory, "$name.png"), bitmap)
         bitmap.recycle()
-        File(directory, "$name.txt").writeText(
+        val sidecar = (
             "canvas=960x540dp; density=1; locale=en_US; direction=Ltr; fontScale=$fontScale; timezone=${fixture.getString("timezone")}\n" +
                 "sceneClock=${Instant.fromEpochSeconds(now)}; localClock=${java.time.Instant.ofEpochSecond(now).atZone(ZoneId.of(fixture.getString("timezone")))}; captureClockMillis=${SystemClock.uptimeMillis()}\n" +
                 "focus=${focus.fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)}; bounds=$bounds; position=${position.position.value}\n" +
@@ -959,8 +960,9 @@ class GuideRealisticSceneTest {
                 "fixture=fixture-epg/epg.json; seed=${fixture.getInt("seed")}; sha256=$fixtureHash; noEventOverrides=true\n" +
                 headerGeometry.joinToString(separator = "\n", postfix = "\n") +
                 "production=TVHeadendPlayerTheme + SideRail + EpgGridScreen; native D-pad focus; released fake SDK; FixtureArt.imageLoader\n" +
-                "background=opaque theme, not live video; Robolectric SDK34 native graphics; playbackRequests=$playbackRequests\n",
+                "background=opaque theme, not live video; Robolectric SDK34 native graphics; playbackRequests=$playbackRequests\n"
         )
+        CaptureOutput.writeText(File(directory, "$name.txt")) { sidecar }
     }
 
     private fun snapshot(): Bitmap {

@@ -48,6 +48,7 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
 import androidx.tv.material3.Button
 import androidx.tv.material3.Text
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.ui.components.TabContentMotion
 import at.bernhardberger.tvhplayer.ui.components.TabContent
 import at.bernhardberger.tvhplayer.ui.components.TabOwner
@@ -577,17 +578,15 @@ class BrowseLayeringTest {
             bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
             view.draw(Canvas(bitmap))
         }
-        val directory = File("build/outputs/browse-cohesion/shell").apply { mkdirs() }
-        File(directory, "$name.png").outputStream().use {
-            assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
-        }
-        File(directory, "$name.txt").writeText(
+        val directory = File("build/outputs/browse-cohesion/shell")
+        CaptureOutput.writePng(File(directory, "$name.png"), bitmap)
+        CaptureOutput.writeText(File(directory, "$name.txt")) {
             "captureUtc=${Instant.now()}\ncanvas=${bitmap.width}x${bitmap.height}; density=1; fontScale=1; locale=en\n" +
                 "direction=${if (rtl) "RTL" else "LTR"}; drawerWidth=${drawerWidth()}; destination=$destination; scope=$selected\n" +
                 "focus=$focusTag; clockMillis=${compose.mainClock.currentTime}; autoAdvance=${compose.mainClock.autoAdvance}\n" +
                 "fixture=synthetic red background and coloured ink; production SideRail/sidebar scene with scope, category or depth content\n" +
-                "createdVisits=${visits.size}; mountedVisits=${mounted.size}; actionableVisits=${visits.count { it.owner.isCurrent }}\n",
-        )
+                "createdVisits=${visits.size}; mountedVisits=${mounted.size}; actionableVisits=${visits.count { it.owner.isCurrent }}\n"
+        }
         return bitmap
     }
 

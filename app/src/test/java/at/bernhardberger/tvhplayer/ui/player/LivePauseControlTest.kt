@@ -35,6 +35,7 @@ import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.playback.LivePauseAvailability
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -201,13 +202,13 @@ class LivePauseControlTest {
             val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
             assertEquals(1920 to 1080, bitmap.width to bitmap.height)
             view.draw(Canvas(bitmap))
-            val directory = File("build/outputs/pause-captures").apply { mkdirs() }
-            File(directory, "$name.png").outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
-            File(directory, "$name.txt").writeText(
+            val directory = File("build/outputs/pause-captures")
+            CaptureOutput.writePng(File(directory, "$name.png"), bitmap)
+            CaptureOutput.writeText(File(directory, "$name.txt")) {
                 "canvas=1920x1080\ndensity=2.0\nlocale=${name.substringBefore('-')}\nfontScale=$fontScale\n" +
                     "leanback=true\nfocus=player-pause\nlivePause=$livePause\npaused=$paused\n" +
-                    "production PlayerChrome; fake state, no playback\n",
-            )
+                    "production PlayerChrome; fake state, no playback\n"
+            }
             bitmap.recycle()
         }
     }

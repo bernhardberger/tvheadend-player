@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.Density
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.ui.components.depth.rememberDepthNavigationState
 import at.bernhardberger.tvhplayer.ui.screens.SettingsScreenNavigation
 import at.bernhardberger.tvhplayer.ui.screens.settings.settingsAudioLevel
@@ -78,10 +79,7 @@ class SettingsAudioPassthroughTest {
         compose.runOnIdle {
             val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
             view.draw(Canvas(bitmap))
-            val directory = File("build/outputs/settings-audio-captures").apply { mkdirs() }
-            File(directory, "passthrough-font$fontScale.png").outputStream().use {
-                check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
-            }
+            CaptureOutput.writePng(File("build/outputs/settings-audio-captures", "passthrough-font$fontScale.png"), bitmap)
         }
         assertEquals(0, changes)
         key(Key.DirectionCenter)

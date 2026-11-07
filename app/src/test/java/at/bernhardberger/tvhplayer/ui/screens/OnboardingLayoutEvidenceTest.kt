@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.text.TextLayoutResult
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepGuidance
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepper
 import androidx.tv.material3.MaterialTheme
@@ -793,11 +794,11 @@ class OnboardingLayoutEvidenceTest {
         compose.runOnIdle {
             val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
             view.draw(Canvas(bitmap))
-            val directory = File("build/outputs/onboarding-captures").apply { mkdirs() }
-            File(directory, "$name.png").outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+            val directory = File("build/outputs/onboarding-captures")
+            CaptureOutput.writePng(File(directory, "$name.png"), bitmap)
             PseudoLocaleEvidence.mirror("onboarding", name, bitmap, view, captureScale, "mdpi 1.0", focus ?: "none",
                 "step=${state.step}; mode=${state.mode}; production ConnectionSetupFlow; fictional offline discovery data")
-            File(directory, "$name.txt").writeText("canvas=960x540dp; pixels=${view.width}x${view.height}; locale=${view.resources.configuration.locales[0].toLanguageTag()}; fontScale=$captureScale; focus=$focus; step=${state.step}; mode=${state.mode}; production composables, fictional offline data")
+            CaptureOutput.writeText(File(directory, "$name.txt")) { "canvas=960x540dp; pixels=${view.width}x${view.height}; locale=${view.resources.configuration.locales[0].toLanguageTag()}; fontScale=$captureScale; focus=$focus; step=${state.step}; mode=${state.mode}; production composables, fictional offline data" }
             bitmap.recycle()
         }
     }

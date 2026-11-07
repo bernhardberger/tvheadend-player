@@ -5,6 +5,7 @@ import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.view.View
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -90,12 +91,12 @@ internal object PseudoLocaleEvidence {
         val pseudo = tag == EN_XA || tag == AR_XB
         if (!pseudo && tag != ZH_HANT) return
         if (pseudo) assertGenerated(tag, view) else assertLocalized(tag, view)
-        val directory = java.io.File(captureRoot, lane).apply { mkdirs() }
+        val directory = java.io.File(captureRoot, lane)
         val file = if (name.contains(tag)) name else "$tag-font$fontScale-$name"
-        java.io.File(directory, "$file.png").outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
-        java.io.File(directory, "$file.txt").writeText(
-            metadata(tag, "960x540 logical; pixels=${bitmap.width}x${bitmap.height}", density, fontScale, focus, scenario, view, pseudo),
-        )
+        CaptureOutput.writePng(java.io.File(directory, "$file.png"), bitmap)
+        CaptureOutput.writeText(java.io.File(directory, "$file.txt")) {
+            metadata(tag, "960x540 logical; pixels=${bitmap.width}x${bitmap.height}", density, fontScale, focus, scenario, view, pseudo)
+        }
     }
 
     /** Capture metadata lines shared by the pseudo-locale lanes. */

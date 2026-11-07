@@ -75,6 +75,7 @@ import at.bernhardberger.tvhplayer.core.homeInitialFocus
 import at.bernhardberger.tvhplayer.core.homeSections
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.testutil.VisualCapture
@@ -709,9 +710,7 @@ class HomeCaptureTest {
             rowTops.zipWithNext().all { (a, b) -> b >= a - 0.5f })
         if (name.endsWith("down-into")) assertTrue("Down-in row travels monotonically: $rowTops",
             rowTops.zipWithNext().all { (a, b) -> b <= a + 0.5f })
-        File(out, "strips/$name.png").apply { parentFile!!.mkdirs() }.outputStream().use {
-            assertTrue(strip.compress(Bitmap.CompressFormat.PNG, 100, it))
-        }
+        CaptureOutput.writePng(File(out, "strips/$name.png"), strip)
         strip.recycle()
     }
 
@@ -1211,9 +1210,7 @@ class HomeCaptureTest {
                 .fetchSemanticsNodes()
                 .map { it.config.toString() }
             val bitmap = draw()
-            File(out, "debug-$tag.png").outputStream().use {
-                bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
-            }
+            CaptureOutput.writePng(File(out, "debug-$tag.png"), bitmap)
             throw AssertionError("focus not on $tag; focused=$focused", e)
         }
     }
@@ -1229,9 +1226,7 @@ class HomeCaptureTest {
     private fun capture(name: String, tag: String) {
         settle(tag)
         val bitmap = draw()
-        File(out, "$name.png").outputStream().use {
-            assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
-        }
+        CaptureOutput.writePng(File(out, "$name.png"), bitmap)
         bitmap.recycle()
     }
 

@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.ui.components.FocusedInfoSettleMs
 import at.bernhardberger.tvhplayer.ui.components.rememberUnlessHeld
 import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
@@ -267,8 +268,7 @@ class PlayerChromeEvidenceTest {
             compose.onNodeWithText("101", useUnmergedTree = true).assertDoesNotExist()
             val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
             compose.runOnIdle { view.draw(Canvas(bitmap)) }
-            val directory = File("build/outputs/channel-number-fallbacks").apply { mkdirs() }
-            File(directory, "$name-off.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            CaptureOutput.writePng(File("build/outputs/channel-number-fallbacks", "$name-off.png"), bitmap)
             bitmap.recycle()
             compose.runOnIdle { at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = true }
             compose.onNodeWithText("101", useUnmergedTree = true).assertExists()
@@ -560,9 +560,8 @@ class PlayerChromeEvidenceTest {
             compose.waitForIdle()
             val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
             compose.runOnIdle { view.draw(Canvas(bitmap)) }
-            val directory = File("../artifacts/player-chrome").apply { mkdirs() }
             val name = "${next.name.lowercase(Locale.ROOT)}-$locale-font$fontScale.png"
-            File(directory, name).outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            CaptureOutput.writePng(File("../artifacts/player-chrome", name), bitmap)
             PseudoLocaleEvidence.mirror("player-chrome", name.removeSuffix(".png"), bitmap, view, fontScale, "xhdpi Density(2.0)", "none",
                 "Player chrome scene ${next.name}; production player composables; fixture programme text is German fake data")
             bitmap.recycle()
