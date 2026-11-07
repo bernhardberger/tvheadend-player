@@ -17,15 +17,16 @@ runtime changes. `./tools/verify` supplies those flags. Task completion alone is
 not a reason to run it; reuse unchanged successful checks.
 Compilation of Android tests is not execution on a device.
 
-Builds reuse warm Gradle daemons, which exit after 10 idle minutes; the Kotlin
-compile daemon is bounded the same way. On the shared LXC the installed
-`gradlew` hook runs each build in the bounded `tvhbuild.slice` without a daemon,
-so every run starts cold. Routine app test runs pass
-`-Ptvhplayer.captureTests=exclude` (two test forks, no capture PNGs); keep the
-default only when you need the visual captures. The slice has an 8 GiB ceiling:
-after an SDK or dependency change, run compile, app tests and lint as separate
+On the shared LXC the installed `gradlew` hook runs each build in the bounded
+`tvhbuild.slice` with single-use Gradle and in-process Kotlin, so JVMs are not
+reused between runs. Routine app test runs default to
+`-Ptvhplayer.captureTests=exclude` (two test forks, no motion capture PNGs).
+Pass `-Ptvhplayer.captureTests=all` for behavior plus visual captures, or `only`
+for marked visual scenarios alone; `tools/verify --visual-captures` selects `all`.
+The slice currently has a 12 GiB ceiling. After an SDK or dependency change,
+run compile, app tests and lint as separate
 invocations, or pass `-Ptvhplayer.testForks=1`; one combined rebuild-plus-tests run
-was OOM-killed. Never run `./gradlew --stop` or kill a
+was OOM-killed under the earlier 8 GiB limit. Never run `./gradlew --stop` or kill a
 daemon you did not start: daemons are shared, so that aborts other agents' builds.
 The build cache is on and shared across worktrees, so compile, resource and lint
 outputs built elsewhere are restored instead of rebuilt. Client unit tests are

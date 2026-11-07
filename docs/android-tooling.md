@@ -89,8 +89,10 @@ capture suites, plus capture methods in the navigation-shell, channel-layout and
 player-chrome evidence classes. Ordinary assertions in those mixed classes stay in
 the routine lane. Other tests may still write diagnostic images. Add the category to
 new dedicated capture scenarios rather than filtering whole classes by filename.
-Direct Gradle runs default to `all`. `tools/verify` uses `exclude`: ordinary behavior,
+Direct Gradle runs and `tools/verify` default to `exclude`: ordinary behavior,
 focused layout smoke checks and clipping/focus regressions remain in the routine gate.
+Pass `-Ptvhplayer.captureTests=all` for behavior plus visual captures, or `only`
+for the marked visual scenarios alone; capture generation is opt-in.
 Audio preferences, startup-buffer choices and playback track lists retain English/default
 and German/1.3× smoke cases; redundant combinations join the extended visual matrix.
 Player geometry, badge visibility and other targeted large-text regressions remain routine.

@@ -10,7 +10,7 @@ Use the normal Java and Android SDK setup from
 [CONTRIBUTING.md](../CONTRIBUTING.md). From the repository root:
 
 ```bash
-./gradlew :app:testPlayDebugUnitTest \
+./gradlew :app:testPlayDebugUnitTest -Ptvhplayer.captureTests=all \
   --tests '*.ChannelsLayoutCaptureTest.presentation*' \
   --tests '*.GuideVisualLayoutTest.presentation' \
   --tests '*.ProgrammeDetailsCaptureTest.presentation' \

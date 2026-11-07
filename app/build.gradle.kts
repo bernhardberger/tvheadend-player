@@ -36,7 +36,7 @@ kotlin {
 }
 
 // Explicit opt-in categories keep behavior tests in mixed evidence classes in the routine lane.
-val captureTests = providers.gradleProperty("tvhplayer.captureTests").orElse("all").get()
+val captureTests = providers.gradleProperty("tvhplayer.captureTests").orElse("exclude").get()
 require(captureTests in setOf("all", "exclude", "only")) {
     "tvhplayer.captureTests must be all, exclude or only"
 }
