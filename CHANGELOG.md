@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.11
+
+### Home
+
+- *Continue watching* shows the recordings you played last first. Recordings
+  this TV hasn't played yet follow by recording date, as before.
+
+### Settings
+
+- *Settings → Appliance* now opens like every other settings page. Without the
+  appliance companion it shows *Not installed* and an *Appliance setup* entry
+  that opens the setup steps full screen, with the QR code next to the text.
+  Before, the page slid off the side of the screen and cut the QR code in half.
+
 ## 0.4.10
 
 ### Recordings
