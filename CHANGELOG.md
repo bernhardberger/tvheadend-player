@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.12
+
+### Settings
+
+- *Settings → About → What's new* shows the changes of the last few versions.
+  After an update, a dot on Settings in the side menu, and *New* on *About*
+  and *What's new*, point you there until you open it once.
+
 ## 0.4.11
 
 ### Home
