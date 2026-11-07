@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvhplayer.core.RECENT_CHANNEL_LIMIT
 import at.bernhardberger.tvhplayer.core.pushRecentChannelId
 import at.bernhardberger.tvhplayer.settings.persistedIdToLongOrNull
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 private val channelIdKey = longPreferencesKey("last_played_channel_id_long")
+private const val RECENT_RECORDING_LIMIT = 50
 private val Context.applianceDataStore by preferencesDataStore(
     name = "tvhplayer_appliance",
 )
@@ -21,6 +23,7 @@ private val Context.applianceDataStore by preferencesDataStore(
 class LastPlayedChannelStore(private val context: Context) {
     private object Keys {
         val RECENT_CHANNEL_IDS = stringPreferencesKey("recent_played_channel_ids")
+        val RECENT_RECORDING_IDS = stringPreferencesKey("recent_played_recording_ids")
     }
 
     val channelId: Flow<ChannelId?> = context.applianceDataStore.data.map { preferences ->
@@ -34,10 +37,31 @@ class LastPlayedChannelStore(private val context: Context) {
             .orEmpty()
     }
 
+    val recentRecordingIds: Flow<List<DvrEntryId>> = context.applianceDataStore.data.map { preferences ->
+        preferences[Keys.RECENT_RECORDING_IDS]
+            ?.split(',')
+            ?.mapNotNull { persistedIdToLongOrNull(it.trim())?.let(::DvrEntryId) }
+            .orEmpty()
+    }
+
+    suspend fun pushRecentRecordingId(recordingId: DvrEntryId) {
+        context.applianceDataStore.edit { preferences ->
+            val current = preferences[Keys.RECENT_RECORDING_IDS]
+                ?.split(',')
+                ?.mapNotNull { persistedIdToLongOrNull(it.trim())?.let(::DvrEntryId) }
+                .orEmpty()
+            preferences[Keys.RECENT_RECORDING_IDS] =
+                (listOf(recordingId) + current.filterNot { it == recordingId })
+                    .take(RECENT_RECORDING_LIMIT)
+                    .joinToString(",") { it.value.toString() }
+        }
+    }
+
     suspend fun clear() {
         context.applianceDataStore.edit { preferences ->
             preferences.remove(channelIdKey)
             preferences.remove(Keys.RECENT_CHANNEL_IDS)
+            preferences.remove(Keys.RECENT_RECORDING_IDS)
         }
     }
 

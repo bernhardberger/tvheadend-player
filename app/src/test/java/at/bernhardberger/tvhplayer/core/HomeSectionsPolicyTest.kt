@@ -238,6 +238,22 @@ class HomeSectionsPolicyTest {
         assertEquals(listOf(20L, 30L), watching.map { it.entry.id.value })
     }
 
+    @Test fun continueWatchingPrefersRecentPlaysThenRecordingDateAndIgnoresIneligibleIds() {
+        val input = homeInput(
+            dvrEntries = listOf(
+                entry(1, start = nowSec - 10),
+                entry(2, start = nowSec - 20),
+                entry(3, start = nowSec - 30),
+                entry(4, start = nowSec - 40),
+                entry(5, start = nowSec - 50),
+            ),
+            admission = { if (it.id == DvrEntryId(5)) null else savedPosition(300L) },
+        ).copy(recentRecordingIds = listOf(99L, 5L, 4L, 3L).map(::DvrEntryId))
+
+        val watching = homeSections(input).filterIsInstance<HomeSection.ContinueWatching>().single().items
+        assertEquals(listOf(4L, 3L, 1L, 2L), watching.map { it.entry.id.value })
+    }
+
     @Test fun continueWatchingCapAtTen() {
         val input = homeInput(
             dvrEntries = (1L..11L).map { entry(it, start = nowSec - it) },

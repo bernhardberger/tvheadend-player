@@ -107,6 +107,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.koin.compose.KoinApplication
 import org.koin.dsl.module
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.first
+import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
@@ -137,6 +140,40 @@ class RecordingPlayerChromeScreenTest {
         loadGate.countDown()
         scope.cancel()
         if (::player.isInitialized) player.release()
+    }
+
+    @Test fun recordsRecentPlaybackOnlyAfterTheRecordingPlays() {
+        val store = LastPlayedChannelStore(context)
+        runBlocking { store.clear() }
+        screen()
+        assertEquals(emptyList<DvrEntryId>(), runBlocking { store.recentRecordingIds.first() })
+        playing()
+        settle()
+        compose.waitUntil(10_000) {
+            runBlocking { store.recentRecordingIds.first() } == listOf(DvrEntryId(7))
+        }
+        // Buffering or a pause must not push the same viewing session a second time.
+        runBlocking { store.pushRecentRecordingId(DvrEntryId(8)) }
+        key(Key.DirectionCenter)
+        key(Key.DirectionCenter)
+        settle()
+        assertEquals(listOf(DvrEntryId(8), DvrEntryId(7)), runBlocking { store.recentRecordingIds.first() })
+    }
+
+    @Test fun recentRecordingHistoryIsBoundedDeduplicatedAndCleared() {
+        val store = LastPlayedChannelStore(context)
+        runBlocking {
+            store.clear()
+            (1L..51L).forEach { store.pushRecentRecordingId(DvrEntryId(it)) }
+            assertEquals((51L downTo 2L).map(::DvrEntryId), store.recentRecordingIds.first())
+            store.pushRecentRecordingId(DvrEntryId(10))
+            val ids = store.recentRecordingIds.first()
+            assertEquals(DvrEntryId(10), ids.first())
+            assertEquals(50, ids.size)
+            assertEquals(1, ids.count { it == DvrEntryId(10) })
+            store.clear()
+            assertEquals(emptyList<DvrEntryId>(), store.recentRecordingIds.first())
+        }
     }
 
     @Test fun entersWithAPassiveBannerAndDownLandsOnPause() {
@@ -955,6 +992,7 @@ class RecordingPlayerChromeScreenTest {
             assertEquals(AppPlaybackTarget.Recording(recording), runtime.activeTarget.value)
         }
         val noticeModule = module {
+            single { LastPlayedChannelStore(context) }
             single { NoticeCenter({ 0L }) { NoticeContext(0, session.observation.value.currentSession?.generationIdentity) } }
         }
         compose.setContent {

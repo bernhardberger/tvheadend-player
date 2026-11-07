@@ -113,6 +113,8 @@ data class HomeInput(
     val playing: HomePlaying?,
     val nowSec: Long,
     val hiddenSections: Set<HomeSectionKind> = emptySet(),
+    /** Locally played recordings, newest first; older entries retain recording-date order. */
+    val recentRecordingIds: List<DvrEntryId> = emptyList(),
 )
 
 private const val RECENT_CHANNEL_LIMIT = 8
@@ -261,15 +263,17 @@ private fun EpgEventEntry.startsInGenreWindow(nowSec: Long): Boolean =
     isRunningAt(this, nowSec) ||
         start.epochSeconds in nowSec + 1..nowSec + GENRE_WINDOW_SECONDS
 
-/** Recordings the resume dialog would offer a position for, newest first. */
+/** Recordings offering resume, most recently played first, then newest recording first. */
 private fun continueWatchingSection(
     input: HomeInput,
     resumeOffered: Map<DvrEntryId, Boolean>,
 ): HomeSection.ContinueWatching? {
+    val recentOrder = input.recentRecordingIds.withIndex().associate { it.value to it.index }
     val items = input.dvrEntries
         .asSequence()
         .filter { resumeOffered.getValue(it.id) }
-        .sortedByDescending { it.start?.epochSeconds ?: Long.MIN_VALUE }
+        .sortedWith(compareBy<DvrEntry> { recentOrder[it.id] ?: Int.MAX_VALUE }
+            .thenByDescending { it.start?.epochSeconds ?: Long.MIN_VALUE })
         .take(RECORDING_SHELF_LIMIT)
         .map(::RecordingItem)
         .toList()
