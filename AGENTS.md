@@ -122,8 +122,9 @@ repository-local domain overlays, then the focused skill, then local style.
   verification. Split only for a real dependency, ownership boundary or context
   problem—not because implementation, review and release are different stages.
 - On the shared LXC, keep Gradle state in disk-backed `$HOME/.gradle` and stop
-  rather than increasing memory if the host becomes sluggish. Builds reuse warm
-  Gradle daemons, which expire after 10 idle minutes. Never run `./gradlew --stop`
+  rather than increasing memory if the host becomes sluggish. Direct Gradle calls
+  reuse daemons only inside the host launcher's owned workers; `tools/verify` keeps
+  single-use JVMs. Both reuse persistent disk caches. Never run `./gradlew --stop`
   or kill daemons you did not start: it aborts other agents' running builds.
 
 ## TV interaction floor
