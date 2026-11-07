@@ -745,6 +745,6 @@
     <string name="appliance_companion_qr_description">QR-kode til oppsettstrinnene for tilleggsappen for TV-modus</string>
     <string name="whats_new">Hva er nytt?</string>
     <string name="whats_new_badge">Nytt</string>
-    <string name="whats_new_updated">Oppdatert til %1$s</string>
+    <string name="whats_new_hint">Nytt i %1$s</string>
     <string name="settings_about_version_summary">Versjon %1$s</string>
 </resources>

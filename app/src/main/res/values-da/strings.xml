@@ -745,6 +745,6 @@
     <string name="appliance_companion_qr_description">QR-kode til opsætning af ledsagerappen til tv-tilstand</string>
     <string name="whats_new">Hvad er nyt?</string>
     <string name="whats_new_badge">Nyt</string>
-    <string name="whats_new_updated">Opdateret til %1$s</string>
+    <string name="whats_new_hint">Nyt i %1$s</string>
     <string name="settings_about_version_summary">Version %1$s</string>
 </resources>

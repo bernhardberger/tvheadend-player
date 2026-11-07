@@ -785,6 +785,7 @@ class HomeCaptureTest {
 
     @Test @Category(VisualCapture::class) fun updateHintHeaderCaptures() = atEvening {
         show(Kind.BROWSE, updateHint = true)
+        compose.onNodeWithText("What's new in ${at.bernhardberger.tvhplayer.BuildConfig.VERSION_NAME}", useUnmergedTree = true).assertIsDisplayed()
         capture("update-hint-unfocused-en-font1.0", "home-recent-0")
         key(Key.DirectionUp)
         key(Key.DirectionLeft)

@@ -900,8 +900,8 @@ private fun HomeHeader(
             RoundIconButton(
                 icon = painterResource(R.drawable.ic_auto_awesome),
                 label = stringResource(R.string.whats_new),
-                value = stringResource(R.string.whats_new_updated, at.bernhardberger.tvhplayer.BuildConfig.VERSION_NAME),
-                active = true,
+                value = stringResource(R.string.whats_new_hint, at.bernhardberger.tvhplayer.BuildConfig.VERSION_NAME),
+                active = false,
                 onClick = onWhatsNew,
                 focusRequester = hintRequester,
                 onFocused = onFocused,

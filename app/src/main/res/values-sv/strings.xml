@@ -745,6 +745,6 @@
     <string name="appliance_companion_qr_description">QR-kod till stegen för att konfigurera kompanjonappen för tv-läge</string>
     <string name="whats_new">Vad är nytt?</string>
     <string name="whats_new_badge">Nytt</string>
-    <string name="whats_new_updated">Uppdaterad till %1$s</string>
+    <string name="whats_new_hint">Nytt i %1$s</string>
     <string name="settings_about_version_summary">Version %1$s</string>
 </resources>

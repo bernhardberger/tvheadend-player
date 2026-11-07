@@ -777,6 +777,6 @@
     <string name="appliance_companion_qr_description">QR kód s postupem nastavení doprovodné aplikace pro režim TV přijímače</string>
     <string name="whats_new">Co je nového</string>
     <string name="whats_new_badge">Nové</string>
-    <string name="whats_new_updated">Aktualizováno na %1$s</string>
+    <string name="whats_new_hint">Novinky ve %1$s</string>
     <string name="settings_about_version_summary">Verze %1$s</string>
 </resources>

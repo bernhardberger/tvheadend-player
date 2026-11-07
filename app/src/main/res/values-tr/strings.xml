@@ -745,6 +745,6 @@
     <string name="appliance_companion_qr_description">TV modu yardımcı uygulamasının kurulum adımları için QR kodu</string>
     <string name="whats_new">Yenilikler</string>
     <string name="whats_new_badge">Yeni</string>
-    <string name="whats_new_updated">Güncellendi: %1$s</string>
+    <string name="whats_new_hint">%1$s yenilikleri</string>
     <string name="settings_about_version_summary">Sürüm %1$s</string>
 </resources>

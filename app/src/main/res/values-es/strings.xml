@@ -761,6 +761,6 @@
     <string name="appliance_companion_qr_description">Código QR con los pasos para configurar la aplicación complementaria del modo televisor</string>
     <string name="whats_new">Novedades</string>
     <string name="whats_new_badge">Nuevo</string>
-    <string name="whats_new_updated">Actualizado a %1$s</string>
+    <string name="whats_new_hint">Novedades en %1$s</string>
     <string name="settings_about_version_summary">Versión %1$s</string>
 </resources>

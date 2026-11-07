@@ -315,7 +315,7 @@ class HomeActionsTest {
         compose.onNodeWithTag("home-onnow-0").performKeyInput { pressKey(Key.DirectionUp) }
         compose.onNodeWithTag("home-tags-button").performKeyInput { pressKey(Key.DirectionLeft) }
         compose.onNodeWithTag("home-update-hint").assertIsFocused()
-            .assertContentDescriptionEquals("What's new, Updated to ${at.bernhardberger.tvhplayer.BuildConfig.VERSION_NAME}")
+            .assertContentDescriptionEquals("What's new, What's new in ${at.bernhardberger.tvhplayer.BuildConfig.VERSION_NAME}")
             .performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("player-info-reading").assertIsDisplayed()
         // DataStore emits the seen version after the reader has opened, not in its click callback.

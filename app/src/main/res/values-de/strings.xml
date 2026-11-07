@@ -761,6 +761,6 @@
     <string name="skip_landing_five_seconds">5 s vor dem Ende</string>
     <string name="whats_new">Was ist neu?</string>
     <string name="whats_new_badge">Neu</string>
-    <string name="whats_new_updated">Aktualisiert auf %1$s</string>
+    <string name="whats_new_hint">Neu in %1$s</string>
     <string name="settings_about_version_summary">Version %1$s</string>
 </resources>
