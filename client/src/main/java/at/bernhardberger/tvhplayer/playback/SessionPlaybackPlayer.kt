@@ -11,6 +11,9 @@ import androidx.media3.common.SimpleBasePlayer
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.media3.LivePlaybackObservation
 import at.bernhardberger.tvheadend.sdk.media3.LiveTimeshiftState
+import at.bernhardberger.tvhplayer.core.committedProgrammeEvent
+import at.bernhardberger.tvhplayer.core.livePlayWhenReady
+import at.bernhardberger.tvhplayer.core.programmePositionWindow
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.SettableFuture
 import kotlin.time.Clock
@@ -38,13 +41,21 @@ internal fun sessionPlaybackCommands(target: AppPlaybackTarget?, pausable: Boole
 
 internal fun sessionPlaybackMetadata(
     target: AppPlaybackTarget?, observation: SessionObservation, now: Instant,
+    timeshiftState: AppTimeshiftState,
+    liveStart: Boolean,
+    programmeWindowEnabled: Boolean,
 ): MediaMetadata {
     val channel: String?
     val title: String?
     when (target) {
         is AppPlaybackTarget.Live -> {
             channel = observation.channel(target.channelId)?.name
-            title = observation.eventAt(target.channelId, now)?.title?.takeIf { it.isNotBlank() } ?: channel
+            val window = if (programmeWindowEnabled) {
+                programmePositionWindow(timeshiftState) { observation.eventAt(target.channelId, it) }
+            } else null
+            val programme = committedProgrammeEvent(window != null, window?.event, timeshiftState,
+                observation.eventAt(target.channelId, now), liveStart && !timeshiftState.paused)
+            title = programme?.title?.takeIf { it.isNotBlank() } ?: channel
         }
         is AppPlaybackTarget.Recording -> {
             val recording = observation.dvrEntry(target.recordingId)
@@ -57,7 +68,10 @@ internal fun sessionPlaybackMetadata(
 }
 
 /** Read-only presentation plus narrowly admitted runtime commands. Never owns the raw player. */
-class SessionPlaybackPlayer(private val runtime: AppPlaybackRuntime) : ForwardingSimpleBasePlayer(runtime.player) {
+class SessionPlaybackPlayer(
+    private val runtime: AppPlaybackRuntime,
+    private val programmeWindowEnabled: Boolean,
+) : ForwardingSimpleBasePlayer(runtime.player) {
     private var metadata = MediaMetadata.EMPTY
     private var metadataTarget: AppPlaybackTarget? = null
     private var itemUid = Any()
@@ -71,10 +85,17 @@ class SessionPlaybackPlayer(private val runtime: AppPlaybackRuntime) : Forwardin
                 delay(1_000)
             }
         }
-        combine(runtime.activeTarget, runtime.livePlaybackObservation, runtime.livePause, observation, clock) {
-                target, live, livePause, snapshot, now ->
-            Triple(target, livePause to ((live as? LivePlaybackObservation.Active)?.timeshiftState is LiveTimeshiftState.Available),
-                sessionPlaybackMetadata(target, snapshot, now))
+        val sampledClock = combine(runtime.activeTarget, clock) { target, now ->
+            val sample = if (target is AppPlaybackTarget.Live) runtime.sampleTimeshiftPresentation() else AppTimeshiftState()
+            Triple(target, sample.takeIf { runtime.activeTarget.value == target } ?: AppTimeshiftState(), now)
+        }
+        val livePresentation = combine(runtime.livePlaybackObservation, runtime.liveStartUndisturbed) { live, start -> live to start }
+        combine(runtime.activeTarget, livePresentation, runtime.livePause, observation, sampledClock) {
+                target, live, livePause, snapshot, sampled ->
+            val timeshift = sampled.second.takeIf { sampled.first == target } ?: AppTimeshiftState()
+            val liveStart = live.second && livePlayWhenReady(livePause, runtime.player.playWhenReady)
+            Triple(target, livePause to ((live.first as? LivePlaybackObservation.Active)?.timeshiftState is LiveTimeshiftState.Available),
+                sessionPlaybackMetadata(target, snapshot, sampled.third, timeshift, liveStart, programmeWindowEnabled))
         }.distinctUntilChanged().collect { (target, _, value) ->
             if (!closed) {
                 if (metadataTarget != target) itemUid = Any()

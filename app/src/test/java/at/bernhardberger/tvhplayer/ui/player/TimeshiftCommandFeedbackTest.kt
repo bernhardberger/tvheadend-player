@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.core.livePlayWhenReady
+
 import android.view.KeyEvent
 import at.bernhardberger.tvhplayer.core.LiveMediaKeyAction
 import at.bernhardberger.tvhplayer.core.MediaPlaybackAction

@@ -35,7 +35,7 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.playback.LivePauseState
-import at.bernhardberger.tvhplayer.ui.player.livePlayWhenReady
+import at.bernhardberger.tvhplayer.core.livePlayWhenReady
 
 /** Null means this drawer item no longer owns the transport. */
 internal fun drawerControlPaused(

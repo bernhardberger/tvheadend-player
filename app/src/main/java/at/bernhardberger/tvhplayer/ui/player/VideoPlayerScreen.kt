@@ -93,6 +93,7 @@ import at.bernhardberger.tvhplayer.core.LiveMediaKeyAction
 import at.bernhardberger.tvhplayer.core.liveMediaKeyAction
 import at.bernhardberger.tvhplayer.playback.LivePauseAvailability
 import at.bernhardberger.tvhplayer.playback.LivePauseState
+import at.bernhardberger.tvhplayer.core.livePlayWhenReady
 import at.bernhardberger.tvhplayer.core.PlayerSurface
 import at.bernhardberger.tvhplayer.core.playerKeyAction
 import at.bernhardberger.tvhplayer.core.playerKeyActionStartsOpeningCycle
@@ -301,14 +302,6 @@ internal fun dispatchTimeshiftPlaybackAction(
 internal fun liveTransportAvailability(state: LivePauseState, installedIsRequested: Boolean): LivePauseAvailability =
     state.availability.takeIf { state.selectionPending || installedIsRequested } ?: LivePauseAvailability.NONE
 
-/**
- * The viewer's Play/Pause intent for live: the pending channel change's, else the installed
- * player's, which a paused seek's brief picture refresh does not change.
- */
-internal fun livePlayWhenReady(state: LivePauseState, playerPlayWhenReady: Boolean): Boolean =
-    if (state.selectionPending) !state.pending
-    else playerPlayWhenReady && !state.pending && !state.pausedSeekRefresh
-
 internal suspend fun stopPlaybackAndClose(
     stopPlayback: suspend () -> Unit,
     closePlayer: () -> Unit,
@@ -446,8 +439,7 @@ fun VideoPlayerScreen(
     val timelineState = rememberLiveTimelinePresentationState(player)
     var sampledTimeshiftState by remember { mutableStateOf(AppTimeshiftState()) }
     var liveRequestToken by remember { mutableLongStateOf(0L) }
-    // The command token a live start began with, until it pauses: its known timing does not end it.
-    var liveStartToken by remember { mutableStateOf<Long?>(0L) }
+    val liveStartUndisturbed by playbackRuntime.liveStartUndisturbed.collectAsStateWithLifecycle()
     // Requests reset presentation synchronously, before their first frame. This effect only samples;
     // it must not reinstate live start after a Pause already accepted for this request.
     LaunchedEffect(videoPlayerViewModel, liveRequestToken) {
@@ -467,17 +459,14 @@ fun VideoPlayerScreen(
                         displayLiveEdgeMs = timelineState.displayLiveEdgeMs,
                         historyStartTimeline = timelineState.historyStartTimeline,
                     )
-                    if (it.paused) liveStartToken = null
                 }
             }
             delay(250L)
         }
     }
-    // Plays the live edge since its start: no pause or timeshift command yet.
-    val undisturbedLiveStart = liveStartToken == timeshiftCommandToken
     val livePaused = !livePlayWhenReady(livePauseState, playWhenReady)
     // The bar's schedule and the info bar's programme both follow it (nowDescribesPlayback).
-    val liveStart = undisturbedLiveStart && !livePaused
+    val liveStart = liveStartUndisturbed && !livePaused
     val effectiveTimeshiftState = if (confirmedPlayingChannelId != null) {
         sampledTimeshiftState
     } else {
@@ -928,7 +917,6 @@ fun VideoPlayerScreen(
         timelineState.invalidateForSourceChange()
         liveRequestToken += 1L
         sampledTimeshiftState = AppTimeshiftState()
-        liveStartToken = timeshiftCommandToken
         // Accepted now, played under this one intent (at once or after the burst settles):
         // a Stop from before loses, a Stop from after withdraws the delayed start.
         liveIntent = playbackRuntime.notePlaybackIntent()

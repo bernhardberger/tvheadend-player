@@ -206,7 +206,7 @@ class MainActivity : AppCompatActivity() {
     override fun onStart() {
         super.onStart()
         playbackLifecycle.onActivityStarted()
-        val sessionPlayer = SessionPlaybackPlayer(playbackRuntime)
+        val sessionPlayer = SessionPlaybackPlayer(playbackRuntime, BuildConfig.PROGRAMME_WINDOW_B)
         mediaSessionLifecycle.start(this, sessionPlayer, lifecycleScope.launch {
             sessionPlayer.observe(tvheadendSession.observation)
         }, sessionPlayer::close)

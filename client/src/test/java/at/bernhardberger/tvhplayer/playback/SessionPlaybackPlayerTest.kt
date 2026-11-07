@@ -2,6 +2,7 @@
 @file:OptIn(
     at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class,
     at.bernhardberger.tvheadend.sdk.playback.SubscriptionInfrastructureApi::class,
+    at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi::class,
 )
 
 package at.bernhardberger.tvhplayer.playback
@@ -24,6 +25,9 @@ import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
+import at.bernhardberger.tvheadend.sdk.media3.testing.TimeshiftTestFixture
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.Assert.*
@@ -36,6 +40,24 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class)
 class SessionPlaybackPlayerTest {
+    @Test fun pausedLiveMetadataUsesTheProgrammeAtPlaybackInsteadOfTheBroadcast() {
+        val now = Instant.parse("2026-09-07T20:30:00Z")
+        val earlier = EpgEvent.create(id = EventId(1), channelId = ChannelId(1),
+            start = now - 90.minutes, stop = now - 30.minutes, title = "Earlier programme")
+        val broadcast = EpgEvent.create(id = EventId(2), channelId = ChannelId(1),
+            start = now - 30.minutes, stop = now + 30.minutes, title = "Broadcast programme")
+        val observation = SessionObservation.create(
+            epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = listOf(broadcast), historicalEvents = listOf(earlier))))
+        val fixture = TimeshiftTestFixture(120.minutes).apply {
+            updateHistory(50.minutes, 90.minutes, estimatedLiveEdgeTime = now)
+        }
+        val state = fixture.state.value.toAppPresentation(fixture.playbackPosition(55.minutes)).copy(paused = true)
+        assertEquals("Earlier programme", sessionPlaybackMetadata(
+            AppPlaybackTarget.Live(ChannelId(1)), observation, now, state, liveStart = false, programmeWindowEnabled = true).title)
+        assertNull(sessionPlaybackMetadata(AppPlaybackTarget.Live(ChannelId(1)), observation, now,
+            state, liveStart = false, programmeWindowEnabled = false).title)
+    }
+
     @Test fun commandsAreAnExactAllowlistForEachTarget() {
         val read = setOf(Player.COMMAND_GET_METADATA, Player.COMMAND_GET_TIMELINE, Player.COMMAND_GET_CURRENT_MEDIA_ITEM,
             Player.COMMAND_STOP)
@@ -1254,7 +1276,12 @@ class SessionPlaybackPlayerTest {
                 stop = now + 1.hours, title = "Programme")),
         ))))
         await { wrapper.mediaMetadata.title == "Programme" }
+        // The fake stream has no rendered wall-clock mapping: after Pause it cannot borrow Now.
+        wrapper.pause()
+        await { wrapper.mediaMetadata.title == "Channel One" }
+        assertFalse(runtime.liveStartUndisturbed.value)
         recording()
+        assertFalse(runtime.liveStartUndisturbed.value)
         await { wrapper.mediaMetadata.title == "Recording" }
         assertEquals("Recorded Channel", wrapper.mediaMetadata.subtitle)
         assertTrue(titles.containsAll(listOf("Channel One", "Programme", "Recording")))
@@ -1389,7 +1416,7 @@ class SessionPlaybackPlayerTest {
         }, session, coordinator, settings, profiles, scope, TvheadendAudioOutputProvider(context), focus,
             PlaybackRuntimePolicy.fromPlayerSettings(),
             noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) })
-        val wrapper = SessionPlaybackPlayer(runtime)
+        val wrapper = SessionPlaybackPlayer(runtime, programmeWindowEnabled = true)
         val observation = scope.launch { wrapper.observe(session.observation) }
 
         suspend fun live(timeshift: Boolean, firstPicture: Boolean = true) {

@@ -10,7 +10,9 @@ import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvhplayer.core.PlayerBarEnd
 import at.bernhardberger.tvhplayer.core.PlayerStateCell
 import at.bernhardberger.tvhplayer.core.bufferStartClockSec
+import at.bernhardberger.tvhplayer.core.halfHourSlot
 import at.bernhardberger.tvhplayer.core.liveBarEnd
+import at.bernhardberger.tvhplayer.core.nowDescribesPlayback
 import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
 import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
 import at.bernhardberger.tvhplayer.core.TimeshiftPositionPresentation
