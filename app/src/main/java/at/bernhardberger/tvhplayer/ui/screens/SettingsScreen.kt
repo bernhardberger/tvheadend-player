@@ -76,15 +76,16 @@ internal fun SettingsScreen(
     val connectionLevels = settingsConnectionLevels(connectionPresentation, onRetry, servers.actions, profileOwner, servers.switchingNow)
     servers.FocusPending(connectionLevels.firstOrNull())
     val profileList by profileOwner.profiles.collectAsStateWithLifecycle()
+    val connectionName = connectionScopeName(profileList)
     val levels = settingsGeneralLevels(navigation) + connectionLevels + settingsPlayerLevels(navigation) + listOf(
         settingsRootLevel(recordingLevels.isNotEmpty(),
             connectionRootStatus(profileList, connectionOverviewStatus(connectionPresentation, profileOwner).title)),
         settingsKeepChannelLevel(navigation),
         settingsWarmPlaybackLevel(navigation),
-        settingsStreamProfileLevel(navigation),
+        settingsStreamProfileLevel(navigation, connectionName = connectionName),
         settingsFrameRateLevel(navigation),
         settingsStartupBufferLevel(navigation),
-        settingsChannelTagsLevel(channelsVm),
+        settingsChannelTagsLevel(channelsVm, connectionName),
     ) + recordingLevels + settingsAboutLevels(observation.sessionState, companionInstalled) +
         listOf(settingsApplianceLevel(companionInstalled))
     SettingsScreenNavigation(navigation, levels, initialFocusEnabled, contentPadding, backEnabled, isCurrent,

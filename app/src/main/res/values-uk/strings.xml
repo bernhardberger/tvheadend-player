@@ -377,6 +377,8 @@
     <string name="connection_try_again">Спробувати ще раз</string>
     <string name="connection_retry_description">Tvheadend Player також повторює спроби автоматично</string>
     <string name="connection_notice_restored">З’єднання відновлено</string>
+    <string name="server_switched">Підключено до %1$s</string>
+    <string name="connection_scope_line">Для %1$s</string>
     <string name="connection_notice_login_rejected">Вхід відхилено</string>
     <string name="recording_action_permission">Цей обліковий запис не може керувати записами.</string>
     <string name="recording_action_conn_limit">Сервер зайнятий. Спробуйте ще раз за мить.</string>
@@ -428,6 +430,9 @@
     <string name="delete_recording">Видалити запис</string>
     <string name="delete_recording_confirm_title">Видалити цей запис?</string>
     <string name="delete_recording_confirm_message">Запис %1$s (%2$s, %3$s) буде видалено із сервера.</string>
+    <string name="remove_entry">Прибрати елемент</string>
+    <string name="remove_entry_confirm_title">Прибрати цей елемент?</string>
+    <string name="remove_entry_confirm_message">Елемент %1$s (%2$s, %3$s) буде прибрано зі списку сервера.</string>
     <string name="delete_folder_all_confirm_title">Видалити всі записи в %1$s?</string>
     <string name="delete_folder_watched_confirm_title">Видалити переглянуті записи в %1$s?</string>
     <plurals name="delete_folder_confirm_message">

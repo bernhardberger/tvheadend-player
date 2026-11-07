@@ -1152,6 +1152,7 @@ class RecordingsVisualLayoutTest {
             DvrEntry.create(it.id, title = it.title, state = DvrEntryState.REMOVED, files = emptyList()) else it })
         compose.onNodeWithTag("details-play").assertDoesNotExist()
         compose.onNodeWithTag("details-delete").assertDoesNotExist()
+        compose.onNodeWithTag("details-remove_entry").assertDoesNotExist()
         focused("recording-list-entry-3")
         repeat(2) { key(Key.DirectionUp) }
         key(Key.DirectionRight)

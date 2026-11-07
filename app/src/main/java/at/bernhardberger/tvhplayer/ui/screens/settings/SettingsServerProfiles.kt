@@ -139,12 +139,18 @@ private fun serverProfileRow(profile: ServerProfileSummary, active: Boolean, can
     return settingsRow(rowId, profile.label ?: serverProfileUnnamed(profile), supporting,
         child = rowId.takeIf { cancelSwitch == null }, onClick = { cancelSwitch?.invoke() },
         leading = { ServerAvatar(look, ServerAvatarRowSize) },
-        supportingContent = supporting?.let { {
+        supportingContent = supporting?.let { { focused ->
+            // The accent marks the state on a resting row. Focus inverts the row, so there it takes the
+            // focused content color the shared Settings rows give their supporting text.
             Column {
                 if (detail != null) Text(detail, style = MaterialTheme.typography.bodySmall,
                     color = LocalContentColor.current.copy(alpha = .75f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 state.forEach { text -> Text(text, style = MaterialTheme.typography.labelSmall,
-                    color = if (profile.passwordNeeded()) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
+                    color = when {
+                        focused -> LocalContentColor.current
+                        profile.passwordNeeded() -> MaterialTheme.colorScheme.tertiary
+                        else -> MaterialTheme.colorScheme.primary
+                    },
                     maxLines = 1, overflow = TextOverflow.Ellipsis) }
             }
         } })
@@ -191,6 +197,15 @@ internal fun connectionRootStatus(profiles: ServerProfileListResult?, status: St
     val active = profiles.activeProfile() ?: return status
     return stringResource(R.string.server_detail_separator, active.label ?: serverProfileUnnamed(active), status)
 }
+
+/**
+ * The connection that per-connection Settings values (channel groups, stream profile) belong to, or
+ * null while at most one is stored, when nothing could be mistaken for another connection's.
+ */
+@Composable
+internal fun connectionScopeName(profiles: ServerProfileListResult?): String? =
+    (profiles as? ServerProfileListResult.Available)?.takeIf { it.profiles.size > 1 }
+        ?.let { profiles.activeProfile() }?.let { serverProfileTitle(it) }
 
 /** The name dialogs and the switch question use: the label, else the account on the address. */
 @Composable

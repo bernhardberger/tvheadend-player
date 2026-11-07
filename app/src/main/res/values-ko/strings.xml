@@ -365,6 +365,8 @@
     <string name="connection_try_again">다시 시도</string>
     <string name="connection_retry_description">Tvheadend Player가 자동으로도 다시 시도합니다</string>
     <string name="connection_notice_restored">연결이 복구되었습니다</string>
+    <string name="server_switched">%1$s에 연결됨</string>
+    <string name="connection_scope_line">%1$s용</string>
     <string name="connection_notice_login_rejected">로그인이 거부되었습니다</string>
     <string name="recording_action_permission">이 계정에는 녹화를 관리할 권한이 없습니다.</string>
     <string name="recording_action_conn_limit">서버가 사용 중입니다. 잠시 후 다시 시도해 주세요.</string>
@@ -407,6 +409,9 @@
     <string name="delete_recording">녹화 삭제</string>
     <string name="delete_recording_confirm_title">이 녹화를 삭제할까요?</string>
     <string name="delete_recording_confirm_message">%1$s(%2$s, %3$s) 항목이 서버에서 삭제됩니다.</string>
+    <string name="remove_entry">항목 제거</string>
+    <string name="remove_entry_confirm_title">이 항목을 제거할까요?</string>
+    <string name="remove_entry_confirm_message">%1$s(%2$s, %3$s) 항목이 서버 목록에서 제거됩니다.</string>
     <string name="delete_folder_all_confirm_title">%1$s의 모든 녹화를 삭제할까요?</string>
     <string name="delete_folder_watched_confirm_title">%1$s에서 시청 완료한 녹화를 삭제할까요?</string>
     <plurals name="delete_folder_confirm_message">

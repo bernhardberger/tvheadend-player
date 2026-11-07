@@ -373,6 +373,8 @@
     <string name="connection_try_again">ניסיון חוזר</string>
     <string name="connection_retry_description">Tvheadend Player ינסה שוב גם באופן אוטומטי</string>
     <string name="connection_notice_restored">החיבור שוחזר</string>
+    <string name="server_switched">מחובר אל %1$s</string>
+    <string name="connection_scope_line">עבור %1$s</string>
     <string name="connection_notice_login_rejected">הכניסה נדחתה</string>
     <string name="recording_action_permission">לחשבון זה אין הרשאה לנהל הקלטות.</string>
     <string name="recording_action_conn_limit">השרת עסוק. אפשר לנסות שוב בקרוב.</string>
@@ -421,6 +423,9 @@
     <string name="delete_recording">מחיקת הקלטה</string>
     <string name="delete_recording_confirm_title">למחוק את ההקלטה הזו?</string>
     <string name="delete_recording_confirm_message">%1$s (%2$s, %3$s) תימחק מהשרת.</string>
+    <string name="remove_entry">הסרת הרשומה</string>
+    <string name="remove_entry_confirm_title">להסיר את הרשומה הזו?</string>
+    <string name="remove_entry_confirm_message">%1$s (%2$s, %3$s) תוסר מרשימת השרת.</string>
     <string name="delete_folder_all_confirm_title">למחוק את כל ההקלטות של %1$s?</string>
     <string name="delete_folder_watched_confirm_title">למחוק הקלטות שנצפו מתוך %1$s?</string>
     <plurals name="delete_folder_confirm_message">

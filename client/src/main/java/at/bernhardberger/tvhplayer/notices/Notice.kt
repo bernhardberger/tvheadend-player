@@ -37,6 +37,12 @@ sealed interface Notice {
         override val severity = NoticeSeverity.INFO
     }
 
+    /** A user-started switch signed in and became the connection in use. [name] is display-only. */
+    data class ServerSwitched(val id: ServerProfileId, val name: String) : Notice {
+        override val key = "server-switched:${id.value}"
+        override val severity = NoticeSeverity.INFO
+    }
+
     data object ServerProfileAlreadyExists : Notice {
         override val key = "server-profile-already-exists"
         override val severity = NoticeSeverity.INFO

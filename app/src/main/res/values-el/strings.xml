@@ -369,6 +369,8 @@
     <string name="connection_try_again">Δοκίμασε ξανά</string>
     <string name="connection_retry_description">Το Tvheadend Player δοκιμάζει ξανά και αυτόματα</string>
     <string name="connection_notice_restored">Η σύνδεση αποκαταστάθηκε</string>
+    <string name="server_switched">Συνδέθηκε με %1$s</string>
+    <string name="connection_scope_line">Για %1$s</string>
     <string name="connection_notice_login_rejected">Η σύνδεση χρήστη απορρίφθηκε</string>
     <string name="recording_action_permission">Αυτός ο λογαριασμός δεν μπορεί να διαχειρίζεται εγγραφές.</string>
     <string name="recording_action_conn_limit">Ο διακομιστής είναι απασχολημένος. Δοκίμασε ξανά σε λίγο.</string>
@@ -414,6 +416,9 @@
     <string name="delete_recording">Διαγραφή εγγραφής</string>
     <string name="delete_recording_confirm_title">Διαγραφή αυτής της εγγραφής;</string>
     <string name="delete_recording_confirm_message">Η εγγραφή %1$s (%2$s, %3$s) θα διαγραφεί από τον διακομιστή.</string>
+    <string name="remove_entry">Αφαίρεση καταχώρισης</string>
+    <string name="remove_entry_confirm_title">Αφαίρεση αυτής της καταχώρισης;</string>
+    <string name="remove_entry_confirm_message">Η καταχώριση %1$s (%2$s, %3$s) θα αφαιρεθεί από τη λίστα του διακομιστή.</string>
     <string name="delete_folder_all_confirm_title">Διαγραφή όλων των εγγραφών στο %1$s;</string>
     <string name="delete_folder_watched_confirm_title">Διαγραφή των προβλημένων εγγραφών στο %1$s;</string>
     <plurals name="delete_folder_confirm_message">

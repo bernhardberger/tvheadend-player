@@ -138,7 +138,7 @@ class ProgrammeDetailsPolicyTest {
         assertEquals(listOf(STOP), actions(recording(DvrEntryState.RECORDING)))
         assertEquals(listOf(WATCH, CANCEL), actions(recording(DvrEntryState.SCHEDULED)))
         assertEquals(listOf(CANCEL), actions(recording(DvrEntryState.SCHEDULED), canWatchChannel = false))
-        assertEquals(listOf(DELETE), actions(recording(DvrEntryState.MISSED)))
+        assertEquals(listOf(REMOVE_ENTRY), actions(recording(DvrEntryState.MISSED)))
         assertEquals(emptyList<BrowseContextAction>(),
             recordingDetailsActions(recording(DvrEntryState.COMPLETED), null, false, false, nowSec = 150))
     }
@@ -201,7 +201,7 @@ class ProgrammeDetailsPolicyTest {
         assertFalse(facts(recording(DvrEntryState.COMPLETED_ERROR, 20)).any { it.kind == DetailsFactKind.LEFT })
         assertEquals(listOf(RESUME, START_OVER, MARK_WATCHED, DELETE), actions(recording(DvrEntryState.COMPLETED_ERROR, 20, listOf(file()))))
         assertEquals(listOf(PLAY, DELETE), actions(recording(DvrEntryState.MISSED, 20, listOf(file()))))
-        assertEquals(listOf(DELETE), actions(recording(DvrEntryState.MISSED, 20)))
+        assertEquals(listOf(REMOVE_ENTRY), actions(recording(DvrEntryState.MISSED, 20)))
     }
 
     @Test fun statusPrioritizesRecordingLifecycleOverAiring() {

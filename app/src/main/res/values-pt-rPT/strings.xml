@@ -357,6 +357,8 @@
     <string name="connection_try_again">Tentar novamente</string>
     <string name="connection_retry_description">O Tvheadend Player também tenta novamente por si</string>
     <string name="connection_notice_restored">Ligação restabelecida</string>
+    <string name="server_switched">Conectado a %1$s</string>
+    <string name="connection_scope_line">Para %1$s</string>
     <string name="connection_notice_login_rejected">Início de sessão rejeitado</string>
     <string name="recording_action_permission">Esta conta não pode gerir gravações.</string>
     <string name="recording_action_conn_limit">O servidor está ocupado. Tenta daqui a pouco.</string>
@@ -393,6 +395,9 @@
     <string name="delete_recording">Eliminar gravação</string>
     <string name="delete_recording_confirm_title">Eliminar esta gravação?</string>
     <string name="delete_recording_confirm_message">%1$s (%2$s, %3$s) será eliminado do servidor.</string>
+    <string name="remove_entry">Remover entrada</string>
+    <string name="remove_entry_confirm_title">Remover esta entrada?</string>
+    <string name="remove_entry_confirm_message">%1$s (%2$s, %3$s) será removido da lista do servidor.</string>
     <string name="delete_folder_all_confirm_title">Eliminar todas as gravações em %1$s?</string>
     <string name="delete_folder_watched_confirm_title">Eliminar as gravações vistas em %1$s?</string>
     <plurals name="delete_folder_confirm_message"><item quantity="one">%1$d gravação (%2$s) será eliminada do servidor.</item><item quantity="many">%1$d gravações (%2$s) serão eliminadas do servidor.</item><item quantity="other">%1$d gravações (%2$s) serão eliminadas do servidor.</item></plurals>

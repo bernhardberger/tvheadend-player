@@ -373,6 +373,8 @@
     <string name="connection_try_again">Réessayer</string>
     <string name="connection_retry_description">Tvheadend Player réessaie aussi automatiquement</string>
     <string name="connection_notice_restored">Connexion rétablie</string>
+    <string name="server_switched">Connecté à %1$s</string>
+    <string name="connection_scope_line">Pour %1$s</string>
     <string name="connection_notice_login_rejected">Identification refusée</string>
     <string name="recording_action_permission">Ce compte ne peut pas gérer les enregistrements.</string>
     <string name="recording_action_conn_limit">Le serveur est occupé. Réessaie dans un instant.</string>
@@ -421,6 +423,9 @@
     <string name="delete_recording">Supprimer l’enregistrement</string>
     <string name="delete_recording_confirm_title">Supprimer cet enregistrement ?</string>
     <string name="delete_recording_confirm_message">%1$s (%2$s, %3$s) sera supprimé du serveur.</string>
+    <string name="remove_entry">Retirer l’entrée</string>
+    <string name="remove_entry_confirm_title">Retirer cette entrée ?</string>
+    <string name="remove_entry_confirm_message">%1$s (%2$s, %3$s) sera retiré de la liste du serveur.</string>
     <string name="delete_folder_all_confirm_title">Supprimer tous les enregistrements de %1$s ?</string>
     <string name="delete_folder_watched_confirm_title">Supprimer les enregistrements vus de %1$s ?</string>
     <plurals name="delete_folder_confirm_message">

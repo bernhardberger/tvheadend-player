@@ -1,6 +1,10 @@
 <resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en">
     <string name="server_connection_failed">Can’t connect to %1$s</string>
     <string name="server_sign_in_rejected">Couldn’t sign in to %1$s. Check the username and password.</string>
+    <!-- Shown after a switch to another connection succeeds. %1$s = the connection's name. -->
+    <string name="server_switched">Connected to %1$s</string>
+    <!-- Leads a Settings page's description when several connections are stored. %1$s = the connection's name -->
+    <string name="connection_scope_line">For %1$s</string>
     <string name="server_profile_removed">Removed %1$s</string>
     <string name="server_profile_already_exists">This connection already exists</string>
     <string name="server_profile_write_failed">The connection could not be selected. Try again.</string>
@@ -619,6 +623,11 @@
     <string name="delete_recording_confirm_title">Delete this recording?</string>
     <!-- Dialog body before deleting one recording. %1$s = title, %2$s = date, %3$s = file size. -->
     <string name="delete_recording_confirm_message">%1$s (%2$s, %3$s) will be deleted from the server.</string>
+    <!-- Delete for a missed, invalid or failed entry that has no file: only its row in the server's list goes. -->
+    <string name="remove_entry">Remove entry</string>
+    <string name="remove_entry_confirm_title">Remove this entry?</string>
+    <!-- Dialog body before removing one entry without a file. %1$s = title, %2$s = date, %3$s = file size. -->
+    <string name="remove_entry_confirm_message">%1$s (%2$s, %3$s) will be removed from the server\'s list.</string>
     <string name="delete_folder_all_confirm_title">Delete all recordings in %1$s?</string>
     <string name="delete_folder_watched_confirm_title">Delete watched recordings in %1$s?</string>
     <!-- Confirmation dialog body before deleting a folder's recordings. %1$d = count, %2$s = total file size such as "4.2 GB". -->

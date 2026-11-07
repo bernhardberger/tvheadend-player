@@ -1266,7 +1266,7 @@ private fun DetailsActions(
                             event != null && !event.isRunning(nowSec)))),
                         maxLines = 1, softWrap = false)
                 }
-                 if (index == 0 && action != BrowseContextAction.DELETE) Button(onClick = { onAction(action) }, modifier = modifier,
+                 if (index == 0 && action != BrowseContextAction.DELETE && action != BrowseContextAction.REMOVE_ENTRY) Button(onClick = { onAction(action) }, modifier = modifier,
                     contentPadding = ButtonDefaults.ButtonWithIconContentPadding, content = content)
                 else OutlinedButton(onClick = { onAction(action) }, modifier = modifier,
                     contentPadding = OutlinedButtonDefaults.ButtonWithIconContentPadding, content = content)

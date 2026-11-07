@@ -369,6 +369,8 @@
     <string name="connection_try_again">Tekrar dene</string>
     <string name="connection_retry_description">Tvheadend Player otomatik olarak da yeniden dener</string>
     <string name="connection_notice_restored">Bağlantı yeniden kuruldu</string>
+    <string name="server_switched">%1$s sunucusuna bağlanıldı</string>
+    <string name="connection_scope_line">%1$s için</string>
     <string name="connection_notice_login_rejected">Oturum açma reddedildi</string>
     <string name="recording_action_permission">Bu hesabın kayıtları yönetme izni yok.</string>
     <string name="recording_action_conn_limit">Sunucu meşgul. Birazdan tekrar deneyin.</string>
@@ -414,6 +416,9 @@
     <string name="delete_recording">Kaydı sil</string>
     <string name="delete_recording_confirm_title">Bu kayıt silinsin mi?</string>
     <string name="delete_recording_confirm_message">%1$s (%2$s, %3$s) sunucudan silinecek.</string>
+    <string name="remove_entry">Girdiyi kaldır</string>
+    <string name="remove_entry_confirm_title">Bu girdi kaldırılsın mı?</string>
+    <string name="remove_entry_confirm_message">%1$s (%2$s, %3$s) sunucunun listesinden kaldırılacak.</string>
     <string name="delete_folder_all_confirm_title">%1$s içindeki tüm kayıtlar silinsin mi?</string>
     <string name="delete_folder_watched_confirm_title">%1$s içindeki izlenen kayıtlar silinsin mi?</string>
     <plurals name="delete_folder_confirm_message">

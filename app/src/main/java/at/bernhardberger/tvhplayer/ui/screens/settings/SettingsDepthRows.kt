@@ -2,12 +2,18 @@ package at.bernhardberger.tvhplayer.ui.screens.settings
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.AnnotatedString
@@ -34,7 +40,11 @@ internal fun settingsLevel(
     activeContent: (@Composable (androidx.compose.ui.focus.FocusRequester, (android.view.KeyEvent) -> Boolean) -> Unit)? = null,
     initialItemId: String? = null,
     description: String? = null,
+    /** The connection a per-connection level belongs to; named on the first heading line when set. */
+    connectionName: String? = null,
 ) = DepthLevel(id, rows, heading = { emphasis ->
+    val headingText = listOfNotNull(connectionName?.let { stringResource(R.string.connection_scope_line, it) }, description)
+        .joinToString("\n").ifEmpty { null }
     // Same heading in the active and preview slots (AOSP TvSettings parity): no
     // back chevron. It uses the browse header band, so the title sits where the
     // Channels, Guide and Recordings titles sit. In the preview slot it reads at the
@@ -43,7 +53,7 @@ internal fun settingsLevel(
         ((TvBrowseHeaderHeight - MaterialTheme.typography.headlineMedium.lineHeight.toDp()) / 2).coerceAtLeast(0.dp)
     }
     val titleBand = @Composable {
-        Row(Modifier.fillMaxWidth().then(if (description == null) Modifier.heightIn(min = TvBrowseHeaderHeight)
+        Row(Modifier.fillMaxWidth().then(if (headingText == null) Modifier.heightIn(min = TvBrowseHeaderHeight)
             else Modifier.padding(top = titleTop)),
             verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             Text(title, style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onSurface,
@@ -65,13 +75,13 @@ internal fun settingsLevel(
                 }.semantics { heading() })
         }
     }
-    if (description == null) {
+    if (headingText == null) {
         Box(Modifier.padding(bottom = TvSpacing4)) { titleBand() }
     } else {
         // One heading block: description aligns with the title, not the rows' inset text.
         Column(Modifier.fillMaxWidth().padding(bottom = 24.dp - DepthListTopReserve)) {
             titleBand()
-            Text(description, style = MaterialTheme.typography.bodyMedium,
+            Text(headingText, style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth().padding(top = TvSpacing4).testTag("settings-description-$id"))
         }
@@ -95,10 +105,11 @@ internal fun settingsRow(
     titleMaxLines: Int = 2,
     /** Drawn instead of [icon], for a row that leads with more than an icon (a server's avatar). */
     leading: (@Composable BoxScope.() -> Unit)? = null,
-    /** Connection rows split their address and status into distinct text styles. */
-    supportingContent: (@Composable () -> Unit)? = null,
+    /** Connection rows split their address and status into distinct text styles; told whether the row is focused. */
+    supportingContent: (@Composable (focused: Boolean) -> Unit)? = null,
     onClick: () -> Unit = {},
 ) = DepthRow(DepthItem(id, child), { if (enabled) onClick() }) { modifier, activate ->
+    var rowFocused by remember { mutableStateOf(false) }
     Column {
         if (section != null) {
             // Group subheader: the design kit's "List / Subheader" type (12sp medium,
@@ -121,7 +132,7 @@ internal fun settingsRow(
             // Keep the last visible scope reachable even when its switch cannot be turned off.
             onClick = { if (enabled) activate() },
             headlineContent = { Text(title.annotated(), style = MaterialTheme.typography.titleMedium, maxLines = titleMaxLines, overflow = TextOverflow.Ellipsis) },
-            supportingContent = supportingContent ?: supporting?.let { { Text(it.annotated(), maxLines = 2, overflow = TextOverflow.Ellipsis) } },
+            supportingContent = supportingContent?.let { { it(rowFocused) } } ?: supporting?.let { { Text(it.annotated(), maxLines = 2, overflow = TextOverflow.Ellipsis) } },
             leadingContent = leading ?: icon?.let { { Icon(painterResource(it), null, Modifier.size(ListItemDefaults.IconSize)) } },
             trailingContent = when {
                 busy -> ({ androidx.compose.material3.CircularProgressIndicator(
@@ -144,7 +155,7 @@ internal fun settingsRow(
                 focusedSelectedContainerColor = MaterialTheme.colorScheme.inverseSurface,
                 focusedSelectedContentColor = MaterialTheme.colorScheme.inverseOnSurface,
             ),
-            modifier = modifier.testTag("settings-row-$id").fillMaxWidth().padding(bottom = TvSpacing4)
+            modifier = modifier.onFocusChanged { rowFocused = it.hasFocus }.testTag("settings-row-$id").fillMaxWidth().padding(bottom = TvSpacing4)
                 .heightIn(min = if (supporting == null) 48.dp else SettingsDepthRowMinHeight).semantics {
                 if (!enabled) disabled()
                 if (checked != null) { role = Role.Switch; toggleableState = ToggleableState(checked) }

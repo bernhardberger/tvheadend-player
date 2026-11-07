@@ -377,6 +377,8 @@
     <string name="connection_try_again">Zkusit znovu</string>
     <string name="connection_retry_description">Tvheadend Player se také pokouší připojit automaticky</string>
     <string name="connection_notice_restored">Připojení obnoveno</string>
+    <string name="server_switched">Připojeno k %1$s</string>
+    <string name="connection_scope_line">Pro %1$s</string>
     <string name="connection_notice_login_rejected">Přihlášení odmítnuto</string>
     <string name="recording_action_permission">Tento účet nemůže spravovat nahrávky.</string>
     <string name="recording_action_conn_limit">Server je zaneprázdněný. Zkus to za chvíli.</string>
@@ -428,6 +430,9 @@
     <string name="delete_recording">Smazat nahrávku</string>
     <string name="delete_recording_confirm_title">Smazat tuto nahrávku?</string>
     <string name="delete_recording_confirm_message">%1$s (%2$s, %3$s) bude smazáno ze serveru.</string>
+    <string name="remove_entry">Odebrat položku</string>
+    <string name="remove_entry_confirm_title">Odebrat tuto položku?</string>
+    <string name="remove_entry_confirm_message">%1$s (%2$s, %3$s) bude odebráno ze seznamu serveru.</string>
     <string name="delete_folder_all_confirm_title">Smazat všechny nahrávky ve složce %1$s?</string>
     <string name="delete_folder_watched_confirm_title">Smazat zhlédnuté nahrávky ve složce %1$s?</string>
     <plurals name="delete_folder_confirm_message">

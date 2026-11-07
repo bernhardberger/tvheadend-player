@@ -137,9 +137,13 @@ internal const val STREAM_PROFILE_LEVEL = "stream-profile"
 internal const val STREAM_PROFILE_DEFAULT = "profile-default"
 
 @Composable
-internal fun settingsStreamProfileLevel(navigation: DepthNavigationState, vm: SettingsPlayerViewModel = koinViewModel()): DepthLevel {
+internal fun settingsStreamProfileLevel(
+    navigation: DepthNavigationState,
+    vm: SettingsPlayerViewModel = koinViewModel(),
+    connectionName: String? = null,
+): DepthLevel {
     val ui by vm.ui.collectAsStateWithLifecycle()
-    return settingsStreamProfileLevel(ui) { profileId ->
+    return settingsStreamProfileLevel(ui, connectionName = connectionName) { profileId ->
         vm.onProfileSelected(profileId)
         navigation.pop()
     }
@@ -150,7 +154,11 @@ internal fun settingsStreamProfileLevel(navigation: DepthNavigationState, vm: Se
  * the page shows only why, so a page left open across a disconnect offers nothing stale.
  */
 @Composable
-internal fun settingsStreamProfileLevel(ui: SettingsPlayerUiState, onSelect: (StreamProfileId?) -> Unit): DepthLevel {
+internal fun settingsStreamProfileLevel(
+    ui: SettingsPlayerUiState,
+    connectionName: String? = null,
+    onSelect: (StreamProfileId?) -> Unit,
+): DepthLevel {
     val direct = stringResource(R.string.profile_direct_streaming)
     val profiles = ui.profiles as? StreamProfilesResult.Available
     val rows = if (profiles == null) {
@@ -167,7 +175,7 @@ internal fun settingsStreamProfileLevel(ui: SettingsPlayerUiState, onSelect: (St
     return settingsLevel(STREAM_PROFILE_LEVEL, stringResource(R.string.profile), rows,
         initialItemId = rows.firstOrNull { it.item.id == ui.selectedProfileId?.let(::streamProfileRowId) }?.item?.id
             ?: rows.first().item.id,
-        description = stringResource(R.string.stream_profile_description))
+        description = stringResource(R.string.stream_profile_description), connectionName = connectionName)
 }
 
 private fun streamProfileRowId(id: StreamProfileId) = "profile-${id.value}"

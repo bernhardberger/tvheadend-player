@@ -16,6 +16,8 @@ import at.bernhardberger.tvhplayer.core.BrowseContextAction.*
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 @OptIn(ExperimentalTvheadendApi::class, TvheadendTestingApi::class)
@@ -151,14 +153,30 @@ class BrowseContextActionsTest {
     @Test fun failedRecordingsWithoutAPlayableFileOnlyOfferDetailsAndDelete() {
         listOf(DvrEntryState.MISSED, DvrEntryState.INVALID,
             DvrEntryState.COMPLETED_ERROR).forEach {
-            assertEquals("$it", listOf(DETAILS, DELETE), actions(recording(it, 20)))
-            assertEquals("$it", listOf(DETAILS, DELETE), actions(recording(it, 20, files = emptyList())))
+            assertEquals("$it", listOf(DETAILS, REMOVE_ENTRY), actions(recording(it, 20)))
+            assertEquals("$it", listOf(DETAILS, REMOVE_ENTRY), actions(recording(it, 20, files = emptyList())))
         }
         listOf(DvrEntryState.MISSED, DvrEntryState.COMPLETED_ERROR).forEach {
             assertEquals("$it", listOf(DETAILS, DELETE), actions(recording(it, 20, listOf(file()), dataSize = 0)))
         }
         listOf(DvrEntryState.INVALID).forEach {
             assertEquals("$it", listOf(DETAILS, DELETE), actions(recording(it, 20, listOf(file()))))
+        }
+    }
+
+    @Test fun deleteRemovesOnlyTheEntryWhenNoFileWasEverWritten() {
+        listOf(DvrEntryState.MISSED, DvrEntryState.INVALID, DvrEntryState.COMPLETED_ERROR).forEach {
+            assertTrue("$it", deleteRemovesEntryOnly(recording(it)))
+            assertTrue("$it", deleteRemovesEntryOnly(recording(it, files = emptyList())))
+            assertFalse("$it", deleteRemovesEntryOnly(recording(it, files = listOf(file()))))
+            assertFalse("$it partial", deleteRemovesEntryOnly(recording(it, files = listOf(file()), dataSize = 0)))
+        }
+        // A finished recording keeps the Delete copy, whatever its file list currently says.
+        assertFalse(deleteRemovesEntryOnly(recording(DvrEntryState.COMPLETED)))
+        // Entries that offer no Delete, or only a live recording's own stop, never take the entry copy.
+        listOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR, DvrEntryState.REMOVED).forEach {
+            assertFalse("$it", deleteRemovesEntryOnly(recording(it)))
+            assertFalse("$it", deleteRemovesEntryOnly(recording(it, files = emptyList())))
         }
     }
 

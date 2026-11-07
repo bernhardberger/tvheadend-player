@@ -385,6 +385,8 @@
     <string name="connection_try_again">إعادة المحاولة</string>
     <string name="connection_retry_description">سيعيد Tvheadend Player المحاولة تلقائيًا أيضًا</string>
     <string name="connection_notice_restored">استُعيد الاتصال</string>
+    <string name="server_switched">تم الاتصال بـ %1$s</string>
+    <string name="connection_scope_line">لـ %1$s</string>
     <string name="connection_notice_login_rejected">رُفض تسجيل الدخول</string>
     <string name="recording_action_permission">لا يملك هذا الحساب إذن إدارة التسجيلات.</string>
     <string name="recording_action_conn_limit">الخادم مشغول. يمكن إعادة المحاولة قريبًا.</string>
@@ -442,6 +444,9 @@
     <string name="delete_recording">حذف التسجيل</string>
     <string name="delete_recording_confirm_title">حذف هذا التسجيل؟</string>
     <string name="delete_recording_confirm_message">سيُحذف %1$s (%2$s، %3$s) من الخادم.</string>
+    <string name="remove_entry">إزالة الإدخال</string>
+    <string name="remove_entry_confirm_title">إزالة هذا الإدخال؟</string>
+    <string name="remove_entry_confirm_message">ستُزال %1$s (%2$s، %3$s) من قائمة الخادم.</string>
     <string name="delete_folder_all_confirm_title">حذف كل تسجيلات %1$s؟</string>
     <string name="delete_folder_watched_confirm_title">حذف التسجيلات المُشاهَدة من %1$s؟</string>
     <plurals name="delete_folder_confirm_message">

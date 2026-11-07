@@ -424,8 +424,7 @@ class ProgrammeDetailsCaptureTest {
         compose.waitForIdle()
         if (!player) compose.onNodeWithText("Close").assertDoesNotExist()
         if (failed) {
-            compose.onNodeWithTag("details-delete").assertIsFocused()
-            compose.onNodeWithTag("details-delete").assertIsFocused()
+            compose.onNodeWithTag("details-remove_entry").assertIsFocused()
             compose.onNodeWithTag("details-description").assertDoesNotExist()
         }
         // All origins now use the shared full-page geometry.

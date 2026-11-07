@@ -233,6 +233,29 @@ class AppProfileOwnerTest {
         assertEquals(next, (stored.profiles() as ServerProfileListResult.Available).activeId)
     }
 
+    @Test fun successfulUserSwitchPostsOneSwitchedNoticeAndSwitchingToTheActiveConnectionPostsNone() = runTest {
+        val stored = FakeServerProfileStore()
+        val first = (stored.addAnonymous("first.invalid", activate = true) as ServerProfileWriteResult.Applied).id
+        val next = (stored.addAnonymous("second.invalid") as ServerProfileWriteResult.Applied).id
+        val session = FakeTvheadendSession()
+        val notices = NoticeCenter({ 0L }, { NoticeContext(0, null) })
+        val owner = AppProfileOwner(session, stored, PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Missing }, { notices })
+        backgroundScope.launch { owner.run() }
+        runCurrent()
+        assertEquals(ServerProfileWriteResult.Applied(first), owner.switchActive(first))
+        assertEquals(null, notices.state.value.candidate)
+        val attempt = backgroundScope.async { owner.switchActive(next) }
+        runCurrent()
+        assertEquals(null, notices.state.value.candidate)
+        session.publish(SessionObservation.create(sessionState = SessionState.Ready(ServerCapabilities.create(
+            streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED))))
+        runCurrent()
+        assertEquals(ServerProfileWriteResult.Applied(next), attempt.await())
+        assertEquals(Notice.ServerSwitched(next, "second.invalid"), notices.state.value.candidate?.notice)
+        assertEquals(1, notices.state.value.pending.size)
+    }
+
     @Test fun rejectedUserSwitchKeepsThePreviousProfileAndRestoresItsConnection() = runTest {
         val stored = FakeServerProfileStore()
         val first = (stored.addAnonymous("first.invalid", activate = true) as ServerProfileWriteResult.Applied).id
@@ -259,7 +282,74 @@ class AppProfileOwnerTest {
         assertFalse(owner.connectionChanges.isLocked)
         assertTrue(noticePosts > 0)
         assertTrue(notices.state.value.candidate!!.notice is Notice.ServerSignInRejected)
+        assertNoSwitchedNotice(notices)
         assertFalse(owner.switchInProgress.value)
+    }
+
+    @Test fun unreachableUserSwitchPostsTheFailureAndNoSwitchedNotice() = runTest {
+        val stored = FakeServerProfileStore()
+        val first = (stored.addAnonymous("first.invalid", activate = true) as ServerProfileWriteResult.Applied).id
+        val next = (stored.addAnonymous("second.invalid") as ServerProfileWriteResult.Applied).id
+        val fake = FakeTvheadendSession()
+        var unreachable = false
+        val session = object : TvheadendSession by fake {
+            override suspend fun connect(profile: ServerProfile): SessionCommandResult =
+                if (unreachable) SessionCommandResult.NO_CHANGE else fake.connect(profile)
+        }
+        val notices = NoticeCenter({ 0L }, { NoticeContext(0, null) })
+        val owner = AppProfileOwner(session, stored, PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Missing }, { notices })
+        backgroundScope.launch { owner.run() }
+        runCurrent()
+        unreachable = true
+        assertEquals(ServerProfileWriteResult.Unavailable, owner.switchActive(next))
+        assertEquals(first, (stored.profiles() as ServerProfileListResult.Available).activeId)
+        assertTrue(notices.state.value.candidate!!.notice is Notice.ServerConnectionFailed)
+        assertNoSwitchedNotice(notices)
+    }
+
+    @Test fun cancellationAfterTheCommitRestoresThePreviousConnectionWithoutASwitchedNotice() = runTest {
+        val stored = FakeServerProfileStore()
+        val first = (stored.addAnonymous("first.invalid", activate = true) as ServerProfileWriteResult.Applied).id
+        val next = (stored.addAnonymous("second.invalid") as ServerProfileWriteResult.Applied).id
+        val gate = CompletableDeferred<Unit>()
+        var activated = false
+        val store = object : ServerProfileStore by stored {
+            override suspend fun setActive(id: ServerProfileId): ServerProfileWriteResult {
+                if (id == next) activated = true
+                return stored.setActive(id)
+            }
+            // Suspends after the commit's last cancellation check, where Back can still cancel the caller.
+            override suspend fun profiles(): ServerProfileListResult {
+                if (activated) gate.await()
+                return stored.profiles()
+            }
+        }
+        val session = FakeTvheadendSession()
+        val notices = NoticeCenter({ 0L }, { NoticeContext(0, null) })
+        val owner = AppProfileOwner(session, store, PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Missing }, { notices })
+        backgroundScope.launch { owner.run() }
+        runCurrent()
+        val attempt = backgroundScope.launch { owner.switchActive(next) }
+        runCurrent()
+        session.publish(SessionObservation.create(sessionState = SessionState.Ready(ServerCapabilities.create(
+            streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED))))
+        runCurrent()
+        assertTrue(activated)
+        attempt.cancel()
+        gate.complete(Unit)
+        runCurrent()
+        assertEquals(first, (stored.profiles() as ServerProfileListResult.Available).activeId)
+        assertEquals(first, (owner.serverProfile.value as ServerProfileReadResult.Available).id)
+        assertNoSwitchedNotice(notices)
+        assertFalse(owner.connectionChanges.isLocked)
+        assertFalse(owner.switchInProgress.value)
+    }
+
+    private fun assertNoSwitchedNotice(notices: NoticeCenter) {
+        assertFalse(notices.state.value.candidate?.notice is Notice.ServerSwitched)
+        assertTrue(notices.state.value.pending.none { it.notice is Notice.ServerSwitched })
     }
 
     @Test fun cancellationAtReceiveBeforeTheSubmitterResumesKeepsTheConnectionLock() = runTest {

@@ -285,6 +285,8 @@ class AppProfileOwner(
             var persisted = false
             var committed = false
             var failureNotice: Notice? = null
+            val switchedNotice = list.profiles.firstOrNull { it.id == id }
+                ?.let { Notice.ServerSwitched(id, serverProfileDisplayName(it)) }
             synchronized(switchLifecycle) {
                 if (switchOwnerClosed) throw CancellationException("Profile owner stopped before switch execution")
                 activeSwitch = caller[Job]
@@ -341,6 +343,10 @@ class AppProfileOwner(
                             }
                             applyServerProfile(previous)
                             failureNotice?.let { notice -> noticeCenter()?.let { it.post(notice, it.context()) } }
+                        } else if (committed && caller.isActive) {
+                            // The retained outcome: no rollback ran. Generic connection notices stay suppressed
+                            // until the switch ends, so this is the only one.
+                            switchedNotice?.let { notice -> noticeCenter()?.let { it.post(notice, it.context()) } }
                         }
                     } finally {
                         switchIdentity.unlock()

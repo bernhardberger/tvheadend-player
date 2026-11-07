@@ -373,6 +373,8 @@
     <string name="connection_try_again">Volver a intentar</string>
     <string name="connection_retry_description">Tvheadend Player también lo reintenta automáticamente</string>
     <string name="connection_notice_restored">Conexión restablecida</string>
+    <string name="server_switched">Conectado a %1$s</string>
+    <string name="connection_scope_line">Para %1$s</string>
     <string name="connection_notice_login_rejected">Inicio de sesión rechazado</string>
     <string name="recording_action_permission">Esta cuenta no puede gestionar grabaciones.</string>
     <string name="recording_action_conn_limit">El servidor está ocupado. Inténtalo de nuevo en un momento.</string>
@@ -421,6 +423,9 @@
     <string name="delete_recording">Eliminar grabación</string>
     <string name="delete_recording_confirm_title">¿Eliminar esta grabación?</string>
     <string name="delete_recording_confirm_message">%1$s (%2$s, %3$s) se eliminará del servidor.</string>
+    <string name="remove_entry">Quitar entrada</string>
+    <string name="remove_entry_confirm_title">¿Quitar esta entrada?</string>
+    <string name="remove_entry_confirm_message">%1$s (%2$s, %3$s) se quitará de la lista del servidor.</string>
     <string name="delete_folder_all_confirm_title">¿Eliminar todas las grabaciones de %1$s?</string>
     <string name="delete_folder_watched_confirm_title">¿Eliminar las grabaciones vistas de %1$s?</string>
     <plurals name="delete_folder_confirm_message">

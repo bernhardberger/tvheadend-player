@@ -41,6 +41,8 @@ internal class NoticeFormatter(private val context: Context) {
         Notice.ServerProfileWriteFailed -> FormattedNotice(context.getString(R.string.server_profile_write_failed))
         is Notice.ServerConnectionFailed -> FormattedNotice(context.getString(R.string.server_connection_failed, notice.name),
             icon = AppNoticeIcon.DISCONNECTED)
+        is Notice.ServerSwitched -> FormattedNotice(context.getString(R.string.server_switched, notice.name),
+            icon = AppNoticeIcon.CONNECTED)
         is Notice.ServerSignInRejected -> FormattedNotice(context.getString(R.string.server_sign_in_rejected, notice.name),
             icon = AppNoticeIcon.SIGN_IN_REJECTED)
         is Notice.AutomaticAdBreakSkip -> FormattedNotice(context.getString(R.string.recording_ad_break_skipped))

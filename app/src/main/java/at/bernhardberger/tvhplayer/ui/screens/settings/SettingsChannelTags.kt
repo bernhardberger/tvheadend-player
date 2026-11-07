@@ -13,13 +13,13 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelTag
 import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
 
 @Composable
-internal fun settingsChannelTagsLevel(channelsVm: ChannelsViewModel): DepthLevel {
+internal fun settingsChannelTagsLevel(channelsVm: ChannelsViewModel, connectionName: String? = null): DepthLevel {
     val observation by channelsVm.observation.collectAsStateWithLifecycle()
     val tags = observation.channelCatalogForDisplay?.tags.orEmpty()
     val state by channelsVm.scope.collectAsStateWithLifecycle()
     val failed by channelsVm.settingsFailure.collectAsStateWithLifecycle()
     return settingsChannelTagsLevel(tags, state.visibility, state.settingsLoaded, failed,
-        channelsVm::retrySettings, channelsVm::toggleScopeVisibility)
+        channelsVm::retrySettings, channelsVm::toggleScopeVisibility, connectionName)
 }
 
 @Composable
@@ -30,6 +30,7 @@ internal fun settingsChannelTagsLevel(
     failed: Boolean,
     onRetry: () -> Unit,
     onToggle: (ChannelTagId?) -> Unit,
+    connectionName: String? = null,
 ): DepthLevel {
     val allVisible = visibility.isAllChannelsVisible()
     val count = tags.count { visibility.isTagVisible(it.id) } + if (allVisible) 1 else 0
@@ -52,5 +53,5 @@ internal fun settingsChannelTagsLevel(
                     onClick = { onToggle(tag.id) }))
             }
         }
-    }, description = stringResource(R.string.settings_channel_groups_description))
+    }, description = stringResource(R.string.settings_channel_groups_description), connectionName = connectionName)
 }

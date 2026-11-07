@@ -121,7 +121,8 @@ internal fun RecordingDetailsHost(
                                         RecordingPlaybackStart.RESUME else RecordingPlaybackStart.START_OVER)
                             }
                         }
-                        BrowseContextAction.STOP, BrowseContextAction.CANCEL, BrowseContextAction.DELETE -> {
+                        BrowseContextAction.STOP, BrowseContextAction.CANCEL, BrowseContextAction.DELETE,
+                        BrowseContextAction.REMOVE_ENTRY -> {
                             focusedAction = action
                             pending = session?.let {
                                 when (action) {
@@ -162,6 +163,7 @@ internal fun RecordingDetailsHost(
             val visibility = remember(mutation) { MutableTransitionState(false).apply { targetState = true } }
             RecordingConfirmationDialog(
                 visibility = visibility, action = action, title = opened.title.orEmpty(),
+                removeEntry = deleteRemovesEntryOnly(opened),
                 channelName = channel?.name ?: opened.channelName.orEmpty(),
                 dateAndTime = formatRecordingSchedule(opened.start?.epochSeconds,
                     dateOnly = action == PendingRecordingAction.DELETE, locale = LocalConfiguration.current.locales[0]),

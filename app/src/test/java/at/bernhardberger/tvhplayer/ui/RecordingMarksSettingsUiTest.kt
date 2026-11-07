@@ -11,6 +11,10 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTextEquals
+import at.bernhardberger.tvheadend.sdk.core.ServerProfileListResult
+import at.bernhardberger.tvhplayer.ui.screens.settings.STREAM_PROFILE_LEVEL
+import at.bernhardberger.tvhplayer.ui.screens.settings.connectionScopeName
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -61,6 +65,34 @@ class RecordingMarksSettingsUiTest {
     @Test fun streamProfileDescriptionBounds() = descriptionBounds { settingsStreamProfileLevel(SettingsPlayerUiState()) {} }
     @Test fun channelGroupsDescriptionBounds() = descriptionBounds {
         settingsChannelTagsLevel(emptyList(), ChannelScopeVisibility(), true, false, {}, {})
+    }
+
+    @Test fun channelGroupsDescriptionNamesTheConnectionOnItsOwnFirstLine() {
+        descriptionBounds { settingsChannelTagsLevel(emptyList(), ChannelScopeVisibility(), true, false, {}, {}, "anna on tvheadend.local") }
+        compose.onNodeWithTag("settings-description-${SettingsSection.CHANNEL_TAGS.name}").assertTextEquals(
+            "For anna on tvheadend.local\nChoose which groups appear in Channels and the Guide.")
+    }
+
+    @Test fun streamProfileDescriptionNamesTheConnectionOnItsOwnFirstLine() {
+        descriptionBounds { settingsStreamProfileLevel(SettingsPlayerUiState(), "anna on tvheadend.local") {} }
+        compose.onNodeWithTag("settings-description-$STREAM_PROFILE_LEVEL").assertTextEquals(
+            "For anna on tvheadend.local\nHow Tvheadend prepares the stream for this TV.")
+    }
+
+    @Test fun onlySeveralStoredConnectionsNameTheActiveOneOnPerConnectionPages() {
+        val anna = fixtureServer(1, "tvheadend.local", username = "anna")
+        val cabin = fixtureServer(2, "cabin.local", label = "Cabin")
+        val names = mutableListOf<String?>()
+        compose.setContent {
+            names += connectionScopeName(null)
+            names += connectionScopeName(ServerProfileListResult.Available(emptyList(), null))
+            names += connectionScopeName(ServerProfileListResult.Available(listOf(anna), anna.id))
+            names += connectionScopeName(ServerProfileListResult.Available(listOf(anna, cabin), anna.id))
+            names += connectionScopeName(ServerProfileListResult.Available(listOf(anna, cabin), cabin.id))
+            names += connectionScopeName(ServerProfileListResult.Available(listOf(anna, cabin), null))
+        }
+        compose.waitForIdle()
+        assertEquals(listOf(null, null, null, "anna on tvheadend.local", "Cabin", null), names.takeLast(6))
     }
 
     private fun descriptionBounds(levelFactory: @Composable () -> DepthLevel) {
