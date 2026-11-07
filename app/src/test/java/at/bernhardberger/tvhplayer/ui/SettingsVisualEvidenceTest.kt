@@ -189,10 +189,11 @@ class SettingsVisualEvidenceTest {
         val state = if (installed) "installed" else "missing"
         capture("en-font1.0-appliance-$state-root")
         press(Key.DirectionCenter)
-        capture("en-font1.0-appliance-$state", reader = !installed)
+        capture("en-font1.0-appliance-$state")
         if (!installed) {
-            repeat(14) { press(Key.DirectionDown) }
-            capture("en-font1.0-appliance-missing-qr", reader = true)
+            press(Key.DirectionDown)
+            press(Key.DirectionCenter)
+            capture("en-font1.0-appliance-missing-reader", reader = true)
         }
     }
 
@@ -457,13 +458,19 @@ class SettingsVisualEvidenceTest {
     }
 
     private fun capture(name: String, middleFocus: Boolean = false, reader: Boolean = false) {
-        val activeColumn = (if (reader) compose.onNode(isFocused()) else compose.onNodeWithTag("depth-active"))
+        val activeColumn = (if (reader) compose.onNodeWithTag("player-info-reading") else compose.onNodeWithTag("depth-active"))
             .fetchSemanticsNode().boundsInRoot
         val rows = if (reader) emptyList() else activeRows()
         lateinit var bitmap: Bitmap
         compose.runOnIdle {
-            bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-            view.draw(Canvas(bitmap))
+            // A dialog reader owns a separate window; capture the top window, not the Settings view beneath it.
+            val windows = Class.forName("android.view.WindowManagerGlobal").let { global ->
+                global.getDeclaredField("mViews").apply { isAccessible = true }
+                    .get(global.getMethod("getInstance").invoke(null)) as List<*>
+            }
+            val captureView = if (reader) windows.lastOrNull() as? View ?: view else view
+            bitmap = Bitmap.createBitmap(captureView.width, captureView.height, Bitmap.Config.ARGB_8888)
+            captureView.draw(Canvas(bitmap))
         }
         val directory = File("build/outputs/settings-c-captures").apply { mkdirs() }
         File(directory, "$name.png").outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }

@@ -81,11 +81,12 @@ internal fun HomeScreen(
     fun current(channelId: ChannelId? = null) = owner.isCurrent &&
         (channelId == null || channelsVm.scope.value.scope.visibleChannels.any { it.id == channelId })
     val recents by lastPlayedStore.recentChannelIds.collectAsStateWithLifecycle(emptyList())
+    val recentRecordings by lastPlayedStore.recentRecordingIds.collectAsStateWithLifecycle(emptyList())
     val nowSec = rememberCurrentEpochSeconds()()
     val playing = playingRecordingId?.let(HomePlaying::Recording)
         ?: playingChannelId?.let(HomePlaying::LiveChannel)
-    val alignedInput = remember(scope, observation, recents, playing, nowSec) {
-        homeInput(scope, observation, recents, playing, nowSec)
+    val alignedInput = remember(scope, observation, recents, recentRecordings, playing, nowSec) {
+        homeInput(scope, observation, recents, playing, nowSec)?.copy(recentRecordingIds = recentRecordings)
     }
     // Retain the input together with both observations: programme pictures and saved channel
     // logos must keep the authority of the same aligned frame while the two flows catch up.

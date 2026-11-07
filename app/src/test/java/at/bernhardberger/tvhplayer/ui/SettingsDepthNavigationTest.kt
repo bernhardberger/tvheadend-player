@@ -735,7 +735,49 @@ class SettingsDepthNavigationTest {
         }
     }
 
-    @Test fun missingCompanionReaderScrollsAndBackRestoresApplianceThenInstallationShowsSetup() {
+    private val qrDescription = "QR code for the appliance companion setup steps"
+
+    @Test fun missingCompanionLevelPreviewsOpensASetupReaderAndBackKeepsTheLevel() {
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                SettingsScreenNavigation(rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.APPLIANCE.name),
+                    listOf(settingsRootLevel(), settingsApplianceLevel(false, {}, false)))
+            }
+        }
+        // Focusing the root row previews the level like every other section.
+        compose.onNode(isFocused() and hasText("Appliance")).assertExists()
+        val preview = hasAnyAncestor(hasTestTag("depth-preview"))
+        compose.onNode(hasText("Appliance companion") and preview, useUnmergedTree = true).assertExists()
+        compose.onNode(hasText("Not installed") and preview, useUnmergedTree = true).assertExists()
+        compose.onNode(hasText("Appliance setup") and preview, useUnmergedTree = true).assertExists()
+        press(Key.DirectionRight)
+        compose.onNode(isFocused() and hasText("Appliance companion") and hasText("Not installed")).assertExists()
+        press(Key.DirectionDown)
+        compose.onNode(isFocused() and hasText("Appliance setup")).assertExists()
+        compose.onNode(isDialog()).assertDoesNotExist()
+        press(Key.DirectionCenter)
+        compose.onNode(isDialog()).assertExists()
+        compose.onNodeWithTag("player-info-reading").assertIsFocused()
+        val window = compose.onNode(isDialog()).fetchSemanticsNode().boundsInRoot
+        val qr = compose.onNodeWithContentDescription(qrDescription)
+        qr.assertIsDisplayed()
+        val qrBounds = qr.fetchSemanticsNode().boundsInRoot
+        val text = compose.onNodeWithTag("details-full-description").fetchSemanticsNode().boundsInRoot
+        assertTrue("QR $qrBounds fits the window $window",
+            qrBounds.left >= window.left && qrBounds.right <= window.right &&
+                qrBounds.top >= window.top && qrBounds.bottom <= window.bottom)
+        assertTrue("QR $qrBounds sits right of the text $text", qrBounds.left >= text.right)
+        pressReader(Key.Back)
+        compose.onNode(isDialog()).assertDoesNotExist()
+        compose.onNode(isFocused() and hasText("Appliance setup")).assertExists()
+        compose.onNodeWithText("Not installed").assertExists()
+        press(Key.Back)
+        compose.onNode(isFocused() and hasText("Appliance")).assertExists()
+        // Previewed again, not left open.
+        compose.onNode(hasText("Appliance setup") and preview, useUnmergedTree = true).assertExists()
+    }
+
+    @Test fun installingCompanionWhileItsReaderIsOpenClosesItAndKeepsTheLevelWorking() {
         var installed by mutableStateOf(false)
         var setups = 0
         compose.setContent {
@@ -744,16 +786,13 @@ class SettingsDepthNavigationTest {
                     listOf(settingsRootLevel(), settingsApplianceLevel(false, { setups++ }, installed)))
             }
         }
-        compose.onNode(isFocused() and hasText("Appliance")).assertExists()
-        press(Key.DirectionRight)
-        compose.onNode(isFocused() and hasText("Not installed", substring = true)).assertExists()
-        repeat(14) { press(Key.DirectionDown) }
-        compose.onNodeWithContentDescription("QR code for the appliance companion setup steps")
-            .assertIsDisplayed()
-        press(Key.Back)
-        compose.onNode(isFocused() and hasText("Appliance")).assertExists()
-        compose.runOnIdle { installed = true }
         press(Key.DirectionCenter)
+        press(Key.DirectionDown)
+        press(Key.DirectionCenter)
+        compose.onNode(isDialog()).assertExists()
+        compose.runOnIdle { installed = true }
+        compose.waitForIdle()
+        compose.onNode(isDialog()).assertDoesNotExist()
         compose.onNode(isFocused() and hasText("Appliance setup")).assertExists()
         compose.onNodeWithText("Not installed").assertDoesNotExist()
         press(Key.DirectionCenter)
@@ -762,7 +801,7 @@ class SettingsDepthNavigationTest {
         compose.onNode(isFocused() and hasText("Appliance")).assertExists()
     }
 
-    @Test fun installingCompanionWhileItsReaderIsOpenFocusesSetupAndKeepsBackWorking() {
+    @Test fun installingCompanionWhileItsLevelIsOpenKeepsFocusOnSetupAndBackWorking() {
         var installed by mutableStateOf(false)
         var setups = 0
         compose.setContent {
@@ -772,7 +811,8 @@ class SettingsDepthNavigationTest {
             }
         }
         press(Key.DirectionCenter)
-        compose.onNode(isFocused() and hasText("Not installed", substring = true)).assertExists()
+        press(Key.DirectionDown)
+        compose.onNode(isFocused() and hasText("Appliance setup")).assertExists()
         compose.runOnIdle { installed = true }
         compose.onNode(isFocused() and hasText("Appliance setup")).assertExists()
         compose.onNodeWithText("Not installed").assertDoesNotExist()
@@ -960,6 +1000,12 @@ class SettingsDepthNavigationTest {
 
     private fun press(key: Key) {
         compose.onRoot().performKeyInput { pressKey(key) }
+        compose.waitForIdle()
+    }
+
+    /** A dialog reader is a second window, so keys go to its focused reading box. */
+    private fun pressReader(key: Key) {
+        compose.onNodeWithTag("player-info-reading").performKeyInput { pressKey(key) }
         compose.waitForIdle()
     }
 

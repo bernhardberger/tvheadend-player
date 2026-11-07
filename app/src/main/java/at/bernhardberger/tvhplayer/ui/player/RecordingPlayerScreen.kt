@@ -30,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -83,9 +84,11 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.playback.currentRecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.data.ConnectionState
+import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
 import at.bernhardberger.tvhplayer.ui.components.rememberPlaybackIntent
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
@@ -214,6 +217,16 @@ fun RecordingPlayerScreen(
     }
     val nowSec = timelineState.nowEpochSec
     val isPlaying = timelineState.isPlaying
+    val lastPlayedStore: LastPlayedChannelStore = koinInject()
+    val playingRecording by rememberUpdatedState(isPlaying && activeTarget == AppPlaybackTarget.Recording(recordingId))
+    LaunchedEffect(recordingId, retainedSelection?.currentSession, lastPlayedStore) {
+        // Await actual playback, not a route opening or an unsuccessful target install. Once
+        // per recording session: pause, buffering and recomposition must not rewrite recency.
+        snapshotFlow {
+            playingRecording
+        }.first { it }
+        lastPlayedStore.pushRecentRecordingId(recordingId)
+    }
     val rootFocus = remember { FocusRequester() }
     val infoFocus = remember { FocusRequester() }
     // The recording player has no layers of its own; a quick list before any focus returns to pause.

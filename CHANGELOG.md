@@ -2,10 +2,26 @@
 
 ## Unreleased
 
-- If a connection cannot be reached or rejects sign-in, switching restores your previous connection and shows a notice.
+- If a connection cannot be reached or rejects sign-in, switching restores your previous connection and shows a notice. A successful switch says *Connected to* and the connection's name.
+- With more than one connection, *Channel groups* and *Stream profile* name the connection they apply to.
+- A missed or failed recording that never wrote a file offers *Remove entry* instead of *Delete recording*.
 - Settings > Connection can keep several connections, including different users on the same server. Choose one to use it, give it a name, or remove it.
 - A removed recording no longer hides another recording of the same program, and retention cleanup no longer repeats the “Recording deleted” notice.
-- Recent channels, channel tags, channel aspect settings, the selected stream profile and audio choices start fresh after this update; they are now kept per connection.
+- Recent channels, the *Continue watching* order, channel tags, channel aspect settings, the selected stream profile and audio choices start fresh after this update; they are now kept per connection.
+
+## 0.4.11
+
+### Home
+
+- *Continue watching* shows the recordings you played last first. Recordings
+  this TV hasn't played yet follow by recording date, as before.
+
+### Settings
+
+- *Settings → Appliance* now opens like every other settings page. Without the
+  appliance companion it shows *Not installed* and an *Appliance setup* entry
+  that opens the setup steps full screen, with the QR code next to the text.
+  Before, the page slid off the side of the screen and cut the QR code in half.
 
 ## 0.4.10
 

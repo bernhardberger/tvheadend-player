@@ -120,6 +120,8 @@ internal fun ProgrammeDetailsFullDescription(
     heading: (@Composable () -> Unit)? = null,
     title: String? = null,
     reading: @Composable () -> Unit,
+    /** Fixed content beside the scrolling text, such as a QR code that must stay in view. */
+    trailing: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val readingFocus = remember { FocusRequester() }
@@ -141,6 +143,7 @@ internal fun ProgrammeDetailsFullDescription(
             contentWidth = if (heading == null) 560.dp else 760.dp,
             content = content,
         )
+        trailing?.invoke()
     }
     }
 }
