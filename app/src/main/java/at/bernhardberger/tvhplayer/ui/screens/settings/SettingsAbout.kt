@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -87,14 +88,27 @@ private fun aboutServerText(state: SessionState): String {
 @Composable
 private fun AboutReadingDialog(title: String, asset: String, onDismiss: () -> Unit) {
     val context = LocalContext.current
+    val text = remember(asset) {
+        val source = context.assets.open("licenses/$asset").bufferedReader().use { it.readText() }
+        if (asset.endsWith(".md")) aboutNoticeText(source) else source
+    }
+    SettingsReadingDialog(title, onDismiss) {
+        Text(text, style = MaterialTheme.typography.bodyLarge)
+    }
+}
+
+/** Full-screen Settings reader: the text scrolls, [trailing] stays in view, Back closes only the reader. */
+@Composable
+internal fun SettingsReadingDialog(
+    title: String,
+    onDismiss: () -> Unit,
+    trailing: (@Composable () -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     val backCycle = rememberBackKeyCycle()
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(
         usePlatformDefaultWidth = false, dismissOnClickOutside = false,
     )) {
-        val text = remember(asset) {
-            val source = context.assets.open("licenses/$asset").bufferedReader().use { it.readText() }
-            if (asset.endsWith(".md")) aboutNoticeText(source) else source
-        }
         ProgrammeDetailsFullDescription(
             modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
                 .backKeyCycleFocus(backCycle)
@@ -109,8 +123,8 @@ private fun AboutReadingDialog(title: String, asset: String, onDismiss: () -> Un
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.semantics { heading() }) },
             reading = {},
-        ) {
-            Text(text, style = MaterialTheme.typography.bodyLarge)
-        }
+            trailing = trailing,
+            content = content,
+        )
     }
 }
