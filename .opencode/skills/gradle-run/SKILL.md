@@ -18,12 +18,17 @@ not a reason to run it; reuse unchanged successful checks.
 Compilation of Android tests is not execution on a device.
 
 On the shared LXC the installed `gradlew` hook runs each build in the bounded
-`tvhbuild.slice` with single-use Gradle and in-process Kotlin, so JVMs are not
-reused between runs. Routine app test runs default to
+`tvhbuild.slice` with in-process Kotlin. Direct Gradle calls reuse a daemon only
+inside a persistent request-owning worker with an isolated registry and cancellation
+lifelines; `tools/verify` retains single-use Gradle. Do not enable daemon reuse
+outside the host launcher. Routine app test runs default to
 `-Ptvhplayer.captureTests=exclude` (two test forks, no motion capture PNGs).
 Pass `-Ptvhplayer.captureTests=all` for behavior plus visual captures, or `only`
 for marked visual scenarios alone; `tools/verify --visual-captures` selects `all`.
-The slice currently has a 12 GiB ceiling. After an SDK or dependency change,
+The slice has a 16 GiB ceiling and a six-CPU aggregate quota. The host broker admits
+one exclusive heavy build or two measured light builds capped at 8 GiB each;
+ordinary test invocations default to heavy. Do not label rebuilds or runs with
+more than two Gradle workers as light. After an SDK or dependency change,
 run compile, app tests and lint as separate
 invocations, or pass `-Ptvhplayer.testForks=1`; one combined rebuild-plus-tests run
 was OOM-killed under the earlier 8 GiB limit. Never run `./gradlew --stop` or kill a
