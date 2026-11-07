@@ -759,4 +759,6 @@
     <string name="appliance_companion_description">O aplicație însoțitoare opțională face ca Tvheadend Player să funcționeze ca aplicația de tuner integrată în televizor. Deschide playerul când pornește televizorul, poate prelua butoane ale telecomenzii, precum TV și Guide, și poate înlocui ecranul de pornire. Este o aplicație separată, disponibilă în versiunile proiectului de pe GitHub, de unde se actualizează singură.</string>
     <string name="appliance_companion_install_info">Pentru configurare, scanează codul sau deschide github.com/bernhardberger/tvheadend-player pe un telefon ori computer, apoi urmează pașii din secțiunea „Appliance companion”.</string>
     <string name="appliance_companion_qr_description">Cod QR pentru pașii de configurare a aplicației însoțitoare pentru modul aparat TV</string>
+    <string name="whats_new">Noutăți</string>
+    <string name="whats_new_badge">Nou</string>
 </resources>

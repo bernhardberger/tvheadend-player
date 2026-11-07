@@ -727,4 +727,6 @@
     <string name="appliance_companion_description">선택 사항인 보조 앱을 사용하면 Tvheadend Player가 TV에 내장된 튜너 앱처럼 작동합니다. TV를 켜면 플레이어를 열고, TV 및 Guide 같은 리모컨 버튼을 대신 처리하며 홈 화면을 대체할 수 있습니다. 프로젝트의 GitHub 릴리스에서 제공하는 별도 앱이며, 해당 릴리스에서 자동으로 업데이트됩니다.</string>
     <string name="appliance_companion_install_info">설정하려면 코드를 스캔하거나 휴대전화 또는 컴퓨터에서 github.com/bernhardberger/tvheadend-player를 연 다음 ‘Appliance companion’ 섹션의 단계를 따라 주세요.</string>
     <string name="appliance_companion_qr_description">전용 기기 모드 보조 앱 설정 단계를 여는 QR 코드</string>
+    <string name="whats_new">새로운 기능</string>
+    <string name="whats_new_badge">새 소식</string>
 </resources>

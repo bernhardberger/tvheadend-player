@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.ui.screens.settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -42,6 +43,8 @@ internal fun settingsAboutLevels(
     sessionState: SessionState,
     companionInstalled: Boolean = false,
     machineTranslated: Boolean = booleanResource(R.bool.language_machine_translated),
+    whatsNewUnseen: Boolean = false,
+    onWhatsNewOpened: () -> Unit = {},
 ): List<DepthLevel> {
     val credits = stringArrayResource(R.array.about_translator_credits).filter { it.isNotBlank() }
     // The reader is a dialog over Settings; the rows stay list items with the details page's read-more arrow.
@@ -50,10 +53,14 @@ internal fun settingsAboutLevels(
     val license = stringResource(R.string.about_license)
     val notices = stringResource(R.string.about_notices)
     val privacy = stringResource(R.string.about_privacy)
+    val whatsNew = stringResource(R.string.whats_new)
     val rows = listOf(
         settingsRow("version", stringResource(R.string.about_version), stringResource(
             R.string.about_version_value, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE,
             stringResource(if (companionInstalled) R.string.about_build_appliance else R.string.about_build_play))),
+        settingsRow("whats-new", whatsNew, titleMaxLines = 3, trailingIcon = R.drawable.ic_arrow_forward,
+            newMarker = whatsNewUnseen,
+            onClick = { reading = whatsNew to "CHANGELOG.md"; onWhatsNewOpened() }),
         settingsRow("server", stringResource(R.string.about_server), aboutServerText(sessionState)),
         settingsRow("license", license, titleMaxLines = 3, trailingIcon = R.drawable.ic_arrow_forward,
             onClick = { reading = license to "LICENSE" }),
@@ -88,12 +95,38 @@ private fun aboutServerText(state: SessionState): String {
 @Composable
 private fun AboutReadingDialog(title: String, asset: String, onDismiss: () -> Unit) {
     val context = LocalContext.current
-    val text = remember(asset) {
-        val source = context.assets.open("licenses/$asset").bufferedReader().use { it.readText() }
-        if (asset.endsWith(".md")) aboutNoticeText(source) else source
+    val source = remember(asset) {
+        context.assets.open("licenses/$asset").bufferedReader().use { it.readText() }
     }
+    val blocks = remember(asset, source) { if (asset == "CHANGELOG.md") changelogBlocks(source) else null }
     SettingsReadingDialog(title, onDismiss) {
-        Text(text, style = MaterialTheme.typography.bodyLarge)
+        if (blocks == null) {
+            val text = remember(asset, source) { if (asset.endsWith(".md")) aboutNoticeText(source) else source }
+            Text(text, style = MaterialTheme.typography.bodyLarge)
+        }
+        else Column {
+            blocks.forEachIndexed { index, block ->
+                val isVersion = block.kind == ChangelogBlockKind.VERSION_HEADING
+                val isHeading = isVersion || block.kind == ChangelogBlockKind.GROUP_HEADING
+                Text(block.text,
+                    style = when (block.kind) {
+                        ChangelogBlockKind.VERSION_HEADING -> MaterialTheme.typography.titleLarge
+                        ChangelogBlockKind.GROUP_HEADING -> MaterialTheme.typography.titleMedium
+                        else -> MaterialTheme.typography.bodyLarge
+                    },
+                    color = if (block.kind == ChangelogBlockKind.GROUP_HEADING) MaterialTheme.colorScheme.onSurfaceVariant
+                        else MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(top = when {
+                        index == 0 -> 0.dp
+                        isVersion -> 32.dp
+                        blocks[index - 1].kind == ChangelogBlockKind.VERSION_HEADING -> 12.dp
+                        blocks[index - 1].kind == ChangelogBlockKind.GROUP_HEADING -> 8.dp
+                        isHeading -> 20.dp
+                        else -> 8.dp
+                    }).semantics { if (isHeading) heading() },
+                )
+            }
+        }
     }
 }
 

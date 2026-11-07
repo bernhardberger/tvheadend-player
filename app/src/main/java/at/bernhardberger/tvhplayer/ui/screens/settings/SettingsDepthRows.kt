@@ -2,12 +2,19 @@ package at.bernhardberger.tvhplayer.ui.screens.settings
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.AnnotatedString
@@ -79,10 +86,13 @@ internal fun settingsRow(
     announcement: String? = null,
     busy: Boolean = false,
     trailingIcon: Int? = null,
+    newMarker: Boolean = false,
     // Long localized titles wrap to a second line before they ellipsize.
     titleMaxLines: Int = 2,
     onClick: () -> Unit = {},
 ) = DepthRow(DepthItem(id, child), { if (enabled) onClick() }) { modifier, activate ->
+    val newLabel = stringResource(R.string.whats_new_badge)
+    var rowFocused by remember { mutableStateOf(false) }
     Column {
         if (section != null) {
             // Group subheader: the design kit's "List / Subheader" type (12sp medium,
@@ -115,8 +125,19 @@ internal fun settingsRow(
                 selected != null -> ({ RadioButton(selected = selected, onClick = null,
                     colors = RadioButtonDefaults.colors(selectedColor = LocalContentColor.current,
                         unselectedColor = LocalContentColor.current)) })
-                trailingIcon != null -> ({ Icon(painterResource(trailingIcon), null, Modifier.size(24.dp)) })
-                child != null -> ({ Icon(painterResource(R.drawable.ic_keyboard_arrow_right), null, Modifier.size(24.dp)) })
+                newMarker || trailingIcon != null || child != null -> ({
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        if (newMarker) Box(Modifier.clearAndSetSemantics {}) {
+                            NavigationDrawerItemDefaults.TrailingBadge(
+                                text = newLabel,
+                                containerColor = if (rowFocused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = if (rowFocused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onPrimaryContainer,
+                            )
+                        }
+                        val arrow = trailingIcon ?: if (child != null) R.drawable.ic_keyboard_arrow_right else null
+                        if (arrow != null) Icon(painterResource(arrow), null, Modifier.size(24.dp))
+                    }
+                })
                 else -> null
             },
             colors = ListItemDefaults.colors(
@@ -128,9 +149,12 @@ internal fun settingsRow(
                 focusedSelectedContainerColor = MaterialTheme.colorScheme.inverseSurface,
                 focusedSelectedContentColor = MaterialTheme.colorScheme.inverseOnSurface,
             ),
-            modifier = modifier.testTag("settings-row-$id").fillMaxWidth().padding(bottom = TvSpacing4)
+            modifier = modifier.onFocusChanged { rowFocused = it.isFocused }
+                .testTag("settings-row-$id").fillMaxWidth().padding(bottom = TvSpacing4)
                 .heightIn(min = if (supporting == null) 48.dp else SettingsDepthRowMinHeight).semantics {
                 if (!enabled) disabled()
+                // newMarker assumes a row without supporting text; this description replaces child text.
+                if (newMarker) contentDescription = "$title, $newLabel"
                 if (checked != null) { role = Role.Switch; toggleableState = ToggleableState(checked) }
                 if (selected != null) role = Role.RadioButton
                 if (announcement != null) {

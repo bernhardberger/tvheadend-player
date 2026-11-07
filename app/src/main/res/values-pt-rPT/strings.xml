@@ -700,4 +700,6 @@
     <string name="appliance_companion_description">Uma aplicação complementar opcional faz o Tvheadend Player funcionar como a aplicação de sintonizador integrada na TV. Abre o leitor quando a TV é ligada, pode assumir botões do comando, como TV e Guide, e substituir o ecrã inicial. É uma aplicação separada, disponível nas versões do projeto no GitHub, a partir das quais se atualiza.</string>
     <string name="appliance_companion_install_info">Para configurar, lê o código ou abre github.com/bernhardberger/tvheadend-player num telemóvel ou computador e segue os passos da secção «Appliance companion».</string>
     <string name="appliance_companion_qr_description">Código QR para os passos de configuração da aplicação complementar do modo TV</string>
+    <string name="whats_new">Novidades</string>
+    <string name="whats_new_badge">Novo</string>
 </resources>

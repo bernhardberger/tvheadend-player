@@ -9,6 +9,36 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class UiSettingsTest {
+    @Test fun storedWhatsNewMarkerIsHiddenUntilLoadedAndForCurrentOrNewerVersions() {
+        assertFalse(hasUnseenWhatsNew(null, 10))
+        assertTrue(hasUnseenWhatsNew(9, 10))
+        assertFalse(hasUnseenWhatsNew(10, 10))
+        assertFalse(hasUnseenWhatsNew(11, 10))
+    }
+
+    @Test fun whatsNewPolicyDistinguishesFreshInstallUpdateAndSeenVersions() {
+        assertFalse(whatsNewUnseen(null, 10, 100, 100))
+        assertTrue(whatsNewUnseen(null, 10, 100, 200))
+        assertTrue(whatsNewUnseen(9, 10, 100, 200))
+        assertFalse(whatsNewUnseen(10, 10, 100, 200))
+        assertFalse(whatsNewUnseen(11, 10, 100, 200))
+    }
+
+    @Test fun whatsNewInitializationAndOpeningPersistAppWide() = kotlinx.coroutines.test.runTest {
+        val fresh = UiSettingsStore(InMemoryPreferencesDataStore())
+        fresh.initializeWhatsNew(10, 100, 100)
+        assertEquals(10, fresh.settings.first().whatsNewSeenVersion)
+        val data = InMemoryPreferencesDataStore()
+        val updated = UiSettingsStore(data)
+        updated.initializeWhatsNew(10, 100, 200)
+        assertEquals(0, updated.settings.first().whatsNewSeenVersion)
+        updated.markWhatsNewSeen(10)
+        val recreated = UiSettingsStore(data)
+        recreated.initializeWhatsNew(11, 100, 300)
+        assertEquals(10, recreated.settings.first().whatsNewSeenVersion)
+        assertTrue(whatsNewUnseen(recreated.settings.first().whatsNewSeenVersion, 11, 100, 300))
+    }
+
     @Test fun homeSectionsDefaultVisibleAndPersistIndependently() = kotlinx.coroutines.test.runTest {
         val data = InMemoryPreferencesDataStore()
         val store = UiSettingsStore(data)

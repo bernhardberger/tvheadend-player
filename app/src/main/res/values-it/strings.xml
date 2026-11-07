@@ -759,4 +759,6 @@
     <string name="appliance_companion_description">Un\'app complementare facoltativa permette a Tvheadend Player di funzionare come l\'app del sintonizzatore integrato nel televisore. Apre il lettore all\'accensione del televisore, può gestire i tasti del telecomando come TV e Guide e sostituire la schermata iniziale. È un\'app separata disponibile nelle release GitHub del progetto e si aggiorna da lì.</string>
     <string name="appliance_companion_install_info">Per configurarla, scansiona il codice o apri github.com/bernhardberger/tvheadend-player su un telefono o un computer, poi segui i passaggi nella sezione «Appliance companion».</string>
     <string name="appliance_companion_qr_description">Codice QR per i passaggi di configurazione dell\'app complementare per la modalità TV</string>
+    <string name="whats_new">Novità</string>
+    <string name="whats_new_badge">Nuovo</string>
 </resources>

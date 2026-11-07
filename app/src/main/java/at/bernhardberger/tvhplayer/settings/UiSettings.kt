@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import at.bernhardberger.tvheadend.sdk.core.DvrConfigId
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -19,6 +20,7 @@ data class UiSettings(
     val guideView: GuideView = GuideView(),
     val showChannelNumbers: Boolean = true,
     val hiddenHomeSections: Set<HomeSectionKind> = emptySet(),
+    val whatsNewSeenVersion: Int? = null,
 )
 
 fun resolvePlaybackAutoStart(storedValue: Boolean?): Boolean = storedValue ?: false
@@ -27,6 +29,7 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
     constructor(context: Context) : this(context.dataStore)
     private object Keys {
         val AUTO_START_PLAYBACK = booleanPreferencesKey("autoStartPlayback")
+        val WHATS_NEW_SEEN_VERSION = intPreferencesKey("whatsNewSeenVersion")
         val CLOCK_FORMAT = stringPreferencesKey("clockFormat")
         val SHOW_CHANNEL_NUMBERS = booleanPreferencesKey("showChannelNumbers")
         val RECORDING_PROFILE = stringPreferencesKey("recordingProfile")
@@ -42,6 +45,7 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
 
     val settings: Flow<UiSettings> = dataStore.data.map { preferences ->
         UiSettings(
+            whatsNewSeenVersion = preferences[Keys.WHATS_NEW_SEEN_VERSION],
             autoStartPlayback = resolvePlaybackAutoStart(preferences[Keys.AUTO_START_PLAYBACK]),
             clockFormat = resolveClockFormat(preferences[Keys.CLOCK_FORMAT]),
             showChannelNumbers = preferences[Keys.SHOW_CHANNEL_NUMBERS] ?: true,
@@ -62,6 +66,19 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
         dataStore.edit { preferences ->
             preferences[Keys.CLOCK_FORMAT] = format.name
         }
+    }
+
+    suspend fun initializeWhatsNew(currentVersion: Int, firstInstallTime: Long, lastUpdateTime: Long) {
+        dataStore.edit { preferences ->
+            if (preferences[Keys.WHATS_NEW_SEEN_VERSION] == null) {
+                preferences[Keys.WHATS_NEW_SEEN_VERSION] =
+                    if (whatsNewUnseen(null, currentVersion, firstInstallTime, lastUpdateTime)) 0 else currentVersion
+            }
+        }
+    }
+
+    suspend fun markWhatsNewSeen(currentVersion: Int) {
+        dataStore.edit { it[Keys.WHATS_NEW_SEEN_VERSION] = currentVersion }
     }
 
     suspend fun setShowChannelNumbers(show: Boolean) {

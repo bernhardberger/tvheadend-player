@@ -759,4 +759,6 @@
     <string name="appliance_companion_description">יישום נלווה אופציונלי מאפשר ל־Tvheadend Player לפעול כמו יישום מקלט הטלוויזיה המובנה. הוא פותח את הנגן כשהטלוויזיה נדלקת, יכול להשתלט על לחצני שלט כמו TV ו־Guide ולהחליף את מסך הבית. זהו יישום נפרד הזמין במהדורות הפרויקט ב־GitHub ומתעדכן משם בעצמו.</string>
     <string name="appliance_companion_install_info">להגדרה, יש לסרוק את הקוד או לפתוח את github.com/bernhardberger/tvheadend-player בטלפון או במחשב, ואז לפעול לפי השלבים בסעיף ״Appliance companion״.</string>
     <string name="appliance_companion_qr_description">קוד QR לשלבי הגדרת היישום הנלווה למצב מכשיר ייעודי</string>
+    <string name="whats_new">מה חדש</string>
+    <string name="whats_new_badge">חדש</string>
 </resources>

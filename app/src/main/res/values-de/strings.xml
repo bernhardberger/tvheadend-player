@@ -759,4 +759,6 @@
     <string name="skip_landing_end">Am Ende</string>
     <string name="skip_landing_two_seconds">2 s vor dem Ende</string>
     <string name="skip_landing_five_seconds">5 s vor dem Ende</string>
+    <string name="whats_new">Was ist neu?</string>
+    <string name="whats_new_badge">Neu</string>
 </resources>

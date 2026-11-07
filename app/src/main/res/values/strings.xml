@@ -932,4 +932,6 @@
     <string name="appliance_companion_install_info">To set it up, scan the code or open github.com/bernhardberger/tvheadend-player on a phone or computer, then follow the steps under Appliance companion.</string>
     <string name="appliance_companion_address" translatable="false">github.com/bernhardberger/tvheadend-player</string>
     <string name="appliance_companion_qr_description">QR code for the appliance companion setup steps</string>
+    <string name="whats_new">What\'s new</string>
+    <string name="whats_new_badge">New</string>
 </resources>

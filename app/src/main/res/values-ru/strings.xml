@@ -776,4 +776,6 @@
     <string name="appliance_companion_description">Необязательное приложение-компаньон позволяет Tvheadend Player работать как встроенное приложение ТВ-тюнера. Оно открывает плеер при включении телевизора, может перехватывать кнопки пульта, например TV и Guide, и заменять главный экран. Это отдельное приложение из выпусков проекта на GitHub, откуда оно самостоятельно обновляется.</string>
     <string name="appliance_companion_install_info">Для настройки отсканируйте код или откройте github.com/bernhardberger/tvheadend-player на телефоне или компьютере и следуйте шагам в разделе «Appliance companion».</string>
     <string name="appliance_companion_qr_description">QR-код с инструкциями по настройке приложения-компаньона для режима ТВ-приставки</string>
+    <string name="whats_new">Что нового</string>
+    <string name="whats_new_badge">Новое</string>
 </resources>

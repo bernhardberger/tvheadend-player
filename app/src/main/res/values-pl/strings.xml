@@ -775,4 +775,6 @@
     <string name="appliance_companion_description">Opcjonalna aplikacja towarzysząca sprawia, że Tvheadend Player działa jak wbudowana aplikacja tunera telewizora. Otwiera odtwarzacz po włączeniu telewizora, może przejąć przyciski pilota, takie jak TV i Guide, oraz zastąpić ekran główny. Jest to osobna aplikacja dostępna w wydaniach projektu w serwisie GitHub, skąd samodzielnie się aktualizuje.</string>
     <string name="appliance_companion_install_info">Aby ją skonfigurować, zeskanuj kod lub otwórz github.com/bernhardberger/tvheadend-player na telefonie lub komputerze, a następnie wykonaj kroki z sekcji „Appliance companion”.</string>
     <string name="appliance_companion_qr_description">Kod QR prowadzący do instrukcji konfiguracji aplikacji towarzyszącej trybu TV</string>
+    <string name="whats_new">Co nowego</string>
+    <string name="whats_new_badge">Nowe</string>
 </resources>

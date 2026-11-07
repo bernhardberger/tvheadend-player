@@ -15,6 +15,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.ui.platform.LocalContext
 import at.bernhardberger.tvhplayer.settings.UiSettings
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
+import at.bernhardberger.tvhplayer.settings.hasUnseenWhatsNew
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import androidx.compose.ui.Modifier
@@ -64,19 +65,22 @@ internal fun SettingsScreen(
     val profiles = observation.currentDvrConfigurations()
     val settings by settingsStore.settings.collectAsStateWithLifecycle(initialValue = UiSettings())
     val scope = rememberCoroutineScope()
+    val whatsNewUnseen = hasUnseenWhatsNew(settings.whatsNewSeenVersion, BuildConfig.VERSION_CODE)
     val recordingLevels = settingsRecordingLevels(profiles, settings.recordingProfileId,
         recordingSpaceText(observation.dvrDiskSpaceState)) { id ->
         scope.launch { settingsStore.setRecordingProfile(id); navigation.pop() }
     }
     val levels = settingsGeneralLevels(navigation) + settingsConnectionLevels(connectionPresentation, onRetry, onSetUp = { setupOpen = true }) + settingsPlayerLevels(navigation) + listOf(
-        settingsRootLevel(recordingLevels.isNotEmpty(), connectionOverviewStatus(connectionPresentation).title),
+        settingsRootLevel(recordingLevels.isNotEmpty(), connectionOverviewStatus(connectionPresentation).title, whatsNewUnseen),
         settingsKeepChannelLevel(navigation),
         settingsWarmPlaybackLevel(navigation),
         settingsStreamProfileLevel(navigation),
         settingsFrameRateLevel(navigation),
         settingsStartupBufferLevel(navigation),
         settingsChannelTagsLevel(channelsVm),
-    ) + recordingLevels + settingsAboutLevels(observation.sessionState, companionInstalled) +
+    ) + recordingLevels + settingsAboutLevels(observation.sessionState, companionInstalled,
+        whatsNewUnseen = whatsNewUnseen,
+        onWhatsNewOpened = { scope.launch { settingsStore.markWhatsNewSeen(BuildConfig.VERSION_CODE) } }) +
         listOf(settingsApplianceLevel(companionInstalled))
     SettingsScreenNavigation(navigation, levels, initialFocusEnabled, contentPadding, backEnabled, isCurrent,
         setup = if (setupOpen) {
@@ -90,6 +94,7 @@ internal fun SettingsScreen(
 internal fun settingsRootLevel(
     showRecordings: Boolean = false,
     connectionStatus: String? = null,
+    whatsNewUnseen: Boolean = false,
 ): DepthLevel = settingsLevel(SETTINGS_ROOT, stringResource(R.string.nav_settings), buildList {
     add(settingsRow(SettingsSection.GENERAL.name, stringResource(R.string.settings_general), child = SettingsSection.GENERAL.name, icon = R.drawable.ic_tune))
     add(settingsRow(SettingsSection.CONNECTION.name, stringResource(R.string.settings_connection_nav), connectionStatus,
@@ -100,7 +105,8 @@ internal fun settingsRootLevel(
     if (showRecordings) add(settingsRow(RECORDINGS_LEVEL, stringResource(R.string.nav_recordings), child = RECORDINGS_LEVEL,
         icon = R.drawable.ic_fiber_manual_record))
     add(settingsRow(SettingsSection.APPLIANCE.name, stringResource(R.string.settings_appliance), child = SettingsSection.APPLIANCE.name, icon = R.drawable.ic_home))
-    add(settingsRow(ABOUT_LEVEL, stringResource(R.string.settings_about), child = ABOUT_LEVEL, icon = R.drawable.ic_info))
+    add(settingsRow(ABOUT_LEVEL, stringResource(R.string.settings_about), child = ABOUT_LEVEL, icon = R.drawable.ic_info,
+        newMarker = whatsNewUnseen))
 })
 
 @Composable
