@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.core
 
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrConfigId
 import at.bernhardberger.tvheadend.sdk.core.DvrConfiguration
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
@@ -44,6 +45,10 @@ data class DvrArchiveFolder(
     val path: List<String>,
     val folders: List<DvrArchiveFolder>,
     val recordings: List<DvrEntry>,
+    /** A channel group's channel, for its logo; null for every other folder. */
+    val channelId: ChannelId? = null,
+    /** Whether a root lists its running recordings in a Recording now row; a flat list keeps them in the list. */
+    val offersRecordingNow: Boolean = true,
 ) {
     val newestRecordingStart: Long?
         get() = (recordings.mapNotNull { it.start?.epochSeconds } +

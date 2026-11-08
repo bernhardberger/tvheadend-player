@@ -41,6 +41,7 @@ import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
+import at.bernhardberger.tvhplayer.core.DvrArchiveGrouping
 import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.common.formatFileSize
@@ -57,6 +58,8 @@ import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.junit.experimental.categories.Category
+import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -87,6 +90,9 @@ class RecordingsVisualLayoutTest {
     private val screenShown = mutableStateOf(true)
     private val endPaddingState = mutableStateOf<Dp?>(null)
     private val connectionState = mutableStateOf<ConnectionUiState>(ConnectionUiState.Ready)
+    private var startGrouping = DvrArchiveGrouping.FOLDERS
+    private var nowSeconds: () -> Long = { System.currentTimeMillis() / 1000L }
+    private val groupingChanges = mutableListOf<DvrArchiveGrouping>()
 
     @Before fun prepare() {
         oldLocale = Locale.getDefault()
@@ -169,11 +175,14 @@ class RecordingsVisualLayoutTest {
     /** Eight recordings of the README evening's channels, with their logos, focused on the Documentaries folder. */
     private fun presentationLibrary(store: Boolean = false) {
         assertTrue(android.os.SystemClock.setCurrentTimeMillis(1_791_144_900_000L))
+        nowSeconds = { 1_791_144_900L }
         val evening = 1_791_057_600L
         // The channels as Channels and the player number them; each logo is the channel's fixture picon.
         val picons = listOf("ridge-earth", "harbor-sport", "northline-news", "kite-kids", "ion-frame", "amber-stage", "harbor-lights")
         val channels = listOf("Ridge Earth", "Harbor Sport", "Northline News", "Kite Kids", "Ion Frame", "Amber Stage", "Harbor Lights")
             .mapIndexed { index, name -> Channel.create(ChannelId(index + 1L), name = name, number = index + 1L, icon = ChannelIcon.ImageCache(ArtworkId(index + 1))) }
+        val genres = mapOf(1L to 0x90L, 2L to 0x90L, 3L to 0x90L, 4L to 0x40L, 5L to 0x40L, 6L to 0x10L, 7L to 0x60L,
+            8L to 0x50L, 9L to 0x40L)
         fun recording(id: Long, title: String, channel: Int, folder: String?, start: Long, minutes: Long,
             art: String?, synopsis: String, position: Long? = null, plays: Long? = null,
             state: DvrEntryState = DvrEntryState.COMPLETED) = DvrEntry.create(
@@ -183,7 +192,8 @@ class RecordingsVisualLayoutTest {
                 stop = Instant.fromEpochSeconds(start + minutes * 60), sizeBytes = minutes * 40_000_000L)),
             channelId = ChannelId(channel.toLong()), channelName = channels[channel - 1].name,
             image = art?.let { ArtworkId(100 + id.toInt()) }, description = synopsis,
-            subtitle = "Winter on the ridge".takeIf { id == 1L }, playPosition = position?.seconds, playCount = plays)
+            subtitle = "Winter on the ridge".takeIf { id == 1L }, playPosition = position?.seconds, playCount = plays,
+            contentGenre = ContentGenre.fromContentType(genres.getValue(id)))
         val library = listOf(
             recording(1, "Ridge Light", 1, "Documentaries", evening, 60, "ridge-light",
                 "Seasonal mountain light, forests and weather moving over a ridge.", position = 1223),
@@ -260,9 +270,9 @@ class RecordingsVisualLayoutTest {
         assertEquals(130f, bounds("recordings-header").left, .1f)
         assertEquals(902f, bounds("recordings-header").right, .1f)
         focused("recordings-folder-Documentaries")
-        key(Key.DirectionUp)
+        upToTabs()
         compose.onNodeWithText("Archive").assertIsFocused()
-        key(Key.DirectionDown)
+        downToList()
         focused("recordings-folder-Documentaries")
         assertNoCommands()
     }
@@ -396,16 +406,144 @@ class RecordingsVisualLayoutTest {
         focused("recordings-folder-Documentaries")
     }
 
+    @Test fun theGroupingPillIsOneStopBetweenTheTabsAndTheArchiveRootButNotInsideAFolder() {
+        show()
+        focused("recordings-folder-Documentaries")
+        key(Key.DirectionUp)
+        focused(GROUPING_PILL)
+        key(Key.DirectionUp)
+        compose.onNodeWithText("Archive").assertIsFocused()
+        key(Key.DirectionDown)
+        focused(GROUPING_PILL)
+        key(Key.DirectionDown)
+        focused("recordings-folder-Documentaries")
+        // Inside a folder there is no pill, and the way up to the tabs is as it was.
+        key(Key.DirectionRight)
+        compose.onNodeWithTag(GROUPING_PILL).assertDoesNotExist()
+        key(Key.DirectionUp)
+        compose.onNodeWithText("Archive").assertIsFocused()
+        assertNoCommands()
+    }
+
+    @Test fun theGroupingChoiceRegroupsOnOkAndBackLeavesItBeing() {
+        show()
+        focused("recordings-folder-Documentaries")
+        key(Key.DirectionUp)
+        key(Key.DirectionCenter)
+        // The current grouping is where the choice opens.
+        focused("recordings-grouping-option-folders")
+        key(Key.Back)
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("recordings-grouping-choice").fetchSemanticsNodes().isEmpty() }
+        focused(GROUPING_PILL)
+        compose.runOnIdle { assertTrue(groupingChanges.isEmpty()) }
+        compose.onNodeWithTag("recordings-folder-Documentaries").assertExists()
+
+        key(Key.DirectionCenter)
+        focused("recordings-grouping-option-folders")
+        key(Key.DirectionDown)
+        focused("recordings-grouping-option-channels")
+        key(Key.DirectionCenter)
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("recordings-grouping-choice").fetchSemanticsNodes().isEmpty() }
+        focused(GROUPING_PILL)
+        compose.runOnIdle { assertEquals(listOf(DvrArchiveGrouping.CHANNELS), groupingChanges) }
+        compose.onNodeWithTag("recordings-folder-Documentaries").assertDoesNotExist()
+        key(Key.DirectionDown)
+        focused("recordings-folder-Ridge Earth HD")
+        assertNoCommands()
+    }
+
+    @Test fun withoutGroupingTheRecordingsAreOneListWhoseDateDividersTakeNoFocus() {
+        startGrouping = DvrArchiveGrouping.NONE
+        show(entries = (1L..5L).map { recording(it, "Recording $it", "recording$it.ts") } +
+            recording(6, "Running now", "running.ts", DvrEntryState.RECORDING, startEpochSeconds = 1_791_100_000))
+        // The running recording is the newest row of the list, not a row of its own above it.
+        compose.onNodeWithTag("recordings-recording-now-folder").assertDoesNotExist()
+        focused("recording-list-entry-6")
+        compose.onAllNodesWithTag("archive-date-divider", useUnmergedTree = true).fetchSemanticsNodes().let {
+            assertTrue("A day opens with its label", it.isNotEmpty())
+        }
+        key(Key.DirectionDown)
+        focused("recording-list-entry-1")
+        key(Key.DirectionUp)
+        focused("recording-list-entry-6")
+        // The first row's Up stop is the pill, as at every root; Down returns to the first recording.
+        key(Key.DirectionUp)
+        focused(GROUPING_PILL)
+        key(Key.DirectionDown)
+        focused("recording-list-entry-6")
+        upToTabs()
+        compose.onNodeWithText("Archive").assertIsFocused()
+        downToList()
+        focused("recording-list-entry-6")
+        assertNoCommands()
+    }
+
+    /** The six frames for the owner's check of the grouping trial: the same library in each arrangement. */
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun groupingFrames() {
+        val out = "build/outputs/recordings-grouping-captures"
+        presentationLibrary()
+        compose.mainClock.advanceTimeBy(1_500)
+        fun toPill() {
+            repeat(8) {
+                if (compose.onAllNodes(hasTestTag(GROUPING_PILL) and isFocused()).fetchSemanticsNodes().isEmpty()) {
+                    key(Key.DirectionUp)
+                }
+            }
+            focused(GROUPING_PILL)
+        }
+        var current = "folders"
+        fun choose(option: String) {
+            key(Key.DirectionCenter)
+            focused("recordings-grouping-option-$current")
+            val names = DvrArchiveGrouping.entries.map { it.name.lowercase() }
+            repeat(names.indexOf(option) - names.indexOf(current)) { key(Key.DirectionDown) }
+            focused("recordings-grouping-option-$option")
+            key(Key.DirectionCenter)
+            compose.waitUntil(10_000) { compose.onAllNodesWithTag("recordings-grouping-choice").fetchSemanticsNodes().isEmpty() }
+            focused(GROUPING_PILL)
+            current = option
+        }
+        toPill()
+        compose.mainClock.advanceTimeBy(1_500)
+        capture("1-pill-focused", 1f, outputs = out)
+        key(Key.DirectionCenter)
+        focused("recordings-grouping-option-folders")
+        compose.mainClock.advanceTimeBy(1_500)
+        capture("2-choice-open", 1f, outputs = out)
+        key(Key.Back)
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("recordings-grouping-choice").fetchSemanticsNodes().isEmpty() }
+        choose("channels")
+        repeat(2) { key(Key.DirectionDown) }
+        compose.mainClock.advanceTimeBy(1_500)
+        capture("3-channels-root", 1f, outputs = out)
+        key(Key.DirectionRight)
+        compose.mainClock.advanceTimeBy(1_500)
+        capture("4-channel-entered", 1f, outputs = out)
+        key(Key.Back)
+        toPill()
+        choose("genres")
+        repeat(2) { key(Key.DirectionDown) }
+        compose.mainClock.advanceTimeBy(1_500)
+        capture("5-genres-root", 1f, outputs = out)
+        toPill()
+        choose("none")
+        key(Key.DirectionDown)
+        compose.mainClock.advanceTimeBy(1_500)
+        capture("6-none-flat-list", 1f, outputs = out)
+    }
+
     @Test fun upFromEachTabsFirstItemReachesThatTabAndDownReturnsToTheList() {
         show(diskSpace = DvrDiskSpaceState.Current(DvrDiskSpace(412_000_000_000L, 1_588_000_000_000L, 2_000_000_000_000L)))
         focused("recordings-folder-Documentaries")
         capture("header-archive", 1f)
-        key(Key.DirectionUp)
+        upToTabs()
         compose.onNodeWithText("Archive").assertIsFocused()
         capture("header-archive-tab-focused", 1f)
-        key(Key.DirectionDown)
+        downToList()
         focused("recordings-folder-Documentaries")
-        key(Key.DirectionUp)
+        upToTabs()
         listOf("Schedule" to 20, "Problems" to 21).forEach { (tab, first) ->
             key(Key.DirectionRight)
             compose.onNodeWithText(tab).assertIsFocused()
@@ -535,7 +673,7 @@ class RecordingsVisualLayoutTest {
         show()
         focused("recordings-folder-Documentaries")
         val archiveRow = bounds("recordings-folder-Documentaries")
-        key(Key.DirectionUp)
+        upToTabs()
         compose.onNodeWithText("Archive").assertIsFocused()
         key(Key.DirectionRight)
         compose.onNodeWithText("Schedule").assertIsFocused()
@@ -626,7 +764,7 @@ class RecordingsVisualLayoutTest {
         focused("recordings-folder-Documentaries")
         val archiveRow = bounds("recordings-folder-Documentaries")
         assertEquals(860f, bounds("recordings-header").right, .1f)
-        key(Key.DirectionUp)
+        upToTabs()
         key(Key.DirectionRight)
         key(Key.DirectionDown)
         focused("recording-list-entry-20")
@@ -647,7 +785,7 @@ class RecordingsVisualLayoutTest {
     @Test fun schedulePaneGivesThePaddedStopAndRuleAndProblemsPaneWhatWentWrong() {
         show(entries = paneEntries(long = false))
         focused("recordings-folder-Sport")
-        key(Key.DirectionUp)
+        upToTabs()
         key(Key.DirectionRight)
         key(Key.DirectionDown)
         focused("recording-list-entry-40")
@@ -694,7 +832,7 @@ class RecordingsVisualLayoutTest {
         Locale.setDefault(Locale.GERMANY)
         show(scale = 1.3f, entries = paneEntries(long = true))
         focused("recordings-folder-Sport")
-        key(Key.DirectionUp)
+        upToTabs()
         key(Key.DirectionRight)
         key(Key.DirectionDown)
         focused("recording-list-entry-40")
@@ -715,7 +853,7 @@ class RecordingsVisualLayoutTest {
     @Test fun emptyScheduleAndProblemsKeepTheirMessageWithoutAPane() {
         show(entries = listOf(recording(1, "Kept match", "Sport/kept.ts")))
         focused("recordings-folder-Sport")
-        key(Key.DirectionUp)
+        upToTabs()
         key(Key.DirectionRight)
         compose.onNodeWithText("Schedule").assertIsFocused()
         compose.onNodeWithText("Nothing is recording or scheduled.").assertIsDisplayed()
@@ -807,7 +945,7 @@ class RecordingsVisualLayoutTest {
             recording(30, "Missed match", null, DvrEntryState.MISSED),
             recording(31, "Broken match", null, DvrEntryState.COMPLETED_ERROR)))
         focused("recordings-folder-Sport")
-        key(Key.DirectionUp)
+        upToTabs()
         key(Key.DirectionRight)
         key(Key.DirectionRight)
         compose.onNodeWithText("Problems").assertIsFocused()
@@ -905,7 +1043,7 @@ class RecordingsVisualLayoutTest {
                 channelName = "Ridge Earth HD"),
         ))
         compose.waitUntil(10_000) { compose.onAllNodes(isFocused()).fetchSemanticsNodes().isNotEmpty() }
-        key(Key.DirectionUp)
+        upToTabs()
         key(Key.DirectionRight)
         compose.onNodeWithText("Schedule").assertIsFocused()
         key(Key.DirectionDown)
@@ -1060,7 +1198,7 @@ class RecordingsVisualLayoutTest {
         focused("recordings-folder-Documentaries")
         key(Key.Back)
         compose.onNodeWithText("Archive").assertIsFocused()
-        key(Key.DirectionDown)
+        downToList()
         focused("recordings-folder-Documentaries")
         key(Key.DirectionLeft)
         compose.onNodeWithTag("nav-recordings").assertIsFocused()
@@ -1154,7 +1292,7 @@ class RecordingsVisualLayoutTest {
         compose.onNodeWithTag("details-play").assertDoesNotExist()
         compose.onNodeWithTag("details-delete").assertDoesNotExist()
         focused("recording-list-entry-3")
-        repeat(2) { key(Key.DirectionUp) }
+        repeat(3) { key(Key.DirectionUp) }
         key(Key.DirectionRight)
         key(Key.DirectionRight)
         compose.onNodeWithText("Problems").assertIsFocused()
@@ -1272,9 +1410,9 @@ class RecordingsVisualLayoutTest {
         ))
         focused("recordings-recording-now-folder")
         compose.onNodeWithText("2 recordings in progress").assertIsDisplayed()
-        key(Key.DirectionUp)
+        upToTabs()
         compose.onNodeWithText("Archive").assertIsFocused()
-        key(Key.DirectionDown)
+        downToList()
         focused("recordings-recording-now-folder")
         capture("recording-now-root", 1f)
         key(Key.DirectionCenter)
@@ -1366,7 +1504,7 @@ class RecordingsVisualLayoutTest {
 
         focused("recordings-folder-Series")
         compose.onNodeWithTag("recordings-recording-now-folder").assertDoesNotExist()
-        key(Key.DirectionUp)
+        upToTabs()
         compose.onNodeWithText("Archive").assertIsFocused()
         assertNoCommands()
     }
@@ -1518,6 +1656,9 @@ class RecordingsVisualLayoutTest {
                                 notices = notices,
                                 onRetry = { error("Unexpected retry") },
                                 onPlayRecording = { _, _ -> playbackRequests++ },
+                                grouping = startGrouping,
+                                onGroupingChange = { groupingChanges += it },
+                                nowSecProvider = nowSeconds,
                             )
                         }
                     }
@@ -1551,6 +1692,19 @@ class RecordingsVisualLayoutTest {
         if (key == Key.Back) compose.runOnIdle { backDispatcher.onBackPressed() }
         else compose.onRoot().performKeyInput { pressKey(key) }
         compose.waitForIdle()
+    }
+
+    /** From the first Archive-root row the tabs are two Ups away: the grouping pill is the stop between. */
+    private fun upToTabs() {
+        key(Key.DirectionUp)
+        focused(GROUPING_PILL)
+        key(Key.DirectionUp)
+    }
+
+    private fun downToList() {
+        key(Key.DirectionDown)
+        focused(GROUPING_PILL)
+        key(Key.DirectionDown)
     }
 
     private fun focused(tag: String) {
@@ -1789,6 +1943,7 @@ class RecordingsVisualLayoutTest {
     }
 
     private companion object {
+        const val GROUPING_PILL = "recordings-grouping-pill"
         const val LONG_TITLE = "Ridge Light: The Remarkable Journey of the Northern Lights Across the Arctic"
     }
 }

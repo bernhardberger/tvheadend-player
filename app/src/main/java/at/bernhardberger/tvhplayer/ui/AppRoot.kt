@@ -606,6 +606,7 @@ fun AppRoot(
     val uiSettingsStore: UiSettingsStore = koinInject()
     val context = LocalContext.current
     val uiSettings by uiSettingsStore.settings.collectAsStateWithLifecycle(initialValue = UiSettings())
+    val settingsScope = rememberCoroutineScope()
     LaunchedEffect(uiSettingsStore) {
         val packageInfo = withContext(Dispatchers.IO) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -1120,6 +1121,8 @@ fun AppRoot(
                             },
                             playingRecordingId = warmRecordingId,
                             onReturnToRecording = returnToWarmRecording,
+                            grouping = uiSettings.recordingsGrouping,
+                            onGroupingChange = { settingsScope.launch { uiSettingsStore.setRecordingsGrouping(it) } },
                             onWatchChannel = requestLivePlayer,
                             contentAllowed = contentAllowed,
                             contentPadding = contentPadding,

@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import at.bernhardberger.tvhplayer.core.DvrArchiveGrouping
 import at.bernhardberger.tvhplayer.core.HomeSectionKind
 
 data class UiSettings(
@@ -21,6 +22,7 @@ data class UiSettings(
     val showChannelNumbers: Boolean = true,
     val hiddenHomeSections: Set<HomeSectionKind> = emptySet(),
     val whatsNewSeenVersion: Int? = null,
+    val recordingsGrouping: DvrArchiveGrouping = DvrArchiveGrouping.FOLDERS,
 )
 
 fun resolvePlaybackAutoStart(storedValue: Boolean?): Boolean = storedValue ?: false
@@ -40,12 +42,15 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
         val GUIDE_ROWS = stringPreferencesKey("guideRowDensity")
         val GUIDE_HEADLINE = booleanPreferencesKey("guideHeadline")
         val GUIDE_GENRE_COLORS = booleanPreferencesKey("guideGenreColors")
+        val RECORDINGS_GROUPING = stringPreferencesKey("recordingsGrouping")
         fun homeSection(kind: HomeSectionKind) = booleanPreferencesKey("homeSection${kind.name}")
     }
 
     val settings: Flow<UiSettings> = dataStore.data.map { preferences ->
         UiSettings(
             whatsNewSeenVersion = preferences[Keys.WHATS_NEW_SEEN_VERSION],
+            recordingsGrouping = DvrArchiveGrouping.entries.firstOrNull { it.name == preferences[Keys.RECORDINGS_GROUPING] }
+                ?: DvrArchiveGrouping.FOLDERS,
             autoStartPlayback = resolvePlaybackAutoStart(preferences[Keys.AUTO_START_PLAYBACK]),
             clockFormat = resolveClockFormat(preferences[Keys.CLOCK_FORMAT]),
             showChannelNumbers = preferences[Keys.SHOW_CHANNEL_NUMBERS] ?: true,
@@ -79,6 +84,10 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
 
     suspend fun markWhatsNewSeen(currentVersion: Int) {
         dataStore.edit { it[Keys.WHATS_NEW_SEEN_VERSION] = currentVersion }
+    }
+
+    suspend fun setRecordingsGrouping(grouping: DvrArchiveGrouping) {
+        dataStore.edit { it[Keys.RECORDINGS_GROUPING] = grouping.name }
     }
 
     suspend fun setShowChannelNumbers(show: Boolean) {

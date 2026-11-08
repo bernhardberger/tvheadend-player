@@ -188,7 +188,7 @@ internal sealed interface ArchiveListItem {
 internal fun recordingItemKey(id: DvrEntryId): Long = id.value
 
 internal fun DvrArchiveFolder.listItems(): List<ArchiveListItem> = buildList {
-    if (path.isEmpty()) {
+    if (path.isEmpty() && offersRecordingNow) {
         runningRecordings().takeIf { it.isNotEmpty() }?.let { add(ArchiveListItem.RecordingNow(it)) }
     }
     addAll(folders.map(ArchiveListItem::Folder))
@@ -246,7 +246,10 @@ internal fun FolderListRow(
     onClick: () -> Unit,
     resumePosition: (DvrEntry) -> Duration? = { null },
     onOpenContextMenu: (() -> Unit)? = null,
+    /** A channel folder shows the channel's logo where other folders show the folder icon. */
+    picon: ChannelIcon? = null,
 ) {
+    var focused by remember { mutableStateOf(false) }
     val summary = remember(folder) { summarizeDvrFolder(folder) }
     val latestResumePosition by rememberUpdatedState(resumePosition)
     // Resume positions arrive with the entries, so a new folder is the only reason to count again.
@@ -298,7 +301,15 @@ internal fun FolderListRow(
             )
         },
         leadingContent = {
-            Icon(
+            if (folder.channelId != null) {
+                PiconBox(
+                    piconPath = picon,
+                    placeholderTint = androidx.tv.material3.LocalContentColor.current,
+                    ground = if (focused) MaterialTheme.colorScheme.inverseSurface else MaterialTheme.colorScheme.background,
+                    prefetchGround = if (focused) MaterialTheme.colorScheme.background else MaterialTheme.colorScheme.inverseSurface,
+                    modifier = Modifier.size(32.dp).testTag("recordings-folder-logo-$tag"),
+                )
+            } else Icon(
                 painter = painterResource(R.drawable.ic_folder),
                 contentDescription = null,
                 tint = androidx.tv.material3.LocalContentColor.current,
@@ -312,8 +323,27 @@ internal fun FolderListRow(
             .tabFocus()
             .fillMaxWidth()
             .testTag("recordings-folder-$tag")
-            .then(contextMenu.modifier),
+            .then(contextMenu.modifier)
+            .onFocusChanged { focused = it.isFocused },
     )
+}
+
+/**
+ * The label that opens a day or month in the flat list, then a thin line. It is only drawn:
+ * the recording row under it is the focus stop, so Down from a day's last row lands on the next day's first.
+ */
+@Composable
+internal fun ArchiveDateDivider(label: String, first: Boolean, modifier: Modifier = Modifier) {
+    Row(
+        modifier.fillMaxWidth().padding(top = if (first) 0.dp else TvSpacing12, bottom = TvSpacing4)
+            .semantics { heading() }.testTag("archive-date-divider"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.width(TvSpacing12))
+        androidx.compose.material3.HorizontalDivider(Modifier.weight(1f))
+    }
 }
 
 private val RecordingNowDotRadius = 5.dp

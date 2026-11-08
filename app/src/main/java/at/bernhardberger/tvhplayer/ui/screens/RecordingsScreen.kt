@@ -126,6 +126,12 @@ import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.DvrLibraryMode
 import at.bernhardberger.tvhplayer.core.DvrLibraryPartition
 import at.bernhardberger.tvhplayer.core.DvrArchiveFolder
+import at.bernhardberger.tvhplayer.core.DvrArchiveGrouping
+import at.bernhardberger.tvhplayer.core.DvrArchiveNaming
+import at.bernhardberger.tvhplayer.core.programmeCategory
+import at.bernhardberger.tvhplayer.ui.common.programmeCategoryLabelRes
+import at.bernhardberger.tvhplayer.ui.screens.recordings.ArchiveGroupingChoice
+import at.bernhardberger.tvhplayer.ui.screens.recordings.ArchivePillHooks
 import at.bernhardberger.tvhplayer.core.DvrProblemBucket
 import at.bernhardberger.tvhplayer.core.DvrScheduleSection
 import at.bernhardberger.tvhplayer.core.buildDvrArchive
@@ -146,6 +152,7 @@ import at.bernhardberger.tvhplayer.ui.components.PreparedBrowseData
 import at.bernhardberger.tvhplayer.ui.components.rememberPreparedBrowseData
 import at.bernhardberger.tvhplayer.ui.components.rememberTabContentMotion
 import at.bernhardberger.tvhplayer.ui.screens.recordings.ArchiveDepthContent
+import at.bernhardberger.tvhplayer.ui.screens.recordings.archiveLevelId
 import at.bernhardberger.tvhplayer.ui.screens.recordings.archiveLevelPath
 import at.bernhardberger.tvhplayer.ui.screens.recordings.archiveLevelItems
 import at.bernhardberger.tvhplayer.ui.screens.recordings.reconcileArchiveStack
@@ -184,6 +191,7 @@ import org.koin.compose.koinInject
 private data class RecordingLibraryPresentation(
     val library: DvrLibraryPartition,
     val archive: DvrArchiveFolder,
+    val archiveEntries: List<DvrEntry>,
     val schedule: List<DvrScheduleSection>,
     val problems: Map<DvrProblemBucket, List<DvrEntry>>,
 )
@@ -256,6 +264,8 @@ fun RecordingsScreen(
     state: RecordingsScreenState? = null,
     playingRecordingId: DvrEntryId? = null,
     onReturnToRecording: (DvrEntryId, () -> Unit) -> Boolean = { _, _ -> false },
+    grouping: DvrArchiveGrouping = DvrArchiveGrouping.FOLDERS,
+    onGroupingChange: (DvrArchiveGrouping) -> Unit = {},
 ) {
     val observation by session.observation.collectAsStateWithLifecycle()
     val dvrMutationActions = remember(session.dvrRepository) {
@@ -278,6 +288,8 @@ fun RecordingsScreen(
         onReturnToRecording = onReturnToRecording,
         dvrMutationActions = dvrMutationActions,
         currentObservation = { session.observation.value },
+        grouping = grouping,
+        onGroupingChange = onGroupingChange,
     )
 }
 
@@ -302,6 +314,8 @@ internal fun RecordingsScreenContent(
     currentObservation: () -> SessionObservation = { observation },
     notices: NoticeCenter = koinInject(),
     nowSecProvider: () -> Long = { System.currentTimeMillis() / 1000L },
+    grouping: DvrArchiveGrouping = DvrArchiveGrouping.FOLDERS,
+    onGroupingChange: (DvrArchiveGrouping) -> Unit = {},
 ) {
     val layoutDirection = LocalLayoutDirection.current
     val startPadding = contentPadding.calculateStartPadding(layoutDirection)
@@ -411,6 +425,42 @@ internal fun RecordingsScreenContent(
         detailsObservation = current
     }
 
+    var chosenGrouping by remember(grouping) { mutableStateOf(grouping) }
+    var groupChoiceOpen by remember { mutableStateOf(false) }
+    var requestPillFocus by remember { mutableStateOf(false) }
+    val pillFocus = remember { FocusRequester() }
+    val noChannelLabel = stringResource(R.string.recordings_group_no_channel)
+    val noGenreLabel = stringResource(R.string.recordings_group_no_genre)
+    val resources = LocalContext.current.resources
+    val naming = remember(channelsById, resources, noChannelLabel, noGenreLabel) {
+        DvrArchiveNaming(
+            channelName = { entry -> entry.channelId?.let(channelsById::get)?.name ?: entry.channelName },
+            channelNumber = { entry -> entry.channelId?.let(channelsById::get)?.number?.toInt() },
+            genreName = { entry ->
+                programmeCategory(entry.contentGenre)?.let { resources.getString(programmeCategoryLabelRes(it)) }
+            },
+            noChannel = noChannelLabel,
+            noGenre = noGenreLabel,
+        )
+    }
+    fun archiveFor(presentation: RecordingLibraryPresentation): DvrArchiveFolder =
+        if (chosenGrouping == DvrArchiveGrouping.FOLDERS) presentation.archive
+        else buildDvrArchive(presentation.archiveEntries, chosenGrouping, naming)
+    LaunchedEffect(requestPillFocus) {
+        if (!requestPillFocus) return@LaunchedEffect
+        repeat(8) {
+            withFrameNanos { }
+            if (runCatching { pillFocus.requestFocus() }.getOrDefault(false)) {
+                contentFocusOwned = false
+                requestContentFocus = false
+                requestPillFocus = false
+                return@LaunchedEffect
+            }
+        }
+        // No pill to land on (empty or deeper level): the list takes it as before.
+        requestPillFocus = false
+        requestContentFocus = true
+    }
     val location = when (mode) {
         DvrLibraryMode.ARCHIVE -> archiveLevel
         DvrLibraryMode.SCHEDULE -> "schedule"
@@ -419,11 +469,13 @@ internal fun RecordingsScreenContent(
     val prepared = rememberPreparedBrowseData(preparationAuthority, observation.dvrSnapshotForDisplay) { snapshot ->
         val library = partitionDvrLibrary(snapshot?.entries.orEmpty())
         currentCoroutineContext().ensureActive()
-        val archive = buildDvrArchive(library.archive + snapshot?.entries.orEmpty().filter(::recordingIsRunning))
+        val archiveEntries = library.archive + snapshot?.entries.orEmpty().filter(::recordingIsRunning)
+        val archive = buildDvrArchive(archiveEntries)
         currentCoroutineContext().ensureActive()
         RecordingLibraryPresentation(
             library = library,
             archive = archive,
+            archiveEntries = archiveEntries,
             schedule = groupDvrSchedule(library.schedule, System.currentTimeMillis() / 1000L),
             problems = groupDvrProblems(library.problems),
         )
@@ -453,7 +505,7 @@ internal fun RecordingsScreenContent(
     val retained = retainedPreparation ?: prepared
     val retainedEntries = retained.input?.entries.orEmpty()
     val observedLibrary = prepared.value.library
-    val observedArchive = prepared.value.archive
+    val observedArchive = remember(prepared.value, chosenGrouping, naming) { archiveFor(prepared.value) }
     val reconciledArchiveStack = remember(observedArchive, archiveNavigation.stack) {
         reconcileArchiveStack(archiveNavigation.stack, observedArchive)
     }
@@ -469,7 +521,9 @@ internal fun RecordingsScreenContent(
     val entries = if (removalHandoff) retainedEntries else observedEntries
     val presentation = if (removalHandoff) retained.value else prepared.value
     val library = presentation.library
-    val archive = presentation.archive
+    val archive = remember(presentation, chosenGrouping, naming) {
+        if (presentation === prepared.value) observedArchive else archiveFor(presentation)
+    }
     val archiveItems = remember(archive, archiveLevel) { archiveLevelItems(archive, archiveLevel) ?: archive.listItems() }
     val scheduleGroups = presentation.schedule
     val problemGroups = presentation.problems
@@ -511,8 +565,9 @@ internal fun RecordingsScreenContent(
         detailsEntry,
         pendingAction,
         folderMenu,
+        groupChoiceOpen,
     ) {
-        if (detailsEntry != null || pendingAction != null || folderMenu != null) return@LaunchedEffect
+        if (detailsEntry != null || pendingAction != null || folderMenu != null || groupChoiceOpen) return@LaunchedEffect
         val requestedEntry = screenState.requestedScheduleEntryId.value
         // Preparation retains the last projection while the new snapshot is calculated.
         // Only the projection built from the displayed snapshot can judge this target.
@@ -568,9 +623,10 @@ internal fun RecordingsScreenContent(
         location,
         focusRecoveryGeneration,
         folderMenu,
+        groupChoiceOpen,
     ) {
         if (!pendingDetailsReturn) return@LaunchedEffect
-        if (detailsEntry != null || pendingAction != null || folderMenu != null) return@LaunchedEffect
+        if (detailsEntry != null || pendingAction != null || folderMenu != null || groupChoiceOpen) return@LaunchedEffect
         repeat(4) {
             withFrameNanos { }
             val restored = runCatching {
@@ -590,7 +646,7 @@ internal fun RecordingsScreenContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .semantics { if (detailsEntry != null || folderMenu != null) hideFromAccessibility() }
+            .semantics { if (detailsEntry != null || folderMenu != null || groupChoiceOpen) hideFromAccessibility() }
             .graphicsLayer { alpha = 1f - (detailsLayering?.detailsAlpha() ?: if (detailsEntry != null && !showContextMenu && !showResumeChoice) 1f else 0f) }
             .onPreviewKeyEvent { event ->
                 if (event.key == relocatingKey) {
@@ -641,10 +697,13 @@ internal fun RecordingsScreenContent(
                         screenState.requestedScheduleEntryId.value = null
                         modeMotion.select(it, DvrLibraryMode.entries)
                         mode = it
-                        requestContentFocus = true
+                        // At the Archive root the grouping pill is the next stop, then the list.
+                        if (it == DvrLibraryMode.ARCHIVE && archiveLevel == archiveLevelId(emptyList())) requestPillFocus = true
+                        else requestContentFocus = true
                     },
                     onMoveToContent = {
-                        requestContentFocus = true
+                        if (mode == DvrLibraryMode.ARCHIVE && archiveLevel == archiveLevelId(emptyList())) requestPillFocus = true
+                        else requestContentFocus = true
                     },
                     modifier = Modifier
                         .onPreviewKeyEvent {
@@ -740,6 +799,7 @@ internal fun RecordingsScreenContent(
             when (mode) {
                 DvrLibraryMode.ARCHIVE -> ArchiveDepthContent(
                     root = frame.archive,
+                    nowSeconds = nowSecProvider,
                     navigation = archiveNavigation,
                     contentPadding = PaddingValues(
                         start = startPadding + TvBrowseLeadingInset,
@@ -747,8 +807,26 @@ internal fun RecordingsScreenContent(
                     ),
                     isCurrent = owner.isCurrent,
                     initialFocusEnabled = owner.isCurrent && initialFocusEnabled &&
-                        detailsEntry == null && folderMenu == null && (contentFocusOwned || requestContentFocus),
-                    backEnabled = backEnabled && detailsEntry == null && folderMenu == null && contentFocusOwned,
+                        detailsEntry == null && folderMenu == null && !groupChoiceOpen &&
+                        (contentFocusOwned || requestContentFocus),
+                    backEnabled = backEnabled && detailsEntry == null && folderMenu == null && !groupChoiceOpen &&
+                        contentFocusOwned,
+                    grouping = chosenGrouping,
+                    pill = ArchivePillHooks(
+                        focusRequester = pillFocus,
+                        open = {
+                            contentFocusOwned = false
+                            groupChoiceOpen = true
+                        },
+                        up = {
+                            if (owner.isCurrent && modeFocus.requestFocus()) {
+                                contentFocusOwned = false
+                                requestContentFocus = false
+                            }
+                        },
+                        focus = { if (owner.isCurrent && pillFocus.requestFocus()) contentFocusOwned = false },
+                        onFocusChanged = { if (it) contentFocusOwned = false },
+                    ),
                     contentFocus = contentFocus,
                     onModeFocus = {
                         if (owner.isCurrent && modeFocus.requestFocus()) {
@@ -776,7 +854,8 @@ internal fun RecordingsScreenContent(
                             showContextMenu = true
                         }
                     },
-                    onOpenFolderMenu = { folder ->
+                    // Channel and genre groups are not server folders; they have no folder actions.
+                    onOpenFolderMenu = if (chosenGrouping != DvrArchiveGrouping.FOLDERS) null else { folder ->
                         val session = currentSession
                         val canModify = (observation.sessionState as? SessionState.Ready)
                             ?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
@@ -1318,6 +1397,31 @@ internal fun RecordingsScreenContent(
     }
     }
     FolderMenu()
+    if (groupChoiceOpen) {
+        ArchiveGroupingChoice(
+            current = chosenGrouping,
+            onChoose = { choice ->
+                groupChoiceOpen = false
+                if (choice != chosenGrouping) {
+                    chosenGrouping = choice
+                    // The old levels do not exist in the new arrangement: start at the root's first row.
+                    archiveNavigation.update(
+                        DepthStack(
+                            listOf(DepthFrame(archiveLevelId(emptyList()))),
+                            visit = archiveNavigation.stack.visit + 1,
+                        ),
+                    )
+                    onGroupingChange(choice)
+                }
+                requestPillFocus = true
+            },
+            onClose = {
+                groupChoiceOpen = false
+                requestPillFocus = true
+            },
+            backEnabled = backEnabled,
+        )
+    }
     }
 }
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Recordings
+
+- Recordings > Archive can group by folders, channels, genres or none.
+
 ## 0.4.12
 
 ### Settings
