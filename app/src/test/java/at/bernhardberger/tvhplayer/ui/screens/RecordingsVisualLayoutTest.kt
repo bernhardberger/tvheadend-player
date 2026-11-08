@@ -471,9 +471,7 @@ class RecordingsVisualLayoutTest {
         compose.runOnIdle { assertEquals(listOf(DvrArchiveView(grouping = DvrArchiveGrouping.CHANNELS)), viewChanges) }
         focused("recordings-grouping-option-channels")
         key(Key.DirectionLeft)
-        focused("recordings-grouping-option-channels")
-        // Back leaves the level for the row that opened it; Back again closes the panel.
-        key(Key.Back)
+        // Left leaves the level for its opener, just like Back.
         gone("recordings-grouping-option-channels")
         focused("recordings-view-group")
         key(Key.DirectionDown)
@@ -483,7 +481,7 @@ class RecordingsVisualLayoutTest {
         key(Key.Back)
         gone("recordings-sort-option-newest")
         focused("recordings-view-sort")
-        key(Key.Back)
+        key(Key.DirectionLeft)
         gone("recordings-grouping-panel")
         focused(GROUPING_PILL)
         compose.onNodeWithTag("recordings-folder-Documentaries").assertDoesNotExist()

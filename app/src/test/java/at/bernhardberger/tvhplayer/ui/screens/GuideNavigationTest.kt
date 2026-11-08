@@ -1186,7 +1186,13 @@ class GuideNavigationTest : GuideScreenFixture() {
         // Prime time ends at 22:00 while it has focus; the open panel keeps it and its neighbours.
         assertTrue(SystemClock.setCurrentTimeMillis((hour + 2 * 3600 + 30) * 1000))
         compose.mainClock.advanceTimeBy(6_000)
-        compose.waitForIdle()
+        tagFocused("guide-time-preset-20")
+        // Now keeps ticking even though the focused period's availability is frozen.
+        key(Key.Back)
+        compose.waitUntil(5_000) {
+            compose.onAllNodes(hasTestTag("guide-time-now") and hasText("22:00")).fetchSemanticsNodes().isNotEmpty()
+        }
+        key(Key.DirectionRight)
         tagFocused("guide-time-preset-20")
         compose.onNodeWithTag("guide-time-preset-20").assertIsEnabled()
         key(Key.DirectionDown)
@@ -1222,19 +1228,18 @@ class GuideNavigationTest : GuideScreenFixture() {
         show()
         key(Key.Enter)
         tagFocused("guide-time-day-0")
-        // Left on the days goes nowhere.
-        key(Key.DirectionLeft)
-        tagFocused("guide-time-day-0")
         key(Key.DirectionDown)
         tagFocused("guide-time-day-1")
         key(Key.DirectionRight)
         // The window's 20:15 lies in Prime time; no time is checked on another day.
         tagFocused("guide-time-preset-20")
         compose.onNodeWithTag("guide-time-preset-20").assertIsNotSelected()
-        // Left and Right stay in the times; Up moves within them.
+        // Right stays in the times; Left returns to the originating day, like Back.
         key(Key.DirectionRight)
         tagFocused("guide-time-preset-20")
         key(Key.DirectionLeft)
+        tagFocused("guide-time-day-1")
+        key(Key.DirectionRight)
         tagFocused("guide-time-preset-20")
         key(Key.DirectionUp)
         tagFocused("guide-time-preset-18")
@@ -1249,11 +1254,25 @@ class GuideNavigationTest : GuideScreenFixture() {
         // Right on Now goes nowhere.
         key(Key.DirectionRight)
         tagFocused("guide-time-now")
-        key(Key.Back)
+        key(Key.DirectionLeft)
         compose.onNodeWithTag("guide-time-panel").assertDoesNotExist()
         dateFocused()
         assertDateButtonNow()
         assertEquals(0, playbackRequests)
+    }
+
+    @Test fun rtlMirrorsOpeningALevelReturningToItsDayAndClosingTheRoot() {
+        show(direction = LayoutDirection.Rtl)
+        key(Key.Enter)
+        tagFocused("guide-time-day-0")
+        key(Key.DirectionLeft)
+        tagFocused("guide-time-preset-20")
+        key(Key.DirectionRight)
+        tagFocused("guide-time-day-0")
+        key(Key.DirectionRight)
+        compose.onNodeWithTag("guide-time-panel").assertDoesNotExist()
+        dateFocused()
+        assertNoPlayback()
     }
 
     @Test fun aTimeJumpsToItsStartClosesThePanelAndKeepsTheChannel() {

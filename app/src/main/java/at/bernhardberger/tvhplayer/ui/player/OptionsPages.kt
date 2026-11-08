@@ -7,13 +7,19 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 
 /**
  * The pages of an options panel, shared by the player's options sheet and the browse side panels:
@@ -61,9 +67,31 @@ internal fun <T> OptionsPageHost(
 }
 
 /**
- * Right on a panel with pages: a row opens its page on the key's press, so the release must not
- * reach the page just opened, and a page itself never lets Right move on ([atRoot] false).
+ * The logical end key opens a row's level; the logical start key does the same step as Back.
+ * Bubble handling lets a focused control use either key first. A back step waits for release,
+ * keeping the entire press inside the panel even when the step closes it over the player.
  */
-internal fun Modifier.optionsPageRightKey(atRoot: Boolean): Modifier = onPreviewKeyEvent { event ->
-    event.key == Key.DirectionRight && (event.type == KeyEventType.KeyUp || !atRoot)
+@Composable
+internal fun Modifier.optionsPageKeys(atRoot: Boolean, onBack: () -> Unit): Modifier {
+    val end = optionsPageEndKey()
+    val start = if (end == Key.DirectionRight) Key.DirectionLeft else Key.DirectionRight
+    var backing by remember { mutableStateOf(false) }
+    return onKeyEvent { event ->
+        when (event.key) {
+            start -> {
+                if (event.type == KeyEventType.KeyDown) backing = true
+                if (event.type == KeyEventType.KeyUp && backing) {
+                    backing = false
+                    if (!event.nativeKeyEvent.isCanceled) onBack()
+                }
+                true
+            }
+            end -> event.type == KeyEventType.KeyUp || !atRoot
+            else -> false
+        }
+    }
 }
+
+@Composable
+internal fun optionsPageEndKey(): Key =
+    if (LocalLayoutDirection.current == LayoutDirection.Rtl) Key.DirectionLeft else Key.DirectionRight

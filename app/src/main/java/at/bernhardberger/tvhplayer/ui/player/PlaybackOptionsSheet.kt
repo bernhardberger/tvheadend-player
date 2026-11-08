@@ -453,7 +453,8 @@ internal fun PlaybackOptionsSheetContent(
 
     PlaybackOptionsOverlayFrame(
         paneTitle = sheetTitle,
-        modifier = Modifier.optionsPageRightKey(atRoot = page == PlaybackOptionsPage.ROOT),
+        modifier = Modifier.optionsPageKeys(atRoot = page == PlaybackOptionsPage.ROOT,
+            onBack = optionsBackStep()),
     ) {
         // A quick list switches pages at once: closing one applies its focused row as it
         // leaves, and list keys must reach only the list that is open.
@@ -463,6 +464,13 @@ internal fun PlaybackOptionsSheetContent(
 
 private fun playbackOptionsPageDepth(page: PlaybackOptionsPage): Int =
     if (page == PlaybackOptionsPage.ROOT) 0 else 1
+
+/** Keep Left on the same Back-policy path, including quick-list restoration and focus return. */
+@Composable
+private fun optionsBackStep(): () -> Unit {
+    val dispatcher = androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
+    return { dispatcher?.onBackPressed() }
+}
 
 /** Width of the floating side panel (Material for TV kit, modal drawer). */
 internal val PlaybackPanelWidth = 320.dp
@@ -1034,6 +1042,7 @@ internal fun PlaybackOptionRow(
     leadingLabel: String? = null,
     trailingLabel: String? = null,
 ) {
+    val endKey = optionsPageEndKey()
     ListItem(
         enabled = enabled,
         // Compose maps ListItem's Selected to platform checked, even for a Switch.
@@ -1103,7 +1112,7 @@ internal fun PlaybackOptionRow(
                 toggleableState = ToggleableState(checked)
             })
             .onPreviewKeyEvent { event ->
-                if (event.key != Key.DirectionRight || !showChevron) {
+                if (event.key != endKey || !showChevron) {
                     false
                 } else {
                     if (enabled && event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {

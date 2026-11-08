@@ -52,7 +52,8 @@ import at.bernhardberger.tvhplayer.ui.components.PlaybackOptionsOverlayFrame
 import at.bernhardberger.tvhplayer.ui.components.browseDetailsViewport
 import at.bernhardberger.tvhplayer.ui.player.OptionsHeader
 import at.bernhardberger.tvhplayer.ui.player.OptionsPageHost
-import at.bernhardberger.tvhplayer.ui.player.optionsPageRightKey
+import at.bernhardberger.tvhplayer.ui.player.optionsPageKeys
+import at.bernhardberger.tvhplayer.ui.player.optionsPageEndKey
 import at.bernhardberger.tvhplayer.ui.components.PanelListEdges
 import at.bernhardberger.tvhplayer.ui.player.PlaybackOptionRow
 import at.bernhardberger.tvhplayer.ui.player.PlaybackPanelHeaderTop
@@ -118,6 +119,7 @@ internal fun BrowseSidePanel(
     width: Dp = PlaybackPanelWidth,
     showHeader: Boolean = true,
     modifier: Modifier = Modifier,
+    atRoot: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val layering = LocalBrowseContentLayering.current
@@ -134,7 +136,7 @@ internal fun BrowseSidePanel(
         paneTitle = title,
         panelTag = panelTag,
         panelWidth = width,
-        modifier = modifier
+        modifier = modifier.optionsPageKeys(atRoot = atRoot, onBack = onClose)
             .backKeyCycleFocus(backCycle)
             .browseDetailsViewport()
             .onPreviewKeyEvent { event ->
@@ -164,8 +166,8 @@ internal fun BrowseSidePanel(
  * The one browse side panel. [entries] are its root; a [BrowsePanelEntry.Choice] with a
  * [BrowsePanelEntry.Choice.level] shows its current value and a chevron, and OK or Right opens
  * the level in the same panel, as in the player's options sheet: the header names the level, a
- * choice applies at once and the level stays on the row just pressed, Left stays put, and Back
- * returns to the root with focus on the row that opened it. Back on the root closes the panel.
+ * choice applies at once and the level stays on the row just pressed. Left or Back returns to
+ * the root with focus on its opener, or closes the root. Left/Right mirror in RTL.
  * Without any level the panel is one flat list under the [title].
  */
 @Composable
@@ -204,7 +206,7 @@ private fun BrowsePanelLevels(
         panelTag = panelTag,
         onClose = { if (shown != null) openKey = null else onClose() },
         showHeader = false,
-        modifier = Modifier.optionsPageRightKey(atRoot = shown == null),
+        atRoot = shown == null,
     ) {
         OptionsPageHost(shown, { if (it == null) 0 else 1 }, Modifier.fillMaxSize()) { key ->
             val level = levelOf(key)
@@ -222,6 +224,7 @@ private fun BrowsePanelLevels(
 }
 
 /** A root row with a level shows the level's value and a chevron, and opens it on Right (and on OK unless it has its own). */
+@Composable
 private fun BrowsePanelEntry.openingItsLevel(open: (String) -> Unit): BrowsePanelEntry {
     if (this !is BrowsePanelEntry.Choice || level == null) return this
     val opens = { open(key) }
@@ -234,12 +237,16 @@ private fun BrowsePanelEntry.openingItsLevel(open: (String) -> Unit): BrowsePane
 }
 
 /** Right opens on its first press and is always consumed, ahead of the row's own handling. */
-private fun Modifier.rightOpens(open: () -> Unit): Modifier = onPreviewKeyEvent { event ->
-    if (event.key != Key.DirectionRight) {
-        false
-    } else {
-        if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) open()
-        true
+@Composable
+private fun Modifier.rightOpens(open: () -> Unit): Modifier {
+    val endKey = optionsPageEndKey()
+    return onPreviewKeyEvent { event ->
+        if (event.key != endKey) {
+            false
+        } else {
+            if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) open()
+            true
+        }
     }
 }
 

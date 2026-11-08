@@ -584,11 +584,16 @@ class RecordingPlayerChromeScreenTest {
     @Test fun leftClosesTheOptionsRootLikeBack() {
         screen()
         playing()
+        positionMs = 600_000L
+        val position = positionMs
         key(Key.Menu)
         assertTrue(exists("playback-options-display"))
         key(Key.DirectionLeft)
         assertFalse(exists("playback-options-display"))
         assertEquals(listOf("player-settings"), focused())
+        assertEquals("the whole Left press belongs to the sheet, not a backward seek", position, positionMs)
+        assertFalse("closing the sheet must not start a seek preview", exists("recording-seek-preview"))
+        assertFalse(texts("−0:30") || texts("-0:30"))
     }
 
     @Test fun theAudioKeyOpensItsListOverWhatTheControlsShowAndBackReturnsThere() {
