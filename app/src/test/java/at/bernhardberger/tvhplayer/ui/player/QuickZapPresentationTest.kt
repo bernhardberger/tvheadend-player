@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.ui.TvCardFocusedScale
 import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import android.app.Application
@@ -364,10 +365,10 @@ class QuickZapPresentationTest {
             assertViewerProgressColor("orange lower progress strip remains visible", strip)
             bitmap.recycle()
             capture("$prefix-native-corner-$state", 2, fontScale)
-            File("../artifacts/quick-zap/$prefix-native-corner-$state-geometry.txt").writeText(
+            CaptureOutput.writeText(File("../artifacts/quick-zap/$prefix-native-corner-$state-geometry.txt")) {
                 "nativeRadiusMeasuredDp=$radius\nscale=$scale\ninnerGapsDp=$gaps\n" +
-                    "supersampling=4x production view draw; native shape, shared focused scale\n",
-            )
+                    "supersampling=4x production view draw; native shape, shared focused scale\n"
+            }
         }
         verify("focused", 1.05f)
         compose.onRoot().performKeyInput { keyDown(Key.DirectionCenter) }
@@ -1041,13 +1042,13 @@ class QuickZapPresentationTest {
         compose.runOnIdle {
             val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
             view.draw(Canvas(bitmap))
-            val directory = File("../artifacts/quick-zap").apply { mkdirs() }
-            File(directory, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-            if (focusedCard != null) File(directory, "$name.txt").writeText(
+            val directory = File("../artifacts/quick-zap")
+            CaptureOutput.writePng(File(directory, "$name.png"), bitmap)
+            if (focusedCard != null) CaptureOutput.writeText(File(directory, "$name.txt")) {
                 "canvas=960x540\ndensity=1.0\nlocale=${if (name.startsWith("de")) "de" else "en"}\n" +
                     "fontScale=$fontScale\nfocus=player-channel-card-$focusedCard\nbounds=$focusedBounds\n" +
-                    "focusOutlineArgb=${Integer.toHexString(focusColor)}\n",
-            )
+                    "focusOutlineArgb=${Integer.toHexString(focusColor)}\n"
+            }
             bitmap.recycle()
         }
     }

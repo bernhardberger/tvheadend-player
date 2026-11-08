@@ -38,6 +38,7 @@ import at.bernhardberger.tvhplayer.settings.WarmPlaybackMode
 import at.bernhardberger.tvhplayer.settings.ClockFormat
 import at.bernhardberger.tvhplayer.settings.UiSettings
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -1527,7 +1528,6 @@ class SettingsDepthNavigationTest {
             bitmap = Bitmap.createBitmap(captureView.width, captureView.height, Bitmap.Config.ARGB_8888)
             captureView.draw(Canvas(bitmap))
         }
-        val directory = File("build/outputs/settings-c-captures").apply { mkdirs() }
-        File(directory, "$name.png").outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+        CaptureOutput.writePng(File("build/outputs/settings-c-captures", "$name.png"), bitmap)
     }
 }

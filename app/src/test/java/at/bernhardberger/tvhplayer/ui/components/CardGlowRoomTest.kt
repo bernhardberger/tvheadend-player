@@ -47,6 +47,7 @@ import at.bernhardberger.tvhplayer.images.ChannelAccents
 import at.bernhardberger.tvhplayer.settings.ChannelsLayout
 import at.bernhardberger.tvhplayer.settings.ChannelsView
 import at.bernhardberger.tvhplayer.stores.ChannelAccentStore
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.testutil.VisualCapture
@@ -385,11 +386,11 @@ class CardGlowRoomTest {
             val minGlow = if (side == Side.TOP && rowAbove != null) MinGlow / 2 else MinGlow
             if (failure == null && glow < minGlow) failure = "$name: no glow reaches past the $side side ($glow)"
         }
-        File(directory(), "$name.txt").takeIf { writes }?.writeText(
+        CaptureOutput.writeText(File(DIRECTORY, "$name.txt")) {
             "canvas=960x540 dp; density=1.0 (mdpi); locale=en; fontScale=1.0\n" +
                 "card=$card\n$report" +
-                "evidenceLimit=static composition only; not physical-TV glow, motion or overscan\n",
-        )
+                "evidenceLimit=static composition only; not physical-TV glow, motion or overscan\n"
+        }
         bitmap.recycle()
         assertTrue(failure ?: "", failure == null)
     }
@@ -432,16 +433,11 @@ class CardGlowRoomTest {
         return bitmap
     }
 
-    private val writes = System.getProperty("tvhplayer.writeMotionCaptures") != "false"
-
-    private fun directory() = File("../build/review/glow-room").apply { mkdirs() }
-
-    private fun save(name: String, bitmap: Bitmap) {
-        if (!writes) return
-        File(directory(), "$name.png").outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
-    }
+    private fun save(name: String, bitmap: Bitmap) = CaptureOutput.writePng(File(DIRECTORY, "$name.png"), bitmap)
 
     private companion object {
+        val DIRECTORY = File("../build/review/glow-room")
+
         /** Pixels past the card edge where the 24dp glow, lifted with the card, has faded below one level. */
         const val Reach = 38
         /** The largest brightness change between neighbouring pixels a fading glow makes. */

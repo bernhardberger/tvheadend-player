@@ -13,6 +13,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.settings.ChannelsLayout
 import at.bernhardberger.tvhplayer.settings.ChannelsView
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import org.junit.Assert.assertTrue
@@ -350,11 +351,9 @@ class ChannelsLayoutCaptureTest {
         val settled = draw()
         assertTrue("$name captured mid-animation", bitmap.sameAs(settled))
         settled.recycle()
-        val directory = File(outputs).apply { mkdirs() }
-        File(directory, "$name.png").outputStream().use {
-            assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
-        }
-        File(directory, "$name.txt").writeText(
+        val directory = File(outputs)
+        CaptureOutput.writePng(File(directory, "$name.png"), bitmap)
+        CaptureOutput.writeText(File(directory, "$name.txt")) {
             """
             canvas=960x540 dp; density=${fixture.context.resources.displayMetrics.density}; locale=$locale; fontScale=$fontScale
             shell=TVHeadendPlayerTheme + SideRail; background=theme background, no video
@@ -362,8 +361,8 @@ class ChannelsLayoutCaptureTest {
             focus=${focus.description} reached by D-pad
             art=fictional fixture pack; channels 8-18 picon-only without EPG; channel 6 EPG without art${if (outputs == "build/outputs/043-channels" && name.startsWith("grid-")) "; wall lineup=30 channels; 19-30 repeat fixture networks/picons without EPG" else ""}
             evidenceLimit=static composition only; not physical-TV focus feel, motion or overscan
-            """.trimIndent() + "\n",
-        )
+            """.trimIndent() + "\n"
+        }
         bitmap.recycle()
     }
 

@@ -35,6 +35,7 @@ import androidx.compose.runtime.saveable.LocalSaveableStateRegistry
 import androidx.compose.runtime.saveable.SaveableStateRegistry
 import androidx.savedstate.serialization.decodeFromSavedState
 import androidx.navigation3.runtime.NavBackStack
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import kotlinx.serialization.serializer
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
@@ -802,10 +803,7 @@ class PlayerEntryOverlayTest {
         val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
         view.draw(Canvas(bitmap))
         if (captureName != null) {
-            val directory = java.io.File("build/outputs/warm-choice-review").apply { mkdirs() }
-            java.io.File(directory, "$captureName.png").outputStream().use {
-                check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
-            }
+            CaptureOutput.writePng(java.io.File("build/outputs/warm-choice-review", "$captureName.png"), bitmap)
         }
         val values = ArrayList<Float>()
         for (y in 0 until bitmap.height step 4) {

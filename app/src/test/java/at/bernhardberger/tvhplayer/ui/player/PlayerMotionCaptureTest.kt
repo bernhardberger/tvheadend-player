@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import android.app.Application
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.asImageBitmap
@@ -381,15 +382,13 @@ class PlayerMotionCaptureTest {
         compose.runOnIdle {
             val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
             view.draw(Canvas(bitmap))
-            val directory = File("../captures/$directory").apply { mkdirs() }
-            File(directory, "$name.png").outputStream().use {
-                assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
-            }
-            File(directory, "$name.txt").writeText(
+            val directory = File("../captures/$directory")
+            CaptureOutput.writePng(File(directory, "$name.png"), bitmap)
+            CaptureOutput.writeText(File(directory, "$name.txt")) {
                 "file=$name.png\ncanvas=${bitmap.width}x${bitmap.height}\ndensity=1.0\nlocale=en\n" +
                     "fontScale=1.0\nfixture=PlayerMotionCaptureTest; production composables, offline fake state\n" +
-                    "focus=$focus\ntiming=$timing\n",
-            )
+                    "focus=$focus\ntiming=$timing\n"
+            }
             bitmap.recycle()
         }
     }

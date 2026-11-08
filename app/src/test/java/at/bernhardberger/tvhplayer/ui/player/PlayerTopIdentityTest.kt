@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
 import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import android.app.Application
@@ -271,10 +272,7 @@ class PlayerTopIdentityTest {
             compose.onNode(number, useUnmergedTree = true).assertDoesNotExist()
             val bitmap = compose.onNodeWithTag("player-info-artwork-fallback", useUnmergedTree = true)
                 .captureToImage().asAndroidBitmap()
-            val directory = java.io.File("build/outputs/channel-number-fallbacks").apply { mkdirs() }
-            java.io.File(directory, "player-info-artwork-off.png").outputStream().use {
-                bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
-            }
+            CaptureOutput.writePng(java.io.File("build/outputs/channel-number-fallbacks", "player-info-artwork-off.png"), bitmap)
             bitmap.recycle()
             compose.runOnIdle { at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = true }
             settle()

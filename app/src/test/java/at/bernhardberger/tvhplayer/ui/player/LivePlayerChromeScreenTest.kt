@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import android.view.View
 import android.os.Looper
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import java.io.File
 import org.robolectric.annotation.GraphicsMode
 import androidx.compose.ui.semantics.SemanticsActions
@@ -2502,8 +2503,7 @@ class LivePlayerChromeScreenTest {
         // Evidence capture of the production screen, 960×540, into the ignored artifacts directory.
         val bitmap = Bitmap.createBitmap(960, 540, Bitmap.Config.ARGB_8888)
         compose.runOnIdle { view.draw(Canvas(bitmap)) }
-        val directory = File("../artifacts/player-chrome").apply { mkdirs() }
-        File(directory, "unavailable-$locale-font$fontScale.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        CaptureOutput.writePng(File("../artifacts/player-chrome", "unavailable-$locale-font$fontScale.png"), bitmap)
         bitmap.recycle()
     }
 

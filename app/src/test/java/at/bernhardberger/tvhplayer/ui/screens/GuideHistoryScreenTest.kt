@@ -24,6 +24,7 @@ import at.bernhardberger.tvhplayer.notices.NoticeContext
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.settings.*
 import at.bernhardberger.tvhplayer.stores.*
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import at.bernhardberger.tvhplayer.ui.components.awaitBrowsePreparation
@@ -400,9 +401,11 @@ class GuideHistoryScreenTest {
         compose.runOnIdle {
             val bitmap = Bitmap.createBitmap(960, 540, Bitmap.Config.ARGB_8888)
             view.draw(Canvas(bitmap))
-            val directory = File("build/outputs/guide-history-evidence").apply { mkdirs() }
-            File(directory, "$locale-font$scale-full-past-guide.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-            File(directory, "$locale-font$scale-full-past-guide.txt").writeText("canvas=960x540\ndensity=1\nlocale=$locale\nfontScale=$scale\nzone=UTC\nfocus=Channel 1 hour -1\nfull EpgGridScreen; real runtime/ExoPlayer/coordinator; SDK fake session\n")
+            val directory = File("build/outputs/guide-history-evidence")
+            CaptureOutput.writePng(File(directory, "$locale-font$scale-full-past-guide.png"), bitmap)
+            CaptureOutput.writeText(File(directory, "$locale-font$scale-full-past-guide.txt")) {
+                "canvas=960x540\ndensity=1\nlocale=$locale\nfontScale=$scale\nzone=UTC\nfocus=Channel 1 hour -1\nfull EpgGridScreen; real runtime/ExoPlayer/coordinator; SDK fake session\n"
+            }
             bitmap.recycle()
         }
         for (hour in 2..6) {

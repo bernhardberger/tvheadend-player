@@ -4,6 +4,7 @@ import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
 import at.bernhardberger.tvhplayer.settings.ChannelsLayout
 import at.bernhardberger.tvhplayer.settings.ChannelsView
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import org.koin.compose.KoinApplication
 import org.koin.dsl.module
 
@@ -195,10 +196,7 @@ class BrowseCohesionEvidenceTest {
             val bitmap = draw(false)
             assertEquals(1920, bitmap.width)
             assertEquals(1080, bitmap.height)
-            val directory = File("build/outputs/u15-offline").apply { mkdirs() }
-            File(directory, "$name.png").outputStream().use {
-                assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
-            }
+            CaptureOutput.writePng(File("build/outputs/u15-offline", "$name.png"), bitmap)
             bitmap.recycle()
         }
         val rowBounds = compose.onNodeWithTag("channel-row-1").fetchSemanticsNode().boundsInRoot
@@ -292,12 +290,13 @@ class BrowseCohesionEvidenceTest {
         if (rtl && entered != null && entered.boundsInRoot.let { it.width == 0f && it.height == 0f }) {
             // Production finding, kept as evidence: the opened folder's depth level is laid out at 0x0
             // (focus is on a node with empty bounds) when the layout direction is right-to-left.
-            val directory = File("../artifacts/translations/round-030/captures/browse").apply { mkdirs() }
+            val directory = File("../artifacts/translations/round-030/captures/browse")
             val shot = draw(false)
-            File(directory, "ar-XB-font1.0-recordings-folder-RTL-FINDING.png").outputStream().use { shot.compress(Bitmap.CompressFormat.PNG, 100, it) }
-            File(directory, "ar-XB-font1.0-recordings-folder-RTL-FINDING.txt").writeText(
+            CaptureOutput.writePng(File(directory, "ar-XB-font1.0-recordings-folder-RTL-FINDING.png"), shot)
+            CaptureOutput.writeText(File(directory, "ar-XB-font1.0-recordings-folder-RTL-FINDING.txt")) {
                 "Archive > Documentaries (Center) under ar-XB: depth-active, recording-list-entry-1 (focused), recording-metadata-pane have bounds 0,0,0,0 after the transition has run.\n" +
-                    "Reproduce: ./gradlew :app:testPlayDebugUnitTest --tests '*BrowseCohesionEvidenceTest.pseudoArXbRecordings'; en-XA lays the same folder out normally.\n")
+                    "Reproduce: ./gradlew :app:testPlayDebugUnitTest --tests '*BrowseCohesionEvidenceTest.pseudoArXbRecordings'; en-XA lays the same folder out normally.\n"
+            }
             org.junit.Assume.assumeTrue(
                 "Known production defect (RTL depth level laid out 0x0, DepthNavigation.kt); finding saved: ar-XB-font1.0-recordings-folder-RTL-FINDING", false)
         }
@@ -710,13 +709,11 @@ class BrowseCohesionEvidenceTest {
         }
         assertTrue("$name captured mid-animation", bitmap.sameAs(settled))
         settled.recycle()
-        val directory = File("build/outputs/browse-cohesion/implemented").apply { mkdirs() }
-        File(directory, "$name.png").outputStream().use {
-            assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
-        }
+        val directory = File("build/outputs/browse-cohesion/implemented")
+        CaptureOutput.writePng(File(directory, "$name.png"), bitmap)
         PseudoLocaleEvidence.mirror("browse", name, bitmap, view, scale, "mdpi 1.0", focus.description,
             "$scenario; production SideRail + screen content; fake SDK fixtures, English fake programme titles")
-        File(directory, "$name.txt").writeText(
+        CaptureOutput.writeText(File(directory, "$name.txt")) {
             """
             baseRevision=f3180df
             captureSource=ux/browse-cohesion implementation worktree
@@ -735,8 +732,8 @@ class BrowseCohesionEvidenceTest {
             sdkCallsBeforeBrowse=$initialSdkCalls; sdkCallsAtCapture=${session.calls.size}; playbackRequests=$playbackRequests; navigationRequests=$navigationRequests
             sdkCallKindsAtCapture=${session.calls}
             evidenceLimit=static production composition only; not physical-TV focus feel, motion, overscan, remote repeat or SurfaceView proof
-            """.trimIndent() + "\n",
-        )
+            """.trimIndent() + "\n"
+        }
         bitmap.recycle()
     }
 

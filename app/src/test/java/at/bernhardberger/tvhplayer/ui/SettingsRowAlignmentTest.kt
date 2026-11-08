@@ -15,6 +15,7 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.*
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.ui.screens.settings.settingsRow
 import org.junit.Assert.*
 import org.junit.Rule
@@ -55,8 +56,7 @@ class SettingsRowAlignmentTest {
         compose.waitForIdle()
         val bitmap = Bitmap.createBitmap(960, 540, Bitmap.Config.ARGB_8888)
         compose.runOnIdle { view.draw(Canvas(bitmap)) }
-        val directory = File("build/outputs/settings-c-captures").apply { mkdirs() }
-        File(directory, "toggle-component-comparison.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        CaptureOutput.writePng(File("build/outputs/settings-c-captures", "toggle-component-comparison.png"), bitmap)
         val results = listOf("App toggle", "Material default", "Material minimum56").associateWith { label ->
             val text = compose.onNodeWithText(label, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
             val ys = (text.top.toInt() - 16..text.bottom.toInt() + 16).filter { y ->
@@ -66,11 +66,14 @@ class SettingsRowAlignmentTest {
             val center = (ys.first() + ys.last() + 1) / 2f
             "textCenter=${text.center.y}, switchCenter=$center, delta=${text.center.y - center}"
         }
-        File(directory, "toggle-component-comparison.txt").writeText(results.entries.joinToString("\n"))
+        CaptureOutput.writeText(File("build/outputs/settings-c-captures", "toggle-component-comparison.txt")) { results.entries.joinToString("\n") }
         val label = compose.onNodeWithText("App toggle", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val fill = (0 until 64).filter { bitmap.getPixel(200, it) == android.graphics.Color.rgb(225, 226, 229) }
         val fillCenter = (fill.first() + fill.last() + 1) / 2f
-        File(directory, "toggle-component-comparison.txt").appendText("\nFocused app containerCenter=$fillCenter, textCenter=${label.center.y}")
+        if (CaptureOutput.enabled) {
+            File("build/outputs/settings-c-captures", "toggle-component-comparison.txt")
+                .appendText("\nFocused app containerCenter=$fillCenter, textCenter=${label.center.y}")
+        }
         assertEquals("One-line label must be centered in its focus surface", fillCenter, label.center.y, .5f)
         val supporting = compose.onNodeWithText("Current value", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val headline = compose.onNodeWithText("Two-line toggle", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot

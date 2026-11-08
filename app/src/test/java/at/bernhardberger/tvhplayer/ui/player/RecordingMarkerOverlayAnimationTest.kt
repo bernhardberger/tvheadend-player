@@ -265,6 +265,41 @@ class RecordingMarkerOverlayAnimationTest {
             at96.third >= frames.last().third * .5f)
     }
 
+    /** The pill's container must not flash while it travels and its label swaps (moved from the capture matrix). */
+    @Test fun thePillContainerColourStaysConstantThroughEveryTravelFrame() {
+        stops = (1..3).map { index ->
+            val time = index * 1_000L
+            RecordingMarkStop(time, RecordingMark(RecordingMarkKind.CHAPTER, time, name = "Chapter $index"))
+        }
+        hints = true
+        show()
+        compose.runOnIdle { navigation.show(stops.map { it.positionMs }, 0) }
+        repeat(25) { advance(16) }
+        val container = containerColour()
+        assertTrue("the sample must hit the drawn container, not the black scene: $container", container != Color.Black)
+        for (key in listOf(Key.DirectionRight, Key.DirectionRight, Key.DirectionLeft)) {
+            compose.onRoot().performKeyInput { pressKey(key) }
+            drawFrame()
+            val startX = compose.onNodeWithTag("recording-marker-target").fetchSemanticsNode().boundsInRoot.center.x
+            var moved = false
+            repeat(25) { frame ->
+                advance(16); drawFrame()
+                moved = moved ||
+                    kotlin.math.abs(compose.onNodeWithTag("recording-marker-target").fetchSemanticsNode().boundsInRoot.center.x - startX) > .5f
+                assertEquals("pill container changed at frame $frame of $key", container, containerColour())
+            }
+            assertTrue("the pill travelled on $key", moved)
+        }
+    }
+
+    /** Top padding centre of the pill: no label ink, rounded edge or underlying scene. */
+    private fun containerColour(): Color {
+        val scene = compose.onNodeWithTag("hint-scene")
+        val sceneBounds = scene.fetchSemanticsNode().boundsInRoot
+        val pill = compose.onNodeWithTag("recording-marker-target").fetchSemanticsNode().boundsInRoot
+        return scene.captureToImage().toPixelMap()[(pill.center.x - sceneBounds.left).toInt(), (pill.top - sceneBounds.top).toInt() + 2]
+    }
+
     @Test fun rapidHeldSelectionsRetainTheLastLabelUntilWithinOneStop() {
         stops = (1..5).map { index ->
             val time = index * 1_000L

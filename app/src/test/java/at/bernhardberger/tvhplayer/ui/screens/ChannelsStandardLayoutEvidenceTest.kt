@@ -4,6 +4,7 @@ import android.app.Application
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.settings.ChannelsLayout
 import at.bernhardberger.tvhplayer.settings.ChannelsView
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -1057,15 +1058,13 @@ class ChannelsStandardLayoutEvidenceTest {
         val bitmap = drawShell()
         compose.waitForIdle()
         assertTrue("$name was captured mid-animation", bitmap.sameAs(drawShell()))
-        val directory = File(CAPTURE_DIRECTORY).apply { mkdirs() }
-        File(directory, "$name.png").outputStream().use {
-            assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
-        }
+        val directory = File(CAPTURE_DIRECTORY)
+        CaptureOutput.writePng(File(directory, "$name.png"), bitmap)
         val picture = compose.onAllNodesWithTag("channels-list-art", useUnmergedTree = true).fetchSemanticsNodes().singleOrNull()
         val next = compose.onAllNodesWithTag("channels-immersive-next", useUnmergedTree = true).fetchSemanticsNodes().singleOrNull()
         val synopsisLines = if (compose.onAllNodesWithTag("channels-immersive-synopsis", useUnmergedTree = true).fetchSemanticsNodes().isEmpty()) 0 else
             detail("channels-immersive-synopsis").textLayout().lineCount
-        File(directory, "$name.txt").writeText(
+        val sidecar = (
             "canvas=960x540 logical; pixels=${bitmap.width}x${bitmap.height}; density=1.0; " +
                 "locale=${name.substringBefore("-font")}; fontScale=${name.substringAfter("-font").substringBefore("-")}; " +
                 "focus/scenario=${name.substringAfter("-font").substringAfter("-").removeSuffix("-bright-video").removeSuffix("-dark-video")}; " +
@@ -1073,8 +1072,9 @@ class ChannelsStandardLayoutEvidenceTest {
                 "picture=${picture?.boundsInRoot ?: "absent"}; headlineTop=${headlineChannel().bounds().top}; " +
                 "nextBottom=${next?.boundsInRoot?.bottom ?: "absent"}; synopsisLines=$synopsisLines; " +
                 "production=MainStartupComposition+SideRail+ChannelsScreenContent; " +
-                "synthetic video; static offline composition only\n",
-        )
+                "synthetic video; static offline composition only\n"
+            )
+        CaptureOutput.writeText(File(directory, "$name.txt")) { sidecar }
     }
 
     private companion object {

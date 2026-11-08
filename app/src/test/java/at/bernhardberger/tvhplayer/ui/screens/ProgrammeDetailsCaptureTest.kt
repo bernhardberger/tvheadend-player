@@ -28,6 +28,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.ui.player.*
 import org.junit.Assert.assertEquals
@@ -173,8 +174,7 @@ class ProgrammeDetailsCaptureTest {
         if (scrolled) compose.onNodeWithTag("details-framed-art", useUnmergedTree = true).assertIsNotDisplayed()
         val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
         compose.runOnIdle { view.draw(Canvas(bitmap)) }
-        val directory = File("../build/review/framed-art").apply { mkdirs() }
-        File(directory, "$name-en-font1.0.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        CaptureOutput.writePng(File("../build/review/framed-art", "$name-en-font1.0.png"), bitmap)
         bitmap.recycle()
     }
 
@@ -236,10 +236,7 @@ class ProgrammeDetailsCaptureTest {
         compose.waitForIdle()
         val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
         compose.runOnIdle { view.draw(Canvas(bitmap)) }
-        val directory = File("build/outputs/details-unify").apply { mkdirs() }
-        File(directory, "warm-recording-${if (player) "player" else "browse"}-en-font1.0.png").outputStream().use {
-            bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
-        }
+        CaptureOutput.writePng(File("build/outputs/details-unify", "warm-recording-${if (player) "player" else "browse"}-en-font1.0.png"), bitmap)
         bitmap.recycle()
     }
 
@@ -387,8 +384,7 @@ class ProgrammeDetailsCaptureTest {
         }
         val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
         compose.runOnIdle { view.draw(Canvas(bitmap)) }
-        val directory = File("build/outputs/presentation").apply { mkdirs() }
-        File(directory, if (store) "store-details.png" else "details.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        CaptureOutput.writePng(File("build/outputs/presentation", if (store) "store-details.png" else "details.png"), bitmap)
         bitmap.recycle()
     }
 
@@ -448,8 +444,7 @@ class ProgrammeDetailsCaptureTest {
             val canvas = Canvas(bitmap)
             view.draw(canvas)
         }
-        val directory = File("build/outputs/details-unify").apply { mkdirs() }
-        File(directory, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        CaptureOutput.writePng(File("build/outputs/details-unify", "$name.png"), bitmap)
         bitmap.recycle()
     }
 }

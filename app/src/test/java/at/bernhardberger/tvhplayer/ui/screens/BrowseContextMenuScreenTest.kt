@@ -26,6 +26,7 @@ import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
 import at.bernhardberger.tvhplayer.settings.ChannelsLayout
 import at.bernhardberger.tvhplayer.settings.ChannelsView
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
@@ -1247,8 +1248,7 @@ class BrowseContextMenuScreenTest {
             else Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888).also { bitmap ->
                 compose.runOnIdle { view.draw(Canvas(bitmap)) }
             }
-        val directory = File("build/outputs/$output").apply { mkdirs() }
-        File(directory, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        CaptureOutput.writePng(File("build/outputs/$output", "$name.png"), bitmap)
         bitmap.recycle()
     }
 

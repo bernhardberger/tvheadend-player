@@ -38,6 +38,7 @@ import androidx.navigation3.ui.NavDisplay
 import at.bernhardberger.tvheadend.sdk.core.CacheStatistics
 import at.bernhardberger.tvhplayer.settings.AppLanguage
 import at.bernhardberger.tvhplayer.settings.UiSettings
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthFrame
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthItem
@@ -857,13 +858,8 @@ class DepthMotionEvidenceTest {
 
     private fun capture(name: String) = write(name, draw())
 
-    private fun write(name: String, bitmap: Bitmap) {
-        if (!java.lang.Boolean.getBoolean("tvhplayer.writeMotionCaptures")) return
-        val directory = File("build/outputs/motion-captures").apply { mkdirs() }
-        File(directory, "$name.png").outputStream().use {
-            assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
-        }
-    }
+    private fun write(name: String, bitmap: Bitmap) =
+        CaptureOutput.writePng(File("build/outputs/motion-captures", "$name.png"), bitmap)
 
     /** The production shell over a flat field, so ink is only what the shell drew. */
     private fun shell(rtl: Boolean = false) {

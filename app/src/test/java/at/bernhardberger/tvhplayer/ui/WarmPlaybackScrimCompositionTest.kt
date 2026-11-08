@@ -24,6 +24,7 @@ import at.bernhardberger.tvhplayer.core.shouldMountPersistentPlayerSurface
 import at.bernhardberger.tvhplayer.core.shouldShowWarmPlaybackScrim
 import at.bernhardberger.tvhplayer.core.shouldCoverWarmPlayback
 import at.bernhardberger.tvhplayer.settings.WarmPlaybackMode
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -154,9 +155,6 @@ class WarmPlaybackScrimCompositionTest {
         assertEquals(expectedPixel, bitmap.getPixel(0, 539))
         assertEquals(Color.Red.toArgb(), bitmap.getPixel(16, 16))
         assertEquals(Color.Green.toArgb(), bitmap.getPixel(944, 524))
-        val directory = File("build/outputs/settings-c-captures").apply { mkdirs() }
-        File(directory, "$captureName.png").outputStream().use {
-            check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
-        }
+        CaptureOutput.writePng(File("build/outputs/settings-c-captures", "$captureName.png"), bitmap)
     }
 }

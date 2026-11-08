@@ -11,6 +11,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import org.robolectric.util.ReflectionHelpers
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import android.graphics.Bitmap
@@ -1357,10 +1358,7 @@ class NavigationShellEvidenceTest {
         // A second frame of the same state proves no animation was still running.
         compose.waitForIdle()
         assertTrue("$name was captured mid-animation", bitmap.sameAs(drawShell()))
-        val directory = File("build/outputs/navigation-shell-captures").apply { mkdirs() }
-        File(directory, "$name.png").outputStream().use {
-            assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
-        }
+        CaptureOutput.writePng(File("build/outputs/navigation-shell-captures", "$name.png"), bitmap)
     }
 
     @Category(VisualCapture::class)
@@ -1399,10 +1397,7 @@ class NavigationShellEvidenceTest {
         val bitmap = drawShell()
         compose.waitForIdle()
         assertTrue("$name was captured mid-animation", bitmap.sameAs(drawShell()))
-        val directory = File("../build/review/drawer-controls").apply { mkdirs() }
-        File(directory, "en-font$fontScale-$name.png").outputStream().use {
-            assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
-        }
+        CaptureOutput.writePng(File("../build/review/drawer-controls", "en-font$fontScale-$name.png"), bitmap)
     }
 
 }

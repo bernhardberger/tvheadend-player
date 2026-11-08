@@ -18,6 +18,7 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.guideDisplayEvents
 import at.bernhardberger.tvhplayer.core.programmeDetailsActions
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsPage
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.screens.guide.*
@@ -125,9 +126,9 @@ class GuideHistoryCompositionTest {
                 android.view.inspector.WindowInspector.getGlobalWindowViews().last()
             } else view
             captureView.draw(Canvas(bitmap))
-            val directory = File("build/outputs/guide-history-evidence").apply { mkdirs() }
-            File(directory, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-            File(directory, "$name.txt").writeText("canvas=960x540\ndensity=1\nzone=UTC\nlocale=${name.substringBefore('-')}\nfontScale=${if (name.contains("1.3")) "1.3" else "1.0"}\nfocus=$focus\nproduction rows/details; SDK snapshot archive; not full screen owner\n")
+            val directory = File("build/outputs/guide-history-evidence")
+            CaptureOutput.writePng(File(directory, "$name.png"), bitmap)
+            CaptureOutput.writeText(File(directory, "$name.txt")) { "canvas=960x540\ndensity=1\nzone=UTC\nlocale=${name.substringBefore('-')}\nfontScale=${if (name.contains("1.3")) "1.3" else "1.0"}\nfocus=$focus\nproduction rows/details; SDK snapshot archive; not full screen owner\n" }
             bitmap.recycle()
         }
     }

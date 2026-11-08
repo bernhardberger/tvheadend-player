@@ -19,6 +19,7 @@ import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.settings.*
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import at.bernhardberger.tvhplayer.testutil.leaveTouchModeBeforeComposing
 import at.bernhardberger.tvhplayer.ui.components.depth.*
@@ -148,13 +149,15 @@ class SettingsConnectionDepthTest {
         compose.runOnIdle {
             val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
             view.draw(Canvas(bitmap))
-            val directory = File("build/outputs/onboarding-captures").apply { mkdirs() }
-            File(directory, "$name.png").outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
-            File(directory, "$name.txt").writeText("canvas=960x540dp; locale=en; fontScale=1.0; focus=${when (name) {
-                "settings-entry" -> "Connection"
-                "settings-connection-page" -> "Set up connection"
-                else -> "setup-continue"
-            }}; Settings inside SideRail; fictional offline data")
+            val directory = File("build/outputs/onboarding-captures")
+            CaptureOutput.writePng(File(directory, "$name.png"), bitmap)
+            CaptureOutput.writeText(File(directory, "$name.txt")) {
+                "canvas=960x540dp; locale=en; fontScale=1.0; focus=${when (name) {
+                    "settings-entry" -> "Connection"
+                    "settings-connection-page" -> "Set up connection"
+                    else -> "setup-continue"
+                }}; Settings inside SideRail; fictional offline data"
+            }
             bitmap.recycle()
         }
     }

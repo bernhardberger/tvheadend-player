@@ -18,6 +18,7 @@ import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.settings.AudioFormatPreference
 import at.bernhardberger.tvhplayer.settings.audioLanguagesWithSlot
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.ui.components.depth.rememberDepthNavigationState
 import at.bernhardberger.tvhplayer.ui.player.PlaybackOptionTrack
 import at.bernhardberger.tvhplayer.ui.player.PlaybackOptionsSheetContent
@@ -221,8 +222,7 @@ class AudioPreferenceUiTest {
         assertEquals(1080, view.height)
         val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
         view.draw(Canvas(bitmap))
-        val directory = File("build/outputs/audio-preference-captures").apply { mkdirs() }
-        File(directory, "$name.png").outputStream().use { check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+        CaptureOutput.writePng(File("build/outputs/audio-preference-captures", "$name.png"), bitmap)
         bitmap.recycle()
     }
 }

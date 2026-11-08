@@ -38,6 +38,7 @@ import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.Tracks
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.ListTopFadeVisible
 import at.bernhardberger.tvhplayer.ui.components.ListBottomFadeVisible
@@ -229,8 +230,7 @@ class PlaybackOptionsTrackListTest {
         assertEquals(1080, view.height)
         val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
         view.draw(Canvas(bitmap))
-        val directory = File("build/outputs/playback-panel-captures").apply { mkdirs() }
-        File(directory, "$name.png").outputStream().use { check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+        CaptureOutput.writePng(File("build/outputs/playback-panel-captures", "$name.png"), bitmap)
         bitmap.recycle()
     }
 
