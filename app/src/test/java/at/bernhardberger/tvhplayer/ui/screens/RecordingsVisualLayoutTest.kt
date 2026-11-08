@@ -673,6 +673,10 @@ class RecordingsVisualLayoutTest {
         repeat(2) { key(Key.DirectionDown) }
         compose.mainClock.advanceTimeBy(1_500)
         capture("5-genres-root", 1f, outputs = out)
+        repeat(4) { key(Key.DirectionDown) }
+        focused("recordings-folder-Children")
+        compose.mainClock.advanceTimeBy(1_500)
+        capture("5b-genres-children-focused", 1f, outputs = out)
         toPill()
         choose("none")
         key(Key.DirectionDown)

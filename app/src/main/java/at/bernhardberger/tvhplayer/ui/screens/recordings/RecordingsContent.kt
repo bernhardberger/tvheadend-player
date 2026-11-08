@@ -248,8 +248,9 @@ internal fun FolderListRow(
     onOpenContextMenu: (() -> Unit)? = null,
     /** A channel folder shows the channel's logo where other folders show the folder icon. */
     picon: ChannelIcon? = null,
-    /** An unfocused genre folder uses its family's color; focus keeps the native readable tint. */
+    /** Optional genre colors; other folders keep the native icon tint in both states. */
     iconTint: Color? = null,
+    focusedIconTint: Color? = null,
 ) {
     var focused by remember { mutableStateOf(false) }
     val summary = remember(folder) { summarizeDvrFolder(folder) }
@@ -314,7 +315,7 @@ internal fun FolderListRow(
             } else Icon(
                 painter = painterResource(R.drawable.ic_folder),
                 contentDescription = null,
-                tint = if (!focused && iconTint != null) iconTint else androidx.tv.material3.LocalContentColor.current,
+                tint = (if (focused) focusedIconTint else iconTint) ?: androidx.tv.material3.LocalContentColor.current,
                 modifier = Modifier.size(32.dp),
             )
         },
