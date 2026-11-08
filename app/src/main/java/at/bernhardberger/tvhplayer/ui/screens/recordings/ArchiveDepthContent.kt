@@ -160,6 +160,7 @@ internal fun ArchiveDepthContent(
                             FolderListRow(item.folder, selected = false, modifier = rowModifier, onClick = activate,
                                 resumePosition = { offeredResumePosition(latestAdmissionForEntry.value(it)) },
                                 onOpenContextMenu = { latestOnOpenFolderMenu.value?.invoke(item.folder) },
+                                iconTint = at.bernhardberger.tvhplayer.ui.tvGenreColors(item.folder.genreCategory)?.base,
                                 picon = item.folder.takeIf { it.channelId != null }
                                     ?.let { folder -> folder.recordings.firstOrNull { it.channelId != null } }
                                     ?.let(latestPiconForEntry.value))

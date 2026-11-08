@@ -74,6 +74,7 @@ class DvrLibraryPolicyTest {
     @Test fun foldersGroupingIsTheServerTree() {
         val entries = listOf(entry(1, DvrEntryState.COMPLETED, 100, listOf("Series")), entry(2, DvrEntryState.COMPLETED, 200, null))
         assertEquals(buildDvrArchive(entries), buildDvrArchive(entries, DvrArchiveGrouping.FOLDERS, naming()))
+        assertTrue(buildDvrArchive(entries, DvrArchiveGrouping.FOLDERS, naming()).folders.all { it.genreCategory == null })
     }
 
     @Test fun channelsGroupingMakesOneFolderPerChannelInNumberOrderNoChannelLast() {
@@ -93,6 +94,7 @@ class DvrLibraryPolicyTest {
         // A channel folder wears its channel's logo; the catch-all keeps the folder icon.
         assertEquals(ChannelId(2), root.folderAt(listOf("News"))?.channelId)
         assertNull(root.folderAt(listOf("No channel"))?.channelId)
+        assertTrue(root.folders.all { it.genreCategory == null })
     }
 
     @Test fun genresGroupingMakesOneFolderPerGenreNewestFirstNoGenreLast() {
@@ -105,6 +107,9 @@ class DvrLibraryPolicyTest {
         assertEquals(listOf(plain), root.folderAt(listOf("No genre"))?.recordings)
         // Only a channel group wears a channel's logo; a genre group keeps the folder icon.
         assertTrue(root.folders.all { it.channelId == null })
+        assertEquals(ProgrammeCategory.SPORT, root.folderAt(listOf("Sport"))?.genreCategory)
+        assertEquals(ProgrammeCategory.NEWS, root.folderAt(listOf("News"))?.genreCategory)
+        assertNull(root.folderAt(listOf("No genre"))?.genreCategory)
     }
 
     @Test fun noGroupingIsOneNewestFirstListWithUnknownStartsLast() {
@@ -236,7 +241,11 @@ class DvrLibraryPolicyTest {
     /** The test naming reads the genre from the title. */
     private fun genred(id: Long, start: Long, genre: String?, channelId: Long? = null) =
         DvrEntry.create(DvrEntryId(id), state = DvrEntryState.COMPLETED, start = Instant.fromEpochSeconds(start), title = genre,
-            channelId = channelId?.let(::ChannelId))
+            channelId = channelId?.let(::ChannelId), contentGenre = when (genre) {
+                "Sport" -> at.bernhardberger.tvheadend.sdk.core.ContentGenre.fromContentType(0x40)
+                "News" -> at.bernhardberger.tvheadend.sdk.core.ContentGenre.fromContentType(0x20)
+                else -> null
+            })
 
     private fun entry(id: Long, state: DvrEntryState, start: Long, folder: List<String>?) =
         DvrEntry.create(DvrEntryId(id), state = state, start = Instant.fromEpochSeconds(start), folder = folder)

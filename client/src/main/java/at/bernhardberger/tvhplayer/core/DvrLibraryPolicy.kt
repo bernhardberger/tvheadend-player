@@ -49,6 +49,8 @@ data class DvrArchiveFolder(
     val channelId: ChannelId? = null,
     /** Whether a root lists its running recordings in a Recording now row; a flat list keeps them in the list. */
     val offersRecordingNow: Boolean = true,
+    /** A named genre group's category; never inferred from its display name. */
+    val genreCategory: ProgrammeCategory? = null,
 ) {
     val newestRecordingStart: Long?
         get() = (recordings.mapNotNull { it.start?.epochSeconds } +
