@@ -51,6 +51,65 @@ private val labels = object : SessionMetadataLabels {
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class)
 class SessionPlaybackPlayerTest {
+    @Test fun controllerChannelStepsRequireAShowingLivePlayerAndNeverSeekPlayback() = exercise {
+        val context = ApplicationProvider.getApplicationContext<Application>()
+        val mediaSession = androidx.media3.session.MediaSession.Builder(context, wrapper).build()
+        val connecting = androidx.media3.session.MediaController.Builder(context, mediaSession.token).buildAsync()
+        val steps = mutableListOf<Int>()
+        val stepCommands = listOf(Player.COMMAND_SEEK_TO_NEXT, Player.COMMAND_SEEK_TO_PREVIOUS,
+            Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM, Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
+        var unregister: () -> Unit = {}
+        try {
+            await { connecting.isDone }
+            val controller = connecting.get()
+            live(false)
+            settle()
+            stepCommands.forEach { assertFalse(controller.isCommandAvailable(it)) }
+            unregister = runtime.registerSessionChannelStep { steps += it }
+            settle()
+            stepCommands.forEach { assertTrue("Live player must offer channel step command $it", controller.isCommandAvailable(it)) }
+            controller.seekToNext()
+            await { steps.size == 1 }
+            controller.seekToPrevious()
+            await { steps.size == 2 }
+            controller.seekToNextMediaItem()
+            await { steps.size == 3 }
+            controller.seekToPreviousMediaItem()
+            await { steps.size == 4 }
+            settle()
+            assertEquals(listOf(1, -1, 1, -1), steps)
+            assertEquals(0, sessionSeeks)
+            assertTrue(connection.speeds.isEmpty())
+
+            // A registration change alone must notify an already connected controller.
+            unregister()
+            await { stepCommands.none(controller::isCommandAvailable) }
+            unregister = runtime.registerSessionChannelStep { steps += it }
+            await { stepCommands.all(controller::isCommandAvailable) }
+            // Route transitions can install the new owner before disposing the outgoing one.
+            val unregisterOutgoing = unregister
+            val incomingSteps = mutableListOf<Int>()
+            unregister = runtime.registerSessionChannelStep { incomingSteps += it }
+            unregisterOutgoing()
+            settle()
+            stepCommands.forEach { assertTrue(controller.isCommandAvailable(it)) }
+            controller.seekToNext()
+            await { incomingSteps == listOf(1) }
+            assertEquals(listOf(1, -1, 1, -1), steps)
+            recording()
+            await { !controller.isCurrentMediaItemLive }
+            stepCommands.forEach { assertFalse(controller.isCommandAvailable(it)) }
+            live(false)
+            await { stepCommands.all(controller::isCommandAvailable) }
+            assertEquals(listOf(1, -1, 1, -1), steps)
+            assertEquals(0, sessionSeeks)
+        } finally {
+            unregister()
+            androidx.media3.session.MediaController.releaseFuture(connecting)
+            mediaSession.release()
+        }
+    }
+
     @Test
     @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
     fun mediaControllerReceivesTheSessionContractAcrossTargetAndFailureChanges() = exercise {
@@ -1536,30 +1595,54 @@ class SessionPlaybackPlayerTest {
         assertEquals(AppPlaybackTarget.Recording(DvrEntryId(1)), runtime.activeTarget.value)
     }
 
-    @Test fun stopQueuedAfterASelectionWithdrawsItsDelayedStartWithoutAFailure() = exercise {
-        live(false)
-        val stops = collectSessionStops()
-        lateinit var zap: Deferred<PlaybackTargetResult?>
-        whileCommandsBlocked {
-            // The live screen accepts a channel (one intent); its start waits for the zap to settle.
-            val intent = runtime.notePlaybackIntent()
-            settle()
-            wrapper.stop() // the viewer's session Stop, after the selection
-            settle()
-            // The zap settles: the delayed start carries the selection's intent and mints none.
-            zap = scope.async { runtime.playLive(liveSelection(), intent) }
-            settle()
+    @Test fun stopQueuedAfterASelectionWithdrawsItsDelayedStartWithoutAFailure() =
+        listOf(false to false, true to false, true to true).forEach { (retireBeforeStop, newerClick) ->
+            exercise {
+                live(false)
+                val stops = collectSessionStops()
+                var intent = -1L
+                var clickIntent: Long? = null
+                var clickedStart: Deferred<PlaybackTargetResult?>? = null
+                lateinit var zap: Deferred<PlaybackTargetResult?>
+                whileCommandsBlocked {
+                    // The live screen accepts a channel (one intent); its start waits for the zap to settle.
+                    intent = runtime.notePlaybackIntent()
+                    runtime.noteLiveSelection(intent)
+                    // An explicit channel click notes intent before joining the older browse start,
+                    // without registering another live selection until its own start runs.
+                    if (newerClick) clickIntent = runtime.notePlaybackIntent()
+                    settle()
+                    wrapper.stop() // the viewer's session Stop, after the selection
+                    settle()
+                    // Cancellation of the old fresh-decoder install can retire its target before
+                    // the queued Stop acquires the serializer, even if a newer click hid the selection.
+                    if (retireBeforeStop) retireWithState(AppPlaybackState.Starting)
+                    // The zap settles: the delayed start carries the selection's intent and mints none.
+                    zap = scope.async { runtime.playLive(liveSelection(), intent) }
+                    clickedStart = clickIntent?.let { current ->
+                        scope.async {
+                            zap.await() // Explicit entry joins the admitted browse start first.
+                            runtime.playLive(liveSelection(), current)
+                        }
+                    }
+                    settle()
+                }
+                await { zap.isCompleted }
+                clickedStart?.let { await { it.isCompleted } }
+                settle()
+                // Stop ran and closed the screen once; neither delayed start installed or failed.
+                assertEquals(null, zap.await())
+                assertEquals(null, clickedStart?.await())
+                assertEquals(1, stops.size)
+                assertTrue(runtime.isPlaybackIntentStopped(intent))
+                clickIntent?.let { assertTrue(runtime.isPlaybackIntentStopped(it)) }
+                assertEquals(1, connection.subscribeCount)
+                assertEquals(1, connection.unsubscribeCount)
+                assertEquals(null, runtime.activeTarget.value)
+                assertEquals(AppPlaybackState.Idle, runtime.state.value)
+                assertEquals(playerLog.toString(), 0, player.mediaItemCount)
+            }
         }
-        await { zap.isCompleted }
-        settle()
-        // Stop ran and closed the screen once; the delayed start neither started nor failed.
-        assertEquals(null, zap.await())
-        assertEquals(1, stops.size)
-        assertEquals(1, connection.subscribeCount)
-        assertEquals(1, connection.unsubscribeCount)
-        assertEquals(null, runtime.activeTarget.value)
-        assertEquals(AppPlaybackState.Idle, runtime.state.value)
-    }
 
     @Test fun enteringALivePlayerAfterAUserStopStartsNothing() = exercise {
         live(false)
@@ -1843,7 +1926,12 @@ class SessionPlaybackPlayerTest {
         /** Runtime listeners, so tests can drive STATE_READY, which the fake stream never reaches. */
         private val playerListeners = mutableListOf<Player.Listener>()
         var reportedDuration: Long? = null
+        var sessionSeeks = 0
         val runtime = AppPlaybackRuntime(object : ExoPlayer by player {
+            override fun seekTo(positionMs: Long) {
+                sessionSeeks++
+                player.seekTo(positionMs)
+            }
             override fun getDuration(): Long = reportedDuration ?: player.duration
             override fun addListener(listener: Player.Listener) {
                 playerListeners += listener

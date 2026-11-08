@@ -20,6 +20,95 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppRootPlaybackOrchestratorTest {
     @Test
+    fun targetLossDuringOwnedCancellationKeepsTheFinalSettlingStep() = runTest {
+        val steps = BrowseChannelStepHandoff()
+        val loseTarget = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        var finalStarted = false
+        steps.playbackChanged(ChannelId(11))
+        val first = steps.queue(ChannelId(22)) {}
+        steps.start(backgroundScope, first) {
+            try { CompletableDeferred<Unit>().await() } finally {
+                withContext(NonCancellable) {
+                    loseTarget.await()
+                    steps.playbackChanged(null)
+                    release.await()
+                }
+            }
+        }
+        val second = steps.queue(ChannelId(33)) {}
+        steps.start(backgroundScope, second) {}
+        val final = steps.queue(ChannelId(44)) {}
+        loseTarget.complete(Unit)
+        runCurrent()
+        try {
+            assertEquals("Target loss must retain the accepted channel cursor", ChannelId(44), steps.channelCursor)
+            steps.start(backgroundScope, final) { finalStarted = true }
+        } finally {
+            release.complete(Unit)
+        }
+        steps.joinStart()
+        runCurrent()
+        assertTrue("The final settling step still starts after target loss", finalStarted)
+    }
+
+    @Test
+    fun withdrawingASettlingStepAbandonsItAndRejectsItsLateCallback() = runTest {
+        val steps = BrowseChannelStepHandoff()
+        var abandoned = false
+        var stepStarted = false
+        val token = steps.queue { abandoned = true }
+        steps.withdrawPending()
+        steps.start(this, token) { stepStarted = true }
+        runCurrent()
+        assertTrue("The unlaunched selection must be abandoned", abandoned)
+        assertFalse("A withdrawn delayed step must not start", stepStarted)
+    }
+
+    @Test
+    fun aNewBrowseStartCancelsAndJoinsItsPredecessorBeforeStarting() = runTest {
+        val steps = BrowseChannelStepHandoff()
+        val release = CompletableDeferred<Unit>()
+        var firstCompletedCleanup = false
+        var finalSawCleanup = false
+        var secondEnded = false
+        var secondStarted = false
+        var entryPending = false
+        var active = ChannelId(11)
+        var adopted: ChannelId? = null
+        val first = steps.queue {}
+        steps.start(backgroundScope, first) {
+            try { CompletableDeferred<Unit>().await() } finally {
+                withContext(NonCancellable) { release.await(); firstCompletedCleanup = true }
+            }
+        }
+        runCurrent()
+        val second = steps.queue {}
+        steps.start(backgroundScope, second, onFinished = { secondEnded = true }) { secondStarted = true }
+        val third = steps.queue {}
+        steps.start(backgroundScope, third, entryPending = { entryPending }) {
+            finalSawCleanup = firstCompletedCleanup
+            active = ChannelId(22)
+        }
+        runCurrent()
+        entryPending = true
+        steps.withdrawPending()
+        val entry = async { steps.joinStart(); adopted = active }
+        runCurrent()
+        try {
+            assertFalse(secondStarted)
+            assertTrue("Cancellation while joining a predecessor ends the launched selection", secondEnded)
+            assertNull("Entry waits for the admitted start, not the old channel", adopted)
+        } finally {
+            release.complete(Unit)
+        }
+        entry.await()
+        runCurrent()
+        assertTrue("The latest start waits for cancellation cleanup", finalSawCleanup)
+        assertEquals("Entry adopts the channel installed by the admitted start", ChannelId(22), adopted)
+    }
+
+    @Test
     fun currentLiveChannelNavigatesWithoutRetuningAndRearmsWarmReturn() = runTest {
         val orchestrator = AppRootPlaybackOrchestrator()
         orchestrator.activePlaybackChanged(
@@ -46,6 +135,29 @@ class AppRootPlaybackOrchestratorTest {
         assertEquals(PlayerRouteTarget.Live(ChannelId(22), "News HD"), target)
         assertEquals(0, playRequests)
         assertTrue(orchestrator.warmReturn.canReturn)
+    }
+
+    @Test
+    fun browseChannelStepRearmsWarmReturnToTheNewChannelWithoutOpeningThePlayer() = runTest {
+        val orchestrator = AppRootPlaybackOrchestrator()
+        var activeChannelId = ChannelId(11)
+        orchestrator.activePlaybackChanged(activeChannelId, null)
+        orchestrator.consumeWarmPlayerTarget(activeChannelId, null, CurrentChannelReadiness.Waiting) {}
+        assertFalse(orchestrator.warmReturn.canReturn)
+        var startedIntent: Long? = null
+
+        orchestrator.startLiveChannelFromBrowse(ChannelId(22), viewingIntent = 7L) { intent ->
+            startedIntent = intent
+            activeChannelId = ChannelId(22)
+        }
+
+        assertEquals(7L, startedIntent)
+        assertTrue("A browse channel step rearms the one-shot warm return", orchestrator.warmReturn.canReturn)
+        assertEquals(
+            PlayerRouteTarget.Live(ChannelId(22), ""),
+            orchestrator.consumeWarmPlayerTarget(activeChannelId, null, CurrentChannelReadiness.Waiting) {},
+        )
+        assertFalse(orchestrator.warmReturn.canReturn)
     }
 
     @Test
