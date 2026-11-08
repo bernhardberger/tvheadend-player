@@ -1,0 +1,8 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>ForbiddenMethodCall:LiveStartBufferPlayerTest.kt:LiveStartBufferPlayerTest$sleep(5)</ID>
+    <ID>ForbiddenMethodCall:LiveStartBufferPlayerTest.kt:LiveStartBufferPlayerTest.SlowDataSource$sleep(2)</ID>
+  </CurrentIssues>
+</SmellBaseline>

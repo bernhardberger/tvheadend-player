@@ -1,0 +1,347 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>ComplexCondition:AppPlaybackRuntime.kt:AppPlaybackRuntime$!foreground || selection.currentSession === current || epoch == null || _activeTarget.value != AppPlaybackTarget.Live(selection.channelId) || activeLiveProfileGeneration != profileOwner.configurationGeneration.value</ID>
+    <ID>ComplexCondition:AppPlaybackRuntime.kt:AppPlaybackRuntime$!isAttached() || !foreground || epoch == null || epoch != activeTargetEpoch || _activeTarget.value !is AppPlaybackTarget.Recording</ID>
+    <ID>ComplexCondition:AppPlaybackRuntime.kt:AppPlaybackRuntime$!pausedSeekSuperseded(arrival, intent, epoch) &amp;&amp; player.currentMediaItem === item &amp;&amp; !player.playWhenReady &amp;&amp; latestConfirmation() != PausedSeekConfirmation.FRAME_RENDERED</ID>
+    <ID>ComplexCondition:AppPlaybackRuntime.kt:AppPlaybackRuntime$!recovering &amp;&amp; _activeTarget.value == null || viewerRetry &amp;&amp; healthyActiveTarget() == null</ID>
+    <ID>ComplexCondition:AppPlaybackRuntime.kt:AppPlaybackRuntime$!recovers &amp;&amp; !(liveZap &amp;&amp; freshDecoderPerZap &amp;&amp; _activeTarget.value is AppPlaybackTarget.Live)</ID>
+    <ID>ComplexCondition:AppPlaybackRuntime.kt:AppPlaybackRuntime$epoch != null &amp;&amp; audioInterruptions.interruption == null &amp;&amp; targetCommands.isOpen() &amp;&amp; livePauseController.awaitsFirstPicture(epoch, livePauseController.currentLivePauseAvailability())</ID>
+    <ID>ComplexCondition:AppPlaybackRuntime.kt:AppPlaybackRuntime$epoch == null || activeTargetEpoch == null || epoch != activeTargetEpoch &amp;&amp; continuity != targetContinuity</ID>
+    <ID>ComplexCondition:AppPlaybackRuntime.kt:AppPlaybackRuntime$foreground &amp;&amp; !targetInstallationInProgress &amp;&amp; !audioInterruptions.interruptionPaused &amp;&amp; !audioInterruptions.interruptionMuted &amp;&amp; !resolvedPause &amp;&amp; livePauseController.pendingLivePauseEpoch != activeTargetEpoch</ID>
+    <ID>ComplexCondition:AppPlaybackRuntime.kt:AppPlaybackRuntime$installedLiveTargetEpochLocked(selection, intent) != frame.epoch || session.observation.value.currentSession !== selection.currentSession || intent != null &amp;&amp; (intent != playbackRequests.get() || isPlaybackIntentStopped(intent))</ID>
+    <ID>ComplexCondition:AppPlaybackRuntime.kt:AppPlaybackRuntime$live &amp;&amp; !timeshift &amp;&amp; !livePauseController.currentLivePauseAvailability().acceptsPause() &amp;&amp; !(playWhenReady &amp;&amp; hasExhaustedRecovery())</ID>
+    <ID>ComplexCondition:AppPlaybackRuntime.kt:AppPlaybackRuntime$recoverySelection != null &amp;&amp; (recoveryIntent != playbackRequests.get() || isPlaybackIntentStopped(recoveryIntent) || livePlaybackObservation.value == LivePlaybackObservation.Departed)</ID>
+    <ID>ComplexCondition:AppPlaybackRuntime.kt:AppPlaybackRuntime$result.disposition == TimeshiftCommandDisposition.NOT_ACCEPTED &amp;&amp; foreground &amp;&amp; audioInterruptions.interruption == null &amp;&amp; targetCommands.isOpen()</ID>
+    <ID>ComplexCondition:AppPlaybackRuntime.kt:AppPlaybackRuntime$result?.isStarted != true &amp;&amp; result != PlaybackTargetResult.DEPARTED &amp;&amp; generation == playbackRequests.get() &amp;&amp; !isPlaybackIntentStopped(generation) &amp;&amp; healthyActiveTarget() is AppPlaybackTarget.Live &amp;&amp; livePlaybackObservation.value is LivePlaybackObservation.Active</ID>
+    <ID>ComplexCondition:AppPlaybackRuntime.kt:AppPlaybackRuntime$stallPolling || !targetCommands.isOpen() || !player.playWhenReady || state != Player.STATE_BUFFERING &amp;&amp; state != Player.STATE_READY</ID>
+    <ID>ComplexCondition:AppPlaybackRuntime.kt:AppPlaybackRuntime$targetInstallationInProgress || coordinator.playerCleanupPending.value || state != Player.STATE_BUFFERING &amp;&amp; state != Player.STATE_READY || recoveryPlaybackBlocked(epoch) || player.currentMediaItem.let { it == null || it !== ownedMediaItem } || bufferRecovery != null || liveRecovery.deferredRecovery != null || liveRecovery.interruptedRecovery != null || presentation.state.value.let { it is AppPlaybackState.Recovering || it is AppPlaybackState.Failed }</ID>
+    <ID>ComplexCondition:BrowseContextActions.kt:!canModifyRecordings || !recordingPlaybackOffered(admission) || admission is RecordingPlaybackAdmission.Growing || entry.state == DvrEntryState.MISSED</ID>
+    <ID>ComplexCondition:ForegroundPlaybackLifecycle.kt:ForegroundPlaybackLifecycle$activeTarget is AppPlaybackTarget.Live &amp;&amp; activeTargetEpoch != null &amp;&amp; timeshiftAvailable &amp;&amp; keepLimit &gt; Duration.ZERO &amp;&amp; interactive</ID>
+    <ID>ComplexCondition:PlaybackAudioTracks.kt:PlaybackAudioTracks$targetInstallationInProgress() || audioOutputChanging || interruptionMuted() || !targetCommands.isOpen()</ID>
+    <ID>ComplexCondition:PlaybackStallWatch.kt:PlaybackStallWatch$!sample.playing || counters == null || since == null || counters !== pictureCounters || sample.renderedFrames != pictureFrames || sample.positionMillis &lt; picturePosition</ID>
+    <ID>ComplexCondition:PlayerBackKeyCycle.kt:PlayerBackKeyCycle$tracking &amp;&amp; !held &amp;&amp; startedWithHoldAllowed &amp;&amp; holdAllowed</ID>
+    <ID>ComplexCondition:ProfileTrace.kt:event.keyCode !in 19..23 &amp;&amp; event.keyCode != KeyEvent.KEYCODE_BACK &amp;&amp; event.keyCode != KeyEvent.KEYCODE_CHANNEL_UP &amp;&amp; event.keyCode != KeyEvent.KEYCODE_CHANNEL_DOWN</ID>
+    <ID>ComplexCondition:RecordingMarkers.kt:RecordingMarkers$!foreground.value || mediaItem == null || player.currentMediaItem !== mediaItem || !markerQuery.isCurrent(binding)</ID>
+    <ID>ComplexCondition:RecordingMarkers.kt:RecordingMarkers$!isCurrent() || pendingRecordingRecoveryPosition.value != null || expectedRevision != recordingMarkerRevision.value || !canSeek()</ID>
+    <ID>ComplexCondition:RecordingMarkers.kt:RecordingMarkers$active &amp;&amp; foreground.value &amp;&amp; markerQuery.isCurrent(binding) &amp;&amp; recordingMarkerRevision.value != appliedRevision</ID>
+    <ID>ComplexCondition:RecordingMarkers.kt:RecordingMarkers$expectedRevision != recordingMarkerRevision.value || !markerQuery.isCurrent() || targetInstallationInProgress() || mediaItem == null || player.currentMediaItem !== mediaItem</ID>
+    <ID>ComplexCondition:RecordingMarkers.kt:RecordingMarkers$targetInstallationInProgress() || mediaItem == null || player.currentMediaItem !== mediaItem || !markerQuery.isCurrent()</ID>
+    <ID>ComplexCondition:SeekbarPolicy.kt:!state.available || !state.timingKnown || programmeStartSec == null || programmeStopSec == null</ID>
+    <ID>ComplexCondition:SessionPlaybackPlayer.kt:SessionPlaybackPlayer$target == null || (failure != null &amp;&amp; (metadataTarget != failure.target || target != failure.target))</ID>
+    <ID>ComplexCondition:TimelineEpgPolicy.kt:channelDirection != null &amp;&amp; ( direction == EpgFocusDirection.UP &amp;&amp; channelDirection &gt; 0 || direction == EpgFocusDirection.DOWN &amp;&amp; channelDirection &lt; 0 )</ID>
+    <ID>ComplexCondition:TimelineEpgPolicy.kt:frontierDirection != null &amp;&amp; ( direction == EpgFocusDirection.LEFT &amp;&amp; frontierDirection &gt; 0 || direction == EpgFocusDirection.RIGHT &amp;&amp; frontierDirection &lt; 0 )</ID>
+    <ID>ComplexCondition:TimelineEpgPolicy.kt:frontierDirection == null &amp;&amp; channelDirection == null &amp;&amp; !windowPending &amp;&amp; !originPending</ID>
+    <ID>ConstructorParameterNaming:AudioInterruptionController.kt:AudioInterruptionController$private val _activeTarget: StateFlow&lt;AppPlaybackTarget?&gt;</ID>
+    <ID>ConstructorParameterNaming:LivePauseController.kt:LivePauseController$private val _activeTarget: StateFlow&lt;AppPlaybackTarget?&gt;</ID>
+    <ID>ConstructorParameterNaming:LivePauseController.kt:LivePauseController$private val _state: StateFlow&lt;AppPlaybackState&gt;</ID>
+    <ID>ConstructorParameterNaming:PlaybackAudioTracks.kt:PlaybackAudioTracks$private val _activeTarget: StateFlow&lt;AppPlaybackTarget?&gt;</ID>
+    <ID>ConstructorParameterNaming:PlaybackPresentationPublisher.kt:PlaybackPresentationPublisher$private val _activeTarget: StateFlow&lt;AppPlaybackTarget?&gt;</ID>
+    <ID>CyclomaticComplexMethod:AppPlaybackError.kt:@OptIn(ExperimentalTvheadendApi::class) fun recordingErrorCondition: AppErrorCondition?</ID>
+    <ID>CyclomaticComplexMethod:AppPlaybackRuntime.kt:AppPlaybackRuntime$@OptIn(ExperimentalTvheadendApi::class) private suspend fun playRecordingLocked: PlaybackTargetResult?</ID>
+    <ID>CyclomaticComplexMethod:AppPlaybackRuntime.kt:AppPlaybackRuntime$@OptIn(ExperimentalTvheadendApi::class) private suspend fun refreshPausedSeekPictureLocked</ID>
+    <ID>CyclomaticComplexMethod:AppPlaybackRuntime.kt:AppPlaybackRuntime$fun onRecoveryRequired</ID>
+    <ID>CyclomaticComplexMethod:AppPlaybackRuntime.kt:AppPlaybackRuntime$fun setSessionPlayWhenReady: Job</ID>
+    <ID>CyclomaticComplexMethod:AppPlaybackRuntime.kt:AppPlaybackRuntime$fun stopFromSession: Job</ID>
+    <ID>CyclomaticComplexMethod:AppPlaybackRuntime.kt:AppPlaybackRuntime$private fun stallSampleLocked: StallSample?</ID>
+    <ID>CyclomaticComplexMethod:AppPlaybackRuntime.kt:AppPlaybackRuntime$private suspend fun applyForegroundPlaybackAction</ID>
+    <ID>CyclomaticComplexMethod:AppPlaybackRuntime.kt:AppPlaybackRuntime$private suspend fun installTargetForPresentation: PlaybackTargetResult</ID>
+    <ID>CyclomaticComplexMethod:AppPlaybackRuntime.kt:AppPlaybackRuntime$private suspend fun pauseTimeshiftPlaybackLocked: TimeshiftCommandResult?</ID>
+    <ID>CyclomaticComplexMethod:AppPlaybackRuntime.kt:AppPlaybackRuntime$private suspend fun playLive: PlaybackTargetResult?</ID>
+    <ID>CyclomaticComplexMethod:AppPlaybackRuntime.kt:AppPlaybackRuntime$private suspend fun retryLiveRetirementLocked: Boolean</ID>
+    <ID>CyclomaticComplexMethod:AppPlaybackRuntime.kt:AppPlaybackRuntime$private suspend fun startLiveSelection: PlaybackTargetResult?</ID>
+    <ID>CyclomaticComplexMethod:AudioInterruptionController.kt:AudioInterruptionController$private suspend fun handleAudioInterruptionLocked</ID>
+    <ID>CyclomaticComplexMethod:AudioInterruptionController.kt:AudioInterruptionController$suspend fun playWithAudioFocusLocked: TimeshiftCommandResult</ID>
+    <ID>CyclomaticComplexMethod:BrowseContextActions.kt:@OptIn(ExperimentalTvheadendApi::class) fun recordingContextActions: List&lt;BrowseContextAction&gt;</ID>
+    <ID>CyclomaticComplexMethod:ConnectionNoticeSource.kt:ConnectionNoticeSource$suspend fun run: Unit</ID>
+    <ID>CyclomaticComplexMethod:DvrChangeNoticeSource.kt:DvrChangeNoticeSource$suspend fun run: Unit</ID>
+    <ID>CyclomaticComplexMethod:ForegroundPlaybackLifecycle.kt:ForegroundPlaybackLifecycle$fun onForegrounded: ForegroundPlaybackAction</ID>
+    <ID>CyclomaticComplexMethod:LivePauseController.kt:LivePauseController$suspend fun resolvePendingLivePauseLocked: Boolean</ID>
+    <ID>CyclomaticComplexMethod:LogoInk.kt:fun inkFadingLogoParts: IntArray?</ID>
+    <ID>CyclomaticComplexMethod:PlayerSettings.kt:fun normalizePreferenceLanguage: String?</ID>
+    <ID>CyclomaticComplexMethod:ProfilePlayback.kt:private fun avcCoding: String</ID>
+    <ID>CyclomaticComplexMethod:ProgrammeActionPolicy.kt:fun programmeActions: List&lt;ProgrammeAction&gt;</ID>
+    <ID>CyclomaticComplexMethod:RecordingSkipPolicy.kt:RecordingSkipPolicy$fun evaluate: RecordingSkipDecision</ID>
+    <ID>CyclomaticComplexMethod:SdkRuntimeOwner.kt:internal suspend fun closeSdkRuntime</ID>
+    <ID>CyclomaticComplexMethod:SessionPlaybackPlayer.kt:SessionPlaybackPlayer$override fun getState: State</ID>
+    <ID>CyclomaticComplexMethod:SessionPlaybackPlayer.kt:SessionPlaybackPlayer$suspend fun observe</ID>
+    <ID>CyclomaticComplexMethod:SessionPlaybackPlayer.kt:private fun sessionMetadataSnapshot: SessionMetadataSnapshot</ID>
+    <ID>CyclomaticComplexMethod:TimelineEpgPolicy.kt:fun epgColumnDataState: EpgColumnDataState</ID>
+    <ID>CyclomaticComplexMethod:TimelineEpgPolicy.kt:fun guidePendingNavigationAction: GuidePendingNavigationAction</ID>
+    <ID>CyclomaticComplexMethod:TimelineEpgPolicy.kt:fun moveTimelineEpgFocus: TimelineEpgFocusMove</ID>
+    <ID>LargeClass:AppPlaybackRuntime.kt:AppPlaybackRuntime</ID>
+    <ID>LongMethod:AppPlaybackRuntime.kt:AppPlaybackRuntime$@OptIn(ExperimentalTvheadendApi::class) private suspend fun playRecordingLocked: PlaybackTargetResult?</ID>
+    <ID>LongMethod:AppPlaybackRuntime.kt:AppPlaybackRuntime$private suspend fun playLive: PlaybackTargetResult?</ID>
+    <ID>LongMethod:ConnectionNoticeSource.kt:ConnectionNoticeSource$suspend fun run: Unit</ID>
+    <ID>LongMethod:LogoInk.kt:fun inkFadingLogoParts: IntArray?</ID>
+    <ID>LongMethod:SessionPlaybackPlayer.kt:SessionPlaybackPlayer$suspend fun observe</ID>
+    <ID>LongMethod:SessionPlaybackPlayer.kt:private fun sessionMetadataSnapshot: SessionMetadataSnapshot</ID>
+    <ID>LoopWithTooManyJumpStatements:AppPlaybackRuntime.kt:AppPlaybackRuntime$while</ID>
+    <ID>LoopWithTooManyJumpStatements:PlaybackErrorClassification.kt:while</ID>
+    <ID>LoopWithTooManyJumpStatements:ProfilePlayback.kt:for</ID>
+    <ID>MagicNumber:AppError.kt:AppErrorCondition.AUTHENTICATION_REJECTED$103</ID>
+    <ID>MagicNumber:AppError.kt:AppErrorCondition.CHANNEL_ACCESS_DENIED$205</ID>
+    <ID>MagicNumber:AppError.kt:AppErrorCondition.CHANNEL_PLAYBACK_FAILED$210</ID>
+    <ID>MagicNumber:AppError.kt:AppErrorCondition.CHANNEL_TAKEN_OVER$206</ID>
+    <ID>MagicNumber:AppError.kt:AppErrorCondition.CREDENTIAL_UNAVAILABLE$106</ID>
+    <ID>MagicNumber:AppError.kt:AppErrorCondition.INCOMPATIBLE_SERVER$105</ID>
+    <ID>MagicNumber:AppError.kt:AppErrorCondition.LOAD_FAILED$109</ID>
+    <ID>MagicNumber:AppError.kt:AppErrorCondition.MUX_NOT_ENABLED$203</ID>
+    <ID>MagicNumber:AppError.kt:AppErrorCondition.NOT_CONFIGURED$107</ID>
+    <ID>MagicNumber:AppError.kt:AppErrorCondition.NOT_TVHEADEND$111</ID>
+    <ID>MagicNumber:AppError.kt:AppErrorCondition.NO_CHANNELS$108</ID>
+    <ID>MagicNumber:AppError.kt:AppErrorCondition.NO_FREE_ADAPTER$201</ID>
+    <ID>MagicNumber:AppError.kt:AppErrorCondition.NO_NETWORK$112</ID>
+    <ID>MagicNumber:AppError.kt:AppErrorCondition.NO_SIGNAL$202</ID>
+    <ID>MagicNumber:AppError.kt:AppErrorCondition.PERMISSION_DENIED$104</ID>
+    <ID>MagicNumber:AppError.kt:AppErrorCondition.RECONNECTING$110</ID>
+    <ID>MagicNumber:AppError.kt:AppErrorCondition.RECORDING_DEFERRED$305</ID>
+    <ID>MagicNumber:AppError.kt:AppErrorCondition.RECORDING_FILE_MISSING$303</ID>
+    <ID>MagicNumber:AppError.kt:AppErrorCondition.RECORDING_INTERRUPTED$301</ID>
+    <ID>MagicNumber:AppError.kt:AppErrorCondition.RECORDING_NOT_STARTED$302</ID>
+    <ID>MagicNumber:AppError.kt:AppErrorCondition.RECORDING_PLAYBACK_FAILED$306</ID>
+    <ID>MagicNumber:AppError.kt:AppErrorCondition.RECORDING_UNAVAILABLE$304</ID>
+    <ID>MagicNumber:AppError.kt:AppErrorCondition.SCRAMBLED$204</ID>
+    <ID>MagicNumber:AppError.kt:AppErrorCondition.STREAM_STOPPED$207</ID>
+    <ID>MagicNumber:AppError.kt:AppErrorCondition.TIMEOUT$102</ID>
+    <ID>MagicNumber:AppError.kt:AppErrorCondition.UNREACHABLE$101</ID>
+    <ID>MagicNumber:AppError.kt:AppErrorCondition.USER_LIMIT$208</ID>
+    <ID>MagicNumber:AudioChoiceStore.kt:AudioChoiceStore$64</ID>
+    <ID>MagicNumber:ConnectionNoticeSource.kt:ConnectionNoticeSource$3_000</ID>
+    <ID>MagicNumber:DvrChangeNoticeSource.kt:DvrChangeNoticeSource$2_000</ID>
+    <ID>MagicNumber:DvrLibraryPolicy.kt:5</ID>
+    <ID>MagicNumber:LogoInk.kt:0.04045f</ID>
+    <ID>MagicNumber:LogoInk.kt:0.055f</ID>
+    <ID>MagicNumber:LogoInk.kt:0.05f</ID>
+    <ID>MagicNumber:LogoInk.kt:0.0722f</ID>
+    <ID>MagicNumber:LogoInk.kt:0.2126f</ID>
+    <ID>MagicNumber:LogoInk.kt:0.7152f</ID>
+    <ID>MagicNumber:LogoInk.kt:0xFF</ID>
+    <ID>MagicNumber:LogoInk.kt:1.055f</ID>
+    <ID>MagicNumber:LogoInk.kt:12.92f</ID>
+    <ID>MagicNumber:LogoInk.kt:127</ID>
+    <ID>MagicNumber:LogoInk.kt:16</ID>
+    <ID>MagicNumber:LogoInk.kt:2.4f</ID>
+    <ID>MagicNumber:LogoInk.kt:24</ID>
+    <ID>MagicNumber:LogoInk.kt:255f</ID>
+    <ID>MagicNumber:LogoInk.kt:8</ID>
+    <ID>MagicNumber:NoticeCenter.kt:NoticeCenter$8</ID>
+    <ID>MagicNumber:PlaybackAudioFocus.kt:AndroidPlaybackAudioFocus$33</ID>
+    <ID>MagicNumber:PlaybackErrorClassification.kt:2000</ID>
+    <ID>MagicNumber:PlaybackErrorClassification.kt:2999</ID>
+    <ID>MagicNumber:PlaybackErrorClassification.kt:32</ID>
+    <ID>MagicNumber:PlaybackErrorClassification.kt:80</ID>
+    <ID>MagicNumber:PlayerSettings.kt:3</ID>
+    <ID>MagicNumber:PlayerSettings.kt:PlayerSettingsStore$10</ID>
+    <ID>MagicNumber:PlayerSettings.kt:PlayerSettingsStore$20</ID>
+    <ID>MagicNumber:PlayerSettings.kt:PlayerSettingsStore$30</ID>
+    <ID>MagicNumber:PlayerSettings.kt:PlayerSettingsStore.Companion$10</ID>
+    <ID>MagicNumber:PlayerSettings.kt:PlayerSettingsStore.Companion$20</ID>
+    <ID>MagicNumber:PlayerSettings.kt:PlayerSettingsStore.Companion$30</ID>
+    <ID>MagicNumber:PlayerSettings.kt:SkipLanding.FIVE_SECONDS_BEFORE$5_000</ID>
+    <ID>MagicNumber:PlayerSettings.kt:SkipLanding.TWO_SECONDS_BEFORE$2_000</ID>
+    <ID>MagicNumber:ProfilePlayback.kt:31</ID>
+    <ID>MagicNumber:ProfilePlayback.kt:4</ID>
+    <ID>MagicNumber:ProfilePlayback.kt:4096</ID>
+    <ID>MagicNumber:ProfilePlayback.kt:7</ID>
+    <ID>MagicNumber:ProfileTrace.kt:19</ID>
+    <ID>MagicNumber:ProfileTrace.kt:23</ID>
+    <ID>MagicNumber:ProfileVideoFrameTrace.kt:ProfileVideoFrameTrace$1_000L</ID>
+    <ID>MagicNumber:RecordingMarkers.kt:RecordingMarkers$3</ID>
+    <ID>MagicNumber:RecordingMarkers.kt:RecordingMarkers$3_000L</ID>
+    <ID>MagicNumber:RecordingMarkers.kt:RecordingMarkers$7_000L</ID>
+    <ID>MagicNumber:RecordingMetadataPolicy.kt:86400L</ID>
+    <ID>MagicNumber:SeekbarPolicy.kt:1_000L</ID>
+    <ID>MagicNumber:SessionAudioSelection.kt:SessionAudioSelection$64</ID>
+    <ID>MagicNumber:SessionPlaybackPlayer.kt:SessionPlaybackPlayer$8</ID>
+    <ID>MagicNumber:TimelineEpgPolicy.kt:30</ID>
+    <ID>MagicNumber:TimeshiftPresentationPolicy.kt:1_000L</ID>
+    <ID>MagicNumber:VideoFrameRate.kt:25f</ID>
+    <ID>MagicNumber:VideoFrameRate.kt:29.97f</ID>
+    <ID>MagicNumber:VideoFrameRate.kt:30f</ID>
+    <ID>MagicNumber:VideoFrameRate.kt:50f</ID>
+    <ID>MagicNumber:VideoFrameRate.kt:59.94f</ID>
+    <ID>MagicNumber:VideoFrameRate.kt:60f</ID>
+    <ID>MagicNumber:VideoFrameRate.kt:VideoFrameRateEstimator$1_000_000.0</ID>
+    <ID>MatchingDeclarationName:BrowseContextActions.kt:BrowseContextAction</ID>
+    <ID>MatchingDeclarationName:ProgrammeActionPolicy.kt:ProgrammeAction</ID>
+    <ID>MatchingDeclarationName:ProgrammeRecordingTargetPolicy.kt:ProgrammeRecordingTarget</ID>
+    <ID>MatchingDeclarationName:RecordingMarkHintPolicy.kt:RecordingMarkHint</ID>
+    <ID>MatchingDeclarationName:RecordingOpenPolicy.kt:RecordingOpenAction</ID>
+    <ID>MaxLineLength:AppError.kt:AppErrorCondition.NOT_TVHEADEND$/** Something answered at the address, but not Tvheadend's HTSP service; told apart from 105 where a setup test can. */</ID>
+    <ID>MaxLineLength:AppPlaybackRuntime.kt:AppPlaybackRuntime$/** The target whose reconnect retune failed: its recovery attempts retry until one starts or the budget runs out. */</ID>
+    <ID>MaxLineLength:AppPlaybackRuntime.kt:AppPlaybackRuntime$_liveStartUndisturbed.value = retainedLive &amp;&amp; previousLiveStart &amp;&amp; !pendingLiveSelectionDisturbed</ID>
+    <ID>MaxLineLength:AppPlaybackRuntime.kt:AppPlaybackRuntime$applyForegroundPlaybackAction(foregroundPlaybackLifecycle.releaseKept(keep.epoch, BackgroundPlaybackNotice.LIMIT_EXPIRED))</ID>
+    <ID>MaxLineLength:AppPlaybackRuntime.kt:AppPlaybackRuntime$applyForegroundPlaybackAction(foregroundPlaybackLifecycle.releaseKept(requestedEpoch, BackgroundPlaybackNotice.TUNER_LOST))</ID>
+    <ID>MaxLineLength:AppPlaybackRuntime.kt:AppPlaybackRuntime$audioOnly</ID>
+    <ID>MaxLineLength:AppPlaybackRuntime.kt:AppPlaybackRuntime$bufferRecovery != null</ID>
+    <ID>MaxLineLength:AppPlaybackRuntime.kt:AppPlaybackRuntime$fun</ID>
+    <ID>MaxLineLength:AppPlaybackRuntime.kt:AppPlaybackRuntime$if</ID>
+    <ID>MaxLineLength:AppPlaybackRuntime.kt:AppPlaybackRuntime$if (!interactive) applyForegroundPlaybackAction(foregroundPlaybackLifecycle.releaseKept(activeTargetEpoch))</ID>
+    <ID>MaxLineLength:AppPlaybackRuntime.kt:AppPlaybackRuntime$if (intent == playbackRequests.get() &amp;&amp; !isPlaybackIntentStopped(intent)) pauseRetainedLiveTargetLocked()</ID>
+    <ID>MaxLineLength:AppPlaybackRuntime.kt:AppPlaybackRuntime$if (isAttached() &amp;&amp; foreground &amp;&amp; setPendingLiveSelectionPaused(!playWhenReady)) return Job().apply { complete() }</ID>
+    <ID>MaxLineLength:AppPlaybackRuntime.kt:AppPlaybackRuntime$if (livePauseController.pendingLivePauseEpoch != epoch) livePauseController.startPendingLivePauseLocked(epoch, wasPlaying = wasPlaying, failClosed = false)</ID>
+    <ID>MaxLineLength:AppPlaybackRuntime.kt:AppPlaybackRuntime$presentation.publishFailed(AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER, target = obligation.target))</ID>
+    <ID>MaxLineLength:AppPlaybackRuntime.kt:AppPlaybackRuntime$presentation.publishFailed(AppPlaybackState.Failed(AppPlaybackFailureReason.RECORDING_READ_FAILED, target = target))</ID>
+    <ID>MaxLineLength:AppPlaybackRuntime.kt:AppPlaybackRuntime$recordingMarkers.observeRecordingMarkersLocked(requireNotNull(installedBinding), continuesTarget = preservesMarkerHistory)</ID>
+    <ID>MaxLineLength:AppPlaybackRuntime.kt:AppPlaybackRuntime$settleRetiredTargetLocked(expectedPresentationEpoch, !currentCoroutineContext().isActive, previousPlayWhenReady)</ID>
+    <ID>MaxLineLength:AppPlaybackRuntime.kt:AppPlaybackRuntime$timeshiftAvailable = policy.liveTimeshiftPeriod(playerSettings) &gt; Duration.ZERO &amp;&amp; timeshift != null</ID>
+    <ID>MaxLineLength:AppPlaybackRuntime.kt:AppPlaybackRuntime$val</ID>
+    <ID>MaxLineLength:AppPlaybackRuntime.kt:AppPlaybackRuntime$val installed = install?.committedEpoch?.let { LiveRecoveryFence(reason, install.selection, it, servedIntent.get()) }</ID>
+    <ID>MaxLineLength:AppPlaybackRuntime.kt:AppPlaybackRuntime$val lossNotice = if (livePlaybackObservation.value is LivePlaybackObservation.Active) keptLiveLoss(keep.epoch) else null</ID>
+    <ID>MaxLineLength:AppPlaybackRuntime.kt:AppPlaybackRuntime$val ownsInstall = targetCommands.readIfOpen { installedLiveTargetEpochLocked(selection, intent) == epoch } == true</ID>
+    <ID>MaxLineLength:AppPlaybackRuntime.kt:AppPlaybackRuntime$val restored = coordinator.setLivePriority(LiveSubscriptionPriority.NORMAL) == TimeshiftCommandResult.ACCEPTED</ID>
+    <ID>MaxLineLength:AppPlaybackRuntime.kt:AppPlaybackRuntime$val timeshift = (livePlaybackObservation.value as? LivePlaybackObservation.Active)?.timeshiftState as? LiveTimeshiftState.Available</ID>
+    <ID>MaxLineLength:AppPlaybackRuntime.kt:AppPlaybackRuntime$val timeshift = audioInterruptions.currentInterruptionContent() == AudioInterruptionContent.LIVE_TIMESHIFT</ID>
+    <ID>MaxLineLength:AppPlaybackRuntime.kt:AppPlaybackRuntime$val yielded = paused &amp;&amp; coordinator.setLivePriority(LiveSubscriptionPriority.YIELD) == TimeshiftCommandResult.ACCEPTED</ID>
+    <ID>MaxLineLength:AppPlaybackRuntime.kt:AppPlaybackRuntime.&lt;no name provided&gt;$if (livePlaybackObservation.value != LivePlaybackObservation.Departed) audioTracks.onTrackSelectionParametersChanged(parameters)</ID>
+    <ID>MaxLineLength:AudioInterruptionController.kt:AudioInterruptionController$(livePlaybackObservation.value as? LivePlaybackObservation.Active)?.timeshiftState is LiveTimeshiftState.Available</ID>
+    <ID>MaxLineLength:AudioInterruptionController.kt:AudioInterruptionController$/** A play waits for the server's resume until the player plays; see [PlaybackPresentationPublisher.holdPlayingPictureLocked]. */</ID>
+    <ID>MaxLineLength:AudioInterruptionController.kt:AudioInterruptionController$coordinator.resumeTimeshift() != TimeshiftCommandResult.ACCEPTED</ID>
+    <ID>MaxLineLength:AudioInterruptionController.kt:AudioInterruptionController$private suspend</ID>
+    <ID>MaxLineLength:AudioInterruptionController.kt:AudioInterruptionController$val hold = if (content == AudioInterruptionContent.LIVE_TIMESHIFT) coordinator.pauseTimeshift() else null</ID>
+    <ID>MaxLineLength:BrowseContextActions.kt:val watched = recordingWatchState(entry, offeredResumePosition(admission), nowSec = 0L) == RecordingWatchState.Watched</ID>
+    <ID>MaxLineLength:BusyRingQuiet.kt:if (visible) null else soundSinceMillis?.let { (it + BUSY_RING_QUIET_AFTER_SOUND_MILLIS - nowMillis).coerceAtLeast(0L) }</ID>
+    <ID>MaxLineLength:ConnectionNoticeSource.kt:ConnectionNoticeSource$currentState.reason.recoveryDisposition == SessionRecoveryDisposition.AUTOMATIC_BACKOFF</ID>
+    <ID>MaxLineLength:ConnectionNoticeSource.kt:ConnectionNoticeSource$loginRejected = notices.post(Notice.Connection(ConnectionNoticeKind.LOGIN_REJECTED), context)</ID>
+    <ID>MaxLineLength:ConnectionNoticeSource.kt:ConnectionNoticeSource$lost = notices.post(Notice.Connection(ConnectionNoticeKind.LOST, saved), currentContext)</ID>
+    <ID>MaxLineLength:ConnectionNoticeSource.kt:ConnectionNoticeSource$val currentContext = NoticeContext(expectedProfile, current.currentSession?.generationIdentity)</ID>
+    <ID>MaxLineLength:DvrChangeNoticeSource.kt:DvrChangeNoticeSource$val groups = mutableMapOf&lt;Triple&lt;NoticeContext, AutorecRuleId, DvrChangeKind&gt;, MutableMap&lt;DvrEntryId, Notice.Dvr&gt;&gt;()</ID>
+    <ID>MaxLineLength:DvrLibraryPolicy.kt:(configs.firstOrNull { it.id == preferredId } ?: configs.firstOrNull { it.name.isBlank() } ?: configs.firstOrNull())?.id</ID>
+    <ID>MaxLineLength:DvrLibraryPolicy.kt:descendantRecordings().count { recordingWatchState(it, resumePosition(it), nowSec = 0L) == RecordingWatchState.Watched }</ID>
+    <ID>MaxLineLength:ForegroundPlaybackLifecycle.kt:ForegroundPlaybackAction$ResumeLive : ForegroundPlaybackAction</ID>
+    <ID>MaxLineLength:LivePauseController.kt:LivePauseController$fun</ID>
+    <ID>MaxLineLength:LivePauseController.kt:LivePauseController$val pending = PendingLivePause(epoch, wasPlaying = wasPlaying, failClosed = failClosed, startupPlay = startupPlay)</ID>
+    <ID>MaxLineLength:LogoInk.kt:if (i + width &lt; size &amp;&amp; pale[i + width] &amp;&amp; part[i + width] == 0) { part[i + width] = parts; stack[top++] = i + width }</ID>
+    <ID>MaxLineLength:LogoInk.kt:if (i &gt;= width &amp;&amp; pale[i - width] &amp;&amp; part[i - width] == 0) { part[i - width] = parts; stack[top++] = i - width }</ID>
+    <ID>MaxLineLength:LogoInk.kt:if (rim[i] &amp;&amp; pixels[i] ushr 24 &gt; 0 &amp;&amp; contrast(luma[i], ground) &lt; RIM_CONTRAST) out[i] = invertLightness(pixels[i])</ID>
+    <ID>MaxLineLength:LogoInk.kt:return 0.2126f * linear(argb shr 16 and 0xFF) + 0.7152f * linear(argb shr 8 and 0xFF) + 0.0722f * linear(argb and 0xFF)</ID>
+    <ID>MaxLineLength:LogoInk.kt:val onGround = area[id] &gt;= MIN_PART_SHARE * solidCount &amp;&amp; edges &gt; 0 &amp;&amp; inkEdges[id] &lt; MAX_INK_BORDER_SHARE * edges</ID>
+    <ID>MaxLineLength:LogoInk.kt:val rim = dilate(dilate(chosen, width, height, radius, horizontal = true), width, height, radius, horizontal = false)</ID>
+    <ID>MaxLineLength:Notice.kt:Notice.BackgroundPlayback$override val severity = if (reason == BackgroundPlaybackNotice.LIMIT_EXPIRED) NoticeSeverity.INFO else NoticeSeverity.FAILURE</ID>
+    <ID>MaxLineLength:Notice.kt:Notice.Connection$override val severity = if (kind == ConnectionNoticeKind.RESTORED) NoticeSeverity.INFO else NoticeSeverity.FAILURE</ID>
+    <ID>MaxLineLength:Notice.kt:private</ID>
+    <ID>MaxLineLength:PlaybackAudioTracks.kt:PlaybackAudioTracks$if (targetInstallationInProgress() || audioOutputChanging || interruptionMuted() || !targetCommands.isOpen()) return</ID>
+    <ID>MaxLineLength:PlaybackAudioTracks.kt:PlaybackAudioTracks$private val _audioAutomatic = MutableStateFlow(player.trackSelectionParameters.overrides.values.none { it.type == C.TRACK_TYPE_AUDIO })</ID>
+    <ID>MaxLineLength:PlaybackPresentationPublisher.kt:PlaybackPresentationPublisher$"seek=${completed?.seekCommand} buffering=${completed?.buffering} pause=${completed?.pauseRestoration} "</ID>
+    <ID>MaxLineLength:PlaybackPresentationPublisher.kt:PlaybackPresentationPublisher$"videoSelected=$videoSelected size=${format?.width}x${format?.height} state=${player.playbackState} "</ID>
+    <ID>MaxLineLength:PlaybackPresentationPublisher.kt:PlaybackPresentationPublisher.&lt;no name provided&gt;$override</ID>
+    <ID>MaxLineLength:PlaybackStallWatch.kt:PlaybackStallWatch$val window = if (sample.pictureShown) PICTURE_STALL_MILLIS else PICTURE_STALL_MILLIS + PICTURE_COVER_GRACE_MILLIS</ID>
+    <ID>MaxLineLength:PlayerSettings.kt:code == language || runCatching { java.util.Locale.forLanguageTag(code).isO3Language == language }.getOrDefault(false)</ID>
+    <ID>MaxLineLength:ProfileTrace.kt:profileTrace("P48:key:${event.keyCode}:time:${event.eventTime}:age:${SystemClock.uptimeMillis() - event.eventTime}") { }</ID>
+    <ID>MaxLineLength:ProgrammeActionPolicy.kt:recording != null &amp;&amp; recordingPlaybackOffered(recordingAdmission)</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPolicy.kt:fun</ID>
+    <ID>MaxLineLength:RecordingMarkerPolicy.kt:RecordingMark$/** Chapters and programme boundaries are points (end == start); interval ends are exclusive. Names are file text only. */</ID>
+    <ID>MaxLineLength:RecordingMarkerPolicy.kt:if</ID>
+    <ID>MaxLineLength:RecordingMarkerPolicy.kt:if (position &gt; 0 &amp;&amp; position &lt; verifiedDurationMs) add(RecordingMark(RecordingMarkKind.PROGRAM_END, position))</ID>
+    <ID>MaxLineLength:RecordingMarkerPolicy.kt:if (position &gt; 0 &amp;&amp; position &lt; verifiedDurationMs) add(RecordingMark(RecordingMarkKind.PROGRAM_START, position))</ID>
+    <ID>MaxLineLength:RecordingMarkerPolicy.kt:marks.filter { it.kind in listOf(RecordingMarkKind.AD_BREAK, RecordingMarkKind.CUT) &amp;&amp; it.startMs &gt;= 0 &amp;&amp; it.endMs in 1 until verifiedDurationMs }</ID>
+    <ID>MaxLineLength:RecordingMarkers.kt:RecordingMarkers$if (!foreground.value || mediaItem == null || player.currentMediaItem !== mediaItem || !markerQuery.isCurrent(binding)) return false</ID>
+    <ID>MaxLineLength:RecordingMarkers.kt:RecordingMarkers$if (!isCurrent() || recordingMarkerRevision.value != expectedRevision || skipPrompt.value != expected) return@runIfOpen</ID>
+    <ID>MaxLineLength:RecordingMarkers.kt:RecordingMarkers$if (active &amp;&amp; foreground.value &amp;&amp; markerQuery.isCurrent(binding) &amp;&amp; recordingMarkerRevision.value != appliedRevision) metadataChanged()</ID>
+    <ID>MaxLineLength:RecordingMarkers.kt:RecordingMarkers$private suspend</ID>
+    <ID>MaxLineLength:RecordingMarkers.kt:if (!chapter.isHidden) add(RecordingChapter(chapter.startTimeMs, chapter.title?.value?.trim()?.takeIf { it.isNotEmpty() }))</ID>
+    <ID>MaxLineLength:RecordingMetadataPolicy.kt:.</ID>
+    <ID>MaxLineLength:RecordingSkipPolicy.kt:RecordingSkipPolicy$fun</ID>
+    <ID>MaxLineLength:RecordingSkipPolicy.kt:it.action == DvrCutpointAction.MUTE &amp;&amp; positionMs &gt;= it.start.inWholeMilliseconds &amp;&amp; positionMs &lt; it.end.inWholeMilliseconds</ID>
+    <ID>MaxLineLength:SessionPlaybackPlayer.kt:(target == null &amp;&amp; reason == AppPlaybackFailureReason.RECORDING_READ_FAILED)</ID>
+    <ID>MaxLineLength:SessionPlaybackPlayer.kt:.</ID>
+    <ID>MaxLineLength:SessionPlaybackPlayer.kt:SessionPlaybackPlayer$.</ID>
+    <ID>MaxLineLength:SessionPlaybackPlayer.kt:SessionPlaybackPlayer$if</ID>
+    <ID>MaxLineLength:SessionPlaybackPlayer.kt:SessionPlaybackPlayer$if (bytes != null || (request.channelIcon == null &amp;&amp; request.recordingImage == null)) cache[request] = bytes</ID>
+    <ID>MaxLineLength:SessionPlaybackPlayer.kt:SessionPlaybackPlayer$sessionMetadataSnapshot(target, snapshot, sampled.third, timeshift, liveStart, programmeWindowEnabled, labels)</ID>
+    <ID>MaxLineLength:SessionPlaybackPlayer.kt:SessionPlaybackPlayer$val sample = if (target is AppPlaybackTarget.Live) runtime.sampleTimeshiftPresentation() else AppTimeshiftState()</ID>
+    <ID>MaxLineLength:SessionPlaybackPlayer.kt:mediaKind == ChannelMediaKind.TV -&gt; if (live) MediaMetadata.MEDIA_TYPE_TV_CHANNEL else MediaMetadata.MEDIA_TYPE_TV_SHOW</ID>
+    <ID>MaxLineLength:SessionPlaybackPlayer.kt:return value.substring(0, value.offsetByCodePoints(0, minOf(limit, value.codePointCount(0, value.length)))).trimEnd()</ID>
+    <ID>MaxLineLength:StartupBufferPolicy.kt:StartupBufferWindow$return if (underruns &gt;= StartupBufferPolicy.UNDERRUNS_FOR_TROUBLE) finish(StartupBufferVerdict.TROUBLE) else null</ID>
+    <ID>MaxLineLength:TimelineEpgPolicy.kt:if</ID>
+    <ID>MaxLineLength:TrackPreferences.kt:AudioFormatPreference.PREFER_DOLBY -&gt; arrayOf(MimeTypes.AUDIO_E_AC3_JOC, MimeTypes.AUDIO_E_AC3, MimeTypes.AUDIO_AC3)</ID>
+    <ID>MaxLineLength:TrackPreferences.kt:AudioFormatPreference.PREFER_STEREO -&gt; arrayOf(MimeTypes.AUDIO_AAC, MimeTypes.AUDIO_MPEG_L2, MimeTypes.AUDIO_MPEG)</ID>
+    <ID>MaxLineLength:VideoFrameRate.kt:internal</ID>
+    <ID>ReturnCount:AppPlaybackError.kt:fun AppPlaybackState.deviceFaultDetail: String?</ID>
+    <ID>ReturnCount:AppPlaybackModels.kt:fun currentLivePlaybackSelection: LivePlaybackSelection?</ID>
+    <ID>ReturnCount:AppPlaybackModels.kt:fun currentRecordingPlaybackSelection: RecordingPlaybackSelection?</ID>
+    <ID>ReturnCount:AppPlaybackRuntime.kt:AppPlaybackRuntime$@OptIn(ExperimentalTvheadendApi::class) internal fun nudgePausedSeek</ID>
+    <ID>ReturnCount:AppPlaybackRuntime.kt:AppPlaybackRuntime$@OptIn(ExperimentalTvheadendApi::class) private suspend fun playRecordingLocked: PlaybackTargetResult?</ID>
+    <ID>ReturnCount:AppPlaybackRuntime.kt:AppPlaybackRuntime$private fun canContinueRecoveryLocked: Boolean</ID>
+    <ID>ReturnCount:AppPlaybackRuntime.kt:AppPlaybackRuntime$private fun publishResolvedRecoveryPlayerState</ID>
+    <ID>ReturnCount:AppPlaybackRuntime.kt:AppPlaybackRuntime$private fun publishTargetFailure</ID>
+    <ID>ReturnCount:AppPlaybackRuntime.kt:AppPlaybackRuntime$private fun resumeInterruptedLiveRecoveryLocked</ID>
+    <ID>ReturnCount:AppPlaybackRuntime.kt:AppPlaybackRuntime$private fun setPendingLiveSelectionPaused: Boolean</ID>
+    <ID>ReturnCount:AppPlaybackRuntime.kt:AppPlaybackRuntime$private fun settleRetiredTargetLocked</ID>
+    <ID>ReturnCount:AppPlaybackRuntime.kt:AppPlaybackRuntime$private fun stallSampleLocked: StallSample?</ID>
+    <ID>ReturnCount:AppPlaybackRuntime.kt:AppPlaybackRuntime$private suspend fun applyPlayIntentToStartedTarget</ID>
+    <ID>ReturnCount:AppPlaybackRuntime.kt:AppPlaybackRuntime$private suspend fun installTargetForPresentation: PlaybackTargetResult</ID>
+    <ID>ReturnCount:AppPlaybackRuntime.kt:AppPlaybackRuntime$private suspend fun pauseTimeshiftPlaybackLocked: TimeshiftCommandResult?</ID>
+    <ID>ReturnCount:AppPlaybackRuntime.kt:AppPlaybackRuntime$private suspend fun playLive: PlaybackTargetResult?</ID>
+    <ID>ReturnCount:AppPlaybackRuntime.kt:AppPlaybackRuntime$private suspend fun recoverStallLocked</ID>
+    <ID>ReturnCount:AppPlaybackRuntime.kt:AppPlaybackRuntime$private suspend fun resumeBufferRecoveryLocked</ID>
+    <ID>ReturnCount:AppPlaybackRuntime.kt:AppPlaybackRuntime$private suspend fun retryLiveRetirementLocked: Boolean</ID>
+    <ID>ReturnCount:AppPlaybackRuntime.kt:AppPlaybackRuntime$private suspend fun stopPlayback: PlaybackStopResult</ID>
+    <ID>ReturnCount:AudioInterruptionController.kt:AudioInterruptionController$private suspend fun handleAudioInterruptionLocked</ID>
+    <ID>ReturnCount:AudioInterruptionController.kt:AudioInterruptionController$suspend fun playWithAudioFocusLocked: TimeshiftCommandResult</ID>
+    <ID>ReturnCount:DvrLibraryPolicy.kt:DvrArchiveFolder$fun folderAt: DvrArchiveFolder?</ID>
+    <ID>ReturnCount:ForegroundPlaybackLifecycle.kt:ForegroundPlaybackLifecycle$fun onBackgrounded: ForegroundPlaybackAction</ID>
+    <ID>ReturnCount:LivePauseController.kt:LivePauseController$suspend fun resolvePendingLivePauseLocked: Boolean</ID>
+    <ID>ReturnCount:LiveRecoveryAttempts.kt:internal fun currentLiveRecoveryFence: LiveRecoveryFence?</ID>
+    <ID>ReturnCount:LogoInk.kt:fun inkFadingLogoParts: IntArray?</ID>
+    <ID>ReturnCount:NoticeCenter.kt:NoticeCenter$@Synchronized fun show: Boolean</ID>
+    <ID>ReturnCount:PlaybackAudioTracks.kt:PlaybackAudioTracks$fun onTrackSelectionParametersChanged</ID>
+    <ID>ReturnCount:PlaybackAudioTracks.kt:PlaybackAudioTracks$suspend fun loadStoredAudioLocked: PlaybackTargetResult?</ID>
+    <ID>ReturnCount:PlaybackErrorClassification.kt:internal fun classifyPlaybackError: String?</ID>
+    <ID>ReturnCount:PlaybackPresentationPublisher.kt:PlaybackPresentationPublisher$private fun liftCoverOnReadyPicture</ID>
+    <ID>ReturnCount:PlaybackPresentationPublisher.kt:PlaybackPresentationPublisher$private fun pictureAdvanced: Boolean</ID>
+    <ID>ReturnCount:PlaybackPresentationPublisher.kt:PlaybackPresentationPublisher.&lt;no name provided&gt;$override fun onRenderedFirstFrame</ID>
+    <ID>ReturnCount:PlayerBackKeyCycle.kt:PlayerBackKeyCycle$fun onKey: PlayerBackKeyResult</ID>
+    <ID>ReturnCount:PlayerSettings.kt:PlayerSettingsStore.Companion$private fun decodeRecentVerdicts: List&lt;StartupBufferVerdict&gt;</ID>
+    <ID>ReturnCount:RecordingMarkerQuery.kt:RecordingMarkerQuery$suspend fun refresh: Boolean</ID>
+    <ID>ReturnCount:RecordingMarkers.kt:RecordingMarkers$private suspend fun refreshMarkers: Boolean</ID>
+    <ID>ReturnCount:RecordingMetadataPolicy.kt:fun recordingElapsedProgress: Float?</ID>
+    <ID>ReturnCount:RecordingMetadataPolicy.kt:fun recordingRemovalTime: Long?</ID>
+    <ID>ReturnCount:RecordingMetadataPolicy.kt:fun recordingStoppedEarly: RecordingShortfall?</ID>
+    <ID>ReturnCount:RecordingMetadataPolicy.kt:private fun recordedFileIntervals: List&lt;Pair&lt;Instant, Instant&gt;&gt;?</ID>
+    <ID>ReturnCount:RecordingOpenPolicy.kt:@OptIn(ExperimentalTvheadendApi::class) fun recordingOpenAction: RecordingOpenAction</ID>
+    <ID>ReturnCount:RecordingOpenPolicy.kt:@OptIn(ExperimentalTvheadendApi::class) fun recordingTimeLeft: Duration?</ID>
+    <ID>ReturnCount:RecordingSkipPolicy.kt:RecordingSkipPolicy$fun evaluate: RecordingSkipDecision</ID>
+    <ID>ReturnCount:SeekbarPolicy.kt:fun programmeAnchoredAxis: ProgrammeAxis?</ID>
+    <ID>ReturnCount:SessionAudioSelection.kt:SessionAudioSelection$fun rememberExplicitChoice: Pair&lt;ChannelId, AudioTrackChoice&gt;?</ID>
+    <ID>ReturnCount:SessionAudioSelection.kt:SessionAudioSelection$fun restore</ID>
+    <ID>ReturnCount:SessionPlaybackPlayer.kt:SessionPlaybackPlayer$override fun getState: State</ID>
+    <ID>ReturnCount:SessionPlaybackPlayer.kt:private fun sessionArtworkRequest: SessionArtworkRequest?</ID>
+    <ID>ReturnCount:StartupBufferController.kt:StartupBufferController$private fun rebufferedWhilePlaying: Boolean</ID>
+    <ID>ReturnCount:StartupBufferController.kt:StartupBufferController$private fun record</ID>
+    <ID>ReturnCount:TimelineEpgPolicy.kt:fun guidePendingNavigationAction: GuidePendingNavigationAction</ID>
+    <ID>ReturnCount:TimelineEpgPolicy.kt:fun initialTimelineEpgFocus: EpgFocusTarget?</ID>
+    <ID>ReturnCount:TimelineEpgPolicy.kt:fun moveTimelineEpgFocus: TimelineEpgFocusMove</ID>
+    <ID>ReturnCount:TimelineEpgPolicy.kt:fun resolveGuideFrontierOrigin: GuideDeferredOriginResolution</ID>
+    <ID>ReturnCount:TimelineEpgPolicy.kt:fun resolveGuideWindowFocus: GuideCoverageFocusResolution</ID>
+    <ID>ReturnCount:TimelineEpgPolicy.kt:fun timelineEventAt: EpgEventEntry?</ID>
+    <ID>ReturnCount:TimelineEpgPolicy.kt:fun timelineEventIsReadable: Boolean</ID>
+    <ID>ReturnCount:TimelineEpgPolicy.kt:fun timelineFocusAnchorRange: LongRange</ID>
+    <ID>ReturnCount:TimelineEpgPolicy.kt:fun timelinePageFocusTarget: EpgFocusTarget?</ID>
+    <ID>ReturnCount:TimeshiftPresentationPolicy.kt:fun programmePositionWindow: ProgrammePositionWindow?</ID>
+    <ID>ReturnCount:TrackPreferences.kt:internal fun TrackSelectionParameters.withTunneling: TrackSelectionParameters</ID>
+    <ID>ReturnCount:VideoFrameRate.kt:VideoFrameRateEstimator$@Synchronized fun estimate: Float?</ID>
+    <ID>ReturnCount:VideoFrameRate.kt:VideoFrameRateEstimator$@Synchronized fun onFrame</ID>
+    <ID>TooGenericExceptionCaught:AppProfileOwner.kt:AppProfileOwner$error: Exception</ID>
+    <ID>TooGenericExceptionCaught:AppProfileOwner.kt:AppProfileOwner$error: Throwable</ID>
+    <ID>TooGenericExceptionCaught:AppProfileOwner.kt:AppProfileOwner$recoveryError: Throwable</ID>
+    <ID>TooGenericExceptionCaught:SdkRuntimeOwner.kt:error: Throwable</ID>
+    <ID>TooManyFunctions:AppPlaybackRuntime.kt:AppPlaybackRuntime</ID>
+    <ID>TooManyFunctions:AppProfileOwner.kt:AppProfileOwner : ConnectionProfileEditor</ID>
+    <ID>TooManyFunctions:DvrLibraryPolicy.kt:at.bernhardberger.tvhplayer.core.DvrLibraryPolicy.kt</ID>
+    <ID>TooManyFunctions:LivePauseController.kt:LivePauseController</ID>
+    <ID>TooManyFunctions:LiveRecoveryController.kt:LiveRecoveryController</ID>
+    <ID>TooManyFunctions:PlaybackAudioTracks.kt:PlaybackAudioTracks</ID>
+    <ID>TooManyFunctions:PlaybackPresentationPublisher.kt:PlaybackPresentationPublisher</ID>
+    <ID>TooManyFunctions:PlayerSettings.kt:PlayerSettingsStore</ID>
+    <ID>TooManyFunctions:RecordingMarkers.kt:RecordingMarkers</ID>
+    <ID>TooManyFunctions:RecordingMetadataPolicy.kt:at.bernhardberger.tvhplayer.core.RecordingMetadataPolicy.kt</ID>
+    <ID>TooManyFunctions:StartupBufferController.kt:StartupBufferController : ListenerAnalyticsListener</ID>
+    <ID>TooManyFunctions:TimelineEpgPolicy.kt:at.bernhardberger.tvhplayer.core.TimelineEpgPolicy.kt</ID>
+    <ID>TooManyFunctions:TimeshiftPresentationPolicy.kt:at.bernhardberger.tvhplayer.core.TimeshiftPresentationPolicy.kt</ID>
+    <ID>TopLevelPropertyNaming:TimelineEpgPolicy.kt:private const val GuideNowLeadSec = 30 * 60L</ID>
+    <ID>UnusedParameter:StartupBufferController.kt:StartupBufferController$committed: Boolean</ID>
+  </CurrentIssues>
+</SmellBaseline>

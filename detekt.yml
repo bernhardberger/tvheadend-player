@@ -1,0 +1,15 @@
+config:
+  validation: true
+
+naming:
+  FunctionNaming:
+    ignoreAnnotated: ['Composable']
+
+complexity:
+  LongParameterList:
+    ignoreAnnotated: ['Composable']
+
+style:
+  MagicNumber:
+    # UI dimensions and animation values are intentional local design values.
+    excludes: ['**/ui/**']
