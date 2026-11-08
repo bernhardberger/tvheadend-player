@@ -8,7 +8,7 @@
     <string name="about_not_connected">לא מחובר</string>
     <string name="about_connected">מחובר</string>
     <string name="about_licenses">רישיונות</string>
-    <string name="about_licenses_summary">GNU GPL v3 והודעות צד שלישי</string>
+    <string name="about_licenses_summary">&#x200F;GNU GPL v3 והודעות צד שלישי</string>
     <string name="about_privacy">מדיניות הפרטיות</string>
     <string name="about_translation">תרגום</string>
 </resources>

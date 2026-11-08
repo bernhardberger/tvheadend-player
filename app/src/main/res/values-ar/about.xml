@@ -8,7 +8,7 @@
     <string name="about_not_connected">غير متصل</string>
     <string name="about_connected">متصل</string>
     <string name="about_licenses">التراخيص</string>
-    <string name="about_licenses_summary">GNU GPL v3 وإشعارات الجهات الخارجية</string>
+    <string name="about_licenses_summary">&#x200F;GNU GPL v3 وإشعارات الجهات الخارجية</string>
     <string name="about_privacy">سياسة الخصوصية</string>
     <string name="about_translation">الترجمة</string>
 </resources>
