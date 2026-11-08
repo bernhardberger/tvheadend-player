@@ -1,64 +1,32 @@
 package at.bernhardberger.tvhplayer.ui.screens.guide
 
 import androidx.annotation.StringRes
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEvent
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.dp
-import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.GuideWindowBounds
 import at.bernhardberger.tvhplayer.core.floorGuideWindowToHour
 import at.bernhardberger.tvhplayer.core.moveGuideWindowByDays
 import at.bernhardberger.tvhplayer.ui.common.formatClock
-import at.bernhardberger.tvhplayer.ui.player.PlaybackPanelPadding
+import at.bernhardberger.tvhplayer.ui.screens.BrowseLevelsPanel
 import at.bernhardberger.tvhplayer.ui.screens.BrowsePanelEntry
-import at.bernhardberger.tvhplayer.ui.screens.BrowsePanelList
-import at.bernhardberger.tvhplayer.ui.screens.BrowseSidePanel
+import at.bernhardberger.tvhplayer.ui.screens.BrowsePanelLevel
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
+import java.util.Locale
 
 /**
- * The Guide's day and time: Now and the days the window reaches on the left, the focused day's
- * times on the right, which follow the days without taking focus. Right enters a day's times,
- * Left or Back returns to the day; Now, a day or a time jumps and closes.
+ * The Guide's day and time: Now and the days the window reaches on the root, each day opening its
+ * times as a level on Right. OK on Now, a day or a time jumps and closes; Back in the times returns
+ * to their day.
  */
 @Composable
 internal fun GuideTimePanel(
@@ -86,128 +54,70 @@ internal fun GuideTimePanel(
     val firstDay = Instant.ofEpochSecond(panelBounds.earliestStartSec).atZone(zoneId).toLocalDate()
     val lastDay = Instant.ofEpochSecond(panelBounds.latestStartSec).atZone(zoneId).toLocalDate()
     val days = generateSequence(firstDay) { it.plusDays(1) }.takeWhile { !it.isAfter(lastDay) }.toList()
-    val dayFocus = remember(days) { days.associateWith { FocusRequester() } }
-    val presetFocus = remember { GuideTimePeriod.entries.associateWith { FocusRequester() } }
-    // The day whose times show: the focused day, today while Now has focus, and while the times
-    // have focus, the day they were entered from.
-    var timesDay by remember { mutableStateOf(windowDay) }
-    var nowFocused by remember { mutableStateOf(false) }
-    var inTimes by remember { mutableStateOf(false) }
-    val presets = guideTimePresets(timesDay, shownSec, openedSec, panelBounds, zoneId, nowShown)
 
-    fun enterTimes() {
-        val entered = guideTimePresets(timesDay, shownSec, openedSec, panelBounds, zoneId, nowShown)
-        val index = guideTimePresetEntry(entered, shownSec, zoneId) ?: return
-        runCatching { presetFocus.getValue(entered[index].period).requestFocus() }
-    }
-    fun backToDay() {
-        runCatching { dayFocus[timesDay]?.requestFocus() }
-    }
-
-    val dayEntries = buildList {
+    val entries = buildList {
         add(BrowsePanelEntry.Choice(
             key = "guide-time-now",
             label = stringResource(R.string.now),
             selected = false,
             onClick = onNow,
             trailing = formatClock(Instant.ofEpochSecond(nowMinuteSec).atZone(zoneId), locale),
-            modifier = Modifier.onFocusChanged {
-                nowFocused = it.isFocused
-                if (it.isFocused) timesDay = today
-            },
         ))
         add(BrowsePanelEntry.Divider)
         days.forEach { day ->
-            // The day whose times have focus keeps a selected container, its chevron pointing at them.
-            val open = inTimes && day == timesDay
+            val dayLabel = guideDayLabel(day, today, zoneId, locale)
+            val presets = guideTimePresets(day, shownSec, openedSec, panelBounds, zoneId, nowShown)
+            val entry = guideTimePresetEntry(presets, shownSec, zoneId)
             add(BrowsePanelEntry.Choice(
                 key = "guide-time-day-${ChronoUnit.DAYS.between(today, day)}",
-                label = guideDayLabel(day, today, zoneId, locale),
-                selected = day == windowDay || open,
-                opensLevel = open,
+                label = dayLabel,
+                selected = day == windowDay,
+                // Right opens the day's times; a day with none left to jump to opens nothing.
+                level = entry?.let {
+                    BrowsePanelLevel(
+                        title = dayLabel,
+                        entries = guideTimeEntries(presets, zoneId, locale, onJump),
+                        radio = false,
+                        focusKey = guideTimeEntryKey(presets[it].period),
+                    )
+                },
+                levelOnOk = false,
                 onClick = {
                     if (day == windowDay) onClose() else {
                         val delta = ChronoUnit.DAYS.between(windowDay, day).toInt()
                         onJump(floorGuideWindowToHour(moveGuideWindowByDays(shownSec, delta, panelBounds, zoneId), zoneId))
                     }
                 },
-                modifier = Modifier.focusRequester(dayFocus.getValue(day))
-                    .onFocusChanged { if (it.isFocused) timesDay = day },
             ))
         }
     }
-    val presetEntries = presets.map { preset ->
-        BrowsePanelEntry.Choice(
-            key = "guide-time-preset-${preset.period.hour.toString().padStart(2, '0')}",
-            label = stringResource(preset.period.label),
-            leading = formatClock(Instant.ofEpochSecond(preset.startSec).atZone(zoneId), locale),
-            selected = preset.checked,
-            enabled = preset.enabled,
-            onClick = { onJump(preset.startSec) },
-            modifier = Modifier.focusRequester(presetFocus.getValue(preset.period)),
-        )
-    }
-    BrowseSidePanel(
+    BrowseLevelsPanel(
         title = stringResource(R.string.guide_time_title),
         panelTag = "guide-time-panel",
-        // Back in the times returns to their day; only Back on the days closes the panel.
-        onClose = { if (inTimes) backToDay() else onClose() },
-        width = GuideTimePanelWidth,
-    ) {
-        // The Row mirrors in RTL, so the times sit toward the end edge in either direction.
-        val ltr = LocalLayoutDirection.current == LayoutDirection.Ltr
-        val towardTimes = if (ltr) Key.DirectionRight else Key.DirectionLeft
-        val towardDays = if (ltr) Key.DirectionLeft else Key.DirectionRight
-        Row(Modifier.fillMaxSize()) {
-            Box(Modifier.weight(1f).onPreviewKeyEvent { event ->
-                when (event.key) {
-                    towardTimes -> {
-                        if (event.isFirstDown() && !nowFocused) enterTimes()
-                        true
-                    }
-                    towardDays -> true
-                    else -> false
-                }
-            }) {
-                BrowsePanelList(dayEntries, radio = false, focusKey = "guide-time-day-${ChronoUnit.DAYS.between(today, windowDay)}")
-            }
-            Box(Modifier.padding(vertical = PlaybackPanelPadding).width(1.dp).fillMaxHeight()
-                .background(MaterialTheme.colorScheme.borderVariant))
-            Column(Modifier.weight(1f).testTag("guide-time-presets")
-                .onFocusChanged { inTimes = it.hasFocus }
-                .onPreviewKeyEvent { event ->
-                    when (event.key) {
-                        towardDays -> {
-                            if (event.isFirstDown()) backToDay()
-                            true
-                        }
-                        towardTimes -> true
-                        else -> false
-                    }
-                }) {
-                // Level with Now and on the rows' text column. The schedule's small day label, set
-                // on the band's bottom edge, reads as the heading of the times below, not as one of them.
-                Box(Modifier.fillMaxWidth().padding(start = PlaybackPanelPadding + 16.dp, end = PlaybackPanelPadding, top = 20.dp)
-                    .heightIn(min = 48.dp), contentAlignment = Alignment.BottomStart) {
-                    Text(
-                        guideDayLabel(timesDay, today, zoneId, locale),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.semantics { heading() },
-                    )
-                }
-                BrowsePanelList(presetEntries, radio = false, takeFocus = false)
-            }
-        }
-    }
+        onClose = onClose,
+        entries = entries,
+        focusKey = "guide-time-day-${ChronoUnit.DAYS.between(today, windowDay)}",
+    )
 }
 
-private fun KeyEvent.isFirstDown() = type == KeyEventType.KeyDown && nativeKeyEvent.repeatCount == 0
+@Composable
+private fun guideTimeEntries(
+    presets: List<GuideTimePreset>,
+    zoneId: ZoneId,
+    locale: Locale,
+    onJump: (Long) -> Unit,
+): List<BrowsePanelEntry> = presets.map { preset ->
+    BrowsePanelEntry.Choice(
+        key = guideTimeEntryKey(preset.period),
+        label = stringResource(preset.period.label),
+        leading = formatClock(Instant.ofEpochSecond(preset.startSec).atZone(zoneId), locale),
+        selected = preset.checked,
+        enabled = preset.enabled,
+        onClick = { onJump(preset.startSec) },
+    )
+}
 
-/** Two panes of about 212dp each beside a divider. */
-private val GuideTimePanelWidth = 464.dp
+private fun guideTimeEntryKey(period: GuideTimePeriod) = "guide-time-preset-${period.hour.toString().padStart(2, '0')}"
 
 /** The fixed times every day offers; each period runs until the next, the last until midnight. */
 internal enum class GuideTimePeriod(val hour: Int, @StringRes val label: Int) {

@@ -514,6 +514,9 @@ class GuideRealisticSceneTest {
         compose.onNodeWithTag("guide-view-headline").assertIsOn()
         compose.onNodeWithTag("guide-view-genre-colors").assertIsOn()
         capture("u5-view-options")
+        key(Key.DirectionRight)
+        tagFocused("guide-view-rows-dense")
+        capture("u5-view-options-rows")
     }
 
     @Test fun u5DayAndTimePanelOpensFromTheDateButton() {
@@ -532,11 +535,14 @@ class GuideRealisticSceneTest {
     @Test fun u5RegularRowsAddTheStartTime() {
         showAt("2026-09-15T19:40:00")
         openViewOptions()
+        key(Key.DirectionRight)
         key(Key.DirectionUp)
         tagFocused("guide-view-rows-regular")
         key(Key.Enter)
         compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("epg-channel-row-1")).fetchSemanticsNodes().any {
             it.boundsInRoot.height > 50f } }
+        key(Key.Back)
+        tagFocused("guide-view-rows")
         key(Key.Back)
         tagFocused("channels-view-button")
         key(Key.DirectionDown)
@@ -1038,7 +1044,7 @@ class GuideRealisticSceneTest {
         repeat(3) { key(Key.DirectionRight) }
         tagFocused("channels-view-button")
         key(Key.Enter)
-        tagFocused("guide-view-rows-dense")
+        tagFocused("guide-view-rows")
     }
 
     /** Filter button, Sport; the panel closes onto the Filter button. */

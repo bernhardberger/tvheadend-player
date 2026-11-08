@@ -445,29 +445,46 @@ class RecordingsVisualLayoutTest {
         assertTrue("the button names the grouping, so it is wider than the round icon", button.width > button.height)
     }
 
-    @Test fun theGroupingChoiceRegroupsOnOkAndBackLeavesItBeing() {
+    @Test fun theViewOptionsPanelOpensLevelsAndBackStepsOutOneLevelAtATime() {
         show()
         focused("recordings-folder-Documentaries")
         key(Key.DirectionUp)
         key(Key.DirectionCenter)
-        // The current grouping is where the choice opens.
-        focused("recordings-grouping-option-folders")
+        // The root opens on Group by and lists the settings, not their choices.
+        focused("recordings-view-group")
+        compose.onNodeWithTag("recordings-grouping-option-folders").assertDoesNotExist()
         key(Key.Back)
-        compose.waitUntil(10_000) { compose.onAllNodesWithTag("recordings-grouping-panel").fetchSemanticsNodes().isEmpty() }
+        gone("recordings-grouping-panel")
         focused(GROUPING_PILL)
         compose.runOnIdle { assertTrue(viewChanges.isEmpty()) }
         compose.onNodeWithTag("recordings-folder-Documentaries").assertExists()
 
         key(Key.DirectionCenter)
+        focused("recordings-view-group")
+        key(Key.DirectionCenter)
+        // The current grouping is where its level opens.
         focused("recordings-grouping-option-folders")
         key(Key.DirectionDown)
         focused("recordings-grouping-option-channels")
         key(Key.DirectionCenter)
-        // A choice applies at once and the panel stays, as in the Channels and Guide panels.
+        // A choice applies at once and the level stays on the row just pressed.
         compose.runOnIdle { assertEquals(listOf(DvrArchiveView(grouping = DvrArchiveGrouping.CHANNELS)), viewChanges) }
         focused("recordings-grouping-option-channels")
+        key(Key.DirectionLeft)
+        focused("recordings-grouping-option-channels")
+        // Back leaves the level for the row that opened it; Back again closes the panel.
         key(Key.Back)
-        compose.waitUntil(10_000) { compose.onAllNodesWithTag("recordings-grouping-panel").fetchSemanticsNodes().isEmpty() }
+        gone("recordings-grouping-option-channels")
+        focused("recordings-view-group")
+        key(Key.DirectionDown)
+        focused("recordings-view-sort")
+        key(Key.DirectionRight)
+        focused("recordings-sort-option-newest")
+        key(Key.Back)
+        gone("recordings-sort-option-newest")
+        focused("recordings-view-sort")
+        key(Key.Back)
+        gone("recordings-grouping-panel")
         focused(GROUPING_PILL)
         compose.onNodeWithTag("recordings-folder-Documentaries").assertDoesNotExist()
         key(Key.DirectionDown)
@@ -513,19 +530,25 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionUp)
         focused(GROUPING_PILL)
         key(Key.DirectionCenter)
-        focused("recordings-grouping-option-none")
-        key(Key.DirectionDown); key(Key.DirectionDown)
+        focused("recordings-view-group")
+        key(Key.DirectionDown)
+        key(Key.DirectionCenter)
+        focused("recordings-sort-option-newest")
+        key(Key.DirectionDown)
         focused("recordings-sort-option-name")
         key(Key.DirectionCenter)
         compose.runOnIdle { assertEquals(DvrArchiveSort.NAME, viewChanges.last().sort) }
         focused("recordings-sort-option-name")
-        key(Key.DirectionDown); key(Key.DirectionDown)
+        key(Key.Back)
+        focused("recordings-view-sort")
+        // The switch sits on the root itself and toggles in place.
+        key(Key.DirectionDown)
         focused("recordings-hide-watched")
         key(Key.DirectionCenter)
         compose.runOnIdle { assertEquals(DvrArchiveView(DvrArchiveGrouping.NONE, DvrArchiveSort.NAME, true), viewChanges.last()) }
         focused("recordings-hide-watched")
         key(Key.Back)
-        compose.waitUntil(10_000) { compose.onAllNodesWithTag("recordings-grouping-panel").fetchSemanticsNodes().isEmpty() }
+        gone("recordings-grouping-panel")
         focused(GROUPING_PILL)
         // Name order, the watched Alpha hidden, and no date dividers outside date order.
         compose.onNodeWithTag("recording-list-entry-2").assertDoesNotExist()
@@ -547,11 +570,12 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionDown)
         focused(GROUPING_PILL)
         key(Key.DirectionCenter)
-        repeat(8) { key(Key.DirectionDown) }
+        focused("recordings-view-group")
+        key(Key.DirectionDown); key(Key.DirectionDown)
         focused("recordings-hide-watched")
         key(Key.DirectionCenter)
         key(Key.Back)
-        compose.waitUntil(10_000) { compose.onAllNodesWithTag("recordings-grouping-panel").fetchSemanticsNodes().isEmpty() }
+        gone("recordings-grouping-panel")
         compose.onNodeWithText("Everything here is watched.").assertDoesNotExist()
         compose.onNodeWithTag("recording-list-entry-2").assertExists()
     }
@@ -574,6 +598,8 @@ class RecordingsVisualLayoutTest {
         var current = "folders"
         fun choose(option: String) {
             key(Key.DirectionCenter)
+            focused("recordings-view-group")
+            key(Key.DirectionCenter)
             focused("recordings-grouping-option-$current")
             val names = DvrArchiveGrouping.entries.map { it.name.lowercase() }
             val steps = names.indexOf(option) - names.indexOf(current)
@@ -581,7 +607,9 @@ class RecordingsVisualLayoutTest {
             focused("recordings-grouping-option-$option")
             key(Key.DirectionCenter)
             key(Key.Back)
-            compose.waitUntil(10_000) { compose.onAllNodesWithTag("recordings-grouping-panel").fetchSemanticsNodes().isEmpty() }
+            gone("recordings-grouping-option-$option")
+            key(Key.Back)
+            gone("recordings-grouping-panel")
             focused(GROUPING_PILL)
             current = option
         }
@@ -591,16 +619,25 @@ class RecordingsVisualLayoutTest {
         compose.mainClock.advanceTimeBy(1_500)
         capture("1-pill-focused", 1f, outputs = out)
         key(Key.DirectionCenter)
+        focused("recordings-view-group")
+        compose.mainClock.advanceTimeBy(1_500)
+        capture("2-view-options-root", 1f, outputs = out)
+        key(Key.DirectionCenter)
         focused("recordings-grouping-option-folders")
         compose.mainClock.advanceTimeBy(1_500)
-        capture("2-choice-open", 1f, outputs = out)
-        // The panel scrolls: the same panel with focus on its last row shows Sort and Filter.
-        repeat(7) { key(Key.DirectionDown) }
-        focused("recordings-hide-watched")
-        compose.mainClock.advanceTimeBy(1_500)
-        capture("2b-choice-open-scrolled", 1f, outputs = out)
+        capture("2-group-by-level", 1f, outputs = out)
         key(Key.Back)
-        compose.waitUntil(10_000) { compose.onAllNodesWithTag("recordings-grouping-panel").fetchSemanticsNodes().isEmpty() }
+        focused("recordings-view-group")
+        key(Key.DirectionDown)
+        key(Key.DirectionCenter)
+        focused("recordings-sort-option-newest")
+        compose.mainClock.advanceTimeBy(1_500)
+        capture("2-sort-level", 1f, outputs = out)
+        key(Key.Back)
+        gone("recordings-sort-option-newest")
+        key(Key.Back)
+        gone("recordings-grouping-panel")
+        focused(GROUPING_PILL)
         choose("channels")
         repeat(2) { key(Key.DirectionDown) }
         compose.mainClock.advanceTimeBy(1_500)
@@ -623,12 +660,12 @@ class RecordingsVisualLayoutTest {
         toPill()
         choose("folders")
         key(Key.DirectionCenter)
-        focused("recordings-grouping-option-folders")
-        repeat(7) { key(Key.DirectionDown) }
+        focused("recordings-view-group")
+        key(Key.DirectionDown); key(Key.DirectionDown)
         focused("recordings-hide-watched")
         key(Key.DirectionCenter)
         key(Key.Back)
-        compose.waitUntil(10_000) { compose.onAllNodesWithTag("recordings-grouping-panel").fetchSemanticsNodes().isEmpty() }
+        gone("recordings-grouping-panel")
         focused(GROUPING_PILL)
         key(Key.DirectionDown)
         compose.mainClock.advanceTimeBy(1_500)
@@ -1813,6 +1850,11 @@ class RecordingsVisualLayoutTest {
             compose.onAllNodes(hasTestTag(tag) and isFocused()).fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithTag(tag).assertIsFocused().assertIsDisplayed()
+    }
+
+    /** Waits for a panel page to finish leaving: its fade keeps it composed for a moment. */
+    private fun gone(tag: String) = compose.waitUntil(10_000) {
+        compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isEmpty()
     }
 
     private fun bounds(tag: String): Rect = compose.onNodeWithTag(tag, useUnmergedTree = true)

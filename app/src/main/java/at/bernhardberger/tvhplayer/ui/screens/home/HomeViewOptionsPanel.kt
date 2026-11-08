@@ -5,8 +5,7 @@ import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.HomeSectionKind
 import at.bernhardberger.tvhplayer.ui.screens.BrowsePanelEntry
-import at.bernhardberger.tvhplayer.ui.screens.BrowsePanelList
-import at.bernhardberger.tvhplayer.ui.screens.BrowseSidePanel
+import at.bernhardberger.tvhplayer.ui.screens.BrowseLevelsPanel
 
 @Composable
 internal fun HomeViewOptionsPanel(
@@ -24,9 +23,10 @@ internal fun HomeViewOptionsPanel(
             ))
         }
     }
-    BrowseSidePanel(stringResource(R.string.channels_view_options), "home-view-panel", onClose) {
-        BrowsePanelList(entries, radio = false, focusKey = "home-view-${HomeSectionKind.CURRENT_ACTIVITY.name}")
-    }
+    BrowseLevelsPanel(
+        stringResource(R.string.channels_view_options), "home-view-panel", onClose, entries,
+        focusKey = "home-view-${HomeSectionKind.CURRENT_ACTIVITY.name}",
+    )
 }
 
 private fun HomeSectionKind.homeLabel() = when (this) {

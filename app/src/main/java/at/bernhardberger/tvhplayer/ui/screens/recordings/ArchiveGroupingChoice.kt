@@ -24,8 +24,8 @@ import at.bernhardberger.tvhplayer.core.DvrArchiveSort
 import at.bernhardberger.tvhplayer.core.DvrArchiveView
 import at.bernhardberger.tvhplayer.ui.components.RoundIconButton
 import at.bernhardberger.tvhplayer.ui.screens.BrowsePanelEntry
-import at.bernhardberger.tvhplayer.ui.screens.BrowsePanelList
-import at.bernhardberger.tvhplayer.ui.screens.BrowseSidePanel
+import at.bernhardberger.tvhplayer.ui.screens.BrowseLevelsPanel
+import at.bernhardberger.tvhplayer.ui.screens.BrowsePanelLevel
 
 internal fun DvrArchiveGrouping.labelRes(): Int = when (this) {
     DvrArchiveGrouping.FOLDERS -> R.string.recordings_grouping_folders
@@ -98,9 +98,8 @@ private fun DvrArchiveSort.labelRes(): Int = when (this) {
 }
 
 /**
- * View options for the Archive: how recordings are grouped and sorted (one choice each) and whether
- * watched ones are hidden. As in the Channels and Guide panels a choice applies at once and the panel
- * stays, with focus on the row just pressed; Back closes it ([onClose]).
+ * View options for the Archive: Group by and Sort open a level each, Hide watched is a switch on the
+ * root. The mechanic is [BrowseLevelsPanel]'s; a choice applies at once through [onChoose].
  */
 @Composable
 internal fun ArchiveGroupingPanel(
@@ -108,36 +107,54 @@ internal fun ArchiveGroupingPanel(
     onChoose: (DvrArchiveView) -> Unit,
     onClose: () -> Unit,
 ) {
-    val entries = buildList {
-        add(BrowsePanelEntry.Section(stringResource(R.string.recordings_grouping_group_by)))
-        DvrArchiveGrouping.entries.forEach { option ->
-            add(BrowsePanelEntry.Choice(
-                key = "recordings-grouping-option-${option.name.lowercase()}",
-                label = stringResource(option.labelRes()),
-                selected = option == current.grouping,
-                onClick = { onChoose(current.copy(grouping = option)) },
-                supporting = stringResource(option.detailRes()),
-            ))
-        }
-        add(BrowsePanelEntry.Section(stringResource(R.string.recordings_sort_title)))
-        DvrArchiveSort.entries.forEach { option ->
-            add(BrowsePanelEntry.Choice(
-                key = "recordings-sort-option-${option.name.lowercase()}",
-                label = stringResource(option.labelRes()),
-                selected = option == current.sort,
-                onClick = { onChoose(current.copy(sort = option)) },
-            ))
-        }
-        add(BrowsePanelEntry.Section(stringResource(R.string.recordings_filter_title)))
-        add(BrowsePanelEntry.Choice(
+    val groupTitle = stringResource(R.string.recordings_grouping_group_by)
+    val sortTitle = stringResource(R.string.recordings_sort_title)
+    val entries = listOf(
+        BrowsePanelEntry.Choice(
+            key = "recordings-view-group",
+            label = groupTitle,
+            selected = false,
+            onClick = {},
+            level = BrowsePanelLevel(
+                title = groupTitle,
+                currentValue = stringResource(current.grouping.labelRes()),
+                entries = DvrArchiveGrouping.entries.map { option ->
+                    BrowsePanelEntry.Choice(
+                        key = "recordings-grouping-option-${option.name.lowercase()}",
+                        label = stringResource(option.labelRes()),
+                        selected = option == current.grouping,
+                        onClick = { onChoose(current.copy(grouping = option)) },
+                        supporting = stringResource(option.detailRes()),
+                    )
+                },
+            ),
+        ),
+        BrowsePanelEntry.Choice(
+            key = "recordings-view-sort",
+            label = sortTitle,
+            selected = false,
+            onClick = {},
+            level = BrowsePanelLevel(
+                title = sortTitle,
+                currentValue = stringResource(current.sort.labelRes()),
+                entries = DvrArchiveSort.entries.map { option ->
+                    BrowsePanelEntry.Choice(
+                        key = "recordings-sort-option-${option.name.lowercase()}",
+                        label = stringResource(option.labelRes()),
+                        selected = option == current.sort,
+                        onClick = { onChoose(current.copy(sort = option)) },
+                    )
+                },
+            ),
+        ),
+        BrowsePanelEntry.Divider,
+        BrowsePanelEntry.Choice(
             key = "recordings-hide-watched",
             label = stringResource(R.string.recordings_hide_watched),
             selected = false,
             onClick = { onChoose(current.copy(hideWatched = !current.hideWatched)) },
             checked = current.hideWatched,
-        ))
-    }
-    BrowseSidePanel(stringResource(R.string.channels_view_options), "recordings-grouping-panel", onClose) {
-        BrowsePanelList(entries, radio = true)
-    }
+        ),
+    )
+    BrowseLevelsPanel(stringResource(R.string.channels_view_options), "recordings-grouping-panel", onClose, entries)
 }

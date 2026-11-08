@@ -1070,6 +1070,7 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         compose.onNodeWithTag("guide-time-now").assert(hasText("Jetzt"))
         compose.onNodeWithTag("guide-time-day-0").assert(hasText("Heute"))
         compose.onNodeWithTag("guide-time-day-1").assert(hasText("Morgen"))
+        key(Key.DirectionRight)
         compose.onNodeWithTag("guide-time-preset-06").assert(hasText("Morgen"))
         compose.onNodeWithTag("guide-time-preset-20").assert(hasText("Hauptabend"))
         compose.onNodeWithTag("guide-time-preset-22").assert(hasText("Spätabend"))
@@ -1080,6 +1081,7 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         show(scale = 1.3f)
         key(Key.Enter)
         tagFocused("guide-time-day-0")
+        key(Key.DirectionRight)
         listOf("06", "12", "15", "18", "20", "22").forEach { hour ->
             val clock = compose.onNode(hasText("$hour:00") and hasAnyAncestor(hasTestTag("guide-time-preset-$hour")),
                 useUnmergedTree = true).fetchSemanticsNode()
@@ -1229,8 +1231,7 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         key(Key.DirectionRight)
         tagFocused("channels-view-button")
         key(Key.Enter)
-        tagFocused("guide-view-rows-regular")
-        key(Key.DirectionDown)
+        tagFocused("guide-view-rows")
         key(Key.DirectionDown)
         tagFocused("guide-view-headline")
         compose.onNodeWithTag("guide-view-headline").assertIsOn()

@@ -88,9 +88,17 @@ class ChannelsLayoutCaptureTest {
         fixture.key(Key.DirectionUp)
         fixture.key(Key.DirectionRight)
         fixture.key(Key.DirectionCenter)
+        capture("grid-view-options-root", hasTestTag("channels-view-layout"), outputs = "build/outputs/043-channels")
+        fixture.key(Key.DirectionRight)
         fixture.awaitFocus(hasTestTag("channels-view-layout-grid"))
+        listOf("layout-immersive", "layout-list", "layout-grid").forEach {
+            compose.onNodeWithTag("channels-view-$it").assertIsDisplayed()
+        }
+        capture("grid-view-options-layout", hasTestTag("channels-view-layout-grid"), outputs = "build/outputs/043-channels")
+        fixture.key(Key.Back)
+        fixture.awaitFocus(hasTestTag("channels-view-layout"))
         repeat(2) { fixture.key(Key.DirectionDown) }
-        listOf("layout-immersive", "layout-list", "layout-grid", "program-art", "channel-names").forEach {
+        listOf("layout", "program-art", "channel-names").forEach {
             compose.onNodeWithTag("channels-view-$it").assertIsDisplayed()
         }
         capture("grid-view-options", hasTestTag("channels-view-channel-names"), outputs = "build/outputs/043-channels")
@@ -308,7 +316,9 @@ class ChannelsLayoutCaptureTest {
         fixture.key(Key.DirectionUp)
         fixture.key(Key.DirectionRight)
         fixture.key(Key.DirectionCenter)
-        capture("panel-3-view-options-${layout.name.lowercase()}", hasTestTag("channels-view-layout-${layout.name.lowercase()}"))
+        capture("panel-3-view-options-${layout.name.lowercase()}", hasTestTag("channels-view-layout"))
+        fixture.key(Key.DirectionRight)
+        capture("panel-3-view-layout-${layout.name.lowercase()}", hasTestTag("channels-view-layout-${layout.name.lowercase()}"))
     }
 
     @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
@@ -331,7 +341,7 @@ class ChannelsLayoutCaptureTest {
         fixture.awaitFocus(tagsButton)
         fixture.key(Key.DirectionRight)
         fixture.key(Key.DirectionCenter)
-        capture("de-1.3-3-view-options", hasTestTag("channels-view-layout-grid"), locale = "de", fontScale = 1.3f)
+        capture("de-1.3-3-view-options", hasTestTag("channels-view-layout"), locale = "de", fontScale = 1.3f)
     }
 
     private fun capture(name: String, focus: SemanticsMatcher, locale: String = "en", fontScale: Float = 1f,

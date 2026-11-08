@@ -51,6 +51,8 @@ import at.bernhardberger.tvhplayer.ui.components.LocalBrowseContentLayering
 import at.bernhardberger.tvhplayer.ui.components.PlaybackOptionsOverlayFrame
 import at.bernhardberger.tvhplayer.ui.components.browseDetailsViewport
 import at.bernhardberger.tvhplayer.ui.player.OptionsHeader
+import at.bernhardberger.tvhplayer.ui.player.OptionsPageHost
+import at.bernhardberger.tvhplayer.ui.player.optionsPageRightKey
 import at.bernhardberger.tvhplayer.ui.components.PanelListEdges
 import at.bernhardberger.tvhplayer.ui.player.PlaybackOptionRow
 import at.bernhardberger.tvhplayer.ui.player.PlaybackPanelHeaderTop
@@ -65,13 +67,14 @@ internal sealed interface BrowsePanelEntry {
     /** Sets a lone row apart from the section above it, where a heading would only repeat its label. */
     data object Divider : BrowsePanelEntry
     /**
-     * A row; [checked] makes it a switch, [opensLevel] a row that opens a level and shows its
-     * current value as [supporting] text, and [dot] marks it with a small color dot before the label.
-     * [leading] and [trailing] put a short value such as a clock before or after the label; a row
-     * that is not [enabled] is drawn disabled and skipped by focus. [modifier] lets the panel
-     * follow or move the row's focus.
+     * A row; [checked] makes it a switch, [level] a row that opens a level (see [BrowseLevelsPanel])
+     * and [dot] marks it with a small color dot before the label. [leading] and [trailing] put a
+     * short value such as a clock before or after the label; a row that is not [enabled] is drawn
+     * disabled and skipped by focus. [modifier] lets the panel follow or move the row's focus.
+     * [opensLevel] only draws the chevron and sends Right to [onClick], for a panel that keeps its
+     * own levels.
      */
-    class Choice(
+    data class Choice(
         val key: String,
         val label: String,
         val selected: Boolean,
@@ -85,13 +88,27 @@ internal sealed interface BrowsePanelEntry {
         val trailing: String? = null,
         val enabled: Boolean = true,
         val modifier: Modifier = Modifier,
+        val level: BrowsePanelLevel? = null,
+        /** False for a row whose OK does something else ([onClick]); Right still opens the [level]. */
+        val levelOnOk: Boolean = true,
     ) : BrowsePanelEntry
 }
+
+/** What a root row opens in a [BrowseLevelsPanel]: a header naming it, and its own lines. */
+internal class BrowsePanelLevel(
+    val title: String,
+    val entries: List<BrowsePanelEntry>,
+    /** Shown under the title and, unless the row has a [BrowsePanelEntry.Choice.supporting] text, on the root row. */
+    val currentValue: String? = null,
+    val radio: Boolean = true,
+    val focusKey: String? = null,
+)
 
 /**
  * The floating side panel over the dimmed browse shell, the rail included. It holds focus until
  * Back closes it; the release of the key that opened it never reaches a row. Back runs [onClose],
- * so a panel with a second pane can step back to the first instead.
+ * so a panel with a second pane or levels can step back to the first instead. A panel with levels
+ * passes [showHeader] false and draws each level's own header inside [OptionsPageHost].
  */
 @Composable
 internal fun BrowseSidePanel(
@@ -99,6 +116,8 @@ internal fun BrowseSidePanel(
     panelTag: String,
     onClose: () -> Unit,
     width: Dp = PlaybackPanelWidth,
+    showHeader: Boolean = true,
+    modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
     val layering = LocalBrowseContentLayering.current
@@ -115,7 +134,7 @@ internal fun BrowseSidePanel(
         paneTitle = title,
         panelTag = panelTag,
         panelWidth = width,
-        modifier = Modifier
+        modifier = modifier
             .backKeyCycleFocus(backCycle)
             .browseDetailsViewport()
             .onPreviewKeyEvent { event ->
@@ -135,9 +154,92 @@ internal fun BrowseSidePanel(
             },
     ) {
         Column(Modifier.fillMaxSize().padding(top = PlaybackPanelHeaderTop)) {
-            OptionsHeader(title = title, currentValue = null, onBack = null)
+            if (showHeader) OptionsHeader(title = title, currentValue = null, onBack = null)
             content()
         }
+    }
+}
+
+/**
+ * The one browse side panel. [entries] are its root; a [BrowsePanelEntry.Choice] with a
+ * [BrowsePanelEntry.Choice.level] shows its current value and a chevron, and OK or Right opens
+ * the level in the same panel, as in the player's options sheet: the header names the level, a
+ * choice applies at once and the level stays on the row just pressed, Left stays put, and Back
+ * returns to the root with focus on the row that opened it. Back on the root closes the panel.
+ * Without any level the panel is one flat list under the [title].
+ */
+@Composable
+internal fun BrowseLevelsPanel(
+    title: String,
+    panelTag: String,
+    onClose: () -> Unit,
+    entries: List<BrowsePanelEntry>,
+    radio: Boolean = false,
+    focusKey: String? = null,
+) {
+    if (entries.none { it is BrowsePanelEntry.Choice && it.level != null }) {
+        BrowseSidePanel(title, panelTag, onClose) { BrowsePanelList(entries, radio, focusKey) }
+    } else {
+        BrowsePanelLevels(title, panelTag, onClose, entries, radio, focusKey)
+    }
+}
+
+@Composable
+private fun BrowsePanelLevels(
+    title: String,
+    panelTag: String,
+    onClose: () -> Unit,
+    entries: List<BrowsePanelEntry>,
+    radio: Boolean,
+    focusKey: String?,
+) {
+    var openKey by remember { mutableStateOf<String?>(null) }
+    var opener by remember { mutableStateOf<String?>(null) }
+    fun levelOf(key: String?) = entries.firstNotNullOfOrNull { entry ->
+        (entry as? BrowsePanelEntry.Choice)?.takeIf { it.key == key }?.level
+    }
+    val shown = openKey?.takeIf { levelOf(it) != null }
+    BrowseSidePanel(
+        title = title,
+        panelTag = panelTag,
+        onClose = { if (shown != null) openKey = null else onClose() },
+        showHeader = false,
+        modifier = Modifier.optionsPageRightKey(atRoot = shown == null),
+    ) {
+        OptionsPageHost(shown, { if (it == null) 0 else 1 }, Modifier.fillMaxSize()) { key ->
+            val level = levelOf(key)
+            Column {
+                OptionsHeader(title = level?.title ?: title, currentValue = level?.currentValue, onBack = null)
+                if (level == null) {
+                    val root = entries.map { it.openingItsLevel { opened -> openKey = opened; opener = opened } }
+                    BrowsePanelList(root, radio, opener ?: focusKey)
+                } else {
+                    BrowsePanelList(level.entries, level.radio, level.focusKey)
+                }
+            }
+        }
+    }
+}
+
+/** A root row with a level shows the level's value and a chevron, and opens it on Right (and on OK unless it has its own). */
+private fun BrowsePanelEntry.openingItsLevel(open: (String) -> Unit): BrowsePanelEntry {
+    if (this !is BrowsePanelEntry.Choice || level == null) return this
+    val opens = { open(key) }
+    return copy(
+        opensLevel = true,
+        supporting = supporting ?: level.currentValue,
+        onClick = if (levelOnOk) opens else onClick,
+        modifier = if (levelOnOk) modifier else modifier.rightOpens(opens),
+    )
+}
+
+/** Right opens on its first press and is always consumed, ahead of the row's own handling. */
+private fun Modifier.rightOpens(open: () -> Unit): Modifier = onPreviewKeyEvent { event ->
+    if (event.key != Key.DirectionRight) {
+        false
+    } else {
+        if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) open()
+        true
     }
 }
 

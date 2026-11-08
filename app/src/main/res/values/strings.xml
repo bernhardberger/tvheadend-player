@@ -558,7 +558,6 @@
     <string name="recordings_sort_newest">Newest first</string>
     <string name="recordings_sort_name">Name A–Z</string>
     <string name="recordings_sort_largest">Largest first</string>
-    <string name="recordings_filter_title">Filter</string>
     <string name="recordings_hide_watched">Hide watched</string>
     <string name="recordings_archive_all_watched">Everything here is watched.</string>
     <string name="recordings_archive_all_watched_hint">Turn off Hide watched in View options.</string>
