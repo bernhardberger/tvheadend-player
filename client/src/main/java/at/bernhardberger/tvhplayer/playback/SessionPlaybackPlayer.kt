@@ -189,7 +189,7 @@ private fun sessionMetadataSnapshot(
     return SessionMetadataSnapshot(MediaMetadata.Builder()
         .setTitle(title).setDisplayTitle(title)
         .setSubtitle(if (live) programmeTitle else episodeSubtitle ?: channelName)
-        .setArtist(channelName).setStation(channelName).setGenre(genre).setMediaType(mediaType)
+        .setArtist(if (live) programmeTitle else channelName).setStation(channelName).setGenre(genre).setMediaType(mediaType)
         .setExtras(bundle).build(), extras)
 }
 

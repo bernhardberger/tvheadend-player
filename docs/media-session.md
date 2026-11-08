@@ -30,7 +30,8 @@ code points, trimmed, never with added prefixes or suffixes.
 |---|---|---|
 | `title`, `displayTitle` | Channel name | Recording title |
 | `subtitle` | Programme at the playback position | Episode subtitle, else channel name |
-| `artist`, `station` | Channel name | Channel name |
+| `artist` | Programme at the playback position; unset when unknown | Channel name |
+| `station` | Channel name | Channel name |
 | `genre` | Programme genre text, else localized category | Localized category |
 | `mediaType` | `TV_CHANNEL` (TV), `RADIO_STATION` (radio) | `TV_SHOW` (TV channel) |
 | `artworkData` | Channel picon | Recording image, else channel picon |
@@ -38,6 +39,8 @@ code points, trimmed, never with added prefixes or suffixes.
 
 `mediaType` is left unset for radio recordings and when the channel kind is
 unknown or other.
+
+The Android TV Now Playing card shows title and artist, so live artist names the programme.
 
 "Programme at the playback position" follows the player's own timeline: while
 watching in timeshift, the session names the programme on screen, not the one

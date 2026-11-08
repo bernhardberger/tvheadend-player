@@ -218,7 +218,7 @@ class SessionPlaybackPlayerTest {
             AppTimeshiftState(), liveStart = true, programmeWindowEnabled = true, labels = labels)
         assertEquals("Station", metadata.title)
         assertEquals("Station", metadata.displayTitle)
-        assertEquals("Station", metadata.artist)
+        assertEquals("Programme", metadata.artist)
         assertEquals("Station", metadata.station)
         assertEquals("Programme", metadata.subtitle)
         assertEquals("Drama", metadata.genre)
@@ -261,6 +261,7 @@ class SessionPlaybackPlayerTest {
             fixture.state.value.toAppPresentation(fixture.playbackPosition(55.minutes)).copy(paused = true),
             liveStart = false, programmeWindowEnabled = true, labels = labels)
         assertNull(slot.subtitle)
+        assertNull(slot.artist)
         assertFalse(requireNotNull(slot.extras).containsKey("at.bernhardberger.tvhplayer.session.nextProgrammeTitle"))
     }
 
@@ -1689,7 +1690,7 @@ class SessionPlaybackPlayerTest {
         assertTrue(wrapper.isCurrentMediaItemDynamic)
         // A finite raw-player duration must never leak into the live session timeline.
         reportedDuration = 60_000
-        assertEquals("Channel One", wrapper.mediaMetadata.artist)
+        assertNull(wrapper.mediaMetadata.artist)
         val now = Clock.System.now()
         val previous = session.observation.value
         session.publish(SessionObservation.create(
