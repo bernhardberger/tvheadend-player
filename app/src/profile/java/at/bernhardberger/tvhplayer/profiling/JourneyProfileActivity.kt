@@ -110,6 +110,12 @@ class JourneyProfileActivity : AppCompatActivity() {
             val profiles = AppProfileOwner(
                 session, profileStore, settings, Dispatchers.IO,
             )
+            val notices = at.bernhardberger.tvhplayer.notices.NoticeCenter(android.os.SystemClock::elapsedRealtime) {
+                at.bernhardberger.tvhplayer.notices.NoticeContext(
+                    profiles.configurationGeneration.value,
+                    session.observation.value.currentSession?.generationIdentity,
+                )
+            }
             val audioOutput = at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider(this@JourneyProfileActivity)
             val loadControl = createTvheadendLoadControl(TvheadendLiveStartBuffer(500.milliseconds))
             val player = loadControl.configure(ExoPlayer.Builder(this@JourneyProfileActivity))
@@ -118,7 +124,8 @@ class JourneyProfileActivity : AppCompatActivity() {
             val coordinator = createTvheadendPlaybackCoordinator(player, loadControl)
             val runtime = AppPlaybackRuntime(player, session, coordinator, settings, profiles, scope, audioOutput,
                 at.bernhardberger.tvhplayer.playback.PlaybackAudioFocus.None,
-                at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy.fromPlayerSettings(trace = ProfilePlaybackTrace))
+                at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy.fromPlayerSettings(trace = ProfilePlaybackTrace),
+                noticeCenter = notices)
             runtimeOwner = SdkRuntimeOwner.create(session, runtime, profiles, coordinator, player, scope)
             withTimeout(5_000) { profiles.serverProfile.filterNotNull().first() }
             session.publish(observation)
@@ -181,6 +188,7 @@ class JourneyProfileActivity : AppCompatActivity() {
                                             onGenre = { backStack.navigateTopLevel(GuideKey) },
                                             onRecordings = { _, _ -> backStack.navigateTopLevel(RecordingsKey) },
                                             lastPlayedStore = lastPlayed,
+                                            lastUpdateTime = 0L, // The fixture has no app update to announce.
                                         )
                                     }
                                 }
