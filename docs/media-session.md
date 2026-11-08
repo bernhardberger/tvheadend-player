@@ -97,6 +97,17 @@ Commands offered to controllers:
   screen is showing, or while live playback continues behind browse with warm
   playback On or Audio only. Not offered for recordings or failed playback.
 
+## Which controllers can send commands
+
+Any app can read the session. Commands are accepted from the system UI, apps
+holding `MEDIA_CONTENT_CONTROL` or `STATUS_BAR_SERVICE`, and apps the user has
+granted notification access. Bridge apps such as the Home Assistant companion
+app use notification access to read media sessions. Media3 ignores commands
+from other apps.
+
+The Player declares visibility of apps with notification access because Media3 cannot
+check a controller package it cannot see on Android 11 and later.
+
 ## Artwork
 
 Artwork is delivered only as bytes in `artworkData`; the session never hands
