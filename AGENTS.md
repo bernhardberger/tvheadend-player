@@ -99,8 +99,14 @@ repository-local domain overlays, then the focused skill, then local style.
   `testutil/` and the screen `*Fixture.kt` builders instead of local copies. A
   scenario written to prove something for one review belongs in the opt-in
   capture lane or is deleted after the decision. Merging or deleting redundant
-  tests in touched code is in scope. Where the generic `test-driven-development`
-  skill differs, these rules win.
+  tests in touched code is in scope. Tests run on virtual time: `runTest` and
+  test dispatchers, the Compose `mainClock`, Robolectric looper idling, Media3
+  `FakeClock` with `TestPlayerRunHelper`; wait for a signal, never poll the real
+  clock or sleep. Client playback tests reuse `PlaybackTestDriver` and use
+  `FakeClock(false)` unless Media3 must progress on its own: under Robolectric,
+  auto-advance also moves the looper clock, so SDK timeouts fire while real SDK
+  threads are still replying. Where the generic `test-driven-development` skill
+  differs, these rules win.
 - Small, localized changes finish with the affected tests and owning compilation
   (test tasks already compile their dependencies). Run `./tools/verify` once for
   integration of a completed batch, before release, or for broad/cross-module,
@@ -216,9 +222,10 @@ only for genuine design or visual judgement (table in the harness doc).
 Non-trivial non-UX work requires a pair of independent `android-reviewer`
 dispatches under the harness routing. Slices inside a larger branch use Sol
 (`openai/gpt-6.1-sol`, `xhigh`) plus Sonnet (`claude-code/claude-sonnet-5-5`,
-`high`). Closing end-of-branch reviews and standalone changes use Astra plus an
-Opus pass with task override `model: claude-code/claude-opus-5-5`,
-`reasoning: high` (no named Opus agent). Substantial new/redesigned
+`high`). Standalone changes use Sol (`high`, `xhigh` when critical) plus an
+Opus pass. Closing end-of-branch reviews use Astra (`openai/gpt-6-astra`,
+`high`) plus an Opus pass. The Opus pass is a task override
+`model: claude-code/claude-opus-5-5`, `reasoning: high` (no named Opus agent). Substantial new/redesigned
 TV surfaces require final screenshot-first `tv-ux-reviewer` coverage; use
 `tv-ux-brief` when direction is unresolved. UX review does not replace distinct
 runtime review or physical-TV gates. Low-impact work has no mandatory pair.

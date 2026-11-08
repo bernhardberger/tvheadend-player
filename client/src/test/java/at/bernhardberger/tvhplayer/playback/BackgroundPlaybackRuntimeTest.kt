@@ -9,10 +9,10 @@ package at.bernhardberger.tvhplayer.playback
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 
 import android.app.Application
-import android.os.Looper
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlaybackException
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.test.utils.FakeClock
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
 import at.bernhardberger.tvheadend.sdk.core.*
@@ -25,13 +25,13 @@ import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.test.*
+import kotlin.time.Duration.Companion.seconds
 import org.junit.Assert.*
 import org.junit.Test
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
@@ -84,7 +84,7 @@ class BackgroundPlaybackRuntimeTest {
         scheduler.advanceTimeBy(1)
         await { runtime.activeTarget.value == null }
         assertEquals(1, connection.subscribeCount)
-        assertEquals(1, connection.unsubscribeCount)
+        await("exactly one subscription unsubscribed") { connection.unsubscribeCount == 1 }
         assertNull(runtime.backgroundNotice.value)
         returnAndRetune()
         assertEquals(BackgroundPlaybackNotice.LIMIT_EXPIRED, runtime.backgroundNotice.value)
@@ -161,7 +161,7 @@ class BackgroundPlaybackRuntimeTest {
         scheduler.advanceTimeBy(1_200_000)
         settle()
         assertEquals(1, connection.subscribeCount)
-        assertEquals(1, connection.unsubscribeCount)
+        await("exactly one subscription unsubscribed") { connection.unsubscribeCount == 1 }
         assertEquals(listOf(LiveSubscriptionPriority.YIELD), connection.priorityChanges)
         assertNull(runtime.backgroundNotice.value)
         returnAndRetune()
@@ -171,7 +171,7 @@ class BackgroundPlaybackRuntimeTest {
         runtime.onAppForegrounded()
         settle()
         assertEquals(2, connection.subscribeCount)
-        assertEquals(1, connection.unsubscribeCount)
+        await("exactly one subscription unsubscribed") { connection.unsubscribeCount == 1 }
         assertNull(runtime.backgroundNotice.value)
     }
 
@@ -193,7 +193,7 @@ class BackgroundPlaybackRuntimeTest {
         await { runtime.activeTarget.value == null }
         settle()
         assertEquals(listOf(LiveSubscriptionPriority.YIELD), connection.priorityChanges)
-        assertEquals(1, connection.unsubscribeCount)
+        await("exactly one subscription unsubscribed") { connection.unsubscribeCount == 1 }
         assertNull(runtime.backgroundNotice.value)
         returnAndRetune()
         assertEquals(2, connection.subscribeCount)
@@ -210,7 +210,7 @@ class BackgroundPlaybackRuntimeTest {
         scheduler.advanceTimeBy(1_200_000)
         settle()
         assertEquals(1, connection.subscribeCount)
-        assertEquals(1, connection.unsubscribeCount)
+        await("exactly one subscription unsubscribed") { connection.unsubscribeCount == 1 }
         assertTrue(connection.priorityChanges.isEmpty())
         returnAndRetune()
         assertEquals(2, connection.subscribeCount)
@@ -231,12 +231,12 @@ class BackgroundPlaybackRuntimeTest {
         // The restart discarded the kept timeshift: the recorded stop still ends the keep.
         await { runtime.activeTarget.value == null }
         assertEquals(1, connection.subscribeCount)
-        assertEquals(1, connection.unsubscribeCount)
+        await("exactly one subscription unsubscribed") { connection.unsubscribeCount == 1 }
         assertEquals(listOf(LiveSubscriptionPriority.YIELD), connection.priorityChanges)
         assertNull(runtime.backgroundNotice.value)
         returnAndRetune()
         assertEquals(2, connection.subscribeCount)
-        assertEquals(1, connection.unsubscribeCount)
+        await("exactly one subscription unsubscribed") { connection.unsubscribeCount == 1 }
         assertEquals(BackgroundPlaybackNotice.INTERRUPTED, runtime.backgroundNotice.value)
     }
 
@@ -257,7 +257,7 @@ class BackgroundPlaybackRuntimeTest {
         release.complete(Unit)
         await { runtime.activeTarget.value == null }
         assertEquals(1, connection.subscribeCount)
-        assertEquals(1, connection.unsubscribeCount)
+        await("exactly one subscription unsubscribed") { connection.unsubscribeCount == 1 }
         assertEquals(listOf(LiveSubscriptionPriority.YIELD), connection.priorityChanges)
         assertNull(runtime.backgroundNotice.value)
         returnAndRetune()
@@ -278,7 +278,7 @@ class BackgroundPlaybackRuntimeTest {
             await { playbackBlocked.count == 0L }
             connection.emit(SubscriptionEvent.Stopped(SubscriptionCondition.NO_DETAIL, null))
             await { liveObservation()?.let { it.serverStopped && it.timeshiftState == LiveTimeshiftState.Unavailable } == true }
-            settle() // The loss check is queued behind the held command.
+            scheduler.runCurrent() // The loss check is queued behind the held command; playback is held too.
             startSubscription()
             // Started clears the flag before any period is bound to the restarted stream.
             await { liveObservation()?.let { !it.serverStopped && it.timeshiftState == LiveTimeshiftState.Unavailable } == true }
@@ -289,12 +289,12 @@ class BackgroundPlaybackRuntimeTest {
         release.complete(Unit)
         await { runtime.activeTarget.value == null }
         assertEquals(1, connection.subscribeCount)
-        assertEquals(1, connection.unsubscribeCount)
+        await("exactly one subscription unsubscribed") { connection.unsubscribeCount == 1 }
         assertEquals(listOf(LiveSubscriptionPriority.YIELD), connection.priorityChanges)
         assertNull(runtime.backgroundNotice.value)
         returnAndRetune()
         assertEquals(2, connection.subscribeCount)
-        assertEquals(1, connection.unsubscribeCount)
+        await("exactly one subscription unsubscribed") { connection.unsubscribeCount == 1 }
         assertEquals(BackgroundPlaybackNotice.INTERRUPTED, runtime.backgroundNotice.value)
     }
 
@@ -339,7 +339,7 @@ class BackgroundPlaybackRuntimeTest {
         await { runtime.activeTarget.value != null && player.playWhenReady }
         settle()
         assertEquals(listOf(LiveSubscriptionPriority.YIELD, LiveSubscriptionPriority.NORMAL), connection.priorityChanges)
-        assertEquals(1, connection.unsubscribeCount)
+        await("exactly one subscription unsubscribed") { connection.unsubscribeCount == 1 }
         assertEquals(BackgroundPlaybackNotice.INTERRUPTED, runtime.backgroundNotice.value)
     }
 
@@ -360,7 +360,7 @@ class BackgroundPlaybackRuntimeTest {
         settle()
         assertNull(runtime.activeTarget.value)
         assertEquals(1, connection.subscribeCount)
-        assertEquals(1, connection.unsubscribeCount)
+        await("exactly one subscription unsubscribed") { connection.unsubscribeCount == 1 }
         assertNull(runtime.backgroundNotice.value)
     }
 
@@ -488,13 +488,13 @@ class BackgroundPlaybackRuntimeTest {
         // The fresh subscription has no timeshift grant: pause must fail closed, not
         // treat a locally paused player as evidence that the server accepted it.
         connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 0)))
-        // The replacement is paused as soon as it is installed. Open and start its subscription
-        // first, so the pause doesn't race the subscription manager's own thread.
+        // The replacement is paused as soon as it is installed. Answer its subscription in scope,
+        // allowing the manager on the test scheduler to run after this pause callback returns.
         val previousMediaItem = player.currentMediaItem
         afterPause = {
             if (player.currentMediaItem !== previousMediaItem && runtime.activeTarget.value != null) {
                 afterPause = {}
-                runBlocking {
+                scope.launch {
                     await { connection.subscribeCount == 2 }
                     connection.awaitCollectionRegistered()
                     startSubscription()
@@ -532,7 +532,7 @@ class BackgroundPlaybackRuntimeTest {
         afterPause = {
             if (player.currentMediaItem !== previousMediaItem && runtime.activeTarget.value != null) {
                 afterPause = {}
-                runBlocking {
+                scope.launch {
                     await { connection.subscribeCount == 2 }
                     connection.awaitCollectionRegistered()
                     startSubscription()
@@ -748,7 +748,7 @@ class BackgroundPlaybackRuntimeTest {
         await { runtime.activeTarget.value == null }
         settle()
         assertEquals(1, connection.subscribeCount)
-        assertEquals(1, connection.unsubscribeCount)
+        await("exactly one subscription unsubscribed") { connection.unsubscribeCount == 1 }
         assertEquals(listOf(LiveSubscriptionPriority.YIELD), connection.priorityChanges)
         assertNull(runtime.backgroundNotice.value)
     }
@@ -948,9 +948,11 @@ class BackgroundPlaybackRuntimeTest {
         val RECORDING = DvrEntryId(1)
 
         /** Shared with [PlaybackRuntimePolicyTest] so host policies run against the same runtime fixture. */
-        fun exercise(policy: PlaybackRuntimePolicy, block: suspend Fixture.() -> Unit) = runBlocking {
-            val fixture = Fixture(policy)
-            try { withTimeout(20_000) { fixture.block() } }
+        fun exercise(policy: PlaybackRuntimePolicy, block: suspend Fixture.() -> Unit) = runTest(timeout = 20.seconds) {
+            val fixture = Fixture(policy, testScheduler)
+            try {
+                fixture.driver.exercise(this, 20_000) { fixture.block() }
+            }
             finally {
                 fixture.scope.cancel()
                 fixture.scheduler.runCurrent()
@@ -976,8 +978,7 @@ class BackgroundPlaybackRuntimeTest {
         override fun abandon() { abandons++; callback = null }
     }
 
-    class Fixture(policy: PlaybackRuntimePolicy) {
-        val scheduler = TestCoroutineScheduler()
+    class Fixture(policy: PlaybackRuntimePolicy, val scheduler: TestCoroutineScheduler) {
         val scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(scheduler))
         private val context = ApplicationProvider.getApplicationContext<Application>()
         val focus = FakeFocus()
@@ -1014,7 +1015,7 @@ class BackgroundPlaybackRuntimeTest {
                 beforeSubscribe()
                 return connection.subscribe(id, channelId, options)
             }
-        }, Dispatchers.Default).apply { startAdmission() }
+        }, StandardTestDispatcher(scheduler)).apply { startAdmission() }
         val session = FakeTvheadendSession(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(Channel.create(ChannelId(1)), Channel.create(ChannelId(2))))),
@@ -1031,9 +1032,11 @@ class BackgroundPlaybackRuntimeTest {
                 }
             }
         })
-        private val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.IO,
+        private val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, StandardTestDispatcher(scheduler),
             readProfileForEditing = { ServerProfileEditReadResult.Missing }).also { owner -> scope.launch { owner.run() } }
-        val player = ExoPlayer.Builder(context).build()
+        // This stalled stream has no playback to advance. Auto advancement also moves Robolectric's
+        // system clock, which can expire SDK watchdogs before the real source-opening thread replies.
+        val player = ExoPlayer.Builder(context).setClock(FakeClock(false)).build()
         var afterPause: () -> Unit = {}
         val coordinator = createTvheadendPlaybackCoordinator(player,
             onRecoveryRequired = { recover(it) }).also { it.launchIn(scope) }
@@ -1163,8 +1166,14 @@ class BackgroundPlaybackRuntimeTest {
             await { install.isCompleted }
             assertTrue(install.await()?.isStarted == true)
             if (timeshift) {
+                // The source's opened/granted publication must precede its first status update.
+                driver.await("initial live timeshift grant", diagnostics = {
+                    "observation=${runtime.livePlaybackObservation.value}; playerError=${player.playerError}; " +
+                        "subscribes=${connection.subscribeCount}; unsubscribes=${connection.unsubscribeCount}"
+                }) { (runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)?.timeshiftState is LiveTimeshiftState.Available }
                 connection.emit(SubscriptionEvent.Timeshift(0, 0, 0, 120_000_000, 100))
-                await { (runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)?.timeshiftState is LiveTimeshiftState.Available }
+                await { ((runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)
+                    ?.timeshiftState as? LiveTimeshiftState.Available)?.playbackPaused != null }
             }
             playerReady()
         }
@@ -1199,12 +1208,11 @@ class BackgroundPlaybackRuntimeTest {
                 DvrRecordingStream(type = SubscriptionStreamType.H264, frameDuration = 20.milliseconds),
             ))), folder = emptyList())
 
-        suspend fun await(predicate: () -> Boolean) {
-            withTimeout(5_000) {
-                while (!predicate()) { scheduler.runCurrent(); shadowOf(Looper.getMainLooper()).idle(); delay(10) }
-            }
-        }
+        internal val driver = PlaybackTestDriver(scheduler)
 
-        suspend fun settle() { repeat(5) { scheduler.runCurrent(); shadowOf(Looper.getMainLooper()).idle(); delay(10) } }
+        fun await(label: String = "background playback condition", predicate: () -> Boolean) =
+            driver.await(label, predicate = predicate)
+
+        fun settle() = driver.settle(player)
     }
 }

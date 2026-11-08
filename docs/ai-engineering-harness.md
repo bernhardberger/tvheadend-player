@@ -215,7 +215,8 @@ risk:
 |---|---|
 | Documentation, tests, or mechanical work with no production behavior change | Normally none |
 | Non-trivial non-UX slice inside a larger branch | Two independent `android-reviewer` dispatches with task overrides: `openai/gpt-6.1-sol` `xhigh` plus `claude-code/claude-sonnet-5-5` `high` |
-| Closing end-of-branch review, or a standalone non-trivial non-UX change, including security/runtime/lifecycle/concurrency | Independent Astra `android-reviewer` plus an independent Opus pass (second `android-reviewer` dispatch with task override `model: claude-code/claude-opus-5-5`, `reasoning: high`; no named Opus agent), subject to the quota fallback below |
+| Standalone non-trivial non-UX change outside a branch | Independent `android-reviewer` with task override `openai/gpt-6.1-sol` `high` (`xhigh` when the change is critical, e.g. security/runtime/lifecycle/concurrency) plus an independent Opus pass (second `android-reviewer` dispatch with task override `model: claude-code/claude-opus-5-5`, `reasoning: high`; no named Opus agent), subject to the quota fallback below |
+| Closing end-of-branch review | Independent Astra `android-reviewer` (`openai/gpt-6-astra` `high`, the agent default; never `xhigh`) plus the same independent Opus pass, subject to the quota fallback below |
 | Ordinary release using the existing release path | No additional model approval; retain release artifact and authorization checks |
 | Unresolved visual direction for a substantial new or redesigned TV surface | Optional `tv-ux-brief` against supplied requirements and baseline images |
 | Screenshot-set coverage, metadata, duplication, staleness, or privacy | Primary checks it; optional `tv-evidence-curator` for useful independent work |

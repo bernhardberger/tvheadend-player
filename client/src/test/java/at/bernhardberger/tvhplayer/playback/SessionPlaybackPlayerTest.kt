@@ -10,11 +10,11 @@ package at.bernhardberger.tvhplayer.playback
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 
 import android.app.Application
-import android.os.Looper
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.SilenceMediaSource
+import androidx.media3.test.utils.FakeClock
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
 import at.bernhardberger.tvheadend.sdk.core.*
@@ -30,12 +30,16 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import at.bernhardberger.tvheadend.sdk.media3.testing.TimeshiftTestFixture
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestCoroutineScheduler
+import kotlinx.coroutines.test.runTest
+import kotlin.time.Duration.Companion.seconds
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 private val labels = object : SessionMetadataLabels {
@@ -196,6 +200,7 @@ class SessionPlaybackPlayerTest {
 
     @Test fun sessionArtworkFollowsOnlyTheCurrentTargetAndNotProgrammeTicks() = exercise {
         val pending = kotlinx.coroutines.CompletableDeferred<ByteArray?>()
+        val completed = kotlinx.coroutines.CompletableDeferred<Unit>()
         val requests = java.util.Collections.synchronizedList(mutableListOf<SessionArtworkRequest>())
         val initial = session.observation.value
         session.publish(SessionObservation.create(sessionState = initial.sessionState,
@@ -209,8 +214,10 @@ class SessionPlaybackPlayerTest {
             val id = (request.target as AppPlaybackTarget.Live).channelId.value
             if (id == 1L) byteArrayOf(1)
             else if (requests.count { it.target == request.target } == 1) throw java.io.IOException("Artwork unavailable")
-            else kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
-                pending.await()
+            else {
+                // The loader resumes on IO; wait for its entire request job, not just its input.
+                kotlinx.coroutines.currentCoroutineContext()[Job]!!.invokeOnCompletion { completed.complete(Unit) }
+                kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) { pending.await() }
             }
         })
         val delivered = mutableListOf<List<Byte>?>()
@@ -239,7 +246,7 @@ class SessionPlaybackPlayerTest {
                 epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = listOf(
                     EpgEvent.create(EventId(3), ChannelId(1), now - 1.hours, now + 1.hours, title = "Next show"))))))
             observations.value = session.observation.value
-            delay(1_100)
+            scheduler.advanceTimeBy(1_100)
             settle()
             assertEquals(1, requests.size)
             live(false, channelId = ChannelId(2))
@@ -252,6 +259,7 @@ class SessionPlaybackPlayerTest {
             live(false)
             await { byteArrayOf(1).contentEquals(artworkPlayer.mediaMetadata.artworkData) }
             pending.complete(byteArrayOf(2))
+            await("late artwork request completed") { completed.isCompleted }
             settle()
             assertTrue(byteArrayOf(1).contentEquals(artworkPlayer.mediaMetadata.artworkData))
             assertEquals(3, requests.size) // Successful identities are cached; failures retry.
@@ -688,7 +696,7 @@ class SessionPlaybackPlayerTest {
         settle()
         assertFalse(wrapper.playWhenReady)
         // The fake stream renders no frame: the refresh ends after its budget on the runtime's clock.
-        shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(PAUSED_SEEK_NUDGE_MILLIS))
+        scheduler.advanceTimeBy(PAUSED_SEEK_NUDGE_MILLIS)
         await { !runtime.livePause.value.pausedSeekRefresh }
         settle()
         assertFalse(player.playWhenReady)
@@ -1112,7 +1120,7 @@ class SessionPlaybackPlayerTest {
         // Not the viewer's stop: the screen stays open and Idle never shows between the targets.
         assertEquals(emptyList<Unit>(), stops)
         assertFalse(states.toString(), AppPlaybackState.Idle in states)
-        assertEquals(1, connection.unsubscribeCount)
+        await("exactly one subscription unsubscribed") { connection.unsubscribeCount == 1 }
     }
 
     @Test fun channelStartedOverARecordingStopsTheRecordingBeforeItsSource() = exercise {
@@ -1328,7 +1336,7 @@ class SessionPlaybackPlayerTest {
         await { runtime.activeTarget.value == null && stops.size == 1 }
         settle()
         assertEquals(1, stops.size)
-        assertEquals(1, connection.unsubscribeCount)
+        await("exactly one subscription unsubscribed") { connection.unsubscribeCount == 1 }
         assertEquals(Player.Commands.EMPTY, wrapper.availableCommands)
     }
 
@@ -1350,7 +1358,7 @@ class SessionPlaybackPlayerTest {
         settle()
         // The queued Stop lost to the newer request: the newer target replaces A and the
         // showing player is not told to close.
-        assertEquals(1, connection.unsubscribeCount)
+        await("exactly one subscription unsubscribed") { connection.unsubscribeCount == 1 }
         assertTrue(install.await()?.isStarted == true)
         assertEquals(AppPlaybackTarget.Recording(DvrEntryId(1)), runtime.activeTarget.value)
         assertEquals(emptyList<Unit>(), stops)
@@ -1382,7 +1390,7 @@ class SessionPlaybackPlayerTest {
         // The screen has not taken the event yet when the viewer tunes (zap settle window).
         runtime.notePlaybackIntent()
         screen.scheduler.advanceUntilIdle()
-        assertEquals(1, connection.unsubscribeCount)
+        await("exactly one subscription unsubscribed") { connection.unsubscribeCount == 1 }
         assertEquals(emptyList<Unit>(), stops)
     }
 
@@ -1405,7 +1413,7 @@ class SessionPlaybackPlayerTest {
     @Test fun warmClickBeforeAQueuedStopClosesWithTheStop() = exercise {
         live(false)
         warmOpeningBeforeAQueuedStopClosesWithIt()
-        await { connection.unsubscribeCount == 1 } // the SDK unsubscribes asynchronously
+        await("exactly one subscription unsubscribed") { connection.unsubscribeCount == 1 }
     }
 
     @Test fun warmPlayerEnteredWhileAStopIsQueuedClosesWithTheStop() = exercise {
@@ -1499,7 +1507,7 @@ class SessionPlaybackPlayerTest {
         await { probe.isCompleted }
         settle()
         assertTrue(runtime.isPlaybackIntentStopped(requireNotNull(probe.await())))
-        assertEquals(1, connection.unsubscribeCount)
+        await("exactly one subscription unsubscribed") { connection.unsubscribeCount == 1 }
         assertEquals(null, runtime.activeTarget.value)
         assertEquals(1, stops.size)
     }
@@ -1637,7 +1645,7 @@ class SessionPlaybackPlayerTest {
                 assertTrue(runtime.isPlaybackIntentStopped(intent))
                 clickIntent?.let { assertTrue(runtime.isPlaybackIntentStopped(it)) }
                 assertEquals(1, connection.subscribeCount)
-                assertEquals(1, connection.unsubscribeCount)
+                await("exactly one subscription unsubscribed") { connection.unsubscribeCount == 1 }
                 assertEquals(null, runtime.activeTarget.value)
                 assertEquals(AppPlaybackState.Idle, runtime.state.value)
                 assertEquals(playerLog.toString(), 0, player.mediaItemCount)
@@ -1692,7 +1700,7 @@ class SessionPlaybackPlayerTest {
         val stops = collectSessionStops()
         runtime.stopAfterLoss() // connection lost
         settle()
-        assertEquals(1, connection.unsubscribeCount)
+        await("exactly one subscription unsubscribed") { connection.unsubscribeCount == 1 }
         assertNotNull(runtime.enterPlayerScreen())
         // Reconnected: the live screen's automatic retry resubscribes.
         connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 0)))
@@ -1782,10 +1790,13 @@ class SessionPlaybackPlayerTest {
             events = listOf(EpgEvent.create(EventId(1), ChannelId(1), start = now - 1.hours,
                 stop = now + 1.hours, title = "Programme")),
         ))))
+        scheduler.advanceTimeBy(1_000)
         await { wrapper.mediaMetadata.subtitle == "Programme" }
         assertEquals(androidx.media3.common.C.TIME_UNSET, wrapper.duration)
         // The fake stream has no rendered wall-clock mapping: after Pause it cannot borrow Now.
         wrapper.pause()
+        await { !player.playWhenReady && !runtime.liveStartUndisturbed.value }
+        scheduler.advanceTimeBy(1_000) // Resample the session timeline after the pause is applied.
         await { wrapper.mediaMetadata.subtitle == null }
         assertTrue(wrapper.isCurrentMediaItemLive)
         assertTrue(wrapper.isCurrentMediaItemDynamic)
@@ -1862,20 +1873,24 @@ class SessionPlaybackPlayerTest {
         assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
     }
 
-    private fun exercise(block: suspend Fixture.() -> Unit) = runBlocking {
-        val fixture = Fixture(CoroutineScope(coroutineContext + SupervisorJob()))
-        try { withTimeout(15_000) { fixture.block() } }
+    private fun exercise(block: suspend Fixture.() -> Unit) = runTest(timeout = 15.seconds) {
+        val fixture = Fixture(CoroutineScope(StandardTestDispatcher(testScheduler) + SupervisorJob()), testScheduler)
+        try {
+            fixture.driver.exercise(this, 15_000) { fixture.block() }
+        }
         finally {
             fixture.observation.cancel()
             fixture.wrapper.close()
             fixture.scope.cancel()
+            testScheduler.runCurrent()
             fixture.runtime.detach()
             fixture.player.release()
             fixture.session.shutdown()
         }
     }
 
-    private class Fixture(val scope: CoroutineScope) {
+    private class Fixture(val scope: CoroutineScope, val scheduler: TestCoroutineScheduler) {
+        val driver = PlaybackTestDriver(scheduler)
         private val context = ApplicationProvider.getApplicationContext<Application>()
         var focusRequests = 0
         var focusGranted = true
@@ -1889,7 +1904,17 @@ class SessionPlaybackPlayerTest {
             override fun abandon() = Unit
         }
         val connection = ScriptedSubscriptionConnection()
-        val manager = createSubscriptionManager(connection, Dispatchers.Default).apply { startAdmission() }
+        private val subscriptions = MutableStateFlow(0)
+        val manager = createSubscriptionManager(object : SubscriptionConnection by connection {
+            override suspend fun subscribe(
+                id: SubscriptionId,
+                channelId: SubscriptionChannelId,
+                options: SubscriptionOptions,
+            ): SubscriptionOperationResult<SubscriptionConfirmation> =
+                connection.subscribe(id, channelId, options).also {
+                    subscriptions.value = connection.subscribeCount
+                }
+        }, Dispatchers.Default).apply { startAdmission() }
         val session = FakeTvheadendSession(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(Channel.create(ChannelId(1), name = "Channel One")))),
@@ -1901,7 +1926,8 @@ class SessionPlaybackPlayerTest {
         val settings = PlayerSettingsStore(InMemoryPreferencesDataStore())
         private val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.IO,
             readProfileForEditing = { ServerProfileEditReadResult.Missing }).also { owner -> scope.launch { owner.run() } }
-        val player = ExoPlayer.Builder(context).build()
+        // Stalled streams must not advance Robolectric time past SDK Handler watchdogs.
+        val player = ExoPlayer.Builder(context).setClock(FakeClock(false)).build()
         /** The SDK's Player stops and the playlists they leave, in order: a stop releases the decoders. */
         val playerLog: MutableList<String> = java.util.Collections.synchronizedList(mutableListOf())
         /** Runs as each [playerLog] entry is made, so a test can cancel a start at that point. */
@@ -1943,6 +1969,7 @@ class SessionPlaybackPlayerTest {
             }
         }, session, coordinator, settings, profiles, scope, TvheadendAudioOutputProvider(context), focus,
             PlaybackRuntimePolicy.fromPlayerSettings(),
+            elapsedRealtime = { scheduler.currentTime },
             noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) })
         val wrapper = SessionPlaybackPlayer(runtime, programmeWindowEnabled = true, labels = labels)
         val observation = scope.launch { wrapper.observe(session.observation) }
@@ -1994,7 +2021,11 @@ class SessionPlaybackPlayerTest {
             await { install.isCompleted }
             assertTrue(install.await()?.isStarted == true)
             if (timeshift) {
+                await { (runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)
+                    ?.timeshiftState is LiveTimeshiftState.Available }
                 connection.emit(SubscriptionEvent.Timeshift(0, 0, 0, 120_000_000, 100))
+                await { ((runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)
+                    ?.timeshiftState as? LiveTimeshiftState.Available)?.playbackPaused != null }
                 await { wrapper.isCommandAvailable(Player.COMMAND_PLAY_PAUSE) }
             }
             // The first picture is ready: a server pause is only sent after it.
@@ -2028,7 +2059,11 @@ class SessionPlaybackPlayerTest {
             await { connection.subscribeCount == subscription }
             connection.awaitCollectionRegistered()
             connection.emit(started)
+            await { (runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)
+                ?.timeshiftState is LiveTimeshiftState.Available }
             connection.emit(SubscriptionEvent.Timeshift(0, 0, 0, 120_000_000, 100))
+            await { ((runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)
+                ?.timeshiftState as? LiveTimeshiftState.Available)?.playbackPaused != null }
             await { runtime.livePause.value.availability == LivePauseAvailability.READY }
         }
 
@@ -2080,7 +2115,8 @@ class SessionPlaybackPlayerTest {
         fun answerNextSubscribe(count: Int) {
             connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 0)))
             scope.launch {
-                await { connection.subscribeCount == count }
+                subscriptions.first { it >= count }
+                assertEquals("expected subscription before answering its start", count, subscriptions.value)
                 connection.awaitCollectionRegistered()
                 connection.emit(started)
             }
@@ -2151,9 +2187,9 @@ class SessionPlaybackPlayerTest {
             commands.serialize(onClosed = {}) {}
         }
 
-        suspend fun await(predicate: () -> Boolean) {
-            withTimeout(5_000) { while (!predicate()) { shadowOf(Looper.getMainLooper()).idle(); delay(10) } }
-        }
-        suspend fun settle() { repeat(5) { shadowOf(Looper.getMainLooper()).idle(); delay(10) } }
+        fun await(label: String = "session playback condition", predicate: () -> Boolean) =
+            driver.await(label, predicate = predicate)
+
+        fun settle() = driver.settle(player)
     }
 }
