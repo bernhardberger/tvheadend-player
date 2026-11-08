@@ -11,6 +11,8 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import at.bernhardberger.tvhplayer.core.DvrArchiveGrouping
+import at.bernhardberger.tvhplayer.core.DvrArchiveSort
+import at.bernhardberger.tvhplayer.core.DvrArchiveView
 import at.bernhardberger.tvhplayer.core.HomeSectionKind
 
 data class UiSettings(
@@ -22,7 +24,7 @@ data class UiSettings(
     val showChannelNumbers: Boolean = true,
     val hiddenHomeSections: Set<HomeSectionKind> = emptySet(),
     val whatsNewSeenVersion: Int? = null,
-    val recordingsGrouping: DvrArchiveGrouping = DvrArchiveGrouping.FOLDERS,
+    val recordingsView: DvrArchiveView = DvrArchiveView(),
 )
 
 fun resolvePlaybackAutoStart(storedValue: Boolean?): Boolean = storedValue ?: false
@@ -43,14 +45,21 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
         val GUIDE_HEADLINE = booleanPreferencesKey("guideHeadline")
         val GUIDE_GENRE_COLORS = booleanPreferencesKey("guideGenreColors")
         val RECORDINGS_GROUPING = stringPreferencesKey("recordingsGrouping")
+        val RECORDINGS_SORT = stringPreferencesKey("recordingsSort")
+        val RECORDINGS_HIDE_WATCHED = booleanPreferencesKey("recordingsHideWatched")
         fun homeSection(kind: HomeSectionKind) = booleanPreferencesKey("homeSection${kind.name}")
     }
 
     val settings: Flow<UiSettings> = dataStore.data.map { preferences ->
         UiSettings(
             whatsNewSeenVersion = preferences[Keys.WHATS_NEW_SEEN_VERSION],
-            recordingsGrouping = DvrArchiveGrouping.entries.firstOrNull { it.name == preferences[Keys.RECORDINGS_GROUPING] }
-                ?: DvrArchiveGrouping.FOLDERS,
+            recordingsView = DvrArchiveView(
+                grouping = DvrArchiveGrouping.entries.firstOrNull { it.name == preferences[Keys.RECORDINGS_GROUPING] }
+                    ?: DvrArchiveGrouping.FOLDERS,
+                sort = DvrArchiveSort.entries.firstOrNull { it.name == preferences[Keys.RECORDINGS_SORT] }
+                    ?: DvrArchiveSort.NEWEST,
+                hideWatched = preferences[Keys.RECORDINGS_HIDE_WATCHED] ?: false,
+            ),
             autoStartPlayback = resolvePlaybackAutoStart(preferences[Keys.AUTO_START_PLAYBACK]),
             clockFormat = resolveClockFormat(preferences[Keys.CLOCK_FORMAT]),
             showChannelNumbers = preferences[Keys.SHOW_CHANNEL_NUMBERS] ?: true,
@@ -86,8 +95,12 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
         dataStore.edit { it[Keys.WHATS_NEW_SEEN_VERSION] = currentVersion }
     }
 
-    suspend fun setRecordingsGrouping(grouping: DvrArchiveGrouping) {
-        dataStore.edit { it[Keys.RECORDINGS_GROUPING] = grouping.name }
+    suspend fun setRecordingsView(view: DvrArchiveView) {
+        dataStore.edit {
+            it[Keys.RECORDINGS_GROUPING] = view.grouping.name
+            it[Keys.RECORDINGS_SORT] = view.sort.name
+            it[Keys.RECORDINGS_HIDE_WATCHED] = view.hideWatched
+        }
     }
 
     suspend fun setShowChannelNumbers(show: Boolean) {

@@ -4,7 +4,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberUpdatedState
@@ -19,7 +21,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -33,15 +34,16 @@ import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.DvrArchiveFolder
 import at.bernhardberger.tvhplayer.core.DvrArchiveGrouping
+import at.bernhardberger.tvhplayer.core.DvrArchiveSort
 import at.bernhardberger.tvhplayer.core.DvrDateSection
 import at.bernhardberger.tvhplayer.core.dvrDateSectionStarts
 import at.bernhardberger.tvhplayer.ui.common.formatDayHeader
 import at.bernhardberger.tvhplayer.core.offeredResumePosition
 import at.bernhardberger.tvhplayer.core.runningRecordings
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnGap
+import at.bernhardberger.tvhplayer.ui.TvGridGutter
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
-import at.bernhardberger.tvhplayer.ui.TvSpacing16
 import at.bernhardberger.tvhplayer.ui.components.depth.*
 
 internal fun archiveLevelId(path: List<String>): String = "archive:${path.joinToString("/")}"
@@ -92,6 +94,11 @@ internal fun ArchiveDepthContent(
     onOpenContextMenu: ((DvrEntry) -> Unit)? = null,
     onOpenFolderMenu: ((DvrArchiveFolder) -> Unit)? = null,
     grouping: DvrArchiveGrouping = DvrArchiveGrouping.FOLDERS,
+    sort: DvrArchiveSort = DvrArchiveSort.NEWEST,
+    /** The archive has recordings but Hide watched leaves none to show: the empty state says so. */
+    emptyBecauseWatched: Boolean = false,
+    /** Hide watched is on: the grouping button takes the tonal fill while it filters the list. */
+    hideWatched: Boolean = false,
     pill: ArchivePillHooks? = null,
     nowSeconds: () -> Long = { System.currentTimeMillis() / 1000L },
 ) {
@@ -100,15 +107,18 @@ internal fun ArchiveDepthContent(
     val latestOnOpenFolderMenu = rememberUpdatedState(onOpenFolderMenu)
     val latestPiconForEntry = rememberUpdatedState(piconForEntry)
     val latestAdmissionForEntry = rememberUpdatedState(admissionForEntry)
-    // Only a flat list is cut into days and months; each cut sits above the run's first recording.
-    val sections = remember(root, grouping) {
-        if (grouping != DvrArchiveGrouping.NONE) emptyMap()
+    // Only a flat list in date order is cut into days and months; each cut sits above the run's first recording.
+    val sections = remember(root, grouping, sort) {
+        if (grouping != DvrArchiveGrouping.NONE || sort != DvrArchiveSort.NEWEST) emptyMap()
         else {
             val starts = dvrDateSectionStarts(root.recordings, java.time.Instant.ofEpochSecond(nowSeconds()), java.time.ZoneId.systemDefault())
             root.recordings.indices.mapNotNull { index -> starts[index]?.let { root.recordings[index].id.value to it } }.toMap()
         }
     }
-    val levels = remember(root, sections) {
+    // The root heading ends before the View options button at the row's end, whatever width its value gives it;
+    // deeper levels have no button. The heading reads the measured width where it lays out.
+    val buttonWidthPx = remember { mutableIntStateOf(0) }
+    val levels = remember(root, sections, emptyBecauseWatched, pill != null) {
         val levels = linkedMapOf<String, DepthLevel>()
         fun addLevel(id: String, heading: @Composable () -> String, items: List<ArchiveListItem>) {
             levels[id] = DepthLevel(
@@ -117,10 +127,18 @@ internal fun ArchiveDepthContent(
                     ArchiveLevelHeading(
                         heading(),
                         emphasis,
+                        endReserve = if (pill != null && id == archiveLevelId(emptyList())) {
+                            { buttonWidthPx.intValue }
+                        } else null,
                     )
                 },
                 emptyContent = {
-                    Text(stringResource(R.string.recordings_archive_empty), style = MaterialTheme.typography.titleLarge,
+                    if (emptyBecauseWatched) Column(verticalArrangement = Arrangement.spacedBy(TvSpacing8)) {
+                        Text(stringResource(R.string.recordings_archive_all_watched), style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onSurface)
+                        Text(stringResource(R.string.recordings_archive_all_watched_hint), style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else Text(stringResource(R.string.recordings_archive_empty), style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onSurface)
                 },
                 rows = items.mapIndexed { index, item ->
@@ -211,27 +229,21 @@ internal fun ArchiveDepthContent(
             modifier = modifier.testTag("recordings-archive-list"),
         )
         if (pill != null && atRoot && isCurrent) {
-            val measurer = rememberTextMeasurer()
-            val title = stringResource(R.string.recordings_archive_all)
-            val titleStyle = MaterialTheme.typography.titleLarge
-            val density = LocalDensity.current
-            val titleWidth = remember(title, titleStyle, density) {
-                with(density) { measurer.measure(title, titleStyle).size.width.toDp() }
-            }
+            // Right-aligned in the title row, ending where the list column ends (above the row chevrons).
             Box(
-                Modifier.padding(
-                    start = contentPadding.calculateStartPadding(LocalLayoutDirection.current) + titleWidth + TvSpacing16,
-                ).height(recordingsHeadingBandHeight()),
-                contentAlignment = Alignment.CenterStart,
+                Modifier.padding(start = contentPadding.calculateStartPadding(LocalLayoutDirection.current))
+                    .width(TvBrowseColumnWidth).height(recordingsHeadingBandHeight()),
+                contentAlignment = Alignment.CenterEnd,
             ) {
-                ArchiveGroupingPill(
+                ArchiveGroupingButton(
                     grouping = grouping,
+                    active = hideWatched,
+                    modifier = Modifier.onSizeChanged { buttonWidthPx.intValue = it.width },
                     focusRequester = pill.focusRequester,
                     onOpen = pill.open,
                     onUp = pill.up,
                     onDown = { contentFocus.requestFocus() },
                     onLeft = onDrawerFocus,
-                    onBack = pill.up,
                     onFocusChanged = { pillFocused = it; pill.onFocusChanged(it) },
                 )
             }
@@ -239,13 +251,13 @@ internal fun ArchiveDepthContent(
     }
 }
 
-/** What the screen decides about the grouping choice: where focus goes from it and what opening it does. */
+/** What the screen decides about the grouping button: where focus goes from it and what opening it does. */
 internal class ArchivePillHooks(
     val focusRequester: FocusRequester,
     val open: () -> Unit,
     /** Focus to the tabs. */
     val up: () -> Unit,
-    /** Focus to the pill, from the list's first row. */
+    /** Focus to the button, from the list's first row. */
     val focus: () -> Unit,
     val onFocusChanged: (Boolean) -> Unit,
 )
@@ -280,12 +292,14 @@ internal const val ArchiveHeadingPreviewScale = 16f / 22f
  * to full size as the column slides into the active slot.
  */
 @Composable
-private fun ArchiveLevelHeading(name: String, emphasis: () -> Float) {
+private fun ArchiveLevelHeading(name: String, emphasis: () -> Float, endReserve: (() -> Int)? = null) {
+    // The measured width of the button at the end of the row (pixels), plus the shared gap.
+    val reserve = endReserve?.let { with(LocalDensity.current) { it().toDp() } + TvGridGutter } ?: 0.dp
     Box(Modifier.fillMaxWidth().height(recordingsHeadingBandHeight())) {
         if (name.isNotEmpty()) Text(
             name, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
             color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.graphicsLayer {
+            modifier = Modifier.padding(end = reserve).graphicsLayer {
                 scaleX = lerp(ArchiveHeadingPreviewScale, 1f, emphasis())
                 scaleY = scaleX
                 transformOrigin = TransformOrigin(0f, 1f)

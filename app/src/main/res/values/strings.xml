@@ -544,17 +544,24 @@
     <!-- Recordings tab listing failed, missed and broken recordings. Noun. Max 14. -->
     <string name="recordings_problems">Problems</string>
     <!-- Archive grouping: the choice beside the "All recordings" title and its four options. -->
-    <string name="recordings_grouping_title">Group recordings</string>
-    <string name="recordings_grouping_message">Choose how Archive lists your recordings.</string>
+    <string name="recordings_grouping_group_by">Group by</string>
     <string name="recordings_grouping_folders">Folders</string>
     <string name="recordings_grouping_channels">Channels</string>
     <string name="recordings_grouping_genres">Genres</string>
     <string name="recordings_grouping_none">None</string>
     <string name="recordings_grouping_folders_detail">The server\'s folder tree</string>
-    <string name="recordings_grouping_channels_detail">A folder per channel, newest first</string>
-    <string name="recordings_grouping_genres_detail">A folder per genre, newest first</string>
-    <string name="recordings_grouping_none_detail">One list, newest first</string>
-    <string name="recordings_grouping_pill_description">Group recordings by: %1$s</string>
+    <string name="recordings_grouping_channels_detail">A folder per channel</string>
+    <string name="recordings_grouping_genres_detail">A folder per genre</string>
+    <string name="recordings_grouping_none_detail">One list with date dividers</string>
+    <!-- Archive view options: the sort order, the filter and the empty state the filter can cause. -->
+    <string name="recordings_sort_title">Sort</string>
+    <string name="recordings_sort_newest">Newest first</string>
+    <string name="recordings_sort_name">Name A–Z</string>
+    <string name="recordings_sort_largest">Largest first</string>
+    <string name="recordings_filter_title">Filter</string>
+    <string name="recordings_hide_watched">Hide watched</string>
+    <string name="recordings_archive_all_watched">Everything here is watched.</string>
+    <string name="recordings_archive_all_watched_hint">Turn off Hide watched in View options.</string>
     <string name="recordings_group_no_channel">No channel</string>
     <string name="recordings_group_no_genre">No genre</string>
     <string name="recordings_date_today">Today</string>

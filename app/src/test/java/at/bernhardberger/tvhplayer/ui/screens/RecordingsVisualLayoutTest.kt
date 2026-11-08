@@ -42,6 +42,8 @@ import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.DvrArchiveGrouping
+import at.bernhardberger.tvhplayer.core.DvrArchiveView
+import at.bernhardberger.tvhplayer.core.DvrArchiveSort
 import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.common.formatFileSize
@@ -90,9 +92,9 @@ class RecordingsVisualLayoutTest {
     private val screenShown = mutableStateOf(true)
     private val endPaddingState = mutableStateOf<Dp?>(null)
     private val connectionState = mutableStateOf<ConnectionUiState>(ConnectionUiState.Ready)
-    private var startGrouping = DvrArchiveGrouping.FOLDERS
+    private var startView = DvrArchiveView()
     private var nowSeconds: () -> Long = { System.currentTimeMillis() / 1000L }
-    private val groupingChanges = mutableListOf<DvrArchiveGrouping>()
+    private val viewChanges = mutableListOf<DvrArchiveView>()
 
     @Before fun prepare() {
         oldLocale = Locale.getDefault()
@@ -425,6 +427,24 @@ class RecordingsVisualLayoutTest {
         assertNoCommands()
     }
 
+    /** French has the longest "All recordings" of the shipped translations; at a large font it must stop short of the button. */
+    @Test @Config(qualifiers = "fr-w960dp-h540dp-land-mdpi")
+    fun theRootHeadingEndsBeforeTheViewOptionsButton() {
+        show(scale = 2f)
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag(GROUPING_PILL).fetchSemanticsNodes().isNotEmpty() }
+        // The preview column carries the first folder's heading; the root's is the one left-most.
+        val headings = compose.onAllNodesWithTag("archive-level-heading", useUnmergedTree = true)
+        val root = (0 until headings.fetchSemanticsNodes().size).map { headings[it] }
+            .minBy { it.fetchSemanticsNode().boundsInRoot.left }
+        val heading = root.fetchSemanticsNode().boundsInRoot
+        val layouts = mutableListOf<TextLayoutResult>()
+        root.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { layout -> layout(layouts) }
+        val button = bounds(GROUPING_PILL)
+        assertTrue("the heading ($heading) ends before the button ($button)", heading.right <= button.left)
+        assertTrue("the long heading is the case under test", layouts.single().hasVisualOverflow)
+        assertTrue("the button names the grouping, so it is wider than the round icon", button.width > button.height)
+    }
+
     @Test fun theGroupingChoiceRegroupsOnOkAndBackLeavesItBeing() {
         show()
         focused("recordings-folder-Documentaries")
@@ -433,9 +453,9 @@ class RecordingsVisualLayoutTest {
         // The current grouping is where the choice opens.
         focused("recordings-grouping-option-folders")
         key(Key.Back)
-        compose.waitUntil(10_000) { compose.onAllNodesWithTag("recordings-grouping-choice").fetchSemanticsNodes().isEmpty() }
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("recordings-grouping-panel").fetchSemanticsNodes().isEmpty() }
         focused(GROUPING_PILL)
-        compose.runOnIdle { assertTrue(groupingChanges.isEmpty()) }
+        compose.runOnIdle { assertTrue(viewChanges.isEmpty()) }
         compose.onNodeWithTag("recordings-folder-Documentaries").assertExists()
 
         key(Key.DirectionCenter)
@@ -443,9 +463,12 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionDown)
         focused("recordings-grouping-option-channels")
         key(Key.DirectionCenter)
-        compose.waitUntil(10_000) { compose.onAllNodesWithTag("recordings-grouping-choice").fetchSemanticsNodes().isEmpty() }
+        // A choice applies at once and the panel stays, as in the Channels and Guide panels.
+        compose.runOnIdle { assertEquals(listOf(DvrArchiveView(grouping = DvrArchiveGrouping.CHANNELS)), viewChanges) }
+        focused("recordings-grouping-option-channels")
+        key(Key.Back)
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("recordings-grouping-panel").fetchSemanticsNodes().isEmpty() }
         focused(GROUPING_PILL)
-        compose.runOnIdle { assertEquals(listOf(DvrArchiveGrouping.CHANNELS), groupingChanges) }
         compose.onNodeWithTag("recordings-folder-Documentaries").assertDoesNotExist()
         key(Key.DirectionDown)
         focused("recordings-folder-Ridge Earth HD")
@@ -453,7 +476,7 @@ class RecordingsVisualLayoutTest {
     }
 
     @Test fun withoutGroupingTheRecordingsAreOneListWhoseDateDividersTakeNoFocus() {
-        startGrouping = DvrArchiveGrouping.NONE
+        startView = DvrArchiveView(grouping = DvrArchiveGrouping.NONE)
         show(entries = (1L..5L).map { recording(it, "Recording $it", "recording$it.ts") } +
             recording(6, "Running now", "running.ts", DvrEntryState.RECORDING, startEpochSeconds = 1_791_100_000))
         // The running recording is the newest row of the list, not a row of its own above it.
@@ -478,6 +501,61 @@ class RecordingsVisualLayoutTest {
         assertNoCommands()
     }
 
+    @Test fun sortAndHideWatchedApplyAtOnceThePanelKeepsFocusAndTheListFollows() {
+        startView = DvrArchiveView(grouping = DvrArchiveGrouping.NONE)
+        show(entries = listOf(
+            recording(1, "Bravo", "b.ts"), recording(2, "Alpha", "a.ts", playCount = 1), recording(3, "Charlie", "c.ts"),
+        ))
+        focused("recording-list-entry-1")
+        compose.onAllNodesWithTag("archive-date-divider", useUnmergedTree = true).fetchSemanticsNodes().let {
+            assertTrue("Newest first keeps the date dividers", it.isNotEmpty())
+        }
+        key(Key.DirectionUp)
+        focused(GROUPING_PILL)
+        key(Key.DirectionCenter)
+        focused("recordings-grouping-option-none")
+        key(Key.DirectionDown); key(Key.DirectionDown)
+        focused("recordings-sort-option-name")
+        key(Key.DirectionCenter)
+        compose.runOnIdle { assertEquals(DvrArchiveSort.NAME, viewChanges.last().sort) }
+        focused("recordings-sort-option-name")
+        key(Key.DirectionDown); key(Key.DirectionDown)
+        focused("recordings-hide-watched")
+        key(Key.DirectionCenter)
+        compose.runOnIdle { assertEquals(DvrArchiveView(DvrArchiveGrouping.NONE, DvrArchiveSort.NAME, true), viewChanges.last()) }
+        focused("recordings-hide-watched")
+        key(Key.Back)
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("recordings-grouping-panel").fetchSemanticsNodes().isEmpty() }
+        focused(GROUPING_PILL)
+        // Name order, the watched Alpha hidden, and no date dividers outside date order.
+        compose.onNodeWithTag("recording-list-entry-2").assertDoesNotExist()
+        assertTrue(bounds("recording-list-entry-1").top < bounds("recording-list-entry-3").top)
+        assertTrue(compose.onAllNodesWithTag("archive-date-divider", useUnmergedTree = true).fetchSemanticsNodes().isEmpty())
+        assertNoCommands()
+    }
+
+    @Test fun anArchiveEmptiedByHideWatchedSaysSoAndTheFilterCanBeTurnedOff() {
+        startView = DvrArchiveView(hideWatched = true)
+        // Recording 1 carries a saved position in the fixture (partly watched), so these two start at 2.
+        show(entries = listOf(recording(2, "Alpha", "a.ts", playCount = 1), recording(3, "Bravo", "b.ts", playCount = 2)))
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(hasText("Archive") and isFocused()).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("Everything here is watched.").assertIsDisplayed()
+        compose.onNodeWithText("Turn off Hide watched in View options.").assertIsDisplayed()
+        compose.onNodeWithText("Archive").assertIsFocused()
+        key(Key.DirectionDown)
+        focused(GROUPING_PILL)
+        key(Key.DirectionCenter)
+        repeat(8) { key(Key.DirectionDown) }
+        focused("recordings-hide-watched")
+        key(Key.DirectionCenter)
+        key(Key.Back)
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("recordings-grouping-panel").fetchSemanticsNodes().isEmpty() }
+        compose.onNodeWithText("Everything here is watched.").assertDoesNotExist()
+        compose.onNodeWithTag("recording-list-entry-2").assertExists()
+    }
+
     /** The six frames for the owner's check of the grouping trial: the same library in each arrangement. */
     @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
@@ -498,13 +576,17 @@ class RecordingsVisualLayoutTest {
             key(Key.DirectionCenter)
             focused("recordings-grouping-option-$current")
             val names = DvrArchiveGrouping.entries.map { it.name.lowercase() }
-            repeat(names.indexOf(option) - names.indexOf(current)) { key(Key.DirectionDown) }
+            val steps = names.indexOf(option) - names.indexOf(current)
+            repeat(kotlin.math.abs(steps)) { key(if (steps > 0) Key.DirectionDown else Key.DirectionUp) }
             focused("recordings-grouping-option-$option")
             key(Key.DirectionCenter)
-            compose.waitUntil(10_000) { compose.onAllNodesWithTag("recordings-grouping-choice").fetchSemanticsNodes().isEmpty() }
+            key(Key.Back)
+            compose.waitUntil(10_000) { compose.onAllNodesWithTag("recordings-grouping-panel").fetchSemanticsNodes().isEmpty() }
             focused(GROUPING_PILL)
             current = option
         }
+        compose.mainClock.advanceTimeBy(1_500)
+        capture("0-button-resting", 1f, outputs = out)
         toPill()
         compose.mainClock.advanceTimeBy(1_500)
         capture("1-pill-focused", 1f, outputs = out)
@@ -512,8 +594,13 @@ class RecordingsVisualLayoutTest {
         focused("recordings-grouping-option-folders")
         compose.mainClock.advanceTimeBy(1_500)
         capture("2-choice-open", 1f, outputs = out)
+        // The panel scrolls: the same panel with focus on its last row shows Sort and Filter.
+        repeat(7) { key(Key.DirectionDown) }
+        focused("recordings-hide-watched")
+        compose.mainClock.advanceTimeBy(1_500)
+        capture("2b-choice-open-scrolled", 1f, outputs = out)
         key(Key.Back)
-        compose.waitUntil(10_000) { compose.onAllNodesWithTag("recordings-grouping-choice").fetchSemanticsNodes().isEmpty() }
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("recordings-grouping-panel").fetchSemanticsNodes().isEmpty() }
         choose("channels")
         repeat(2) { key(Key.DirectionDown) }
         compose.mainClock.advanceTimeBy(1_500)
@@ -532,6 +619,20 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionDown)
         compose.mainClock.advanceTimeBy(1_500)
         capture("6-none-flat-list", 1f, outputs = out)
+        // Hide watched on: the button rests tonal while the filter narrows the list.
+        toPill()
+        choose("folders")
+        key(Key.DirectionCenter)
+        focused("recordings-grouping-option-folders")
+        repeat(7) { key(Key.DirectionDown) }
+        focused("recordings-hide-watched")
+        key(Key.DirectionCenter)
+        key(Key.Back)
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("recordings-grouping-panel").fetchSemanticsNodes().isEmpty() }
+        focused(GROUPING_PILL)
+        key(Key.DirectionDown)
+        compose.mainClock.advanceTimeBy(1_500)
+        capture("7-button-resting-hide-watched", 1f, outputs = out)
     }
 
     @Test fun upFromEachTabsFirstItemReachesThatTabAndDownReturnsToTheList() {
@@ -1656,8 +1757,8 @@ class RecordingsVisualLayoutTest {
                                 notices = notices,
                                 onRetry = { error("Unexpected retry") },
                                 onPlayRecording = { _, _ -> playbackRequests++ },
-                                grouping = startGrouping,
-                                onGroupingChange = { groupingChanges += it },
+                                view = startView,
+                                onViewChange = { viewChanges += it },
                                 nowSecProvider = nowSeconds,
                             )
                         }
@@ -1943,7 +2044,7 @@ class RecordingsVisualLayoutTest {
     }
 
     private companion object {
-        const val GROUPING_PILL = "recordings-grouping-pill"
+        const val GROUPING_PILL = "recordings-grouping-button"
         const val LONG_TITLE = "Ridge Light: The Remarkable Journey of the Northern Lights Across the Arctic"
     }
 }

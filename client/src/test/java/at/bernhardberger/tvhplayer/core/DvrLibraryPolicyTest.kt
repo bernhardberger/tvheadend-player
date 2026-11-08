@@ -140,6 +140,81 @@ class DvrLibraryPolicyTest {
         assertEquals(DvrDateSection.Undated, dvrDateSection(DvrEntry.create(DvrEntryId(9), state = DvrEntryState.COMPLETED), now, zone))
     }
 
+    @Test fun sortByNameOrdersTitlesAndGroupsIgnoringCaseTiesNewestAndTheCatchAllStaysLast() {
+        val bravo = sized(1, 100, "bravo", 5, channel = "Zeta")
+        val alpha = sized(2, 200, "Alpha", 5, channel = "Zeta")
+        val alphaNewer = sized(3, 300, "alpha", 5, channel = "Zeta")
+        val untitled = sized(4, 400, null, 5, channel = "Zeta")
+        val other = sized(5, 150, "Charlie", 5, channel = "alpha channel")
+        val orphan = sized(6, 900, "Aardvark", 5, channel = null)
+        val root = buildDvrArchive(
+            listOf(bravo, alpha, alphaNewer, untitled, other, orphan), DvrArchiveGrouping.CHANNELS,
+            naming(numbers = mapOf("Zeta" to 1)), DvrArchiveSort.NAME,
+        )
+
+        assertEquals(listOf("alpha channel", "Zeta", "No channel"), root.folders.map { it.name })
+        assertEquals(listOf(alphaNewer, alpha, bravo, untitled), root.folderAt(listOf("Zeta"))?.recordings)
+    }
+
+    @Test fun sortByLargestOrdersBySizeThenNewestWithUnknownSizeLastAtEveryLevel() {
+        val small = sized(1, 100, "a", 10, folder = listOf("Series", "Season"))
+        val big = sized(2, 200, "b", 90, folder = listOf("Series", "Season"))
+        val tie = sized(3, 300, "c", 10, folder = listOf("Series", "Season"))
+        val unknown = sized(4, 400, "d", null, folder = listOf("Series", "Season"))
+        val huge = sized(5, 50, "e", 500, folder = listOf("Film"))
+        val root = buildDvrArchive(listOf(small, big, tie, unknown, huge), DvrArchiveGrouping.FOLDERS,
+            naming(), DvrArchiveSort.LARGEST)
+
+        assertEquals(listOf("Film", "Series"), root.folders.map { it.name })
+        assertEquals(listOf(big, tie, small, unknown), root.folderAt(listOf("Series", "Season"))?.recordings)
+    }
+
+    @Test fun sortKeepsFolderRowsAndRecordingRowsAsTwoBlocks() {
+        val inFolder = sized(1, 100, "z", 1, folder = listOf("A"))
+        val loose = sized(2, 200, "a", 99, folder = emptyList())
+        val root = buildDvrArchive(listOf(inFolder, loose), DvrArchiveGrouping.FOLDERS, naming(), DvrArchiveSort.LARGEST)
+
+        assertEquals(listOf("A"), root.folders.map { it.name })
+        assertEquals(listOf(loose), root.recordings)
+    }
+
+    @Test fun hideWatchedDropsWatchedRecordingsAndTheGroupsTheyEmptyButNeverARunningOne() {
+        val seen = onChannel(1, 100, "News").withPlays(1)
+        val unseen = onChannel(2, 200, "News")
+        val allSeen = onChannel(3, 300, "Film").withPlays(2)
+        val running = DvrEntry.create(DvrEntryId(4), state = DvrEntryState.RECORDING, start = Instant.fromEpochSeconds(400),
+            channelName = "Film", playCount = 1)
+        val entries = listOf(seen, unseen, allSeen, running)
+        val watched = { entry: DvrEntry -> recordingWatchedToEnd(entry, null) }
+
+        val root = buildDvrArchive(entries, DvrArchiveGrouping.CHANNELS, naming(), isWatched = watched)
+        assertEquals(listOf("Film", "News"), root.folders.map { it.name })
+        assertEquals(listOf(running), root.folderAt(listOf("Film"))?.recordings)
+        assertEquals(listOf(unseen), root.folderAt(listOf("News"))?.recordings)
+        assertEquals(1, summarizeDvrFolder(checkNotNull(root.folderAt(listOf("News")))).recordingCount)
+
+        val onlyWatched = buildDvrArchive(listOf(seen, allSeen), DvrArchiveGrouping.FOLDERS, naming(), isWatched = watched)
+        assertTrue(onlyWatched.folders.isEmpty() && onlyWatched.recordings.isEmpty())
+    }
+
+    @Test fun watchedMeansPlayedToTheEndNotPartlyWatchedNorMissed() {
+        val played = onChannel(1, 100, "News").withPlays(1)
+        assertTrue(recordingWatchedToEnd(played, null))
+        assertFalse(recordingWatchedToEnd(played, kotlin.time.Duration.parse("5m")))
+        assertFalse(recordingWatchedToEnd(onChannel(2, 100, "News"), null))
+        assertFalse(recordingWatchedToEnd(
+            DvrEntry.create(DvrEntryId(3), state = DvrEntryState.MISSED, playCount = 1), null))
+    }
+
+    private fun DvrEntry.withPlays(count: Long) = DvrEntry.create(id, state = state, start = start,
+        channelName = channelName, playCount = count)
+
+    /** A recording with a title and, when known, one file of [size] bytes. */
+    private fun sized(id: Long, start: Long, title: String?, size: Long?, channel: String? = null, folder: List<String>? = null) =
+        DvrEntry.create(DvrEntryId(id), state = DvrEntryState.COMPLETED, start = Instant.fromEpochSeconds(start),
+            title = title, channelName = channel, folder = folder,
+            files = size?.let { listOf(DvrRecordingFile.create(sizeBytes = it)) })
+
     private fun naming(numbers: Map<String, Int> = emptyMap()) = DvrArchiveNaming(
         channelName = { it.channelName },
         channelNumber = { numbers[it.channelName] },

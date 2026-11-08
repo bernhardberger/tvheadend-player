@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.core
 
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import java.text.Collator
 import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
@@ -39,21 +40,88 @@ fun buildDvrArchive(
     entries: List<DvrEntry>,
     grouping: DvrArchiveGrouping,
     naming: DvrArchiveNaming,
-): DvrArchiveFolder = when (grouping) {
-    DvrArchiveGrouping.FOLDERS -> buildDvrArchive(entries)
-    // Channel number order, as the channel list reads; unnumbered channels after, by name.
-    DvrArchiveGrouping.CHANNELS -> virtualGroups(
-        entries, naming.channelName, naming.noChannel,
-        compareBy<DvrArchiveFolder> { naming.channelNumber(it.recordings.first()) ?: Int.MAX_VALUE }
-            .thenBy { it.name.lowercase() },
+    sort: DvrArchiveSort = DvrArchiveSort.NEWEST,
+    isWatched: ((DvrEntry) -> Boolean)? = null,
+): DvrArchiveFolder {
+    // Hide watched: a running recording is not finished, so it is never hidden; a group left with
+    // nothing is never built, and the counts and sizes of what remains follow from what is shown.
+    val shown = if (isWatched == null) entries else entries.filterNot { !recordingIsRunning(it) && isWatched(it) }
+    val tree = when (grouping) {
+        DvrArchiveGrouping.FOLDERS -> buildDvrArchive(shown)
+        // Channel number order, as the channel list reads; unnumbered channels after, by name.
+        DvrArchiveGrouping.CHANNELS -> virtualGroups(
+            shown, naming.channelName, naming.noChannel,
+            compareBy<DvrArchiveFolder> { naming.channelNumber(it.recordings.first()) ?: Int.MAX_VALUE }
+                .thenBy { it.name.lowercase() },
+        )
+        DvrArchiveGrouping.GENRES -> virtualGroups(
+            shown, naming.genreName, naming.noGenre,
+            compareByDescending<DvrArchiveFolder> { it.newestRecordingStart ?: Long.MIN_VALUE }
+                .thenBy { it.name.lowercase() },
+        )
+        DvrArchiveGrouping.NONE -> DvrArchiveFolder("", emptyList(), emptyList(), shown.newestFirst(),
+            offersRecordingNow = false)
+    }
+    val lastGroup = when (grouping) {
+        DvrArchiveGrouping.CHANNELS -> naming.noChannel
+        DvrArchiveGrouping.GENRES -> naming.noGenre
+        else -> null
+    }
+    return if (sort == DvrArchiveSort.NEWEST) tree else tree.arranged(sort, lastGroup)
+}
+
+/** The viewer's choices for Recordings > Archive: how it is grouped, ordered and filtered. */
+data class DvrArchiveView(
+    val grouping: DvrArchiveGrouping = DvrArchiveGrouping.FOLDERS,
+    val sort: DvrArchiveSort = DvrArchiveSort.NEWEST,
+    val hideWatched: Boolean = false,
+)
+
+/** How the recordings, and the group rows, of every level are ordered. */
+enum class DvrArchiveSort {
+    /** Recordings by start; groups as the grouping orders them (folders and genres by newest, channels by number). */
+    NEWEST,
+    /** By title, or by group name; locale-aware and case-insensitive. */
+    NAME,
+    /** By file size, or by the total size of a group. */
+    LARGEST,
+}
+
+/**
+ * Re-sorts every level of the tree. Ties are broken by the newest start and recordings without a
+ * known title or size come last; the group named [lastGroup] (the catch-all) stays after the rest.
+ */
+private fun DvrArchiveFolder.arranged(sort: DvrArchiveSort, lastGroup: String?): DvrArchiveFolder {
+    val collator = Collator.getInstance().apply { strength = Collator.SECONDARY }
+    val newest = compareByDescending<DvrEntry> { it.start?.epochSeconds ?: Long.MIN_VALUE }
+    val recordingOrder: Comparator<DvrEntry> = when (sort) {
+        DvrArchiveSort.NEWEST -> newest
+        DvrArchiveSort.NAME -> Comparator<DvrEntry> { a, b ->
+            val left = a.title?.takeIf(String::isNotBlank)
+            val right = b.title?.takeIf(String::isNotBlank)
+            when {
+                left == null && right == null -> 0
+                left == null -> 1
+                right == null -> -1
+                else -> collator.compare(left, right)
+            }
+        }.then(newest)
+        DvrArchiveSort.LARGEST -> compareByDescending<DvrEntry> { recordingSizeBytes(it) ?: -1L }.then(newest)
+    }
+    val groupOrder: Comparator<DvrArchiveFolder> = when (sort) {
+        DvrArchiveSort.NEWEST -> compareByDescending { it.newestRecordingStart ?: Long.MIN_VALUE }
+        DvrArchiveSort.NAME -> Comparator<DvrArchiveFolder> { a, b -> collator.compare(a.name, b.name) }
+            .thenByDescending { it.newestRecordingStart ?: Long.MIN_VALUE }
+        DvrArchiveSort.LARGEST -> compareByDescending<DvrArchiveFolder> { summarizeDvrFolder(it).totalSizeBytes }
+            .thenByDescending { it.newestRecordingStart ?: Long.MIN_VALUE }
+    }
+    fun DvrArchiveFolder.sorted(): DvrArchiveFolder = copy(
+        folders = folders.map { it.sorted() }
+            .sortedWith(compareBy<DvrArchiveFolder> { lastGroup != null && it.name == lastGroup && path.isEmpty() }
+                .then(groupOrder)),
+        recordings = recordings.sortedWith(recordingOrder),
     )
-    DvrArchiveGrouping.GENRES -> virtualGroups(
-        entries, naming.genreName, naming.noGenre,
-        compareByDescending<DvrArchiveFolder> { it.newestRecordingStart ?: Long.MIN_VALUE }
-            .thenBy { it.name.lowercase() },
-    )
-    DvrArchiveGrouping.NONE -> DvrArchiveFolder("", emptyList(), emptyList(), entries.newestFirst(),
-        offersRecordingNow = false)
+    return sorted()
 }
 
 private fun List<DvrEntry>.newestFirst() = sortedByDescending { it.start?.epochSeconds ?: Long.MIN_VALUE }

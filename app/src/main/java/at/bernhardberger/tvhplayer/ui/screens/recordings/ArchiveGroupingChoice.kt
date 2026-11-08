@@ -1,23 +1,14 @@
 package at.bernhardberger.tvhplayer.ui.screens.recordings
 
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -27,21 +18,14 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.activity.compose.BackHandler
-import androidx.tv.material3.ClickableSurfaceDefaults
-import androidx.tv.material3.Icon
-import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Surface
-import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.DvrArchiveGrouping
-import at.bernhardberger.tvhplayer.ui.TvSpacing8
-import at.bernhardberger.tvhplayer.ui.components.TwoColumnDialog
-import at.bernhardberger.tvhplayer.ui.components.TwoColumnDialogButton
+import at.bernhardberger.tvhplayer.core.DvrArchiveSort
+import at.bernhardberger.tvhplayer.core.DvrArchiveView
+import at.bernhardberger.tvhplayer.ui.components.RoundIconButton
+import at.bernhardberger.tvhplayer.ui.screens.BrowsePanelEntry
+import at.bernhardberger.tvhplayer.ui.screens.BrowsePanelList
+import at.bernhardberger.tvhplayer.ui.screens.BrowseSidePanel
 
 internal fun DvrArchiveGrouping.labelRes(): Int = when (this) {
     DvrArchiveGrouping.FOLDERS -> R.string.recordings_grouping_folders
@@ -58,31 +42,36 @@ private fun DvrArchiveGrouping.detailRes(): Int = when (this) {
 }
 
 /**
- * The grouping choice beside the root title. It is its own focus stop between the tabs and the
- * list: every direction is decided here so no neighbour's key handling can move or activate through it.
- * [onUp], [onDown] and [onLeft] move focus on the first press only; held repeats are swallowed.
+ * The View options button of the Archive root, in the title row, naming the current grouping. It is its own focus stop between the
+ * tabs and the list: every direction is decided here so no neighbour's key handling can move or
+ * activate through it. [onUp], [onDown] and [onLeft] move focus on the first press only; held
+ * repeats are swallowed, and Right goes nowhere.
  */
 @Composable
-internal fun ArchiveGroupingPill(
+internal fun ArchiveGroupingButton(
     grouping: DvrArchiveGrouping,
+    /** Only a filter that narrows the list makes the button tonal; the grouping and sort name themselves. */
+    active: Boolean,
     focusRequester: FocusRequester,
     onOpen: () -> Unit,
     onUp: () -> Unit,
     onDown: () -> Unit,
     onLeft: (() -> Unit)?,
-    onBack: () -> Unit,
     onFocusChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var focused by remember { mutableStateOf(false) }
-    BackHandler(enabled = focused, onBack = onBack)
-    val label = stringResource(grouping.labelRes())
-    val description = stringResource(R.string.recordings_grouping_pill_description, label)
-    Surface(
+    BackHandler(enabled = focused, onBack = onUp)
+    RoundIconButton(
+        icon = painterResource(R.drawable.ic_tune),
+        label = stringResource(R.string.channels_view_options),
+        value = stringResource(grouping.labelRes()),
+        active = active,
         onClick = onOpen,
-        shape = ClickableSurfaceDefaults.shape(CircleShape),
+        focusRequester = focusRequester,
+        onFocused = {},
         modifier = modifier
-            .focusRequester(focusRequester)
+            .focusProperties { right = FocusRequester.Cancel }
             .onFocusChanged {
                 focused = it.isFocused
                 onFocusChanged(it.isFocused)
@@ -98,62 +87,57 @@ internal fun ArchiveGroupingPill(
                 if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) move?.invoke()
                 true
             }
-            .semantics(mergeDescendants = true) { contentDescription = description }
-            .testTag("recordings-grouping-pill"),
-    ) {
-        Row(
-            Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(painterResource(R.drawable.ic_sort), contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(TvSpacing8))
-            Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-    }
+            .testTag("recordings-grouping-button"),
+    )
+}
+
+private fun DvrArchiveSort.labelRes(): Int = when (this) {
+    DvrArchiveSort.NEWEST -> R.string.recordings_sort_newest
+    DvrArchiveSort.NAME -> R.string.recordings_sort_name
+    DvrArchiveSort.LARGEST -> R.string.recordings_sort_largest
 }
 
 /**
- * The four groupings as the shared two-column dialog's actions, the current one checked and focused.
- * Choosing calls [onChoose] and the owner closes it; Back reaches [onClose] without a change.
+ * View options for the Archive: how recordings are grouped and sorted (one choice each) and whether
+ * watched ones are hidden. As in the Channels and Guide panels a choice applies at once and the panel
+ * stays, with focus on the row just pressed; Back closes it ([onClose]).
  */
 @Composable
-internal fun ArchiveGroupingChoice(
-    current: DvrArchiveGrouping,
-    onChoose: (DvrArchiveGrouping) -> Unit,
+internal fun ArchiveGroupingPanel(
+    current: DvrArchiveView,
+    onChoose: (DvrArchiveView) -> Unit,
     onClose: () -> Unit,
-    backEnabled: Boolean,
 ) {
-    val options = DvrArchiveGrouping.entries
-    val requesters = remember { options.associateWith { FocusRequester() } }
-    LaunchedEffect(backEnabled) {
-        if (!backEnabled) return@LaunchedEffect
-        withFrameNanos { }
-        requesters.getValue(current).requestFocus()
-    }
-    TwoColumnDialog(
-        title = stringResource(R.string.recordings_grouping_title),
-        message = stringResource(R.string.recordings_grouping_message),
-        onDismiss = onClose,
-        modifier = Modifier.testTag("recordings-grouping-choice"),
-        backEnabled = backEnabled,
-    ) {
-        options.forEachIndexed { index, option ->
-            TwoColumnDialogButton(
+    val entries = buildList {
+        add(BrowsePanelEntry.Section(stringResource(R.string.recordings_grouping_group_by)))
+        DvrArchiveGrouping.entries.forEach { option ->
+            add(BrowsePanelEntry.Choice(
+                key = "recordings-grouping-option-${option.name.lowercase()}",
                 label = stringResource(option.labelRes()),
-                onClick = { onChoose(option) },
-                modifier = Modifier.testTag("recordings-grouping-option-${option.name.lowercase()}")
-                    .focusRequester(requesters.getValue(option))
-                    .focusProperties {
-                        up = options.getOrNull(index - 1)?.let(requesters::get) ?: FocusRequester.Cancel
-                        down = options.getOrNull(index + 1)?.let(requesters::get) ?: FocusRequester.Cancel
-                        left = FocusRequester.Cancel
-                        right = FocusRequester.Cancel
-                    },
-                subtitle = stringResource(option.detailRes()),
-                icon = if (option == current) {
-                    { Icon(painterResource(R.drawable.ic_check), contentDescription = null, modifier = Modifier.size(24.dp)) }
-                } else null,
-            )
+                selected = option == current.grouping,
+                onClick = { onChoose(current.copy(grouping = option)) },
+                supporting = stringResource(option.detailRes()),
+            ))
         }
+        add(BrowsePanelEntry.Section(stringResource(R.string.recordings_sort_title)))
+        DvrArchiveSort.entries.forEach { option ->
+            add(BrowsePanelEntry.Choice(
+                key = "recordings-sort-option-${option.name.lowercase()}",
+                label = stringResource(option.labelRes()),
+                selected = option == current.sort,
+                onClick = { onChoose(current.copy(sort = option)) },
+            ))
+        }
+        add(BrowsePanelEntry.Section(stringResource(R.string.recordings_filter_title)))
+        add(BrowsePanelEntry.Choice(
+            key = "recordings-hide-watched",
+            label = stringResource(R.string.recordings_hide_watched),
+            selected = false,
+            onClick = { onChoose(current.copy(hideWatched = !current.hideWatched)) },
+            checked = current.hideWatched,
+        ))
+    }
+    BrowseSidePanel(stringResource(R.string.channels_view_options), "recordings-grouping-panel", onClose) {
+        BrowsePanelList(entries, radio = true)
     }
 }
