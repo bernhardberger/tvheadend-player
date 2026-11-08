@@ -51,6 +51,74 @@ private val labels = object : SessionMetadataLabels {
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class)
 class SessionPlaybackPlayerTest {
+    @Test fun sessionArtworkFollowsOnlyTheCurrentTargetAndNotProgrammeTicks() = exercise {
+        val pending = kotlinx.coroutines.CompletableDeferred<ByteArray?>()
+        val requests = java.util.Collections.synchronizedList(mutableListOf<SessionArtworkRequest>())
+        val initial = session.observation.value
+        session.publish(SessionObservation.create(sessionState = initial.sessionState,
+            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(
+                Channel.create(ChannelId(1), name = "One"), Channel.create(ChannelId(2), name = "Two")))),
+            epgState = initial.epgState, dvrState = initial.dvrState))
+        val observations = kotlinx.coroutines.flow.MutableStateFlow(SessionObservation.create(
+            channelState = session.observation.value.channelState))
+        val artworkPlayer = SessionPlaybackPlayer(runtime, true, labels, SessionArtworkLoader { request, _ ->
+            requests += request
+            val id = (request.target as AppPlaybackTarget.Live).channelId.value
+            if (id == 1L) byteArrayOf(1)
+            else if (requests.count { it.target == request.target } == 1) throw java.io.IOException("Artwork unavailable")
+            else kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                pending.await()
+            }
+        })
+        val delivered = mutableListOf<List<Byte>?>()
+        artworkPlayer.addListener(object : Player.Listener {
+            override fun onMediaMetadataChanged(mediaMetadata: MediaMetadata) {
+                delivered += mediaMetadata.artworkData?.toList()
+            }
+        })
+        val observing = scope.launch { artworkPlayer.observe(observations) }
+        try {
+            live(false)
+            settle()
+            assertTrue(requests.isEmpty())
+            assertNull(artworkPlayer.mediaMetadata.artworkData)
+            observations.value = session.observation.value
+            await { artworkPlayer.mediaMetadata.artworkData != null }
+            assertTrue(delivered.contains(listOf(1.toByte())))
+            assertTrue(byteArrayOf(1).contentEquals(artworkPlayer.mediaMetadata.artworkData))
+            assertEquals(MediaMetadata.PICTURE_TYPE_FRONT_COVER, artworkPlayer.mediaMetadata.artworkDataType)
+            assertNull(artworkPlayer.mediaMetadata.artworkUri)
+            assertNull(artworkPlayer.currentMediaItem?.mediaMetadata?.artworkData)
+            val before = session.observation.value
+            val now = Clock.System.now()
+            session.publish(SessionObservation.create(sessionState = before.sessionState,
+                channelState = before.channelState, dvrState = before.dvrState,
+                epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = listOf(
+                    EpgEvent.create(EventId(3), ChannelId(1), now - 1.hours, now + 1.hours, title = "Next show"))))))
+            observations.value = session.observation.value
+            delay(1_100)
+            settle()
+            assertEquals(1, requests.size)
+            live(false, channelId = ChannelId(2))
+            await { requests.size == 2 }
+            assertNull(artworkPlayer.mediaMetadata.artworkData)
+            live(false)
+            await { byteArrayOf(1).contentEquals(artworkPlayer.mediaMetadata.artworkData) }
+            live(false, channelId = ChannelId(2))
+            await { requests.size == 3 }
+            live(false)
+            await { byteArrayOf(1).contentEquals(artworkPlayer.mediaMetadata.artworkData) }
+            pending.complete(byteArrayOf(2))
+            settle()
+            assertTrue(byteArrayOf(1).contentEquals(artworkPlayer.mediaMetadata.artworkData))
+            assertEquals(3, requests.size) // Successful identities are cached; failures retry.
+        } finally {
+            pending.complete(null)
+            observing.cancel()
+            artworkPlayer.close()
+        }
+    }
+
     @Test fun liveMetadataUsesChannelAsTitleAndProgrammeAsSubtitle() {
         val now = Instant.parse("2026-09-07T20:30:00Z")
         val episode = EpgEpisode(null, null, 2, 3, 4, 5, 6, 7, "S2 E4")
@@ -1718,13 +1786,14 @@ class SessionPlaybackPlayerTest {
             }
         }
 
-        suspend fun live(timeshift: Boolean, firstPicture: Boolean = true) {
+        suspend fun live(timeshift: Boolean, firstPicture: Boolean = true, channelId: ChannelId = ChannelId(1)) {
             settings.setTimeshiftEnabled(timeshift)
+            val previousSubscriptions = connection.subscribeCount
             connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, if (timeshift) 120 else 0)))
             val install = scope.async {
-                runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(1))))
+                runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, channelId)))
             }
-            await { connection.subscribeCount == 1 }
+            await { connection.subscribeCount > previousSubscriptions }
             connection.awaitCollectionRegistered()
             connection.emit(started)
             await { install.isCompleted }

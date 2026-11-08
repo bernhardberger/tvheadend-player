@@ -11,7 +11,10 @@ import androidx.media3.common.Player
 import androidx.media3.common.PlaybackException
 import android.os.Bundle
 import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.ChannelMediaKind
+import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.ContentGenre
 import at.bernhardberger.tvheadend.sdk.core.mediaKind
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
@@ -29,6 +32,11 @@ import com.google.common.util.concurrent.SettableFuture
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -55,6 +63,18 @@ interface SessionMetadataLabels {
     fun channelNumber(channel: Channel): String?
     fun error(kind: SessionPlaybackErrorKind): String
 }
+
+/** Encoded, bounded artwork only. Null means no source; failures throw and are not cached. */
+fun interface SessionArtworkLoader {
+    suspend fun load(request: SessionArtworkRequest, observation: SessionObservation): ByteArray?
+}
+
+data class SessionArtworkRequest(
+    val target: AppPlaybackTarget,
+    val channelIcon: ChannelIcon?,
+    val recordingImage: ArtworkId?,
+    val session: CurrentSessionObservation,
+)
 
 enum class SessionPlaybackErrorKind { RECORDING_READ, CHANNEL_UNAVAILABLE, PLAYBACK }
 
@@ -178,6 +198,7 @@ class SessionPlaybackPlayer(
     private val runtime: AppPlaybackRuntime,
     private val programmeWindowEnabled: Boolean,
     private val labels: SessionMetadataLabels,
+    private val artworkLoader: SessionArtworkLoader = SessionArtworkLoader { _, _ -> null },
 ) : ForwardingSimpleBasePlayer(runtime.player) {
     private var metadata = SessionMetadataSnapshot(MediaMetadata.EMPTY, emptyMap())
     private var metadataTarget: AppPlaybackTarget? = null
@@ -185,9 +206,15 @@ class SessionPlaybackPlayer(
     private var closed = false
     private var errorKey: SessionFailureKey? = null
     private var error: PlaybackException? = null
+    private var artworkRequest: SessionArtworkRequest? = null
+    private var artworkData: ByteArray? = null
+    private var artworkJob: Job? = null
 
     /** The activity starts this on the player's looper and cancels it before releasing the session. */
-    suspend fun observe(observation: StateFlow<SessionObservation>) {
+    suspend fun observe(observation: StateFlow<SessionObservation>) = coroutineScope {
+        // Small, session-local cache of successes and source absence, never failed loads.
+        val cache = java.util.LinkedHashMap<SessionArtworkRequest, ByteArray?>(8, 0.75f, true)
+        var cacheSession: CurrentSessionObservation? = null
         val clock = flow {
             while (true) {
                 emit(Clock.System.now())
@@ -209,10 +236,43 @@ class SessionPlaybackPlayer(
             SessionPresentationSnapshot(target, livePause,
                 (live.live as? LivePlaybackObservation.Active)?.timeshiftState is LiveTimeshiftState.Available,
                 live.state, live.growing,
-                sessionMetadataSnapshot(target, snapshot, sampled.third, timeshift, liveStart, programmeWindowEnabled, labels))
+                sessionMetadataSnapshot(target, snapshot, sampled.third, timeshift, liveStart, programmeWindowEnabled, labels),
+                sessionArtworkRequest(target, snapshot))
         }.distinctUntilChanged().collect { value ->
             if (!closed) {
                 val target = value.target
+                if (value.artwork != artworkRequest && target == runtime.activeTarget.value) {
+                    artworkJob?.cancel()
+                    artworkRequest = value.artwork
+                    artworkData = null
+                    val request = value.artwork
+                    if (request != null) {
+                        if (request.session != cacheSession) {
+                            cache.clear()
+                            cacheSession = request.session
+                        }
+                        if (cache.containsKey(request)) artworkData = cache[request]
+                        else {
+                            val captured = observation.value
+                            artworkJob = launch {
+                                val bytes = try {
+                                    withContext(Dispatchers.IO) { artworkLoader.load(request, captured) }
+                                } catch (cancelled: CancellationException) {
+                                    throw cancelled
+                                } catch (_: Exception) {
+                                    return@launch
+                                }
+                                if (!closed && artworkRequest == request &&
+                                    sessionArtworkRequest(runtime.activeTarget.value, observation.value) == request) {
+                                    if (bytes != null || (request.channelIcon == null && request.recordingImage == null)) cache[request] = bytes
+                                    if (cache.size > 8) cache.remove(cache.keys.first())
+                                    artworkData = bytes
+                                    invalidateState()
+                                }
+                            }
+                        }
+                    }
+                }
                 if (target != null && target == runtime.activeTarget.value) {
                     if (metadataTarget != target) itemUid = Any()
                     metadataTarget = target
@@ -253,7 +313,8 @@ class SessionPlaybackPlayer(
         val seekable = target is AppPlaybackTarget.Recording && player.isCurrentMediaItemSeekable &&
             player.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
         // Publish a sanitized single-item timeline, never the SDK's URI, IDs, extras or raw errors.
-        val currentMetadata = metadata.metadata.takeIf { metadataTarget == target } ?: MediaMetadata.EMPTY
+        val currentMetadata = (metadata.metadata.takeIf { metadataTarget == target } ?: MediaMetadata.EMPTY)
+            .buildUpon().setArtworkData(artworkData.takeIf { artworkRequest?.target == target }, MediaMetadata.PICTURE_TYPE_FRONT_COVER).build()
         val item = MediaItemData.Builder(itemUid)
             .setMediaItem(MediaItem.Builder()
                 .apply { if (target is AppPlaybackTarget.Live) setLiveConfiguration(MediaItem.LiveConfiguration.UNSET) }
@@ -311,6 +372,8 @@ class SessionPlaybackPlayer(
     fun close() {
         if (closed) return
         closed = true
+        artworkJob?.cancel()
+        artworkData = null
         // Commands belong to the runtime: let their local/server transaction finish even
         // after this presentation wrapper is detached. Their futures may still complete.
         // ForwardingSimpleBasePlayer owns a private listener. Swapping detaches it without
@@ -328,7 +391,19 @@ private data class SessionRuntimePresentation(
 private data class SessionPresentationSnapshot(
     val target: AppPlaybackTarget?, val pause: LivePauseState, val timeshift: Boolean,
     val state: AppPlaybackState, val growing: Boolean, val metadata: SessionMetadataSnapshot,
+    val artwork: SessionArtworkRequest?,
 )
+
+private fun sessionArtworkRequest(target: AppPlaybackTarget?, observation: SessionObservation): SessionArtworkRequest? {
+    val session = observation.currentSession ?: return null
+    if (target == null) return null
+    val recording = (target as? AppPlaybackTarget.Recording)?.let { observation.dvrEntry(it.recordingId) }
+    val channel = when (target) {
+        is AppPlaybackTarget.Live -> observation.channel(target.channelId)
+        is AppPlaybackTarget.Recording -> recording?.channelId?.let(observation::channel)
+    }
+    return SessionArtworkRequest(target, channel?.icon, recording?.image, session)
+}
 
 private data class SessionFailureKey(val kind: SessionPlaybackErrorKind, val code: Int, val target: AppPlaybackTarget?)
 

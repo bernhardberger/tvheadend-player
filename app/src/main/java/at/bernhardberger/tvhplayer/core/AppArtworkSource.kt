@@ -3,6 +3,10 @@ package at.bernhardberger.tvhplayer.core
 import at.bernhardberger.tvheadend.sdk.android.TvheadendArtwork
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
+import at.bernhardberger.tvheadend.sdk.core.SessionObservation
+import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
+import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 
 /**
  * Coil model for one TVHeadend image-cache entry, captured with the session it belongs to.
@@ -21,4 +25,22 @@ data class AppArtworkSource(
     val savedKey: String? = null,
 ) {
     override fun toString(): String = "AppArtworkSource(currentSession=$currentSession, id=$id, saved=$saved)"
+}
+
+/** Shared logo model resolution for Compose and non-UI consumers. */
+@OptIn(ExperimentalTvheadendApi::class)
+internal fun channelLogoModel(
+    icon: ChannelIcon,
+    current: CurrentSessionObservation?,
+    tvheadend: TvheadendSession?,
+    observation: SessionObservation?,
+): Any = when (icon) {
+    is ChannelIcon.RemoteUrl -> icon.url
+    is ChannelIcon.ImageCache -> {
+        val id = icon.artworkId
+        if (current != null) AppArtworkSource(current, id)
+        else if (tvheadend == null || observation == null) AppArtworkSource(null, id)
+        else AppArtworkSource(null, id, TvheadendArtwork.cached(tvheadend, observation, id),
+            tvheadend.artwork.cachedArtwork(observation, id)?.cacheKey)
+    }
 }

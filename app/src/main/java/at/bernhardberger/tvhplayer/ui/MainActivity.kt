@@ -133,6 +133,7 @@ class MainActivity : AppCompatActivity() {
     private val notices: NoticeCenter by inject()
     private val tvheadendSession: TvheadendSession by inject()
     private val channelAccents: ChannelAccents by inject()
+    private val imageLoader: coil3.ImageLoader by inject()
     private val mediaSessionLifecycle = ActivityMediaSessionLifecycle()
     private val playbackLifecycle = MainActivityPlaybackLifecycle(
         owners = playbackOwners,
@@ -214,7 +215,8 @@ class MainActivity : AppCompatActivity() {
     override fun onStart() {
         super.onStart()
         playbackLifecycle.onActivityStarted()
-        val sessionPlayer = SessionPlaybackPlayer(playbackRuntime, BuildConfig.PROGRAMME_WINDOW_B, AppSessionMetadataLabels(this))
+        val sessionPlayer = SessionPlaybackPlayer(playbackRuntime, BuildConfig.PROGRAMME_WINDOW_B, AppSessionMetadataLabels(this),
+            at.bernhardberger.tvhplayer.images.AppSessionArtworkLoader(applicationContext, tvheadendSession, imageLoader))
         mediaSessionLifecycle.start(this, sessionPlayer, lifecycleScope.launch {
             sessionPlayer.observe(tvheadendSession.observation)
         }, sessionPlayer::close)
@@ -320,7 +322,15 @@ internal class ActivityMediaSessionLifecycle {
         val activity = PendingIntent.getActivity(context, 0,
             Intent(context, MainActivity::class.java).setAction(ACTION_SESSION_ACTIVITY).setPackage(context.packageName),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-        session = MediaSession.Builder(context, player).setId(sessionId).setSessionActivity(activity).build()
+        val decoder = androidx.media3.datasource.DataSourceBitmapLoader(context)
+        val bitmapLoader = androidx.media3.session.CacheBitmapLoader(object : androidx.media3.common.util.BitmapLoader {
+            override fun supportsMimeType(mimeType: String): Boolean = decoder.supportsMimeType(mimeType)
+            override fun decodeBitmap(data: ByteArray) = decoder.decodeBitmap(data)
+            override fun loadBitmap(uri: android.net.Uri): com.google.common.util.concurrent.ListenableFuture<android.graphics.Bitmap> =
+                com.google.common.util.concurrent.Futures.immediateFailedFuture(UnsupportedOperationException("Session artwork uses bytes only"))
+        })
+        session = MediaSession.Builder(context, player).setId(sessionId).setSessionActivity(activity)
+            .setBitmapLoader(bitmapLoader).build()
     }
 
     fun stop() {

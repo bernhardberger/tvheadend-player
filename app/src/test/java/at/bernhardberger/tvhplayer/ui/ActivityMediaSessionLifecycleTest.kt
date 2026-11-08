@@ -19,6 +19,7 @@ import org.robolectric.Shadows.shadowOf
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class)
 class ActivityMediaSessionLifecycleTest {
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
     @Test fun startStopStartBuildsAndReleasesTheSessionAndObservation() {
         val lifecycle = ActivityMediaSessionLifecycle()
         val context = ApplicationProvider.getApplicationContext<Application>()
@@ -49,6 +50,16 @@ class ActivityMediaSessionLifecycleTest {
             )) assertEquals(context.getString(resource), labels.error(kind))
             assertEquals("12.3", labels.channelNumber(at.bernhardberger.tvheadend.sdk.core.Channel.create(
                 at.bernhardberger.tvheadend.sdk.core.ChannelId(1), number = 12, numberMinor = 3)))
+            val bitmap = at.bernhardberger.tvhplayer.testutil.FixtureArt.picon("harbor-sport")
+            val bytes = java.io.ByteArrayOutputStream().also {
+                bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+            }.toByteArray()
+            val decoded = session.bitmapLoader.decodeBitmap(bytes).get(5, java.util.concurrent.TimeUnit.SECONDS)
+            assertTrue(decoded.width > 0 && decoded.height > 0)
+            val uri = android.net.Uri.parse("data:image/png;base64," + android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP))
+            org.junit.Assert.assertThrows(java.util.concurrent.ExecutionException::class.java) {
+                session.bitmapLoader.loadBitmap(uri).get(5, java.util.concurrent.TimeUnit.SECONDS)
+            }
             lifecycle.stop()
             lifecycle.stop()
             assertTrue(observation.isCancelled)
