@@ -102,8 +102,11 @@ repository-local domain overlays, then the focused skill, then local style.
   tests in touched code is in scope. Tests run on virtual time: `runTest` and
   test dispatchers, the Compose `mainClock`, Robolectric looper idling, Media3
   `FakeClock` with `TestPlayerRunHelper`; wait for a signal, never poll the real
-  clock or sleep. Where the generic `test-driven-development` skill differs,
-  these rules win.
+  clock or sleep. Client playback tests reuse `PlaybackTestDriver` and use
+  `FakeClock(false)` unless Media3 must progress on its own: under Robolectric,
+  auto-advance also moves the looper clock, so SDK timeouts fire while real SDK
+  threads are still replying. Where the generic `test-driven-development` skill
+  differs, these rules win.
 - Small, localized changes finish with the affected tests and owning compilation
   (test tasks already compile their dependencies). Run `./tools/verify` once for
   integration of a completed batch, before release, or for broad/cross-module,

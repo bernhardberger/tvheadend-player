@@ -7,6 +7,7 @@ import androidx.media3.common.MimeTypes
 import androidx.media3.common.TrackGroup
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.test.utils.FakeClock
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
@@ -40,7 +41,7 @@ class AutomaticAudioRuntimeTest {
         val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings,
             kotlinx.coroutines.test.StandardTestDispatcher(testScheduler),
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
-        val player = ExoPlayer.Builder(context).build()
+        val player = ExoPlayer.Builder(context).setClock(FakeClock(true)).build()
         val runtime = AppPlaybackRuntime(player, session, createTvheadendPlaybackCoordinator(player),
             settings, profiles, backgroundScope, TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None,
             PlaybackRuntimePolicy.fromPlayerSettings(),

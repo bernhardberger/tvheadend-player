@@ -55,6 +55,8 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.androidx.media3.session)
+    testImplementation(libs.androidx.media3.test.utils)
+    testImplementation(libs.androidx.media3.test.utils.robolectric)
     testImplementation("org.robolectric:robolectric:4.17")
     testImplementation(libs.androidx.test.ext.junit)
     testImplementation(libs.kotlinx.coroutines.test)
