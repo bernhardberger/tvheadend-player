@@ -60,6 +60,7 @@ class ChannelScheduleCaptureTest {
 
     @Test fun englishStates() = capture("en", listOf("live", "behind-live", "future", "tomorrow-gap", "end", "failed", "loading", "loading-more", "empty", "offline", "no-art"))
     @Test fun englishBackToTabs() = capture("en", listOf("back-to-tabs"))
+    @Test fun englishTabEdges() = capture("en", listOf("tabs-start", "tabs-middle", "tabs-all-fit"))
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
     fun germanLongTitle() = capture("de", listOf("long-title"))
 
@@ -267,7 +268,8 @@ class ChannelScheduleCaptureTest {
                         else -> week.mapIndexed { index, (programme, start, duration) -> event(index + 1L, programme, start, duration) }
                             .filter { it.stop.epochSeconds > historyStart }
                             .filterNot { scene == "tomorrow-gap" && it.start.epochSeconds in at(16, 2, 30) until at(16, 6, 0) }
-                            .filterNot { scene == "loading-more" && it.start.epochSeconds >= at(17, 0, 0) }
+                             .filterNot { scene == "loading-more" && it.start.epochSeconds >= at(17, 0, 0) }
+                             .filterNot { scene == "tabs-all-fit" && it.start.epochSeconds >= at(17, 0, 0) }
                     }
                     CompositionLocalProvider(LocalWatchingChannel provides channel.id,
                         LocalWatchingIndicator provides ChannelPlaybackIndicator.PLAYING) {
@@ -306,6 +308,15 @@ class ChannelScheduleCaptureTest {
             if (name == "back-to-tabs") {
                 compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
                 compose.onRoot().performKeyInput { pressKey(Key.Back) }
+                compose.onNode(isSelected()).assertIsFocused()
+                compose.mainClock.advanceTimeBy(1000)
+                compose.waitForIdle()
+            }
+            if (name == "tabs-middle") {
+                compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+                compose.onRoot().performKeyInput { pressKey(Key.Back) }
+                repeat(5) { compose.onRoot().performKeyInput { pressKey(Key.DirectionRight) } }
+                repeat(2) { compose.onRoot().performKeyInput { pressKey(Key.DirectionLeft) } }
                 compose.onNode(isSelected()).assertIsFocused()
                 compose.mainClock.advanceTimeBy(1000)
                 compose.waitForIdle()

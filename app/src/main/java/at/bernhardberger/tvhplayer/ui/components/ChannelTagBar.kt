@@ -150,7 +150,7 @@ fun ChannelTagSelector(
 /** The least of a cut trailing tab that reads as more scopes rather than a stray edge. */
 private val ScopeOverflowPeek = 56.dp
 
-private class TabEdgeFadeState {
+internal class TabEdgeFadeState {
     private val viewportBounds = mutableStateOf(Rect.Zero)
     private val tabBounds = mutableStateMapOf<Int, Rect>()
 
@@ -194,20 +194,28 @@ private class TabEdgeFadeState {
         focusedIndex: Int,
         layoutDirection: LayoutDirection,
         maximumWidthPx: Float,
+        trailing: Boolean = false,
+        includeFullyHiddenTabs: Boolean = false,
     ): Float {
         val viewport = viewportBounds.value
         val active = tabBounds[activeIndex] ?: return 0f
         val focused = tabBounds[focusedIndex]
+        // Keep the tag rail's partial-tab-only leading hint by default. Other rails can
+        // signal all hidden content at either logical edge, with the same protection.
+        val edgeDirection = if (!trailing) layoutDirection else when (layoutDirection) {
+            LayoutDirection.Ltr -> LayoutDirection.Rtl
+            LayoutDirection.Rtl -> LayoutDirection.Ltr
+        }
         val hasDepartingInactiveTab = tabBounds.any { (index, bounds) ->
-            index != activeIndex && index != focusedIndex && when (layoutDirection) {
-                LayoutDirection.Ltr -> bounds.left < viewport.left && bounds.right > viewport.left
-                LayoutDirection.Rtl -> bounds.right > viewport.right && bounds.left < viewport.right
+            index != activeIndex && index != focusedIndex && when (edgeDirection) {
+                LayoutDirection.Ltr -> bounds.left < viewport.left && (includeFullyHiddenTabs || bounds.right > viewport.left)
+                LayoutDirection.Rtl -> bounds.right > viewport.right && (includeFullyHiddenTabs || bounds.left < viewport.right)
             }
         }
         if (!hasDepartingInactiveTab) return 0f
 
-        val activeSpace = active.spaceFromLeadingEdge(viewport, layoutDirection)
-        val focusedSpace = focused?.spaceFromLeadingEdge(viewport, layoutDirection)
+        val activeSpace = active.spaceFromLeadingEdge(viewport, edgeDirection)
+        val focusedSpace = focused?.spaceFromLeadingEdge(viewport, edgeDirection)
         val spaceBeforeProtected = if (focusedSpace == null) {
             activeSpace
         } else {

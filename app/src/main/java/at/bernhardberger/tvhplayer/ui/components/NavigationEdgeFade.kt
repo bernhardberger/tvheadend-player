@@ -14,12 +14,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 
 /**
- * Fades drawn content to transparent at logical-leading without adding a UI node.
+ * Fades drawn content at logical edges without adding a UI node. Trailing is opt-in.
  */
 internal fun Modifier.navigationEdgeFadeMask(
     width: Dp,
     maskEnabled: () -> Boolean = { true },
     availableWidthPx: DrawScope.() -> Float = { width.toPx() },
+    availableTrailingWidthPx: DrawScope.() -> Float = { 0f },
 ): Modifier = graphicsLayer {
     compositingStrategy = if (maskEnabled()) {
         CompositingStrategy.Offscreen
@@ -31,17 +32,17 @@ internal fun Modifier.navigationEdgeFadeMask(
     if (!maskEnabled()) return@drawWithContent
 
     val fadeWidth = availableWidthPx().coerceIn(0f, width.toPx())
-    if (fadeWidth <= 0f) return@drawWithContent
-
     drawNavigationFadeMask(fadeWidth)
+    drawNavigationFadeMask(availableTrailingWidthPx().coerceIn(0f, width.toPx()), trailing = true)
 }
 
 private fun DrawScope.drawNavigationFadeMask(
     width: Float,
+    trailing: Boolean = false,
 ) {
     if (width <= 0f) return
 
-    val ltr = layoutDirection == LayoutDirection.Ltr
+    val ltr = (layoutDirection == LayoutDirection.Ltr) != trailing
     val leadingLeft = if (ltr) 0f else size.width - width
     drawRect(
         brush = Brush.horizontalGradient(
