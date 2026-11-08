@@ -42,6 +42,7 @@ import at.bernhardberger.tvhplayer.core.offeredResumePosition
 import at.bernhardberger.tvhplayer.core.runningRecordings
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnGap
 import at.bernhardberger.tvhplayer.ui.TvGridGutter
+import at.bernhardberger.tvhplayer.ui.TvIconButtonSize
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.components.depth.*
@@ -276,11 +277,15 @@ private fun dateSectionLabel(section: DvrDateSection): String = when (section) {
     DvrDateSection.Undated -> stringResource(R.string.recordings_date_unknown)
 }
 
-/** Every Recordings tab's first heading uses this band, so first rows line up across tabs. */
+/**
+ * Every Recordings tab's first heading uses this band, so first rows line up across tabs. It holds a
+ * header button with a margin, so the Archive's view options button sits in it on the heading's line and
+ * the first row's focus growth stays clear of the button.
+ */
 @Composable
 internal fun recordingsHeadingBandHeight(): Dp {
     val lineHeight = with(LocalDensity.current) { MaterialTheme.typography.titleLarge.lineHeight.toDp() }
-    return maxOf(32.dp, lineHeight + 4.dp)
+    return maxOf(32.dp, lineHeight + 4.dp, TvIconButtonSize + TvSpacing8)
 }
 
 /** The preview-slot heading reads at the row title size: titleMedium 16sp of titleLarge 22sp. */
@@ -295,7 +300,7 @@ internal const val ArchiveHeadingPreviewScale = 16f / 22f
 private fun ArchiveLevelHeading(name: String, emphasis: () -> Float, endReserve: (() -> Int)? = null) {
     // The measured width of the button at the end of the row (pixels), plus the shared gap.
     val reserve = endReserve?.let { with(LocalDensity.current) { it().toDp() } + TvGridGutter } ?: 0.dp
-    Box(Modifier.fillMaxWidth().height(recordingsHeadingBandHeight())) {
+    Box(Modifier.fillMaxWidth().height(recordingsHeadingBandHeight()), contentAlignment = Alignment.CenterStart) {
         if (name.isNotEmpty()) Text(
             name, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
             color = MaterialTheme.colorScheme.onSurface,

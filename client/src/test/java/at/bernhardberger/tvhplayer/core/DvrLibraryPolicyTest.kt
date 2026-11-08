@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.core
 
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
@@ -76,10 +77,10 @@ class DvrLibraryPolicyTest {
     }
 
     @Test fun channelsGroupingMakesOneFolderPerChannelInNumberOrderNoChannelLast() {
-        val oldNews = onChannel(1, 100, "News", folder = listOf("Series"))
-        val newNews = onChannel(2, 300, "News")
-        val film = onChannel(3, 200, "Film")
-        val orphan = onChannel(4, 400, null)
+        val oldNews = onChannel(1, 100, "News", folder = listOf("Series"), channelId = 2)
+        val newNews = onChannel(2, 300, "News", channelId = 2)
+        val film = onChannel(3, 200, "Film", channelId = 9)
+        val orphan = onChannel(4, 400, null, channelId = 5)
         val root = buildDvrArchive(
             listOf(oldNews, orphan, film, newNews), DvrArchiveGrouping.CHANNELS,
             naming(numbers = mapOf("News" to 2, "Film" to 9)),
@@ -89,16 +90,21 @@ class DvrLibraryPolicyTest {
         assertEquals(listOf(newNews, oldNews), root.folderAt(listOf("News"))?.recordings)
         assertEquals(listOf(orphan), root.folderAt(listOf("No channel"))?.recordings)
         assertTrue(root.recordings.isEmpty())
+        // A channel folder wears its channel's logo; the catch-all keeps the folder icon.
+        assertEquals(ChannelId(2), root.folderAt(listOf("News"))?.channelId)
+        assertNull(root.folderAt(listOf("No channel"))?.channelId)
     }
 
     @Test fun genresGroupingMakesOneFolderPerGenreNewestFirstNoGenreLast() {
-        val sport = genred(1, 100, "Sport")
-        val news = genred(2, 300, "News")
-        val plain = genred(3, 500, null)
+        val sport = genred(1, 100, "Sport", channelId = 7)
+        val news = genred(2, 300, "News", channelId = 8)
+        val plain = genred(3, 500, null, channelId = 9)
         val root = buildDvrArchive(listOf(sport, plain, news), DvrArchiveGrouping.GENRES, naming())
 
         assertEquals(listOf("News", "Sport", "No genre"), root.folders.map { it.name })
         assertEquals(listOf(plain), root.folderAt(listOf("No genre"))?.recordings)
+        // Only a channel group wears a channel's logo; a genre group keeps the folder icon.
+        assertTrue(root.folders.all { it.channelId == null })
     }
 
     @Test fun noGroupingIsOneNewestFirstListWithUnknownStartsLast() {
@@ -223,13 +229,14 @@ class DvrLibraryPolicyTest {
         noGenre = "No genre",
     )
 
-    private fun onChannel(id: Long, start: Long, channel: String?, folder: List<String>? = null) =
+    private fun onChannel(id: Long, start: Long, channel: String?, folder: List<String>? = null, channelId: Long? = null) =
         DvrEntry.create(DvrEntryId(id), state = DvrEntryState.COMPLETED, start = Instant.fromEpochSeconds(start),
-            channelName = channel, folder = folder)
+            channelName = channel, folder = folder, channelId = channelId?.let(::ChannelId))
 
     /** The test naming reads the genre from the title. */
-    private fun genred(id: Long, start: Long, genre: String?) =
-        DvrEntry.create(DvrEntryId(id), state = DvrEntryState.COMPLETED, start = Instant.fromEpochSeconds(start), title = genre)
+    private fun genred(id: Long, start: Long, genre: String?, channelId: Long? = null) =
+        DvrEntry.create(DvrEntryId(id), state = DvrEntryState.COMPLETED, start = Instant.fromEpochSeconds(start), title = genre,
+            channelId = channelId?.let(::ChannelId))
 
     private fun entry(id: Long, state: DvrEntryState, start: Long, folder: List<String>?) =
         DvrEntry.create(DvrEntryId(id), state = state, start = Instant.fromEpochSeconds(start), folder = folder)

@@ -6,6 +6,8 @@ import at.bernhardberger.tvhplayer.notices.NoticeContext
 import android.app.Application
 import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
+import at.bernhardberger.tvhplayer.ui.TvCardFocusedScale
+import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -445,6 +447,23 @@ class RecordingsVisualLayoutTest {
         assertTrue("the button names the grouping, so it is wider than the round icon", button.width > button.height)
     }
 
+    /** The button sits on the heading's line and the focused first row, grown by its focus, stays clear of it. */
+    @Test fun theViewOptionsButtonSitsOnTheHeadingLineAndClearOfTheFocusedFirstRow() {
+        show()
+        focused("recordings-folder-Documentaries")
+        val headings = compose.onAllNodesWithTag("archive-level-heading", useUnmergedTree = true)
+        val heading = (0 until headings.fetchSemanticsNodes().size).map { headings[it].fetchSemanticsNode().boundsInRoot }
+            .minBy { it.left }
+        val button = bounds(GROUPING_PILL)
+        val row = bounds("recordings-folder-Documentaries")
+        // The row's focus scale grows it toward the button; what is left must stay a visible gap.
+        val grownTop = row.top - row.height * (TvCardFocusedScale - 1f) / 2f
+        val clearance = grownTop - button.bottom
+        val minimum = with(compose.density) { (TvSpacing8 / 2).toPx() }
+        assertTrue("the focused first row ($row grown) clears the button ($button) by $clearance", clearance >= minimum)
+        assertEquals("the button is centered on the heading line", heading.center.y, button.center.y, 2f)
+    }
+
     @Test fun theViewOptionsPanelOpensLevelsAndBackStepsOutOneLevelAtATime() {
         show()
         focused("recordings-folder-Documentaries")
@@ -616,6 +635,11 @@ class RecordingsVisualLayoutTest {
         toPill()
         compose.mainClock.advanceTimeBy(1_500)
         capture("1-pill-focused", 1f, outputs = out)
+        // The first row's focus card grows toward the button: it must stay clear of it.
+        key(Key.DirectionDown)
+        compose.mainClock.advanceTimeBy(1_500)
+        capture("1b-first-row-focused", 1f, outputs = out)
+        toPill()
         key(Key.DirectionCenter)
         focused("recordings-view-group")
         compose.mainClock.advanceTimeBy(1_500)

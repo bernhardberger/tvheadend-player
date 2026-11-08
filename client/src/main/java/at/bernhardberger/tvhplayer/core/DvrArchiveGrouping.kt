@@ -53,6 +53,7 @@ fun buildDvrArchive(
             shown, naming.channelName, naming.noChannel,
             compareBy<DvrArchiveFolder> { naming.channelNumber(it.recordings.first()) ?: Int.MAX_VALUE }
                 .thenBy { it.name.lowercase() },
+            channelLogo = true,
         )
         DvrArchiveGrouping.GENRES -> virtualGroups(
             shown, naming.genreName, naming.noGenre,
@@ -131,18 +132,20 @@ private fun virtualGroups(
     nameOf: (DvrEntry) -> String?,
     unnamed: String,
     order: Comparator<DvrArchiveFolder>,
+    channelLogo: Boolean = false,
 ): DvrArchiveFolder {
     val named = entries.groupBy { nameOf(it)?.takeIf(String::isNotBlank) }
-    fun folder(name: String, members: List<DvrEntry>) = DvrArchiveFolder(
+    // Only a named channel group carries its channel (the row draws its logo); every other group keeps the folder icon.
+    fun folder(name: String, members: List<DvrEntry>, channel: Boolean) = DvrArchiveFolder(
         name = name,
         path = listOf(name),
         folders = emptyList(),
         recordings = members.newestFirst(),
-        channelId = members.firstNotNullOfOrNull { it.channelId },
+        channelId = if (channel) members.firstNotNullOfOrNull { it.channelId } else null,
     )
-    val groups = named.filterKeys { it != null }.map { (name, members) -> folder(checkNotNull(name), members) }
+    val groups = named.filterKeys { it != null }.map { (name, members) -> folder(checkNotNull(name), members, channelLogo) }
         .sortedWith(order)
-    val rest = named[null]?.let { folder(unnamed, it) }
+    val rest = named[null]?.let { folder(unnamed, it, channel = false) }
     return DvrArchiveFolder("", emptyList(), groups + listOfNotNull(rest), emptyList())
 }
 
