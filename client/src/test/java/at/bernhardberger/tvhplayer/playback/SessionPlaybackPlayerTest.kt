@@ -51,6 +51,90 @@ private val labels = object : SessionMetadataLabels {
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class)
 class SessionPlaybackPlayerTest {
+    @Test
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun mediaControllerReceivesTheSessionContractAcrossTargetAndFailureChanges() = exercise {
+        val context = ApplicationProvider.getApplicationContext<Application>()
+        val now = Clock.System.now()
+        val initial = session.observation.value
+        val event = EpgEvent.create(EventId(1), ChannelId(1), now - 30.minutes, now + 30.minutes,
+            title = "Programme", subtitle = "Episode", summary = "Short description", genre = "Drama",
+            episode = EpgEpisode(null, null, 2, 3, 4, 5, 6, 7, "S2 E4"), contentGenre = ContentGenre.fromContentType(0x10))
+        val next = EpgEvent.create(EventId(2), ChannelId(1), now + 30.minutes, now + 90.minutes, title = "Next")
+        val channels = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(Channel.create(ChannelId(1),
+            name = "Channel One", services = listOf(ChannelService("", "", 1, null, null, null))))))
+        val recordings = DvrRepositoryState.Current(DvrSnapshot.create(listOf(DvrEntry.create(DvrEntryId(1),
+            state = DvrEntryState.COMPLETED, title = "Recording", subtitle = "Recorded episode", channelName = "Recorded Channel"))))
+        session.publish(SessionObservation.create(sessionState = initial.sessionState, channelState = channels,
+            epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = listOf(event, next))), dvrState = recordings))
+        val bytes = java.io.ByteArrayOutputStream().also {
+            android.graphics.Bitmap.createBitmap(2, 2, android.graphics.Bitmap.Config.ARGB_8888)
+                .compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+        }.toByteArray()
+        val publishedPlayer = SessionPlaybackPlayer(runtime, true, labels, SessionArtworkLoader { _, _ -> bytes })
+        val observing = scope.launch { publishedPlayer.observe(session.observation) }
+        val mediaSession = androidx.media3.session.MediaSession.Builder(context, publishedPlayer).build()
+        val connecting = androidx.media3.session.MediaController.Builder(context, mediaSession.token).buildAsync()
+        try {
+            await { connecting.isDone }
+            val modern = connecting.get()
+            live(false)
+            await { modern.mediaMetadata.subtitle == "Programme" }
+            await { modern.mediaMetadata.artworkData != null }
+            assertEquals("Channel One", modern.mediaMetadata.title)
+            assertTrue(bytes.contentEquals(modern.mediaMetadata.artworkData))
+            assertNull(modern.mediaMetadata.artworkUri)
+            assertTrue(modern.isCurrentMediaItemLive)
+            assertTrue(modern.isCurrentMediaItemDynamic)
+            assertEquals(androidx.media3.common.C.TIME_UNSET, modern.duration)
+            val extras = requireNotNull(modern.mediaMetadata.extras)
+            // Mapping is covered below; here every published extra must survive the session boundary.
+            val publishedExtras = requireNotNull(publishedPlayer.mediaMetadata.extras)
+            assertEquals(publishedExtras.keySet(), extras.keySet())
+            for (key in publishedExtras.keySet()) {
+                assertEquals(key, publishedExtras.get(key), extras.get(key))
+            }
+            assertEquals("Programme", extras.getString("at.bernhardberger.tvhplayer.session.programmeTitle"))
+            assertEquals("Drama", modern.mediaMetadata.genre)
+            assertEquals("Drama", extras.getString("at.bernhardberger.tvhplayer.session.genre"))
+            assertEquals("Drama", extras.getString("android.media.metadata.GENRE"))
+            val forbidden = listOf(Player.COMMAND_SEEK_TO_NEXT, Player.COMMAND_SEEK_TO_PREVIOUS,
+                Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM, Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,
+                Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM, Player.COMMAND_SEEK_TO_DEFAULT_POSITION,
+                Player.COMMAND_SEEK_TO_MEDIA_ITEM, Player.COMMAND_SEEK_BACK, Player.COMMAND_SEEK_FORWARD)
+            forbidden.forEach { assertFalse(modern.isCommandAvailable(it)) }
+
+            session.publish(SessionObservation.create(sessionState = initial.sessionState, channelState = channels,
+                epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = listOf(EpgEvent.create(EventId(3),
+                    ChannelId(1), event.start, event.stop, title = "Changed programme"), next))), dvrState = recordings))
+            await { modern.mediaMetadata.subtitle == "Changed programme" }
+            reportedDuration = 60_000
+            recording()
+            await { modern.mediaMetadata.title == "Recording" }
+            assertEquals("Recorded episode", modern.mediaMetadata.subtitle)
+            assertTrue(modern.duration > 0)
+
+            retireWithState(AppPlaybackState.Failed(AppPlaybackFailureReason.RECORDING_READ_FAILED,
+                playerErrorClassification = "private diagnostic must not escape"))
+            val message = labels.error(SessionPlaybackErrorKind.RECORDING_READ)
+            await { modern.playerError?.message == message }
+            // Media3 adds RELEASE to every controller: it disconnects the controller, not playback.
+            assertEquals(setOf(Player.COMMAND_GET_CURRENT_MEDIA_ITEM, Player.COMMAND_GET_TIMELINE,
+                Player.COMMAND_GET_METADATA, Player.COMMAND_STOP, Player.COMMAND_RELEASE), modern.availableCommands.let { commands ->
+                (0 until commands.size()).map(commands::get).toSet()
+            })
+            modern.stop()
+            // Media3 1.11.1 caches errors at MediaSessionImpl.java:1789-1803/:1879 until a playback-state change.
+            // Do not assert the controller's cached error here; the platform side is checked on the G10.
+            await { runtime.state.value == AppPlaybackState.Idle && publishedPlayer.playerError == null && modern.mediaItemCount == 0 }
+        } finally {
+            androidx.media3.session.MediaController.releaseFuture(connecting)
+            mediaSession.release()
+            observing.cancel()
+            publishedPlayer.close()
+        }
+    }
+
     @Test fun sessionArtworkFollowsOnlyTheCurrentTargetAndNotProgrammeTicks() = exercise {
         val pending = kotlinx.coroutines.CompletableDeferred<ByteArray?>()
         val requests = java.util.Collections.synchronizedList(mutableListOf<SessionArtworkRequest>())
