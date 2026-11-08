@@ -84,6 +84,8 @@ printf '    Visual capture matrix: %s (use --visual-captures to include it)\n' "
 # Separate invocations: on a full rebuild, compilation memory held by the Gradle
 # JVM plus Robolectric forks plus lint analysis exceeded the 8 GiB build slice.
 gradle_common=("${gradle_arguments[@]}" "-Ptvhplayer.captureTests=$capture_tests" --console=plain --no-scan)
+printf '==> Detekt production and test policy checks\n'
+./gradlew :app:detekt :app:detektTests :client:detekt :client:detektTests "${gradle_common[@]}"
 ./gradlew \
     :client:compileDebugUnitTestSources :decoder-ffmpeg:compileDebugUnitTestSources \
     :app:compilePlayDebugUnitTestSources :app:compilePlayDebugAndroidTestKotlin \

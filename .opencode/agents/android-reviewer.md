@@ -34,8 +34,10 @@ Independently review one frozen, tested TVHeadend Player package packet.
 - Test truthfulness includes test economy. Report, normally as non-blocking
   findings, tests that duplicate an existing case, change detectors (exact dp,
   copied UI text, call order or internal structure that is not the contract),
-  assertions that would still pass with the logic removed, and copied fixture
-  helpers; name the existing test or fixture to fold them into. Note when the
+  assertions that would still pass with the logic removed, copied fixture
+  helpers, and real-clock waits (sleeps, `delay` settling, polling with
+  timeouts) where virtual time or a signal would do; name the existing test,
+  fixture or virtual-time API to use instead. Note when the
   test diff is far larger than the production change it covers.
 - Rendered visual quality belongs to `tv-ux-reviewer`; physical video, audio,
   motion, overscan, remote feel, and deinterlacing remain human/device evidence.

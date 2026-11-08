@@ -5,7 +5,6 @@
 package at.bernhardberger.tvhplayer.playback
 
 import android.app.Application
-import android.os.Looper
 import androidx.media3.common.C
 import androidx.media3.exoplayer.FormatHolder
 import androidx.media3.common.Timeline
@@ -18,17 +17,18 @@ import androidx.media3.exoplayer.source.SampleStream
 import androidx.media3.exoplayer.trackselection.FixedTrackSelection
 import androidx.media3.exoplayer.upstream.DefaultAllocator
 import androidx.media3.exoplayer.upstream.BandwidthMeter
+import androidx.media3.test.utils.FakeClock
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvheadend.sdk.media3.*
 import at.bernhardberger.tvheadend.sdk.playback.*
 import at.bernhardberger.tvheadend.sdk.testing.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.lang.reflect.Proxy
 
@@ -41,9 +41,12 @@ class AudioInterruptionBufferContractTest {
     @Test
     fun withoutDiscardDisabledAudioReportsExhaustionAfterRetirement() = exercise(discard = false)
 
-    private fun exercise(discard: Boolean) = runBlocking {
+    private fun exercise(discard: Boolean) = runTest {
         val scope = CoroutineScope(coroutineContext + SupervisorJob())
-        val player = ExoPlayer.Builder(ApplicationProvider.getApplicationContext<Application>()).build()
+        val driver = PlaybackTestDriver(testScheduler)
+        fun await(predicate: () -> Boolean) = driver.await("buffer contract condition", predicate = predicate)
+        val player = ExoPlayer.Builder(ApplicationProvider.getApplicationContext<Application>())
+            .setClock(FakeClock(true)).build()
         var source: MediaSource? = null
         // Capture the actual source installed by the public coordinator; drive its period below.
         val capturingPlayer = Proxy.newProxyInstance(ExoPlayer::class.java.classLoader,
@@ -75,7 +78,7 @@ class AudioInterruptionBufferContractTest {
         var period: MediaPeriod? = null
         var timeline: Timeline? = null
         val caller = MediaSource.MediaSourceCaller { _, value -> timeline = value }
-        try {
+        driver.exercise(this, 60_000) body@ { try {
             val result = coordinator.setLiveTarget(session, requireNotNull(session.observation.value.currentSession), ChannelId(1))
             assertTrue(result is LivePlaybackTargetResult.Bound && result.result.isStarted)
             player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
@@ -131,7 +134,7 @@ class AudioInterruptionBufferContractTest {
                 if (recoveries.isNotEmpty()) {
                     assertFalse(discard)
                     assertEquals(listOf(PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED), recoveries)
-                    return@runBlocking
+                    return@body
                 }
                 if (discard) assertTrue("Queues must remain bounded while audio is disabled", allocator.totalBytesAllocated < 2 * 1024 * 1024)
             }
@@ -146,11 +149,7 @@ class AudioInterruptionBufferContractTest {
             manager.closeAndJoin()
             session.shutdown()
             player.release()
-        }
-    }
-
-    private suspend fun await(predicate: () -> Boolean) = withTimeout(5_000) {
-        while (!predicate()) { shadowOf(Looper.getMainLooper()).idle(); delay(1) }
+        } }
     }
 
     private fun stream(index: Long, type: SubscriptionStreamType) = SubscriptionStream(

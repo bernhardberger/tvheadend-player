@@ -7,6 +7,7 @@ import androidx.media3.common.Format
 import androidx.media3.common.MimeTypes
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.audio.AudioOutputProvider
+import androidx.media3.test.utils.FakeClock
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
@@ -34,11 +35,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -55,8 +54,7 @@ class AudioPassthroughStartupTest {
     @Test fun recordingFirstStartupWithHeadphonesConfiguresPcmWithoutChangingStoredSetting() =
         exercise(recordingFirst = true, headphones = true)
 
-    // Media3's real playback thread and this timeout must use the same wall-clock domain.
-    private fun exercise(recordingFirst: Boolean, headphones: Boolean = false) = runBlocking {
+    private fun exercise(recordingFirst: Boolean, headphones: Boolean = false) = runTest {
         val runtimeScope = CoroutineScope(coroutineContext + SupervisorJob())
         val context = ApplicationProvider.getApplicationContext<Application>()
         val settings = PlayerSettingsStore(InMemoryPreferencesDataStore())
@@ -70,6 +68,7 @@ class AudioPassthroughStartupTest {
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
         val output = TvheadendAudioOutputProvider(context)
         val player = ExoPlayer.Builder(context)
+            .setClock(FakeClock(true))
             .setRenderersFactory(createTvheadendRenderersFactory(context, output)).build()
         val runtime = AppPlaybackRuntime(player, session, createTvheadendPlaybackCoordinator(player),
             settings, profiles, runtimeScope, output, PlaybackAudioFocus.None, PlaybackRuntimePolicy.fromPlayerSettings(),
@@ -97,9 +96,7 @@ class AudioPassthroughStartupTest {
             assertThrows(IllegalStateException::class.java) { output.configurePassthrough(true) }
             outputs.personalOutputConnected.value = false
             settings.setAudioPassthroughEnabled(true)
-            withTimeout(5_000) {
-                while (!output.isPassthroughEnabled) delay(10)
-            }
+            PlaybackTestDriver(testScheduler).await("passthrough output enabled") { output.isPassthroughEnabled }
             requestTarget()
             assertTrue(output.isPassthroughEnabled)
             assertFalse(runtime.audioPassthroughChangeFailed.value)

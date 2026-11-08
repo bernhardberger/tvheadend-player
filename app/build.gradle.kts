@@ -19,6 +19,7 @@ import java.util.Locale
 import javax.inject.Inject
 
 plugins {
+    alias(libs.plugins.detekt)
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlin.serialization)

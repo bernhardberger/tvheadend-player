@@ -1,0 +1,1334 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>ComplexCondition:AppConnectionViewModel.kt:AppConnectionViewModel$state is SessionState.Unavailable &amp;&amp; (state.reason.recoveryDisposition == SessionRecoveryDisposition.EXPLICIT_RETRY || allowAutomaticBackoff &amp;&amp; state.reason.recoveryDisposition == SessionRecoveryDisposition.AUTOMATIC_BACKOFF)</ID>
+    <ID>ComplexCondition:AppRoot.kt:isPlayer || activeChannelId == null || warmPlaybackMode == null || warmPlaybackMode == WarmPlaybackMode.OFF</ID>
+    <ID>ComplexCondition:AppRoot.kt:startupReveal != null &amp;&amp; revealingTarget == null || revealingTarget?.matchesPlayerKey(currentDestination) == false || applianceLaunchState is ApplianceLaunchState.Pending || (applianceLaunchState is ApplianceLaunchState.Entering &amp;&amp; enteringLaunchTarget != revealingTarget)</ID>
+    <ID>ComplexCondition:ChannelDrawer.kt:it.isFocused &amp;&amp; ownsInput() &amp;&amp; (focusedCatalog.isEmpty() || focusedCatalog == ids)</ID>
+    <ID>ComplexCondition:ChannelSchedule.kt:!entered &amp;&amp; openingEventId == null || removed != null &amp;&amp; removed.id == openingEventId</ID>
+    <ID>ComplexCondition:ChannelSchedule.kt:rowOwnsFocus &amp;&amp; openingEventId != null &amp;&amp; focusedEvent?.id != openingEventId &amp;&amp; events.isNotEmpty()</ID>
+    <ID>ComplexCondition:ChannelsScreen.kt:drawerState?.currentValue == DrawerValue.Open || contextChannelId != null || openPanel != null || !contentEntryEnabled || !matchesRequestedRows(currentScope()) || !matchesRequestedRows(latestRenderedScope) || restorationGeneration != generation</ID>
+    <ID>ComplexCondition:DepthNavigation.kt:it.isFocused &amp;&amp; latestActive.value &amp;&amp; latestStillOwning.value(capturedVisit) &amp;&amp; !(restoring &amp;&amp; row.item.id != latestFocusedId.value)</ID>
+    <ID>ComplexCondition:EpgGridContent.kt:channel.icon != null &amp;&amp; (currentSession != null || channel.icon is ChannelIcon.RemoteUrl) &amp;&amp; !logoFailed</ID>
+    <ID>ComplexCondition:EpgGridScreen.kt:!guideActive || !indexCurrent || initialPositionDone || channels.isEmpty() || focusRows.size != channels.size</ID>
+    <ID>ComplexCondition:EpgGridScreen.kt:!indexCurrent || !channelScopeState.settingsLoaded || channelViewModel.scope.value != channelScopeState || coverageTagId != channelScope.activeTagId || !initialPositionDone</ID>
+    <ID>ComplexCondition:EpgGridScreen.kt:!indexCurrent || !initialPositionDone || focusRows.size != channels.size || channels.isEmpty()</ID>
+    <ID>ComplexCondition:EpgGridScreen.kt:current != null &amp;&amp; lastFocusedEvent?.let { it.id == current.eventId &amp;&amp; it.stop.epochSeconds &lt;= nowSecProvider() } == true &amp;&amp; focusRows.getOrNull(current.channelIndex)?.events?.none { it.id == current.eventId } != false</ID>
+    <ID>ComplexCondition:EpgGridScreen.kt:destinationEntryPending &amp;&amp; pendingPlayerReturn == null &amp;&amp; (target == null || waitForEntryProgramme) &amp;&amp; coverageRequest != null</ID>
+    <ID>ComplexCondition:EpgGridScreen.kt:frontierRequest != null || pendingFrontierOrigin != null || channelFocusRequest != null || windowFocusRequest != null</ID>
+    <ID>ComplexCondition:EpgGridScreen.kt:genreEntryPending || playerReturnChannelId != null || destinationEntryPending &amp;&amp; pendingPlayerReturn == null</ID>
+    <ID>ComplexCondition:EpgGridScreen.kt:mayFocusProgramme &amp;&amp; event != null &amp;&amp; focusWindowFor(event) == windowStartSec &amp;&amp; channelListState.layoutInfo.visibleItemsInfo.any { it.index == next.channelIndex }</ID>
+    <ID>ComplexCondition:EpgGridScreen.kt:mayFocusProgramme &amp;&amp; frontierRequest == null &amp;&amp; pendingFrontierOrigin == null &amp;&amp; channelFocusRequest == null &amp;&amp; windowFocusRequest == null &amp;&amp; (initialPositionDone || channels.isEmpty())</ID>
+    <ID>ComplexCondition:EpgGridScreen.kt:realizedTarget != selectedTarget || frontierRequest != null || channelFocusRequest != null || windowFocusRequest != null</ID>
+    <ID>ComplexCondition:EpgGridScreen.kt:target != null &amp;&amp; event != null &amp;&amp; nowSec in windowStartSec until windowEndSec &amp;&amp; nowSec in event.start.epochSeconds until event.stop.epochSeconds</ID>
+    <ID>ComplexCondition:GuideCoverageRequestOwner.kt:GuideCoverageRequestOwner$existing != null &amp;&amp; existing.windowStartSec == windowStartSec &amp;&amp; existing.job.isActive &amp;&amp; orderedChannelIds.all { requests[it] === existing }</ID>
+    <ID>ComplexCondition:GuideViewport.kt:nowSec != null &amp;&amp; nowSec in eventStartSec until eventEndSec &amp;&amp; nowSec in windowStartSec + leftReserve until windowStartSec + rightLimit &amp;&amp; minOf(eventEndSec, windowStartSec + rightLimit) - maxOf(eventStartSec, windowStartSec + leftReserve) &gt;= GuideOnAirReadableSec</ID>
+    <ID>ComplexCondition:HomeContent.kt:entryFocusApplied &amp;&amp; !emptyHasFocus &amp;&amp; !restoreHeader &amp;&amp; !followInitialFocus &amp;&amp; (hasHomeFocus || (sections.isNotEmpty() &amp;&amp; !regainingOwnership))</ID>
+    <ID>ComplexCondition:HomeRecordingActions.kt:owner?.isCurrent != false &amp;&amp; capability != null &amp;&amp; current.currentSession === capability &amp;&amp; current.dvrEntry(opened.id)?.let(current::recordingPlaybackAdmission)?.let { recordingOpenAction(it) != RecordingOpenAction.DETAILS } == true</ID>
+    <ID>ComplexCondition:HomeRecordingActions.kt:owner?.isCurrent == false || capability == null || current.currentSession !== capability || latest == null || recordingWatchStateAction(latest, current.recordingPlaybackAdmission(latest), (current.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED) != action</ID>
+    <ID>ComplexCondition:HomeScreen.kt:!menu &amp;&amp; !recordingIsRunning(entry) &amp;&amp; capability != null &amp;&amp; (action == RecordingOpenAction.START_OVER || action == RecordingOpenAction.RESUME)</ID>
+    <ID>ComplexCondition:MainActivity.kt:MainStartupActivityKeyDispatcher$action == KeyEvent.ACTION_DOWN &amp;&amp; repeatCount == 0 &amp;&amp; contract.mode is MainStartupKeyMode.Actionable &amp;&amp; keyCode.isStartupActivationKey()</ID>
+    <ID>ComplexCondition:PiconBox.kt:loaded &amp;&amp; transformation == null &amp;&amp; groundArgb != null &amp;&amp; inkSize != null &amp;&amp; prefetchGround != null</ID>
+    <ID>ComplexCondition:PlaybackOptionsSheet.kt:contentState != PlaybackTrackContentState.AVAILABLE &amp;&amp; !(quick &amp;&amp; offered &amp;&amp; contentState == PlaybackTrackContentState.EMPTY)</ID>
+    <ID>ComplexCondition:PlayerActionRow.kt:tag == "player-pause" &amp;&amp; pauseUnavailableReason != null || tag == "player-schedule" &amp;&amp; !scheduleAvailable</ID>
+    <ID>ComplexCondition:PlayerChromeControls.kt:(delta &lt; 0 &amp;&amp; target &lt; recordingRange.positionMs) || (delta &gt; 0 &amp;&amp; target &gt; recordingRange.positionMs)</ID>
+    <ID>ComplexCondition:PlayerMotion.kt:!open &amp;&amp; visibility.isIdle &amp;&amp; !visibility.currentState &amp;&amp; retention.shown != null</ID>
+    <ID>ComplexCondition:PlayerTimeline.kt:!programmeWindow &amp;&amp; rewindableStartFraction != null &amp;&amp; currentProgress != null &amp;&amp; programmeTargetAvailable != false</ID>
+    <ID>ComplexCondition:PlayerTimelinePresentationState.kt:LiveTimelinePresentationState$disposed || generation !== sourceGeneration || epoch != generation.positionSampleEpoch || generation.positionCommandsInFlight != 0</ID>
+    <ID>ComplexCondition:PlayerTimelinePresentationState.kt:LiveTimelinePresentationState$pending?.acceptedSeek != null &amp;&amp; result.timingKnown &amp;&amp; pending.mappingTimeline?.describesSameSegment(result.timeline) == true &amp;&amp; result.playbackSeek === pending.acceptedSeek</ID>
+    <ID>ComplexCondition:ProgrammeArtwork.kt:model == null || load.failed || (channelIcon != null &amp;&amp; load.needsFallback)</ID>
+    <ID>ComplexCondition:ProgrammeDetailsLayout.kt:!trapFocus &amp;&amp; ((delta &lt; 0 &amp;&amp; !scroll.canScrollBackward) || (delta &gt; 0 &amp;&amp; !scroll.canScrollForward))</ID>
+    <ID>ComplexCondition:QuickZapPresentation.kt:!built[0] || !shown &amp;&amp; !expanded &amp;&amp; channelPeek == null</ID>
+    <ID>ComplexCondition:RecordingsContent.kt:failure == null &amp;&amp; !stoppedEarly &amp;&amp; !watched &amp;&amp; timeLeft == null &amp;&amp; rule == null &amp;&amp; partialSize == null</ID>
+    <ID>ComplexCondition:RecordingsScreen.kt:!activeChoice &amp;&amp; capability != null &amp;&amp; (action == at.bernhardberger.tvhplayer.core.RecordingOpenAction.START_OVER || action == at.bernhardberger.tvhplayer.core.RecordingOpenAction.RESUME)</ID>
+    <ID>ComplexCondition:RecordingsScreen.kt:!requestContentFocus &amp;&amp; !(alertShown &amp;&amp; (loadingFocusParked || contentFocusOwned))</ID>
+    <ID>ComplexCondition:RecordingsScreen.kt:action != null &amp;&amp; target != null &amp;&amp; selectedCapability != null &amp;&amp; mutationStateCurrent</ID>
+    <ID>ComplexCondition:RecordingsScreen.kt:event.type == KeyEventType.KeyDown &amp;&amp; event.key == Key.DirectionUp &amp;&amp; mode != DvrLibraryMode.ARCHIVE &amp;&amp; contentHasFocus &amp;&amp; selectedKeys[location] == itemKeys.firstOrNull()</ID>
+    <ID>ComplexCondition:RecordingsScreen.kt:mode != DvrLibraryMode.ARCHIVE &amp;&amp; (unavailableScheduleEntry || (itemKeys.isNotEmpty() &amp;&amp; selectedKeys[location] !in itemKeys))</ID>
+    <ID>ComplexCondition:RecordingsScreen.kt:mode == DvrLibraryMode.SCHEDULE &amp;&amp; initialFocusEnabled &amp;&amp; (loadingFocusParked || contentFocusOwned)</ID>
+    <ID>ComplexCondition:RecordingsScreen.kt:recordingIsRunning(opened) &amp;&amp; selectedCapability != null &amp;&amp; channel != null &amp;&amp; onWatchChannel != null</ID>
+    <ID>ComplexCondition:SideRail.kt:searched &amp;&amp; !enteringContent &amp;&amp; drawerState.currentValue == DrawerValue.Closed &amp;&amp; !detailsOpen &amp;&amp; !modalOpen</ID>
+    <ID>ComplexCondition:SidebarGuideScene.kt:entry != null &amp;&amp; (visible || retained || showing.value)</ID>
+    <ID>ComplexCondition:StepOffsetDescription.kt:!settled || key == null || held.key == null || held.identity != identity</ID>
+    <ID>ComplexCondition:VideoPlayerScreen.kt:!contentAllowed &amp;&amp; !(startupOutcomeDelivered &amp;&amp; startupTarget != null &amp;&amp; initialStartupTarget == startupTarget)</ID>
+    <ID>ComplexCondition:VideoPlayerScreen.kt:!screenActive || serverWait.presentation != null &amp;&amp; playbackRuntime.activeTarget.value == null || screenEntry == null</ID>
+    <ID>ComplexCondition:VideoPlayerScreen.kt:initialStartupTarget == target &amp;&amp; !initialPlaybackAdopted &amp;&amp; !startupOutcomeDelivered &amp;&amp; selection != null &amp;&amp; intent != null</ID>
+    <ID>CyclomaticComplexMethod:AppErrorText.kt:@StringRes internal fun AppErrorCondition.hintRes: Int?</ID>
+    <ID>CyclomaticComplexMethod:AppErrorText.kt:@StringRes internal fun AppErrorCondition.titleRes: Int</ID>
+    <ID>CyclomaticComplexMethod:AppErrorText.kt:@StringRes private fun AppErrorCondition.reasonRes: Int</ID>
+    <ID>CyclomaticComplexMethod:AppNoticeHost.kt:@Composable internal fun AppNoticePresentation</ID>
+    <ID>CyclomaticComplexMethod:AppRoot.kt:@Composable fun AppRoot</ID>
+    <ID>CyclomaticComplexMethod:AppRoot.kt:@Composable internal fun MainStartupComposition</ID>
+    <ID>CyclomaticComplexMethod:BrowseContextMenu.kt:@Composable internal fun BrowseContextMenu</ID>
+    <ID>CyclomaticComplexMethod:BrowseContextMenu.kt:@Composable internal fun rememberBrowseContextMenuTrigger: BrowseContextMenuTrigger</ID>
+    <ID>CyclomaticComplexMethod:BrowseContextMenu.kt:internal fun BrowseContextAction.label: Int</ID>
+    <ID>CyclomaticComplexMethod:CentredDialog.kt:@Composable internal fun CentredDialog</ID>
+    <ID>CyclomaticComplexMethod:ChannelAccents.kt:ChannelAccents$suspend fun fillIn</ID>
+    <ID>CyclomaticComplexMethod:ChannelDrawer.kt:@OptIn(ExperimentalFoundationApi::class) @Composable fun ChannelDrawer</ID>
+    <ID>CyclomaticComplexMethod:ChannelNumberOverlay.kt:@Composable private fun ChannelNumberEntryRow</ID>
+    <ID>CyclomaticComplexMethod:ChannelRow.kt:@Composable fun ChannelRow</ID>
+    <ID>CyclomaticComplexMethod:ChannelSchedule.kt:@Composable @OptIn(ExperimentalFoundationApi::class) internal fun ChannelSchedule</ID>
+    <ID>CyclomaticComplexMethod:ChannelSchedule.kt:@Composable private fun ChannelScheduleRow</ID>
+    <ID>CyclomaticComplexMethod:ChannelsGrid.kt:@OptIn(ExperimentalFoundationApi::class) @Composable internal fun ChannelsGrid</ID>
+    <ID>CyclomaticComplexMethod:ChannelsHeader.kt:@Composable internal fun ChannelsHeader</ID>
+    <ID>CyclomaticComplexMethod:ChannelsImmersiveList.kt:@Composable internal fun ChannelsImmersiveBackground</ID>
+    <ID>CyclomaticComplexMethod:ChannelsImmersiveList.kt:@Composable internal fun ChannelsRowCard</ID>
+    <ID>CyclomaticComplexMethod:ChannelsImmersiveList.kt:@OptIn(ExperimentalFoundationApi::class) @Composable private fun ChannelsCardRow</ID>
+    <ID>CyclomaticComplexMethod:ChannelsScreen.kt:@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class) @Composable internal fun ChannelsScreenContent</ID>
+    <ID>CyclomaticComplexMethod:ColdStart.kt:@Composable internal fun rememberColdStart: ColdStart</ID>
+    <ID>CyclomaticComplexMethod:CompactZapCard.kt:@Composable internal fun CompactZapCard</ID>
+    <ID>CyclomaticComplexMethod:DepthNavigation.kt:@Composable @OptIn(ExperimentalFoundationApi::class) private fun DepthStripPane</ID>
+    <ID>CyclomaticComplexMethod:DepthNavigation.kt:@Composable fun DepthNavigation</ID>
+    <ID>CyclomaticComplexMethod:DetailsBackdropContrast.kt:internal fun measuredDetailsDim: Float</ID>
+    <ID>CyclomaticComplexMethod:DetailsTint.kt:@Composable internal fun rememberDetailsTint: State&lt;Color&gt;</ID>
+    <ID>CyclomaticComplexMethod:DvrMutationActions.kt:@OptIn(ExperimentalTvheadendApi::class) internal suspend fun DvrMutationActions.runFolderAction: Notice.DvrFolderActionFailed?</ID>
+    <ID>CyclomaticComplexMethod:EmbeddedProgressCardBorder.kt:@Composable internal fun rememberCardFocusRing: CardFocusRing</ID>
+    <ID>CyclomaticComplexMethod:EpgGridContent.kt:@Composable internal fun TimelineChannelRow</ID>
+    <ID>CyclomaticComplexMethod:EpgGridContent.kt:@Composable internal fun TimelineProgrammeCell</ID>
+    <ID>CyclomaticComplexMethod:EpgGridScreen.kt:@OptIn(ExperimentalFoundationApi::class, at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class) @Composable fun EpgGridScreen</ID>
+    <ID>CyclomaticComplexMethod:GuideHeadline.kt:@OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class) @Composable private fun GuideHeadlineContent</ID>
+    <ID>CyclomaticComplexMethod:GuideTimePanel.kt:@Composable internal fun GuideTimePanel</ID>
+    <ID>CyclomaticComplexMethod:GuideTimelineBody.kt:@OptIn(ExperimentalFoundationApi::class, at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class) @Composable internal fun GuideTimelineBody</ID>
+    <ID>CyclomaticComplexMethod:HomeActivityCard.kt:@Composable internal fun HomeActivityCard</ID>
+    <ID>CyclomaticComplexMethod:HomeActivityCard.kt:@Composable private fun activityTimesLine: String</ID>
+    <ID>CyclomaticComplexMethod:HomeContent.kt:@Composable internal fun HomeContent</ID>
+    <ID>CyclomaticComplexMethod:HomeContent.kt:@Composable internal fun rememberHomePageMotion: HomePageMotion</ID>
+    <ID>CyclomaticComplexMethod:HomeContent.kt:@Composable private fun HomeActivityRow</ID>
+    <ID>CyclomaticComplexMethod:HomeContent.kt:@OptIn(ExperimentalFoundationApi::class) @Composable private fun &lt;T&gt; HomeCardRow</ID>
+    <ID>CyclomaticComplexMethod:HomeEmptyState.kt:@Composable internal fun HomeEmptyState</ID>
+    <ID>CyclomaticComplexMethod:HomeRecordingActions.kt:@OptIn(ExperimentalTvheadendApi::class) @Composable internal fun HomeRecordingActions</ID>
+    <ID>CyclomaticComplexMethod:HomeScreen.kt:@Composable @OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class) internal fun HomeScreen</ID>
+    <ID>CyclomaticComplexMethod:HomeScreen.kt:@Composable @OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class) internal fun HomeScreenContent</ID>
+    <ID>CyclomaticComplexMethod:JourneyProfileActivity.kt:JourneyProfileActivity$override fun onCreate</ID>
+    <ID>CyclomaticComplexMethod:MainStartupKeyCycleOwner.kt:MainStartupKeyCycleOwner$fun keyEvent: MainStartupKeyDecision</ID>
+    <ID>CyclomaticComplexMethod:MainStartupPresentation.kt:fun mainStartupPresentation: MainStartupPresentation</ID>
+    <ID>CyclomaticComplexMethod:NoticeFormatter.kt:NoticeFormatter$fun format: FormattedNotice</ID>
+    <ID>CyclomaticComplexMethod:NoticeFormatter.kt:NoticeFormatter$private fun formatDvr: FormattedNotice</ID>
+    <ID>CyclomaticComplexMethod:PiconBox.kt:@Composable fun PiconBox</ID>
+    <ID>CyclomaticComplexMethod:PlaybackKeyPolicy.kt:fun playerKeyAction: PlayerKeyAction</ID>
+    <ID>CyclomaticComplexMethod:PlaybackOptionsSheet.kt:@Composable internal fun PlaybackOptionRow</ID>
+    <ID>CyclomaticComplexMethod:PlaybackOptionsSheet.kt:@Composable internal fun PlaybackOptionsSheet</ID>
+    <ID>CyclomaticComplexMethod:PlaybackOptionsSheet.kt:@Composable internal fun PlaybackOptionsSheetContent</ID>
+    <ID>CyclomaticComplexMethod:PlaybackOptionsSheet.kt:@OptIn(ExperimentalFoundationApi::class) @Composable private fun ColumnScope.TrackOptionsPage</ID>
+    <ID>CyclomaticComplexMethod:PlaybackSeekbar.kt:@Composable fun PlaybackSeekbar</ID>
+    <ID>CyclomaticComplexMethod:PlaybackStatsOverlay.kt:@Composable internal fun PlaybackStatsOverlay</ID>
+    <ID>CyclomaticComplexMethod:PlayerActionRow.kt:@Composable internal fun PlayerActionRow</ID>
+    <ID>CyclomaticComplexMethod:PlayerBackPolicy.kt:fun playerBackAction: PlayerBackAction</ID>
+    <ID>CyclomaticComplexMethod:PlayerBackPolicy.kt:fun playerForegroundLayer: PlayerForegroundLayer</ID>
+    <ID>CyclomaticComplexMethod:PlayerChannelBrowser.kt:@Composable internal fun PlayerChannelBrowser</ID>
+    <ID>CyclomaticComplexMethod:PlayerChrome.kt:@Composable internal fun PlayerChrome</ID>
+    <ID>CyclomaticComplexMethod:PlayerChromeBarStatus.kt:internal fun PlayerChromeTimeline.Live.barPresentation: LiveBarPresentation</ID>
+    <ID>CyclomaticComplexMethod:PlayerChromeControls.kt:@Composable internal fun PlayerChromeControls</ID>
+    <ID>CyclomaticComplexMethod:PlayerErrorSurfaces.kt:@Composable internal fun LivePlayerAlertOverlay</ID>
+    <ID>CyclomaticComplexMethod:PlayerHelpers.kt:fun collectTracks: List&lt;UiTrack&gt;</ID>
+    <ID>CyclomaticComplexMethod:PlayerInfoBar.kt:@Composable fun PlayerInfoBar</ID>
+    <ID>CyclomaticComplexMethod:PlayerTimeline.kt:@Composable fun PlayerTimelineBar</ID>
+    <ID>CyclomaticComplexMethod:PlayerTimeline.kt:@Composable fun PlayerTimelineBlock</ID>
+    <ID>CyclomaticComplexMethod:PlayerTimelinePresentationState.kt:LiveTimelinePresentationState$fun queueRelativeSeek</ID>
+    <ID>CyclomaticComplexMethod:PlayerTimelinePresentationState.kt:LiveTimelinePresentationState$suspend fun sampleTimeshiftPresentation: AppTimeshiftState?</ID>
+    <ID>CyclomaticComplexMethod:PlayerTopIdentity.kt:@Composable private fun RecentRow</ID>
+    <ID>CyclomaticComplexMethod:PlayerVideoSurface.kt:@OptIn(UnstableApi::class) @Composable fun PlayerVideoSurface</ID>
+    <ID>CyclomaticComplexMethod:ProgrammeDetailsHost.kt:@OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class) @Composable internal fun ProgrammeDetailsHost</ID>
+    <ID>CyclomaticComplexMethod:ProgrammeDetailsLayout.kt:@Composable internal fun ScrollReadingBox</ID>
+    <ID>CyclomaticComplexMethod:ProgrammeDetailsPage.kt:@Composable private fun DetailsActions</ID>
+    <ID>CyclomaticComplexMethod:ProgrammeDetailsPage.kt:@Composable private fun DetailsInformation</ID>
+    <ID>CyclomaticComplexMethod:ProgrammeDetailsPage.kt:@OptIn(ExperimentalFoundationApi::class) @Composable internal fun ProgrammeDetailsPage</ID>
+    <ID>CyclomaticComplexMethod:ProgrammeDetailsPage.kt:@OptIn(ExperimentalTvheadendApi::class) @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class) internal fun recordingMetadataFacts: List&lt;Pair&lt;String, String&gt;&gt;</ID>
+    <ID>CyclomaticComplexMethod:ProgrammeDetailsPage.kt:internal fun programmeAboutFacts: List&lt;Pair&lt;String, String&gt;&gt;</ID>
+    <ID>CyclomaticComplexMethod:ProgrammeInfoSheet.kt:@Composable internal fun &lt;T : Any&gt; PlayerPage</ID>
+    <ID>CyclomaticComplexMethod:ProgrammePane.kt:@Composable internal fun ProgrammeHeadline</ID>
+    <ID>CyclomaticComplexMethod:ProgrammePane.kt:@Composable private fun HeadlineColumn</ID>
+    <ID>CyclomaticComplexMethod:QuickZapPresentation.kt:@Composable internal fun QuickZapRail</ID>
+    <ID>CyclomaticComplexMethod:RecordingDetailsHost.kt:@OptIn(ExperimentalTvheadendApi::class) @Composable internal fun RecordingDetailsHost</ID>
+    <ID>CyclomaticComplexMethod:RecordingMarkTrack.kt:@Composable internal fun TimelineMarkLayer</ID>
+    <ID>CyclomaticComplexMethod:RecordingMarkerOverlay.kt:@Composable internal fun RecordingMarkerOverlay</ID>
+    <ID>CyclomaticComplexMethod:RecordingMarkerOverlay.kt:@Composable private fun RecordingMarkPill</ID>
+    <ID>CyclomaticComplexMethod:RecordingMarkerOverlay.kt:RecordingMarkerNavigation$fun handle: Boolean</ID>
+    <ID>CyclomaticComplexMethod:RecordingPlaybackChoice.kt:@Composable internal fun RecordingPlaybackChoice</ID>
+    <ID>CyclomaticComplexMethod:RecordingPlayerScreen.kt:@OptIn(UnstableApi::class) @kotlin.OptIn(ExperimentalTvheadendApi::class) @Composable fun RecordingPlayerScreen</ID>
+    <ID>CyclomaticComplexMethod:RecordingsContent.kt:@Composable internal fun RecordingListRow</ID>
+    <ID>CyclomaticComplexMethod:RecordingsContent.kt:@Composable internal fun RecordingMetadataPane</ID>
+    <ID>CyclomaticComplexMethod:RecordingsContent.kt:@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class) @Composable internal fun RecordingProblems</ID>
+    <ID>CyclomaticComplexMethod:RecordingsContent.kt:@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class) @Composable internal fun RecordingSchedule</ID>
+    <ID>CyclomaticComplexMethod:RecordingsScreen.kt:@OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class) @Composable internal fun RecordingsScreenContent</ID>
+    <ID>CyclomaticComplexMethod:SettingsAbout.kt:@Composable internal fun AboutReadingDialog</ID>
+    <ID>CyclomaticComplexMethod:SettingsDepthRows.kt:internal fun settingsRow</ID>
+    <ID>CyclomaticComplexMethod:SetupWelcome.kt:@Composable internal fun SetupWelcome</ID>
+    <ID>CyclomaticComplexMethod:SideRail.kt:@Composable internal fun SideRail</ID>
+    <ID>CyclomaticComplexMethod:SideRail.kt:@Composable private fun DrawerNowPlayingControls</ID>
+    <ID>CyclomaticComplexMethod:SideRail.kt:@Composable private fun NavigationDrawerScope.DrawerNowPlaying</ID>
+    <ID>CyclomaticComplexMethod:TimeshiftSeekPreview.kt:@Composable internal fun TimeshiftSeekPreviewTimeline</ID>
+    <ID>CyclomaticComplexMethod:TrackLabelPolicy.kt:fun humanCodecName: String?</ID>
+    <ID>CyclomaticComplexMethod:TvOutlinedTextField.kt:@Composable fun TvOutlinedTextField</ID>
+    <ID>CyclomaticComplexMethod:TvPasswordField.kt:@Composable fun TvPasswordField</ID>
+    <ID>CyclomaticComplexMethod:TvRecoveryOverlay.kt:@Composable fun TvRecoveryOverlay</ID>
+    <ID>CyclomaticComplexMethod:TwoColumnDialog.kt:@Composable internal fun TwoColumnDialog</ID>
+    <ID>CyclomaticComplexMethod:VideoPlayerScreen.kt:@OptIn(UnstableApi::class) @kotlin.OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class) @Composable fun VideoPlayerScreen</ID>
+    <ID>DestructuringDeclarationWithTooManyEntries:PlayerActionRow.kt:(tag, label, icon, action, focus, state)</ID>
+    <ID>DestructuringDeclarationWithTooManyEntries:ProgrammeWindow.kt:val (event, position, axisStart, axisStop, start, end) = resolved</ID>
+    <ID>EmptyElseBlock:ProgrammeDetailsPage.kt:if (backEnabled) reading = true</ID>
+    <ID>ExplicitItLambdaMultipleParameters:ProgrammeDetailsPage.kt:{ _, it -&gt; it.id.value }</ID>
+    <ID>InvalidRange:EpgGridScreen.kt:0 until 0</ID>
+    <ID>LongMethod:AppRoot.kt:@Composable fun AppRoot</ID>
+    <ID>LongMethod:AppRoot.kt:@Composable internal fun MainStartupComposition</ID>
+    <ID>LongMethod:ArchiveDepthContent.kt:fun addLevel</ID>
+    <ID>LongMethod:BrowsePanels.kt:@OptIn(ExperimentalFoundationApi::class) @Composable internal fun BrowsePanelList</ID>
+    <ID>LongMethod:CentredDialog.kt:@Composable internal fun CentredDialog</ID>
+    <ID>LongMethod:ChannelDrawer.kt:@OptIn(ExperimentalFoundationApi::class) @Composable fun ChannelDrawer</ID>
+    <ID>LongMethod:ChannelNumberOverlay.kt:@Composable private fun ChannelNumberEntryRow</ID>
+    <ID>LongMethod:ChannelRow.kt:@Composable fun ChannelRow</ID>
+    <ID>LongMethod:ChannelSchedule.kt:@Composable @OptIn(ExperimentalFoundationApi::class) internal fun ChannelSchedule</ID>
+    <ID>LongMethod:ChannelSchedule.kt:@Composable private fun ChannelScheduleRow</ID>
+    <ID>LongMethod:ChannelsGrid.kt:@OptIn(ExperimentalFoundationApi::class) @Composable internal fun ChannelsGrid</ID>
+    <ID>LongMethod:ChannelsHeader.kt:@Composable internal fun ChannelsHeader</ID>
+    <ID>LongMethod:ChannelsImmersiveList.kt:@Composable internal fun ChannelsRowCard</ID>
+    <ID>LongMethod:ChannelsImmersiveList.kt:@OptIn(ExperimentalFoundationApi::class) @Composable private fun ChannelsCardRow</ID>
+    <ID>LongMethod:ChannelsScreen.kt:@Composable fun BrowseColumn</ID>
+    <ID>LongMethod:ChannelsScreen.kt:@Composable fun ChannelBrowseContent</ID>
+    <ID>LongMethod:ChannelsScreen.kt:@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class) @Composable internal fun ChannelsScreenContent</ID>
+    <ID>LongMethod:CompactZapCard.kt:@Composable internal fun CompactZapCard</ID>
+    <ID>LongMethod:DepthNavigation.kt:@Composable @OptIn(ExperimentalFoundationApi::class) private fun DepthStripPane</ID>
+    <ID>LongMethod:DepthNavigation.kt:@Composable fun DepthNavigation</ID>
+    <ID>LongMethod:EpgGridContent.kt:@Composable internal fun TimelineChannelRow</ID>
+    <ID>LongMethod:EpgGridContent.kt:@Composable internal fun TimelineProgrammeCell</ID>
+    <ID>LongMethod:EpgGridContent.kt:@Composable internal fun TimelineTimeRuler</ID>
+    <ID>LongMethod:EpgGridScreen.kt:@Composable fun GuideBrowseContent</ID>
+    <ID>LongMethod:EpgGridScreen.kt:@Composable fun GuideOverlays</ID>
+    <ID>LongMethod:EpgGridScreen.kt:@Composable fun GuidePositionEffects</ID>
+    <ID>LongMethod:EpgGridScreen.kt:@OptIn(ExperimentalFoundationApi::class, at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class) @Composable fun EpgGridScreen</ID>
+    <ID>LongMethod:EpgGridScreen.kt:fun moveFocus: Boolean</ID>
+    <ID>LongMethod:GuideTimePanel.kt:@Composable internal fun GuideTimePanel</ID>
+    <ID>LongMethod:GuideTimelineBody.kt:@OptIn(ExperimentalFoundationApi::class, at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class) @Composable internal fun GuideTimelineBody</ID>
+    <ID>LongMethod:HomeActivityCard.kt:@Composable internal fun HomeActivityCard</ID>
+    <ID>LongMethod:HomeContent.kt:@Composable internal fun HomeContent</ID>
+    <ID>LongMethod:HomeContent.kt:@Composable internal fun rememberHomePageMotion: HomePageMotion</ID>
+    <ID>LongMethod:HomeContent.kt:@Composable private fun HomeActivityRow</ID>
+    <ID>LongMethod:HomeContent.kt:@Composable private fun HomeHeader</ID>
+    <ID>LongMethod:HomeContent.kt:@Composable private fun HomeShelfRow</ID>
+    <ID>LongMethod:HomeContent.kt:@OptIn(ExperimentalFoundationApi::class) @Composable private fun &lt;T&gt; HomeCardRow</ID>
+    <ID>LongMethod:HomeRecordingActions.kt:@OptIn(ExperimentalTvheadendApi::class) @Composable internal fun HomeRecordingActions</ID>
+    <ID>LongMethod:HomeScreen.kt:@Composable @OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class) internal fun HomeScreen</ID>
+    <ID>LongMethod:HomeScreen.kt:@Composable @OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class) internal fun HomeScreenContent</ID>
+    <ID>LongMethod:JourneyProfileActivity.kt:JourneyProfileActivity$override fun onCreate</ID>
+    <ID>LongMethod:LivePlayerServerWait.kt:@Composable internal fun LivePlayerServerWait</ID>
+    <ID>LongMethod:MainStartupScreen.kt:@Composable internal fun MainStartupFrame</ID>
+    <ID>LongMethod:PlaybackKeyPolicy.kt:fun playerKeyAction: PlayerKeyAction</ID>
+    <ID>LongMethod:PlaybackOptionsSheet.kt:@Composable internal fun PlaybackOptionRow</ID>
+    <ID>LongMethod:PlaybackOptionsSheet.kt:@Composable internal fun PlaybackOptionsSheet</ID>
+    <ID>LongMethod:PlaybackOptionsSheet.kt:@Composable internal fun PlaybackOptionsSheetContent</ID>
+    <ID>LongMethod:PlaybackOptionsSheet.kt:@Composable private fun PlaybackOptionsRoot</ID>
+    <ID>LongMethod:PlaybackOptionsSheet.kt:@OptIn(ExperimentalFoundationApi::class) @Composable private fun ColumnScope.TrackOptionsPage</ID>
+    <ID>LongMethod:PlaybackSeekbar.kt:@Composable fun PlaybackSeekbar</ID>
+    <ID>LongMethod:PlaybackStatsOverlay.kt:@Composable internal fun PlaybackStatsOverlay</ID>
+    <ID>LongMethod:PlayerChannelBrowser.kt:@Composable internal fun PlayerChannelBrowser</ID>
+    <ID>LongMethod:PlayerChrome.kt:@Composable internal fun PlayerChrome</ID>
+    <ID>LongMethod:PlayerChromeControls.kt:@Composable internal fun PlayerChromeControls</ID>
+    <ID>LongMethod:PlayerTimeline.kt:@Composable fun PlayerTimelineBar</ID>
+    <ID>LongMethod:PlayerTimeline.kt:@Composable fun PlayerTimelineBlock</ID>
+    <ID>LongMethod:PlayerTimelinePresentationState.kt:LiveTimelinePresentationState$fun queueRelativeSeek</ID>
+    <ID>LongMethod:PlayerTopIdentity.kt:@Composable internal fun PlayerTopIdentity</ID>
+    <ID>LongMethod:PlayerTopIdentity.kt:@Composable private fun RecentRow</ID>
+    <ID>LongMethod:PlayerVideoSurface.kt:@OptIn(UnstableApi::class) @Composable fun PlayerVideoSurface</ID>
+    <ID>LongMethod:ProgrammeDetailsHost.kt:@OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class) @Composable internal fun ProgrammeDetailsHost</ID>
+    <ID>LongMethod:ProgrammeDetailsPage.kt:@Composable private fun DetailsInformation</ID>
+    <ID>LongMethod:ProgrammeDetailsPage.kt:@OptIn(ExperimentalFoundationApi::class) @Composable internal fun ProgrammeDetailsPage</ID>
+    <ID>LongMethod:ProgrammeInfoSheet.kt:@Composable internal fun &lt;T : Any&gt; PlayerPage</ID>
+    <ID>LongMethod:ProgrammePane.kt:@Composable internal fun ProgrammeHeadline</ID>
+    <ID>LongMethod:QuickZapPresentation.kt:@Composable internal fun QuickZapRail</ID>
+    <ID>LongMethod:RecordingDetailsHost.kt:@OptIn(ExperimentalTvheadendApi::class) @Composable internal fun RecordingDetailsHost</ID>
+    <ID>LongMethod:RecordingMarkerOverlay.kt:@Composable internal fun RecordingMarkerOverlay</ID>
+    <ID>LongMethod:RecordingMarkerOverlay.kt:@Composable private fun RecordingMarkPill</ID>
+    <ID>LongMethod:RecordingPlaybackChoice.kt:@Composable internal fun RecordingPlaybackChoice</ID>
+    <ID>LongMethod:RecordingPlayerScreen.kt:@OptIn(UnstableApi::class) @kotlin.OptIn(ExperimentalTvheadendApi::class) @Composable fun RecordingPlayerScreen</ID>
+    <ID>LongMethod:RecordingSkipButton.kt:@Composable internal fun RecordingSkipPrompt</ID>
+    <ID>LongMethod:RecordingsContent.kt:@Composable internal fun FolderListRow</ID>
+    <ID>LongMethod:RecordingsContent.kt:@Composable internal fun RecordingListRow</ID>
+    <ID>LongMethod:RecordingsContent.kt:@Composable internal fun RecordingMetadataPane</ID>
+    <ID>LongMethod:RecordingsContent.kt:@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class) @Composable internal fun RecordingProblems</ID>
+    <ID>LongMethod:RecordingsContent.kt:@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class) @Composable internal fun RecordingSchedule</ID>
+    <ID>LongMethod:RecordingsScreen.kt:@Composable fun FolderMenu</ID>
+    <ID>LongMethod:RecordingsScreen.kt:@Composable fun RecordingDetails</ID>
+    <ID>LongMethod:RecordingsScreen.kt:@OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class) @Composable internal fun RecordingsScreenContent</ID>
+    <ID>LongMethod:SettingsDepthRows.kt:internal fun settingsRow</ID>
+    <ID>LongMethod:SetupWelcome.kt:@Composable internal fun SetupWelcome</ID>
+    <ID>LongMethod:SideRail.kt:@Composable internal fun SideRail</ID>
+    <ID>LongMethod:SideRail.kt:@Composable private fun NavigationDrawerScope.DrawerNowPlaying</ID>
+    <ID>LongMethod:TimeshiftSeekPreview.kt:@Composable internal fun TimeshiftSeekPreviewTimeline</ID>
+    <ID>LongMethod:TvPasswordField.kt:@Composable fun TvPasswordField</ID>
+    <ID>LongMethod:TvRecoveryOverlay.kt:@Composable fun TvRecoveryOverlay</ID>
+    <ID>LongMethod:TwoColumnDialog.kt:@Composable internal fun TwoColumnDialog</ID>
+    <ID>LongMethod:VideoPlayerScreen.kt:@Composable fun PlayerContent</ID>
+    <ID>LongMethod:VideoPlayerScreen.kt:@Composable fun PlayerControls</ID>
+    <ID>LongMethod:VideoPlayerScreen.kt:@Composable fun PlayerPanels</ID>
+    <ID>LongMethod:VideoPlayerScreen.kt:@Composable fun playerRootModifier: Modifier</ID>
+    <ID>LongMethod:VideoPlayerScreen.kt:@OptIn(UnstableApi::class) @kotlin.OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class) @Composable fun VideoPlayerScreen</ID>
+    <ID>LoopWithTooManyJumpStatements:BackdropTransformation.kt:for</ID>
+    <ID>LoopWithTooManyJumpStatements:ChannelAccents.kt:ChannelAccents$for</ID>
+    <ID>LoopWithTooManyJumpStatements:ChannelsViewModel.kt:ChannelsViewModel$while</ID>
+    <ID>LoopWithTooManyJumpStatements:DetailsBackdropContrast.kt:for</ID>
+    <ID>LoopWithTooManyJumpStatements:DvrMutationActions.kt:for</ID>
+    <ID>LoopWithTooManyJumpStatements:PlayerHelpers.kt:for</ID>
+    <ID>LoopWithTooManyJumpStatements:PlayerTimelinePresentationState.kt:LiveTimelinePresentationState$while</ID>
+    <ID>LoopWithTooManyJumpStatements:WatchingProgress.kt:while</ID>
+    <ID>MagicNumber:ArtworkSample.kt:64</ID>
+    <ID>MagicNumber:BackdropTransformation.kt:0xff</ID>
+    <ID>MagicNumber:BackdropTransformation.kt:16</ID>
+    <ID>MagicNumber:BackdropTransformation.kt:24</ID>
+    <ID>MagicNumber:BackdropTransformation.kt:8</ID>
+    <ID>MagicNumber:BackdropTransformation.kt:BackdropTransformation$3</ID>
+    <ID>MagicNumber:CacheStatisticsFormatting.kt:1_000_000</ID>
+    <ID>MagicNumber:ChannelAccentPolicy.kt:120f</ID>
+    <ID>MagicNumber:ChannelAccentPolicy.kt:16</ID>
+    <ID>MagicNumber:ChannelAccentPolicy.kt:180f</ID>
+    <ID>MagicNumber:ChannelAccentPolicy.kt:240f</ID>
+    <ID>MagicNumber:ChannelAccentPolicy.kt:255</ID>
+    <ID>MagicNumber:ChannelAccentPolicy.kt:255f</ID>
+    <ID>MagicNumber:ChannelAccentPolicy.kt:300f</ID>
+    <ID>MagicNumber:ChannelAccentPolicy.kt:360f</ID>
+    <ID>MagicNumber:ChannelAccentPolicy.kt:60f</ID>
+    <ID>MagicNumber:ChannelAccentPolicy.kt:8</ID>
+    <ID>MagicNumber:ChannelAccents.kt:0xFFFFFF</ID>
+    <ID>MagicNumber:ChannelNavigation.kt:ChannelNavigation$9</ID>
+    <ID>MagicNumber:CinematicScrimTransformation.kt:50.1f</ID>
+    <ID>MagicNumber:CinematicScrimTransformation.kt:54f</ID>
+    <ID>MagicNumber:CinematicScrimTransformation.kt:91.24f</ID>
+    <ID>MagicNumber:CinematicScrimTransformation.kt:912.4f</ID>
+    <ID>MagicNumber:CinematicScrimTransformation.kt:GuideScrimTransformation$.2f</ID>
+    <ID>MagicNumber:CinematicScrimTransformation.kt:GuideScrimTransformation$.64f</ID>
+    <ID>MagicNumber:CinematicScrimTransformation.kt:GuideScrimTransformation$.6f</ID>
+    <ID>MagicNumber:DetailsBackdropContrast.kt:.04045</ID>
+    <ID>MagicNumber:DetailsBackdropContrast.kt:.05</ID>
+    <ID>MagicNumber:DetailsBackdropContrast.kt:.055</ID>
+    <ID>MagicNumber:DetailsBackdropContrast.kt:.0722</ID>
+    <ID>MagicNumber:DetailsBackdropContrast.kt:.2126</ID>
+    <ID>MagicNumber:DetailsBackdropContrast.kt:.7152</ID>
+    <ID>MagicNumber:DetailsBackdropContrast.kt:1.055</ID>
+    <ID>MagicNumber:DetailsBackdropContrast.kt:12</ID>
+    <ID>MagicNumber:DetailsBackdropContrast.kt:12.92</ID>
+    <ID>MagicNumber:DetailsBackdropContrast.kt:152</ID>
+    <ID>MagicNumber:DetailsBackdropContrast.kt:16</ID>
+    <ID>MagicNumber:DetailsBackdropContrast.kt:160</ID>
+    <ID>MagicNumber:DetailsBackdropContrast.kt:2.4</ID>
+    <ID>MagicNumber:DetailsBackdropContrast.kt:255</ID>
+    <ID>MagicNumber:DetailsBackdropContrast.kt:255.0</ID>
+    <ID>MagicNumber:DetailsBackdropContrast.kt:26</ID>
+    <ID>MagicNumber:DetailsBackdropContrast.kt:4.55</ID>
+    <ID>MagicNumber:DetailsBackdropContrast.kt:8</ID>
+    <ID>MagicNumber:DetailsBackdropContrast.kt:86</ID>
+    <ID>MagicNumber:DetailsBackdropContrast.kt:90</ID>
+    <ID>MagicNumber:DetailsBackdropContrast.kt:90f</ID>
+    <ID>MagicNumber:DetailsTint.kt:.075f</ID>
+    <ID>MagicNumber:HomeSectionsPolicy.kt:10</ID>
+    <ID>MagicNumber:JourneyProfileActivity.kt:JourneyProfileActivity$5_000</ID>
+    <ID>MagicNumber:JourneyProfileActivity.kt:JourneyProfileActivity$9982</ID>
+    <ID>MagicNumber:LogoGlowPolicy.kt:0xff</ID>
+    <ID>MagicNumber:LogoGlowPolicy.kt:16</ID>
+    <ID>MagicNumber:LogoGlowPolicy.kt:24</ID>
+    <ID>MagicNumber:LogoGlowPolicy.kt:8</ID>
+    <ID>MagicNumber:LogoHaloTransformation.kt:LogoHaloTransformation$24</ID>
+    <ID>MagicNumber:LogoHaloTransformation.kt:LogoHaloTransformation$3</ID>
+    <ID>MagicNumber:LogoInkTransformation.kt:24</ID>
+    <ID>MagicNumber:PlayerBarStatus.kt:1_000L</ID>
+    <ID>MagicNumber:PlayerBarStatus.kt:3_600_000L</ID>
+    <ID>MagicNumber:PlayerBarStatus.kt:5</ID>
+    <ID>MagicNumber:PlayerBarStatus.kt:999L</ID>
+    <ID>MagicNumber:SessionArtworkLoader.kt:100</ID>
+    <ID>MagicNumber:SessionArtworkLoader.kt:1024</ID>
+    <ID>MagicNumber:SessionArtworkLoader.kt:256</ID>
+    <ID>MagicNumber:SessionArtworkLoader.kt:3</ID>
+    <ID>MagicNumber:SessionArtworkLoader.kt:4</ID>
+    <ID>MagicNumber:SessionArtworkLoader.kt:45</ID>
+    <ID>MagicNumber:SessionArtworkLoader.kt:60</ID>
+    <ID>MagicNumber:SessionArtworkLoader.kt:75</ID>
+    <ID>MagicNumber:SessionArtworkLoader.kt:90</ID>
+    <ID>MagicNumber:SettingsStorageViewModel.kt:SettingsStorageViewModel$4_000</ID>
+    <ID>MagicNumber:TestCredentialProvisioner.kt:65_535L</ID>
+    <ID>MagicNumber:TrackLabelPolicy.kt:6</ID>
+    <ID>MagicNumber:TrackLabelPolicy.kt:8</ID>
+    <ID>MagicNumber:TvheadendArtworkLoader.kt:10</ID>
+    <ID>MagicNumber:WhatsNewPolicy.kt:1000</ID>
+    <ID>MagicNumber:WhatsNewPolicy.kt:14L</ID>
+    <ID>MagicNumber:WhatsNewPolicy.kt:24</ID>
+    <ID>MagicNumber:WhatsNewPolicy.kt:60</ID>
+    <ID>MatchingDeclarationName:AppErrorAlert.kt:BrowseConnectionFailure</ID>
+    <ID>MatchingDeclarationName:BrowseContextMenu.kt:BrowseContextMenuTrigger</ID>
+    <ID>MatchingDeclarationName:BrowsePanels.kt:BrowsePanelEntry</ID>
+    <ID>MatchingDeclarationName:BrowsePreparation.kt:PreparedBrowseData&lt;I, T&gt;</ID>
+    <ID>MatchingDeclarationName:ChannelNowStatusPolicy.kt:ChannelNowStatus</ID>
+    <ID>MatchingDeclarationName:ChannelTitle.kt:AppChannelNumbers</ID>
+    <ID>MatchingDeclarationName:ChannelsGroups.kt:ChannelsGroup</ID>
+    <ID>MatchingDeclarationName:ChannelsHeader.kt:ChannelsHeaderFocus</ID>
+    <ID>MatchingDeclarationName:ChannelsPanels.kt:ChannelsPanel</ID>
+    <ID>MatchingDeclarationName:CompactBufferingStatus.kt:PlayerBusyStatus</ID>
+    <ID>MatchingDeclarationName:GuideTimelineBody.kt:GuideTabBody</ID>
+    <ID>MatchingDeclarationName:LivePlayerServerWait.kt:LivePlayerServerWaitState</ID>
+    <ID>MatchingDeclarationName:NavigationEdgeFade.kt:NavigationTabOverflowState</ID>
+    <ID>MatchingDeclarationName:PlaybackRecoveryPresentation.kt:PlaybackRetryCommand</ID>
+    <ID>MatchingDeclarationName:PlayerAutoHidePolicy.kt:PlayerAutoHideContext</ID>
+    <ID>MatchingDeclarationName:PlayerBackDispatcher.kt:PlayerModalBackOwner</ID>
+    <ID>MatchingDeclarationName:PlayerHelpers.kt:UiTrack</ID>
+    <ID>MatchingDeclarationName:PlayerInfoBar.kt:PlayerInfoBarData</ID>
+    <ID>MatchingDeclarationName:PlayerStop.kt:PlayerClose</ID>
+    <ID>MatchingDeclarationName:ProgrammeArtwork.kt:PictureLoad</ID>
+    <ID>MatchingDeclarationName:ProgrammeCategoryPolicy.kt:ProgrammeCategory</ID>
+    <ID>MatchingDeclarationName:RecordingPlaybackPresentation.kt:RecordingFinishedAction</ID>
+    <ID>MatchingDeclarationName:SessionArtworkLoader.kt:AppSessionArtworkLoader : SessionArtworkLoader</ID>
+    <ID>MatchingDeclarationName:StatusBadge.kt:StatusBadgeTone</ID>
+    <ID>MatchingDeclarationName:TimeConverter.kt:AppClock</ID>
+    <ID>MatchingDeclarationName:TrackLabelPolicy.kt:HumanTrackLabel</ID>
+    <ID>MatchingDeclarationName:TvOutlinedTextField.kt:FieldOpenPress</ID>
+    <ID>MatchingDeclarationName:TvRecoveryOverlay.kt:TvRecoveryAction</ID>
+    <ID>MatchingDeclarationName:VideoDisplayMode.kt:DisplayModeSpec</ID>
+    <ID>MaxLineLength:AboutNoticeText.kt:if (line.takeWhile { it == '#' }.length == 2) ChangelogBlockKind.VERSION_HEADING else ChangelogBlockKind.GROUP_HEADING</ID>
+    <ID>MaxLineLength:AppConnectionViewModel.kt:AppConnectionViewModel$allowAutomaticBackoff &amp;&amp; state.reason.recoveryDisposition == SessionRecoveryDisposition.AUTOMATIC_BACKOFF</ID>
+    <ID>MaxLineLength:AppNoticeHost.kt:tint = if (icon == AppNoticeIcon.RECORDING) recordingMarkColor(focused = false) else LocalContentColor.current</ID>
+    <ID>MaxLineLength:AppNoticeHost.kt:val displayMillis = when (next.notice.severity) { NoticeSeverity.INFO -&gt; 4_000L; NoticeSeverity.FAILURE -&gt; 6_000L }</ID>
+    <ID>MaxLineLength:AppRoot.kt:((coldStartVisible &amp;&amp; landingCatalogAvailable) || effectiveStartupPresentation == MainStartupPresentation.Inactive)</ID>
+    <ID>MaxLineLength:AppRoot.kt:(playbackRuntime.activeTarget.value as? AppPlaybackTarget.Recording)?.recordingId</ID>
+    <ID>MaxLineLength:AppRoot.kt:CompositionLocalProvider</ID>
+    <ID>MaxLineLength:AppRoot.kt:activeChannelId = (playbackRuntime.activeTarget.value as? AppPlaybackTarget.Live)?.channelId</ID>
+    <ID>MaxLineLength:AppRoot.kt:activeRecordingId = (playbackRuntime.activeTarget.value as? AppPlaybackTarget.Recording)?.recordingId</ID>
+    <ID>MaxLineLength:AppRoot.kt:at.bernhardberger.tvhplayer.ui.components.rememberPlaybackIntent(playbackRuntime.player).value</ID>
+    <ID>MaxLineLength:AppRoot.kt:backStack.pushTransient(recordingPlayerKey(target.recordingId, RecordingPlaybackStart.START_OVER))</ID>
+    <ID>MaxLineLength:AppRoot.kt:browseStop</ID>
+    <ID>MaxLineLength:AppRoot.kt:content(TvFullScreenPadding, false, contentAllowed, rememberShellBackStack(backStack, playerShell = true))</ID>
+    <ID>MaxLineLength:AppRoot.kt:guideChannelRequest = PlayerReturnFocus(channelId, channelId, programme?.id, programme?.start?.epochSeconds)</ID>
+    <ID>MaxLineLength:AppRoot.kt:if (isPlayer || activeChannelId == null || warmPlaybackMode == null || warmPlaybackMode == WarmPlaybackMode.OFF) return@LaunchedEffect</ID>
+    <ID>MaxLineLength:AppRoot.kt:is PlayerRouteTarget.Live -&gt; backStack.pushTransient(LivePlayerKey(target.channelId.value, target.channelName))</ID>
+    <ID>MaxLineLength:AppRoot.kt:launchState = if (guideRequest != null &amp;&amp; backStack.isNotEmpty()) ApplianceLaunchState.Idle else applianceLaunchState</ID>
+    <ID>MaxLineLength:AppRoot.kt:livePause.availability == at.bernhardberger.tvhplayer.playback.LivePauseAvailability.STARTING</ID>
+    <ID>MaxLineLength:AppRoot.kt:livePauseAvailable</ID>
+    <ID>MaxLineLength:AppRoot.kt:onRecordings = { mode, entryId -&gt; recordingsScreenState.open(mode, entryId); navigateTopLevel(RecordingsKey) }</ID>
+    <ID>MaxLineLength:AppRoot.kt:playbackRuntime.setSessionPlayWhenReady(playWhenReady) { playbackRuntime.activeTarget.value == target }</ID>
+    <ID>MaxLineLength:AppRoot.kt:playerShown = { !shouldShowMainNavigationRail(backStack.lastOrNull(), navigationStartDestination) }</ID>
+    <ID>MaxLineLength:AppRoot.kt:startPlayback = { playbackRuntime.playRecording(selection, RecordingPlaybackStart.START_OVER) }</ID>
+    <ID>MaxLineLength:AppRoot.kt:stopWhileBrowsing = shouldStopPlaybackWhileBrowsing(isPlayerRoute = false, mode = warmPlaybackMode)</ID>
+    <ID>MaxLineLength:AppRoot.kt:uiSettingsStore.initializeWhatsNew(BuildConfig.VERSION_CODE, packageInfo.firstInstallTime, packageInfo.lastUpdateTime)</ID>
+    <ID>MaxLineLength:AppRoot.kt:val</ID>
+    <ID>MaxLineLength:AppRoot.kt:val landingCatalogAvailable = currentChannelReadiness.channelsAvailable() || currentChannelReadiness is CurrentChannelReadiness.Ready</ID>
+    <ID>MaxLineLength:AppRoot.kt:val launchRequest = (applianceLaunchState as? ApplianceLaunchState.Pending)?.request ?: enteringLaunchTarget?.request</ID>
+    <ID>MaxLineLength:AppRoot.kt:val playerTransition = shellBackStack.lastOrNull().let { it is LivePlayerKey || it is RecordingPlayerKey }</ID>
+    <ID>MaxLineLength:AppRootDestinationContent.kt:onRecordings: (at.bernhardberger.tvhplayer.core.DvrLibraryMode, at.bernhardberger.tvheadend.sdk.core.DvrEntryId?) -&gt; Unit</ID>
+    <ID>MaxLineLength:AppTabRow.kt:AppTabScope$modifier</ID>
+    <ID>MaxLineLength:AppTabRow.kt:if (event.type == KeyEventType.KeyDown &amp;&amp; event.nativeKeyEvent.repeatCount == 0) onMoveToContent() else true</ID>
+    <ID>MaxLineLength:ApplianceLaunchRequests.kt:ApplianceLaunchRequests$if (previous != ApplianceLaunchState.Idle &amp;&amp; destination != ApplianceEntryDestination.GUIDE &amp;&amp; !pendingGuide) return</ID>
+    <ID>MaxLineLength:ArtworkContext.kt:val context = remember(session, latest) { ArtworkContext(session, derivedStateOf { latest.value.currentSession }, latest) }</ID>
+    <ID>MaxLineLength:BackdropTransformation.kt:pixels[i] = (a shl 24) or (channel(p shr 16 and 0xff) shl 16) or (channel(p shr 8 and 0xff) shl 8) or channel(p and 0xff)</ID>
+    <ID>MaxLineLength:BrowseContentLayering.kt:BrowseDepartureElement$private data</ID>
+    <ID>MaxLineLength:BrowseContentLayering.kt:BrowseDepartureNode$internal</ID>
+    <ID>MaxLineLength:BrowseContentLayering.kt:BrowseScrimFrame$internal</ID>
+    <ID>MaxLineLength:BrowseContextMenu.kt:color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)</ID>
+    <ID>MaxLineLength:BrowseContextMenu.kt:color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)</ID>
+    <ID>MaxLineLength:BrowsePanels.kt:val activation = event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter</ID>
+    <ID>MaxLineLength:CentredDialog.kt:Text</ID>
+    <ID>MaxLineLength:CentredDialog.kt:color = MaterialTheme.colorScheme.onSurface</ID>
+    <ID>MaxLineLength:CentredDialog.kt:if</ID>
+    <ID>MaxLineLength:CentredDialog.kt:val activation = event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter</ID>
+    <ID>MaxLineLength:CentredDialog.kt:visibility: MutableTransitionState&lt;Boolean&gt; = remember { MutableTransitionState(false).apply { targetState = true } }</ID>
+    <ID>MaxLineLength:ChannelAccent.kt:if</ID>
+    <ID>MaxLineLength:ChannelAccents.kt:ChannelAccents$.</ID>
+    <ID>MaxLineLength:ChannelAccents.kt:return@withContext if (failure == null || failure == TvheadendFailure.FILE_UNAVAILABLE) NEUTRAL_ACCENT_RGB else null</ID>
+    <ID>MaxLineLength:ChannelContextMenu.kt:BrowseContextAction.WATCH</ID>
+    <ID>MaxLineLength:ChannelDrawer.kt:.</ID>
+    <ID>MaxLineLength:ChannelDrawer.kt:Text(stringResource(R.string.empty_channel_tag), Modifier.padding(horizontal = 58.dp), color = MaterialTheme.colorScheme.onSurface)</ID>
+    <ID>MaxLineLength:ChannelDrawer.kt:if</ID>
+    <ID>MaxLineLength:ChannelDrawer.kt:modifier = Modifier.padding(start = 58.dp, end = 58.dp, top = 16.dp).focusRequester(emptyFocus).testTag("player-shelf-close")</ID>
+    <ID>MaxLineLength:ChannelDrawer.kt:playbackIndicator</ID>
+    <ID>MaxLineLength:ChannelDrawer.kt:playbackIndicator: ChannelPlaybackIndicator = if (playingChannelId != null) ChannelPlaybackIndicator.PLAYING else ChannelPlaybackIndicator.NONE</ID>
+    <ID>MaxLineLength:ChannelNowIndicators.kt:playbackIndicator: ChannelPlaybackIndicator = if (playingNow) ChannelPlaybackIndicator.PLAYING else ChannelPlaybackIndicator.NONE</ID>
+    <ID>MaxLineLength:ChannelNumberOverlay.kt:ChannelNumberName(entry.target, Modifier.weight(1f, fill = false).padding(start = with(density) { spaceWidth.toDp() }))</ID>
+    <ID>MaxLineLength:ChannelNumberOverlay.kt:DigitArrivals$private fun progress</ID>
+    <ID>MaxLineLength:ChannelNumberOverlay.kt:color</ID>
+    <ID>MaxLineLength:ChannelNumberOverlay.kt:drawRoundRect</ID>
+    <ID>MaxLineLength:ChannelNumberOverlay.kt:drawRoundRect(TvSurfaceColors.containerHighest, cornerRadius = CornerRadius(ChipTileCorner.toPx()), alpha = tile)</ID>
+    <ID>MaxLineLength:ChannelNumberOverlay.kt:else</ID>
+    <ID>MaxLineLength:ChannelNumberOverlay.kt:it.nativeCanvas.drawRoundRect(insetX, insetY, right - insetX, size.height - insetY, corner, corner, shadow)</ID>
+    <ID>MaxLineLength:ChannelNumberOverlay.kt:text = (destination as? ChannelNumberTarget.Channel)?.name ?: stringResource(R.string.player_channel_number_none)</ID>
+    <ID>MaxLineLength:ChannelNumberOverlay.kt:transitionSpec = { if (targetState) snap() else tween(PlayerMotion.DestinationExitMs, easing = PlayerMotion.Standard) }</ID>
+    <ID>MaxLineLength:ChannelPlaybackIndicator.kt:painterResource(if (indicator == ChannelPlaybackIndicator.PAUSED) R.drawable.ic_pause else R.drawable.ic_play_arrow)</ID>
+    <ID>MaxLineLength:ChannelRow.kt:color = progressColor(watchingIndicator(programme, nowSec).isPlayingItem, recordingNow, focused)</ID>
+    <ID>MaxLineLength:ChannelRow.kt:playbackIndicator: ChannelPlaybackIndicator = if (playingNow) ChannelPlaybackIndicator.PLAYING else ChannelPlaybackIndicator.NONE</ID>
+    <ID>MaxLineLength:ChannelSchedule.kt:.</ID>
+    <ID>MaxLineLength:ChannelSchedule.kt:Button</ID>
+    <ID>MaxLineLength:ChannelSchedule.kt:Button(onClick = onRetry, modifier = Modifier.onFocusChanged { if (it.isFocused) rowOwnsFocus = false }) { Text(stringResource(R.string.retry)) }</ID>
+    <ID>MaxLineLength:ChannelSchedule.kt:Column</ID>
+    <ID>MaxLineLength:ChannelSchedule.kt:Row</ID>
+    <ID>MaxLineLength:ChannelSchedule.kt:ScheduleNote(formatHm(gap.start), stringResource(R.string.channel_schedule_gap, formatHm(gap.stop)), timeWidth)</ID>
+    <ID>MaxLineLength:ChannelSchedule.kt:if</ID>
+    <ID>MaxLineLength:ChannelSchedule.kt:if (failed) stringResource(if (recording == DvrEntryState.MISSED) R.string.recording_notice_missed else R.string.details_status_failed) else null</ID>
+    <ID>MaxLineLength:ChannelSchedule.kt:if (image != null) ProgrammeArtwork(image, null, null, Modifier.size(ScheduleArtworkSize.width, ScheduleArtworkSize.height))</ID>
+    <ID>MaxLineLength:ChannelSchedule.kt:private</ID>
+    <ID>MaxLineLength:ChannelSchedule.kt:private val ScheduleFailedStates = setOf(DvrEntryState.COMPLETED_ERROR, DvrEntryState.FILE_MISSING, DvrEntryState.MISSED)</ID>
+    <ID>MaxLineLength:ChannelSchedule.kt:repeat(3) { SkeletonLine(Modifier.width(56.dp), style = MaterialTheme.typography.titleMedium, widthFraction = 1f) }</ID>
+    <ID>MaxLineLength:ChannelSchedule.kt:tabEdgeFade</ID>
+    <ID>MaxLineLength:ChannelSchedule.kt:tabEdgeFade.availableFadeWidthPx(selectedIndex, focusedTabIndex, layoutDirection, Float.MAX_VALUE) &gt; 0f</ID>
+    <ID>MaxLineLength:ChannelSchedule.kt:trackColor</ID>
+    <ID>MaxLineLength:ChannelSchedule.kt:val</ID>
+    <ID>MaxLineLength:ChannelSchedule.kt:val gaps = previous?.let { scheduleGaps(it.stop.epochSeconds, event.start.epochSeconds, zone) }.orEmpty()</ID>
+    <ID>MaxLineLength:ChannelSchedule.kt:val headlineColor = LocalContentColor.current.let { if (ended) it.copy(alpha = TvTextSecondaryAlpha) else it }</ID>
+    <ID>MaxLineLength:ChannelSchedule.kt:val placeable = measurable.measure(constraints.copy(minWidth = minOf(constraints.minWidth, width), maxWidth = width))</ID>
+    <ID>MaxLineLength:ChannelsGrid.kt:else -&gt; ChannelNavigation.pageDirectionForKeyCode(event.nativeKeyEvent.keyCode)?.let(onPage) ?: false</ID>
+    <ID>MaxLineLength:ChannelsImmersiveList.kt:Box</ID>
+    <ID>MaxLineLength:ChannelsImmersiveList.kt:ChannelBackdrop$private data</ID>
+    <ID>MaxLineLength:ChannelsImmersiveList.kt:ChannelLogoGlow(shown.icon, channel, Modifier.testTag("channels-logo-glow"), onSettled = { glowSettled = true })</ID>
+    <ID>MaxLineLength:ChannelsImmersiveList.kt:ProgrammeHeadlineGroupGap</ID>
+    <ID>MaxLineLength:ChannelsImmersiveList.kt:Row</ID>
+    <ID>MaxLineLength:ChannelsImmersiveList.kt:else -&gt; ChannelNavigation.pageDirectionForKeyCode(event.nativeKeyEvent.keyCode)?.let(cards.onPage) ?: false</ID>
+    <ID>MaxLineLength:ChannelsImmersiveList.kt:footer = next?.takeIf { showNext }?.let { { footerModifier -&gt; NextProgramme(it, nextScheduled, footerModifier) } }</ID>
+    <ID>MaxLineLength:ChannelsImmersiveList.kt:ground = channelAccentGround(channel.icon, channel.id, depth = (pictureHeight - textHeight) / 2 / pictureHeight)</ID>
+    <ID>MaxLineLength:ChannelsImmersiveList.kt:if</ID>
+    <ID>MaxLineLength:ChannelsImmersiveList.kt:programmeHeaderMetadata(programmeAboutFacts(it, null, resources, locale), resources, it.episode, it.firstAired, locale, it.contentGenre)</ID>
+    <ID>MaxLineLength:ChannelsImmersiveList.kt:style = at.bernhardberger.tvhplayer.ui.components.channelCaptionStyle()</ID>
+    <ID>MaxLineLength:ChannelsImmersiveList.kt:typography.labelMedium.lineHeight.toDp() + ProgrammeHeadlineTitleGap + typography.headlineLarge.lineHeight.toDp() * 2</ID>
+    <ID>MaxLineLength:ChannelsScreen.kt:.</ID>
+    <ID>MaxLineLength:ChannelsScreen.kt:// The passive details hold no target, so the end edge leads to the header buttons.</ID>
+    <ID>MaxLineLength:ChannelsScreen.kt:Modifier.padding(top = ProgrammePanePictureGap).weight(1f).widthIn(max = ProgrammePaneWidth)</ID>
+    <ID>MaxLineLength:ChannelsScreen.kt:playbackIndicator: ChannelPlaybackIndicator = if (playingChannelId != null) ChannelPlaybackIndicator.PLAYING else ChannelPlaybackIndicator.NONE</ID>
+    <ID>MaxLineLength:ChannelsScreen.kt:val awayFromNavigation = if (layoutDirection == LayoutDirection.Ltr) FocusDirection.Right else FocusDirection.Left</ID>
+    <ID>MaxLineLength:ChannelsScreen.kt:val entryId = restoredChannelId(orderedChannelIds, rememberedChannelIds[channelScope.activeTagId], playingChannelId)</ID>
+    <ID>MaxLineLength:ChannelsScreen.kt:val playbackIndicator = if (playbackChannelId != null) LocalWatchingIndicator.current else ChannelPlaybackIndicator.NONE</ID>
+    <ID>MaxLineLength:ChannelsView.kt:ChannelsView$/** The card layouts whose art switch is on: immersive cards show programme pictures by default, grid cards logos. */</ID>
+    <ID>MaxLineLength:ChannelsView.kt:programArt = ChannelsLayout.entries.filterTo(mutableSetOf()) { it.hasArtSwitch &amp;&amp; programArt(it) ?: (it in DefaultProgramArt) }</ID>
+    <ID>MaxLineLength:ChannelsViewModel.kt:ChannelsViewModel$mutableScope.value = ChannelScopeState(resolved, current, visibility = effective.visibility, observation = source)</ID>
+    <ID>MaxLineLength:ChannelsViewModel.kt:ChannelsViewModel$setScopeVisible(tagId, if (tagId == null) !visibility.isAllChannelsVisible() else !visibility.isTagVisible(tagId))</ID>
+    <ID>MaxLineLength:ColdStart.kt:coldStartPresentation(connectionState, currentChannelReadiness, failures.shown(connectionState), landingContentDrawn)</ID>
+    <ID>MaxLineLength:CompactZapCard.kt:ChannelProgrammeSubtitle(programme, currentEvent.start.epochSeconds, subtitleModifier.testTag("$tag-now"))</ID>
+    <ID>MaxLineLength:CompactZapCard.kt:MaterialTheme.typography.titleMedium.lineHeight.toDp() + MaterialTheme.typography.bodySmall.lineHeight.toDp() + CompactZapStripRoom</ID>
+    <ID>MaxLineLength:CompactZapCard.kt:Row</ID>
+    <ID>MaxLineLength:CompactZapCard.kt:if (recording) RecordingBadge(DvrEntryState.RECORDING, Modifier.align(Alignment.TopEnd).padding(CompactZapEmbedInset))</ID>
+    <ID>MaxLineLength:CompactZapCard.kt:internal</ID>
+    <ID>MaxLineLength:CompactZapCard.kt:modifier = Modifier.weight(1f).testTag("$tag-${if (programme != null &amp;&amp; !channelLed) "now" else "identity"}")</ID>
+    <ID>MaxLineLength:CompactZapCard.kt:val haloTransformation = remember(haloPx) { if (haloPx &gt; 0) LogoHaloTransformation(haloPx, CompactZapLogoHaloAlpha) else null }</ID>
+    <ID>MaxLineLength:CompactZapCard.kt:val subtitleModifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = CompactZapStripRoom - 2.dp)</ID>
+    <ID>MaxLineLength:ConnectionSetupState.kt:ConnectionSetupState$SetupStep.ADDRESS -&gt; focusAddress(if (step == SetupStep.FIND_SERVER) AddressFocus.SEARCH else AddressFocus.CONTINUE)</ID>
+    <ID>MaxLineLength:ConnectionSetupSteps.kt:Text(stringResource(if (state.mode == SetupMode.EDIT) R.string.onboarding_save_connection else R.string.onboarding_start_watching))</ID>
+    <ID>MaxLineLength:ConnectionSetupSteps.kt:meta = stringResource(R.string.onboarding_change_address_detail, state.form.host.trim(), state.form.port.trim())</ID>
+    <ID>MaxLineLength:ConnectionSetupSteps.kt:modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(top = TvSpacing80, bottom = 64.dp)</ID>
+    <ID>MaxLineLength:ConnectionSetupSteps.kt:title = stringResource(if (state.searching) R.string.onboarding_find_searching else R.string.onboarding_search_again)</ID>
+    <ID>MaxLineLength:ConnectionSetupSteps.kt:val body = if (state.mode == SetupMode.EDIT) stringResource(R.string.onboarding_edit_failure_body, reason) else reason</ID>
+    <ID>MaxLineLength:ConnectionSetupSteps.kt:{ CircularProgressIndicator(Modifier.size(24.dp), color = LocalContentColor.current, strokeWidth = 3.dp) }</ID>
+    <ID>MaxLineLength:DepthNavigation.kt:.</ID>
+    <ID>MaxLineLength:DepthNavigation.kt:&lt;no name provided&gt;$if (!latestActive.value || latestScrollHeld.value.value) 0f else bringIntoViewSpec.calculateScrollDistance(offset, size, containerSize)</ID>
+    <ID>MaxLineLength:DepthNavigation.kt:focusedItemId = if (column.path == state.stack.path) reconciled.active.focusedItemId else column.frame.focusedItemId</ID>
+    <ID>MaxLineLength:DepthNavigation.kt:identities = if (column.path == state.stack.path) identities else column.level.rows.map { it.item }</ID>
+    <ID>MaxLineLength:DepthNavigation.kt:if</ID>
+    <ID>MaxLineLength:DepthNavigation.kt:state.update(state.stack.viewport(items.getOrNull(index)?.id, index, offset))</ID>
+    <ID>MaxLineLength:DepthNavigation.kt:val</ID>
+    <ID>MaxLineLength:DepthNavigation.kt:val column = DepthStripColumn(path, previewLevel, openingFrame(state.stack, childId))</ID>
+    <ID>MaxLineLength:DepthNavigation.kt:viewportIndex = if (column.path == state.stack.path) reconciled.active.firstVisibleIndex else column.frame.firstVisibleIndex</ID>
+    <ID>MaxLineLength:DepthNavigation.kt:viewportOffset = if (column.path == state.stack.path) reconciled.active.scrollOffset else column.frame.scrollOffset</ID>
+    <ID>MaxLineLength:DepthStack.kt:DepthPreviewKey</ID>
+    <ID>MaxLineLength:DepthStack.kt:DepthStack$active.copy(firstVisibleItemId = itemId, firstVisibleIndex = index.coerceAtLeast(0), scrollOffset = offset.coerceAtLeast(0))</ID>
+    <ID>MaxLineLength:DetailsTint.kt:/** Preserve the seed's hue, with HSL saturation capped at 35% and lightness fixed at 7.5%, the theme background's lightness. */</ID>
+    <ID>MaxLineLength:DvrMutationActions.kt:internal</ID>
+    <ID>MaxLineLength:DvrMutationActions.kt:val canModify = (current.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED</ID>
+    <ID>MaxLineLength:EmbeddedProgressCardBorder.kt:scaling = launch { ring.scale.animateTo(target, tween(cardFocusScaleMillis(interaction), easing = ScaleEasing)) }</ID>
+    <ID>MaxLineLength:Epg.kt:episode.episodeNumber?.let { add(resources.getString(if (spoken) R.string.episode_number_spoken else R.string.episode_number_compact, it)) }</ID>
+    <ID>MaxLineLength:Epg.kt:episode.seasonNumber?.let { add(resources.getString(if (spoken) R.string.episode_season_spoken else R.string.episode_season_compact, it)) }</ID>
+    <ID>MaxLineLength:Epg.kt:formatShortDate(java.time.Instant.ofEpochSecond(firstAired.epochSeconds).atZone(java.time.ZoneId.systemDefault()), locale)</ID>
+    <ID>MaxLineLength:EpgGridContent.kt:(guideTimelineRowHeight(rows) - guideCellTextHeight(rows)) / 2 + MaterialTheme.typography.titleSmall.lineHeight.toDp()</ID>
+    <ID>MaxLineLength:EpgGridContent.kt:(if (layoutDirection == LayoutDirection.Rtl) trackWidth - start - width else start).roundToPx()</ID>
+    <ID>MaxLineLength:EpgGridContent.kt:.</ID>
+    <ID>MaxLineLength:EpgGridContent.kt:DvrEntryState.RECORDING_ERROR, DvrEntryState.COMPLETED_ERROR, DvrEntryState.FILE_MISSING -&gt; R.string.recording_state_failed</ID>
+    <ID>MaxLineLength:EpgGridContent.kt:SkeletonLine(style = MaterialTheme.typography.labelSmall, widthFraction = GuideSkeletonTimeFraction)</ID>
+    <ID>MaxLineLength:EpgGridContent.kt:if</ID>
+    <ID>MaxLineLength:EpgGridContent.kt:if (time.width &gt; constraints.maxWidth) layout(0, 0) {} else layout(time.width, time.height) { time.placeRelative(0, 0) }</ID>
+    <ID>MaxLineLength:EpgGridContent.kt:modifier = Modifier.markAtFullSizeOrNone().size(StatusIconSize).testTag("guide-cell-failed-mark")</ID>
+    <ID>MaxLineLength:EpgGridContent.kt:val lines = ticks.indices.map { measurables[2 * it].measure(Constraints.fixed(1.dp.roundToPx(), height)) }</ID>
+    <ID>MaxLineLength:EpgGridContent.kt:val nowX = guideTimePositionPx(nowSec, windowStartSec, windowEndSec, constraints.maxWidth.toFloat()).roundToInt()</ID>
+    <ID>MaxLineLength:EpgGridContent.kt:val stem = measurables[0].measure(Constraints.fixed(2.dp.roundToPx(), (height - stemTop).coerceAtLeast(0)))</ID>
+    <ID>MaxLineLength:EpgGridModals.kt:title = stringResource(if (action == ProgrammeAction.STOP_RECORDING) R.string.stop_recording_confirm_title else R.string.cancel_recording_confirm_title)</ID>
+    <ID>MaxLineLength:EpgGridModals.kt:val</ID>
+    <ID>MaxLineLength:EpgGridScreen.kt:/** Now in the day and time panel and Back-to-now: the window opens just before now, on the programme on air there. */</ID>
+    <ID>MaxLineLength:EpgGridScreen.kt:/** The Guide's 1xx alert, shown only while it has no channels to draw: the connection's failure, or 108 when Ready has none. */</ID>
+    <ID>MaxLineLength:EpgGridScreen.kt:// Focus that arrives on another cell, or after the selection was cleared, starts a new anchor.</ID>
+    <ID>MaxLineLength:EpgGridScreen.kt:coverageWindowBounds.copy(latestStartSec = coverageWindowBounds.latestStartSec + GUIDE_VISIBLE_WINDOW_SEC - visibleWindowSec)</ID>
+    <ID>MaxLineLength:EpgGridScreen.kt:currentObservation.currentSession != null &amp;&amp; sourceObservation?.currentSession === currentObservation.currentSession</ID>
+    <ID>MaxLineLength:EpgGridScreen.kt:focusRows.getOrNull(target.channelIndex)?.events?.firstOrNull { it.id == target.eventId }</ID>
+    <ID>MaxLineLength:EpgGridScreen.kt:focusRows[channelIndex].events.none { nowSecProvider() in it.start.epochSeconds until it.stop.epochSeconds }</ID>
+    <ID>MaxLineLength:EpgGridScreen.kt:fun</ID>
+    <ID>MaxLineLength:EpgGridScreen.kt:if</ID>
+    <ID>MaxLineLength:EpgGridScreen.kt:internal</ID>
+    <ID>MaxLineLength:EpgGridScreen.kt:modifier = Modifier.padding(start = startPadding + TvBrowseLeadingInset, top = headlineDrop())</ID>
+    <ID>MaxLineLength:EpgGridScreen.kt:targetSec = if (current == null &amp;&amp; nowSec in windowStartSec until windowEndSec) nowSec else windowStartSec</ID>
+    <ID>MaxLineLength:EpgGridScreen.kt:timelineContentPadding = guideTimelineContentPadding(contentPadding, layoutDirection, terminalReserve)</ID>
+    <ID>MaxLineLength:EpgGridScreen.kt:val</ID>
+    <ID>MaxLineLength:EpgGridScreen.kt:val (focusStartInset, focusEndInset) = guideFocusInsets(earlierContent, laterContent, layoutDirection == LayoutDirection.Rtl)</ID>
+    <ID>MaxLineLength:EpgGridScreen.kt:val browseAlpha = { 1f - (detailsLayering?.detailsAlpha() ?: if (detailsEvent != null &amp;&amp; !showContextMenu) 1f else 0f) }</ID>
+    <ID>MaxLineLength:EpgGridScreen.kt:val displayEvents = remember(observation.epgSnapshotForDisplay) { guideDisplayEvents(observation.epgSnapshotForDisplay) }</ID>
+    <ID>MaxLineLength:EpgGridScreen.kt:val event = target?.let { focusRows.getOrNull(it.channelIndex)?.events?.firstOrNull { e -&gt; e.id == it.eventId } }</ID>
+    <ID>MaxLineLength:EpgGridScreen.kt:val matching = channels.flatMap { channel -&gt; events.filter { it.channelId == channel.id &amp;&amp; programmeCategory(it) == genre } }</ID>
+    <ID>MaxLineLength:EpgGridScreen.kt:val restoredPosition = remember { guidePositionStore.position.value.takeIf { playerReturn != null || browseReturn } }</ID>
+    <ID>MaxLineLength:EpgGridScreen.kt:val terminalReserve = guideTerminalViewportReserve(earlierContent, laterContent, layoutDirection == LayoutDirection.Rtl)</ID>
+    <ID>MaxLineLength:EpgGridScreen.kt:windowBounds.constrain(maxOf(targetWindowStartSec, minOf(across.start.epochSeconds, nowSecProvider())))</ID>
+    <ID>MaxLineLength:GuideHeadline.kt:/** A fallback logo's height beside the headline: it starts 24dp below the header and ends 8dp above the headline's bottom. */</ID>
+    <ID>MaxLineLength:GuideHeadline.kt:DvrEntryState.COMPLETED</ID>
+    <ID>MaxLineLength:GuideHeadline.kt:DvrEntryState.MISSED</ID>
+    <ID>MaxLineLength:GuideHeadline.kt:ProgrammeHeadlineGroupGap</ID>
+    <ID>MaxLineLength:GuideHeadline.kt:pictureHeight = logoTop + headlineDrop + guideHeadlineHeight() + GuideHeadlineRulerGap + GuideHeadlinePictureReach</ID>
+    <ID>MaxLineLength:GuideHeadline.kt:programmeHeaderMetadata(programmeAboutFacts(it, null, resources, locale), resources, it.episode, it.firstAired, locale, it.contentGenre)</ID>
+    <ID>MaxLineLength:GuideTimePanel.kt:Box</ID>
+    <ID>MaxLineLength:GuideTimePanel.kt:BrowsePanelList(dayEntries, radio = false, focusKey = "guide-time-day-${ChronoUnit.DAYS.between(today, windowDay)}")</ID>
+    <ID>MaxLineLength:GuideTimePanel.kt:onJump(floorGuideWindowToHour(moveGuideWindowByDays(shownSec, delta, panelBounds, zoneId), zoneId))</ID>
+    <ID>MaxLineLength:GuideTimePanel.kt:val starts = GuideTimePeriod.entries.map { ZonedDateTime.ofLocal(day.atTime(it.hour, 0), zoneId, null).toEpochSecond() }</ID>
+    <ID>MaxLineLength:GuideTimelineBody.kt:ProvideArtworkSession</ID>
+    <ID>MaxLineLength:GuideTimelineBody.kt:guideInnerContinuation(frame.earlierContent, frame.laterContent, layoutDirection == LayoutDirection.Rtl)</ID>
+    <ID>MaxLineLength:GuideViewport.kt:if (trackWidthPx &lt;= 0f) 1L else ceil(overlapPx * (windowDurationSec.toDouble() / trackWidthPx)).toLong().coerceAtLeast(1L)</ID>
+    <ID>MaxLineLength:HomeActivityCard.kt:color</ID>
+    <ID>MaxLineLength:HomeActivityCard.kt:playerMinutesLeft(((viewer.durationMs - viewer.positionMs).coerceAtLeast(0L) + 59_999L).div(60_000L).toInt())</ID>
+    <ID>MaxLineLength:HomeActivityCard.kt:val start = if (recordingOnly) entry?.start?.epochSeconds else event?.start?.epochSeconds ?: entry?.start?.epochSeconds</ID>
+    <ID>MaxLineLength:HomeContent.kt:Spacer</ID>
+    <ID>MaxLineLength:HomeContent.kt:bottomSpace</ID>
+    <ID>MaxLineLength:HomeContent.kt:event.type == KeyEventType.KeyDown &amp;&amp; event.key == (if (ltr) Key.DirectionRight else Key.DirectionLeft)</ID>
+    <ID>MaxLineLength:HomeContent.kt:if</ID>
+    <ID>MaxLineLength:HomeContent.kt:if (section is HomeSection.ContinueWatching || section is HomeSection.RecentlyRecorded || section is HomeSection.RecentChannels) 1 else 0</ID>
+    <ID>MaxLineLength:HomeContent.kt:leading = { androidx.tv.material3.Icon(painterResource(R.drawable.ic_event), null, Modifier.size(36.dp), tint = TvTextColors.secondary) }</ID>
+    <ID>MaxLineLength:HomeContent.kt:maxHeight = (HomeImmersiveSlot - HomeHeroGap - 20.dp - HomeOnNowHeadingContentGap - 28.dp - 24.dp).roundToPx()</ID>
+    <ID>MaxLineLength:HomeContent.kt:next?.let { runCatching { requesters[it]?.requestFocus() ?: false }.getOrDefault(false) } ?: false</ID>
+    <ID>MaxLineLength:HomeContent.kt:onLongClick = if (playing !is HomePlaying.LiveChannel) ({ onContextMenu(index, activityKey(item)) }) else null</ID>
+    <ID>MaxLineLength:HomeContent.kt:runCatching { (key?.let { requesters[it.section] } ?: emptyFocus ?: viewRequester).requestFocus() }</ID>
+    <ID>MaxLineLength:HomeContent.kt:val</ID>
+    <ID>MaxLineLength:HomeContent.kt:val emphasisState = animateFloatAsState(if (focused) 1f else 0f, RowChangeMotion, label = "home-row-emphasis")</ID>
+    <ID>MaxLineLength:HomeContent.kt:val key = (focusedCard ?: initialKey)?.takeIf { target -&gt; renderedSections.any { it.kind == target.section } }</ID>
+    <ID>MaxLineLength:HomeContent.kt:val next = if (focusedSection == null) firstSection else renderedSections.getOrNull(index + 1)?.kind</ID>
+    <ID>MaxLineLength:HomeContent.kt:val revealed = if (motion.revealFromBottom) (block.height * motion.block.value).toInt() else block.height</ID>
+    <ID>MaxLineLength:HomeContent.kt:val target = if (restoreHeader) (if (restoreTags) tagsRequester else viewRequester) else initialKey?.let { requesters[it.section] } ?: emptyFocus ?: viewRequester</ID>
+    <ID>MaxLineLength:HomeGenreCard.kt:.</ID>
+    <ID>MaxLineLength:HomeRecordingActions.kt:(current.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED</ID>
+    <ID>MaxLineLength:HomeRecordingActions.kt:BrowseContextAction.CANCEL -&gt; capability?.let { pendingMutation = DvrMutationAction.Cancel(it, opened.id) }</ID>
+    <ID>MaxLineLength:HomeRecordingActions.kt:BrowseContextAction.CONTINUE_WATCHING -&gt; onReturnToRecording(opened.id) { closeBehindPlayer(onClose) }</ID>
+    <ID>MaxLineLength:HomeRecordingActions.kt:BrowseContextAction.DELETE -&gt; capability?.let { pendingMutation = DvrMutationAction.Delete(it, opened.id) }</ID>
+    <ID>MaxLineLength:HomeRecordingActions.kt:BrowseContextAction.STOP -&gt; capability?.let { pendingMutation = DvrMutationAction.Stop(it, opened.id) }</ID>
+    <ID>MaxLineLength:HomeRecordingActions.kt:LocalWatchingTarget.current</ID>
+    <ID>MaxLineLength:HomeRecordingActions.kt:Notice.DvrActionFailed(DvrMutationKind.UPDATE, result.toDvrMutationFeedback())</ID>
+    <ID>MaxLineLength:HomeRecordingActions.kt:else -&gt; { menu = false; details = true; initialAction = action.takeUnless { it == BrowseContextAction.DETAILS } }</ID>
+    <ID>MaxLineLength:HomeRecordingActions.kt:episode = programmeEpisodeLine(opened.episode, opened.subtitle, androidx.compose.ui.platform.LocalContext.current.resources)</ID>
+    <ID>MaxLineLength:HomeRecordingActions.kt:if</ID>
+    <ID>MaxLineLength:HomeRecordingActions.kt:when</ID>
+    <ID>MaxLineLength:HomeScreen.kt:?:</ID>
+    <ID>MaxLineLength:HomeScreen.kt:HomeScreenContent</ID>
+    <ID>MaxLineLength:HomeScreen.kt:hasChannelsOutsideScope: Boolean = observation.channelState.channelCatalogForDisplay?.channels?.isNotEmpty() == true</ID>
+    <ID>MaxLineLength:HomeScreen.kt:if (action == RecordingOpenAction.RESUME) RecordingPlaybackStart.RESUME else RecordingPlaybackStart.START_OVER</ID>
+    <ID>MaxLineLength:HomeScreen.kt:loadedSettings.whatsNewSeenVersion</ID>
+    <ID>MaxLineLength:HomeScreen.kt:modifier = modifier.onGloballyPositioned { laidOut = true }</ID>
+    <ID>MaxLineLength:HomeScreen.kt:onGenre = { if (current()) onGenre(it) }</ID>
+    <ID>MaxLineLength:HomeScreen.kt:onSectionVisibleChange = { section, visible -&gt; if (owner.isCurrent) saveScope.launch { settingsStore.setHomeSectionVisible(section, visible) } }</ID>
+    <ID>MaxLineLength:HomeScreen.kt:onWhatsNewOpened = { saveScope.launch { settingsStore.markWhatsNewSeen(at.bernhardberger.tvhplayer.BuildConfig.VERSION_CODE) } }</ID>
+    <ID>MaxLineLength:HomeScreen.kt:val openOptions = { if (owner?.isCurrent != false) { restoreTagHeader = false; restoreHeader = true; options = true } }</ID>
+    <ID>MaxLineLength:JourneyProfileActivity.kt:JourneyProfileActivity$AppDestination.HOME</ID>
+    <ID>MaxLineLength:JourneyProfileActivity.kt:JourneyProfileActivity$BrowsingScopeContent</ID>
+    <ID>MaxLineLength:JourneyProfileActivity.kt:JourneyProfileActivity$at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy.fromPlayerSettings(trace = ProfilePlaybackTrace)</ID>
+    <ID>MaxLineLength:JourneyProfileActivity.kt:JourneyProfileActivity$contentPadding = padding</ID>
+    <ID>MaxLineLength:JourneyProfileActivity.kt:JourneyProfileActivity$entry</ID>
+    <ID>MaxLineLength:JourneyProfileActivity.kt:JourneyProfileActivity$val audioOutput = at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider(this@JourneyProfileActivity)</ID>
+    <ID>MaxLineLength:LivePlayerLayerState.kt:LivePlayerLayerState$foregroundLayer: PlayerForegroundLayer = at.bernhardberger.tvhplayer.core.playerForegroundLayer(foregroundContext())</ID>
+    <ID>MaxLineLength:LivePlayerServerWait.kt:LivePlayerServerWaitState$AndroidKeyEvent.ACTION_DOWN -&gt; if (native.repeatCount == 0) layerState.core.beginOpeningKeyCycle(native.keyCode)</ID>
+    <ID>MaxLineLength:LivePlayerServerWait.kt:val state = remember(close) { LivePlayerServerWaitState(hasSession, latest, connection, close, reconnect, connectionSettings) }</ID>
+    <ID>MaxLineLength:LogoInkTransformation.kt:LogoInkTransformation$override val cacheKey: String = "logoInk(${Integer.toHexString(ground)},${width}x$height${if (trim) ",trim" else ""})"</ID>
+    <ID>MaxLineLength:LogoInkTransformation.kt:LogoInkTransformation$val logo = if (inked == null) source else Bitmap.createBitmap(inked, source.width, source.height, Bitmap.Config.ARGB_8888)</ID>
+    <ID>MaxLineLength:MainActivity.kt:ActivityMediaSessionLifecycle$Intent(context, MainActivity::class.java).setAction(ACTION_SESSION_ACTIVITY).setPackage(context.packageName)</ID>
+    <ID>MaxLineLength:MainActivity.kt:ActivityMediaSessionLifecycle.&lt;no name provided&gt;$com.google.common.util.concurrent.Futures.immediateFailedFuture(UnsupportedOperationException("Session artwork uses bytes only"))</ID>
+    <ID>MaxLineLength:MainActivity.kt:ActivityMediaSessionLifecycle.&lt;no name provided&gt;$override</ID>
+    <ID>MaxLineLength:MainActivity.kt:MainActivity$at.bernhardberger.tvhplayer.images.AppSessionArtworkLoader(applicationContext, tvheadendSession, imageLoader)</ID>
+    <ID>MaxLineLength:MainActivity.kt:MainActivity$at.bernhardberger.tvhplayer.ui.startup.LocalMainStartupKeyCycleOwner provides mainStartupKeyCycleOwner</ID>
+    <ID>MaxLineLength:MainActivity.kt:MainActivity$onAppBackgrounded = { playbackRuntime.onAppBackgrounded(getSystemService(PowerManager::class.java).isInteractive) }</ID>
+    <ID>MaxLineLength:MainActivity.kt:MainActivity$val</ID>
+    <ID>MaxLineLength:MainStartupPlayback.kt:MainStartupReveal$fun targetFor: ApplianceLaunchTarget?</ID>
+    <ID>MaxLineLength:MainStartupPresentation.kt:WaitingConnectionFailure$else -&gt; WaitingConnectionFailure(latched = waitingConnectionFailure(connectionState, latched.takeUnless { retrying }))</ID>
+    <ID>MaxLineLength:MainStartupPresentation.kt:if</ID>
+    <ID>MaxLineLength:NavigationEdgeFade.kt:private</ID>
+    <ID>MaxLineLength:NoticeFormatter.kt:NoticeFormatter$add(context.resources.getQuantityString(R.plurals.recording_notice_count, notice.count, notice.count))</ID>
+    <ID>MaxLineLength:NoticeFormatter.kt:NoticeFormatter$val name = entry.title?.trim()?.takeIf(String::isNotEmpty) ?: channel ?: context.getString(R.string.recording_notice_fallback)</ID>
+    <ID>MaxLineLength:PiconBox.kt:/** The width a logo of [logo]'s size is drawn in by [InlineLogoScale] in a [box]; the whole box when its size is unknown. */</ID>
+    <ID>MaxLineLength:PlaybackOptionsSheet.kt:checked != null</ID>
+    <ID>MaxLineLength:PlaybackOptionsSheet.kt:currentValue = if (subtitleState == PlaybackTrackContentState.EMPTY) subtitlesOffLabel else subtitlesValue</ID>
+    <ID>MaxLineLength:PlaybackSeekbar.kt:"${it.event?.title?.let { title -&gt; "$title. " }.orEmpty()}${clockLabels?.first} - ${clockLabels?.second}. $state"</ID>
+    <ID>MaxLineLength:PlaybackSeekbar.kt:/** The wall-clock second of the live edge, to give a live step's target its clock time; null without known timing. */</ID>
+    <ID>MaxLineLength:PlaybackSeekbar.kt:// The whole value, metadata included, holds still during a burst; the buffer's length is read when the step settles.</ID>
+    <ID>MaxLineLength:PlaybackSeekbar.kt:?:</ID>
+    <ID>MaxLineLength:PlaybackSeekbar.kt:fillColor = if (schedule != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.tertiary</ID>
+    <ID>MaxLineLength:PlaybackSeekbar.kt:leadingLabelTestTag</ID>
+    <ID>MaxLineLength:PlaybackSeekbar.kt:sampledPosition != null -&gt; liveStepReadout(stepDeltaMs ?: 0L, sampledPosition.behindLiveMs, liveLabel, targetClock)</ID>
+    <ID>MaxLineLength:PlaybackSeekbar.kt:val estimatedPrefix = stringResource(R.string.player_timing_estimated).takeIf { range.positionEstimated || range.displayEndMs &gt; range.endMs }</ID>
+    <ID>MaxLineLength:PlaybackSeekbar.kt:val schedule = schedule?.takeIf { !previewing &amp;&amp; programmeWindow == null &amp;&amp; range.domain == SeekbarDomain.TIMESHIFT }</ID>
+    <ID>MaxLineLength:PlaybackSeekbar.kt:val shownSchedule = schedule?.takeIf { !previewing &amp;&amp; programmeWindow == null &amp;&amp; range.domain == SeekbarDomain.TIMESHIFT }</ID>
+    <ID>MaxLineLength:PlaybackTimeFormat.kt:*</ID>
+    <ID>MaxLineLength:PlayerActionRow.kt:Icon(painterResource(icon), contentDescription = label, modifier = glyphModifier.size(IconButtonDefaults.MediumIconSize))</ID>
+    <ID>MaxLineLength:PlayerActionRow.kt:contentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = if (tag == "player-pause") 1f else 0.88f)</ID>
+    <ID>MaxLineLength:PlayerActionRow.kt:onSchedule?.let { PlayerAction("player-schedule", stringResource(R.string.channel_schedule), R.drawable.ic_event_list, it, scheduleFocus) }</ID>
+    <ID>MaxLineLength:PlayerActionRow.kt:val</ID>
+    <ID>MaxLineLength:PlayerBarStatus.kt:PlayerBarEnd$fun</ID>
+    <ID>MaxLineLength:PlayerBarStatus.kt:fun</ID>
+    <ID>MaxLineLength:PlayerBarStatus.kt:return</ID>
+    <ID>MaxLineLength:PlayerBarStatus.kt:return if (lengthMs != null &amp;&amp; lengthMs &gt;= 3_600_000L &amp;&amp; positionMs &lt; 3_600_000L) "0:${elapsed.padStart(5, '0')}" else elapsed</ID>
+    <ID>MaxLineLength:PlayerBarStatusView.kt:PlayerStateCell.PLAYING -&gt; Icon(painterResource(R.drawable.ic_play_arrow), null, Modifier.size(size), tint = color)</ID>
+    <ID>MaxLineLength:PlayerBarStatusView.kt:bottom = PlayerBannerBottomPadding + TimelineRowInset + (row - PlayerChromeTokens.chipHeight).coerceAtLeast(0.dp) / 2</ID>
+    <ID>MaxLineLength:PlayerBarStatusView.kt:internal</ID>
+    <ID>MaxLineLength:PlayerBarStatusView.kt:softWrap = false</ID>
+    <ID>MaxLineLength:PlayerChannelBrowser.kt:// The row above the focused one is invisible, so its title leaves the accessibility tree too.</ID>
+    <ID>MaxLineLength:PlayerChannelBrowser.kt:Text</ID>
+    <ID>MaxLineLength:PlayerChannelBrowser.kt:else</ID>
+    <ID>MaxLineLength:PlayerChannelBrowser.kt:val cardHeight = with(density) { 94.dp + typography.titleMedium.lineHeight.toDp() + typography.bodySmall.lineHeight.toDp() }</ID>
+    <ID>MaxLineLength:PlayerChannelSchedule.kt:onPlayRecording = onPlayRecording?.let { play -&gt; { selection -&gt; layers.closeSchedule(false); play(selection) } }</ID>
+    <ID>MaxLineLength:PlayerChannelSchedule.kt:val moreLoading = scheduleCoveragePending(connection, observation.epgState, channelId, throughSec, pendingRequest != null)</ID>
+    <ID>MaxLineLength:PlayerChrome.kt:Box</ID>
+    <ID>MaxLineLength:PlayerChrome.kt:Modifier.fillMaxSize().testTag("player-info-artwork")</ID>
+    <ID>MaxLineLength:PlayerChrome.kt:RecordingBannerTimeline(timeline, step = shown == PlayerChromeMode.BANNER_STEP, state = content.state)</ID>
+    <ID>MaxLineLength:PlayerChrome.kt:actions.animateTo(1f, tween(PlayerMotion.ShortMs, delayMillis = PlayerMotion.FastMs, easing = PlayerMotion.Standard))</ID>
+    <ID>MaxLineLength:PlayerChrome.kt:fillColor = if (presentation.availableStart != null) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface</ID>
+    <ID>MaxLineLength:PlayerChrome.kt:val</ID>
+    <ID>MaxLineLength:PlayerChromeBarStatus.kt:internal</ID>
+    <ID>MaxLineLength:PlayerChromeBarStatus.kt:progress = schedule?.fraction ?: range?.let { liveTimelineProgress(it, position, committedTimeshift.paused, false) }</ID>
+    <ID>MaxLineLength:PlayerChromeBarStatus.kt:val end = barEnd()?.let { it.copy(end = window?.let(::programmeWindowClockLabels)?.second ?: schedule?.endLabel ?: it.end) }</ID>
+    <ID>MaxLineLength:PlayerChromeControls.kt:.</ID>
+    <ID>MaxLineLength:PlayerChromeControls.kt:androidx.tv.material3</ID>
+    <ID>MaxLineLength:PlayerChromeControls.kt:if (markerNavigation.selectedMs !in recording.markers || !seekable || !actions.active) markerNavigation.dismiss()</ID>
+    <ID>MaxLineLength:PlayerChromeControls.kt:if (settlingHold.value) PlayerMotion.StandardDecelerate else PlayerMotion.Standard</ID>
+    <ID>MaxLineLength:PlayerChromeControls.kt:infoBar</ID>
+    <ID>MaxLineLength:PlayerChromeControls.kt:markerNavigation</ID>
+    <ID>MaxLineLength:PlayerChromeControls.kt:modifier</ID>
+    <ID>MaxLineLength:PlayerChromeControls.kt:positionSpec.value = tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard)</ID>
+    <ID>MaxLineLength:PlayerChromeControls.kt:positionSpec.value = tween(requireNotNull(repeatInterval.value), easing = LinearEasing)</ID>
+    <ID>MaxLineLength:PlayerChromeControls.kt:val positionSpec = remember { mutableStateOf&lt;AnimationSpec&lt;Float&gt;&gt;(tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard)) }</ID>
+    <ID>MaxLineLength:PlayerChromeControls.kt:val step = at.bernhardberger.tvhplayer.core.seekStepMs(event.nativeKeyEvent.repeatCount)</ID>
+    <ID>MaxLineLength:PlayerChromeParts.kt:Box(Modifier.fillMaxWidth().height(PlayerChromeTokens.topScrimHeight).background(PlayerChromeTokens.topScrim))</ID>
+    <ID>MaxLineLength:PlayerChromeParts.kt:Text</ID>
+    <ID>MaxLineLength:PlayerChromeParts.kt:formatTimeIntervalSpoken(start.epochSeconds, stop.epochSeconds, androidx.compose.ui.platform.LocalResources.current)</ID>
+    <ID>MaxLineLength:PlayerChromeParts.kt:next = next?.title?.takeIf(String::isNotBlank)?.let { title -&gt; "${formatClock(next.start.epochSeconds)} $title" }</ID>
+    <ID>MaxLineLength:PlayerChromeParts.kt:recordedDate != null &amp;&amp; endsAt != null -&gt; stringResource(R.string.player_recorded_ends, recordedDate, formatClock(endsAt))</ID>
+    <ID>MaxLineLength:PlayerChromeParts.kt:recordingPaddedStop(entry)?.let { stringResource(R.string.player_recording_until, formatClock(it.epochSeconds)) }</ID>
+    <ID>MaxLineLength:PlayerChromeParts.kt:spokenTimeRange = event?.let { formatTimeIntervalSpoken(it.start.epochSeconds, it.stop.epochSeconds, resources) }.orEmpty()</ID>
+    <ID>MaxLineLength:PlayerChromeParts.kt:summary = if (compact) null else event?.summary?.takeIf(String::isNotBlank) ?: event?.description?.takeIf(String::isNotBlank)</ID>
+    <ID>MaxLineLength:PlayerChromeParts.kt:timeRange = if (start != null &amp;&amp; stop != null) formatTimeInterval(start.epochSeconds, stop.epochSeconds) else ""</ID>
+    <ID>MaxLineLength:PlayerChromeRecordingTimeline.kt:RecordingTimelineBlock(timeline, range, tone = PlayerTimelineTone.INTERACTIVE, status = recordingBarStatus(timeline, state, range))</ID>
+    <ID>MaxLineLength:PlayerChromeRecordingTimeline.kt:marks = remember(timeline.marks, range?.displayEndMs) { range?.let { timelineMarks(timeline.marks, it.displayEndMs) } }</ID>
+    <ID>MaxLineLength:PlayerChromeRecordingTimeline.kt:modifier = Modifier.testTag("recording-duration-status").clearAndSetSemantics { contentDescription = description }</ID>
+    <ID>MaxLineLength:PlayerChromeRecordingTimeline.kt:timeline</ID>
+    <ID>MaxLineLength:PlayerChromeRecordingTimeline.kt:val</ID>
+    <ID>MaxLineLength:PlayerChromeRecordingTimeline.kt:val spoken = rememberSettledStep(timeline.stepId, "$offsetMs|${readout.target}", timeline.stepSettled, description).orEmpty()</ID>
+    <ID>MaxLineLength:PlayerControlsLayer.kt:tween(if (modalVisible) PlayerMotion.FastMs else PlayerMotion.MediumMs, easing = PlayerMotion.StandardAccelerate)</ID>
+    <ID>MaxLineLength:PlayerControlsLayer.kt:val appear = animateEnterAfterFirstFrames(tween(PlayerMotion.MediumMs, easing = PlayerMotion.EmphasizedDecelerate))</ID>
+    <ID>MaxLineLength:PlayerEntryHandoff.kt:internal</ID>
+    <ID>MaxLineLength:PlayerEntryHandoff.kt:val defer: (() -&gt; Unit) -&gt; Unit = { close -&gt; if (handoff == null) close() else handoff.closeBehindPlayer(overlay, close) }</ID>
+    <ID>MaxLineLength:PlayerIdentityCard.kt:textAlign = TextAlign.Center</ID>
+    <ID>MaxLineLength:PlayerInfoBar.kt:.</ID>
+    <ID>MaxLineLength:PlayerInfoBar.kt:Text</ID>
+    <ID>MaxLineLength:PlayerInfoBar.kt:color = MaterialTheme.colorScheme.onSurface</ID>
+    <ID>MaxLineLength:PlayerInfoBar.kt:else</ID>
+    <ID>MaxLineLength:PlayerInfoBar.kt:if</ID>
+    <ID>MaxLineLength:PlayerInfoBar.kt:private</ID>
+    <ID>MaxLineLength:PlayerInfoBar.kt:val</ID>
+    <ID>MaxLineLength:PlayerInfoBar.kt:val max = if (constraints.hasBoundedWidth) (constraints.maxWidth - reserve.roundToPx()).coerceAtLeast(0) else constraints.maxWidth</ID>
+    <ID>MaxLineLength:PlayerInfoBar.kt:}</ID>
+    <ID>MaxLineLength:PlayerLayerState.kt:PlayerLayerState$if</ID>
+    <ID>MaxLineLength:PlayerMotion.kt:Box(Modifier.focusRequester(contentFocus).focusRestorer().focusGroup(), propagateMinConstraints = true) { content() }</ID>
+    <ID>MaxLineLength:PlayerOverlayChrome.kt:val entering = motion?.animateEnterAfterFirstFrames(tween(PlayerMotion.MediumMs, easing = PlayerMotion.EmphasizedDecelerate))</ID>
+    <ID>MaxLineLength:PlayerProgrammeDetails.kt:onPlayRecording: (at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection, at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart) -&gt; Unit</ID>
+    <ID>MaxLineLength:PlayerTimeline.kt:.</ID>
+    <ID>MaxLineLength:PlayerTimeline.kt:/** The state cell before the bar, the end after it (replacing [trailingLabel]) and a live end's distance behind live. */</ID>
+    <ID>MaxLineLength:PlayerTimeline.kt:TimelineTargetLabel</ID>
+    <ID>MaxLineLength:PlayerTimeline.kt:animationSpec = tween(if (emphasized) PlayerMotion.MediumMs else PlayerMotion.ShortMs, easing = PlayerMotion.Standard)</ID>
+    <ID>MaxLineLength:PlayerTimeline.kt:easing = if (active) PlayerMotion.EmphasizedDecelerate else PlayerMotion.StandardAccelerate</ID>
+    <ID>MaxLineLength:PlayerTimeline.kt:if</ID>
+    <ID>MaxLineLength:PlayerTimeline.kt:leadingLabel?.let { TimelineEndpointLabel(it, leadingColor, leadingLabelTestTag, endpointEmphasis) }</ID>
+    <ID>MaxLineLength:PlayerTimeline.kt:painterResource(if (direction == StepDirection.BEHIND) R.drawable.ic_fast_rewind else R.drawable.ic_fast_forward)</ID>
+    <ID>MaxLineLength:PlayerTimeline.kt:private fun LayoutCoordinates.unclippedBoundsInRoot: Rect</ID>
+    <ID>MaxLineLength:PlayerTimeline.kt:tween(PlayerMotion.FastMs, easing = if (active) PlayerMotion.StandardDecelerate else PlayerMotion.StandardAccelerate)</ID>
+    <ID>MaxLineLength:PlayerTimeline.kt:val</ID>
+    <ID>MaxLineLength:PlayerTimelinePresentationState.kt:LiveTimelinePresentationState$decision</ID>
+    <ID>MaxLineLength:PlayerTimelinePresentationState.kt:LiveTimelinePresentationState$generation.seekQueue = generation.seekQueue.copy(pendingTargetMs = refreshed.target.position.inWholeMilliseconds)</ID>
+    <ID>MaxLineLength:PlayerTimelinePresentationState.kt:LiveTimelinePresentationState$it.displacement.inWholeMilliseconds</ID>
+    <ID>MaxLineLength:PlayerTimelinePresentationState.kt:LiveTimelinePresentationState$resolved.displacement.inWholeMilliseconds</ID>
+    <ID>MaxLineLength:PlayerTimelinePresentationState.kt:LiveTimelinePresentationState$result.available &amp;&amp; it.wallClockMapping is at.bernhardberger.tvheadend.sdk.media3.TimeshiftWallClockMapping.Estimate</ID>
+    <ID>MaxLineLength:PlayerTimelinePresentationState.kt:LiveTimelinePresentationState$val</ID>
+    <ID>MaxLineLength:PlayerTopIdentity.kt:Text</ID>
+    <ID>MaxLineLength:PlayerTopIdentity.kt:else</ID>
+    <ID>MaxLineLength:PlayerTopIdentity.kt:if</ID>
+    <ID>MaxLineLength:PlayerTopIdentity.kt:modifier = Modifier.align(Alignment.CenterEnd).size(IdentityInset).testTag("player-top-identity-next")</ID>
+    <ID>MaxLineLength:PlayerTopIdentity.kt:modifier = Modifier.align(Alignment.CenterStart).size(IdentityInset).testTag("player-top-identity-previous")</ID>
+    <ID>MaxLineLength:ProgramDetails.kt:internal</ID>
+    <ID>MaxLineLength:ProgrammeArtwork.kt:progressModifier.align(Alignment.BottomStart).fillMaxWidth()</ID>
+    <ID>MaxLineLength:ProgrammeContextMenu.kt:progressColor = progressColor(indicator.isPlayingItem, recording?.let(::recordingIsRunning) == true)</ID>
+    <ID>MaxLineLength:ProgrammeDetailsHost.kt:(if (targetState) fadeIn(tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard)) else EnterTransition.None)</ID>
+    <ID>MaxLineLength:ProgrammeDetailsHost.kt:.</ID>
+    <ID>MaxLineLength:ProgrammeDetailsHost.kt:PlayerMotionFrame</ID>
+    <ID>MaxLineLength:ProgrammeDetailsHost.kt:actionRecording?.state !in listOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)</ID>
+    <ID>MaxLineLength:ProgrammeDetailsHost.kt:canPlayRecording = onPlayRecording != null</ID>
+    <ID>MaxLineLength:ProgrammeDetailsHost.kt:if</ID>
+    <ID>MaxLineLength:ProgrammeDetailsHost.kt:listOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)</ID>
+    <ID>MaxLineLength:ProgrammeDetailsLayout.kt:Row</ID>
+    <ID>MaxLineLength:ProgrammeDetailsLayout.kt:Text</ID>
+    <ID>MaxLineLength:ProgrammeDetailsLayout.kt:maxLines = 2</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:(</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:(viewport - headingKeyline - factsHeadingHeight).coerceAtLeast(1).toDp() - DetailsSafeEdge</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:.</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:?:</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:AiringCard</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:Box</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:Column</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:Column(Modifier.padding(DetailsReadingInset), verticalArrangement = Arrangement.spacedBy(10.dp), content = content)</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:Column(Modifier.widthIn(max = 470.dp).onGloballyPositioned { textArea("failure", it.boundsInRoot(), false) }) { synopsis() }</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:DetailsActions</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:DetailsSection.FACTS -&gt; factsTop - (if (focused == DetailsSection.AIRINGS) 0 else airingsText.intValue) - headingKeyline</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:DetailsSectionHeading(stringResource(R.string.details_other_airings, pageTitle), emphasis, Modifier.padding(start = DetailsKeyline))</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:Modifier.testTag("details-reading-text")</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:PiconBox</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:SingletonImageLoader.get(context).execute(ImageRequest.Builder(context).data(it).size(width, height).build())</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:Text</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:Text(displayed, Modifier.testTag("details-synopsis").onGloballyPositioned { onTextArea(it.boundsInRoot()) }, style = style, maxLines = 2)</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:drawnWidth = with(density) { inlineLogoDrawnWidth(logo, Size(InlineLogoWidth.toPx(), InlineLogoHeight.toPx())).toDp() }</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:else</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:else -&gt; formatRecordingSchedule(fact.seconds, locale = LocalConfiguration.current.locales[0], nowSec = nowSec)</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:fact(R.string.details_broadcast, resources.getString(if (it) R.string.details_broadcast_new else R.string.details_broadcast_repeat))</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:fact(R.string.details_categories, event?.categories?.map(String::trim)?.filter(String::isNotEmpty)?.distinct()?.joinToString(" • "))</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:fact(R.string.details_keywords, event?.keywords?.map(String::trim)?.filter(String::isNotEmpty)?.distinct()?.joinToString(" • "))</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:fact(R.string.details_year, (event?.copyrightYear ?: recording?.copyrightYear)?.let { formatMetadataNumber(it, locale) })</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:factsScroll.animateScrollTo(factsScroll.value + with(density) { 60.dp.roundToPx() }, RowChangeMotion)</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:floor: Float = if (sharp) 0f else DetailsScrolledDimAlpha</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:formatRecordingDate(removal, dateOnly = true, locale = LocalConfiguration.current.locales[0], nowSec = nowSec)</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:formatTimeInterval(start.epochSeconds, stop.epochSeconds, withDate = true, locale = locale, nowSec = nowSec)</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:humanLanguageName</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:if</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:if (focused) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = .12f)</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:if (listState.layoutInfo.visibleItemsInfo.none { it.key == target.value }) listState.scrollToItem(ids.indexOf(target))</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:internal</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:it in listOf(BrowseContextAction.MARK_WATCHED, BrowseContextAction.MARK_UNWATCHED)</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:it in listOf(BrowseContextAction.RECORD, BrowseContextAction.CANCEL, BrowseContextAction.STOP)</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:nowSec</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:private</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:section == DetailsSection.FACTS &amp;&amp; (key.key == Key.DirectionLeft || key.key == Key.DirectionRight) -&gt; true</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:textAreas = textAreas.values.toList()</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:tint = if (focused) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.onSurface</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:total?.takeIf { it &gt;= n }?.let { resources.getString(R.string.details_count_of, n.toInt(), it.toInt()) } ?: formatMetadataNumber(n, locale)</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:transitionSpec = { tween(PlayerMotion.MediumMs * 2, easing = PlayerMotion.Standard) }</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:val</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:val (width, height) = with(density) { DetailsHeroLogoSize.first.roundToPx() to DetailsHeroLogoSize.second.roundToPx() }</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:val airingsEmphasis = animateFloatAsState(if (focusedSection == DetailsSection.AIRINGS) 1f else 0f, RowChangeMotion, label = "details-airings")</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:val facts = event?.let { programmeDetailsFacts(it, nowSec) } ?: recording?.let { recordingDetailsFacts(it, recordingAdmission, nowSec) }.orEmpty()</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:val factsEmphasis = animateFloatAsState(if (focusedSection == DetailsSection.FACTS) 1f else 0f, RowChangeMotion, label = "details-facts")</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:val heroEmphasis = animateFloatAsState(if (focusedSection == DetailsSection.ACTIONS) 1f else 0f, RowChangeMotion, label = "details-hero")</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:val scrolledDim = key(source, false) { rememberDetailsDim(blurredSamples.value, sharp = false, textTop = scrolledTextTop) }</ID>
+    <ID>MaxLineLength:ProgrammeDetailsPage.kt:var section by remember { mutableStateOf(if (returnToCard in ids) DetailsSection.AIRINGS else DetailsSection.ACTIONS) }</ID>
+    <ID>MaxLineLength:ProgrammeHero.kt:Box</ID>
+    <ID>MaxLineLength:ProgrammeHero.kt:style = if (compact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.headlineSmall</ID>
+    <ID>MaxLineLength:ProgrammeInfoSheet.kt:Box(Modifier.fillMaxSize().padding(top = if (header != null) 156.dp else 0.dp)) { programme(it) }</ID>
+    <ID>MaxLineLength:ProgrammeInfoSheet.kt:PlayerMotionFrame</ID>
+    <ID>MaxLineLength:ProgrammeInfoSheet.kt:fun fraction</ID>
+    <ID>MaxLineLength:ProgrammeInfoSheet.kt:initialScale = if (railStrip) NowPlayingFromIdentityScale else 1f</ID>
+    <ID>MaxLineLength:ProgrammeInfoSheet.kt:return if (inheritedFade == null || alpha == 0f) alpha else alpha / (1f - fraction(inheritedFade)).coerceAtLeast(0.001f)</ID>
+    <ID>MaxLineLength:ProgrammeInfoSheet.kt:scaleIn</ID>
+    <ID>MaxLineLength:ProgrammeInfoSheet.kt:scaleOut</ID>
+    <ID>MaxLineLength:ProgrammeInfoSheet.kt:stringResource(if (header != null || railExpanded) R.string.nav_channels else R.string.details_back_to_tv)</ID>
+    <ID>MaxLineLength:ProgrammeInfoSheet.kt:targetScale = if (railStrip) NowPlayingFromIdentityScale else 1f</ID>
+    <ID>MaxLineLength:ProgrammePane.kt:*</ID>
+    <ID>MaxLineLength:ProgrammePane.kt:Modifier.align(Alignment.Center).fillMaxWidth(PictureLogoWidthFraction).fillMaxHeight(PictureLogoHeightFraction)</ID>
+    <ID>MaxLineLength:ProgrammePane.kt:Modifier.layoutId(HeadlinePart.FACTS).padding(top = ProgrammeHeadlineGroupGap).testTag("$tagPrefix-facts")</ID>
+    <ID>MaxLineLength:ProgrammePane.kt:Row</ID>
+    <ID>MaxLineLength:ProgrammePane.kt:SkeletonLine(Modifier.padding(top = ProgrammeHeadlineGroupGap), typography.labelMedium, widthFraction = 0.35f)</ID>
+    <ID>MaxLineLength:ProgrammePane.kt:SkeletonLine(Modifier.padding(top = ProgrammeHeadlineTitleGap).testTag("$tagPrefix-loading"), titleStyle, widthFraction = 0.7f)</ID>
+    <ID>MaxLineLength:ProgrammePane.kt:Text</ID>
+    <ID>MaxLineLength:ProgrammePane.kt:if (!constraints.hasBoundedHeight) loose else loose.copy(maxHeight = (constraints.maxHeight - used).coerceAtLeast(0))</ID>
+    <ID>MaxLineLength:ProgrammePane.kt:if (progress != null) ProgressStrip(progress, Modifier.weight(1f, fill = false).width(160.dp), progressColor)</ID>
+    <ID>MaxLineLength:ProgrammePane.kt:modifier = Modifier.layoutId(HeadlinePart.TITLE).padding(top = ProgrammeHeadlineTitleGap).testTag("$tagPrefix-title")</ID>
+    <ID>MaxLineLength:ProgrammeWindow.kt:committedProgrammeEvent(committedWindow != null, committedWindow?.event, committedState, currentBroadcast, liveStart)</ID>
+    <ID>MaxLineLength:ProgrammeWindow.kt:internal</ID>
+    <ID>MaxLineLength:ProgrammeWindow.kt:return</ID>
+    <ID>MaxLineLength:QuickZapPresentation.kt:.</ID>
+    <ID>MaxLineLength:QuickZapPreview.kt:Text(it, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, color = secondary)</ID>
+    <ID>MaxLineLength:QuickZapPreview.kt:Text(it, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis, color = secondary)</ID>
+    <ID>MaxLineLength:QuickZapPreview.kt:Text(metadata, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, color = tertiary)</ID>
+    <ID>MaxLineLength:RecordingDetailsHost.kt:Notice.DvrActionFailed(DvrMutationKind.UPDATE, result.toDvrMutationFeedback())</ID>
+    <ID>MaxLineLength:RecordingDetailsHost.kt:if (latest.currentSession !== capability || !mutation.recordingStateIsCurrent(latest)) return@launch</ID>
+    <ID>MaxLineLength:RecordingDetailsHost.kt:if (recordingWatchStateAction(entry, latest.recordingPlaybackAdmission(entry), writable) != action) return@launch</ID>
+    <ID>MaxLineLength:RecordingDetailsHost.kt:opened.channelId?.let(current::channel)?.let { onWatchChannel?.invoke(it.id, it.name.orEmpty()) }</ID>
+    <ID>MaxLineLength:RecordingDetailsHost.kt:recordingConfigurations = displayObservation.currentDvrConfigurations().takeIf { capability != null }.orEmpty()</ID>
+    <ID>MaxLineLength:RecordingDetailsHost.kt:when</ID>
+    <ID>MaxLineLength:RecordingMarkTrack.kt:(other.kind != RecordingMarkKind.PROGRAM_START &amp;&amp; other.kind != RecordingMarkKind.PROGRAM_END || otherIndex &lt; index)</ID>
+    <ID>MaxLineLength:RecordingMarkTrack.kt:/** [marks] on a bar [displayEndMs] long, [selected] among them (at its end with [selectedEnd]); null without marks or length. */</ID>
+    <ID>MaxLineLength:RecordingMarkTrack.kt:RecordingMarkKind.CHAPTER</ID>
+    <ID>MaxLineLength:RecordingMarkTrack.kt:if</ID>
+    <ID>MaxLineLength:RecordingMarkTrack.kt:marks.none { it.startMs == mark.startMs &amp;&amp; it.kind in listOf(RecordingMarkKind.PROGRAM_START, RecordingMarkKind.PROGRAM_END) }</ID>
+    <ID>MaxLineLength:RecordingMarkerOverlay.kt:(width * ((pillPosition?.value ?: selectedPosition.toFloat()) / displayDurationMs.coerceAtLeast(1)).coerceIn(0f, 1f) - it.width / 2f)</ID>
+    <ID>MaxLineLength:RecordingMarkerOverlay.kt:Box</ID>
+    <ID>MaxLineLength:RecordingMarkerOverlay.kt:RecordingMarkKind.CUT</ID>
+    <ID>MaxLineLength:RecordingMarkerOverlay.kt:RecordingMarkKind.CUT -&gt; stringResource(if (stop.atEnd) R.string.recording_mark_cut_ends else R.string.recording_mark_cut)</ID>
+    <ID>MaxLineLength:RecordingMarkerOverlay.kt:RecordingMarkSymbol</ID>
+    <ID>MaxLineLength:RecordingMarkerOverlay.kt:SizeTransform(clip = false) { _, _ -&gt; tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard) }</ID>
+    <ID>MaxLineLength:RecordingMarkerOverlay.kt:animationSpec = tween(PlayerMotion.ShortMs, easing = PlayerMotion.Standard)</ID>
+    <ID>MaxLineLength:RecordingMarkerOverlay.kt:color = LocalContentColor.current.copy(alpha = 0.8f)</ID>
+    <ID>MaxLineLength:RecordingMarkerOverlay.kt:if (index &lt; markers.lastIndex) add(CustomAccessibilityAction(nextLabel) { navigation.move(markers, 1); true })</ID>
+    <ID>MaxLineLength:RecordingMarkerOverlay.kt:modifier</ID>
+    <ID>MaxLineLength:RecordingMarkerOverlay.kt:painterResource(if (kind == RecordingMarkKind.PROGRAM_START) R.drawable.ic_flag else R.drawable.ic_sports_score)</ID>
+    <ID>MaxLineLength:RecordingMarkerOverlay.kt:requireNotNull(label.first)</ID>
+    <ID>MaxLineLength:RecordingMarkerOverlay.kt:style = MaterialTheme.typography.labelSmall.copy(fontSize = font, lineHeight = line, fontWeight = FontWeight.SemiBold)</ID>
+    <ID>MaxLineLength:RecordingMarkerOverlay.kt:val hint = RecordingMarkHint(centre(stop.positionMs), size.width.toFloat(), requireNotNull(stop.mark).kind)</ID>
+    <ID>MaxLineLength:RecordingMarkerOverlay.kt:width * (if (displayDurationMs &gt; 0) (positionMs.toDouble() / displayDurationMs).coerceIn(0.0, 1.0) else 0.0).toFloat()</ID>
+    <ID>MaxLineLength:RecordingPlaybackChoice.kt:.</ID>
+    <ID>MaxLineLength:RecordingPlaybackChoice.kt:Icon(painterResource(if (resumePosition == null) R.drawable.ic_play_arrow else R.drawable.ic_replay), null, Modifier.size(ButtonDefaults.IconSize))</ID>
+    <ID>MaxLineLength:RecordingPlaybackChoice.kt:Text(stringResource(R.string.recording_resume_from, formatPlaybackDuration(positionMs)), maxLines = 1, softWrap = false)</ID>
+    <ID>MaxLineLength:RecordingPlaybackChoice.kt:Text(stringResource(if (resumePosition == null) R.string.recording_choice_play else R.string.context_start_over), maxLines = 1, softWrap = false)</ID>
+    <ID>MaxLineLength:RecordingPlayerScreen.kt:PlayerBusyIndicator(PlayerBusyStatus.BUFFERING.takeIf { bufferingVisible }, Modifier.align(Alignment.Center))</ID>
+    <ID>MaxLineLength:RecordingPlayerScreen.kt:foregroundBlocked = recordingLoading || foregroundContext.recoveryVisible || foregroundContext.terminalErrorVisible</ID>
+    <ID>MaxLineLength:RecordingPlayerScreen.kt:if (playerModals.isNotEmpty() || layers.infoOpen) backDispatcher?.onBackPressed() else handlePlaybackBack()</ID>
+    <ID>MaxLineLength:RecordingPlayerScreen.kt:onShowGuide: (at.bernhardberger.tvheadend.sdk.core.ChannelId, at.bernhardberger.tvheadend.sdk.core.EpgEvent?) -&gt; Unit = { _, _ -&gt; }</ID>
+    <ID>MaxLineLength:RecordingPlayerScreen.kt:val canSeekMarks = timelineState.canSeek &amp;&amp; retainedSelection != null &amp;&amp; retainedSelection.currentSession === currentSession</ID>
+    <ID>MaxLineLength:RecordingPlayerScreen.kt:val markStops = remember(marks, durationMs) { at.bernhardberger.tvhplayer.core.recordingMarkStops(marks, durationMs) }</ID>
+    <ID>MaxLineLength:RecordingSkipButton.kt:drawRect(color, topLeft = Offset(opticalOffset + triangleWidth + gap, 0f), size = Size(barWidth, size.height))</ID>
+    <ID>MaxLineLength:RecordingSkipButton.kt:internal</ID>
+    <ID>MaxLineLength:RecordingSkipButton.kt:layout(width, height) { child.placeRelative((width - child.width) / 2, (height - rise - child.height) / 2) }</ID>
+    <ID>MaxLineLength:RecordingSkipButton.kt:layout(width, height) { child.placeRelative(-(child.width - width) / 2, -(child.height - rise - height) / 2) }</ID>
+    <ID>MaxLineLength:RecordingSkipButton.kt:topLeft = Offset(inset, inset)</ID>
+    <ID>MaxLineLength:RecordingsContent.kt:/** A completed recording is the normal case and carries no mark; running and scheduled ones carry theirs at the row's end. */</ID>
+    <ID>MaxLineLength:RecordingsContent.kt:ProgrammeStatusLine</ID>
+    <ID>MaxLineLength:RecordingsContent.kt:Text(stringResource(R.string.recordings_recording_now_folder), maxLines = 1, overflow = TextOverflow.Ellipsis)</ID>
+    <ID>MaxLineLength:RecordingsContent.kt:append(" • ").append(pluralStringResource(R.plurals.recordings_folder_watched_count, watched, watched))</ID>
+    <ID>MaxLineLength:RecordingsContent.kt:append(resources.getString(R.string.recording_length_recorded, formatRecordedDuration(it, resources)))</ID>
+    <ID>MaxLineLength:RecordingsContent.kt:at.bernhardberger.tvhplayer.ui.common.formatRecordedDuration(it, androidx.compose.ui.platform.LocalResources.current)</ID>
+    <ID>MaxLineLength:RecordingsContent.kt:drawCircle(Color.Black, radius = (RecordingNowDotRadius + RecordingNowDotGap).toPx(), center = dotCenter(size), blendMode = BlendMode.Clear)</ID>
+    <ID>MaxLineLength:RecordingsContent.kt:drawCircle(recordingMarkColor(focused), radius = RecordingNowDotRadius.toPx(), center = dotCenter(size))</ID>
+    <ID>MaxLineLength:RecordingsContent.kt:ground = if (focused) MaterialTheme.colorScheme.inverseSurface else MaterialTheme.colorScheme.background</ID>
+    <ID>MaxLineLength:RecordingsContent.kt:if (recordingStoppedEarly(entry) != null) add(RecordingOverlineMark.STOPPED_EARLY to stringResource(R.string.recordings_stopped_early))</ID>
+    <ID>MaxLineLength:RecordingsContent.kt:prefetchGround = if (focused) MaterialTheme.colorScheme.background else MaterialTheme.colorScheme.inverseSurface</ID>
+    <ID>MaxLineLength:RecordingsContent.kt:programmeHeaderMetadata(programmeAboutFacts(null, entry, resources, locale), resources, entry.episode, null, locale, entry.contentGenre)</ID>
+    <ID>MaxLineLength:RecordingsContent.kt:recordingLengthSeconds(entry, nowSec)?.takeIf { it &gt; 0 &amp;&amp; entry.state != DvrEntryState.SCHEDULED }</ID>
+    <ID>MaxLineLength:RecordingsContent.kt:tint = if (mark == RecordingOverlineMark.FAILED) failedTint else androidx.tv.material3.LocalContentColor.current</ID>
+    <ID>MaxLineLength:RecordingsContent.kt:val alert = recordingsAppError(empty = true, connectionUiState = connectionUiState, connectionFailure = connectionFailure)</ID>
+    <ID>MaxLineLength:RecordingsContent.kt:val endsAt = stringResource(R.string.recording_ends_at, formatClock(nowSec + timeLeft.inWholeSeconds))</ID>
+    <ID>MaxLineLength:RecordingsContent.kt:val viewerFraction = recordingViewerPosition(entry.id)?.fraction ?: (watchState as? RecordingWatchState.PartlyWatched)?.fraction?.toFloat()</ID>
+    <ID>MaxLineLength:RecordingsModals.kt:firstLabel = stringResource(if (action == PendingRecordingAction.DELETE) R.string.keep else R.string.keep_recording)</ID>
+    <ID>MaxLineLength:RecordingsModals.kt:visibility: MutableTransitionState&lt;Boolean&gt; = remember { MutableTransitionState(false).apply { targetState = true } }</ID>
+    <ID>MaxLineLength:RecordingsScreen.kt:(if (targetState) fadeIn(tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard)) else EnterTransition.None)</ID>
+    <ID>MaxLineLength:RecordingsScreen.kt:.</ID>
+    <ID>MaxLineLength:RecordingsScreen.kt:BrowseContextAction.DELETE_WATCHED</ID>
+    <ID>MaxLineLength:RecordingsScreen.kt:DvrLibraryMode.ARCHIVE -&gt; requireNotNull(archiveLevelItems(observedArchive, reconciledArchiveStack.active.levelId)).map { it.key }</ID>
+    <ID>MaxLineLength:RecordingsScreen.kt:Icon(painterResource(R.drawable.ic_folder), contentDescription = null, modifier = Modifier.size(48.dp))</ID>
+    <ID>MaxLineLength:RecordingsScreen.kt:R.string.delete_folder_all_confirm_title</ID>
+    <ID>MaxLineLength:RecordingsScreen.kt:append</ID>
+    <ID>MaxLineLength:RecordingsScreen.kt:canWatchChannel = selectedCapability != null &amp;&amp; onWatchChannel != null &amp;&amp; opened.channelId?.let(channelsById::get) != null</ID>
+    <ID>MaxLineLength:RecordingsScreen.kt:episode = programmeEpisodeLine(opened.episode, opened.subtitle, androidx.compose.ui.platform.LocalContext.current.resources)</ID>
+    <ID>MaxLineLength:RecordingsScreen.kt:folder.watchedCount { at.bernhardberger.tvhplayer.core.offeredResumePosition(observation.recordingPlaybackAdmission(it)) }</ID>
+    <ID>MaxLineLength:RecordingsScreen.kt:folderContextActions(folder, observation::recordingPlaybackAdmission, canModify).isNotEmpty()</ID>
+    <ID>MaxLineLength:RecordingsScreen.kt:fun</ID>
+    <ID>MaxLineLength:RecordingsScreen.kt:if</ID>
+    <ID>MaxLineLength:RecordingsScreen.kt:if (recordingWatchStateAction(entry, current.recordingPlaybackAdmission(entry), canModify) != action) return@launch</ID>
+    <ID>MaxLineLength:RecordingsScreen.kt:pluralStringResource(R.plurals.recordings_folder_recording_count, summary.recordingCount, summary.recordingCount)</ID>
+    <ID>MaxLineLength:RecordingsScreen.kt:progressModifier = Modifier.testTag("browse-context-progress")</ID>
+    <ID>MaxLineLength:RecordingsScreen.kt:resumePositionMs = at.bernhardberger.tvhplayer.core.offeredResumePosition(openedAdmission)?.inWholeMilliseconds</ID>
+    <ID>MaxLineLength:RecordingsScreen.kt:showContextMenu = action in listOf(BrowseContextAction.STOP, BrowseContextAction.CANCEL, BrowseContextAction.DELETE)</ID>
+    <ID>MaxLineLength:RecordingsScreen.kt:val actions = folder?.let { folderContextActions(it, observation::recordingPlaybackAdmission, canModify) }.orEmpty()</ID>
+    <ID>MaxLineLength:RecordingsScreen.kt:val archiveItems = remember(archive, archiveLevel) { archiveLevelItems(archive, archiveLevel) ?: archive.listItems() }</ID>
+    <ID>MaxLineLength:RecordingsScreen.kt:watched.takeIf { it &gt; 0 }?.let { pluralStringResource(R.plurals.recordings_folder_watched_count, it, it) }</ID>
+    <ID>MaxLineLength:RecordingsScreen.kt:when</ID>
+    <ID>MaxLineLength:SessionArtworkLoader.kt:AppSessionArtworkLoader$if (request.channelIcon != null || request.recordingImage != null) throw IOException("Session artwork unavailable")</ID>
+    <ID>MaxLineLength:SessionArtworkLoader.kt:Canvas(output).drawBitmap(source, null, Rect(left, top, left + width, top + height), Paint(Paint.FILTER_BITMAP_FLAG))</ID>
+    <ID>MaxLineLength:SessionArtworkLoader.kt:if</ID>
+    <ID>MaxLineLength:SessionArtworkLoader.kt:val output = Bitmap.createBitmap(if (picon) edge else width, if (picon) edge else height, Bitmap.Config.ARGB_8888)</ID>
+    <ID>MaxLineLength:SettingsAbout.kt:color</ID>
+    <ID>MaxLineLength:SettingsAbout.kt:internal</ID>
+    <ID>MaxLineLength:SettingsAbout.kt:settingsRow</ID>
+    <ID>MaxLineLength:SettingsAudioPreferences.kt:add</ID>
+    <ID>MaxLineLength:SettingsAudioPreferences.kt:add(settingsRow("audio-format", stringResource(R.string.audio_format), formatName(ui.audioFormat), child = "audio-format"))</ID>
+    <ID>MaxLineLength:SettingsAudioPreferences.kt:private</ID>
+    <ID>MaxLineLength:SettingsChannelTags.kt:return</ID>
+    <ID>MaxLineLength:SettingsChannelTags.kt:supporting = stringResource(if (loaded) R.string.channel_settings_save_failed else R.string.channel_settings_load_failed)</ID>
+    <ID>MaxLineLength:SettingsConnectionOverview.kt:supporting = stringResource(R.string.setup_connection_description)</ID>
+    <ID>MaxLineLength:SettingsConnectionOverview.kt:supporting = stringResource(if (connecting) R.string.connection_overview_connecting else R.string.connection_retry_description)</ID>
+    <ID>MaxLineLength:SettingsDepthRows.kt:Row</ID>
+    <ID>MaxLineLength:SettingsDepthRows.kt:containerColor = if (rowFocused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer</ID>
+    <ID>MaxLineLength:SettingsDepthRows.kt:contentColor = if (rowFocused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onPrimaryContainer</ID>
+    <ID>MaxLineLength:SettingsDepthRows.kt:headlineContent = { Text(title.annotated(), style = MaterialTheme.typography.titleMedium, maxLines = titleMaxLines, overflow = TextOverflow.Ellipsis) }</ID>
+    <ID>MaxLineLength:SettingsDepthRows.kt:leadingContent = icon?.let { { Icon(painterResource(it), null, Modifier.size(ListItemDefaults.IconSize)) } }</ID>
+    <ID>MaxLineLength:SettingsGeneral.kt:settingsRow(format.name, label, selected = format == settings.clockFormat, onClick = { onSelectClockFormat(format) })</ID>
+    <ID>MaxLineLength:SettingsGeneral.kt:settingsRow(language.rowId, label, selected = language == selectedLanguage, onClick = { onSelectLanguage(language) })</ID>
+    <ID>MaxLineLength:SettingsGeneral.kt:val usage = stringResource(R.string.cache_usage, cacheSizeMegabytes(statistics, LocalConfiguration.current.locales[0]))</ID>
+    <ID>MaxLineLength:SettingsPlayer.kt:internal</ID>
+    <ID>MaxLineLength:SettingsPlayer.kt:settingsLevel</ID>
+    <ID>MaxLineLength:SettingsPlayer.kt:settingsPlayerLevel</ID>
+    <ID>MaxLineLength:SettingsPlayer.kt:val</ID>
+    <ID>MaxLineLength:SettingsScreen.kt:add(settingsRow(SettingsSection.APPLIANCE.name, stringResource(R.string.settings_appliance), child = SettingsSection.APPLIANCE.name, icon = R.drawable.ic_home))</ID>
+    <ID>MaxLineLength:SettingsScreen.kt:add(settingsRow(SettingsSection.AUDIO.name, stringResource(R.string.settings_audio_nav), child = SettingsSection.AUDIO.name, icon = R.drawable.ic_subtitles))</ID>
+    <ID>MaxLineLength:SettingsScreen.kt:add(settingsRow(SettingsSection.CHANNEL_TAGS.name, stringResource(R.string.settings_channel_tags_nav), child = SettingsSection.CHANNEL_TAGS.name, icon = R.drawable.ic_filter_list))</ID>
+    <ID>MaxLineLength:SettingsScreen.kt:add(settingsRow(SettingsSection.GENERAL.name, stringResource(R.string.settings_general), child = SettingsSection.GENERAL.name, icon = R.drawable.ic_tune))</ID>
+    <ID>MaxLineLength:SettingsScreen.kt:add(settingsRow(SettingsSection.PLAYER.name, stringResource(R.string.settings_player), child = SettingsSection.PLAYER.name, icon = R.drawable.ic_play_arrow))</ID>
+    <ID>MaxLineLength:SettingsScreen.kt:fallbackLevel = { id -&gt; settingsLevel(id, unavailable, listOf(settingsRow("unavailable", unavailable, onClick = navigation::pop))) }</ID>
+    <ID>MaxLineLength:SettingsScreen.kt:if</ID>
+    <ID>MaxLineLength:SettingsScreen.kt:val</ID>
+    <ID>MaxLineLength:SetupWelcome.kt:val toMarkerY = (maxHeight - SignatureBottom - SignatureMarkSize / 2) - (maxHeight / 2 - StartupMarkCenterAboveMiddle)</ID>
+    <ID>MaxLineLength:SideRail.kt:/** Line two: the playback mark, then the state it leaves unsaid and the channel when the title is a programme or recording. */</ID>
+    <ID>MaxLineLength:SideRail.kt:// The pink error pill vanishes on the light focused item; use the deep container there.</ID>
+    <ID>MaxLineLength:SideRail.kt:BrowseViewport</ID>
+    <ID>MaxLineLength:SideRail.kt:Icon(painterResource(icon), contentDescription = null, modifier = Modifier.size(IconButtonDefaults.SmallIconSize))</ID>
+    <ID>MaxLineLength:SideRail.kt:alpha = layering.modalScrimAlpha()</ID>
+    <ID>MaxLineLength:SideRail.kt:compositingStrategy</ID>
+    <ID>MaxLineLength:SideRail.kt:contentDescription = if (item.route == AppDestination.SETTINGS) settingsDescription else item.label</ID>
+    <ID>MaxLineLength:SideRail.kt:if</ID>
+    <ID>MaxLineLength:SideRail.kt:val awayFromRail = if (LocalLayoutDirection.current == LayoutDirection.Ltr) FocusDirection.Right else FocusDirection.Left</ID>
+    <ID>MaxLineLength:SideRail.kt:val page = measurable.measure(constraints.copy(minWidth = constraints.maxWidth + extra, maxWidth = constraints.maxWidth + extra))</ID>
+    <ID>MaxLineLength:StatusBadge.kt:.</ID>
+    <ID>MaxLineLength:StatusBadge.kt:Icon(painterResource(icon), contentDescription = null, modifier = Modifier.size(StatusBadgeGlyphSize), tint = content)</ID>
+    <ID>MaxLineLength:StatusBadge.kt:Text(text, style = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium, maxLines = 1, softWrap = false, color = content)</ID>
+    <ID>MaxLineLength:StatusBadge.kt:fun</ID>
+    <ID>MaxLineLength:StatusBadge.kt:if (state == DvrEntryState.RECORDING) R.string.player_recording else R.string.recording_state_recording_errors</ID>
+    <ID>MaxLineLength:StepOffsetDescription.kt:R.string.timeshift_seek_preview_short_description</ID>
+    <ID>MaxLineLength:TimeConverter.kt:/** A length as read aloud, in the configured app locale; zero units are left out, so whole minutes read without "0 seconds". */</ID>
+    <ID>MaxLineLength:TimeConverter.kt:/** The spoken form of [formatTimeInterval] for the clock times alone: built from the instants, never from display text. */</ID>
+    <ID>MaxLineLength:TimeConverter.kt:if</ID>
+    <ID>MaxLineLength:TimeConverter.kt:return</ID>
+    <ID>MaxLineLength:TimeshiftSeekPreview.kt:"${it.event?.title?.let { title -&gt; "$title. " }.orEmpty()}${clockLabels?.first} - ${clockLabels?.second}. $description"</ID>
+    <ID>MaxLineLength:TimeshiftSeekPreview.kt:/** The wall-clock second now; with [barStatus] the buffer's start clock is the leading label without programme clocks. */</ID>
+    <ID>MaxLineLength:TimeshiftSeekPreview.kt:feedback = feedback ?: programmeWindow?.let { if (!it.targetAvailable) unavailableTarget else it.event?.title?.takeIf { titleAsFeedback } }</ID>
+    <ID>MaxLineLength:TimeshiftSeekPreview.kt:nowSec?.takeIf { targetState.available &amp;&amp; targetState.timingKnown }?.let { timeshiftStartClock(targetState, it) }</ID>
+    <ID>MaxLineLength:TimeshiftSeekPreview.kt:trailingLabel = if (barStatus?.end != null) null else clockLabels?.second ?: formatPlaybackDuration(0).takeIf { range.positionKnown }</ID>
+    <ID>MaxLineLength:TimeshiftSeekPreview.kt:val description = liveStepDescription(decision.deltaMs, readout, targetClock != null, behindLiveLabel, bufferStartDescription)</ID>
+    <ID>MaxLineLength:TvOutlinedTextField.kt:keyboardOptions = if (onImeAction == null) keyboardOptions.copy(imeAction = ImeAction.Done) else keyboardOptions</ID>
+    <ID>MaxLineLength:TvRecoveryOverlay.kt:Button</ID>
+    <ID>MaxLineLength:TvRecoveryOverlay.kt:right = if (index &lt; buttons.lastIndex) buttonFocus[index + 1] else FocusRequester.Cancel</ID>
+    <ID>MaxLineLength:TvRecoveryOverlay.kt:val titleColor = if (icon != null &amp;&amp; !ring) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface</ID>
+    <ID>MaxLineLength:TwoColumnDialog.kt:Column</ID>
+    <ID>MaxLineLength:TwoColumnDialog.kt:color = LocalContentColor.current.copy(alpha = 0.6f)</ID>
+    <ID>MaxLineLength:TwoColumnDialog.kt:val activation = event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter</ID>
+    <ID>MaxLineLength:VideoDisplayMode.kt:(!matchesVideoRate(base.refreshRate, rate) &amp;&amp; base.alternativeRefreshRates.none { matchesVideoRate(it, rate) })</ID>
+    <ID>MaxLineLength:VideoDisplayMode.kt:internal</ID>
+    <ID>MaxLineLength:VideoPlayerScreen.kt:NowPlayingStrip</ID>
+    <ID>MaxLineLength:VideoPlayerScreen.kt:PlayerForegroundLayer.OPTIONS_DETAIL, PlayerForegroundLayer.OPTIONS_QUICK_LIST -&gt; layerState.core.optionsPage</ID>
+    <ID>MaxLineLength:VideoPlayerScreen.kt:active</ID>
+    <ID>MaxLineLength:VideoPlayerScreen.kt:chromeState</ID>
+    <ID>MaxLineLength:VideoPlayerScreen.kt:if</ID>
+    <ID>MaxLineLength:VideoPlayerScreen.kt:initialPlaybackEpoch = requestIntent?.let { playbackRuntime.installedLiveTargetEpoch(playbackSelection, it) }</ID>
+    <ID>MaxLineLength:VideoPlayerScreen.kt:layerState</ID>
+    <ID>MaxLineLength:VideoPlayerScreen.kt:layerState.handleScheduleKey(event, foregroundLayer, ::prepareSchedule)?.let { return@onPreviewKeyEvent it }</ID>
+    <ID>MaxLineLength:VideoPlayerScreen.kt:onStartupOutcome: (at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget, at.bernhardberger.tvhplayer.core.MainStartupPlaybackOutcome) -&gt; Boolean = { _, _ -&gt; false }</ID>
+    <ID>MaxLineLength:VideoPlayerScreen.kt:val</ID>
+    <ID>MaxLineLength:VideoPlayerScreen.kt:val compactTuning = busyStatus == PlayerBusyStatus.TUNING &amp;&amp; statusPresentation == PlaybackStatusPresentation.COMPACT_TUNING</ID>
+    <ID>MaxLineLength:VideoPlayerScreen.kt:val detailsBaseEvent = if (infoRailChannelId == null) infoEvent else channelsVm.nowEvent(detailsChannelId, nowSec)</ID>
+    <ID>MaxLineLength:VideoPlayerScreen.kt:val serverWait = rememberLivePlayerServerWait(observation, connectionUiState, playerClose, onReconnect, onOpenConnectionSettings)</ID>
+    <ID>MaxLineLength:VideoPlayerScreen.kt:val unavailableShown = channelUnavailable &amp;&amp; foregroundLayer in setOf(PlayerForegroundLayer.CONTROLS, PlayerForegroundLayer.NONE, PlayerForegroundLayer.CHANNEL_DRAWER)</ID>
+    <ID>MaxLineLength:VideoPlayerScreen.kt:var initialStartupTarget by remember { mutableStateOf&lt;at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget?&gt;(null) }</ID>
+    <ID>MaxLineLength:VideoSurfaceFrameRate.kt:VideoSurfaceFrameRate$Build.VERSION.SDK_INT &gt;= Build.VERSION_CODES.S &amp;&amp; request.change != SurfaceFrameRateChange.SEAMLESS_DEFAULT</ID>
+    <ID>MaxLineLength:VideoSurfaceFrameRate.kt:VideoSurfaceFrameRate$val surfaceRequest = if (target.change == SurfaceFrameRateChange.DISPLAY_MODE) SurfaceFrameRateRequest() else target</ID>
+    <ID>MaxLineLength:WatchingProgress.kt:internal</ID>
+    <ID>MaxLineLength:WatchingProgress.kt:is AppPlaybackTarget.Recording</ID>
+    <ID>MaxLineLength:WatchingProgress.kt:val at = if (watchingIndicator(event, nowSec).isPlayingItem) liveViewerEpochSec(event.channelId, nowSec) ?: return null else nowSec</ID>
+    <ID>MaxLineLength:WatchingProgress.kt:watchingIndicator(event, nowSec) != ChannelPlaybackIndicator.NONE || programmeBehindLive(event) &amp;&amp; event.isRunning(nowSec)</ID>
+    <ID>MaxLineLength:WhatsNewPolicy.kt:)</ID>
+    <ID>NestedBlockDepth:HomeScreen.kt:@Composable @OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class) internal fun HomeScreenContent</ID>
+    <ID>ReturnCount:ApplianceLaunchRequests.kt:ApplianceLaunchRequests$@Synchronized fun resolve: ApplianceLaunchTarget?</ID>
+    <ID>ReturnCount:ChannelAccents.kt:ChannelAccents$suspend fun sample: Int?</ID>
+    <ID>ReturnCount:ChannelNavigation.kt:ChannelNavigation$fun adjacentId: ChannelId?</ID>
+    <ID>ReturnCount:ChannelNavigation.kt:ChannelNavigation$fun entryReadiness: ChannelNumberEntryReadiness</ID>
+    <ID>ReturnCount:ChannelNavigation.kt:ChannelNavigation$fun idForNumber: ChannelId?</ID>
+    <ID>ReturnCount:ChannelSchedulePolicy.kt:internal fun scheduleHistoryStart: Long?</ID>
+    <ID>ReturnCount:ChannelsScreen.kt:fun focusBrowseContent: Boolean</ID>
+    <ID>ReturnCount:ChannelsScreen.kt:fun pageChannels: Boolean</ID>
+    <ID>ReturnCount:ChannelsScreen.kt:fun requestChannelFocus: Boolean</ID>
+    <ID>ReturnCount:ConnectionSetupState.kt:ConnectionSetupState$fun back: Boolean</ID>
+    <ID>ReturnCount:ConnectionSetupState.kt:internal suspend fun TvheadendSession.connectForSetup: SetupFailure?</ID>
+    <ID>ReturnCount:DepthStack.kt:DepthKeyCycle$fun handle: Boolean</ID>
+    <ID>ReturnCount:DepthStack.kt:DepthStack$fun enter: DepthStack</ID>
+    <ID>ReturnCount:EpgGridModals.kt:@OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class) internal fun programmeConfirmationTarget: Pair&lt;Int, String&gt;?</ID>
+    <ID>ReturnCount:EpgGridScreen.kt:fun anchorFor: GuideFocusAnchor</ID>
+    <ID>ReturnCount:EpgGridScreen.kt:fun leaveGuideScope: Boolean</ID>
+    <ID>ReturnCount:EpgGridScreen.kt:fun moveFocus: Boolean</ID>
+    <ID>ReturnCount:EpgGridScreen.kt:fun pageColumns</ID>
+    <ID>ReturnCount:EpgGridScreen.kt:fun pageCoverageSettled: Boolean</ID>
+    <ID>ReturnCount:EpgGridScreen.kt:fun requestChannelFocus</ID>
+    <ID>ReturnCount:EpgGridScreen.kt:fun requestVisibleWindow: GuideCoverageRequestToken?</ID>
+    <ID>ReturnCount:GuideCoverageRequestOwner.kt:GuideCoverageRequestOwner$fun request: GuideCoverageRequestToken</ID>
+    <ID>ReturnCount:GuideHeadline.kt:internal fun guideHeadlineProgramme: GuideHeadlineProgramme?</ID>
+    <ID>ReturnCount:GuideViewport.kt:internal fun guideFocusWindowStart: Long</ID>
+    <ID>ReturnCount:HomeActivityCard.kt:@Composable private fun activityTimesLine: String</ID>
+    <ID>ReturnCount:HomeSectionsPolicy.kt:fun homeInitialFocus: HomeFocusKey?</ID>
+    <ID>ReturnCount:LivePlayerLayerState.kt:LivePlayerLayerState$fun handleScheduleKey: Boolean?</ID>
+    <ID>ReturnCount:LivePlayerServerWait.kt:LivePlayerServerWaitState$fun consumesKey: Boolean</ID>
+    <ID>ReturnCount:MainActivity.kt:MainStartupActivityKeyDispatcher$fun dispatch: Boolean</ID>
+    <ID>ReturnCount:MainStartupKeyCycleOwner.kt:MainStartupKeyCycleOwner$fun keyEvent: MainStartupKeyDecision</ID>
+    <ID>ReturnCount:MainStartupLoadingFeedback.kt:MainStartupLoadingTiming$fun elapsedMillis: Long</ID>
+    <ID>ReturnCount:MainStartupPresentation.kt:fun coldStartPresentation: MainStartupPresentation</ID>
+    <ID>ReturnCount:MainStartupPresentation.kt:fun mainStartupPresentation: MainStartupPresentation</ID>
+    <ID>ReturnCount:NavigationEdgeFade.kt:NavigationTabOverflowState$fun availableFadeWidthPx: Float</ID>
+    <ID>ReturnCount:NavigationEdgeFade.kt:NavigationTabOverflowState$fun trailingHintWidthPx: Float</ID>
+    <ID>ReturnCount:PlaybackKeyPolicy.kt:fun playerKeyAction: PlayerKeyAction</ID>
+    <ID>ReturnCount:PlaybackOptionsPolicy.kt:fun playbackTrackFocusTarget: PlaybackTrackFocusTarget</ID>
+    <ID>ReturnCount:PlaybackStatsDisplay.kt:private fun readDisplayOutput: DisplayOutput?</ID>
+    <ID>ReturnCount:PlaybackStatusPresentation.kt:@OptIn(UnstableApi::class) fun recordingPlayerAlert: LivePlayerAlert?</ID>
+    <ID>ReturnCount:PlayerBackDispatcher.kt:internal fun PlayerBackKeyCycle.intercept: Boolean</ID>
+    <ID>ReturnCount:PlayerChromeBarStatus.kt:internal fun PlayerChromeTimeline.Live.scheduleProgress: ScheduleProgress?</ID>
+    <ID>ReturnCount:PlayerLayerState.kt:PlayerLayerState$fun handleOverlayKey: Boolean?</ID>
+    <ID>ReturnCount:PlayerLayerState.kt:PlayerLayerState$fun openOptionsForKey: Boolean</ID>
+    <ID>ReturnCount:PlayerTimelinePresentationState.kt:LiveTimelinePresentationState$fun queueRelativeSeek</ID>
+    <ID>ReturnCount:PlayerTimelinePresentationState.kt:LiveTimelinePresentationState$fun updateTimeline</ID>
+    <ID>ReturnCount:PlayerTimelinePresentationState.kt:LiveTimelinePresentationState$suspend fun sampleTimeshiftPresentation: AppTimeshiftState?</ID>
+    <ID>ReturnCount:PlayerTimelinePresentationState.kt:RecordingTimelinePresentationState$fun commitPendingSeek</ID>
+    <ID>ReturnCount:ProgrammeAgeRating.kt:internal fun programmeAgeRating: String?</ID>
+    <ID>ReturnCount:RailNowPlaying.kt:internal fun railNowPlaying: RailNowPlaying?</ID>
+    <ID>ReturnCount:RecordingMarkerOverlay.kt:RecordingMarkerNavigation$fun handle: Boolean</ID>
+    <ID>ReturnCount:RemoteLogoCache.kt:RemoteLogoCache$private fun initializedGeneration: Long</ID>
+    <ID>ReturnCount:SectionScroll.kt:SectionScroll$override fun calculateScrollDistance: Float</ID>
+    <ID>ReturnCount:SessionArtworkLoader.kt:AppSessionArtworkLoader$override suspend fun load: ByteArray?</ID>
+    <ID>ReturnCount:SideRail.kt:@Composable internal fun Modifier.browseScreenBackdrop: Modifier</ID>
+    <ID>ReturnCount:TestCredentialProvisioner.kt:TestCredentialProvisioner$private fun readPayload: TestCredentialPayload?</ID>
+    <ID>ReturnCount:TestCredentialProvisioner.kt:internal fun validateTestCredentialPayload: TestCredentialPayload?</ID>
+    <ID>ReturnCount:VideoDisplayMode.kt:internal fun nextBaseMode: DisplayModeSpec?</ID>
+    <ID>ReturnCount:VideoPlayerScreen.kt:fun tuneAdjacentChannel: Boolean</ID>
+    <ID>ReturnCount:VideoPlayerScreen.kt:fun: Boolean</ID>
+    <ID>ReturnCount:VideoPlayerScreen.kt:internal fun CoroutineScope.scheduleChannelZap: Job?</ID>
+    <ID>ReturnCount:WatchingProgress.kt:@Composable internal fun programmeMinutesLeft: Int?</ID>
+    <ID>ReturnCount:WatchingProgress.kt:@Composable internal fun programmeProgress: Float?</ID>
+    <ID>ReturnCount:WatchingProgress.kt:internal fun liveViewerPosition: LiveViewerPosition?</ID>
+    <ID>TooGenericExceptionCaught:RemoteLogoCache.kt:RemoteLogoCache$error: Throwable</ID>
+    <ID>TooManyFunctions:AppRoot.kt:at.bernhardberger.tvhplayer.ui.AppRoot.kt</ID>
+    <ID>TooManyFunctions:ChannelNavigation.kt:ChannelNavigation</ID>
+    <ID>TooManyFunctions:ChannelSchedule.kt:at.bernhardberger.tvhplayer.ui.components.ChannelSchedule.kt</ID>
+    <ID>TooManyFunctions:ChannelsScreen.kt:at.bernhardberger.tvhplayer.ui.screens.ChannelsScreen.kt</ID>
+    <ID>TooManyFunctions:ConnectionFormState.kt:ConnectionFormState</ID>
+    <ID>TooManyFunctions:ConnectionSetupState.kt:ConnectionSetupState</ID>
+    <ID>TooManyFunctions:ConnectionSetupSteps.kt:at.bernhardberger.tvhplayer.ui.screens.onboarding.ConnectionSetupSteps.kt</ID>
+    <ID>TooManyFunctions:EpgGridContent.kt:at.bernhardberger.tvhplayer.ui.screens.guide.EpgGridContent.kt</ID>
+    <ID>TooManyFunctions:HomeContent.kt:at.bernhardberger.tvhplayer.ui.screens.home.HomeContent.kt</ID>
+    <ID>TooManyFunctions:HomeSectionsPolicy.kt:at.bernhardberger.tvhplayer.core.HomeSectionsPolicy.kt</ID>
+    <ID>TooManyFunctions:LivePlayerLayerState.kt:LivePlayerLayerState</ID>
+    <ID>TooManyFunctions:PlaybackKeyPolicy.kt:at.bernhardberger.tvhplayer.core.PlaybackKeyPolicy.kt</ID>
+    <ID>TooManyFunctions:PlaybackOptionsSheet.kt:at.bernhardberger.tvhplayer.ui.player.PlaybackOptionsSheet.kt</ID>
+    <ID>TooManyFunctions:PlaybackStatsOverlay.kt:at.bernhardberger.tvhplayer.ui.player.PlaybackStatsOverlay.kt</ID>
+    <ID>TooManyFunctions:PlayerChromeBarStatus.kt:at.bernhardberger.tvhplayer.ui.player.PlayerChromeBarStatus.kt</ID>
+    <ID>TooManyFunctions:PlayerChromeState.kt:PlayerChromeState</ID>
+    <ID>TooManyFunctions:PlayerLayerState.kt:PlayerLayerState</ID>
+    <ID>TooManyFunctions:PlayerTimelinePresentationState.kt:LiveTimelinePresentationState</ID>
+    <ID>TooManyFunctions:ProgrammeDetailsPage.kt:at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsPage.kt</ID>
+    <ID>TooManyFunctions:RecordingsContent.kt:at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingsContent.kt</ID>
+    <ID>TooManyFunctions:SettingsPlayer.kt:at.bernhardberger.tvhplayer.ui.screens.settings.SettingsPlayer.kt</ID>
+    <ID>TooManyFunctions:SettingsPlayerViewModel.kt:SettingsPlayerViewModel : ViewModel</ID>
+    <ID>TooManyFunctions:SideRail.kt:at.bernhardberger.tvhplayer.ui.components.SideRail.kt</ID>
+    <ID>TooManyFunctions:TimeConverter.kt:at.bernhardberger.tvhplayer.ui.common.TimeConverter.kt</ID>
+    <ID>TooManyFunctions:VideoPlayerViewModel.kt:VideoPlayerViewModel : ViewModel</ID>
+    <ID>TooManyFunctions:WatchingProgress.kt:at.bernhardberger.tvhplayer.ui.components.WatchingProgress.kt</ID>
+    <ID>TopLevelPropertyNaming:AppRoot.kt:/** * Autoplay handoff: the full-screen startup screen fades into the first video frames over the * M3 long2 duration with M3 standard easing, after the first picture's [PlayerMotion.PictureHoldMs]. */ internal const val StartupRevealMs = 500</ID>
+    <ID>TopLevelPropertyNaming:ArchiveDepthContent.kt:/** The preview-slot heading reads at the row title size: titleMedium 16sp of titleLarge 22sp. */ internal const val ArchiveHeadingPreviewScale = 16f / 22f</ID>
+    <ID>TopLevelPropertyNaming:ArchiveDepthContent.kt:internal const val RecordingNowLevelId = "recording-now"</ID>
+    <ID>TopLevelPropertyNaming:BrowseContentLayering.kt:/** * The gradient's darkness at the screen edge. The closed rail's icons only need to read over the * backdrop; the open drawer's labels lie over the content, so it darkens like the kit's modal drawer. */ private const val ClosedRailEdgeAlpha = 0.6f</ID>
+    <ID>TopLevelPropertyNaming:BrowseContentLayering.kt:/** The kit's modal drawer scrim, `colorScheme.scrim` at 50%: content under the drawer stays legible. */ private const val ForegroundUnderDrawerAlpha = 0.5f</ID>
+    <ID>TopLevelPropertyNaming:BrowseContentLayering.kt:private const val OpenDrawerEdgeAlpha = 0.95f</ID>
+    <ID>TopLevelPropertyNaming:ChannelAccent.kt:/** The accent's share in the scrolled page's even tint: a calm wash of the channel's colour. */ private const val LogoTintShare = 0.12f</ID>
+    <ID>TopLevelPropertyNaming:ChannelAccent.kt:/** The glow is baked at this fraction of its size; its dither keeps the stretch free of bands. */ private const val LogoGlowScale = 2</ID>
+    <ID>TopLevelPropertyNaming:ChannelNumberOverlay.kt:private const val NotYet = Long.MAX_VALUE</ID>
+    <ID>TopLevelPropertyNaming:ChannelNumberOverlay.kt:private const val PlateShadowAlpha = 0.3f</ID>
+    <ID>TopLevelPropertyNaming:ChannelNumberOverlay.kt:private const val Settled = Long.MIN_VALUE / 2</ID>
+    <ID>TopLevelPropertyNaming:ChannelSchedule.kt:/** The separator of the channel rows' programme line. */ private const val ScheduleSeparator = " • "</ID>
+    <ID>TopLevelPropertyNaming:ChannelSchedule.kt:private const val ScheduleSkeletonRows = 5</ID>
+    <ID>TopLevelPropertyNaming:ChannelsGrid.kt:/** Four columns of the immersive row's cards. */ internal const val ChannelsGridColumns = 4</ID>
+    <ID>TopLevelPropertyNaming:ChannelsImmersiveList.kt:private const val ImmersiveCardLogoWidthFraction = 0.6f</ID>
+    <ID>TopLevelPropertyNaming:ChannelsImmersiveList.kt:private const val ImmersiveListSynopsisLines = 3</ID>
+    <ID>TopLevelPropertyNaming:ChannelsImmersiveList.kt:private const val ImmersiveSynopsisLines = 2</ID>
+    <ID>TopLevelPropertyNaming:CompactZapCard.kt:/** The halo's strength right next to a logo over a picture. */ private const val CompactZapLogoHaloAlpha = 0.6f</ID>
+    <ID>TopLevelPropertyNaming:CompactZapCard.kt:/** The kit reaches about 0.5 at the text's top and 0.8 at the bottom. */ private const val CompactZapScrimTextAlpha = 0.8f</ID>
+    <ID>TopLevelPropertyNaming:CompactZapCard.kt:private const val CompactZapAccentAlpha = 0.48f</ID>
+    <ID>TopLevelPropertyNaming:CompactZapCard.kt:private const val CompactZapLogoWidthFraction = 0.6f</ID>
+    <ID>TopLevelPropertyNaming:CompactZapCard.kt:private const val CompactZapScrimBottomAlpha = 0.95f</ID>
+    <ID>TopLevelPropertyNaming:DepthNavigation.kt:/** * Depth motion follows AOSP TvSettings' two-panel transition: a long, decelerating * slide (`easing_browse`) with a short alpha crossfade, and a 0.6 preview dim. Every * column travels the same single step, so the columns keep their spacing while they * move and the one leaving the active slot keeps the arriving column's velocity. */ internal const val DepthSlideMillis = 1000</ID>
+    <ID>TopLevelPropertyNaming:DepthNavigation.kt:/** * The parent column left of the active one dims further than the preview while it slides off, * then fades out once the slide has settled: its trailing edge would otherwise rest beside the * rail, where its folder arrows read as the rail's own. */ internal const val DepthParentAlpha = 0f</ID>
+    <ID>TopLevelPropertyNaming:DepthNavigation.kt:/** How long a restore waits for its row to compose before it lets the pane go. */ private const val RestoreFocusWaitMillis = 1000L</ID>
+    <ID>TopLevelPropertyNaming:DepthNavigation.kt:internal const val DepthAlphaMillis = 200</ID>
+    <ID>TopLevelPropertyNaming:DepthNavigation.kt:internal const val DepthParentSlideAlpha = 0.25f</ID>
+    <ID>TopLevelPropertyNaming:DepthStack.kt:/** How many left levels keep their focused row and viewport; the oldest left is forgotten first. */ internal const val DepthRememberedLevels = 64</ID>
+    <ID>TopLevelPropertyNaming:EmbeddedProgressCardBorder.kt:/** One way of the pulse, solid to faint; a whole breath takes twice as long. */ internal const val CardFocusRingPulseMs = 1500</ID>
+    <ID>TopLevelPropertyNaming:EmbeddedProgressCardBorder.kt:/** The ring's alpha at the faint end of its pulse, as Google TV Home's ring reads over its backdrop. */ internal const val CardFocusRingPulseLow = 0.45f</ID>
+    <ID>TopLevelPropertyNaming:EpgGridContent.kt:/** Programmes outside the chosen genre draw their content at half strength. */ private const val GuideOutsideGenreAlpha = 0.5f</ID>
+    <ID>TopLevelPropertyNaming:EpgGridContent.kt:private const val GuideSkeletonBlockSec = 3_600L</ID>
+    <ID>TopLevelPropertyNaming:EpgGridContent.kt:private const val GuideSkeletonTimeFraction = 0.4f</ID>
+    <ID>TopLevelPropertyNaming:FocusedInfo.kt:/** How long focus must rest after a held key before the focused card's info returns. */ internal const val FocusedInfoSettleMs = 250L</ID>
+    <ID>TopLevelPropertyNaming:FocusedInfo.kt:private const val FocusedInfoInDelayMs = 120</ID>
+    <ID>TopLevelPropertyNaming:FocusedInfo.kt:private const val FocusedInfoInMs = 180</ID>
+    <ID>TopLevelPropertyNaming:FocusedInfo.kt:private const val FocusedInfoOutDelayMs = 30</ID>
+    <ID>TopLevelPropertyNaming:FocusedInfo.kt:private const val FocusedInfoOutMs = 120</ID>
+    <ID>TopLevelPropertyNaming:FocusedInfo.kt:private const val FocusedInfoTotalMs = FocusedInfoInDelayMs + FocusedInfoInMs</ID>
+    <ID>TopLevelPropertyNaming:GuideHeadline.kt:/** How long focus rests on a programme before the headline and its picture follow it. */ internal const val GuideHeadlineSettleMs = 200L</ID>
+    <ID>TopLevelPropertyNaming:GuideViewport.kt:/** How much of the programme on air must be readable for it to keep the window around now. */ private const val GuideOnAirReadableSec = 1800L</ID>
+    <ID>TopLevelPropertyNaming:HomeEmptyState.kt:/** Most cold starts have their rows by then; those never see the indicator. */ private const val HomeLoadingIndicatorDelayMs = 1_500L</ID>
+    <ID>TopLevelPropertyNaming:LivePlayerServerWait.kt:internal const val LivePlayerServerWaitTag = "player-server-wait"</ID>
+    <ID>TopLevelPropertyNaming:LogoGlowPolicy.kt:/** The accent's share at the glow's centre: a normalized accent there reads like Google TV's corner. */ private const val LogoGlowPeak = 0.55f</ID>
+    <ID>TopLevelPropertyNaming:LogoGlowPolicy.kt:/** The glow's reach from the top-right corner, as shares of the width and the height. */ private const val LogoGlowReachX = 0.9f</ID>
+    <ID>TopLevelPropertyNaming:LogoGlowPolicy.kt:private const val LogoGlowReachY = 1.2f</ID>
+    <ID>TopLevelPropertyNaming:MainStartupLoadingFeedback.kt:internal const val MainStartupBriefWaitMillis = 400L</ID>
+    <ID>TopLevelPropertyNaming:MainStartupPresentation.kt:/** Shown cold-start screens stay at least this long, so they can be read; one never shown waits for nothing. */ internal const val ColdStartMinimumVisibleMillis = 500L</ID>
+    <ID>TopLevelPropertyNaming:MainStartupScreen.kt:private const val MainStartupMarkTag = "main-startup-mark"</ID>
+    <ID>TopLevelPropertyNaming:MainStartupScreen.kt:private const val MainStartupRootTag = "main-startup-root"</ID>
+    <ID>TopLevelPropertyNaming:PlayerActionRow.kt:/** Material disabled content alpha, used for a pause control that stays focusable. */ internal const val PauseUnavailableIconAlpha = TvTextDisabledAlpha</ID>
+    <ID>TopLevelPropertyNaming:PlayerErrorSurfaces.kt:internal const val PlayerChannelMessageDetailTag = "player-channel-unavailable-detail"</ID>
+    <ID>TopLevelPropertyNaming:PlayerErrorSurfaces.kt:internal const val PlayerChannelMessageTag = "player-channel-unavailable"</ID>
+    <ID>TopLevelPropertyNaming:PlayerErrorSurfaces.kt:private const val NoDeadline = Long.MIN_VALUE</ID>
+    <ID>TopLevelPropertyNaming:PlayerIdentityCard.kt:/** The [PlayerChromeActions.restoreFocus] token that returns focus to the controls' [PlayerTopIdentity]. */ internal const val PlayerIdentityCardTag = "player-identity-card"</ID>
+    <ID>TopLevelPropertyNaming:PlayerTopIdentity.kt:/** How much of a page's opening the identity takes to give way to the strip. */ private const val IdentityPageMorphMs = 200f</ID>
+    <ID>TopLevelPropertyNaming:PlayerTopIdentity.kt:/** The identity's share of the strip's chip: 48dp of 64dp. */ private const val IdentityMorphShrink = 0.25f</ID>
+    <ID>TopLevelPropertyNaming:PlayerTopIdentity.kt:/** The live top identity's test tag. */ internal const val PlayerTopIdentityTag = "player-top-identity"</ID>
+    <ID>TopLevelPropertyNaming:PlayerTopIdentity.kt:private const val ArrowAlpha = TvPassiveAlpha</ID>
+    <ID>TopLevelPropertyNaming:ProgrammeAgeRating.kt:// Long enough for FSK, FSF, PEGI, BBFC, MPAA and similar codes. private const val MaxRatingCodeLength = 6</ID>
+    <ID>TopLevelPropertyNaming:ProgrammeDetailsPage.kt:/** Google TV's scrolled details page measured about 0.6 of the sharp art's brightness. */ private const val DetailsScrolledDimAlpha = .4f</ID>
+    <ID>TopLevelPropertyNaming:ProgrammeDetailsPage.kt:/** The reader keeps at least its original dim, or the measured readable dim when that is stronger. */ private const val DetailsReadingDimAlpha = .6f</ID>
+    <ID>TopLevelPropertyNaming:ProgrammeDetailsPage.kt:/** The scrim's reach from the top-right corner, as shares of the width and the height. */ private const val DetailsScrimReachX = 1f</ID>
+    <ID>TopLevelPropertyNaming:ProgrammeDetailsPage.kt:// Material for TV kit "Immersive row" background image: 758 of 960dp, top-right (Figma 8689:24742). private const val DetailsHeroWidthFraction = 758f / 960f</ID>
+    <ID>TopLevelPropertyNaming:ProgrammeDetailsPage.kt:private const val DetailsBackdropBlurRadius = 3</ID>
+    <ID>TopLevelPropertyNaming:ProgrammeDetailsPage.kt:private const val DetailsBackdropWidth = 160</ID>
+    <ID>TopLevelPropertyNaming:ProgrammeDetailsPage.kt:private const val DetailsScrimReachY = 1.2f</ID>
+    <ID>TopLevelPropertyNaming:ProgrammeInfoSheet.kt:/** The live top identity's chip against the strip's: 64dp to 48dp. */ private const val NowPlayingFromIdentityScale = 64f / 48f</ID>
+    <ID>TopLevelPropertyNaming:ProgrammePane.kt:/** The logo's room in the pane's picture: as wide as on the logo cards, half the picture tall. */ private const val PictureLogoWidthFraction = 0.6f</ID>
+    <ID>TopLevelPropertyNaming:ProgrammePane.kt:private const val PictureLogoHeightFraction = 0.5f</ID>
+    <ID>TopLevelPropertyNaming:QuickZapPresentation.kt:/** The peeking cards' emphasis relative to the action row: present, but quieter than the controls. */ private const val ChannelPeekAlpha = 0.6f</ID>
+    <ID>TopLevelPropertyNaming:RecordingMarkTrack.kt:private const val AdTintAlpha = 0.26f</ID>
+    <ID>TopLevelPropertyNaming:RecordingMarkTrack.kt:private const val AdTintSelectedAlpha = 0.80f</ID>
+    <ID>TopLevelPropertyNaming:RecordingMarkTrack.kt:private const val TickAlpha = 0.55f</ID>
+    <ID>TopLevelPropertyNaming:RecordingMarkerOverlay.kt:/** Symbols stay dimmed so the selected pill remains the row's full-white element. */ private const val HintAlpha = 0.47f</ID>
+    <ID>TopLevelPropertyNaming:RecordingMarkerOverlay.kt:private const val OpenHintAlpha = 0.70f</ID>
+    <ID>TopLevelPropertyNaming:RecordingSkipButton.kt:private const val SkipFocusAllowance = 1.1f</ID>
+    <ID>TopLevelPropertyNaming:RecordingsContent.kt:private const val RecordingSkeletonOverlineFraction = 0.5f</ID>
+    <ID>TopLevelPropertyNaming:RecordingsContent.kt:private const val RecordingSkeletonSupportingFraction = 0.4f</ID>
+    <ID>TopLevelPropertyNaming:RecordingsContent.kt:private const val RecordingsSkeletonRows = 12</ID>
+    <ID>TopLevelPropertyNaming:RowEmphasis.kt:/** * A step from one row to the next where the rows themselves travel. Fitted to the G10's Google TV * launcher, frames 81–103 (240x135 source, under 1 px RMS). */ internal const val RowTravelMs = 410</ID>
+    <ID>TopLevelPropertyNaming:RowEmphasis.kt:/** A card wholly past its row's start keyline, where it lies under the navigation drawer, in the focused row. */ internal const val RowPastStartAlpha = 0.2f</ID>
+    <ID>TopLevelPropertyNaming:RowEmphasis.kt:/** The same in a row without focus, whose own dimming counts towards it. */ private const val DimmedRowPastStartAlpha = 0.12f</ID>
+    <ID>TopLevelPropertyNaming:RowEmphasis.kt:internal const val RowChangeMs = 300</ID>
+    <ID>TopLevelPropertyNaming:RowEmphasis.kt:internal const val RowDimAlpha = 0.4f</ID>
+    <ID>TopLevelPropertyNaming:RowEmphasis.kt:internal const val RowHeaderQuietAlpha = TvPassiveAlpha</ID>
+    <ID>TopLevelPropertyNaming:RowEmphasis.kt:internal const val RowHeaderQuietScale = 14f / 24f</ID>
+    <ID>TopLevelPropertyNaming:SettingsDepthRows.kt:/** The preview-slot title reads at the row title size: titleMedium 16sp of headlineMedium 28sp. */ internal const val SettingsHeadingPreviewScale = 16f / 28f</ID>
+    <ID>TopLevelPropertyNaming:SetupWelcome.kt:private const val WelcomeMorphMs = 450</ID>
+    <ID>TopLevelPropertyNaming:SetupWelcome.kt:private const val WelcomeRevealDelayMs = 300</ID>
+    <ID>TopLevelPropertyNaming:SetupWelcome.kt:private const val WelcomeRevealMs = 400</ID>
+    <ID>TopLevelPropertyNaming:SideRail.kt:/** Fainter than the header buttons' ghost fill: the controls stay subordinate to the title. */ private const val DrawerControlFillAlpha = 0.28f</ID>
+    <ID>TopLevelPropertyNaming:SkeletonLine.kt:// The bar covers the letters of the line, not its leading. private const val SkeletonBarShare = 0.8f</ID>
+    <ID>TopLevelPropertyNaming:SkeletonLine.kt:private const val SkeletonLineWidthFraction = 0.6f</ID>
+    <ID>TopLevelPropertyNaming:SkeletonLine.kt:private const val SkeletonPulseLow = 0.5f</ID>
+    <ID>TopLevelPropertyNaming:SkeletonLine.kt:private const val SkeletonPulsePeriodMillis = 1_600L</ID>
+    <ID>TopLevelPropertyNaming:StartupBrandBackground.kt:/** The light-only plate's resting glow; breathing lifts it to 30%. */ internal const val StartupBrandBackgroundRestingAlpha = 0.2f</ID>
+    <ID>TopLevelPropertyNaming:TvRecoveryOverlay.kt:const val MaxRecoveryActions = 3</ID>
+    <ID>TopLevelPropertyNaming:TvRecoveryOverlay.kt:private const val RecoveryBodyAlpha = 0.8f</ID>
+    <ID>TopLevelPropertyNaming:VideoPlayerScreen.kt:/** Trial: how many recent channels the row below the top identity offers. */ private const val RecentChannelCount = 8</ID>
+    <ID>UnusedParameter:DebugVideoBackdrop.kt:modifier: Modifier = Modifier</ID>
+    <ID>UnusedParameter:DebugVideoBackdrop.kt:visible: Boolean</ID>
+    <ID>UnusedParameter:DepthNavigation.kt:stepPixels: Int</ID>
+    <ID>UnusedParameter:EpgGridContent.kt:endPadding: Dp</ID>
+    <ID>UnusedParameter:EpgGridContent.kt:startPadding: Dp</ID>
+    <ID>UnusedParameter:PlaybackKeyPolicy.kt:timeshiftAvailable: Boolean</ID>
+    <ID>UnusedParameter:PlayerBackPolicy.kt:surface: PlayerSurface</ID>
+    <ID>UnusedParameter:PlayerChrome.kt:/** Retained trial caller input; the passive top identity cannot take focus. */ onChannelCardFocusChanged: (Boolean) -&gt; Unit = {}</ID>
+    <ID>UnusedParameter:PlayerChrome.kt:onRecentRowOpenChange: (Boolean) -&gt; Unit = {}</ID>
+    <ID>UnusedParameter:PlayerChrome.kt:recentRowOpen: Boolean = false</ID>
+    <ID>UnusedParameter:PlayerChromeControls.kt:/** Retained trial caller input; the passive top identity does not handle keys. */ onChannelZap: ((direction: Int, keyTimeMs: Long, repeat: Boolean) -&gt; Unit)? = null</ID>
+    <ID>UnusedParameter:PlayerIdentityCard.kt:channelId: ChannelId?</ID>
+    <ID>UnusedParameter:PlayerTimelinePresentationState.kt:LiveTimelinePresentationState$controlsVisible: Boolean</ID>
+    <ID>UnusedParameter:PlayerTimelinePresentationState.kt:RecordingTimelinePresentationState$controlsVisible: Boolean</ID>
+    <ID>UnusedParameter:RecordingPlayerScreen.kt:keyCode: Int</ID>
+    <ID>WildcardImport:AppNoticeHost.kt:import androidx.compose.foundation.layout.*</ID>
+    <ID>WildcardImport:AppNoticeHost.kt:import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:ArchiveDepthContent.kt:import androidx.compose.foundation.layout.*</ID>
+    <ID>WildcardImport:ArchiveDepthContent.kt:import at.bernhardberger.tvhplayer.ui.components.depth.*</ID>
+    <ID>WildcardImport:ArtworkCardGlow.kt:import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:BrowseContextMenu.kt:import androidx.compose.foundation.layout.*</ID>
+    <ID>WildcardImport:BrowseContextMenu.kt:import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:BrowseContextMenu.kt:import androidx.compose.ui.focus.*</ID>
+    <ID>WildcardImport:BrowseContextMenu.kt:import androidx.compose.ui.input.key.*</ID>
+    <ID>WildcardImport:CentredDialog.kt:import androidx.compose.foundation.layout.*</ID>
+    <ID>WildcardImport:CentredDialog.kt:import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:CentredDialog.kt:import androidx.compose.ui.input.key.*</ID>
+    <ID>WildcardImport:ChannelContextMenu.kt:import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:ChannelContextMenu.kt:import at.bernhardberger.tvheadend.sdk.core.*</ID>
+    <ID>WildcardImport:ChannelSchedule.kt:import androidx.compose.foundation.layout.*</ID>
+    <ID>WildcardImport:ChannelSchedule.kt:import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:ChannelSchedule.kt:import androidx.compose.ui.focus.*</ID>
+    <ID>WildcardImport:ChannelSchedule.kt:import androidx.compose.ui.semantics.*</ID>
+    <ID>WildcardImport:ChannelSchedule.kt:import androidx.tv.material3.*</ID>
+    <ID>WildcardImport:ChannelSchedule.kt:import at.bernhardberger.tvheadend.sdk.core.*</ID>
+    <ID>WildcardImport:DepthNavigation.kt:import androidx.compose.foundation.layout.*</ID>
+    <ID>WildcardImport:DepthNavigation.kt:import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:DepthNavigation.kt:import androidx.compose.ui.focus.*</ID>
+    <ID>WildcardImport:DetailsTint.kt:import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:HomeRecordingActions.kt:import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:HomeRecordingActions.kt:import at.bernhardberger.tvheadend.sdk.core.*</ID>
+    <ID>WildcardImport:HomeRecordingActions.kt:import at.bernhardberger.tvhplayer.core.*</ID>
+    <ID>WildcardImport:HomeRecordingActions.kt:import at.bernhardberger.tvhplayer.notices.*</ID>
+    <ID>WildcardImport:HomeRecordingActions.kt:import at.bernhardberger.tvhplayer.ui.components.*</ID>
+    <ID>WildcardImport:HomeRecordingActions.kt:import at.bernhardberger.tvhplayer.ui.screens.*</ID>
+    <ID>WildcardImport:HomeScreen.kt:import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:HomeScreen.kt:import at.bernhardberger.tvheadend.sdk.core.*</ID>
+    <ID>WildcardImport:HomeScreen.kt:import at.bernhardberger.tvhplayer.core.*</ID>
+    <ID>WildcardImport:PlayerChannelBrowser.kt:import androidx.compose.foundation.layout.*</ID>
+    <ID>WildcardImport:PlayerChannelBrowser.kt:import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:PlayerChannelBrowser.kt:import androidx.compose.ui.input.key.*</ID>
+    <ID>WildcardImport:PlayerChannelBrowser.kt:import at.bernhardberger.tvheadend.sdk.core.*</ID>
+    <ID>WildcardImport:PlayerChannelSchedule.kt:import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:PlayerChannelSchedule.kt:import at.bernhardberger.tvheadend.sdk.core.*</ID>
+    <ID>WildcardImport:PlayerChannelSchedule.kt:import at.bernhardberger.tvhplayer.ui.components.*</ID>
+    <ID>WildcardImport:PlayerInfoBar.kt:import androidx.compose.foundation.layout.*</ID>
+    <ID>WildcardImport:PlayerProgrammeDetails.kt:import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:PlayerProgrammeDetails.kt:import at.bernhardberger.tvheadend.sdk.core.*</ID>
+    <ID>WildcardImport:PlayerProgrammeDetails.kt:import at.bernhardberger.tvhplayer.core.*</ID>
+    <ID>WildcardImport:ProgrammeArtwork.kt:import androidx.compose.foundation.layout.*</ID>
+    <ID>WildcardImport:ProgrammeArtwork.kt:import at.bernhardberger.tvheadend.sdk.core.*</ID>
+    <ID>WildcardImport:ProgrammeArtwork.kt:import at.bernhardberger.tvhplayer.core.*</ID>
+    <ID>WildcardImport:ProgrammeContextMenu.kt:import at.bernhardberger.tvheadend.sdk.core.*</ID>
+    <ID>WildcardImport:ProgrammeContextMenu.kt:import at.bernhardberger.tvhplayer.core.*</ID>
+    <ID>WildcardImport:ProgrammeContextMenu.kt:import at.bernhardberger.tvhplayer.ui.components.*</ID>
+    <ID>WildcardImport:ProgrammeDetailsHost.kt:import androidx.compose.animation.*</ID>
+    <ID>WildcardImport:ProgrammeDetailsHost.kt:import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:ProgrammeDetailsHost.kt:import androidx.compose.ui.input.key.*</ID>
+    <ID>WildcardImport:ProgrammeDetailsHost.kt:import at.bernhardberger.tvheadend.sdk.core.*</ID>
+    <ID>WildcardImport:ProgrammeDetailsHost.kt:import at.bernhardberger.tvhplayer.core.*</ID>
+    <ID>WildcardImport:ProgrammeDetailsHost.kt:import at.bernhardberger.tvhplayer.ui.common.*</ID>
+    <ID>WildcardImport:ProgrammeDetailsHost.kt:import at.bernhardberger.tvhplayer.ui.components.*</ID>
+    <ID>WildcardImport:ProgrammeDetailsLayout.kt:import androidx.compose.foundation.layout.*</ID>
+    <ID>WildcardImport:ProgrammeDetailsLayout.kt:import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:ProgrammeDetailsLayout.kt:import androidx.compose.ui.focus.*</ID>
+    <ID>WildcardImport:ProgrammeDetailsLayout.kt:import androidx.compose.ui.graphics.*</ID>
+    <ID>WildcardImport:ProgrammeDetailsLayout.kt:import androidx.compose.ui.input.key.*</ID>
+    <ID>WildcardImport:ProgrammeDetailsLayout.kt:import androidx.tv.material3.*</ID>
+    <ID>WildcardImport:ProgrammeDetailsPage.kt:import androidx.compose.foundation.layout.*</ID>
+    <ID>WildcardImport:ProgrammeDetailsPage.kt:import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:ProgrammeDetailsPage.kt:import androidx.compose.ui.focus.*</ID>
+    <ID>WildcardImport:ProgrammeDetailsPage.kt:import androidx.compose.ui.graphics.*</ID>
+    <ID>WildcardImport:ProgrammeDetailsPage.kt:import androidx.compose.ui.input.key.*</ID>
+    <ID>WildcardImport:ProgrammeDetailsPage.kt:import androidx.compose.ui.semantics.*</ID>
+    <ID>WildcardImport:ProgrammeDetailsPage.kt:import androidx.tv.material3.*</ID>
+    <ID>WildcardImport:ProgrammeDetailsPage.kt:import at.bernhardberger.tvheadend.sdk.core.*</ID>
+    <ID>WildcardImport:ProgrammeDetailsPage.kt:import at.bernhardberger.tvhplayer.core.*</ID>
+    <ID>WildcardImport:ProgrammeDetailsPage.kt:import at.bernhardberger.tvhplayer.ui.common.*</ID>
+    <ID>WildcardImport:ProgrammeDetailsPage.kt:import at.bernhardberger.tvhplayer.ui.player.*</ID>
+    <ID>WildcardImport:ProgrammeHero.kt:import androidx.compose.foundation.layout.*</ID>
+    <ID>WildcardImport:QuickZapPreview.kt:import androidx.compose.foundation.layout.*</ID>
+    <ID>WildcardImport:QuickZapPreview.kt:import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:RecordingDetailsHost.kt:import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:RecordingDetailsHost.kt:import androidx.compose.ui.input.key.*</ID>
+    <ID>WildcardImport:RecordingDetailsHost.kt:import at.bernhardberger.tvheadend.sdk.core.*</ID>
+    <ID>WildcardImport:RecordingDetailsHost.kt:import at.bernhardberger.tvhplayer.core.*</ID>
+    <ID>WildcardImport:RecordingDetailsHost.kt:import at.bernhardberger.tvhplayer.notices.*</ID>
+    <ID>WildcardImport:RecordingDetailsHost.kt:import at.bernhardberger.tvhplayer.ui.screens.recordings.*</ID>
+    <ID>WildcardImport:RecordingPlaybackChoice.kt:import androidx.compose.foundation.layout.*</ID>
+    <ID>WildcardImport:RecordingPlaybackChoice.kt:import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:RecordingPlaybackChoice.kt:import androidx.compose.ui.focus.*</ID>
+    <ID>WildcardImport:RecordingPlaybackChoice.kt:import androidx.compose.ui.semantics.*</ID>
+    <ID>WildcardImport:RecordingPlaybackChoice.kt:import androidx.tv.material3.*</ID>
+    <ID>WildcardImport:RecordingPlaybackChoice.kt:import at.bernhardberger.tvheadend.sdk.core.*</ID>
+    <ID>WildcardImport:RecordingPlaybackChoice.kt:import at.bernhardberger.tvhplayer.core.*</ID>
+    <ID>WildcardImport:RecordingPlaybackChoice.kt:import at.bernhardberger.tvhplayer.ui.common.*</ID>
+    <ID>WildcardImport:RecordingPlaybackChoice.kt:import at.bernhardberger.tvhplayer.ui.components.*</ID>
+    <ID>WildcardImport:SettingsConnectionOverview.kt:import androidx.compose.foundation.layout.*</ID>
+    <ID>WildcardImport:SettingsConnectionOverview.kt:import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:SettingsConnectionOverview.kt:import androidx.tv.material3.*</ID>
+    <ID>WildcardImport:SettingsConnectionOverview.kt:import at.bernhardberger.tvhplayer.ui.components.depth.*</ID>
+    <ID>WildcardImport:SettingsDepthRows.kt:import androidx.compose.foundation.layout.*</ID>
+    <ID>WildcardImport:SettingsDepthRows.kt:import androidx.compose.ui.semantics.*</ID>
+    <ID>WildcardImport:SettingsDepthRows.kt:import androidx.tv.material3.*</ID>
+    <ID>WildcardImport:SettingsDepthRows.kt:import at.bernhardberger.tvhplayer.ui.components.depth.*</ID>
+    <ID>WildcardImport:SettingsGeneral.kt:import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:SettingsScreen.kt:import androidx.compose.foundation.layout.*</ID>
+    <ID>WildcardImport:SettingsScreen.kt:import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:SettingsScreen.kt:import at.bernhardberger.tvhplayer.ui.*</ID>
+    <ID>WildcardImport:SettingsScreen.kt:import at.bernhardberger.tvhplayer.ui.components.depth.*</ID>
+    <ID>WildcardImport:SettingsScreen.kt:import at.bernhardberger.tvhplayer.ui.screens.settings.*</ID>
+    <ID>WildcardImport:TvPasswordField.kt:import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:TwoColumnDialog.kt:import androidx.compose.foundation.layout.*</ID>
+    <ID>WildcardImport:TwoColumnDialog.kt:import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:TwoColumnDialog.kt:import androidx.compose.ui.input.key.*</ID>
+    <ID>WildcardImport:TwoColumnDialog.kt:import androidx.tv.material3.*</ID>
+    <ID>WildcardImport:TwoColumnDialog.kt:import at.bernhardberger.tvhplayer.ui.player.*</ID>
+  </CurrentIssues>
+</SmellBaseline>

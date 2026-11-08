@@ -71,6 +71,9 @@ when authorized. Your return alone does not trigger full verification.
   not exact dp, copied UI text, call order or internal structure unless that is
   the contract. Reuse `testutil/` and the screen `*Fixture.kt` builders instead
   of local helper copies. Merge or delete tests your change makes redundant.
+  Drive time virtually (`runTest`/test dispatchers, Compose `mainClock`,
+  Robolectric looper idling, Media3 `FakeClock` and `TestPlayerRunHelper`) and
+  wait for signals; no `Thread.sleep`, real `delay` settling or polling loops.
 - Load focused `kotlin-*` and `compose-*` skills for the actual implementation
   question, not every skill associated with a touched file.
 

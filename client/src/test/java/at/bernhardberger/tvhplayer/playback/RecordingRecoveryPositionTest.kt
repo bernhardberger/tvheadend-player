@@ -9,7 +9,6 @@ package at.bernhardberger.tvhplayer.playback
 
 import android.app.Application
 import android.net.Uri
-import android.os.Looper
 import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
@@ -47,11 +46,17 @@ import java.io.FileNotFoundException
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import kotlinx.coroutines.*
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestCoroutineScheduler
+import kotlinx.coroutines.test.runTest
+import kotlin.time.Duration.Companion.seconds
+import androidx.media3.test.utils.FakeClock
+import androidx.media3.test.utils.robolectric.RobolectricUtil
+import androidx.media3.test.utils.robolectric.TestPlayerRunHelper
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 /**
@@ -405,11 +410,15 @@ class RecordingRecoveryPositionTest {
         growing: Boolean = false,
         cutpoints: (suspend () -> DvrCutpointsResult)? = null,
         block: suspend Fixture.() -> Unit,
-    ) = runBlocking {
-        val fixture = Fixture(CoroutineScope(coroutineContext + SupervisorJob()), bookmark, growing, cutpoints)
-        try { withTimeout(120_000) { fixture.block() } }
+    ) = runTest(timeout = 120.seconds) {
+        val fixture = Fixture(CoroutineScope(StandardTestDispatcher(testScheduler) + SupervisorJob()),
+            testScheduler, bookmark, growing, cutpoints)
+        try {
+            fixture.driver.exercise(this, 120_000) { fixture.block() }
+        }
         finally {
             fixture.scope.cancel()
+            testScheduler.runCurrent()
             fixture.runtime.detach()
             fixture.player.release()
             fixture.session.shutdown()
@@ -418,6 +427,7 @@ class RecordingRecoveryPositionTest {
 
     private class Fixture(
         val scope: CoroutineScope,
+        val scheduler: TestCoroutineScheduler,
         private val bookmark: kotlin.time.Duration?,
         private val growing: Boolean,
         cutpoints: (suspend () -> DvrCutpointsResult)?,
@@ -438,6 +448,7 @@ class RecordingRecoveryPositionTest {
             readProfileForEditing = { ServerProfileEditReadResult.Missing }).also { owner -> scope.launch { owner.run() } }
         val media = ControlledRecording()
         val player: ExoPlayer = ExoPlayer.Builder(context)
+            .setClock(FakeClock(true))
             .setRenderersFactory { _, _, _, _, _ -> arrayOf<Renderer>(ConsumingAudioSink()) }
             .build()
 
@@ -464,6 +475,7 @@ class RecordingRecoveryPositionTest {
         val runtime = AppPlaybackRuntime(player, playbackSession,
             coordinator, settings, profiles, scope, TvheadendAudioOutputProvider(context), focus,
             PlaybackRuntimePolicy.fromPlayerSettings(),
+            elapsedRealtime = { scheduler.currentTime },
             noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) })
 
         fun observation(entries: List<DvrEntryId> = listOf(FIRST, SECOND)) = recordings(
@@ -548,9 +560,12 @@ class RecordingRecoveryPositionTest {
             // and that load must reach the armed byte.
             assertTrue("seek target already loaded: ${failurePlayback()}", media.readPosition < byteAt(positionMs))
             runtime.seekTo(positionMs)
-            withTimeoutOrNull(10_000) {
-                while (player.playerError == null) { shadowOf(Looper.getMainLooper()).idleFor(TICK); delay(2) }
-            } ?: throw AssertionError("the armed read failure never surfaced: ${failurePlayback()}")
+            try {
+                TestPlayerRunHelper.advance(player).withTimeoutMs(10_000).untilPlayerError()
+            } catch (timeout: java.util.concurrent.TimeoutException) {
+                throw AssertionError("Timed out waiting for armed read failure: ${failurePlayback()}", timeout)
+            }
+            scheduler.runCurrent()
             assertTrue(runtime.state.value is AppPlaybackState.Failed)
             // A real read error leaves the failed target where it stood.
             assertNear(positionMs, player.currentPosition)
@@ -559,13 +574,15 @@ class RecordingRecoveryPositionTest {
 
         /** Playback reaches [positionMs], keeps playing from there, and has not failed. */
         suspend fun assertEventuallyNear(positionMs: Long) {
-            val arrivedMs = withTimeoutOrNull(30_000) {
-                while (!near(positionMs, player.currentPosition) || !player.isPlaying) tick()
-                player.currentPosition
-            } ?: throw AssertionError("never played near $positionMs: ${playback()}")
-            withTimeoutOrNull(30_000) {
-                while (player.currentPosition < arrivedMs + 1_000) tick()
-            } ?: throw AssertionError("did not play on from $arrivedMs: ${playback()}")
+            driver.await("playing near $positionMs", diagnostics = { playback() }) {
+                near(positionMs, player.currentPosition) && player.isPlaying
+            }
+            val arrivedMs = player.currentPosition
+            try {
+                TestPlayerRunHelper.advance(player).withTimeoutMs(30_000).untilPositionAtLeast(arrivedMs + 1_000)
+            } catch (timeout: java.util.concurrent.TimeoutException) {
+                throw AssertionError("Timed out waiting for resumed playback progress: ${playback()}", timeout)
+            }
             assertNull("player error: ${playback()}", player.playerError)
             assertTrue("not playing: ${playback()}", player.isPlaying)
             assertNear(positionMs, player.currentPosition)
@@ -578,22 +595,23 @@ class RecordingRecoveryPositionTest {
             "buffered=${player.bufferedPosition} state=${player.playbackState} loading=${player.isLoading} " +
             "playWhenReady=${player.playWhenReady} readByte=${media.readPosition} armedByte=${media.failFromByte}"
 
-        private suspend fun tick() {
-            shadowOf(Looper.getMainLooper()).idleFor(TICK)
-            delay(2)
-        }
+        val driver = PlaybackTestDriver(scheduler, waitTimeoutMillis = 10_000)
 
-        // Media3 schedules its playback loop on Robolectric's clock; idling alone never advances it.
-        suspend fun awaitMain(condition: () -> Boolean) = withTimeout(10_000) {
-            while (!condition()) { shadowOf(Looper.getMainLooper()).idleFor(TICK); delay(2) }
-        }
+        fun awaitMain(condition: () -> Boolean) = driver.await("recording playback condition", predicate = condition)
 
-        suspend fun settleMain() { repeat(20) { tick() } }
+        fun settleMain() {
+            scheduler.advanceTimeBy(1_000)
+            scheduler.runCurrent()
+            TestPlayerRunHelper.advance(player).untilPendingCommandsAreFullyHandled()
+            scheduler.runCurrent()
+        }
 
         suspend fun awaitRecoveryTimeout() {
             assertNotNull(coordinator.pendingRecordingRecoveryPosition.value)
-            // Pump both the SDK's Handler timeout and Media3's real playback threads.
-            awaitMain { coordinator.pendingRecordingRecoveryPosition.value == null }
+            RobolectricUtil.runMainLooperUntil({
+                scheduler.runCurrent()
+                coordinator.pendingRecordingRecoveryPosition.value == null
+            }, 10_000, androidx.media3.common.util.Clock.DEFAULT)
         }
     }
 
@@ -746,7 +764,6 @@ class RecordingRecoveryPositionTest {
         const val RECORDING_MS = 30 * 60_000
         const val WAV_HEADER = 44
         const val LOAD_CHECK_BYTES = 10_000 // 10 s of the recording
-        val TICK: java.time.Duration = java.time.Duration.ofMillis(50)
         val RECORDING_START: Instant = Instant.fromEpochSeconds(1_700_000_000)
 
         fun wav(lengthMs: Int): ByteArray = java.nio.ByteBuffer.allocate(WAV_HEADER + lengthMs)

@@ -1,0 +1,17 @@
+# No default rules: test policy is deliberately limited to these two contracts.
+config:
+  validation: true
+
+naming:
+  active: true
+  ClassNaming:
+    active: true
+    classPattern: '(?!.*(Review|Slice|Evidence|Acceptance|PreRelease))[A-Z][a-zA-Z0-9]*'
+
+style:
+  active: true
+  ForbiddenMethodCall:
+    active: true
+    methods:
+      - value: 'java.lang.Thread.sleep'
+        reason: 'Use virtual time or fakes instead of real-clock waits in tests.'
