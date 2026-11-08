@@ -661,7 +661,6 @@
     <string name="channel_schedule_gap">%1$s之前没有节目信息</string>
     <string name="channel_schedule_end">%1$s之后没有节目信息</string>
     <string name="channel_schedule_loading_more">正在加载后续日期</string>
-    <string name="recording_choice_watch_channel">观看频道</string>
     <string name="recording_choice_play">播放录制内容</string>
     <string name="context_resume_from">从%1$s继续播放</string>
     <string name="home_all_scheduled">全部录制计划</string>

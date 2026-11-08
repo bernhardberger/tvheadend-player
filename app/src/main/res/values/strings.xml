@@ -59,7 +59,6 @@
     <string name="context_show_guide">Show in Guide</string>
     <string name="context_resume">Resume</string>
     <string name="context_start_over">Watch from beginning</string>
-    <string name="recording_choice_watch_channel">Watch channel</string>
     <string name="recording_choice_play">Play recording</string>
     <string name="context_resume_from">from %1$s</string>
     <string name="home_all_scheduled">All scheduled</string>

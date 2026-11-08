@@ -706,7 +706,6 @@
     <string name="channel_schedule_gap">Χωρίς πληροφορίες προγράμματος έως %1$s</string>
     <string name="channel_schedule_end">Χωρίς πληροφορίες προγράμματος μετά τις %1$s</string>
     <string name="channel_schedule_loading_more">Φόρτωση επόμενων ημερών</string>
-    <string name="recording_choice_watch_channel">Προβολή καναλιού</string>
     <string name="recording_choice_play">Αναπαραγωγή εγγραφής</string>
     <string name="context_resume_from">από %1$s</string>
     <string name="home_all_scheduled">Όλες οι προγραμματισμένες</string>

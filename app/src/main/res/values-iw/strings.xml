@@ -721,7 +721,6 @@
     <string name="channel_schedule_gap">אין מידע על תוכניות עד %1$s</string>
     <string name="channel_schedule_end">אין מידע על תוכניות אחרי %1$s</string>
     <string name="channel_schedule_loading_more">טעינת ימים מאוחרים יותר</string>
-    <string name="recording_choice_watch_channel">צפייה בערוץ</string>
     <string name="recording_choice_play">הפעלת הקלטה</string>
     <string name="context_resume_from">מ־%1$s</string>
     <string name="home_all_scheduled">כל המתוזמנות</string>

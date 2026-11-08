@@ -30,6 +30,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -97,6 +98,7 @@ internal fun CentredDialog(
     text: String,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    width: Dp = 528.dp,
     backEnabled: Boolean = true,
     secondaryText: String? = null,
     eyebrow: (@Composable () -> Unit)? = null,
@@ -163,7 +165,7 @@ internal fun CentredDialog(
                 }, label = "dialog-options") { alternative ->
             PlayerMotionFrame(leaving = (alternative != null) != (alternativeContent != null)) {
             if (alternative != null) alternative() else {
-            Column(Modifier.width(528.dp).clip(RoundedCornerShape(16.dp)).background(TvSurfaceColors.container)
+            Column(Modifier.width(width).clip(RoundedCornerShape(16.dp)).background(TvSurfaceColors.container)
                 .testTag("centred-dialog-card").padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp)) {
                 Column(Modifier.fillMaxWidth().testTag("centred-dialog-content")) {
@@ -184,7 +186,8 @@ internal fun CentredDialog(
                             color = TvTextColors.secondary)
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), content = actions)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp), content = actions)
             }
             }
             }

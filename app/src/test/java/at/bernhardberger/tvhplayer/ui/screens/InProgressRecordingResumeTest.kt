@@ -70,7 +70,9 @@ class InProgressRecordingResumeTest {
         var watched: at.bernhardberger.tvheadend.sdk.core.ChannelId? = null
         val starts = openDetails(754L, directly = true, onWatch = { id, _ -> watched = id })
         compose.onNodeWithTag("recording-resume").assertIsFocused()
-            .performKeyInput { pressKey(Key.DirectionLeft) }
+            .performKeyInput { pressKey(Key.DirectionRight) }
+        compose.onNodeWithTag("recording-start-over").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionRight) }
         compose.onNodeWithTag("recording-watch-live").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionCenter) }
         compose.runOnIdle {
@@ -92,7 +94,9 @@ class InProgressRecordingResumeTest {
         val starts = openDetails(754L, directly = true, onWatch = { _, _ -> error("stale Watch live") },
             latestObservation = { latest })
         compose.onNodeWithTag("recording-resume").assertIsFocused()
-            .performKeyInput { pressKey(Key.DirectionLeft) }
+            .performKeyInput { pressKey(Key.DirectionRight) }
+        compose.onNodeWithTag("recording-start-over").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionRight) }
         compose.onNodeWithTag("recording-watch-live").assertIsFocused()
         compose.runOnIdle { latest = observation(754L) }
         compose.onNodeWithTag("recording-watch-live").performKeyInput { pressKey(Key.DirectionCenter) }

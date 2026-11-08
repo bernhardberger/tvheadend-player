@@ -706,7 +706,6 @@
     <string name="channel_schedule_gap">Nincs műsorinformáció eddig: %1$s</string>
     <string name="channel_schedule_end">Nincs műsorinformáció ezután: %1$s</string>
     <string name="channel_schedule_loading_more">Későbbi napok betöltése</string>
-    <string name="recording_choice_watch_channel">Csatorna nézése</string>
     <string name="recording_choice_play">Felvétel lejátszása</string>
     <string name="context_resume_from">innen: %1$s</string>
     <string name="home_all_scheduled">Összes ütemezett</string>

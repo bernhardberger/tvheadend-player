@@ -110,7 +110,7 @@ internal fun BrowseContextMenu(
                 TwoColumnDialogButton(
                     stringResource(when {
                         action == BrowseContextAction.WATCH_LIVE && recordingState in
-                            listOf(DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR) -> R.string.recording_choice_watch_channel
+                            listOf(DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR) -> R.string.context_watch_channel
                         programDetailsLabel && action == BrowseContextAction.DETAILS -> R.string.details_program
                         else -> action.label(watchChannel)
                     }),

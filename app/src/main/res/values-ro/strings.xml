@@ -721,7 +721,6 @@
     <string name="channel_schedule_gap">Nu există informații despre emisiuni până la %1$s</string>
     <string name="channel_schedule_end">Nu există informații despre emisiuni după %1$s</string>
     <string name="channel_schedule_loading_more">Se încarcă zilele următoare</string>
-    <string name="recording_choice_watch_channel">Vizionează canalul</string>
     <string name="recording_choice_play">Redă înregistrarea</string>
     <string name="context_resume_from">de la %1$s</string>
     <string name="home_all_scheduled">Toate programările</string>

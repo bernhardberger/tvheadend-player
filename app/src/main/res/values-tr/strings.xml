@@ -706,7 +706,6 @@
     <string name="channel_schedule_gap">%1$s saatine kadar program bilgisi yok</string>
     <string name="channel_schedule_end">%1$s saatinden sonra program bilgisi yok</string>
     <string name="channel_schedule_loading_more">Sonraki günler yükleniyor</string>
-    <string name="recording_choice_watch_channel">Kanalı izle</string>
     <string name="recording_choice_play">Kaydı oynat</string>
     <string name="context_resume_from">%1$s konumundan</string>
     <string name="home_all_scheduled">Tüm planlananlar</string>

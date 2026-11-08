@@ -722,7 +722,6 @@
     <string name="channel_schedule_gap">Aucune information sur les programmes jusqu’à %1$s</string>
     <string name="channel_schedule_end">Aucune information sur les programmes après %1$s</string>
     <string name="channel_schedule_loading_more">Chargement des jours suivants</string>
-    <string name="recording_choice_watch_channel">Regarder la chaîne</string>
     <string name="recording_choice_play">Lire l’enregistrement</string>
     <string name="context_resume_from">à partir de %1$s</string>
     <string name="home_all_scheduled">Tous les programmés</string>

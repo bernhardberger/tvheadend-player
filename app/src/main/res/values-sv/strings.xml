@@ -706,7 +706,6 @@
     <string name="channel_schedule_gap">Ingen programinformation fram till %1$s</string>
     <string name="channel_schedule_end">Ingen programinformation efter %1$s</string>
     <string name="channel_schedule_loading_more">Laddar senare dagar</string>
-    <string name="recording_choice_watch_channel">Titta på kanal</string>
     <string name="recording_choice_play">Spela upp inspelningen</string>
     <string name="context_resume_from">från %1$s</string>
     <string name="home_all_scheduled">Alla schemalagda</string>

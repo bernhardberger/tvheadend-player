@@ -706,7 +706,6 @@
     <string name="channel_schedule_gap">Ei ohjelmatietoja ennen ajankohtaa %1$s</string>
     <string name="channel_schedule_end">Ei ohjelmatietoja ajankohdan %1$s jälkeen</string>
     <string name="channel_schedule_loading_more">Ladataan myöhempiä päiviä</string>
-    <string name="recording_choice_watch_channel">Katso kanavaa</string>
     <string name="recording_choice_play">Toista tallenne</string>
     <string name="context_resume_from">kohdasta %1$s</string>
     <string name="home_all_scheduled">Kaikki ajastetut</string>

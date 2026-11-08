@@ -302,8 +302,8 @@ Each card behaves like the screen it comes from.
 
 **Recording choice dialog:** OK on an active recording opens the existing
 centred resume dialog (`RecordingsScreen.kt`, `CentredDialog`) with up to three
-buttons: **Watch channel** (tunes the channel), **Resume from …**
-(only with a resume position) and **Watch from beginning**. Without a resume
+buttons: **Resume from …** (only with a resume position),
+**Watch from beginning** and **Watch channel** (tunes the channel), in that order. Without a resume
 point the start action is **Play recording**, with the play icon; with one,
 Watch from beginning uses the replay icon. Resume takes initial
 focus when offered; otherwise Play recording does. That default action is
@@ -400,7 +400,7 @@ How phase 2 is presented remains open; the removed tabs are not a requirement.
 2. OK and Hold OK per card as in [3.6](#36-ok-and-hold-ok-on-each-card); On now
    tunes on OK.
 3. Active recordings (Home and Recordings → Recording now) open the choice dialog
-   Watch channel / Resume from … / Watch from beginning.
+   Resume from … / Watch from beginning / Watch channel (or Play recording / Watch channel without a resume point).
 4. Warm playback keeps the video as background; no artwork backdrop then.
 5. Recents: one history, per server profile, up to 20 stored; Home and the
    player show up to 8; shared-scope filter; playing channel left out.
