@@ -548,8 +548,11 @@ class RecordingPlayerChromeScreenTest {
         settle()
         key(Key.DirectionCenter)
         assertFalse("the page replaces the root", exists("playback-options-stats"))
-        key(Key.Back)
-        assertTrue("Back returns to the root", exists("playback-options-stats"))
+        repeatedLeftCycle {
+            assertFalse("Left down and repeats must not leave the detail before release", exists("playback-options-stats"))
+        }
+        assertTrue("one Left cycle returns exactly one level to the root", exists("playback-options-stats"))
+        assertEquals(listOf("playback-options-display"), focused())
         key(Key.Back)
         assertFalse(exists("playback-options-display"))
         assertEquals("closing the options returns focus to their gear", listOf("player-settings"), focused())
@@ -582,18 +585,23 @@ class RecordingPlayerChromeScreenTest {
     }
 
     @Test fun leftClosesTheOptionsRootLikeBack() {
-        screen()
+        var playerCloses = 0
+        screen(onClose = { playerCloses++ })
         playing()
         positionMs = 600_000L
         val position = positionMs
         key(Key.Menu)
         assertTrue(exists("playback-options-display"))
-        key(Key.DirectionLeft)
+        repeatedLeftCycle {
+            assertTrue("Left down and repeats must keep the root until release", exists("playback-options-display"))
+            assertEquals(position, positionMs)
+            assertFalse(exists("recording-seek-preview"))
+        }
         assertFalse(exists("playback-options-display"))
         assertEquals(listOf("player-settings"), focused())
         assertEquals("the whole Left press belongs to the sheet, not a backward seek", position, positionMs)
         assertFalse("closing the sheet must not start a seek preview", exists("recording-seek-preview"))
-        assertFalse(texts("−0:30") || texts("-0:30"))
+        assertEquals("one Left cycle closes only the options, not the player", 0, playerCloses)
     }
 
     @Test fun theAudioKeyOpensItsListOverWhatTheControlsShowAndBackReturnsThere() {
@@ -927,6 +935,23 @@ class RecordingPlayerChromeScreenTest {
 
     private fun key(key: Key) {
         compose.onRoot().performKeyInput { pressKey(key) }
+        settle()
+    }
+
+    private fun repeatedLeftCycle(beforeRelease: () -> Unit) {
+        val downTime = android.os.SystemClock.uptimeMillis()
+        repeat(4) { repeatCount ->
+            compose.runOnUiThread {
+                rootView.dispatchKeyEvent(AndroidKeyEvent(downTime, android.os.SystemClock.uptimeMillis(),
+                    AndroidKeyEvent.ACTION_DOWN, AndroidKeyEvent.KEYCODE_DPAD_LEFT, repeatCount))
+            }
+            settle()
+            beforeRelease()
+        }
+        compose.runOnUiThread {
+            rootView.dispatchKeyEvent(AndroidKeyEvent(downTime, android.os.SystemClock.uptimeMillis(),
+                AndroidKeyEvent.ACTION_UP, AndroidKeyEvent.KEYCODE_DPAD_LEFT, 0))
+        }
         settle()
     }
 
