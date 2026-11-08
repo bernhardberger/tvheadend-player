@@ -82,6 +82,10 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
 
+/** Prefer real marks on entry; the synthetic start remains available to horizontal navigation. */
+internal fun recordingMarkerOpeningPositions(stops: List<RecordingMarkStop>): List<Long> =
+    stops.filter { it.mark != null }.ifEmpty { stops }.map { it.positionMs }
+
 /** Shared with the screen's ancestor Back interceptor; survives focus relocation. */
 internal class RecordingMarkerNavigation {
     var selectedMs by mutableStateOf<Long?>(null)
