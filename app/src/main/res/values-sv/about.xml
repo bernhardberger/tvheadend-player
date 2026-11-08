@@ -7,12 +7,8 @@
     <string name="about_server">Server</string>
     <string name="about_not_connected">Inte ansluten</string>
     <string name="about_connected">Ansluten</string>
-    <string name="about_license">GNU General Public License v3</string>
-    <string name="about_attribution">Baserad på TVHStream av Preclikos</string>
-    <string name="about_notices">Meddelanden och tredjepartsbibliotek</string>
+    <string name="about_licenses">Licenser</string>
+    <string name="about_licenses_summary">GNU GPL v3 och tredjepartsmeddelanden</string>
     <string name="about_privacy">Integritetspolicy</string>
     <string name="about_translation">Översättning</string>
-    <string name="about_machine_translated">Maskinöversatt</string>
-    <string name="about_machine_translated_details">Ingen har granskat den här översättningen ännu. Rapportera fel som GitHub-ärenden för Tvheadend Player.</string>
-    <bool name="language_machine_translated">true</bool>
 </resources>

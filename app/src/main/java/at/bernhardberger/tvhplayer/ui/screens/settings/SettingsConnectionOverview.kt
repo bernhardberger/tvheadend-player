@@ -125,7 +125,7 @@ internal fun settingsConnectionOverview(
     val retryAction: () -> Unit = { if (!connecting) onRetry() }
     val missing = stringResource(R.string.connection_overview_unavailable)
     val edit = settingsRow(EDIT_CONNECTION, stringResource(R.string.setup_connection),
-        supporting = stringResource(R.string.setup_connection_description), trailingIcon = R.drawable.ic_arrow_forward,
+        supporting = stringResource(R.string.setup_connection_description), trailingIcon = R.drawable.ic_arrow_circle_right,
         onClick = onSetUp)
     val retry = settingsRow(RETRY_CONNECTION, stringResource(R.string.connection_try_again),
         supporting = stringResource(if (connecting) R.string.connection_overview_connecting else R.string.connection_retry_description),

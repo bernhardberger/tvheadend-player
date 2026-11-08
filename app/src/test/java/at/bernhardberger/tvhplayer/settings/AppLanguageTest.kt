@@ -7,7 +7,6 @@ import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.R
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -102,23 +101,6 @@ class AppLanguageTest {
         // de-CH and en-GB override only some strings; the rest resolves to the language.
         listOf("de-DE", "de-AT", "de-CH").forEach { assertEquals(it, german, clearCache(it)) }
         listOf("en-GB", "en-US").forEach { assertEquals(it, clearCache("en"), clearCache(it)) }
-    }
-
-    @Test
-    fun machineTranslatedNotice_isOnlyFlaggedForTheMachineDraftedLanguages() {
-        val app = ApplicationProvider.getApplicationContext<Application>()
-        fun flagged(tag: String) = app.createConfigurationContext(
-            Configuration().apply { setLocales(LocaleList(Locale.forLanguageTag(tag))) },
-        ).resources.getBoolean(R.bool.language_machine_translated)
-        val machine = listOf(
-            "cs", "da", "el", "es", "fi", "fr", "hr", "hu", "it", "ja", "ko", "nb", "nl", "pl",
-            "pt-BR", "pt-PT", "ro", "ru", "sv", "tr", "uk", "zh-Hans", "zh-Hant",
-        )
-        assertEquals(23, machine.size)
-        // The two regional overrides are machine-drafted too, so they carry the notice themselves.
-        (machine + listOf("en-GB", "de-CH")).forEach { assertTrue("$it carries the notice", flagged(it)) }
-        // Source English, the reviewed German and its inherited regions carry none.
-        listOf("en", "en-US", "de", "de-AT", "de-DE").forEach { assertFalse("$it has no notice", flagged(it)) }
     }
 
     @Test

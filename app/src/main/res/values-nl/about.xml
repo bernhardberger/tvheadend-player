@@ -7,12 +7,8 @@
     <string name="about_server">Server</string>
     <string name="about_not_connected">Niet verbonden</string>
     <string name="about_connected">Verbonden</string>
-    <string name="about_license">GNU General Public License v3</string>
-    <string name="about_attribution">Gebaseerd op TVHStream van Preclikos</string>
-    <string name="about_notices">Kennisgevingen en bibliotheken van derden</string>
+    <string name="about_licenses">Licenties</string>
+    <string name="about_licenses_summary">GNU GPL v3 en kennisgevingen van derden</string>
     <string name="about_privacy">Privacybeleid</string>
     <string name="about_translation">Vertaling</string>
-    <string name="about_machine_translated">Machinaal vertaald</string>
-    <string name="about_machine_translated_details">Deze vertaling is nog door niemand gecontroleerd. Meld fouten als GitHub-issues voor Tvheadend Player.</string>
-    <bool name="language_machine_translated">true</bool>
 </resources>
