@@ -99,8 +99,11 @@ repository-local domain overlays, then the focused skill, then local style.
   `testutil/` and the screen `*Fixture.kt` builders instead of local copies. A
   scenario written to prove something for one review belongs in the opt-in
   capture lane or is deleted after the decision. Merging or deleting redundant
-  tests in touched code is in scope. Where the generic `test-driven-development`
-  skill differs, these rules win.
+  tests in touched code is in scope. Tests run on virtual time: `runTest` and
+  test dispatchers, the Compose `mainClock`, Robolectric looper idling, Media3
+  `FakeClock` with `TestPlayerRunHelper`; wait for a signal, never poll the real
+  clock or sleep. Where the generic `test-driven-development` skill differs,
+  these rules win.
 - Small, localized changes finish with the affected tests and owning compilation
   (test tasks already compile their dependencies). Run `./tools/verify` once for
   integration of a completed batch, before release, or for broad/cross-module,
