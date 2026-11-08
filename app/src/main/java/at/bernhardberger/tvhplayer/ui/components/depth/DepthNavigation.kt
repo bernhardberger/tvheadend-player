@@ -25,11 +25,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.*
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
@@ -70,9 +68,6 @@ class DepthLevel(
     // Emphasis is 1 in the active slot and 0 in the preview slot; it follows the strip
     // slide, so a heading can grow while its column moves into the active slot.
     val heading: @Composable (emphasis: () -> Float) -> Unit,
-    // A leaf editor is mounted only while active. Its rows are its independent safe preview.
-    // Editors forward non-editing Left here before a read-only text field consumes it.
-    val activeContent: (@Composable (FocusRequester, (KeyEvent) -> Boolean) -> Unit)? = null,
     val initialItemId: String? = null,
     val passiveContent: (@Composable () -> Unit)? = null,
     val emptyContent: (@Composable () -> Unit)? = null,
@@ -193,7 +188,7 @@ fun DepthNavigation(
     fun resolve(id: String): DepthLevel {
         val candidate = levels[id]
         return candidate?.takeIf {
-            it.rows.isNotEmpty() || it.activeContent != null || it.passiveContent != null || it.emptyContent != null
+            it.rows.isNotEmpty() || it.passiveContent != null || it.emptyContent != null
         } ?: fallbackLevel(id)
     }
     val level = resolve(stack.active.levelId)
@@ -208,12 +203,8 @@ fun DepthNavigation(
     val latestLevels by rememberUpdatedState(levels)
     val latestIsCurrent = rememberUpdatedState(isCurrent)
     val cycles = remember { DepthKeyCycle() }
-    val backCycle = rememberBackKeyCycle(isCurrent && backEnabled && level.activeContent == null &&
+    val backCycle = rememberBackKeyCycle(isCurrent && backEnabled &&
         (state.stack.canPop || onRootBack != null))
-    val editorBackCycle = rememberBackKeyCycle(isCurrent && backEnabled &&
-        level.activeContent != null && state.stack.canPop)
-    val focusManager = LocalFocusManager.current
-    var editorLeftExit by remember { mutableStateOf(false) }
     var pendingRootBack by remember { mutableStateOf<Int?>(null) }
     var pendingRootVisit by remember { mutableLongStateOf(0L) }
     var pendingExit by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -247,16 +238,6 @@ fun DepthNavigation(
     // A choice level opens on its current choice; a browse level where it was left.
     fun openingFrame(stack: DepthStack, levelId: String) =
         if (resolve(levelId).initialItemId != null) DepthFrame(levelId) else stack.frameFor(levelId)
-    fun editorLeft(native: KeyEvent): Boolean {
-        if (!isCurrent || state.stack.visit != stack.visit || level.activeContent == null) return false
-        return cycles.handle(native.keyCode, native.action == KeyEvent.ACTION_DOWN, native.repeatCount) {
-            editorLeftExit = false
-            val moved = focusManager.moveFocus(FocusDirection.Left)
-            // Compose also reports a cancelled focus search as handled.
-            if ((editorLeftExit || !moved) && backEnabled && state.stack.canPop) pop()
-            true
-        }
-    }
     fun activate(row: DepthRow, visit: Long, enterOnly: Boolean = false) {
         if (!latestIsCurrent.value || state.stack.visit != visit) return
         val currentRows = latestLevels[state.stack.active.levelId]?.rows?.takeIf { it.isNotEmpty() } ?: level.rows
@@ -287,16 +268,12 @@ fun DepthNavigation(
         reconciled.frames.forEachIndexed { index, frame ->
             val path = reconciled.frames.take(index + 1).map { it.levelId }
             val columnLevel = resolve(frame.levelId)
-            if (columnLevel.activeContent == null) add(DepthStripColumn(path, columnLevel, frame))
+            add(DepthStripColumn(path, columnLevel, frame))
         }
-        if (level.activeContent == null) {
-            val childId = level.rows.firstOrNull { it.item.id == reconciled.active.focusedItemId }?.previewLevelId
-            if (childId != null) {
-                val previewLevel = resolve(childId)
-                if (previewLevel.activeContent == null) {
-                    add(DepthStripColumn(reconciled.path + childId, previewLevel, openingFrame(reconciled, childId)))
-                }
-            }
+        val childId = level.rows.firstOrNull { it.item.id == reconciled.active.focusedItemId }?.previewLevelId
+        if (childId != null) {
+            val previewLevel = resolve(childId)
+            add(DepthStripColumn(reconciled.path + childId, previewLevel, openingFrame(reconciled, childId)))
         }
     }
     val activeIndex = reconciled.frames.lastIndex
@@ -316,19 +293,14 @@ fun DepthNavigation(
     }
     val displayed = if (moving) unionStrip(held, desired) else desired
 
-    Box(modifier.backKeyCycleFocus(backCycle, editorBackCycle).onPreviewKeyEvent { event ->
+    Box(modifier.backKeyCycleFocus(backCycle).onPreviewKeyEvent { event ->
         if (!isCurrent) {
             backCycle.reset()
-            editorBackCycle.reset()
             return@onPreviewKeyEvent false
         }
         val native = event.nativeKeyEvent
         val code = native.keyCode
         if (code == KeyEvent.KEYCODE_BACK) {
-            if (level.activeContent != null) {
-                backCycle.reset()
-                return@onPreviewKeyEvent false
-            }
             return@onPreviewKeyEvent backCycle.handle(native.action == KeyEvent.ACTION_DOWN,
                 native.repeatCount, native.isCanceled,
                 enabled = backEnabled && (state.stack.canPop || onRootBack != null)) {
@@ -350,7 +322,6 @@ fun DepthNavigation(
         // repeats outran the entering level on the TV and escaped to the tabs.
         val consumed = cycles.handle(code, native.action == KeyEvent.ACTION_DOWN, native.repeatCount, repeats = code == KeyEvent.KEYCODE_DPAD_LEFT) {
             when {
-                level.activeContent != null -> false // The editor/IME owns input before local Back.
                 back && backEnabled && state.stack.canPop -> { pop(); true }
                 (back && backEnabled || up) && exit != null -> {
                     pendingRootBack = code
@@ -374,16 +345,6 @@ fun DepthNavigation(
             if (!native.isCanceled && pendingRootVisit == state.stack.visit) action?.invoke()
         }
         consumed
-    }.onKeyEvent { event ->
-        val native = event.nativeKeyEvent
-        if (!isCurrent || level.activeContent == null) {
-            editorBackCycle.reset()
-            return@onKeyEvent false
-        }
-        if (native.keyCode != KeyEvent.KEYCODE_BACK && native.keyCode != KeyEvent.KEYCODE_DPAD_LEFT) return@onKeyEvent false
-        if (native.keyCode == KeyEvent.KEYCODE_DPAD_LEFT) return@onKeyEvent editorLeft(native)
-        editorBackCycle.handle(native.action == KeyEvent.ACTION_DOWN, native.repeatCount, native.isCanceled,
-            enabled = backEnabled && state.stack.canPop) { pop() }
     }) {
         Box(Modifier.fillMaxSize().padding(start = columnInset)) {
             // Offsets do not enlarge a Box. Include every placed slot in the strip's
@@ -437,7 +398,7 @@ fun DepthNavigation(
                             viewportOffset = if (column.path == state.stack.path) reconciled.active.scrollOffset else column.frame.scrollOffset,
                             onViewport = { index, offset, owned, items ->
                                 if (latestIsCurrent.value && state.stack.visit == owned &&
-                                    state.stack.path == column.path && level.activeContent == null) {
+                                    state.stack.path == column.path) {
                                     state.update(state.stack.viewport(items.getOrNull(index)?.id, index, offset))
                                 }
                             },
@@ -467,80 +428,54 @@ fun DepthNavigation(
                                 if (path != null) {
                                     val childId = path.last()
                                     val previewLevel = resolve(childId)
-                                    if (previewLevel.activeContent == null) {
-                                        val column = DepthStripColumn(path, previewLevel, openingFrame(state.stack, childId))
-                                        key(column.path) {
-                                            val columnVisit = state.stack.visit
-                                            DepthStripPane(
-                                                column = column,
-                                                activePath = state.stack.path,
-                                                isCurrent = isCurrent,
-                                                visit = columnVisit,
-                                                stillOwning = { owned ->
-                                                    latestIsCurrent.value &&
-                                                        column.path == state.stack.path &&
-                                                        state.stack.visit == owned
-                                                },
-                                                stackCanPop = stack.canPop,
-                                                stepPixels = stepPixels,
-                                                xOffset = 0,
-                                                emphasis = { 0f },
-                                                columnWidth = columnWidth,
-                                                contentPadding = contentPadding,
-                                                previewAlpha = previewAlpha,
-                                                parentAlpha = parentAlpha,
-                                                 initialFocusEnabled = initialFocusEnabled,
-                                                 activeFocusRequester = null,
-                                                 pageKeyDirection = null,
-                                                list = listState(column.path, column.frame),
-                                                identities = column.level.rows.map { it.item },
-                                                onFocusItem = { itemId, items, owned ->
-                                                    if (latestIsCurrent.value && state.stack.visit == owned) {
-                                                        state.update(state.stack.focus(itemId, items))
-                                                    }
-                                                },
-                                                onActivate = { row, owned -> activate(row, owned) },
-                                                focusedItemId = column.frame.focusedItemId,
-                                                viewportIndex = column.frame.firstVisibleIndex,
-                                                viewportOffset = column.frame.scrollOffset,
-                                                onViewport = { index, offset, owned, items ->
-                                                    if (latestIsCurrent.value && state.stack.visit == owned &&
-                                                        state.stack.path == column.path && level.activeContent == null) {
-                                                        state.update(state.stack.viewport(items.getOrNull(index)?.id, index, offset))
-                                                    }
-                                                },
-                                            )
-                                        }
-                                    } else {
-                                        Box(Modifier.fillMaxSize()) {}
+                                    val column = DepthStripColumn(path, previewLevel, openingFrame(state.stack, childId))
+                                    key(column.path) {
+                                        val columnVisit = state.stack.visit
+                                        DepthStripPane(
+                                            column = column,
+                                            activePath = state.stack.path,
+                                            isCurrent = isCurrent,
+                                            visit = columnVisit,
+                                            stillOwning = { owned ->
+                                                latestIsCurrent.value &&
+                                                    column.path == state.stack.path &&
+                                                    state.stack.visit == owned
+                                            },
+                                            stackCanPop = stack.canPop,
+                                            stepPixels = stepPixels,
+                                            xOffset = 0,
+                                            emphasis = { 0f },
+                                            columnWidth = columnWidth,
+                                            contentPadding = contentPadding,
+                                            previewAlpha = previewAlpha,
+                                            parentAlpha = parentAlpha,
+                                            initialFocusEnabled = initialFocusEnabled,
+                                            activeFocusRequester = null,
+                                            pageKeyDirection = null,
+                                            list = listState(column.path, column.frame),
+                                            identities = column.level.rows.map { it.item },
+                                            onFocusItem = { itemId, items, owned ->
+                                                if (latestIsCurrent.value && state.stack.visit == owned) {
+                                                    state.update(state.stack.focus(itemId, items))
+                                                }
+                                            },
+                                            onActivate = { row, owned -> activate(row, owned) },
+                                            focusedItemId = column.frame.focusedItemId,
+                                            viewportIndex = column.frame.firstVisibleIndex,
+                                            viewportOffset = column.frame.scrollOffset,
+                                            onViewport = { index, offset, owned, items ->
+                                                if (latestIsCurrent.value && state.stack.visit == owned &&
+                                                    state.stack.path == column.path) {
+                                                    state.update(state.stack.viewport(items.getOrNull(index)?.id, index, offset))
+                                                }
+                                            },
+                                        )
                                     }
                                 } else {
                                     Box(Modifier.fillMaxSize()) {}
                                 }
                             }
                         }
-                    }
-                }
-            }
-            if (isCurrent && level.activeContent != null) {
-                val editorFocus = remember { FocusRequester() }
-                val editorVisit = stack.visit
-                LaunchedEffect(stack.visit, initialFocusEnabled) {
-                    if (!initialFocusEnabled) return@LaunchedEffect
-                    editorFocus.requestFocus()
-                }
-                Box(Modifier.fillMaxSize().padding(top = contentPadding.calculateTopPadding(),
-                    bottom = contentPadding.calculateBottomPadding())
-                    .focusProperties {
-                        onExit = {
-                            if (requestedFocusDirection == FocusDirection.Left) {
-                                editorLeftExit = true
-                                cancelFocusChange()
-                            }
-                        }
-                    }.focusGroup()) {
-                    if (state.stack.visit == editorVisit) {
-                        level.activeContent.invoke(editorFocus, ::editorLeft)
                     }
                 }
             }

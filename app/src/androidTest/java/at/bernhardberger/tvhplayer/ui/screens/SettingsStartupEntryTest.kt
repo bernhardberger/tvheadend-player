@@ -3,13 +3,9 @@ package at.bernhardberger.tvhplayer.ui.screens
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.tv.material3.Button
-import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.depth.*
 import at.bernhardberger.tvhplayer.ui.screens.settings.settingsLevel
@@ -91,30 +87,6 @@ class SettingsStartupEntryTest {
         compose.onNodeWithText("App language").assertIsFocused()
         compose.onNodeWithText("German").assertExists()
         assertEquals("general", state.stack.active.levelId)
-    }
-
-    @Test fun dedicatedEditorIsNotMountedByPreviewAndIsRemovedOnDeparture() {
-        var mounted = 0
-        var current by mutableStateOf(true)
-        compose.setContent {
-            TVHeadendPlayerTheme {
-                SettingsScreenNavigation(rememberDepthNavigationState("root"), listOf(
-                    settingsLevel("root", "Settings", listOf(settingsRow("connection", "Connection", child = "editor"))),
-                    settingsLevel("editor", "Connection", listOf(settingsRow("safe", "Open connection settings")),
-                        activeContent = { requester, _ ->
-                            DisposableEffect(Unit) { mounted++; onDispose { mounted-- } }
-                            Button(onClick = {}, modifier = Modifier.focusRequester(requester)) { Text("Editor") }
-                        }),
-                ), isCurrent = current)
-            }
-        }
-        assertEquals(0, mounted)
-        key(Key.DirectionCenter)
-        compose.waitForIdle()
-        assertEquals(1, mounted)
-        compose.runOnIdle { current = false }
-        compose.waitForIdle()
-        assertEquals(0, mounted)
     }
 
     @Test fun missingActiveItemFallsBackToNearestRemainingRow() {

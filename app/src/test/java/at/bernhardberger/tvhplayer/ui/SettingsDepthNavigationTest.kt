@@ -14,7 +14,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -1212,19 +1211,6 @@ class SettingsDepthNavigationTest {
         assertEquals(1, navigation.stack.frames.size)
     }
 
-    @Test fun dedicatedLeafWithoutPreviewRowsStillReceivesInitialFocus() {
-        compose.setContent {
-            TVHeadendPlayerTheme {
-                SettingsScreenNavigation(rememberDepthNavigationState("editor"), listOf(
-                    settingsLevel("editor", "Editor", emptyList(), activeContent = { requester, _ ->
-                        Button(onClick = {}, modifier = Modifier.focusRequester(requester)) { Text("Editor action") }
-                    }),
-                ))
-            }
-        }
-        compose.onNodeWithText("Editor action").assertIsFocused()
-    }
-
     @Test fun rootGeneralLanguageChoiceAndSwitchAreExplicitAndRestoreParent() {
         var language by mutableStateOf(AppLanguage.SYSTEM)
         var clockFormat by mutableStateOf(ClockFormat.SYSTEM)
@@ -1360,35 +1346,6 @@ class SettingsDepthNavigationTest {
         repeat(3) { press(Key.DirectionLeft) }
         compose.onNodeWithText("Level 0 item 12").assertIsFocused()
         assertEquals(parentBounds, compose.onNodeWithText("Level 0 item 12").fetchSemanticsNode().boundsInRoot)
-    }
-
-    @Test fun dedicatedLeafIsNeverMountedAsPreviewOrOutgoingAndBackRestoresInvoker() {
-        var mounted = 0
-        var activations = 0
-        var shellBack = 0
-        lateinit var navigation: DepthNavigationState
-        compose.setContent {
-            TVHeadendPlayerTheme {
-                BackHandler { shellBack++ }
-                navigation = rememberDepthNavigationState("root")
-                SettingsScreenNavigation(navigation, listOf(
-                    settingsLevel("root", "Settings", listOf(settingsRow("connection", "Connection", child = "editor"))),
-                    settingsLevel("editor", "Connection", listOf(settingsRow("safe", "Open connection settings")), activeContent = { requester, _ ->
-                        DisposableEffect(Unit) { mounted++; onDispose { mounted-- } }
-                        Button(onClick = { activations++ }, modifier = Modifier.focusRequester(requester)) { Text("Editor fixture") }
-                    }),
-                ))
-            }
-        }
-        assertEquals(0, mounted)
-        press(Key.DirectionCenter)
-        compose.onNodeWithText("Editor fixture").assertIsFocused()
-        assertEquals(1, mounted)
-        assertEquals(0, activations)
-        press(Key.Back)
-        compose.onNodeWithText("Connection").assertIsFocused()
-        assertEquals(0, mounted)
-        assertEquals(0, shellBack)
     }
 
     @Test fun missingAndEmptyRowsRecoverWithoutStaleFocusOrPreview() {
