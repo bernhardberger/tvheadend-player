@@ -21,6 +21,71 @@ import at.bernhardberger.tvhplayer.core.consumeWarmReturn
 import at.bernhardberger.tvhplayer.core.rearmWarmReturn
 import at.bernhardberger.tvhplayer.core.rearmWarmReturnForPlaybackSelection
 import at.bernhardberger.tvhplayer.core.warmPlaybackTarget
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+/** Browse owns delayed zaps; explicit entry withdraws those and waits for any running start. */
+internal class BrowseChannelStepHandoff {
+    private var generation = 0L
+    private var cancelPending: (() -> Unit)? = null
+    private var running: Job? = null
+    private var playingChannelId: ChannelId? = null
+    private var pendingChannelId: ChannelId? = null
+
+    val channelCursor: ChannelId? get() = pendingChannelId ?: playingChannelId
+
+    fun playbackChanged(channelId: ChannelId?) {
+        playingChannelId = channelId
+    }
+
+    val starting: Boolean get() = running?.isCompleted == false
+
+    fun queue(channelId: ChannelId? = null, cancelPending: () -> Unit): Long {
+        withdrawPending()
+        ++generation
+        pendingChannelId = channelId
+        this.cancelPending = cancelPending
+        return generation
+    }
+
+    fun withdrawPending() {
+        val cancel = cancelPending ?: return
+        ++generation
+        cancelPending = null
+        pendingChannelId = null
+        cancel()
+    }
+
+    fun start(
+        scope: CoroutineScope,
+        token: Long,
+        entryPending: () -> Boolean = { false },
+        onFinished: () -> Unit = {},
+        playback: suspend () -> Unit,
+    ) {
+        if (entryPending() || token != generation || cancelPending == null) return
+        cancelPending = null
+        val superseded = running
+        superseded?.cancel()
+        running = scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            try {
+                superseded?.join()
+                playback()
+            } finally {
+                if (token == generation) pendingChannelId = null
+                onFinished()
+                // A cancelled join must not let the next start leapfrog an older cleanup.
+                withContext(NonCancellable) { superseded?.join() }
+            }
+        }
+    }
+
+    suspend fun joinStart() { running?.join() }
+}
 
 internal sealed interface PlayerRouteTarget {
     data class Live(
@@ -83,6 +148,16 @@ internal class AppRootPlaybackOrchestrator {
         if (activeChannelId != requestedChannelId) startPlayback(viewingIntent)
         if (generation != playbackSelectionGeneration) return null
         return PlayerRouteTarget.Live(requestedChannelId, requestedChannelName)
+    }
+
+    suspend fun startLiveChannelFromBrowse(
+        channelId: ChannelId,
+        viewingIntent: Long,
+        startPlayback: suspend (viewingIntent: Long) -> Unit,
+    ) {
+        ++playbackSelectionGeneration
+        browseNavigationSelected(channelId, null)
+        startPlayback(viewingIntent)
     }
 
     suspend fun requestRecordingPlayer(

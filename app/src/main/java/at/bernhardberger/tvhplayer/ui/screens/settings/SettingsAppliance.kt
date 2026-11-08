@@ -57,7 +57,7 @@ internal fun settingsApplianceLevel(
         stringResource(R.string.settings_appliance),
         if (companionInstalled) listOf(
             settingsRow("setup", setup,
-                trailingIcon = R.drawable.ic_arrow_forward,
+                trailingIcon = R.drawable.ic_open_in_new,
                 supporting = stringResource(
                     if (serviceEnabled) R.string.appliance_service_enabled
                     else R.string.appliance_service_disabled
@@ -66,7 +66,7 @@ internal fun settingsApplianceLevel(
             ),
         ) else listOf(
             settingsRow("companion", title, stringResource(R.string.appliance_companion_not_installed)),
-            settingsRow("setup", setup, trailingIcon = R.drawable.ic_arrow_forward, onClick = { reading = true }),
+            settingsRow("setup", setup, onClick = { reading = true }),
         ),
     )
 }

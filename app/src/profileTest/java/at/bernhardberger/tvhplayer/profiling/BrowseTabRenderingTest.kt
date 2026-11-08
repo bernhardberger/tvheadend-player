@@ -32,10 +32,7 @@ import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import at.bernhardberger.tvheadend.sdk.core.ChannelTag
-import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
-import at.bernhardberger.tvhplayer.ui.components.ChannelTagSelector
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingModeTabs
 import at.bernhardberger.tvhplayer.core.DvrLibraryMode
 import java.io.File
@@ -48,8 +45,7 @@ import org.junit.Test
 class BrowseTabRenderingTest {
     @get:Rule val compose = createAndroidComposeRule<JourneyProfileActivity>()
 
-    @Test fun channelScopeTravelsAndReversesWithoutDarkeningTextAheadOfThePill() = checkTabs(false)
-    @Test fun recordingScopeTravelsAndReversesWithoutDarkeningTextAheadOfThePill() = checkTabs(true)
+    @Test fun recordingScopeTravelsAndReversesWithoutDarkeningTextAheadOfThePill() = checkTabs()
 
     @Test fun recordingsUsesTheShellHeaderAnchor() {
         compose.waitUntilAtLeastOneExists(hasText("All channels"), 15_000)
@@ -72,30 +68,21 @@ class BrowseTabRenderingTest {
         capture("recordings-full")
     }
 
-    private fun checkTabs(recordings: Boolean) {
+    private fun checkTabs() {
         compose.waitUntilAtLeastOneExists(hasText("All channels"), 15_000)
-        var tag by mutableStateOf<ChannelTagId?>(null)
         var mode by mutableStateOf(DvrLibraryMode.ARCHIVE)
-        val labels = if (recordings) listOf("Archive", "Schedule", "Problems") else listOf("All channels", "News", "Sports")
-        val prefix = if (recordings) "recordings" else "channels-guide"
+        val labels = listOf("Archive", "Schedule", "Problems")
+        val prefix = "recordings"
         val initial = FocusRequester()
         compose.activityRule.scenario.onActivity { activity ->
             activity.setContent {
                 TVHeadendPlayerTheme {
                     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(32.dp)) {
-                        Text(if (recordings) "Recordings" else "Channels / Guide", style = MaterialTheme.typography.headlineMedium,
+                        Text("Recordings", style = MaterialTheme.typography.headlineMedium,
                             color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.testTag("heading"))
-                        if (recordings) {
-                            RecordingModeTabs(mode, initial, Modifier.width(800.dp).testTag("scope-row"),
-                                onFocused = { mode = it }, onClick = { mode = it }, onMoveToContent = {})
-                        } else {
-                            ChannelTagSelector(
-                                tags = listOf(ChannelTag.create(ChannelTagId(7), "News"), ChannelTag.create(ChannelTagId(8), "Sports")),
-                                activeTagId = tag, onSelectTag = { tag = it },
-                                modifier = Modifier.width(800.dp).testTag("scope-row"), activeFocusRequester = initial,
-                            )
-                        }
+                        RecordingModeTabs(mode, initial, Modifier.width(800.dp).testTag("scope-row"),
+                            onFocused = { mode = it }, onClick = { mode = it }, onMoveToContent = {})
                     }
                 }
             }

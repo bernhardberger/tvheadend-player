@@ -722,7 +722,6 @@
     <string name="channel_schedule_gap">Nema informacija o emisijama do %1$s</string>
     <string name="channel_schedule_end">Nema informacija o emisijama nakon %1$s</string>
     <string name="channel_schedule_loading_more">Učitavanje sljedećih dana</string>
-    <string name="recording_choice_watch_channel">Gledaj kanal</string>
     <string name="recording_choice_play">Reproduciraj snimku</string>
     <string name="context_resume_from">od %1$s</string>
     <string name="home_all_scheduled">Sva zakazana</string>
@@ -762,4 +761,6 @@
     <string name="appliance_companion_qr_description">QR kôd s koracima za postavljanje prateće aplikacije za način TV prijamnika</string>
     <string name="whats_new">Što je novo</string>
     <string name="whats_new_badge">Novo</string>
+    <string name="whats_new_hint">Novo u %1$s</string>
+    <string name="settings_about_version_summary">Verzija %1$s</string>
 </resources>

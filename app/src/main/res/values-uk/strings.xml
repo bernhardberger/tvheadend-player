@@ -737,7 +737,6 @@
     <string name="channel_schedule_gap">Немає інформації про передачі до %1$s</string>
     <string name="channel_schedule_end">Немає інформації про передачі після %1$s</string>
     <string name="channel_schedule_loading_more">Завантаження наступних днів</string>
-    <string name="recording_choice_watch_channel">Дивитися канал</string>
     <string name="recording_choice_play">Відтворити запис</string>
     <string name="context_resume_from">від %1$s</string>
     <string name="home_all_scheduled">Усі заплановані</string>
@@ -778,4 +777,6 @@
     <string name="appliance_companion_qr_description">QR-код з інструкціями з налаштування застосунку-компаньйона для режиму ТВ-приставки</string>
     <string name="whats_new">Що нового</string>
     <string name="whats_new_badge">Нове</string>
+    <string name="whats_new_hint">Нове у %1$s</string>
+    <string name="settings_about_version_summary">Версія %1$s</string>
 </resources>

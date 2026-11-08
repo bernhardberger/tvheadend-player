@@ -736,7 +736,6 @@
     <string name="channel_schedule_gap">Brak informacji o programach do %1$s</string>
     <string name="channel_schedule_end">Brak informacji o programach po %1$s</string>
     <string name="channel_schedule_loading_more">Wczytywanie kolejnych dni</string>
-    <string name="recording_choice_watch_channel">Oglądaj kanał</string>
     <string name="recording_choice_play">Odtwórz nagranie</string>
     <string name="context_resume_from">od %1$s</string>
     <string name="home_all_scheduled">Wszystkie zaplanowane</string>
@@ -777,4 +776,6 @@
     <string name="appliance_companion_qr_description">Kod QR prowadzący do instrukcji konfiguracji aplikacji towarzyszącej trybu TV</string>
     <string name="whats_new">Co nowego</string>
     <string name="whats_new_badge">Nowe</string>
+    <string name="whats_new_hint">Nowości w %1$s</string>
+    <string name="settings_about_version_summary">Wersja %1$s</string>
 </resources>

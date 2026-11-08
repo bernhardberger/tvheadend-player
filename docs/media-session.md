@@ -83,13 +83,30 @@ because the Media3-to-platform conversion drops the standard genre field.
 
 Live items are marked live and dynamic and have no duration. A recording that
 is still being written is dynamic. Finished recordings report their duration.
-The session does not offer next, previous or channel switching.
+Next is channel up; Previous is channel down. Both use the remote channel keys'
+order, scope and zap pacing. In the player, stepping gives the same feedback as
+the remote channel keys. Behind browse, stepping shows no banner or other feedback.
+While a channel change is still tuning, Next and Previous can be briefly unavailable.
 
 Commands offered to controllers:
 
 - Always: get current item, get metadata, get timeline, stop.
 - Play/pause: recordings, and live channels that can be paused.
 - Seek within the item: recordings that can be seeked.
+- Next/Previous (including next/previous item): live channels while the player
+  screen is showing, or while live playback continues behind browse with warm
+  playback On or Audio only. Not offered for recordings or failed playback.
+
+## Which controllers can send commands
+
+Any app can read the session. Commands are accepted from the system UI, apps
+holding `MEDIA_CONTENT_CONTROL` or `STATUS_BAR_SERVICE`, and apps the user has
+granted notification access. Bridge apps such as the Home Assistant companion
+app use notification access to read media sessions. Media3 ignores commands
+from other apps.
+
+The Player declares visibility of apps with notification access because Media3 cannot
+check a controller package it cannot see on Android 11 and later.
 
 ## Artwork
 

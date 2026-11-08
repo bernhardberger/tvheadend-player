@@ -315,7 +315,7 @@ internal fun PlayerChromeControls(
                                     val markers = recording?.markers.orEmpty()
                                     if (event.key == Key.DirectionUp && markers.isNotEmpty()) {
                                         onInteraction()
-                                        markerNavigation.show(markers, recording?.let { it.targetMs ?: it.positionMs } ?: 0L,
+                                        markerNavigation.show(recordingMarkerOpeningPositions(recording?.markStops.orEmpty()), recording?.let { it.targetMs ?: it.positionMs } ?: 0L,
                                             event.key, recording?.markerRevision ?: 0L)
                                     } else {
                                         relocatingKey = event.key
@@ -349,7 +349,7 @@ internal fun PlayerChromeControls(
                     onSeekMarker = onSeekMarker,
                     onOpenMarkers = {
                         onCommitSeek(); onInteraction()
-                        markerNavigation.show(recording.markers, recording.targetMs ?: recording.positionMs,
+                        markerNavigation.show(recordingMarkerOpeningPositions(recording.markStops), recording.targetMs ?: recording.positionMs,
                             revision = recording.markerRevision)
                     },
                     onSeekTo = { onInteraction(); onSeek(it - (recording.targetMs ?: recording.positionMs)) },

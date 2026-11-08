@@ -11,6 +11,11 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
@@ -39,11 +44,75 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-xhdpi")
 class ChannelScheduleFocusTest {
     @get:Rule val compose = createComposeRule()
+
+    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun overflowingDayTabsFadeWithoutDimmingTheSelectedTab() = assertDayTabFade(LayoutDirection.Ltr)
+
+    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun overflowingDayTabsMirrorInRtl() = assertDayTabFade(LayoutDirection.Rtl)
+
+    private fun assertDayTabFade(direction: LayoutDirection) {
+        val week = List(20) { event(it + 1, NOW + it * 86_400L, NOW + it * 86_400L + 3600) }
+        var events by mutableStateOf(week)
+        var width by mutableStateOf(480.dp)
+        lateinit var view: android.view.View
+        compose.setContent { CompositionLocalProvider(LocalLayoutDirection provides direction) { TVHeadendPlayerTheme { PlaybackOptionsOverlayFrame(panelWidth = width) {
+            view = LocalView.current
+            ChannelSchedule(null, events, NOW, NOW, false, false, { null }, {}, {}, {})
+        } } } }
+        fun image(node: SemanticsNodeInteraction): androidx.compose.ui.graphics.PixelMap {
+            val bounds = node.fetchSemanticsNode().boundsInRoot
+            lateinit var result: androidx.compose.ui.graphics.PixelMap
+            compose.runOnIdle {
+                val bitmap = android.graphics.Bitmap.createBitmap(view.width, view.height, android.graphics.Bitmap.Config.ARGB_8888)
+                view.draw(android.graphics.Canvas(bitmap))
+                result = bitmap.asImageBitmap().toPixelMap(bounds.left.toInt(), bounds.top.toInt(), bounds.width.toInt(), bounds.height.toInt())
+                bitmap.recycle()
+            }
+            return result
+        }
+        compose.waitForIdle()
+        val date = java.time.Instant.ofEpochSecond(week[2].start.epochSeconds).atZone(ZoneId.systemDefault()).toLocalDate()
+        val third = compose.onNodeWithTag("schedule-tab-$date")
+        val original = third.getUnclippedBoundsInRoot()
+        val selected = compose.onNode(isSelected())
+        val beforeSelected = image(selected)
+        val before = image(third)
+        val secondDate = date.minusDays(1)
+        val second = compose.onNodeWithTag("schedule-tab-$secondDate")
+        val beforeSecond = image(second)
+        val list = compose.onNodeWithTag("channel-schedule-list").getUnclippedBoundsInRoot()
+        fun ink(image: androidx.compose.ui.graphics.PixelMap, from: Int = 0, to: Int = image.width): Float =
+            (from until to).sumOf { x -> (0 until image.height).sumOf { y -> (image[x, y].red - image[0, 0].red).coerceAtLeast(0f).toDouble() } }.toFloat()
+        val next = compose.onNodeWithTag("schedule-tab-${date.plusDays(1)}").getUnclippedBoundsInRoot()
+        // A viewport ending in the gap used to fade only empty space despite later days.
+        compose.runOnIdle {
+            val end = if (direction == LayoutDirection.Ltr) original.right - list.left else list.right - original.left
+            val gap = if (direction == LayoutDirection.Ltr) next.left - original.right else original.left - next.right
+            width = end + gap / 2 + PlaybackPanelPadding
+        }
+        compose.waitForIdle()
+        val gapHint = ink(image(third))
+        assertTrue("overflow in a gap must leave visible partial faded label ink", gapHint > 0f && gapHint < ink(before) * .95f)
+        val after = image(third)
+        val afterSelected = image(selected)
+        val visible = minOf(after.width, before.width)
+        val beforeInk = if (direction == LayoutDirection.Ltr) ink(before, 0, visible) else ink(before, before.width - visible, before.width)
+        val afterInk = if (direction == LayoutDirection.Ltr) ink(after, 0, visible) else ink(after, after.width - visible, after.width)
+        assertTrue("overflowing label must fade rather than end at full ink", afterInk < beforeInk * .95f)
+        assertEquals("selected tab stays unfaded", ink(beforeSelected, 0, beforeSelected.width),
+            ink(afterSelected, 0, afterSelected.width), 1f)
+        compose.runOnIdle { width = 480.dp; events = week.take(2) }
+        compose.waitForIdle()
+        val allFit = image(second)
+        assertEquals("all-fit row leaves tab ink unchanged", ink(beforeSecond, 0, beforeSecond.width), ink(allFit, 0, allFit.width), 1f)
+    }
 
     @Test fun liveEntryTabsAndOpeningUseRemoteFocus() {
         var opened: EventId? = null

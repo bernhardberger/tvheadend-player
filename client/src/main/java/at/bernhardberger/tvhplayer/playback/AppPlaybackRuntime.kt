@@ -157,6 +157,15 @@ class AppPlaybackRuntime(
      */
     val sessionStops: Flow<Unit> = lastSessionStop.filter { it >= 0 && it == playbackRequests.get() }.map { }
 
+    private val _sessionChannelStep = MutableStateFlow<((Int) -> Unit)?>(null)
+    internal val sessionChannelStep = _sessionChannelStep.asStateFlow()
+
+    /** The showing live player owns channel order, scope and zap pacing. Returns its cleanup. */
+    fun registerSessionChannelStep(handler: (Int) -> Unit): () -> Unit {
+        _sessionChannelStep.value = handler
+        return { _sessionChannelStep.compareAndSet(handler, null) }
+    }
+
     fun consumeBackgroundNotice(notice: BackgroundPlaybackNotice) {
         _backgroundNotice.compareAndSet(notice, null)
     }
@@ -1888,7 +1897,8 @@ class AppPlaybackRuntime(
      * after it arrived cancels it outright. While it is still the viewer's latest action it
      * stops whatever target is active when it runs (a channel or recording still starting
      * when it arrived included), provided the session is attached and the app is in the
-     * foreground. Also clears a terminal failure after its target has retired.
+     * foreground. Also stops a targetless Starting hand-over and clears a terminal failure
+     * after its target has retired.
      * Registered as pending from arrival until its check (see
      * [enterPlayerScreen]). Announces itself on [sessionStops] together with the intent
      * generation current when it arrived.
@@ -1916,7 +1926,8 @@ class AppPlaybackRuntime(
                 val current = synchronized(intentLock) {
                     endPendingLocked()
                     (isAttached() && foreground &&
-                        (activeTargetEpoch != null || (_activeTarget.value == null && state.value is AppPlaybackState.Failed)) &&
+                        (activeTargetEpoch != null || (_activeTarget.value == null &&
+                            (state.value == AppPlaybackState.Starting || state.value is AppPlaybackState.Failed))) &&
                         request == playbackRequests.get())
                         .also { if (it) userStopIntent = maxOf(userStopIntent, request) }
                 }

@@ -698,7 +698,6 @@
     <string name="channel_schedule_gap">Keine Programminformationen bis %1$s</string>
     <string name="channel_schedule_end">Keine Programminformationen nach %1$s</string>
     <string name="channel_schedule_loading_more">Weitere Tage werden geladen</string>
-    <string name="recording_choice_watch_channel">Sender ansehen</string>
     <string name="recording_choice_play">Aufnahme abspielen</string>
     <string name="context_resume_from">ab %1$s</string>
     <string name="home_all_scheduled">Alle geplanten</string>
@@ -761,4 +760,6 @@
     <string name="skip_landing_five_seconds">5 s vor dem Ende</string>
     <string name="whats_new">Was ist neu?</string>
     <string name="whats_new_badge">Neu</string>
+    <string name="whats_new_hint">Neu in %1$s</string>
+    <string name="settings_about_version_summary">Version %1$s</string>
 </resources>

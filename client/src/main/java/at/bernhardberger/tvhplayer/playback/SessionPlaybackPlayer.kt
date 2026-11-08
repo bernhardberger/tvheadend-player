@@ -44,7 +44,9 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
 
 /** [pausable]: live timeshift is granted, or live pause still awaits the grant or first picture. */
-internal fun sessionPlaybackCommands(target: AppPlaybackTarget?, pausable: Boolean, seekable: Boolean): Player.Commands {
+internal fun sessionPlaybackCommands(
+    target: AppPlaybackTarget?, pausable: Boolean, seekable: Boolean, channelStepAvailable: Boolean = false,
+): Player.Commands {
     if (target == null) return Player.Commands.EMPTY
     return Player.Commands.Builder().addAll(
         Player.COMMAND_GET_CURRENT_MEDIA_ITEM,
@@ -54,6 +56,10 @@ internal fun sessionPlaybackCommands(target: AppPlaybackTarget?, pausable: Boole
     ).apply {
         if (target is AppPlaybackTarget.Recording || pausable) add(Player.COMMAND_PLAY_PAUSE)
         if (target is AppPlaybackTarget.Recording && seekable) add(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
+        if (target is AppPlaybackTarget.Live && channelStepAvailable) addAll(
+            Player.COMMAND_SEEK_TO_NEXT, Player.COMMAND_SEEK_TO_PREVIOUS,
+            Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM, Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,
+        )
     }.build()
 }
 
@@ -212,6 +218,11 @@ class SessionPlaybackPlayer(
 
     /** The activity starts this on the player's looper and cancels it before releasing the session. */
     suspend fun observe(observation: StateFlow<SessionObservation>) = coroutineScope {
+        launch {
+            runtime.sessionChannelStep.collect {
+                if (!closed) invalidateState()
+            }
+        }
         // Small, session-local cache of successes and source absence, never failed loads.
         val cache = java.util.LinkedHashMap<SessionArtworkRequest, ByteArray?>(8, 0.75f, true)
         var cacheSession: CurrentSessionObservation? = null
@@ -325,7 +336,8 @@ class SessionPlaybackPlayer(
             .setDurationUs(if (target is AppPlaybackTarget.Live || player.duration == C.TIME_UNSET) C.TIME_UNSET else player.duration * 1_000)
             .build()
         return super.getState().buildUpon()
-            .setAvailableCommands(failedCommands ?: sessionPlaybackCommands(target, timeshift || livePause.availability.acceptsPause(), seekable))
+            .setAvailableCommands(failedCommands ?: sessionPlaybackCommands(target,
+                timeshift || livePause.availability.acceptsPause(), seekable, runtime.sessionChannelStep.value != null))
             .apply {
                 // A pending channel change: Play/Pause address that channel, not the installed player.
                 if (livePause.selectionPending) {
@@ -352,8 +364,21 @@ class SessionPlaybackPlayer(
     override fun handleSetPlayWhenReady(playWhenReady: Boolean): ListenableFuture<*> =
         awaitCommand(runtime.setSessionPlayWhenReady(playWhenReady) { !closed })
 
-    override fun handleSeek(mediaItemIndex: Int, positionMs: Long, seekCommand: Int): ListenableFuture<*> =
-        awaitCommand(runtime.seekRecordingFromSession(positionMs) { !closed })
+    override fun handleSeek(mediaItemIndex: Int, positionMs: Long, seekCommand: Int): ListenableFuture<*> {
+        val direction = when (seekCommand) {
+            Player.COMMAND_SEEK_TO_NEXT, Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM -> 1
+            Player.COMMAND_SEEK_TO_PREVIOUS, Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM -> -1
+            else -> null
+        }
+        if (direction != null) {
+            // BasePlayer also routes implied no-op/default-position seeks here. These commands
+            // mean channel keys, never a restart, go-live or a seek in the underlying player.
+            if (!closed && runtime.activeTarget.value is AppPlaybackTarget.Live &&
+                runtime.state.value !is AppPlaybackState.Failed) runtime.sessionChannelStep.value?.invoke(direction)
+            return com.google.common.util.concurrent.Futures.immediateVoidFuture()
+        }
+        return awaitCommand(runtime.seekRecordingFromSession(positionMs) { !closed })
+    }
 
     /** The player's own Stop: runtime teardown, then a showing player screen closes. */
     override fun handleStop(): ListenableFuture<*> =

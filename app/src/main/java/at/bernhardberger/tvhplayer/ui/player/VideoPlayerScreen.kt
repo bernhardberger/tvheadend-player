@@ -157,6 +157,9 @@ import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
 
+// An outgoing player can remain composed during the root's route transition.
+internal val LocalSessionChannelStepAllowed = androidx.compose.runtime.compositionLocalOf { true }
+
 private const val CHANNEL_NUMBER_TIMEOUT_MS = 1_500L
 private const val COMPLETE_CHANNEL_NUMBER_TIMEOUT_MS = 250L
 /** How long "No channel" stays readable after an entry that names no channel. */
@@ -960,6 +963,21 @@ fun VideoPlayerScreen(
         // A series' first press tunes at once; its later presses and every repeat settle, so a
         // series tunes its first and its last channel, not one tuner per key press.
         return tuneChannel(channel, zapPacer.settleDelayMs(keyTimeMs, repeat))
+    }
+
+    val sessionChannelStepEnabled = LocalSessionChannelStepAllowed.current && screenActive &&
+        !playerClose.requested && activeTarget is AppPlaybackTarget.Live
+    val latestSessionChannelStep by rememberUpdatedState<(Int) -> Unit> { direction ->
+        if (sessionChannelStepEnabled) {
+            channelNumberInput = ""
+            tuneAdjacentChannel(direction, SystemClock.uptimeMillis(), repeat = false)
+        }
+    }
+    DisposableEffect(playbackRuntime, sessionChannelStepEnabled) {
+        val unregister = if (sessionChannelStepEnabled) {
+            playbackRuntime.registerSessionChannelStep { latestSessionChannelStep(it) }
+        } else null
+        onDispose { unregister?.invoke() }
     }
 
     fun tuneEnteredChannel(): Boolean {

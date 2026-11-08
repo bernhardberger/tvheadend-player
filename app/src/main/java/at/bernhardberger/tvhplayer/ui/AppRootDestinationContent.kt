@@ -61,6 +61,7 @@ internal fun StartupGatedPlayerContent(
 
 @Composable
 internal fun HomeRouteContent(
+    lastUpdateTime: Long?,
     homeFocus: androidx.compose.runtime.MutableState<at.bernhardberger.tvhplayer.core.HomeFocusKey?>,
     contentAllowed: Boolean,
     contentPadding: PaddingValues,
@@ -89,6 +90,7 @@ internal fun HomeRouteContent(
                 onRecoveryDrawn = { recoveryDrawn = true; onContentDrawn() },
                 retainLoadFailure = recoveryDrawn && !homeDrawn) { HomeScreen(
                 onContentDrawn = { homeDrawn = true; onContentDrawn() },
+                lastUpdateTime = lastUpdateTime,
                 focusMemory = homeFocus,
                 contentPadding = contentPadding,
                 initialFocusEnabled = initialFocusEnabled,
