@@ -219,9 +219,10 @@ only for genuine design or visual judgement (table in the harness doc).
 Non-trivial non-UX work requires a pair of independent `android-reviewer`
 dispatches under the harness routing. Slices inside a larger branch use Sol
 (`openai/gpt-6.1-sol`, `xhigh`) plus Sonnet (`claude-code/claude-sonnet-5-5`,
-`high`). Closing end-of-branch reviews and standalone changes use Astra plus an
-Opus pass with task override `model: claude-code/claude-opus-5-5`,
-`reasoning: high` (no named Opus agent). Substantial new/redesigned
+`high`). Standalone changes use Sol (`high`, `xhigh` when critical) plus an
+Opus pass. Closing end-of-branch reviews use Astra (`openai/gpt-6-astra`,
+`high`) plus an Opus pass. The Opus pass is a task override
+`model: claude-code/claude-opus-5-5`, `reasoning: high` (no named Opus agent). Substantial new/redesigned
 TV surfaces require final screenshot-first `tv-ux-reviewer` coverage; use
 `tv-ux-brief` when direction is unresolved. UX review does not replace distinct
 runtime review or physical-TV gates. Low-impact work has no mandatory pair.
