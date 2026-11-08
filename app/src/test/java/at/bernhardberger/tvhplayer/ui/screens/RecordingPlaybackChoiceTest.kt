@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import at.bernhardberger.tvheadend.sdk.core.*
@@ -44,6 +45,11 @@ class RecordingPlaybackChoiceTest {
             assertEquals("All actions share one line", buttons.first().top, bounds.top)
             assertTrue("Actions stay inside the card padding", bounds.left >= content.left && bounds.right <= content.right)
         }
+        val card = compose.onNodeWithTag("centred-dialog-card").getUnclippedBoundsInRoot()
+        val padding = (content.left - card.left) + (card.right - content.right)
+        assertEquals("The card follows the action row, without an empty band",
+            (buttons.last().right - buttons.first().left + padding).value,
+            (card.right - card.left).value, 1f)
         val liveLabel = mutableListOf<TextLayoutResult>()
         compose.onNode(hasText("Watch live") and hasAnyAncestor(hasTestTag("recording-watch-live")), useUnmergedTree = true)
             .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(liveLabel) }
@@ -73,6 +79,7 @@ class RecordingPlaybackChoiceTest {
         compose.onNodeWithText("Watch from beginning").assertDoesNotExist()
         compose.onNodeWithTag("recording-resume").assertDoesNotExist()
         assertLeftToRight("recording-start-over", "recording-watch-live")
+        compose.onNodeWithTag("centred-dialog-card").assertWidthIsEqualTo(528.dp)
         compose.onNodeWithTag("recording-start-over").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionLeft) }
         compose.onNodeWithTag("recording-start-over").assertIsFocused()

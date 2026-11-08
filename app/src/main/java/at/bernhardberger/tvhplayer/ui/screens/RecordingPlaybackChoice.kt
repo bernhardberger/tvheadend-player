@@ -64,7 +64,6 @@ internal fun RecordingPlaybackChoice(
             }
         },
         onDismiss = onClose,
-        width = if (resumePosition != null && onWatchLive != null) 688.dp else 528.dp,
         backEnabled = backEnabled,
     ) {
         LaunchedEffect(firstFocus) { withFrameNanos { }; firstFocus.requestFocus() }
