@@ -741,7 +741,6 @@
     <string name="channel_schedule_gap">Do %1$s nejsou informace o pořadech</string>
     <string name="channel_schedule_end">Po %1$s nejsou informace o pořadech</string>
     <string name="channel_schedule_loading_more">Načítání dalších dnů</string>
-    <string name="recording_choice_watch_channel">Sledovat kanál</string>
     <string name="recording_choice_play">Přehrát nahrávku</string>
     <string name="context_resume_from">od %1$s</string>
     <string name="home_all_scheduled">Všechna plánovaná</string>
@@ -782,4 +781,6 @@
     <string name="appliance_companion_qr_description">QR kód s postupem nastavení doprovodné aplikace pro režim TV přijímače</string>
     <string name="whats_new">Co je nového</string>
     <string name="whats_new_badge">Nové</string>
+    <string name="whats_new_hint">Novinky ve %1$s</string>
+    <string name="settings_about_version_summary">Verze %1$s</string>
 </resources>

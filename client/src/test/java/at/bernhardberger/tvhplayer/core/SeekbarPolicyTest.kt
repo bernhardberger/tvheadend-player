@@ -1,6 +1,14 @@
+@file:OptIn(at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi::class)
+
 package at.bernhardberger.tvhplayer.core
 
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
+import at.bernhardberger.tvhplayer.playback.toAppPresentation
+import at.bernhardberger.tvheadend.sdk.core.*
+import at.bernhardberger.tvheadend.sdk.media3.testing.TimeshiftTestFixture
+import java.time.ZoneId
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -8,6 +16,104 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SeekbarPolicyTest {
+    private val live = Instant.parse("2026-09-07T20:30:00Z")
+    private val a = EpgEvent.create(EventId(1), ChannelId(1),
+        start = Instant.parse("2026-09-07T19:00:00Z"), stop = Instant.parse("2026-09-07T20:00:00Z"), title = "A")
+    private val b = EpgEvent.create(EventId(2), ChannelId(1),
+        start = Instant.parse("2026-09-07T20:00:00Z"), stop = Instant.parse("2026-09-07T21:00:00Z"), title = "B")
+    private fun fixture() = TimeshiftTestFixture(120.minutes).apply {
+        updateHistory(50.minutes, 90.minutes, estimatedLiveEdgeTime = live)
+    }
+    private fun TimeshiftTestFixture.presentation(position: Int = 65) =
+        state.value.toAppPresentation(playbackPosition(position.minutes))
+    private val observation = SessionObservation.create(epgState = EpgRepositoryState.Current(
+        EpgSnapshot.create(events = listOf(b), historicalEvents = listOf(a))))
+    private fun lookup(time: Instant) = observation.eventAt(ChannelId(1), time)
+
+    @Test fun currentBroadcastFallbackRequiresLiveStartOrCommittedNowTiming() {
+        val unknown = AppTimeshiftState(available = true, paused = true, timingKnown = false)
+        val granted = AppTimeshiftState(available = true, timingKnown = false)
+        val known = AppTimeshiftState(available = true, bufferStartMs = -600_000,
+            positionMs = -300_000, liveEdgeMs = 0, timingKnown = true)
+        for ((state, liveStart, expected) in listOf(
+            Triple(unknown, false, null),
+            Triple(AppTimeshiftState(), false, b),
+            Triple(granted, false, null),
+            Triple(granted, true, b),
+            Triple(known, false, null),
+            Triple(known, true, b),
+        )) {
+            assertEquals("state=$state liveStart=$liveStart", expected,
+                committedProgrammeEvent(false, null, state, b, liveStart))
+        }
+    }
+
+    @Test fun retainedProgrammeIdentityAndSlotsNeverBorrowTheCurrentBroadcast() {
+        val fixture = fixture()
+        val state = fixture.presentation(55)
+        val window = requireNotNull(programmePositionWindow(state, eventAt = ::lookup))
+        assertEquals(a, window.event)
+        assertEquals(a, committedProgrammeEvent(true, window.event, state, b, liveStart = true))
+        val cold = SessionObservation.create(epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = listOf(b))))
+        val slot = requireNotNull(programmePositionWindow(state) { cold.eventAt(ChannelId(1), it) })
+        assertNull(slot.event)
+        assertEquals(Instant.parse("2026-09-07T19:30:00Z") to Instant.parse("2026-09-07T20:00:00Z"), slot.start to slot.stop)
+        assertNull(committedProgrammeEvent(true, slot.event, state, b, liveStart = true))
+    }
+
+    @Test fun restartRejectsRetainedMappingEvenWhenTransportAndScheduleMatch() {
+        val fixture = fixture()
+        val previous = fixture.presentation()
+        fixture.restartSegment()
+        fixture.updateHistory(50.minutes, 90.minutes, estimatedLiveEdgeTime = live)
+        val current = fixture.presentation()
+        assertTrue(previous.timeline!!.describesSameSubscription(current.timeline))
+        assertFalse(previous.timeline!!.describesSameSegment(current.timeline))
+        assertNull(programmePositionWindow(current, previous.playbackTarget, previous.timeline, eventAt = ::lookup))
+        assertTrue(programmePositionWindow(current, eventAt = ::lookup) != null)
+    }
+
+    @Test fun missingMappingOrReplacementDoesNotBorrowLiveProgramme() {
+        val fixture = fixture()
+        fixture.updateHistory(89.minutes, 90.minutes, estimatedLiveEdgeTime = live)
+        val state = fixture.presentation(90)
+        for (slot in listOf(programmePositionWindow(state) { null }, programmePositionWindow(state) { a })) {
+            assertNull(slot!!.event)
+            assertEquals(Instant.parse("2026-09-07T20:30:00Z") to Instant.parse("2026-09-07T21:00:00Z"), slot.start to slot.stop)
+        }
+        fixture.updateHistory(50.minutes, 90.minutes)
+        assertNull(programmePositionWindow(fixture.presentation(), eventAt = ::lookup))
+        fixture.replaceSubscription()
+        fixture.updateHistory(50.minutes, 90.minutes, estimatedLiveEdgeTime = live)
+        assertNull(programmePositionWindow(fixture.presentation(), state.playbackTarget, state.timeline, eventAt = ::lookup))
+        assertNull(programmePositionWindow(state.copy(timingKnown = false), eventAt = ::lookup))
+    }
+
+    @Test fun pausedSeekKeepsSelectedProgrammeWhileCommittedPositionIsUnknown() {
+        val fixture = fixture()
+        val previous = fixture.presentation()
+        val mapping = requireNotNull(previous.timeline)
+        val target = requireNotNull(mapping.select(55.minutes))
+        val pending = previous.copy(paused = true, timingKnown = false, playbackTarget = null)
+        assertNull(programmePositionWindow(pending, eventAt = ::lookup))
+        assertEquals("A", requireNotNull(programmePositionWindow(pending, target, mapping, eventAt = ::lookup)).event?.title)
+        fixture.restartSegment()
+        fixture.updateHistory(50.minutes, 90.minutes, estimatedLiveEdgeTime = live)
+        assertNull(programmePositionWindow(fixture.presentation().copy(timingKnown = false), target, mapping, eventAt = ::lookup))
+        assertNull(programmePositionWindow(pending.copy(available = false), target, mapping, eventAt = ::lookup))
+    }
+
+    @Test fun halfHourSlotsAlignToTheLocalClock() {
+        val utc = ZoneId.of("UTC")
+        assertEquals(Instant.parse("2026-09-07T20:30:00Z") to Instant.parse("2026-09-07T21:00:00Z"),
+            halfHourSlot(Instant.parse("2026-09-07T20:40:00Z"), utc))
+        assertEquals("a slot starts at its own boundary", Instant.parse("2026-09-07T21:00:00Z"),
+            halfHourSlot(Instant.parse("2026-09-07T21:00:00Z"), utc).first)
+        assertEquals(Instant.parse("2026-09-07T20:30:00Z"), halfHourSlot(Instant.parse("2026-09-07T20:59:59Z"), utc).first)
+        assertEquals(Instant.parse("2026-09-07T04:15:00Z") to Instant.parse("2026-09-07T04:45:00Z"),
+            halfHourSlot(Instant.parse("2026-09-07T04:22:00Z"), ZoneId.of("Asia/Kathmandu")))
+    }
+
     @Test
     fun collectedHistoryFillsTheAxisLikeAGrowingRecording() {
         val state = AppTimeshiftState(

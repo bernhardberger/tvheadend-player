@@ -90,6 +90,17 @@ repository-local domain overlays, then the focused skill, then local style.
   real regression or meaningful uncovered contract. Equivalent reuse, mechanical
   refactoring, and reversible low-impact edits do not automatically need new tests.
   Keep pure policy outside Android UI where practical so JVM tests can cover it.
+- Tests cost build time and maintenance; their count is not evidence of care.
+  Before adding one, find the existing test of that unit and extend it with a
+  case or parameter; start a new test or file only when none fits, and say why.
+  A regression test counts only after it has failed against the pre-fix code.
+  Assert the rule or outcome, not incidental values: exact dp, copied UI text,
+  call order and internal structure only where they are the contract. Reuse
+  `testutil/` and the screen `*Fixture.kt` builders instead of local copies. A
+  scenario written to prove something for one review belongs in the opt-in
+  capture lane or is deleted after the decision. Merging or deleting redundant
+  tests in touched code is in scope. Where the generic `test-driven-development`
+  skill differs, these rules win.
 - Small, localized changes finish with the affected tests and owning compilation
   (test tasks already compile their dependencies). Run `./tools/verify` once for
   integration of a completed batch, before release, or for broad/cross-module,

@@ -9,6 +9,19 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class UiSettingsTest {
+    @Test fun updateHintExpiresExactlyFourteenDaysAfterUpdate() {
+        val updated = 1_000L
+        val expiry = updated + 14L * 24 * 60 * 60 * 1000
+        assertTrue(whatsNewHintShown(9, 10, updated, updated))
+        assertTrue(whatsNewHintShown(9, 10, updated, expiry - 1))
+        assertFalse(whatsNewHintShown(9, 10, updated, expiry))
+        assertFalse(whatsNewHintShown(9, 10, updated, expiry + 1))
+        assertFalse(whatsNewHintShown(10, 10, updated, updated))
+        assertFalse(whatsNewHintShown(11, 10, updated, updated))
+        assertFalse(whatsNewHintShown(null, 10, updated, updated))
+        assertFalse(whatsNewHintShown(9, 10, null, updated))
+        assertFalse(whatsNewHintShown(9, 10, updated, updated - 1))
+    }
     @Test fun storedWhatsNewMarkerIsHiddenUntilLoadedAndForCurrentOrNewerVersions() {
         assertFalse(hasUnseenWhatsNew(null, 10))
         assertTrue(hasUnseenWhatsNew(9, 10))
@@ -28,6 +41,7 @@ class UiSettingsTest {
         val fresh = UiSettingsStore(InMemoryPreferencesDataStore())
         fresh.initializeWhatsNew(10, 100, 100)
         assertEquals(10, fresh.settings.first().whatsNewSeenVersion)
+        assertFalse(whatsNewHintShown(fresh.settings.first().whatsNewSeenVersion, 10, 100, 200))
         val data = InMemoryPreferencesDataStore()
         val updated = UiSettingsStore(data)
         updated.initializeWhatsNew(10, 100, 200)

@@ -711,7 +711,6 @@
     <string name="channel_schedule_gap">Geen programma-informatie tot %1$s</string>
     <string name="channel_schedule_end">Geen programma-informatie na %1$s</string>
     <string name="channel_schedule_loading_more">Latere dagen laden</string>
-    <string name="recording_choice_watch_channel">Zender kijken</string>
     <string name="recording_choice_play">Opname afspelen</string>
     <string name="context_resume_from">vanaf %1$s</string>
     <string name="home_all_scheduled">Alle geplande</string>
@@ -750,4 +749,6 @@
     <string name="appliance_companion_qr_description">QR-code voor de instelstappen van de begeleidende app voor tv-modus</string>
     <string name="whats_new">Wat is er nieuw?</string>
     <string name="whats_new_badge">Nieuw</string>
+    <string name="whats_new_hint">Nieuw in %1$s</string>
+    <string name="settings_about_version_summary">Versie %1$s</string>
 </resources>

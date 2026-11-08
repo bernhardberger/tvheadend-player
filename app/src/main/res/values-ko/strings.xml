@@ -696,7 +696,6 @@
     <string name="channel_schedule_gap">%1$s까지 프로그램 정보 없음</string>
     <string name="channel_schedule_end">%1$s 이후 프로그램 정보 없음</string>
     <string name="channel_schedule_loading_more">이후 날짜 불러오는 중</string>
-    <string name="recording_choice_watch_channel">채널 시청</string>
     <string name="recording_choice_play">녹화 재생</string>
     <string name="context_resume_from">%1$s부터</string>
     <string name="home_all_scheduled">모든 예약</string>
@@ -734,4 +733,6 @@
     <string name="appliance_companion_qr_description">전용 기기 모드 보조 앱 설정 단계를 여는 QR 코드</string>
     <string name="whats_new">새로운 기능</string>
     <string name="whats_new_badge">새 소식</string>
+    <string name="whats_new_hint">%1$s의 새로운 기능</string>
+    <string name="settings_about_version_summary">버전 %1$s</string>
 </resources>

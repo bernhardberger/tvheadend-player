@@ -9,6 +9,51 @@
 - A removed recording no longer hides another recording of the same program, and retention cleanup no longer repeats the “Recording deleted” notice.
 - Recent channels, the *Continue watching* order, channel tags, channel aspect settings, the selected stream profile and audio choices start fresh after this update; they are now kept per connection.
 
+## 0.4.13
+
+### Home
+
+- After an update, Home shows *What's new in 0.4.13* next to the clock. It
+  opens *What's new*, so you can see what changed and what to try. It's there
+  for the testing phase on Google Play and goes away once you open it, or after
+  14 days. It replaces the dot and the *New* badges in Settings from 0.4.12.
+- The *All channels* card at the end of *Recent channels* has the same caption
+  as the channel tiles.
+
+### Recordings
+
+- OK on a recording that's still running offers playing it first: *Resume
+  from …* or *Play recording*, then *Watch from beginning*, then *Watch
+  live*. The dialog is only as wide as its buttons need.
+- The timeline marks where the program starts and ends with a flag and a
+  finish flag instead of dots.
+- Up from the seekbar opens the marks at the nearest real mark instead of the
+  start of the recording.
+
+### Live TV
+
+- In the channel schedule, day tabs that don't fit fade out at the edge
+  instead of being cut off, and the edge always shows part of the next day
+  when more follow.
+
+### Media controls
+
+- Apps that show what's playing on your TV, like the Home Assistant companion
+  app, now get the channel, the program you're watching (also with timeshift),
+  episode, start and end times, genre and artwork. With notification access
+  they can also pause, play and switch channels.
+- Next and Previous from media controls switch channels during live TV, in the
+  same order as the remote's channel keys, including while the picture keeps
+  playing behind the menus.
+
+### Settings
+
+- *About* shows *Version 0.4.13* under its name instead of the bare number.
+- *About* has one *Licenses* entry for the GNU GPL v3 and the third-party
+  notices instead of two, and the note about machine-translated text is gone.
+- Entries that open a full-screen page no longer show an arrow. *Set up
+  connection* and the appliance companion entry show where they take you.
+
 ## 0.4.12
 
 ### Settings

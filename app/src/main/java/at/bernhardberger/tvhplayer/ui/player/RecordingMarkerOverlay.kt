@@ -82,6 +82,10 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
 
+/** Prefer real marks on entry; the synthetic start remains available to horizontal navigation. */
+internal fun recordingMarkerOpeningPositions(stops: List<RecordingMarkStop>): List<Long> =
+    stops.filter { it.mark != null }.ifEmpty { stops }.map { it.positionMs }
+
 /** Shared with the screen's ancestor Back interceptor; survives focus relocation. */
 internal class RecordingMarkerNavigation {
     var selectedMs by mutableStateOf<Long?>(null)
@@ -435,7 +439,8 @@ private fun RecordingMarkPill(
                 color = LocalContentColor.current.copy(alpha = 0.8f), modifier = Modifier.testTag("recording-marker-name"),
             )
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (label.second in listOf(RecordingMarkKind.AD_BREAK, RecordingMarkKind.CUT)) {
+                if (label.second in listOf(RecordingMarkKind.AD_BREAK, RecordingMarkKind.CUT,
+                        RecordingMarkKind.PROGRAM_START, RecordingMarkKind.PROGRAM_END)) {
                     RecordingMarkSymbol(requireNotNull(label.second), large = true, tint = LocalContentColor.current)
                 }
                 Text(
@@ -450,14 +455,17 @@ private fun RecordingMarkPill(
 }
 
 /**
- * A mark's symbol: a dot for a chapter, scissors for a cut, an outlined "Ad" for an ad break. Its own
+ * A mark's symbol: a dot for a chapter, scissors for a cut, an outlined "Ad" for an ad break,
+ * a flag for program start and a checkered flag for program end. Its own
  * drawing because no shared icon or badge comes at these sizes or carries a text mark this small.
  */
 @Composable
 private fun RecordingMarkSymbol(kind: RecordingMarkKind, large: Boolean, tint: Color, modifier: Modifier = Modifier) {
     when (kind) {
-        RecordingMarkKind.PROGRAM_START, RecordingMarkKind.PROGRAM_END,
         RecordingMarkKind.CHAPTER -> Box(modifier.size(if (large) 6.dp else 4.dp).background(tint, CircleShape))
+        RecordingMarkKind.PROGRAM_START, RecordingMarkKind.PROGRAM_END -> Icon(
+            painterResource(if (kind == RecordingMarkKind.PROGRAM_START) R.drawable.ic_flag else R.drawable.ic_sports_score),
+            contentDescription = null, tint = tint, modifier = modifier.size(if (large) 14.dp else 10.dp))
         RecordingMarkKind.CUT -> Icon(painterResource(R.drawable.ic_content_cut), contentDescription = null, tint = tint,
             modifier = modifier.size(if (large) 14.dp else 10.dp))
         RecordingMarkKind.AD_BREAK -> {

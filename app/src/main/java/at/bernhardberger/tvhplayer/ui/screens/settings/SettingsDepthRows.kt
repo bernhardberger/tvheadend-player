@@ -38,7 +38,6 @@ internal fun settingsLevel(
     id: String,
     title: String,
     rows: List<DepthRow>,
-    activeContent: (@Composable (androidx.compose.ui.focus.FocusRequester, (android.view.KeyEvent) -> Boolean) -> Unit)? = null,
     initialItemId: String? = null,
     description: String? = null,
     /** The connection a per-connection level belongs to; named on the first heading line when set. */
@@ -87,7 +86,7 @@ internal fun settingsLevel(
                 modifier = Modifier.fillMaxWidth().padding(top = TvSpacing4).testTag("settings-description-$id"))
         }
     }
-}, activeContent = activeContent, initialItemId = initialItemId)
+}, initialItemId = initialItemId)
 
 internal fun settingsRow(
     id: String,

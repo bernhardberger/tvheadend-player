@@ -5,10 +5,8 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.View
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -22,15 +20,14 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.ui.components.depth.rememberDepthNavigationState
 import at.bernhardberger.tvhplayer.ui.components.SideRail
-import at.bernhardberger.tvhplayer.settings.UiSettings
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
-import at.bernhardberger.tvhplayer.settings.hasUnseenWhatsNew
 import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -59,16 +56,14 @@ class SettingsAboutTest {
 
     private var sessionState by mutableStateOf<SessionState>(SessionState.Disconnected)
 
-    private fun show(fontScale: Float = 1f, machineTranslated: Boolean? = false) {
+    private fun show(fontScale: Float = 1f) {
         compose.setContent {
             CompositionLocalProvider(LocalDensity provides Density(1f, fontScale)) {
                 TVHeadendPlayerTheme {
                     view = LocalView.current
                     Box(Modifier.fillMaxSize().background(Color.Black)) {
                         SettingsScreenNavigation(rememberDepthNavigationState(SETTINGS_ROOT, ABOUT_LEVEL),
-                            listOf(settingsRootLevel()) + (
-                                if (machineTranslated == null) settingsAboutLevels(sessionState)
-                                else settingsAboutLevels(sessionState, machineTranslated = machineTranslated)))
+                            listOf(settingsRootLevel()) + settingsAboutLevels(sessionState))
                     }
                 }
             }
@@ -93,16 +88,21 @@ class SettingsAboutTest {
         press(Key.DirectionCenter)
         compose.onNodeWithText("Version", substring = true).assertIsFocused()
         compose.onAllNodesWithText("TRANSLATION").assertCountEquals(0)
-        compose.onAllNodesWithText("Machine-translated").assertCountEquals(0)
         press(Key.DirectionDown)
         compose.onNodeWithText("What's new").assertIsFocused()
         press(Key.DirectionDown)
         compose.onNodeWithText("Not connected", substring = true).assertIsFocused()
         press(Key.DirectionDown)
-        compose.onNodeWithText("GNU General Public License v3").assertIsFocused()
+        compose.onNodeWithText("Licenses").assertIsFocused()
         press(Key.DirectionCenter)
         compose.onNode(isDialog()).assertExists()
         compose.onNodeWithTag("player-info-reading").assertIsFocused()
+        val resources = RuntimeEnvironment.getApplication().assets
+        val notice = resources.open("licenses/NOTICE.md").bufferedReader().use { aboutNoticeText(it.readText()) }
+        val license = resources.open("licenses/LICENSE").bufferedReader().use { it.readText() }
+        org.junit.Assert.assertEquals(listOf(notice, license),
+            compose.onAllNodes(hasText(notice) or hasText(license)).fetchSemanticsNodes()
+                .flatMap { node -> node.config[SemanticsProperties.Text].map { it.text } })
         val scroll = compose.onNode(hasScrollAction() and hasAnyAncestor(isDialog())).fetchSemanticsNode()
             .config[SemanticsProperties.VerticalScrollAxisRange]
         val before = scroll.value()
@@ -125,17 +125,7 @@ class SettingsAboutTest {
         backKey(true, repeat = 2)
         compose.onNodeWithTag("player-info-reading").assertIsFocused()
         backKey(false)
-        compose.onNodeWithText("GNU General Public License v3").assertIsFocused()
-        press(Key.DirectionDown)
-        compose.onNodeWithText("Notices and third-party libraries", substring = true).assertIsFocused()
-        press(Key.DirectionCenter)
-        compose.onNodeWithTag("player-info-reading").assertIsFocused()
-        val noticesScroll = compose.onNode(hasScrollAction() and hasAnyAncestor(isDialog())).fetchSemanticsNode()
-            .config[SemanticsProperties.VerticalScrollAxisRange]
-        press(Key.DirectionDown)
-        compose.runOnIdle { org.junit.Assert.assertTrue(noticesScroll.value() > 0f) }
-        press(Key.Back)
-        compose.onNodeWithText("Notices and third-party libraries", substring = true).assertIsFocused()
+        compose.onNodeWithText("Licenses").assertIsFocused()
         press(Key.DirectionDown)
         compose.onNodeWithText("Privacy policy").assertIsFocused()
         press(Key.DirectionCenter)
@@ -147,35 +137,6 @@ class SettingsAboutTest {
         compose.onNodeWithText("Privacy policy").assertIsFocused()
         press(Key.Back)
         compose.onNodeWithText("About").assertIsFocused()
-    }
-
-    @Test fun machineTranslatedLanguageShowsItsNoticeUnderTranslation() {
-        show(machineTranslated = true)
-        press(Key.DirectionCenter)
-        repeat(6) { press(Key.DirectionDown) }
-        compose.onNodeWithText("Machine-translated", substring = true).assertIsFocused()
-        compose.onNodeWithText("TRANSLATION").assertIsDisplayed()
-        compose.onNodeWithText("Nobody has checked this translation yet", substring = true).assertIsDisplayed()
-    }
-
-    // The notice follows the language's own resource flag (null passes none): machine-drafted Japanese
-    // shows it under Translation, reviewed German does not.
-    @Test @Config(qualifiers = "ja-w960dp-h540dp-land-mdpi")
-    fun machineDraftedJapaneseShowsTheNoticeFromItsResources() {
-        show(machineTranslated = null)
-        press(Key.DirectionCenter)
-        val title = RuntimeEnvironment.getApplication().resources.getString(at.bernhardberger.tvhplayer.R.string.about_machine_translated)
-        org.junit.Assert.assertNotEquals("Machine-translated", title)
-        repeat(6) { press(Key.DirectionDown) }
-        compose.onNodeWithText(title, substring = true).assertIsFocused()
-    }
-
-    @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
-    fun reviewedGermanShowsNoMachineNotice() {
-        show(machineTranslated = null)
-        press(Key.DirectionCenter)
-        val title = RuntimeEnvironment.getApplication().resources.getString(at.bernhardberger.tvhplayer.R.string.about_machine_translated)
-        compose.onNodeWithText(title, substring = true).assertDoesNotExist()
     }
 
     @Test @Category(VisualCapture::class)
@@ -195,7 +156,7 @@ class SettingsAboutTest {
 
     private var captureScale = 1f
 
-    @Test fun whatsNewMarkersClearTogetherAndConnectionProblemWins() = whatsNewJourney(false)
+    @Test fun versionSummaryStaysAndOnlyConnectionHasRailBadge() = whatsNewJourney(false)
 
     @Test @Category(VisualCapture::class)
     fun whatsNewEnglishCaptures() = whatsNewJourney(true)
@@ -209,17 +170,14 @@ class SettingsAboutTest {
             CompositionLocalProvider(LocalDensity provides Density(1f, 1f)) {
                 TVHeadendPlayerTheme {
                     view = LocalView.current
-                    val settings by store.settings.collectAsState(initial = UiSettings())
-                    val unseen = hasUnseenWhatsNew(settings.whatsNewSeenVersion, version)
                     val scope = rememberCoroutineScope()
                     val navigation = rememberDepthNavigationState(SETTINGS_ROOT, ABOUT_LEVEL)
                     Box(Modifier.fillMaxSize().background(Color.Black)) {
                         SideRail(currentRoute = AppDestination.SETTINGS, connectionDegraded = degraded,
-                            whatsNewUnseen = unseen, onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
+                            onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                             SettingsScreenNavigation(navigation,
-                                listOf(settingsRootLevel(whatsNewUnseen = unseen)) +
-                                    settingsAboutLevels(sessionState, machineTranslated = false,
-                                        whatsNewUnseen = unseen,
+                                listOf(settingsRootLevel()) +
+                                    settingsAboutLevels(sessionState,
                                         onWhatsNewOpened = { scope.launch { store.markWhatsNewSeen(version) } }),
                                 contentPadding = padding, initialFocusEnabled = !drawerActive)
                         }
@@ -228,9 +186,10 @@ class SettingsAboutTest {
             }
         }
         compose.onNodeWithTag("settings-row-$ABOUT_LEVEL").assertIsFocused()
-            .assertContentDescriptionEquals("About, New")
-        compose.onNodeWithTag("whats-new-badge", useUnmergedTree = true).assertIsDisplayed()
-        compose.onNodeWithTag("nav-settings").assertContentDescriptionEquals("Settings, New")
+        compose.onNodeWithText("Version ${at.bernhardberger.tvhplayer.BuildConfig.VERSION_NAME}", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithText("Updated to ${at.bernhardberger.tvhplayer.BuildConfig.VERSION_NAME}").assertDoesNotExist()
+        compose.onNodeWithTag("whats-new-badge", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("nav-settings").assertContentDescriptionEquals("Settings")
         if (captures) save("whats-new-rail-collapsed-en-font1.0")
         compose.runOnIdle { degraded = true }
         compose.onNodeWithTag("whats-new-badge", useUnmergedTree = true).assertDoesNotExist()
@@ -240,7 +199,7 @@ class SettingsAboutTest {
         press(Key.Back)
         compose.onNodeWithTag("nav-settings").assertIsFocused()
         compose.onNode(hasText("New") and hasAnyAncestor(hasTestTag("nav-settings")), useUnmergedTree = true)
-            .assertIsDisplayed()
+            .assertDoesNotExist()
         if (captures) save("whats-new-rail-expanded-focused-en-font1.0")
         compose.runOnIdle { degraded = true }
         compose.onNode(hasText("New") and hasAnyAncestor(hasTestTag("nav-settings")), useUnmergedTree = true).assertDoesNotExist()
@@ -254,7 +213,8 @@ class SettingsAboutTest {
         compose.onNodeWithTag("settings-row-$ABOUT_LEVEL").assertIsFocused()
         press(Key.DirectionCenter)
         compose.onNodeWithTag("settings-row-version").assertIsFocused()
-        compose.onNodeWithTag("settings-row-whats-new").assertContentDescriptionEquals("What's new, New")
+        compose.onNodeWithTag("settings-row-whats-new")
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.ContentDescription))
         press(Key.DirectionDown)
         compose.onNodeWithTag("settings-row-whats-new").assertIsFocused()
         if (captures) save("whats-new-about-en-font1.0")
@@ -274,6 +234,9 @@ class SettingsAboutTest {
         press(Key.Back)
         compose.onNodeWithTag("settings-row-$ABOUT_LEVEL").assertIsFocused()
             .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.ContentDescription))
+        compose.onNodeWithText("Version ${at.bernhardberger.tvhplayer.BuildConfig.VERSION_NAME}", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithText("Updated to ${at.bernhardberger.tvhplayer.BuildConfig.VERSION_NAME}").assertDoesNotExist()
+        if (captures) save("whats-new-settings-version-en-font1.0")
         compose.onNodeWithTag("whats-new-badge", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("nav-settings").assertContentDescriptionEquals("Settings")
         press(Key.Back)
@@ -291,11 +254,7 @@ class SettingsAboutTest {
         press(Key.DirectionDown)
         press(Key.DirectionDown)
         press(Key.DirectionCenter)
-        save("$name-license")
-        press(Key.Back)
-        press(Key.DirectionDown)
-        press(Key.DirectionCenter)
-        save("$name-notices")
+        save("$name-licenses")
         press(Key.Back)
         press(Key.DirectionDown)
         press(Key.DirectionCenter)

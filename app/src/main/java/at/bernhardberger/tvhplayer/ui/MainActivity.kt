@@ -6,6 +6,7 @@ import at.bernhardberger.tvheadend.sdk.core.channelCatalogForDisplay
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 
 import android.app.Activity
+import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -29,6 +30,13 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.session.MediaSession
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.playback.SessionPlaybackPlayer
+import at.bernhardberger.tvhplayer.playback.SessionMetadataLabels
+import at.bernhardberger.tvhplayer.playback.SessionPlaybackErrorKind
+import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ContentGenre
+import at.bernhardberger.tvhplayer.core.visibleChannelNumber
+import at.bernhardberger.tvhplayer.core.programmeCategory
+import at.bernhardberger.tvhplayer.ui.common.programmeCategoryLabelRes
 import kotlinx.coroutines.Job
 import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.R
@@ -128,6 +136,7 @@ class MainActivity : AppCompatActivity() {
     private val tvheadendSession: TvheadendSession by inject()
     private val channelAccents: ChannelAccents by inject()
     private val profileOwner: AppProfileOwner by inject()
+    private val imageLoader: coil3.ImageLoader by inject()
     private val mediaSessionLifecycle = ActivityMediaSessionLifecycle()
     private val playbackLifecycle = MainActivityPlaybackLifecycle(
         owners = playbackOwners,
@@ -211,7 +220,8 @@ class MainActivity : AppCompatActivity() {
     override fun onStart() {
         super.onStart()
         playbackLifecycle.onActivityStarted()
-        val sessionPlayer = SessionPlaybackPlayer(playbackRuntime)
+        val sessionPlayer = SessionPlaybackPlayer(playbackRuntime, BuildConfig.PROGRAMME_WINDOW_B, AppSessionMetadataLabels(this),
+            at.bernhardberger.tvhplayer.images.AppSessionArtworkLoader(applicationContext, tvheadendSession, imageLoader))
         mediaSessionLifecycle.start(this, sessionPlayer, lifecycleScope.launch {
             sessionPlayer.observe(tvheadendSession.observation)
         }, sessionPlayer::close)
@@ -310,11 +320,23 @@ internal class ActivityMediaSessionLifecycle {
     private var observation: Job? = null
     private var releasePlayer: (() -> Unit)? = null
 
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     fun start(context: Context, player: androidx.media3.common.Player, observation: Job, releasePlayer: () -> Unit) {
         check(session == null)
         this.observation = observation
         this.releasePlayer = releasePlayer
-        session = MediaSession.Builder(context, player).setId(sessionId).build()
+        val activity = PendingIntent.getActivity(context, 0,
+            Intent(context, MainActivity::class.java).setAction(ACTION_SESSION_ACTIVITY).setPackage(context.packageName),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        val decoder = androidx.media3.datasource.DataSourceBitmapLoader(context)
+        val bitmapLoader = androidx.media3.session.CacheBitmapLoader(object : androidx.media3.common.util.BitmapLoader {
+            override fun supportsMimeType(mimeType: String): Boolean = decoder.supportsMimeType(mimeType)
+            override fun decodeBitmap(data: ByteArray) = decoder.decodeBitmap(data)
+            override fun loadBitmap(uri: android.net.Uri): com.google.common.util.concurrent.ListenableFuture<android.graphics.Bitmap> =
+                com.google.common.util.concurrent.Futures.immediateFailedFuture(UnsupportedOperationException("Session artwork uses bytes only"))
+        })
+        session = MediaSession.Builder(context, player).setId(sessionId).setSessionActivity(activity)
+            .setBitmapLoader(bitmapLoader).build()
     }
 
     fun stop() {
@@ -326,6 +348,24 @@ internal class ActivityMediaSessionLifecycle {
         releasePlayer?.invoke()
         releasePlayer = null
     }
+}
+
+internal const val ACTION_SESSION_ACTIVITY = "at.bernhardberger.tvhplayer.action.SESSION_ACTIVITY"
+
+internal class AppSessionMetadataLabels(private val context: Context) : SessionMetadataLabels {
+    override fun genre(genre: ContentGenre): String? = programmeCategory(genre)?.let {
+        context.getString(programmeCategoryLabelRes(it))
+    }
+
+    override fun channelNumber(channel: Channel): String? = channel.visibleChannelNumber?.let {
+        "$it" + (channel.numberMinor?.takeIf { minor -> minor > 0 }?.let { minor -> ".$minor" } ?: "")
+    }
+
+    override fun error(kind: SessionPlaybackErrorKind): String = context.getString(when (kind) {
+        SessionPlaybackErrorKind.RECORDING -> R.string.error_306_title
+        SessionPlaybackErrorKind.CHANNEL_UNAVAILABLE -> R.string.error_203_title
+        SessionPlaybackErrorKind.CHANNEL -> R.string.error_210_title
+    })
 }
 
 internal class MainActivityPlaybackLifecycle(

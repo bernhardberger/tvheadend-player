@@ -100,7 +100,7 @@ internal fun settingsServerLevels(
         serverListStatus(profiles, status, stringResource(R.string.server_none_in_use)), icon = R.drawable.ic_cloud)
     val add = settingsRow(ADD_SERVER, stringResource(R.string.server_add),
         supporting = stringResource(R.string.server_add_description), icon = R.drawable.ic_add,
-        trailingIcon = R.drawable.ic_arrow_forward, onClick = actions.onAdd)
+        trailingIcon = R.drawable.ic_arrow_circle_right, onClick = actions.onAdd)
     val retry = settingsRow(RETRY_CONNECTION, stringResource(R.string.connection_try_again),
         supporting = stringResource(if (connecting) R.string.connection_overview_connecting else R.string.connection_retry_description),
         icon = R.drawable.ic_refresh, onClick = { if (!connecting) onRetry() })
@@ -172,13 +172,13 @@ internal fun settingsServerLevel(
             trailingIcon = R.drawable.ic_arrow_forward, onClick = { actions.onUse(profile) }))
         if (profile.passwordNeeded()) add(settingsRow(SERVER_PASSWORD, stringResource(R.string.server_enter_password),
             supporting = stringResource(R.string.server_password_needed),
-            trailingIcon = R.drawable.ic_arrow_forward, onClick = { actions.onEnterPassword(profile) }))
+            trailingIcon = R.drawable.ic_arrow_circle_right, onClick = { actions.onEnterPassword(profile) }))
         add(settingsRow(EDIT_CONNECTION, stringResource(R.string.setup_connection),
             supporting = stringResource(R.string.setup_connection_description),
-            trailingIcon = R.drawable.ic_arrow_forward, onClick = { actions.onSetUp(profile) }))
+            trailingIcon = R.drawable.ic_arrow_circle_right, onClick = { actions.onSetUp(profile) }))
         add(settingsRow(SERVER_NAME, stringResource(R.string.server_name),
             supporting = profile.label ?: stringResource(R.string.server_name_not_set),
-            trailingIcon = R.drawable.ic_arrow_forward, onClick = { actions.onName(profile) }))
+            trailingIcon = R.drawable.ic_arrow_circle_right, onClick = { actions.onName(profile) }))
         add(settingsRow(SERVER_REMOVE, stringResource(R.string.server_remove),
             supporting = stringResource(R.string.server_remove_description),
             trailingIcon = R.drawable.ic_delete_outlined, onClick = { actions.onRemove(profile) }))

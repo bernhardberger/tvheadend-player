@@ -57,6 +57,36 @@ class HomeActionsTest {
         compose.runOnIdle { assertTrue(opened) }
     }
 
+    @Test fun recentChannelsEndCardCaptionMatchesTheTileNames() {
+        val input = HomeInput(listOf(channel), emptyMap(), emptyList(), listOf(channel.id), emptyList(), { null }, null, now)
+        compose.setContent { TVHeadendPlayerTheme {
+            HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
+                onPlay = { _, _ -> }, onPlayRecording = { _, _ -> },
+                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
+        } }
+        compose.onNodeWithTag("home-recent-0").assertIsFocused()
+        fun caption(text: String): Triple<androidx.compose.ui.text.TextLayoutInput, Float, Float> {
+            val node = compose.onNode(hasText(text) and hasAnyAncestor(hasTestTag("home-section-RECENT_CHANNELS")),
+                useUnmergedTree = true)
+            val results = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+            node.fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult]
+                .action?.invoke(results)
+            val bounds = node.getUnclippedBoundsInRoot()
+            return Triple(results.single().layoutInput, (bounds.bottom - bounds.top).value, bounds.top.value)
+        }
+        val tile = caption("Test channel")
+        val end = caption("All channels")
+        assertEquals(tile.first.style.fontSize, end.first.style.fontSize)
+        assertEquals(tile.first.style.fontWeight, end.first.style.fontWeight)
+        assertEquals(tile.first.style.lineHeight, end.first.style.lineHeight)
+        assertEquals(tile.first.style.letterSpacing, end.first.style.letterSpacing)
+        assertEquals(androidx.compose.ui.text.style.TextAlign.Center, end.first.style.textAlign)
+        assertEquals(tile.first.style.textAlign, end.first.style.textAlign)
+        assertEquals(2, end.first.maxLines)
+        assertEquals(tile.second, end.second, 0.5f)
+        assertEquals("captions start at the same line under equal pictures", tile.third, end.third, 0.5f)
+    }
+
     @Test fun rowReentryRestoresItemIdentityAfterAnEarlierItemLeaves() = recentRowRefresh(false)
 
     @Test fun rowReentryUsesClampedPreviousIndexWhenItsItemLeaves() = recentRowRefresh(true)
@@ -232,6 +262,84 @@ class HomeActionsTest {
     private fun onNowSections() = listOf(HomeSection.OnNow(listOf(OnNowItem(channel,
         EpgEvent.create(EventId(1), channel.id, Instant.fromEpochSeconds(now - 60),
             Instant.fromEpochSeconds(now + 600), title = "Programme")))))
+
+    @Test fun updateHintKeepsInitialFocusAndDirectionalPaths() = updateHintPaths(false)
+
+    @Test fun updateHintMirrorsDirectionalPathsInRtl() = updateHintPaths(true)
+
+    private fun updateHintPaths(rtl: Boolean) {
+        leaveTouchMode()
+        var shown by mutableStateOf(true)
+        val rail = androidx.compose.ui.focus.FocusRequester()
+        val leading = if (rtl) Key.DirectionRight else Key.DirectionLeft
+        val trailing = if (rtl) Key.DirectionLeft else Key.DirectionRight
+        compose.setContent { TVHeadendPlayerTheme {
+            CompositionLocalProvider(LocalBrowseNavigationFocus provides rail,
+                androidx.compose.ui.platform.LocalLayoutDirection provides
+                    if (rtl) androidx.compose.ui.unit.LayoutDirection.Rtl else androidx.compose.ui.unit.LayoutDirection.Ltr) {
+                androidx.compose.foundation.layout.Box {
+                    HomeContent(onNowSections(), PaddingValues(), homeInitialFocus(onNowSections()), {},
+                        updateHintShown = shown)
+                    androidx.tv.material3.Button({}, modifier = androidx.compose.ui.Modifier.focusRequester(rail)
+                        .testTag("test-rail")) { androidx.tv.material3.Text("Home") }
+                }
+            }
+        } }
+        fun press(tag: String, key: Key) = compose.onNodeWithTag(tag).assertIsFocused().performKeyInput { pressKey(key) }
+        press("home-onnow-0", Key.DirectionUp)
+        press("home-tags-button", leading)
+        press("home-update-hint", Key.DirectionUp)
+        press("home-update-hint", trailing)
+        press("home-tags-button", leading)
+        press("home-update-hint", Key.DirectionDown)
+        press("home-onnow-0", Key.DirectionUp)
+        press("home-tags-button", leading)
+        press("home-update-hint", leading)
+        compose.onNodeWithTag("test-rail").assertIsFocused()
+        compose.runOnIdle { shown = false }
+        compose.onNodeWithTag("home-update-hint").assertDoesNotExist()
+        compose.onNodeWithTag("home-onnow-0").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.RequestFocus)
+        press("home-onnow-0", Key.DirectionUp)
+        press("home-tags-button", leading)
+        compose.onNodeWithTag("test-rail").assertIsFocused()
+    }
+
+    @Test fun openingUpdateHintMarksSeenAndBackRestoresTags() {
+        leaveTouchMode()
+        var shown by mutableStateOf(true)
+        var opened = 0
+        compose.setContent { TVHeadendPlayerTheme {
+            HomeContent(onNowSections(), PaddingValues(), homeInitialFocus(onNowSections()), {},
+                updateHintShown = shown, onWhatsNewOpened = { opened++ })
+        } }
+        compose.onNodeWithTag("home-onnow-0").performKeyInput { pressKey(Key.DirectionUp) }
+        compose.onNodeWithTag("home-tags-button").performKeyInput { pressKey(Key.DirectionLeft) }
+        compose.onNodeWithTag("home-update-hint").assertIsFocused()
+            .assertContentDescriptionEquals("What's new, What's new in ${at.bernhardberger.tvhplayer.BuildConfig.VERSION_NAME}")
+            .performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("player-info-reading").assertIsDisplayed()
+        // DataStore emits the seen version after the reader has opened, not in its click callback.
+        compose.runOnIdle { assertEquals(1, opened); shown = false }
+        compose.onNodeWithTag("home-update-hint").assertDoesNotExist()
+        compose.onNodeWithTag("player-info-reading").performKeyInput { pressKey(Key.Back) }
+        compose.onNodeWithTag("player-info-reading").assertDoesNotExist()
+        compose.onNodeWithTag("home-update-hint").assertDoesNotExist()
+        compose.onNodeWithTag("home-tags-button").assertIsFocused()
+    }
+
+    @Test fun focusedUpdateHintExpiryRestoresTags() {
+        leaveTouchMode()
+        var shown by mutableStateOf(true)
+        compose.setContent { TVHeadendPlayerTheme {
+            HomeContent(onNowSections(), PaddingValues(), homeInitialFocus(onNowSections()), {}, updateHintShown = shown)
+        } }
+        compose.onNodeWithTag("home-onnow-0").performKeyInput { pressKey(Key.DirectionUp) }
+        compose.onNodeWithTag("home-tags-button").performKeyInput { pressKey(Key.DirectionLeft) }
+        compose.onNodeWithTag("home-update-hint").assertIsFocused()
+        compose.runOnIdle { shown = false }
+        compose.onNodeWithTag("home-update-hint").assertDoesNotExist()
+        compose.onNodeWithTag("home-tags-button").assertIsFocused()
+    }
 
     @Test fun aHandOffThatNeverLandsCannotBePressedAndMovesFocusToTheHeader() {
         leaveTouchMode()
@@ -829,7 +937,7 @@ class HomeActionsTest {
         compose.setContent { org.koin.compose.KoinIsolatedContext(dependencies) {
             DisposableEffect(Unit) { onDispose { viewModels.clear(); dependencies.close() } }
             TVHeadendPlayerTheme {
-                HomeScreen(PaddingValues(), true, vm, null, null,
+                HomeScreen(null, PaddingValues(), true, vm, null, null,
                     onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
                     onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> },
                     lastPlayedStore = at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore(
@@ -866,7 +974,7 @@ class HomeActionsTest {
         compose.setContent { org.koin.compose.KoinIsolatedContext(dependencies) {
             DisposableEffect(Unit) { onDispose { viewModels.clear(); dependencies.close() } }
             TVHeadendPlayerTheme {
-                HomeScreen(PaddingValues(), true, vm, channel.id, null,
+                HomeScreen(null, PaddingValues(), true, vm, channel.id, null,
                     onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
                     onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> }, focusMemory = memory,
                     lastPlayedStore = at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore(
@@ -1087,7 +1195,8 @@ class HomeActionsTest {
         recordingHome(running = true, onWatch = { tuned += it }, onPlay = { fail("must not start recording") })
         compose.onNodeWithTag("home-activity-0").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.mainClock.advanceTimeBy(500)
-        compose.onNodeWithTag("recording-resume").assertIsFocused().performKeyInput { pressKey(Key.DirectionLeft) }
+        compose.onNodeWithTag("recording-resume").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
+        compose.onNodeWithTag("recording-start-over").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
         compose.onNodeWithTag("recording-watch-live").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.runOnIdle { assertEquals(listOf(channel.id), tuned) }
     }
@@ -1098,7 +1207,8 @@ class HomeActionsTest {
             onPlay = { fail("must not start recording") }, outsideScope = true, onWatchRecording = { tuned += it })
         compose.onNodeWithTag("home-activity-0").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.mainClock.advanceTimeBy(500)
-        compose.onNodeWithTag("recording-resume").assertIsFocused().performKeyInput { pressKey(Key.DirectionLeft) }
+        compose.onNodeWithTag("recording-resume").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
+        compose.onNodeWithTag("recording-start-over").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
         compose.onNodeWithTag("recording-watch-live").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.runOnIdle { assertEquals(listOf(channel.id), tuned) }
     }
@@ -1121,7 +1231,7 @@ class HomeActionsTest {
         compose.onNode(hasText("Watch") and hasAnyAncestor(hasTestTag("browse-context-menu"))).assertIsFocused().performKeyInput {
             pressKey(Key.DirectionDown); pressKey(Key.DirectionDown)
         }
-        compose.onNodeWithText("Watch channel").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("browse-context-action-watch_live").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.runOnIdle { assertEquals(listOf(channel.id), tuned) }
     }
 

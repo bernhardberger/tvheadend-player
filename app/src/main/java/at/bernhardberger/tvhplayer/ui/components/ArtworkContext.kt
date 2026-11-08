@@ -10,14 +10,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import at.bernhardberger.tvheadend.sdk.android.TvheadendArtwork
-import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
-import at.bernhardberger.tvhplayer.core.AppArtworkSource
+import at.bernhardberger.tvhplayer.core.channelLogoModel
 
 /**
  * The session logos, programme pictures and their colours are loaded with: null before Ready, when
@@ -43,21 +41,14 @@ class ArtworkContext(
      * cleared the profile's saved logos shows once that profile is active again.
      */
     @OptIn(ExperimentalTvheadendApi::class)
-    internal fun logo(icon: ChannelIcon): Any = when (icon) {
-        is ChannelIcon.ImageCache -> imageCacheLogo(icon.artworkId)
-        is ChannelIcon.RemoteUrl -> icon.url
-    }
-
-    @OptIn(ExperimentalTvheadendApi::class)
-    private fun imageCacheLogo(id: ArtworkId): AppArtworkSource {
-        val current = session.value
-        if (current != null) return AppArtworkSource(current, id)
-        // Read only to resolve again on each emission; the copy stays the [observation]'s profile's.
-        latest.value
-        val tvheadend = tvheadend ?: return AppArtworkSource(null, id)
-        val observed = observation.value ?: return AppArtworkSource(null, id)
-        return AppArtworkSource(null, id, TvheadendArtwork.cached(tvheadend, observed, id),
-            tvheadend.artwork.cachedArtwork(observed, id)?.cacheKey)
+    internal fun logo(icon: ChannelIcon): Any {
+        val current = if (icon is ChannelIcon.ImageCache) session.value else null
+        val observed = if (icon is ChannelIcon.ImageCache && current == null) {
+            // Re-resolve saved copies on emissions, still bound to the surface's profile.
+            latest.value
+            observation.value
+        } else null
+        return channelLogoModel(icon, current, tvheadend, observed)
     }
 }
 

@@ -65,13 +65,21 @@ when authorized. Your return alone does not trigger full verification.
   add or extend tests for real regressions or meaningful uncovered contracts,
   not automatically for equivalent reuse or mechanical cleanup. Do not add tests
   for model names or prompt wording.
+- Before adding a test, search for the existing test of that unit and extend it
+  with a case or parameter; start a new test or file only when none fits. Write
+  a regression test before the fix and run it red. Assert the rule or outcome,
+  not exact dp, copied UI text, call order or internal structure unless that is
+  the contract. Reuse `testutil/` and the screen `*Fixture.kt` builders instead
+  of local helper copies. Merge or delete tests your change makes redundant.
 - Load focused `kotlin-*` and `compose-*` skills for the actual implementation
   question, not every skill associated with a touched file.
 
 ## Return format
 
 1. `Changed files`: path per line with a one-line purpose.
-2. `Tests`: exact commands run and their result lines; name any test you added.
+2. `Tests`: exact commands run and their result lines; name each test you
+   added, extended, merged or removed; net test lines next to net production
+   lines; for a regression test, its failing line from the red run.
 3. `Gate`: the packet's gate command and its final status line, or the exact
    failure and what you tried.
 4. `Decisions`: anything you chose that the packet left open, with the reason.

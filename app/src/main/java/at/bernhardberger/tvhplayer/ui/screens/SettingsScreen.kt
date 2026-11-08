@@ -16,7 +16,6 @@ import androidx.compose.ui.platform.LocalContext
 import at.bernhardberger.tvhplayer.settings.UiSettings
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
-import at.bernhardberger.tvhplayer.settings.hasUnseenWhatsNew
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import androidx.compose.ui.Modifier
@@ -70,7 +69,6 @@ internal fun SettingsScreen(
     val profiles = observation.currentDvrConfigurations()
     val settings by settingsStore.settings.collectAsStateWithLifecycle(initialValue = UiSettings())
     val scope = rememberCoroutineScope()
-    val whatsNewUnseen = hasUnseenWhatsNew(settings.whatsNewSeenVersion, BuildConfig.VERSION_CODE)
     val recordingLevels = settingsRecordingLevels(profiles, settings.recordingProfileId,
         recordingSpaceText(observation.dvrDiskSpaceState)) { id ->
         scope.launch { settingsStore.setRecordingProfile(id); navigation.pop() }
@@ -81,7 +79,7 @@ internal fun SettingsScreen(
     val connectionName = connectionScopeName(profileList)
     val levels = settingsGeneralLevels(navigation) + connectionLevels + settingsPlayerLevels(navigation) + listOf(
         settingsRootLevel(recordingLevels.isNotEmpty(),
-            connectionRootStatus(profileList, connectionOverviewStatus(connectionPresentation, profileOwner).title), whatsNewUnseen),
+            connectionRootStatus(profileList, connectionOverviewStatus(connectionPresentation, profileOwner).title)),
         settingsKeepChannelLevel(navigation),
         settingsWarmPlaybackLevel(navigation),
         settingsStreamProfileLevel(navigation, connectionName = connectionName),
@@ -89,7 +87,6 @@ internal fun SettingsScreen(
         settingsStartupBufferLevel(navigation),
         settingsChannelTagsLevel(channelsVm, connectionName),
     ) + recordingLevels + settingsAboutLevels(observation.sessionState, companionInstalled,
-        whatsNewUnseen = whatsNewUnseen,
         onWhatsNewOpened = { scope.launch { settingsStore.markWhatsNewSeen(BuildConfig.VERSION_CODE) } }) +
         listOf(settingsApplianceLevel(companionInstalled))
     SettingsScreenNavigation(navigation, levels, initialFocusEnabled, contentPadding, backEnabled, isCurrent,
@@ -100,12 +97,11 @@ internal fun SettingsScreen(
         onCancelSwitch = servers::cancelSwitch.takeIf { servers.switchingNow })
 }
 
-/** Connection's row carries the overview's status title, the only value on the root. */
+/** Connection carries its status; About always names the installed version. */
 @Composable
 internal fun settingsRootLevel(
     showRecordings: Boolean = false,
     connectionStatus: String? = null,
-    whatsNewUnseen: Boolean = false,
 ): DepthLevel = settingsLevel(SETTINGS_ROOT, stringResource(R.string.nav_settings), buildList {
     add(settingsRow(SettingsSection.GENERAL.name, stringResource(R.string.settings_general), child = SettingsSection.GENERAL.name, icon = R.drawable.ic_tune))
     add(settingsRow(SettingsSection.CONNECTION.name, stringResource(R.string.settings_connection_nav), connectionStatus,
@@ -116,8 +112,9 @@ internal fun settingsRootLevel(
     if (showRecordings) add(settingsRow(RECORDINGS_LEVEL, stringResource(R.string.nav_recordings), child = RECORDINGS_LEVEL,
         icon = R.drawable.ic_fiber_manual_record))
     add(settingsRow(SettingsSection.APPLIANCE.name, stringResource(R.string.settings_appliance), child = SettingsSection.APPLIANCE.name, icon = R.drawable.ic_home))
-    add(settingsRow(ABOUT_LEVEL, stringResource(R.string.settings_about), child = ABOUT_LEVEL, icon = R.drawable.ic_info,
-        newMarker = whatsNewUnseen))
+    add(settingsRow(ABOUT_LEVEL, stringResource(R.string.settings_about),
+        supporting = stringResource(R.string.settings_about_version_summary, BuildConfig.VERSION_NAME),
+        child = ABOUT_LEVEL, icon = R.drawable.ic_info))
 })
 
 @Composable

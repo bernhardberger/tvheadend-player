@@ -711,7 +711,6 @@
     <string name="channel_schedule_gap">Nincs műsorinformáció eddig: %1$s</string>
     <string name="channel_schedule_end">Nincs műsorinformáció ezután: %1$s</string>
     <string name="channel_schedule_loading_more">Későbbi napok betöltése</string>
-    <string name="recording_choice_watch_channel">Csatorna nézése</string>
     <string name="recording_choice_play">Felvétel lejátszása</string>
     <string name="context_resume_from">innen: %1$s</string>
     <string name="home_all_scheduled">Összes ütemezett</string>
@@ -750,4 +749,6 @@
     <string name="appliance_companion_qr_description">QR-kód a TV-készülék mód kísérőalkalmazásának beállítási lépéseihez</string>
     <string name="whats_new">Újdonságok</string>
     <string name="whats_new_badge">Új</string>
+    <string name="whats_new_hint">Újdonságok: %1$s</string>
+    <string name="settings_about_version_summary">Verzió %1$s</string>
 </resources>

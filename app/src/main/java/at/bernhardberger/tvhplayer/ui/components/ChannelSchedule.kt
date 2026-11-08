@@ -20,6 +20,9 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
@@ -39,6 +42,7 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.core.programmeCategory
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
+import at.bernhardberger.tvhplayer.ui.TvNavigationRailGradientRunout
 import at.bernhardberger.tvhplayer.ui.TvSpacing12
 import at.bernhardberger.tvhplayer.ui.TvSpacing16
 import at.bernhardberger.tvhplayer.ui.TvTextColors
@@ -191,12 +195,44 @@ internal fun ChannelSchedule(
         } else {
             // The selected day's tab stays whole in view wherever the list or the tabs moved it.
             val tabInView = remember(days) { days.associateWith { BringIntoViewRequester() } }
+            val tabEdgeFade = remember(days) { NavigationTabOverflowState() }
+            val layoutDirection = LocalLayoutDirection.current
+            val selectedIndex = days.indexOf(selectedDay).coerceAtLeast(0)
+            var focusedTabIndex by remember(days) { mutableIntStateOf(-1) }
             LaunchedEffect(tabInView, selectedDay) {
                 withFrameNanos { }
                 selectedDay?.let(tabInView::get)?.bringIntoView()
             }
-            AppTabRow(days.indexOf(selectedDay).coerceAtLeast(0), AppTabStyle.Section,
-                modifier = Modifier.padding(horizontal = PlaybackPanelPadding),
+            AppTabRow(selectedIndex, AppTabStyle.Section,
+                modifier = Modifier
+                    .padding(horizontal = PlaybackPanelPadding)
+                    .layout { measurable, constraints ->
+                        val width = tabEdgeFade.trailingHintWidthPx(
+                            fullWidthPx = constraints.maxWidth.toFloat(),
+                            protectedIndices = setOf(selectedIndex, focusedTabIndex),
+                            minimumPeekPx = 56.dp.toPx(),
+                            layoutDirection = layoutDirection,
+                        ).roundToInt()
+                        val placeable = measurable.measure(constraints.copy(minWidth = minOf(constraints.minWidth, width), maxWidth = width))
+                        layout(constraints.maxWidth, placeable.height) { placeable.placeRelative(0, 0) }
+                    }
+                    .onGloballyPositioned(tabEdgeFade::updateViewportBounds)
+                    .navigationEdgeFadeMask(
+                        width = TvNavigationRailGradientRunout,
+                        maskEnabled = {
+                            tabEdgeFade.availableFadeWidthPx(selectedIndex, focusedTabIndex, layoutDirection, Float.MAX_VALUE) > 0f ||
+                                tabEdgeFade.availableFadeWidthPx(selectedIndex, focusedTabIndex, layoutDirection, Float.MAX_VALUE,
+                                    trailing = true) > 0f
+                        },
+                        availableWidthPx = {
+                            tabEdgeFade.availableFadeWidthPx(selectedIndex, focusedTabIndex, layoutDirection,
+                                TvNavigationRailGradientRunout.toPx())
+                        },
+                        availableTrailingWidthPx = {
+                            tabEdgeFade.availableFadeWidthPx(selectedIndex, focusedTabIndex, layoutDirection,
+                                TvNavigationRailGradientRunout.toPx(), trailing = true)
+                        },
+                    ),
                 selectedTabFocus = selectedTabFocus,
                 onMoveToContent = {
                     val target = if (selectedDay == today) scheduleInitialEvent(events.filter { date(it) == today }, viewerSec, nowSec)
@@ -220,7 +256,11 @@ internal fun ChannelSchedule(
                                     target?.let { event -> scope.launch { scrollToRow(events.indexOf(event)) } }
                                 }
                         }, first = index == 0, last = index == days.lastIndex,
-                        modifier = Modifier.bringIntoViewRequester(tabInView.getValue(day)).testTag("schedule-tab-$day"),
+                        modifier = Modifier
+                            .bringIntoViewRequester(tabInView.getValue(day))
+                            .onGloballyPositioned { tabEdgeFade.updateTabBounds(index, it) }
+                            .onFocusChanged { if (it.isFocused) focusedTabIndex = index else if (focusedTabIndex == index) focusedTabIndex = -1 }
+                            .testTag("schedule-tab-$day"),
                         label = when (day) {
                             today -> stringResource(R.string.channel_schedule_today)
                             today.plusDays(1) -> stringResource(R.string.channel_schedule_tomorrow)

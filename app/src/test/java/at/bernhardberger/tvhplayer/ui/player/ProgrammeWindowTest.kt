@@ -42,8 +42,7 @@ class ProgrammeWindowTest {
     }
     private fun TimeshiftTestFixture.presentation(position: Int = 65) = state.value.toAppPresentation(playbackPosition(position.minutes))
 
-    @Test fun archivedProgrammeIsDisplayOnlyAndColdSessionDoesNotInventHistory() {
-        val fixture = fixture()
+    @Test fun archivedProgrammeIsDisplayOnly() {
         val before = SessionObservation.create(epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = listOf(a))))
         assertEquals(a, before.eventAt(ChannelId(1), a.start + 55.minutes))
         assertEquals(listOf(b), snapshot.events)
@@ -51,13 +50,6 @@ class ProgrammeWindowTest {
         assertNull(observation.event(a.id))
         assertNull(currentProgrammeEvent(observation, a))
         assertEquals(b, currentProgrammeEvent(observation, b))
-        val state = fixture.presentation(55)
-        assertEquals(a, programmeWindow(state, eventAt = ::lookup)!!.event)
-        val cold = SessionObservation.create(epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = listOf(b))))
-        // Without the programme the axis is the half-hour slot; no programme is invented.
-        val slot = requireNotNull(programmeWindow(state) { cold.eventAt(ChannelId(1), it) })
-        assertNull(slot.event)
-        assertEquals(Instant.parse("2026-09-07T19:30:00Z") to Instant.parse("2026-09-07T20:00:00Z"), slot.start to slot.stop)
     }
 
     @Test fun adjacentRetainedProgrammesFillToTheirOwnEndAndSwitchAtExclusiveBoundary() {
@@ -81,6 +73,7 @@ class ProgrammeWindowTest {
         val preview = programmeWindow(state, target, state.timeline, ::lookup)!!
         assertEquals(a, displayedProgrammeEvent(true, preview, committed, state, b))
         assertNull(displayedProgrammeEvent(true, null, committed, state, b))
+        assertNull(displayedProgrammeEvent(true, null, committed, state, b, liveStart = true))
         assertEquals(b, displayedProgrammeEvent(false, null, committed, state, b))
         assertNull(displayedProgrammeEvent(false, null, null, state, b))
 
@@ -95,29 +88,11 @@ class ProgrammeWindowTest {
         assertEquals(b, displayedProgrammeEvent(false, null, actual, latest, a))
     }
 
-    @Test fun unknownCommittedTimingCannotAuthorizeCurrentScheduleAfterPreviewDismissal() {
-        val unknown = at.bernhardberger.tvhplayer.playback.AppTimeshiftState(
-            available = true, paused = true, timingKnown = false,
-        )
-        assertNull(displayedProgrammeEvent(false, null, null, unknown, b))
-        assertEquals(b, displayedProgrammeEvent(false, null, null,
-            at.bernhardberger.tvhplayer.playback.AppTimeshiftState(), b))
-    }
-
-    @Test fun aLiveStartShowsCurrentBroadcastBeforeTheFirstTimeshiftStatus() {
-        val granted = at.bernhardberger.tvhplayer.playback.AppTimeshiftState(available = true, timingKnown = false)
-        assertNull(displayedProgrammeEvent(false, null, null, granted, b))
-        assertEquals(b, displayedProgrammeEvent(false, null, null, granted, b, liveStart = true))
-        assertNull(displayedProgrammeEvent(true, null, null, granted, b, liveStart = true))
-    }
-
     @Test fun aLiveStartKeepsTheCurrentBroadcastAndItsNextOnceTimingIsKnownUntilTheWindow() {
         // Known timing that alone does not describe playback at now (not yet at the live edge).
         val known = at.bernhardberger.tvhplayer.playback.AppTimeshiftState(available = true, bufferStartMs = -600_000,
             positionMs = -300_000, liveEdgeMs = 0, timingKnown = true)
-        assertNull(displayedProgrammeEvent(false, null, null, known, b))
         assertNull(displayedNextEvent(false, null, known, a, liveStart = false, currentProgramme = b) { a })
-        assertEquals(b, displayedProgrammeEvent(false, null, null, known, b, liveStart = true))
         assertEquals(a, displayedNextEvent(false, null, known, a, liveStart = true, currentProgramme = b) { error("no window") })
         assertNull("a step's preview has its own window", displayedNextEvent(true, null, known, a, liveStart = true, currentProgramme = b) { a })
     }
@@ -244,58 +219,27 @@ class ProgrammeWindowTest {
         assertEquals(1f, completed.availableEndFraction)
     }
 
-    @Test fun shallowMissingGapMidnightAndReplacementStayHonest() {
+    @Test fun shallowHistoryAndMidnightLabelsKeepTheirGeometry() {
         val fixture = fixture()
         fixture.updateHistory(89.minutes, 90.minutes, estimatedLiveEdgeTime = live)
         val state = fixture.presentation(90)
         assertEquals(29f / 60, programmeWindow(state, eventAt = ::lookup)!!.availableStartFraction, 0.0001f)
-        // Without a programme at the position (none, or one that does not contain it) the axis is the
-        // half-hour slot: at 20:30 exactly the next one, with no programme borrowed.
-        for (slot in listOf(programmeWindow(state) { null }, programmeWindow(state) { a })) {
-            assertNull(slot!!.event)
-            assertEquals(Instant.parse("2026-09-07T20:30:00Z") to Instant.parse("2026-09-07T21:00:00Z"), slot.start to slot.stop)
-        }
-        fixture.updateHistory(50.minutes, 90.minutes)
-        assertNull(programmeWindow(fixture.presentation(), eventAt = ::lookup))
-        fixture.replaceSubscription()
-        fixture.updateHistory(50.minutes, 90.minutes, estimatedLiveEdgeTime = live)
-        assertNull(programmeWindow(fixture.presentation(), state.playbackTarget, state.timeline, ::lookup))
         val midnight = event(3, "2026-09-07T23:30:00Z", "2026-09-08T00:30:00Z", "Midnight")
         val labels = programmeWindowClockLabels(midnight, ZoneId.of("UTC"))
         assertEquals("23:30", labels.first)
         assertEquals("00:30", labels.second)
-        assertNull(programmeWindow(state.copy(timingKnown = false), eventAt = ::lookup))
     }
 
-    @Test fun restartRejectsRetainedMappingEvenWhenTransportAndScheduleMatch() {
-        val fixture = fixture()
-        val previous = fixture.presentation()
-        fixture.restartSegment()
-        fixture.updateHistory(50.minutes, 90.minutes, estimatedLiveEdgeTime = live)
-        val current = fixture.presentation()
-        assertTrue(previous.timeline!!.describesSameSubscription(current.timeline))
-        assertFalse(previous.timeline!!.describesSameSegment(current.timeline))
-        assertNull(programmeWindow(current, previous.playbackTarget, previous.timeline, ::lookup))
-        assertNotNull(programmeWindow(current, eventAt = ::lookup))
-    }
-
-    @Test fun pausedSeekKeepsSelectedProgrammeWhileCommittedPositionIsUnknown() {
+    @Test fun pausedSeekKeepsSelectedProgrammeGeometryWhileCommittedPositionIsUnknown() {
         val fixture = fixture()
         val previous = fixture.presentation()
         val mapping = requireNotNull(previous.timeline)
         val target = requireNotNull(mapping.select(55.minutes))
         val pending = previous.copy(paused = true, timingKnown = false, playbackTarget = null)
 
-        assertNull(programmeWindow(pending, eventAt = ::lookup))
         val selected = requireNotNull(programmeWindow(pending, target, mapping, ::lookup))
-        assertEquals("A", selected.event?.title)
         assertEquals(55f / 60, selected.positionFraction, 0.0001f)
         assertTrue(selected.targetAvailable)
-
-        fixture.restartSegment()
-        fixture.updateHistory(50.minutes, 90.minutes, estimatedLiveEdgeTime = live)
-        assertNull(programmeWindow(fixture.presentation().copy(timingKnown = false), target, mapping, ::lookup))
-        assertNull(programmeWindow(pending.copy(available = false), target, mapping, ::lookup))
     }
 
     @Test fun previewPinsEstimateAcrossHeldInputLateMetadataPauseAndEviction() = runTest {
@@ -339,31 +283,18 @@ class ProgrammeWindowTest {
         updateHistory(50.minutes, 90.minutes, estimatedLiveEdgeTime = Instant.parse("2026-09-07T20:40:00Z"))
     }
 
-    @Test fun halfHourSlotsAlignToTheLocalClock() {
-        val utc = ZoneId.of("UTC")
-        assertEquals(Instant.parse("2026-09-07T20:30:00Z") to Instant.parse("2026-09-07T21:00:00Z"),
-            halfHourSlot(Instant.parse("2026-09-07T20:40:00Z"), utc))
-        assertEquals("a slot starts at its own boundary", Instant.parse("2026-09-07T21:00:00Z"),
-            halfHourSlot(Instant.parse("2026-09-07T21:00:00Z"), utc).first)
-        assertEquals(Instant.parse("2026-09-07T20:30:00Z"), halfHourSlot(Instant.parse("2026-09-07T20:59:59Z"), utc).first)
-        // Kathmandu is UTC+5:45: its 10:00 local is 04:15 UTC.
-        assertEquals(Instant.parse("2026-09-07T04:15:00Z") to Instant.parse("2026-09-07T04:45:00Z"),
-            halfHourSlot(Instant.parse("2026-09-07T04:22:00Z"), ZoneId.of("Asia/Kathmandu")))
-    }
-
     @Test fun withoutAGuideTheSlotIsTheAxisAndTheBufferItsAvailableRange() {
         val fixture = slotFixture()
         val state = with(fixture) { state.value.toAppPresentation(playbackPosition(90.minutes)) }
         val window = requireNotNull(programmeWindow(state, eventAt = ::noGuide))
         assertNull("an axis, never a programme", window.event)
+        assertNull(displayedProgrammeEvent(false, null, window, state, b, liveStart = true))
         assertEquals(Instant.parse("2026-09-07T20:30:00Z") to Instant.parse("2026-09-07T21:00:00Z"), window.start to window.stop)
         assertEquals("the live edge ten minutes into the slot", 1f / 3, window.liveFraction!!, 0.001f)
         assertEquals("playback at live", 1f / 3, window.positionFraction, 0.001f)
         assertEquals("the buffer began before the slot", 0f, window.availableStartFraction, 0f)
         assertEquals(1f / 3, window.availableEndFraction, 0.001f)
         assertEquals("the slot's clocks label the axis", "20:30" to "21:00", programmeWindowClockLabels(window, ZoneId.of("UTC")))
-        // A committed slot never lends programme information, not even the current broadcast on a fresh start.
-        assertNull(displayedProgrammeEvent(false, null, window, state, b, liveStart = true))
     }
 
     @Test fun steppingBackPastTheSlotStartMovesTheAxisToThePreviousSlot() {

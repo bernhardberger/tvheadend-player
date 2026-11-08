@@ -157,6 +157,15 @@ class AppPlaybackRuntime(
      */
     val sessionStops: Flow<Unit> = lastSessionStop.filter { it >= 0 && it == playbackRequests.get() }.map { }
 
+    private val _sessionChannelStep = MutableStateFlow<((Int) -> Unit)?>(null)
+    internal val sessionChannelStep = _sessionChannelStep.asStateFlow()
+
+    /** The showing live player owns channel order, scope and zap pacing. Returns its cleanup. */
+    fun registerSessionChannelStep(handler: (Int) -> Unit): () -> Unit {
+        _sessionChannelStep.value = handler
+        return { _sessionChannelStep.compareAndSet(handler, null) }
+    }
+
     fun consumeBackgroundNotice(notice: BackgroundPlaybackNotice) {
         _backgroundNotice.compareAndSet(notice, null)
     }
@@ -281,6 +290,7 @@ class AppPlaybackRuntime(
     private data class LiveRetirementRetry(
         val epoch: Long?,
         val install: LiveInstallAttribution?,
+        val target: AppPlaybackTarget?,
     )
     @Volatile
     private var liveRetirement: LiveRetirementRetry? = null
@@ -346,6 +356,10 @@ class AppPlaybackRuntime(
     val hasAudioInterruption: Boolean get() = audioInterruptions.interruption != null
     val state = presentation.state
     val activeTarget = _activeTarget.asStateFlow()
+    private val _liveStartUndisturbed = MutableStateFlow(false)
+    /** This live tune has not paused or received a Pause/Play command, including during admission. */
+    val liveStartUndisturbed = _liveStartUndisturbed.asStateFlow()
+    private var pendingLiveSelectionDisturbed = false
     val recordingSelection = _recordingSelection.asStateFlow()
     val recordingAdmission = _recordingAdmission.asStateFlow()
     val livePlaybackObservation = coordinator.livePlaybackObservation
@@ -423,6 +437,7 @@ class AppPlaybackRuntime(
                 livePauseController.publishLivePause()
                 val active = livePlaybackObservation.value as? LivePlaybackObservation.Active
                 val timeshift = active?.timeshiftState as? LiveTimeshiftState.Available
+                if (timeshift?.playbackPaused == true) _liveStartUndisturbed.value = false
                 if (foreground && !targetInstallationInProgress && !audioInterruptions.interruptionPaused && !audioInterruptions.interruptionMuted &&
                     !resolvedPause && livePauseController.pendingLivePauseEpoch != activeTargetEpoch
                 ) {
@@ -597,18 +612,30 @@ class AppPlaybackRuntime(
                 return@serializeViewerStart null
             }
             if (policy.trace.enabled) policy.trace.tuneAdmitted()
+            val previousLiveStart = synchronized(intentLock) {
+                val previous = _liveStartUndisturbed.value
+                _liveStartUndisturbed.value = !pendingLiveSelectionDisturbed
+                previous
+            }
             lastLiveChannelId = selection.channelId
             forgetRecordingRecoveryLocked()
             liveRecovery.resetBackoffLocked()
             val startEpoch = presentationEpoch.snapshot()
+            var started = false
             val result = try {
                 playLive(
                     channelId = selection.channelId,
                     recovering = false,
                     expectedPresentationEpoch = startEpoch,
                     servedGeneration = generation,
-                )
+                ).also { started = it?.isStarted == true }
             } finally {
+                if (!started) {
+                    val retainedLive = healthyActiveTarget() is AppPlaybackTarget.Live
+                    synchronized(intentLock) {
+                        _liveStartUndisturbed.value = retainedLive && previousLiveStart && !pendingLiveSelectionDisturbed
+                    }
+                }
                 settleCancelledStartLocked(startEpoch, generation)
             }
             // A commit ended the selection. Otherwise the start failed while the previous live
@@ -682,6 +709,7 @@ class AppPlaybackRuntime(
         if (profileSelection == null) {
             return completeUnavailableTarget(
                 expectedPresentationEpoch = expectedPresentationEpoch,
+                target = AppPlaybackTarget.Live(channelId),
                 result = unavailableLiveTargetResult(channelId),
                 failureReason = AppPlaybackFailureReason.OTHER,
                 keptTarget = keptTarget,
@@ -693,6 +721,7 @@ class AppPlaybackRuntime(
         ) {
             return completeUnavailableTarget(
                 expectedPresentationEpoch = expectedPresentationEpoch,
+                target = AppPlaybackTarget.Live(channelId),
                 result = PlaybackTargetResult.NOT_READY,
                 failureReason = AppPlaybackFailureReason.OTHER,
                 keptTarget = keptTarget,
@@ -708,6 +737,7 @@ class AppPlaybackRuntime(
         if (selection == null) {
             return completeUnavailableTarget(
                 expectedPresentationEpoch = expectedPresentationEpoch,
+                target = AppPlaybackTarget.Live(channelId),
                 result = unavailableLiveTargetResult(channelId),
                 failureReason = AppPlaybackFailureReason.OTHER,
                 keptTarget = keptTarget,
@@ -720,6 +750,7 @@ class AppPlaybackRuntime(
         ) {
             return completeUnavailableTarget(
                 expectedPresentationEpoch = expectedPresentationEpoch,
+                target = AppPlaybackTarget.Live(channelId),
                 result = PlaybackTargetResult.NOT_READY,
                 failureReason = AppPlaybackFailureReason.OTHER,
                 keptTarget = keptTarget,
@@ -819,6 +850,7 @@ class AppPlaybackRuntime(
                     expectedPresentationEpoch = expectedPresentationEpoch,
                     reason = AppPlaybackFailureReason.OTHER,
                     targetResult = targetResult,
+                    target = AppPlaybackTarget.Live(channelId),
                 )
             }
         ) } finally {
@@ -941,6 +973,7 @@ class AppPlaybackRuntime(
             ) return
             pendingLiveSelection = generation
             pendingLiveSelectionPaused = false
+            pendingLiveSelectionDisturbed = false
         }
         livePauseController.publishLivePause()
     }
@@ -951,6 +984,9 @@ class AppPlaybackRuntime(
         synchronized(intentLock) {
             pendingLiveSelectionLocked() ?: return false
             pendingLiveSelectionPaused = paused
+            pendingLiveSelectionDisturbed = true
+            // Like pending Play/Pause itself, this intent must not wait behind the tune's install.
+            _liveStartUndisturbed.value = false
         }
         livePauseController.publishLivePause()
         return true
@@ -1124,6 +1160,7 @@ class AppPlaybackRuntime(
             val observation = session.observation.value
             return completeUnavailableRecordingTarget(
                 expectedPresentationEpoch = expectedPresentationEpoch,
+                target = AppPlaybackTarget.Recording(recordingId),
                 result = if (observation.currentSession == null) {
                     PlaybackTargetResult.NOT_READY
                 } else {
@@ -1194,6 +1231,7 @@ class AppPlaybackRuntime(
                     if (!continues) targetContinuity = epoch
                     livePauseController.dropPendingLivePauseLocked()
                     _activeTarget.value = AppPlaybackTarget.Recording(selection.recordingId)
+                    _liveStartUndisturbed.value = false
                     _recordingSelection.value = selection
                     _recordingAdmission.value = admission
                     recordingMarkers.applySettings(playerSettings)
@@ -1209,6 +1247,7 @@ class AppPlaybackRuntime(
                     expectedPresentationEpoch = expectedPresentationEpoch,
                     reason = AppPlaybackFailureReason.RECORDING_READ_FAILED,
                     targetResult = targetResult,
+                    target = AppPlaybackTarget.Recording(recordingId),
                     recordingAdmission = admission,
                 )
             }
@@ -1424,6 +1463,7 @@ class AppPlaybackRuntime(
 
     private suspend fun stopPlayback(): PlaybackStopResult {
         if (!targetCommands.isOpen()) return PlaybackStopResult.SHUT_DOWN
+        _liveStartUndisturbed.value = false
         // A timer executing this stop must not cancel its own serialized cleanup.
         val timer = keepTimer
         keepTimer = null
@@ -1467,6 +1507,7 @@ class AppPlaybackRuntime(
     private suspend fun stopOtherKindBeforeInstall(live: Boolean, expectedPresentationEpoch: Long) {
         val previous = _activeTarget.value ?: return
         if ((previous is AppPlaybackTarget.Live) == live) return
+        if (!live) _liveStartUndisturbed.value = false
         bufferRecovery = null
         livePauseController.dropPendingLivePauseLocked()
         if (livePlaybackObservation.value == LivePlaybackObservation.Departed) {
@@ -1541,6 +1582,7 @@ class AppPlaybackRuntime(
     suspend fun pauseTimeshift(): TimeshiftCommandResult = targetCommands.serialize(
         onClosed = { TimeshiftCommandResult.SHUT_DOWN },
     ) {
+        _liveStartUndisturbed.value = false
         if (audioInterruptions.interruptionMuted) TimeshiftCommandResult.UNAVAILABLE else coordinator.pauseTimeshift()
     }
 
@@ -1573,6 +1615,7 @@ class AppPlaybackRuntime(
 
     private suspend fun pauseTimeshiftPlaybackLocked(): TimeshiftCommandResult? {
         if (!foreground) return TimeshiftCommandResult.UNAVAILABLE
+        _liveStartUndisturbed.value = false
         if (audioInterruptions.interruptionMuted) {
             audioInterruptions.playWithAudioFocusLocked(restoreSoundOnly = true)
             return null
@@ -1612,7 +1655,10 @@ class AppPlaybackRuntime(
             onClosed = { TimeshiftCommandResult.SHUT_DOWN },
         ) {
             if (arrival != playbackRequests.get()) TimeshiftCommandResult.ACCEPTED
-            else audioInterruptions.playWithAudioFocusLocked(resumeTimeshift = true)
+            else {
+                _liveStartUndisturbed.value = false
+                audioInterruptions.playWithAudioFocusLocked(resumeTimeshift = true)
+            }
         }
     }
     suspend fun goLive(): TimeshiftCommandResult = targetCommands.serialize(
@@ -1829,6 +1875,7 @@ class AppPlaybackRuntime(
                 if (live && !timeshift && !livePauseController.currentLivePauseAvailability().acceptsPause() &&
                     !(playWhenReady && hasExhaustedRecovery())
                 ) return@serialize
+                _liveStartUndisturbed.value = false
                 if (playWhenReady) {
                     val result = audioInterruptions.playWithAudioFocusLocked(resumeTimeshift = timeshift)
                     // A denied focus request retains its interruption hold/mute. Only a
@@ -1850,7 +1897,9 @@ class AppPlaybackRuntime(
      * after it arrived cancels it outright. While it is still the viewer's latest action it
      * stops whatever target is active when it runs (a channel or recording still starting
      * when it arrived included), provided the session is attached and the app is in the
-     * foreground. Registered as pending from arrival until its check (see
+     * foreground. Also stops a targetless Starting hand-over and clears a terminal failure
+     * after its target has retired.
+     * Registered as pending from arrival until its check (see
      * [enterPlayerScreen]). Announces itself on [sessionStops] together with the intent
      * generation current when it arrived.
      */
@@ -1876,7 +1925,9 @@ class AppPlaybackRuntime(
             targetCommands.serialize(onClosed = {}) {
                 val current = synchronized(intentLock) {
                     endPendingLocked()
-                    (isAttached() && foreground && activeTargetEpoch != null &&
+                    (isAttached() && foreground &&
+                        (activeTargetEpoch != null || (_activeTarget.value == null &&
+                            (state.value == AppPlaybackState.Starting || state.value is AppPlaybackState.Failed))) &&
                         request == playbackRequests.get())
                         .also { if (it) userStopIntent = maxOf(userStopIntent, request) }
                 }
@@ -1951,6 +2002,8 @@ class AppPlaybackRuntime(
             val retirement = LiveRetirementRetry(
                 activeTargetEpoch,
                 reportedInstall,
+                (reportedInstall?.selection ?: origin?.selection)?.let { AppPlaybackTarget.Live(it.channelId) }
+                    ?: _activeTarget.value,
             ).takeIf { reason != PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED }
             if (retirement != null) liveRetirement = retirement
             scope.launch {
@@ -2133,7 +2186,7 @@ class AppPlaybackRuntime(
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (_: RuntimeException) {
-                presentation.publishFailed(AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER))
+                presentation.publishFailed(AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER, target = obligation.target))
                 return false
             }
             when (result.outcome) {
@@ -2143,13 +2196,13 @@ class AppPlaybackRuntime(
                     if (epoch != null && activeTargetEpoch == epoch &&
                         player.currentMediaItem === ownedMediaItem
                     ) presentationEpoch.publishIfCurrent(epoch) {
-                        presentation.publishFailed(AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER))
+                        presentation.publishFailed(AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER, target = obligation.target))
                     }
                     return false
                 }
                 else -> {
                     presentation.publishFailed(recoveryExhaustedState(result,
-                        PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED_RETIREMENT_FAILED))
+                        PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED_RETIREMENT_FAILED, obligation.target))
                     return false
                 }
             }
@@ -2160,6 +2213,7 @@ class AppPlaybackRuntime(
 
     /** Withdraw attribution without pausing, preparing or changing replacement playback. */
     private fun withdrawDepartedTargetLocked() {
+        _liveStartUndisturbed.value = false
         departedEpoch = activeTargetEpoch
         bufferRecovery = null
         liveRecovery.dropDeferredLocked()
@@ -2227,9 +2281,11 @@ class AppPlaybackRuntime(
      * tuner. Surfacing a failure lets the user choose, instead of retuning forever.
      */
     private suspend fun publishRecoveryExhausted(recoveryReason: PlaybackRecoveryReason) {
+        val target = _activeTarget.value
+        _liveStartUndisturbed.value = false
         val stopResult = stopPlayback()
         if (!targetCommands.isOpen()) return
-        presentation.publishFailed(recoveryExhaustedState(stopResult, recoveryReason))
+        presentation.publishFailed(recoveryExhaustedState(stopResult, recoveryReason, target))
         presentation.publishDiagnostics()
     }
 
@@ -2353,7 +2409,7 @@ class AppPlaybackRuntime(
         noteRecordingInterruptionLocked()
         stopPlayback()
         if (!targetCommands.isOpen()) return
-        presentation.publishFailed(AppPlaybackState.Failed(AppPlaybackFailureReason.RECORDING_READ_FAILED))
+        presentation.publishFailed(AppPlaybackState.Failed(AppPlaybackFailureReason.RECORDING_READ_FAILED, target = target))
         presentation.publishDiagnostics()
     }
 
@@ -2406,6 +2462,7 @@ class AppPlaybackRuntime(
         _recordingSelection.value = null
         _recordingAdmission.value = null
         activeTargetEpoch = null
+        _liveStartUndisturbed.value = false
         livePauseController.publishLivePause()
         presentationEpoch.publishIfCurrent(expectedPresentationEpoch) {
             presentation.publishStarting()
@@ -2432,6 +2489,7 @@ class AppPlaybackRuntime(
         settingsJob.join()
         declaredFrameDurationJob.join()
         targetCommands.awaitIdle {
+            _liveStartUndisturbed.value = false
             recordingRecovery = null
             livePauseController.dropPendingLivePauseLocked()
             dropHeldLiveSelectionPause()
@@ -2516,6 +2574,7 @@ class AppPlaybackRuntime(
 
     private suspend fun completeUnavailableTarget(
         expectedPresentationEpoch: Long,
+        target: AppPlaybackTarget,
         result: PlaybackTargetResult,
         failureReason: AppPlaybackFailureReason,
         keptTarget: () -> AppPlaybackTarget? = ::healthyActiveTarget,
@@ -2529,12 +2588,14 @@ class AppPlaybackRuntime(
                 expectedPresentationEpoch = expectedPresentationEpoch,
                 reason = failureReason,
                 targetResult = targetResult,
+                target = target,
             )
         },
     )
 
     private suspend fun completeUnavailableRecordingTarget(
         expectedPresentationEpoch: Long,
+        target: AppPlaybackTarget.Recording,
         result: PlaybackTargetResult,
         admission: RecordingPlaybackAdmission,
     ): PlaybackTargetResult = installTargetForPresentation(
@@ -2547,6 +2608,7 @@ class AppPlaybackRuntime(
                 reason = AppPlaybackFailureReason.RECORDING_READ_FAILED,
                 targetResult = targetResult,
                 recordingAdmission = admission,
+                target = target,
             )
         },
     )
@@ -2564,17 +2626,19 @@ class AppPlaybackRuntime(
 
     private fun publishTargetFailure(
         expectedPresentationEpoch: Long,
+        target: AppPlaybackTarget,
         reason: AppPlaybackFailureReason,
         targetResult: PlaybackTargetResult,
         recordingAdmission: RecordingPlaybackAdmission? = null,
     ) {
         if (!targetCommands.isOpen()) return
         if (healthyActiveTarget() != null) return
+        _liveStartUndisturbed.value = false
         if (coordinator.playerCleanupPending.value && activeTargetEpoch != null) {
             // A failed stop can leave Media3 non-IDLE, but that source is no longer playable.
             // Keep the target epoch so the serialized retirement retry still owns its fence.
             presentationEpoch.publishIfCurrent(expectedPresentationEpoch) {
-                presentation.publishFailed(AppPlaybackState.Failed(reason, targetResult))
+                presentation.publishFailed(AppPlaybackState.Failed(reason, targetResult, target = target))
                 presentation.publishDiagnostics()
             }
             return
@@ -2590,7 +2654,7 @@ class AppPlaybackRuntime(
             _recordingSelection.value = null
             _recordingAdmission.value = recordingAdmission
             recordingMarkers.clearRecordingMarkers()
-            presentation.publishFailed(AppPlaybackState.Failed(reason, targetResult))
+            presentation.publishFailed(AppPlaybackState.Failed(reason, targetResult, target = target))
             presentation.publishDiagnostics()
         }
     }
@@ -2817,6 +2881,7 @@ class AppPlaybackRuntime(
         val reconnectRetryPending = epoch != null && reconnectRecoveryEpoch == epoch &&
             failClosedPauseEpoch == null && liveRecovery.attemptPendingFor(epoch)
         if (!reconnectRetryPending) {
+            if (healthyActiveTarget() == null) _liveStartUndisturbed.value = false
             presentation.publishFailed(
                 AppPlaybackState.Failed(
                     reason = if (_activeTarget.value is AppPlaybackTarget.Recording) {
@@ -2829,6 +2894,7 @@ class AppPlaybackRuntime(
                     playerErrorClassification = classifyPlaybackError(player.playerError),
                     subscriptionIssue = lastSubscriptionIssue(),
                     deviceFault = isDevicePlaybackFault(player.playerError),
+                    target = _activeTarget.value,
                 ),
             )
         }

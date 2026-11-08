@@ -24,18 +24,23 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.*
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.dialog
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.constrainHeight
+import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import androidx.tv.material3.Button
 import androidx.tv.material3.OutlinedButton
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
+import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
 import at.bernhardberger.tvhplayer.ui.TvTextColors
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotionFrame
@@ -163,9 +168,9 @@ internal fun CentredDialog(
                 }, label = "dialog-options") { alternative ->
             PlayerMotionFrame(leaving = (alternative != null) != (alternativeContent != null)) {
             if (alternative != null) alternative() else {
-            Column(Modifier.width(528.dp).clip(RoundedCornerShape(16.dp)).background(TvSurfaceColors.container)
+            Layout(modifier = Modifier.clip(RoundedCornerShape(16.dp)).background(TvSurfaceColors.container)
                 .testTag("centred-dialog-card").padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp)) {
+                content = {
                 Column(Modifier.fillMaxWidth().testTag("centred-dialog-content")) {
                     Column(Modifier.fillMaxWidth().testTag("centred-dialog-text"),
                         verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -184,7 +189,26 @@ internal fun CentredDialog(
                             color = TvTextColors.secondary)
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), content = actions)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp), content = actions)
+            }) { measurables, constraints ->
+                // Only actions determine the width; copy is measured afterwards so it wraps.
+                // The FlowRow's maximum intrinsic width is its natural, unwrapped row.
+                val padding = 48.dp.roundToPx()
+                val width = constraints.constrainWidth(
+                    measurables[1].maxIntrinsicWidth(Constraints.Infinity).coerceIn(
+                        528.dp.roundToPx() - padding,
+                        (960.dp - TvGridHorizontalMargin * 2).roundToPx() - padding,
+                    ),
+                )
+                val childConstraints = constraints.copy(minWidth = width, maxWidth = width, minHeight = 0)
+                val actionsPlaceable = measurables[1].measure(childConstraints)
+                val textPlaceable = measurables[0].measure(childConstraints)
+                val gap = 24.dp.roundToPx()
+                layout(width, constraints.constrainHeight(textPlaceable.height + gap + actionsPlaceable.height)) {
+                    textPlaceable.placeRelative(0, 0)
+                    actionsPlaceable.placeRelative(0, textPlaceable.height + gap)
+                }
             }
             }
             }

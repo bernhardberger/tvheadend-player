@@ -771,7 +771,6 @@
     <string name="channel_schedule_gap">لا توجد معلومات برامج حتى %1$s</string>
     <string name="channel_schedule_end">لا توجد معلومات برامج بعد %1$s</string>
     <string name="channel_schedule_loading_more">جارٍ تحميل الأيام التالية</string>
-    <string name="recording_choice_watch_channel">مشاهدة القناة</string>
     <string name="recording_choice_play">تشغيل التسجيل</string>
     <string name="context_resume_from">من %1$s</string>
     <string name="home_all_scheduled">كل التسجيلات المجدولة</string>
@@ -814,4 +813,6 @@
     <string name="appliance_companion_qr_description">رمز QR لخطوات إعداد التطبيق المرافق لوضع الجهاز المخصّص</string>
     <string name="whats_new">ما الجديد</string>
     <string name="whats_new_badge">جديد</string>
+    <string name="whats_new_hint">ما الجديد في %1$s</string>
+    <string name="settings_about_version_summary">الإصدار %1$s</string>
 </resources>

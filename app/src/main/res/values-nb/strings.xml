@@ -711,7 +711,6 @@
     <string name="channel_schedule_gap">Ingen programinformasjon frem til %1$s</string>
     <string name="channel_schedule_end">Ingen programinformasjon etter %1$s</string>
     <string name="channel_schedule_loading_more">Laster inn senere dager</string>
-    <string name="recording_choice_watch_channel">Se kanal</string>
     <string name="recording_choice_play">Spill av opptak</string>
     <string name="context_resume_from">fra %1$s</string>
     <string name="home_all_scheduled">Alle planlagte</string>
@@ -750,4 +749,6 @@
     <string name="appliance_companion_qr_description">QR-kode til oppsettstrinnene for tilleggsappen for TV-modus</string>
     <string name="whats_new">Hva er nytt?</string>
     <string name="whats_new_badge">Nytt</string>
+    <string name="whats_new_hint">Nytt i %1$s</string>
+    <string name="settings_about_version_summary">Versjon %1$s</string>
 </resources>

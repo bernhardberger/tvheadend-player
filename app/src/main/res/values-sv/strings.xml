@@ -711,7 +711,6 @@
     <string name="channel_schedule_gap">Ingen programinformation fram till %1$s</string>
     <string name="channel_schedule_end">Ingen programinformation efter %1$s</string>
     <string name="channel_schedule_loading_more">Laddar senare dagar</string>
-    <string name="recording_choice_watch_channel">Titta på kanal</string>
     <string name="recording_choice_play">Spela upp inspelningen</string>
     <string name="context_resume_from">från %1$s</string>
     <string name="home_all_scheduled">Alla schemalagda</string>
@@ -750,4 +749,6 @@
     <string name="appliance_companion_qr_description">QR-kod till stegen för att konfigurera kompanjonappen för tv-läge</string>
     <string name="whats_new">Vad är nytt?</string>
     <string name="whats_new_badge">Nytt</string>
+    <string name="whats_new_hint">Nytt i %1$s</string>
+    <string name="settings_about_version_summary">Version %1$s</string>
 </resources>

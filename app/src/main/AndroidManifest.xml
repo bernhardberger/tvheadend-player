@@ -6,6 +6,10 @@
         android:protectionLevel="signature" />
     <queries>
         <package android:name="${applianceCompanionPackage}" />
+        <!-- Media3 checks controller packages to trust apps with notification access. -->
+        <intent>
+            <action android:name="android.service.notification.NotificationListenerService" />
+        </intent>
     </queries>
 	<uses-feature
 		android:name="android.software.leanback"

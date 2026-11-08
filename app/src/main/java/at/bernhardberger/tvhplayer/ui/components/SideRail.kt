@@ -259,7 +259,6 @@ internal fun SideRail(
     ),
     rootBackPriority: Boolean = false,
     connectionDegraded: Boolean = false,
-    whatsNewUnseen: Boolean = false,
     onBackHandlerChanged: ((() -> Unit) -> Unit) = {},
     /** What plays behind browse; the controls below it act on that target. */
     nowPlaying: RailNowPlaying? = null,
@@ -285,7 +284,6 @@ internal fun SideRail(
     val settingsLabel = stringResource(R.string.nav_settings)
     val settingsDescription = when {
         connectionDegraded -> stringResource(R.string.connection_problem_label)
-        whatsNewUnseen -> "$settingsLabel, ${stringResource(R.string.whats_new_badge)}"
         else -> settingsLabel
     }
     val mainItems = remember(
@@ -603,7 +601,6 @@ internal fun SideRail(
                     footerItems.forEach { item ->
                         key(item.route) {
                             val showConnectionBadge = item.route == AppDestination.SETTINGS && connectionDegraded
-                            val showNewBadge = item.route == AppDestination.SETTINGS && whatsNewUnseen && !connectionDegraded
                             var itemFocused by remember { mutableStateOf(false) }
                             NavigationDrawerItem(
                                 selected = selectedRoute == item.route,
@@ -612,14 +609,14 @@ internal fun SideRail(
                                     PinnedRailIcon {
                                         Box {
                                             item.icon()
-                                            if ((showConnectionBadge || showNewBadge) && drawerValue == DrawerValue.Closed) {
+                                            if (showConnectionBadge && drawerValue == DrawerValue.Closed) {
                                                 Box(
                                                     Modifier
                                                         .align(Alignment.TopEnd)
                                                         .offset(x = 2.dp, y = (-2).dp)
                                                         .size(8.dp)
-                                                        .background(if (showConnectionBadge) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary, CircleShape)
-                                                        .testTag(if (showConnectionBadge) "connection-problem-badge" else "whats-new-badge")
+                                                        .background(MaterialTheme.colorScheme.error, CircleShape)
+                                                        .testTag("connection-problem-badge")
                                                         .clearAndSetSemantics {},
                                                 )
                                             }
@@ -641,14 +638,6 @@ internal fun SideRail(
                                             } else {
                                                 MaterialTheme.colorScheme.onError
                                             },
-                                        )
-                                    }
-                                } else if (showNewBadge) {
-                                    {
-                                        NavigationDrawerItemDefaults.TrailingBadge(
-                                            text = stringResource(R.string.whats_new_badge),
-                                            containerColor = if (itemFocused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer,
-                                            contentColor = if (itemFocused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onPrimaryContainer,
                                         )
                                     }
                                 } else null,

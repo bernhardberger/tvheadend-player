@@ -7,12 +7,8 @@
     <string name="about_server">Сервер</string>
     <string name="about_not_connected">Не підключено</string>
     <string name="about_connected">Підключено</string>
-    <string name="about_license">GNU General Public License v3</string>
-    <string name="about_attribution">На основі TVHStream від Preclikos</string>
-    <string name="about_notices">Правові повідомлення та сторонні бібліотеки</string>
+    <string name="about_licenses">Ліцензії</string>
+    <string name="about_licenses_summary">GNU GPL v3 і правові повідомлення третіх сторін</string>
     <string name="about_privacy">Політика конфіденційності</string>
     <string name="about_translation">Переклад</string>
-    <string name="about_machine_translated">Машинний переклад</string>
-    <string name="about_machine_translated_details">Цей переклад ще ніхто не перевірив. Повідомляйте про помилки в розділі Issues проєкту Tvheadend Player на GitHub.</string>
-    <bool name="language_machine_translated">true</bool>
 </resources>

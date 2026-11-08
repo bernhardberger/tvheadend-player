@@ -711,7 +711,6 @@
     <string name="channel_schedule_gap">%1$s saatine kadar program bilgisi yok</string>
     <string name="channel_schedule_end">%1$s saatinden sonra program bilgisi yok</string>
     <string name="channel_schedule_loading_more">Sonraki günler yükleniyor</string>
-    <string name="recording_choice_watch_channel">Kanalı izle</string>
     <string name="recording_choice_play">Kaydı oynat</string>
     <string name="context_resume_from">%1$s konumundan</string>
     <string name="home_all_scheduled">Tüm planlananlar</string>
@@ -750,4 +749,6 @@
     <string name="appliance_companion_qr_description">TV modu yardımcı uygulamasının kurulum adımları için QR kodu</string>
     <string name="whats_new">Yenilikler</string>
     <string name="whats_new_badge">Yeni</string>
+    <string name="whats_new_hint">%1$s yenilikleri</string>
+    <string name="settings_about_version_summary">Sürüm %1$s</string>
 </resources>

@@ -666,7 +666,6 @@
     <string name="channel_schedule_gap">%1$s之前沒有節目資訊</string>
     <string name="channel_schedule_end">%1$s之後沒有節目資訊</string>
     <string name="channel_schedule_loading_more">正在載入後續日期</string>
-    <string name="recording_choice_watch_channel">觀看頻道</string>
     <string name="recording_choice_play">播放錄影</string>
     <string name="context_resume_from">從%1$s繼續播放</string>
     <string name="home_all_scheduled">所有預約</string>
@@ -704,4 +703,6 @@
     <string name="appliance_companion_qr_description">電視模式配套應用程式設定步驟的 QR 碼</string>
     <string name="whats_new">更新內容</string>
     <string name="whats_new_badge">新</string>
+    <string name="whats_new_hint">%1$s 更新內容</string>
+    <string name="settings_about_version_summary">版本 %1$s</string>
 </resources>

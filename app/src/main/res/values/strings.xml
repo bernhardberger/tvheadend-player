@@ -110,7 +110,6 @@
     <string name="context_show_guide">Show in Guide</string>
     <string name="context_resume">Resume</string>
     <string name="context_start_over">Watch from beginning</string>
-    <string name="recording_choice_watch_channel">Watch channel</string>
     <string name="recording_choice_play">Play recording</string>
     <string name="context_resume_from">from %1$s</string>
     <string name="home_all_scheduled">All scheduled</string>
@@ -990,4 +989,6 @@
     <string name="appliance_companion_qr_description">QR code for the appliance companion setup steps</string>
     <string name="whats_new">What\'s new</string>
     <string name="whats_new_badge">New</string>
+    <string name="whats_new_hint">What\'s new in %1$s</string>
+    <string name="settings_about_version_summary">Version %1$s</string>
 </resources>
