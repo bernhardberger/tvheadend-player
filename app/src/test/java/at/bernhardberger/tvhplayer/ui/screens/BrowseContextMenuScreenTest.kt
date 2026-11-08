@@ -445,7 +445,7 @@ class BrowseContextMenuScreenTest {
         show(recordings = true)
         compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
         compose.onNodeWithText("Resume").assertIsFocused()
-        compose.onNodeWithText("Watch channel").assertDoesNotExist()
+        compose.onNodeWithTag("browse-context-action-watch_live").assertDoesNotExist()
         compose.onNodeWithText("from 1:02:00", useUnmergedTree = true).assertExists()
         val button = compose.onNodeWithText("Resume").getUnclippedBoundsInRoot()
         val title = compose.onNodeWithText("Resume", useUnmergedTree = true).getUnclippedBoundsInRoot()
@@ -456,24 +456,52 @@ class BrowseContextMenuScreenTest {
         capture("recordings-resume-position")
     }
 
-    @Test fun runningRecordingMenuWatchesChannelAfterPlaybackActions() {
+    @Test fun runningRecordingMenuWatchesLiveAfterPlaybackActions() {
         show(recordings = true, recordingState = DvrEntryState.RECORDING, growingFile = true)
         compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
         compose.onNodeWithText("Watch").assertIsFocused().performKeyInput {
             pressKey(Key.DirectionDown); pressKey(Key.DirectionDown)
         }
-        compose.onNodeWithText("Watch channel").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("browse-context-action-watch_live").assertTextEquals("Watch live")
+            .assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.runOnIdle { assertEquals(ChannelId(1), watchedChannel); assertEquals(0, plays) }
     }
 
-    @Test fun scheduledRecordingMenuDoesNotOfferWatchChannel() {
+    @Test fun scheduledRecordingMenuDoesNotOfferWatchLive() {
         show(recordings = true, recordingState = DvrEntryState.SCHEDULED)
         compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
-        compose.onNodeWithText("Watch channel").assertDoesNotExist()
+        compose.onNodeWithTag("browse-context-action-watch_live").assertDoesNotExist()
     }
 
     @Test @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
-    fun recordingResumeDialogCapture() = recordingOkShowsResumeAndBackRestoresRow()
+    @OptIn(TvheadendTestingApi::class)
+    fun recordingResumeDialogCapture() {
+        val session = show(recordings = true, realRail = true,
+            recordingState = DvrEntryState.RECORDING, growingFile = true)
+        val row = compose.onNodeWithTag("recording-list-entry-1").requestFocus()
+        row.performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("recording-resume").assertIsFocused()
+        capture("with-resume-en-font1.0", "recording-choice")
+        compose.runOnIdle { back.onBackPressed() }
+        compose.runOnIdle {
+            val previous = session.observation.value
+            val entries = previous.dvrSnapshotForDisplay!!.entries.map { entry ->
+                if (entry.id != DvrEntryId(1)) entry else DvrEntry.create(entry.id,
+                    channelId = entry.channelId, eventId = entry.eventId, title = entry.title,
+                    folder = entry.folder, channelName = entry.channelName, state = entry.state,
+                    start = entry.start, stop = entry.stop, files = entry.files, playPosition = 0.seconds,
+                    summary = entry.summary, description = entry.description, subtitle = entry.subtitle,
+                    image = entry.image)
+            }
+            session.publish(SessionObservation.create(previous.sessionState, previous.channelState,
+                previous.epgState, DvrRepositoryState.Current(DvrSnapshot.create(entries)),
+                recordingProgressCapability = previous.recordingProgressCapability))
+        }
+        row.performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("recording-start-over").assertIsFocused()
+        compose.onNodeWithTag("recording-resume").assertDoesNotExist()
+        capture("without-resume-en-font1.0", "recording-choice")
+    }
 
     @Test fun recordingOkShowsResumeAndBackRestoresRow() {
         val now = Instant.parse("2026-09-15T19:00:00Z").epochSeconds

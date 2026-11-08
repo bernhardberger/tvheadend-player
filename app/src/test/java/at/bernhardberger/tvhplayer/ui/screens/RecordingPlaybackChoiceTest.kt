@@ -2,7 +2,6 @@ package at.bernhardberger.tvhplayer.ui.screens
 
 import android.app.Application
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.text.TextLayoutResult
@@ -28,7 +27,6 @@ import kotlin.time.Instant
 @OptIn(TvheadendTestingApi::class, ExperimentalTvheadendApi::class)
 class RecordingPlaybackChoiceTest {
     @get:Rule val compose = createComposeRule()
-    private lateinit var view: android.view.View
 
     @Test fun activeChoiceStartsAtResumeAndNavigatesInOrder() {
         var watched = 0
@@ -36,7 +34,7 @@ class RecordingPlaybackChoiceTest {
         show(754L, watch = { watched++ }, play = { starts += it })
         compose.onNodeWithTag("recording-resume").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionLeft) }
-        compose.onNodeWithText("Watch channel").assertExists()
+        compose.onNodeWithTag("recording-watch-live").assertTextEquals("Watch live")
         compose.onNodeWithText("Watch from beginning").assertExists()
         assertLeftToRight("recording-resume", "recording-start-over", "recording-watch-live")
         val content = compose.onNodeWithTag("centred-dialog-content").getUnclippedBoundsInRoot()
@@ -47,10 +45,9 @@ class RecordingPlaybackChoiceTest {
             assertTrue("Actions stay inside the card padding", bounds.left >= content.left && bounds.right <= content.right)
         }
         val liveLabel = mutableListOf<TextLayoutResult>()
-        compose.onNodeWithText("Watch channel", useUnmergedTree = true)
+        compose.onNode(hasText("Watch live") and hasAnyAncestor(hasTestTag("recording-watch-live")), useUnmergedTree = true)
             .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(liveLabel) }
-        assertFalse("Watch channel has room for its complete label", liveLabel.single().hasVisualOverflow)
-        capture("with-resume")
+        assertFalse("The live action has room for its complete label", liveLabel.single().hasVisualOverflow)
         compose.onNodeWithTag("recording-resume").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionRight) }
         compose.onNodeWithTag("recording-start-over").assertIsFocused()
@@ -76,7 +73,6 @@ class RecordingPlaybackChoiceTest {
         compose.onNodeWithText("Watch from beginning").assertDoesNotExist()
         compose.onNodeWithTag("recording-resume").assertDoesNotExist()
         assertLeftToRight("recording-start-over", "recording-watch-live")
-        capture("without-resume")
         compose.onNodeWithTag("recording-start-over").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionLeft) }
         compose.onNodeWithTag("recording-start-over").assertIsFocused()
@@ -111,16 +107,6 @@ class RecordingPlaybackChoiceTest {
         assertEquals(before, compose.onNodeWithTag("centred-dialog-card").getUnclippedBoundsInRoot())
     }
 
-    private fun capture(name: String) {
-        compose.mainClock.advanceTimeBy(500)
-        val bitmap = android.graphics.Bitmap.createBitmap(960, 540, android.graphics.Bitmap.Config.ARGB_8888)
-        compose.runOnIdle { view.draw(android.graphics.Canvas(bitmap)) }
-        val file = java.io.File("build/outputs/recording-choice", "$name-en-font1.0.png")
-        file.parentFile.mkdirs()
-        file.outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
-        bitmap.recycle()
-    }
-
     private fun assertLeftToRight(vararg tags: String) {
         tags.toList().zipWithNext().forEach { (left, right) ->
             assertTrue(compose.onNodeWithTag(left).getUnclippedBoundsInRoot().right <
@@ -145,7 +131,6 @@ class RecordingPlaybackChoiceTest {
             recordingProgressCapability = RecordingProgressCapability.SUPPORTED)
         compose.setContent {
             TVHeadendPlayerTheme {
-                view = LocalView.current
                 if (visible.value) RecordingPlaybackChoice(entry, observation.recordingPlaybackAdmission(entry),
                     observation, channel, now, play, close, watch)
             }

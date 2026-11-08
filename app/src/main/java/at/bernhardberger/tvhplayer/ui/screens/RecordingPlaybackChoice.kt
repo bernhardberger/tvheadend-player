@@ -108,7 +108,7 @@ internal fun RecordingPlaybackChoice(
         ) {
             Icon(painterResource(R.drawable.ic_live_tv_outlined), null, Modifier.size(ButtonDefaults.IconSize))
             Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-            Text(stringResource(R.string.context_watch_channel), maxLines = 1, softWrap = false)
+            Text(stringResource(R.string.context_watch_live), maxLines = 1, softWrap = false)
         }
     }
 }

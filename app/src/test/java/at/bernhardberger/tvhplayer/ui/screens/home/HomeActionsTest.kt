@@ -1231,7 +1231,7 @@ class HomeActionsTest {
         compose.onNode(hasText("Watch") and hasAnyAncestor(hasTestTag("browse-context-menu"))).assertIsFocused().performKeyInput {
             pressKey(Key.DirectionDown); pressKey(Key.DirectionDown)
         }
-        compose.onNodeWithText("Watch channel").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("browse-context-action-watch_live").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.runOnIdle { assertEquals(listOf(channel.id), tuned) }
     }
 
