@@ -88,17 +88,21 @@ class ChannelScheduleFocusTest {
         val second = compose.onNodeWithTag("schedule-tab-$secondDate")
         val beforeSecond = image(second)
         val list = compose.onNodeWithTag("channel-schedule-list").getUnclippedBoundsInRoot()
-        // Put the viewport through the label, not a tab's empty end padding.
+        fun ink(image: androidx.compose.ui.graphics.PixelMap, from: Int = 0, to: Int = image.width): Float =
+            (from until to).sumOf { x -> (0 until image.height).sumOf { y -> (image[x, y].red - image[0, 0].red).coerceAtLeast(0f).toDouble() } }.toFloat()
+        val next = compose.onNodeWithTag("schedule-tab-${date.plusDays(1)}").getUnclippedBoundsInRoot()
+        // A viewport ending in the gap used to fade only empty space despite later days.
         compose.runOnIdle {
-            val offset = if (direction == LayoutDirection.Ltr) original.left - list.left else list.right - original.right
-            width = offset + (original.right - original.left) / 2 + PlaybackPanelPadding
+            val end = if (direction == LayoutDirection.Ltr) original.right - list.left else list.right - original.left
+            val gap = if (direction == LayoutDirection.Ltr) next.left - original.right else original.left - next.right
+            width = end + gap / 2 + PlaybackPanelPadding
         }
         compose.waitForIdle()
+        val gapHint = ink(image(third))
+        assertTrue("overflow in a gap must leave visible partial faded label ink", gapHint > 0f && gapHint < ink(before) * .95f)
         val after = image(third)
         val afterSelected = image(selected)
-        fun ink(image: androidx.compose.ui.graphics.PixelMap, from: Int, to: Int): Float =
-            (from until to).sumOf { x -> (0 until image.height).sumOf { y -> (image[x, y].red - image[0, 0].red).coerceAtLeast(0f).toDouble() } }.toFloat()
-        val visible = minOf(after.width, before.width / 2)
+        val visible = minOf(after.width, before.width)
         val beforeInk = if (direction == LayoutDirection.Ltr) ink(before, 0, visible) else ink(before, before.width - visible, before.width)
         val afterInk = if (direction == LayoutDirection.Ltr) ink(after, 0, visible) else ink(after, after.width - visible, after.width)
         assertTrue("overflowing label must fade rather than end at full ink", afterInk < beforeInk * .95f)

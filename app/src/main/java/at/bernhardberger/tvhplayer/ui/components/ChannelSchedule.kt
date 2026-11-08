@@ -20,6 +20,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalConfiguration
@@ -194,7 +195,7 @@ internal fun ChannelSchedule(
         } else {
             // The selected day's tab stays whole in view wherever the list or the tabs moved it.
             val tabInView = remember(days) { days.associateWith { BringIntoViewRequester() } }
-            val tabEdgeFade = remember(days) { TabEdgeFadeState() }
+            val tabEdgeFade = remember(days) { NavigationTabOverflowState() }
             val layoutDirection = LocalLayoutDirection.current
             val selectedIndex = days.indexOf(selectedDay).coerceAtLeast(0)
             var focusedTabIndex by remember(days) { mutableIntStateOf(-1) }
@@ -205,22 +206,31 @@ internal fun ChannelSchedule(
             AppTabRow(selectedIndex, AppTabStyle.Section,
                 modifier = Modifier
                     .padding(horizontal = PlaybackPanelPadding)
+                    .layout { measurable, constraints ->
+                        val width = tabEdgeFade.trailingHintWidthPx(
+                            fullWidthPx = constraints.maxWidth.toFloat(),
+                            protectedIndices = setOf(selectedIndex, focusedTabIndex),
+                            minimumPeekPx = 56.dp.toPx(),
+                            layoutDirection = layoutDirection,
+                        ).roundToInt()
+                        val placeable = measurable.measure(constraints.copy(minWidth = minOf(constraints.minWidth, width), maxWidth = width))
+                        layout(constraints.maxWidth, placeable.height) { placeable.placeRelative(0, 0) }
+                    }
                     .onGloballyPositioned(tabEdgeFade::updateViewportBounds)
                     .navigationEdgeFadeMask(
                         width = TvNavigationRailGradientRunout,
                         maskEnabled = {
-                            tabEdgeFade.availableFadeWidthPx(selectedIndex, focusedTabIndex, layoutDirection, Float.MAX_VALUE,
-                                includeFullyHiddenTabs = true) > 0f ||
+                            tabEdgeFade.availableFadeWidthPx(selectedIndex, focusedTabIndex, layoutDirection, Float.MAX_VALUE) > 0f ||
                                 tabEdgeFade.availableFadeWidthPx(selectedIndex, focusedTabIndex, layoutDirection, Float.MAX_VALUE,
-                                    trailing = true, includeFullyHiddenTabs = true) > 0f
+                                    trailing = true) > 0f
                         },
                         availableWidthPx = {
                             tabEdgeFade.availableFadeWidthPx(selectedIndex, focusedTabIndex, layoutDirection,
-                                TvNavigationRailGradientRunout.toPx(), includeFullyHiddenTabs = true)
+                                TvNavigationRailGradientRunout.toPx())
                         },
                         availableTrailingWidthPx = {
                             tabEdgeFade.availableFadeWidthPx(selectedIndex, focusedTabIndex, layoutDirection,
-                                TvNavigationRailGradientRunout.toPx(), trailing = true, includeFullyHiddenTabs = true)
+                                TvNavigationRailGradientRunout.toPx(), trailing = true)
                         },
                     ),
                 selectedTabFocus = selectedTabFocus,
