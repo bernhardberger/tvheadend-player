@@ -36,7 +36,8 @@ code points, trimmed, never with added prefixes or suffixes.
 | `artworkData` | Channel picon | Recording image, else channel picon |
 | `artworkUri` | Never set | Never set |
 
-`mediaType` is left unset when the channel kind is unknown or other.
+`mediaType` is left unset for radio recordings and when the channel kind is
+unknown or other.
 
 "Programme at the playback position" follows the player's own timeline: while
 watching in timeshift, the session names the programme on screen, not the one
@@ -97,12 +98,25 @@ is absent.
 
 ## Errors
 
-When playback fails for good, the session reports an error with one of these
-fixed messages, never server or decoder text:
+When playback fails for good, the session reports an error with a fixed
+message, never server or decoder text. The message is the same title the app
+shows for that failure, in the app's language:
 
-- "Recording can't be read"
-- "Channel unavailable"
-- "Playback failed"
+| Failed item | Message (English) |
+|---|---|
+| Recording | "Can’t play this recording" |
+| Channel whose subscription failed or that is unavailable | "Channel not available" |
+| Channel that failed for any other reason | "Can’t play this channel" |
+
+Match on the error code rather than the text. The code describes the cause and
+is independent of the message:
+
+| Cause | `PlaybackException` code |
+|---|---|
+| Recording file can't be read | `ERROR_CODE_IO_UNSPECIFIED` |
+| Subscription failed or channel unavailable | `ERROR_CODE_REMOTE_ERROR` |
+| Decoder or device fault | `ERROR_CODE_DECODING_FAILED` |
+| Any other failure | `ERROR_CODE_REMOTE_ERROR` |
 
 While failed, only stop and the get commands are offered. Stop or new playback
 clears the error.

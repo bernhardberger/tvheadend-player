@@ -45,6 +45,8 @@ sealed interface AppPlaybackState {
         val recoveryReason: PlaybackRecoveryReason? = null,
         /** The player on this device failed, not the stream's delivery; see [isDevicePlaybackFault]. */
         val deviceFault: Boolean = false,
+        /** The target whose attempt or playback failed; null only when no target was known. */
+        val target: AppPlaybackTarget? = null,
     ) : AppPlaybackState
 }
 

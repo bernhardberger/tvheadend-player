@@ -1,7 +1,4 @@
 <resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en">
-    <string name="session_recording_read_failed">Recording can\'t be read</string>
-    <string name="session_channel_unavailable">Channel unavailable</string>
-    <string name="session_playback_failed">Playback failed</string>
     <string name="recording_ad_break_skipped">Ad break skipped</string>
     <string name="settings_channel_numbers">Channel numbers</string>
     <string name="settings_channel_numbers_help">Turn off if your remote has no number keys</string>

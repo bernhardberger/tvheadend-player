@@ -315,6 +315,7 @@ internal class ActivityMediaSessionLifecycle {
     private var observation: Job? = null
     private var releasePlayer: (() -> Unit)? = null
 
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     fun start(context: Context, player: androidx.media3.common.Player, observation: Job, releasePlayer: () -> Unit) {
         check(session == null)
         this.observation = observation
@@ -356,9 +357,9 @@ internal class AppSessionMetadataLabels(private val context: Context) : SessionM
     }
 
     override fun error(kind: SessionPlaybackErrorKind): String = context.getString(when (kind) {
-        SessionPlaybackErrorKind.RECORDING_READ -> R.string.session_recording_read_failed
-        SessionPlaybackErrorKind.CHANNEL_UNAVAILABLE -> R.string.session_channel_unavailable
-        SessionPlaybackErrorKind.PLAYBACK -> R.string.session_playback_failed
+        SessionPlaybackErrorKind.RECORDING -> R.string.error_306_title
+        SessionPlaybackErrorKind.CHANNEL_UNAVAILABLE -> R.string.error_203_title
+        SessionPlaybackErrorKind.CHANNEL -> R.string.error_210_title
     })
 }
 

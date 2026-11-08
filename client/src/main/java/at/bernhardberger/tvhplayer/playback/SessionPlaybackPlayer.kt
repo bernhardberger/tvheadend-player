@@ -76,7 +76,7 @@ data class SessionArtworkRequest(
     val session: CurrentSessionObservation,
 )
 
-enum class SessionPlaybackErrorKind { RECORDING_READ, CHANNEL_UNAVAILABLE, PLAYBACK }
+enum class SessionPlaybackErrorKind { RECORDING, CHANNEL_UNAVAILABLE, CHANNEL }
 
 private const val SESSION_EXTRA_PREFIX = "at.bernhardberger.tvhplayer.session."
 private val SESSION_WHITESPACE = Regex("[\\s\\p{Z}]+")
@@ -277,8 +277,7 @@ class SessionPlaybackPlayer(
                     if (metadataTarget != target) itemUid = Any()
                     metadataTarget = target
                     metadata = value.metadata
-                } else if (runtime.state.value == AppPlaybackState.Idle ||
-                    (runtime.state.value == AppPlaybackState.Starting && runtime.activeTarget.value == null)) {
+                } else if (runtime.state.value == AppPlaybackState.Idle) {
                     metadataTarget = null
                     metadata = SessionMetadataSnapshot(MediaMetadata.EMPTY, emptyMap())
                 }
@@ -291,13 +290,13 @@ class SessionPlaybackPlayer(
         if (closed) return State.Builder().build()
         val activeTarget = runtime.activeTarget.value
         val state = runtime.state.value
-        if (activeTarget == null && (state == AppPlaybackState.Idle || state == AppPlaybackState.Starting)) {
+        if (activeTarget == null && state == AppPlaybackState.Idle) {
             metadataTarget = null
             metadata = SessionMetadataSnapshot(MediaMetadata.EMPTY, emptyMap())
         }
         val failure = state as? AppPlaybackState.Failed
-        val target = activeTarget ?: metadataTarget.takeIf { failure != null }
-        val nextErrorKey = failure?.sessionFailureKey(target)
+        val target = activeTarget ?: failure?.target
+        val nextErrorKey = failure?.sessionFailureKey()
         if (nextErrorKey != errorKey) {
             errorKey = nextErrorKey
             error = nextErrorKey?.let { PlaybackException(labels.error(it.kind), null, it.code) }
@@ -305,7 +304,7 @@ class SessionPlaybackPlayer(
         val failedCommands = if (failure != null) Player.Commands.Builder().addAll(
             Player.COMMAND_GET_CURRENT_MEDIA_ITEM, Player.COMMAND_GET_TIMELINE,
             Player.COMMAND_GET_METADATA, Player.COMMAND_STOP).build() else null
-        if (target == null) return State.Builder()
+        if (target == null || (failure != null && (metadataTarget != failure.target || target != failure.target))) return State.Builder()
             .setPlayerError(error).setAvailableCommands(failedCommands ?: Player.Commands.EMPTY).build()
         val timeshift = (runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)
             ?.timeshiftState is LiveTimeshiftState.Available
@@ -407,11 +406,19 @@ private fun sessionArtworkRequest(target: AppPlaybackTarget?, observation: Sessi
 
 private data class SessionFailureKey(val kind: SessionPlaybackErrorKind, val code: Int, val target: AppPlaybackTarget?)
 
-private fun AppPlaybackState.Failed.sessionFailureKey(target: AppPlaybackTarget?): SessionFailureKey = when {
-    reason == AppPlaybackFailureReason.RECORDING_READ_FAILED -> SessionFailureKey(
-        SessionPlaybackErrorKind.RECORDING_READ, PlaybackException.ERROR_CODE_IO_UNSPECIFIED, target)
-    subscriptionIssue != null || targetResult == PlaybackTargetResult.TARGET_UNAVAILABLE -> SessionFailureKey(
-        SessionPlaybackErrorKind.CHANNEL_UNAVAILABLE, PlaybackException.ERROR_CODE_REMOTE_ERROR, target)
-    deviceFault -> SessionFailureKey(SessionPlaybackErrorKind.PLAYBACK, PlaybackException.ERROR_CODE_DECODING_FAILED, target)
-    else -> SessionFailureKey(SessionPlaybackErrorKind.PLAYBACK, PlaybackException.ERROR_CODE_REMOTE_ERROR, target)
+private fun AppPlaybackState.Failed.sessionFailureKey(): SessionFailureKey {
+    val channelUnavailable = subscriptionIssue != null || targetResult == PlaybackTargetResult.TARGET_UNAVAILABLE
+    val kind = when {
+        target is AppPlaybackTarget.Recording ||
+            (target == null && reason == AppPlaybackFailureReason.RECORDING_READ_FAILED) -> SessionPlaybackErrorKind.RECORDING
+        channelUnavailable -> SessionPlaybackErrorKind.CHANNEL_UNAVAILABLE
+        else -> SessionPlaybackErrorKind.CHANNEL
+    }
+    val code = when {
+        reason == AppPlaybackFailureReason.RECORDING_READ_FAILED -> PlaybackException.ERROR_CODE_IO_UNSPECIFIED
+        channelUnavailable -> PlaybackException.ERROR_CODE_REMOTE_ERROR
+        deviceFault -> PlaybackException.ERROR_CODE_DECODING_FAILED
+        else -> PlaybackException.ERROR_CODE_REMOTE_ERROR
+    }
+    return SessionFailureKey(kind, code, target)
 }

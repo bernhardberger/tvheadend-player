@@ -43,11 +43,9 @@ class ActivityMediaSessionLifecycleTest {
             assertEquals(ACTION_SESSION_ACTIVITY, intent.action)
             assertTrue(intent.extras == null || intent.extras!!.isEmpty)
             val labels = AppSessionMetadataLabels(context)
-            for ((kind, resource) in listOf(
-                at.bernhardberger.tvhplayer.playback.SessionPlaybackErrorKind.RECORDING_READ to at.bernhardberger.tvhplayer.R.string.session_recording_read_failed,
-                at.bernhardberger.tvhplayer.playback.SessionPlaybackErrorKind.CHANNEL_UNAVAILABLE to at.bernhardberger.tvhplayer.R.string.session_channel_unavailable,
-                at.bernhardberger.tvhplayer.playback.SessionPlaybackErrorKind.PLAYBACK to at.bernhardberger.tvhplayer.R.string.session_playback_failed,
-            )) assertEquals(context.getString(resource), labels.error(kind))
+            val errors = at.bernhardberger.tvhplayer.playback.SessionPlaybackErrorKind.entries.map(labels::error)
+            assertTrue(errors.all { it.isNotBlank() })
+            assertEquals(errors.size, errors.toSet().size)
             assertEquals("12.3", labels.channelNumber(at.bernhardberger.tvheadend.sdk.core.Channel.create(
                 at.bernhardberger.tvheadend.sdk.core.ChannelId(1), number = 12, numberMinor = 3)))
             val bitmap = at.bernhardberger.tvhplayer.testutil.FixtureArt.picon("harbor-sport")

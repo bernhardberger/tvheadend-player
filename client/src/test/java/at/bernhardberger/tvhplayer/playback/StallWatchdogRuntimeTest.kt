@@ -128,6 +128,7 @@ class StallWatchdogRuntimeTest {
 
         val failed = runtime.state.value as AppPlaybackState.Failed
         assertEquals(PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED, failed.recoveryReason)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), failed.target)
         assertNull(runtime.activeTarget.value)
         settle()
         assertEquals(subscribes + 1, connection.subscribeCount)

@@ -89,8 +89,10 @@ internal fun playerStateAfterRecoveryResolution(
 internal fun recoveryExhaustedState(
     stopResult: PlaybackStopResult,
     recoveryReason: PlaybackRecoveryReason,
+    target: AppPlaybackTarget? = null,
 ): AppPlaybackState.Failed = AppPlaybackState.Failed(
     reason = AppPlaybackFailureReason.OTHER,
     subscriptionIssue = stopResult.finalSubscriptionIssue,
     recoveryReason = recoveryReason,
+    target = target,
 )

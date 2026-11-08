@@ -2094,7 +2094,8 @@ class AudioInterruptionRuntimeTest {
         exhaust()
         await { cleanup?.isCompleted == true && runtime.state.value is AppPlaybackState.Failed }
         assertEquals(1, player.mediaItemCount)
-        assertEquals(AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER), runtime.state.value)
+        assertEquals(AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER,
+            target = AppPlaybackTarget.Live(ChannelId(1))), runtime.state.value)
         failCoordinatorStop = false
         failCoordinatorRemoval = false
         suppress(false)
@@ -2303,7 +2304,8 @@ class AudioInterruptionRuntimeTest {
         settle()
         assertEquals(1, connection.subscribeCount)
         assertEquals(1, player.mediaItemCount)
-        assertEquals(AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER), runtime.state.value)
+        assertEquals(AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER,
+            target = AppPlaybackTarget.Live(ChannelId(1))), runtime.state.value)
         failCoordinatorStop = false
         failCoordinatorRemoval = false
         val retry = scope.async { runtime.retryLive(viewerRetry = true) }

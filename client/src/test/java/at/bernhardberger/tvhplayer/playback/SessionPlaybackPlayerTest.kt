@@ -42,9 +42,9 @@ private val labels = object : SessionMetadataLabels {
     override fun genre(genre: ContentGenre): String = "Category"
     override fun channelNumber(channel: Channel): String = "Test number"
     override fun error(kind: SessionPlaybackErrorKind): String = when (kind) {
-        SessionPlaybackErrorKind.RECORDING_READ -> "Recording can't be read"
+        SessionPlaybackErrorKind.RECORDING -> "Recording can't be read"
         SessionPlaybackErrorKind.CHANNEL_UNAVAILABLE -> "Channel unavailable"
-        SessionPlaybackErrorKind.PLAYBACK -> "Playback failed"
+        SessionPlaybackErrorKind.CHANNEL -> "Playback failed"
     }
 }
 
@@ -116,7 +116,7 @@ class SessionPlaybackPlayerTest {
 
             retireWithState(AppPlaybackState.Failed(AppPlaybackFailureReason.RECORDING_READ_FAILED,
                 playerErrorClassification = "private diagnostic must not escape"))
-            val message = labels.error(SessionPlaybackErrorKind.RECORDING_READ)
+            val message = labels.error(SessionPlaybackErrorKind.RECORDING)
             await { modern.playerError?.message == message }
             // Media3 adds RELEASE to every controller: it disconnects the controller, not playback.
             assertEquals(setOf(Player.COMMAND_GET_CURRENT_MEDIA_ITEM, Player.COMMAND_GET_TIMELINE,
@@ -345,7 +345,7 @@ class SessionPlaybackPlayerTest {
     @Test fun terminalFailureRetainsTheRetiredItemAndSanitizesTheError() {
         val cases = listOf(
             Triple(AppPlaybackState.Failed(AppPlaybackFailureReason.RECORDING_READ_FAILED,
-                playerErrorClassification = "private diagnostic"), "Recording can't be read", androidx.media3.common.PlaybackException.ERROR_CODE_IO_UNSPECIFIED),
+                playerErrorClassification = "private diagnostic"), "Playback failed", androidx.media3.common.PlaybackException.ERROR_CODE_IO_UNSPECIFIED),
             Triple(AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER, targetResult = PlaybackTargetResult.TARGET_UNAVAILABLE),
                 "Channel unavailable", androidx.media3.common.PlaybackException.ERROR_CODE_REMOTE_ERROR),
             Triple(AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER, subscriptionIssue = SubscriptionIssue.NO_INPUT),
@@ -377,58 +377,68 @@ class SessionPlaybackPlayerTest {
             assertEquals(AppPlaybackState.Idle, runtime.state.value)
             assertEquals(1, stops.size)
             for ((failure, text, code) in cases) {
-                recording()
-                await { wrapper.mediaMetadata.title == "Recording" }
-                var errorEvents = 0
-                val listener = object : Player.Listener {
-                    override fun onPlayerError(error: androidx.media3.common.PlaybackException) { errorEvents++ }
-                }
-                wrapper.addListener(listener)
-                retireWithState(failure)
-                await { wrapper.playerError != null }
-                assertEquals("Recording", wrapper.mediaMetadata.title)
-                assertEquals(text, wrapper.playerError?.message)
-                assertEquals(code, wrapper.playerError?.errorCode)
-                assertNull(wrapper.playerError?.cause)
-                assertTrue(requireNotNull(wrapper.playerError).extras.isEmpty)
-                assertTrue(wrapper.isCommandAvailable(Player.COMMAND_STOP))
-                assertFalse(wrapper.isCommandAvailable(Player.COMMAND_PLAY_PAUSE))
-                assertFalse(wrapper.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM))
-                val error = wrapper.playerError
-                repeat(2) { index ->
-                    // Raw player events force forwarding-state invalidation while failure is unchanged.
-                    player.volume = if (index == 0) 0.5f else 1f
-                    settle()
-                }
-                assertSame(error, wrapper.playerError)
-                assertEquals(1, errorEvents)
-                wrapper.removeListener(listener)
-                for (state in listOf(AppPlaybackState.Recovering(PlaybackRecoveryReason.LIVE_ENDED, 1_000), AppPlaybackState.Buffering)) {
-                    publishState(state)
-                    await { wrapper.playerError == null }
+                for (recordingTarget in listOf(true, false)) {
+                    if (recordingTarget) recording() else live(false)
+                    val title = if (recordingTarget) "Recording" else "Channel One"
+                    await { wrapper.mediaMetadata.title == title }
                     retireWithState(failure)
                     await { wrapper.playerError != null }
+                    assertEquals(title, wrapper.mediaMetadata.title)
+                    assertEquals(if (recordingTarget) labels.error(SessionPlaybackErrorKind.RECORDING) else text,
+                        wrapper.playerError?.message)
+                    assertEquals(code, wrapper.playerError?.errorCode)
+                    assertNull(wrapper.playerError?.cause)
+                    assertTrue(requireNotNull(wrapper.playerError).extras.isEmpty)
                 }
-                recording()
-                await { wrapper.playerError == null && wrapper.currentMediaItem != null }
+            }
+            recording()
+            await { wrapper.mediaMetadata.title == "Recording" }
+            val failure = cases.first().first.copy(target = AppPlaybackTarget.Recording(DvrEntryId(1)))
+            var errorEvents = 0
+            val listener = object : Player.Listener {
+                override fun onPlayerError(error: androidx.media3.common.PlaybackException) { errorEvents++ }
+            }
+            wrapper.addListener(listener)
+            retireWithState(failure)
+            await { wrapper.playerError != null }
+            assertEquals("Recording", wrapper.mediaMetadata.title)
+            assertTrue(wrapper.isCommandAvailable(Player.COMMAND_STOP))
+            assertFalse(wrapper.isCommandAvailable(Player.COMMAND_PLAY_PAUSE))
+            assertFalse(wrapper.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM))
+            val error = wrapper.playerError
+            repeat(2) { index ->
+                // Raw player events force forwarding-state invalidation while failure is unchanged.
+                player.volume = if (index == 0) 0.5f else 1f
+                settle()
+            }
+            assertSame(error, wrapper.playerError)
+            assertEquals(1, errorEvents)
+            wrapper.removeListener(listener)
+            for (state in listOf(AppPlaybackState.Recovering(PlaybackRecoveryReason.LIVE_ENDED, 1_000), AppPlaybackState.Buffering)) {
+                publishState(state)
+                await { wrapper.playerError == null }
                 retireWithState(failure)
                 await { wrapper.playerError != null }
-                val stopsBefore = stops.size
-                wrapper.stop()
-                await { wrapper.currentMediaItem == null && wrapper.playerError == null }
+            }
+            recording()
+            await { wrapper.playerError == null && wrapper.currentMediaItem != null }
+            retireWithState(failure)
+            await { wrapper.playerError != null }
+            val stopsBefore = stops.size
+            wrapper.stop()
+            await { wrapper.currentMediaItem == null && wrapper.playerError == null }
+            settle()
+            assertEquals(AppPlaybackState.Idle, runtime.state.value)
+            assertEquals(stopsBefore + 1, stops.size)
+            val afterStop = SessionPlaybackPlayer(runtime, true, labels)
+            val afterStopObservation = scope.launch { afterStop.observe(session.observation) }
+            try {
                 settle()
-                assertEquals(AppPlaybackState.Idle, runtime.state.value)
-                assertEquals(stopsBefore + 1, stops.size)
-                val afterStop = SessionPlaybackPlayer(runtime, true, labels)
-                val afterStopObservation = scope.launch { afterStop.observe(session.observation) }
-                try {
-                    settle()
-                    assertNull(afterStop.playerError)
-                    assertNull(afterStop.currentMediaItem)
-                } finally {
-                    afterStopObservation.cancel()
-                    afterStop.close()
-                }
+                assertNull(afterStop.playerError)
+                assertNull(afterStop.currentMediaItem)
+            } finally {
+                afterStopObservation.cancel()
+                afterStop.close()
             }
             recording()
             await { wrapper.mediaMetadata.title == "Recording" }
@@ -1087,8 +1097,17 @@ class SessionPlaybackPlayerTest {
         assertEquals(null, runtime.activeTarget.value)
         assertEquals(null, runtime.recordingSelection.value)
         assertTrue(runtime.state.value.toString(), runtime.state.value is AppPlaybackState.Failed)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), (runtime.state.value as AppPlaybackState.Failed).target)
         assertFalse(runtime.videoPresentation.value.visible)
         assertEquals(emptyList<Unit>(), stops)
+        // Real install failure retires the target epoch; Stop must still clear the runtime failure.
+        await { wrapper.playerError != null }
+        assertNull(wrapper.currentMediaItem)
+        assertEquals(labels.error(SessionPlaybackErrorKind.CHANNEL_UNAVAILABLE), wrapper.playerError?.message)
+        wrapper.stop()
+        await { runtime.state.value == AppPlaybackState.Idle && wrapper.playerError == null }
+        assertNull(wrapper.currentMediaItem)
+        assertEquals(listOf(Unit), stops)
     }
 
     @Test fun aRecordingThatCannotBindLeavesTheChannelPlaying() = exercise {
@@ -1841,6 +1860,9 @@ class SessionPlaybackPlayerTest {
 
         @Suppress("UNCHECKED_CAST")
         fun retireWithState(state: AppPlaybackState) {
+            val attributed = if (state is AppPlaybackState.Failed) {
+                state.copy(target = state.target ?: runtime.activeTarget.value)
+            } else state
             AppPlaybackRuntime::class.java.getDeclaredField("activeTargetEpoch").let {
                 it.isAccessible = true
                 it.set(runtime, null)
@@ -1849,7 +1871,7 @@ class SessionPlaybackPlayerTest {
                 it.isAccessible = true
                 (it.get(runtime) as kotlinx.coroutines.flow.MutableStateFlow<AppPlaybackTarget?>).value = null
             }
-            publishState(state)
+            publishState(attributed)
         }
 
         @Suppress("UNCHECKED_CAST")

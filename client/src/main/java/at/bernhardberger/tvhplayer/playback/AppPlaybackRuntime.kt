@@ -281,6 +281,7 @@ class AppPlaybackRuntime(
     private data class LiveRetirementRetry(
         val epoch: Long?,
         val install: LiveInstallAttribution?,
+        val target: AppPlaybackTarget?,
     )
     @Volatile
     private var liveRetirement: LiveRetirementRetry? = null
@@ -699,6 +700,7 @@ class AppPlaybackRuntime(
         if (profileSelection == null) {
             return completeUnavailableTarget(
                 expectedPresentationEpoch = expectedPresentationEpoch,
+                target = AppPlaybackTarget.Live(channelId),
                 result = unavailableLiveTargetResult(channelId),
                 failureReason = AppPlaybackFailureReason.OTHER,
                 keptTarget = keptTarget,
@@ -710,6 +712,7 @@ class AppPlaybackRuntime(
         ) {
             return completeUnavailableTarget(
                 expectedPresentationEpoch = expectedPresentationEpoch,
+                target = AppPlaybackTarget.Live(channelId),
                 result = PlaybackTargetResult.NOT_READY,
                 failureReason = AppPlaybackFailureReason.OTHER,
                 keptTarget = keptTarget,
@@ -725,6 +728,7 @@ class AppPlaybackRuntime(
         if (selection == null) {
             return completeUnavailableTarget(
                 expectedPresentationEpoch = expectedPresentationEpoch,
+                target = AppPlaybackTarget.Live(channelId),
                 result = unavailableLiveTargetResult(channelId),
                 failureReason = AppPlaybackFailureReason.OTHER,
                 keptTarget = keptTarget,
@@ -737,6 +741,7 @@ class AppPlaybackRuntime(
         ) {
             return completeUnavailableTarget(
                 expectedPresentationEpoch = expectedPresentationEpoch,
+                target = AppPlaybackTarget.Live(channelId),
                 result = PlaybackTargetResult.NOT_READY,
                 failureReason = AppPlaybackFailureReason.OTHER,
                 keptTarget = keptTarget,
@@ -836,6 +841,7 @@ class AppPlaybackRuntime(
                     expectedPresentationEpoch = expectedPresentationEpoch,
                     reason = AppPlaybackFailureReason.OTHER,
                     targetResult = targetResult,
+                    target = AppPlaybackTarget.Live(channelId),
                 )
             }
         ) } finally {
@@ -1145,6 +1151,7 @@ class AppPlaybackRuntime(
             val observation = session.observation.value
             return completeUnavailableRecordingTarget(
                 expectedPresentationEpoch = expectedPresentationEpoch,
+                target = AppPlaybackTarget.Recording(recordingId),
                 result = if (observation.currentSession == null) {
                     PlaybackTargetResult.NOT_READY
                 } else {
@@ -1231,6 +1238,7 @@ class AppPlaybackRuntime(
                     expectedPresentationEpoch = expectedPresentationEpoch,
                     reason = AppPlaybackFailureReason.RECORDING_READ_FAILED,
                     targetResult = targetResult,
+                    target = AppPlaybackTarget.Recording(recordingId),
                     recordingAdmission = admission,
                 )
             }
@@ -1983,6 +1991,8 @@ class AppPlaybackRuntime(
             val retirement = LiveRetirementRetry(
                 activeTargetEpoch,
                 reportedInstall,
+                (reportedInstall?.selection ?: origin?.selection)?.let { AppPlaybackTarget.Live(it.channelId) }
+                    ?: _activeTarget.value,
             ).takeIf { reason != PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED }
             if (retirement != null) liveRetirement = retirement
             scope.launch {
@@ -2165,7 +2175,7 @@ class AppPlaybackRuntime(
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (_: RuntimeException) {
-                presentation.publishFailed(AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER))
+                presentation.publishFailed(AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER, target = obligation.target))
                 return false
             }
             when (result.outcome) {
@@ -2175,13 +2185,13 @@ class AppPlaybackRuntime(
                     if (epoch != null && activeTargetEpoch == epoch &&
                         player.currentMediaItem === ownedMediaItem
                     ) presentationEpoch.publishIfCurrent(epoch) {
-                        presentation.publishFailed(AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER))
+                        presentation.publishFailed(AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER, target = obligation.target))
                     }
                     return false
                 }
                 else -> {
                     presentation.publishFailed(recoveryExhaustedState(result,
-                        PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED_RETIREMENT_FAILED))
+                        PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED_RETIREMENT_FAILED, obligation.target))
                     return false
                 }
             }
@@ -2260,10 +2270,11 @@ class AppPlaybackRuntime(
      * tuner. Surfacing a failure lets the user choose, instead of retuning forever.
      */
     private suspend fun publishRecoveryExhausted(recoveryReason: PlaybackRecoveryReason) {
+        val target = _activeTarget.value
         _liveStartUndisturbed.value = false
         val stopResult = stopPlayback()
         if (!targetCommands.isOpen()) return
-        presentation.publishFailed(recoveryExhaustedState(stopResult, recoveryReason))
+        presentation.publishFailed(recoveryExhaustedState(stopResult, recoveryReason, target))
         presentation.publishDiagnostics()
     }
 
@@ -2387,7 +2398,7 @@ class AppPlaybackRuntime(
         noteRecordingInterruptionLocked()
         stopPlayback()
         if (!targetCommands.isOpen()) return
-        presentation.publishFailed(AppPlaybackState.Failed(AppPlaybackFailureReason.RECORDING_READ_FAILED))
+        presentation.publishFailed(AppPlaybackState.Failed(AppPlaybackFailureReason.RECORDING_READ_FAILED, target = target))
         presentation.publishDiagnostics()
     }
 
@@ -2552,6 +2563,7 @@ class AppPlaybackRuntime(
 
     private suspend fun completeUnavailableTarget(
         expectedPresentationEpoch: Long,
+        target: AppPlaybackTarget,
         result: PlaybackTargetResult,
         failureReason: AppPlaybackFailureReason,
         keptTarget: () -> AppPlaybackTarget? = ::healthyActiveTarget,
@@ -2565,12 +2577,14 @@ class AppPlaybackRuntime(
                 expectedPresentationEpoch = expectedPresentationEpoch,
                 reason = failureReason,
                 targetResult = targetResult,
+                target = target,
             )
         },
     )
 
     private suspend fun completeUnavailableRecordingTarget(
         expectedPresentationEpoch: Long,
+        target: AppPlaybackTarget.Recording,
         result: PlaybackTargetResult,
         admission: RecordingPlaybackAdmission,
     ): PlaybackTargetResult = installTargetForPresentation(
@@ -2583,6 +2597,7 @@ class AppPlaybackRuntime(
                 reason = AppPlaybackFailureReason.RECORDING_READ_FAILED,
                 targetResult = targetResult,
                 recordingAdmission = admission,
+                target = target,
             )
         },
     )
@@ -2600,6 +2615,7 @@ class AppPlaybackRuntime(
 
     private fun publishTargetFailure(
         expectedPresentationEpoch: Long,
+        target: AppPlaybackTarget,
         reason: AppPlaybackFailureReason,
         targetResult: PlaybackTargetResult,
         recordingAdmission: RecordingPlaybackAdmission? = null,
@@ -2611,7 +2627,7 @@ class AppPlaybackRuntime(
             // A failed stop can leave Media3 non-IDLE, but that source is no longer playable.
             // Keep the target epoch so the serialized retirement retry still owns its fence.
             presentationEpoch.publishIfCurrent(expectedPresentationEpoch) {
-                presentation.publishFailed(AppPlaybackState.Failed(reason, targetResult))
+                presentation.publishFailed(AppPlaybackState.Failed(reason, targetResult, target = target))
                 presentation.publishDiagnostics()
             }
             return
@@ -2627,7 +2643,7 @@ class AppPlaybackRuntime(
             _recordingSelection.value = null
             _recordingAdmission.value = recordingAdmission
             recordingMarkers.clearRecordingMarkers()
-            presentation.publishFailed(AppPlaybackState.Failed(reason, targetResult))
+            presentation.publishFailed(AppPlaybackState.Failed(reason, targetResult, target = target))
             presentation.publishDiagnostics()
         }
     }
@@ -2867,6 +2883,7 @@ class AppPlaybackRuntime(
                     playerErrorClassification = classifyPlaybackError(player.playerError),
                     subscriptionIssue = lastSubscriptionIssue(),
                     deviceFault = isDevicePlaybackFault(player.playerError),
+                    target = _activeTarget.value,
                 ),
             )
         }
