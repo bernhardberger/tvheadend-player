@@ -99,8 +99,9 @@ is absent.
 ## Errors
 
 When playback fails for good, the session reports an error with a fixed
-message, never server or decoder text. The message is the same title the app
-shows for that failure, in the app's language:
+message, never server or decoder text. The message is one of three fixed texts,
+translated into the app's language. It can be less specific than what the app
+shows on screen:
 
 | Failed item | Message (English) |
 |---|---|
@@ -109,14 +110,17 @@ shows for that failure, in the app's language:
 | Channel that failed for any other reason | "Can’t play this channel" |
 
 Match on the error code rather than the text. The code describes the cause and
-is independent of the message:
+is independent of the message. The first matching row wins:
 
 | Cause | `PlaybackException` code |
 |---|---|
-| Recording file can't be read | `ERROR_CODE_IO_UNSPECIFIED` |
+| Recording stopped while reading, including decoder failures (`RECORDING_READ_FAILED`) | `ERROR_CODE_IO_UNSPECIFIED` |
 | Subscription failed or channel unavailable | `ERROR_CODE_REMOTE_ERROR` |
 | Decoder or device fault | `ERROR_CODE_DECODING_FAILED` |
 | Any other failure | `ERROR_CODE_REMOTE_ERROR` |
+
+A recording decoder failure marked `RECORDING_READ_FAILED` reports
+`ERROR_CODE_IO_UNSPECIFIED`, not `ERROR_CODE_DECODING_FAILED`.
 
 While failed, only stop and the get commands are offered. Stop or new playback
 clears the error.
