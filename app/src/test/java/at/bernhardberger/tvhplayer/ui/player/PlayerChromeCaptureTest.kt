@@ -75,6 +75,7 @@ import at.bernhardberger.tvhplayer.core.BrowseContextAction
 import at.bernhardberger.tvhplayer.core.ProgrammeAction
 import at.bernhardberger.tvhplayer.core.programmeDetailsActions
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsPage
+import at.bernhardberger.tvhplayer.core.halfHourSlot
 import at.bernhardberger.tvhplayer.core.liveBarEnd
 import at.bernhardberger.tvhplayer.core.playerStateCell
 import at.bernhardberger.tvhplayer.core.recordingBarEnd

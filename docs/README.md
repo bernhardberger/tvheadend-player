@@ -25,6 +25,7 @@ the whole `docs/` tree. Repository presence, a recent date, or words such as
 | `ai-engineering-harness.md` | Current AI-harness architecture and operation; harness work only. |
 | `code-ownership.md` | Compact source and tooling ownership map; read before locating application code or delegating broad repository mapping. |
 | `client-module.md` | UI-free `:client` library ownership, dependency rules and placement rule; read before adding runtime, persistence or domain code. |
+| `media-session.md` | Media session contract for other apps: fields, extras keys, artwork, errors, commands and Media3 limits; session or metadata work. |
 | `appliance-mode-spec.md` | Autoplay, HOME/Guide/wake integration, warm playback, TCL firmware behavior and Simple TV retirement. |
 | `device-targets.md` | Device roles and mutation boundary; physical-device, install, ADB, signing, or deployment work only. |
 | `android-tooling.md` | Build/install/capture conventions and lane selection: Notebook032 interactive preview, LXC119 automated capture, physical TV acceptance; Android CLI and R8 limits. |

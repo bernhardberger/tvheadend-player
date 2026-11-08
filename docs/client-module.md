@@ -201,8 +201,8 @@ the system session once.
 When the player info/options layer is open, both player screens leave media keys
 unhandled so they reach the session as the single handler.
 The appliance accessibility service still handles only
-its appliance-entry keys, not media keys. No next/previous, playlist, volume,
-device or speed commands are exposed by the session.
+its appliance-entry keys, not media keys. Next/Previous step live channels.
+No playlist, volume, device or speed commands are exposed by the session.
 
 ## Deferred work
 

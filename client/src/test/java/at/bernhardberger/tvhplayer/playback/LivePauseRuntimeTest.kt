@@ -2,6 +2,7 @@
 @file:OptIn(
     at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class,
     at.bernhardberger.tvheadend.sdk.playback.SubscriptionInfrastructureApi::class,
+    at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class,
     kotlinx.coroutines.ExperimentalCoroutinesApi::class,
 )
 
@@ -15,8 +16,10 @@ import androidx.media3.exoplayer.ExoPlaybackException
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.media3.LivePlaybackObservation
 import at.bernhardberger.tvheadend.sdk.media3.LiveTimeshiftState
+import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandResult
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionConfirmation
+import at.bernhardberger.tvheadend.sdk.playback.SkipOutcome
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionEvent
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionOperationResult
 import at.bernhardberger.tvheadend.sdk.playback.LiveSubscriptionPriority
@@ -50,11 +53,14 @@ class LivePauseRuntimeTest {
 
     @Test fun startingPressSendsExactlyOneServerPauseOnlyOnceGrantedAndFirstPictureReady() = exercise {
         val gate = startingLive()
+        assertTrue(runtime.liveStartUndisturbed.value)
         assertTrue(player.playWhenReady)
         assertNull(runtime.pauseTimeshiftPlayback())
+        assertFalse(runtime.liveStartUndisturbed.value)
         assertFalse(player.playWhenReady)
         assertEquals(LivePauseState(LivePauseAvailability.STARTING, pending = true), runtime.livePause.value)
         settle()
+        assertFalse(runtime.liveStartUndisturbed.value)
         assertEquals(emptyList<Int>(), connection.speeds)
 
         // A server hold before the first picture would leave the viewer on "Tuning…".
@@ -128,6 +134,7 @@ class LivePauseRuntimeTest {
         val gate = startingLive()
         assertNull(runtime.pauseTimeshiftPlayback())
         runtime.resumeTimeshift()
+        assertFalse(runtime.liveStartUndisturbed.value)
         assertTrue(player.playWhenReady)
         assertFalse(runtime.livePause.value.pending)
 
@@ -151,6 +158,7 @@ class LivePauseRuntimeTest {
         assertEquals(emptyList<Int>(), connection.speeds)
         assertTrue(player.playWhenReady)
         assertNull(runtime.livePauseNotice.value)
+        assertTrue(runtime.liveStartUndisturbed.value)
     }
 
     @Test fun timeshiftOffInSettingsIsOffAndNeverPends() = exercise {
@@ -630,11 +638,27 @@ class LivePauseRuntimeTest {
     @Test fun playAfterAHeldPauseRestoresTheStartupPlayWithoutServerCommands() = exercise {
         live()
         val intent = runtime.notePlaybackIntent().also(runtime::noteLiveSelection)
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        beforeSettingsRead = {
+            entered.complete(Unit)
+            release.await()
+        }
+        connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 120)))
+        val gate = holdSubscribe()
+        val tune = scope.async { runtime.playLive(selection(2), intent) }
+        await { entered.isCompleted }
+        assertTrue(runtime.liveStartUndisturbed.value)
+        assertEquals(TimeshiftCommandResult.ACCEPTED, runtime.resumeTimeshift())
+        assertFalse(runtime.liveStartUndisturbed.value)
         assertNull(runtime.pauseTimeshiftPlayback())
         assertEquals(TimeshiftCommandResult.ACCEPTED, runtime.resumeTimeshift())
+        assertFalse(runtime.liveStartUndisturbed.value)
         assertEquals(LivePauseState(LivePauseAvailability.STARTING, selectionPending = true), runtime.livePause.value)
-
-        val gate = pendingZap(channel = 2, intent = intent)
+        beforeSettingsRead = {}
+        release.complete(Unit)
+        await { tune.isCompleted }
+        assertTrue(tune.await()?.isStarted == true)
         await { player.playWhenReady }
         grant(gate)
         playerReady()
@@ -642,6 +666,7 @@ class LivePauseRuntimeTest {
         assertEquals(emptyList<Int>(), connection.speeds)
         assertTrue(player.playWhenReady)
         assertEquals(LivePauseState(LivePauseAvailability.READY), runtime.livePause.value)
+        assertFalse(runtime.liveStartUndisturbed.value)
     }
 
     @Test fun anotherChannelChangeDropsTheHeldPause() = exercise {
@@ -676,6 +701,78 @@ class LivePauseRuntimeTest {
         assertEquals(emptyList<Int>(), connection.speeds)
         assertTrue(player.playWhenReady)
         assertEquals(LivePauseState(LivePauseAvailability.READY), runtime.livePause.value)
+        assertTrue(runtime.liveStartUndisturbed.value)
+    }
+
+    @Test fun liveStartEvidenceEndsOnEachTransportCommandAndRecording() = exercise {
+        val commands: List<suspend () -> Unit> = listOf(
+            { runtime.pauseTimeshift(); Unit },
+            { runtime.resumeTimeshift(); Unit },
+            { runtime.setSessionPlayWhenReady(false) { true }.join() },
+            { runtime.setSessionPlayWhenReady(true) { true }.join() },
+            { runtime.stop(); Unit },
+        )
+        for (command in commands) {
+            live()
+            settle()
+            assertTrue(runtime.liveStartUndisturbed.value)
+            val job = scope.launch { command() }
+            await { job.isCompleted }
+            assertFalse(runtime.liveStartUndisturbed.value)
+        }
+        live()
+        settle()
+        assertTrue(runtime.liveStartUndisturbed.value)
+        val sample = scope.async { runtime.sampleTimeshiftPresentation() }
+        await { sample.isCompleted }
+        val timeline = requireNotNull(sample.await().timeline)
+        val seeks = connection.seekTargets.size
+        val seek = scope.async { runtime.seekTimeshift(requireNotNull(timeline.select(timeline.start))) }
+        await { connection.seekTargets.size > seeks }
+        connection.emit(SubscriptionEvent.Skipped(true, SkipOutcome.ACCEPTED, 0, null))
+        await { seek.isCompleted }
+        assertTrue(runtime.liveStartUndisturbed.value)
+        val returns = connection.seekTargets.size
+        val goLive = scope.async { runtime.goLive() }
+        await { goLive.isCompleted || connection.seekTargets.size > returns }
+        if (!goLive.isCompleted) connection.emit(SubscriptionEvent.Skipped(true, SkipOutcome.ACCEPTED, 0, null))
+        await { goLive.isCompleted }
+        assertEquals(TimeshiftCommandResult.ACCEPTED, goLive.await())
+        settle()
+        assertTrue(runtime.liveStartUndisturbed.value)
+        val subscriptions = connection.subscribeCount
+        connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 120)))
+        val retry = scope.async { runtime.retryLive() }
+        await { connection.subscribeCount > subscriptions }
+        connection.awaitCollectionRegistered()
+        startSubscription()
+        await { retry.isCompleted }
+        assertTrue(retry.await()?.isStarted == true)
+        settle()
+        assertTrue(runtime.liveStartUndisturbed.value)
+        val install = scope.async {
+            runtime.playRecording(requireNotNull(currentRecordingPlaybackSelection(
+                session.observation.value, BackgroundPlaybackRuntimeTest.RECORDING)), RecordingPlaybackStart.START_OVER)
+        }
+        await { install.isCompleted }
+        assertTrue(install.await()?.isStarted == true)
+        assertFalse(runtime.liveStartUndisturbed.value)
+    }
+
+    @Test fun observedPauseEndsLiveStartWithoutAScreenSampler() = exercise {
+        live()
+        settle()
+        assertTrue(runtime.liveStartUndisturbed.value)
+        player.pause()
+        settle()
+        assertTrue("a local pause only temporarily hides live-start presentation", runtime.liveStartUndisturbed.value)
+        player.play()
+        settle()
+        connection.emit(SubscriptionEvent.Speed(0))
+        await { !runtime.liveStartUndisturbed.value }
+        connection.emit(SubscriptionEvent.Speed(100))
+        await { player.playWhenReady }
+        assertFalse(runtime.liveStartUndisturbed.value)
     }
 
     @Test fun heldPauseWithoutAGrantOnTheNewChannelStartsItWithFocusAndNotifies() = exercise {

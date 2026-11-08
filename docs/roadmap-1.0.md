@@ -253,6 +253,7 @@ Source: `defect-ledger.md`, `media3-upgrade-assessment-2026-07-28.md`.
 | P4 | Deferred with P3. Fixes arising from P3 | Focused regression test per fix |
 | P5 | Media3 1.11.1 device matrix and interlaced-motion comparison (assessment steps 5–6, doc still names 1.10.1) **[TV]** | Assessment updated to the current stack and gate passed |
 | P6 | G08 intermittent bad render mode (`appliance-tcl-findings-2026-07-27.md`): decide observe-only or investigate | Owner decision recorded |
+| P7 | **Owner 2026-11-07, next 0.4.x if it needs no SDK release.** Complete the media session (issue #19 context: Home Assistant and remote displays read it; MQTT or webhooks stay out of the player). Gaps in `SessionPlaybackPlayer`: only title and channel today; add episode, start/stop, genre, short description, channel number and media type in non-display fields so system UI stays clean; the programme at the timeshift position, not the one airing now (reuse the chrome's programme window); artwork as bytes through the authenticated image loader, programme art with the picon as fallback; a session activity; live marked as live; a sanitized error state. Channel up/down through the session (TV-VC) is a separate owner decision | Planned in its own session; metadata and state proven by tests; Media Session Validator run on the G10 (S5) |
 
 ### D — DVR completeness
 
