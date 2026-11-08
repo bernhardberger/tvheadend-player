@@ -88,17 +88,18 @@ class RecordingMarkerOverlayAnimationTest {
         assertTrue("15:00 dot must not be hidden by transparent overflow padding", ink(centre) > 0f)
     }
 
-    @Test fun openHintsUseSeventyPercentInkAndProgramBoundariesHaveDots() {
+    @Test fun openHintsUseSeventyPercentInkAndProgramBoundariesHaveFlags() {
         stops = listOf(RecordingMarkStop(1_000, RecordingMark(RecordingMarkKind.CHAPTER, 1_000)),
             RecordingMarkStop(7_000, RecordingMark(RecordingMarkKind.PROGRAM_START, 7_000)))
         hints = true
         show()
-        assertTrue("program boundary has a resting dot", ink() > 0f)
+        assertTrue("program boundary has a resting flag", ink() > 0f)
         compose.runOnIdle { navigation.show(stops.map { it.positionMs }, 0) }
         repeat(30) { advance(16); drawFrame() }
         val pixels = compose.onNodeWithTag("hint-scene").captureToImage().toPixelMap()
         // Theme onSurface is #E1E2E5, not pure white.
-        assertEquals("open dot alpha", .70f * 225 / 255, pixels[560, 128].red, .02f)
+        val brightest = (553..566).maxOf { x -> (121..134).maxOf { y -> pixels[x, y].red } }
+        assertEquals("open flag alpha", .70f * 225 / 255, brightest, .02f)
     }
 
     private fun advance(ms: Long) {
