@@ -1393,26 +1393,29 @@ class AudioInterruptionRuntimeTest {
         assertEquals("channel one of another server is not this one", 1, connection.subscribeCount)
     }
 
-    // The SDK's ended-period error is private and arrives on IO; there is no public signal after
-    // which a single 10ms Media3 error-check advance is safe. Only these error-observation cases
-    // opt into auto-advance instead of pumping time in a predicate or exposing a production seam.
-    @Test fun aChannelChangeDuringAReconnectRetryEndsTheRetries() = exercise(autoAdvancePlayerClock = true) {
+    // Finish the old open before retiring its binding; inject the error to test retry policy
+    // without racing SDK IO delivery or auto-advancing Media3's watchdogs.
+    @Test fun aChannelChangeDuringAReconnectRetryEndsTheRetries() = exercise {
+        val opener = controlledOpener()
         live(timeshift = false)
+        opener.finishOpen()
         restartServer()
         session.scriptLivePlaybackFailure(PlaybackBindingResult.TargetUnavailable)
         val retune = scope.async { runtime.retuneAfterReconnect() }
         await { retune.isCompleted }
         await { (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis == 2_000L }
-        // Observe the ended stream's asynchronous error before zapping, without consuming backoff.
-        await("ended stream error before channel change") { player.playerError != null }
+        reportStreamError()
+        settle()
         // The viewer picks another channel while the retry waits.
-        session.scriptLivePlaybackSuccess(manager)
+        session.scriptLivePlaybackSuccess(opener)
         live(timeshift = false, channel = 2)
+        opener.finishOpen()
         advanceRecoveryTime(40_001)
         settleManager()
         assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
         assertFalse(runtime.state.value is AppPlaybackState.Recovering || runtime.state.value is AppPlaybackState.Failed)
         assertEquals(2, connection.subscribeCount)
+        assertEquals(listOf(1L, 2L), subscribedChannels.toList())
     }
 
     @Test fun theEndedStreamsErrorDuringAReconnectBackoffKeepsTheChannelRecovering() = exercise {
@@ -1503,24 +1506,29 @@ class AudioInterruptionRuntimeTest {
         assertEquals(1, connection.subscribeCount)
     }
 
-    // Like the channel-change case, this observes the real ended-period error, not reportStreamError().
-    @Test fun aFailedReconnectRetuneRetriesUntilTheChannelComesBack() = exercise(autoAdvancePlayerClock = true) {
+    // As above, old and replacement opens finish under test control, independently of SDK IO errors.
+    @Test fun aFailedReconnectRetuneRetriesUntilTheChannelComesBack() = exercise {
+        val opener = controlledOpener()
         live(timeshift = false)
+        opener.finishOpen()
         restartServer()
         session.scriptLivePlaybackFailure(PlaybackBindingResult.TargetUnavailable)
         val retune = scope.async { runtime.retuneAfterReconnect() }
         await { retune.isCompleted }
         await { (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis == 2_000L }
-        session.scriptLivePlaybackSuccess(manager)
-        await("ended stream error before reconnect retry") { player.playerError != null }
+        session.scriptLivePlaybackSuccess(opener)
+        reportStreamError()
+        settle()
         assertEquals("before retry: ${runtime.state.value}", 2_000L,
             (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis)
         advanceRecoveryTime(2_001)
         await { connection.subscribeCount == 2 }
         startSubscription(connection.awaitCollectionRegistered())
+        opener.finishOpen()
         markReady()
         await { runtime.state.value !is AppPlaybackState.Recovering }
         settle()
+        assertFalse(runtime.state.value is AppPlaybackState.Failed)
         assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
         assertTrue(player.playWhenReady)
         assertEquals(2, connection.subscribeCount)
@@ -2602,12 +2610,10 @@ class AudioInterruptionRuntimeTest {
 
     private fun exercise(
         granted: Boolean = true,
-        autoAdvancePlayerClock: Boolean = false,
         block: suspend Fixture.() -> Unit,
     ) = runTest(timeout = 15.seconds) {
         val scheduler = testScheduler
-        val fixture = Fixture(CoroutineScope(StandardTestDispatcher(scheduler) + SupervisorJob()), granted, scheduler,
-            autoAdvancePlayerClock)
+        val fixture = Fixture(CoroutineScope(StandardTestDispatcher(scheduler) + SupervisorJob()), granted, scheduler)
         try {
             fixture.driver.exercise(this, 15_000) { fixture.block() }
         }
@@ -2656,7 +2662,6 @@ class AudioInterruptionRuntimeTest {
         val scope: CoroutineScope,
         granted: Boolean,
         private val scheduler: TestCoroutineScheduler,
-        autoAdvancePlayerClock: Boolean,
     ) {
         val driver = PlaybackTestDriver(scheduler)
         private val context = ApplicationProvider.getApplicationContext<Application>()
@@ -2732,7 +2737,7 @@ class AudioInterruptionRuntimeTest {
         // would reach the runtime as an unrelated player error at a wall-clock dependent moment.
         val player = ExoPlayer.Builder(context)
             // Stalled streams must not advance Robolectric time past SDK Handler watchdogs.
-            .setClock(FakeClock(autoAdvancePlayerClock))
+            .setClock(FakeClock(false))
             .setMediaSourceFactory(DefaultMediaSourceFactory(DataSource.Factory { StalledDataSource() }))
             .build()
         val recoveries = mutableListOf<PlaybackRecoveryReason>()
@@ -2760,6 +2765,8 @@ class AudioInterruptionRuntimeTest {
                     failNextPrepare = false
                     throw IllegalStateException("scripted prepare failure")
                 }
+                // Match Media3's error reset on preparation after a source failure.
+                reportedPlayerError = null
                 player.prepare()
             }
         }
@@ -2857,6 +2864,46 @@ class AudioInterruptionRuntimeTest {
         }
 
         fun audioDisabled() = C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes
+
+        fun controlledOpener() = ControlledOpener().also { session.scriptLivePlaybackSuccess(it) }
+
+        /** Gates return from the real manager and acknowledges consumption by the SDK source. */
+        inner class ControlledOpener : SubscriptionOpener {
+            private val opens = java.util.concurrent.ConcurrentLinkedQueue<PendingOpen>()
+
+            override suspend fun open(
+                channelId: SubscriptionChannelId,
+                consumer: SubscriptionEventConsumer,
+                timeshiftPeriod: kotlin.time.Duration,
+            ): SubscriptionOpenResult {
+                val pending = PendingOpen()
+                opens.add(pending)
+                val result = manager.open(channelId, consumer, timeshiftPeriod)
+                check(result is SubscriptionOpenResult.Opened)
+                pending.ready.complete(Unit)
+                pending.release.await()
+                return SubscriptionOpenResult.Opened(object : ActiveSubscription by result.subscription {
+                    override val state: kotlinx.coroutines.flow.StateFlow<SubscriptionState>
+                        get() {
+                            pending.consumed.complete(Unit)
+                            return result.subscription.state
+                        }
+                })
+            }
+
+            fun finishOpen() {
+                await("subscription open ready") { opens.peek()?.ready?.isCompleted == true }
+                val pending = opens.remove()
+                pending.release.complete(Unit)
+                await("source consumed subscription open") { pending.consumed.isCompleted }
+            }
+        }
+
+        private class PendingOpen {
+            val ready = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            val consumed = CompletableDeferred<Unit>()
+        }
 
         suspend fun live(timeshift: Boolean, channel: Int = 1, granted: Boolean = timeshift, firstPicture: Boolean = true) {
             settings.setTimeshiftEnabled(timeshift)
@@ -2960,7 +3007,7 @@ class AudioInterruptionRuntimeTest {
         }
 
         fun await(label: String = "audio interruption condition", predicate: () -> Boolean) =
-            driver.await(label, predicate = predicate)
+            driver.await(label, diagnostics = { "runtimeState=${runtime.state.value}" }, predicate = predicate)
 
         fun settle() = driver.settle(player)
 
