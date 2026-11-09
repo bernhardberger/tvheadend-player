@@ -96,27 +96,8 @@ enum class DvrArchiveSort {
 private fun DvrArchiveFolder.arranged(sort: DvrArchiveSort, lastGroup: String?): DvrArchiveFolder {
     val collator = Collator.getInstance().apply { strength = Collator.SECONDARY }
     val newest = compareByDescending<DvrEntry> { it.start?.epochSeconds ?: Long.MIN_VALUE }
-    val recordingOrder: Comparator<DvrEntry> = when (sort) {
-        DvrArchiveSort.NEWEST -> newest
-        DvrArchiveSort.NAME -> Comparator<DvrEntry> { a, b ->
-            val left = a.title?.takeIf(String::isNotBlank)
-            val right = b.title?.takeIf(String::isNotBlank)
-            when {
-                left == null && right == null -> 0
-                left == null -> 1
-                right == null -> -1
-                else -> collator.compare(left, right)
-            }
-        }.then(newest)
-        DvrArchiveSort.LARGEST -> compareByDescending<DvrEntry> { recordingSizeBytes(it) ?: -1L }.then(newest)
-    }
-    val groupOrder: Comparator<DvrArchiveFolder> = when (sort) {
-        DvrArchiveSort.NEWEST -> compareByDescending { it.newestRecordingStart ?: Long.MIN_VALUE }
-        DvrArchiveSort.NAME -> Comparator<DvrArchiveFolder> { a, b -> collator.compare(a.name, b.name) }
-            .thenByDescending { it.newestRecordingStart ?: Long.MIN_VALUE }
-        DvrArchiveSort.LARGEST -> compareByDescending<DvrArchiveFolder> { summarizeDvrFolder(it).totalSizeBytes }
-            .thenByDescending { it.newestRecordingStart ?: Long.MIN_VALUE }
-    }
+    val recordingOrder = archiveRecordingOrder(sort, collator, newest)
+    val groupOrder = archiveGroupOrder(sort, collator)
     fun DvrArchiveFolder.sorted(): DvrArchiveFolder = copy(
         folders = folders.map { it.sorted() }
             .sortedWith(compareBy<DvrArchiveFolder> { lastGroup != null && it.name == lastGroup && path.isEmpty() }
@@ -125,6 +106,34 @@ private fun DvrArchiveFolder.arranged(sort: DvrArchiveSort, lastGroup: String?):
     )
     return sorted()
 }
+
+private fun archiveRecordingOrder(
+    sort: DvrArchiveSort,
+    collator: Collator,
+    newest: Comparator<DvrEntry>,
+): Comparator<DvrEntry> = when (sort) {
+    DvrArchiveSort.NEWEST -> newest
+    DvrArchiveSort.NAME -> Comparator<DvrEntry> { a, b ->
+        val left = a.title?.takeIf(String::isNotBlank)
+        val right = b.title?.takeIf(String::isNotBlank)
+        when {
+            left == null && right == null -> 0
+            left == null -> 1
+            right == null -> -1
+            else -> collator.compare(left, right)
+        }
+    }.then(newest)
+    DvrArchiveSort.LARGEST -> compareByDescending<DvrEntry> { recordingSizeBytes(it) ?: -1L }.then(newest)
+}
+
+private fun archiveGroupOrder(sort: DvrArchiveSort, collator: Collator): Comparator<DvrArchiveFolder> =
+    when (sort) {
+        DvrArchiveSort.NEWEST -> compareByDescending { it.newestRecordingStart ?: Long.MIN_VALUE }
+        DvrArchiveSort.NAME -> Comparator<DvrArchiveFolder> { a, b -> collator.compare(a.name, b.name) }
+            .thenByDescending { it.newestRecordingStart ?: Long.MIN_VALUE }
+        DvrArchiveSort.LARGEST -> compareByDescending<DvrArchiveFolder> { summarizeDvrFolder(it).totalSizeBytes }
+            .thenByDescending { it.newestRecordingStart ?: Long.MIN_VALUE }
+    }
 
 private fun List<DvrEntry>.newestFirst() = sortedByDescending { it.start?.epochSeconds ?: Long.MIN_VALUE }
 
@@ -146,7 +155,9 @@ private fun virtualGroups(
         channelId = if (named && channelLogo) members.firstNotNullOfOrNull { it.channelId } else null,
         genreCategory = if (named && genreCategory) programmeCategory(members.first().contentGenre) else null,
     )
-    val groups = named.filterKeys { it != null }.map { (name, members) -> folder(checkNotNull(name), members, named = true) }
+    val groups = named.filterKeys { it != null }.map { (name, members) ->
+        folder(checkNotNull(name), members, named = true)
+    }
         .sortedWith(order)
     val rest = named[null]?.let { folder(unnamed, it, named = false) }
     return DvrArchiveFolder("", emptyList(), groups + listOfNotNull(rest), emptyList())
@@ -163,7 +174,7 @@ sealed interface DvrDateSection {
     data object Undated : DvrDateSection
 }
 
-private const val DaySectionDays = 6L
+private const val DAY_SECTION_DAYS = 6L
 
 fun dvrDateSection(entry: DvrEntry, now: Instant, zone: ZoneId): DvrDateSection {
     val start = entry.start ?: return DvrDateSection.Undated
@@ -172,7 +183,7 @@ fun dvrDateSection(entry: DvrEntry, now: Instant, zone: ZoneId): DvrDateSection 
     return when {
         date >= today -> DvrDateSection.Today
         date == today.minusDays(1) -> DvrDateSection.Yesterday
-        date >= today.minusDays(DaySectionDays) -> DvrDateSection.Day(date)
+        date >= today.minusDays(DAY_SECTION_DAYS) -> DvrDateSection.Day(date)
         else -> DvrDateSection.Month(YearMonth.from(date))
     }
 }

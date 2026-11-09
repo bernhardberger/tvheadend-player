@@ -191,6 +191,12 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import org.koin.compose.koinInject
 
+private fun recordingOverlayOpen(
+    detailsEntry: DvrEntry?,
+    pendingAction: PendingRecordingAction?,
+    folderMenu: FolderMenuTarget?,
+): Boolean = detailsEntry != null || pendingAction != null || folderMenu != null
+
 private data class RecordingLibraryPresentation(
     val library: DvrLibraryPartition,
     val archive: DvrArchiveFolder,
@@ -454,8 +460,12 @@ internal fun RecordingsScreenContent(
         else buildDvrArchive(
             presentation.archiveEntries, chosenGrouping, naming, chosenView.sort,
             isWatched = { entry: DvrEntry ->
-                recordingWatchedToEnd(entry,
-                    at.bernhardberger.tvhplayer.core.offeredResumePosition(observation.recordingPlaybackAdmission(entry)))
+                recordingWatchedToEnd(
+                    entry,
+                    at.bernhardberger.tvhplayer.core.offeredResumePosition(
+                        observation.recordingPlaybackAdmission(entry),
+                    ),
+                )
             }.takeIf { hideWatched },
         )
     LaunchedEffect(requestPillFocus) {
@@ -517,7 +527,9 @@ internal fun RecordingsScreenContent(
     val retained = retainedPreparation ?: prepared
     val retainedEntries = retained.input?.entries.orEmpty()
     val observedLibrary = prepared.value.library
-    val observedArchive = remember(prepared.value, chosenView, naming, if (hideWatched) observation else null) { archiveFor(prepared.value) }
+    val observedArchive = remember(prepared.value, chosenView, naming, if (hideWatched) observation else null) {
+        archiveFor(prepared.value)
+    }
     val reconciledArchiveStack = remember(observedArchive, archiveNavigation.stack) {
         reconcileArchiveStack(archiveNavigation.stack, observedArchive)
     }
@@ -579,7 +591,7 @@ internal fun RecordingsScreenContent(
         folderMenu,
         groupChoiceOpen,
     ) {
-        if (detailsEntry != null || pendingAction != null || folderMenu != null || groupChoiceOpen) return@LaunchedEffect
+        if (recordingOverlayOpen(detailsEntry, pendingAction, folderMenu) || groupChoiceOpen) return@LaunchedEffect
         val requestedEntry = screenState.requestedScheduleEntryId.value
         // Preparation retains the last projection while the new snapshot is calculated.
         // Only the projection built from the displayed snapshot can judge this target.
@@ -638,7 +650,7 @@ internal fun RecordingsScreenContent(
         groupChoiceOpen,
     ) {
         if (!pendingDetailsReturn) return@LaunchedEffect
-        if (detailsEntry != null || pendingAction != null || folderMenu != null || groupChoiceOpen) return@LaunchedEffect
+        if (recordingOverlayOpen(detailsEntry, pendingAction, folderMenu) || groupChoiceOpen) return@LaunchedEffect
         repeat(4) {
             withFrameNanos { }
             val restored = runCatching {

@@ -42,7 +42,8 @@ private fun DvrArchiveGrouping.detailRes(): Int = when (this) {
 }
 
 /**
- * The View options button of the Archive root, in the title row, naming the current grouping. It is its own focus stop between the
+ * The View options button of the Archive root, in the title row, naming the current grouping.
+ * It is its own focus stop between the
  * tabs and the list: every direction is decided here so no neighbour's key handling can move or
  * activate through it. [onUp], [onDown] and [onLeft] move focus on the first press only; held
  * repeats are swallowed, and Right goes nowhere.

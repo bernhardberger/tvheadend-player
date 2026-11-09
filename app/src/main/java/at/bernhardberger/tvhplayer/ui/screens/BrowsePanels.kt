@@ -223,7 +223,10 @@ private fun BrowsePanelLevels(
     }
 }
 
-/** A root row with a level shows the level's value and a chevron, and opens it on Right (and on OK unless it has its own). */
+/**
+ * A root row with a level shows the level's value and a chevron, and opens it on Right
+ * (and on OK unless it has its own).
+ */
 @Composable
 private fun BrowsePanelEntry.openingItsLevel(open: (String) -> Unit): BrowsePanelEntry {
     if (this !is BrowsePanelEntry.Choice || level == null) return this

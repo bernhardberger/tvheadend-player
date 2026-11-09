@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.ui.screens.recordings
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -110,106 +111,16 @@ internal fun ArchiveDepthContent(
     val latestAdmissionForEntry = rememberUpdatedState(admissionForEntry)
     // Only a flat list in date order is cut into days and months; each cut sits above the run's first recording.
     val sections = remember(root, grouping, sort) {
-        if (grouping != DvrArchiveGrouping.NONE || sort != DvrArchiveSort.NEWEST) emptyMap()
-        else {
-            val starts = dvrDateSectionStarts(root.recordings, java.time.Instant.ofEpochSecond(nowSeconds()), java.time.ZoneId.systemDefault())
-            root.recordings.indices.mapNotNull { index -> starts[index]?.let { root.recordings[index].id.value to it } }.toMap()
-        }
+        archiveDateSections(root, grouping, sort, nowSeconds)
     }
     // The root heading ends before the View options button at the row's end, whatever width its value gives it;
     // deeper levels have no button. The heading reads the measured width where it lays out.
     val buttonWidthPx = remember { mutableIntStateOf(0) }
-    val levels = remember(root, sections, emptyBecauseWatched, pill != null) {
-        val levels = linkedMapOf<String, DepthLevel>()
-        fun addLevel(id: String, heading: @Composable () -> String, items: List<ArchiveListItem>) {
-            levels[id] = DepthLevel(
-                id = id,
-                heading = { emphasis ->
-                    ArchiveLevelHeading(
-                        heading(),
-                        emphasis,
-                        endReserve = if (pill != null && id == archiveLevelId(emptyList())) {
-                            { buttonWidthPx.intValue }
-                        } else null,
-                    )
-                },
-                emptyContent = {
-                    if (emptyBecauseWatched) Column(verticalArrangement = Arrangement.spacedBy(TvSpacing8)) {
-                        Text(stringResource(R.string.recordings_archive_all_watched), style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onSurface)
-                        Text(stringResource(R.string.recordings_archive_all_watched_hint), style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    } else Text(stringResource(R.string.recordings_archive_empty), style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface)
-                },
-                rows = items.mapIndexed { index, item ->
-                    when (item) {
-                        is ArchiveListItem.RecordingNow -> {
-                            addLevel(RecordingNowLevelId, { stringResource(R.string.recordings_recording_now_folder) },
-                                item.entries.map(ArchiveListItem::Recording))
-                            DepthRow(DepthItem(item.key, RecordingNowLevelId)) { rowModifier, activate ->
-                                Column {
-                                    RecordingNowFolderRow(item.entries.size, rowModifier, activate)
-                                    HorizontalDivider(modifier = Modifier.padding(vertical = TvSpacing8))
-                                }
-                            }
-                        }
-                        is ArchiveListItem.Folder -> DepthRow(
-                            DepthItem(item.key, archiveLevelId(item.folder.path)),
-                        ) { rowModifier, activate ->
-                            FolderListRow(item.folder, selected = false, modifier = rowModifier, onClick = activate,
-                                resumePosition = { offeredResumePosition(latestAdmissionForEntry.value(it)) },
-                                onOpenContextMenu = { latestOnOpenFolderMenu.value?.invoke(item.folder) },
-                                iconTint = at.bernhardberger.tvhplayer.ui.tvGenreColors(item.folder.genreCategory)?.base,
-                                focusedIconTint = at.bernhardberger.tvhplayer.ui.tvGenreColors(item.folder.genreCategory)?.focusedBase,
-                                picon = item.folder.takeIf { it.channelId != null }
-                                    ?.let { folder -> folder.recordings.firstOrNull { it.channelId != null } }
-                                    ?.let(latestPiconForEntry.value))
-                        }
-                        is ArchiveListItem.Recording -> {
-                            val previewId = "metadata:${item.entry.id.value}"
-                            levels[previewId] = DepthLevel(
-                                id = previewId,
-                                rows = emptyList(),
-                                heading = { ArchiveLevelHeading("", it) },
-                                passiveContent = {
-                                    RecordingMetadataPane(item.entry, latestPiconForEntry.value(item.entry),
-                                        latestAdmissionForEntry.value(item.entry),
-                                        Modifier.padding(bottom = contentPadding.calculateBottomPadding()))
-                                },
-                            )
-                            DepthRow(
-                                DepthItem(item.key),
-                                onActivate = { latestOnOpenRecording.value(item.entry) },
-                                previewLevelId = previewId,
-                            ) { rowModifier, activate ->
-                                // Only the root list carries the cuts; the Recording now level is a plain list.
-                                val section = if (id == archiveLevelId(emptyList())) sections[item.entry.id.value] else null
-                                Column {
-                                    if (section != null) ArchiveDateDivider(dateSectionLabel(section), first = index == 0)
-                                    RecordingListRow(
-                                        entry = item.entry, piconPath = latestPiconForEntry.value(item.entry),
-                                        resumePosition = offeredResumePosition(latestAdmissionForEntry.value(item.entry)),
-                                        selected = false, modifier = rowModifier,
-                                        onClick = activate,
-                                        onOpenContextMenu = { latestOnOpenContextMenu.value?.invoke(item.entry) },
-                                    )
-                                }
-                            }
-                        }
-                    }
-                },
-            )
-        }
-        fun addFolder(folder: DvrArchiveFolder) {
-            addLevel(archiveLevelId(folder.path), {
-                if (folder.path.isEmpty()) stringResource(R.string.recordings_archive_all) else folder.name
-            }, folder.listItems())
-            folder.folders.forEach(::addFolder)
-        }
-        addFolder(root)
-        levels
-    }
+    val levels = rememberArchiveLevels(
+        root, sections, emptyBecauseWatched, pill != null, buttonWidthPx, contentPadding,
+        latestAdmissionForEntry, latestOnOpenFolderMenu, latestPiconForEntry,
+        latestOnOpenRecording, latestOnOpenContextMenu,
+    )
     val atRoot = navigation.stack.active.levelId == archiveLevelId(emptyList())
     var pillFocused by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxSize()) {
@@ -226,7 +137,8 @@ internal fun ArchiveDepthContent(
             activeFocusRequester = contentFocus,
             onRootBack = onModeFocus,
             onRootLeft = onDrawerFocus,
-            // At the root the grouping choice is the stop between the list and the tabs; inside a group it is not there.
+            // At the root the grouping choice is the stop between the list and the tabs;
+            // inside a group it is not there.
             onFirstRowUp = if (pill != null && atRoot) pill.focus else onModeFocus,
             pageKeyDirection = at.bernhardberger.tvhplayer.core.ChannelNavigation::pageDirectionForKeyCode,
             modifier = modifier.testTag("recordings-archive-list"),
@@ -252,6 +164,151 @@ internal fun ArchiveDepthContent(
             }
         }
     }
+}
+
+@Composable
+private fun rememberArchiveLevels(
+    root: DvrArchiveFolder,
+    sections: Map<Long, DvrDateSection>,
+    emptyBecauseWatched: Boolean,
+    hasPill: Boolean,
+    buttonWidthPx: State<Int>,
+    contentPadding: PaddingValues,
+    latestAdmissionForEntry: State<(DvrEntry) -> RecordingPlaybackAdmission?>,
+    latestOnOpenFolderMenu: State<((DvrArchiveFolder) -> Unit)?>,
+    latestPiconForEntry: State<(DvrEntry) -> ChannelIcon?>,
+    latestOnOpenRecording: State<(DvrEntry) -> Unit>,
+    latestOnOpenContextMenu: State<((DvrEntry) -> Unit)?>,
+): Map<String, DepthLevel> = remember(root, sections, emptyBecauseWatched, hasPill) {
+        val levels = linkedMapOf<String, DepthLevel>()
+        fun addLevel(id: String, heading: @Composable () -> String, items: List<ArchiveListItem>) {
+            levels[id] = DepthLevel(
+                id = id,
+                heading = { emphasis ->
+                    ArchiveLevelHeading(
+                        heading(),
+                        emphasis,
+                        endReserve = if (hasPill && id == archiveLevelId(emptyList())) {
+                            { buttonWidthPx.value }
+                        } else null,
+                    )
+                },
+                emptyContent = {
+                    if (emptyBecauseWatched) Column(verticalArrangement = Arrangement.spacedBy(TvSpacing8)) {
+                        Text(
+                            stringResource(R.string.recordings_archive_all_watched),
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            stringResource(R.string.recordings_archive_all_watched_hint),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else Text(
+                        stringResource(R.string.recordings_archive_empty), style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                },
+                rows = items.mapIndexed { index, item ->
+                    when (item) {
+                        is ArchiveListItem.RecordingNow -> {
+                            addLevel(RecordingNowLevelId, { stringResource(R.string.recordings_recording_now_folder) },
+                                item.entries.map(ArchiveListItem::Recording))
+                            DepthRow(DepthItem(item.key, RecordingNowLevelId)) { rowModifier, activate ->
+                                Column {
+                                    RecordingNowFolderRow(item.entries.size, rowModifier, activate)
+                                    HorizontalDivider(modifier = Modifier.padding(vertical = TvSpacing8))
+                                }
+                            }
+                        }
+                        is ArchiveListItem.Folder -> archiveFolderRow(
+                            item, latestAdmissionForEntry, latestOnOpenFolderMenu, latestPiconForEntry,
+                        )
+                        is ArchiveListItem.Recording -> {
+                            val previewId = "metadata:${item.entry.id.value}"
+                            levels[previewId] = DepthLevel(
+                                id = previewId,
+                                rows = emptyList(),
+                                heading = { ArchiveLevelHeading("", it) },
+                                passiveContent = {
+                                    RecordingMetadataPane(item.entry, latestPiconForEntry.value(item.entry),
+                                        latestAdmissionForEntry.value(item.entry),
+                                        Modifier.padding(bottom = contentPadding.calculateBottomPadding()))
+                                },
+                            )
+                            DepthRow(
+                                DepthItem(item.key),
+                                onActivate = { latestOnOpenRecording.value(item.entry) },
+                                previewLevelId = previewId,
+                            ) { rowModifier, activate ->
+                                // Only the root list carries the cuts; the Recording now level is a plain list.
+                                val section = if (id == archiveLevelId(emptyList())) {
+                                    sections[item.entry.id.value]
+                                } else null
+                                Column {
+                                    if (section != null) {
+                                        ArchiveDateDivider(dateSectionLabel(section), first = index == 0)
+                                    }
+                                    RecordingListRow(
+                                        entry = item.entry, piconPath = latestPiconForEntry.value(item.entry),
+                                        resumePosition = offeredResumePosition(
+                                            latestAdmissionForEntry.value(item.entry),
+                                        ),
+                                        selected = false, modifier = rowModifier,
+                                        onClick = activate,
+                                        onOpenContextMenu = { latestOnOpenContextMenu.value?.invoke(item.entry) },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                },
+            )
+        }
+        fun addFolder(folder: DvrArchiveFolder) {
+            addLevel(archiveLevelId(folder.path), {
+                if (folder.path.isEmpty()) stringResource(R.string.recordings_archive_all) else folder.name
+            }, folder.listItems())
+            folder.folders.forEach(::addFolder)
+        }
+        addFolder(root)
+        levels
+    }
+
+private fun archiveDateSections(
+    root: DvrArchiveFolder,
+    grouping: DvrArchiveGrouping,
+    sort: DvrArchiveSort,
+    nowSeconds: () -> Long,
+): Map<Long, DvrDateSection> {
+    if (grouping != DvrArchiveGrouping.NONE || sort != DvrArchiveSort.NEWEST) return emptyMap()
+    val starts = dvrDateSectionStarts(
+        root.recordings, java.time.Instant.ofEpochSecond(nowSeconds()), java.time.ZoneId.systemDefault(),
+    )
+    return root.recordings.indices.mapNotNull { index ->
+        starts[index]?.let { root.recordings[index].id.value to it }
+    }.toMap()
+}
+
+private fun archiveFolderRow(
+    item: ArchiveListItem.Folder,
+    admissionForEntry: State<(DvrEntry) -> RecordingPlaybackAdmission?>,
+    onOpenFolderMenu: State<((DvrArchiveFolder) -> Unit)?>,
+    piconForEntry: State<(DvrEntry) -> ChannelIcon?>,
+): DepthRow = DepthRow(
+    DepthItem(item.key, archiveLevelId(item.folder.path)),
+) { rowModifier, activate ->
+    FolderListRow(
+        item.folder, selected = false, modifier = rowModifier, onClick = activate,
+        resumePosition = { offeredResumePosition(admissionForEntry.value(it)) },
+        onOpenContextMenu = { onOpenFolderMenu.value?.invoke(item.folder) },
+        iconTint = at.bernhardberger.tvhplayer.ui.tvGenreColors(item.folder.genreCategory)?.base,
+        focusedIconTint = at.bernhardberger.tvhplayer.ui.tvGenreColors(item.folder.genreCategory)?.focusedBase,
+        picon = item.folder.takeIf { it.channelId != null }
+            ?.let { folder -> folder.recordings.firstOrNull { it.channelId != null } }
+            ?.let(piconForEntry.value),
+    )
 }
 
 /** What the screen decides about the grouping button: where focus goes from it and what opening it does. */
