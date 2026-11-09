@@ -304,7 +304,6 @@
     <ID>ReturnCount:RecordingOpenPolicy.kt:@OptIn(ExperimentalTvheadendApi::class) fun recordingOpenAction: RecordingOpenAction</ID>
     <ID>ReturnCount:RecordingOpenPolicy.kt:@OptIn(ExperimentalTvheadendApi::class) fun recordingTimeLeft: Duration?</ID>
     <ID>ReturnCount:RecordingSkipPolicy.kt:RecordingSkipPolicy$fun evaluate: RecordingSkipDecision</ID>
-    <ID>ReturnCount:SeekbarPolicy.kt:fun programmeAnchoredAxis: ProgrammeAxis?</ID>
     <ID>ReturnCount:SessionAudioSelection.kt:SessionAudioSelection$fun rememberExplicitChoice: Pair&lt;ChannelId, AudioTrackChoice&gt;?</ID>
     <ID>ReturnCount:SessionAudioSelection.kt:SessionAudioSelection$fun restore</ID>
     <ID>ReturnCount:SessionPlaybackPlayer.kt:SessionPlaybackPlayer$override fun getState: State</ID>

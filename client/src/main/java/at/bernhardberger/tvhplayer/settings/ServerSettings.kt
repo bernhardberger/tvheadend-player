@@ -20,11 +20,6 @@ enum class ServerAuthenticationMode {
     PASSWORD,
 }
 
-data class ServerConnectionPresentation(
-    val endpoint: String,
-    val authenticationMode: ServerAuthenticationMode,
-)
-
 /**
  * Complete in-memory connection values for replacement decisions.
  *
@@ -65,30 +60,6 @@ class ServerConnectionConfiguration(
             "username=<redacted>, " +
             "password=<redacted>, " +
             "authenticationMode=$authenticationMode)"
-}
-
-fun serverConnectionPresentation(
-    host: String,
-    htspPort: Int,
-    passwordConfigured: Boolean,
-): ServerConnectionPresentation {
-    val readableHost = host.trim()
-    val endpointHost = if (
-        readableHost.contains(':') &&
-        !(readableHost.startsWith('[') && readableHost.endsWith(']'))
-    ) {
-        "[$readableHost]"
-    } else {
-        readableHost
-    }
-    return ServerConnectionPresentation(
-        endpoint = "$endpointHost:$htspPort",
-        authenticationMode = if (passwordConfigured) {
-            ServerAuthenticationMode.PASSWORD
-        } else {
-            ServerAuthenticationMode.ANONYMOUS
-        },
-    )
 }
 
 internal fun serverSettingsForEditing(

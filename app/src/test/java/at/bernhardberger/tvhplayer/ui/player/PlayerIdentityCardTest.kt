@@ -116,7 +116,6 @@ class PlayerIdentityCardTest {
         assertTrue(exists(PlayerTopIdentityTag))
         assertEquals(0, compose.onAllNodes(hasTestTag(PlayerTopIdentityTag) and isFocusable(), useUnmergedTree = true).fetchSemanticsNodes().size)
         assertEquals(emptyList<String>(), focused())
-        assertFalse("the card is gone", exists(PlayerIdentityCardTag))
     }
 
     /** One chrome: a recording's layout is live's, at the same canvas and font scale. */

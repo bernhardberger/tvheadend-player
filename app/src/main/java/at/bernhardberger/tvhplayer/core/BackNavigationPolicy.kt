@@ -87,6 +87,3 @@ fun warmPlaybackTarget(
     activeRecordingId != null -> WarmPlaybackTarget.RECORDING
     else -> WarmPlaybackTarget.NONE
 }
-
-fun nestedBackAction(hasPreviousEntry: Boolean): BackAction =
-    if (hasPreviousEntry) BackAction.POP_NAVIGATION else BackAction.RETURN_TO_PARENT

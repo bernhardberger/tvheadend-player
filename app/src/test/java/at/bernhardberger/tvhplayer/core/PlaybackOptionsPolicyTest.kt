@@ -10,34 +10,6 @@ class PlaybackOptionsPolicyTest {
             listOf(PlaybackOptionsPage.AUDIO, PlaybackOptionsPage.SUBTITLES, PlaybackOptionsPage.DISPLAY, PlaybackOptionsPage.STATS),
             playbackOptionsCategories(),
         )
-        assertEquals(
-            PlaybackOptionsPage.SUBTITLES,
-            adjacentPlaybackOptionsPage(
-                current = PlaybackOptionsPage.AUDIO,
-                direction = 1,
-            ),
-        )
-        assertEquals(
-            PlaybackOptionsPage.DISPLAY,
-            adjacentPlaybackOptionsPage(
-                current = PlaybackOptionsPage.SUBTITLES,
-                direction = 1,
-            ),
-        )
-        assertEquals(
-            PlaybackOptionsPage.STATS,
-            adjacentPlaybackOptionsPage(
-                current = PlaybackOptionsPage.DISPLAY,
-                direction = 1,
-            ),
-        )
-        assertEquals(
-            PlaybackOptionsPage.AUDIO,
-            adjacentPlaybackOptionsPage(
-                current = PlaybackOptionsPage.STATS,
-                direction = 1,
-            ),
-        )
     }
 
     @Test

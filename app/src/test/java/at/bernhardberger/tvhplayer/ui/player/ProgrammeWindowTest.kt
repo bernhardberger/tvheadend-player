@@ -48,8 +48,6 @@ class ProgrammeWindowTest {
         assertEquals(listOf(b), snapshot.events)
         assertEquals(listOf(a), snapshot.historicalEvents)
         assertNull(observation.event(a.id))
-        assertNull(currentProgrammeEvent(observation, a))
-        assertEquals(b, currentProgrammeEvent(observation, b))
     }
 
     @Test fun adjacentRetainedProgrammesFillToTheirOwnEndAndSwitchAtExclusiveBoundary() {

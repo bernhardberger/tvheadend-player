@@ -70,25 +70,3 @@ fun LiveTimeshiftState.toAppPresentation(
         )
     }
 }
-
-internal fun measuredTimeshiftPresentation(
-    bufferedDuration: Duration?,
-    positionBehindLive: Duration?,
-    serverPaused: Boolean?,
-    grantedPeriod: Duration? = null,
-): AppTimeshiftState {
-    val buffered = bufferedDuration?.takeIf { it.isFinite() && it >= Duration.ZERO }
-        ?.inWholeMilliseconds
-    val behind = positionBehindLive?.takeIf { it.isFinite() && it >= Duration.ZERO }
-        ?.inWholeMilliseconds
-    return AppTimeshiftState(
-        available = true,
-        paused = serverPaused == true,
-        bufferStartMs = -(buffered ?: 0L),
-        positionMs = -(behind ?: 0L),
-        serverBehindLiveMs = behind,
-        capacityMs = grantedPeriod?.takeIf { it.isFinite() && it > Duration.ZERO }
-            ?.inWholeMilliseconds,
-        timingKnown = buffered != null && behind != null && behind <= buffered,
-    )
-}

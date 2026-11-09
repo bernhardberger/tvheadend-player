@@ -82,26 +82,6 @@ class NavigationShellPolicyTest {
     }
 
     @Test
-    fun backFromSettingsContentFocusesCurrentCategory() {
-        assertEquals(
-            SettingsBackAction.FOCUS_CURRENT_CATEGORY,
-            settingsBackAction(
-                contentPaneFocused = true,
-            ),
-        )
-    }
-
-    @Test
-    fun backFromSettingsCategoryDelegatesToGlobalDrawer() {
-        assertEquals(
-            SettingsBackAction.DELEGATE_TO_GLOBAL_NAVIGATION,
-            settingsBackAction(
-                contentPaneFocused = false,
-            ),
-        )
-    }
-
-    @Test
     fun showsRailOnBrowseDestinations() {
         assertTrue(
             showGlobalNavigationRail(

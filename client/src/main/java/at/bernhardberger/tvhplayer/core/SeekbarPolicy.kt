@@ -68,32 +68,6 @@ data class ProgrammeAxis(
     val rewindableStartsBeforeProgramme: Boolean,
 )
 
-/**
- * Returns null when there is no usable programme, allowing the caller to fall
- * back to the timeshift buffer axis.
- */
-fun programmeAnchoredAxis(
-    state: AppTimeshiftState,
-    nowEpochSec: Long,
-    programmeStartSec: Long?,
-    programmeStopSec: Long?,
-): ProgrammeAxis? {
-    if (!state.available || !state.timingKnown || programmeStartSec == null || programmeStopSec == null) return null
-    val span = programmeStopSec - programmeStartSec
-    if (span <= 0L) return null
-
-    fun fraction(epochSec: Long): Float =
-        ((epochSec - programmeStartSec).toDouble() / span.toDouble()).toFloat().coerceIn(0f, 1f)
-
-    return ProgrammeAxis(
-        playbackFraction = fraction(nowEpochSec + state.positionMs / 1_000L),
-        liveEdgeFraction = fraction(nowEpochSec),
-        rewindableStartFraction = fraction(nowEpochSec + state.bufferStartMs / 1_000L),
-        rewindableStartsBeforeProgramme =
-            nowEpochSec + state.bufferStartMs / 1_000L < programmeStartSec,
-    )
-}
-
 fun recordingSeekbarRange(positionMs: Long, durationMs: Long?, displayDurationMs: Long? = durationMs): SeekbarRange? {
     val end = durationMs?.takeIf { it > 0L } ?: return null
     val displayEnd = maxOf(end, displayDurationMs ?: end)
@@ -156,6 +130,3 @@ fun seekbarScrub(
     val delta = seekStepMs(repeatCount) * if (direction >= 0) 1 else -1
     return (range.positionMs + delta).coerceIn(range.startMs, range.endMs)
 }
-
-/** Whether programme progress should be shown as non-interactive information. */
-fun shouldShowProgrammeProgress(hasCurrentEpgEvent: Boolean): Boolean = hasCurrentEpgEvent

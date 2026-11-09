@@ -118,15 +118,4 @@ class BackNavigationPolicyTest {
         )
     }
 
-    @Test
-    fun nestedBackReturnsToParentOrPopsAnExistingEntry() {
-        assertEquals(
-            BackAction.RETURN_TO_PARENT,
-            nestedBackAction(hasPreviousEntry = false),
-        )
-        assertEquals(
-            BackAction.POP_NAVIGATION,
-            nestedBackAction(hasPreviousEntry = true),
-        )
-    }
 }

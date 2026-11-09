@@ -26,32 +26,6 @@ class ServerConnectionConfigurationTest {
         assertTrue(diagnostic.contains("authenticationMode=PASSWORD"))
     }
 
-    @Test
-    fun presentationKeepsEndpointReadableWithoutClaimingAStoredUsername() {
-        assertEquals(
-            ServerConnectionPresentation(
-                endpoint = "tvheadend.example.invalid:9982",
-                authenticationMode = ServerAuthenticationMode.ANONYMOUS,
-            ),
-            serverConnectionPresentation(
-                host = " tvheadend.example.invalid ",
-                htspPort = 9982,
-                passwordConfigured = false,
-            ),
-        )
-        assertEquals(
-            ServerConnectionPresentation(
-                endpoint = "[2001:db8::10]:9982",
-                authenticationMode = ServerAuthenticationMode.PASSWORD,
-            ),
-            serverConnectionPresentation(
-                host = "2001:db8::10",
-                htspPort = 9982,
-                passwordConfigured = true,
-            ),
-        )
-    }
-
     private fun configuration(
         host: String = "tvheadend.example.invalid",
         htspPort: Int = 9982,

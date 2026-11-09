@@ -27,7 +27,6 @@ import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
-import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -174,53 +173,6 @@ class AppPlaybackRuntimeTest {
     }
 
     @Test
-    fun missingOrContradictoryTimingIsNotAMeasuredLivePosition() {
-        val measurements = listOf(
-            null to null,
-            null to 10.minutes,
-            30.minutes to null,
-            Duration.INFINITE to Duration.ZERO,
-            30.minutes to Duration.INFINITE,
-            1.minutes to 10.minutes,
-            (-1).minutes to Duration.ZERO,
-        )
-        measurements.forEach { (buffer, behind) ->
-            val state = measuredTimeshiftPresentation(buffer, behind, true, 1.hours)
-            assertTrue(state.available)
-            assertTrue(state.paused)
-            assertFalse(state.timingKnown)
-            assertFalse(at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation(state).atLiveEdge)
-            assertFalse(at.bernhardberger.tvhplayer.core.canSeekTimeshiftBackward(state))
-            assertFalse(at.bernhardberger.tvhplayer.core.canSeekTimeshiftForward(state))
-            assertFalse(at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange(state).positionKnown)
-        }
-        val measuredLive = measuredTimeshiftPresentation(Duration.ZERO, Duration.ZERO, false)
-        assertTrue(measuredLive.timingKnown)
-        assertTrue(at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation(measuredLive).atLiveEdge)
-    }
-
-    @Test
-    fun grantedCapacityIsDisplayEvidenceNotAvailableHistory() {
-        val state = measuredTimeshiftPresentation(
-            bufferedDuration = 30.minutes,
-            positionBehindLive = 10.minutes,
-            serverPaused = true,
-            grantedPeriod = 1.hours,
-        )
-        assertEquals(3_600_000L, state.capacityMs)
-        assertEquals(-1_800_000L, state.bufferStartMs)
-        assertEquals(-600_000L, state.positionMs)
-        val unknown = measuredTimeshiftPresentation(null, null, null, Duration.INFINITE)
-        assertNull(unknown.capacityMs)
-        assertEquals(0L, unknown.bufferStartMs)
-        val missingBuffer = measuredTimeshiftPresentation(null, 10.minutes, true, 1.hours)
-        assertEquals(0L, missingBuffer.bufferStartMs)
-        assertEquals(-600_000L, missingBuffer.positionMs)
-        assertFalse(missingBuffer.timingKnown)
-        assertFalse(unknown.timingKnown)
-    }
-
-    @Test
     fun enabledTimeshiftRequestsTheFixedProductPeriod() {
         assertEquals(2.hours, requestedLiveTimeshiftPeriod(timeshiftEnabled = true))
     }
@@ -235,36 +187,6 @@ class AppPlaybackRuntimeTest {
         assertEquals(
             AppTimeshiftState(),
             LiveTimeshiftState.Unavailable.toAppPresentation(),
-        )
-    }
-
-    @Test
-    fun nullMeasuredTimeshiftDoesNotInventSeekableHistory() {
-        assertEquals(
-            AppTimeshiftState(available = true, timingKnown = false),
-            measuredTimeshiftPresentation(
-                bufferedDuration = null,
-                positionBehindLive = null,
-                serverPaused = false,
-            ),
-        )
-    }
-
-    @Test
-    fun measuredTimeshiftPreservesObservedBufferPositionAndPause() {
-        assertEquals(
-            AppTimeshiftState(
-                available = true,
-                paused = true,
-                bufferStartMs = -120_000L,
-                positionMs = -30_000L,
-                serverBehindLiveMs = 30_000L,
-            ),
-            measuredTimeshiftPresentation(
-                bufferedDuration = 2.minutes,
-                positionBehindLive = 30.seconds,
-                serverPaused = true,
-            ),
         )
     }
 

@@ -2,7 +2,6 @@ package at.bernhardberger.tvhplayer.core
 
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.playback.LivePauseState
-import at.bernhardberger.tvhplayer.playback.TimeshiftSeekDecision
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentTarget
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftTimeline
@@ -166,12 +165,6 @@ fun programmePositionWindow(
 fun projectedTimeshiftState(state: AppTimeshiftState, targetMs: Long): AppTimeshiftState =
     state.copy(positionMs = targetMs, serverBehindLiveMs = null)
 
-fun canSeekTimeshiftBackward(state: AppTimeshiftState): Boolean =
-    state.available && state.timingKnown && state.positionMs - state.bufferStartMs > 1_000L
-
-fun canSeekTimeshiftForward(state: AppTimeshiftState): Boolean =
-    state.available && state.timingKnown && !timeshiftPositionPresentation(state).atLiveEdge
-
 fun queueTimeshiftSeek(
     queue: TimeshiftSeekQueueState,
     state: AppTimeshiftState,
@@ -194,15 +187,6 @@ fun queueTimeshiftSeek(
         projectedFromPositionMs = queue.projectedFromPositionMs
             .takeIf { observedProjection != null },
         projectedPositionMs = observedProjection,
-    )
-}
-
-fun queuedTimeshiftSeekDecision(queue: TimeshiftSeekQueueState): TimeshiftSeekDecision {
-    val targetMs = requireNotNull(queue.pendingTargetMs)
-    return TimeshiftSeekDecision(
-        targetMs = targetMs,
-        deltaMs = queue.pendingDeltaMs,
-        clamped = queue.pendingClamped,
     )
 }
 
