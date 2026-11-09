@@ -1073,9 +1073,6 @@ class LivePauseRuntimeTest {
         val error = ExoPlaybackException.createForUnexpected(
             RuntimeException("test"), PlaybackException.ERROR_CODE_UNSPECIFIED,
         )
-        forcedPlayerError = error
-        playerListeners.toList().forEach { it.onPlayerError(error) }
-        val events = Player.Events(androidx.media3.common.FlagSet.Builder().add(Player.EVENT_PLAYER_ERROR).build())
-        playerListeners.toList().forEach { it.onEvents(runtime.player, events) }
+        dispatchPlayerError(runtime.player, playerListeners, error) { forcedPlayerError = it }
     }
 }

@@ -4,7 +4,10 @@
 package at.bernhardberger.tvhplayer.playback
 
 import android.os.Looper
+import androidx.media3.common.FlagSet
+import androidx.media3.common.Player
 import androidx.media3.common.util.Clock
+import androidx.media3.exoplayer.ExoPlaybackException
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.test.utils.robolectric.RobolectricUtil
 import kotlinx.coroutines.CoroutineScope
@@ -13,6 +16,21 @@ import kotlinx.coroutines.test.TestCoroutineScheduler
 import org.robolectric.Shadows.shadowOf
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
+
+internal fun dispatchPlayerError(
+    player: Player,
+    listeners: List<Player.Listener>,
+    error: ExoPlaybackException,
+    setPlayerError: (ExoPlaybackException) -> Unit,
+) {
+    setPlayerError(error)
+    listeners.toList().forEach {
+        it.onPlayerErrorChanged(error)
+        it.onPlayerError(error)
+    }
+    val events = Player.Events(FlagSet.Builder().add(Player.EVENT_PLAYER_ERROR).build())
+    listeners.toList().forEach { it.onEvents(player, events) }
+}
 
 /** Drives due coroutine/looper work without advancing recovery timers during real-thread handoffs. */
 internal class PlaybackTestDriver(

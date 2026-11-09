@@ -555,8 +555,8 @@ class WatchingProgressTest {
                 listeners.toList().forEach { it.onPlayerError(error) }
                 val events = Player.Events(androidx.media3.common.FlagSet.Builder().add(Player.EVENT_PLAYER_ERROR).build())
                 listeners.toList().forEach { it.onEvents(player, events) }
+                assertTrue(runtime.state.value is AppPlaybackState.Failed)
             }
-            compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Failed }
             compose.waitForIdle()
             compose.runOnIdle {
                 assertEquals(AppPlaybackTarget.Live(channel.id), runtime.activeTarget.value)

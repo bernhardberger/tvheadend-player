@@ -2953,13 +2953,7 @@ class AudioInterruptionRuntimeTest {
             val error = ExoPlaybackException.createForSource(
                 IOException("stream ended"), PlaybackException.ERROR_CODE_IO_UNSPECIFIED,
             )
-            reportedPlayerError = error
-            playerListeners.toList().forEach {
-                it.onPlayerErrorChanged(error)
-                it.onPlayerError(error)
-            }
-            val events = Player.Events(androidx.media3.common.FlagSet.Builder().add(Player.EVENT_PLAYER_ERROR).build())
-            playerListeners.toList().forEach { it.onEvents(runtimePlayer, events) }
+            dispatchPlayerError(runtimePlayer, playerListeners, error) { reportedPlayerError = it }
         }
 
         fun suppress(suppressed: Boolean) {
