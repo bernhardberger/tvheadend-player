@@ -71,29 +71,19 @@ class SettingsVisualEvidenceTest {
                 }
             }
         }
-        fun settle() {
-            compose.mainClock.advanceTimeBy(1000)
-            compose.waitForIdle()
-        }
         compose.onNode(isFocused() and hasText("While browsing")).assertExists()
-        settle()
         press(Key.DirectionCenter)
         compose.onNodeWithText("Show picture").assertIsFocused().assertIsSelected()
-        settle()
         press(Key.DirectionDown)
-        settle()
         press(Key.DirectionCenter)
         press(Key.DirectionCenter)
         compose.onNodeWithText("Sound only").assertIsFocused().assertIsSelected()
-        settle()
         press(Key.DirectionDown)
         press(Key.DirectionCenter)
         press(Key.DirectionCenter)
         compose.onNodeWithText("Stop").assertIsFocused().assertIsSelected()
-        settle()
         press(Key.Back)
         compose.onNode(isFocused() and hasText("While browsing") and hasText("Stop")).assertExists()
-        settle()
     }
 
     @Category(VisualCapture::class)
