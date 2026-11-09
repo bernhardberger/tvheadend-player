@@ -9,7 +9,9 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.Clock
 import androidx.media3.exoplayer.ExoPlaybackException
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.test.utils.FakeClock
 import androidx.media3.test.utils.robolectric.RobolectricUtil
+import androidx.media3.test.utils.robolectric.TestPlayerRunHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.TestCoroutineScheduler
@@ -63,6 +65,28 @@ internal class PlaybackTestDriver(
         scheduler.runCurrent()
         shadowOf(Looper.getMainLooper()).idle()
         scheduler.runCurrent()
+    }
+
+    /** For live sources whose manager and SDK work use this scheduler, not real IO threads. */
+    fun settleLive(player: ExoPlayer) {
+        repeat(8) {
+            scheduler.runCurrent()
+            TestPlayerRunHelper.advance(player).untilPendingCommandsAreFullyHandled()
+            shadowOf(Looper.getMainLooper()).idle()
+        }
+    }
+
+    fun advanceLive(player: ExoPlayer, clock: FakeClock, millis: Long) {
+        require(millis >= 0)
+        settleLive(player)
+        var remaining = millis
+        while (remaining > 0) {
+            val step = minOf(remaining, 100)
+            scheduler.advanceTimeBy(step)
+            clock.advanceTime(step)
+            settleLive(player)
+            remaining -= step
+        }
     }
 
     suspend fun <T> exercise(scope: CoroutineScope, timeoutMillis: Long, block: suspend () -> T): T {

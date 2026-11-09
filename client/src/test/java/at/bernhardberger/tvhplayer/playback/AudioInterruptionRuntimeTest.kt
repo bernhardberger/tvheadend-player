@@ -828,7 +828,7 @@ class AudioInterruptionRuntimeTest {
         await { connection.subscribeCount == subscriptions + 1 }
     }
 
-    @Test fun interruptedRecoveryNeverRetunesAReplacementTarget() = exercise {
+    @Test fun interruptedRecoveryNeverRetunesAReplacementTarget() = exercise(deterministicLive = true) {
         awaitSecondRecoveryBackoff()
         focus.send(AudioInterruption.TRANSIENT_LOSS)
         await { !player.playWhenReady }
@@ -878,7 +878,7 @@ class AudioInterruptionRuntimeTest {
         assertFalse(runtime.state.value is AppPlaybackState.Recovering)
     }
 
-    @Test fun stopAndDetachEndAnInterruptedRecovery() = exercise {
+    @Test fun stopAndDetachEndAnInterruptedRecovery() = exercise(deterministicLive = true) {
         awaitSecondRecoveryBackoff()
         focus.send(AudioInterruption.TRANSIENT_LOSS)
         await { !player.playWhenReady }
@@ -1438,10 +1438,12 @@ class AudioInterruptionRuntimeTest {
         assertEquals("channel one of another server is not this one", 1, connection.subscribeCount)
     }
 
-    // The SDK's ended-period error is private and arrives on IO; there is no public signal after
-    // which a single 10ms Media3 error-check advance is safe. Only these error-observation cases
-    // opt into auto-advance instead of pumping time in a predicate or exposing a production seam.
-    @Test fun aChannelChangeDuringAReconnectRetryEndsTheRetries() = exercise(autoAdvancePlayerClock = true) {
+    @Test fun aChannelChangeDuringAReconnectRetryEndsTheRetries() = exercise(
+        deterministicLive = true,
+        // This fixture reports READY only to the app, not to the SDK's real player. Keep its
+        // preparation watchdog outside the stale-retry observation window for the new channel.
+        recoveryPolicy = PlaybackRecoveryPolicy(preparationDurationMillis = 60_000L),
+    ) {
         live(timeshift = false)
         restartServer()
         session.scriptLivePlaybackFailure(PlaybackBindingResult.TargetUnavailable)
@@ -1449,6 +1451,7 @@ class AudioInterruptionRuntimeTest {
         await { retune.isCompleted }
         await { (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis == 2_000L }
         // Observe the ended stream's asynchronous error before zapping, without consuming backoff.
+        advanceRecoveryTime(100)
         await("ended stream error before channel change") { player.playerError != null }
         // The viewer picks another channel while the retry waits.
         session.scriptLivePlaybackSuccess(manager)
@@ -1457,7 +1460,7 @@ class AudioInterruptionRuntimeTest {
         settleManager()
         assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
         assertFalse(runtime.state.value is AppPlaybackState.Recovering || runtime.state.value is AppPlaybackState.Failed)
-        assertEquals(2, connection.subscribeCount)
+        assertEquals("No stale reconnect retry: recoveries=$recoveries", 2, connection.subscribeCount)
     }
 
     @Test fun theEndedStreamsErrorDuringAReconnectBackoffKeepsTheChannelRecovering() = exercise {
@@ -1549,7 +1552,7 @@ class AudioInterruptionRuntimeTest {
     }
 
     // Like the channel-change case, this observes the real ended-period error, not reportStreamError().
-    @Test fun aFailedReconnectRetuneRetriesUntilTheChannelComesBack() = exercise(autoAdvancePlayerClock = true) {
+    @Test fun aFailedReconnectRetuneRetriesUntilTheChannelComesBack() = exercise(deterministicLive = true) {
         live(timeshift = false)
         restartServer()
         session.scriptLivePlaybackFailure(PlaybackBindingResult.TargetUnavailable)
@@ -1557,6 +1560,7 @@ class AudioInterruptionRuntimeTest {
         await { retune.isCompleted }
         await { (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis == 2_000L }
         session.scriptLivePlaybackSuccess(manager)
+        advanceRecoveryTime(100)
         await("ended stream error before reconnect retry") { player.playerError != null }
         assertEquals("before retry: ${runtime.state.value}", 2_000L,
             (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis)
@@ -2647,14 +2651,17 @@ class AudioInterruptionRuntimeTest {
 
     private fun exercise(
         granted: Boolean = true,
-        autoAdvancePlayerClock: Boolean = false,
+        deterministicLive: Boolean = false,
+        recoveryPolicy: PlaybackRecoveryPolicy = PlaybackRecoveryPolicy(),
         block: suspend Fixture.() -> Unit,
     ) = runTest(timeout = 15.seconds) {
         val scheduler = testScheduler
-        val fixture = Fixture(CoroutineScope(StandardTestDispatcher(scheduler) + SupervisorJob()), granted, scheduler,
-            autoAdvancePlayerClock)
+        val dispatcher = StandardTestDispatcher(scheduler)
+        val fixture = Fixture(CoroutineScope(dispatcher + SupervisorJob()), granted, scheduler,
+            dispatcher.takeIf { deterministicLive }, recoveryPolicy)
         try {
-            fixture.driver.exercise(this, 15_000) { fixture.block() }
+            if (deterministicLive) fixture.block()
+            else fixture.driver.exercise(this, 15_000) { fixture.block() }
         }
         finally {
             fixture.scope.cancel()
@@ -2701,7 +2708,8 @@ class AudioInterruptionRuntimeTest {
         val scope: CoroutineScope,
         granted: Boolean,
         val scheduler: TestCoroutineScheduler,
-        autoAdvancePlayerClock: Boolean,
+        private val liveWorkDispatcher: CoroutineDispatcher?,
+        recoveryPolicy: PlaybackRecoveryPolicy,
     ) {
         val driver = PlaybackTestDriver(scheduler)
         private val context = ApplicationProvider.getApplicationContext<Application>()
@@ -2751,7 +2759,7 @@ class AudioInterruptionRuntimeTest {
                 beforeSpeed(speed)
                 return connection.speed(id, speed)
             }
-        }, managerDispatcher).apply { startAdmission() }
+        }, liveWorkDispatcher ?: managerDispatcher).apply { startAdmission() }
         val session = FakeTvheadendSession(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(Channel.create(ChannelId(1)), Channel.create(ChannelId(2))))),
@@ -2776,9 +2784,10 @@ class AudioInterruptionRuntimeTest {
         val output = TvheadendAudioOutputProvider(context)
         // Application-owned items such as file:///replacement stay loading: a real load failure
         // would reach the runtime as an unrelated player error at a wall-clock dependent moment.
+        val clock = FakeClock(false)
         val player = ExoPlayer.Builder(context)
             // Stalled streams must not advance Robolectric time past SDK Handler watchdogs.
-            .setClock(FakeClock(autoAdvancePlayerClock))
+            .setClock(clock)
             .setMediaSourceFactory(DefaultMediaSourceFactory(DataSource.Factory { StalledDataSource() }))
             .build()
         val recoveries = mutableListOf<PlaybackRecoveryReason>()
@@ -2809,10 +2818,10 @@ class AudioInterruptionRuntimeTest {
                 player.prepare()
             }
         }
-        val coordinator = createTvheadendPlaybackCoordinator(coordinatorPlayer, onRecoveryRequired = {
+        val coordinator = createTvheadendPlaybackCoordinator(coordinatorPlayer, recoveryPolicy = recoveryPolicy, onRecoveryRequired = {
             recoveries += it
             recover(it)
-        }).also { it.launchIn(scope) }
+        }, workDispatcher = liveWorkDispatcher ?: Dispatchers.IO).also { it.launchIn(scope) }
         var beforeRecordingBinding: () -> Unit = {}
         /** Runs inside a live target install, before the session binds the channel. */
         var beforeLiveBinding: () -> Unit = {}
@@ -2901,6 +2910,12 @@ class AudioInterruptionRuntimeTest {
             session.retire()
             connection.emit(SubscriptionEvent.Stopped(SubscriptionCondition.NO_DETAIL, null))
             settle()
+            if (liveWorkDispatcher != null) {
+                // Stopped replaces the source epoch but does not end the transport. A server
+                // restart also closes the old streams; make their EOF explicit before advancing.
+                connection.completeStreams()
+                settle()
+            }
             session.replaceGeneration(SessionObservation.create(
                 sessionState = ready.sessionState, channelState = ready.channelState,
                 epgState = ready.epgState, dvrState = ready.dvrState,
@@ -3006,10 +3021,18 @@ class AudioInterruptionRuntimeTest {
             ), null))
         }
 
-        fun await(label: String = "audio interruption condition", predicate: () -> Boolean) =
-            driver.await(label, predicate = predicate)
+        fun await(label: String = "audio interruption condition", predicate: () -> Boolean) {
+            if (liveWorkDispatcher != null) {
+                settle()
+                assertTrue("$label: state=${runtime.state.value}, playerState=${player.playbackState}, " +
+                    "playerError=${player.playerError}, live=${runtime.livePlaybackObservation.value}", predicate())
+            } else driver.await(label, predicate = predicate)
+        }
 
-        fun settle() = driver.settle(player)
+        fun settle() {
+            if (liveWorkDispatcher != null) driver.settleLive(player)
+            else driver.settle(player)
+        }
 
         fun settleManager() {
             settle()
@@ -3017,8 +3040,11 @@ class AudioInterruptionRuntimeTest {
         }
 
         fun advanceRecoveryTime(millis: Long = 2_500) {
-            scheduler.advanceTimeBy(millis)
-            scheduler.runCurrent()
+            if (liveWorkDispatcher != null) driver.advanceLive(player, clock, millis)
+            else {
+                scheduler.advanceTimeBy(millis)
+                scheduler.runCurrent()
+            }
         }
     }
 }
