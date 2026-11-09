@@ -36,11 +36,17 @@ internal fun RecordingPlaybackChoice(
     val resumeFocus = remember { FocusRequester() }
     val liveFocus = remember { FocusRequester() }
     val startFocus = remember { FocusRequester() }
+    val playable = recordingPlaybackOffered(admission)
+    val deferred = admission == RecordingPlaybackAdmission.GrowingDeferred
     val resumePosition = offeredResumePosition(admission)
     val positionMs = resumePosition?.inWholeMilliseconds ?: 0L
-    val firstFocus = if (resumePosition != null) resumeFocus else startFocus
+    val firstFocus = when {
+        !playable -> liveFocus
+        resumePosition != null -> resumeFocus
+        else -> startFocus
+    }
     var startFocused by remember(entry.id) { mutableStateOf(resumePosition == null) }
-    var liveFocused by remember(entry.id) { mutableStateOf(false) }
+    var liveFocused by remember(entry.id) { mutableStateOf(!playable) }
     val durationMs = recordingDetailsFacts(entry, admission, nowSec)
         .firstOrNull { it.kind == DetailsFactKind.LENGTH }?.seconds?.times(1000L)
     val resumeEnd = recordingEndsAtSec(nowSec, positionMs, durationMs)
@@ -52,7 +58,7 @@ internal fun RecordingPlaybackChoice(
     CentredDialog(
         title = entry.title.orEmpty(),
         secondaryText = programmeEpisodeLine(entry.episode, entry.subtitle, resources),
-        text = "",
+        text = if (deferred) stringResource(R.string.error_305_reason) else "",
         eyebrow = {
             ProvideArtworkSession(observation.currentSession, observation) {
                 ProgrammeEyebrow(channel?.icon, listOfNotNull(
@@ -80,28 +86,30 @@ internal fun RecordingPlaybackChoice(
             Spacer(Modifier.width(ButtonDefaults.IconSpacing))
             Text(stringResource(R.string.recording_resume_from, formatPlaybackDuration(positionMs)), maxLines = 1, softWrap = false)
         }
-        val startModifier = Modifier.height(40.dp).focusRequester(startFocus)
-                .onFocusChanged { if (it.isFocused) { startFocused = true; liveFocused = false } }
-                .semantics { if (startEnd.isNotBlank()) stateDescription = startEnd }
-                .focusProperties { left = if (resumePosition != null) resumeFocus else FocusRequester.Cancel; right = if (onWatchLive != null) liveFocus else FocusRequester.Cancel }
-                .testTag("recording-start-over")
-        val startContent: @Composable RowScope.() -> Unit = {
-            Icon(painterResource(if (resumePosition == null) R.drawable.ic_play_arrow else R.drawable.ic_replay), null, Modifier.size(ButtonDefaults.IconSize))
-            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-            Text(stringResource(if (resumePosition == null) R.string.recording_choice_play else R.string.context_start_over), maxLines = 1, softWrap = false)
+        if (playable) {
+            val startModifier = Modifier.height(40.dp).focusRequester(startFocus)
+                    .onFocusChanged { if (it.isFocused) { startFocused = true; liveFocused = false } }
+                    .semantics { if (startEnd.isNotBlank()) stateDescription = startEnd }
+                    .focusProperties { left = if (resumePosition != null) resumeFocus else FocusRequester.Cancel; right = if (onWatchLive != null) liveFocus else FocusRequester.Cancel }
+                    .testTag("recording-start-over")
+            val startContent: @Composable RowScope.() -> Unit = {
+                Icon(painterResource(if (resumePosition == null) R.drawable.ic_play_arrow else R.drawable.ic_replay), null, Modifier.size(ButtonDefaults.IconSize))
+                Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                Text(stringResource(if (resumePosition == null) R.string.recording_choice_play else R.string.context_start_over), maxLines = 1, softWrap = false)
+            }
+            if (resumePosition == null) Button(
+                onClick = { onPlay(RecordingPlaybackStart.START_OVER) }, modifier = startModifier,
+                contentPadding = ButtonDefaults.ButtonWithIconContentPadding, content = startContent,
+            ) else OutlinedButton(
+                onClick = { onPlay(RecordingPlaybackStart.START_OVER) }, modifier = startModifier,
+                contentPadding = OutlinedButtonDefaults.ButtonWithIconContentPadding, content = startContent,
+            )
         }
-        if (resumePosition == null) Button(
-            onClick = { onPlay(RecordingPlaybackStart.START_OVER) }, modifier = startModifier,
-            contentPadding = ButtonDefaults.ButtonWithIconContentPadding, content = startContent,
-        ) else OutlinedButton(
-            onClick = { onPlay(RecordingPlaybackStart.START_OVER) }, modifier = startModifier,
-            contentPadding = OutlinedButtonDefaults.ButtonWithIconContentPadding, content = startContent,
-        )
         if (onWatchLive != null) OutlinedButton(
             onClick = onWatchLive,
             modifier = Modifier.height(40.dp).focusRequester(liveFocus)
                 .onFocusChanged { if (it.isFocused) { startFocused = false; liveFocused = true } }
-                .focusProperties { left = startFocus; right = FocusRequester.Cancel }
+                .focusProperties { left = if (!playable) FocusRequester.Cancel else startFocus; right = FocusRequester.Cancel }
                 .testTag("recording-watch-live"),
             contentPadding = OutlinedButtonDefaults.ButtonWithIconContentPadding,
         ) {
