@@ -798,12 +798,12 @@ class AudioInterruptionRuntimeTest {
         assertFalse(runtime.state.value is AppPlaybackState.Recovering)
 
         // Another recovery interrupted, then replaced by a recording.
+        val opener = controlledOpener()
         runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
         await { connection.subscribeCount == subscriptions + 1 }
         val replacement = connection.awaitCollectionRegistered()
         startSubscription(replacement)
-        await { player.playWhenReady && runtime.state.value !is AppPlaybackState.Recovering }
-        connection.emit(replacement, SubscriptionEvent.Timeshift(0, 0, 0, 120_000_000, 100))
+        awaitReplacementTimeshift(opener, replacement)
         runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
         await { (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis == 2_000L }
         focus.send(AudioInterruption.TRANSIENT_LOSS)
@@ -847,12 +847,12 @@ class AudioInterruptionRuntimeTest {
         settleManager()
         assertEquals(subscriptions, connection.subscribeCount)
 
+        val opener = controlledOpener()
         runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
         await { connection.subscribeCount == subscriptions + 1 }
         val replacement = connection.awaitCollectionRegistered()
         startSubscription(replacement)
-        await { player.playWhenReady && runtime.state.value !is AppPlaybackState.Recovering }
-        connection.emit(replacement, SubscriptionEvent.Timeshift(0, 0, 0, 120_000_000, 100))
+        awaitReplacementTimeshift(opener, replacement)
         runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
         await { (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis == 2_000L }
         focus.send(AudioInterruption.TRANSIENT_LOSS)
@@ -2866,6 +2866,15 @@ class AudioInterruptionRuntimeTest {
         fun audioDisabled() = C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes
 
         fun controlledOpener() = ControlledOpener().also { session.scriptLivePlaybackSuccess(it) }
+
+        suspend fun awaitReplacementTimeshift(opener: ControlledOpener, replacement: ScriptedSubscriptionRegistration) {
+            // Installed is not timeshift-ready: an unconsumed open still makes focus loss mute live TV.
+            opener.finishOpen()
+            await { player.playWhenReady && runtime.state.value !is AppPlaybackState.Recovering }
+            connection.emit(replacement, SubscriptionEvent.Timeshift(0, 0, 0, 120_000_000, 100))
+            await { ((runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)
+                ?.timeshiftState as? LiveTimeshiftState.Available)?.playbackPaused != null }
+        }
 
         /** Gates return from the real manager and acknowledges consumption by the SDK source. */
         inner class ControlledOpener : SubscriptionOpener {
