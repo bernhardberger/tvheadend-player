@@ -1,6 +1,9 @@
 package at.bernhardberger.tvhplayer.settings
 
 import at.bernhardberger.tvheadend.sdk.core.SessionCommandResult
+import at.bernhardberger.tvheadend.sdk.core.SessionFailure
+import at.bernhardberger.tvheadend.sdk.core.SessionObservation
+import at.bernhardberger.tvheadend.sdk.core.SessionState
 
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
 import at.bernhardberger.tvheadend.sdk.android.TvheadendServerProfileStore
@@ -43,6 +46,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.CoroutineContext
+
+private const val MAX_SERVER_PORT = 65535
 
 /** Connection-form operations backed by the process-owned SDK profile store. */
 interface ConnectionProfileEditor {
@@ -109,7 +115,9 @@ class AppProfileOwner(
         capacity = Channel.UNLIMITED,
         onUndeliveredElement = { command ->
             command.releaseSensitiveMaterial()
-            command.completion.completeExceptionally(CancellationException("Profile owner stopped before command execution"))
+            command.completion.completeExceptionally(
+                CancellationException("Profile owner stopped before command execution"),
+            )
         },
     )
     private val mutableServerProfile = MutableStateFlow<ServerProfileReadResult?>(null)
@@ -222,14 +230,22 @@ class AppProfileOwner(
         }
     }
 
-    suspend fun addPassword(host: String, port: Int, username: String, password: String, label: String? = null): SaveServerProfileResult {
+    suspend fun addPassword(
+        host: String,
+        port: Int,
+        username: String,
+        password: String,
+        label: String? = null,
+    ): SaveServerProfileResult {
         validateServerAddress(host, port)
         val normalizedLabel = ServerProfileSummary.normalizeLabel(label)
         return mutate {
             val list = profileStore.profiles() as? ServerProfileListResult.Available
                 ?: return@mutate SaveServerProfileResult.Unavailable
             duplicate(list, host, port, username)?.let { return@mutate SaveServerProfileResult.AlreadyExists(it) }
-            saveResult(refreshAfterWrite(profileStore.addPassword(host, port, username, password, normalizedLabel, activate = true)))
+            saveResult(refreshAfterWrite(
+                profileStore.addPassword(host, port, username, password, normalizedLabel, activate = true),
+            ))
         }
     }
 
@@ -237,19 +253,36 @@ class AppProfileOwner(
         validateServerAddress(host, port)
         val normalizedLabel = ServerProfileSummary.normalizeLabel(label)
         return mutate {
-            val list = profileStore.profiles() as? ServerProfileListResult.Available ?: return@mutate SaveServerProfileResult.Unavailable
-            duplicate(list, host, port, null, excluding = id)?.let { return@mutate SaveServerProfileResult.AlreadyExists(it) }
-            saveResult(refreshAfterWrite(profileStore.updateAnonymous(id, host, port, normalizedLabel), list.activeId == id))
+            val list = profileStore.profiles() as? ServerProfileListResult.Available
+                ?: return@mutate SaveServerProfileResult.Unavailable
+            duplicate(list, host, port, null, excluding = id)?.let {
+                return@mutate SaveServerProfileResult.AlreadyExists(it)
+            }
+            saveResult(refreshAfterWrite(
+                profileStore.updateAnonymous(id, host, port, normalizedLabel), list.activeId == id,
+            ))
         }
     }
 
-    suspend fun updatePassword(id: ServerProfileId, host: String, port: Int, username: String, password: String, label: String?): SaveServerProfileResult {
+    suspend fun updatePassword(
+        id: ServerProfileId,
+        host: String,
+        port: Int,
+        username: String,
+        password: String,
+        label: String?,
+    ): SaveServerProfileResult {
         validateServerAddress(host, port)
         val normalizedLabel = ServerProfileSummary.normalizeLabel(label)
         return mutate {
-            val list = profileStore.profiles() as? ServerProfileListResult.Available ?: return@mutate SaveServerProfileResult.Unavailable
-            duplicate(list, host, port, username, excluding = id)?.let { return@mutate SaveServerProfileResult.AlreadyExists(it) }
-            saveResult(refreshAfterWrite(profileStore.updatePassword(id, host, port, username, password, normalizedLabel), list.activeId == id))
+            val list = profileStore.profiles() as? ServerProfileListResult.Available
+                ?: return@mutate SaveServerProfileResult.Unavailable
+            duplicate(list, host, port, username, excluding = id)?.let {
+                return@mutate SaveServerProfileResult.AlreadyExists(it)
+            }
+            saveResult(refreshAfterWrite(
+                profileStore.updatePassword(id, host, port, username, password, normalizedLabel), list.activeId == id,
+            ))
         }
     }
 
@@ -273,11 +306,9 @@ class AppProfileOwner(
     /** Tests the target on the shared connection; persistence changes only after sign-in succeeds. */
     suspend fun switchActive(id: ServerProfileId, beforeConnect: suspend () -> Unit = {}): ServerProfileWriteResult =
         connectionChanges.withLock {
-            val list = profiles.value as? ServerProfileListResult.Available
-                ?: return@withLock unavailableSwitch()
+            val list = availableProfiles() ?: return@withLock unavailableSwitch(noticeCenter)
             if (list.activeId == id) return@withLock ServerProfileWriteResult.Applied(id)
-            val target = profileStore.load(id) as? ServerProfileReadResult.Available
-                ?: return@withLock unavailableSwitch()
+            val target = loadSwitchTarget(id) ?: return@withLock unavailableSwitch(noticeCenter)
             val previous = profileStore.loadActive()
             val previousId = list.activeId
             val generation = configurationGeneration.value
@@ -285,13 +316,8 @@ class AppProfileOwner(
             var persisted = false
             var committed = false
             var failureNotice: Notice? = null
-            val switchedNotice = list.profiles.firstOrNull { it.id == id }
-                ?.let { Notice.ServerSwitched(id, serverProfileDisplayName(it)) }
-            synchronized(switchLifecycle) {
-                if (switchOwnerClosed) throw CancellationException("Profile owner stopped before switch execution")
-                activeSwitch = caller[Job]
-                mutableSwitchInProgress.value = true
-            }
+            val switchedNotice = switchedProfileNotice(list, id)
+            beginSwitch(caller)
             try {
                 beforeConnect()
                 switchIdentity.lock()
@@ -299,19 +325,15 @@ class AppProfileOwner(
                     session.disconnect()
                     val before = session.observation.value
                     if (session.connect(target.profile) != SessionCommandResult.STARTED) {
-                        failureNotice = Notice.ServerConnectionFailed(serverProfileDisplayName(list.profiles.first { it.id == id }))
+                        failureNotice = connectionFailedNotice(list, id)
                         return@withLock ServerProfileWriteResult.Unavailable
                     }
-                    val outcome = session.observation.first {
-                        it !== before && (it.sessionState is at.bernhardberger.tvheadend.sdk.core.SessionState.Ready ||
-                            it.sessionState is at.bernhardberger.tvheadend.sdk.core.SessionState.Unavailable)
-                    }.sessionState
+                    val outcome = awaitSwitchOutcome(session, before)
                     currentCoroutineContext().ensureActive()
-                    if (configurationGeneration.value != generation) return@withLock ServerProfileWriteResult.Unavailable
-                    if (outcome is at.bernhardberger.tvheadend.sdk.core.SessionState.Unavailable) {
-                        val name = list.profiles.first { it.id == id }.let(::serverProfileDisplayName)
-                        failureNotice = if (outcome.reason == at.bernhardberger.tvheadend.sdk.core.SessionFailure.AUTHENTICATION_REJECTED)
-                            Notice.ServerSignInRejected(name) else Notice.ServerConnectionFailed(name)
+                    if (configurationGeneration.value != generation)
+                        return@withLock ServerProfileWriteResult.Unavailable
+                    if (outcome is SessionState.Unavailable) {
+                        failureNotice = failedSwitchNotice(list, id, outcome)
                         return@withLock ServerProfileWriteResult.Unavailable
                     }
                     withContext(NonCancellable) {
@@ -321,67 +343,89 @@ class AppProfileOwner(
                             // With no previous selection there is no rollback API or connection to
                             // return to: once persistence starts, that successful selection wins.
                             if (previousId != null) caller.ensureActive()
-                            mutableConfigurationGeneration.value += 1
-                            playerSettings.useProfile(id)
-                            audioProfileId = id.value
-                            mutableProfiles.value = profileStore.profiles()
-                            mutableServerProfile.value = target
+                            publishSwitchedProfile(id, target)
                             committed = true
                         } else {
-                            noticeCenter()?.let { it.post(Notice.ServerProfileWriteFailed, it.context()) }
+                            postSwitchNotice(noticeCenter, Notice.ServerProfileWriteFailed)
                         }
                         result
                     }
                 } finally {
                     try {
-                        if ((!committed || !caller.isActive) &&
-                            (!persisted || previousId != null) &&
-                            (configurationGeneration.value == generation || committed && configurationGeneration.value == generation + 1)) withContext(NonCancellable) {
-                            if (persisted && previousId != null) {
-                                profileStore.setActive(previousId)
-                                mutableProfiles.value = profileStore.profiles()
-                            }
-                            applyServerProfile(previous)
-                            failureNotice?.let { notice -> noticeCenter()?.let { it.post(notice, it.context()) } }
+                        if (shouldRestoreSwitch(committed, caller, persisted, previousId) {
+                                switchGenerationMatches(configurationGeneration, generation, committed) })
+                            withContext(NonCancellable) {
+                                restoreSwitch(persisted, previousId, previous, failureNotice)
                         } else if (committed && caller.isActive) {
                             // The retained outcome: no rollback ran. Generic connection notices stay suppressed
                             // until the switch ends, so this is the only one.
-                            switchedNotice?.let { notice -> noticeCenter()?.let { it.post(notice, it.context()) } }
+                            postSwitchNotice(noticeCenter, switchedNotice)
                         }
                     } finally {
                         switchIdentity.unlock()
                     }
                 }
             } finally {
-                synchronized(switchLifecycle) {
-                    activeSwitch = null
-                    mutableSwitchInProgress.value = false
-                }
+                endSwitch()
             }
         }
 
-    private fun unavailableSwitch(): ServerProfileWriteResult.Unavailable {
-        noticeCenter()?.let { it.post(Notice.ServerProfileWriteFailed, it.context()) }
-        return ServerProfileWriteResult.Unavailable
+    private fun availableProfiles() = profiles.value as? ServerProfileListResult.Available
+
+    private suspend fun loadSwitchTarget(id: ServerProfileId) =
+        profileStore.load(id) as? ServerProfileReadResult.Available
+
+    private fun beginSwitch(caller: CoroutineContext) = synchronized(switchLifecycle) {
+        if (switchOwnerClosed) throw CancellationException("Profile owner stopped before switch execution")
+        activeSwitch = caller[Job]
+        mutableSwitchInProgress.value = true
+    }
+
+    private fun endSwitch() = synchronized(switchLifecycle) {
+        activeSwitch = null
+        mutableSwitchInProgress.value = false
+    }
+
+    private suspend fun publishSwitchedProfile(id: ServerProfileId, target: ServerProfileReadResult.Available) {
+        mutableConfigurationGeneration.value += 1
+        playerSettings.useProfile(id)
+        audioProfileId = id.value
+        mutableProfiles.value = profileStore.profiles()
+        mutableServerProfile.value = target
+    }
+
+    private suspend fun restoreSwitch(
+        persisted: Boolean,
+        previousId: ServerProfileId?,
+        previous: ServerProfileReadResult,
+        failureNotice: Notice?,
+    ) {
+        if (persisted && previousId != null) {
+            profileStore.setActive(previousId)
+            mutableProfiles.value = profileStore.profiles()
+        }
+        applyServerProfile(previous)
+        postSwitchNotice(noticeCenter, failureNotice)
     }
 
     suspend fun remove(id: ServerProfileId): ServerProfileWriteResult = mutate { removeProfile(id) }
 
-    private fun duplicate(list: ServerProfileListResult.Available, host: String, port: Int, username: String?, excluding: ServerProfileId? = null): ServerProfileId? {
+    private fun duplicate(
+        list: ServerProfileListResult.Available,
+        host: String,
+        port: Int,
+        username: String?,
+        excluding: ServerProfileId? = null,
+    ): ServerProfileId? {
         return existingServerProfile(list.profiles.filterNot { it.id == excluding }, host, port, username)?.also {
             noticeCenter()?.let { center -> center.post(Notice.ServerProfileAlreadyExists, center.context()) }
         }
     }
 
-    private fun saveResult(result: ServerProfileWriteResult): SaveServerProfileResult {
-        return when (result) {
-            is ServerProfileWriteResult.Applied -> SaveServerProfileResult.Applied(result.id)
-            ServerProfileWriteResult.NotFound -> SaveServerProfileResult.NotFound
-            ServerProfileWriteResult.Unavailable -> SaveServerProfileResult.Unavailable
-        }
-    }
-
-    private suspend fun refreshAfterWrite(result: ServerProfileWriteResult, affectsActive: Boolean = true): ServerProfileWriteResult {
+    private suspend fun refreshAfterWrite(
+        result: ServerProfileWriteResult,
+        affectsActive: Boolean = true,
+    ): ServerProfileWriteResult {
         if (result is ServerProfileWriteResult.Applied && affectsActive) mutableConfigurationGeneration.value += 1
         mutableProfiles.value = profileStore.profiles()
         if (result is ServerProfileWriteResult.Applied &&
@@ -392,7 +436,9 @@ class AppProfileOwner(
     }
 
     private fun validateServerAddress(host: String, port: Int) {
-        require(host.isNotBlank() && host.none(Char::isISOControl) && port in 1..65535) { "Invalid server address" }
+        require(host.isNotBlank() && host.none(Char::isISOControl) && port in 1..MAX_SERVER_PORT) {
+            "Invalid server address"
+        }
     }
 
     private suspend fun removeProfile(id: ServerProfileId): ServerProfileWriteResult {
@@ -422,7 +468,9 @@ class AppProfileOwner(
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
             } finally {
-                noticeCenter()?.let { center -> center.post(Notice.ServerProfileRemoved(id, serverProfileDisplayName(summary)), center.context()) }
+                noticeCenter()?.let { center ->
+                    center.post(Notice.ServerProfileRemoved(id, serverProfileDisplayName(summary)), center.context())
+                }
             }
         } else if (active) {
             applyServerProfile(profileStore.loadActive())
@@ -541,7 +589,9 @@ class AppProfileOwner(
             return@withLock
         }
         val result = if (id == null) profileStore.addPassword(host, htspPort, username, password, activate = true)
-        else profileStore.updatePassword(id, host, htspPort, username, password, list.profiles.find { it.id == id }?.label)
+        else profileStore.updatePassword(
+            id, host, htspPort, username, password, list.profiles.find { it.id == id }?.label,
+        )
         check(refreshAfterWrite(result) is ServerProfileWriteResult.Applied)
     }
 
@@ -689,6 +739,59 @@ private sealed class ProfileCommand {
     open fun releaseSensitiveMaterial() = Unit
 
     final override fun toString(): String = "ProfileCommand(<redacted>)"
+}
+
+private suspend fun awaitSwitchOutcome(session: TvheadendSession, before: SessionObservation): SessionState =
+    session.observation.first {
+        it !== before && (it.sessionState is SessionState.Ready || it.sessionState is SessionState.Unavailable)
+    }.sessionState
+
+private fun connectionFailedNotice(list: ServerProfileListResult.Available, id: ServerProfileId): Notice =
+    Notice.ServerConnectionFailed(serverProfileDisplayName(list.profiles.first { it.id == id }))
+
+private fun switchGenerationMatches(generationState: StateFlow<Long>, generation: Long, committed: Boolean): Boolean =
+    generationState.value == generation || committed && generationState.value == generation + 1
+
+private fun unavailableSwitch(noticeCenter: () -> NoticeCenter?): ServerProfileWriteResult.Unavailable {
+    noticeCenter()?.let { it.post(Notice.ServerProfileWriteFailed, it.context()) }
+    return ServerProfileWriteResult.Unavailable
+}
+
+private fun shouldRestoreSwitch(
+    committed: Boolean,
+    caller: CoroutineContext,
+    persisted: Boolean,
+    previousId: ServerProfileId?,
+    generationMatches: () -> Boolean,
+): Boolean =
+    if (!committed || !caller.isActive) switchCanRestore(persisted, previousId) && generationMatches() else false
+
+private fun switchCanRestore(persisted: Boolean, previousId: ServerProfileId?): Boolean =
+    !persisted || previousId != null
+
+private fun saveResult(result: ServerProfileWriteResult): SaveServerProfileResult {
+    return when (result) {
+        is ServerProfileWriteResult.Applied -> SaveServerProfileResult.Applied(result.id)
+        ServerProfileWriteResult.NotFound -> SaveServerProfileResult.NotFound
+        ServerProfileWriteResult.Unavailable -> SaveServerProfileResult.Unavailable
+    }
+}
+
+private fun postSwitchNotice(noticeCenter: () -> NoticeCenter?, notice: Notice?) {
+    notice?.let { value -> noticeCenter()?.let { it.post(value, it.context()) } }
+}
+
+private fun switchedProfileNotice(list: ServerProfileListResult.Available, id: ServerProfileId): Notice? =
+    list.profiles.firstOrNull { it.id == id }?.let { Notice.ServerSwitched(id, serverProfileDisplayName(it)) }
+
+private fun failedSwitchNotice(
+    list: ServerProfileListResult.Available,
+    id: ServerProfileId,
+    outcome: SessionState.Unavailable,
+): Notice {
+    val name = list.profiles.first { it.id == id }.let(::serverProfileDisplayName)
+    return if (outcome.reason == SessionFailure.AUTHENTICATION_REJECTED)
+        Notice.ServerSignInRejected(name) else Notice.ServerConnectionFailed(name)
 }
 
 private sealed class ServerProfileCommand : ProfileCommand()

@@ -88,7 +88,8 @@ class ChannelsViewModel(
                     saveJob?.cancel()
                     saveJob = null
                     unsavedPreferences = null
-                    preferences = if (previous == null && tagSelectedBeforeLoad) saved.copy(activeTagId = initialTagId) else saved
+                    preferences = if (previous == null && tagSelectedBeforeLoad)
+                        saved.copy(activeTagId = initialTagId) else saved
                     tagSelectedBeforeLoad = false
                     mutableSettingsFailure.value = false
                     publishScope()
@@ -161,7 +162,8 @@ class ChannelsViewModel(
             mutableUnavailableTagNotice.value = resolved.fallback == TagScopeFallback.TAG_UNAVAILABLE
         }
         preferences = effective
-        mutableScope.value = ChannelScopeState(resolved, current, visibility = effective.visibility, observation = source,
+        mutableScope.value = ChannelScopeState(
+            resolved, current, visibility = effective.visibility, observation = source,
             profileId = effective.profileId)
         if (effective != requested) enqueueSave()
     }

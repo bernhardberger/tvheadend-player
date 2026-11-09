@@ -37,7 +37,9 @@ class ConnectionNoticeSource(
         var lossJob: Job? = null
         var lossOwed = false
         var suppressed = false
-        combine(profileGeneration, observations, switchInProgress) { generation, observation, switching -> Triple(generation, observation, switching) }
+        combine(profileGeneration, observations, switchInProgress) { generation, observation, switching ->
+            Triple(generation, observation, switching)
+        }
             .collect { (generation, observation, switching) ->
                 notices.prune()
                 // combine can already have queued a pair when either live input advances.
@@ -93,7 +95,8 @@ class ConnectionNoticeSource(
                             loginRejected = notices.post(Notice.Connection(ConnectionNoticeKind.LOGIN_REJECTED), context)
                         }
                     }
-                    (lossOwed && state !is SessionState.Ready) || state == SessionState.Connecting || (state is SessionState.Unavailable &&
+                    (lossOwed && state !is SessionState.Ready) || state == SessionState.Connecting ||
+                        (state is SessionState.Unavailable &&
                         state.reason.recoveryDisposition == SessionRecoveryDisposition.AUTOMATIC_BACKOFF) -> {
                         if (!lost && lossJob == null) {
                             // Suppression can cancel the job while the original reconnect
@@ -111,7 +114,8 @@ class ConnectionNoticeSource(
                                     (currentState is SessionState.Unavailable &&
                                         currentState.reason.recoveryDisposition == SessionRecoveryDisposition.AUTOMATIC_BACKOFF)
                                 val currentContext = NoticeContext(expectedProfile, current.currentSession?.generationIdentity)
-                                if (!switchInProgress.value && profileGeneration.value == expectedProfile && reconnecting) {
+                                if (!switchInProgress.value && profileGeneration.value == expectedProfile &&
+                                    reconnecting) {
                                     val saved = deriveCurrentChannelReadiness(
                                         connected = false,
                                         authority = current.channelCatalogAuthority,

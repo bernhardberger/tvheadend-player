@@ -287,6 +287,10 @@ internal class ConnectionSetupState(
             }
             return
         }
+        connect(profile, confirmed)
+    }
+
+    private fun connect(profile: ServerProfile, confirmed: Boolean) {
         if (mode.keepsSavedConnection &&
             existingProfile(form.host.trim(), form.port.trim().toInt(), form.username.trim())
         ) return
@@ -345,11 +349,13 @@ internal class ConnectionSetupState(
                 // so only the owner can say whether a profile now keeps this connection. This also
                 // waits out a save in progress; one it never took leaves nothing saved.
                 val saved = profiles.serverSettings.firstOrNull()?.host?.isNotBlank() == true
-                if (passed && (editing || !saved) && owned()) session.disconnect()
+                if (shouldDisconnectTest(passed, saved) && owned()) session.disconnect()
                 if (editing && owned()) restoreSaved()
             }
         }
     }
+
+    private fun shouldDisconnectTest(passed: Boolean, saved: Boolean): Boolean = passed && (editing || !saved)
 
     fun onAction(action: SetupAction) {
         when (action) {
@@ -501,7 +507,8 @@ internal class ConnectionSetupState(
             // Only an anonymous question can survive the form's credential-free restoration.
             // Otherwise Account reopens without the question, so sign-in must be entered again.
             save = { listOf(it.step.resumable().name,
-                it.confirmingSwitch && it.form.username.isEmpty() && it.form.password.isEmpty() && !it.form.hasSavedPassword) },
+                it.confirmingSwitch && it.form.username.isEmpty() &&
+                    it.form.password.isEmpty() && !it.form.hasSavedPassword) },
             restore = {
                 ConnectionSetupState(
                     form, session, profiles, discovery, scope, mode,

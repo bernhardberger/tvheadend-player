@@ -59,7 +59,8 @@ class ChannelAspectStore(private val dataStore: DataStore<Preferences>) {
             val others = decode(preferences[key]).filterNot { it.profile == profile && it.channel == channel.value }
             val entries = if (mode == AspectRatioMode.FIT) others else others + Entry(profile, channel.value, mode)
             preferences[key] = Json.encodeToString(
-                entries.filterNot { it.profile == profile } + entries.filter { it.profile == profile }.takeLast(MAX_ENTRIES),
+                entries.filterNot { it.profile == profile } +
+                    entries.filter { it.profile == profile }.takeLast(MAX_ENTRIES),
             )
             stored = true
         }
@@ -67,7 +68,9 @@ class ChannelAspectStore(private val dataStore: DataStore<Preferences>) {
     }
 
     internal suspend fun removeProfile(profile: String) {
-        dataStore.edit { it[key] = Json.encodeToString(decode(it[key]).filterNot { entry -> entry.profile == profile }) }
+        dataStore.edit {
+            it[key] = Json.encodeToString(decode(it[key]).filterNot { entry -> entry.profile == profile })
+        }
     }
 
     private fun decode(value: String?): List<Entry> {

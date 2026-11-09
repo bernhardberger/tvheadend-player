@@ -54,7 +54,9 @@ class AudioChoiceStore(private val dataStore: DataStore<Preferences>) {
     }
 
     internal suspend fun removeProfile(profile: String) {
-        dataStore.edit { it[key] = Json.encodeToString(decode(it[key]).filterNot { entry -> entry.profile == profile }) }
+        dataStore.edit {
+            it[key] = Json.encodeToString(decode(it[key]).filterNot { entry -> entry.profile == profile })
+        }
     }
 
     private fun decode(value: String?): List<Entry> {

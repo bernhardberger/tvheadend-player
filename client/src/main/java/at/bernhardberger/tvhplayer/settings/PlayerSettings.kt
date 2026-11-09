@@ -214,7 +214,17 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
     ): StreamProfileId? {
         if (!observationIsCurrent()) return null
         val preferences = dataStore.data.first()
-        val serverId = preferences.activeProfileId() ?: return null
+        return preferences.activeProfileId()?.let { serverId ->
+            resolveStreamProfileSelection(preferences, serverId, discoveredProfiles, observationIsCurrent)
+        }
+    }
+
+    private fun resolveStreamProfileSelection(
+        preferences: Preferences,
+        serverId: ServerProfileId,
+        discoveredProfiles: List<StreamProfile>,
+        observationIsCurrent: () -> Boolean,
+    ): StreamProfileId? {
         val selected = preferences[streamProfileKey(serverId)]
             ?.takeIf(String::isNotBlank)
             ?.let { value -> runCatching { StreamProfileId(value) }.getOrNull() }
@@ -292,7 +302,8 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
     }
 
     internal companion object {
-        private fun streamProfileKey(id: ServerProfileId) = stringPreferencesKey(profilePreferencePrefix(id) + "streamProfile")
+        private fun streamProfileKey(id: ServerProfileId) =
+            stringPreferencesKey(profilePreferencePrefix(id) + "streamProfile")
         fun decodeStartupBufferLearning(p: Preferences): StartupBufferLearningState {
             val profile = p[Keys.STARTUP_BUFFER_LEARNED_PROFILE]
             // Learning from other rules restarts at the default level.

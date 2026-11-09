@@ -43,7 +43,9 @@ internal fun settingsLevel(
     /** The connection a per-connection level belongs to; named on the first heading line when set. */
     connectionName: String? = null,
 ) = DepthLevel(id, rows, heading = { emphasis ->
-    val headingText = listOfNotNull(connectionName?.let { stringResource(R.string.connection_scope_line, it) }, description)
+    val headingText = listOfNotNull(
+        connectionName?.let { stringResource(R.string.connection_scope_line, it) }, description,
+    )
         .joinToString("\n").ifEmpty { null }
     // Same heading in the active and preview slots (AOSP TvSettings parity): no
     // back chevron. It uses the browse header band, so the title sits where the
@@ -134,8 +136,12 @@ internal fun settingsRow(
             // Keep the last visible scope reachable even when its switch cannot be turned off.
             onClick = { if (enabled) activate() },
             headlineContent = { Text(title.annotated(), style = MaterialTheme.typography.titleMedium, maxLines = titleMaxLines, overflow = TextOverflow.Ellipsis) },
-            supportingContent = supportingContent?.let { { it(rowFocused) } } ?: supporting?.let { { Text(it.annotated(), maxLines = 2, overflow = TextOverflow.Ellipsis) } },
-            leadingContent = leading ?: icon?.let { { Icon(painterResource(it), null, Modifier.size(ListItemDefaults.IconSize)) } },
+            supportingContent = supportingContent?.let { { it(rowFocused) } } ?: supporting?.let {
+                { Text(it.annotated(), maxLines = 2, overflow = TextOverflow.Ellipsis) }
+            },
+            leadingContent = leading ?: icon?.let {
+                { Icon(painterResource(it), null, Modifier.size(ListItemDefaults.IconSize)) }
+            },
             trailingContent = when {
                 busy -> ({ androidx.compose.material3.CircularProgressIndicator(
                     modifier = Modifier.size(24.dp), color = LocalContentColor.current, strokeWidth = 2.dp,

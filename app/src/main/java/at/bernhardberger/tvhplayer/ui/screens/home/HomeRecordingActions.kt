@@ -118,7 +118,9 @@ internal fun HomeRecordingActions(
                     BrowseContextAction.WATCH_LIVE -> watchLive?.invoke()
                     BrowseContextAction.STOP -> capability?.let { pendingMutation = DvrMutationAction.Stop(it, opened.id) }
                     BrowseContextAction.CANCEL -> capability?.let { pendingMutation = DvrMutationAction.Cancel(it, opened.id) }
-                    BrowseContextAction.DELETE, BrowseContextAction.REMOVE_ENTRY -> capability?.let { pendingMutation = DvrMutationAction.Delete(it, opened.id) }
+                    BrowseContextAction.DELETE, BrowseContextAction.REMOVE_ENTRY -> capability?.let {
+                        pendingMutation = DvrMutationAction.Delete(it, opened.id)
+                    }
                     BrowseContextAction.MARK_WATCHED, BrowseContextAction.MARK_UNWATCHED -> {
                         mutationBusy = true
                         scope.launch {

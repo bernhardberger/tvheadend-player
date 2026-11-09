@@ -73,7 +73,9 @@ internal fun SettingsScreen(
         recordingSpaceText(observation.dvrDiskSpaceState)) { id ->
         scope.launch { settingsStore.setRecordingProfile(id); navigation.pop() }
     }
-    val connectionLevels = settingsConnectionLevels(connectionPresentation, onRetry, servers.actions, profileOwner, servers.switchingNow)
+    val connectionLevels = settingsConnectionLevels(
+        connectionPresentation, onRetry, servers.actions, profileOwner, servers.switchingNow,
+    )
     servers.FocusPending(connectionLevels.firstOrNull())
     val profileList by profileOwner.profiles.collectAsStateWithLifecycle()
     val connectionName = connectionScopeName(profileList)
@@ -162,13 +164,7 @@ internal fun SettingsScreenNavigation(
         onDispose { layering?.details?.remove(pageKey) }
     }
     Box(Modifier.fillMaxSize().onPreviewKeyEvent { event ->
-        val native = event.nativeKeyEvent
-        if (onCancelSwitch == null || covered || !isCurrent || !backEnabled ||
-            native.keyCode != android.view.KeyEvent.KEYCODE_BACK) {
-            switchBack.reset()
-            false
-        } else switchBack.handle(native.action == android.view.KeyEvent.ACTION_DOWN,
-            native.repeatCount, native.isCanceled) { onCancelSwitch() }
+        handleSwitchBack(event.nativeKeyEvent, switchBack, onCancelSwitch, covered, isCurrent, backEnabled)
     }) {
         // Settings keeps its columns and focus under the setup; nothing behind it takes focus or
         // Back, and closing the setup returns focus to the row that opened it.
@@ -191,7 +187,7 @@ internal fun SettingsScreenNavigation(
             onRootBack = rootFocus?.let { { it.requestFocus() } },
             pageKeyDirection = ChannelNavigation::pageDirectionForKeyCode,
         )
-        BackHandler(enabled = backEnabled && isCurrent && !covered && onCancelSwitch != null) { onCancelSwitch?.invoke() }
+        SwitchBackHandler(backEnabled, isCurrent, covered, onCancelSwitch)
         if (shownSetup != null) {
             // Registered before the setup's own handler, so its steps go back first.
             BackHandler(backEnabled, onCloseSetup)
@@ -201,4 +197,35 @@ internal fun SettingsScreenNavigation(
         }
         shownDialog?.invoke()
     }
+}
+
+@Composable
+private fun SwitchBackHandler(
+    backEnabled: Boolean,
+    isCurrent: Boolean,
+    covered: Boolean,
+    onCancelSwitch: (() -> Unit)?,
+) {
+    BackHandler(enabled = backEnabled && isCurrent && !covered && onCancelSwitch != null) {
+        onCancelSwitch?.invoke()
+    }
+}
+
+private fun handleSwitchBack(
+    native: android.view.KeyEvent,
+    switchBack: at.bernhardberger.tvhplayer.core.BackKeyCycle,
+    onCancelSwitch: (() -> Unit)?,
+    covered: Boolean,
+    isCurrent: Boolean,
+    backEnabled: Boolean,
+): Boolean {
+    if (onCancelSwitch == null || covered || !isCurrent) {
+        switchBack.reset()
+        return false
+    }
+    return if (!backEnabled || native.keyCode != android.view.KeyEvent.KEYCODE_BACK) {
+        switchBack.reset()
+        false
+    } else switchBack.handle(native.action == android.view.KeyEvent.ACTION_DOWN,
+        native.repeatCount, native.isCanceled) { onCancelSwitch() }
 }

@@ -533,7 +533,8 @@ fun AppRoot(
 
     var navigationStartDestination by remember {
         mutableStateOf<AppNavKey?>(
-            if (noServerInUse) SettingsKey(SettingsSection.CONNECTION) else when (val launchState = applianceLaunchState) {
+            if (noServerInUse) SettingsKey(SettingsSection.CONNECTION)
+            else when (val launchState = applianceLaunchState) {
                 ApplianceLaunchState.Idle -> HomeKey
                 is ApplianceLaunchState.Pending -> if (
                     deferredBackAction ==

@@ -54,7 +54,8 @@ class LastPlayedChannelStore(private val dataStore: DataStore<Preferences>) {
         dataStore.edit { preferences ->
             val id = preferences.activeProfileId() ?: return@edit
             val key = recentRecordingsKey(id)
-            preferences[key] = (listOf(recordingId) + decodeRecordings(preferences[key]).filterNot { it == recordingId })
+            preferences[key] = (listOf(recordingId) +
+                decodeRecordings(preferences[key]).filterNot { it == recordingId })
                 .take(RECENT_RECORDING_LIMIT)
                 .joinToString(",") { it.value.toString() }
         }

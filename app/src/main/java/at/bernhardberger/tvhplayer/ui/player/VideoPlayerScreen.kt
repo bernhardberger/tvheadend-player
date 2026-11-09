@@ -663,7 +663,9 @@ fun VideoPlayerScreen(
                         requestedChannelFailed = false
                         initialPlayback.selection = playbackSelection
                         initialPlayback.intent = requestIntent
-                        initialPlayback.epoch = requestIntent?.let { playbackRuntime.installedLiveTargetEpoch(playbackSelection, it) }
+                        initialPlayback.epoch = requestIntent?.let {
+                            playbackRuntime.installedLiveTargetEpoch(playbackSelection, it)
+                        }
                         initialPlayback.token = requestToken
                         initialStartupTarget = startupOwner
                         initialPlaybackAdopted = false
@@ -1881,34 +1883,6 @@ private class InitialLivePlaybackState {
     var epoch by mutableStateOf<Long?>(null)
     var intent by mutableStateOf<Long?>(null)
     var token by mutableLongStateOf(-1L)
-}
-
-@Composable
-private fun LivePlayerDiagnostics(
-    viewModel: VideoPlayerViewModel,
-    enabled: Boolean,
-    visible: Boolean,
-    aspectRatio: at.bernhardberger.tvhplayer.settings.AspectRatioMode,
-    timeshiftState: AppTimeshiftState,
-    playbackRuntime: at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime,
-    modifier: Modifier,
-) {
-    val diagnostics by viewModel.diagnostics.collectAsStateWithLifecycle()
-    // Only Stats for nerds needs full diagnostics.
-    DisposableEffect(enabled) {
-        viewModel.setDiagnosticsEnabled(enabled)
-        onDispose {
-            if (enabled) viewModel.setDiagnosticsEnabled(false)
-        }
-    }
-    PlaybackStatsVisibility(visible = visible, modifier = modifier) {
-        PlaybackStatsOverlay(
-            diagnostics = diagnostics,
-            aspectRatio = aspectRatio,
-            timeshiftState = timeshiftState,
-            frameRate = playbackRuntime.frameRate,
-        )
-    }
 }
 
 @Composable

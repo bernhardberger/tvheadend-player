@@ -102,10 +102,13 @@ class JourneyProfileActivity : AppCompatActivity() {
             )
             val settings = PlayerSettingsStore(this@JourneyProfileActivity)
             val tags = ChannelTagSettingsStore(this@JourneyProfileActivity)
-            tags.save(at.bernhardberger.tvhplayer.settings.ChannelTagPreferences(profileId = tags.settings.first().profileId))
+            tags.save(at.bernhardberger.tvhplayer.settings.ChannelTagPreferences(
+                profileId = tags.settings.first().profileId,
+            ))
             val profileStore = TvheadendServerProfileStore(this@JourneyProfileActivity)
             // Only the isolated .profile UID sees this anonymous fixture identity.
-            check(profileStore.addAnonymous("offline.invalid", 9982, activate = true) is ServerProfileWriteResult.Applied)
+            check(profileStore.addAnonymous("offline.invalid", 9982, activate = true)
+                is ServerProfileWriteResult.Applied)
             val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
             val profiles = AppProfileOwner(
                 session, profileStore, settings, Dispatchers.IO,

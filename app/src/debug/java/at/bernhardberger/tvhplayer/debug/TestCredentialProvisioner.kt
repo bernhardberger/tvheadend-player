@@ -54,7 +54,8 @@ internal class TestCredentialProvisioner(private val context: Context) {
         var result = "failed"
         try {
             val payload = readPayload(stagingFile) ?: return
-            val owner = org.koin.core.context.GlobalContext.get().get<at.bernhardberger.tvhplayer.settings.AppProfileOwner>()
+            val owner = org.koin.core.context.GlobalContext.get()
+                .get<at.bernhardberger.tvhplayer.settings.AppProfileOwner>()
             val profiles = owner.profiles.filterNotNull().first() as? ServerProfileListResult.Available
                 ?: error("Profile store unavailable")
             val existing = existingServerProfile(profiles.profiles, payload.host, payload.htspPort, payload.username)

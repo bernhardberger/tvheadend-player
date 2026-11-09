@@ -34,7 +34,7 @@ import at.bernhardberger.tvhplayer.ui.components.arrivalFocus
 import at.bernhardberger.tvhplayer.ui.components.serverAddress
 
 /** The longest name a server profile stores. */
-internal const val ServerNameMaxLength = 64
+internal const val SERVER_NAME_MAX_LENGTH = 64
 
 internal const val SERVER_NAME_FIELD = "server-name-field"
 internal const val SERVER_NAME_SAVE = "server-name-save"
@@ -62,7 +62,8 @@ internal fun SettingsServerName(
             GuidedStepGuidance(
                 title = stringResource(R.string.server_name_title),
                 body = stringResource(R.string.server_name_body, fallback),
-                meta = if (username == null) address else stringResource(R.string.server_detail_separator, username, address),
+                meta = if (username == null) address
+                else stringResource(R.string.server_detail_separator, username, address),
             )
         }) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -77,7 +78,9 @@ internal fun SettingsServerName(
                     editingId = editingId,
                     setEditingId = { editingId = it },
                     value = name,
-                    onValueChange = { value -> name = value.filterNot(Char::isISOControl).take(ServerNameMaxLength) },
+                    onValueChange = { value ->
+                        name = value.filterNot(Char::isISOControl).take(SERVER_NAME_MAX_LENGTH)
+                    },
                     label = null,
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.Words,

@@ -118,7 +118,8 @@ internal fun ConnectionSetupFlow(
         }
     }
     // Over the step, so it takes focus and Back until the user answers.
-    if (state.confirmingSwitch && confirmSwitch != null) confirmSwitch(state.form, state::confirmSwitch, state::keepWatching)
+    if (state.confirmingSwitch && confirmSwitch != null)
+        confirmSwitch(state.form, state::confirmSwitch, state::keepWatching)
 }
 
 @Composable
@@ -404,10 +405,13 @@ private fun SignInStep(state: ConnectionSetupState, profileName: String?) {
     GuidedStepLayout(guidance = {
         GuidedStepGuidance(
             title = stringResource(
-                if (state.mode == SetupMode.PASSWORD) R.string.server_password_title else R.string.onboarding_sign_in_title,
+                if (state.mode == SetupMode.PASSWORD) R.string.server_password_title
+                else R.string.onboarding_sign_in_title,
             ),
             body = if (state.mode == SetupMode.PASSWORD) {
-                val account = stringResource(R.string.server_user_on_host, state.form.username.trim(), state.form.host.trim())
+                val account = stringResource(
+                    R.string.server_user_on_host, state.form.username.trim(), state.form.host.trim(),
+                )
                 stringResource(R.string.server_password_body, account, profileName ?: account)
             } else {
                 stringResource(R.string.onboarding_sign_in_body)
@@ -577,7 +581,8 @@ private fun FailureStep(state: ConnectionSetupState, failure: SetupFailure) {
         stringResource(R.string.server_detail_separator, serverAddress(host, port), form.username)
     }
     val reason = if (failure.showsHint) text.paragraph(failure.condition) else text.reason(failure.condition)
-    val body = if (state.mode.keepsSavedConnection) stringResource(R.string.onboarding_edit_failure_body, reason) else reason
+    val body = if (state.mode.keepsSavedConnection)
+        stringResource(R.string.onboarding_edit_failure_body, reason) else reason
     GuidedStepLayout(
         guidance = {
             GuidedStepGuidance(

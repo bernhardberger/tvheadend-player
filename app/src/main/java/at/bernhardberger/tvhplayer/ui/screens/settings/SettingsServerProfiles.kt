@@ -28,8 +28,6 @@ internal const val SERVER_REMOVE = "server-remove"
 internal const val SERVER_ADDRESS = "server-address"
 internal const val SERVER_ACCOUNT = "server-account"
 
-private const val DEFAULT_PORT = 9982
-
 /** A stored server's row on the Connection list and the id of the level it opens. */
 internal fun serverProfileRowId(id: ServerProfileId): String = "server-${id.value}"
 
@@ -60,21 +58,6 @@ internal fun ServerProfileListResult?.serversStored(): Boolean =
 internal fun ServerProfileListResult?.activeProfile(): ServerProfileSummary? =
     (this as? ServerProfileListResult.Available)?.let { list -> list.profiles.firstOrNull { it.id == list.activeId } }
 
-/** A server's name without its label: the account on the address, or the address alone. */
-@Composable
-internal fun serverProfileUnnamed(profile: ServerProfileSummary): String {
-    val address = serverAddress(profile)
-    val username = profile.accountName()
-    return if (username == null) address else stringResource(R.string.server_user_on_host, username, address)
-}
-
-@Composable
-private fun serverAddress(profile: ServerProfileSummary): String =
-    if (profile.port == DEFAULT_PORT) profile.host else stringResource(R.string.server_host_port, profile.host, profile.port)
-
-private fun ServerProfileSummary.accountName(): String? =
-    username?.takeIf { authenticationMode == ServerProfileAuthenticationMode.PASSWORD && it.isNotBlank() }
-
 private fun ServerProfileSummary.passwordNeeded(): Boolean =
     authenticationMode == ServerProfileAuthenticationMode.PASSWORD && !credentialsAvailable
 
@@ -102,7 +85,9 @@ internal fun settingsServerLevels(
         supporting = stringResource(R.string.server_add_description), icon = R.drawable.ic_add,
         trailingIcon = R.drawable.ic_arrow_circle_right, onClick = actions.onAdd)
     val retry = settingsRow(RETRY_CONNECTION, stringResource(R.string.connection_try_again),
-        supporting = stringResource(if (connecting) R.string.connection_overview_connecting else R.string.connection_retry_description),
+        supporting = stringResource(
+            if (connecting) R.string.connection_overview_connecting else R.string.connection_retry_description,
+        ),
         icon = R.drawable.ic_refresh, onClick = { if (!connecting) onRetry() })
     val rows = buildList {
         stored.forEach { profile -> add(serverProfileRow(profile, profile.id == list?.activeId,
@@ -123,7 +108,9 @@ internal fun settingsServerLevels(
 }
 
 @Composable
-private fun serverProfileRow(profile: ServerProfileSummary, active: Boolean, cancelSwitch: (() -> Unit)? = null): DepthRow {
+private fun serverProfileRow(
+    profile: ServerProfileSummary, active: Boolean, cancelSwitch: (() -> Unit)? = null,
+): DepthRow {
     val state = listOfNotNull(
         stringResource(R.string.server_in_use).takeIf { active },
         stringResource(R.string.server_password_needed).takeIf { profile.passwordNeeded() },
@@ -144,7 +131,8 @@ private fun serverProfileRow(profile: ServerProfileSummary, active: Boolean, can
             // focused content color the shared Settings rows give their supporting text.
             Column {
                 if (detail != null) Text(detail, style = MaterialTheme.typography.bodySmall,
-                    color = LocalContentColor.current.copy(alpha = .75f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    color = LocalContentColor.current.copy(alpha = .75f),
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
                 state.forEach { text -> Text(text, style = MaterialTheme.typography.labelSmall,
                     color = when {
                         focused -> LocalContentColor.current
@@ -189,24 +177,3 @@ internal fun settingsServerLevel(
     }
     return settingsLevel(serverProfileRowId(profile.id), profile.label ?: serverProfileUnnamed(profile), rows)
 }
-
-/** "<name> · <status>" for Settings' Connection row, or that no server is in use. */
-@Composable
-internal fun connectionRootStatus(profiles: ServerProfileListResult?, status: String): String {
-    if (profiles.noServerInUse()) return stringResource(R.string.server_none_in_use)
-    val active = profiles.activeProfile() ?: return status
-    return stringResource(R.string.server_detail_separator, active.label ?: serverProfileUnnamed(active), status)
-}
-
-/**
- * The connection that per-connection Settings values (channel groups, stream profile) belong to, or
- * null while at most one is stored, when nothing could be mistaken for another connection's.
- */
-@Composable
-internal fun connectionScopeName(profiles: ServerProfileListResult?): String? =
-    (profiles as? ServerProfileListResult.Available)?.takeIf { it.profiles.size > 1 }
-        ?.let { profiles.activeProfile() }?.let { serverProfileTitle(it) }
-
-/** The name dialogs and the switch question use: the label, else the account on the address. */
-@Composable
-internal fun serverProfileTitle(profile: ServerProfileSummary): String = profile.label ?: serverProfileUnnamed(profile)

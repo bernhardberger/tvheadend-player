@@ -49,8 +49,12 @@ internal fun SwitchServerDialog(
     CentredDialog(
         title = stringResource(R.string.server_switch_title, name),
         message = when {
-            username == null -> stringResource(if (recording) R.string.server_switch_recording_anonymous else R.string.server_switch_live_anonymous)
-            else -> stringResource(if (recording) R.string.server_switch_recording else R.string.server_switch_live, username)
+            username == null -> stringResource(
+                if (recording) R.string.server_switch_recording_anonymous else R.string.server_switch_live_anonymous,
+            )
+            else -> stringResource(
+                if (recording) R.string.server_switch_recording else R.string.server_switch_live, username,
+            )
         },
         firstLabel = stringResource(R.string.server_keep_watching),
         secondLabel = stringResource(R.string.server_switch),
