@@ -142,7 +142,15 @@ fun RecordingPlayerScreen(
         )
     }
     val diagnostics by session.diagnostics.collectAsStateWithLifecycle()
-    val retainedSelection = recordingSelection?.takeIf { it.recordingId == recordingId }
+    val rejectedSelectionExpired = activeTarget == null &&
+        recordingSelection?.recordingId == recordingId &&
+        recordingSelection?.currentSession !== currentSession && when (recordingAdmission) {
+            RecordingPlaybackAdmission.GrowingDeferred,
+            RecordingPlaybackAdmission.ObservationExpired,
+            RecordingPlaybackAdmission.TargetUnavailable -> true
+            else -> false
+        }
+    val retainedSelection = recordingSelection?.takeIf { it.recordingId == recordingId && !rejectedSelectionExpired }
     var targetObservation by remember(recordingId, retainedSelection?.currentSession) {
         mutableStateOf(
             observation.takeIf {
@@ -161,7 +169,9 @@ fun RecordingPlayerScreen(
         }
     }
     val entry = targetObservation?.dvrEntry(recordingId)
-    val admission = recordingAdmission.takeIf { retainedSelection != null }
+    // A rejection is scoped to its server session; only an installed target keeps its snapshot.
+    val admission = if (rejectedSelectionExpired) RecordingPlaybackAdmission.ObservationExpired
+        else recordingAdmission.takeIf { retainedSelection != null }
     val playbackAvailable = entry != null && when (admission) {
         is RecordingPlaybackAdmission.Completed,
         is RecordingPlaybackAdmission.Growing -> true
