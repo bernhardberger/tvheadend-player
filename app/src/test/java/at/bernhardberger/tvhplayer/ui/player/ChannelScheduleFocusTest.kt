@@ -352,7 +352,7 @@ class ChannelScheduleFocusTest {
             contentGenre = ContentGenre.fromContentType(0x20L)) }
         compose.setContent { TVHeadendPlayerTheme { PlaybackOptionsOverlayFrame(panelWidth = 480.dp) {
             ChannelSchedule(null, news, NOW, NOW, false, false,
-                { if (it.id == EventId(1)) DvrEntryState.COMPLETED_ERROR else null }, {}, {}, {})
+                { if (it.id == EventId(1)) DvrEntry.create(DvrEntryId(1), state = DvrEntryState.COMPLETED_ERROR) else null }, {}, {}, {})
         } } }
         // An ellipsis may only ever cut the category, never the time left or the failure.
         compose.onNodeWithText("Ended • Recording failed • News", useUnmergedTree = true).assertExists()

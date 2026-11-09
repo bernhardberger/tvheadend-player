@@ -91,6 +91,7 @@ import at.bernhardberger.tvhplayer.settings.GuideRows
 import at.bernhardberger.tvhplayer.core.ProgrammeCategory
 import at.bernhardberger.tvhplayer.core.programmeCategory
 import at.bernhardberger.tvhplayer.ui.common.programmeCategoryLabel
+import at.bernhardberger.tvhplayer.ui.components.rule
 import at.bernhardberger.tvhplayer.ui.tvGenreColors
 import at.bernhardberger.tvhplayer.core.AppError
 import at.bernhardberger.tvhplayer.core.AppErrorAction
@@ -629,6 +630,7 @@ internal fun TimelineProgrammeCell(
                 if (markState != null) {
                     RecordingStatusIndicator(
                         state = markState,
+                        rule = recording?.rule,
                         modifier = Modifier.markAtFullSizeOrNone().testTag("guide-cell-recording-mark"),
                     )
                 }

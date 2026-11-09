@@ -101,6 +101,7 @@ internal fun HomeRecordingActions(
                 opened.stop?.epochSeconds, androidx.compose.ui.platform.LocalConfiguration.current.locales[0]),
             summary = opened.summary?.takeIf(String::isNotBlank) ?: opened.description.orEmpty(),
             recordingState = opened.state,
+            recordingRule = opened.rule,
             resumePositionMs = offeredResumePosition(admission)?.inWholeMilliseconds,
             playbackIndicator = watchingIndicator(opened.id),
             actions = recordingContextActions(opened, admission, canModify, canWatchChannel = watchLive != null,
