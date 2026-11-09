@@ -120,6 +120,15 @@ class RecordingPlaybackChoiceTest {
         compose.runOnIdle { assertEquals(1, watched); assertTrue(starts.isEmpty()) }
     }
 
+    @Test fun runningChoiceThatCannotPlayOnlyOffersWatchLiveWithoutTheFinishedReason() {
+        show(754L, watch = {}, progress = RecordingProgressCapability.UNSUPPORTED)
+        val reason = ApplicationProvider.getApplicationContext<Application>().getString(R.string.error_305_reason)
+        compose.onNodeWithText(reason).assertDoesNotExist()
+        compose.onNodeWithTag("recording-resume").assertDoesNotExist()
+        compose.onNodeWithTag("recording-start-over").assertDoesNotExist()
+        compose.onNodeWithTag("recording-watch-live").assertIsFocused()
+    }
+
     @Test fun endsAtInEyebrowDoesNotResizeDialogWhenWatchingChannel() {
         show(754L, watch = {})
         val before = compose.onNodeWithTag("centred-dialog-card").getUnclippedBoundsInRoot()
@@ -141,7 +150,7 @@ class RecordingPlaybackChoiceTest {
     private fun show(position: Long?, watch: (() -> Unit)? = null,
         play: (RecordingPlaybackStart) -> Unit = {},
         visible: androidx.compose.runtime.MutableState<Boolean> = mutableStateOf(true), close: () -> Unit = {},
-        serverPath: String = "test.ts") {
+        serverPath: String = "test.ts", progress: RecordingProgressCapability = RecordingProgressCapability.SUPPORTED) {
         val now = 1_800_000_000L
         val channel = Channel.create(ChannelId(1), name = "Test channel")
         val entry = DvrEntry.create(DvrEntryId(1), title = "Test recording", state = DvrEntryState.RECORDING,
@@ -153,7 +162,7 @@ class RecordingPlaybackChoiceTest {
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(channels = listOf(channel))),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = listOf(entry))),
-            recordingProgressCapability = RecordingProgressCapability.SUPPORTED)
+            recordingProgressCapability = progress)
         compose.setContent {
             TVHeadendPlayerTheme {
                 if (visible.value) RecordingPlaybackChoice(entry, observation.recordingPlaybackAdmission(entry),
