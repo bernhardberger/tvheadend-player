@@ -9,6 +9,24 @@
 - A removed recording no longer hides another recording of the same program, and retention cleanup no longer repeats the “Recording deleted” notice.
 - Recent channels, the *Continue watching* order, channel tags, channel aspect settings, the selected stream profile and audio choices start fresh after this update; they are now kept per connection.
 
+## 0.4.14
+
+### Recordings
+
+- OK on a recording that's still running but can't be played yet, like a
+  Matroska recording, now says it can be played once it's finished and offers
+  *Watch live*. Before, it tried to play it and showed *Recording
+  interrupted*, although the recording kept going (#20). Playing a recording
+  while it's still running works with MPEG-TS recordings.
+- The dialog doesn't offer *Play recording* for any recording that can't be
+  played, and when playback is refused, the error says why instead of
+  *Recording interrupted*.
+- The red dot now only means recording now. Finished recordings show a
+  library icon in the Guide, the channel schedule and the recording lists
+  (#21).
+- Scheduled recordings from a series recording or repeating timer show stacked
+  clocks instead of a single clock.
+
 ## 0.4.13
 
 ### Home
