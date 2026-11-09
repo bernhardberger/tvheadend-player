@@ -37,13 +37,16 @@ import coil3.request.ErrorResult
 import coil3.request.SuccessResult
 import java.util.Collections
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.coroutines.CoroutineContext
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.channels.Channel as ContinuationChannel
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -78,7 +81,11 @@ class ChannelAccentsTest {
     private val session = FakeTvheadendSession(observation(catalog(listOf(red, stored, null, white, broken))))
     private val store = ChannelAccentStore()
     private val accents = ChannelAccents(store) { current, id -> key(id).takeIf { session.isCurrent(current) } }
-    private val scope = CoroutineScope(Dispatchers.Default + Job())
+    private val continuations = ContinuationChannel<Runnable>(ContinuationChannel.UNLIMITED)
+    private val dispatcher = object : CoroutineDispatcher() {
+        override fun dispatch(context: CoroutineContext, block: Runnable) { check(continuations.trySend(block).isSuccess) }
+    }
+    private val scope = CoroutineScope(dispatcher + Job())
 
     /** Every picon load in order, and how many ran at once at most. */
     private val loads: MutableList<ArtworkId> = Collections.synchronizedList(mutableListOf())
@@ -86,15 +93,16 @@ class ChannelAccentsTest {
     private val mostAtOnce = AtomicInteger()
     /** Loads of these picons wait here. */
     private val gates = mutableMapOf<ArtworkId, CompletableDeferred<Unit>>()
-    private val loader = ImageLoader.Builder(app).components {
+    private val loader = ImageLoader.Builder(app).coroutineContext(Dispatchers.Unconfined).components {
         add(Interceptor { chain ->
             val id = (chain.request.data as AppArtworkSource).id
             assertFalse("the small bitmap is kept out of the memory cache", chain.request.memoryCachePolicy.writeEnabled)
             loads += id
             mostAtOnce.accumulateAndGet(running.incrementAndGet(), ::maxOf)
             try {
+                // A held load cannot return to the scope yet; signal that its gate was reached.
+                if (id in gates) continuations.trySend(Runnable {})
                 gates[id]?.await()
-                delay(20)
                 if (id == broken) ErrorResult(null, chain.request, TvheadendArtworkLoadException(TvheadendFailure.TIMEOUT))
                 else if (id == missing) ErrorResult(null, chain.request, TvheadendArtworkLoadException(TvheadendFailure.FILE_UNAVAILABLE))
                 else if (id == corrupt) ErrorResult(null, chain.request, IllegalStateException("synthetic decode failure"))
@@ -105,7 +113,11 @@ class ChannelAccentsTest {
         })
     }.build()
 
-    @After fun stop() { scope.coroutineContext[Job]!!.cancel() }
+    @After fun stop() {
+        val job = scope.coroutineContext[Job]!!
+        job.cancel()
+        await { job.isCompleted }
+    }
 
     @Test fun fillInSamplesImageCacheIconsButDoesNotFetchRemoteUrls() {
         session.publish(observation(ChannelCatalog.create(listOf(
@@ -121,7 +133,7 @@ class ChannelAccentsTest {
         val url = "https://192.0.2.1/logo.png"
         DetailsArtColors.clear()
         var loads = 0
-        images.install(ImageLoader.Builder(app).components {
+        images.install(ImageLoader.Builder(app).coroutineContext(Dispatchers.Unconfined).components {
             add(Interceptor { chain ->
                 assertEquals(url, chain.request.data)
                 loads++
@@ -237,7 +249,10 @@ class ChannelAccentsTest {
     }
 
     @Test fun twoCallersForOnePiconSampleItOnceAndAStoredColourNeedsNoLoad() {
+        val gate = CompletableDeferred<Unit>().also { gates[red] = it }
         val both = listOf(sampleNow(red), sampleNow(red))
+        await { loads.size == 1 }
+        gate.complete(Unit)
         val colours = runBlocking { both.map { it.awaitIdling() } }
         assertEquals(listOf(red).ids(), loaded())
         assertEquals(colours[0], colours[1])
@@ -273,19 +288,16 @@ class ChannelAccentsTest {
 
     private fun source(id: ArtworkId) = AppArtworkSource(requireNotNull(session.observation.value.currentSession), id)
 
-    /** Coil dispatches on the main looper, which Robolectric runs only when idled. */
-    private fun await(condition: () -> Boolean) {
-        val deadline = System.nanoTime() + 10_000_000_000L
-        while (!condition()) {
-            check(System.nanoTime() < deadline) { "timed out; loads: ${loaded()}" }
-            shadowOf(Looper.getMainLooper()).idle()
-            Thread.sleep(2)
+    /** Default sampling returns to this scope through an observable continuation, not a timer. */
+    private fun await(condition: () -> Boolean) = runBlocking {
+        withTimeout(10_000) {
+            while (!condition()) continuations.receive().run()
         }
     }
 
     private fun idle(millis: Long) {
-        val end = System.nanoTime() + millis * 1_000_000
-        while (System.nanoTime() < end) { shadowOf(Looper.getMainLooper()).idle(); Thread.sleep(2) }
+        shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(millis))
+        while (true) (continuations.tryReceive().getOrNull() ?: break).run()
     }
 
     private fun <T> Deferred<T>.awaitIdling(): T {

@@ -210,9 +210,8 @@ class LiveZapStartOwnershipTest {
     }
 
     /** Lets the runtime run on without advancing the frame clock: nothing recomposes. */
-    private fun drainWithoutFrames() = repeat(50) {
+    private fun drainWithoutFrames() {
         shadowOf(Looper.getMainLooper()).idle()
-        Thread.sleep(10)
     }
 
     private fun binds() = session.calls.count { it == FakeSessionCall.BIND_LIVE_PLAYBACK }

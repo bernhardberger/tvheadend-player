@@ -16,12 +16,6 @@
     <ID>ClassNaming:TimeshiftCommandDeviceAcceptanceTest.kt:TimeshiftCommandDeviceAcceptanceTest</ID>
     <ID>ClassNaming:TranslationLocaleCaptureTest.kt:PseudoLocaleEvidence</ID>
     <ID>ForbiddenMethodCall:BrowseCohesionEvidenceTest.kt:BrowseCohesionEvidenceTest$sleep(100)</ID>
-    <ID>ForbiddenMethodCall:BrowseContentRetentionTest.kt:BrowseContentRetentionTest$sleep(50)</ID>
-    <ID>ForbiddenMethodCall:ChannelAccentsTest.kt:ChannelAccentsTest$sleep(2)</ID>
-    <ID>ForbiddenMethodCall:ChannelScheduleFocusTest.kt:ChannelScheduleFocusTest$sleep(10)</ID>
-    <ID>ForbiddenMethodCall:ChannelsLayoutFocusTest.kt:ChannelsLayoutFocusTest$sleep(500)</ID>
-    <ID>ForbiddenMethodCall:LiveZapStartOwnershipTest.kt:LiveZapStartOwnershipTest$sleep(10)</ID>
-    <ID>ForbiddenMethodCall:PiconBoxInkTest.kt:PiconBoxInkTest$sleep(10)</ID>
     <ID>ForbiddenMethodCall:ProgrammeDetailsCaptureTest.kt:ProgrammeDetailsCaptureTest$sleep(100)</ID>
   </CurrentIssues>
 </SmellBaseline>
