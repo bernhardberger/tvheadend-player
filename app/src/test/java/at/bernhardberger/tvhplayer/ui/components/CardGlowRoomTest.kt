@@ -52,7 +52,6 @@ import at.bernhardberger.tvhplayer.stores.ChannelAccentStore
 import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
-import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.TvCardFocusedScale
 import at.bernhardberger.tvhplayer.ui.player.PlayerChannelBrowser
@@ -67,7 +66,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.junit.experimental.categories.Category
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
@@ -131,15 +129,6 @@ class CardGlowRoomTest {
         fixture.awaitFocus(card(1))
         assertTrue("back at the top nothing stands above it again", rowAboveEdge() < 1f)
     }
-
-    @Test @Category(VisualCapture::class)
-    fun captureScrolledGridAtRest() {
-        fixture.show(ChannelsView(ChannelsLayout.GRID, setOf(ChannelsLayout.GRID)), fixture.fixtureArt())
-        scrolledGrid()
-    }
-
-    @Test @Category(VisualCapture::class)
-    fun captureRingPulseFrames() = ringPulsesBetweenSolidAndSeeThrough()
 
     @Test fun immersiveRowKeepsItsGlowAbove() {
         fixture.show(ChannelsView(ChannelsLayout.IMMERSIVE, setOf(ChannelsLayout.IMMERSIVE)), fixture.fixtureArt())

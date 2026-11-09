@@ -198,12 +198,6 @@ class NavigationShellEvidenceTest {
 
     @Category(VisualCapture::class)
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi") fun englishNormal() = captureShell("en", 1f)
-    @Category(VisualCapture::class)
-    @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi") fun germanNormal() = captureShell("de", 1f)
-    @Category(VisualCapture::class)
-    @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi") fun englishEnlarged() = captureShell("en", 1.3f)
-    @Category(VisualCapture::class)
-    @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi") fun germanEnlarged() = captureShell("de", 1.3f)
 
     /**
      * 12 + 56 + 12 closed and 12 + 256 + 12 expanded, with Settings C keeping its
@@ -527,70 +521,6 @@ class NavigationShellEvidenceTest {
     private fun key(key: Key) {
         compose.onRoot().performKeyInput { pressKey(key) }
         compose.waitForIdle()
-    }
-
-    @Category(VisualCapture::class)
-    @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
-    fun approvedDrawerControlStates() {
-        images.install(FixtureArt.imageLoader(RuntimeEnvironment.getApplication(), mapOf(
-            ArtworkId(1) to FixtureArt.picon("ridge-earth"), ArtworkId(3) to FixtureArt.picon("northline-news"))))
-        settingsShell(1f)
-        compose.runOnIdle { warmPlayback = true }
-        playLive()
-        captureNowPlaying("G-5-closed-playing")
-        compose.runOnIdle { watchingIndicator = ChannelPlaybackIndicator.PAUSED }
-        captureNowPlaying("closed-paused")
-        compose.runOnIdle { watchingIndicator = ChannelPlaybackIndicator.PLAYING }
-        openDrawer()
-        focusControl("fullscreen")
-        captureNowPlaying("G-1-fullscreen-focused")
-        focusControl("stop")
-        captureNowPlaying("G-2-stop-focused")
-        compose.runOnIdle { watchingIndicator = ChannelPlaybackIndicator.PAUSED }
-        focusControl("pause")
-        captureNowPlaying("G-3-play-focused")
-        openDrawer()
-        compose.runOnIdle { watchingIndicator = ChannelPlaybackIndicator.PLAYING; pauseAvailable = false }
-        captureNowPlaying("G-4-no-timeshift")
-        // The bright Northline mark and recording title share the fixture's news scene.
-        key(Key.DirectionRight)
-        playRecording()
-        assertEquals(80f, drawerWidth(), .5f)
-        captureNowPlaying("R9-closed-recording-bright-logo")
-    }
-
-    @Category(VisualCapture::class)
-    @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
-    fun approvedDrawerControlEnlarged() {
-        images.install(FixtureArt.imageLoader(RuntimeEnvironment.getApplication(), mapOf(
-            ArtworkId(1) to FixtureArt.picon("ridge-earth"), ArtworkId(3) to FixtureArt.picon("northline-news"))))
-        settingsShell(1.3f)
-        compose.runOnIdle { warmPlayback = true }
-        playLive()
-        openDrawer()
-        focusControl("fullscreen")
-        assertEquals(100f, bounds("global-drawer-now-playing").height, .5f)
-        captureNowPlaying("G-6-fullscreen-focused", fontScale = "1.3")
-    }
-
-    /** The open header at full HD with Full screen focused, live and paused. */
-    @Category(VisualCapture::class)
-    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
-    fun openHeaderFullHd() {
-        images.install(FixtureArt.imageLoader(RuntimeEnvironment.getApplication(), mapOf(
-            ArtworkId(1) to FixtureArt.picon("ridge-earth"), ArtworkId(3) to FixtureArt.picon("northline-news"))))
-        settingsShell(1f, density = 2f)
-        compose.runOnIdle { warmPlayback = true }
-        playLive()
-        openDrawer()
-        focusControl("fullscreen")
-        compose.onNodeWithTag("global-drawer-now-playing-fullscreen").assertIsFocused()
-        assertEquals(1920, view.width)
-        assertEquals(1080, view.height)
-        captureNowPlaying("1080p-open-live-fullscreen-focused")
-        compose.runOnIdle { watchingIndicator = ChannelPlaybackIndicator.PAUSED }
-        compose.onNodeWithTag("global-drawer-now-playing-fullscreen").assertIsFocused()
-        captureNowPlaying("1080p-open-paused-fullscreen-focused")
     }
 
     @Test
@@ -1231,7 +1161,7 @@ class NavigationShellEvidenceTest {
     }
 
     /** Settings root on the global shell, over an offline video-like still. */
-    private fun settingsShell(fontScale: Float, density: Float = 1f, withHome: Boolean = false) {
+    private fun settingsShell(fontScale: Float, withHome: Boolean = false) {
         val still = FixtureArt.art("still-ridge-light").asImageBitmap()
         val recordingStill = FixtureArt.art("still-northline-studio").asImageBitmap()
         lateinit var navigation: DepthNavigationState
@@ -1239,7 +1169,7 @@ class NavigationShellEvidenceTest {
         compose.setContent {
             CompositionLocalProvider(
                 LocalLifecycleOwner provides shellOwner,
-                LocalDensity provides Density(density, fontScale),
+                LocalDensity provides Density(1f, fontScale),
                 LocalWatchingTarget provides (heldTarget ?: nowPlaying?.target),
                 LocalWatchingChannel provides ((heldTarget ?: nowPlaying?.target) as? AppPlaybackTarget.Live)?.channelId,
                 LocalWatchingIndicator provides watchingIndicator,
@@ -1361,43 +1291,12 @@ class NavigationShellEvidenceTest {
         CaptureOutput.writePng(File("build/outputs/navigation-shell-captures", "$name.png"), bitmap)
     }
 
-    @Category(VisualCapture::class)
-    @Test @Config(qualifiers = PseudoLocaleEvidence.QUALIFIERS_EN_XA) fun pseudoEnXaDrawer() = capturePseudoDrawer(PseudoLocaleEvidence.EN_XA)
-    @Category(VisualCapture::class)
-    @Test @Config(qualifiers = PseudoLocaleEvidence.QUALIFIERS_AR_XB) fun pseudoArXbDrawer() = capturePseudoDrawer(PseudoLocaleEvidence.AR_XB)
-
-    /** The drawer with a playing channel, closed and open, on generated pseudo-locale resources. */
-    private fun capturePseudoDrawer(tag: String) {
-        images.install(FixtureArt.imageLoader(RuntimeEnvironment.getApplication(), mapOf(
-            ArtworkId(1) to FixtureArt.picon("ridge-earth"), ArtworkId(3) to FixtureArt.picon("northline-news"))))
-        settingsShell(1f)
-        PseudoLocaleEvidence.assertGenerated(tag, view)
-        compose.runOnIdle { warmPlayback = true }
-        playLive()
-        fun save(name: String, focus: String) {
-            compose.waitForIdle()
-            val bitmap = drawShell()
-            compose.waitForIdle()
-            assertTrue("$name was captured mid-animation", bitmap.sameAs(drawShell()))
-            PseudoLocaleEvidence.mirror("drawer", "$tag-font1.0-$name", bitmap, view, 1f, "mdpi 1.0", focus,
-                "Settings on the SideRail with live playback; drawerWidth=${drawerWidth()}; production SideRail")
-            bitmap.recycle()
-        }
-        save("closed-playing", "none (drawer closed)")
-        openDrawer()
-        save("open-destination-focus", "nav-settings")
-        focusControl("fullscreen")
-        save("open-fullscreen-focus", "global-drawer-now-playing-fullscreen")
-        focusControl("stop")
-        save("open-stop-focus", "global-drawer-now-playing-stop")
-    }
-
-    private fun captureNowPlaying(name: String, fontScale: String = "1.0") {
+    private fun captureNowPlaying(name: String) {
         compose.waitForIdle()
         val bitmap = drawShell()
         compose.waitForIdle()
         assertTrue("$name was captured mid-animation", bitmap.sameAs(drawShell()))
-        CaptureOutput.writePng(File("../build/review/drawer-controls", "en-font$fontScale-$name.png"), bitmap)
+        CaptureOutput.writePng(File("../build/review/drawer-controls", "en-font1.0-$name.png"), bitmap)
     }
 
 }

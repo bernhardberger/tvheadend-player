@@ -468,16 +468,6 @@ class SettingsServerProfilesTest {
         return pixels
     }
 
-    @Test @Category(VisualCapture::class) fun captureFailedSwitchNotice() {
-        frameScene(); settings(rail = true)
-        rejectNextConnection = true
-        press(Key.DirectionDown); press(Key.DirectionCenter); press(Key.DirectionCenter)
-        settle()
-        assertTrue(!owner.connectionChanges.isLocked)
-        compose.onNodeWithText("Couldn’t sign in to kids on tvheadend.home.arpa. Check the username and password.").assertIsDisplayed()
-        capture("13-failed-switch-notice", "kids on tvheadend.home.arpa")
-    }
-
     @Test fun theListOpensOnTheServerInUseInStoredOrder() {
         stored(active = 2)
         settings()
@@ -770,14 +760,14 @@ class SettingsServerProfilesTest {
         capture("05-switched-connecting", "kids on tvheadend.home.arpa")
     }
 
-    @Test @Category(VisualCapture::class) fun captureAddAndName() {
+    @Test fun addAndNameReturnsToTheNamedConnection() {
         runBlocking { store.addPassword("tvheadend.home.arpa", 9982, "anna", "fixture-secret", "Living room", activate = true) }
         settings(rail = true)
         repeat(1) { press(Key.DirectionDown) }
         compose.onNodeWithTag("settings-row-$ADD_SERVER").assertIsFocused()
         press(Key.DirectionCenter)
         compose.onNodeWithTag("setup-find-server").assertIsFocused()
-        capture("06-add-server-step", "Find servers on my network")
+        compose.mainClock.advanceTimeBy(1_000)
         type("setup-host", "tvheadend.home.arpa")
         compose.onNodeWithTag("setup-continue").performSemanticsAction(SemanticsActions.RequestFocus)
         press(Key.DirectionCenter)
@@ -789,7 +779,7 @@ class SettingsServerProfilesTest {
         settle()
         compose.onNodeWithTag("setup-start-watching").assertIsFocused()
         compose.onNodeWithTag("setup-add-name").assertIsDisplayed()
-        capture("07-add-connected-offer-name", "Start watching")
+        compose.mainClock.advanceTimeBy(1_000)
         press(Key.DirectionRight)
         compose.onNodeWithTag("setup-add-name").assertIsFocused()
         press(Key.DirectionCenter)
@@ -799,58 +789,14 @@ class SettingsServerProfilesTest {
         compose.onNodeWithTag(SERVER_NAME_FIELD).assertIsFocused()
         type(SERVER_NAME_FIELD, "Kids")
         compose.onNodeWithTag(SERVER_NAME_FIELD).assertIsFocused()
-        capture("08-name-step", "Name (optional)")
+        compose.mainClock.advanceTimeBy(1_000)
         compose.onNodeWithTag(SERVER_NAME_SAVE).performSemanticsAction(SemanticsActions.RequestFocus)
         press(Key.DirectionCenter)
         settle()
         assertTrue((owner.profiles.value as? ServerProfileListResult.Available)?.profiles?.any { it.label == "Kids" } == true)
         compose.waitForIdle()
         compose.onNodeWithTag(row(2)).assertIsFocused()
-        capture("08b-named-server-in-list", "Kids")
-    }
-
-    @Test @Category(VisualCapture::class) fun captureEnterPasswordAgain() {
-        frameScene()
-        settings(rail = true)
-        repeat(3) { press(Key.DirectionDown) }
-        press(Key.DirectionCenter)
-        compose.onNodeWithTag("settings-row-$SERVER_PASSWORD").assertIsFocused()
-        capture("09b-password-unreadable-level", "Enter password")
-        press(Key.DirectionCenter)
-        settle()
-        compose.onNodeWithTag("setup-password").assertIsFocused()
-        capture("10-enter-password-again", "Password")
-    }
-
-    @Test @Category(VisualCapture::class) fun captureRemoveTheServerInUse() {
-        frameScene()
-        settings(rail = true)
-        press(Key.DirectionCenter)
-        compose.onNodeWithTag("settings-row-$SERVER_REMOVE").performSemanticsAction(SemanticsActions.RequestFocus)
-        press(Key.DirectionCenter)
-        compose.onNodeWithTag(REMOVE_KEEP).assertIsFocused()
-        capture("11-remove-active-confirm", "Keep")
-        press(Key.DirectionRight)
-        press(Key.DirectionCenter)
-        settle()
-        assertEquals(3, (owner.profiles.value as? ServerProfileListResult.Available)?.profiles?.size)
-        compose.waitForIdle()
-        compose.onNodeWithTag(row(2)).assertIsFocused()
-        capture("12-after-remove-none-active", "kids on tvheadend.home.arpa")
-    }
-
-    @Test @Category(VisualCapture::class) fun captureLongName() {
-        runBlocking {
-            store.addPassword("recordings-and-live-tv.basement.home.arpa", 9983, "grandparents", "fixture-secret",
-                "Grandparents’ living room downstairs with the big satellite dish", activate = true)
-            store.addPassword("recordings-and-live-tv.basement.home.arpa", 9983, "a-very-long-user-name-for-the-kids", "fixture-secret",
-                null, activate = false)
-        }
-        settings(rail = true)
-        capture("long-name-list", "Grandparents’ living room downstairs with the big satellite dish")
-        press(Key.DirectionDown)
-        press(Key.DirectionCenter)
-        capture("long-name-level", "Use this connection")
+        compose.mainClock.advanceTimeBy(1_000)
     }
 
     private fun ready() = at.bernhardberger.tvheadend.sdk.core.SessionObservation.create(

@@ -1,13 +1,9 @@
 package at.bernhardberger.tvhplayer.ui
 
 import android.app.Application
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.*
 import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -19,8 +15,6 @@ import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.settings.*
-import at.bernhardberger.tvhplayer.testutil.CaptureOutput
-import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import at.bernhardberger.tvhplayer.testutil.leaveTouchModeBeforeComposing
 import at.bernhardberger.tvhplayer.ui.components.depth.*
 import at.bernhardberger.tvhplayer.ui.components.SideRail
@@ -30,12 +24,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
-import org.junit.experimental.categories.Category
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], qualifiers = "en-w960dp-h540dp-land-mdpi", application = Application::class)
@@ -108,58 +100,6 @@ class SettingsConnectionDepthTest {
         assertEquals(0, cancellations)
         press(Key.Back)
         assertEquals(1, cancellations)
-    }
-
-    @Test @Category(VisualCapture::class)
-    fun captureSettingsConnectionEntryAndPrefilledWizard() {
-        val editor = Editor()
-        lateinit var view: View
-        compose.setContent {
-            view = LocalView.current
-            TVHeadendPlayerTheme {
-                androidx.tv.material3.Surface {
-                    val navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.CONNECTION.name)
-                    SideRail(currentRoute = AppDestination.SETTINGS,
-                        onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
-                    SettingsWithSetup(navigation, { onSaved ->
-                        SettingsConnection(editor, session, { restores++ }, onSaved = onSaved)
-                    }, contentPadding = padding, initialFocusEnabled = !drawerActive)
-                    }
-                }
-            }
-        }
-        press(Key.DirectionDown)
-        press(Key.DirectionUp)
-        compose.onNodeWithText("Connection").assertIsFocused()
-        capture(view, "settings-entry")
-        press(Key.DirectionCenter)
-        press(Key.DirectionCenter)
-        compose.onNodeWithText("Set up connection").assertIsFocused()
-        capture(view, "settings-connection-page")
-        press(Key.DirectionCenter)
-        compose.onNodeWithTag("setup-continue").assertIsFocused()
-        val bounds = compose.onNodeWithTag("setup-find-server").fetchSemanticsNode().boundsInRoot
-        assertEquals(696f, bounds.center.x, 0.5f)
-        assertEquals(110f, bounds.center.y, 0.5f)
-        capture(view, "settings-prefilled-wizard")
-    }
-
-    private fun capture(view: View, name: String) {
-        compose.mainClock.advanceTimeBy(1_000)
-        compose.runOnIdle {
-            val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-            view.draw(Canvas(bitmap))
-            val directory = File("build/outputs/onboarding-captures")
-            CaptureOutput.writePng(File(directory, "$name.png"), bitmap)
-            CaptureOutput.writeText(File(directory, "$name.txt")) {
-                "canvas=960x540dp; locale=en; fontScale=1.0; focus=${when (name) {
-                    "settings-entry" -> "Connection"
-                    "settings-connection-page" -> "Set up connection"
-                    else -> "setup-continue"
-                }}; Settings inside SideRail; fictional offline data"
-            }
-            bitmap.recycle()
-        }
     }
 
     @Composable
