@@ -50,6 +50,7 @@ internal fun ProgrammeContextMenu(
         watchChannel = !event.isRunning(nowSec), programDetailsLabel = true,
         modifier = modifier, onAction = { onAction(event, it) }, onClose = onClose, backEnabled = backEnabled,
         recordingState = recording?.state,
+        recordingRule = recording?.rule,
         playbackIndicator = channelWatchingIndicator(event.channelId),
         artwork = {
             // The menu shows its pictures with the session it was opened with.

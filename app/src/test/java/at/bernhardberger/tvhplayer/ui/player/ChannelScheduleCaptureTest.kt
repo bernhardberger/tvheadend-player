@@ -127,7 +127,7 @@ class ChannelScheduleCaptureTest {
                         PlaybackOptionsOverlayFrame(panelWidth = 480.dp, showScrim = false) {
                             ChannelSchedule(channel, events, now, now, loading = false, offline = false, recording = { event ->
                                     // Tonight's Tide Watch is scheduled, as in the Guide.
-                                    DvrEntryState.SCHEDULED.takeIf { !store && event.id == EventId(4) }
+                                    DvrEntry.create(DvrEntryId(4), state = DvrEntryState.SCHEDULED).takeIf { !store && event.id == EventId(4) }
                                 }, onOpen = {}, onClose = {}, onRetry = {}, viewerBehindMs = 0)
                         }
                     }
@@ -216,7 +216,7 @@ class ChannelScheduleCaptureTest {
                                         at(15, 17, 10) -> DvrEntryState.COMPLETED_ERROR.takeIf { scene == "failed" }
                                         at(15, 20, 15), at(15, 21, 0), at(16, 14, 0) -> DvrEntryState.SCHEDULED
                                         else -> null
-                                    }
+                                    }?.let { state -> DvrEntry.create(DvrEntryId(it.id.value), state = state) }
                                 },
                                 onOpen = {}, onClose = {}, onRetry = {},
                                 initialEvent = when (scene) {

@@ -89,7 +89,7 @@ internal fun PlayerChannelSchedule(
             ChannelSchedule(channel, events, nowSec, viewerSec,
                  loading = scheduleLoading(connection, observation.epgState) || moreLoading,
                  offline = scheduleOffline(connection, observation.epgState),
-                recording = { observation.dvrEntryForEvent(it)?.takeUnless(::recordingWasRemoved)?.state },
+                recording = { observation.dvrEntryForEvent(it)?.takeUnless(::recordingWasRemoved) },
                 onOpen = { contextMenu = false; layers.showScheduleDetails(it) },
                 onContextMenu = { contextMenu = true; layers.showScheduleDetails(it) },
                 onClose = { layers.closeSchedule() }, onRetry = onRetry,

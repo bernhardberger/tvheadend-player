@@ -74,6 +74,8 @@ when authorized. Your return alone does not trigger full verification.
   Drive time virtually (`runTest`/test dispatchers, Compose `mainClock`,
   Robolectric looper idling, Media3 `FakeClock` and `TestPlayerRunHelper`) and
   wait for signals; no `Thread.sleep`, real `delay` settling or polling loops.
+  Virtual time still costs CPU: a Compose `mainClock` advance renders every
+  frame in between, so advance only as far as the assertion needs.
 - Load focused `kotlin-*` and `compose-*` skills for the actual implementation
   question, not every skill associated with a touched file.
 
@@ -82,7 +84,9 @@ when authorized. Your return alone does not trigger full verification.
 1. `Changed files`: path per line with a one-line purpose.
 2. `Tests`: exact commands run and their result lines; name each test you
    added, extended, merged or removed; net test lines next to net production
-   lines; for a regression test, its failing line from the red run.
+   lines; for a regression test, its failing line from the red run; run time
+   before and after for each changed test class, with the cause of any class
+   that got slower and why it could not be avoided.
 3. `Gate`: the packet's gate command and its final status line, or the exact
    failure and what you tried.
 4. `Decisions`: anything you chose that the packet left open, with the reason.

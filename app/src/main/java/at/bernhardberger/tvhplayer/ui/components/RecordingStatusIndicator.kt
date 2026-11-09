@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.components
 
+import androidx.annotation.DrawableRes
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -11,29 +13,50 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.TvRecordingFocusedColor
+import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
 
 /** Icon size for status marks set next to small text: chips, guide cells, list rows. */
 val StatusIconSize: Dp = 16.dp
 
+/** The kind of rule a recording comes from, when the server says it has one. */
+enum class RecordingRule(@StringRes val label: Int) {
+    SERIES(R.string.recording_from_series_rule),
+    TIMER(R.string.recording_from_timer_rule),
+}
+
+val DvrEntry.rule: RecordingRule?
+    get() = when {
+        autorecRuleId != null -> RecordingRule.SERIES
+        timerecRuleId != null -> RecordingRule.TIMER
+        else -> null
+    }
+
 /**
- * Recording now, with or without errors, and a finished recording are the red dot; scheduled is a clock in the
- * surrounding content colour. Pass [focused] when the mark sits on a focused, light row or cell: the dot turns
- * deeper red.
+ * Recording now, with or without errors, is the red dot; scheduled is a clock in the surrounding content colour,
+ * stacked clocks when a [rule] scheduled it; a finished recording is the library mark in the muted content colour.
+ * Where a recording came from shows only while it is scheduled. Pass [focused] when the mark sits on a focused,
+ * light row or cell: the dot turns deeper red.
  */
 @Composable
 fun RecordingStatusIndicator(
     state: DvrEntryState,
     modifier: Modifier = Modifier,
+    rule: RecordingRule? = null,
     announceState: Boolean = true,
     focused: Boolean = false,
 ) {
-    val recording = when (state) {
-        DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR, DvrEntryState.COMPLETED -> true
-        DvrEntryState.SCHEDULED -> false
+    val content = LocalContentColor.current
+    val (@DrawableRes icon, tint) = when (state) {
+        DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR ->
+            R.drawable.ic_fiber_manual_record to recordingMarkColor(focused)
+        DvrEntryState.COMPLETED -> R.drawable.ic_video_library to content.copy(alpha = TvTextSecondaryAlpha)
+        DvrEntryState.SCHEDULED ->
+            (if (rule != null) R.drawable.ic_schedule_rule else R.drawable.ic_schedule) to content
         else -> return
     }
     val description = stringResource(
@@ -41,14 +64,14 @@ fun RecordingStatusIndicator(
             DvrEntryState.RECORDING_ERROR -> R.string.recording_state_recording_errors
             DvrEntryState.RECORDING -> R.string.recording_state_recording
             DvrEntryState.COMPLETED -> R.string.details_recorded
-            else -> R.string.recording_state_scheduled
+            else -> rule?.label ?: R.string.recording_state_scheduled
         }
     )
     Icon(
-        painter = painterResource(if (recording) R.drawable.ic_fiber_manual_record else R.drawable.ic_schedule),
+        painter = painterResource(icon),
         contentDescription = description.takeIf { announceState },
         modifier = modifier.size(StatusIconSize),
-        tint = if (recording) recordingMarkColor(focused) else LocalContentColor.current,
+        tint = tint,
     )
 }
 
