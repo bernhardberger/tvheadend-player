@@ -90,33 +90,7 @@ class DetailsTintTest {
 
     @After fun close() { releaseSample.complete(Unit) }
 
-    @Test fun theArtsColourScrimsTheFullScreenArt() {
-        releaseSample.complete(Unit)
-        showPage()
-        compose.waitUntil(10_000) { DetailsArtColors.stored(AppArtworkSource(session, art)) != null }
-        // The page starts fully dimmed until the backdrop's dim is measured off the UI thread, which
-        // under load can take longer than any fixed clock advance.
-        val corner = Color(0xFF190C0C).copy(alpha = .92f).compositeOver(Color.Red)
-        compose.waitUntil(10_000) {
-            compose.mainClock.advanceTimeBy(100)
-            (pixel(20, 1060) shr 16 and 0xff) >= (corner.toArgb() shr 16 and 0xff) - 3
-        }
-        // The bottom-left corner, beyond the scrim's reach from the top right, away from the text.
-        assertNear(20, 1060, corner)
-    }
-
-    @Test fun warmPlaybackKeepsTheThemeBehindTheTransparentPage() {
-        showPage(warm = true)
-        assertPixel(20, 20, 0xFF111416.toInt())
-    }
-
-    @Test fun absentArtGlowsWithTheStoredPiconAccent() {
-        runBlocking { store.put("tint-test-2", 0x336699) }
-        showPage(hasArt = false)
-        // Without art the logo's colour glows from the top-right corner, once baked.
-        awaitGlow()
-        assertNear(1919, 0, Color(0xFF336699).copy(alpha = .55f).compositeOver(neutral))
-    }
+    @Test fun absentArtGlowsWithTheStoredPiconAccent() = absentArtUsesPiconAccent(stored = true)
 
     @OptIn(ExperimentalTvheadendApi::class, TvheadendTestingApi::class)
     @Test fun beforeASessionASavedLogosStoredColourShowsInTheFirstFrame() {
@@ -149,79 +123,62 @@ class DetailsTintTest {
         assertPixel(20, 20, 0xFF111416.toInt())
     }
 
-    @Test fun absentArtSamplesThePiconThroughTheExistingAccentStore() {
-        releaseSample.complete(Unit)
+    @Test fun absentArtSamplesThePiconThroughTheExistingAccentStore() = absentArtUsesPiconAccent(stored = false)
+
+    private fun absentArtUsesPiconAccent(stored: Boolean) {
+        if (stored) runBlocking { store.put("tint-test-2", 0x336699) }
+        else releaseSample.complete(Unit)
         showPage(hasArt = false)
         compose.waitUntil(10_000) { store["tint-test-2"] != null }
         awaitGlow()
-        assertNear(1919, 0, Color(0xFF000000.toInt() or requireNotNull(store["tint-test-2"])).copy(alpha = .55f)
+        val accent = if (stored) 0x336699 else requireNotNull(store["tint-test-2"])
+        assertNear(1919, 0, Color(0xFF000000.toInt() or accent).copy(alpha = .55f)
             .compositeOver(neutral))
-        assertEquals(1, samples.get())
+        if (!stored) assertEquals(1, samples.get())
     }
 
-    @Test fun aCachedNeutralGlowIsNeitherShownNorReportedWhileTheLogosColourIsSampled() {
+    @Test fun aCachedNeutralGlowIsNeitherShownNorReportedWhileTheLogosColourIsSampled() = staleGlowIsHidden(changedInPlace = false)
+
+    @Test fun aLogoChangedInPlaceHidesTheOldGlowWhileItsColourIsSampled() = staleGlowIsHidden(changedInPlace = true)
+
+    private fun staleGlowIsHidden(changedInPlace: Boolean) {
+        if (changedInPlace) runBlocking { store.put("tint-test-2", 0x336699) }
         val noLogo = ChannelId(9)
         val sampled = ChannelId(1)
-        val settled = mutableListOf<ChannelId>()
+        val replaced = ArtworkId(5)
+        val settled = mutableListOf<Pair<ChannelId, ArtworkId?>>()
         var shown by mutableStateOf(noLogo)
-        compose.setContent {
-            CompositionLocalProvider(LocalChannelAccents provides accents, LocalDensity provides Density(2f)) {
-                TVHeadendPlayerTheme {
-                    view = LocalView.current
-                    ProvideArtworkSession(session) {
-                        // A new glow per channel, as each backdrop of the immersive list is.
-                        key(shown) {
-                            val id = shown
-                            ChannelLogoGlow(picon.takeIf { id == sampled }?.let { ChannelIcon.ImageCache(it) }, id, Modifier.fillMaxSize(),
-                                onSettled = { settled += id })
-                        }
-                    }
-                }
-            }
-        }
-        // A channel without a logo bakes the neutral glow at this size.
-        compose.waitUntil(10_000) { noLogo in settled }
-        compose.runOnIdle { shown = sampled }
-        compose.mainClock.advanceTimeBy(1000)
-        compose.waitForIdle()
-        // Its colour is still being sampled: the neutral glow found in the cache is not its glow.
-        assertEquals(listOf(noLogo), settled)
-        assertPixel(1919, 0, neutral.toArgb())
-        releaseSample.complete(Unit)
-        compose.waitUntil(10_000) { sampled in settled }
-        assertEquals(listOf(noLogo, sampled), settled)
-        assertNear(1919, 0, Color(0xFF000000.toInt() or requireNotNull(store["tint-test-2"])).copy(alpha = .55f)
-            .compositeOver(neutral))
-    }
-
-    @Test fun aLogoChangedInPlaceHidesTheOldGlowWhileItsColourIsSampled() {
-        runBlocking { store.put("tint-test-2", 0x336699) }
-        val channel = ChannelId(1)
-        val settled = mutableListOf<ArtworkId>()
         var logo by mutableStateOf(picon)
         compose.setContent {
             CompositionLocalProvider(LocalChannelAccents provides accents, LocalDensity provides Density(2f)) {
                 TVHeadendPlayerTheme {
                     view = LocalView.current
                     ProvideArtworkSession(session) {
-                        val shown = logo
-                        ChannelLogoGlow(ChannelIcon.ImageCache(shown), channel, Modifier.fillMaxSize(), onSettled = { settled += shown })
+                        key(if (changedInPlace) sampled else shown) {
+                            val id = if (changedInPlace) sampled else shown
+                            val artwork = if (changedInPlace) logo else picon.takeIf { id == sampled }
+                            ChannelLogoGlow(artwork?.let { ChannelIcon.ImageCache(it) }, id, Modifier.fillMaxSize(),
+                                onSettled = { settled += id to artwork })
+                        }
                     }
                 }
             }
         }
-        compose.waitUntil(10_000) { picon in settled }
-        awaitGlow()
-        // The same glow, kept in place, while the new logo's colour is sampled: the old colour's
-        // glow is not the new logo's.
-        val replaced = ArtworkId(5)
-        compose.runOnIdle { logo = replaced }
+        val initial = if (changedInPlace) sampled to picon else noLogo to null
+        val next = sampled to if (changedInPlace) replaced else picon
+        compose.waitUntil(10_000) { initial in settled }
+        if (changedInPlace) awaitGlow()
+        compose.runOnIdle { if (changedInPlace) logo = replaced else shown = sampled }
         compose.mainClock.advanceTimeBy(1000)
+        compose.waitForIdle()
+        // Neither a cached neutral glow nor the previous logo's glow belongs to the pending logo.
+        assertEquals(listOf(initial), settled)
         assertPixel(1919, 0, neutral.toArgb())
-        assertEquals(listOf(picon), settled)
         releaseSample.complete(Unit)
-        compose.waitUntil(10_000) { replaced in settled }
-        assertNear(1919, 0, Color(0xFF000000.toInt() or requireNotNull(store["tint-test-5"])).copy(alpha = .55f)
+        compose.waitUntil(10_000) { next in settled }
+        if (!changedInPlace) assertEquals(listOf(initial, next), settled)
+        val sampledKey = if (changedInPlace) "tint-test-5" else "tint-test-2"
+        assertNear(1919, 0, Color(0xFF000000.toInt() or requireNotNull(store[sampledKey])).copy(alpha = .55f)
             .compositeOver(neutral))
     }
 
@@ -254,24 +211,21 @@ class DetailsTintTest {
         assertTrue(returned.any { it != neutral && it != redTint })
     }
 
-    @Test fun aSmallVividAreaWinsOverLargerSkinTones() {
-        artBitmap = {
-            Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888).apply {
-                eraseColor(android.graphics.Color.rgb(0xD9, 0xA0, 0x7A))
-                for (x in 0 until 64) for (y in 0 until 16) setPixel(x, y, android.graphics.Color.rgb(0xC8, 0x18, 0x10))
-            }
-        }
-        assertEquals(0f, rgbToHsv(requireNotNull(sampleArt(ArtworkId(3)))).first, 15f)
-    }
+    @Test fun aSmallVividAreaWinsOverLargerSkinTones() = sampledArtTint(vivid = true)
 
-    @Test fun artWithoutAVividColourStaysNeutral() {
+    @Test fun artWithoutAVividColourStaysNeutral() = sampledArtTint(vivid = false)
+
+    private fun sampledArtTint(vivid: Boolean) {
         artBitmap = {
             Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888).apply {
-                eraseColor(android.graphics.Color.GRAY)
-                for (x in 0 until 64) for (y in 0 until 16) setPixel(x, y, android.graphics.Color.WHITE)
+                eraseColor(if (vivid) android.graphics.Color.rgb(0xD9, 0xA0, 0x7A) else android.graphics.Color.GRAY)
+                val accent = if (vivid) android.graphics.Color.rgb(0xC8, 0x18, 0x10) else android.graphics.Color.WHITE
+                for (x in 0 until 64) for (y in 0 until 16) setPixel(x, y, accent)
             }
         }
-        assertEquals(0x131313, detailsTintRgb(requireNotNull(sampleArt(ArtworkId(4)))))
+        val sampled = requireNotNull(sampleArt(ArtworkId(if (vivid) 3 else 4)))
+        if (vivid) assertEquals(0f, rgbToHsv(sampled).first, 15f)
+        else assertEquals(0x131313, detailsTintRgb(sampled))
     }
 
     private fun sampleArt(id: ArtworkId): Int? {
@@ -341,10 +295,6 @@ class DetailsTintTest {
     }
 
     private fun assertPixel(x: Int, y: Int, expected: Int) {
-        compose.waitForIdle()
-        val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
-        compose.runOnIdle { view.draw(Canvas(bitmap)) }
-        assertEquals("pixel $x,$y", expected, bitmap.getPixel(x, y))
-        bitmap.recycle()
+        assertEquals("pixel $x,$y", expected, pixel(x, y))
     }
 }

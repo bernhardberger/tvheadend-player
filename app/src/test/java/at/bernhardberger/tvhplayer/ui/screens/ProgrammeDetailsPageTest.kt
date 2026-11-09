@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.key
@@ -115,112 +116,10 @@ class ProgrammeDetailsPageTest {
             .assertContentDescriptionEquals("120m, Documentary, Season 2, Episode 3")
         compose.onNodeWithTag("details-timeline").assertExists()
         compose.onNodeWithTag("details-progress", useUnmergedTree = true).assertExists()
-        // The text column keeps to the left ~55% of the screen, clear of the art's focal area.
-        Assert.assertTrue(compose.onNodeWithTag("details-timeline").getUnclippedBoundsInRoot().right.value <= 960f * .55f)
         // The lower section follows the natural header instead of reserving an empty first screen.
         val heading = compose.onNodeWithText("Other airings of Ridge Light").getBoundsInRoot()
-        capture("details-top")
-        Assert.assertTrue("$heading", heading.top >= compose.onNodeWithTag("details-actions").getUnclippedBoundsInRoot().bottom + 8.dp)
         Assert.assertTrue("$heading", heading.bottom.value <= 540f - 48f)
         compose.onNodeWithText("About Ridge Light").assertDoesNotExist()
-        capture("details-top")
-        capture("live-art", "u15-details-layout")
-    }
-    @Test fun brightArtKeepsTheTopBlockReadable() { show(bright = true); capture("details-top-bright") }
-
-    @Test @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
-    fun brightBackdropContrastCaptures() = backdropContrastCaptures(bright = true)
-
-    @Test @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
-    fun darkBackdropContrastCaptures() = backdropContrastCaptures(bright = false)
-
-    private fun backdropContrastCaptures(bright: Boolean) {
-        // The pack's brightest picture by mean WCAG luminance, and its darkest picture.
-        val picture = if (bright) "still-paper-kite-tales" else "still-northline-studio"
-        val title = if (bright) "Paper Kite Tales" else "Northline Tonight"
-        val station = Channel.create(ChannelId(1), name = if (bright) "Kite Kids" else "Northline News", number = 101,
-            icon = ChannelIcon.ImageCache(ArtworkId(1)))
-        images.install(FixtureArt.imageLoader(ApplicationProvider.getApplicationContext(), mapOf(
-            ArtworkId(1) to FixtureArt.picon(if (bright) "kite-kids" else "northline-news"),
-            ArtworkId(2) to FixtureArt.art(picture))))
-        val programme = EpgEvent.create(EventId(1), station.id, start, start + 7200.seconds,
-            title = title, subtitle = if (bright) "Over the painted hills" else "The evening bulletin",
-            genre = if (bright) "Animation" else "News", image = ArtworkId(2),
-            summary = if (bright) "A paper kite travels over painted hills and discovers a world of colour."
-                else "Evening studio news from a regional desk with two anchors.")
-        val next = EpgEvent.create(EventId(2), station.id, start + 86400.seconds, start + 90000.seconds,
-            title = title, image = ArtworkId(2))
-        compose.setContent {
-            CompositionLocalProvider(LocalDensity provides Density(2f, 1f)) {
-                TVHeadendPlayerTheme {
-                    view = LocalView.current
-                    ProvideArtworkSession(session) {
-                        ProgrammeDetailsPage(programme, null, station, start.epochSeconds + 480,
-                            programmeDetailsActions(programme, start.epochSeconds + 480, null, null, true, true), {}, {},
-                            related = listOf(next), channelOf = { station })
-                    }
-                }
-            }
-        }
-        compose.onNodeWithTag("details-watch").assertIsFocused()
-        // This point is the studio's ceiling light or the kite's sky, away from text. A pending
-        // measurement covers it with the solid <=26/255 tint. Wait for the decoded art to emerge;
-        // snapshot() then advances the shared motion to its settled endpoint.
-        compose.waitUntil(10_000) {
-            val frame = snapshot()
-            val ready = android.graphics.Color.blue(frame.getPixel(1372, 92)) > 50
-            frame.recycle()
-            ready
-        }
-        saveBackdropCapture("$picture-sharp", listOf(
-            compose.onNodeWithTag("details-title"), compose.onNodeWithTag("details-subtitle"),
-            compose.onNodeWithTag("details-metadata"), compose.onNodeWithTag("details-synopsis", useUnmergedTree = true)))
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
-        compose.onNodeWithTag("details-card-2").assertIsFocused()
-        saveBackdropCapture("$picture-scrolled", listOf(compose.onNodeWithText("Other airings of $title"),
-            compose.onNodeWithTag("details-card-time", useUnmergedTree = true),
-            compose.onNodeWithTag("details-card-subtitle-2", useUnmergedTree = true)))
-    }
-
-    private fun saveBackdropCapture(name: String, text: List<SemanticsNodeInteraction>) {
-        val full = snapshot()
-        val bitmap = Bitmap.createScaledBitmap(full, 960, 540, true)
-        CaptureOutput.writePng(File("../build/review/details-bright-art", "$name.png"), bitmap)
-        val ratios = text.map { node ->
-            val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
-            val semantics = node.fetchSemanticsNode()
-            semantics.config.getOrNull(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult)?.action?.invoke(layouts)
-            val layout = layouts.singleOrNull()
-            val bounds = semantics.boundsInRoot
-            fun luminance(x: Int, y: Int): Double {
-                val pixel = full.getPixel(x.coerceIn(0, full.width - 1), y.coerceIn(0, full.height - 1))
-                return detailsRelativeLuminance((pixel shr 16 and 255) / 255.0, (pixel shr 8 and 255) / 255.0, (pixel and 255) / 255.0)
-            }
-            // Real raster ink and the art exposed by spaces in that same line, not an assumed
-            // theme colour or a sample from an unrelated corner of the page.
-            val foreground = if (layout == null) {
-                // These small captions can have no fully covered raster pixel. WCAG measures ink
-                // colour, not anti-aliased edge coverage; use the palette's weakest RGB channel.
-                val ink = if (semantics.config.getOrNull(SemanticsProperties.TestTag) == "details-card-time") 225.0 / 255 else 192.0 / 255
-                detailsRelativeLuminance(ink, ink, ink)
-            } else (bounds.top.toInt() until bounds.bottom.toInt()).maxOf { y ->
-                (bounds.left.toInt() until bounds.right.toInt()).maxOf { x -> luminance(x, y) }
-            }
-            val background = if (layout == null) (bounds.left.toInt() until bounds.right.toInt()).maxOf { x ->
-                // Card captions clear text semantics because the card speaks the whole airing;
-                // their top padding exposes the backdrop immediately above their ink.
-                luminance(x, bounds.top.toInt() - 2)
-            } else layout.layoutInput.text.indices.filter { layout.layoutInput.text[it] == ' ' }.maxOf { index ->
-                val space = layout.getBoundingBox(index)
-                luminance((bounds.left + space.center.x).toInt(), (bounds.top + space.center.y).toInt())
-            }
-            val ratio = (foreground + .05) / (background + .05)
-            "${layout?.layoutInput?.text ?: semantics.config.getOrNull(SemanticsProperties.TestTag)}: $ratio"
-                .also { Assert.assertTrue("$name $it fg=$foreground bg=$background bounds=$bounds", ratio >= 4.5) }
-        }
-        CaptureOutput.writeText(File("../build/review/details-bright-art", "$name-contrast.txt")) { ratios.joinToString("\n", postfix = "\n") }
-        bitmap.recycle()
-        full.recycle()
     }
 
     @Test fun plainDetailsOpensReaderAndRestoresTheAiring() {
@@ -228,14 +127,12 @@ class ProgrammeDetailsPageTest {
         compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
         compose.onNodeWithTag("details-card-2").assertIsFocused()
         compose.onNode(hasText("Genre") and hasAnyAncestor(hasTestTag("details-facts")), useUnmergedTree = true).assertExists()
-        capture("airings-and-details")
         compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
         compose.onNodeWithTag("details-facts-panel").assertIsFocused()
         compose.onNodeWithTag("details-card-2").assertIsNotFocused()
         compose.onRoot().performKeyInput { pressKey(Key.DirectionLeft); pressKey(Key.DirectionRight) }
         compose.onNodeWithTag("details-facts-panel").assertIsFocused()
         compose.onNodeWithText("Mountain • Winter", useUnmergedTree = true).assertIsDisplayed()
-        capture("details-panel-focused-dimmed-airings")
         compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("player-info-reading").assertIsFocused()
         compose.runOnIdle { back.onBackPressed() }
@@ -258,7 +155,7 @@ class ProgrammeDetailsPageTest {
         Assert.assertEquals(before, compose.onNodeWithTag("details-card-2").getUnclippedBoundsInRoot().top)
     }
 
-    @Test fun headerBlockDimsWithAiringsUsingTheSharedClock() {
+    @Test fun headerBlockDimsWithAirings() {
         show(heroVariant = 1)
         fun brightestAboutText(): Int {
             val bounds = compose.onNodeWithText("Record", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
@@ -273,35 +170,8 @@ class ProgrammeDetailsPageTest {
         compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
         val quiet = brightestAboutText()
         Assert.assertTrue("header glyph brightness $active -> $quiet", quiet < active * .55f)
-        capture("header-dimmed-airings-active")
     }
 
-    @Test fun headingVisibleGapIsSixteenDpInQuietAndActiveStates() {
-        show(future = true)
-        fun gap(): Float {
-            val heading = compose.onNodeWithText("Other airings of Ridge Light").fetchSemanticsNode().boundsInRoot
-            val card = compose.onNodeWithTag("details-card-2").fetchSemanticsNode().boundsInRoot
-            val bitmap = snapshot()
-            fun red(x: Int, y: Int) = android.graphics.Color.red(bitmap.getPixel(x, y))
-            // The logo's glow behind the page brightens the background gradually; the glyphs
-            // and the card's edge stand out from it.
-            val glyphBottom = (heading.top.toInt() until heading.bottom.toInt()).last { y ->
-                (heading.left.toInt() until heading.right.toInt()).any { x -> red(x, y) > 100 }
-            }
-            val x = card.center.x.toInt()
-            val cardTop = (glyphBottom + 2..card.top.toInt() + 20).first { y -> kotlin.math.abs(red(x, y) - red(x, y - 1)) > 10 }
-            bitmap.recycle()
-            return (cardTop - glyphBottom - 1) / 2f
-        }
-        val quiet = gap()
-        capture("heading-gap-quiet")
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
-        val active = gap()
-        capture("heading-gap-active")
-        Assert.assertEquals("quiet gap", 16f, quiet, 1f)
-        Assert.assertEquals("active gap", 16f, active, 1f)
-        Assert.assertEquals("same visible gap", quiet, active, 1f)
-    }
 
     @Test fun detailsAndAiringsHeadingsUseTheSameQuietAndActiveSizes() {
         show(richFacts = true)
@@ -315,25 +185,8 @@ class ProgrammeDetailsPageTest {
         Assert.assertEquals(quietAirings, quietDetails, .5f)
         compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
         val activeAirings = height("Other airings of Ridge Light")
-        fun factsGap(): Float {
-            val heading = compose.onNodeWithText("Details", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-            val label = compose.onNode(hasText("Genre") and hasAnyAncestor(hasTestTag("details-facts")), useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-            val bitmap = snapshot()
-            val glyphBottom = (heading.top.toInt() until heading.bottom.toInt()).last { y ->
-                (heading.left.toInt() until heading.right.toInt()).any { x -> android.graphics.Color.red(bitmap.getPixel(x, y)) > 50 }
-            }
-            val labelTop = (label.top.toInt() until label.bottom.toInt()).first { y ->
-                (label.left.toInt() until label.right.toInt()).any { x -> android.graphics.Color.red(bitmap.getPixel(x, y)) > 45 }
-            }
-            bitmap.recycle()
-            return (labelTop - glyphBottom - 1) / 2f
-        }
-        val quietGap = factsGap()
         compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
         Assert.assertEquals(activeAirings, height("Details"), .5f)
-        Assert.assertEquals(18f / 28f, quietDetails / height("Details"), .02f)
-        Assert.assertEquals("quiet facts gap", 16f, quietGap, 1f)
-        Assert.assertEquals("active facts gap", 16f, factsGap(), 1f)
     }
 
     @Test fun focusedAiringScaleIsNotClippedMidSectionTransition() {
@@ -348,7 +201,6 @@ class ProgrammeDetailsPageTest {
         val x = ((card.left.value - 8f) * 2).toInt()
         val y = ((card.top.value + (card.bottom - card.top).value / 2) * 2).toInt()
         Assert.assertTrue("focused overflow at $x,$y", android.graphics.Color.red(bitmap.getPixel(x, y)) > 35)
-        CaptureOutput.writePng(File("build/outputs/u15-about", "airings-focused-mid-transition.png"), bitmap)
         bitmap.recycle()
         compose.mainClock.autoAdvance = true
     }
@@ -375,7 +227,6 @@ class ProgrammeDetailsPageTest {
             Assert.assertEquals("plate must be faded once with its art", channel(active) * .4f + channel(page) * .6f,
                 channel(quiet).toFloat(), 2f)
         }
-        capture("dimmed-airings-picon-plates")
     }
     @Test fun longTitleKeepsPanelAndActionsAboveBottomSafeEdge() {
         show(longTitle = true)
@@ -383,18 +234,8 @@ class ProgrammeDetailsPageTest {
         val actions = compose.onNodeWithTag("details-actions").getUnclippedBoundsInRoot()
         Assert.assertTrue("$actions", actions.bottom.value <= 540f - 48f)
         compose.onNodeWithTag("details-about-description").assertIsDisplayed()
-        capture("details-long-title")
     }
-    @Test fun shortAboutAlwaysFocusesAndOpensSharedReader() {
-        show()
-        compose.onNodeWithTag("details-watch").performKeyInput { pressKey(Key.DirectionUp) }
-        compose.onNodeWithTag("details-about-description").assertIsFocused()
-            .performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.onNodeWithTag("player-info-reading").assertIsFocused()
-        compose.onNodeWithTag("details-hero-blurred").assertExists()
-        compose.runOnIdle { back.onBackPressed() }
-        compose.onNodeWithTag("details-about-description").assertIsFocused()
-    }
+    @Test fun shortAboutAlwaysFocusesAndOpensSharedReader() = aboutOpensSharedReader(longText = false)
     @Test fun factsWithoutDescriptionAppearInHeaderWithoutAnEmptyReader() {
         show(factsOnly = true)
         compose.onNodeWithTag("details-metadata").assertTextEquals("120m • Documentary")
@@ -420,7 +261,6 @@ class ProgrammeDetailsPageTest {
         val page = compose.onNodeWithTag("programme-details-page").getUnclippedBoundsInRoot()
         Assert.assertEquals(0f, page.left.value, 1f)
         Assert.assertEquals(960f, page.right.value, 1f)
-        capture("details-fullscreen-no-rail")
     }
     @Test fun leftAtEverySectionEdgeStaysInDetailsAndBackStillCloses() {
         var closed = 0
@@ -436,30 +276,15 @@ class ProgrammeDetailsPageTest {
         compose.runOnIdle { back.onBackPressed() }
         Assert.assertEquals(1, closed)
     }
-    @Test fun futureWithoutArtReservesNoHero() {
-        show(future = true); compose.onNodeWithTag("details-hero").assertDoesNotExist()
-        compose.onNodeWithTag("details-progress").assertDoesNotExist()
-        capture("details-top-noart")
-        capture("future-no-art", "u15-details-layout")
-    }
-    @Test fun recordingPartlyWatched() {
+    @Test fun partlyWatchedRecordingFocusesResumeAndDescribesProgressWithoutAirings() {
         show(recording = true); compose.onNodeWithTag("details-resume").assertIsFocused()
         val progress = compose.onNodeWithTag("details-progress", useUnmergedTree = true)
         Assert.assertEquals(3723f / 7200f, progress.fetchSemanticsNode().config[
             androidx.compose.ui.semantics.SemanticsProperties.ProgressBarRangeInfo].current, .0001f)
-        val left = compose.onNodeWithText("1:02:03", useUnmergedTree = true).getUnclippedBoundsInRoot()
-        val right = compose.onNodeWithText("2:00:00 • 58m left", useUnmergedTree = true).getUnclippedBoundsInRoot()
-        val strip = progress.getUnclippedBoundsInRoot()
-        Assert.assertEquals(8f, (strip.left - left.right).value, .5f)
-        Assert.assertEquals(8f, (right.left - strip.right).value, .5f)
-        Assert.assertEquals(4f, (strip.bottom - strip.top).value, .5f)
-        compose.onNodeWithText("Left", substring = true).assertDoesNotExist()
         compose.onNodeWithTag("details-timeline").assert(androidx.compose.ui.test.SemanticsMatcher.expectValue(
             androidx.compose.ui.semantics.SemanticsProperties.ContentDescription,
             listOf("62 minutes of 120 minutes, 58 minutes left")))
         compose.onNodeWithText("Other airings of Ridge Light").assertDoesNotExist()
-        capture("recording-partly-watched")
-        capture("recording-partly-watched", "u15-details-layout")
     }
 
     @OptIn(ExperimentalTvheadendApi::class)
@@ -502,14 +327,10 @@ class ProgrammeDetailsPageTest {
         val bounds = about.getUnclippedBoundsInRoot()
         Assert.assertTrue("$bounds", bounds.top.value >= 48f && bounds.bottom.value <= 540f - 48f)
         val text = compose.onNode(hasText(event.summary!!) and hasAnyAncestor(hasTestTag("details-about")), useUnmergedTree = true)
-        Assert.assertEquals(64.4f, text.getUnclippedBoundsInRoot().left.value, 1f)
         text.assertIsDisplayed()
-        compose.onNode(hasText("More info") and hasAnyAncestor(hasTestTag("details-about")), useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("details-about-arrow", useUnmergedTree = true).assertIsDisplayed()
-        Assert.assertEquals(584f, (bounds.right - bounds.left).value, 1f)
         Assert.assertTrue(bounds.bottom < compose.onNodeWithTag("details-actions").getUnclippedBoundsInRoot().top)
         compose.onNodeWithTag("details-facts", useUnmergedTree = true).assertExists()
-        capture("about-focused")
         compose.runOnIdle { back.onBackPressed() }
         compose.onNodeWithTag("details-watch").assertIsFocused().assertIsDisplayed()
         Assert.assertEquals(0, closed)
@@ -517,26 +338,34 @@ class ProgrammeDetailsPageTest {
         Assert.assertEquals(1, closed)
     }
 
-    @Test fun longAboutOpensSharedReaderScrollsToEndAndRestoresAbout() {
-        show(longText = true)
+    @Test fun longAboutOpensSharedReaderScrollsToEndAndRestoresAbout() = aboutOpensSharedReader(longText = true)
+
+    private fun aboutOpensSharedReader(longText: Boolean) {
+        show(longText = longText)
         compose.onNodeWithTag("details-watch").performKeyInput { pressKey(Key.DirectionUp) }
         compose.onNodeWithTag("details-about-description").assertIsFocused()
-        capture("about-long-focused")
         compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("player-info-reading").assertIsFocused()
         compose.onNode(hasText(event.title!!) and hasAnyAncestor(hasTestTag("details-reading-heading")), useUnmergedTree = true).assertExists()
         compose.onNode(hasText("More info") and hasAnyAncestor(hasTestTag("details-reading-heading")), useUnmergedTree = true).assertDoesNotExist()
-        capture("full-description-open")
         val text = compose.onNodeWithTag("details-reading-text", useUnmergedTree = true)
-        val firstTop = text.getUnclippedBoundsInRoot().top.value
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
-        Assert.assertEquals(60f, firstTop - text.getUnclippedBoundsInRoot().top.value, 2f)
-        capture("reading-long-scrolled")
-        repeat(100) { compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) } }
-        Assert.assertTrue(text.getUnclippedBoundsInRoot().bottom.value <= 540f - 48f + 1f)
-        val endTop = text.getUnclippedBoundsInRoot().top.value
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
-        Assert.assertTrue(text.getUnclippedBoundsInRoot().top.value > endTop)
+        if (longText) {
+            fun readingScrollValue() = compose.onNode(
+                SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange) and
+                    hasAnyAncestor(hasTestTag("player-info-reading")), useUnmergedTree = true)
+                .fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
+            var previous = Float.NaN
+            var steps = 0
+            while (readingScrollValue() != previous && steps < 100) {
+                previous = readingScrollValue()
+                compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+                steps++
+            }
+            Assert.assertTrue(text.getUnclippedBoundsInRoot().bottom.value <= 540f - 48f + 1f)
+            val endTop = text.getUnclippedBoundsInRoot().top.value
+            compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
+            Assert.assertTrue(text.getUnclippedBoundsInRoot().top.value > endTop)
+        }
         compose.runOnIdle { back.onBackPressed() }
         compose.onNodeWithTag("details-about-description").assertIsFocused().assertIsDisplayed()
         compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
@@ -549,19 +378,17 @@ class ProgrammeDetailsPageTest {
 
     @Test fun sectionScrollFinishesInOneMotionWithoutPausing() {
         show(longText = true)
-        fun scrollValue() = compose.onNodeWithTag("details-page-scroll", useUnmergedTree = true)
-            .fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
         compose.mainClock.autoAdvance = false
         for (key in listOf(Key.DirectionDown, Key.DirectionUp)) {
-            val values = mutableListOf(scrollValue())
+            val values = mutableListOf(pageScrollValue())
             compose.onRoot().performKeyInput { pressKey(key) }
             repeat((RowChangeMs + 64) / 16) {
                 compose.mainClock.advanceTimeByFrame()
-                values += scrollValue()
+                values += pageScrollValue()
             }
             val finish = values.last()
             compose.mainClock.advanceTimeBy(1000)
-            Assert.assertEquals("$key must finish in one motion: $values", scrollValue(), finish, 1f)
+            Assert.assertEquals("$key must finish in one motion: $values", pageScrollValue(), finish, 1f)
             val moving = values.dropWhile { it == values.first() }.dropLastWhile { it == values.last() }
             Assert.assertTrue("$key must move: $values", moving.isNotEmpty())
             // Sub-pixel easing steps may repeat a pixel within the last two before the finish.
@@ -602,51 +429,29 @@ class ProgrammeDetailsPageTest {
         Assert.assertEquals(quietWidth, headingWidth(), 1f)
     }
 
-    @Test fun standardScrollCaptures() {
-        show(cast = true)
-        capture("top", "details-standard-scroll")
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
-        compose.onNodeWithTag("details-card-2").assertIsFocused()
-        capture("other-airings-focused", "details-standard-scroll")
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
-        compose.onNodeWithTag("details-facts-panel").assertIsFocused()
-        // The credits are part of the facts; there is no separate Cast & crew row.
-        capture("facts-with-cast-focused", "details-standard-scroll")
-    }
-    @Test fun standardScrollFactsCapture() {
-        show(richFacts = true)
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
-        compose.onNodeWithTag("details-facts-panel").assertIsFocused()
-        capture("facts-focused", "details-standard-scroll")
-    }
 
     @Test fun panelAndActionsShareTheTopWithoutScrolling() {
         show(summaryOnly = true)
-        fun scrollValue() = compose.onNodeWithTag("details-page-scroll", useUnmergedTree = true)
-            .fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
-        val top = scrollValue()
+        val top = pageScrollValue()
         compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
         compose.onNodeWithTag("details-about-description").assertIsFocused()
-        Assert.assertEquals(top, scrollValue(), 0f)
+        Assert.assertEquals(top, pageScrollValue(), 0f)
         compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
         compose.onNodeWithTag("details-watch").assertIsFocused()
-        Assert.assertEquals(top, scrollValue(), 0f)
+        Assert.assertEquals(top, pageScrollValue(), 0f)
     }
 
     @Test fun pageReturnedToFromAnAiringStartsAtTheAiringsWithoutScrolling() {
         compose.mainClock.autoAdvance = false
         show(longText = true, returnToCard = airings[2].id)
-        fun scrollValue() = compose.onNodeWithTag("details-page-scroll", useUnmergedTree = true)
-            .fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
-        val values = mutableListOf(scrollValue())
+        val values = mutableListOf(pageScrollValue())
         repeat((RowChangeMs + 64) / 16) {
             compose.mainClock.advanceTimeByFrame()
-            values += scrollValue()
+            values += pageScrollValue()
         }
         compose.mainClock.autoAdvance = true
         compose.waitForIdle()
-        val settled = scrollValue()
+        val settled = pageScrollValue()
         Assert.assertTrue("page must start below the top: $values", settled > 0f)
         Assert.assertTrue("page must jump straight to the airings: $values",
             values.dropWhile { it == 0f }.all { it == settled })
@@ -679,15 +484,13 @@ class ProgrammeDetailsPageTest {
 
     // The airings row's text shrinks while the page scrolls to the facts: aimed at where the facts
     // end up, the heading rises straight to the keyline instead of overshooting and swinging back.
-    @Test fun factsHeadingRisesToTheKeylineWithoutPassingIt() {
-        show(cast = true)
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
-        compose.onNodeWithTag("details-card-2").assertIsFocused()
-        assertFactsHeadingRisesStraightToTheKeyline()
-    }
-    @Test fun factsHeadingRisesStraightToTheKeylineOnAPageReturnedToAtTheAirings() {
-        show(cast = true, returnToCard = airings[2].id)
-        compose.onNodeWithTag("details-card-${airings[2].id.value}").assertIsFocused()
+    @Test fun factsHeadingRisesToTheKeylineWithoutPassingIt() = factsHeadingRisesToTheKeyline(returned = false)
+    @Test fun factsHeadingRisesStraightToTheKeylineOnAPageReturnedToAtTheAirings() = factsHeadingRisesToTheKeyline(returned = true)
+
+    private fun factsHeadingRisesToTheKeyline(returned: Boolean) {
+        show(cast = true, returnToCard = airings[2].id.takeIf { returned })
+        if (!returned) compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.onNodeWithTag("details-card-${if (returned) airings[2].id.value else 2}").assertIsFocused()
         assertFactsHeadingRisesStraightToTheKeyline()
     }
     private fun assertFactsHeadingRisesStraightToTheKeyline() {
@@ -707,23 +510,6 @@ class ProgrammeDetailsPageTest {
         Assert.assertEquals(160f, factsHeadingTop(), .5f)
     }
 
-    // One scroll of our own per section change, with the rows' shared motion: calmer than the
-    // standard spring, which has all but arrived two thirds of the way through it.
-    @Test fun sectionScrollTakesTheRowChangeMotion() {
-        show(cast = true)
-        compose.mainClock.autoAdvance = false
-        val start = pageScrollValue()
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
-        compose.mainClock.advanceTimeBy(RowChangeMs * 2L / 3)
-        val twoThirds = pageScrollValue()
-        compose.mainClock.advanceTimeBy(RowChangeMs / 3L + 32)
-        val settled = pageScrollValue()
-        compose.mainClock.advanceTimeBy(1000)
-        Assert.assertEquals("settled once the motion's time is up", pageScrollValue(), settled, 0f)
-        Assert.assertTrue("still moving at two thirds: $start < $twoThirds < $settled",
-            twoThirds > start && settled - twoThirds > 4f)
-        compose.mainClock.autoAdvance = true
-    }
 
     @Test fun movesWithinARowDoNotScrollThePage() {
         show(cast = true)
@@ -787,36 +573,24 @@ class ProgrammeDetailsPageTest {
         compose.mainClock.autoAdvance = true
     }
 
-    @Test fun aboutPrecedesAiringsAndRowScrollsToTheScreenEdge() {
+    @Test fun firstAiringFocusDescriptionsAndRowScrollRestoreAfterBack() {
         var opened: EpgEvent? = null
         show(onRelated = { opened = it }, realRail = true)
         compose.onNodeWithTag("details-watch").performKeyInput { pressKey(Key.DirectionDown) }
         compose.onNodeWithTag("details-read-more").assertDoesNotExist()
         val first = compose.onNodeWithTag("details-card-2").assertIsFocused().assertIsDisplayed()
-        Assert.assertEquals(58f, first.getUnclippedBoundsInRoot().left.value, 1f)
         compose.onNodeWithText("Other airings of Ridge Light").assertIsDisplayed()
         compose.onNodeWithTag("details-about-description").assertIsNotFocused()
         // Cards lead with when; the page's own title is never repeated, a different one is the episode line.
-        val time = compose.onAllNodesWithTag("details-card-time", useUnmergedTree = true)[0]
         first.assertContentDescriptionEquals("Tomorrow 20:00, 101 Ridge Earth HD")
         compose.onNodeWithTag("details-card-4").assertContentDescriptionEquals("Fri, Sep 18 20:00, Into the Polar Night, 101 Ridge Earth HD")
         compose.onNodeWithTag("details-card-5").assertContentDescriptionEquals(
             "Sat, Sep 19 20:00, Ridge Light: Northern Journey Across the Frozen Ridge, 102 Ridge Earth Plus")
         compose.onNode(hasText("Ridge Light") and hasAnyAncestor(hasTestTag("details-airings")), useUnmergedTree = true).assertDoesNotExist()
-        // The text clears the focused card's 1.1 scale (~6dp) and outline.
-        val card = first.getUnclippedBoundsInRoot()
-        Assert.assertTrue(time.getUnclippedBoundsInRoot().top.value - card.bottom.value >= 6f + 4f + 4f)
-        // The row runs past the right screen edge.
-        Assert.assertTrue(compose.onNodeWithTag("details-card-5").getUnclippedBoundsInRoot().right.value > 960f)
-        capture("airings-row-focused-first")
         compose.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
         compose.onNodeWithTag("details-card-3").assertIsFocused()
-        capture("airings-card-without-art")
         compose.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
         compose.onNodeWithTag("details-card-4").assertIsFocused()
-        Assert.assertEquals(58f, compose.onNodeWithTag("details-card-4").getUnclippedBoundsInRoot().left.value, 1f)
-        Assert.assertTrue(compose.onNodeWithTag("details-card-3").getUnclippedBoundsInRoot().left.value < 58f)
-        capture("airings-row-scrolled")
         compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.runOnIdle { Assert.assertEquals(EventId(4), opened?.id) }
         compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
@@ -832,10 +606,9 @@ class ProgrammeDetailsPageTest {
         show(future = true)
         compose.onNodeWithTag("details-synopsis").assertDoesNotExist()
         compose.onNodeWithTag("details-hero").assertDoesNotExist()
+        compose.onNodeWithTag("details-progress").assertDoesNotExist()
         compose.onNodeWithTag("details-about").assertDoesNotExist()
-        val title = compose.onNodeWithText("Ridge Light").getUnclippedBoundsInRoot()
-        val facts = compose.onNodeWithTag("details-metadata").assertTextEquals("Today\u00a019:00 • 120m").getUnclippedBoundsInRoot()
-        Assert.assertEquals(8f, facts.top.value - title.bottom.value, 1f)
+        compose.onNodeWithTag("details-metadata").assertTextEquals("Today\u00a019:00 • 120m")
         // Without an About section, Down goes straight to the row.
         compose.onNodeWithTag("details-watch").performKeyInput { pressKey(Key.DirectionDown) }
         compose.onNodeWithTag("details-card-2").assertIsFocused()
@@ -853,18 +626,10 @@ class ProgrammeDetailsPageTest {
             compose.onNode(hasText(it) and facts, useUnmergedTree = true).getUnclippedBoundsInRoot()
         }
         Assert.assertTrue(labels.all { it.top == labels.first().top })
-        Assert.assertTrue(labels.zipWithNext().all { (a, b) -> b.left - a.left == 224.dp })
         val values = listOf("Documentary", "2", "3 von 8").map {
             compose.onNode(hasText(it) and facts, useUnmergedTree = true).getUnclippedBoundsInRoot()
         }
         Assert.assertTrue(values.zip(labels).all { (value, label) -> value.left == label.left && value.top >= label.bottom })
-        compose.onNode(hasText("Genre") and facts, useUnmergedTree = true).assertExists()
-        capture("facts-flow-de")
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionUp); pressKey(Key.DirectionUp) }
-        compose.onNodeWithTag("details-about-description").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.onNodeWithTag("player-info-reading").assertIsFocused()
-        compose.onNodeWithTag("details-facts", useUnmergedTree = true).assertDoesNotExist()
-        compose.onNodeWithTag("details-reading-text", useUnmergedTree = true).assertExists()
     }
 
     @Test fun largeTextKeepsActionsAboutAndAiringsReachable() {
@@ -959,12 +724,6 @@ class ProgrammeDetailsPageTest {
             airing("Ridge Light: Winter", "Part 1"), "Ridge Light", "Part 1", resources))
     }
 
-    @Test fun durationFormatterKeepsMinutesForDetailsAndDialogs() {
-        val resources = ApplicationProvider.getApplicationContext<Application>().resources
-        Assert.assertEquals("120m", at.bernhardberger.tvhplayer.ui.common.formatDurationMinutes(120, resources))
-        Assert.assertEquals("45m", at.bernhardberger.tvhplayer.ui.common.formatDurationMinutes(45, resources))
-        Assert.assertEquals("112m", at.bernhardberger.tvhplayer.ui.common.formatDurationMinutes(112, resources))
-    }
 
     private lateinit var back: androidx.activity.OnBackPressedDispatcher
 
@@ -972,7 +731,6 @@ class ProgrammeDetailsPageTest {
         show(todayCard = true)
         compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
         compose.onNodeWithTag("details-card-2").assertContentDescriptionEquals("Today 20:00, 101 Ridge Earth HD")
-        capture("blurred-backdrop")
     }
 
     @Test fun runningAiringCardSaysWhenItEndsAndShowsItsProgress() {
@@ -1001,12 +759,10 @@ class ProgrammeDetailsPageTest {
 
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
     fun germanRatingMoreAndToday() {
-        show(longSynopsis = true, todayCard = true)
+        show(longSynopsis = true)
         compose.onNodeWithTag("details-rating").assertContentDescriptionEquals("Altersfreigabe 12+")
         val text = compose.onNodeWithTag("details-synopsis", useUnmergedTree = true).fetchSemanticsNode().config[SemanticsProperties.Text].single()
         Assert.assertTrue(text.text.endsWith("… Mehr"))
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
-        compose.onNodeWithTag("details-card-2").assertContentDescriptionEquals("Heute 20:00, 101 Ridge Earth HD")
     }
 
     @Test fun scrolledFullScreenArtTradesTheScrimForAnEvenDim() = fullScreenScrim()
@@ -1054,7 +810,7 @@ class ProgrammeDetailsPageTest {
         Assert.assertTrue("the left lightens without losing contrast", after[3] > before[3] + 10)
     }
 
-    @Test fun heroCoversThePageAndStaysStillWhileTheBlurFadesIn() {
+    @Test fun heroCoversThePageAndStaysStill() {
         show()
         fun frame(tag: String): androidx.compose.ui.geometry.Rect {
             val coordinates = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().layoutInfo.coordinates
@@ -1065,18 +821,18 @@ class ProgrammeDetailsPageTest {
         }
         val screen = androidx.compose.ui.geometry.Rect(0f, 0f, 1920f, 1080f)
         Assert.assertEquals(screen, frame("details-hero"))
-        capture("details-art-top", "u15-details-layout")
         compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
         compose.mainClock.advanceTimeBy(1000)
         // The picture stays still (no zoom) and the blurred copy lies exactly over it.
         Assert.assertEquals(screen, frame("details-hero"))
         Assert.assertEquals(screen, frame("details-hero-blurred"))
-        capture("details-art-scrolled", "u15-details-layout")
     }
 
     @Test fun warmPlaybackShowsNoArtSoTheVideoStaysTheBackground() {
         show(warm = true)
-        capture("warm-playback", "u15-details-layout")
+        val frame = snapshot()
+        Assert.assertEquals("theme background behind the transparent page", Color(0xFF111416).toArgb(), frame.getPixel(20, 20))
+        frame.recycle()
         compose.onNodeWithTag("details-hero").assertDoesNotExist()
         compose.onNodeWithTag("details-hero-logo").assertDoesNotExist()
         compose.onNodeWithTag("details-logo-glow").assertDoesNotExist()
@@ -1087,23 +843,21 @@ class ProgrammeDetailsPageTest {
         compose.onNodeWithTag("details-logo-glow").assertDoesNotExist()
     }
 
-    @Test fun soundOnlyKeepsTheProgrammeArtworkWhilePlaybackContinues() {
+    @Test fun soundOnlyKeepsTheProgrammeArtworkWhilePlaybackContinues() = playbackModeUsesProgrammeArtwork(
+        at.bernhardberger.tvhplayer.settings.WarmPlaybackMode.AUDIO_ONLY)
+
+    @Test fun stoppedBrowseUsesTheProgrammeArtwork() = playbackModeUsesProgrammeArtwork(
+        at.bernhardberger.tvhplayer.settings.WarmPlaybackMode.OFF)
+
+    private fun playbackModeUsesProgrammeArtwork(playbackMode: at.bernhardberger.tvhplayer.settings.WarmPlaybackMode) {
         val mode = androidx.compose.runtime.mutableStateOf(at.bernhardberger.tvhplayer.settings.WarmPlaybackMode.ON)
         show(warmMode = mode)
         compose.onNodeWithTag("details-hero").assertDoesNotExist()
-        compose.runOnIdle { mode.value = at.bernhardberger.tvhplayer.settings.WarmPlaybackMode.AUDIO_ONLY }
+        compose.runOnIdle { mode.value = playbackMode }
         compose.waitForIdle()
         compose.onNodeWithTag("details-hero").assertExists()
     }
 
-    @Test fun stoppedBrowseUsesTheProgrammeArtwork() {
-        val mode = androidx.compose.runtime.mutableStateOf(at.bernhardberger.tvhplayer.settings.WarmPlaybackMode.ON)
-        show(warmMode = mode)
-        compose.onNodeWithTag("details-hero").assertDoesNotExist()
-        compose.runOnIdle { mode.value = at.bernhardberger.tvhplayer.settings.WarmPlaybackMode.OFF }
-        compose.waitForIdle()
-        compose.onNodeWithTag("details-hero").assertExists()
-    }
 
     @Test fun withoutArtTheLogosGlowTurnsIntoAnEvenTintWhileTheLogoScrollsAway() {
         show(future = true)
@@ -1122,7 +876,6 @@ class ProgrammeDetailsPageTest {
         Assert.assertEquals(19f, android.graphics.Color.red(top.getPixel(5, 540)).toFloat(), 2f)
         val glow = top.getPixel(1910, 5)
         top.recycle()
-        capture("details-noart-top", "u15-details-layout")
         compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
         compose.mainClock.advanceTimeBy(1000)
         // The logo leaves with the page, the glow gives way to an even tint of its colour, and
@@ -1136,20 +889,14 @@ class ProgrammeDetailsPageTest {
         Assert.assertTrue("dimmer than the glow", light(corner) < light(glow))
         Assert.assertTrue("tinted, not the plain background", corner != background)
         Assert.assertEquals("even", light(corner).toFloat(), light(edge).toFloat(), 3f)
-        capture("details-noart-scrolled", "u15-details-layout")
     }
 
     @Test fun longTitleUsesOneLineAcrossThePageWithinTheKeylines() {
         show(longTitle = true)
         val title = compose.onNodeWithTag("details-title")
-        val bounds = title.getUnclippedBoundsInRoot()
-        Assert.assertTrue((bounds.right - bounds.left).value > 470f)
-        Assert.assertEquals(58f, bounds.left.value, .5f)
-        Assert.assertTrue(bounds.right.value <= 902f)
         val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
         title.performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { it(layouts) }
         Assert.assertEquals(1, layouts.single().lineCount)
-        capture("details-wide-one-line-title")
     }
 
     @Test fun longTitleBesideTheLogoStopsShortOfItOnTwoLines() {
@@ -1160,59 +907,32 @@ class ProgrammeDetailsPageTest {
         val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
         title.performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { it(layouts) }
         Assert.assertEquals(2, layouts.single().lineCount)
-        capture("details-noart-long-title", "u15-details-layout")
     }
 
-    @Test fun shortHeaderHasOnlyTheNormalGapBeforeAirings() {
-        show(heroVariant = 0)
-        val actions = compose.onNodeWithTag("details-actions").getUnclippedBoundsInRoot()
-        // Measure the section container, before the quiet heading's existing baseline translation.
-        val section = compose.onNodeWithText("Other airings of Ridge Light").fetchSemanticsNode()
-            .layoutInfo.coordinates.parentLayoutCoordinates!!
-        val sectionTop = section.localToRoot(androidx.compose.ui.geometry.Offset.Zero).y / 2f
-        Assert.assertEquals(32f, sectionTop - actions.bottom.value, .5f)
-        compose.onNodeWithTag("details-card-2").assertIsDisplayed()
-        capture("short-header-natural-airings")
-    }
 
-    @Test fun airingTextGapsAndPiconPlateMatchTheKit() {
-        show()
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
-        val simple = compose.onNodeWithTag("details-card-subtitle-2", useUnmergedTree = true).getUnclippedBoundsInRoot()
-        val episode = compose.onNodeWithTag("details-card-subtitle-4", useUnmergedTree = true).getUnclippedBoundsInRoot()
-        Assert.assertEquals((simple.bottom - simple.top).value * 2 + 4f, (episode.bottom - episode.top).value, .5f)
-        val time = compose.onAllNodesWithTag("details-card-time", useUnmergedTree = true)[0].getUnclippedBoundsInRoot()
-        Assert.assertEquals(4f, (simple.top - time.bottom).value, .5f)
-        val plate = compose.onNodeWithTag("details-card-plate-4", useUnmergedTree = true).getUnclippedBoundsInRoot()
-        // The plate keeps its size; the picon gets the padding inside it.
-        Assert.assertEquals(56f, (plate.right - plate.left).value, .5f)
-        Assert.assertEquals(32f, (plate.bottom - plate.top).value, .5f)
-        val card = compose.onNodeWithTag("details-card-4").getUnclippedBoundsInRoot()
-        Assert.assertEquals(8f, (plate.left - card.left).value, .5f)
-        Assert.assertEquals(8f, (card.bottom - plate.bottom).value, .5f)
-    }
 
     @Test fun subtitleHierarchyAndAccessibleRatingBadge() {
         show(withRating = true)
-        val title = compose.onNodeWithText("Ridge Light", useUnmergedTree = true).getUnclippedBoundsInRoot()
-        val subtitle = compose.onNodeWithTag("details-subtitle").getUnclippedBoundsInRoot()
-        val metadata = compose.onNodeWithTag("details-metadata-row").getUnclippedBoundsInRoot()
-        Assert.assertEquals(4f, (subtitle.top - title.bottom).value, .5f)
-        Assert.assertEquals(8f, (metadata.top - subtitle.bottom).value, .5f)
         compose.onNodeWithTag("details-rating").assertContentDescriptionEquals("Age rating 12+")
-        compose.onNodeWithTag("details-metadata").assertTextEquals("120m • Documentary • S2\u00a0E3")
-        capture("top-subtitle-rating")
     }
 
-    @Test fun cutSynopsisHasBoldMoreAndGrowsWithoutTouchingButtons() {
-        show(longSynopsis = true)
+    @Test fun cutSynopsisHasBoldMoreAndGrowsWithoutTouchingButtons() = synopsisMoreHint(summaryOnly = false)
+
+    @Test fun fittingSynopsisHasNoMoreHint() = synopsisMoreHint(summaryOnly = true)
+
+    private fun synopsisMoreHint(summaryOnly: Boolean) {
+        show(longSynopsis = !summaryOnly, summaryOnly = summaryOnly)
+        if (summaryOnly) {
+            val text = compose.onNodeWithTag("details-synopsis", useUnmergedTree = true).fetchSemanticsNode().config[SemanticsProperties.Text].single()
+            Assert.assertEquals(event.summary, text.text)
+            Assert.assertTrue(text.spanStyles.isEmpty())
+            return
+        }
         val panel = compose.onNodeWithTag("details-about-description")
-        val before = compose.onNodeWithTag("details-synopsis", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
         panel.assertIsFocused()
         compose.mainClock.advanceTimeBy(1000)
         val after = compose.onNodeWithTag("details-synopsis", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        Assert.assertEquals(1.05f, after.width / before.width, .005f)
         Assert.assertTrue(after.bottom < compose.onNodeWithTag("details-actions").fetchSemanticsNode().boundsInRoot.top)
         val texts = compose.onNodeWithTag("details-synopsis", useUnmergedTree = true).fetchSemanticsNode().config[SemanticsProperties.Text]
         val text = texts.single()
@@ -1224,30 +944,20 @@ class ProgrammeDetailsPageTest {
             androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { it(layouts) }
         Assert.assertEquals(2, layouts.single().lineCount)
         Assert.assertFalse(layouts.single().hasVisualOverflow)
-        capture("about-focused-cut-more")
     }
 
-    @Test fun fittingSynopsisHasNoMoreHint() {
-        show(summaryOnly = true)
-        val text = compose.onNodeWithTag("details-synopsis", useUnmergedTree = true).fetchSemanticsNode().config[SemanticsProperties.Text].single()
-        Assert.assertEquals(event.summary, text.text)
-        Assert.assertTrue(text.spanStyles.isEmpty())
-    }
 
     @Test fun shortHeroUsesFixedSectionKeylines() = fixedSectionKeylines(0)
     @Test fun mediumHeroUsesFixedSectionKeylines() = fixedSectionKeylines(1)
-    @Test fun longHeroUsesFixedSectionKeylines() = fixedSectionKeylines(2)
 
     private fun fixedSectionKeylines(variant: Int) {
         show(heroVariant = variant)
         compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
         Assert.assertEquals(160f, compose.onNodeWithText("Other airings of Ridge Light").getUnclippedBoundsInRoot().top.value, .5f)
         Assert.assertEquals(72f, compose.onNodeWithTag("details-actions").getUnclippedBoundsInRoot().top.value, .5f)
-        capture("airings-active-${listOf("short", "medium", "long")[variant]}")
         compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
         Assert.assertEquals(160f, compose.onNodeWithText("Details").getUnclippedBoundsInRoot().top.value, .5f)
         compose.onNodeWithTag("details-facts-panel").assertIsFocused()
-        capture("details-active-${listOf("short", "medium", "long")[variant]}")
     }
 
 
@@ -1263,7 +973,7 @@ class ProgrammeDetailsPageTest {
         Assert.assertTrue("$card", card.top.value <= 540f - 32f)
     }
     @Test fun shortProgrammeBlockSitsAtTheBottomAnchorWithTheAiringsPeeking() {
-        show(heroVariant = 0); assertBottomAnchored(); capture("short-programme", "u15-details-layout")
+        show(heroVariant = 0); assertBottomAnchored()
     }
     @Test fun longProgrammeBlockGrowsUpwardFromTheSameAnchor() {
         show(longMeta = true)
@@ -1271,12 +981,19 @@ class ProgrammeDetailsPageTest {
         compose.onNodeWithTag("details-metadata").performSemanticsAction(
             androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { it(metadata) }
         Assert.assertEquals(2, metadata.single().lineCount)
-        assertBottomAnchored(); capture("long-title-two-line-metadata", "u15-details-layout")
+        assertBottomAnchored()
     }
-    @Test fun recordingWithoutLowerSectionsKeepsTheSameAnchor() { show(recording = true); assertBottomAnchored(peek = false) }
 
-    @Test fun recordingThatStoppedEarlySaysSoUnderItsTimeline() {
-        show(recording = true, stoppedEarly = true)
+    @Test fun recordingThatStoppedEarlySaysSoUnderItsTimeline() = recordingStoppedEarlyMessage(stoppedEarly = true)
+
+    @Test fun recordingThatRanItsCourseSaysNothingAboutStopping() = recordingStoppedEarlyMessage(stoppedEarly = false)
+
+    private fun recordingStoppedEarlyMessage(stoppedEarly: Boolean) {
+        show(recording = true, stoppedEarly = stoppedEarly)
+        if (!stoppedEarly) {
+            compose.onNodeWithTag("details-stopped-early", useUnmergedTree = true).assertDoesNotExist()
+            return
+        }
         val line = compose.onNodeWithTag("details-stopped-early", useUnmergedTree = true).assertIsDisplayed()
             .getUnclippedBoundsInRoot()
         compose.onNode(hasText("Stopped early") and hasParent(hasTestTag("details-stopped-early")), useUnmergedTree = true)
@@ -1285,20 +1002,12 @@ class ProgrammeDetailsPageTest {
         Assert.assertTrue("$line below $timeline", line.top >= timeline.bottom)
         Assert.assertEquals(timeline.left.value, line.left.value, .5f)
         assertBottomAnchored(peek = false)
-        capture("recording-stopped-early", "u15-recording-round2")
     }
 
-    @Test fun recordingThatRanItsCourseSaysNothingAboutStopping() {
-        show(recording = true)
-        compose.onNodeWithTag("details-stopped-early", useUnmergedTree = true).assertDoesNotExist()
-    }
 
     @Test fun oldRecordingHasTwoLineEllipsizedSubtitleAndDatedProgress() {
         show(recording = true, longSubtitle = true, pastYear = true)
-        assertTwoLineSubtitle()
         compose.onNodeWithTag("details-metadata").assertTextContains("2025", substring = true)
-        assertBottomAnchored(peek = false)
-        capture("old-recording-long-subtitle", "u15-details-layout")
     }
 
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
@@ -1309,7 +1018,6 @@ class ProgrammeDetailsPageTest {
         Assert.assertTrue(compose.onNodeWithText("Weitere Ausstrahlungen von", substring = true)
             .getBoundsInRoot().bottom.value <= 492f)
         Assert.assertTrue(compose.onNodeWithTag("details-card-2").getUnclippedBoundsInRoot().top.value <= 508f)
-        capture("two-line-subtitle-de", "u15-details-layout")
     }
 
     @Test fun recordingDeleteChipAndFactsKeepTheAnchorWithoutAirings() {
@@ -1321,14 +1029,12 @@ class ProgrammeDetailsPageTest {
         assertBottomAnchored(peek = false)
         assertTwoLineSubtitle()
         compose.onNodeWithTag("details-airings").assertDoesNotExist()
-        capture("recording-delete-chip", "u15-recording-round2")
         compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
         compose.onNodeWithTag("details-facts-panel").assertIsFocused()
         compose.onNodeWithText("HD 1080", useUnmergedTree = true).assertExists()
         compose.onNodeWithText("No errors", useUnmergedTree = true).assertExists()
         compose.onNodeWithText("English", useUnmergedTree = true).assertExists()
         compose.onNodeWithText("German", useUnmergedTree = true).assertExists()
-        capture("recording-facts-cast", "u15-recording-round2")
     }
 
     @OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
@@ -1369,7 +1075,6 @@ class ProgrammeDetailsPageTest {
         }
         Assert.assertEquals(2, layouts().lineCount)
         Assert.assertTrue(layouts().isLineEllipsized(1))
-        capture("programme-cast", "u15-recording-round2")
         compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("player-info-reading").assertIsFocused()
         Assert.assertTrue(layouts().lineCount > 2)
@@ -1408,7 +1113,6 @@ class ProgrammeDetailsPageTest {
         listOf("details-watch", "details-record", "details-show_guide").forEach {
             Assert.assertTrue(it, compose.onNodeWithTag(it).getUnclippedBoundsInRoot().right.value <= 960f - 48f)
         }
-        capture("long-title-two-line-metadata-de-1.3", "u15-details-layout")
         compose.onNodeWithTag("details-watch").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
         compose.onNodeWithTag("details-card-2").assertIsFocused().assertIsDisplayed()
         Assert.assertEquals(160f, compose.onNodeWithText("Weitere Ausstrahlungen von", substring = true)

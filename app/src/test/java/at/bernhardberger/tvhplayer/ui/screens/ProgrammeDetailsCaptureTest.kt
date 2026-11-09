@@ -22,6 +22,8 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.*
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.focus.FocusRequester
@@ -43,6 +45,8 @@ import at.bernhardberger.tvhplayer.ui.WarmPlaybackScrim
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsPage
 import at.bernhardberger.tvhplayer.core.programmeDetailsActions
 import at.bernhardberger.tvhplayer.core.recordingDetailsActions
+import at.bernhardberger.tvhplayer.core.detailsRelativeLuminance
+import at.bernhardberger.tvhplayer.ui.common.AppClock
 import java.io.File
 import java.util.Locale
 import java.util.TimeZone
@@ -52,6 +56,7 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.junit.Assert
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -70,6 +75,8 @@ class ProgrammeDetailsCaptureTest {
     @get:Rule val compose = createComposeRule()
     private val oldLocale = Locale.getDefault()
     private val oldZone = TimeZone.getDefault()
+    private val oldClock = AppClock.systemUses24Hour
+    private val oldFormat = AppClock.format
     private lateinit var view: View
     private val session = FakeSessionObservation(SessionObservation.create(
         sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
@@ -84,6 +91,8 @@ class ProgrammeDetailsCaptureTest {
     @Before fun prepare() {
         Locale.setDefault(Locale.US)
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+        AppClock.format = at.bernhardberger.tvhplayer.settings.ClockFormat.SYSTEM
+        AppClock.systemUses24Hour = true
         images.install(FixtureArt.imageLoader(ApplicationProvider.getApplicationContext(), mapOf(
             ArtworkId(1) to FixtureArt.picon("ridge-earth"), ArtworkId(2) to FixtureArt.art("ridge-light"),
             ArtworkId(3) to FixtureArt.art("still-ridge-light"))))
@@ -91,6 +100,8 @@ class ProgrammeDetailsCaptureTest {
     @After fun release() {
         Locale.setDefault(oldLocale)
         TimeZone.setDefault(oldZone)
+        AppClock.systemUses24Hour = oldClock
+        AppClock.format = oldFormat
     }
 
     @Test fun guideArtLongDescription() = capture("guide-art-long", guide = true)
@@ -101,6 +112,109 @@ class ProgrammeDetailsCaptureTest {
     @Test fun playerGeometryMatchesModalHosts() = capture("player-geometry", guide = false, player = true)
     @Test fun guideWithoutButtonsTrapsPanelFocusAndBackCloses() = emptyPanel(guide = true)
     @Test fun recordingWithoutButtonsTrapsPanelFocusAndBackCloses() = emptyPanel(guide = false)
+
+    @Test @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
+    fun brightBackdropContrastCaptures() = backdropContrastCaptures(bright = true)
+
+    @Test @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
+    fun darkBackdropContrastCaptures() = backdropContrastCaptures(bright = false)
+
+    private fun backdropContrastCaptures(bright: Boolean) {
+        // The pack's brightest picture by mean WCAG luminance, and its darkest picture.
+        val picture = if (bright) "still-paper-kite-tales" else "still-northline-studio"
+        val title = if (bright) "Paper Kite Tales" else "Northline Tonight"
+        val station = Channel.create(ChannelId(1), name = if (bright) "Kite Kids" else "Northline News", number = 101,
+            icon = ChannelIcon.ImageCache(ArtworkId(1)))
+        images.install(FixtureArt.imageLoader(ApplicationProvider.getApplicationContext(), mapOf(
+            ArtworkId(1) to FixtureArt.picon(if (bright) "kite-kids" else "northline-news"),
+            ArtworkId(2) to FixtureArt.art(picture))))
+        val programme = EpgEvent.create(EventId(1), station.id, start, start + 7200.seconds,
+            title = title, subtitle = if (bright) "Over the painted hills" else "The evening bulletin",
+            genre = if (bright) "Animation" else "News", image = ArtworkId(2),
+            summary = if (bright) "A paper kite travels over painted hills and discovers a world of colour."
+                else "Evening studio news from a regional desk with two anchors.")
+        val next = EpgEvent.create(EventId(2), station.id, start + 86400.seconds, start + 90000.seconds,
+            title = title, image = ArtworkId(2))
+        compose.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(2f, 1f)) {
+                TVHeadendPlayerTheme {
+                    view = LocalView.current
+                    ProvideArtworkSession(session) {
+                        ProgrammeDetailsPage(programme, null, station, start.epochSeconds + 480,
+                            programmeDetailsActions(programme, start.epochSeconds + 480, null, null, true, true), {}, {},
+                            related = listOf(next), channelOf = { station })
+                    }
+                }
+            }
+        }
+        compose.onNodeWithTag("details-watch").assertIsFocused()
+        // This point is the studio's ceiling light or the kite's sky, away from text. A pending
+        // measurement covers it with the solid <=26/255 tint. Wait for the decoded art to emerge;
+        // snapshot() then advances the shared motion to its settled endpoint.
+        compose.waitUntil(10_000) {
+            val frame = snapshot()
+            val ready = android.graphics.Color.blue(frame.getPixel(1372, 92)) > 50
+            frame.recycle()
+            ready
+        }
+        saveBackdropCapture("$picture-sharp", listOf(
+            compose.onNodeWithTag("details-title"), compose.onNodeWithTag("details-subtitle"),
+            compose.onNodeWithTag("details-metadata"), compose.onNodeWithTag("details-synopsis", useUnmergedTree = true)))
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.onNodeWithTag("details-card-2").assertIsFocused()
+        saveBackdropCapture("$picture-scrolled", listOf(compose.onNodeWithText("Other airings of $title"),
+            compose.onNodeWithTag("details-card-time", useUnmergedTree = true),
+            compose.onNodeWithTag("details-card-subtitle-2", useUnmergedTree = true)))
+    }
+
+    private fun saveBackdropCapture(name: String, text: List<SemanticsNodeInteraction>) {
+        val full = snapshot()
+        val bitmap = Bitmap.createScaledBitmap(full, 960, 540, true)
+        CaptureOutput.writePng(File("../build/review/details-bright-art", "$name.png"), bitmap)
+        val ratios = text.map { node ->
+            val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+            val semantics = node.fetchSemanticsNode()
+            semantics.config.getOrNull(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult)?.action?.invoke(layouts)
+            val layout = layouts.singleOrNull()
+            val bounds = semantics.boundsInRoot
+            fun luminance(x: Int, y: Int): Double {
+                val pixel = full.getPixel(x.coerceIn(0, full.width - 1), y.coerceIn(0, full.height - 1))
+                return detailsRelativeLuminance((pixel shr 16 and 255) / 255.0, (pixel shr 8 and 255) / 255.0, (pixel and 255) / 255.0)
+            }
+            // Real raster ink and the art exposed by spaces in that same line, not an assumed
+            // theme colour or a sample from an unrelated corner of the page.
+            val foreground = if (layout == null) {
+                // These small captions can have no fully covered raster pixel. WCAG measures ink
+                // colour, not anti-aliased edge coverage; use the palette's weakest RGB channel.
+                val ink = if (semantics.config.getOrNull(SemanticsProperties.TestTag) == "details-card-time") 225.0 / 255 else 192.0 / 255
+                detailsRelativeLuminance(ink, ink, ink)
+            } else (bounds.top.toInt() until bounds.bottom.toInt()).maxOf { y ->
+                (bounds.left.toInt() until bounds.right.toInt()).maxOf { x -> luminance(x, y) }
+            }
+            val background = if (layout == null) (bounds.left.toInt() until bounds.right.toInt()).maxOf { x ->
+                // Card captions clear text semantics because the card speaks the whole airing;
+                // their top padding exposes the backdrop immediately above their ink.
+                luminance(x, bounds.top.toInt() - 2)
+            } else layout.layoutInput.text.indices.filter { layout.layoutInput.text[it] == ' ' }.maxOf { index ->
+                val space = layout.getBoundingBox(index)
+                luminance((bounds.left + space.center.x).toInt(), (bounds.top + space.center.y).toInt())
+            }
+            val ratio = (foreground + .05) / (background + .05)
+            "${layout?.layoutInput?.text ?: semantics.config.getOrNull(SemanticsProperties.TestTag)}: $ratio"
+                .also { Assert.assertTrue("$name $it fg=$foreground bg=$background bounds=$bounds", ratio >= 4.5) }
+        }
+        CaptureOutput.writeText(File("../build/review/details-bright-art", "$name-contrast.txt")) { ratios.joinToString("\n", postfix = "\n") }
+        bitmap.recycle()
+        full.recycle()
+    }
+
+    private fun snapshot(): Bitmap {
+        compose.mainClock.advanceTimeBy(1000)
+        compose.waitForIdle()
+        val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
+        compose.runOnIdle { view.draw(Canvas(bitmap)) }
+        return bitmap
+    }
 
     @Test @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
     fun framedRecordingPlaying() = framedCapture("01-recording-playing", recording = true)
