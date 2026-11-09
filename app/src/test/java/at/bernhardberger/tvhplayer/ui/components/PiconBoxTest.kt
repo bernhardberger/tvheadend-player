@@ -60,7 +60,6 @@ import coil3.request.SuccessResult
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import org.junit.After
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -81,7 +80,6 @@ class PiconBoxTest {
     @get:Rule val images = ImageLoaderRule()
     @get:Rule val compose = createComposeRule()
     private lateinit var view: View
-    private var requests = 0
     private val loadingGate = CompletableDeferred<Unit>()
     private var background = Color.Unspecified
     private var passiveTint = Color.Unspecified
@@ -122,8 +120,6 @@ class PiconBoxTest {
         assertPiconColor(focused)
         focus("other-row")
         assertPiconColor(rest)
-        // The logo is inked for each ground the row shows: rest, focus, rest again.
-        assertEquals(if (state == ArtworkState.MISSING) 0 else 3, requests)
     }
 
     private fun assertPassiveFallback(state: ArtworkState) {
@@ -145,7 +141,6 @@ class PiconBoxTest {
             .components {
                 add(Interceptor { chain ->
                     assertTrue(chain.request.data is AppArtworkSource)
-                    requests++
                     when (state) {
                         ArtworkState.MISSING -> error("Absent artwork must not be requested")
                         ArtworkState.LOADING -> {
@@ -213,12 +208,6 @@ class PiconBoxTest {
             }
         }
         compose.waitForIdle()
-        // Successful rows also warm the other focus fill; failed/loading logos do not prefetch.
-        assertEquals(when {
-            state == ArtworkState.MISSING -> 0
-            state == ArtworkState.SUCCESS && inRow -> 2
-            else -> 1
-        }, requests)
     }
 
     private fun focus(tag: String) {

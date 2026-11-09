@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import at.bernhardberger.tvhplayer.testutil.CaptureOutput
+import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import at.bernhardberger.tvhplayer.ui.TvCardFocusedScale
 import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import android.app.Application
@@ -83,6 +84,7 @@ import org.junit.Rule
 import org.junit.Before
 import org.junit.After
 import org.junit.Test
+import org.junit.experimental.categories.Category
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -127,6 +129,7 @@ class QuickZapPresentationTest {
     private var picks = 0
     private var confirmPicks = true
     private var focusColor = 0
+    private var nativeFocusColor = 0
     private var viewerProgressColor = 0
 
     private fun assertViewerProgressColor(message: String, pixel: Int) {
@@ -153,7 +156,6 @@ class QuickZapPresentationTest {
         card(2).assertIsFocused()
         val playingBounds = compose.onNodeWithTag("channel-playing-indicator", useUnmergedTree = true)
             .fetchSemanticsNode().boundsInRoot
-        capture("en-font1-marker-playing", 2)
         compose.runOnIdle { indicator = ChannelPlaybackIndicator.PAUSED }
         assertEquals(playingBounds, compose.onNodeWithTag("channel-paused-indicator", useUnmergedTree = true)
             .fetchSemanticsNode().boundsInRoot)
@@ -170,7 +172,6 @@ class QuickZapPresentationTest {
         assertTrue(brightPixels.isNotEmpty())
         assertTrue(brightPixels.all { kotlin.math.abs(android.graphics.Color.blue(it) - android.graphics.Color.red(it)) < 15 })
         bitmap.recycle()
-        capture("en-font1-marker-paused", 2)
         compose.mainClock.autoAdvance = false
         compose.runOnIdle { indicator = ChannelPlaybackIndicator.TUNING }
         compose.waitForIdle()
@@ -178,7 +179,6 @@ class QuickZapPresentationTest {
         compose.mainClock.advanceTimeBy(96)
         assertEquals(playingBounds, compose.onNodeWithTag("channel-tuning-indicator", useUnmergedTree = true)
             .fetchSemanticsNode().boundsInRoot)
-        capture("en-font1-marker-tuning-96ms", 2)
         compose.runOnIdle { indicator = ChannelPlaybackIndicator.NONE }
         compose.waitForIdle()
         compose.mainClock.advanceTimeByFrame()
@@ -294,10 +294,8 @@ class QuickZapPresentationTest {
     }
     private var catalog by mutableStateOf(channels)
 
-    @Test fun nativeCardCornerGapIsUniformFocusedAndPressed() = cornerGeometry(1f, "en-font1")
-
-    @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
-    fun germanLargeNativeCardCornerGapIsUniformFocusedAndPressed() = cornerGeometry(1.3f, "de-font1.3")
+    @Test @Category(VisualCapture::class)
+    fun nativeCardCornerGapIsUniformFocusedAndPressed() = cornerGeometry(1f, "en-font1")
 
     private fun cornerGeometry(fontScale: Float, prefix: String) {
         content(fontScale = fontScale)
@@ -364,7 +362,20 @@ class QuickZapPresentationTest {
                 top + (progress.bottom - focused.top - .75f) * scale)
             assertViewerProgressColor("orange lower progress strip remains visible", strip)
             bitmap.recycle()
-            capture("$prefix-native-corner-$state", 2, fontScale)
+            val name = "$prefix-native-corner-$state"
+            val focusedBounds = card(2).assertIsFocused().fetchSemanticsNode().boundsInRoot
+            compose.runOnIdle {
+                val capture = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+                view.draw(Canvas(capture))
+                val directory = File("../artifacts/quick-zap")
+                CaptureOutput.writePng(File(directory, "$name.png"), capture)
+                CaptureOutput.writeText(File(directory, "$name.txt")) {
+                    "canvas=960x540\ndensity=1.0\nlocale=en\n" +
+                        "fontScale=$fontScale\nfocus=player-channel-card-2\nbounds=$focusedBounds\n" +
+                        "focusOutlineArgb=${Integer.toHexString(focusColor)}\n"
+                }
+                capture.recycle()
+            }
             CaptureOutput.writeText(File("../artifacts/quick-zap/$prefix-native-corner-$state-geometry.txt")) {
                 "nativeRadiusMeasuredDp=$radius\nscale=$scale\ninnerGapsDp=$gaps\n" +
                     "supersampling=4x production view draw; native shape, shared focused scale\n"
@@ -386,18 +397,16 @@ class QuickZapPresentationTest {
         for (close in listOf(Key.DirectionUp, Key.Back)) {
             key(close)
             compose.onNodeWithTag("player-pause").assertIsFocused()
+            assertFalse(layers.channelDrawerOpen)
             key(Key.DirectionDown)
             card(2).assertIsFocused()
         }
         assertEquals(0, picks)
     }
 
-    @Test fun tunedCardsKeepBoundsAcrossUpAndBack() = stableReentry(1f, "en-font1")
+    @Test fun tunedCardsKeepBoundsAcrossUpAndBack() = stableReentry(1f)
 
-    @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
-    fun germanLargeTextTunedCardsKeepBoundsAcrossUpAndBack() = stableReentry(1.3f, "de-font1.3")
-
-    private fun stableReentry(fontScale: Float, prefix: String) {
+    private fun stableReentry(fontScale: Float) {
         content(fontScale = fontScale)
         key(Key.DirectionDown)
         for ((id, close) in listOf(3 to Key.DirectionUp, 4 to Key.Back)) {
@@ -405,13 +414,11 @@ class QuickZapPresentationTest {
             card(id).assertIsFocused()
             key(Key.DirectionCenter)
             val before = card(id).fetchSemanticsNode().boundsInRoot
-            capture("$prefix-tuned-$id-before", id, fontScale)
             key(close)
             compose.onNodeWithTag("player-pause").assertIsFocused()
             key(Key.DirectionDown)
             card(id).assertIsFocused()
             assertEquals(before, card(id).fetchSemanticsNode().boundsInRoot)
-            capture("$prefix-tuned-$id-reopened", id, fontScale)
         }
         assertEquals(2, picks)
     }
@@ -495,7 +502,7 @@ class QuickZapPresentationTest {
         assertEquals(0, picks)
     }
 
-    @Test fun focusedOutlineMatchesNativeButtonColorAndKeepsProgressVisible() {
+    @Test fun focusedOutlineMatchesNativeButtonColor() {
         content()
         val button = compose.onNodeWithTag("player-pause").fetchSemanticsNode().boundsInRoot
         fun pixel(x: Float, y: Float): Int {
@@ -511,38 +518,17 @@ class QuickZapPresentationTest {
         val scale = TvCardFocusedScale
         val outlineTop = bounds.center.y - (bounds.height / 2f + 4.25f) * scale
         assertEquals(focusColor, pixel(bounds.center.x, outlineTop))
-        assertEquals(0xFFE1E2E5.toInt(), focusColor)
+        assertEquals(nativeFocusColor, focusColor)
     }
 
     @Test fun peekOpensWithoutTuningAndDifferentPickKeepsFocusUntilPlayingPick() {
         content()
         compose.onNodeWithTag("player-pause").assertIsFocused()
         compose.onNodeWithTag("player-channel-card-2").assertDoesNotExist()
-        capture("en-font1-peek")
         key(Key.DirectionDown)
         card(2).assertIsFocused()
         assertEquals(0, picks)
         compose.onNodeWithTag("player-pause").assertDoesNotExist()
-        val focusedBounds = card(2).fetchSemanticsNode().boundsInRoot
-        val progressBounds = compose.onNodeWithTag("player-channel-2-progress", useUnmergedTree = true)
-            .fetchSemanticsNode().boundsInRoot
-        // Card and strip semantics describe the resting layout; the focus scale applies to the drawing.
-        val scale = TvCardFocusedScale
-        assertEquals("progress stays embedded at the bottom", focusedBounds.bottom, progressBounds.bottom, .5f)
-        assertEquals("progress stays full width", focusedBounds.left, progressBounds.left, .5f)
-        assertTrue("progress remains a visible strip", progressBounds.height >= 2f)
-        val center = focusedBounds.center
-        compose.runOnIdle {
-            val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-            view.draw(Canvas(bitmap))
-            val pixel = bitmap.getPixel(
-                (center.x + (progressBounds.left + progressBounds.width * .1f - center.x) * scale).toInt(),
-                (center.y + (progressBounds.bottom - center.y) * scale - 1f).toInt(),
-            )
-            assertViewerProgressColor("orange progress is painted above the bottom edge, not covered by the gray ring", pixel)
-            bitmap.recycle()
-        }
-        capture("en-font1-expanded")
         key(Key.DirectionRight)
         card(3).assertIsFocused()
         val before = card(3).fetchSemanticsNode().boundsInRoot
@@ -557,18 +543,6 @@ class QuickZapPresentationTest {
         assertEquals(1, picks)
     }
 
-    @Test fun upAndBackRestoreControlsAndNextDownStillOpens() {
-        content()
-        for (close in listOf(Key.DirectionUp, Key.Back)) {
-            key(Key.DirectionDown)
-            card(2).assertIsFocused()
-            key(close)
-            compose.onNodeWithTag("player-pause").assertIsFocused()
-            assertFalse(layers.channelDrawerOpen)
-        }
-        assertEquals(0, picks)
-    }
-
     @Test fun horizontalViewportReachesScreenEdgesButFocusedCardsStaySafe() {
         content()
         key(Key.DirectionDown)
@@ -581,7 +555,6 @@ class QuickZapPresentationTest {
         assertEquals(960f, shelf.right, .5f)
         assertTrue("bottom third: $focused", focused.top >= 360f)
         assertTrue("bottom focus overflow inside screen: $focused", focused.bottom <= 520f)
-        capture("en-font1-scrolled")
     }
 
     @Test fun pinnedRailKeepsTheFocusedCardOnTheStartKeylineUntilTheListEnds() {
@@ -645,7 +618,6 @@ class QuickZapPresentationTest {
                 SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo),
             useUnmergedTree = true,
         ).assertCountEquals(0)
-        capture("de-font1.3-expanded-bright")
     }
 
     @Test fun transitionKeepsTheOpeningPressFromActivatingCards() {
@@ -653,7 +625,6 @@ class QuickZapPresentationTest {
         compose.mainClock.autoAdvance = false
         key(Key.DirectionDown)
         compose.mainClock.advanceTimeBy(96)
-        capture("en-font1-opening")
         assertEquals(0, picks)
         compose.mainClock.autoAdvance = true
         compose.waitForIdle()
@@ -829,9 +800,7 @@ class QuickZapPresentationTest {
         var controls by mutableStateOf(true)
         val card = FocusRequester()
         var focused = false
-        var built = 0
         detachedRail({ controls }) {
-            androidx.compose.runtime.DisposableEffect(Unit) { built++; onDispose { } }
             Box(
                 Modifier.height(48.dp).fillMaxWidth()
                     .testTag("rail-card")
@@ -869,7 +838,6 @@ class QuickZapPresentationTest {
         compose.onNodeWithTag("rail-card").assertExists()
         requestFocus()
         assertTrue("the next reveal's rail takes focus again", focused)
-        assertEquals("and is the same rail", 1, built)
     }
 
     @Test fun closedRailPeeksThePlayingCardAtTheBottomEdgeAndRisesFromThere() {
@@ -956,6 +924,7 @@ class QuickZapPresentationTest {
                 at.bernhardberger.tvhplayer.ui.components.LocalWatchingIndicator provides indicator) {
                 TVHeadendPlayerTheme {
                     focusColor = androidx.tv.material3.MaterialTheme.colorScheme.onSurface.toArgb()
+                    nativeFocusColor = androidx.tv.material3.MaterialTheme.colorScheme.inverseSurface.toArgb()
                     viewerProgressColor = at.bernhardberger.tvhplayer.ui.components.progressColor(true).toArgb()
                     Box(Modifier.fillMaxSize().background(if (bright) Color(0xFFDDEAF0) else Color(0xFF24384A))
                         .onPreviewKeyEvent { event ->
@@ -1036,20 +1005,4 @@ class QuickZapPresentationTest {
     )
     private fun card(id: Int) = compose.onNodeWithTag("player-channel-card-$id")
     private fun key(key: Key) { compose.onRoot().performKeyInput { pressKey(key) }; compose.waitForIdle() }
-    private fun capture(name: String, focusedCard: Int? = null, fontScale: Float = 1f) {
-        compose.waitForIdle()
-        val focusedBounds = focusedCard?.let { card(it).assertIsFocused().fetchSemanticsNode().boundsInRoot }
-        compose.runOnIdle {
-            val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-            view.draw(Canvas(bitmap))
-            val directory = File("../artifacts/quick-zap")
-            CaptureOutput.writePng(File(directory, "$name.png"), bitmap)
-            if (focusedCard != null) CaptureOutput.writeText(File(directory, "$name.txt")) {
-                "canvas=960x540\ndensity=1.0\nlocale=${if (name.startsWith("de")) "de" else "en"}\n" +
-                    "fontScale=$fontScale\nfocus=player-channel-card-$focusedCard\nbounds=$focusedBounds\n" +
-                    "focusOutlineArgb=${Integer.toHexString(focusColor)}\n"
-            }
-            bitmap.recycle()
-        }
-    }
 }

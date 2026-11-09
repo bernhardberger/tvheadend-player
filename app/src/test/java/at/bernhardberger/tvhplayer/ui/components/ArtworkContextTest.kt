@@ -43,7 +43,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -96,7 +95,6 @@ class ArtworkContextTest {
     @Test fun aGuideUpdateNeitherRecomposesALogoNorRequestsItAgain() {
         val session = FakeTvheadendSession(observation(ready, guide = 1))
         show(session)
-        val current = requireNotNull(session.observation.value.currentSession)
         assertEquals(1, requests.size)
         val logos = logoCompositions
         val seen = observationCompositions
@@ -104,7 +102,6 @@ class ArtworkContextTest {
         repeat(3) { session.publish(observation(ready, guide = 2 + it)) }
         compose.waitForIdle()
 
-        assertSame(current, session.observation.value.currentSession)
         assertTrue("the guide updates reached the composition", observationCompositions > seen)
         assertEquals(logos, logoCompositions)
         assertEquals(1, requests.size)

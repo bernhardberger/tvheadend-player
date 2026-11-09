@@ -15,3 +15,5 @@ style:
     methods:
       - value: 'java.lang.Thread.sleep'
         reason: 'Use virtual time or fakes instead of real-clock waits in tests.'
+      - value: 'java.lang.System.nanoTime'
+        reason: 'Use virtual time or bounded completion signals instead of real-clock polling in tests.'

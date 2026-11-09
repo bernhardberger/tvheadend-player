@@ -39,7 +39,6 @@ class ChannelPlaybackIndicatorTest {
         assertEquals(ChannelPlaybackIndicator.PLAYING, indicator(AppPlaybackState.Playing))
         assertEquals(ChannelPlaybackIndicator.PAUSED, indicator(AppPlaybackState.Playing, false))
         assertEquals(ChannelPlaybackIndicator.TUNING, indicator(AppPlaybackState.Starting, false))
-        assertEquals(ChannelPlaybackIndicator.PLAYING, indicator(AppPlaybackState.Playing))
         assertEquals(ChannelPlaybackIndicator.NONE, indicator(AppPlaybackState.Idle))
         assertEquals(ChannelPlaybackIndicator.NONE, indicator(AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER)))
         assertEquals(ChannelPlaybackIndicator.NONE, indicator(AppPlaybackState.Finished))

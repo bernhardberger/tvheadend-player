@@ -1570,6 +1570,7 @@ class AudioInterruptionRuntimeTest {
         markReady()
         await { runtime.state.value !is AppPlaybackState.Recovering }
         settle()
+        assertFalse(runtime.state.value is AppPlaybackState.Failed)
         assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
         assertTrue(player.playWhenReady)
         assertEquals(2, connection.subscribeCount)
@@ -2815,6 +2816,8 @@ class AudioInterruptionRuntimeTest {
                     failNextPrepare = false
                     throw IllegalStateException("scripted prepare failure")
                 }
+                // Match Media3's error reset on preparation after a source failure.
+                reportedPlayerError = null
                 player.prepare()
             }
         }
@@ -3026,7 +3029,7 @@ class AudioInterruptionRuntimeTest {
                 settle()
                 assertTrue("$label: state=${runtime.state.value}, playerState=${player.playbackState}, " +
                     "playerError=${player.playerError}, live=${runtime.livePlaybackObservation.value}", predicate())
-            } else driver.await(label, predicate = predicate)
+            } else driver.await(label, diagnostics = { "runtimeState=${runtime.state.value}" }, predicate = predicate)
         }
 
         fun settle() {

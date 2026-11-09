@@ -435,6 +435,8 @@ class ChannelScheduleFocusTest {
         ))
         val requests = java.util.Collections.synchronizedList(mutableListOf<Triple<CurrentSessionObservation, ChannelId, Instant>>())
         val ended = AtomicInteger()
+        val requestStarted = java.util.concurrent.Semaphore(0)
+        val requestEnded = java.util.concurrent.Semaphore(0)
         val firstUnwound = CompletableDeferred<Unit>()
         val session = object : TvheadendSession by fake {
             override val epgRepository = object : EpgRepository by fake.epgRepository {
@@ -442,11 +444,13 @@ class ChannelScheduleFocusTest {
                     through: Instant): EpgCoverageAcquisitionResult {
                     requests += Triple(currentSession, channelId, through)
                     val first = requests.size == 1
+                    requestStarted.release()
                     // A server that never answers: only cancellation or the panel's timeout ends the request.
                     try { awaitCancellation() } finally {
                         // The first request unwinds slowly, finishing only after its replacement started.
                         if (first) withContext(NonCancellable) { firstUnwound.await() }
                         ended.incrementAndGet()
+                        requestEnded.release()
                     }
                 }
             }
@@ -471,10 +475,12 @@ class ChannelScheduleFocusTest {
                 onShowGuide = { _, _ -> error("Unexpected Guide") }, session = session)
         } }
         fun settle() { compose.mainClock.advanceTimeBy(100); compose.waitForIdle() }
-        // The request runs off the main thread; frames keep the paused clock's effects moving meanwhile.
-        fun settleUntil(condition: () -> Boolean) {
-            repeat(100) { if (condition()) return; settle(); Thread.sleep(10) }
-            assertTrue(condition())
+        // The repository runs on Default: wait for its fake's signal, not elapsed wall time.
+        fun awaitSignal(signal: java.util.concurrent.Semaphore) {
+            settle()
+            settle()
+            assertTrue("repository did not signal", signal.tryAcquire(1, java.util.concurrent.TimeUnit.SECONDS))
+            settle()
         }
         // performScrollToNode animates its scroll, which the paused clock never finishes; jump to the last row instead.
         fun footer(): SemanticsNodeInteraction {
@@ -483,7 +489,8 @@ class ChannelScheduleFocusTest {
             return compose.onNodeWithTag("channel-schedule-footer")
         }
         settle()
-        settleUntil { requests.size == 1 }
+        awaitSignal(requestStarted)
+        assertEquals(1, requests.size)
         val (first, channelId, through) = requests[0]
         assertSame(fake.observation.value.currentSession, first)
         assertEquals(channel.id, channelId)
@@ -494,22 +501,26 @@ class ChannelScheduleFocusTest {
         // A new session generation cancels the old request and asks again under the new proof.
         compose.runOnIdle { fake.replaceGeneration(fake.observation.value) }
         settle()
-        settleUntil { requests.size == 2 }
+        awaitSignal(requestStarted)
+        assertEquals(2, requests.size)
         assertNotSame(first, requests[1].first)
         assertSame(fake.observation.value.currentSession, requests[1].first)
         // The replaced request's late end leaves the running one's loading line alone.
         firstUnwound.complete(Unit)
-        settleUntil { ended.get() == 1 }
+        awaitSignal(requestEnded)
+        assertEquals(1, ended.get())
         settle()
         footer().assertTextEquals("Loading later days")
 
         // Closing the panel cancels its request; opening it again asks once more.
         compose.runOnIdle { open = false }
         settle()
-        settleUntil { ended.get() == 2 }
+        awaitSignal(requestEnded)
+        assertEquals(2, ended.get())
         compose.runOnIdle { open = true }
         settle()
-        settleUntil { requests.size == 3 }
+        awaitSignal(requestStarted)
+        assertEquals(3, requests.size)
         footer().assertTextEquals("Loading later days")
 
         // The timeout settles the request: the list ends on its end-of-schedule line.
@@ -518,9 +529,12 @@ class ChannelScheduleFocusTest {
         footer().assertTextEquals("Loading later days")
         compose.mainClock.advanceTimeBy(1_500)
         compose.waitForIdle()
-        settleUntil { ended.get() == 3 }
+        awaitSignal(requestEnded)
+        assertEquals(3, ended.get())
         // The request's end reaches the list on a later frame; under load that can take a few.
-        settleUntil { runCatching { footer().assertTextContains("No program information after", substring = true) }.isSuccess }
+        compose.mainClock.advanceTimeUntil(timeoutMillis = 10_000) {
+            runCatching { footer().assertTextContains("No program information after", substring = true) }.isSuccess
+        }
         assertEquals(3, requests.size)
     }
 

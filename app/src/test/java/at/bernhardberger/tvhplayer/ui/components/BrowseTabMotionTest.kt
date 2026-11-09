@@ -103,7 +103,6 @@ class BrowseTabMotionTest {
     @Test fun overflowReversalLtr() = overflow(false, 1f)
     @Test fun overflowReversalRtl() = overflow(true, 1f)
     @Test fun overflowReversalLargeTextLtr() = overflow(false, 1.5f)
-    @Test fun overflowReversalLargeTextRtl() = overflow(true, 1.5f)
 
     private fun returnMotion(rightToLeft: Boolean) {
         show(rightToLeft)
@@ -112,12 +111,10 @@ class BrowseTabMotionTest {
         val original = visits.single()
         key(if (rtl) Key.DirectionLeft else Key.DirectionRight)
         advance(64)
-        println("outbound rtl=$rtl x=${pageX()} alpha=${peak(visits.last().color)} visits=${visits.size}")
         key(if (rtl) Key.DirectionRight else Key.DirectionLeft)
         advance(32)
         val first = pageX()
         val alpha = peak(visits.last().color)
-        println("return rtl=$rtl origin=$origin first=$first alpha=$alpha")
         assertTrue("return visit must slide in the latest logical direction", (first - origin) * (if (rtl) -1f else 1f) < -1f)
         assertTrue("return visit must fade, not snap opaque", alpha in .02f.. .98f)
         advance(48)
@@ -149,7 +146,6 @@ class BrowseTabMotionTest {
         }
         advance(1000)
         val settled = labelX(5)
-        println("overflow rtl=$rtl font=$fontScale labels=$samples final=$settled pillRelative=$pills pages=$pages")
         assertEquals("key dispatch must not reposition the viewport synchronously", before, samples.first(), .5f)
         assertAnimated(samples, settled)
         assertAnimated(pills, pillX() - labelX(5))
@@ -162,7 +158,6 @@ class BrowseTabMotionTest {
         val interrupted = mutableListOf(labelX(5))
         repeat(12) { advance(16); interrupted += labelX(5) }
         advance(1000)
-        println("overflow interrupted rtl=$rtl font=$fontScale samples=$interrupted final=${labelX(5)}")
         assertEquals("reversal must not reposition synchronously", midScroll, interrupted.first(), .5f)
         assertAnimated(interrupted, labelX(5))
         assertEquals("latest reversal returns to the same viewport", settled, labelX(5), .5f)

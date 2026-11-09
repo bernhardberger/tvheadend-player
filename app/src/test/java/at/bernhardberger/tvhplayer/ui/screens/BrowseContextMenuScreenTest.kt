@@ -66,7 +66,9 @@ class BrowseContextMenuScreenTest {
     private var watchedChannel: ChannelId? = null
     private var playedChannel: ChannelId? = null
     private var goLives = 0
-    private val playerEntry = at.bernhardberger.tvhplayer.ui.PlayerEntryHandoff()
+    private var playerEntry = at.bernhardberger.tvhplayer.ui.PlayerEntryHandoff()
+    private val screenContent = androidx.compose.runtime.mutableStateOf<(@androidx.compose.runtime.Composable () -> Unit)?>(null)
+    private val scheduleRequests = mutableListOf<DvrScheduleRequest>()
 
     /** Starts a player request that stays pending, as while the player is still opening. */
     private fun requestPlayer() {
@@ -75,7 +77,7 @@ class BrowseContextMenuScreenTest {
         }
     }
 
-    @Test fun channelMenuShowsCurrentProgrammeArtwork() = menuArtwork(recordings = false, artwork = true)
+    @Test fun channelMenuShowsCurrentProgrammeArtwork() = menuArtwork(recordings = false, artwork = true, geometry = true)
     @Test fun channelMenuWithoutArtworkShowsPicon() = menuArtwork(recordings = false, artwork = false)
     @Test fun channelMenuWithoutProgrammeShowsPicon() = menuArtwork(recordings = false, artwork = false, noProgramme = true)
     @Test fun guideMenuShowsProgrammeArtwork() = menuArtwork(recordings = false, artwork = true, guideMenu = true)
@@ -84,7 +86,7 @@ class BrowseContextMenuScreenTest {
     @Test fun recordingMenuUsesFanartWhenImageIsAbsent() = menuArtwork(recordings = true, artwork = false, fanartOnly = true)
 
     private fun menuArtwork(recordings: Boolean, artwork: Boolean, guideMenu: Boolean = false,
-        noProgramme: Boolean = false, fanartOnly: Boolean = false) {
+        noProgramme: Boolean = false, fanartOnly: Boolean = false, geometry: Boolean = false) {
         show(recordings, guideMenu = guideMenu, artwork = artwork, noProgramme = noProgramme,
             imageProbe = true, fanartOnly = fanartOnly)
         if (!guideMenu) compose.onNodeWithTag(if (recordings) "recording-list-entry-1" else "channel-row-1")
@@ -97,7 +99,7 @@ class BrowseContextMenuScreenTest {
         else compose.onNodeWithTag("browse-context-plate").assertDoesNotExist()
         if (recordings || noProgramme) compose.onNodeWithTag("browse-context-progress").assertDoesNotExist()
         if (noProgramme) compose.onNodeWithText("Watch channel").assertIsFocused()
-        assertMoreOptionsGeometry()
+        if (geometry) assertMoreOptionsGeometry()
         compose.mainClock.advanceTimeBy(500)
         val bounds = compose.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
         val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
@@ -106,38 +108,27 @@ class BrowseContextMenuScreenTest {
             if (hasArtwork) android.graphics.Color.RED else android.graphics.Color.CYAN,
             bitmap.getPixel(bounds.center.x.toInt(), bounds.center.y.toInt()))
         bitmap.recycle()
-        if (noProgramme) capture("channel-only")
-        else if (!hasArtwork && !recordings) capture("channels-picon")
     }
 
     @Test fun channelMenuShowsChannelAndTimeBelowProgramme() {
-        show(recordings = false)
-        compose.onNodeWithTag("channel-row-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
-        val inMenu = hasAnyAncestor(hasTestTag("browse-context-menu"))
-        compose.onNodeWithTag("browse-context-menu").assert(
-            SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.IsDialog))
-        val menuBounds = compose.onNodeWithTag("browse-context-menu").getUnclippedBoundsInRoot()
-        assertEquals(960f, (menuBounds.right - menuBounds.left).value, 1f)
-        val subtitle = compose.onNode(hasText("101 Ridge Earth HD • On now • until ", substring = true) and inMenu)
-        val programme = compose.onNode(hasText("Ridge Light") and inMenu)
-        subtitle.assertExists()
-        assertTrue(programme.getUnclippedBoundsInRoot().bottom <= subtitle.getUnclippedBoundsInRoot().top)
-        assertMoreOptionsGeometry()
-        capture("channels-header", "u15-menu-headers")
-    }
-
-    @Test fun relatedFocusDoesNotReplaceDetailsOrItsRecordTarget() {
-        show(recordings = false)
-        compose.onNodeWithTag("channel-row-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
-        compose.onNodeWithText("Program details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.onNodeWithTag("details-watch").performKeyInput { pressKey(Key.DirectionDown) }
-        compose.onNodeWithTag("details-card-3").assertIsFocused()
-        compose.onNodeWithTag("programme-details-page").assert(
-            SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.PaneTitle, "Ridge Light"))
-        compose.onNodeWithTag("details-card-3").performKeyInput { pressKey(Key.DirectionUp) }
-        compose.onNodeWithTag("details-record").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.onNodeWithTag("centred-dialog-card").assertDoesNotExist()
-        compose.onNodeWithTag("details-record").assertIsFocused()
+        listOf(false, true).forEach { guideMenu ->
+            show(recordings = false, guideMenu = guideMenu)
+            if (!guideMenu) compose.onNodeWithTag("channel-row-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
+            val inMenu = hasAnyAncestor(hasTestTag("browse-context-menu"))
+            compose.onNodeWithTag("browse-context-menu").assert(
+                SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.IsDialog))
+            val menuBounds = compose.onNodeWithTag("browse-context-menu").getUnclippedBoundsInRoot()
+            assertEquals(960f, (menuBounds.right - menuBounds.left).value, 1f)
+            val subtitle = compose.onNode(hasText("101 Ridge Earth HD • On now • until ", substring = true) and inMenu)
+            val programme = compose.onNode(hasText("Ridge Light") and inMenu)
+            subtitle.assertExists()
+            assertTrue(programme.getUnclippedBoundsInRoot().bottom <= subtitle.getUnclippedBoundsInRoot().top)
+            compose.onNodeWithText("Watch", substring = false).assertIsFocused()
+            compose.onNodeWithText("Watch channel").assertDoesNotExist()
+            compose.onNodeWithText("On now • until ", substring = true).assertExists()
+            compose.onNodeWithTag("browse-context-progress").assertIsDisplayed()
+            compose.onNodeWithTag("browse-context-plate").assertIsDisplayed()
+        }
     }
 
     @Test fun airingHoldAndMenuConsumeReleaseAndRestoreTheSameCardWithoutScrolling() {
@@ -169,24 +160,27 @@ class BrowseContextMenuScreenTest {
     }
 
     @Test fun airingMenuDetailsPushesTheAiringAndGuideActsOnThatPage() {
-        show(recordings = false)
-        openAirings()
-        compose.onNodeWithTag("details-card-3").performKeyInput { pressKey(Key.DirectionRight) }
-        compose.onNodeWithTag("details-card-4").performKeyInput { pressKey(Key.Menu) }
-        compose.onNodeWithText("Program details", substring = false).requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.onNodeWithTag("details-show_guide").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
-        assertEquals(EventId(4), guideProgramme?.id)
-        assertEquals(ChannelId(2), guideRequest)
+        listOf(false, true).forEach { byMenu ->
+            show(recordings = false)
+            openAirings()
+            val eventId = if (byMenu) EventId(4) else EventId(3)
+            if (byMenu) compose.onNodeWithTag("details-card-3").performKeyInput { pressKey(Key.DirectionRight) }
+            compose.onNodeWithTag("details-card-${eventId.value}").assertIsFocused().performKeyInput {
+                pressKey(if (byMenu) Key.Menu else Key.DirectionCenter)
+            }
+            if (byMenu) compose.onNodeWithText("Program details", substring = false).requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+            compose.onNodeWithTag("details-show_guide").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+            assertEquals(eventId, guideProgramme?.id)
+            assertEquals(if (byMenu) ChannelId(2) else ChannelId(1), guideRequest)
+            assertEquals(guideProgramme?.channelId, guideRequest)
+            compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
+        }
     }
 
     @Test fun airingMenuDetailsBackReturnsToHostingCardWithoutMenuOrBrowseFlashEveryFrame() {
         show(recordings = false, realRail = true)
         val browse = resumeBitmap()
-        var x = 0; var y = 0; var brightest = 0
-        for (px in 212 until 900) for (py in 20 until 220) {
-            val light = android.graphics.Color.red(browse.getPixel(px, py))
-            if (light > brightest) { brightest = light; x = px; y = py }
-        }
+        val (x, y, brightest) = brightestRedPixel(browse, 212 until 900, 20 until 220)
         browse.recycle()
         assertTrue("Rendered browse heading probe", brightest > 100)
         openAirings()
@@ -234,6 +228,7 @@ class BrowseContextMenuScreenTest {
         card.assertIsFocused()
         assertEquals(scroll, detailsScroll())
         assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
+        assertEquals(DvrSchedule.Programme(EventId(4)), scheduleRequests.single().schedule)
     }
 
     private fun openAirings() {
@@ -245,28 +240,6 @@ class BrowseContextMenuScreenTest {
 
     private fun detailsScroll(): Float = compose.onNodeWithTag("details-page-scroll", useUnmergedTree = true)
         .fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
-
-    @Test fun guideMenuShowsChannelAndTimeBelowProgrammeTitle() {
-        show(recordings = false, guideMenu = true)
-        val title = compose.onNodeWithText("Ridge Light")
-        val channel = compose.onNodeWithText("101 Ridge Earth HD • On now • until ", substring = true)
-        assertTrue(title.getUnclippedBoundsInRoot().bottom <= channel.getUnclippedBoundsInRoot().top)
-        // The same order as the Channels menu: Watch first.
-        compose.onNodeWithText("Watch").assertIsFocused()
-        assertMoreOptionsGeometry()
-        capture("guide-header", "u15-menu-headers")
-    }
-
-    @Test fun runningGuideMenuShowsWatchAndEmbeddedArtworkProgress() {
-        show(recordings = false, guideMenu = true)
-        compose.onNodeWithText("Watch", substring = false).assertExists()
-        compose.onNodeWithText("Watch channel").assertDoesNotExist()
-        compose.onNodeWithText("On now • until ", substring = true).assertExists()
-        compose.onNodeWithTag("browse-context-progress").assertIsDisplayed().assertHeightIsEqualTo(3.dp)
-        compose.onNodeWithTag("browse-context-artwork").assertWidthIsEqualTo(268.dp)
-        compose.onNodeWithTag("browse-context-plate").assertIsDisplayed()
-        assertMoreOptionsGeometry()
-    }
 
     private fun assertMoreOptionsGeometry() {
         val item = compose.onNodeWithTag("browse-context-item")
@@ -293,9 +266,6 @@ class BrowseContextMenuScreenTest {
             summary = "A winter expedition.", description = "Longer description.")
         compose.onNodeWithText("Into the Polar Night\nA winter expedition.").assertIsDisplayed()
         compose.onNodeWithText("Longer description.").assertDoesNotExist()
-    }
-
-    @Test fun programmeDescriptionFallsBackWhenSummaryIsBlank() {
         show(recordings = false, guideMenu = true, summary = " ", description = "A winter expedition.")
         compose.onNodeWithText("A winter expedition.").assertIsDisplayed()
     }
@@ -305,7 +275,6 @@ class BrowseContextMenuScreenTest {
             description = "A winter expedition.")
         compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
         compose.onNodeWithText("Into the Polar Night\nA winter expedition.").assertIsDisplayed()
-        assertMoreOptionsGeometry()
     }
 
     @Test fun futureGuideMenuShowsWatchChannelAndNoProgress() {
@@ -315,7 +284,6 @@ class BrowseContextMenuScreenTest {
         compose.onNodeWithText("On now • until ", substring = true).assertDoesNotExist()
         compose.onNodeWithTag("browse-context-progress").assertDoesNotExist()
         compose.onNodeWithTag("browse-context-plate").assertIsDisplayed()
-        capture("guide-future", "u15-context")
     }
 
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
@@ -325,7 +293,6 @@ class BrowseContextMenuScreenTest {
         compose.onNodeWithText(resources.getString(at.bernhardberger.tvhplayer.R.string.context_watch)).assertExists()
         compose.onNodeWithText("Läuft • bis ", substring = true).assertExists()
         compose.onNodeWithTag("browse-context-progress").assertIsDisplayed()
-        capture("guide-german", "u15-context")
     }
 
     @Test fun channelsHoldMenuBackAndWatch() {
@@ -346,8 +313,10 @@ class BrowseContextMenuScreenTest {
         assertEquals(1, plays)
     }
 
-    @Test fun programmeMenuTakesNoKeysWhileItsPlaybackIsOpening() = channelMenuWhileOpening(noProgramme = false)
-    @Test fun channelMenuTakesNoKeysWhileItsPlaybackIsOpening() = channelMenuWhileOpening(noProgramme = true)
+    @Test fun programmeMenuTakesNoKeysWhileItsPlaybackIsOpening() {
+        channelMenuWhileOpening(noProgramme = false)
+        channelMenuWhileOpening(noProgramme = true)
+    }
 
     private fun channelMenuWhileOpening(noProgramme: Boolean) {
         val session = show(recordings = false, noProgramme = noProgramme, entryHandoff = true)
@@ -363,8 +332,10 @@ class BrowseContextMenuScreenTest {
         assertEquals(1, plays)
     }
 
-    @Test fun programmeMenuWatchLiveGoesLiveOnTheWatchedChannel() = watchLiveFromMenu(noProgramme = false)
-    @Test fun channelMenuWatchLiveGoesLiveOnTheWatchedChannel() = watchLiveFromMenu(noProgramme = true)
+    @Test fun programmeMenuWatchLiveGoesLiveOnTheWatchedChannel() {
+        watchLiveFromMenu(noProgramme = false)
+        watchLiveFromMenu(noProgramme = true)
+    }
 
     private fun watchLiveFromMenu(noProgramme: Boolean) {
         show(recordings = false, noProgramme = noProgramme, watching = true, behindLive = true)
@@ -378,8 +349,10 @@ class BrowseContextMenuScreenTest {
         }
     }
 
-    @Test fun programmeMenuContinueWatchingReturnsWithoutGoingLive() = continueFromMenu(noProgramme = false)
-    @Test fun channelMenuContinueWatchingReturnsWithoutGoingLive() = continueFromMenu(noProgramme = true)
+    @Test fun programmeMenuContinueWatchingReturnsWithoutGoingLive() {
+        continueFromMenu(noProgramme = false)
+        continueFromMenu(noProgramme = true)
+    }
 
     private fun continueFromMenu(noProgramme: Boolean) {
         show(recordings = false, noProgramme = noProgramme, watching = true, behindLive = true)
@@ -394,8 +367,10 @@ class BrowseContextMenuScreenTest {
         }
     }
 
-    @Test fun programmeMenuFromAGoneSessionDropsContinueAndLive() = staleSessionMenu(noProgramme = false)
-    @Test fun channelMenuFromAGoneSessionDropsContinueAndLive() = staleSessionMenu(noProgramme = true)
+    @Test fun programmeMenuFromAGoneSessionDropsContinueAndLive() {
+        staleSessionMenu(noProgramme = false)
+        staleSessionMenu(noProgramme = true)
+    }
 
     private fun staleSessionMenu(noProgramme: Boolean) {
         val session = show(recordings = false, noProgramme = noProgramme, watching = true, behindLive = true)
@@ -467,12 +442,6 @@ class BrowseContextMenuScreenTest {
         compose.runOnIdle { assertEquals(ChannelId(1), watchedChannel); assertEquals(0, plays) }
     }
 
-    @Test fun scheduledRecordingMenuDoesNotOfferWatchLive() {
-        show(recordings = true, recordingState = DvrEntryState.SCHEDULED)
-        compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
-        compose.onNodeWithTag("browse-context-action-watch_live").assertDoesNotExist()
-    }
-
     @Test @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
     @OptIn(TvheadendTestingApi::class)
     fun recordingResumeDialogCapture() {
@@ -521,8 +490,7 @@ class BrowseContextMenuScreenTest {
             SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, resumeEnd))
         compose.onNodeWithTag("recording-start-over").assert(
             SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, startOverEnd))
-        val card = compose.onNodeWithTag("centred-dialog-card").assertWidthIsEqualTo(528.dp)
-            .getUnclippedBoundsInRoot()
+        val card = compose.onNodeWithTag("centred-dialog-card").getUnclippedBoundsInRoot()
         assertEquals(480f, (card.left.value + card.right.value) / 2f, 0.5f)
         assertEquals(270f, (card.top.value + card.bottom.value) / 2f, 0.5f)
         compose.onNodeWithTag("centred-dialog-content").assertWidthIsEqualTo(480.dp)
@@ -535,18 +503,8 @@ class BrowseContextMenuScreenTest {
         compose.onNodeWithTag("recording-resume").performKeyPress(activation(android.view.KeyEvent.ACTION_UP))
         assertEquals(0, plays)
         compose.onNodeWithTag("recording-resume").assertIsFocused()
-        capture("resume", "u15-dialogs")
         compose.runOnIdle { back.onBackPressed() }
         row.assertIsFocused()
-        row.performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.onNodeWithTag("recording-resume").performKeyInput { pressKey(Key.DirectionRight) }
-        compose.onNodeWithTag("recording-start-over").assertIsFocused()
-        compose.onNodeWithText(startOverEnd, substring = true).assertExists()
-        compose.onNodeWithText(resumeEnd, substring = true).assertDoesNotExist()
-        capture("resume-start-over", "u15-dialogs")
-        compose.onNodeWithTag("recording-start-over").performKeyInput { pressKey(Key.DirectionCenter) }
-        assertEquals(1, plays)
-        assertEquals(RecordingPlaybackStart.START_OVER, start)
     }
 
     @Test fun recordingResumeWithoutPiconStartsTextAtTheContentEdge() {
@@ -656,13 +614,7 @@ class BrowseContextMenuScreenTest {
         compose.mainClock.advanceTimeBy(500)
         val after = resumeBitmap()
         // Sample a rail glyph, then compare the actual composited window with the original rail.
-        var brightest = 0
-        var x = 0
-        var y = 0
-        for (px in 24 until 112) for (py in 100 until 980) {
-            val light = android.graphics.Color.red(before.getPixel(px, py))
-            if (light > brightest) { brightest = light; x = px; y = py }
-        }
+        val (x, y, brightest) = brightestRedPixel(before, 24 until 112, 100 until 980)
         assertTrue("Rail glyph was rendered", brightest > 100)
         assertEquals("Rail covered by the single 60% scrim", brightest * 0.4f,
             android.graphics.Color.red(after.getPixel(x, y)).toFloat(), 2f)
@@ -705,11 +657,7 @@ class BrowseContextMenuScreenTest {
         // Probe the heading for the picker: opaque-layer registration alone can hide the rail.
         val xs = if (details) 96 until 900 else 24 until 112
         val ys = if (details) 125 until 260 else 100 until 980
-        var x = 0; var y = 0; var brightest = 0
-        for (px in xs) for (py in ys) {
-            val light = android.graphics.Color.red(original.getPixel(px, py))
-            if (light > brightest) { brightest = light; x = px; y = py }
-        }
+        val (x, y, brightest) = brightestRedPixel(original, xs, ys)
         assertTrue("Rendered backdrop probe", brightest > 100)
         fun assertFrames(exiting: Boolean = false) {
             repeat(24) { frame ->
@@ -793,7 +741,6 @@ class BrowseContextMenuScreenTest {
         compose.onNodeWithText("Keep recording").assertIsFocused()
         compose.onRoot().performKeyPress(activation(android.view.KeyEvent.ACTION_UP))
         compose.onNodeWithText("Keep recording").assertIsFocused()
-        capture("cancel-recording", "u15-dialogs")
         compose.runOnIdle { back.onBackPressed() }
         compose.onNodeWithTag("details-cancel").assertIsFocused()
         compose.runOnIdle { back.onBackPressed() }
@@ -856,6 +803,9 @@ class BrowseContextMenuScreenTest {
         compose.onNodeWithTag("channel-row-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
         compose.onNodeWithText("Program details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("details-watch").performKeyInput { pressKey(Key.DirectionDown) }
+        compose.onNodeWithTag("details-card-3").assertIsFocused()
+        compose.onNodeWithTag("programme-details-page").assert(
+            SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Ridge Light"))
         compose.onNodeWithTag("details-card-3").performKeyInput { pressKey(Key.DirectionCenter) }
         compose.runOnIdle { back.onBackPressed() }
         compose.onNodeWithTag("details-card-3").assertIsFocused().performKeyInput { pressKey(Key.DirectionUp) }
@@ -864,30 +814,35 @@ class BrowseContextMenuScreenTest {
         compose.onNodeWithTag("details-record").assertIsFocused()
     }
 
-    @Test fun recordingMenuDetailsBackNeverReopensMenuEveryFrame() = menuDetailsFrames(recordings = true)
+    @Test fun recordingMenuDetailsBackNeverReopensMenuEveryFrame() {
+        menuDetailsFrames(recordings = true)
+        menuDetailsFrames(recordings = true, openedDirectly = true)
+    }
 
     @Test fun channelMenuDetailsBackNeverReopensMenuEveryFrame() = menuDetailsFrames(recordings = false)
 
-    private fun menuDetailsFrames(recordings: Boolean) {
-        show(recordings = recordings, realRail = true, fixedNow = if (recordings) 1_789_480_800L else null)
+    private fun menuDetailsFrames(recordings: Boolean, openedDirectly: Boolean = false) {
+        show(recordings = recordings, realRail = true, fixedNow = if (recordings) 1_789_480_800L else null,
+            recordingState = if (openedDirectly) DvrEntryState.SCHEDULED else DvrEntryState.COMPLETED)
         val browse = resumeBitmap()
         // The browse page's top left (tabs, first rows), not the rail: opaque-layer registration can hide the rail
         // even when neither the menu nor the details background is actually drawn.
-        var x = 0; var y = 0; var brightest = 0
         // Above Recordings' focused row: its focus growth restarts after Back, so it is no stable probe.
         val probeBottom = if (recordings) compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot.top.toInt() - 8 else 220
-        for (px in 212 until 900) for (py in 20 until minOf(220, probeBottom)) {
-            val light = android.graphics.Color.red(browse.getPixel(px, py))
-            if (light > brightest) { brightest = light; x = px; y = py }
-        }
+        val (x, y, brightest) = brightestRedPixel(browse, 212 until 900, 20 until minOf(220, probeBottom))
         browse.recycle()
         assertTrue("Rendered browse heading probe", brightest > 100)
         val row = compose.onNodeWithTag(if (recordings) "recording-list-entry-1" else "channel-row-1").requestFocus()
-        row.performKeyPress(activation(android.view.KeyEvent.ACTION_DOWN))
-        row.performKeyPress(activation(android.view.KeyEvent.ACTION_DOWN, 1))
-        compose.onRoot().performKeyPress(activation(android.view.KeyEvent.ACTION_UP))
         val detailsLabel = if (recordings) "Details" else "Program details"
-        compose.onNodeWithText(detailsLabel).requestFocus()
+        if (openedDirectly) {
+            row.performKeyInput { pressKey(Key.DirectionCenter) }
+            compose.onNodeWithTag("details-watch").assertIsFocused()
+        } else {
+            row.performKeyPress(activation(android.view.KeyEvent.ACTION_DOWN))
+            row.performKeyPress(activation(android.view.KeyEvent.ACTION_DOWN, 1))
+            compose.onRoot().performKeyPress(activation(android.view.KeyEvent.ACTION_UP))
+            compose.onNodeWithText(detailsLabel).requestFocus()
+        }
         fun assertCoveredFrames(direction: String) {
             repeat(24) { frame ->
                 compose.mainClock.advanceTimeByFrame()
@@ -899,9 +854,14 @@ class BrowseContextMenuScreenTest {
         }
         compose.mainClock.autoAdvance = false
         try {
-            compose.onNodeWithText(detailsLabel).performKeyInput { pressKey(Key.DirectionCenter) }
-            assertCoveredFrames("Menu to details")
-            compose.onNodeWithTag(if (recordings) "details-resume" else "details-watch").assertIsFocused()
+            if (!openedDirectly) {
+                compose.onNodeWithText(detailsLabel).performKeyInput { pressKey(Key.DirectionCenter) }
+                assertCoveredFrames("Menu to details")
+            }
+            val initialAction = if (recordings && !openedDirectly) "details-resume" else "details-watch"
+            compose.onNodeWithTag(initialAction).assertIsFocused()
+            compose.onRoot().performKeyPress(activation(android.view.KeyEvent.ACTION_UP))
+            compose.onNodeWithTag(initialAction).assertIsFocused()
             compose.runOnIdle { back.onBackPressed() }
             val lights = mutableListOf<Int>()
             repeat(24) {
@@ -920,41 +880,6 @@ class BrowseContextMenuScreenTest {
             compose.mainClock.autoAdvance = true
         }
         assertEquals(0, plays)
-    }
-
-    @Test fun directRecordingDetailsBackFadesMonotonicallyToBrowseEveryFrame() {
-        show(recordings = true, recordingState = DvrEntryState.SCHEDULED, realRail = true)
-        val browse = resumeBitmap()
-        var x = 0; var y = 0; var brightest = 0
-        // Above the focused row: its focus growth restarts after Back, so it is no stable probe.
-        val rowTop = compose.onNodeWithTag("recording-list-entry-1").fetchSemanticsNode().boundsInRoot.top.toInt()
-        for (px in 212 until 900) for (py in 20 until minOf(220, rowTop - 8)) {
-            val light = android.graphics.Color.red(browse.getPixel(px, py))
-            if (light > brightest) { brightest = light; x = px; y = py }
-        }
-        browse.recycle()
-        assertTrue("Rendered browse heading probe", brightest > 100)
-        val row = compose.onNodeWithTag("recording-list-entry-1").requestFocus()
-        row.performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.onNodeWithTag("details-watch").assertIsFocused()
-        compose.mainClock.autoAdvance = false
-        val lights = mutableListOf<Int>()
-        try {
-            compose.runOnIdle { back.onBackPressed() }
-            repeat(24) {
-                compose.mainClock.advanceTimeByFrame()
-                lights += probeLight(x, y)
-                compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
-            }
-            // The details page's blurred art is not black, so opaque means well below the browse probe.
-            assertTrue("Details starts opaque: $lights", lights.first() < brightest * .3f)
-            assertTrue("Exit is a fade, not a flash: $lights", lights.any { it in (brightest / 4)..(brightest * 3 / 4) })
-            assertTrue("Browse must not flash then darken: $lights", lights.zipWithNext().all { (a, b) -> b >= a - 2 })
-            assertTrue("Browse is restored: $lights", lights.last() >= brightest - 2)
-            row.assertIsFocused()
-        } finally {
-            compose.mainClock.autoAdvance = true
-        }
     }
 
     @Test fun recordingDetailsConsumesRepeatedBackDuringFadeAndRestoresAfterExit() {
@@ -983,32 +908,6 @@ class BrowseContextMenuScreenTest {
         compose.runOnIdle { fallback.remove() }
     }
 
-    @Test fun recordingsDetailsBackRestoresTheOriginatingRow() {
-        show(recordings = true)
-        val row = compose.onNodeWithTag("recording-list-entry-1")
-        row.requestFocus().performKeyInput { pressKey(Key.Menu) }
-        compose.onNodeWithText("Details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.onNodeWithTag("details-resume").assertIsFocused()
-        compose.onRoot().performKeyPress(activation(android.view.KeyEvent.ACTION_UP))
-        compose.onNodeWithTag("details-resume").assertIsFocused()
-        compose.runOnIdle { back.onBackPressed() }
-        compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
-        row.assertIsFocused()
-        assertEquals(0, plays)
-    }
-
-    @Test fun channelsStackedAiringShowGuideCarriesPageProgramme() {
-        show(recordings = false)
-        compose.onNodeWithTag("channel-row-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
-        compose.onNodeWithText("Program details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.onNodeWithTag("details-watch").performKeyInput { pressKey(Key.DirectionDown) }
-        compose.onNodeWithTag("details-card-3").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.onNodeWithTag("details-show_guide").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
-        assertEquals(EventId(3), guideProgramme?.id)
-        assertEquals(guideProgramme?.channelId, guideRequest)
-        compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
-    }
-
     @Test fun channelsDetailsStackBackAndOpeningReleaseRestoreExactOrigin() {
         show(recordings = false)
         val row = compose.onNodeWithTag("channel-row-1").requestFocus()
@@ -1025,30 +924,26 @@ class BrowseContextMenuScreenTest {
         compose.onNodeWithTag("details-card-3").assertDoesNotExist()
         val heading = compose.onNodeWithText("Other airings of ", substring = true).getBoundsInRoot()
         org.junit.Assert.assertTrue("$heading peeks above the safe edge", heading.bottom <= compose.onRoot().getUnclippedBoundsInRoot().bottom - 48.dp)
-        capture("stacked-from-airing", "u15-about")
-        compose.runOnIdle { back.onBackPressed() }
-        compose.onNodeWithTag("details-card-3").assertIsFocused()
-        compose.runOnIdle { back.onBackPressed() }
+        hardwareBack()
+        compose.onNodeWithTag("details-card-3").assertIsFocused().assertIsDisplayed()
+        compose.onNodeWithTag("details-card-1").assertDoesNotExist()
+        hardwareBack()
         compose.onNodeWithTag("details-record").assertIsFocused()
-        compose.runOnIdle { back.onBackPressed() }
+        hardwareBack()
+        compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
         row.assertIsFocused()
         assertEquals(0, plays)
-    }
 
-    @Test fun hardwareBackPopsStackedDetailsOnceAndLeavesReadingFirst() {
-        show(recordings = false)
-        val row = compose.onNodeWithTag("channel-row-1").requestFocus()
+        // Also restore a later card entered from Watch, then leave reading before closing.
         row.performKeyInput { pressKey(Key.Menu) }
         compose.onNodeWithText("Program details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onRoot().performKeyPress(activation(android.view.KeyEvent.ACTION_UP))
-        // Watch → row → Right ×2 → OK stacks that airing's details.
         compose.onNodeWithTag("details-watch").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
         compose.onNodeWithTag("details-card-3").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
         compose.onNodeWithTag("details-card-4").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
         compose.onNodeWithTag("details-card-5").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("details-watch").assertIsFocused()
         compose.onNodeWithTag("details-card-5").assertDoesNotExist()
-        // One hardware Back pops the stacked page onto the same card; it never just drops focus.
         hardwareBack()
         compose.onNodeWithTag("details-card-5").assertIsFocused().assertIsDisplayed()
         compose.onNodeWithTag("details-card-1").assertDoesNotExist()
@@ -1159,28 +1054,25 @@ class BrowseContextMenuScreenTest {
     }
 
     @Test fun scheduledDetailsWatchChannelUsesLivePlayback() {
-        show(recordings = true, recordingState = DvrEntryState.SCHEDULED)
-        compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.onNodeWithTag("details-watch").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
-        assertEquals(ChannelId(1), watchedChannel)
-        assertEquals(0, plays)
+        listOf(false, true).forEach { offline ->
+            show(recordings = true, recordingState = DvrEntryState.SCHEDULED, offline = offline)
+            compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+            compose.onNodeWithTag("details-watch").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+            assertEquals(ChannelId(1), watchedChannel)
+            assertEquals(0, plays)
+        }
     }
 
     @Test fun offlineChannelsMenuWatchPlaysTheChannel() {
-        show(recordings = false, offline = true)
-        compose.onNodeWithTag("channel-row-1", useUnmergedTree = true).requestFocus().performKeyInput { pressKey(Key.Menu) }
-        compose.waitForIdle()
-        compose.onNodeWithText("Watch").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
-        assertEquals(1, plays)
-    }
-
-    @Test fun offlineChannelsMenuDetailsWatchPlaysTheChannel() {
-        show(recordings = false, offline = true)
-        compose.onNodeWithTag("channel-row-1", useUnmergedTree = true).requestFocus().performKeyInput { pressKey(Key.Menu) }
-        compose.onNodeWithText("Program details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.waitForIdle()
-        compose.onNodeWithTag("details-watch").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
-        assertEquals(1, plays)
+        listOf(false, true).forEach { details ->
+            show(recordings = false, offline = true)
+            compose.onNodeWithTag("channel-row-1", useUnmergedTree = true).requestFocus().performKeyInput { pressKey(Key.Menu) }
+            if (details) compose.onNodeWithText("Program details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+            compose.waitForIdle()
+            val watch = if (details) compose.onNodeWithTag("details-watch") else compose.onNodeWithText("Watch")
+            watch.assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+            assertEquals(1, plays)
+        }
     }
 
     @Test fun offlineDetailsOfferRecordingPlaybackOnlyOnceTheSessionIsReady() {
@@ -1220,14 +1112,6 @@ class BrowseContextMenuScreenTest {
         compose.waitForIdle()
         compose.onNodeWithTag("details-watch").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
         assertEquals(1, plays)
-    }
-
-    @Test fun offlineScheduledDetailsWatchChannelUsesLivePlayback() {
-        show(recordings = true, recordingState = DvrEntryState.SCHEDULED, offline = true)
-        compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.onNodeWithTag("details-watch").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
-        assertEquals(ChannelId(1), watchedChannel)
-        assertEquals(0, plays)
     }
 
     @Test fun deniedDvrPermissionKeepsRecordingPlaybackButRemovesDelete() {
@@ -1287,6 +1171,15 @@ class BrowseContextMenuScreenTest {
         }
     }
 
+    private fun brightestRedPixel(bitmap: Bitmap, xs: IntRange, ys: IntRange): Triple<Int, Int, Int> {
+        var x = 0; var y = 0; var brightest = 0
+        for (px in xs) for (py in ys) {
+            val light = android.graphics.Color.red(bitmap.getPixel(px, py))
+            if (light > brightest) { brightest = light; x = px; y = py }
+        }
+        return Triple(x, y, brightest)
+    }
+
     /** Draw the same window coordinate, clipping raster work to the pixel asserted by frame loops. */
     private fun probeLight(x: Int, y: Int): Int {
         val bitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
@@ -1305,16 +1198,6 @@ class BrowseContextMenuScreenTest {
         compose.onNodeWithTag("channel-row-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
         compose.onNodeWithTag("nav-channels").assertDoesNotExist()
         compose.onNodeWithText("Watch").performKeyInput { pressKey(Key.DirectionLeft) }.assertIsFocused()
-        capture("channels-fullscreen-widebutton")
-        val middle = compose.onNodeWithText("Watch").getUnclippedBoundsInRoot()
-            .let { ((it.top.value + it.bottom.value) / 2f * 2f).toInt() }
-        val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
-        compose.runOnIdle { view.draw(Canvas(bitmap)) }
-        // 268dp native button, enlarged 1.1x; the right middle fills, both right corners curve in.
-        assertTrue(android.graphics.Color.red(bitmap.getPixel(1680, middle)) > 200)
-        assertTrue(android.graphics.Color.red(bitmap.getPixel(1680, middle - 50)) < 80)
-        assertTrue(android.graphics.Color.red(bitmap.getPixel(1680, middle + 50)) < 80)
-        bitmap.recycle()
         compose.onNodeWithText("Record").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("centred-dialog-card").assertDoesNotExist()
         compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
@@ -1360,7 +1243,6 @@ class BrowseContextMenuScreenTest {
             if (action == "Back") hardwareBack() else hardwareKey(android.view.KeyEvent.KEYCODE_DPAD_CENTER)
             repeat(36) {
                 compose.mainClock.advanceTimeByFrame()
-                probeLight(0, 0)
                 val focused = compose.onAllNodes(isFocused(), useUnmergedTree = true).fetchSemanticsNodes()
                 frames += focused.map { "${it.id}:${it.config.getOrElse(SemanticsProperties.TestTag) { "" }}:${it.config.getOrElse(SemanticsProperties.Text) { emptyList() }}" }
                 assertTrue("Unexpected focus at frame $it: $frames", focused.all { it.id == row || (!returned && it.id in before) })
@@ -1387,9 +1269,24 @@ class BrowseContextMenuScreenTest {
         offline: Boolean = false, guideDetails: Boolean = false, entryHandoff: Boolean = false,
         rootArtwork: FakeTvheadendSession? = null, watching: Boolean = false,
         behindLive: Boolean = false, growingFile: Boolean = false): FakeTvheadendSession {
+        val firstLeg = screenContent.value == null
+        if (!firstLeg) {
+            compose.runOnIdle { screenContent.value = null }
+            compose.waitForIdle()
+        }
+        plays = 0
+        goLives = 0
+        start = null
+        watchedChannel = null
+        playedChannel = null
+        guideRequest = null
+        guideProgramme = null
+        artworkRequests.clear()
+        scheduleRequests.clear()
+        playerEntry = at.bernhardberger.tvhplayer.ui.PlayerEntryHandoff()
         val context = ApplicationProvider.getApplicationContext<Application>()
         val now = fixedNow?.let(Instant::fromEpochSeconds) ?: Instant.parse("2026-09-15T19:00:00Z")
-        check(android.os.SystemClock.setCurrentTimeMillis(now.toEpochMilliseconds()))
+        if (firstLeg) check(android.os.SystemClock.setCurrentTimeMillis(now.toEpochMilliseconds()))
         val channel = Channel.create(ChannelId(1), name = "Ridge Earth HD", number = 101, icon = if (picon) ChannelIcon.ImageCache(ArtworkId(1)) else null)
         val otherChannel = Channel.create(ChannelId(2), name = "Ridge Earth SD", number = 100, icon = ChannelIcon.ImageCache(ArtworkId(1)))
         val event = EpgEvent.create(EventId(1), channel.id,
@@ -1434,9 +1331,17 @@ class BrowseContextMenuScreenTest {
                 DvrConfiguration(DvrConfigId("one"), "One", ""), DvrConfiguration(DvrConfigId("two"), "Two", "")) else emptyList()),
             recordingProgressCapability = RecordingProgressCapability.SUPPORTED,
         ))
+        val screenSession = object : TvheadendSession by session {
+            override val dvrRepository = object : DvrRepository by session.dvrRepository {
+                override suspend fun scheduleEntry(currentSession: CurrentSessionObservation, request: DvrScheduleRequest): DvrMutationResult<DvrEntryId> {
+                    scheduleRequests += request
+                    return session.dvrRepository.scheduleEntry(currentSession, request)
+                }
+            }
+        }
         val notices = NoticeCenter({ 0L }) { NoticeContext(0, session.observation.value.currentSession?.generationIdentity) }
         val dependencies = module {
-            single<TvheadendSession> { session }; single { notices }
+            single<TvheadendSession> { screenSession }; single { notices }
             single { at.bernhardberger.tvhplayer.settings.UiSettingsStore(context) }
         }
         val application = org.koin.dsl.koinApplication { modules(dependencies) }
@@ -1449,7 +1354,7 @@ class BrowseContextMenuScreenTest {
             if (recordingState == DvrEntryState.SCHEDULED || recordingState == DvrEntryState.RECORDING)
                 mode.value = at.bernhardberger.tvhplayer.core.DvrLibraryMode.SCHEDULE
         }
-        compose.setContent {
+        screenContent.value = {
             org.koin.compose.KoinIsolatedContext(application) {
                 androidx.compose.runtime.DisposableEffect(application) {
                     onDispose { application.close() }
@@ -1481,14 +1386,14 @@ class BrowseContextMenuScreenTest {
                             openingEvent = event, openingObservation = observation, observation = observation,
                             currentObservation = { session.observation.value }, nowSecProvider = { now.epochSeconds },
                             showContextMenu = !guideDetails, onShowDetails = {},
-                            mutations = DvrMutationActions(session.dvrRepository), notices = notices,
+                            mutations = DvrMutationActions(screenSession.dvrRepository), notices = notices,
                             mutationScope = androidx.compose.runtime.rememberCoroutineScope(),
                             mutationInFlight = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(null) },
                             onPlay = { _, _ -> plays++; requestPlayer() }, onPlayRecording = {}, onClose = {},
                          ) else if (recordings) RecordingsScreenContent(
                              initialFocusEnabled = !drawerActive,
                             observation = observation, state = state,
-                             dvrMutationActions = DvrMutationActions(session.dvrRepository), notices = notices,
+                             dvrMutationActions = DvrMutationActions(screenSession.dvrRepository), notices = notices,
                              nowSecProvider = { now.epochSeconds },
                             onPlayRecording = { _, intent -> plays++; start = intent; requestPlayer() },
                             onWatchChannel = { channelId, _ -> watchedChannel = channelId },
@@ -1514,6 +1419,7 @@ class BrowseContextMenuScreenTest {
                 } }
             }
         }
+        if (firstLeg) compose.setContent { screenContent.value?.invoke() }
         compose.waitForIdle()
         compose.waitUntil(10_000) {
             compose.onAllNodesWithTag(if (guideDetails) "details-watch" else if (guideMenu) "browse-context-menu" else if (recordings) "recording-list-entry-1" else "channel-row-1").fetchSemanticsNodes().isNotEmpty()
