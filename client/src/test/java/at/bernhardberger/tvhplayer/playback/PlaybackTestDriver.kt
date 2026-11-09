@@ -67,6 +67,14 @@ internal class PlaybackTestDriver(
         scheduler.runCurrent()
     }
 
+    /** Controlled work has no real-thread handoff to wait for: a missing signal is a failure now. */
+    fun awaitCurrent(label: String, predicate: () -> Boolean) {
+        scheduler.runCurrent()
+        shadowOf(Looper.getMainLooper()).idle()
+        scheduler.runCurrent()
+        if (!predicate()) throw AssertionError("Missing signal after controlled work: $label")
+    }
+
     /** For live sources whose manager and SDK work use this scheduler, not real IO threads. */
     fun settleLive(player: ExoPlayer) {
         repeat(8) {

@@ -24,6 +24,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -35,14 +36,15 @@ import org.robolectric.annotation.Config
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class AutomaticAudioRuntimeTest {
     @Test fun queuedAutomaticChoiceSurvivesSheetCancellationAndPublishesOverrideState() = runTest {
+        val work = StandardTestDispatcher(testScheduler)
         val context = ApplicationProvider.getApplicationContext<Application>()
         val settings = PlayerSettingsStore(InMemoryPreferencesDataStore())
         val session = FakeTvheadendSession()
         val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings,
-            kotlinx.coroutines.test.StandardTestDispatcher(testScheduler),
+            work,
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
-        val player = ExoPlayer.Builder(context).setClock(FakeClock(true)).build()
-        val runtime = AppPlaybackRuntime(player, session, createTvheadendPlaybackCoordinator(player),
+        val player = ExoPlayer.Builder(context).setClock(FakeClock(false)).build()
+        val runtime = AppPlaybackRuntime(player, session, createTvheadendPlaybackCoordinator(player, workDispatcher = work),
             settings, profiles, backgroundScope, TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None,
             PlaybackRuntimePolicy.fromPlayerSettings(),
             noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) })
@@ -70,6 +72,7 @@ class AutomaticAudioRuntimeTest {
             sheetScope.cancel()
             releaseCommand.complete(Unit)
             blocker.join()
+            PlaybackTestDriver(testScheduler).awaitCurrent("queued automatic choice completed") { choice.isCompleted }
             choice.join()
             assertFalse(choice.isCancelled)
             assertTrue(runtime.audioAutomatic.value)

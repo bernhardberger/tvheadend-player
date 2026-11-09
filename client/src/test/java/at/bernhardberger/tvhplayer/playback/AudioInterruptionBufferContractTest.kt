@@ -24,6 +24,7 @@ import at.bernhardberger.tvheadend.sdk.media3.*
 import at.bernhardberger.tvheadend.sdk.playback.*
 import at.bernhardberger.tvheadend.sdk.testing.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
 import org.junit.Test
@@ -42,11 +43,13 @@ class AudioInterruptionBufferContractTest {
     fun withoutDiscardDisabledAudioReportsExhaustionAfterRetirement() = exercise(discard = false)
 
     private fun exercise(discard: Boolean) = runTest {
+        val work = StandardTestDispatcher(testScheduler)
         val scope = CoroutineScope(coroutineContext + SupervisorJob())
         val driver = PlaybackTestDriver(testScheduler)
+        // Period preparation and sample availability are signals from Media3's real loader thread.
         fun await(predicate: () -> Boolean) = driver.await("buffer contract condition", predicate = predicate)
         val player = ExoPlayer.Builder(ApplicationProvider.getApplicationContext<Application>())
-            .setClock(FakeClock(true)).build()
+            .setClock(FakeClock(false)).build()
         var source: MediaSource? = null
         // Capture the actual source installed by the public coordinator; drive its period below.
         val capturingPlayer = Proxy.newProxyInstance(ExoPlayer::class.java.classLoader,
@@ -63,7 +66,7 @@ class AudioInterruptionBufferContractTest {
         val connection = ScriptedSubscriptionConnection().apply {
             scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 0)))
         }
-        val manager = createSubscriptionManager(connection, Dispatchers.Default).apply { startAdmission() }
+        val manager = createSubscriptionManager(connection, work).apply { startAdmission() }
         val session = FakeTvheadendSession(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(Channel.create(ChannelId(1))))),
@@ -71,7 +74,7 @@ class AudioInterruptionBufferContractTest {
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
         )).apply { scriptLivePlaybackSuccess(manager) }
         val recoveries = mutableListOf<PlaybackRecoveryReason>()
-        val coordinator = createTvheadendPlaybackCoordinator(capturingPlayer, onRecoveryRequired = {
+        val coordinator = createTvheadendPlaybackCoordinator(capturingPlayer, workDispatcher = work, onRecoveryRequired = {
             assertEquals(0, player.mediaItemCount)
             recoveries += it
         }).also { it.launchIn(scope) }

@@ -31,13 +31,13 @@ import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -55,6 +55,7 @@ class AudioPassthroughStartupTest {
         exercise(recordingFirst = true, headphones = true)
 
     private fun exercise(recordingFirst: Boolean, headphones: Boolean = false) = runTest {
+        val work = StandardTestDispatcher(testScheduler)
         val runtimeScope = CoroutineScope(coroutineContext + SupervisorJob())
         val context = ApplicationProvider.getApplicationContext<Application>()
         val settings = PlayerSettingsStore(InMemoryPreferencesDataStore())
@@ -64,13 +65,13 @@ class AudioPassthroughStartupTest {
             override fun close() = Unit
         }
         val session = FakeTvheadendSession()
-        val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.IO,
+        val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, work,
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
         val output = TvheadendAudioOutputProvider(context)
         val player = ExoPlayer.Builder(context)
-            .setClock(FakeClock(true))
+            .setClock(FakeClock(false))
             .setRenderersFactory(createTvheadendRenderersFactory(context, output)).build()
-        val runtime = AppPlaybackRuntime(player, session, createTvheadendPlaybackCoordinator(player),
+        val runtime = AppPlaybackRuntime(player, session, createTvheadendPlaybackCoordinator(player, workDispatcher = work),
             settings, profiles, runtimeScope, output, PlaybackAudioFocus.None, PlaybackRuntimePolicy.fromPlayerSettings(),
             audioOutputs = outputs,
             noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) })
@@ -96,6 +97,7 @@ class AudioPassthroughStartupTest {
             assertThrows(IllegalStateException::class.java) { output.configurePassthrough(true) }
             outputs.personalOutputConnected.value = false
             settings.setAudioPassthroughEnabled(true)
+            // Output reconfiguration acknowledges work on Media3's real playback thread.
             PlaybackTestDriver(testScheduler).await("passthrough output enabled") { output.isPassthroughEnabled }
             requestTarget()
             assertTrue(output.isPassthroughEnabled)
