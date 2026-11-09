@@ -2657,7 +2657,7 @@ class AudioInterruptionRuntimeTest {
         val fixture = Fixture(CoroutineScope(dispatcher + SupervisorJob()), granted, scheduler,
             dispatcher, recoveryPolicy)
         try {
-            fixture.block()
+            fixture.driver.exercise(this, settle = fixture::settle) { fixture.block() }
         }
         finally {
             fixture.scope.cancel()

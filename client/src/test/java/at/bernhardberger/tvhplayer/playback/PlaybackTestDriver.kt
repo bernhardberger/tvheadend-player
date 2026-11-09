@@ -60,6 +60,7 @@ internal class PlaybackTestDriver(
         scheduler.runCurrent()
         val handled = AtomicBoolean()
         player.createMessage { _, _ -> handled.set(true) }.send()
+        // PlayerMessage is acknowledged by Media3's real playback thread.
         await("playback-thread round trip") { handled.get() }
         // Drain coroutine effects of the acknowledgement before main callbacks, then their effects.
         scheduler.runCurrent()
@@ -97,11 +98,26 @@ internal class PlaybackTestDriver(
         }
     }
 
-    suspend fun <T> exercise(scope: CoroutineScope, timeoutMillis: Long, block: suspend () -> T): T {
+    suspend fun <T> exercise(
+        scope: CoroutineScope,
+        timeoutMillis: Long? = null,
+        settle: () -> Unit = {},
+        block: suspend () -> T,
+    ): T {
         val exercise = scope.async { block() }
-        // Suspending here would let runTest auto-advance timers while SDK threads are still replying.
-        // This real-time watchdog owns the whole body, independently of each shorter inner wait.
-        await("test exercise completion", timeoutMillis) { exercise.isCompleted }
-        return exercise.await()
+        try {
+            if (timeoutMillis == null) {
+                scheduler.runCurrent()
+                if (!exercise.isCompleted) settle()
+                awaitCurrent("test exercise completion") { exercise.isCompleted }
+            } else {
+                // Real IO/loader bodies need a watchdog; suspension would auto-advance SDK timers.
+                await("test exercise completion", timeoutMillis) { exercise.isCompleted }
+            }
+            return exercise.await()
+        } finally {
+            // A missing controlled signal must not leave a suspended child for runTest's watchdog.
+            exercise.cancel()
+        }
     }
 }

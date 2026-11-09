@@ -81,6 +81,7 @@ class AudioInterruptionBufferContractTest {
         var period: MediaPeriod? = null
         var timeline: Timeline? = null
         val caller = MediaSource.MediaSourceCaller { _, value -> timeline = value }
+        // The body crosses Media3's real loader thread while preparing and reading its period.
         driver.exercise(this, 60_000) body@ { try {
             val result = coordinator.setLiveTarget(session, requireNotNull(session.observation.value.currentSession), ChannelId(1))
             assertTrue(result is LivePlaybackTargetResult.Bound && result.result.isStarted)

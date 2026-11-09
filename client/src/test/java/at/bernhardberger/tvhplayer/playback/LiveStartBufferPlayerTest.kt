@@ -101,7 +101,7 @@ class LiveStartBufferPlayerTest {
         player.prepare()
         player.play()
         driver.advanceLive(player, clock, 100)
-        driver.await("silence source startup") { error != null || player.isPlaying }
+        driver.awaitCurrent("silence source startup") { error != null || player.isPlaying }
         assertNull(error)
         assertTrue(player.isPlaying)
         assertEquals(Player.STATE_READY, player.playbackState)
@@ -131,6 +131,7 @@ class LiveStartBufferPlayerTest {
             // The progressive loader still extracts the WAV prefix on a real Media3 thread.
             driver.await("progressive tracks") { !player.currentTracks.isEmpty || player.playerError != null }
             driver.advanceLive(player, clock, 100)
+            // The real Media3 progressive loader may still be filling the startup buffer.
             driver.await("non-live startup") { player.playerError != null || player.isPlaying }
             assertNull(player.playerError)
             assertTrue(player.isPlaying)
@@ -149,14 +150,16 @@ class LiveStartBufferPlayerTest {
 
     private fun liveBufferExercise(skip: Boolean) = runTest {
         val driver = PlaybackTestDriver(testScheduler, waitTimeoutMillis = 10_000)
-        // Only Media3's real extractor/loader handoffs use the main-looper wait.
-        fun awaitMain(condition: () -> Boolean) = driver.await("live buffer condition", predicate = condition)
         val work = StandardTestDispatcher(testScheduler)
         val scope = CoroutineScope(work + SupervisorJob())
         val clock = FakeClock(false)
         val player = control.configure(ExoPlayer.Builder(context).setClock(clock))
             .setRenderersFactory { _, _, _, _, _ -> arrayOf<Renderer>(SampleSink(consume = skip)) }
             .build()
+        fun awaitMain(condition: () -> Boolean) {
+            driver.settleLive(player)
+            driver.awaitCurrent("live buffer condition", condition)
+        }
         val connection = ScriptedSubscriptionConnection().apply {
             scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 120)))
         }

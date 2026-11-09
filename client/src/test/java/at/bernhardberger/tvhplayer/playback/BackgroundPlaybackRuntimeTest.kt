@@ -956,7 +956,7 @@ class BackgroundPlaybackRuntimeTest {
         fun exercise(policy: PlaybackRuntimePolicy, block: suspend Fixture.() -> Unit) = runTest(timeout = 20.seconds) {
             val fixture = Fixture(policy, testScheduler)
             try {
-                fixture.block()
+                fixture.driver.exercise(this, settle = fixture::settle) { fixture.block() }
             }
             finally {
                 fixture.scope.cancel()

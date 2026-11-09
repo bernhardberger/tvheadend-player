@@ -116,7 +116,7 @@ class SessionPlaybackPlayerTest {
 
     @Test
     @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
-    fun mediaControllerReceivesTheSessionContractAcrossTargetAndFailureChanges() = exercise {
+    fun mediaControllerReceivesTheSessionContractAcrossTargetAndFailureChanges() = exercise(realThreads = true) {
         val context = ApplicationProvider.getApplicationContext<Application>()
         val now = Clock.System.now()
         val initial = session.observation.value
@@ -199,7 +199,7 @@ class SessionPlaybackPlayerTest {
         }
     }
 
-    @Test fun sessionArtworkFollowsOnlyTheCurrentTargetAndNotProgrammeTicks() = exercise {
+    @Test fun sessionArtworkFollowsOnlyTheCurrentTargetAndNotProgrammeTicks() = exercise(realThreads = true) {
         // Keep the real IO loader: this case checks a cancelled request completing across threads.
         val pending = kotlinx.coroutines.CompletableDeferred<ByteArray?>()
         val completed = kotlinx.coroutines.CompletableDeferred<Unit>()
@@ -235,6 +235,7 @@ class SessionPlaybackPlayerTest {
             assertTrue(requests.isEmpty())
             assertNull(artworkPlayer.mediaMetadata.artworkData)
             observations.value = session.observation.value
+            // SessionArtworkLoader executes on Dispatchers.IO, outside the test scheduler.
             driver.await("initial artwork loaded") { artworkPlayer.mediaMetadata.artworkData != null }
             assertTrue(delivered.contains(listOf(1.toByte())))
             assertTrue(byteArrayOf(1).contentEquals(artworkPlayer.mediaMetadata.artworkData))
@@ -252,15 +253,20 @@ class SessionPlaybackPlayerTest {
             settle()
             assertEquals(1, requests.size)
             live(false, channelId = ChannelId(2))
+            // The request is recorded by the real IO loader.
             driver.await("second artwork requested") { requests.size == 2 }
             assertNull(artworkPlayer.mediaMetadata.artworkData)
             live(false)
-            await { byteArrayOf(1).contentEquals(artworkPlayer.mediaMetadata.artworkData) }
+            // Even a cached artwork result is delivered through Dispatchers.IO.
+            driver.await("cached artwork restored") { byteArrayOf(1).contentEquals(artworkPlayer.mediaMetadata.artworkData) }
             live(false, channelId = ChannelId(2))
+            // The retry also enters the real IO loader.
             driver.await("retry artwork requested") { requests.size == 3 }
             live(false)
-            await { byteArrayOf(1).contentEquals(artworkPlayer.mediaMetadata.artworkData) }
+            // The cached current target crosses IO while the stale request is still pending.
+            driver.await("current artwork restored") { byteArrayOf(1).contentEquals(artworkPlayer.mediaMetadata.artworkData) }
             pending.complete(byteArrayOf(2))
+            // Completion belongs to the non-cancellable request on Dispatchers.IO.
             driver.await("late artwork request completed") { completed.isCompleted }
             settle()
             assertTrue(byteArrayOf(1).contentEquals(artworkPlayer.mediaMetadata.artworkData))
@@ -1875,10 +1881,12 @@ class SessionPlaybackPlayerTest {
         assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
     }
 
-    private fun exercise(block: suspend Fixture.() -> Unit) = runTest(timeout = 15.seconds) {
+    private fun exercise(realThreads: Boolean = false, block: suspend Fixture.() -> Unit) = runTest(timeout = 15.seconds) {
         val fixture = Fixture(CoroutineScope(StandardTestDispatcher(testScheduler) + SupervisorJob()), testScheduler)
         try {
-            fixture.driver.exercise(this, 15_000) { fixture.block() }
+            // Only the artwork cases run SessionArtworkLoader on production Dispatchers.IO.
+            fixture.driver.exercise(this, timeoutMillis = if (realThreads) 15_000 else null,
+                settle = fixture::settle) { fixture.block() }
         }
         finally {
             fixture.observation.cancel()

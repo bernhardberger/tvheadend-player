@@ -611,7 +611,7 @@ class RecordingRecoveryPositionTest {
             assertTrue("installation: $installed; state: ${runtime.state.value}", installed?.isStarted == true)
             // untilBackgroundThreadCondition rechecks through the player's clock after 1ms,
             // which cannot fire on FakeClock(false). Use the driver's looper signal wait;
-            // it also drains due SDK work without advancing recurring probe/watchdog timers.
+            // the real recording loader must catch up without advancing SDK watchdog timers.
             driver.await("growing recording loader caught up") {
                 requireNotNull(realRecording).waitingReads.value > 0
             }
@@ -757,20 +757,21 @@ class RecordingRecoveryPositionTest {
 
         fun awaitReadFailure() {
             driver.settleLive(player)
-            // The loader must reach the armed byte before virtual playback can drain its prefix.
+            // Media3's real loader must reach the armed byte before virtual playback drains it.
             driver.await("loader reached armed read", diagnostics = { failurePlayback() }) {
                 media.readPosition >= media.failFromByte
             }
+            // The real loader reports the read failure through its analytics callback.
             driver.await("loader reported read failure", diagnostics = { failurePlayback() }) { media.loadErrorReported }
             // Analytics posts before the playback thread finishes its loader-error callback.
             driver.settle(player)
             driver.advanceLive(player, clock, 100)
-            driver.await("failed load prefix ready", diagnostics = { failurePlayback() }) {
+            driver.awaitCurrent("failed load prefix ready: ${failurePlayback()}") {
                 player.isPlaying || player.playerError != null
             }
             // Includes the short prefix's startup transition and its two seconds of consumption.
             driver.advanceLive(player, clock, 5_000)
-            driver.await("armed read failure", diagnostics = { failurePlayback() }) { player.playerError != null }
+            driver.awaitCurrent("armed read failure: ${failurePlayback()}") { player.playerError != null }
         }
 
         fun awaitPlayback(condition: () -> Boolean) {
