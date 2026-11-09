@@ -28,8 +28,8 @@ android {
         applicationId = "at.bernhardberger.tvhplayer.appliance"
         minSdk = 28
         targetSdk = 36
-        versionCode = 1001
-        versionName = "0.2.0"
+        versionCode = 1002
+        versionName = "0.2.1"
     }
     buildTypes {
         debug {
