@@ -8,9 +8,11 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
+import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import org.junit.Assert.*
 import org.junit.Rule
@@ -103,6 +105,21 @@ class RecordingPlaybackChoiceTest {
         compose.runOnIdle { assertEquals(listOf(RecordingPlaybackStart.RESUME), starts) }
     }
 
+    @Test fun deferredChoiceExplainsWhyAndOnlyOffersWatchLive() {
+        var watched = 0
+        val starts = mutableListOf<RecordingPlaybackStart>()
+        show(754L, watch = { watched++ }, play = { starts += it }, serverPath = "test.mkv")
+        val reason = ApplicationProvider.getApplicationContext<Application>().getString(R.string.error_305_reason)
+        compose.onNodeWithText(reason).assertIsDisplayed()
+        compose.onNodeWithTag("recording-resume").assertDoesNotExist()
+        compose.onNodeWithTag("recording-start-over").assertDoesNotExist()
+        compose.onNodeWithTag("recording-watch-live").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionLeft); pressKey(Key.DirectionRight) }
+        compose.onNodeWithTag("recording-watch-live").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.runOnIdle { assertEquals(1, watched); assertTrue(starts.isEmpty()) }
+    }
+
     @Test fun endsAtInEyebrowDoesNotResizeDialogWhenWatchingChannel() {
         show(754L, watch = {})
         val before = compose.onNodeWithTag("centred-dialog-card").getUnclippedBoundsInRoot()
@@ -123,13 +140,14 @@ class RecordingPlaybackChoiceTest {
 
     private fun show(position: Long?, watch: (() -> Unit)? = null,
         play: (RecordingPlaybackStart) -> Unit = {},
-        visible: androidx.compose.runtime.MutableState<Boolean> = mutableStateOf(true), close: () -> Unit = {}) {
+        visible: androidx.compose.runtime.MutableState<Boolean> = mutableStateOf(true), close: () -> Unit = {},
+        serverPath: String = "test.ts") {
         val now = 1_800_000_000L
         val channel = Channel.create(ChannelId(1), name = "Test channel")
         val entry = DvrEntry.create(DvrEntryId(1), title = "Test recording", state = DvrEntryState.RECORDING,
             channelId = channel.id, start = Instant.fromEpochSeconds(now - 1800), stop = Instant.fromEpochSeconds(now + 1800),
             playPosition = position?.seconds,
-            files = listOf(TvheadendTestResultFactory.recordingFile(serverPath = "test.ts",
+            files = listOf(TvheadendTestResultFactory.recordingFile(serverPath = serverPath,
                 start = Instant.fromEpochSeconds(now - 1800), stop = Instant.fromEpochSeconds(now))))
         val observation = SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),

@@ -970,7 +970,7 @@ internal fun RecordingsScreenContent(
             LaunchedEffect(choice) {
                 if (!choice) closeResume()
             }
-            RecordingPlaybackChoice(opened, openedAdmission, observation, channel, nowSec,
+            if (choice) RecordingPlaybackChoice(opened, openedAdmission, observation, channel, nowSec,
                 onPlay = play, onClose = closeResume, onWatchLive = watchLive, backEnabled = backEnabled)
         }
         if (showResumeChoice) {
