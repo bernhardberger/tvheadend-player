@@ -979,7 +979,7 @@ internal fun recordingMetadataFacts(recording: DvrEntry, configurations: List<Dv
         fact(if (neverRecorded) R.string.recording_state_scheduled else R.string.details_recorded,
             formatTimeInterval(start.epochSeconds, stop.epochSeconds, withDate = true, locale = locale, nowSec = nowSec))
     }
-    if (recording.removalDays == RECORDING_REMOVAL_WHEN_SPACE_NEEDED)
+    if (recording.removal == DvrRemoval.UntilSpaceNeeded)
         fact(R.string.details_retention, resources.getString(R.string.details_kept_until_space_needed))
 }
 

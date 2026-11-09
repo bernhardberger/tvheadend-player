@@ -10,15 +10,15 @@ import org.junit.Test
 
 class RecordingMetadataPolicyTest {
     @Test fun removalUsesStopAndOnlyFutureFiniteDays() {
-        fun entry(days: Long?, stop: Instant? = Instant.fromEpochSeconds(100)) =
-            DvrEntry.create(DvrEntryId(1), stop = stop, removalDays = days)
-        assertEquals(86500L, recordingRemovalTime(entry(1), 100))
-        for (days in listOf(null, 0L, 2147483646L, 2147483647L))
-            assertNull(recordingRemovalTime(entry(days), 100))
-        assertNull(recordingRemovalTime(entry(1), 86500))
-        assertNull(recordingRemovalTime(entry(1), 86501))
-        assertNull(recordingRemovalTime(entry(1, null), 100))
-        assertEquals(100L + 2147483645L * 86400L, recordingRemovalTime(entry(2147483645L), 100))
+        fun entry(removal: DvrRemoval?, stop: Instant? = Instant.fromEpochSeconds(100)) =
+            DvrEntry.create(DvrEntryId(1), stop = stop, removal = removal)
+        assertEquals(86500L, recordingRemovalTime(entry(DvrRemoval.Days(1)), 100))
+        for (removal in listOf(null, DvrRemoval.ServerDefault, DvrRemoval.UntilSpaceNeeded, DvrRemoval.Forever))
+            assertNull(recordingRemovalTime(entry(removal), 100))
+        assertNull(recordingRemovalTime(entry(DvrRemoval.Days(1)), 86500))
+        assertNull(recordingRemovalTime(entry(DvrRemoval.Days(1)), 86501))
+        assertNull(recordingRemovalTime(entry(DvrRemoval.Days(1), null), 100))
+        assertEquals(100L + 2147483645L * 86400L, recordingRemovalTime(entry(DvrRemoval.Days(2147483645)), 100))
     }
 
     @Test fun sizePrefersTotalAndFallsBackToKnownFileSizes() {
