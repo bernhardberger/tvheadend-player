@@ -5,34 +5,19 @@ import org.junit.Test
 
 class MainStartupLoadingFeedbackTest {
     @Test
-    fun cachedWaitUsesExactGraceWithoutVisualPromotion() {
-        val cached = MainStartupPresentation.Passive(MainStartupMessageKind.SYNCING_METADATA)
-        assertEquals(MainStartupLoadingFeedback.HIDDEN, mainStartupLoadingFeedback(cached, 399L))
-        assertEquals(MainStartupLoadingFeedback.WAITING, mainStartupLoadingFeedback(cached, 400L))
-        assertEquals(MainStartupLoadingFeedback.WAITING, mainStartupLoadingFeedback(cached, 1_999L))
-        assertEquals(MainStartupLoadingFeedback.WAITING, mainStartupLoadingFeedback(cached, 2_000L))
-        assertEquals(MainStartupLoadingFeedback.WAITING, mainStartupLoadingFeedback(cached, 30_000L))
-    }
-
-    @Test
-    fun localUnknownDoesNotFlashFullSynchronization() {
+    fun blockingStagesUseExactGraceAndKeepWaiting() {
         val preparing = MainStartupPresentation.Passive(MainStartupMessageKind.PREPARING)
         val connecting = MainStartupPresentation.Passive(MainStartupMessageKind.CONNECTING)
         val tuning = MainStartupPresentation.Passive(MainStartupMessageKind.STARTING_TELEVISION)
-        for (unknown in listOf(preparing, connecting, tuning)) {
+        val syncing = MainStartupPresentation.Passive(MainStartupMessageKind.SYNCING_METADATA)
+        for (unknown in listOf(preparing, connecting, tuning, syncing)) {
             assertEquals(MainStartupLoadingFeedback.HIDDEN, mainStartupLoadingFeedback(unknown, 0L))
             assertEquals(MainStartupLoadingFeedback.HIDDEN, mainStartupLoadingFeedback(unknown, 399L))
             assertEquals(MainStartupLoadingFeedback.WAITING, mainStartupLoadingFeedback(unknown, 400L))
+            assertEquals(MainStartupLoadingFeedback.WAITING, mainStartupLoadingFeedback(unknown, 1_999L))
             assertEquals(MainStartupLoadingFeedback.WAITING, mainStartupLoadingFeedback(unknown, 2_000L))
+            assertEquals(MainStartupLoadingFeedback.WAITING, mainStartupLoadingFeedback(unknown, 30_000L))
         }
-    }
-
-    @Test
-    fun uncachedSynchronizationHasTheSameGraceAsEveryBlockingStage() {
-        val syncing = MainStartupPresentation.Passive(MainStartupMessageKind.SYNCING_METADATA)
-        assertEquals(MainStartupLoadingFeedback.HIDDEN, mainStartupLoadingFeedback(syncing, 0L))
-        assertEquals(MainStartupLoadingFeedback.HIDDEN, mainStartupLoadingFeedback(syncing, 399L))
-        assertEquals(MainStartupLoadingFeedback.WAITING, mainStartupLoadingFeedback(syncing, 400L))
     }
 
     @Test
@@ -55,16 +40,6 @@ class MainStartupLoadingFeedbackTest {
         assertEquals(2_000L, timing.elapsedMillis(true, 1L, 2_100L))
     }
 
-    @Test
-    fun connectingSyncReconnectAndTuningKeepOneContinuousWait() {
-        val timing = MainStartupLoadingTiming()
-        timing.observe(true, 1L, 0L)
-        for ((index, stage) in listOf(MainStartupMessageKind.CONNECTING, MainStartupMessageKind.SYNCING_METADATA, MainStartupMessageKind.RECONNECTING, MainStartupMessageKind.SYNCING_METADATA, MainStartupMessageKind.STARTING_TELEVISION).withIndex()) {
-            assertEquals((index + 1) * 400L,
-                timing.observe(true, 1L, (index + 1) * 400L))
-            assertEquals(MainStartupLoadingFeedback.WAITING, mainStartupLoadingFeedback(MainStartupPresentation.Passive(stage), (index + 1) * 400L))
-        }
-    }
 
     @Test
     fun recoveryThenRetryOfSameRequestStartsFreshGrace() {

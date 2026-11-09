@@ -359,6 +359,7 @@ class AppPlaybackRuntime(
     /** This live tune has not paused or received a Pause/Play command, including during admission. */
     val liveStartUndisturbed = _liveStartUndisturbed.asStateFlow()
     private var pendingLiveSelectionDisturbed = false
+    /** The installed or rejected recording selection owning [recordingAdmission]; not proof of playback. */
     val recordingSelection = _recordingSelection.asStateFlow()
     val recordingAdmission = _recordingAdmission.asStateFlow()
     val livePlaybackObservation = coordinator.livePlaybackObservation
@@ -890,7 +891,7 @@ class AppPlaybackRuntime(
             forgetRecordingRecoveryLocked()
             val startEpoch = presentationEpoch.snapshot()
             try {
-                playRecordingLocked(selection.recordingId, start)
+                playRecordingLocked(selection.recordingId, start, requestedSelection = selection)
             } finally {
                 settleCancelledStartLocked(startEpoch, request)
             }
@@ -1100,7 +1101,8 @@ class AppPlaybackRuntime(
                 null
             } else {
                 noteRecordingInterruptionLocked()
-                playRecordingLocked(selection.recordingId, start, recoverAt = recordingRecovery)
+                playRecordingLocked(selection.recordingId, start,
+                    recoverAt = recordingRecovery, requestedSelection = selection)
             }
         },
     )
@@ -1147,6 +1149,7 @@ class AppPlaybackRuntime(
         recoverAt: RecordingRecoveryPosition? = null,
         // A stall recovery replaces the very target it validated: Pause and Play still address it.
         continuesTarget: Boolean = false,
+        requestedSelection: RecordingPlaybackSelection? = null,
     ): PlaybackTargetResult? {
         if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
         val playerSettings = settings.playerSettings.first()
@@ -1174,6 +1177,9 @@ class AppPlaybackRuntime(
                     RecordingPlaybackAdmission.ObservationExpired
                 } else {
                     RecordingPlaybackAdmission.TargetUnavailable
+                },
+                selection = requestedSelection ?: observation.currentSession?.let {
+                    RecordingPlaybackSelection(it, recordingId)
                 },
             )
         }
@@ -1253,6 +1259,7 @@ class AppPlaybackRuntime(
                     targetResult = targetResult,
                     target = AppPlaybackTarget.Recording(recordingId),
                     recordingAdmission = admission,
+                    recordingSelection = selection,
                 )
             }
         )
@@ -2602,6 +2609,7 @@ class AppPlaybackRuntime(
         target: AppPlaybackTarget.Recording,
         result: PlaybackTargetResult,
         admission: RecordingPlaybackAdmission,
+        selection: RecordingPlaybackSelection?,
     ): PlaybackTargetResult = installTargetForPresentation(
         expectedPresentationEpoch = expectedPresentationEpoch,
         installTarget = { result },
@@ -2612,6 +2620,7 @@ class AppPlaybackRuntime(
                 reason = AppPlaybackFailureReason.RECORDING_READ_FAILED,
                 targetResult = targetResult,
                 recordingAdmission = admission,
+                recordingSelection = selection,
                 target = target,
             )
         },
@@ -2634,6 +2643,7 @@ class AppPlaybackRuntime(
         reason: AppPlaybackFailureReason,
         targetResult: PlaybackTargetResult,
         recordingAdmission: RecordingPlaybackAdmission? = null,
+        recordingSelection: RecordingPlaybackSelection? = null,
     ) {
         if (!targetCommands.isOpen()) return
         if (healthyActiveTarget() != null) return
@@ -2655,7 +2665,9 @@ class AppPlaybackRuntime(
             _activeTarget.value = null
             frameRate.reset()
             livePauseController.publishLivePause()
-            _recordingSelection.value = null
+            // Rejection has no active target, but its admission still belongs to this recording
+            // and server session. Keep that identity so another route cannot inherit its reason.
+            _recordingSelection.value = recordingSelection
             _recordingAdmission.value = recordingAdmission
             recordingMarkers.clearRecordingMarkers()
             presentation.publishFailed(AppPlaybackState.Failed(reason, targetResult, target = target))

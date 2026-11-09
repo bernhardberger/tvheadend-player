@@ -32,22 +32,38 @@ class TimelineEpgFocusPolicyTest {
             readableRangeSec = readable, anchorSec = now).target)
     }
 
-    @Test fun onAirAnchorAdvancesBetweenMovesAndPageResolution() {
-        val rows = listOf(row(1, event(11, 0, 120)), row(2, event(21, 0, 120)),
-            row(3, event(31, 0, 30), event(32, 30, 120)))
-        val readable = 0L until 180 * 60L
-        val firstAnchor = timelineFocusAnchorRange(rows[0].events.single(), readable, nowSec = 15 * 60L)
-        val first = moveTimelineEpgFocus(rows, focus(0, 11), EpgFocusDirection.DOWN,
-            readableRangeSec = readable, anchorSpanSec = firstAnchor).target
-        assertEquals(focus(1, 21), first)
-        val nextAnchor = timelineFocusAnchorRange(rows[1].events.single(), readable, nowSec = 45 * 60L)
-        assertEquals(45 * 60L..45 * 60L, nextAnchor)
-        assertEquals(focus(2, 32), moveTimelineEpgFocus(rows, first, EpgFocusDirection.DOWN,
-            readableRangeSec = readable, anchorSpanSec = nextAnchor).target)
-        assertEquals(focus(2, 32), timelinePageFocusTarget(rows, first, 2, 1,
-            readableRangeSec = readable, anchorSpanSec = nextAnchor))
-        assertEquals(0L until 120 * 60L,
-            timelineFocusAnchorRange(rows[1].events.single(), readable, nowSec = 125 * 60L))
+    @Test fun readableOnAirAnchorsAdvanceAndTrackAdjacentProgrammeChanges() {
+        run {
+            val rows = listOf(row(1, event(11, 0, 120)), row(2, event(21, 0, 120)),
+                row(3, event(31, 0, 30), event(32, 30, 120)))
+            val readable = 0L until 180 * 60L
+            val firstAnchor = timelineFocusAnchorRange(rows[0].events.single(), readable, nowSec = 15 * 60L)
+            val first = moveTimelineEpgFocus(rows, focus(0, 11), EpgFocusDirection.DOWN,
+                readableRangeSec = readable, anchorSpanSec = firstAnchor).target
+            assertEquals(focus(1, 21), first)
+            val nextAnchor = timelineFocusAnchorRange(rows[1].events.single(), readable, nowSec = 45 * 60L)
+            assertEquals(45 * 60L..45 * 60L, nextAnchor)
+            assertEquals(focus(2, 32), moveTimelineEpgFocus(rows, first, EpgFocusDirection.DOWN,
+                readableRangeSec = readable, anchorSpanSec = nextAnchor).target)
+            assertEquals(focus(2, 32), timelinePageFocusTarget(rows, first, 2, 1,
+                readableRangeSec = readable, anchorSpanSec = nextAnchor))
+            assertEquals(0L until 120 * 60L,
+                timelineFocusAnchorRange(rows[1].events.single(), readable, nowSec = 125 * 60L))
+        }
+        run {
+            // 00:49: the focused programme began at 00:24, but the adjacent row changed at 00:25.
+            val current = event(11, 24, 78)
+            val readable = 0L until 180 * 60L
+            val anchor = timelineFocusAnchorRange(current, readable, nowSec = 49 * 60L)
+            assertEquals(49 * 60L..49 * 60L, anchor)
+            val rows = listOf(row(1, current), row(2, event(21, -84, 25), event(22, 25, 134)))
+            assertEquals(focus(1, 22), moveTimelineEpgFocus(rows, focus(0, 11), EpgFocusDirection.DOWN,
+                readableRangeSec = readable, anchorSpanSec = anchor).target)
+            assertEquals(focus(1, 22), timelinePageFocusTarget(rows, focus(0, 11), 1, 1,
+                readableRangeSec = readable, anchorSpanSec = anchor))
+            assertEquals(24 * 60L until 40 * 60L,
+                timelineFocusAnchorRange(current, 0L until 40 * 60L, nowSec = 49 * 60L))
+        }
     }
 
     @Test fun onAirProgrammeWithNowInLeftReserveUsesVisibleSpanRatherThanClampedNow() {
@@ -59,21 +75,6 @@ class TimelineEpgFocusPolicyTest {
             readableRangeSec = readable, minReadableOverlapSec = 720, anchorSpanSec = span).target)
         assertEquals(focus(1, 22), timelinePageFocusTarget(rows, focus(0, 11), 1, 1,
             readableRangeSec = readable, minReadableOverlapSec = 720, anchorSpanSec = span))
-    }
-
-    @Test fun readableOnAirAnchorUsesNowAfterTheAdjacentRowsProgrammeChanges() {
-        // 00:49: Das Gespräch began at 00:24, but the adjacent row changed at 00:25.
-        val current = event(11, 24, 78)
-        val readable = 0L until 180 * 60L
-        val anchor = timelineFocusAnchorRange(current, readable, nowSec = 49 * 60L)
-        assertEquals(49 * 60L..49 * 60L, anchor)
-        val rows = listOf(row(1, current), row(2, event(21, -84, 25), event(22, 25, 134)))
-        assertEquals(focus(1, 22), moveTimelineEpgFocus(rows, focus(0, 11), EpgFocusDirection.DOWN,
-            readableRangeSec = readable, anchorSpanSec = anchor).target)
-        assertEquals(focus(1, 22), timelinePageFocusTarget(rows, focus(0, 11), 1, 1,
-            readableRangeSec = readable, anchorSpanSec = anchor))
-        assertEquals(24 * 60L until 40 * 60L,
-            timelineFocusAnchorRange(current, 0L until 40 * 60L, nowSec = 49 * 60L))
     }
 
     @Test fun stickyVisibleSpanSurvivesALongProgrammeAndChannelPaging() {
@@ -165,13 +166,8 @@ class TimelineEpgFocusPolicyTest {
             assertNull(timelinePageFocusTarget(rows, current, if (direction == EpgFocusDirection.UP) 0 else 2,
                 if (direction == EpgFocusDirection.UP) -1 else 1, readableRangeSec = readable, minReadableOverlapSec = 720))
         }
-    }
-
-    @Test fun programmesAboveOnlyOutsideTheWindowFocusTheHeader() {
-        val readable = 40 * 60L until 170 * 60L
-        val rows = listOf(row(1, event(11, 0, 40), event(12, 170, 200)), row(2, event(21, 60, 100)))
-        val current = focus(1, 21)
-        val move = moveTimelineEpgFocus(rows, current, EpgFocusDirection.UP,
+        val outsideRows = listOf(row(1, event(11, 0, 40), event(12, 170, 200)), row(2, event(21, 60, 100)))
+        val move = moveTimelineEpgFocus(outsideRows, current, EpgFocusDirection.UP,
             readableRangeSec = readable, minReadableOverlapSec = 720)
         assertEquals(current, move.target)
         assertTrue(move.focusHeader)
@@ -209,7 +205,7 @@ class TimelineEpgFocusPolicyTest {
     }
 
     @Test
-    fun viewportEligibilityKeepsPartialCellsAndExcludesWhollyClippedCells() {
+    fun viewportEligibilityKeepsPartialFocusedAndUnknownCellsButExcludesWhollyClippedCells() {
         val clippedCells = listOf(990 to 310, 1135 to 165, 1083 to 217, 1010 to 290, 1038 to 262)
         clippedCells.forEach { (start, width) ->
             assertFalse(shouldComposeTimelineCell(start, width, 900, false))
@@ -219,10 +215,6 @@ class TimelineEpgFocusPolicyTest {
         assertFalse(shouldComposeTimelineCell(900, 1, 900, false))
         assertFalse(shouldComposeTimelineCell(0, 0, 900, false))
         assertFalse(shouldComposeTimelineCell(0, 100, 0, false))
-    }
-
-    @Test
-    fun viewportEligibilityNeverDropsTheFocusTargetOrGuessesUnknownGeometry() {
         assertTrue(shouldComposeTimelineCell(990, 310, 900, true))
         assertTrue(shouldComposeTimelineCell(990, 310, null, false))
     }
@@ -244,45 +236,25 @@ class TimelineEpgFocusPolicyTest {
     }
 
     @Test
-    fun pageFocusSkipsEmptyFilteredRowsFromPreferredPageTarget() {
-        val rows = listOf(
-            row(1, event(11, 0, 100)),
-            row(2),
-            row(3),
-            row(4, event(41, 20, 120)),
-            row(5),
-        )
-
-        assertEquals(
-            EpgFocusTarget(channelIndex = 3, eventId = EventId(41)),
-            timelinePageFocusTarget(
-                rows = rows,
-                current = EpgFocusTarget(channelIndex = 0, eventId = EventId(11)),
-                preferredChannelIndex = 2,
-                direction = 1,
-            ),
-        )
-    }
-
-    @Test
-    fun pageFocusCanSearchBackwardAcrossEmptyFilteredRows() {
-        val rows = listOf(
-            row(1, event(11, 0, 100)),
-            row(2),
-            row(3, event(31, 20, 120)),
-            row(4),
-            row(5, event(51, 0, 100)),
-        )
-
-        assertEquals(
-            EpgFocusTarget(channelIndex = 2, eventId = EventId(31)),
-            timelinePageFocusTarget(
-                rows = rows,
-                current = EpgFocusTarget(channelIndex = 4, eventId = EventId(51)),
-                preferredChannelIndex = 3,
-                direction = -1,
-            ),
-        )
+    fun pageFocusSearchesForwardAndBackwardAcrossEmptyFilteredRows() {
+        for (direction in listOf(1, -1)) {
+            val rows = listOf(
+                row(1, event(11, 0, 100)),
+                row(2),
+                if (direction == 1) row(3) else row(3, event(31, 20, 120)),
+                if (direction == 1) row(4, event(41, 20, 120)) else row(4),
+                if (direction == 1) row(5) else row(5, event(51, 0, 100)),
+            )
+            assertEquals(
+                focus(if (direction == 1) 3 else 2, if (direction == 1) 41 else 31),
+                timelinePageFocusTarget(
+                    rows = rows,
+                    current = focus(if (direction == 1) 0 else 4, if (direction == 1) 11 else 51),
+                    preferredChannelIndex = if (direction == 1) 2 else 3,
+                    direction = direction,
+                ),
+            )
+        }
     }
 
     @Test
@@ -309,7 +281,7 @@ class TimelineEpgFocusPolicyTest {
     }
 
     @Test
-    fun reconciliationKeepsExistingSemanticEventTarget() {
+    fun reconciliationKeepsExistingSemanticEventTargetAcrossChannelReordering() {
         val current = EpgFocusTarget(channelIndex = 1, eventId = EventId(21))
 
         assertEquals(
@@ -318,6 +290,17 @@ class TimelineEpgFocusPolicyTest {
                 rows = rows,
                 current = current,
                 preferredChannelIndex = 0,
+                targetSec = 0,
+            ),
+        )
+        val reordered = listOf(rows[1], rows[0], rows[2])
+
+        assertEquals(
+            focus(0, 21),
+            reconcileTimelineEpgFocus(
+                rows = reordered,
+                current = focus(1, 21),
+                preferredChannelIndex = 1,
                 targetSec = 0,
             ),
         )
@@ -338,21 +321,6 @@ class TimelineEpgFocusPolicyTest {
                 current = focus(0, 11),
                 preferredChannelIndex = 0,
                 targetSec = 45 * 60,
-            ),
-        )
-    }
-
-    @Test
-    fun reconciliationTracksSemanticEventAcrossChannelReordering() {
-        val reordered = listOf(rows[1], rows[0], rows[2])
-
-        assertEquals(
-            focus(0, 21),
-            reconcileTimelineEpgFocus(
-                rows = reordered,
-                current = focus(1, 21),
-                preferredChannelIndex = 1,
-                targetSec = 0,
             ),
         )
     }
@@ -385,7 +353,7 @@ class TimelineEpgFocusPolicyTest {
 
     @Test
     fun repeatedDownAndUpKeepTheAnchorTimeInsteadOfDrifting() {
-        // D33: by best overlap, 11 (2:00) led to 21 and then 32, an hour earlier.
+        // By best overlap, 11 (2:00) led to 21 and then 32, an hour earlier.
         val rows = listOf(
             row(1, event(11, 120, 180)),
             row(2, event(21, 50, 160), event(22, 160, 240)),
@@ -416,15 +384,7 @@ class TimelineEpgFocusPolicyTest {
     }
 
     @Test
-    fun upFromFirstChannelMovesToCompactGuideHeader() {
-        val move = moveTimelineEpgFocus(rows, focus(0, 11), EpgFocusDirection.UP)
-
-        assertTrue(move.focusHeader)
-        assertEquals(focus(0, 11), move.target)
-    }
-
-    @Test
-    fun navigationStopsAtTimelineAndLineupEndpoints() {
+    fun navigationStopsAtLineupEndpointsAndRequestsDataAtTimeFrontiers() {
         val left = moveTimelineEpgFocus(rows, focus(0, 11), EpgFocusDirection.LEFT)
         val down = moveTimelineEpgFocus(rows, focus(2, 31), EpgFocusDirection.DOWN)
 
@@ -433,10 +393,6 @@ class TimelineEpgFocusPolicyTest {
         assertEquals(-1, left.timeFrontierDirection)
         assertFalse(left.pageChannels)
         assertFalse(down.pageChannels)
-    }
-
-    @Test
-    fun rightPastLoadedProgrammeFrontierRequestsMoreGuideData() {
         val move = moveTimelineEpgFocus(rows, focus(0, 12), EpgFocusDirection.RIGHT)
 
         assertEquals(focus(0, 12), move.target)
@@ -472,19 +428,6 @@ class TimelineEpgFocusPolicyTest {
     }
 
     @Test
-    fun crossingVisibleRowsRequestsChannelPage() {
-        val move = moveTimelineEpgFocus(
-            rows = rows,
-            current = focus(1, 22),
-            direction = EpgFocusDirection.DOWN,
-            visibleChannelRange = 0..1,
-        )
-
-        assertTrue(move.pageChannels)
-        assertEquals(EventId(31), move.target.eventId)
-    }
-
-    @Test
     fun verticalNavigationSkipsRowsWithoutFilteredEvents() {
         val filteredRows = listOf(
             row(1, event(11, 0, 60)),
@@ -513,7 +456,10 @@ class TimelineEpgFocusPolicyTest {
     }
 
     @Test
-    fun upAcrossOnlyEmptyRowsMovesToHeader() {
+    fun upFromFirstChannelOrAcrossOnlyEmptyRowsMovesToHeader() {
+        val first = moveTimelineEpgFocus(rows, focus(0, 11), EpgFocusDirection.UP)
+        assertTrue(first.focusHeader)
+        assertEquals(focus(0, 11), first.target)
         val filteredRows = listOf(
             row(1),
             row(2),

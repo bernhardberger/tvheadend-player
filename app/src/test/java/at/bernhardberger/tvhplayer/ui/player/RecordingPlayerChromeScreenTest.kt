@@ -22,12 +22,15 @@ import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import at.bernhardberger.tvhplayer.ui.common.formatClock
+import at.bernhardberger.tvhplayer.ui.common.titleRes
+import at.bernhardberger.tvhplayer.core.AppErrorCondition
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.pressKey
@@ -66,6 +69,8 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvheadend.sdk.core.TvheadendTestResultFactory
+import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
 import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
 import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
@@ -139,6 +144,35 @@ class RecordingPlayerChromeScreenTest {
     private var forcedTracks: Tracks? = null
     private var positionMs = 600_000L
     private val loadGate = CountDownLatch(1)
+
+    @OptIn(TvheadendTestingApi::class)
+    @Test fun refusedRecordingShowsUnavailableInsteadOfInterrupted() {
+        screen(refusedEntry = DvrEntry.create(
+            id = DvrEntryId(7), state = DvrEntryState.RECORDING, title = "Zeit im Bild",
+            files = listOf(TvheadendTestResultFactory.recordingFile(fileId = 1, serverPath = "/rec/programme.mkv")),
+        ))
+        assertTrue(runtime.state.value is AppPlaybackState.Failed)
+        assertEquals(null, runtime.activeTarget.value)
+        compose.onNodeWithTag("tv-recovery-title")
+            .assertTextEquals(context.getString(AppErrorCondition.RECORDING_UNAVAILABLE.titleRes()))
+    }
+
+    @Test fun rejectedRecordingReasonExpiresWhenTheServerSessionChanges() {
+        val session = screen(refusedEntry = DvrEntry.create(
+            id = DvrEntryId(7), state = DvrEntryState.RECORDING, title = "Zeit im Bild",
+        ))
+        compose.onNodeWithTag("tv-recovery-title")
+            .assertTextEquals(context.getString(AppErrorCondition.RECORDING_FILE_MISSING.titleRes()))
+        compose.runOnIdle {
+            session.replaceGeneration(SessionObservation.create(
+                sessionState = session.observation.value.sessionState,
+                dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
+            ))
+        }
+        settle()
+        compose.onNodeWithTag("tv-recovery-title")
+            .assertTextEquals(context.getString(AppErrorCondition.RECORDING_UNAVAILABLE.titleRes()))
+    }
 
     @After fun after() {
         loadGate.countDown()
@@ -944,13 +978,13 @@ class RecordingPlayerChromeScreenTest {
     }
 
     /** [listed] false: the server never lists the recording, so the screen stays in its loading state. */
-    private fun screen(onClose: () -> Unit = {}, listed: Boolean = true) {
+    private fun screen(onClose: () -> Unit = {}, listed: Boolean = true, refusedEntry: DvrEntry? = null): FakeTvheadendSession {
         val recording = DvrEntryId(7)
         val session = FakeTvheadendSession(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(Channel.create(ChannelId(1), name = "Documentary")))),
             epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
-            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(listOfNotNull(DvrEntry.create(
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(listOfNotNull(refusedEntry ?: DvrEntry.create(
                 id = recording, state = DvrEntryState.COMPLETED, title = "Zeit im Bild", channelName = "Documentary",
             ).takeIf { listed }))),
         )).apply { scriptRecordingPlaybackSuccess() }
@@ -1000,7 +1034,7 @@ class RecordingPlayerChromeScreenTest {
                     RecordingPlaybackStart.START_OVER)
             }
             compose.waitUntil(10_000) { install.isCompleted }
-            assertEquals(AppPlaybackTarget.Recording(recording), runtime.activeTarget.value)
+            if (refusedEntry == null) assertEquals(AppPlaybackTarget.Recording(recording), runtime.activeTarget.value)
         }
         val noticeModule = module {
             single { LastPlayedChannelStore(context) }
@@ -1028,10 +1062,11 @@ class RecordingPlayerChromeScreenTest {
             }
             }
         }
-        if (listed) compose.waitUntil(10_000) { runtime.activeTarget.value == AppPlaybackTarget.Recording(recording) }
+        if (listed && refusedEntry == null) compose.waitUntil(10_000) { runtime.activeTarget.value == AppPlaybackTarget.Recording(recording) }
         settle()
         compose.mainClock.autoAdvance = false
         settle()
+        return session
     }
 
     private fun loading(item: MediaItem): MediaSource = ProgressiveMediaSource.Factory {

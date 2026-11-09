@@ -915,6 +915,8 @@ class LivePlayerChromeScreenTest {
         compose.waitForIdle()
         assertTrue(player.trackSelectionParameters.overrides.isNotEmpty())
         compose.onRoot().performKeyInput { keyDown(Key.Back) }
+        // Apply the key's snapshot update and restart the timer before crossing its old deadline.
+        settleFrames()
         compose.mainClock.advanceTimeBy(400)
         compose.waitForIdle()
         assertTrue("Back down renews the list across its previous deadline", exists("playback-options-track-list"))

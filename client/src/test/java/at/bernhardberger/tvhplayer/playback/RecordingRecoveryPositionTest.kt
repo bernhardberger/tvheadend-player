@@ -136,6 +136,35 @@ class RecordingRecoveryPositionTest {
         }
     }
 
+    @OptIn(TvheadendTestingApi::class)
+    @Test fun refusedGrowingMatroskaRetainsItsDeferredReasonOnlyForItsSelection() = exercise(growing = true) {
+        session.publish(recordings(listOf(FIRST), null, DvrEntryState.RECORDING, true,
+            files = listOf(TvheadendTestResultFactory.recordingFile(serverPath = "/rec/programme.mkv"))))
+        val entry = requireNotNull(session.observation.value.dvrEntry(FIRST))
+        val requested = selection(FIRST)
+        val install = scope.async { runtime.playRecording(requested, RecordingPlaybackStart.START_OVER) }
+        awaitCurrent { install.isCompleted }
+        assertFalse(install.await()?.isStarted == true)
+        assertNull(runtime.activeTarget.value)
+        val retained = runtime.recordingSelection.value
+        val failure = runtime.state.value as AppPlaybackState.Failed
+        assertEquals(at.bernhardberger.tvhplayer.core.AppErrorCondition.RECORDING_DEFERRED,
+            at.bernhardberger.tvhplayer.core.recordingErrorCondition(entry,
+                runtime.recordingAdmission.value.takeIf { retained?.recordingId == FIRST }, failure))
+        assertEquals(requested, retained)
+        session.publish(recordings(listOf(SECOND), null, DvrEntryState.SCHEDULED))
+        val nextSelection = selection(SECOND)
+        val next = scope.async { runtime.playRecording(nextSelection, RecordingPlaybackStart.START_OVER) }
+        awaitCurrent { next.isCompleted }
+        assertEquals(nextSelection, runtime.recordingSelection.value)
+        assertEquals(at.bernhardberger.tvhplayer.core.AppErrorCondition.RECORDING_NOT_STARTED,
+            at.bernhardberger.tvhplayer.core.recordingErrorCondition(session.observation.value.dvrEntry(SECOND),
+                runtime.recordingAdmission.value, runtime.state.value as AppPlaybackState.Failed))
+        runtime.stop()
+        assertNull(runtime.recordingSelection.value)
+        assertNull(runtime.recordingAdmission.value)
+    }
+
     @Test fun runtimeAndSessionSeeksRemainDeliberateWhenCutpointsArriveLater() {
         for (sessionSeek in listOf(false, true)) {
             for ((action, mode) in listOf(
@@ -802,6 +831,8 @@ class RecordingRecoveryPositionTest {
                 val observation = session.observation.value
                 if (observation.currentSession !== currentSession) {
                     RecordingPlaybackAdmission.ObservationExpired
+                } else if (observation.dvrEntry(recordingId)?.let { observation.recordingPlaybackAdmission(it) } == RecordingPlaybackAdmission.GrowingDeferred) {
+                    RecordingPlaybackAdmission.GrowingDeferred
                 } else when (observation.dvrEntry(recordingId)?.state) {
                     DvrEntryState.RECORDING -> at.bernhardberger.tvheadend.sdk.core.TvheadendTestResultFactory.growingRecordingAdmission(null, RecordingProgressCapability.SUPPORTED)
                     DvrEntryState.COMPLETED -> at.bernhardberger.tvheadend.sdk.core.TvheadendTestResultFactory.completedRecordingAdmission(null, RecordingProgressCapability.SUPPORTED)

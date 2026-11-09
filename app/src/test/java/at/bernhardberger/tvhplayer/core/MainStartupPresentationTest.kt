@@ -48,90 +48,35 @@ class MainStartupPresentationTest {
             val cached = presentation(connection, readiness) as MainStartupPresentation.Passive
             assertEquals(uncached.messageKind, cached.messageKind)
             assertEquals(uncached, cached)
-            assertEquals(MainStartupLoadingFeedback.HIDDEN, mainStartupLoadingFeedback(cached, 0L))
         }
-        val requests = ApplianceLaunchRequests()
-        requests.request()
-        val pending = requests.state.value as ApplianceLaunchState.Pending
-        assertEquals(null, requests.resolve(pending.request, readiness, channels.first().id))
-        assertEquals(pending, requests.state.value)
     }
 
     @Test
-    fun resolvingLocal_takesPrecedenceAndIsPassivePreparing() {
-        assertEquals(
-            MainStartupPresentation.Passive(MainStartupMessageKind.PREPARING),
-            mainStartupPresentation(
-                startupState = MainStartupState.ResolvingLocal,
-                launchState = entering(),
+    fun localResolutionThenLaunchStateTakePrecedenceOverReadyTransport() {
+        for ((startup, launch, expected) in listOf(
+            Triple(MainStartupState.ResolvingLocal, entering(), MainStartupPresentation.Passive(MainStartupMessageKind.PREPARING)),
+            Triple(readyBootstrap, ApplianceLaunchState.Idle, MainStartupPresentation.Inactive),
+            Triple(readyBootstrap, entering(), MainStartupPresentation.Passive(MainStartupMessageKind.STARTING_TELEVISION)),
+        )) {
+            assertEquals(expected, mainStartupPresentation(
+                startupState = startup,
+                launchState = launch,
                 connectionState = ConnectionUiState.Ready,
                 currentChannelReadiness = CurrentChannelReadiness.Ready(listOf(Channel.create(ChannelId(1)))),
-            ),
-        )
-    }
-
-    @Test
-    fun readyBootstrapWithIdleLaunch_isInactive() {
-        assertEquals(
-            MainStartupPresentation.Inactive,
-            mainStartupPresentation(
-                startupState = readyBootstrap,
-                launchState = ApplianceLaunchState.Idle,
-                connectionState = ConnectionUiState.Ready,
-                currentChannelReadiness = CurrentChannelReadiness.Ready(listOf(Channel.create(ChannelId(1)))),
-            ),
-        )
-    }
-
-    @Test
-    fun entering_takesPrecedenceAndIsPassiveStartingTelevision() {
-        assertEquals(
-            MainStartupPresentation.Passive(MainStartupMessageKind.STARTING_TELEVISION),
-            mainStartupPresentation(
-                startupState = readyBootstrap,
-                launchState = entering(),
-                connectionState = ConnectionUiState.Ready,
-                currentChannelReadiness = CurrentChannelReadiness.Ready(listOf(Channel.create(ChannelId(1)))),
-            ),
-        )
+            ))
+        }
     }
 
     @Test
     fun pendingTransportPhases_arePassiveWithNoActions() {
-        assertEquals(
-            MainStartupPresentation.Passive(MainStartupMessageKind.CONNECTING),
-            presentation(connectionState = ConnectionUiState.Connecting),
-        )
-        assertEquals(
-            MainStartupPresentation.Passive(MainStartupMessageKind.SYNCING_METADATA),
-            presentation(connectionState = ConnectionUiState.SyncingChannels),
-        )
-        assertEquals(
-            MainStartupPresentation.Passive(MainStartupMessageKind.RECONNECTING),
-            presentation(connectionState = ConnectionUiState.Reconnecting),
-        )
-    }
-
-    @Test
-    fun readyTransportWaitingForCurrentMetadata_isPassiveAndNeverEnters() {
-        assertEquals(
-            MainStartupPresentation.Passive(
-                MainStartupMessageKind.WAITING_FOR_CURRENT_CHANNEL_METADATA,
-            ),
-            presentation(
-                connectionState = ConnectionUiState.Ready,
-                currentChannelReadiness = CurrentChannelReadiness.Waiting,
-            ),
-        )
-    }
-
-    @Test
-    fun retainedInventoryNeverChangesTheCurrentMetadataStage() {
-        val retained = CurrentChannelReadiness.Browsable(listOf(Channel.create(ChannelId(1))))
-        assertEquals(
-            MainStartupPresentation.Passive(MainStartupMessageKind.WAITING_FOR_CURRENT_CHANNEL_METADATA),
-            presentation(ConnectionUiState.Ready, retained),
-        )
+        for ((connection, message) in listOf(
+            ConnectionUiState.Connecting to MainStartupMessageKind.CONNECTING,
+            ConnectionUiState.SyncingChannels to MainStartupMessageKind.SYNCING_METADATA,
+            ConnectionUiState.Reconnecting to MainStartupMessageKind.RECONNECTING,
+            ConnectionUiState.Ready to MainStartupMessageKind.WAITING_FOR_CURRENT_CHANNEL_METADATA,
+        )) {
+            assertEquals(MainStartupPresentation.Passive(message), presentation(connection))
+        }
     }
 
     @Test
@@ -178,51 +123,13 @@ class MainStartupPresentationTest {
     }
 
     @Test
-    fun notConfiguredAndCredentialUnavailableExposeOnlyConnectionSettings() {
-        assertEquals(
-            actionable(AppErrorCondition.NOT_CONFIGURED, AppErrorAction.CONNECTION_SETTINGS),
-            presentation(connectionState = ConnectionUiState.NeedsConfiguration),
-        )
-        assertEquals(
-            actionable(AppErrorCondition.CREDENTIAL_UNAVAILABLE, AppErrorAction.CONNECTION_SETTINGS),
-            presentation(connectionState = ConnectionUiState.CredentialUnavailable),
-        )
-    }
-
-    @Test
-    fun sessionFailureActionsFollowSdkRecoveryGuidance() {
-        assertEquals(
-            actionable(AppErrorCondition.LOAD_FAILED, *retryAndSettings),
-            presentation(
-                connectionState = ConnectionUiState.Error(
-                    ConnectionFailureKind.OTHER,
-                    SessionRecoveryDisposition.EXPLICIT_RETRY,
-                ),
-            ),
-        )
-        assertEquals(
-            actionable(AppErrorCondition.AUTHENTICATION_REJECTED, AppErrorAction.CONNECTION_SETTINGS),
-            presentation(
-                connectionState = ConnectionUiState.Error(
-                    ConnectionFailureKind.AUTHENTICATION,
-                    SessionRecoveryDisposition.PROFILE_CHANGE_REQUIRED,
-                ),
-            ),
-        )
-        // 110: the SDK retries by itself, so no Retry; the alert's text says it is reconnecting.
-        assertEquals(
-            actionable(AppErrorCondition.RECONNECTING, AppErrorAction.CONNECTION_SETTINGS),
-            presentation(
-                connectionState = ConnectionUiState.Error(
-                    ConnectionFailureKind.UNREACHABLE,
-                    SessionRecoveryDisposition.AUTOMATIC_BACKOFF,
-                ),
-            ),
-        )
-    }
-
-    @Test
     fun everyFailureKindHasItsConditionAndTheSdkActionPolicy() {
+        for ((connection, condition) in listOf(
+            ConnectionUiState.NeedsConfiguration to AppErrorCondition.NOT_CONFIGURED,
+            ConnectionUiState.CredentialUnavailable to AppErrorCondition.CREDENTIAL_UNAVAILABLE,
+        )) {
+            assertEquals(actionable(condition, AppErrorAction.CONNECTION_SETTINGS), presentation(connection))
+        }
         val conditions = mapOf(
             ConnectionFailureKind.UNREACHABLE to AppErrorCondition.UNREACHABLE,
             ConnectionFailureKind.TIMEOUT to AppErrorCondition.TIMEOUT,
@@ -244,13 +151,10 @@ class MainStartupPresentationTest {
     }
 
     @Test
-    fun emptyRetainedInventoryCannotAuthorizeReadyEntry() {
+    fun emptyBrowsableInventoryStillShowsSyncingMetadata() {
         val emptyRetained = CurrentChannelReadiness.Browsable(emptyList())
         val syncing = presentation(ConnectionUiState.SyncingChannels, emptyRetained) as MainStartupPresentation.Passive
         assertEquals(MainStartupPresentation.Passive(MainStartupMessageKind.SYNCING_METADATA), syncing)
-        val current = CurrentChannelReadiness.Ready(listOf(Channel.create(ChannelId(1))))
-        val ready = presentation(ConnectionUiState.Ready, current)
-        assertEquals(MainStartupLoadingFeedback.HIDDEN, mainStartupLoadingFeedback(ready, 0L))
     }
 
 

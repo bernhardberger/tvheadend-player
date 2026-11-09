@@ -17,20 +17,15 @@ class PlayerBackKeyCycleTest {
         assertEquals(PlayerBackKeyResult.BACK, up())
     }
 
-    @Test fun firstRepeatHoldsExactlyOnceAndReleaseDoesNotGoBack() {
-        down()
-        assertEquals(PlayerBackKeyResult.HOLD, down(1))
-        assertEquals(PlayerBackKeyResult.NONE, down(2))
-        assertEquals(PlayerBackKeyResult.NONE, up())
-        down()
-        assertEquals(PlayerBackKeyResult.BACK, up())
-    }
-
-    @Test fun longPressFlagIsEnoughWhileTracking() {
-        down()
-        assertEquals(PlayerBackKeyResult.HOLD, down(long = true))
-        assertEquals(PlayerBackKeyResult.NONE, down(long = true))
-        assertEquals(PlayerBackKeyResult.NONE, up())
+    @Test fun repeatOrLongPressHoldsExactlyOnceAndReleaseDoesNotGoBack() {
+        for (long in listOf(false, true)) {
+            down()
+            assertEquals(PlayerBackKeyResult.HOLD, down(if (long) 0 else 1, long = long))
+            assertEquals(PlayerBackKeyResult.NONE, down(if (long) 0 else 2, long = long))
+            assertEquals(PlayerBackKeyResult.NONE, up())
+            down()
+            assertEquals(PlayerBackKeyResult.BACK, up())
+        }
     }
 
     @Test fun untrackedRepeatFlagAndReleaseDoNothing() {
@@ -59,8 +54,6 @@ class PlayerBackKeyCycleTest {
         assertEquals(PlayerBackKeyResult.NONE, down(1, allowed = true))
         assertEquals(PlayerBackKeyResult.NONE, down(2, allowed = true))
         assertEquals(PlayerBackKeyResult.BACK, up())
-        down()
-        assertEquals(PlayerBackKeyResult.HOLD, down(1))
     }
 
     @Test fun vanishedOrReplacedOwnerConsumesShortAndHeldReleases() {

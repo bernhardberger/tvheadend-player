@@ -43,7 +43,9 @@ import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
+import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.images.ChannelAccents
+import at.bernhardberger.tvhplayer.images.DetailsArtColors
 import at.bernhardberger.tvhplayer.settings.ChannelsLayout
 import at.bernhardberger.tvhplayer.settings.ChannelsView
 import at.bernhardberger.tvhplayer.stores.ChannelAccentStore
@@ -71,6 +73,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
 import kotlin.math.abs
+import kotlin.time.Instant
 
 /**
  * A focused card's glow fades out on every side instead of ending in a straight cut where its row
@@ -83,15 +86,17 @@ import kotlin.math.abs
 class CardGlowRoomTest {
     @get:Rule val images = ImageLoaderRule()
     @get:Rule val compose = createComposeRule()
-    private val fixture = ChannelsLayoutFixture(compose, images)
+    private val accentStore = ChannelAccentStore()
+    private val accents = ChannelAccents(accentStore) { _, id -> "channels-${id.value}" }
+    private val fixture = ChannelsLayoutFixture(compose, images, accents)
 
     private fun card(id: Int) = hasTestTag("channel-card-$id")
 
     @Test fun gridFirstCardKeepsItsGlowAboveAndBeforeIt() {
         fixture.show(ChannelsView(ChannelsLayout.GRID, setOf(ChannelsLayout.GRID)), fixture.fixtureArt())
-        channels("grid-1-first-card", card(1), Side.TOP, Side.START)
+        channels("grid-1-first-card", 1, Side.TOP, Side.START)
         repeat(ChannelsGridColumns - 1) { fixture.key(Key.DirectionRight) }
-        channels("grid-2-last-column", card(ChannelsGridColumns), Side.TOP, Side.END)
+        channels("grid-2-last-column", ChannelsGridColumns, Side.TOP, Side.END)
         repeat(ChannelsGridColumns - 1) { fixture.key(Key.DirectionLeft) }
         scrolledGrid()
     }
@@ -100,7 +105,7 @@ class CardGlowRoomTest {
         fixture.awaitFocus(card(1))
         repeat(2) { fixture.key(Key.DirectionDown) }
         // Past the inset line the row above fades out, so only the gap before it shows the glow alone.
-        channels("grid-3-scrolled", card(1 + 2 * ChannelsGridColumns), Side.TOP, rowAbove = ChannelsGridEdgeInset.value)
+        channels("grid-3-scrolled", 1 + 2 * ChannelsGridColumns, Side.TOP, rowAbove = ChannelsGridEdgeInset.value)
     }
 
     @Test fun theRowAboveShowsOnlyWhileTheGridCanScrollBack() {
@@ -138,14 +143,14 @@ class CardGlowRoomTest {
 
     @Test fun immersiveRowKeepsItsGlowAbove() {
         fixture.show(ChannelsView(ChannelsLayout.IMMERSIVE, setOf(ChannelsLayout.IMMERSIVE)), fixture.fixtureArt())
-        channels("immersive-1-first-card", card(1), Side.TOP)
+        channels("immersive-1-first-card", 1, Side.TOP)
         repeat(5) { fixture.key(Key.DirectionRight) }
-        channels("immersive-2-scrolled", card(6), Side.TOP)
+        channels("immersive-2-scrolled", 6, Side.TOP)
     }
 
     @Test fun immersiveLogoRowKeepsItsGlowAbove() {
         fixture.show(ChannelsView(ChannelsLayout.IMMERSIVE), fixture.fixtureArt())
-        channels("immersive-3-logo", card(1), Side.TOP)
+        channels("immersive-3-logo", 1, Side.TOP)
     }
 
     /** The second card: the row's title stands above the first. */
@@ -291,10 +296,12 @@ class CardGlowRoomTest {
         return (ringLuminance - beyond) / (255f - beyond)
     }
 
-    private fun channels(name: String, focus: SemanticsMatcher, vararg sides: Side, rowAbove: Float? = null) {
+    private fun channels(name: String, focused: Int, vararg sides: Side, rowAbove: Float? = null) {
+        val focus = card(focused)
         fixture.awaitFocus(focus)
         // Glow colour, background and scroll settle; the logo glow is baked off the main thread.
         compose.mainClock.advanceTimeBy(1_500)
+        awaitChannelColors(focused)
         compose.waitUntil(10_000) {
             compose.onAllNodesWithTag("channels-logo-glow").fetchSemanticsNodes().isEmpty() ||
                 compose.onAllNodesWithTag("channels-immersive-picon").fetchSemanticsNodes().isNotEmpty()
@@ -302,6 +309,23 @@ class CardGlowRoomTest {
         compose.mainClock.advanceTimeBy(1_500)
         compose.waitForIdle()
         check(name, bounds(focus), sides, rowAbove)
+    }
+
+    private fun awaitChannelColors(focused: Int) {
+        val prefix = if (fixture.channelsView.layout == ChannelsLayout.GRID) "channels-grid" else "channels-immersive"
+        val observation = fixture.shownObservation
+        val art = observation.eventAt(ChannelId(focused.toLong()), Instant.fromEpochSeconds(System.currentTimeMillis() / 1000))
+            ?.image?.takeIf { fixture.channelsView.showsProgramArt }
+        val picture = art?.let { AppArtworkSource(requireNotNull(observation.currentSession), it) }
+        // Neither the focused picture's glow nor any visible logo card's fill is tracked by Compose idle.
+        // Wait for their palette results before advancing the colour animations, not just for the backdrop.
+        compose.waitUntil(10_000) {
+            (picture == null || DetailsArtColors.stored(picture) != null) && ChannelsLayoutFixture.PICONS.indices.all { index ->
+                val id = index + 1
+                compose.onAllNodesWithTag("$prefix-$id-picon").fetchSemanticsNodes().isEmpty() ||
+                    accentStore["channels-$id"] != null
+            }
+        }
     }
 
     private lateinit var view: View

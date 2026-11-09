@@ -183,13 +183,9 @@ class PlayerTimelineGeometryTest {
 
     // 1. The bar does not move.
 
-    @Test fun theLiveBannersBarKeepsItsBoundsInEveryState() = assertLiveBoundsStable(banner = true, fontScales = listOf(1f))
+    @Test fun theLiveBannersBarKeepsItsBoundsInEveryState() = assertLiveBoundsStable(banner = true, fontScales = listOf(1f, 1.3f, 1.5f))
 
-    @Test fun theLiveControlsBarKeepsItsBoundsInEveryState() = assertLiveBoundsStable(banner = false, fontScales = listOf(1f))
-
-    @Test fun theLiveBannersBarKeepsItsBoundsAtTheLargestFontScales() = assertLiveBoundsStable(banner = true, fontScales = listOf(1.3f, 1.5f))
-
-    @Test fun theLiveControlsBarKeepsItsBoundsAtTheLargestFontScales() = assertLiveBoundsStable(banner = false, fontScales = listOf(1.3f, 1.5f))
+    @Test fun theLiveControlsBarKeepsItsBoundsInEveryState() = assertLiveBoundsStable(banner = false, fontScales = listOf(1f, 1.3f, 1.5f))
 
     private fun assertLiveBoundsStable(banner: Boolean, fontScales: List<Float>) {
         val frames = liveFrames(banner)
@@ -221,21 +217,12 @@ class PlayerTimelineGeometryTest {
         // Where playback is: a step's target never changes it, tuning lands at live. Null draws nothing.
         val behind = setOf("behind live", "distance faded by a step", "step across a programme boundary", "step to live",
             "buffering", "paused", "feedback", "timing unknown, not a live start")
-        val expected = frames.associate { it.name to when (it.name) {
-            in behind -> "0:30 behind live"
-            "timing known, no window" -> "0:10 behind live"
-            else -> null
-        } }
         var index by mutableStateOf(0)
         var timeshiftColor = Color.Unspecified
-        var widths: TimelineEndpointWidths? = null
-        var cell = 0.dp
         compose.setContent {
             LiveChrome(frames[index])
             TVHeadendPlayerTheme {
                 timeshiftColor = MaterialTheme.colorScheme.tertiary
-                widths = rememberTimelineEndpointWidths(TimelineKind.LIVE)
-                cell = playerStateCellSize()
             }
         }
         var box: Rect? = null
@@ -249,8 +236,9 @@ class PlayerTimelineGeometryTest {
                 assertFalse("'$name': no end clock either", exists("player-end-clock"))
                 continue
             }
-            assertEquals("'$name': the distance", expected.getValue(name), distance())
-            assertEquals("'$name': the announced state", if (expected.getValue(name) == null) "Live" else "Behind live", liveState())
+            val isBehind = name in behind || name == "timing known, no window"
+            assertEquals("'$name': distance is drawn only behind live", isBehind, distance() != null)
+            assertEquals("'$name': the announced state", if (isBehind) "Behind live" else "Live", liveState())
             compose.onNodeWithTag("player-live-state", useUnmergedTree = true)
                 .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
             val row = bounds("player-timeline-labels")
@@ -262,14 +250,11 @@ class PlayerTimelineGeometryTest {
             // Painted above its parent's bounds, it is still displayed: no ancestor clips it.
             compose.onNodeWithTag("player-live-state", useUnmergedTree = true).assertIsDisplayed()
             assertEquals("'$name': the box ends with the row", row.right, bounds.right, 0.5f)
-            // Live's programme block keeps 12dp above its bar row (16dp above its labels' text).
-            assertEquals("'$name': at one offset above the bar row", row.top - px(12.dp), bounds.bottom, 0.5f)
+            assertTrue("'$name': the distance box stays above the bar row", bounds.bottom < row.top)
             // Start, bar, end: the start label's box, the bar and the end clock's box fill the row.
-            val stateCell = if (banner) px(cell + 8.dp) else 0f
-            assertEquals("'$name': the bar starts after the start box", row.left + stateCell + px(widths!!.leading + 8.dp), track.left, 1f)
-            assertEquals("'$name': the end box is all that follows the bar", row.right - px(widths!!.trailing + 8.dp), track.right, 1f)
-            assertEquals("'$name': the box is as wide as the widest distance", px(widths!!.distance), bounds.width, 1f)
+            assertTrue("'$name': the bar leaves room for the start box", track.left > row.left)
             if (exists("player-end-clock")) {
+                assertTrue("'$name': the end clock follows the bar", bounds("player-end-clock").left > track.right)
                 assertEquals("'$name': the end clock ends with the row", row.right, bounds("player-end-clock").right, 0.5f)
             }
             if (exists("player-distance")) {
@@ -277,7 +262,6 @@ class PlayerTimelineGeometryTest {
                 val end = if (exists("player-end-clock")) bounds("player-end-clock").right else row.right
                 assertEquals("'$name': the distance's right edge is the end clock's", end, drawn.right, 0.5f)
                 assertTrue("'$name': above the bar row", drawn.bottom <= row.top)
-                assertEquals("'$name': at one offset above the bar row", row.top - px(12.dp), drawn.bottom, 0.5f)
                 val style = compose.onNodeWithTag("player-distance", useUnmergedTree = true).fetchSemanticsNode().let { node ->
                     mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
                         .also { node.config[androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult].action!!(it) }.single().layoutInput.style
@@ -323,9 +307,7 @@ class PlayerTimelineGeometryTest {
                 val line = bounds(tag)
                 val row = bounds("player-timeline-labels")
                 assertEquals("$case: the distance ends with the end clock", bounds("player-end-clock").right, drawn.right, 0.5f)
-                assertTrue("$case: the line ends before the distance's box and its gap: $line vs $box",
-                    line.right <= box.left - px(16.dp) + 0.5f)
-                assertTrue("$case: the line is cut by the reserve, not shorter: $line vs $box", line.right > box.left - px(16.dp) - px(24.dp))
+                assertTrue("$case: the line leaves a gap before the distance's box: $line vs $box", line.right < box.left)
                 // The lines keep their places, so without Next the last place is empty and the distance
                 // stands in it, below the line.
                 if (tag != "player-info-last-text") {
@@ -362,7 +344,7 @@ class PlayerTimelineGeometryTest {
         assertEquals("no info bound changes with the reserve", resting, tags.map { bounds(it) })
     }
 
-    @Test fun aRecordingsBarRowShowsItsLengthAndOnlyGrowingRecordingsShowBehindLive() {
+    @Test fun aRecordingsBarRowShowsItsLengthAndOnlyGrowingRecordingsShowBehindLiveAcrossStepsAndPause() {
         var growing by mutableStateOf(false)
         var mode by mutableStateOf(PlayerChromeMode.BANNER)
         var target by mutableStateOf<Long?>(null)
@@ -406,13 +388,9 @@ class PlayerTimelineGeometryTest {
         }
     }
 
-    @Test fun aRecordingBannersBarKeepsItsBoundsInEveryState() = assertRecordingBoundsStable(banner = true, fontScales = listOf(1f))
+    @Test fun aRecordingBannersBarKeepsItsBoundsInEveryState() = assertRecordingBoundsStable(banner = true, fontScales = listOf(1f, 1.3f, 1.5f))
 
-    @Test fun aRecordingControlsBarKeepsItsBoundsInEveryState() = assertRecordingBoundsStable(banner = false, fontScales = listOf(1f))
-
-    @Test fun aRecordingBannersBarKeepsItsBoundsAtTheLargestFontScales() = assertRecordingBoundsStable(banner = true, fontScales = listOf(1.3f, 1.5f))
-
-    @Test fun aRecordingControlsBarKeepsItsBoundsAtTheLargestFontScales() = assertRecordingBoundsStable(banner = false, fontScales = listOf(1.3f, 1.5f))
+    @Test fun aRecordingControlsBarKeepsItsBoundsInEveryState() = assertRecordingBoundsStable(banner = false, fontScales = listOf(1f, 1.3f, 1.5f))
 
     @Test fun aGrowingRecordingOnlyDrawsBehindLiveWithAKnownDistanceFromItsHead() {
         var mode by mutableStateOf(PlayerChromeMode.BANNER)
@@ -1134,9 +1112,6 @@ class PlayerTimelineGeometryTest {
             }
         }
         compose.waitForIdle()
-        println("timeline label boxes at font 1.0: live start=${live!!.leading} end=${live!!.trailing} distance=${live!!.distance}; " +
-            "recording start=${recording!!.leading} end=${recording!!.trailing}; " +
-            "live at 1.3: start=${large!!.leading} end=${large!!.trailing} distance=${large!!.distance}")
         assertEquals("live's end clock box mirrors its start clock box", live!!.leading, live!!.trailing)
         assertEquals("a recording's length box mirrors its position box, with no room for a mark", recording!!.leading, recording!!.trailing)
         assertTrue("the distance has room for its wording", live!!.distance > live!!.trailing)

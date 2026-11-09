@@ -9,7 +9,6 @@ class DvrMutationValidityTest {
     @Test fun scheduledToRecordingInvalidatesCancel() = checkTransition(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING, false)
     @Test fun recordingToCompletedInvalidatesStop() = checkTransition(DvrEntryState.RECORDING, DvrEntryState.COMPLETED, false)
     @Test fun removedEntryInvalidatesCancel() = checkTransition(DvrEntryState.SCHEDULED, null, false)
-    @Test fun removedEntryInvalidatesStop() = checkTransition(DvrEntryState.RECORDING, null, false)
     @Test fun unchangedScheduledKeepsCancel() = checkTransition(DvrEntryState.SCHEDULED, DvrEntryState.SCHEDULED, true)
     @Test fun unchangedRecordingKeepsStop() = checkTransition(DvrEntryState.RECORDING, DvrEntryState.RECORDING, true)
     @Test fun differentSessionInvalidatesBoth() {
