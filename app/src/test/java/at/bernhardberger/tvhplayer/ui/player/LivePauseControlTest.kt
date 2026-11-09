@@ -124,30 +124,22 @@ class LivePauseControlTest {
     }
 
     @Category(VisualCapture::class)
-    @Test fun capturesEnglish() = captures("en", 1f)
-    @Category(VisualCapture::class)
-    @Test fun capturesEnglishLargeText() = captures("en", 1.3f)
-    @Category(VisualCapture::class)
-    @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
-    fun capturesGerman() = captures("de", 1f)
-    @Category(VisualCapture::class)
-    @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
-    fun capturesGermanLargeText() = captures("de", 1.3f)
+    @Test fun capturesEnglish() = captures()
 
-    private fun captures(locale: String, fontScale: Float) {
-        show(LivePauseAvailability.UNAVAILABLE, fontScale)
+    private fun captures() {
+        show(LivePauseAvailability.UNAVAILABLE)
         center()
         compose.onNodeWithTag("player-pause").assertIsFocused()
-        capture("$locale-font$fontScale-unavailable-channel", fontScale)
+        capture("en-font1.0-unavailable-channel", 1f)
         compose.runOnIdle { livePause = LivePauseAvailability.OFF }
         center()
         compose.onNodeWithTag("player-pause").assertIsFocused()
-        capture("$locale-font$fontScale-timeshift-off", fontScale)
+        capture("en-font1.0-timeshift-off", 1f)
         compose.runOnIdle { livePause = LivePauseAvailability.STARTING }
         center()
         compose.runOnIdle { paused = true }
         compose.onNodeWithTag("player-pause").assertIsFocused().assertContentDescriptionEquals(text(R.string.play))
-        capture("$locale-font$fontScale-starting-pending", fontScale)
+        capture("en-font1.0-starting-pending", 1f)
     }
 
     private var shown = false

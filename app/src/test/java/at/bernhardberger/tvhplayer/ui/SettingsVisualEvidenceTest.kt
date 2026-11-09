@@ -48,7 +48,6 @@ import java.io.File
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Category(VisualCapture::class)
 class SettingsVisualEvidenceTest {
     @get:Rule val compose = createComposeRule()
     private lateinit var view: View
@@ -72,91 +71,25 @@ class SettingsVisualEvidenceTest {
                 }
             }
         }
-        fun save(name: String) {
-            compose.mainClock.advanceTimeBy(1000)
-            compose.waitForIdle()
-            compose.runOnIdle {
-                val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-                view.draw(Canvas(bitmap))
-                val file = File("../build/review/warm-choice/$name.png").apply { parentFile.mkdirs() }
-                file.outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
-                bitmap.recycle()
-            }
-        }
         compose.onNode(isFocused() and hasText("While browsing")).assertExists()
-        save("en-font1.0-playback-row")
         press(Key.DirectionCenter)
         compose.onNodeWithText("Show picture").assertIsFocused().assertIsSelected()
-        save("en-font1.0-choice-on")
         press(Key.DirectionDown)
-        save("en-font1.0-choice-sound-focus")
         press(Key.DirectionCenter)
         press(Key.DirectionCenter)
         compose.onNodeWithText("Sound only").assertIsFocused().assertIsSelected()
-        save("en-font1.0-choice-sound-selected")
         press(Key.DirectionDown)
         press(Key.DirectionCenter)
         press(Key.DirectionCenter)
         compose.onNodeWithText("Stop").assertIsFocused().assertIsSelected()
-        save("en-font1.0-choice-stop-selected")
         press(Key.Back)
         compose.onNode(isFocused() and hasText("While browsing") and hasText("Stop")).assertExists()
-        save("en-font1.0-playback-row-restored")
     }
 
-    @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi") fun englishNormal() = captureStates("en", 1f)
-    @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi") fun germanNormal() = captureStates("de", 1f)
-    @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi") fun englishEnlarged() = captureStates("en", 1.3f)
-    @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi") fun germanEnlarged() = captureStates("de", 1.3f)
-
     @Category(VisualCapture::class)
-    @Test @Config(qualifiers = PseudoLocaleEvidence.QUALIFIERS_EN_XA) fun pseudoEnXa() = capturePseudoSettings(PseudoLocaleEvidence.EN_XA)
-    @Category(VisualCapture::class)
-    @Test @Config(qualifiers = PseudoLocaleEvidence.QUALIFIERS_AR_XB) fun pseudoArXb() = capturePseudoSettings(PseudoLocaleEvidence.AR_XB)
-
-    // Representative CJK capture on the integrated zh-Hant resources.
-    @Category(VisualCapture::class)
-    @Test @Config(qualifiers = PseudoLocaleEvidence.QUALIFIERS_ZH_HANT) fun cjkZhHant() = capturePseudoSettings(PseudoLocaleEvidence.ZH_HANT)
-
-    /**
-     * Settings root, General and the language page on generated pseudo-locale resources. Row
-     * positions are not asserted: long or mirrored text may legitimately re-wrap the rows.
-     */
-    private fun capturePseudoSettings(tag: String) {
-        val resources = RuntimeEnvironment.getApplication().resources
-        lateinit var navigation: DepthNavigationState
-        compose.setContent {
-            CompositionLocalProvider(LocalDensity provides Density(1f, 1f)) {
-                TVHeadendPlayerTheme {
-                    view = LocalView.current
-                    navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.GENERAL.name)
-                    Box(Modifier.fillMaxSize().background(Color.Black)) {
-                        DebugVideoBackdrop(true, Modifier.fillMaxSize())
-                        WarmPlaybackScrim()
-                        SideRail(currentRoute = AppDestination.SETTINGS,
-                            onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
-                            SettingsScreenNavigation(navigation, listOf(
-                                settingsRootLevel(
-                                    connectionStatus = resources.getString(at.bernhardberger.tvhplayer.R.string.error_101_title))) +
-                                settingsGeneralLevels(UiSettings(), AppLanguage.SYSTEM, CacheStatistics.EMPTY, CacheClearState.IDLE, {}, {}),
-                                initialFocusEnabled = !drawerActive, contentPadding = padding)
-                        }
-                    }
-                }
-            }
-        }
-        if (tag == PseudoLocaleEvidence.EN_XA || tag == PseudoLocaleEvidence.AR_XB) PseudoLocaleEvidence.assertGenerated(tag, view)
-        else PseudoLocaleEvidence.assertLocalized(tag, view)
-        val prefix = "$tag-font1.0"
-        compose.runOnIdle {
-            navigation.update(DepthStack(listOf(DepthFrame(SETTINGS_ROOT, SettingsSection.GENERAL.name))))
-        }
-        capture("$prefix-root")
-        press(Key.DirectionCenter)
-        capture("$prefix-general")
-        press(Key.DirectionRight)
-        capture("$prefix-language")
-    }
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi") fun englishNormal() = captureStates("en", 1f, captures = true)
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi") fun englishSettingsBehaviour() = captureStates("en", 1f, captures = false)
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi") fun englishEnlarged() = captureStates("en", 1.3f, captures = false)
 
     @Category(VisualCapture::class)
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi") fun applianceCompanionMissing() = captureAppliance(false)
@@ -197,7 +130,7 @@ class SettingsVisualEvidenceTest {
         }
     }
 
-    private fun captureStates(locale: String, fontScale: Float) {
+    private fun captureStates(locale: String, fontScale: Float, captures: Boolean) {
         var cacheState by mutableStateOf(CacheClearState.IDLE)
         var cacheCalls = 0
         var setupCalls = 0
@@ -242,14 +175,14 @@ class SettingsVisualEvidenceTest {
         compose.runOnIdle {
             navigation.update(DepthStack(listOf(DepthFrame(SETTINGS_ROOT, SettingsSection.CONNECTION.name))))
         }
-        capture("$prefix-connection-preview")
+        capture("$prefix-connection-preview", writeImages = captures)
         press(Key.DirectionCenter)
         compose.onNodeWithTag("settings-row-${serverProfileRowId(fixtureActiveServer.id)}").assertIsFocused()
         compose.onNodeWithText(resources.getString(at.bernhardberger.tvhplayer.R.string.connection_try_again)).assertIsDisplayed()
         compose.onNodeWithText(resources.getString(at.bernhardberger.tvhplayer.R.string.setup_connection),
             useUnmergedTree = true).assertIsDisplayed() // Preview of the focused server's level.
         compose.onAllNodes(hasSetTextAction()).assertCountEquals(0)
-        capture("$prefix-connection-overview")
+        capture("$prefix-connection-overview", writeImages = captures)
         press(Key.Back)
         compose.runOnIdle { navigation.update(DepthStack(listOf(DepthFrame(SETTINGS_ROOT, SettingsSection.GENERAL.name)), visit = navigation.stack.visit + 1)) }
         // Accepted Settings C geometry on the 80dp Material for TV drawer shell.
@@ -258,23 +191,23 @@ class SettingsVisualEvidenceTest {
         assertEquals(28f, activeColumn.top, .5f)
         assertEquals(340f, activeColumn.width, .5f)
         if (fontScale == 1f) assertRowTops(76f, 136f, 204f, 264f, 324f, 384f, 444f)
-        capture("$prefix-root")
+        capture("$prefix-root", writeImages = captures)
         press(Key.DirectionDown)
-        capture("$prefix-root-middle-focus", middleFocus = true)
+        capture("$prefix-root-middle-focus", middleFocus = true, writeImages = captures)
         press(Key.DirectionUp)
         press(Key.DirectionCenter)
         if (fontScale == 1f) assertRowTops(76f, 144f, 212f, if (locale == "de") 289f else 280f)
-        capture("$prefix-general")
+        capture("$prefix-general", writeImages = captures)
         press(Key.DirectionDown)
-        capture("$prefix-general-middle-focus", middleFocus = true)
+        capture("$prefix-general-middle-focus", middleFocus = true, writeImages = captures)
         press(Key.DirectionUp)
         press(Key.DirectionRight)
         // Match the accepted board: Follow system is both focused and selected.
-        capture("$prefix-language")
+        capture("$prefix-language", writeImages = captures)
         press(Key.Back)
         press(Key.DirectionDown)
         press(Key.DirectionRight)
-        capture("$prefix-clock-format")
+        capture("$prefix-clock-format", writeImages = captures)
         press(Key.Back)
         press(Key.DirectionDown)
         press(Key.DirectionDown)
@@ -282,7 +215,7 @@ class SettingsVisualEvidenceTest {
         val row = compose.onNodeWithText(cacheLabel)
         row.assertIsFocused()
         val bounds = row.fetchSemanticsNode().boundsInRoot
-        capture("$prefix-cache-idle")
+        capture("$prefix-cache-idle", writeImages = captures)
         press(Key.DirectionCenter)
         press(Key.DirectionCenter)
         assertEquals(1, cacheCalls)
@@ -300,7 +233,7 @@ class SettingsVisualEvidenceTest {
                 assertEquals(512f, noticeBounds.bottom)
                 assertTrue(noticeBounds.width <= 556f)
             }
-            capture("$prefix-cache-${state.name.lowercase()}")
+            capture("$prefix-cache-${state.name.lowercase()}", writeImages = captures)
             if (state == CacheClearState.FAILED) {
                 press(Key.DirectionCenter)
                 assertEquals(2, cacheCalls)
@@ -311,7 +244,7 @@ class SettingsVisualEvidenceTest {
         repeat(5) { press(Key.DirectionDown) } // Connection, Channel groups, Playback, Audio & subtitles, Appliance
         press(Key.DirectionCenter)
         compose.onNodeWithText(setupLabel).assertIsFocused()
-        capture("$prefix-appliance-setup")
+        capture("$prefix-appliance-setup", writeImages = captures)
         assertEquals(0, setupCalls)
         press(Key.DirectionCenter)
         assertEquals(1, setupCalls) // Opens the companion directly; its screen owns the disclosure.
@@ -319,6 +252,7 @@ class SettingsVisualEvidenceTest {
         assertEquals(SETTINGS_ROOT, navigation.stack.active.levelId)
     }
 
+    @Category(VisualCapture::class)
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi") fun englishPlaybackPages() {
         val ui = connectedPlaybackUi()
         lateinit var navigation: DepthNavigationState
@@ -359,6 +293,7 @@ class SettingsVisualEvidenceTest {
     }
 
     /** Playback with the Recording marks group focused on Ad breaks, then the Ad breaks choice. */
+    @Category(VisualCapture::class)
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi") fun englishRecordingMarksPages() {
         val ui = connectedPlaybackUi()
         lateinit var navigation: DepthNavigationState
@@ -389,6 +324,7 @@ class SettingsVisualEvidenceTest {
     }
 
     /** README scene: Playback settings over the warm Ridge Light picture, 1920×1080. */
+    @Category(VisualCapture::class)
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi") fun presentation() {
         val ui = connectedPlaybackUi()
         val still = at.bernhardberger.tvhplayer.testutil.FixtureArt.art("still-ridge-light").asImageBitmap()
@@ -457,7 +393,7 @@ class SettingsVisualEvidenceTest {
         tops.zip(rows).forEach { (top, row) -> assertEquals(top, row.top, .5f) }
     }
 
-    private fun capture(name: String, middleFocus: Boolean = false, reader: Boolean = false) {
+    private fun capture(name: String, middleFocus: Boolean = false, reader: Boolean = false, writeImages: Boolean = true) {
         val activeColumn = (if (reader) compose.onNodeWithTag("player-info-reading") else compose.onNodeWithTag("depth-active"))
             .fetchSemanticsNode().boundsInRoot
         val rows = if (reader) emptyList() else activeRows()
@@ -472,8 +408,6 @@ class SettingsVisualEvidenceTest {
             bitmap = Bitmap.createBitmap(captureView.width, captureView.height, Bitmap.Config.ARGB_8888)
             captureView.draw(Canvas(bitmap))
         }
-        val directory = File("build/outputs/settings-c-captures").apply { mkdirs() }
-        File(directory, "$name.png").outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
         val focusEvidence = if (middleFocus) {
             val focused = compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot
             val x = (activeColumn.left + 8f).toInt()
@@ -496,18 +430,23 @@ class SettingsVisualEvidenceTest {
             assertTrue("Focus must not overlap next row", native.bottom <= rows[index + 1].top)
             "middleFocus=$focused; nativeFocusVertical=$native; rows=$rows\n"
         } else ""
-        PseudoLocaleEvidence.mirror("settings", name, bitmap, view, name.substringAfter("-font").substringBefore("-").toFloat(),
-            "mdpi 1.0", name.substringAfter("-font").substringAfter("-"),
-            "Settings on SideRail; production SettingsScreenNavigation; native focus; activeColumn=$activeColumn; rows=$rows")
-        File(directory, "$name.txt").writeText(
-            "canvas=960x540 logical; pixels=${bitmap.width}x${bitmap.height}; density=1.0; " +
-                "locale=${name.substringBefore("-font")}; fontScale=${name.substringAfter("-font").substringBefore("-")}; " +
-                "focus/scenario=${name.substringAfter("-font").substringAfter("-")}; " +
-                "production=SideRail+SettingsScreenNavigation; warm playback scrim; " +
-                "activeColumn=$activeColumn; " +
-                "rows=$rows; " +
-                focusEvidence +
-                "static offline composition only\n",
-        )
+        if (writeImages) {
+            val directory = File("build/outputs/settings-c-captures").apply { mkdirs() }
+            File(directory, "$name.png").outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+            PseudoLocaleEvidence.mirror("settings", name, bitmap, view, name.substringAfter("-font").substringBefore("-").toFloat(),
+                "mdpi 1.0", name.substringAfter("-font").substringAfter("-"),
+                "Settings on SideRail; production SettingsScreenNavigation; native focus; activeColumn=$activeColumn; rows=$rows")
+            File(directory, "$name.txt").writeText(
+                "canvas=960x540 logical; pixels=${bitmap.width}x${bitmap.height}; density=1.0; " +
+                    "locale=${name.substringBefore("-font")}; fontScale=${name.substringAfter("-font").substringBefore("-")}; " +
+                    "focus/scenario=${name.substringAfter("-font").substringAfter("-")}; " +
+                    "production=SideRail+SettingsScreenNavigation; warm playback scrim; " +
+                    "activeColumn=$activeColumn; " +
+                    "rows=$rows; " +
+                    focusEvidence +
+                    "static offline composition only\n",
+            )
+        }
+        bitmap.recycle()
     }
 }

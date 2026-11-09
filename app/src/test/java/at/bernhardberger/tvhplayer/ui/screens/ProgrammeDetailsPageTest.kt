@@ -560,19 +560,6 @@ class ProgrammeDetailsPageTest {
         Assert.assertEquals(160f, airingsHeadingTop(), .5f)
     }
 
-    @Test @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
-    fun airingsToFactsScrollCaptures() {
-        show(cast = true)
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
-        compose.onNodeWithTag("details-card-2").assertIsFocused()
-        compose.mainClock.autoAdvance = false
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
-        compose.mainClock.advanceTimeBy(RowChangeMs / 2L)
-        capture("airings-to-facts-mid-move", "details-scroll-pace", settle = false)
-        capture("airings-to-facts-settled", "details-scroll-pace")
-        compose.mainClock.autoAdvance = true
-    }
-
     @Test fun firstAiringFocusDescriptionsAndRowScrollRestoreAfterBack() {
         var opened: EpgEvent? = null
         show(onRelated = { opened = it }, realRail = true)

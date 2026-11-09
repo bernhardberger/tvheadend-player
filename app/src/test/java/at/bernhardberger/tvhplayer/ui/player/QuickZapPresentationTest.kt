@@ -1,7 +1,5 @@
 package at.bernhardberger.tvhplayer.ui.player
 
-import at.bernhardberger.tvhplayer.testutil.CaptureOutput
-import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import at.bernhardberger.tvhplayer.ui.TvCardFocusedScale
 import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import android.app.Application
@@ -84,12 +82,10 @@ import org.junit.Rule
 import org.junit.Before
 import org.junit.After
 import org.junit.Test
-import org.junit.experimental.categories.Category
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import java.io.File
 import java.io.ByteArrayOutputStream
 import java.util.TimeZone
 import kotlin.time.Instant
@@ -294,11 +290,10 @@ class QuickZapPresentationTest {
     }
     private var catalog by mutableStateOf(channels)
 
-    @Test @Category(VisualCapture::class)
-    fun nativeCardCornerGapIsUniformFocusedAndPressed() = cornerGeometry(1f, "en-font1")
+    @Test fun nativeCardCornerGapIsUniformFocusedAndPressed() = cornerGeometry()
 
-    private fun cornerGeometry(fontScale: Float, prefix: String) {
-        content(fontScale = fontScale)
+    private fun cornerGeometry() {
+        content(fontScale = 1f)
         key(Key.DirectionDown)
         card(2).assertIsFocused()
         fun verify(state: String, expectedScale: Float) {
@@ -362,24 +357,7 @@ class QuickZapPresentationTest {
                 top + (progress.bottom - focused.top - .75f) * scale)
             assertViewerProgressColor("orange lower progress strip remains visible", strip)
             bitmap.recycle()
-            val name = "$prefix-native-corner-$state"
-            val focusedBounds = card(2).assertIsFocused().fetchSemanticsNode().boundsInRoot
-            compose.runOnIdle {
-                val capture = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-                view.draw(Canvas(capture))
-                val directory = File("../artifacts/quick-zap")
-                CaptureOutput.writePng(File(directory, "$name.png"), capture)
-                CaptureOutput.writeText(File(directory, "$name.txt")) {
-                    "canvas=960x540\ndensity=1.0\nlocale=en\n" +
-                        "fontScale=$fontScale\nfocus=player-channel-card-2\nbounds=$focusedBounds\n" +
-                        "focusOutlineArgb=${Integer.toHexString(focusColor)}\n"
-                }
-                capture.recycle()
-            }
-            CaptureOutput.writeText(File("../artifacts/quick-zap/$prefix-native-corner-$state-geometry.txt")) {
-                "nativeRadiusMeasuredDp=$radius\nscale=$scale\ninnerGapsDp=$gaps\n" +
-                    "supersampling=4x production view draw; native shape, shared focused scale\n"
-            }
+            card(2).assertIsFocused()
         }
         verify("focused", 1.05f)
         compose.onRoot().performKeyInput { keyDown(Key.DirectionCenter) }

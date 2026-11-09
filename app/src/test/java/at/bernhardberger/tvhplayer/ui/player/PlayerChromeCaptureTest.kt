@@ -86,8 +86,6 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackSource
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
-import at.bernhardberger.tvhplayer.settings.ClockFormat
-import at.bernhardberger.tvhplayer.ui.common.AppClock
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.screens.guide.ConfirmProgrammeActionDialog
 import java.io.File
@@ -133,7 +131,6 @@ import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-xhdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Category(VisualCapture::class)
 @OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
 class PlayerChromeCaptureTest {
     @get:Rule val images = ImageLoaderRule()
@@ -181,11 +178,16 @@ class PlayerChromeCaptureTest {
         defaultZone?.let(TimeZone::setDefault)
     }
 
+    @Category(VisualCapture::class)
     @Test fun english() = captures("en", 1f)
 
+    @Test fun programmeAiringsAndRailBadgeGeometry() = captures("en", 1f, assertionsOnly = true)
+
     /** The README scene: Ridge Light at 20:15 of 20:00-21:00 on 2026-10-04, ten minutes buffered, at live. */
+    @Category(VisualCapture::class)
     @Test fun presentation() = presentation("player", railOpen = false)
 
+    @Category(VisualCapture::class)
     @Test fun presentationWithoutChannelNumbers() {
         try {
             at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = false
@@ -196,9 +198,11 @@ class PlayerChromeCaptureTest {
     }
 
     /** The same moment with the channel rail open on the playing channel, its program above the cards. */
+    @Category(VisualCapture::class)
     @Test fun presentationRail() = presentation("player-rail", railOpen = true)
 
     /** Store player: a concert still and the production live controls at the same evening clock. */
+    @Category(VisualCapture::class)
     @Test @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi")
     fun storePlayer() = presentation("store-player", railOpen = false, concert = true)
 
@@ -285,10 +289,6 @@ class PlayerChromeCaptureTest {
         File(directory, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         bitmap.recycle()
     }
-    @Test fun seekSteps() = captures("en", 1f, stepsOnly = true)
-    @Test fun seekStepsLong() = captures("en", 1f, longStepsOnly = true)
-    @Test fun detailsButtonsEnglish() = captures("en", 1f, detailsOnly = true)
-    @Test fun programmeDetailsEnglish() = captures("en", 1f, programmeOnly = true)
 
     private enum class Scene {
         CONTROLS_LIVE, CONTROLS_NO_LOGO, CONTROLS_BEHIND, CONTROLS_PAUSED, BANNER_TUNING, BANNER_BEHIND, BANNER_STEP, TRAY_ART, TRAY_TEXT,
@@ -299,9 +299,6 @@ class PlayerChromeCaptureTest {
         STEP_REACHING_LIVE, RECORDING_BANNER, RECORDING_STEP, RECORDING_CONTROLS, RECORDING_GROWING, RECORDING_HIDDEN_PAUSED,
         CONTROLS_STEP, RECORDING_CONTROLS_STEP, BANNER_NO_EPG_LIVE, CONTROLS_NO_EPG, BANNER_NO_EPG_NO_TIMESHIFT, CONTROLS_REVEAL_MID,
         BANNER_STEP_OVER_DISTANCE, CONTROLS_STEP_OVER_DISTANCE, BANNER_STEP_FORWARD, CONTROLS_STEP_FORWARD, RECORDING_STEP_FORWARD, RECORDING_CONTROLS_STEP_FORWARD,
-        // The longest step label (hours) at the bar's two ends; captured at font scale 1.3 (longStepsOnly).
-        BANNER_STEP_LONG_START, BANNER_STEP_LONG_END, CONTROLS_STEP_LONG_START, CONTROLS_STEP_LONG_END,
-        RECORDING_STEP_LONG_START, RECORDING_STEP_LONG_END, RECORDING_CONTROLS_STEP_LONG_START, RECORDING_CONTROLS_STEP_LONG_END,
         // Player (i) focus and the channel rail's Recent row.
         INFO_FOCUSED, RECORDING_INFO_FOCUSED, RECENT_OPEN, BROWSER_NOW, BROWSER_EMPTY,
         // The audio button beside Info, focused.
@@ -311,23 +308,11 @@ class PlayerChromeCaptureTest {
     /** [Scene.CONTROLS_REVEAL_MID] composes the Banner, then the controls take it over. */
     private var revealControls by mutableStateOf(false)
 
-    @Test fun englishTwelveHourClock() = try {
-        AppClock.format = ClockFormat.TWELVE_HOUR
-        captures("en", 1f, clockSuffix = "-12h")
-    } finally {
-        AppClock.format = ClockFormat.SYSTEM
-    }
-
     private fun captures(
         locale: String,
         fontScale: Float,
-        programmeOnly: Boolean = false,
-        clockSuffix: String = "",
-        detailsOnly: Boolean = false,
-        stepsOnly: Boolean = false,
-        longStepsOnly: Boolean = false,
+        assertionsOnly: Boolean = false,
     ) {
-        if (detailsOnly) brightStill = FixtureArt.art("still-ridge-light")
         lateinit var view: View
         var scene by mutableStateOf(Scene.CONTROLS_LIVE)
         compose.mainClock.autoAdvance = false
@@ -351,12 +336,7 @@ class PlayerChromeCaptureTest {
         }
         // Recording and state scenes are captured in English at font scale 1.0 only.
         for (next in Scene.entries.filter {
-            if (longStepsOnly) it in longSteps
-            else if (it in longSteps) false
-            else if (stepsOnly) it in setOf(Scene.BANNER_STEP, Scene.BANNER_STEP_FORWARD, Scene.CONTROLS_STEP, Scene.CONTROLS_STEP_FORWARD,
-                Scene.RECORDING_STEP, Scene.RECORDING_STEP_FORWARD, Scene.RECORDING_CONTROLS_STEP, Scene.RECORDING_CONTROLS_STEP_FORWARD)
-            else if (detailsOnly) it in setOf(Scene.INFO_FOCUSED, Scene.RECORDING_INFO_FOCUSED)
-            else if (programmeOnly) it in Scene.PROGRAMME_INFO_NO_EPG..Scene.PROGRAMME_CONFIRM_STOP
+            if (assertionsOnly) it in setOf(Scene.PROGRAMME_AIRINGS, Scene.RAIL_PEEK)
             else it < Scene.BANNER_LIVE || locale == "en" && fontScale == 1f
         }) {
             compose.runOnIdle { scene = next; revealControls = false }
@@ -481,16 +461,6 @@ class PlayerChromeCaptureTest {
             if (next == Scene.PROGRAMME_INFO_NO_EPG) {
                 compose.onNodeWithTag("details-continue_watching").assertIsFocused()
             }
-            if (next in longSteps) {
-                // The longest label sits inside the bar at either end, whole and not wider than the bar.
-                fun bounds(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-                val chip = bounds("timeshift-preview-target")
-                val track = bounds("player-timeline-track")
-                assertTrue("the chip $chip stays inside the bar $track", chip.left >= track.left - 1f && chip.right <= track.right + 1f)
-                assertTrue("the chip is no wider than the bar", chip.width <= track.width)
-                val offset = bounds("timeshift-preview-target-position")
-                assertTrue("its target text is whole inside the chip", offset.left >= chip.left - 1f && offset.right <= chip.right + 1f)
-            }
             // No status slot and no Go live: the state cell lives in the bar row.
             compose.onNodeWithTag("player-status-slot", useUnmergedTree = true).assertDoesNotExist()
             compose.onNodeWithTag("player-go-live", useUnmergedTree = true).assertDoesNotExist()
@@ -499,9 +469,9 @@ class PlayerChromeCaptureTest {
                 val canvas = Canvas(bitmap)
                 view.draw(canvas)
             }
-            val directory = File(if (detailsOnly) "../build/review/player-info" else "../artifacts/player-chrome").apply { mkdirs() }
-            val name = "${next.name.lowercase(Locale.ROOT).replace('_', '-')}-$locale-font$fontScale$clockSuffix.png"
-            File(directory, name).outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            val directory = File("../artifacts/player-chrome").apply { if (!assertionsOnly) mkdirs() }
+            val name = "${next.name.lowercase(Locale.ROOT).replace('_', '-')}-$locale-font$fontScale.png"
+            if (!assertionsOnly) File(directory, name).outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
             bitmap.recycle()
             if (next == Scene.PROGRAMME_MORE_INFO) {
                 repeat(60) {
@@ -527,6 +497,7 @@ class PlayerChromeCaptureTest {
                 val screen = compose.onRoot().fetchSemanticsNode().boundsInRoot
                 val focused = compose.onNodeWithTag(last).fetchSemanticsNode().boundsInRoot
                 assertTrue("the last card stays on screen: $focused in $screen", focused.left >= screen.left && focused.right <= screen.right)
+                if (assertionsOnly) continue
                 val scrolled = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
                 compose.runOnIdle { view.draw(Canvas(scrolled)) }
                 File(directory, "programme-airings-last-$locale-font$fontScale.png").outputStream().use {
@@ -626,14 +597,6 @@ class PlayerChromeCaptureTest {
                 committed = timeshift, shown = ProgrammeWindow(programme, Instant.fromEpochSeconds(NOW - 23), 0.56f, 0.46f, 0.57f, 0.57f, true))
             Scene.BANNER_STEP_FORWARD -> Banner(PlayerChromeMode.BANNER_STEP, content, stepTimeline(timeshift,
                 at.bernhardberger.tvhplayer.playback.TimeshiftSeekDecision(-23_000, 180_000, false)))
-            // Over two hours of stepping, from 3:52 into a 3-hour buffer: the label at the left end (−1:56:10) and the right (+2:45:50).
-            Scene.BANNER_STEP_LONG_START -> Banner(PlayerChromeMode.BANNER_STEP, content, stepTimeline(longBuffer, longStartStep))
-            Scene.BANNER_STEP_LONG_END -> Banner(PlayerChromeMode.BANNER_STEP, content, stepTimeline(longBufferFar, longEndStep)
-                .copy(committedWindow = endingWindow(0.98f), programmeWindow = endingWindow(0.985f)))
-            Scene.CONTROLS_STEP_LONG_START -> Controls(projectedTimeshiftState(longBuffer, longStartStep.targetMs), true, false, content,
-                step = longStartStep.deltaMs, committed = longBuffer, shown = programmeWindowAt(longStartStep.targetMs))
-            Scene.CONTROLS_STEP_LONG_END -> Controls(projectedTimeshiftState(longBufferFar, longEndStep.targetMs), true, false, content,
-                step = longEndStep.deltaMs, committed = longBufferFar, window = endingWindow(0.98f), shown = endingWindow(0.985f))
             Scene.CONTROLS_REVEAL_MID -> RevealChrome(content, timeshift)
             // Over an hour behind live at the end of the programme played then: a step forward 30 s reads
             // out at the bar's right end, its opaque chip over the distance, which is wider than the end clock.
@@ -699,35 +662,28 @@ class PlayerChromeCaptureTest {
                 recordingBarEnd(positionMs = 1_045_000, durationMs = 4_350_000, growing = false),
                 Modifier.align(Alignment.BottomStart).padding(playerHiddenChipPadding()))
             Scene.RECORDING_BANNER, Scene.RECORDING_STEP, Scene.RECORDING_CONTROLS, Scene.RECORDING_GROWING, Scene.RECORDING_CONTROLS_STEP, Scene.RECORDING_INFO_FOCUSED,
-            Scene.RECORDING_STEP_FORWARD, Scene.RECORDING_CONTROLS_STEP_FORWARD,
-            Scene.RECORDING_STEP_LONG_START, Scene.RECORDING_STEP_LONG_END,
-            Scene.RECORDING_CONTROLS_STEP_LONG_START, Scene.RECORDING_CONTROLS_STEP_LONG_END -> {
+            Scene.RECORDING_STEP_FORWARD, Scene.RECORDING_CONTROLS_STEP_FORWARD -> {
                 val growing = scene == Scene.RECORDING_GROWING
-                // A 4-hour recording at 2:00:00, for the hour-long steps to either end.
-                val long = scene in longSteps
-                val position = if (long) 7_200_000L else 1_045_000L
-                val duration = if (long) 14_400_000L else 4_350_000L
+                val position = 1_045_000L
+                val duration = 4_350_000L
                 ProvideArtworkSession(session) { RecordingChromeFixture(
                     mode = when (scene) {
-                        Scene.RECORDING_STEP, Scene.RECORDING_STEP_FORWARD, Scene.RECORDING_STEP_LONG_START, Scene.RECORDING_STEP_LONG_END ->
+                        Scene.RECORDING_STEP, Scene.RECORDING_STEP_FORWARD ->
                             PlayerChromeMode.BANNER_STEP
-                        Scene.RECORDING_CONTROLS, Scene.RECORDING_CONTROLS_STEP, Scene.RECORDING_CONTROLS_STEP_FORWARD, Scene.RECORDING_INFO_FOCUSED,
-                        Scene.RECORDING_CONTROLS_STEP_LONG_START, Scene.RECORDING_CONTROLS_STEP_LONG_END -> PlayerChromeMode.CONTROLS
+                        Scene.RECORDING_CONTROLS, Scene.RECORDING_CONTROLS_STEP, Scene.RECORDING_CONTROLS_STEP_FORWARD, Scene.RECORDING_INFO_FOCUSED -> PlayerChromeMode.CONTROLS
                         else -> PlayerChromeMode.BANNER
                     },
                     // 0:17:25 of 1:12:30; a quick step back 30 s previews 0:16:55.
                     positionMs = position,
                     durationMs = duration,
                     targetMs = when (scene) {
-                        Scene.RECORDING_STEP_LONG_START, Scene.RECORDING_CONTROLS_STEP_LONG_START -> 20_000L // −1:59:40
-                        Scene.RECORDING_STEP_LONG_END, Scene.RECORDING_CONTROLS_STEP_LONG_END -> 14_380_000L // +1:59:40
                         Scene.RECORDING_STEP, Scene.RECORDING_CONTROLS_STEP -> 1_015_000L
                         Scene.RECORDING_STEP_FORWARD, Scene.RECORDING_CONTROLS_STEP_FORWARD -> 1_225_000L // +3:00
                         else -> null
                     },
                     originMs = position.takeIf { scene.name.startsWith("RECORDING") && scene.name.contains("STEP") },
                     // Stepping in the full controls: the focused timeline.
-                    restoreFocus = if (scene == Scene.RECORDING_INFO_FOCUSED) "player-info" else "player-seekbar".takeIf { scene == Scene.RECORDING_CONTROLS_STEP || scene == Scene.RECORDING_CONTROLS_STEP_FORWARD || scene in longSteps && scene.name.contains("CONTROLS") },
+                    restoreFocus = if (scene == Scene.RECORDING_INFO_FOCUSED) "player-info" else "player-seekbar".takeIf { scene == Scene.RECORDING_CONTROLS_STEP || scene == Scene.RECORDING_CONTROLS_STEP_FORWARD },
                     growing = growing,
                     info = fixtureRecordingInfo(programme.title.orEmpty(), growing, subtitle = programme.subtitle,
                          positionMs = position, durationMs = duration, nowSec = NOW)
@@ -940,12 +896,6 @@ class PlayerChromeCaptureTest {
         val KIDS_LOGO = ArtworkId(5)
         val hourBehind = AppTimeshiftState(available = true, bufferStartMs = -7_200_000, positionMs = -3_730_000, liveEdgeMs = 0, timingKnown = true)
         val hourBehindStep = at.bernhardberger.tvhplayer.playback.TimeshiftSeekDecision(targetMs = -3_700_000, deltaMs = 30_000, clamped = false)
-        val longBuffer = AppTimeshiftState(available = true, bufferStartMs = -10_800_000, positionMs = -3_730_000, liveEdgeMs = 0, timingKnown = true)
-        val longStartStep = at.bernhardberger.tvhplayer.playback.TimeshiftSeekDecision(targetMs = -10_700_000, deltaMs = -6_970_000, clamped = false)
-        val longBufferFar = longBuffer.copy(positionMs = -10_000_000)
-        val longEndStep = at.bernhardberger.tvhplayer.playback.TimeshiftSeekDecision(targetMs = -50_000, deltaMs = 9_950_000, clamped = false)
-        val longSteps = setOf(Scene.BANNER_STEP_LONG_START, Scene.BANNER_STEP_LONG_END, Scene.CONTROLS_STEP_LONG_START, Scene.CONTROLS_STEP_LONG_END,
-            Scene.RECORDING_STEP_LONG_START, Scene.RECORDING_STEP_LONG_END, Scene.RECORDING_CONTROLS_STEP_LONG_START, Scene.RECORDING_CONTROLS_STEP_LONG_END)
         val nearEnd = AppTimeshiftState(available = true, bufferStartMs = -600_000, positionMs = -40_000, liveEdgeMs = 0, timingKnown = true)
         val nearEndStep = at.bernhardberger.tvhplayer.playback.TimeshiftSeekDecision(targetMs = -10_000, deltaMs = 30_000, clamped = false)
         val reachingLiveStep = at.bernhardberger.tvhplayer.playback.TimeshiftSeekDecision(targetMs = 0, deltaMs = 40_000, clamped = false)

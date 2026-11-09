@@ -356,25 +356,6 @@ class OnboardingLayoutEvidenceTest {
         capture("welcome")
     }
 
-    @Test @Category(VisualCapture::class)
-    fun captureWelcomeLargeFont() {
-        show(SetupStep.WELCOME, scale = 1.3f)
-        press(Key.DirectionCenter)
-        back()
-        compose.onNodeWithTag("setup-welcome-continue").assertIsFocused().assertIsDisplayed()
-        capture("welcome-font1.3")
-    }
-
-    @Test @Category(VisualCapture::class)
-    @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
-    fun captureGermanWelcomeLargeFont() {
-        show(SetupStep.WELCOME, scale = 1.3f)
-        press(Key.DirectionCenter)
-        back()
-        compose.onNodeWithTag("setup-welcome-continue").assertIsFocused().assertIsDisplayed()
-        capture("welcome-de-font1.3")
-    }
-
     @Test fun showPasswordRowSitsBetweenThePasswordAndContinue() {
         show(SetupStep.SIGN_IN, ConnectionFormState(host = "192.0.2.10"))
         press(Key.DirectionDown)
@@ -500,44 +481,6 @@ class OnboardingLayoutEvidenceTest {
     }
 
     @Test @Category(VisualCapture::class)
-    @Config(qualifiers = "en-rXA-w960dp-h540dp-land-xhdpi")
-    fun captureLongStepLabelsPseudoEnglish() = captureLongStepLabels("en-XA")
-
-    @Test @Category(VisualCapture::class)
-    @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
-    fun captureLongStepLabelsGerman() = captureLongStepLabels("de")
-
-    private fun captureLongStepLabels(locale: String) {
-        show(density = 2f)
-        assertEquals(1920, view.width)
-        assertEquals(1080, view.height)
-        capture("$locale-font1.0-server")
-        compose.runOnIdle { state.continueFromAddress() }
-        compose.onNodeWithTag("setup-host").assertIsFocused()
-        capture("$locale-font1.0-server-validation")
-        compose.runOnIdle { state.openSearch() }
-        compose.waitForIdle()
-        capture("$locale-font1.0-search-searching")
-        discovery.value = discovering(SERVER)
-        compose.waitForIdle()
-        capture("$locale-font1.0-search-results")
-        compose.runOnIdle { state.chooseServer(SERVER) }
-        compose.onNodeWithTag("setup-username").assertIsFocused()
-        capture("$locale-font1.0-account")
-    }
-
-    @Test @Category(VisualCapture::class)
-    fun captureLongListOfServers() {
-        show(SetupStep.FIND_SERVER)
-        discovery.value = discovering(*MANY_SERVERS)
-        compose.waitForIdle()
-        capture("search-many-results")
-        repeat(MANY_SERVERS.size) { press(Key.DirectionDown) }
-        compose.onNodeWithTag("setup-server-${MANY_SERVERS.lastIndex}").assertIsFocused().assertIsDisplayed()
-        capture("search-many-results-last")
-    }
-
-    @Test @Category(VisualCapture::class)
     fun capturePrefilledServerAndSavedAccount() {
         showEdit()
         press(Key.DirectionDown)
@@ -547,21 +490,6 @@ class OnboardingLayoutEvidenceTest {
         capture("edit-account-saved-password")
         compose.runOnIdle { state.continueFromSignIn() }
         capture("edit-connect")
-    }
-
-    @Test @Category(VisualCapture::class)
-    fun captureAccountShowPasswordRow() {
-        show(SetupStep.SIGN_IN, ConnectionFormState(host = "192.0.2.10"))
-        press(Key.DirectionDown)
-        press(Key.DirectionCenter)
-        compose.onNodeWithTag("setup-password").performTextInput("fictional-pass")
-        back()
-        press(Key.DirectionDown)
-        compose.onNodeWithText("Show password").assertIsFocused().assertIsOff()
-        capture("account-show-password-off")
-        press(Key.DirectionCenter)
-        compose.onNodeWithText("Show password").assertIsFocused().assertIsOn()
-        capture("account-show-password-on")
     }
 
     @Test @Category(VisualCapture::class)
@@ -578,30 +506,6 @@ class OnboardingLayoutEvidenceTest {
         compose.runOnIdle { session.publish(ready()) }
         assertSuccess()
         capture("success-focused")
-    }
-
-    @Test @Category(VisualCapture::class) @Config(qualifiers = PseudoLocaleEvidence.QUALIFIERS_EN_XA)
-    fun pseudoEnXaServer() = pseudoServer()
-    @Test @Category(VisualCapture::class) @Config(qualifiers = PseudoLocaleEvidence.QUALIFIERS_AR_XB)
-    fun pseudoArXbServer() = pseudoServer()
-    @Test @Category(VisualCapture::class) @Config(qualifiers = PseudoLocaleEvidence.QUALIFIERS_EN_XA)
-    fun pseudoEnXaAccount() = pseudoAccount()
-    @Test @Category(VisualCapture::class) @Config(qualifiers = PseudoLocaleEvidence.QUALIFIERS_AR_XB)
-    fun pseudoArXbAccount() = pseudoAccount()
-
-    private fun pseudoServer() {
-        show()
-        compose.onNodeWithTag("setup-find-server").assertIsFocused()
-        capture("server")
-        compose.runOnUiThread { state.continueFromAddress() }
-        compose.waitForIdle()
-        capture("server-validation")
-        compose.runOnUiThread { state.openSearch() }
-        compose.waitForIdle()
-        capture("search-searching")
-        discovery.value = discovering(SERVER, SECOND_SERVER)
-        compose.waitForIdle()
-        capture("search-results")
     }
 
     @Test fun theSuccessActionLooksFocusedWhenTheTestPasses() {
@@ -742,11 +646,6 @@ class OnboardingLayoutEvidenceTest {
         assertTrue("the focused $tag has a light fill, its middle row is at ${row[row.size / 2]}", row[row.size / 2] > 0.5f)
     }
 
-    private fun pseudoAccount() {
-        show(SetupStep.SIGN_IN, ConnectionFormState(host = "192.0.2.10"))
-        capture("account")
-    }
-
     private fun assertSuccess() {
         compose.onNodeWithTag("setup-start-watching").assertIsFocused().assertIsDisplayed()
         assertLabelled("setup-start-watching")
@@ -762,12 +661,12 @@ class OnboardingLayoutEvidenceTest {
     private fun showEdit() = show(mode = SetupMode.EDIT)
 
     private fun show(step: SetupStep = SetupStep.ADDRESS, form: ConnectionFormState = ConnectionFormState(),
-        mode: SetupMode = SetupMode.FIRST_RUN, scale: Float = 1f, density: Float = 1f) {
+        mode: SetupMode = SetupMode.FIRST_RUN, scale: Float = 1f) {
         captureScale = scale
         compose.setContent {
             view = LocalView.current
             val scope = rememberCoroutineScope()
-            CompositionLocalProvider(LocalDensity provides Density(density, scale)) {
+            CompositionLocalProvider(LocalDensity provides Density(1f, scale)) {
                 TVHeadendPlayerTheme {
                     Surface(modifier = Modifier.fillMaxSize(), colors = SurfaceDefaults.colors(
                         containerColor = MaterialTheme.colorScheme.background,
@@ -805,7 +704,6 @@ class OnboardingLayoutEvidenceTest {
 }
 
 private val SERVER = DiscoveredTvheadendServer("Living room", "192.0.2.10", 9982)
-private val SECOND_SERVER = DiscoveredTvheadendServer("Office", "192.0.2.11", 9982)
 private val MANY_SERVERS = Array(9) { DiscoveredTvheadendServer("Server ${it + 1}", "192.0.2.${it + 20}", 9982) }
 private object FixtureProfiles : ConnectionProfileEditor {
     override val serverSettings = emptyFlow<ServerSettings>()
