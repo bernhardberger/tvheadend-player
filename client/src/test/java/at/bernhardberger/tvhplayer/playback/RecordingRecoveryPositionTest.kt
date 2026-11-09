@@ -565,8 +565,7 @@ class RecordingRecoveryPositionTest {
             } catch (timeout: java.util.concurrent.TimeoutException) {
                 throw AssertionError("Timed out waiting for armed read failure: ${failurePlayback()}", timeout)
             }
-            scheduler.runCurrent()
-            assertTrue(runtime.state.value is AppPlaybackState.Failed)
+            awaitMain { runtime.state.value is AppPlaybackState.Failed }
             // A real read error leaves the failed target where it stood.
             assertNear(positionMs, player.currentPosition)
             media.failFromByte = Long.MAX_VALUE

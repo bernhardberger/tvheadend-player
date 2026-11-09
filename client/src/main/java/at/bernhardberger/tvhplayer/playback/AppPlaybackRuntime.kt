@@ -6,7 +6,6 @@ import android.os.Handler
 import android.os.SystemClock
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
-import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.common.TrackSelectionParameters
@@ -523,8 +522,13 @@ class AppPlaybackRuntime(
             }
         }
 
-        override fun onPlayerError(error: PlaybackException) {
-            if (!targetInstallationInProgress && targetCommands.isOpen()) publishPlayerError()
+        override fun onEvents(player: Player, events: Player.Events) {
+            // A source replacement can clear its predecessor's error within this dispatch.
+            if (events.contains(Player.EVENT_PLAYER_ERROR) &&
+                !targetInstallationInProgress && targetCommands.isOpen()
+            ) {
+                publishPlayerError()
+            }
         }
     }
 
@@ -2871,6 +2875,7 @@ class AppPlaybackRuntime(
     }
 
     private fun publishPlayerErrorFromPlayer() {
+        val error = player.playerError ?: return
         // A failed target never completes a pause pressed before its grant. A paused kept-channel
         // retune still has to fail closed, so its pending pause resolves (and stops) serialized.
         val failClosedPauseEpoch = livePauseController.onPlayerErrorUnderAccessLock()
@@ -2889,11 +2894,11 @@ class AppPlaybackRuntime(
                     } else {
                         AppPlaybackFailureReason.OTHER
                     },
-                    playerErrorCode = player.playerError?.errorCodeName,
-                    playerErrorNumber = player.playerError?.errorCode,
-                    playerErrorClassification = classifyPlaybackError(player.playerError),
+                    playerErrorCode = error.errorCodeName,
+                    playerErrorNumber = error.errorCode,
+                    playerErrorClassification = classifyPlaybackError(error),
                     subscriptionIssue = lastSubscriptionIssue(),
-                    deviceFault = isDevicePlaybackFault(player.playerError),
+                    deviceFault = isDevicePlaybackFault(error),
                     target = _activeTarget.value,
                 ),
             )
