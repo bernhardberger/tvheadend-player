@@ -58,6 +58,7 @@ import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.ChannelScopeVisibility
+import at.bernhardberger.tvhplayer.images.ChannelAccents
 import at.bernhardberger.tvhplayer.settings.ChannelsView
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
@@ -78,6 +79,7 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
 import at.bernhardberger.tvhplayer.ui.components.LiveViewerPosition
 import at.bernhardberger.tvhplayer.ui.components.LocalLivePosition
+import at.bernhardberger.tvhplayer.ui.components.LocalChannelAccents
 import at.bernhardberger.tvhplayer.ui.components.LocalWatchingChannel
 import at.bernhardberger.tvhplayer.ui.components.LocalWatchingIndicator
 import at.bernhardberger.tvhplayer.ui.components.LocalWatchingTarget
@@ -92,11 +94,17 @@ import kotlin.time.Instant
  * Channels 8-18 are picon-only: no EPG. Channel 2 carries the long German name and title;
  * channel 6 has EPG without art. The view lives here as the app keeps it, so View options apply.
  */
-internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule, private val images: ImageLoaderRule) {
+internal class ChannelsLayoutFixture(
+    private val compose: ComposeContentTestRule,
+    private val images: ImageLoaderRule,
+    private val accents: ChannelAccents? = null,
+) {
     var selected by mutableStateOf<ChannelId?>(null)
     var channelsView by mutableStateOf(ChannelsView())
     var plays = 0
     lateinit var view: View
+    lateinit var shownObservation: SessionObservation
+        private set
 
     val context: Application get() = ApplicationProvider.getApplicationContext()
 
@@ -122,6 +130,7 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
         tagNotice: Boolean = false,
     ) {
         val observation = observation(tags, manyTags, emptyGroup, recordingNow, scheduledNext, guidePending, firstTitle, presentation, channelCount)
+        shownObservation = observation
         // All channels is opt-in under Settings: hiding it shows the tags only.
         val visibility = if (allChannels) ChannelScopeVisibility() else ChannelScopeVisibility(
             configured = true, allChannelsVisible = false,
@@ -138,6 +147,7 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
         compose.setContent {
             CompositionLocalProvider(
                 LocalDensity provides Density(LocalDensity.current.density, scale),
+                LocalChannelAccents provides (accents ?: LocalChannelAccents.current),
                 LocalWarmPlayback provides warmPlayback,
                 LocalWatchingTarget provides nowPlaying?.target,
                 LocalWatchingChannel provides playingLive,
