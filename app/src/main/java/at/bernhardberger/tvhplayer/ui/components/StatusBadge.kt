@@ -76,12 +76,19 @@ fun StatusBadge(
 
 /**
  * A DVR state as badges: `● REC` while recording, followed by "Errors" when the recording has them;
- * a clock for scheduled; "Failed" for a recording that failed. A completed or cancelled recording
- * has none. [label] false keeps the scheduled clock without its word, for small image corners;
- * [compact] steps the recording badges down for the corner of a small card.
+ * a clock for scheduled, stacked clocks when a [rule] scheduled it; "Failed" for a recording that
+ * failed. A completed or cancelled recording has none. [label] false keeps the scheduled clock
+ * without its word, for small image corners; [compact] steps the recording badges down for the
+ * corner of a small card.
  */
 @Composable
-fun RecordingBadge(state: DvrEntryState?, modifier: Modifier = Modifier, label: Boolean = true, compact: Boolean = false) {
+fun RecordingBadge(
+    state: DvrEntryState?,
+    modifier: Modifier = Modifier,
+    label: Boolean = true,
+    compact: Boolean = false,
+    rule: RecordingRule? = null,
+) {
     when (state) {
         DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR -> {
             val description = stringResource(
@@ -99,8 +106,9 @@ fun RecordingBadge(state: DvrEntryState?, modifier: Modifier = Modifier, label: 
         }
         DvrEntryState.SCHEDULED -> {
             StatusBadge(stringResource(R.string.recording_state_scheduled).takeIf { label }, StatusBadgeTone.NEUTRAL,
-                modifier.testTag("recording-badge-scheduled"), icon = R.drawable.ic_schedule,
-                contentDescription = stringResource(R.string.details_status_scheduled))
+                modifier.testTag("recording-badge-scheduled"),
+                icon = if (rule != null) R.drawable.ic_schedule_rule else R.drawable.ic_schedule,
+                contentDescription = stringResource(rule?.label ?: R.string.details_status_scheduled))
         }
         DvrEntryState.COMPLETED_ERROR, DvrEntryState.FILE_MISSING ->
             StatusBadge(stringResource(R.string.recording_state_failed), StatusBadgeTone.ERROR,

@@ -1069,7 +1069,7 @@ private fun DetailsInformation(
             if (removal != null) {
                 DetailsStatusBadge(null, stringResource(R.string.details_available_until,
                     formatRecordingDate(removal, dateOnly = true, locale = LocalConfiguration.current.locales[0], nowSec = nowSec)))
-            } else detailsStatus(event, recording, nowSec)?.let { DetailsStatusBadge(it) }
+            } else detailsStatus(event, recording, nowSec)?.let { DetailsStatusBadge(it, rule = recording?.rule) }
         }
         Spacer(Modifier.height(8.dp))
         var titleInk by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
@@ -1277,11 +1277,11 @@ private fun DetailsActions(
 
 /** The page's status in the eyebrow: the recording badges, or a neutral fact badge. */
 @Composable
-private fun DetailsStatusBadge(status: DetailsStatus?, label: String? = null) {
+private fun DetailsStatusBadge(status: DetailsStatus?, label: String? = null, rule: RecordingRule? = null) {
     when (status) {
         DetailsStatus.RECORDING -> RecordingBadge(DvrEntryState.RECORDING)
         DetailsStatus.RECORDING_ERRORS -> RecordingBadge(DvrEntryState.RECORDING_ERROR)
-        DetailsStatus.SCHEDULED -> RecordingBadge(DvrEntryState.SCHEDULED)
+        DetailsStatus.SCHEDULED -> RecordingBadge(DvrEntryState.SCHEDULED, rule = rule)
         DetailsStatus.MISSED -> RecordingBadge(DvrEntryState.MISSED)
         DetailsStatus.CANCELLED -> RecordingBadge(DvrEntryState.INVALID)
         DetailsStatus.FAILED -> RecordingBadge(DvrEntryState.COMPLETED_ERROR)

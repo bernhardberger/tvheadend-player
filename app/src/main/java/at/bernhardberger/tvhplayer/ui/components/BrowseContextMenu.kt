@@ -70,6 +70,7 @@ internal fun BrowseContextMenu(
     programDetailsLabel: Boolean = false,
     backEnabled: Boolean = true,
     recordingState: DvrEntryState? = null,
+    recordingRule: RecordingRule? = null,
     resumePositionMs: Long? = null,
     /** The playing item's mark, drawn as Continue watching's icon. */
     playbackIndicator: ChannelPlaybackIndicator = ChannelPlaybackIndicator.NONE,
@@ -99,7 +100,7 @@ internal fun BrowseContextMenu(
                         color = MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     if (subtitle.isNotBlank()) Text(subtitle, style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    RecordingBadge(recordingState, Modifier.testTag("browse-context-recording"))
+                    RecordingBadge(recordingState, Modifier.testTag("browse-context-recording"), rule = recordingRule)
                     if (description.isNotBlank()) Text(description, style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), maxLines = 3, overflow = TextOverflow.Ellipsis)
                 }
