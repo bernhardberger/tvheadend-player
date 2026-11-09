@@ -10,6 +10,7 @@ package at.bernhardberger.tvhplayer.playback
 
 import android.app.Application
 import android.net.Uri
+import android.os.Looper
 import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
@@ -25,6 +26,9 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.FormatHolder
 import androidx.media3.exoplayer.Renderer
 import androidx.media3.exoplayer.RendererCapabilities
+import androidx.media3.exoplayer.analytics.AnalyticsListener
+import androidx.media3.exoplayer.source.LoadEventInfo
+import androidx.media3.exoplayer.source.MediaLoadData
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.source.SampleStream
@@ -46,6 +50,8 @@ import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import java.io.FileNotFoundException
+import java.io.IOException
+import java.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import kotlinx.coroutines.*
@@ -55,12 +61,12 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlin.time.Duration.Companion.seconds
 import androidx.media3.test.utils.FakeClock
-import androidx.media3.test.utils.robolectric.RobolectricUtil
 import androidx.media3.test.utils.robolectric.TestPlayerRunHelper
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 /**
@@ -144,11 +150,11 @@ class RecordingRecoveryPositionTest {
                     play(FIRST)
                     if (sessionSeek) {
                         val seek = runtime.seekRecordingFromSession(TWENTY_MINUTES) { true }
-                        awaitMain { seek.isCompleted }
+                        awaitCurrent { seek.isCompleted }
                     } else runtime.seekTo(TWENTY_MINUTES)
                     awaitMain { player.currentPosition >= TWENTY_MINUTES }
                     response.complete(Unit)
-                    awaitMain { runtime.recordingCutpoints.value == points }
+                    awaitCurrent { runtime.recordingCutpoints.value == points }
                     settleMain()
                     assertTrue("deliberate destination: ${player.currentPosition}", player.currentPosition < 25 * ONE_MINUTE)
                     assertNull(runtime.recordingSkipPrompt.value)
@@ -167,13 +173,13 @@ class RecordingRecoveryPositionTest {
             exercise(cutpoints = { DvrCutpointsResult.Available.create(points) }) {
                 settings.setAdBreakMode(mode)
                 play(FIRST)
-                awaitMain { runtime.recordingCutpoints.value == points }
+                awaitCurrent { runtime.recordingCutpoints.value == points }
                 failAtTwentyMinutes()
                 media.failFromByte = Long.MAX_VALUE
                 media.seekable = false
                 assertTrue(runtime.retryRecording()?.isStarted == true)
                 awaitUnseekablePlayback()
-                awaitMain { runtime.recordingCutpoints.value == points }
+                awaitCurrent { runtime.recordingCutpoints.value == points }
                 settleMain()
                 assertTrue(player.currentPosition < ONE_MINUTE)
                 media.openSeeking()
@@ -257,7 +263,7 @@ class RecordingRecoveryPositionTest {
         media.failFromByte = byteAt(2_000) // the recovered play fails again 2 s in, still unseekable
 
         assertTrue(runtime.retryRecording()?.isStarted == true)
-        awaitMain { player.playerError != null }
+        awaitReadFailure()
         assertTrue(player.currentPosition < ONE_MINUTE)
         media.failFromByte = Long.MAX_VALUE
         assertTrue(runtime.retryRecording()?.isStarted == true)
@@ -314,11 +320,11 @@ class RecordingRecoveryPositionTest {
 
         play(FIRST)
         // The new play's own failure does not resurface the stopped play's position.
-        awaitMain { player.playerError != null }
+        awaitReadFailure()
         assertTrue(player.currentPosition < ONE_MINUTE)
         media.failFromByte = Long.MAX_VALUE
         assertTrue(runtime.retryRecording()?.isStarted == true)
-        awaitMain { player.isPlaying && coordinator.pendingRecordingRecoveryPosition.value == null }
+        awaitPlayback { player.isPlaying && coordinator.pendingRecordingRecoveryPosition.value == null }
         assertTrue("after retry: ${player.currentPosition}", player.currentPosition < ONE_MINUTE)
     }
 
@@ -328,14 +334,14 @@ class RecordingRecoveryPositionTest {
 
         media.failFromByte = byteAt(2_000) // the second recording fails 2 s in
         play(SECOND)
-        awaitMain { player.playerError != null }
+        awaitReadFailure()
         media.failFromByte = Long.MAX_VALUE
         assertTrue(runtime.retryRecording()?.isStarted == true)
-        awaitMain { player.isPlaying && coordinator.pendingRecordingRecoveryPosition.value == null }
+        awaitPlayback { player.isPlaying && coordinator.pendingRecordingRecoveryPosition.value == null }
         assertTrue("second after retry: ${player.currentPosition}", player.currentPosition < ONE_MINUTE)
 
         assertTrue(restore(FIRST)?.isStarted == true)
-        awaitMain { player.isPlaying && coordinator.pendingRecordingRecoveryPosition.value == null }
+        awaitPlayback { player.isPlaying && coordinator.pendingRecordingRecoveryPosition.value == null }
         assertEquals(AppPlaybackTarget.Recording(FIRST), runtime.activeTarget.value)
         assertTrue("first restored: ${player.currentPosition}", player.currentPosition < ONE_MINUTE)
     }
@@ -346,7 +352,7 @@ class RecordingRecoveryPositionTest {
 
         assertTrue(runtime.retryRecording()?.isStarted == true)
 
-        awaitMain { player.isPlaying && coordinator.pendingRecordingRecoveryPosition.value == null }
+        awaitPlayback { player.isPlaying && coordinator.pendingRecordingRecoveryPosition.value == null }
         assertTrue("near the end: ${player.currentPosition}", player.currentPosition < ONE_MINUTE)
     }
 
@@ -424,7 +430,8 @@ class RecordingRecoveryPositionTest {
             assertTrue(runtime.retryRecording()?.isStarted == true)
             assertTrue(runtime.recordingAdmission.value is RecordingPlaybackAdmission.Completed)
 
-            awaitMain { player.isCurrentMediaItemSeekable && player.isPlaying }
+            awaitMain { player.isCurrentMediaItemSeekable }
+            awaitPlayback { player.isPlaying }
             settleMain()
             assertTrue("near the media end: ${player.currentPosition}", player.currentPosition < ONE_MINUTE)
         }
@@ -467,7 +474,6 @@ class RecordingRecoveryPositionTest {
             assertTrue("after the settle bound: ${player.currentPosition}", player.currentPosition < ONE_MINUTE)
         }
 
-    // Real Media3 and the SDK's asynchronous machinery require looper pumping.
     private fun exercise(
         bookmark: kotlin.time.Duration? = null,
         growing: Boolean = false,
@@ -477,7 +483,7 @@ class RecordingRecoveryPositionTest {
         val fixture = Fixture(CoroutineScope(StandardTestDispatcher(testScheduler) + SupervisorJob()),
             testScheduler, bookmark, growing, cutpoints)
         try {
-            fixture.driver.exercise(this, 120_000) { fixture.block() }
+            fixture.block()
         }
         finally {
             fixture.scope.cancel()
@@ -503,22 +509,31 @@ class RecordingRecoveryPositionTest {
         }
         private val connection = ScriptedSubscriptionConnection()
         private val work = StandardTestDispatcher(scheduler)
-        private val manager = createSubscriptionManager(connection,
-            if (realRecording != null) work else Dispatchers.Default).apply { startAdmission() }
+        private val manager = createSubscriptionManager(connection, work).apply { startAdmission() }
         val session = FakeTvheadendSession(if (realRecording != null) growingObservation() else observation()).apply {
             scriptLivePlaybackSuccess(manager)
             if (realRecording != null) scriptGrowingRecordingPlayback(realRecording) else scriptRecordingPlaybackSuccess()
         }
         val settings = PlayerSettingsStore(InMemoryPreferencesDataStore())
         private val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings,
-            if (realRecording != null) work else Dispatchers.IO,
+            work,
             readProfileForEditing = { ServerProfileEditReadResult.Missing }).also { owner -> scope.launch { owner.run() } }
         val media = ControlledRecording()
-        val clock = FakeClock(realRecording == null)
+        val clock = FakeClock(false)
         val player: ExoPlayer = ExoPlayer.Builder(context)
             .setClock(clock)
             .setRenderersFactory { _, _, _, _, _ -> arrayOf<Renderer>(ConsumingAudioSink()) }
-            .build()
+            .build().also { playback ->
+                playback.addAnalyticsListener(object : AnalyticsListener {
+                    override fun onLoadError(
+                        eventTime: AnalyticsListener.EventTime,
+                        loadEventInfo: LoadEventInfo,
+                        mediaLoadData: MediaLoadData,
+                        error: IOException,
+                        wasCanceled: Boolean,
+                    ) { media.loadErrorReported = true }
+                })
+            }
 
         // The SDK installs its recording item as usual; the fake server has no bytes, so the
         // same item plays from the controlled recording instead.
@@ -529,7 +544,7 @@ class RecordingRecoveryPositionTest {
             override fun setMediaSource(mediaSource: MediaSource, startPositionMs: Long) {
                 player.setMediaSource(media.source(mediaSource.mediaItem), startPositionMs)
             }
-        }, workDispatcher = if (realRecording != null) work else Dispatchers.IO).also { it.launchIn(scope) }
+        }, workDispatcher = work).also { it.launchIn(scope) }
 
         private val playbackSession = when {
             realRecording != null -> session
@@ -616,16 +631,21 @@ class RecordingRecoveryPositionTest {
             awaitSeekable: Boolean = true,
         ) {
             val install = scope.async { runtime.playRecording(selection(recordingId), start) }
-            awaitMain { install.isCompleted }
+            awaitCurrent { install.isCompleted }
             assertTrue(install.await()?.isStarted == true)
-            if (awaitSeekable) awaitMain { player.isCurrentMediaItemSeekable && player.isPlaying }
+            if (awaitSeekable) {
+                awaitMain { player.isCurrentMediaItemSeekable }
+                if (media.failFromByte != Long.MAX_VALUE) awaitReadFailure()
+                else awaitPlayback { player.isPlaying }
+            }
         }
 
         suspend fun restore(recordingId: DvrEntryId): PlaybackTargetResult? {
             val restore = scope.async {
                 runtime.restoreRecordingRoute(selection(recordingId), RecordingPlaybackStart.START_OVER)
             }
-            awaitMain { restore.isCompleted }
+            awaitCurrent { restore.isCompleted }
+            driver.advanceLive(player, clock, 100)
             return restore.await()
         }
 
@@ -637,14 +657,14 @@ class RecordingRecoveryPositionTest {
 
         /** The recovered play runs from the start while its recording cannot seek yet. */
         suspend fun awaitUnseekablePlayback() {
-            awaitMain { player.isPlaying }
+            awaitPlayback { player.isPlaying }
             assertFalse(player.isCurrentMediaItemSeekable)
             assertTrue("before seekability: ${player.currentPosition}", player.currentPosition < ONE_MINUTE)
         }
 
         suspend fun seekToTwentyMinutes() {
             runtime.seekTo(TWENTY_MINUTES)
-            awaitMain { player.isPlaying && player.currentPosition >= TWENTY_MINUTES }
+            awaitPlayback { player.isPlaying && player.currentPosition >= TWENTY_MINUTES }
         }
 
         suspend fun retryWithChangedPendingDuration(unknown: Boolean) {
@@ -676,12 +696,8 @@ class RecordingRecoveryPositionTest {
             // and that load must reach the armed byte.
             assertTrue("seek target already loaded: ${failurePlayback()}", media.readPosition < byteAt(positionMs))
             runtime.seekTo(positionMs)
-            try {
-                TestPlayerRunHelper.advance(player).withTimeoutMs(10_000).untilPlayerError()
-            } catch (timeout: java.util.concurrent.TimeoutException) {
-                throw AssertionError("Timed out waiting for armed read failure: ${failurePlayback()}", timeout)
-            }
-            awaitMain { runtime.state.value is AppPlaybackState.Failed }
+            awaitReadFailure()
+            awaitCurrent { runtime.state.value is AppPlaybackState.Failed }
             // A real read error leaves the failed target where it stood.
             assertNear(positionMs, player.currentPosition)
             media.failFromByte = Long.MAX_VALUE
@@ -689,15 +705,12 @@ class RecordingRecoveryPositionTest {
 
         /** Playback reaches [positionMs], keeps playing from there, and has not failed. */
         suspend fun assertEventuallyNear(positionMs: Long) {
-            driver.await("playing near $positionMs", diagnostics = { playback() }) {
+            awaitPlayback {
                 near(positionMs, player.currentPosition) && player.isPlaying
             }
             val arrivedMs = player.currentPosition
-            try {
-                TestPlayerRunHelper.advance(player).withTimeoutMs(30_000).untilPositionAtLeast(arrivedMs + 1_000)
-            } catch (timeout: java.util.concurrent.TimeoutException) {
-                throw AssertionError("Timed out waiting for resumed playback progress: ${playback()}", timeout)
-            }
+            driver.advanceLive(player, clock, 1_000)
+            assertTrue("resumed playback must progress: ${playback()}", player.currentPosition >= arrivedMs + 1_000)
             assertNull("player error: ${playback()}", player.playerError)
             assertTrue("not playing: ${playback()}", player.isPlaying)
             assertNear(positionMs, player.currentPosition)
@@ -708,25 +721,61 @@ class RecordingRecoveryPositionTest {
 
         private fun failurePlayback() = "position=${player.currentPosition} " +
             "buffered=${player.bufferedPosition} state=${player.playbackState} loading=${player.isLoading} " +
+            "playing=${player.isPlaying} suppression=${player.playbackSuppressionReason} clock=${clock.elapsedRealtime()} " +
             "playWhenReady=${player.playWhenReady} readByte=${media.readPosition} armedByte=${media.failFromByte}"
 
         val driver = PlaybackTestDriver(scheduler, waitTimeoutMillis = 10_000)
 
+        fun awaitReadFailure() {
+            driver.settleLive(player)
+            // The loader must reach the armed byte before virtual playback can drain its prefix.
+            driver.await("loader reached armed read", diagnostics = { failurePlayback() }) {
+                media.readPosition >= media.failFromByte
+            }
+            driver.await("loader reported read failure", diagnostics = { failurePlayback() }) { media.loadErrorReported }
+            // Analytics posts before the playback thread finishes its loader-error callback.
+            driver.settle(player)
+            driver.advanceLive(player, clock, 100)
+            driver.await("failed load prefix ready", diagnostics = { failurePlayback() }) {
+                player.isPlaying || player.playerError != null
+            }
+            // Includes the short prefix's startup transition and its two seconds of consumption.
+            driver.advanceLive(player, clock, 5_000)
+            driver.await("armed read failure", diagnostics = { failurePlayback() }) { player.playerError != null }
+        }
+
+        fun awaitPlayback(condition: () -> Boolean) {
+            // A real loader fills the prefix; only then advance the non-auto player clock.
+            fun awaitPrefix() = driver.await("loaded playback prefix", diagnostics = { failurePlayback() }) {
+                media.readPosition >= byteAt(minOf(player.currentPosition + 5_000, media.lengthMs))
+            }
+            awaitPrefix()
+            driver.advanceLive(player, clock, 100)
+            // Becoming ready can apply the pending resume/cut skip and start another real load.
+            if (!condition()) {
+                awaitPrefix()
+                driver.advanceLive(player, clock, 100)
+            }
+            driver.settle(player)
+            driver.awaitCurrent("recording playback: ${playback()}", condition)
+        }
+
+        // Real progressive extraction and playback-thread notifications must reach the main looper.
         fun awaitMain(condition: () -> Boolean) = driver.await("recording playback condition", predicate = condition)
 
-        fun settleMain() {
-            scheduler.advanceTimeBy(1_000)
-            scheduler.runCurrent()
-            TestPlayerRunHelper.advance(player).untilPendingCommandsAreFullyHandled()
-            scheduler.runCurrent()
+        fun awaitCurrent(condition: () -> Boolean) {
+            driver.settleLive(player)
+            driver.awaitCurrent("recording runtime condition", condition)
         }
+
+        fun settleMain() = driver.advanceLive(player, clock, 1_000)
 
         suspend fun awaitRecoveryTimeout() {
             assertNotNull(coordinator.pendingRecordingRecoveryPosition.value)
-            RobolectricUtil.runMainLooperUntil({
-                scheduler.runCurrent()
-                coordinator.pendingRecordingRecoveryPosition.value == null
-            }, 10_000, androidx.media3.common.util.Clock.DEFAULT)
+            driver.advanceLive(player, clock, 20_000)
+            // The SDK's growing-resume settle bound is a 20 s Android Handler, not player-clock work.
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(20))
+            awaitCurrent { coordinator.pendingRecordingRecoveryPosition.value == null }
         }
     }
 
@@ -774,16 +823,20 @@ class RecordingRecoveryPositionTest {
         @Volatile var failFromByte = Long.MAX_VALUE
         /** The byte offset the most recent read reached, for diagnostics. */
         @Volatile var readPosition = 0L
+        var loadErrorReported = false
         @Volatile var seekable = true
         @Volatile var unknownDuration = false
         /** The length a new open of the recording serves, as a growing file's probe reports it. */
         @Volatile var lengthMs = RECORDING_MS.toLong()
         private val held = mutableListOf<Pair<ExtractorOutput, SeekMap>>()
 
-        fun source(item: MediaItem): MediaSource =
-            ProgressiveMediaSource.Factory(DataSource.Factory { ControlledDataSource() }, ExtractorsFactory {
+        fun source(item: MediaItem): MediaSource {
+            readPosition = 0
+            loadErrorReported = false
+            return ProgressiveMediaSource.Factory(DataSource.Factory { ControlledDataSource() }, ExtractorsFactory {
                 arrayOf<Extractor>(GatedExtractor())
             }).setContinueLoadingCheckIntervalBytes(LOAD_CHECK_BYTES).createMediaSource(item)
+        }
 
         fun openSeeking() {
             val pending = synchronized(held) {
