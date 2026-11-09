@@ -10,6 +10,8 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toPixelMap
@@ -37,12 +39,12 @@ class MutedPastRowStartTest {
 
     private lateinit var state: LazyListState
 
-    private fun show(emphasis: Float, focusedIndex: Int = -1) {
+    private fun show(emphasis: State<Float>, focusedIndex: Int = -1) {
         compose.setContent {
             state = rememberLazyListState()
             LazyRow(Modifier.background(Color.Black), state, PaddingValues(start = 200.dp)) {
                 itemsIndexed(List(20) { it }) { index, _ ->
-                    MutedPastRowStart(state, index, 0f, { emphasis }, { index == focusedIndex }) {
+                    MutedPastRowStart(state, index, 0f, { emphasis.value }, { index == focusedIndex }) {
                         Column {
                             Box(Modifier.size(100.dp).background(Color.White).testTag("card-$index"))
                             Box(Modifier.size(100.dp).mutedTextPastRowStart().background(Color.White).testTag("text-$index"))
@@ -61,20 +63,18 @@ class MutedPastRowStartTest {
     }
 
     @Test fun textIsGoneAndTheCardStaysDimInTheFocusedRow() {
-        show(emphasis = 1f)
+        val emphasis = mutableStateOf(1f)
+        show(emphasis)
         assertEquals(RowPastStartAlpha, brightness("card-0"), 0.01f)
         assertEquals(0f, brightness("text-0"), 0.01f)
-    }
-
-    @Test fun textIsGoneAndTheCardStaysDimInARowWithoutFocus() {
         // The row's own dimming is its parent's; this is only what is added to that.
-        show(emphasis = 0f)
+        compose.runOnIdle { emphasis.value = 0f }
         assertEquals(0.12f / RowDimAlpha, brightness("card-0"), 0.01f)
         assertEquals(0f, brightness("text-0"), 0.01f)
     }
 
     @Test fun aFocusedCardAndACardInPlaceKeepTheirText() {
-        show(emphasis = 1f, focusedIndex = 0)
+        show(emphasis = mutableStateOf(1f), focusedIndex = 0)
         assertEquals(1f, brightness("text-0"), 0.01f)
         assertEquals(1f, brightness("text-1"), 0.01f)
     }

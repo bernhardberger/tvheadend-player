@@ -90,17 +90,13 @@ class CardGlowRoomTest {
     @Test fun gridFirstCardKeepsItsGlowAboveAndBeforeIt() {
         fixture.show(ChannelsView(ChannelsLayout.GRID, setOf(ChannelsLayout.GRID)), fixture.fixtureArt())
         channels("grid-1-first-card", card(1), Side.TOP, Side.START)
-    }
-
-    @Test fun gridLastColumnKeepsItsGlowAboveAndAfterIt() {
-        fixture.show(ChannelsView(ChannelsLayout.GRID, setOf(ChannelsLayout.GRID)), fixture.fixtureArt())
-        fixture.awaitFocus(card(1))
         repeat(ChannelsGridColumns - 1) { fixture.key(Key.DirectionRight) }
         channels("grid-2-last-column", card(ChannelsGridColumns), Side.TOP, Side.END)
+        repeat(ChannelsGridColumns - 1) { fixture.key(Key.DirectionLeft) }
+        scrolledGrid()
     }
 
-    @Test fun gridKeepsItsGlowAboveAfterScrolling() {
-        fixture.show(ChannelsView(ChannelsLayout.GRID, setOf(ChannelsLayout.GRID)), fixture.fixtureArt())
+    private fun scrolledGrid() {
         fixture.awaitFocus(card(1))
         repeat(2) { fixture.key(Key.DirectionDown) }
         // Past the inset line the row above fades out, so only the gap before it shows the glow alone.
@@ -132,7 +128,10 @@ class CardGlowRoomTest {
     }
 
     @Test @Category(VisualCapture::class)
-    fun captureScrolledGridAtRest() = gridKeepsItsGlowAboveAfterScrolling()
+    fun captureScrolledGridAtRest() {
+        fixture.show(ChannelsView(ChannelsLayout.GRID, setOf(ChannelsLayout.GRID)), fixture.fixtureArt())
+        scrolledGrid()
+    }
 
     @Test @Category(VisualCapture::class)
     fun captureRingPulseFrames() = ringPulsesBetweenSolidAndSeeThrough()
@@ -443,6 +442,5 @@ class CardGlowRoomTest {
         /** The largest brightness change between neighbouring pixels a fading glow makes. */
         const val MaxStep = 3.5f
         const val MinGlow = 4f
-        /** Pixel rows at the bottom edge of the row above a scrolled grid's focused row that show its content. */
     }
 }
