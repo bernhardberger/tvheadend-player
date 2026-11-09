@@ -1336,7 +1336,7 @@ class ProgrammeDetailsPageTest {
         val context = ApplicationProvider.getApplicationContext<Application>()
         val profile = DvrConfiguration(DvrConfigId("default"), "", "")
         val entry = DvrEntry.create(DvrEntryId(1), configId = profile.id,
-            removalDays = RECORDING_REMOVAL_WHEN_SPACE_NEEDED,
+            removal = DvrRemoval.UntilSpaceNeeded,
             files = listOf(DvrRecordingFile.create(streams = listOf("deu", "ger", "eng").map {
                 DvrRecordingStream(at.bernhardberger.tvheadend.sdk.playback.SubscriptionStreamType.AAC, language = it)
             })))
@@ -1471,7 +1471,7 @@ class ProgrammeDetailsPageTest {
             else -> event
         }
         val entry = DvrEntry.create(DvrEntryId(1), channelId = channel.id, title = event.title,
-            removalDays = 7.takeIf { recordingFacts }?.toLong(),
+            removal = DvrRemoval.Days(7).takeIf { recordingFacts },
             dataSizeBytes = 2_500_000_000.takeIf { recordingFacts }, configId = DvrConfigId("archive").takeIf { recordingFacts },
             streamErrors = 0.takeIf { recordingFacts }?.toLong(), dataErrors = 0.takeIf { recordingFacts }?.toLong(),
             startExtraMinutes = 120.seconds.takeIf { recordingFacts }, stopExtraMinutes = 300.seconds.takeIf { recordingFacts },

@@ -2,12 +2,11 @@ package at.bernhardberger.tvhplayer.core
 
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvheadend.sdk.core.DvrRemoval
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionStreamType
 import kotlin.time.Duration
 import kotlin.time.Instant
-
-const val RECORDING_REMOVAL_WHEN_SPACE_NEEDED = 2147483646L
 
 /** A finished recording under this share of its planned length shows as stopped early... */
 const val RECORDING_STOPPED_EARLY_FRACTION = 0.9
@@ -107,7 +106,7 @@ fun recordingStoppedEarly(recording: DvrEntry): RecordingShortfall? {
 
 /** File removal, not DVR log retention. Unknown and server-managed policies have no date. */
 fun recordingRemovalTime(recording: DvrEntry, nowSec: Long): Long? {
-    val days = recording.removalDays?.takeIf { it in 1 until RECORDING_REMOVAL_WHEN_SPACE_NEEDED } ?: return null
+    val days = (recording.removal as? DvrRemoval.Days)?.days ?: return null
     val stop = recording.stop?.epochSeconds ?: return null
     return (stop + days * 86400L).takeIf { it > nowSec }
 }
