@@ -68,7 +68,6 @@ import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
-import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.core.PlayerForegroundContext
@@ -176,7 +175,6 @@ class PlayerMotionTest {
         var restore by mutableStateOf(false)
         val pageRequests = mutableListOf<PlaybackOptionsPage>()
         compose.setContent {
-            val context = LocalContext.current
             TVHeadendPlayerTheme {
                 Box(Modifier.fillMaxSize()) {
                     liveControls(optionsOpen = open, restoreOptionsFocus = restore, onOptionsFocusRestored = { restore = false })
@@ -318,7 +316,6 @@ class PlayerMotionTest {
         lateinit var layers: LivePlayerLayerState
         var channel by mutableStateOf(ChannelId(1))
         compose.setContent {
-            val context = LocalContext.current
             layers = rememberLivePlayerLayerState()
             TVHeadendPlayerTheme {
                 Box(Modifier.fillMaxSize()) {
@@ -373,7 +370,6 @@ class PlayerMotionTest {
         lateinit var view: View
         compose.setContent {
             view = LocalView.current
-            val context = LocalContext.current
             layers = rememberLivePlayerLayerState()
             TVHeadendPlayerTheme {
                 Box(Modifier.fillMaxSize()) {
@@ -925,7 +921,6 @@ class PlayerMotionTest {
         var restore by mutableStateOf(false)
         var panelComposed = false
         compose.setContent {
-            val context = LocalContext.current
             TVHeadendPlayerTheme {
                 Box(Modifier.fillMaxSize()) {
                     // The controls host their own layer, covered while the panel is open.
@@ -1011,35 +1006,26 @@ class PlayerMotionTest {
         entry: PlayerControlsEntry = PlayerControlsEntry.TRAVEL,
         restoreOptionsFocus: Boolean = false,
         onOptionsFocusRestored: () -> Unit = {},
-        restoreInfoFocus: Boolean = false,
-        onInfoFocusRestored: () -> Unit = {},
         onOpenOptions: () -> Unit = {},
-        onOpenInfo: () -> Unit = {},
         channelId: ChannelId? = null,
-        channelName: String = "One",
         title: String = "",
-        nowEvent: EpgEvent? = null,
-        nowSec: Long = 1_800,
-        timeshiftState: AppTimeshiftState = AppTimeshiftState(),
         numberEntryShown: Boolean = false,
     ) {
         PlayerChrome(
             mode = mode,
-            content = PlayerChromeContent("", liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, channelName, null, null, false, nowSec, title)),
-            timeline = PlayerChromeTimeline.Live(timeshiftState, nowSec, nowEvent, motionKey = channelId),
+            content = PlayerChromeContent("", liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "One", null, null, false, 1_800, title)),
+            timeline = PlayerChromeTimeline.Live(AppTimeshiftState(), 1_800, null, motionKey = channelId),
             actions = PlayerChromeActions(
                 active = !optionsOpen,
                 restoreFocus = when {
-                    restoreInfoFocus -> "player-info"
                     restoreOptionsFocus -> "player-settings"
                     else -> null
                 },
             ),
             onTogglePause = {}, onSeek = {}, onStop = {}, onInteraction = {},
-            onInfo = onOpenInfo,
+            onInfo = {},
             onOptions = onOpenOptions,
             onFocusRestored = {
-                if (restoreInfoFocus) onInfoFocusRestored()
                 if (restoreOptionsFocus) onOptionsFocusRestored()
             },
             entry = entry,
