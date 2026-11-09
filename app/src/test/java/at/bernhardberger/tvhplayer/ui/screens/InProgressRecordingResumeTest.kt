@@ -1,6 +1,9 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
 import android.app.Application
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.view.View
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.assertIsFocused
@@ -19,6 +22,10 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalView
+import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
+import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import at.bernhardberger.tvhplayer.ui.PlayerEntryHandoff
 import at.bernhardberger.tvhplayer.ui.PlayerEntryOverlays
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
@@ -52,12 +59,14 @@ import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
+import org.junit.experimental.categories.Category
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
+import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
@@ -65,6 +74,28 @@ import kotlin.time.Instant
 @OptIn(TvheadendTestingApi::class)
 class InProgressRecordingResumeTest {
     @get:Rule val compose = createComposeRule()
+    private lateinit var view: View
+
+    @Test @Category(VisualCapture::class)
+    @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
+    fun captureDeferredRecordingChoice() {
+        openDetails(754L, directly = true, serverPath = "evening-news.mkv", onWatch = { _, _ -> })
+        compose.onNodeWithTag("recording-watch-live").assertIsFocused()
+        compose.onNodeWithText(ApplicationProvider.getApplicationContext<Application>().getString(R.string.error_305_reason))
+            .assertExists()
+        compose.mainClock.advanceTimeBy(1_000)
+        compose.waitForIdle()
+        val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
+        compose.runOnIdle { view.draw(Canvas(bitmap)) }
+        val output = File("../artifacts/recording-playback-choice/deferred-en-font1.0.png")
+        CaptureOutput.writePng(output, bitmap)
+        bitmap.recycle()
+        CaptureOutput.writeText(File(output.parentFile, "deferred-en-font1.0.txt")) {
+            "Production Recordings screen and RecordingPlaybackChoice; fake running Matroska recording; " +
+                "1920x1080 pixels, 960x540dp, en, font scale 1.0; Watch live focused. " +
+                "Offline Robolectric capture, not a physical-TV or playback test."
+        }
+    }
 
     @Test fun recordingNowOkOffersWatchChannelToTheLeftOfResume() {
         var watched: at.bernhardberger.tvheadend.sdk.core.ChannelId? = null
@@ -318,9 +349,10 @@ class InProgressRecordingResumeTest {
         handoff: PlayerEntryHandoff? = null, requestGate: CompletableDeferred<Unit>? = null,
         onWatch: ((at.bernhardberger.tvheadend.sdk.core.ChannelId, String) -> Unit)? = null,
         latestObservation: (() -> SessionObservation?)? = null,
+        serverPath: String = "evening-news.ts",
         onReturn: (DvrEntryId) -> Boolean = { true }): List<RecordingPlaybackStart> {
         val starts = mutableListOf<RecordingPlaybackStart>()
-        val observation = observation(playPositionSeconds, completed)
+        val observation = observation(playPositionSeconds, completed, serverPath)
         val playbackSession = requireNotNull(if (staleSession) observation(playPositionSeconds, completed).currentSession
             else observation.currentSession)
         val actions = DvrMutationActions(
@@ -335,6 +367,7 @@ class InProgressRecordingResumeTest {
             at.bernhardberger.tvhplayer.notices.NoticeContext(0, observation.currentSession?.generationIdentity)
         }
         compose.setContent {
+            view = LocalView.current
             val scope = rememberCoroutineScope()
             val content: @Composable () -> Unit = {
             androidx.compose.runtime.CompositionLocalProvider(
@@ -384,7 +417,8 @@ class InProgressRecordingResumeTest {
         return starts
     }
 
-    private fun observation(playPositionSeconds: Long?, completed: Boolean = false): SessionObservation {
+    private fun observation(playPositionSeconds: Long?, completed: Boolean = false,
+        serverPath: String = "evening-news.ts"): SessionObservation {
         val now = System.currentTimeMillis()
         val entry = DvrEntry.create(
             id = DvrEntryId(1),
@@ -394,7 +428,7 @@ class InProgressRecordingResumeTest {
             start = Instant.fromEpochMilliseconds(now - 1_800_000),
             stop = Instant.fromEpochMilliseconds(now + 1_800_000),
             folder = emptyList(),
-            files = listOf(TvheadendTestResultFactory.recordingFile(serverPath = "evening-news.ts",
+            files = listOf(TvheadendTestResultFactory.recordingFile(serverPath = serverPath,
                 start = Instant.fromEpochMilliseconds(now - 1_800_000),
                 stop = Instant.fromEpochMilliseconds(now))),
             playPosition = playPositionSeconds?.seconds,
