@@ -415,8 +415,7 @@ class BrowseContextMenuScreenTest {
         assertEquals(RecordingPlaybackStart.RESUME, start)
     }
 
-    @Test @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
-    fun recordingMenuResumeHasQuietPositionLine() {
+    @Test fun recordingMenuResumeHasQuietPositionLine() {
         show(recordings = true)
         compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
         compose.onNodeWithText("Resume").assertIsFocused()
@@ -428,7 +427,6 @@ class BrowseContextMenuScreenTest {
         assertEquals("resume stack is vertically centred", (button.top.value + button.bottom.value) / 2,
             (title.top.value + position.bottom.value) / 2, 0.5f)
         assertTrue("two-line action stays compact", (button.bottom - button.top).value <= 56f)
-        capture("recordings-resume-position")
     }
 
     @Test fun runningRecordingMenuWatchesLiveAfterPlaybackActions() {

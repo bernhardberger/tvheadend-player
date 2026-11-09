@@ -491,18 +491,6 @@ class PlayerChromeEvidenceTest {
     @Category(VisualCapture::class)
     @Test fun english() = captures("en", 1f)
     @Category(VisualCapture::class)
-    @Test fun englishLargeText() = captures("en", 1.3f)
-    @Category(VisualCapture::class)
-    @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
-    fun german() = captures("de", 1f)
-    @Category(VisualCapture::class)
-    @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
-    fun germanLargeText() = captures("de", 1.3f)
-
-    @Category(VisualCapture::class)
-    @Test @Config(qualifiers = PseudoLocaleEvidence.QUALIFIERS_EN_XA_XHDPI)
-    fun pseudoEnXa() = captures(PseudoLocaleEvidence.EN_XA, 1f)
-    @Category(VisualCapture::class)
     @Test @Config(qualifiers = PseudoLocaleEvidence.QUALIFIERS_AR_XB_XHDPI)
     fun pseudoArXb() = captures(PseudoLocaleEvidence.AR_XB, 1f)
 

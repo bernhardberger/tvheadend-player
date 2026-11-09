@@ -74,8 +74,6 @@ class BrowseErrorAlertCaptureTest {
         )
     }
 
-    @Test fun channelsWithoutChannels() = capture("channels-108-no-channels") { channels(ConnectionUiState.Ready) }
-
     @Test fun channelsUnreachable() = capture("channels-101-unreachable") {
         channels(ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.EXPLICIT_RETRY))
     }

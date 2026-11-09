@@ -58,7 +58,6 @@ import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
 import at.bernhardberger.tvhplayer.R
 import androidx.compose.ui.res.stringResource
-import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import coil3.ImageLoader
 import coil3.map.Mapper
 import coil3.request.Options
@@ -68,7 +67,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import org.junit.experimental.categories.Category
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
