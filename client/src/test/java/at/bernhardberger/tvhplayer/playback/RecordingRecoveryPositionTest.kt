@@ -3,6 +3,7 @@
     at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class,
     at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class,
     at.bernhardberger.tvheadend.sdk.playback.SubscriptionInfrastructureApi::class,
+    kotlinx.coroutines.ExperimentalCoroutinesApi::class,
 )
 
 package at.bernhardberger.tvhplayer.playback
@@ -13,6 +14,7 @@ import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
+import androidx.media3.common.Player
 import androidx.media3.datasource.BaseDataSource
 import androidx.media3.datasource.ByteArrayDataSource
 import androidx.media3.datasource.DataSource
@@ -39,6 +41,7 @@ import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvheadend.sdk.media3.*
 import at.bernhardberger.tvheadend.sdk.playback.*
 import at.bernhardberger.tvheadend.sdk.testing.*
+import at.bernhardberger.tvhplayer.core.recordingErrorCondition
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
@@ -48,6 +51,7 @@ import kotlin.time.Instant
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestCoroutineScheduler
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlin.time.Duration.Companion.seconds
 import androidx.media3.test.utils.FakeClock
@@ -62,11 +66,70 @@ import org.robolectric.annotation.Config
 /**
  * The viewer's start choice applies to the first open; recovery continues where playback stood.
  * A real player plays a 30-minute recording whose reads can fail and whose seek map can arrive
- * late, as a progressive file's does; only the SDK's server data source is replaced.
+ * late, as a progressive file's does. Growing-source cases instead use real synthetic TS bytes
+ * through the SDK's growing recording source and Media3 extractor.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class)
 class RecordingRecoveryPositionTest {
+    @Test fun aGrowingRecordingContinuesPastTheOldEndWhenMoreBytesArrive() = exerciseGrowing {
+        playGrowing()
+        val oldEnd = player.duration
+        assertTrue("the TS extent must be known", oldEnd > 0)
+        appendGrowing()
+
+        driver.advanceLive(player, clock, oldEnd + 1_000)
+
+        assertTrue("position=${player.currentPosition}, old end=$oldEnd", player.currentPosition > oldEnd)
+        assertTrue(player.isPlaying)
+        assertNoRecordingFailure()
+    }
+
+    @Test fun aGrowingRecordingRecoversFromAnInterruptedReaderWhileTheFileKeepsGrowing() = exerciseGrowing {
+        playGrowing()
+        val oldEnd = player.duration
+        requireNotNull(realRecording).interrupt()
+        appendGrowing()
+
+        // Media3 may retry a failed load. Let its retry/backoff run on the controlled clock,
+        // then require playback beyond the bytes available before the interruption.
+        driver.advanceLive(player, clock, oldEnd + 5_000)
+
+        assertNoRecordingFailure()
+        assertTrue("position=${player.currentPosition}, old end=$oldEnd", player.currentPosition > oldEnd)
+        assertTrue(player.isPlaying)
+    }
+
+    @Test fun aGrowingRecordingEndsNormallyAfterTheWriterFinishes() = exerciseGrowing {
+        playGrowing()
+        appendGrowing()
+        requireNotNull(realRecording).finish()
+        session.publish(growingObservation(completed = true))
+
+        driver.advanceLive(player, clock, 15_000)
+        TestPlayerRunHelper.advance(player).untilState(Player.STATE_ENDED)
+        driver.settleLive(player)
+
+        assertNoRecordingFailure()
+        assertEquals(Player.STATE_ENDED, player.playbackState)
+    }
+
+    private fun exerciseGrowing(block: suspend Fixture.() -> Unit) = runTest(timeout = 120.seconds) {
+        val recording = FakeGrowingRecording(TS.copyOfRange(0, TS_SPLIT))
+        val fixture = Fixture(CoroutineScope(StandardTestDispatcher(testScheduler) + SupervisorJob()),
+            testScheduler, null, true, null, recording)
+        try {
+            fixture.block()
+        } finally {
+            recording.finish()
+            fixture.scope.cancel()
+            testScheduler.runCurrent()
+            fixture.runtime.detach()
+            fixture.player.release()
+            fixture.session.shutdown()
+        }
+    }
+
     @Test fun runtimeAndSessionSeeksRemainDeliberateWhenCutpointsArriveLater() {
         for (sessionSeek in listOf(false, true)) {
             for ((action, mode) in listOf(
@@ -431,6 +494,7 @@ class RecordingRecoveryPositionTest {
         private val bookmark: kotlin.time.Duration?,
         private val growing: Boolean,
         cutpoints: (suspend () -> DvrCutpointsResult)?,
+        val realRecording: FakeGrowingRecording? = null,
     ) {
         private val context = ApplicationProvider.getApplicationContext<Application>()
         private val focus = object : PlaybackAudioFocus {
@@ -438,32 +502,37 @@ class RecordingRecoveryPositionTest {
             override fun abandon() = Unit
         }
         private val connection = ScriptedSubscriptionConnection()
-        private val manager = createSubscriptionManager(connection, Dispatchers.Default).apply { startAdmission() }
-        val session = FakeTvheadendSession(observation()).apply {
+        private val work = StandardTestDispatcher(scheduler)
+        private val manager = createSubscriptionManager(connection,
+            if (realRecording != null) work else Dispatchers.Default).apply { startAdmission() }
+        val session = FakeTvheadendSession(if (realRecording != null) growingObservation() else observation()).apply {
             scriptLivePlaybackSuccess(manager)
-            scriptRecordingPlaybackSuccess()
+            if (realRecording != null) scriptGrowingRecordingPlayback(realRecording) else scriptRecordingPlaybackSuccess()
         }
         val settings = PlayerSettingsStore(InMemoryPreferencesDataStore())
-        private val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.IO,
+        private val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings,
+            if (realRecording != null) work else Dispatchers.IO,
             readProfileForEditing = { ServerProfileEditReadResult.Missing }).also { owner -> scope.launch { owner.run() } }
         val media = ControlledRecording()
+        val clock = FakeClock(realRecording == null)
         val player: ExoPlayer = ExoPlayer.Builder(context)
-            .setClock(FakeClock(true))
+            .setClock(clock)
             .setRenderersFactory { _, _, _, _, _ -> arrayOf<Renderer>(ConsumingAudioSink()) }
             .build()
 
         // The SDK installs its recording item as usual; the fake server has no bytes, so the
         // same item plays from the controlled recording instead.
-        val coordinator = createTvheadendPlaybackCoordinator(object : ExoPlayer by player {
+        val coordinator = createTvheadendPlaybackCoordinator(if (realRecording != null) player else object : ExoPlayer by player {
             override fun setMediaSource(mediaSource: MediaSource) {
                 player.setMediaSource(media.source(mediaSource.mediaItem))
             }
             override fun setMediaSource(mediaSource: MediaSource, startPositionMs: Long) {
                 player.setMediaSource(media.source(mediaSource.mediaItem), startPositionMs)
             }
-        }).also { it.launchIn(scope) }
+        }, workDispatcher = if (realRecording != null) work else Dispatchers.IO).also { it.launchIn(scope) }
 
         private val playbackSession = when {
+            realRecording != null -> session
             growing -> GrowingRecordingSession(session)
             cutpoints == null -> session
             else -> object : TvheadendSession by session {
@@ -477,6 +546,53 @@ class RecordingRecoveryPositionTest {
             PlaybackRuntimePolicy.fromPlayerSettings(),
             elapsedRealtime = { scheduler.currentTime },
             noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) })
+
+        private val growingStates = mutableListOf<AppPlaybackState>()
+
+        @OptIn(TvheadendTestingApi::class)
+        fun growingObservation(completed: Boolean = false) = recordings(
+            listOf(FIRST), null, if (completed) DvrEntryState.COMPLETED else DvrEntryState.RECORDING,
+            progressSupported = true,
+            files = listOf(TvheadendTestResultFactory.recordingFile(fileId = 1, serverPath = "synthetic.ts",
+                start = RECORDING_START, stop = if (completed) RECORDING_START + 12.seconds else null,
+                sizeBytes = requireNotNull(realRecording).sizeBytes)),
+        )
+
+        suspend fun playGrowing() {
+            scope.launch(UnconfinedTestDispatcher(scheduler)) { runtime.state.collect { growingStates += it } }
+            val install = scope.async { runtime.playRecording(selection(FIRST), RecordingPlaybackStart.START_OVER) }
+            driver.settleLive(player)
+            assertTrue("recording installation must complete", install.isCompleted)
+            val installed = install.await()
+            assertTrue("installation: $installed; state: ${runtime.state.value}", installed?.isStarted == true)
+            // untilBackgroundThreadCondition rechecks through the player's clock after 1ms,
+            // which cannot fire on FakeClock(false). Use the driver's looper signal wait;
+            // it also drains due SDK work without advancing recurring probe/watchdog timers.
+            driver.await("growing recording loader caught up") {
+                requireNotNull(realRecording).waitingReads.value > 0
+            }
+            driver.advanceLive(player, clock, 100)
+            TestPlayerRunHelper.advance(player).untilState(Player.STATE_READY)
+            assertGrowingTarget()
+            assertTrue(player.isPlaying)
+            assertNoRecordingFailure()
+        }
+
+        fun appendGrowing() {
+            val recording = requireNotNull(realRecording)
+            recording.append(TS.copyOfRange(TS_SPLIT, TS.size))
+            session.publish(growingObservation())
+            driver.settleLive(player)
+        }
+
+        fun assertNoRecordingFailure() {
+            val failure = growingStates.filterIsInstance<AppPlaybackState.Failed>().firstOrNull()
+            val condition = recordingErrorCondition(session.observation.value.dvrEntry(FIRST),
+                runtime.recordingAdmission.value, failure)
+            assertNull("growing recording must recover, not fail: $condition; $failure", failure)
+            assertNull(player.playerError)
+            assertNull(condition)
+        }
 
         fun observation(entries: List<DvrEntryId> = listOf(FIRST, SECOND)) = recordings(
             entries, bookmark, if (growing) DvrEntryState.RECORDING else DvrEntryState.COMPLETED, growing,
@@ -716,6 +832,7 @@ class RecordingRecoveryPositionTest {
         private val formatHolder = FormatHolder()
         private val buffer = DecoderInputBuffer(DecoderInputBuffer.BUFFER_REPLACEMENT_MODE_DISABLED)
         private var heldTimeUs: Long? = null
+        private var ended = false
 
         override fun getName() = "ConsumingAudioSink"
         override fun supportsFormat(format: Format): Int = RendererCapabilities.create(
@@ -726,9 +843,10 @@ class RecordingRecoveryPositionTest {
             },
         )
         override fun isReady() = heldTimeUs != null || isSourceReady
-        override fun isEnded() = false
+        override fun isEnded() = ended
         override fun onPositionReset(positionUs: Long, joining: Boolean, sampleStreamIsResetToKeyFrame: Boolean) {
             heldTimeUs = null
+            ended = false
         }
         override fun render(positionUs: Long, elapsedRealtimeUs: Long) {
             while (true) {
@@ -736,7 +854,7 @@ class RecordingRecoveryPositionTest {
                     buffer.clear()
                     when (readSource(formatHolder, buffer, SampleStream.FLAG_OMIT_SAMPLE_DATA)) {
                         C.RESULT_FORMAT_READ -> return@run null
-                        C.RESULT_BUFFER_READ -> if (buffer.isEndOfStream) return else buffer.timeUs
+                        C.RESULT_BUFFER_READ -> if (buffer.isEndOfStream) { ended = true; return } else buffer.timeUs
                         else -> return
                     }
                 } ?: continue
@@ -764,6 +882,9 @@ class RecordingRecoveryPositionTest {
         const val WAV_HEADER = 44
         const val LOAD_CHECK_BYTES = 10_000 // 10 s of the recording
         val RECORDING_START: Instant = Instant.fromEpochSeconds(1_700_000_000)
+        val TS: ByteArray = requireNotNull(RecordingRecoveryPositionTest::class.java
+            .getResourceAsStream("/playback/growing-recording.ts")).use { it.readBytes() }
+        val TS_SPLIT: Int = (TS.size / 2 / 188) * 188
 
         fun wav(lengthMs: Int): ByteArray = java.nio.ByteBuffer.allocate(WAV_HEADER + lengthMs)
             .order(java.nio.ByteOrder.LITTLE_ENDIAN).apply {
