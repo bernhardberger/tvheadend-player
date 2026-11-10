@@ -35,7 +35,9 @@ fun channelContextActions(
     if (event != null) {
         val actions = programmeActions(event, nowSec, recording, canModifyRecordings = canModifyRecordings,
             recordingAdmission = recordingAdmission)
-        if (recording != null && ProgrammeAction.WATCH_FROM_START in actions) add(BrowseContextAction.PLAY)
+        if (recording != null && ProgrammeAction.WATCH_FROM_START in actions) {
+            add(if (nowSec < event.stop.epochSeconds) BrowseContextAction.START_OVER else BrowseContextAction.PLAY)
+        }
         add(BrowseContextAction.DETAILS)
         actions.mapNotNullTo(this) {
             when (it) {

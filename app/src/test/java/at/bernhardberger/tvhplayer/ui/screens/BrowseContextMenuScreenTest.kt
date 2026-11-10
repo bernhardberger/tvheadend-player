@@ -65,6 +65,7 @@ class BrowseContextMenuScreenTest {
     private var start: RecordingPlaybackStart? = null
     private var watchedChannel: ChannelId? = null
     private var playedChannel: ChannelId? = null
+    private var playedRecording: DvrEntryId? = null
     private var goLives = 0
     private var playerEntry = at.bernhardberger.tvhplayer.ui.PlayerEntryHandoff()
     private val screenContent = androidx.compose.runtime.mutableStateOf<(@androidx.compose.runtime.Composable () -> Unit)?>(null)
@@ -81,6 +82,28 @@ class BrowseContextMenuScreenTest {
     @Test fun channelMenuWithoutArtworkShowsPicon() = menuArtwork(recordings = false, artwork = false)
     @Test fun channelMenuWithoutProgrammeShowsPicon() = menuArtwork(recordings = false, artwork = false, noProgramme = true)
     @Test fun guideMenuShowsProgrammeArtwork() = menuArtwork(recordings = false, artwork = true, guideMenu = true)
+    @Test fun runningGuideRecordingStartsOverFromMenuAndDetailsEvenWhileWatchingLive() {
+        for (details in listOf(false, true)) {
+            show(recordings = false, guideMenu = true, guideDetails = details, channelRecording = true,
+                recordingState = DvrEntryState.RECORDING, growingFile = true, watching = true, behindLive = true,
+                dvrWrite = CapabilityAccess.DENIED, awaitContent = false)
+            val first = if (details) compose.onNodeWithTag("details-continue_watching")
+                else compose.onNodeWithText("Continue watching")
+            first.assertIsFocused()
+            // The details actions are horizontal; the context menu uses Down.
+            if (details) {
+                first.performKeyInput { pressKey(Key.DirectionRight) }
+                compose.onNodeWithTag("details-watch_live").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
+                compose.onNodeWithTag("details-start_over").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+            } else {
+                first.performKeyInput { pressKey(Key.DirectionDown); pressKey(Key.DirectionDown) }
+                compose.onNodeWithText("Watch from beginning").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+            }
+            assertEquals(DvrEntryId(1), playedRecording)
+            assertEquals(1, plays)
+            assertEquals(0, goLives)
+        }
+    }
     @Test fun recordingMenuShowsRecordingArtwork() = menuArtwork(recordings = true, artwork = true)
     @Test fun recordingMenuWithoutArtworkShowsPicon() = menuArtwork(recordings = true, artwork = false)
     @Test fun recordingMenuUsesFanartWhenImageIsAbsent() = menuArtwork(recordings = true, artwork = false, fanartOnly = true)
@@ -1268,7 +1291,7 @@ class BrowseContextMenuScreenTest {
         fixedNow: Long? = null, profiles: Boolean = false, scopeTabs: Boolean = false,
         offline: Boolean = false, guideDetails: Boolean = false, entryHandoff: Boolean = false,
         rootArtwork: FakeTvheadendSession? = null, watching: Boolean = false,
-        behindLive: Boolean = false, growingFile: Boolean = false): FakeTvheadendSession {
+        behindLive: Boolean = false, growingFile: Boolean = false, awaitContent: Boolean = true): FakeTvheadendSession {
         val firstLeg = screenContent.value == null
         if (!firstLeg) {
             compose.runOnIdle { screenContent.value = null }
@@ -1279,6 +1302,7 @@ class BrowseContextMenuScreenTest {
         start = null
         watchedChannel = null
         playedChannel = null
+        playedRecording = null
         guideRequest = null
         guideProgramme = null
         artworkRequests.clear()
@@ -1389,7 +1413,8 @@ class BrowseContextMenuScreenTest {
                             mutations = DvrMutationActions(screenSession.dvrRepository), notices = notices,
                             mutationScope = androidx.compose.runtime.rememberCoroutineScope(),
                             mutationInFlight = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(null) },
-                            onPlay = { _, _ -> plays++; requestPlayer() }, onPlayRecording = {}, onClose = {},
+                            onPlay = { _, _ -> plays++; requestPlayer() },
+                            onPlayRecording = { playedRecording = it.recordingId; plays++; requestPlayer() }, onClose = {},
                          ) else if (recordings) RecordingsScreenContent(
                              initialFocusEnabled = !drawerActive,
                             observation = observation, state = state,
@@ -1421,8 +1446,10 @@ class BrowseContextMenuScreenTest {
         }
         if (firstLeg) compose.setContent { screenContent.value?.invoke() }
         compose.waitForIdle()
-        compose.waitUntil(10_000) {
-            compose.onAllNodesWithTag(if (guideDetails) "details-watch" else if (guideMenu) "browse-context-menu" else if (recordings) "recording-list-entry-1" else "channel-row-1").fetchSemanticsNodes().isNotEmpty()
+        if (awaitContent) compose.waitUntil(10_000) {
+            compose.onAllNodesWithTag(if (guideDetails) {
+                if (watching) "details-continue_watching" else "details-watch"
+            } else if (guideMenu) "browse-context-menu" else if (recordings) "recording-list-entry-1" else "channel-row-1").fetchSemanticsNodes().isNotEmpty()
         }
         return session
     }

@@ -109,7 +109,7 @@ internal fun ProgrammeDetailsHost(
     val actions = programmeDetailsActions(event, nowSec, recording,
         recording?.let(displayObservation::recordingPlaybackAdmission), canModify,
         channel != null, liveProgramme = live != null, playing = isPlaying(event), behindLive = isBehindLive(event))
-        .filter { it != BrowseContextAction.PLAY || onPlayRecording != null && capability != null }
+        .filter { it !in listOf(BrowseContextAction.PLAY, BrowseContextAction.START_OVER) || onPlayRecording != null && capability != null }
     val visibility = remember { MutableTransitionState(false).apply { targetState = true } }
     val closing = !visibility.targetState
     at.bernhardberger.tvhplayer.ui.player.RegisterPlayerModal(
@@ -221,7 +221,7 @@ internal fun ProgrammeDetailsHost(
         val actionRecording = current.dvrEntryForEvent(actionEvent)
         val actionCanModify = current.dvrState is DvrRepositoryState.Current &&
             (current.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
-        if (action == BrowseContextAction.PLAY && actionRecording != null) {
+        if (action in listOf(BrowseContextAction.PLAY, BrowseContextAction.START_OVER) && actionRecording != null) {
             // Every page and menu stays up until the player has replaced browse.
             closeBehindPlayer(close)
             onPlayRecording?.invoke(RecordingPlaybackSelection(capability, actionRecording.id))
@@ -308,7 +308,7 @@ internal fun ProgrammeDetailsHost(
                 pageRecording?.let(displayObservation::recordingPlaybackAdmission), canModify,
                 pageChannel != null, liveProgramme = pageLive != null, playing = isPlaying(pageEvent),
                 behindLive = isBehindLive(pageEvent))
-                .filter { it != BrowseContextAction.PLAY || onPlayRecording != null && capability != null }
+                .filter { it !in listOf(BrowseContextAction.PLAY, BrowseContextAction.START_OVER) || onPlayRecording != null && capability != null }
             val covered = menuAiring != null || pendingAction != null
             // The page shows its pictures with the session it was opened with.
             PlayerMotionFrame(leaving = page.id != selected.id || covered) { ProvideArtworkSession(capability, displayObservation) {

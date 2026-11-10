@@ -24,15 +24,18 @@ fun programmeActions(
     recordingAdmission: RecordingPlaybackAdmission? = null,
 ): List<ProgrammeAction> {
     val actions = when {
-        event.start.epochSeconds <= nowSec && nowSec < event.stop.epochSeconds -> listOf(
-            ProgrammeAction.WATCH,
-            when (recording?.state) {
+        event.start.epochSeconds <= nowSec && nowSec < event.stop.epochSeconds -> buildList {
+            add(ProgrammeAction.WATCH)
+            if (recording != null && recordingIsRunning(recording) && recordingPlaybackOffered(recordingAdmission)) {
+                add(ProgrammeAction.WATCH_FROM_START)
+            }
+            add(when (recording?.state) {
                 // Stopping keeps the partial recording; cancelling would abort it on the server.
                 DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR -> ProgrammeAction.STOP_RECORDING
                 DvrEntryState.SCHEDULED -> ProgrammeAction.CANCEL_RECORDING
                 else -> ProgrammeAction.RECORD
-            },
-        )
+            })
+        }
         event.start.epochSeconds > nowSec -> when (recording?.state) {
             DvrEntryState.SCHEDULED -> listOf(ProgrammeAction.CANCEL_RECORDING)
             // Stopping keeps the partial recording; cancelling would abort it on the server.

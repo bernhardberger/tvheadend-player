@@ -36,6 +36,15 @@ class ProgrammeActionPolicyTest {
         for (state in listOf(DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)) {
             assertEquals("$state", listOf(ProgrammeAction.WATCH, ProgrammeAction.STOP_RECORDING),
                 programmeActions(event, event.start.epochSeconds, recording(state)))
+            val entry = recording(state, files = listOf(file("/rec/a.ts")))
+            val admission = SessionObservation.create(recordingProgressCapability = RecordingProgressCapability.SUPPORTED)
+                .recordingPlaybackAdmission(entry)
+            assertEquals("$state", listOf(ProgrammeAction.WATCH, ProgrammeAction.WATCH_FROM_START, ProgrammeAction.STOP_RECORDING),
+                programmeActions(event, event.start.epochSeconds, entry, recordingAdmission = admission))
+            assertEquals(listOf(ProgrammeAction.WATCH, ProgrammeAction.WATCH_FROM_START),
+                programmeActions(event, event.start.epochSeconds, entry, canModifyRecordings = false, recordingAdmission = admission))
+            assertEquals(listOf(ProgrammeAction.STOP_RECORDING),
+                programmeActions(event, beforeStart, entry, recordingAdmission = admission))
         }
     }
 
@@ -92,6 +101,11 @@ class ProgrammeActionPolicyTest {
         ).forEach { (case, files) ->
             assertEquals(case, emptyList<ProgrammeAction>(),
                 ended(recording(DvrEntryState.RECORDING_ERROR, files = files)))
+            val entry = recording(DvrEntryState.RECORDING_ERROR, files = files)
+            assertEquals(case, listOf(ProgrammeAction.WATCH, ProgrammeAction.STOP_RECORDING),
+                programmeActions(event, event.start.epochSeconds, entry,
+                    recordingAdmission = SessionObservation.create(recordingProgressCapability = RecordingProgressCapability.SUPPORTED)
+                        .recordingPlaybackAdmission(entry)))
         }
     }
 
@@ -100,6 +114,9 @@ class ProgrammeActionPolicyTest {
         val growing = recording(DvrEntryState.RECORDING_ERROR, files = listOf(file("/rec/a.ts")))
         listOf(RecordingProgressCapability.UNKNOWN, RecordingProgressCapability.UNSUPPORTED).forEach {
             assertEquals("$it", emptyList<ProgrammeAction>(), ended(growing, capability = it))
+            assertEquals("$it", listOf(ProgrammeAction.WATCH, ProgrammeAction.STOP_RECORDING),
+                programmeActions(event, event.start.epochSeconds, growing,
+                    recordingAdmission = SessionObservation.create(recordingProgressCapability = it).recordingPlaybackAdmission(growing)))
         }
     }
 

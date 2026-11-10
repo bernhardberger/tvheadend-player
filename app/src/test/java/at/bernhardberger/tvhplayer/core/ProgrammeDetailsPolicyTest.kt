@@ -68,6 +68,14 @@ class ProgrammeDetailsPolicyTest {
         assertEquals(listOf(WATCH, SHOW_GUIDE), programmeDetailsActions(event, 200, null, null, true, true))
         assertEquals(emptyList<BrowseContextAction>(), programmeDetailsActions(event, 150, null, null, false, false))
         assertFalse(programmeDetailsActions(event, 150, null, null, true, true, liveProgramme = false).contains(RECORD))
+        for (state in listOf(DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)) {
+            val entry = recording(state, files = listOf(file()))
+            assertEquals(listOf(WATCH, START_OVER, STOP, SHOW_GUIDE),
+                programmeDetailsActions(event, 150, entry, admission(entry), true, true))
+            assertEquals(listOf(CONTINUE_WATCHING, WATCH_LIVE, START_OVER, SHOW_GUIDE),
+                programmeDetailsActions(event, 150, entry, admission(entry), false, true, playing = true, behindLive = true))
+            assertEquals(listOf(WATCH, SHOW_GUIDE), programmeDetailsActions(event, 150, entry, null, false, true))
+        }
     }
 
     @Test fun livePlayerReplacesWatchWithContinueAndKeepsGuardedRecordingAndGuide() {

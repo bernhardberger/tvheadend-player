@@ -58,10 +58,15 @@ class BrowseContextActionsTest {
         assertEquals(listOf(WATCH, DETAILS, SHOW_GUIDE), channelContextActions(event, 200, null, null, true))
     }
 
-    @Test fun runningOrFutureProgrammeMenuNeverPlaysItsRecording() {
-        val growing = recording(DvrEntryState.RECORDING, 20, listOf(file()))
-        assertEquals(listOf(WATCH, DETAILS, STOP, SHOW_GUIDE),
-            channelContextActions(event, 150, growing, admission(growing), true))
+    @Test fun runningProgrammeMenuStartsOverAfterLiveActionsButFutureProgrammeDoesNot() {
+        for (state in listOf(DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)) {
+            val growing = recording(state, 20, listOf(file()))
+            assertEquals(listOf(WATCH, START_OVER, DETAILS, STOP, SHOW_GUIDE),
+                channelContextActions(event, 150, growing, admission(growing), true))
+            assertEquals(listOf(CONTINUE_WATCHING, WATCH_LIVE, START_OVER, DETAILS, SHOW_GUIDE),
+                channelContextActions(event, 150, growing, admission(growing), false, playing = true, behindLive = true))
+            assertEquals(listOf(WATCH, DETAILS, SHOW_GUIDE), channelContextActions(event, 150, growing, null, false))
+        }
         val completed = recording(DvrEntryState.COMPLETED)
         assertEquals(listOf(WATCH, DETAILS, RECORD, SHOW_GUIDE),
             channelContextActions(event, 50, completed, admission(completed), true))
