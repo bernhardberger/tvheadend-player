@@ -6,6 +6,7 @@
 
 package at.bernhardberger.tvhplayer.ui
 
+import at.bernhardberger.tvhplayer.testutil.setContentWithBrowsePreparation
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -112,7 +113,6 @@ import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import at.bernhardberger.tvhplayer.viewmodels.SettingsPlayerViewModel
 import at.bernhardberger.tvhplayer.viewmodels.SettingsStorageViewModel
 import at.bernhardberger.tvhplayer.viewmodels.VideoPlayerViewModel
-import at.bernhardberger.tvhplayer.ui.components.awaitBrowsePreparation
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -242,6 +242,7 @@ class PlayerEntryOverlayTest {
             beforeSettingsRead = {}
             release.complete(Unit)
         }
+        // Rebinding waits for the Media3 playback thread to retire the previous target.
         compose.waitUntil(10_000) { playerVisible && session.calls.count { it == FakeSessionCall.BIND_LIVE_PLAYBACK } > bindings }
         settle()
         assertEquals(bindings + 1, session.calls.count { it == FakeSessionCall.BIND_LIVE_PLAYBACK })
@@ -276,6 +277,7 @@ class PlayerEntryOverlayTest {
         // Stopping what plays gives the rail its mark back and leaves nothing to return to.
         leavePlayer()
         compose.runOnIdle { scope.launch { runtime.stop() } }
+        // Target teardown includes work on the Media3 playback thread.
         compose.waitUntil(10_000) { runtime.activeTarget.value == null }
         settle()
         compose.onNodeWithTag("global-drawer-now-playing").assertDoesNotExist()
@@ -328,6 +330,7 @@ class PlayerEntryOverlayTest {
         val bindings = session.calls.count { it == FakeSessionCall.BIND_RECORDING_PLAYBACK }
         val selection = runtime.recordingSelection.value
         compose.onNodeWithTag("recording-list-entry-7").performSemanticsAction(SemanticsActions.OnClick)
+        // First entry installs the recording through the Media3 playback thread.
         compose.waitUntil(10_000) { playerVisible }
         settle()
         val backsToLeave = leavePlayer()
@@ -545,6 +548,7 @@ class PlayerEntryOverlayTest {
         leavePlayer()
         assertEquals(target, runtime.activeTarget.value)
         compose.runOnIdle { scope.launch { playerSettings.setWarmPlaybackMode(WarmPlaybackMode.OFF) } }
+        // Disabling warm playback tears down the target on the Media3 playback thread.
         compose.waitUntil(10_000) { runtime.activeTarget.value == null }
         compose.onNodeWithTag("recording-list-entry-7").performSemanticsAction(SemanticsActions.OnClick)
         settle()
@@ -554,11 +558,13 @@ class PlayerEntryOverlayTest {
     @Test fun recordingOffStopsWhenLeavingThePlayer() {
         recordingRow()
         compose.onNodeWithTag("recording-list-entry-7").performSemanticsAction(SemanticsActions.OnClick)
+        // First entry installs the recording through the Media3 playback thread.
         compose.waitUntil(10_000) { playerVisible }
         compose.runOnIdle { scope.launch { playerSettings.setWarmPlaybackMode(WarmPlaybackMode.OFF) } }
         settle()
         assertEquals(AppPlaybackTarget.Recording(DvrEntryId(7)), runtime.activeTarget.value)
         leavePlayer()
+        // Leaving with warm playback off tears down on the Media3 playback thread.
         compose.waitUntil(10_000) { runtime.activeTarget.value == null }
     }
 
@@ -592,6 +598,7 @@ class PlayerEntryOverlayTest {
                 activated = true
             }
         }
+        // Stopping or replacing the rendered target includes the Media3 playback thread.
         compose.waitUntil(10_000) { activated }
         settle()
         compose.onNodeWithTag("recording-resume").assertExists()
@@ -607,10 +614,10 @@ class PlayerEntryOverlayTest {
                     RecordingPlaybackStart.RESUME)
             }
         }
+        // Installing the initial recording includes the Media3 playback thread.
         compose.waitUntil(10_000) { runtime.activeTarget.value == AppPlaybackTarget.Recording(DvrEntryId(7)) }
         compose.onNodeWithTag("nav-recordings").performSemanticsAction(SemanticsActions.OnClick)
-        // Dispatchers.Default's serial browse-preparation lane builds the recording rows.
-        compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("recording-list-entry-7")).fetchSemanticsNodes().isNotEmpty() }
+        compose.mainClock.advanceTimeUntil(timeoutMillis = 1_000) { compose.onAllNodes(hasTestTag("recording-list-entry-7")).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("recording-list-entry-7").requestFocus()
         settle()
     }
@@ -619,8 +626,7 @@ class PlayerEntryOverlayTest {
         if (warm) recordingRow() else app(programme, recordings)
         if (recordings && !warm) {
             compose.onNodeWithTag("nav-recordings").performSemanticsAction(SemanticsActions.OnClick)
-            // Dispatchers.Default's serial browse-preparation lane builds the recording rows.
-            compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("recording-list-entry-7")).fetchSemanticsNodes().isNotEmpty() }
+            compose.mainClock.advanceTimeUntil(timeoutMillis = 1_000) { compose.onAllNodes(hasTestTag("recording-list-entry-7")).fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("recording-list-entry-7").requestFocus()
             settle()
         }
@@ -738,7 +744,7 @@ class PlayerEntryOverlayTest {
             viewModel { SettingsPlayerViewModel(get(), get(), get(), get(), get()) }
         }
         val server = ServerSettings(host = "offline.invalid")
-        compose.setContent {
+        compose.setContentWithBrowsePreparation {
             view = LocalView.current
             CompositionLocalProvider(LocalSaveableStateRegistry provides savedState) {
             KoinIsolatedContext(koinApplication { modules(dependencies) }) {
@@ -761,16 +767,14 @@ class PlayerEntryOverlayTest {
             }
         }
         val entryTag = if (channelsLayout == ChannelsLayout.LIST) "channel-row-1" else "channel-card-1"
-        // Home's Dispatchers.Default browse preparation must finish before it exposes the rail.
-        compose.waitUntil(15_000) { compose.onAllNodes(hasTestTag("nav-channels")).fetchSemanticsNodes().isNotEmpty() }
+        compose.awaitScheduledWork(profileDispatcher) { compose.onAllNodes(hasTestTag("nav-channels")).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("nav-channels").performSemanticsAction(SemanticsActions.OnClick)
         compose.waitForIdle()
-        // Channel rows also depend on Dispatchers.Default's serial browse-preparation lane.
-        compose.waitUntil(15_000) {
+        compose.awaitScheduledWork(profileDispatcher) {
             compose.onAllNodes(hasTestTag(entryTag)).fetchSemanticsNodes().isNotEmpty()
         }
         settle()
-        compose.waitUntil(10_000) { compose.onAllNodes(isFocused()).fetchSemanticsNodes().isNotEmpty() }
+        compose.awaitScheduledWork(profileDispatcher) { compose.onAllNodes(isFocused()).fetchSemanticsNodes().isNotEmpty() }
         if (compose.onAllNodes(hasTestTag("nav-channels") and isFocused()).fetchSemanticsNodes().isNotEmpty()) {
             key(Key.DirectionRight)
         }
@@ -796,13 +800,13 @@ class PlayerEntryOverlayTest {
         }
     }.createMediaSource(item)
 
-    // Profile discovery is controlled; the serial Default preparation lane has its own drain signal.
+    // Profile discovery and browse preparation both advance on the test clocks.
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     private fun settle() {
         repeat(10) {
             profileDispatcher.scheduler.runCurrent()
             compose.mainClock.advanceTimeBy(100)
-            compose.awaitBrowsePreparation()
+            compose.waitForIdle()
         }
     }
 

@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.testutil.setContentWithBrowsePreparation
 import android.app.Application
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -41,7 +42,6 @@ import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.ui.components.rememberBrowseConnectionFailure
 import at.bernhardberger.tvhplayer.viewmodels.resolveChannelScopeState
-import at.bernhardberger.tvhplayer.ui.components.awaitBrowsePreparation
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -208,7 +208,7 @@ class BrowseErrorAlertTest {
         compose.runOnIdle { connection = ConnectionUiState.SyncingChannels }
         compose.waitForIdle()
         assertEquals(0, compose.onAllNodes(hasTestTag("tv-recovery-overlay")).fetchSemanticsNodes().size)
-        compose.waitUntil(10_000) {
+        compose.mainClock.advanceTimeUntil(timeoutMillis = 1_000) {
             compose.onAllNodes(hasAnyAncestor(hasTestTag("recordings-mode-tabs")) and isFocused())
                 .fetchSemanticsNodes().isNotEmpty() ||
                 compose.onAllNodes(hasTestTag("recordings-mode-tabs") and isFocused()).fetchSemanticsNodes().isNotEmpty()
@@ -242,7 +242,7 @@ class BrowseErrorAlertTest {
         val session = FakeTvheadendSession(observation)
         val mutations = DvrMutationActions(session.dvrRepository)
         val notices = NoticeCenter(android.os.SystemClock::elapsedRealtime) { NoticeContext(0L, null) }
-        compose.setContent {
+        compose.setContentWithBrowsePreparation {
             val browseFailure = rememberBrowseConnectionFailure(connection, profileGeneration) {
                 actions += AppErrorAction.RETRY
             }
@@ -287,13 +287,12 @@ class BrowseErrorAlertTest {
     }
 
     private fun awaitFocus(tag: String) {
-        // Restoring browse focus can await preparation on Dispatchers.Default.
-        compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag(tag) and isFocused()).fetchSemanticsNodes().isNotEmpty() }
+        compose.mainClock.advanceTimeUntil(timeoutMillis = 1_000) { compose.onAllNodes(hasTestTag(tag) and isFocused()).fetchSemanticsNodes().isNotEmpty() }
     }
 
     // A key reaches the screen once it has prepared what it shows, as on a device where that takes milliseconds.
     private fun key(key: Key) {
-        compose.awaitBrowsePreparation()
+        compose.waitForIdle()
         compose.onRoot().performKeyInput { pressKey(key) }
         compose.waitForIdle()
     }

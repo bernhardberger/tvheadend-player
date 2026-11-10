@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.testutil.setContentWithBrowsePreparation
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -27,7 +28,6 @@ import at.bernhardberger.tvhplayer.stores.*
 import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
-import at.bernhardberger.tvhplayer.ui.components.awaitBrowsePreparation
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.*
@@ -111,7 +111,7 @@ class GuideHistoryScreenTest {
         }
         val session = FakeTvheadendSession(observation)
         val opening = session.observation.value
-        compose.setContent {
+        compose.setContentWithBrowsePreparation {
             back = requireNotNull(androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
             TVHeadendPlayerTheme {
                 val current by session.observation.collectAsState()
@@ -205,7 +205,7 @@ class GuideHistoryScreenTest {
             single<TvheadendSession> { session }
         }
         val noticeApplication = org.koin.dsl.koinApplication { modules(noticeModule) }
-        compose.setContent {
+        compose.setContentWithBrowsePreparation {
             view = LocalView.current
             back = requireNotNull(androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
             org.koin.compose.KoinIsolatedContext(noticeApplication) {
@@ -221,13 +221,12 @@ class GuideHistoryScreenTest {
             }
         }
         fun focused(title: String) {
-            // Guide preparation/frontier searches run on Dispatchers.Default, outside the Compose clock.
-            compose.waitUntil(10_000) { compose.onAllNodes(hasText(title) and isFocused()).fetchSemanticsNodes().isNotEmpty() }
+            compose.mainClock.advanceTimeUntil(timeoutMillis = 1_000) { compose.onAllNodes(hasText(title) and isFocused()).fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithText(title).assertIsFocused()
         }
         // A key reaches the screen once it has prepared what it shows, as on a device where that takes milliseconds.
         fun key(key: Key) {
-            compose.awaitBrowsePreparation()
+            compose.waitForIdle()
             compose.onRoot().performKeyInput { pressKey(key) }
             compose.waitForIdle()
         }
@@ -236,8 +235,7 @@ class GuideHistoryScreenTest {
                 compose.onAllNodes(hasTestTag("guide-date-button") and isFocused()).fetchSemanticsNodes().isNotEmpty()
             }
         }
-        // Browse preparation runs on Dispatchers.Default, outside the Compose clock.
-        compose.waitUntil(10_000) { compose.onAllNodes(hasText("Channel 1 hour 0")).fetchSemanticsNodes().isNotEmpty() }
+        compose.mainClock.advanceTimeUntil(timeoutMillis = 1_000) { compose.onAllNodes(hasText("Channel 1 hour 0")).fetchSemanticsNodes().isNotEmpty() }
         key(Key.DirectionDown)
         focused("Channel 1 hour 0")
         if (transition == "menu-details") {
@@ -422,8 +420,7 @@ class GuideHistoryScreenTest {
         key(Key.DirectionLeft)
         focused("Channel 1 hour -1")
         compose.runOnIdle { session.publish(observation(false)) }
-        // Replacing the guide index runs on Dispatchers.Default, outside the Compose clock.
-        compose.waitUntil(10_000) { compose.onAllNodes(hasText("Channel 1 hour -1")).fetchSemanticsNodes().isEmpty() }
+        compose.mainClock.advanceTimeUntil(timeoutMillis = 1_000) { compose.onAllNodes(hasText("Channel 1 hour -1")).fetchSemanticsNodes().isEmpty() }
         dateFocused()
         key(Key.DirectionDown)
         focused("Channel 1 hour 0")
@@ -431,8 +428,7 @@ class GuideHistoryScreenTest {
         key(Key.DirectionLeft)
         focused("Channel 1 hour -1")
         compose.runOnIdle { session.replaceGeneration(observation(false)) }
-        // Replacing the guide index runs on Dispatchers.Default, outside the Compose clock.
-        compose.waitUntil(10_000) { compose.onAllNodes(hasText("Channel 1 hour -1")).fetchSemanticsNodes().isEmpty() }
+        compose.mainClock.advanceTimeUntil(timeoutMillis = 1_000) { compose.onAllNodes(hasText("Channel 1 hour -1")).fetchSemanticsNodes().isEmpty() }
         dateFocused()
         key(Key.DirectionDown)
         focused("Channel 1 hour 0")

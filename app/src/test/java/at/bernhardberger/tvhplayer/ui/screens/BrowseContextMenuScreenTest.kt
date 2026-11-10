@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.testutil.setContentWithBrowsePreparation
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -1417,10 +1418,9 @@ class BrowseContextMenuScreenTest {
                 } }
             }
         }
-        if (firstLeg) compose.setContent { screenContent.value?.invoke() }
+        if (firstLeg) compose.setContentWithBrowsePreparation { screenContent.value?.invoke() }
         compose.waitForIdle()
-        // Browse preparation runs on Dispatchers.Default, outside the Compose clock.
-        compose.waitUntil(10_000) {
+        compose.mainClock.advanceTimeUntil(timeoutMillis = 1_000) {
             compose.onAllNodesWithTag(if (guideDetails) "details-watch" else if (guideMenu) "browse-context-menu" else if (recordings) "recording-list-entry-1" else "channel-row-1").fetchSemanticsNodes().isNotEmpty()
         }
         return session

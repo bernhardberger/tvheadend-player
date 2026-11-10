@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.testutil.setContentWithBrowsePreparation
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -366,7 +367,7 @@ class InProgressRecordingResumeTest {
         val notices = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) {
             at.bernhardberger.tvhplayer.notices.NoticeContext(0, observation.currentSession?.generationIdentity)
         }
-        compose.setContent {
+        compose.setContentWithBrowsePreparation {
             view = LocalView.current
             val scope = rememberCoroutineScope()
             val content: @Composable () -> Unit = {
@@ -408,8 +409,7 @@ class InProgressRecordingResumeTest {
             if (handoff == null) content() else PlayerEntryOverlays(handoff, playerShown = { false }, content = content)
         }
         if (fromPlayer) { compose.waitForIdle(); return starts }
-        // Browse preparation runs on Dispatchers.Default, outside the Compose clock.
-        compose.waitUntil(10_000) {
+        compose.mainClock.advanceTimeUntil(timeoutMillis = 1_000) {
             compose.onAllNodes(hasTestTag("recording-list-entry-1")).fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithTag("recording-list-entry-1").requestFocus()

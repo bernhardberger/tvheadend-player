@@ -12,6 +12,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -21,6 +22,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.zIndex
 import androidx.tv.material3.MaterialTheme
+import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.withContext
@@ -29,6 +31,9 @@ internal data class PreparedBrowseData<I, T>(val input: I, val value: T, val req
 
 // A single CPU lane leaves capacity for input, composition and ongoing playback.
 private val preparationDispatcher = Dispatchers.Default.limitedParallelism(1)
+
+/** Tests set this context to drive browse preparation with their own clock. */
+internal val LocalBrowsePreparationContext = staticCompositionLocalOf<CoroutineContext> { preparationDispatcher }
 
 /** Publish complete projections, then catch up to the newest queued input.
  * Metadata churn does not cancel every calculation and starve the first display.
@@ -45,13 +50,14 @@ internal fun <I, T> rememberPreparedBrowseData(
     requestKey: Any? = authority,
     prepare: suspend (I) -> T,
 ): PreparedBrowseData<I, T>? {
+    val preparationContext = LocalBrowsePreparationContext.current
     val latestInput = rememberUpdatedState(input)
     val latestPrepare = rememberUpdatedState(prepare)
     var result by remember(authority) { mutableStateOf<PreparedBrowseData<I, T>?>(null) }
-    LaunchedEffect(authority, requestKey) {
+    LaunchedEffect(authority, requestKey, preparationContext) {
         snapshotFlow { latestInput.value }.conflate().collect { captured ->
             val calculate = latestPrepare.value
-            val prepared = withContext(preparationDispatcher) { calculate(captured) }
+            val prepared = withContext(preparationContext) { calculate(captured) }
             result = PreparedBrowseData(captured, prepared, requestKey)
         }
     }

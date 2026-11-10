@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.testutil.setContentWithBrowsePreparation
 import android.app.Application
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import androidx.activity.OnBackPressedDispatcher
@@ -91,15 +92,14 @@ class RecordingConfirmationStateTest {
         )
         val state = RecordingsScreenState()
         val notices = NoticeCenter({ 0L }) { NoticeContext(0, session.observation.value.currentSession?.generationIdentity) }
-        compose.setContent {
+        compose.setContentWithBrowsePreparation {
             TVHeadendPlayerTheme {
                 RecordingsScreenContent(observation = session.observation.collectAsState().value,
                     currentObservation = { session.observation.value }, state = state,
                     dvrMutationActions = actions, notices = notices)
             }
         }
-        // Browse preparation runs on Dispatchers.Default, outside the Compose clock.
-        compose.waitUntil(10_000) {
+        compose.mainClock.advanceTimeUntil(timeoutMillis = 1_000) {
             compose.onAllNodesWithTag("recording-list-entry-1").fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
@@ -137,14 +137,14 @@ class RecordingConfirmationStateTest {
         )
         val state = RecordingsScreenState()
         val notices = NoticeCenter({ 0L }) { NoticeContext(0, session.observation.value.currentSession?.generationIdentity) }
-        compose.setContent {
+        compose.setContentWithBrowsePreparation {
             TVHeadendPlayerTheme {
                 RecordingsScreenContent(observation = session.observation.collectAsState().value,
                     currentObservation = { session.observation.value }, state = state,
                     dvrMutationActions = actions, notices = notices)
             }
         }
-        compose.waitUntil(10_000) {
+        compose.mainClock.advanceTimeUntil(timeoutMillis = 1_000) {
             compose.onAllNodes(hasTestTag("recording-list-entry-1")).fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
@@ -153,8 +153,7 @@ class RecordingConfirmationStateTest {
         compose.onNodeWithTag("recording-confirmation-back").assertIsFocused()
         compose.onNodeWithTag("recording-confirmation-confirm").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
-        // Dispatchers.Default prepares the new list; removal alone does not prove the focus handoff.
-        compose.waitUntil(10_000) {
+        compose.mainClock.advanceTimeUntil(timeoutMillis = 1_000) {
             compose.onAllNodes(hasTestTag("recording-list-entry-1")).fetchSemanticsNodes().isEmpty() &&
                 compose.onAllNodes(hasTestTag("recording-list-entry-2") and isFocused()).fetchSemanticsNodes().isNotEmpty()
         }
@@ -190,7 +189,7 @@ class RecordingConfirmationStateTest {
         val state = RecordingsScreenState()
         val notices = NoticeCenter({ 0L }) { NoticeContext(0, session.observation.value.currentSession?.generationIdentity) }
         lateinit var back: OnBackPressedDispatcher
-        compose.setContent {
+        compose.setContentWithBrowsePreparation {
             TVHeadendPlayerTheme {
                 back = requireNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
                 RecordingsScreenContent(observation = session.observation.collectAsState().value,
@@ -198,7 +197,7 @@ class RecordingConfirmationStateTest {
                     dvrMutationActions = actions, notices = notices)
             }
         }
-        compose.waitUntil(10_000) { compose.onAllNodesWithText("Series").fetchSemanticsNodes().isNotEmpty() }
+        compose.mainClock.advanceTimeUntil(timeoutMillis = 1_000) { compose.onAllNodesWithText("Series").fetchSemanticsNodes().isNotEmpty() }
         listOf("Series", "Middle", "Only").forEach { name ->
             compose.onNode(hasText(name) and hasClickAction()).requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         }
@@ -215,9 +214,8 @@ class RecordingConfirmationStateTest {
             compose.onNodeWithTag("recording-confirmation-back").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
             compose.onNodeWithTag("recording-confirmation-confirm").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
         }
-        // Dispatchers.Default prepares the archive; wait for the focus handoff as well as its new path.
         val returnTarget = hasText(if (emptyRoot) "Archive" else if (source == "menu") "Before" else "Next") and hasClickAction()
-        compose.waitUntil(10_000) {
+        compose.mainClock.advanceTimeUntil(timeoutMillis = 1_000) {
             state.archivePath == (if (emptyRoot) emptyList<String>() else listOf("Series")) &&
                 compose.onAllNodes(returnTarget and isFocused()).fetchSemanticsNodes().isNotEmpty()
         }
@@ -250,7 +248,7 @@ class RecordingConfirmationStateTest {
             deleteEntry = { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
         )
         val notices = NoticeCenter({ 0L }) { NoticeContext(0, session.observation.value.currentSession?.generationIdentity) }
-        compose.setContent {
+        compose.setContentWithBrowsePreparation {
             TVHeadendPlayerTheme {
                 backDispatcher = requireNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
                 RecordingsScreenContent(
@@ -260,7 +258,7 @@ class RecordingConfirmationStateTest {
                 )
             }
         }
-        compose.waitUntil(10_000) {
+        compose.mainClock.advanceTimeUntil(timeoutMillis = 1_000) {
             compose.onAllNodes(hasTestTag("recording-list-entry-1")).fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
@@ -292,7 +290,7 @@ class RecordingConfirmationStateTest {
         val notices = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) {
             at.bernhardberger.tvhplayer.notices.NoticeContext(0, session.observation.value.currentSession?.generationIdentity)
         }
-        compose.setContent {
+        compose.setContentWithBrowsePreparation {
             TVHeadendPlayerTheme {
                 RecordingsScreenContent(
                     observation = session.observation.collectAsState().value,
@@ -302,7 +300,7 @@ class RecordingConfirmationStateTest {
                 )
             }
         }
-        compose.waitUntil(10_000) {
+        compose.mainClock.advanceTimeUntil(timeoutMillis = 1_000) {
             compose.onAllNodes(hasTestTag("recording-list-entry-1")).fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithTag("recording-list-entry-1").requestFocus()
@@ -349,7 +347,7 @@ class RecordingConfirmationStateTest {
         val notices = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) {
             at.bernhardberger.tvhplayer.notices.NoticeContext(0, session.observation.value.currentSession?.generationIdentity)
         }
-        compose.setContent {
+        compose.setContentWithBrowsePreparation {
             TVHeadendPlayerTheme {
                 RecordingsScreenContent(
                     observation = session.observation.collectAsState().value,
@@ -359,7 +357,7 @@ class RecordingConfirmationStateTest {
                 )
             }
         }
-        compose.waitUntil(10_000) {
+        compose.mainClock.advanceTimeUntil(timeoutMillis = 1_000) {
             compose.onAllNodes(hasTestTag("recording-list-entry-1")).fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithTag("recording-list-entry-1").requestFocus()

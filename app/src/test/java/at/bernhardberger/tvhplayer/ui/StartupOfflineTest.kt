@@ -451,7 +451,6 @@ class StartupOfflineTest {
             shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(50))
             compose.mainClock.advanceTimeBy(50)
         }
-        // Dispatchers.Default browse preparation remains real; this idle only drains UI work.
         compose.waitForIdle()
     }
 
@@ -462,13 +461,11 @@ class StartupOfflineTest {
 
     /** Home is the landing destination; these journeys browse the channel rows. */
     private fun openChannels() {
-        // Home's Dispatchers.Default browse preparation must finish before it exposes the rail.
         compose.waitUntil(15_000) {
             compose.onAllNodes(hasTestTag("nav-channels")).fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithTag("nav-channels")
             .performSemanticsAction(SemanticsActions.OnClick)
-        // Channel preparation still runs on Dispatchers.Default, outside Compose's idle tracking.
         compose.waitForIdle()
     }
 
@@ -506,7 +503,6 @@ class StartupOfflineTest {
         repeat(10) {
             profileDispatcher.scheduler.runCurrent()
             compose.mainClock.advanceTimeBy(100)
-            // Dispatchers.Default browse preparation remains real; this idle only drains UI work.
             compose.waitForIdle()
         }
     }
@@ -582,7 +578,6 @@ class StartupOfflineTest {
         }
         if (!awaitRows) return
         openChannels()
-        // Dispatchers.Default's serial browse-preparation lane builds the channel rows.
         compose.waitUntil(15_000) {
             compose.onAllNodes(hasTestTag("channel-row-1")).fetchSemanticsNodes().isNotEmpty()
         }
