@@ -58,6 +58,9 @@ import kotlinx.coroutines.flow.*
 import java.util.concurrent.CountDownLatch
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
+import at.bernhardberger.tvhplayer.images.ChannelAccents
+import at.bernhardberger.tvhplayer.stores.ChannelAccentStore
+import kotlin.coroutines.EmptyCoroutineContext
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.player.NowPlayingStrip
 import at.bernhardberger.tvhplayer.ui.screens.ProgrammeContextMenu
@@ -117,6 +120,8 @@ class WatchingProgressTest {
     private val livePosition = mutableStateOf<LiveViewerPosition?>(LiveViewerPosition(channel.id, now))
     private val indicator = mutableStateOf(ChannelPlaybackIndicator.PLAYING)
     private val target = mutableStateOf<AppPlaybackTarget?>(AppPlaybackTarget.Live(channel.id))
+    /** Samples picon colours on the effect clock, so no worker thread writes Compose state behind an assertion. */
+    private val accents = ChannelAccents(ChannelAccentStore(), EmptyCoroutineContext) { _, _ -> null }
     /** A player runtime that can go live; absent unless a test provides it. */
     private val goLive = mutableStateOf<(suspend () -> Unit)?>(null)
 
@@ -670,7 +675,8 @@ class WatchingProgressTest {
                 LocalWatchingTarget provides target.value,
                 LocalWatchingChannel provides (target.value as? AppPlaybackTarget.Live)?.channelId,
                 LocalWatchingIndicator provides indicator.value, LocalRecordingPosition provides position,
-                LocalLivePosition provides livePosition) {
+                LocalLivePosition provides livePosition, LocalChannelAccents provides accents,
+                LocalArtworkSamplingContext provides EmptyCoroutineContext) {
                 TVHeadendPlayerTheme {
                     view = LocalView.current
                     viewerColor = MaterialTheme.colorScheme.tertiary.toArgb()
