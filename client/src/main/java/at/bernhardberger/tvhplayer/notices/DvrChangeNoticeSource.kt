@@ -19,6 +19,9 @@ class DvrChangeNoticeSource(private val repository: DvrRepository, private val n
             if (context.session !== change.generationIdentity) return@collect
             // Open set: a kind added by a later SDK has no wording here yet.
             if (change.kind !in ANNOUNCED_KINDS) return@collect
+            // A retained removed entry already announced its deletion; retention cleanup is not another one.
+            if (change.kind == DvrChangeKind.REMOVED && change.current == null &&
+                change.previous?.state == DvrEntryState.REMOVED) return@collect
             val entry = change.current ?: change.previous ?: return@collect
             if (change.kind != DvrChangeKind.SCHEDULED) {
                 // Do not announce a buffered schedule after that entry has already started or gone away.

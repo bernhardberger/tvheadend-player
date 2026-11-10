@@ -26,21 +26,17 @@ import androidx.compose.ui.test.pressKey
 import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
-import org.junit.experimental.categories.Category
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import java.io.File
 
 /**
- * Frame by frame, the production drawer opening from content and closing again, cropped to the
- * drawer's destinations; the capture writes one sheet per direction into `build/review/drawer/`.
+ * Frame-by-frame assertions for the production drawer opening from content and closing again.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
@@ -60,21 +56,8 @@ class DrawerOpeningCaptureTest {
                 middle - nearTop >= 8)
         }
         compose.onNodeWithTag("nav-channels").assertIsFocused()
-    }
-
-    @Category(VisualCapture::class)
-    @Test fun drawerOpeningAndClosingFrames() {
-        showDrawer()
-        val opening = frames(Key.DirectionLeft)
-        compose.onNodeWithTag("nav-channels").assertIsFocused()
-        val closing = frames(Key.DirectionRight)
+        frames(Key.DirectionRight).forEach { it.recycle() }
         compose.onNodeWithTag("content").assertIsFocused()
-
-        val directory = generateSequence(File("").absoluteFile) { it.parentFile }
-            .first { File(it, "settings.gradle.kts").exists() }
-            .resolve("build/review/drawer").apply { mkdirs() }
-        sheet(opening).save(File(directory, "opening.png"))
-        sheet(closing).save(File(directory, "closing.png"))
     }
 
     /** The last light pixel of the selected Channels pill on [row] of a cropped frame. */
@@ -130,28 +113,12 @@ class DrawerOpeningCaptureTest {
         return bitmap
     }
 
-    /** Frames in reading order, five to a row, 32 ms apart. */
-    private fun sheet(frames: List<Bitmap>): Bitmap {
-        val columns = 5
-        val rows = (frames.size + columns - 1) / columns
-        val sheet = Bitmap.createBitmap(columns * (CropWidth + Gap), rows * (CropHeight + Gap), Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(sheet)
-        canvas.drawColor(android.graphics.Color.MAGENTA)
-        frames.forEachIndexed { index, frame ->
-            canvas.drawBitmap(frame, (index % columns) * (CropWidth + Gap).toFloat(), (index / columns) * (CropHeight + Gap).toFloat(), null)
-        }
-        return sheet
-    }
-
-    private fun Bitmap.save(file: File) = file.outputStream().use { compress(Bitmap.CompressFormat.PNG, 100, it) }
-
     private companion object {
         const val FrameCount = 20
         // The brand and the four destinations at full width; the open drawer reaches 280.
         const val CropTop = 150
         const val CropWidth = 300
         const val CropHeight = 210
-        const val Gap = 4
         // The Channels item's vertical middle (screen 214) in the crop.
         const val PillMiddle = 64
     }

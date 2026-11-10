@@ -13,16 +13,16 @@ import org.junit.Test
 class DvrLibraryPolicyTest {
     @Test fun explicitlyEmptyMissingFilesMeansRemoved() {
         assertTrue(recordingWasRemoved(DvrEntry.create(DvrEntryId(1),
-            state = DvrEntryState.FILE_MISSING, files = emptyList())))
+            state = DvrEntryState.REMOVED, files = emptyList())))
     }
 
     @Test fun listedMissingFileMeansRemoved() {
         assertTrue(recordingWasRemoved(DvrEntry.create(DvrEntryId(1),
-            state = DvrEntryState.FILE_MISSING, files = listOf(DvrRecordingFile.create()))))
+            state = DvrEntryState.REMOVED, files = listOf(DvrRecordingFile.create()))))
     }
 
     @Test fun absentMissingFilesAfterServerRestartMeansRemoved() {
-        assertTrue(recordingWasRemoved(DvrEntry.create(DvrEntryId(1), state = DvrEntryState.FILE_MISSING)))
+        assertTrue(recordingWasRemoved(DvrEntry.create(DvrEntryId(1), state = DvrEntryState.REMOVED)))
     }
 
     @Test fun otherStatesWithAnyFilesShapeAreNotRemoved() {

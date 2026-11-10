@@ -91,6 +91,7 @@ import at.bernhardberger.tvhplayer.settings.GuideRows
 import at.bernhardberger.tvhplayer.core.ProgrammeCategory
 import at.bernhardberger.tvhplayer.core.programmeCategory
 import at.bernhardberger.tvhplayer.ui.common.programmeCategoryLabel
+import at.bernhardberger.tvhplayer.ui.components.rule
 import at.bernhardberger.tvhplayer.ui.tvGenreColors
 import at.bernhardberger.tvhplayer.core.AppError
 import at.bernhardberger.tvhplayer.core.AppErrorAction
@@ -607,7 +608,7 @@ internal fun TimelineProgrammeCell(
     // A failed or missed recording is the `error` "!" alone; one still running with errors adds it
     // beside its dot.
     val failed = when (recording?.state) {
-        DvrEntryState.RECORDING_ERROR, DvrEntryState.COMPLETED_ERROR, DvrEntryState.FILE_MISSING -> R.string.recording_state_failed
+        DvrEntryState.RECORDING_ERROR, DvrEntryState.COMPLETED_ERROR -> R.string.recording_state_failed
         DvrEntryState.MISSED -> R.string.recording_notice_missed
         else -> null
     }
@@ -629,6 +630,7 @@ internal fun TimelineProgrammeCell(
                 if (markState != null) {
                     RecordingStatusIndicator(
                         state = markState,
+                        rule = recording?.rule,
                         modifier = Modifier.markAtFullSizeOrNone().testTag("guide-cell-recording-mark"),
                     )
                 }

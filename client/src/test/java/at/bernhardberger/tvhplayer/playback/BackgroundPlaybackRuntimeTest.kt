@@ -275,13 +275,18 @@ class BackgroundPlaybackRuntimeTest {
         val playbackBlocked = java.util.concurrent.CountDownLatch(1)
         android.os.Handler(player.playbackLooper).post { playbackBlocked.countDown(); playbackHeld.await() }
         try {
-            await { playbackBlocked.count == 0L }
+            // The real playback thread must be held before the replacement can bind its period.
+            driver.await("playback thread held before period bind") { playbackBlocked.count == 0L }
             connection.emit(SubscriptionEvent.Stopped(SubscriptionCondition.NO_DETAIL, null))
-            await { liveObservation()?.let { it.serverStopped && it.timeshiftState == LiveTimeshiftState.Unavailable } == true }
+            driver.awaitCurrent("stopped while playback thread held") {
+                liveObservation()?.let { it.serverStopped && it.timeshiftState == LiveTimeshiftState.Unavailable } == true
+            }
             scheduler.runCurrent() // The loss check is queued behind the held command; playback is held too.
             startSubscription()
             // Started clears the flag before any period is bound to the restarted stream.
-            await { liveObservation()?.let { !it.serverStopped && it.timeshiftState == LiveTimeshiftState.Unavailable } == true }
+            driver.awaitCurrent("replacement still unbound") {
+                liveObservation()?.let { !it.serverStopped && it.timeshiftState == LiveTimeshiftState.Unavailable } == true
+            }
         } finally {
             playbackHeld.countDown()
         }
@@ -951,7 +956,7 @@ class BackgroundPlaybackRuntimeTest {
         fun exercise(policy: PlaybackRuntimePolicy, block: suspend Fixture.() -> Unit) = runTest(timeout = 20.seconds) {
             val fixture = Fixture(policy, testScheduler)
             try {
-                fixture.driver.exercise(this, 20_000) { fixture.block() }
+                fixture.driver.exercise(this, settle = fixture::settle) { fixture.block() }
             }
             finally {
                 fixture.scope.cancel()
@@ -979,7 +984,8 @@ class BackgroundPlaybackRuntimeTest {
     }
 
     class Fixture(policy: PlaybackRuntimePolicy, val scheduler: TestCoroutineScheduler) {
-        val scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(scheduler))
+        private val work = StandardTestDispatcher(scheduler)
+        val scope = CoroutineScope(SupervisorJob() + work)
         private val context = ApplicationProvider.getApplicationContext<Application>()
         val focus = FakeFocus()
         val connection = ScriptedSubscriptionConnection()
@@ -1015,7 +1021,7 @@ class BackgroundPlaybackRuntimeTest {
                 beforeSubscribe()
                 return connection.subscribe(id, channelId, options)
             }
-        }, StandardTestDispatcher(scheduler)).apply { startAdmission() }
+        }, work).apply { startAdmission() }
         val session = FakeTvheadendSession(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(Channel.create(ChannelId(1)), Channel.create(ChannelId(2))))),
@@ -1032,13 +1038,13 @@ class BackgroundPlaybackRuntimeTest {
                 }
             }
         })
-        private val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, StandardTestDispatcher(scheduler),
+        private val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, work,
             readProfileForEditing = { ServerProfileEditReadResult.Missing }).also { owner -> scope.launch { owner.run() } }
         // This stalled stream has no playback to advance. Auto advancement also moves Robolectric's
         // system clock, which can expire SDK watchdogs before the real source-opening thread replies.
         val player = ExoPlayer.Builder(context).setClock(FakeClock(false)).build()
         var afterPause: () -> Unit = {}
-        val coordinator = createTvheadendPlaybackCoordinator(player,
+        val coordinator = createTvheadendPlaybackCoordinator(player, workDispatcher = work,
             onRecoveryRequired = { recover(it) }).also { it.launchIn(scope) }
         /** Currently registered runtime listeners, so tests can drive states the fake stream never reaches. */
         val playerListeners = mutableListOf<Player.Listener>()
@@ -1167,10 +1173,9 @@ class BackgroundPlaybackRuntimeTest {
             assertTrue(install.await()?.isStarted == true)
             if (timeshift) {
                 // The source's opened/granted publication must precede its first status update.
-                driver.await("initial live timeshift grant", diagnostics = {
-                    "observation=${runtime.livePlaybackObservation.value}; playerError=${player.playerError}; " +
-                        "subscribes=${connection.subscribeCount}; unsubscribes=${connection.unsubscribeCount}"
-                }) { (runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)?.timeshiftState is LiveTimeshiftState.Available }
+                await("initial live timeshift grant") {
+                    (runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)?.timeshiftState is LiveTimeshiftState.Available
+                }
                 connection.emit(SubscriptionEvent.Timeshift(0, 0, 0, 120_000_000, 100))
                 await { ((runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)
                     ?.timeshiftState as? LiveTimeshiftState.Available)?.playbackPaused != null }
@@ -1210,9 +1215,15 @@ class BackgroundPlaybackRuntimeTest {
 
         internal val driver = PlaybackTestDriver(scheduler)
 
-        fun await(label: String = "background playback condition", predicate: () -> Boolean) =
-            driver.await(label, predicate = predicate)
+        fun await(label: String = "background playback condition", predicate: () -> Boolean) {
+            settle()
+            driver.awaitCurrent(label, predicate)
+        }
 
-        fun settle() = driver.settle(player)
+        fun settle() {
+            // Media3's pending-command helper can advance the main clock to future stall/cover
+            // polls. This fixture drives those timers explicitly, so acknowledge only due work.
+            repeat(8) { driver.settle(player) }
+        }
     }
 }

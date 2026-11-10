@@ -735,17 +735,11 @@ class ChannelsStandardLayoutEvidenceTest {
     // ---- captures ----
 
     @Category(VisualCapture::class)
-    @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi") fun captureEnglishNormal() = captureSet("en", 1f)
-    @Category(VisualCapture::class)
-    @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi") fun captureGermanNormal() = captureSet("de", 1f)
-    @Category(VisualCapture::class)
-    @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi") fun captureEnglishEnlarged() = captureSet("en", 1.3f)
-    @Category(VisualCapture::class)
-    @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi") fun captureGermanEnlarged() = captureSet("de", 1.3f)
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi") fun captureEnglishNormal() = captureSet()
 
-    private fun captureSet(locale: String, fontScale: Float) {
-        channelsShell(fontScale)
-        val prefix = "$locale-font$fontScale"
+    private fun captureSet() {
+        channelsShell(1f)
+        val prefix = "en-font1.0"
         row(1).assertIsFocused()
         captureBackgrounds("$prefix-entry-first-row-focused")
         key(Key.DirectionUp)
@@ -758,8 +752,8 @@ class ChannelsStandardLayoutEvidenceTest {
 
         key(Key.DirectionDown)
         row(LONG_TEXT).assertIsFocused()
-        // The long programme keeps three whole synopsis lines, one at larger text.
-        assertDescriptionFits(if (fontScale == 1f) 3 else 1)
+        // The long programme keeps three whole synopsis lines.
+        assertDescriptionFits(3)
         captureBackgrounds("$prefix-long-programme")
 
         key(Key.DirectionDown)

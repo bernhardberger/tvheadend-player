@@ -9,7 +9,7 @@ import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 enum class BrowseContextAction {
     CONTINUE_WATCHING, WATCH_LIVE,
     WATCH, DETAILS, RECORD, STOP, CANCEL, SHOW_GUIDE,
-    RESUME, START_OVER, PLAY, MARK_WATCHED, MARK_UNWATCHED, DELETE,
+    RESUME, START_OVER, PLAY, MARK_WATCHED, MARK_UNWATCHED, DELETE, REMOVE_ENTRY,
     MARK_ALL_WATCHED, MARK_ALL_UNWATCHED, DELETE_WATCHED, DELETE_ALL,
 }
 
@@ -84,10 +84,20 @@ fun recordingContextActions(
         DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR -> add(BrowseContextAction.STOP)
         DvrEntryState.SCHEDULED -> add(BrowseContextAction.CANCEL)
         DvrEntryState.COMPLETED, DvrEntryState.MISSED, DvrEntryState.INVALID,
-        DvrEntryState.COMPLETED_ERROR, DvrEntryState.FILE_MISSING -> add(BrowseContextAction.DELETE)
+        DvrEntryState.COMPLETED_ERROR -> add(
+            if (deleteRemovesEntryOnly(entry)) BrowseContextAction.REMOVE_ENTRY else BrowseContextAction.DELETE)
         else -> Unit
     }
 }
+
+/**
+ * True when deleting [entry] only removes its row from the server's list: a missed, invalid or
+ * failed entry that never produced a file. An entry with a file, also a partial one, deletes the
+ * recording. A completed entry always has one, whatever its file list currently says.
+ */
+fun deleteRemovesEntryOnly(entry: DvrEntry): Boolean =
+    entry.state in setOf(DvrEntryState.MISSED, DvrEntryState.INVALID, DvrEntryState.COMPLETED_ERROR) &&
+        entry.files.isNullOrEmpty()
 
 /**
  * Watch-state commands are only useful for playable, ended recordings with write authority. The

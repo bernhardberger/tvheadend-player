@@ -339,9 +339,9 @@ class PlaybackStatusPresentationTest {
             ),
             alert(readFailed, retry = PlaybackRetryCommand.NONE),
         )
-        val missing = DvrEntry.create(DvrEntryId(1), state = DvrEntryState.FILE_MISSING)
+        val missing = DvrEntry.create(DvrEntryId(1), state = DvrEntryState.REMOVED)
         assertEquals(
-            AppError(AppErrorCondition.RECORDING_FILE_MISSING, listOf(AppErrorAction.CLOSE)),
+            AppError(AppErrorCondition.RECORDING_UNAVAILABLE, listOf(AppErrorAction.CLOSE)),
             (alert(AppPlaybackState.Idle, missing, RecordingPlaybackAdmission.TargetUnavailable) as LivePlayerAlert.Error).error,
         )
     }
@@ -406,7 +406,7 @@ class PlaybackStatusPresentationTest {
 
         assertEquals(AppErrorCondition.RECORDING_NOT_STARTED, alert(DvrEntryState.SCHEDULED).error.condition)
         assertEquals(start, alert(DvrEntryState.SCHEDULED).startsAt)
-        assertNull(alert(DvrEntryState.FILE_MISSING).startsAt)
+        assertNull(alert(DvrEntryState.REMOVED).startsAt)
     }
 
     private fun failed(issue: SubscriptionIssue? = null, recoveryReason: PlaybackRecoveryReason? = null) =

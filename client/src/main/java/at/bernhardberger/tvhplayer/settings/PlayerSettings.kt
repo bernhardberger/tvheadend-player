@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import at.bernhardberger.tvheadend.sdk.core.StreamProfile
 import at.bernhardberger.tvheadend.sdk.core.StreamProfileId
+import at.bernhardberger.tvheadend.sdk.core.ServerProfileId
 import at.bernhardberger.tvhplayer.playback.StartupBufferVerdict
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -131,11 +132,22 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
     internal val audioChoices = AudioChoiceStore(dataStore)
     val channelAspects = ChannelAspectStore(dataStore)
 
+    internal suspend fun useProfile(id: ServerProfileId?) {
+        dataStore.edit { if (id == null) it.remove(activeProfileKey) else it[activeProfileKey] = id.value }
+    }
+
+    internal suspend fun removeProfile(id: ServerProfileId) {
+        audioChoices.removeProfile(id.value)
+        channelAspects.removeProfile(id.value)
+        dataStore.edit { p ->
+            p.asMap().keys.filter { it.name.startsWith(profilePreferencePrefix(id)) }.forEach { p.remove(it) }
+        }
+    }
+
     private object Keys {
         val AD_BREAK_MODE = stringPreferencesKey("adBreakMode")
         val SKIP_CUTS = booleanPreferencesKey("skipCuts")
         val SKIP_LANDING = stringPreferencesKey("skipLanding")
-        val PROFILE_UUID = stringPreferencesKey("profileUuid")
         val AUDIO_LANGUAGES = stringPreferencesKey("audioLanguages")
         val AUDIO_FORMAT = stringPreferencesKey("audioFormat")
         val AUDIO_DESCRIPTION = booleanPreferencesKey("audioDescription")
@@ -201,7 +213,19 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
         observationIsCurrent: () -> Boolean,
     ): StreamProfileId? {
         if (!observationIsCurrent()) return null
-        val selected = dataStore.data.first()[Keys.PROFILE_UUID]
+        val preferences = dataStore.data.first()
+        return preferences.activeProfileId()?.let { serverId ->
+            resolveStreamProfileSelection(preferences, serverId, discoveredProfiles, observationIsCurrent)
+        }
+    }
+
+    private fun resolveStreamProfileSelection(
+        preferences: Preferences,
+        serverId: ServerProfileId,
+        discoveredProfiles: List<StreamProfile>,
+        observationIsCurrent: () -> Boolean,
+    ): StreamProfileId? {
+        val selected = preferences[streamProfileKey(serverId)]
             ?.takeIf(String::isNotBlank)
             ?.let { value -> runCatching { StreamProfileId(value) }.getOrNull() }
             ?.takeIf { id -> discoveredProfiles.any { it.id == id } }
@@ -210,10 +234,11 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
 
     internal suspend fun setStreamProfile(profileId: StreamProfileId?) {
         dataStore.edit { preferences ->
+            val serverId = preferences.activeProfileId() ?: return@edit
             if (profileId == null) {
-                preferences.remove(Keys.PROFILE_UUID)
+                preferences.remove(streamProfileKey(serverId))
             } else {
-                preferences[Keys.PROFILE_UUID] = profileId.value
+                preferences[streamProfileKey(serverId)] = profileId.value
             }
         }
     }
@@ -277,6 +302,8 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
     }
 
     internal companion object {
+        private fun streamProfileKey(id: ServerProfileId) =
+            stringPreferencesKey(profilePreferencePrefix(id) + "streamProfile")
         fun decodeStartupBufferLearning(p: Preferences): StartupBufferLearningState {
             val profile = p[Keys.STARTUP_BUFFER_LEARNED_PROFILE]
             // Learning from other rules restarts at the default level.

@@ -47,8 +47,9 @@ tasks.withType<Test>().configureEach {
     // Separate JVMs isolate Robolectric/Compose globals. Keep visual capture runs serial.
     maxParallelForks = if (captureTests == "exclude") testForks.toInt() else 1
     // Robolectric sandboxes grow each fork's native memory and metaspace for its whole life
-    // (~3 GiB RSS after ~85 classes at -Xmx512m); recycling forks keeps two inside the 8 GiB build slice.
-    forkEvery = 30
+    // (~3 GiB RSS after ~85 classes at -Xmx512m). Two forks recycled every 90 classes peak
+    // at about 6.5 GiB with Gradle, inside one 12 GiB build-broker lane, and start fewer cold JVMs.
+    forkEvery = 90
     // Motion regressions still render/assert every sampled frame in the routine lane.
     // Encoding their diagnostic PNGs belongs to explicit visual-evidence runs.
     systemProperty("tvhplayer.writeMotionCaptures", captureTests != "exclude")
@@ -95,8 +96,8 @@ android {
         applicationId = "at.bernhardberger.tvhplayer"
         minSdk = 28
         targetSdk = 36
-        versionCode = 178
-        versionName = "0.4.13"
+        versionCode = 179
+        versionName = "0.4.14"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "PROFILE_TRACE", "false")

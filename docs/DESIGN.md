@@ -83,12 +83,14 @@ Meaning of colour:
   (including paused intent) identifies a playing item. Starting's tuning spinner
   is loading feedback, not playing identity or orange progress; Recovering, Failed,
   Idle and Finished have neither playing identity nor viewer progress.
-- **Recording red** means "a recording exists or runs". **`error`** means "a
+- **Recording red** means "recording now". **`error`** means "a
   failure the user must act on". No component declares its own red: marks come
   from `RecordingStatusIndicator` (dot) and `RecordingBadge` (badge), progress
   bars and other drawn marks from `recordingMarkColor`, and a source test keeps
   the recording reds inside those owners and the theme.
-  - **Dot** (16dp, a clock when scheduled) only in rows and grid cells, at the
+  - **Dot** (16dp; a clock when scheduled, stacked clocks when a series or
+    timer rule scheduled it; the muted library mark when finished) only in rows
+    and grid cells, at the
     right end of the title line: channel rows, Recordings rows, Guide cells
     (the title ellipsizes first). The lines above and
     below keep their full width, so progress and metadata never shorten for a
@@ -101,7 +103,7 @@ Meaning of colour:
     it as a number. The
     trailing slot belongs to where OK leads, such as a folder's chevron.
     A running recording with errors adds the `error` "!" beside the dot. Guide
-    cells also mark a finished recording with the dot and a failed or missed one
+    cells and the channel schedule also mark a finished recording with the library mark and a failed or missed one
     with the `error` "!". No dot
     on section headings or titles; the "Recording now" folder carries its dot
     as a badge on the folder icon.
@@ -115,7 +117,10 @@ Meaning of colour:
     (an invalid entry) a neutral badge with the cancel mark and "Canceled", errors
     while recording a red `● REC` plus an `error` "Errors" badge. "On now"
     and "Available until" are neutral badges. The Guide headline badges what
-    its cells mark: also a neutral "Recorded" with a dot.
+    its cells mark: also a neutral "Recorded" with the library mark.
+    "Scheduled" carries stacked clocks wherever a rule scheduled it. Where a recording
+    came from shows only while it is scheduled: running is the red dot,
+    whatever scheduled it (decided 2026-11-09, following Kodi and TiVo).
   - In Recordings overlines a failure, missed recordings included, is an
     `error` "!" symbol; cancelled and stopped early are muted symbols. Problems
     lists missed recordings under "Failed"; only invalid entries are "Canceled"
@@ -453,7 +458,7 @@ Anatomy per Material for TV / design kit:
   moves to Channels, also when the focused Pause control disappears. The *Stop*
   browse setting never shows it. Nothing is reserved when nothing plays.
 - Destinations (Channels, Guide, Recordings) are centred between the top section
-  and the bottom section; Settings is the bottom section. Nothing in the rail
+  and the bottom section; Settings is at the bottom. Nothing in the rail
   moves when it expands: rows keep their positions and icons and the brand mark
   stay on the kit's fixed icon column (12 + 16dp; the library's 4dp leading-slot
   growth is cancelled). Only the sheet widens and labels/wordmark reveal.

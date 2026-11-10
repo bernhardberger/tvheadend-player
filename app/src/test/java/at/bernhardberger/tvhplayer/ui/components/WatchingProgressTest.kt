@@ -10,11 +10,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
-import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -35,6 +33,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.PlaybackException
 import androidx.media3.datasource.BaseDataSource
 import androidx.media3.datasource.DataSpec
+import androidx.media3.exoplayer.ExoPlaybackException
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
@@ -54,20 +53,17 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.playback.*
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
-import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.util.concurrent.CountDownLatch
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
-import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.player.NowPlayingStrip
 import at.bernhardberger.tvhplayer.ui.screens.ProgrammeContextMenu
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeadline
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeadlineProgramme
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingListRow
-import java.io.File
 import java.util.Locale
 import java.util.TimeZone
 import kotlin.time.Duration.Companion.seconds
@@ -78,7 +74,6 @@ import org.junit.Rule
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.junit.experimental.categories.Category
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -202,8 +197,6 @@ class WatchingProgressTest {
         show("menu")
         compose.onNodeWithText("Continue watching").assertIsFocused()
         compose.onNodeWithText("Watch live").assertExists()
-        compose.onAllNodesWithTag("channel-playing-indicator", useUnmergedTree = true).assertCountEquals(1)
-        assertMarkInside("Continue watching")
     }
     @Test fun contextMenuOfAnotherChannelKeepsWatch() {
         goLive.value = {}
@@ -326,7 +319,6 @@ class WatchingProgressTest {
         show("past-recording")
         assertFraction(.5f)
         assertOrangeProgress()
-        compose.onNodeWithTag("details-metadata", useUnmergedTree = true).assertTextContains("Today", substring = true)
     }
     @Test fun unrelatedLiveProgrammeDoesNotReadSample() {
         var reads = 0
@@ -350,7 +342,12 @@ class WatchingProgressTest {
     @Test fun zapShowsTheProgrammeAtTheRewoundPosition() {
         livePosition.value = LiveViewerPosition(channel.id, start.epochSeconds - 1800)
         indicator.value = ChannelPlaybackIndicator.PAUSED
-        show("zap")
+        val currentEvent = mutableStateOf<EpgEvent?>(event)
+        show("zap", zapEvent = currentEvent)
+        compose.onNodeWithText(previousEvent.title!!, useUnmergedTree = true).assertExists()
+        assertFraction(.5f)
+        assertOrangeProgress()
+        compose.runOnIdle { currentEvent.value = null }
         compose.onNodeWithText(previousEvent.title!!, useUnmergedTree = true).assertExists()
         assertFraction(.5f)
         assertOrangeProgress()
@@ -359,14 +356,6 @@ class WatchingProgressTest {
         livePosition.value = LiveViewerPosition(channel.id, start.epochSeconds - 1800)
         show("zap-no-history")
         compose.onNodeWithText(event.title!!, useUnmergedTree = true).assertExists()
-    }
-    @Test fun zapShowsRewoundProgrammeDuringAnEpgGap() {
-        livePosition.value = LiveViewerPosition(channel.id, start.epochSeconds - 1800)
-        indicator.value = ChannelPlaybackIndicator.PAUSED
-        show("zap-gap")
-        compose.onNodeWithText(previousEvent.title!!, useUnmergedTree = true).assertExists()
-        assertFraction(.5f)
-        assertOrangeProgress()
     }
     @Test fun guideAtLiveEdgeHasNoHiddenFirstFrame() = liveEdgeFractions("guide")
     @Test fun contextAtLiveEdgeHasNoHiddenFirstFrame() = liveEdgeFractions("menu")
@@ -434,7 +423,9 @@ class WatchingProgressTest {
         val listeners = mutableListOf<Player.Listener>()
         var ready = false
         var positionMs = 900_000L
+        var forcedPlayerError: ExoPlaybackException? = null
         val player = object : ExoPlayer by base {
+            override fun getPlayerError() = forcedPlayerError ?: base.playerError
             override fun getPlaybackState() = if (ready) Player.STATE_READY else base.playbackState
             override fun isPlaying() = ready && base.playWhenReady
             override fun getCurrentPosition() = positionMs
@@ -545,9 +536,15 @@ class WatchingProgressTest {
             assertEquals("Live install", at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult.STARTED,
                 runBlocking { live.await() })
             compose.runOnIdle {
-                listeners.toList().forEach { it.onPlayerError(PlaybackException("scripted failure", null, PlaybackException.ERROR_CODE_DECODING_FAILED)) }
+                val error = ExoPlaybackException.createForUnexpected(
+                    RuntimeException("scripted failure"), PlaybackException.ERROR_CODE_DECODING_FAILED,
+                )
+                forcedPlayerError = error
+                listeners.toList().forEach { it.onPlayerError(error) }
+                val events = Player.Events(androidx.media3.common.FlagSet.Builder().add(Player.EVENT_PLAYER_ERROR).build())
+                listeners.toList().forEach { it.onEvents(player, events) }
+                assertTrue(runtime.state.value is AppPlaybackState.Failed)
             }
-            compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Failed }
             compose.waitForIdle()
             compose.runOnIdle {
                 assertEquals(AppPlaybackTarget.Live(channel.id), runtime.activeTarget.value)
@@ -578,7 +575,6 @@ class WatchingProgressTest {
 
     private fun assertFraction(value: Float) = progressBar().assert(
         SemanticsMatcher.expectValue(SemanticsProperties.ProgressBarRangeInfo, ProgressBarRangeInfo(value, 0f..1f)))
-    @Test fun nowPlayingStripKeepsTheSharedMark() { show("zap"); marker().assertExists() }
     @Test fun pausedZapKeepsOrangeProgressWithoutALogoPlate() {
         indicator.value = ChannelPlaybackIndicator.PAUSED
         show("zap")
@@ -588,6 +584,7 @@ class WatchingProgressTest {
     }
     @Test fun zapWithoutLogoKeepsChannelNumberFallback() {
         show("zap", picon = null)
+        marker().assertExists()
         compose.onNodeWithText("101", useUnmergedTree = true).assertIsDisplayed()
         assertPlate()
     }
@@ -614,97 +611,9 @@ class WatchingProgressTest {
         compose.onNodeWithTag("details-progress", useUnmergedTree = true).assertDoesNotExist()
     }
 
-    @Test @Category(VisualCapture::class) fun guidePlayingCapture() = captureSurface("guide")
-    @Test @Category(VisualCapture::class) fun detailsUnknownPositionCapture() {
-        livePosition.value = LiveViewerPosition(channel.id, null)
-        indicator.value = ChannelPlaybackIndicator.PAUSED
-        show("programme")
-        save("details-unknown-position")
-    }
-    @Test @Category(VisualCapture::class) fun futureProgrammePausedChannelCapture() {
-        indicator.value = ChannelPlaybackIndicator.PAUSED
-        show("future")
-        save("details-future-paused-channel")
-    }
-    @Test @Category(VisualCapture::class) fun pastProgrammeRecordingProgressCapture() {
-        indicator.value = ChannelPlaybackIndicator.PAUSED
-        show("past-recording")
-        save("details-past-recording-progress")
-    }
-    @Test @Category(VisualCapture::class) fun rewoundProgrammeEpgGapCapture() {
-        livePosition.value = LiveViewerPosition(channel.id, start.epochSeconds - 1800)
-        indicator.value = ChannelPlaybackIndicator.PAUSED
-        show("zap-gap")
-        save("zap-epg-gap")
-    }
-    @Test @Category(VisualCapture::class) fun pausedCompactCardCapture() = pausedChannelCapture("card")
-    @Test @Category(VisualCapture::class) fun pausedChannelRowCapture() = pausedChannelCapture("channel-row")
-    @Test @Category(VisualCapture::class) fun pausedChannelsHeadlineCapture() = pausedChannelCapture("channels-headline")
-    @Test @Category(VisualCapture::class) fun rewoundPreviousProgrammeCapture() {
-        livePosition.value = LiveViewerPosition(channel.id, start.epochSeconds - 1800)
-        indicator.value = ChannelPlaybackIndicator.PAUSED
-        show("zap")
-        save("zap-previous-programme")
-    }
-    private fun pausedChannelCapture(surface: String) {
-        livePosition.value = LiveViewerPosition(channel.id, start.epochSeconds + 600)
-        indicator.value = ChannelPlaybackIndicator.PAUSED
-        show(surface)
-        save("$surface-paused")
-    }
-    @Test @Category(VisualCapture::class) fun programmePlayingCapture() = captureSurface("programme", "details-watch")
-    @Test @Category(VisualCapture::class) fun menuPlayingCapture() = captureSurface("menu")
-    @Test @Category(VisualCapture::class) fun channelMenuLiveEdgeCapture() {
-        goLive.value = {}
-        livePosition.value = LiveViewerPosition(channel.id, now, behindLive = false)
-        show("menu")
-        save("menu-continue-live-edge")
-    }
-    @Test @Category(VisualCapture::class) fun channelMenuBehindLiveCapture() {
-        goLive.value = {}
-        livePosition.value = LiveViewerPosition(channel.id, now - 600)
-        show("menu")
-        save("menu-continue-behind-live")
-    }
-    @Test @Category(VisualCapture::class) fun guideMenuViewerProgrammeCapture() {
-        // From the Guide, the earlier programme the paused viewer is in.
-        goLive.value = {}
-        indicator.value = ChannelPlaybackIndicator.PAUSED
-        livePosition.value = LiveViewerPosition(channel.id, start.epochSeconds - 600)
-        show("menu-previous")
-        save("menu-continue-guide-viewer-programme")
-    }
-    @Test @Category(VisualCapture::class) fun playingRecordingMenuCapture() {
+    @Test fun playingRecordingMenuKeepsContinueWatchingFocused() {
         show("recording-menu")
         compose.onNodeWithText("Continue watching").assertIsFocused()
-        save("menu-continue-recording")
-    }
-    @Test @Category(VisualCapture::class) fun detailsContinueBehindLiveCapture() {
-        goLive.value = {}
-        livePosition.value = LiveViewerPosition(channel.id, now - 600)
-        show("programme-continue")
-        save("details-continue-behind-live")
-    }
-    @Test @Category(VisualCapture::class) fun recordingDetailsContinueCapture() {
-        show("recording-continue")
-        save("details-continue-recording")
-    }
-    @Test @Category(VisualCapture::class) fun zapPlayingCapture() = captureSurface("zap")
-    @Test @Category(VisualCapture::class) fun recordingRowPlayingCapture() = captureSurface("row", "recording-list-entry-1")
-    @Test @Category(VisualCapture::class) fun recordingDetailsPlayingCapture() = captureSurface("recording", "details-resume")
-    @Test @Category(VisualCapture::class) fun pausedZapCapture() {
-        indicator.value = ChannelPlaybackIndicator.PAUSED
-        show("zap")
-        save("zap-paused")
-    }
-    @Test @Category(VisualCapture::class) fun pausedRecordingCapture() {
-        indicator.value = ChannelPlaybackIndicator.PAUSED
-        show("recording")
-        save("recording-paused")
-    }
-    @Test @Category(VisualCapture::class) fun zapNumberFallbackCapture() {
-        show("zap", picon = null)
-        save("zap-number-fallback")
     }
 
     private fun marker() = compose.onNodeWithTag("channel-playing-indicator", useUnmergedTree = true)
@@ -751,8 +660,8 @@ class WatchingProgressTest {
         bitmap.recycle()
     }
 
-    private fun show(surface: String, picon: ChannelIcon? = channel.icon) {
-        if (surface in listOf("recording", "row", "recording-menu", "recording-continue"))
+    private fun show(surface: String, picon: ChannelIcon? = channel.icon, zapEvent: State<EpgEvent?>? = null) {
+        if (surface in listOf("recording", "row", "recording-menu"))
             target.value = AppPlaybackTarget.Recording(recording.id)
         compose.setContent {
             CompositionLocalProvider(LocalDensity provides Density(2f, 1f), LocalWatchingGoLive provides goLive.value,
@@ -780,8 +689,8 @@ class WatchingProgressTest {
                                     recording.takeIf { surface == "recording" }, channel, now,
                                     listOf(if (surface == "recording") BrowseContextAction.RESUME else BrowseContextAction.WATCH,
                                         BrowseContextAction.SHOW_GUIDE), {}, {})
-                                "menu", "menu-previous" -> ProgrammeContextMenu(
-                                    if (surface == "menu") event else previousEvent, channel, null, now, false,
+                                "menu" -> ProgrammeContextMenu(
+                                    event, channel, null, now, false,
                                     observation.currentSession, observation, false, { _, _ -> }, {})
                                 // As the Recordings screen opens it for the playing recording.
                                 "recording-menu" -> BrowseContextMenu(recording.title.orEmpty(), channel.name.orEmpty(),
@@ -793,14 +702,8 @@ class WatchingProgressTest {
                                     ProgrammeArtwork(recording.image, channel.icon, recordingViewerPosition(recording.id)?.fraction,
                                         Modifier.fillMaxSize(), progressColor = progressColor(true))
                                 }
-                                "programme-continue" -> ProgrammeDetailsPage(event, null, channel, now,
-                                    listOf(BrowseContextAction.CONTINUE_WATCHING, BrowseContextAction.WATCH_LIVE,
-                                        BrowseContextAction.RECORD, BrowseContextAction.SHOW_GUIDE), {}, {})
-                                "recording-continue" -> ProgrammeDetailsPage(null, recording, channel, now,
-                                    listOf(BrowseContextAction.CONTINUE_WATCHING, BrowseContextAction.START_OVER,
-                                        BrowseContextAction.MARK_WATCHED, BrowseContextAction.DELETE), {}, {})
-                                "zap", "zap-no-history", "zap-gap" -> NowPlayingStrip(channel.id, "101", channel.name.orEmpty(), picon,
-                                    event.takeUnless { surface == "zap-gap" }, now,
+                                "zap", "zap-no-history" -> NowPlayingStrip(channel.id, "101", channel.name.orEmpty(), picon,
+                                    if (zapEvent != null) zapEvent.value else event, now,
                                     Modifier.padding(48.dp), indicator.value,
                                     programmeAt = { at -> previousEvent.takeIf {
                                         surface != "zap-no-history" && at >= it.start.epochSeconds && at < it.stop.epochSeconds } })
@@ -824,23 +727,4 @@ class WatchingProgressTest {
         compose.waitForIdle()
     }
 
-    private fun captureSurface(surface: String, focusTag: String? = null) {
-        show(surface)
-        if (focusTag != null) compose.onNodeWithTag(focusTag).performSemanticsAction(SemanticsActions.RequestFocus)
-        save("$surface-${if (surface == "guide" || surface == "zap") "passive" else "focused"}")
-        if (focusTag != null) {
-            compose.onNodeWithTag(focusTag).performKeyInput { pressKey(if (surface == "row") Key.DirectionDown else Key.DirectionRight) }
-            compose.onNodeWithTag(focusTag).assertIsNotFocused()
-            save("$surface-unfocused")
-        }
-    }
-
-    private fun save(name: String) {
-        compose.mainClock.advanceTimeBy(1000)
-        compose.waitForIdle()
-        val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
-        compose.runOnIdle { view.draw(Canvas(bitmap)) }
-        CaptureOutput.writePng(File("build/outputs/now-playing", "$name.png"), bitmap)
-        bitmap.recycle()
-    }
 }

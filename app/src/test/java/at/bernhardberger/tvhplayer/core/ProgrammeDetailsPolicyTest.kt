@@ -115,7 +115,7 @@ class ProgrammeDetailsPolicyTest {
             assertFalse(CONTINUE_WATCHING in channelContextActions(null, 150, null, null, canModify))
             val entries = listOf<DvrEntry?>(null) + listOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING,
                 DvrEntryState.RECORDING_ERROR, DvrEntryState.COMPLETED, DvrEntryState.COMPLETED_ERROR,
-                DvrEntryState.MISSED, DvrEntryState.INVALID, DvrEntryState.FILE_MISSING).map { recording(it) }
+                DvrEntryState.MISSED, DvrEntryState.INVALID, DvrEntryState.REMOVED).map { recording(it) }
             for (entry in entries) {
                 val playback = entry?.let { admission(it) }
                 for (now in listOf(50L, 150L, 250L)) {
@@ -138,7 +138,7 @@ class ProgrammeDetailsPolicyTest {
         assertEquals(listOf(STOP), actions(recording(DvrEntryState.RECORDING)))
         assertEquals(listOf(WATCH, CANCEL), actions(recording(DvrEntryState.SCHEDULED)))
         assertEquals(listOf(CANCEL), actions(recording(DvrEntryState.SCHEDULED), canWatchChannel = false))
-        assertEquals(listOf(DELETE), actions(recording(DvrEntryState.MISSED)))
+        assertEquals(listOf(REMOVE_ENTRY), actions(recording(DvrEntryState.MISSED)))
         assertEquals(emptyList<BrowseContextAction>(),
             recordingDetailsActions(recording(DvrEntryState.COMPLETED), null, false, false, nowSec = 150))
     }
@@ -151,7 +151,7 @@ class ProgrammeDetailsPolicyTest {
     @Test fun recordingGuideActionRequiresAnUnfinishedAiringAndWatchableChannel() {
         val states = listOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR,
             DvrEntryState.COMPLETED, DvrEntryState.COMPLETED_ERROR, DvrEntryState.MISSED,
-            DvrEntryState.INVALID, DvrEntryState.FILE_MISSING)
+            DvrEntryState.INVALID, DvrEntryState.REMOVED)
         for (state in states) for (watchable in listOf(true, false)) for (now in listOf(50L, 150L, 200L)) {
             val entry = recording(state)
             val expected = watchable && now < 200 && state in listOf(DvrEntryState.SCHEDULED,
@@ -201,7 +201,7 @@ class ProgrammeDetailsPolicyTest {
         assertFalse(facts(recording(DvrEntryState.COMPLETED_ERROR, 20)).any { it.kind == DetailsFactKind.LEFT })
         assertEquals(listOf(RESUME, START_OVER, MARK_WATCHED, DELETE), actions(recording(DvrEntryState.COMPLETED_ERROR, 20, listOf(file()))))
         assertEquals(listOf(PLAY, DELETE), actions(recording(DvrEntryState.MISSED, 20, listOf(file()))))
-        assertEquals(listOf(DELETE), actions(recording(DvrEntryState.MISSED, 20)))
+        assertEquals(listOf(REMOVE_ENTRY), actions(recording(DvrEntryState.MISSED, 20)))
     }
 
     @Test fun statusPrioritizesRecordingLifecycleOverAiring() {
@@ -214,7 +214,7 @@ class ProgrammeDetailsPolicyTest {
         assertEquals(DetailsStatus.MISSED, detailsStatus(null, recording(DvrEntryState.MISSED), 150))
         // Canceled is neutral, as in the list, the pane and Problems; only real failures are red.
         assertEquals(DetailsStatus.CANCELLED, detailsStatus(null, recording(DvrEntryState.INVALID), 150))
-        listOf(DvrEntryState.COMPLETED_ERROR, DvrEntryState.FILE_MISSING).forEach {
+        listOf(DvrEntryState.COMPLETED_ERROR).forEach {
             assertEquals(DetailsStatus.FAILED, detailsStatus(null, recording(it), 150))
         }
         assertNull(detailsStatus(null, recording(DvrEntryState.COMPLETED), 150))

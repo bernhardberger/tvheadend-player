@@ -35,9 +35,11 @@ class PlaybackErrorClassificationTest {
     @Test fun causeCycleStopsBeforeRevisitingAnException() {
         val first = IllegalStateException().apply { stackTrace = emptyArray() }
         val second = IllegalArgumentException().apply { stackTrace = emptyArray() }
+        val third = UnsupportedOperationException().apply { stackTrace = emptyArray() }
         first.initCause(second)
-        second.initCause(first)
-        assertEquals("IllegalArgumentException", classifyPlaybackError(first))
+        second.initCause(third)
+        third.initCause(first)
+        assertEquals("UnsupportedOperationException", classifyPlaybackError(first))
     }
 
     @Test fun deepChainStopsAtThirtyTwoExceptions() {

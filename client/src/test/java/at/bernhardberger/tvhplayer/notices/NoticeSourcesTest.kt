@@ -11,6 +11,94 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class NoticeSourcesTest {
+    @Test fun cancelledBeforeHandoverRestartsTheOriginalLossTimeoutWithoutReady() =
+        cancelledBeforeHandoverRestartsLoss(SessionState.Connecting)
+
+    @Test fun cancelledBeforeHandoverRestartsTheSynchronizingLossTimeoutWithoutReady() =
+        cancelledBeforeHandoverRestartsLoss(SessionState.Synchronizing)
+
+    private fun cancelledBeforeHandoverRestartsLoss(resumedState: SessionState) = runTest {
+        val observation = MutableStateFlow(readyObservation())
+        val profile = MutableStateFlow(0L)
+        val switching = MutableStateFlow(false)
+        val center = NoticeCenter({ testScheduler.currentTime }) {
+            NoticeContext(profile.value, observation.value.currentSession?.generationIdentity)
+        }
+        val source = ConnectionNoticeSource(observation, profile, center, switching)
+        backgroundScope.launch { source.run() }; runCurrent()
+        observation.value = SessionObservation.create(sessionState = SessionState.Connecting)
+        runCurrent(); advanceTimeBy(2_000)
+        switching.value = true; runCurrent()
+        observation.value = SessionObservation.create(sessionState = resumedState); runCurrent()
+        advanceTimeBy(4_000); runCurrent()
+        assertNull(center.state.value.candidate)
+        switching.value = false; runCurrent()
+        advanceTimeBy(2_999); runCurrent()
+        assertNull(center.state.value.candidate)
+        advanceTimeBy(1); runCurrent()
+        assertEquals(ConnectionNoticeKind.LOST, (center.state.value.candidate!!.notice as Notice.Connection).kind)
+        assertTrue(source.lossAnnounced.value)
+        switching.value = true; runCurrent()
+        advanceTimeBy(4_000); runCurrent()
+        assertTrue(source.lossAnnounced.value)
+        switching.value = false; runCurrent()
+        assertTrue(source.lossAnnounced.value)
+    }
+
+    @Test fun committedTargetDoesNotInheritTheOriginalConnectionsOwedLoss() = runTest {
+        val observation = MutableStateFlow(readyObservation())
+        val profile = MutableStateFlow(0L)
+        val switching = MutableStateFlow(false)
+        val center = NoticeCenter({ testScheduler.currentTime }) {
+            NoticeContext(profile.value, observation.value.currentSession?.generationIdentity)
+        }
+        val source = ConnectionNoticeSource(observation, profile, center, switching)
+        backgroundScope.launch { source.run() }; runCurrent()
+        observation.value = SessionObservation.create(sessionState = SessionState.Connecting)
+        runCurrent(); advanceTimeBy(2_000)
+        switching.value = true; runCurrent()
+        observation.value = SessionObservation.create(sessionState = SessionState.Synchronizing)
+        runCurrent(); advanceTimeBy(4_000); runCurrent()
+        assertNull(center.state.value.candidate)
+        profile.value = 1; runCurrent()
+        switching.value = false; runCurrent()
+        advanceTimeBy(4_000); runCurrent()
+        assertNull(center.state.value.candidate)
+        assertFalse(source.lossAnnounced.value)
+        observation.value = readyObservation(); runCurrent()
+        assertNull(center.state.value.candidate)
+    }
+
+    @Test fun trialAndFallbackSuppressConnectionNoticesAndCancelPendingLoss() = runTest {
+        val observation = MutableStateFlow(readyObservation())
+        val profile = MutableStateFlow(0L)
+        val switching = MutableStateFlow(false)
+        val center = NoticeCenter({ testScheduler.currentTime }) {
+            NoticeContext(profile.value, observation.value.currentSession?.generationIdentity)
+        }
+        val source = ConnectionNoticeSource(observation, profile, center, switching)
+        backgroundScope.launch { source.run() }
+        runCurrent()
+        observation.value = SessionObservation.create(sessionState = SessionState.Connecting)
+        runCurrent(); advanceTimeBy(2_000)
+        switching.value = true
+        runCurrent()
+        observation.value = SessionObservation.create(sessionState = SessionState.Unavailable(SessionFailure.AUTHENTICATION_REJECTED))
+        runCurrent(); advanceTimeBy(4_000); runCurrent()
+        assertNull(center.state.value.candidate)
+        assertFalse(source.lossAnnounced.value)
+        observation.value = readyObservation(); runCurrent()
+        observation.value = SessionObservation.create(sessionState = SessionState.Connecting)
+        runCurrent(); advanceTimeBy(4_000); runCurrent()
+        assertNull(center.state.value.candidate)
+        observation.value = readyObservation(); runCurrent()
+        switching.value = false; runCurrent()
+        assertNull(center.state.value.candidate)
+        // Normal in-use failures still announce after the attempt ends.
+        observation.value = SessionObservation.create(sessionState = SessionState.Unavailable(SessionFailure.AUTHENTICATION_REJECTED))
+        runCurrent()
+        assertEquals(Notice.Connection(ConnectionNoticeKind.LOGIN_REJECTED), center.state.value.candidate!!.notice)
+    }
     @Test fun announcedLossPersistsAfterNoticeExpiryAndClearsOnRecoveryOrProfileChange() = runTest {
         val observation = MutableStateFlow(readyObservation())
         val profile = MutableStateFlow(0L)
@@ -213,6 +301,33 @@ class NoticeSourcesTest {
         emit(6, DvrChangeKind.RECORDING_ABORTED, DvrEntryState.COMPLETED, DvrChangeOrigin.External)
         runCurrent()
         assertEquals(listOf(1L, 2L, 4L, 5L, 6L), center.state.value.pending.map { (it.notice as Notice.Dvr).entry.id.value })
+    }
+
+    @Test fun retainedRemovalAndLaterPurgeAnnounceDeletionOnlyOnce() = runTest {
+        val session = FakeTvheadendSession(readyObservation())
+        val identity = session.observation.value.currentSession!!.generationIdentity
+        val center = NoticeCenter({ testScheduler.currentTime }, { NoticeContext(0, identity) })
+        backgroundScope.launch { DvrChangeNoticeSource(session.dvrRepository, center).run() }
+        runCurrent()
+        val previous = DvrEntry.create(DvrEntryId(1), state = DvrEntryState.COMPLETED)
+        val removed = DvrEntry.create(previous.id, state = DvrEntryState.REMOVED)
+        val origin = DvrChangeOrigin.ThisClient(DvrMutationKind.DELETE)
+        session.dvrRepository.emitChange(DvrChange.create(DvrChangeKind.REMOVED,
+            previous, removed, origin, identity))
+        runCurrent()
+        val first = center.state.value.pending.single()
+        val fact = first.notice as Notice.Dvr
+        assertEquals(DvrChangeKind.REMOVED, fact.kind)
+        assertEquals(DvrEntryState.REMOVED, fact.entry.state)
+        assertTrue(center.show(first.id, 4_000))
+        advanceTimeBy(4_001)
+        center.prune()
+        for (purgeOrigin in listOf(origin, DvrChangeOrigin.External)) {
+            session.dvrRepository.emitChange(DvrChange.create(DvrChangeKind.REMOVED,
+                removed, null, purgeOrigin, identity))
+            runCurrent()
+            assertNull(center.state.value.candidate)
+        }
     }
 
     @Test fun seriesGroupsDistinctEntriesPerRuleAndRejectsRetiredGeneration() = runTest {

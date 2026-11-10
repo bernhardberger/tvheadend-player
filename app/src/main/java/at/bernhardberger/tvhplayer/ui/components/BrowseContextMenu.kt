@@ -70,6 +70,7 @@ internal fun BrowseContextMenu(
     programDetailsLabel: Boolean = false,
     backEnabled: Boolean = true,
     recordingState: DvrEntryState? = null,
+    recordingRule: RecordingRule? = null,
     resumePositionMs: Long? = null,
     /** The playing item's mark, drawn as Continue watching's icon. */
     playbackIndicator: ChannelPlaybackIndicator = ChannelPlaybackIndicator.NONE,
@@ -99,7 +100,7 @@ internal fun BrowseContextMenu(
                         color = MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     if (subtitle.isNotBlank()) Text(subtitle, style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    RecordingBadge(recordingState, Modifier.testTag("browse-context-recording"))
+                    RecordingBadge(recordingState, Modifier.testTag("browse-context-recording"), rule = recordingRule)
                     if (description.isNotBlank()) Text(description, style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), maxLines = 3, overflow = TextOverflow.Ellipsis)
                 }
@@ -155,6 +156,7 @@ internal fun BrowseContextAction.label(watchChannel: Boolean): Int = when (this)
     BrowseContextAction.MARK_WATCHED -> R.string.context_mark_watched
     BrowseContextAction.MARK_UNWATCHED -> R.string.context_mark_unwatched
     BrowseContextAction.DELETE -> R.string.context_delete
+    BrowseContextAction.REMOVE_ENTRY -> R.string.remove_entry
     BrowseContextAction.MARK_ALL_WATCHED -> R.string.context_mark_all_watched
     BrowseContextAction.MARK_ALL_UNWATCHED -> R.string.context_mark_all_unwatched
     BrowseContextAction.DELETE_WATCHED -> R.string.context_delete_watched
@@ -165,7 +167,8 @@ internal fun BrowseContextAction.icon(): Int = when (this) {
     BrowseContextAction.DETAILS -> R.drawable.ic_info
     BrowseContextAction.RECORD -> R.drawable.ic_fiber_manual_record
     BrowseContextAction.STOP, BrowseContextAction.CANCEL -> R.drawable.ic_stop
-    BrowseContextAction.DELETE, BrowseContextAction.DELETE_WATCHED -> R.drawable.ic_delete_outlined
+    BrowseContextAction.DELETE, BrowseContextAction.REMOVE_ENTRY, BrowseContextAction.DELETE_WATCHED ->
+        R.drawable.ic_delete_outlined
     BrowseContextAction.DELETE_ALL -> R.drawable.ic_delete_sweep_outlined
     BrowseContextAction.SHOW_GUIDE -> R.drawable.ic_event
     BrowseContextAction.CONTINUE_WATCHING -> R.drawable.ic_play_arrow

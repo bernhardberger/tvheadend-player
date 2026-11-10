@@ -50,16 +50,6 @@ class PlaybackKeyPolicyTest {
     }
 
     @Test
-    fun hiddenControlsAreRevealedByOkAndVerticalDpad() {
-        assertTrue(shouldRevealPlaybackControls(false, KeyEvent.KEYCODE_DPAD_CENTER))
-        assertTrue(shouldRevealPlaybackControls(false, KeyEvent.KEYCODE_ENTER))
-        assertTrue(shouldRevealPlaybackControls(false, KeyEvent.KEYCODE_NUMPAD_ENTER))
-        assertTrue(shouldRevealPlaybackControls(false, KeyEvent.KEYCODE_DPAD_DOWN))
-        assertTrue(shouldRevealPlaybackControls(false, KeyEvent.KEYCODE_DPAD_UP))
-        assertFalse(shouldRevealPlaybackControls(true, KeyEvent.KEYCODE_DPAD_CENTER))
-    }
-
-    @Test
     fun revealingKeyCycleIsSuppressedUntilItsMatchingKeyUp() {
         assertTrue(
             playbackSuppressesRevealingKey(
@@ -508,18 +498,6 @@ class PlaybackKeyPolicyTest {
     fun channelKeysTuneUnlessTheRailBrowsesWithThem() {
         assertEquals(ChannelKeyAction.BROWSE_LIST, playbackChannelKeyAction(railBrowsesChannelKeys = true))
         assertEquals(ChannelKeyAction.TUNE, playbackChannelKeyAction(railBrowsesChannelKeys = false))
-    }
-
-    @Test
-    fun overlayFocusStartsOnControlCluster() {
-        assertEquals(
-            PlaybackOverlayFocusTarget.CONTROLS_CLUSTER,
-            initialPlaybackOverlayFocus(timeshiftAvailable = true),
-        )
-        assertEquals(
-            PlaybackOverlayFocusTarget.CONTROLS_CLUSTER,
-            initialPlaybackOverlayFocus(timeshiftAvailable = false),
-        )
     }
 
     private companion object {

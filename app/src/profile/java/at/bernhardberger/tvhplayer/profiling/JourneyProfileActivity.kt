@@ -20,7 +20,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.media3.exoplayer.ExoPlayer
 import at.bernhardberger.tvheadend.sdk.android.TvheadendServerProfileStore
-import at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult
+import at.bernhardberger.tvheadend.sdk.core.ServerProfileWriteResult
 import at.bernhardberger.tvheadend.sdk.core.EpgCoverageAcquisitionResult
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendLiveStartBuffer
@@ -102,10 +102,13 @@ class JourneyProfileActivity : AppCompatActivity() {
             )
             val settings = PlayerSettingsStore(this@JourneyProfileActivity)
             val tags = ChannelTagSettingsStore(this@JourneyProfileActivity)
-            tags.save(at.bernhardberger.tvhplayer.settings.ChannelTagPreferences())
+            tags.save(at.bernhardberger.tvhplayer.settings.ChannelTagPreferences(
+                profileId = tags.settings.first().profileId,
+            ))
             val profileStore = TvheadendServerProfileStore(this@JourneyProfileActivity)
             // Only the isolated .profile UID sees this anonymous fixture identity.
-            check(profileStore.storeAnonymous("offline.invalid", 9982) is ServerProfileReadResult.Available)
+            check(profileStore.addAnonymous("offline.invalid", 9982, activate = true)
+                is ServerProfileWriteResult.Applied)
             val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
             val profiles = AppProfileOwner(
                 session, profileStore, settings, Dispatchers.IO,

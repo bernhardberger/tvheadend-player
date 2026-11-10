@@ -15,7 +15,7 @@ import org.junit.Test
 
 /** Settings → Connection shows the catalog's 1xx title and reason for a failure, its own status otherwise. */
 class ConnectionOverviewFailureTest {
-    private val profile = ServerProfileReadResult.anonymous("offline.invalid", 9982)
+    private val profile = ServerProfileReadResult.anonymous(at.bernhardberger.tvheadend.sdk.core.ServerProfileId.generate(), "offline.invalid", 9982)
     private val saved = CurrentChannelReadiness.Browsable(listOf(Channel.create(ChannelId(1), name = "Name 1", number = 1)))
 
     @Test fun failuresAreTheirCatalogConditions() {

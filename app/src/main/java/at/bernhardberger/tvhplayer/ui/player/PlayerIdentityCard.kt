@@ -21,9 +21,6 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 
-/** The [PlayerChromeActions.restoreFocus] token that returns focus to the controls' [PlayerTopIdentity]. */
-internal const val PlayerIdentityCardTag = "player-identity-card"
-
 /** The picon's room: centred, lifted clear of the label along the card's bottom edge. */
 private val PiconWidth = 136.dp
 private val PiconHeight = 60.dp

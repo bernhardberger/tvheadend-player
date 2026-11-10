@@ -71,7 +71,7 @@ class NumericChannelReturnTest(private val tagged: Boolean, private val completi
         val originalTags = tags.settings.first()
         tags.save(originalTags.copy(activeTagId = if (tagged) tag.id else null))
         val profileStore = TvheadendServerProfileStore(context)
-        profileStore.storeAnonymous("offline.invalid", 9982)
+        profileStore.addAnonymous("offline.invalid", 9982, activate = true)
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
         val profiles = AppProfileOwner(session, profileStore, settings, Dispatchers.IO)
         val profileJob = scope.launch { profiles.run() }
@@ -88,7 +88,7 @@ class NumericChannelReturnTest(private val tagged: Boolean, private val completi
                 noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) })
         }
         val video = withContext(Dispatchers.Main) { VideoPlayerViewModel(runtime, session) }
-        val catalog = withContext(Dispatchers.Main) { ChannelsViewModel(session, tags) }
+        val catalog = withContext(Dispatchers.Main) { ChannelsViewModel(session, tags, profiles.liveProfile) }
         models.put("video", video)
         models.put("channels", catalog)
         catalog.scope.first { it.scope.visibleChannels.size == if (tagged) 2 else 3 }
@@ -125,7 +125,7 @@ class NumericChannelReturnTest(private val tagged: Boolean, private val completi
             withContext(Dispatchers.Main) { runtime.detach(); controlled.player.release() }
             scope.cancel()
             tags.save(originalTags)
-            profileStore.clearProfile()
+            profileStore.clearAll()
         }
     }
 

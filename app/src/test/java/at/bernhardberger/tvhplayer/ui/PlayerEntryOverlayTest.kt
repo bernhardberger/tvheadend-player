@@ -36,6 +36,7 @@ import androidx.compose.runtime.saveable.SaveableStateRegistry
 import androidx.savedstate.serialization.decodeFromSavedState
 import androidx.navigation3.runtime.NavBackStack
 import at.bernhardberger.tvhplayer.testutil.CaptureOutput
+import at.bernhardberger.tvhplayer.testutil.awaitScheduledWork
 import kotlinx.serialization.serializer
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
@@ -123,6 +124,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertEquals
@@ -154,6 +156,7 @@ class PlayerEntryOverlayTest {
     private val savedState = SaveableStateRegistry(restoredValues = null, canBeSaved = { true })
     private val context = ApplicationProvider.getApplicationContext<Application>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val profileDispatcher = StandardTestDispatcher()
     private val catalog = ChannelCatalog.create((1..3L).map { Channel.create(ChannelId(it), name = "Name $it", number = it) })
     private lateinit var player: ExoPlayer
     private lateinit var view: View
@@ -218,7 +221,7 @@ class PlayerEntryOverlayTest {
     @Test fun immediateSameChannelReturnWaitsForTheAcceptedStopEvenAfterAModeChange() {
         app(programme = true, mode = WarmPlaybackMode.OFF)
         compose.onNodeWithTag("channel-row-1").performSemanticsAction(SemanticsActions.OnClick)
-        compose.waitUntil(10_000) { playerVisible && runtime.activeTarget.value != null }
+        compose.awaitScheduledWork(profileDispatcher) { playerVisible && runtime.activeTarget.value != null }
         settle()
         val bindings = session.calls.count { it == FakeSessionCall.BIND_LIVE_PLAYBACK }
         val entered = CompletableDeferred<Unit>()
@@ -248,7 +251,7 @@ class PlayerEntryOverlayTest {
     @Test fun railSlotReturnsToTheLivePlayerWithoutRebinding() {
         app(programme = true, holdLive = true)
         compose.onNodeWithTag("channel-row-1").performSemanticsAction(SemanticsActions.OnClick)
-        compose.waitUntil(10_000) { playerVisible && runtime.activeTarget.value != null }
+        compose.awaitScheduledWork(profileDispatcher) { playerVisible && runtime.activeTarget.value != null }
         settle()
         val epoch = runtime.videoPresentation.value.epoch
         val bindings = session.calls.count { it == FakeSessionCall.BIND_LIVE_PLAYBACK }
@@ -283,7 +286,7 @@ class PlayerEntryOverlayTest {
     @Test fun railSlotOnTheRemoteReturnsToThePlayerAndBackToThePlayingChannel() {
         app(programme = true, holdLive = true)
         compose.onNodeWithTag("channel-row-1").performSemanticsAction(SemanticsActions.OnClick)
-        compose.waitUntil(10_000) { playerVisible && runtime.activeTarget.value != null }
+        compose.awaitScheduledWork(profileDispatcher) { playerVisible && runtime.activeTarget.value != null }
         settle()
         val epoch = runtime.videoPresentation.value.epoch
         val bindings = session.calls.count { it == FakeSessionCall.BIND_LIVE_PLAYBACK }
@@ -406,7 +409,7 @@ class PlayerEntryOverlayTest {
     @Test fun railSlotIsAbsentWhenBrowseStopsPlayback() {
         app(programme = true, mode = WarmPlaybackMode.OFF)
         compose.onNodeWithTag("channel-row-1").performSemanticsAction(SemanticsActions.OnClick)
-        compose.waitUntil(10_000) { playerVisible && runtime.activeTarget.value != null }
+        compose.awaitScheduledWork(profileDispatcher) { playerVisible && runtime.activeTarget.value != null }
         settle()
         leavePlayer()
         compose.onNodeWithTag("global-drawer-now-playing").assertDoesNotExist()
@@ -416,7 +419,7 @@ class PlayerEntryOverlayTest {
     @Test fun railSlotTitleFollowsAGuideThatArrivesLater() {
         app(programme = false, holdLive = true)
         compose.onNodeWithTag("channel-row-1").performSemanticsAction(SemanticsActions.OnClick)
-        compose.waitUntil(10_000) { playerVisible && runtime.activeTarget.value != null }
+        compose.awaitScheduledWork(profileDispatcher) { playerVisible && runtime.activeTarget.value != null }
         settle()
         leavePlayer()
         assertTrue(slotDescription()!!.startsWith("Now playing: 1 Name 1, "))
@@ -441,7 +444,7 @@ class PlayerEntryOverlayTest {
         // The rail shows only what still plays, so the slot's entry keeps its tune open.
         app(programme = true, mode = WarmPlaybackMode.AUDIO_ONLY, syntheticVideo = true, holdLive = from == "rail")
         compose.onNodeWithTag("channel-row-1").performSemanticsAction(SemanticsActions.OnClick)
-        compose.waitUntil(10_000) { playerVisible && runtime.activeTarget.value != null }
+        compose.awaitScheduledWork(profileDispatcher) { playerVisible && runtime.activeTarget.value != null }
         settle()
         leavePlayer()
         if (from == "details" || from == "menu") {
@@ -499,7 +502,7 @@ class PlayerEntryOverlayTest {
         val entryTag = if (layout == ChannelsLayout.LIST) "channel-row-1" else "channel-card-1"
         app(programme = true, mode = mode, channelsLayout = layout)
         compose.onNodeWithTag(entryTag).performSemanticsAction(SemanticsActions.OnClick)
-        compose.waitUntil(10_000) { playerVisible && runtime.activeTarget.value != null }
+        compose.awaitScheduledWork(profileDispatcher) { playerVisible && runtime.activeTarget.value != null }
         settle()
         val epoch = runtime.videoPresentation.value.epoch
         val bindings = session.calls.count { it == FakeSessionCall.BIND_LIVE_PLAYBACK }
@@ -517,7 +520,7 @@ class PlayerEntryOverlayTest {
             assertEquals(null, runtime.activeTarget.value)
         }
         compose.onNodeWithTag(entryTag).performSemanticsAction(SemanticsActions.OnClick)
-        compose.waitUntil(10_000) { playerVisible && runtime.activeTarget.value != null }
+        compose.awaitScheduledWork(profileDispatcher) { playerVisible && runtime.activeTarget.value != null }
         settle()
         compose.runOnIdle {
             assertEquals(bindings + if (mode == WarmPlaybackMode.OFF) 1 else 0,
@@ -606,6 +609,7 @@ class PlayerEntryOverlayTest {
         }
         compose.waitUntil(10_000) { runtime.activeTarget.value == AppPlaybackTarget.Recording(DvrEntryId(7)) }
         compose.onNodeWithTag("nav-recordings").performSemanticsAction(SemanticsActions.OnClick)
+        // Dispatchers.Default's serial browse-preparation lane builds the recording rows.
         compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("recording-list-entry-7")).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("recording-list-entry-7").requestFocus()
         settle()
@@ -615,6 +619,7 @@ class PlayerEntryOverlayTest {
         if (warm) recordingRow() else app(programme, recordings)
         if (recordings && !warm) {
             compose.onNodeWithTag("nav-recordings").performSemanticsAction(SemanticsActions.OnClick)
+            // Dispatchers.Default's serial browse-preparation lane builds the recording rows.
             compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("recording-list-entry-7")).fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("recording-list-entry-7").requestFocus()
             settle()
@@ -695,8 +700,8 @@ class PlayerEntryOverlayTest {
         val settings = PlayerSettingsStore(InMemoryData { beforeSettingsRead() })
         playerSettings = settings
         runBlocking { settings.setWarmPlaybackMode(mode) }
-        val profiles = AppProfileOwner(session, FakeServerProfileStore(ServerProfileReadResult.anonymous("offline.invalid", 9982)),
-            settings, Dispatchers.IO, readProfileForEditing = { ServerProfileEditReadResult.Missing })
+        val profiles = AppProfileOwner(session, FakeServerProfileStore(ServerProfileReadResult.anonymous(at.bernhardberger.tvheadend.sdk.core.ServerProfileId.generate(), "offline.invalid", 9982)),
+            settings, profileDispatcher, readProfileForEditing = { ServerProfileEditReadResult.Missing })
         scope.launch { profiles.run() }
         player = ExoPlayer.Builder(context).build()
         val base = player
@@ -727,7 +732,7 @@ class PlayerEntryOverlayTest {
             single { notices }
             single { ConnectionNoticeSource(session.observation, profiles.configurationGeneration, notices) }
             viewModel { AppConnectionViewModel(get(), get(), get()) }
-            viewModel { ChannelsViewModel(get(), get()) }
+            viewModel { ChannelsViewModel(get(), get(), get<AppProfileOwner>().liveProfile) }
             viewModel { VideoPlayerViewModel(get(), get()) }
             viewModel { SettingsStorageViewModel(session.cache, get(), ChannelAccentStore()) {} }
             viewModel { SettingsPlayerViewModel(get(), get(), get(), get(), get()) }
@@ -756,10 +761,11 @@ class PlayerEntryOverlayTest {
             }
         }
         val entryTag = if (channelsLayout == ChannelsLayout.LIST) "channel-row-1" else "channel-card-1"
-        // Home is the landing destination; these journeys browse the channel rows.
+        // Home's Dispatchers.Default browse preparation must finish before it exposes the rail.
         compose.waitUntil(15_000) { compose.onAllNodes(hasTestTag("nav-channels")).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("nav-channels").performSemanticsAction(SemanticsActions.OnClick)
         compose.waitForIdle()
+        // Channel rows also depend on Dispatchers.Default's serial browse-preparation lane.
         compose.waitUntil(15_000) {
             compose.onAllNodes(hasTestTag(entryTag)).fetchSemanticsNodes().isNotEmpty()
         }
@@ -790,9 +796,11 @@ class PlayerEntryOverlayTest {
         }
     }.createMediaSource(item)
 
-    // Background preparation takes real time, which the advanced clock does not see.
+    // Profile discovery is controlled; the serial Default preparation lane has its own drain signal.
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     private fun settle() {
         repeat(10) {
+            profileDispatcher.scheduler.runCurrent()
             compose.mainClock.advanceTimeBy(100)
             compose.awaitBrowsePreparation()
         }

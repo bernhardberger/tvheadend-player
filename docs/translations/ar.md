@@ -37,6 +37,8 @@ Review corrections: past-tense recorded dates, singular TV/GUIDE button, channel
 
 0.4.1 setup search strings drafted against `e59ff38a` by GPT-6.1 Sol and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer.
 
+0.5 connections strings (`server_*`) drafted against `996a93f9` by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer.
+
 ## Open questions
 
 - Regional broadcast terminology for multiplex and timeshift needs reviewer attention.

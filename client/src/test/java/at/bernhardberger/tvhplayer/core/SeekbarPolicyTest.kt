@@ -115,6 +115,19 @@ class SeekbarPolicyTest {
     }
 
     @Test
+    fun unknownTimingDoesNotClaimAKnownSeekbarPosition() {
+        val unknown = AppTimeshiftState(available = true, timingKnown = false)
+        val contradictory = unknown.copy(
+            bufferStartMs = -60_000L,
+            positionMs = -600_000L,
+            serverBehindLiveMs = 600_000L,
+        )
+        for (state in listOf(unknown, contradictory)) {
+            assertFalse(timeshiftSeekbarRange(state).positionKnown)
+        }
+    }
+
+    @Test
     fun collectedHistoryFillsTheAxisLikeAGrowingRecording() {
         val state = AppTimeshiftState(
             available = true,
@@ -156,11 +169,11 @@ class SeekbarPolicyTest {
             available = true, bufferStartMs = -60_000L, positionMs = -20_000L, liveEdgeMs = 0L, displayLiveEdgeMs = 3_000L,
         )
         val queue = queueTimeshiftSeek(TimeshiftSeekQueueState(), state, SEEKBAR_STEP_INITIAL_MS)
-        val decision = queuedTimeshiftSeekDecision(queue)
+        val targetMs = requireNotNull(queue.pendingTargetMs)
 
-        assertEquals(0L, decision.targetMs)
-        assertEquals(20_000L, decision.deltaMs)
-        assertEquals(1f, timeshiftSeekbarRange(projectedTimeshiftState(state, decision.targetMs)).displayProgress, 0f)
+        assertEquals(0L, targetMs)
+        assertEquals(20_000L, queue.pendingDeltaMs)
+        assertEquals(1f, timeshiftSeekbarRange(projectedTimeshiftState(state, targetMs)).displayProgress, 0f)
         // The controls' scrub reaches it too.
         val scrub = seekbarScrub(timeshiftSeekbarRange(state), 1, 0)
         assertEquals(0L, scrub)
@@ -205,120 +218,6 @@ class SeekbarPolicyTest {
         assertEquals(0f, expired.displayProgress, 0f)
         assertTrue(expired.availableStartFraction > expired.displayProgress)
         assertEquals(-10_000L, seekbarScrub(expired, -1, 0))
-    }
-
-    @Test
-    fun axisIsNullWithoutAProgramme() {
-        val state = AppTimeshiftState(available = true, bufferStartMs = -60_000L)
-
-        assertEquals(null, programmeAnchoredAxis(state, 5_400L, null, 7_200L))
-        assertEquals(null, programmeAnchoredAxis(state, 5_400L, 3_600L, 3_600L))
-        assertEquals(
-            null,
-            programmeAnchoredAxis(state.copy(available = false), 5_400L, 3_600L, 7_200L),
-        )
-    }
-
-    @Test
-    fun playbackFractionTracksPositionWithinProgramme() {
-        val axis = programmeAnchoredAxis(
-            state = AppTimeshiftState(
-                available = true,
-                bufferStartMs = -1_800_000L,
-                positionMs = -600_000L,
-            ),
-            nowEpochSec = 5_400L,
-            programmeStartSec = 3_600L,
-            programmeStopSec = 7_200L,
-        )
-
-        assertEquals(1f / 3f, requireNotNull(axis).playbackFraction, 0.001f)
-    }
-
-    @Test
-    fun liveEdgeSitsAheadOfPlaybackWhenBehindLive() {
-        val axis = requireNotNull(
-            programmeAnchoredAxis(
-                state = AppTimeshiftState(
-                    available = true,
-                    bufferStartMs = -1_800_000L,
-                    positionMs = -120_000L,
-                ),
-                nowEpochSec = 5_400L,
-                programmeStartSec = 3_600L,
-                programmeStopSec = 7_200L,
-            ),
-        )
-
-        assertTrue(axis.liveEdgeFraction > axis.playbackFraction)
-        assertEquals(0.5f, axis.liveEdgeFraction, 0.001f)
-    }
-
-    @Test
-    fun rewindableRegionClampsToProgrammeStart() {
-        val axis = requireNotNull(
-            programmeAnchoredAxis(
-                state = AppTimeshiftState(
-                    available = true,
-                    bufferStartMs = -3_600_000L,
-                ),
-                nowEpochSec = 5_400L,
-                programmeStartSec = 3_600L,
-                programmeStopSec = 7_200L,
-            ),
-        )
-
-        assertEquals(0f, axis.rewindableStartFraction, 0.001f)
-        assertTrue(axis.rewindableStartsBeforeProgramme)
-    }
-
-    @Test
-    fun rewindableBoundaryAtProgrammeStartIsNotOffAxis() {
-        val axis = requireNotNull(
-            programmeAnchoredAxis(
-                state = AppTimeshiftState(
-                    available = true,
-                    bufferStartMs = -1_800_000L,
-                ),
-                nowEpochSec = 5_400L,
-                programmeStartSec = 3_600L,
-                programmeStopSec = 7_200L,
-            ),
-        )
-
-        assertEquals(0f, axis.rewindableStartFraction, 0.001f)
-        assertFalse(axis.rewindableStartsBeforeProgramme)
-    }
-
-    @Test
-    fun axisIsStableAsTheBufferGrows() {
-        val shortBuffer = requireNotNull(
-            programmeAnchoredAxis(
-                state = AppTimeshiftState(
-                    available = true,
-                    bufferStartMs = -60_000L,
-                    positionMs = -30_000L,
-                ),
-                nowEpochSec = 5_400L,
-                programmeStartSec = 3_600L,
-                programmeStopSec = 7_200L,
-            ),
-        )
-        val longBuffer = requireNotNull(
-            programmeAnchoredAxis(
-                state = AppTimeshiftState(
-                    available = true,
-                    bufferStartMs = -1_800_000L,
-                    positionMs = -30_000L,
-                ),
-                nowEpochSec = 5_400L,
-                programmeStartSec = 3_600L,
-                programmeStopSec = 7_200L,
-            ),
-        )
-
-        assertEquals(shortBuffer.playbackFraction, longBuffer.playbackFraction, 0.001f)
-        assertEquals(shortBuffer.liveEdgeFraction, longBuffer.liveEdgeFraction, 0.001f)
     }
 
     @Test
@@ -404,12 +303,6 @@ class SeekbarPolicyTest {
     }
 
     @Test
-    fun programmeProgressHiddenWithoutCurrentEvent() {
-        assertTrue(shouldShowProgrammeProgress(hasCurrentEpgEvent = true))
-        assertFalse(shouldShowProgrammeProgress(hasCurrentEpgEvent = false))
-    }
-
-    @Test
     fun programmeTimingDescribesLivePlaybackEvenWithATimeshiftBuffer() {
         val live = AppTimeshiftState(
             available = true,
@@ -442,12 +335,10 @@ class SeekbarPolicyTest {
         assertTrue(presentation.atLiveEdge)
         assertEquals(0L, presentation.behindLiveMs)
         assertTrue(programmeTimingDescribesPlayback(freshlyTuned))
-        assertFalse(canSeekTimeshiftForward(freshlyTuned))
 
         val shifted = freshlyTuned.copy(serverBehindLiveMs = TIMESHIFT_LIVE_EDGE_TOLERANCE_MS + 1L)
         assertFalse(timeshiftPositionPresentation(shifted).atLiveEdge)
         assertEquals(TIMESHIFT_LIVE_EDGE_TOLERANCE_MS + 1L, timeshiftPositionPresentation(shifted).behindLiveMs)
-        assertTrue(canSeekTimeshiftForward(shifted))
 
         val unreported = freshlyTuned.copy(serverBehindLiveMs = null)
         assertFalse(timeshiftPositionPresentation(unreported).atLiveEdge)

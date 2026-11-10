@@ -23,7 +23,7 @@ class PlayerChromeStateTest {
         for (rail in listOf(false, true)) {
             val state = LivePlayerLayerState(this, 5_000L)
             state.showControls()
-            state.onActionFocused(PlayerIdentityCardTag)
+            state.onActionFocused("player-pause")
             if (rail) state.openChannelDrawer()
             state.openInfo()
             assertEquals(rail, state.channelRailPresented)

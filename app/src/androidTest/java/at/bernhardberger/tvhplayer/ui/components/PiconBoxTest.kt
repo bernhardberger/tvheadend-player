@@ -13,11 +13,15 @@ import androidx.compose.ui.graphics.PixelMap
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.tv.material3.Icon
+import androidx.tv.material3.MaterialTheme
+import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
@@ -67,7 +71,10 @@ class PiconBoxTest {
                             contentScale = ContentScale.Crop) }
                         // The former subcomposition propagated its fixed minimum constraints
                         // to the icon. Preserve that full, centred square for load/error states.
-                        Box(bounds("reference")) { PiconPlaceholder(Modifier.fillMaxSize()) }
+                        Box(bounds("reference")) {
+                            Icon(painterResource(R.drawable.ic_live_tv_outlined), null,
+                                Modifier.fillMaxSize(), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                 }
             }
@@ -90,7 +97,10 @@ class PiconBoxTest {
                 Column {
                     PiconBox(ChannelIcon.ImageCache(ArtworkId(1)), bounds("pending"))
                     PiconBox(null, bounds("missing"))
-                    Box(bounds("reference")) { PiconPlaceholder(Modifier.fillMaxSize()) }
+                    Box(bounds("reference")) {
+                        Icon(painterResource(R.drawable.ic_live_tv_outlined), null,
+                            Modifier.fillMaxSize(), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
         }

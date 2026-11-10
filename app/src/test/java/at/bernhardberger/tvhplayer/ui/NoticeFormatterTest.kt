@@ -25,7 +25,27 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en")
 class NoticeFormatterTest {
+    @Test fun failedServerSwitchDistinguishesConnectionAndSignIn() {
+        assertEquals("Can’t connect to Cabin", formatter.format(Notice.ServerConnectionFailed("Cabin")).headline)
+        assertEquals("Couldn’t sign in to Cabin. Check the username and password.",
+            formatter.format(Notice.ServerSignInRejected("Cabin")).headline)
+    }
     private val formatter get() = NoticeFormatter(ApplicationProvider.getApplicationContext<Application>())
+
+    @Test fun successfulSwitchNamesTheServerWithTheConnectedIcon() {
+        val id = at.bernhardberger.tvheadend.sdk.core.ServerProfileId.from("00000000-0000-4000-8000-000000000001")
+        val formatted = formatter.format(Notice.ServerSwitched(id, "Cabin"))
+        assertEquals("Connected to Cabin", formatted.headline)
+        assertEquals(AppNoticeIcon.CONNECTED, formatted.icon)
+        val other = at.bernhardberger.tvheadend.sdk.core.ServerProfileId.from("00000000-0000-4000-8000-000000000002")
+        assertFalse(Notice.ServerSwitched(id, "Cabin").key == Notice.ServerSwitched(other, "Cabin").key)
+    }
+
+    @Test fun removedServerNoticeNamesTheServer() {
+        val id = at.bernhardberger.tvheadend.sdk.core.ServerProfileId.from("00000000-0000-4000-8000-000000000001")
+        assertEquals("Removed kids on tvheadend.home.arpa",
+            formatter.format(Notice.ServerProfileRemoved(id, "kids on tvheadend.home.arpa")).headline)
+    }
 
     @Test fun automaticAdSkipUsesInformationalEnglishText() {
         assertEquals("Ad break skipped", formatter.format(Notice.AutomaticAdBreakSkip(1_000)).headline)
@@ -57,7 +77,12 @@ class NoticeFormatterTest {
     @Test fun connectionNoticesShowWhetherThePlugIsIn() {
         assertEquals(AppNoticeIcon.DISCONNECTED, formatter.format(Notice.Connection(ConnectionNoticeKind.LOST)).icon)
         assertEquals(AppNoticeIcon.CONNECTED, formatter.format(Notice.Connection(ConnectionNoticeKind.RESTORED)).icon)
-        assertEquals(AppNoticeIcon.WARNING, formatter.format(Notice.Connection(ConnectionNoticeKind.LOGIN_REJECTED)).icon)
+        assertEquals(AppNoticeIcon.SIGN_IN_REJECTED, formatter.format(Notice.Connection(ConnectionNoticeKind.LOGIN_REJECTED)).icon)
+    }
+
+    @Test fun aFailedSwitchShowsItsOwnIconForUnreachableAndRejected() {
+        assertEquals(AppNoticeIcon.DISCONNECTED, formatter.format(Notice.ServerConnectionFailed("Cabin")).icon)
+        assertEquals(AppNoticeIcon.SIGN_IN_REJECTED, formatter.format(Notice.ServerSignInRejected("Cabin")).icon)
     }
 
     @Test @Config(qualifiers = "de") fun lostNoticeWithAndWithoutSavedChannelsInGerman() {
@@ -140,6 +165,23 @@ class NoticeFormatterTest {
             val result = formatter.format(Notice.Dvr(kind, entry, DvrChangeOrigin.External, count = 3))
 
             assertFalse(result.detail.orEmpty().contains("Grand Prix of Austria"))
+        }
+    }
+
+    @Test fun retainedRemovedEntryIsDeletedAndRealCancellationsStayCanceled() {
+        val removed = DvrEntry.create(DvrEntryId(1), title = "Show", state = DvrEntryState.REMOVED)
+        val result = formatter.format(Notice.Dvr(DvrChangeKind.REMOVED, removed,
+            DvrChangeOrigin.ThisClient(DvrMutationKind.DELETE)))
+        assertEquals("Recording deleted", result.headline)
+        assertEquals(AppNoticeIcon.DELETE, result.icon)
+        for ((state, origin) in listOf(
+            DvrEntryState.SCHEDULED to DvrChangeOrigin.External,
+            DvrEntryState.INVALID to DvrChangeOrigin.ThisClient(DvrMutationKind.CANCEL),
+        )) {
+            val canceled = formatter.format(Notice.Dvr(DvrChangeKind.REMOVED,
+                DvrEntry.create(DvrEntryId(2), state = state), origin))
+            assertEquals("Recording canceled", canceled.headline)
+            assertEquals(AppNoticeIcon.CANCEL, canceled.icon)
         }
     }
 }

@@ -79,7 +79,7 @@ import kotlinx.coroutines.launch
 internal fun ChannelSchedule(
     channel: Channel?, events: List<EpgEvent>, nowSec: Long, viewerSec: Long?,
     loading: Boolean, offline: Boolean,
-    recording: (EpgEvent) -> DvrEntryState?,
+    recording: (EpgEvent) -> DvrEntry?,
     onOpen: (EpgEvent) -> Unit, onClose: () -> Unit, onRetry: () -> Unit,
     modifier: Modifier = Modifier,
     initialEvent: EpgEvent? = scheduleInitialEvent(events, viewerSec, nowSec),
@@ -425,12 +425,13 @@ private fun ScheduleHeadline(time: String?, timeWidth: Dp, content: @Composable 
 
 @Composable
 private fun ChannelScheduleRow(
-    event: EpgEvent, nowSec: Long, viewerSec: Long?, viewerBehindMs: Long?, recording: DvrEntryState?, timeWidth: Dp,
+    event: EpgEvent, nowSec: Long, viewerSec: Long?, viewerBehindMs: Long?, entry: DvrEntry?, timeWidth: Dp,
     onClick: () -> Unit, modifier: Modifier = Modifier,
     onContextMenu: (() -> Unit)? = null,
 ) {
     val contextMenu = rememberBrowseContextMenuTrigger(onContextMenu)
     var focused by remember { mutableStateOf(false) }
+    val recording = entry?.state
     val start = event.start.epochSeconds
     val stop = event.stop.epochSeconds
     // Ended for the viewer: what lies between a behind-live viewer and live is still ahead of them.
@@ -466,7 +467,7 @@ private fun ChannelScheduleRow(
                     Text(event.title.orEmpty(), Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (recording != null && !failed) {
                         Spacer(Modifier.width(TvSpacing8))
-                        RecordingStatusIndicator(recording, focused = focused)
+                        RecordingStatusIndicator(recording, rule = entry.rule, focused = focused)
                     }
                     if (failed) {
                         Spacer(Modifier.width(TvSpacing8))
@@ -501,7 +502,7 @@ private fun ChannelScheduleRow(
 private const val ScheduleSeparator = " • "
 private val ScheduleProgressGap = 3.dp
 private val ScheduleRunningStates = setOf(DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)
-private val ScheduleFailedStates = setOf(DvrEntryState.COMPLETED_ERROR, DvrEntryState.FILE_MISSING, DvrEntryState.MISSED)
+private val ScheduleFailedStates = setOf(DvrEntryState.COMPLETED_ERROR, DvrEntryState.MISSED)
 
 internal fun scheduleEventDay(event: EpgEvent, today: java.time.LocalDate, zone: ZoneId): java.time.LocalDate {
     val start = Instant.ofEpochSecond(event.start.epochSeconds).atZone(zone).toLocalDate()

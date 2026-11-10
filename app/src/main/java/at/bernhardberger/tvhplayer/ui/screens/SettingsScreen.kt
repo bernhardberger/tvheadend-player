@@ -15,9 +15,11 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.ui.platform.LocalContext
 import at.bernhardberger.tvhplayer.settings.UiSettings
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
+import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
@@ -51,6 +53,9 @@ internal fun SettingsScreen(
     backEnabled: Boolean = true,
     isCurrent: Boolean = true,
     settingsStore: UiSettingsStore = koinInject(),
+    profileOwner: AppProfileOwner = koinInject(),
+    playbackInterruption: () -> PlaybackInterruption = rememberPlaybackInterruption(),
+    stopPlayback: suspend () -> Unit = rememberPlaybackStop(),
 ) {
     val context = LocalContext.current
     var companionInstalled by remember(context) { mutableStateOf(isApplianceCompanionInstalled(context)) }
@@ -59,7 +64,7 @@ internal fun SettingsScreen(
         onPauseOrDispose { }
     }
     val navigation = rememberDepthNavigationState(SETTINGS_ROOT, section.name)
-    var setupOpen by rememberSaveable { mutableStateOf(false) }
+    val servers = rememberServerSettingsState(navigation, profileOwner, playbackInterruption, stopPlayback)
     val observation by channelsVm.observation.collectAsStateWithLifecycle()
     val profiles = observation.currentDvrConfigurations()
     val settings by settingsStore.settings.collectAsStateWithLifecycle(initialValue = UiSettings())
@@ -68,22 +73,30 @@ internal fun SettingsScreen(
         recordingSpaceText(observation.dvrDiskSpaceState)) { id ->
         scope.launch { settingsStore.setRecordingProfile(id); navigation.pop() }
     }
-    val levels = settingsGeneralLevels(navigation) + settingsConnectionLevels(connectionPresentation, onRetry, onSetUp = { setupOpen = true }) + settingsPlayerLevels(navigation) + listOf(
-        settingsRootLevel(recordingLevels.isNotEmpty(), connectionOverviewStatus(connectionPresentation).title),
+    val connectionLevels = settingsConnectionLevels(
+        connectionPresentation, onRetry, servers.actions, profileOwner, servers.switchingNow,
+    )
+    servers.FocusPending(connectionLevels.firstOrNull())
+    val profileList by profileOwner.profiles.collectAsStateWithLifecycle()
+    val connectionName = connectionScopeName(profileList)
+    val levels = settingsGeneralLevels(navigation) + connectionLevels + settingsPlayerLevels(navigation) + listOf(
+        settingsRootLevel(recordingLevels.isNotEmpty(),
+            connectionRootStatus(profileList, connectionOverviewStatus(connectionPresentation, profileOwner).title)),
         settingsKeepChannelLevel(navigation),
         settingsWarmPlaybackLevel(navigation),
-        settingsStreamProfileLevel(navigation),
+        settingsStreamProfileLevel(navigation, connectionName = connectionName),
         settingsFrameRateLevel(navigation),
         settingsStartupBufferLevel(navigation),
-        settingsChannelTagsLevel(channelsVm),
+        settingsChannelTagsLevel(channelsVm, connectionName),
     ) + recordingLevels + settingsAboutLevels(observation.sessionState, companionInstalled,
         onWhatsNewOpened = { scope.launch { settingsStore.markWhatsNewSeen(BuildConfig.VERSION_CODE) } }) +
         listOf(settingsApplianceLevel(companionInstalled))
     SettingsScreenNavigation(navigation, levels, initialFocusEnabled, contentPadding, backEnabled, isCurrent,
-        setup = if (setupOpen) {
-            { SettingsConnection(onSaved = { setupOpen = false }) }
-        } else null,
-        onCloseSetup = { setupOpen = false })
+        setup = servers.setupContent(),
+        onCloseSetup = servers::closeSetup,
+        dialog = servers.dialogContent(),
+        onCloseDialog = servers::closeDialogs,
+        onCancelSwitch = servers::cancelSwitch.takeIf { servers.switchingNow })
 }
 
 /** Connection carries its status; About always names the installed version. */
@@ -117,7 +130,12 @@ internal fun SettingsScreenNavigation(
     /** The connection setup, shown over Settings while it is open; Settings stays where it was. */
     setup: (@Composable () -> Unit)? = null,
     onCloseSetup: () -> Unit = {},
+    /** A question over Settings; it takes focus and Back, and Settings refocuses its row after it. */
+    dialog: (@Composable () -> Unit)? = null,
+    onCloseDialog: () -> Unit = {},
+    onCancelSwitch: (() -> Unit)? = null,
 ) {
+    val switchBack = at.bernhardberger.tvhplayer.ui.components.rememberBackKeyCycle()
     val rootFocus = LocalBrowseNavigationFocus.current
     val unavailable = stringResource(R.string.settings_unavailable)
     val layoutDirection = LocalLayoutDirection.current
@@ -134,6 +152,10 @@ internal fun SettingsScreenNavigation(
     val shownSetup = setup?.takeIf { isCurrent }
     if (setup != null && !isCurrent) SideEffect(onCloseSetup)
     val setupOpen = shownSetup != null
+    // A question closes the same way, so it cannot return with what it said before leaving.
+    val shownDialog = dialog?.takeIf { isCurrent }
+    if (dialog != null && !isCurrent) SideEffect(onCloseDialog)
+    val covered = setupOpen || shownDialog != null
     val layering = LocalBrowseContentLayering.current
     val pageKey = remember { Any() }
     val opacity = remember { mutableFloatStateOf(1f) }
@@ -141,7 +163,9 @@ internal fun SettingsScreenNavigation(
         if (setupOpen && isCurrent) layering?.details?.set(pageKey, opacity)
         onDispose { layering?.details?.remove(pageKey) }
     }
-    Box(Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize().onPreviewKeyEvent { event ->
+        handleSwitchBack(event.nativeKeyEvent, switchBack, onCancelSwitch, covered, isCurrent, backEnabled)
+    }) {
         // Settings keeps its columns and focus under the setup; nothing behind it takes focus or
         // Back, and closing the setup returns focus to the row that opened it.
         DepthNavigation(
@@ -155,14 +179,15 @@ internal fun SettingsScreenNavigation(
                 bottom = contentPadding.calculateBottomPadding()),
             modifier = Modifier.fillMaxSize()
                 .then(if (setupOpen) Modifier.clearAndSetSemantics { } else Modifier)
-                .focusProperties { onEnter = { if (setupOpen) cancelFocusChange() } }
+                .focusProperties { onEnter = { if (covered) cancelFocusChange() } }
                 .focusGroup(),
-            initialFocusEnabled = initialFocusEnabled && !setupOpen,
-            backEnabled = backEnabled && !setupOpen,
+            initialFocusEnabled = initialFocusEnabled && !covered,
+            backEnabled = backEnabled && !covered,
             isCurrent = isCurrent,
             onRootBack = rootFocus?.let { { it.requestFocus() } },
             pageKeyDirection = ChannelNavigation::pageDirectionForKeyCode,
         )
+        SwitchBackHandler(backEnabled, isCurrent, covered, onCancelSwitch)
         if (shownSetup != null) {
             // Registered before the setup's own handler, so its steps go back first.
             BackHandler(backEnabled, onCloseSetup)
@@ -170,5 +195,37 @@ internal fun SettingsScreenNavigation(
                 shownSetup()
             }
         }
+        shownDialog?.invoke()
     }
+}
+
+@Composable
+private fun SwitchBackHandler(
+    backEnabled: Boolean,
+    isCurrent: Boolean,
+    covered: Boolean,
+    onCancelSwitch: (() -> Unit)?,
+) {
+    BackHandler(enabled = backEnabled && isCurrent && !covered && onCancelSwitch != null) {
+        onCancelSwitch?.invoke()
+    }
+}
+
+private fun handleSwitchBack(
+    native: android.view.KeyEvent,
+    switchBack: at.bernhardberger.tvhplayer.core.BackKeyCycle,
+    onCancelSwitch: (() -> Unit)?,
+    covered: Boolean,
+    isCurrent: Boolean,
+    backEnabled: Boolean,
+): Boolean {
+    if (onCancelSwitch == null || covered || !isCurrent) {
+        switchBack.reset()
+        return false
+    }
+    return if (!backEnabled || native.keyCode != android.view.KeyEvent.KEYCODE_BACK) {
+        switchBack.reset()
+        false
+    } else switchBack.handle(native.action == android.view.KeyEvent.ACTION_DOWN,
+        native.repeatCount, native.isCanceled) { onCancelSwitch() }
 }

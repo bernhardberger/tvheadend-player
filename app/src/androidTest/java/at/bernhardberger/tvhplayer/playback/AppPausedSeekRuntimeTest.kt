@@ -270,7 +270,7 @@ class AppPausedSeekRuntimeTest {
                 assertNull("No playback error after Stop; cause type=${sourceFailure.get()?.javaClass?.simpleName}; " +
                     "knownPeriodTerminal=${sourceFailure.get()?.message == "Live subscription preparation failed"}", failure.get())
                 assertEquals("Only explicit actions and bounded paused refill", expectedSpeeds, connection.speeds)
-                assertEquals("Only in-memory profile reads", listOf(FakeServerProfileStoreCall.LOAD_PROFILE), profileStore.calls)
+                assertEquals("Only in-memory profile reads", listOf(FakeServerProfileStoreCall.PROFILES, FakeServerProfileStoreCall.LOAD_ACTIVE), profileStore.calls)
             } finally { withContext(NonCancellable) {
                 withContext(Dispatchers.Main) { runtime.detach() }
                 lifetime.shutdown(2.seconds)

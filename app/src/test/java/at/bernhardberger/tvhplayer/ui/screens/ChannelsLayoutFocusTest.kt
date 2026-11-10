@@ -974,9 +974,8 @@ class ChannelsLayoutFocusTest {
         repeat(7) { fixture.key(Key.DirectionRight) }
         fixture.awaitFocus(card(8))
         compose.mainClock.advanceTimeBy(800)
-        // The glow bakes off the main thread; the backdrop still waits for the logo, well within its timeout.
-        Thread.sleep(500)
         compose.mainClock.advanceTimeBy(200)
+        // This proves the glow node is mounted and the picon waits for its logo, not that the glow bake finished.
         compose.onNodeWithTag("channels-logo-glow").assertExists()
         compose.onNodeWithTag("channels-immersive-picon").assertDoesNotExist()
         logos.complete(Unit)

@@ -119,14 +119,11 @@ class PiconBoxInkTest {
         ground = LIGHT_FILL
         val frames = mutableListOf<Shown>()
         val frameColours = mutableListOf<String>()
-        val deadline = System.currentTimeMillis() + 5_000
-        do {
-            compose.mainClock.advanceTimeByFrame()
+        compose.mainClock.advanceTimeUntil(timeoutMillis = 5_000) {
             frames += pixels()
             frameColours += colours()
-            if (frames.last().let { it.dark >= WHOLE_LOGO && it.white == 0 }) break
-            Thread.sleep(10)
-        } while (System.currentTimeMillis() < deadline)
+            frames.last().let { it.dark >= WHOLE_LOGO && it.white == 0 }
+        }
         compose.mainClock.autoAdvance = true
 
         assertTrue("the logo should end inked dark: ${frames.last()}", frames.last().dark >= WHOLE_LOGO)
@@ -168,7 +165,8 @@ class PiconBoxInkTest {
 
     /** Loads [images] through Coil's own decode path, so transformations, the memory cache and the fade are real. */
     private fun cachingLoader(images: Map<ArtworkId, Bitmap>, onFetch: () -> Unit = {}): ImageLoader =
-        ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>()).components {
+        ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>())
+            .coroutineContext(kotlinx.coroutines.Dispatchers.Main.immediate).components {
             add(Fetcher.Factory<AppArtworkSource> { data, _, _ ->
                 Fetcher {
                     onFetch()

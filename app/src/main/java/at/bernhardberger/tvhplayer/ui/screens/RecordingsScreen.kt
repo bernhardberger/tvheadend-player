@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
+import at.bernhardberger.tvhplayer.ui.components.rule
 import at.bernhardberger.tvhplayer.ui.components.watchingIndicator
 import at.bernhardberger.tvhplayer.ui.components.recordingViewerPosition
 import at.bernhardberger.tvhplayer.ui.components.progressColor
@@ -37,6 +38,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 
 import at.bernhardberger.tvhplayer.core.BrowseContextAction
 import at.bernhardberger.tvhplayer.core.recordingContextActions
+import at.bernhardberger.tvhplayer.core.deleteRemovesEntryOnly
 import at.bernhardberger.tvhplayer.ui.components.BrowseContextMenu
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeArtwork
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
@@ -1065,7 +1067,7 @@ internal fun RecordingsScreenContent(
             LaunchedEffect(choice) {
                 if (!choice) closeResume()
             }
-            RecordingPlaybackChoice(opened, openedAdmission, observation, channel, nowSec,
+            if (choice) RecordingPlaybackChoice(opened, openedAdmission, observation, channel, nowSec,
                 onPlay = play, onClose = closeResume, onWatchLive = watchLive, backEnabled = backEnabled)
         }
         if (showResumeChoice) {
@@ -1131,6 +1133,7 @@ internal fun RecordingsScreenContent(
                 androidx.compose.ui.platform.LocalConfiguration.current.locales[0]),
             summary = opened.summary?.takeIf(String::isNotBlank) ?: opened.description.orEmpty(),
             recordingState = opened.state,
+            recordingRule = opened.rule,
             resumePositionMs = at.bernhardberger.tvhplayer.core.offeredResumePosition(openedAdmission)?.inWholeMilliseconds,
             playbackIndicator = watchingIndicator(opened.id),
             actions = recordingContextActions(opened, canModifyRecordings = selectedCapability != null &&
@@ -1151,7 +1154,8 @@ internal fun RecordingsScreenContent(
                 // Playback keeps the menu up until the player has replaced browse.
                 if (playing == null) {
                     menuConsumed = action != BrowseContextAction.DETAILS
-                    showContextMenu = action in listOf(BrowseContextAction.STOP, BrowseContextAction.CANCEL, BrowseContextAction.DELETE)
+                    showContextMenu = action in listOf(BrowseContextAction.STOP, BrowseContextAction.CANCEL,
+                        BrowseContextAction.DELETE, BrowseContextAction.REMOVE_ENTRY)
                 }
                 when (action) {
                     BrowseContextAction.WATCH_LIVE -> opened.channelId?.let(channelsById::get)?.let { channel ->
@@ -1190,7 +1194,7 @@ internal fun RecordingsScreenContent(
                         pendingMutation = selectedCapability?.let { DvrMutationAction.Cancel(it, opened.id) }
                         pendingAction = PendingRecordingAction.CANCEL
                     }
-                    BrowseContextAction.DELETE -> {
+                    BrowseContextAction.DELETE, BrowseContextAction.REMOVE_ENTRY -> {
                         detailsInitialAction = RecordingDetailsAction.DELETE
                         pendingMutation = selectedCapability?.let { DvrMutationAction.Delete(it, opened.id) }
                         pendingAction = PendingRecordingAction.DELETE
@@ -1244,7 +1248,8 @@ internal fun RecordingsScreenContent(
                 RecordingDetailsAction.RESUME -> BrowseContextAction.RESUME
                 RecordingDetailsAction.BEGINNING -> BrowseContextAction.START_OVER
                 RecordingDetailsAction.PLAY -> BrowseContextAction.PLAY
-                RecordingDetailsAction.DELETE -> BrowseContextAction.DELETE
+                RecordingDetailsAction.DELETE ->
+                    if (deleteRemovesEntryOnly(opened)) BrowseContextAction.REMOVE_ENTRY else BrowseContextAction.DELETE
                 null -> null
             },
             backEnabled = backEnabled && !closing && menu == showContextMenu && pendingAction == null,
@@ -1299,6 +1304,7 @@ internal fun RecordingsScreenContent(
         RecordingConfirmationDialog(
             visibility = confirmationVisibility,
             action = action,
+            removeEntry = deleteRemovesEntryOnly(target),
             title = target.title.orEmpty(),
             channelName = target.channelId?.let(channelsById::get)?.name ?: target.channelName.orEmpty(),
             dateAndTime = at.bernhardberger.tvhplayer.ui.common.formatRecordingSchedule(target.start?.epochSeconds,

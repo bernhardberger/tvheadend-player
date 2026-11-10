@@ -31,6 +31,19 @@ object TvSurfaceColors {
     val bright = Color(0xFF37393B)
 }
 
+/**
+ * A server avatar's fill and its letter or glyph: Material 3 dark tones 30 and 90, slightly muted,
+ * in the order blue, amber, green, purple, teal, rose. The index comes from the server's address.
+ */
+val TvServerAvatarColors: List<Pair<Color, Color>> = listOf(
+    Color(0xFF0F4A64) to Color(0xFFC4E7FF),
+    Color(0xFF574100) to Color(0xFFFFDF9E),
+    Color(0xFF2B4D23) to Color(0xFFC4EFA9),
+    Color(0xFF45386A) to Color(0xFFE6DCFF),
+    Color(0xFF0E4D48) to Color(0xFFA6F0E6),
+    Color(0xFF62303B) to Color(0xFFFFD9DF),
+)
+
 // Material Color Utilities 0.3.0: cyan #00BCFA, orange #FA7F00.
 // Dark roles use generated tones; tertiary deliberately uses T70, not T80.
 val TvDarkColors = darkColorScheme(

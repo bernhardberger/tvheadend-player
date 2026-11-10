@@ -158,7 +158,9 @@ class GuideRealisticSceneTest {
                 "failed" -> DvrEntryState.COMPLETED_ERROR
                 else -> error("Unsupported fixture DVR state")
             },
-            start = event.start, stop = event.stop, channelName = channels.single { it.id == event.channelId }.name)
+            start = event.start, stop = event.stop, channelName = channels.single { it.id == event.channelId }.name,
+            // A fixture series stands for the rule that scheduled it.
+            autorecRuleId = record.optString("series_id").takeIf(String::isNotEmpty)?.let(::AutorecRuleId))
     }
 
     @Before fun prepare() {
@@ -582,7 +584,7 @@ class GuideRealisticSceneTest {
 
     @Test fun u5RecordingNowAndScheduledMarksShowBesideTheirTitles() {
         showAt("2026-09-15T20:00:00")
-        // Without the headline the window around 20:00 shows Northline Tonight (recording) and Amber Stage (scheduled twice) together.
+        // Without the headline the window around 20:00 shows Northline Tonight (recording) and Amber Stage (scheduled twice by a series rule) together.
         runBlocking { uiSettings.setGuideView(GuideView(headline = false)) }
         compose.waitUntil(10_000) { compose.onAllNodesWithTag("guide-headline").fetchSemanticsNodes().isEmpty() }
         moveToChannel(9)
@@ -590,7 +592,7 @@ class GuideRealisticSceneTest {
         assertMarks("guide-cell-recording-mark", atLeast = 3)
     }
 
-    @Test fun u5RecordedProgrammeShowsTheRecordingDot() {
+    @Test fun u5RecordedProgrammeShowsTheRecordedMark() {
         // The film ended at 22:20 the previous evening; Left from the current programme reaches it.
         showAt("2026-09-14T22:40:00")
         moveToChannel(9)
@@ -844,7 +846,7 @@ class GuideRealisticSceneTest {
         val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.IO,
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
         if (playerJourney) runtimeScope.launch { profiles.run() }
-        val model = ChannelsViewModel(session, ChannelTagSettingsStore(preferences()))
+        val model = ChannelsViewModel(session, ChannelTagSettingsStore(preferences()), profiles.liveProfile)
         models.put("channels", model)
         player = ExoPlayer.Builder(context()).build()
         val coordinator = createTvheadendPlaybackCoordinator(player).also { if (playerJourney) it.launchIn(runtimeScope) }

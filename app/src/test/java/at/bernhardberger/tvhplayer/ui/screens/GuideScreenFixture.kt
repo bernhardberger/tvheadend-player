@@ -304,9 +304,9 @@ abstract class GuideScreenFixture {
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
         if (playingChannel != null) runtimeScope.launch { profiles.run() }
         val tagSettings = ChannelTagSettingsStore(preferences())
-        if (activeTag) runBlocking { tagSettings.save(ChannelTagPreferences(activeTagId = ChannelTagId(1))) }
-        if (activeGroup != null) runBlocking { tagSettings.save(ChannelTagPreferences(activeTagId = activeGroup)) }
-        model = ChannelsViewModel(session, tagSettings)
+        if (activeTag) runBlocking { tagSettings.save(tagSettings.settings.first().copy(activeTagId = ChannelTagId(1))) }
+        if (activeGroup != null) runBlocking { tagSettings.save(tagSettings.settings.first().copy(activeTagId = activeGroup)) }
+        model = ChannelsViewModel(session, tagSettings, profiles.liveProfile)
         models.put("channels", model)
         player = ExoPlayer.Builder(context()).build()
         val runtime = AppPlaybackRuntime(player, session, createTvheadendPlaybackCoordinator(player).also {
@@ -528,7 +528,10 @@ abstract class GuideScreenFixture {
     fun title(channel: Int, offset: Int) = if (channel == 2 && offset == 0)
         "Wunder der Natur: Eine außergewöhnliche Reise durch die nördlichen Landschaften" else "Channel $channel • Programme $offset"
     fun preferences() = object : DataStore<Preferences> {
-        override val data = MutableStateFlow(emptyPreferences())
+        override val data = MutableStateFlow(androidx.datastore.preferences.core.preferencesOf(
+            androidx.datastore.preferences.core.stringPreferencesKey("activeServerProfileId") to
+                at.bernhardberger.tvheadend.sdk.core.ServerProfileId.generate().value,
+        ))
         override suspend fun updateData(transform: suspend (Preferences) -> Preferences) = transform(data.value).also { data.value = it }
     }
     fun context(): Application = ApplicationProvider.getApplicationContext()

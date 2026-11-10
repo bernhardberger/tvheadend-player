@@ -20,7 +20,9 @@ import java.time.format.TextStyle
 import kotlin.time.Clock
 import kotlin.time.Instant
 
-internal enum class AppNoticeIcon { SCHEDULE, RECORDING, CHECK, STOP, WARNING, CANCEL, DELETE, CONNECTED, DISCONNECTED }
+internal enum class AppNoticeIcon {
+    SCHEDULE, RECORDING, CHECK, STOP, WARNING, CANCEL, DELETE, CONNECTED, DISCONNECTED, SIGN_IN_REJECTED
+}
 internal data class FormattedNotice(val headline: String, val detail: String? = null, val icon: AppNoticeIcon? = null)
 
 private fun dvrFailureReason(failure: DvrMutationFeedback): Int = when (failure) {
@@ -36,6 +38,18 @@ private fun dvrFailureReason(failure: DvrMutationFeedback): Int = when (failure)
 /** The only resource/wording boundary for transient feedback. */
 internal class NoticeFormatter(private val context: Context) {
     fun format(notice: Notice, now: Instant = Clock.System.now()): FormattedNotice = when (notice) {
+        is Notice.ServerProfileRemoved ->
+            FormattedNotice(context.getString(R.string.server_profile_removed, notice.name))
+        Notice.ServerProfileAlreadyExists -> FormattedNotice(context.getString(R.string.server_profile_already_exists))
+        Notice.ServerProfileWriteFailed -> FormattedNotice(context.getString(R.string.server_profile_write_failed))
+        is Notice.ServerConnectionFailed -> FormattedNotice(
+            context.getString(R.string.server_connection_failed, notice.name),
+            icon = AppNoticeIcon.DISCONNECTED)
+        is Notice.ServerSwitched -> FormattedNotice(context.getString(R.string.server_switched, notice.name),
+            icon = AppNoticeIcon.CONNECTED)
+        is Notice.ServerSignInRejected -> FormattedNotice(
+            context.getString(R.string.server_sign_in_rejected, notice.name),
+            icon = AppNoticeIcon.SIGN_IN_REJECTED)
         is Notice.AutomaticAdBreakSkip -> FormattedNotice(context.getString(R.string.recording_ad_break_skipped))
         is Notice.Dvr -> formatDvr(notice, now)
         is Notice.DvrActionFailed -> FormattedNotice(context.getString(when (notice.failure) {
@@ -62,7 +76,7 @@ internal class NoticeFormatter(private val context: Context) {
         }), icon = when (notice.kind) {
             ConnectionNoticeKind.RESTORED -> AppNoticeIcon.CONNECTED
             ConnectionNoticeKind.LOST -> AppNoticeIcon.DISCONNECTED
-            ConnectionNoticeKind.LOGIN_REJECTED -> AppNoticeIcon.WARNING
+            ConnectionNoticeKind.LOGIN_REJECTED -> AppNoticeIcon.SIGN_IN_REJECTED
         })
         is Notice.CacheClear -> FormattedNotice(context.getString(
             if (notice.success) R.string.cache_notice_cleared else R.string.cache_notice_failed))

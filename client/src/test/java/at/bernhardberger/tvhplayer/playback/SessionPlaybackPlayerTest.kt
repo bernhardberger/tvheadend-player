@@ -116,7 +116,7 @@ class SessionPlaybackPlayerTest {
 
     @Test
     @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
-    fun mediaControllerReceivesTheSessionContractAcrossTargetAndFailureChanges() = exercise {
+    fun mediaControllerReceivesTheSessionContractAcrossTargetAndFailureChanges() = exercise(realThreads = true) {
         val context = ApplicationProvider.getApplicationContext<Application>()
         val now = Clock.System.now()
         val initial = session.observation.value
@@ -143,7 +143,8 @@ class SessionPlaybackPlayerTest {
             val modern = connecting.get()
             live(false)
             await { modern.mediaMetadata.subtitle == "Programme" }
-            await { modern.mediaMetadata.artworkData != null }
+            // Session artwork loading uses production Dispatchers.IO, then the controller's looper.
+            driver.await("controller received IO-loaded artwork") { modern.mediaMetadata.artworkData != null }
             assertEquals("Channel One", modern.mediaMetadata.title)
             assertTrue(bytes.contentEquals(modern.mediaMetadata.artworkData))
             assertNull(modern.mediaMetadata.artworkUri)
@@ -198,7 +199,8 @@ class SessionPlaybackPlayerTest {
         }
     }
 
-    @Test fun sessionArtworkFollowsOnlyTheCurrentTargetAndNotProgrammeTicks() = exercise {
+    @Test fun sessionArtworkFollowsOnlyTheCurrentTargetAndNotProgrammeTicks() = exercise(realThreads = true) {
+        // Keep the real IO loader: this case checks a cancelled request completing across threads.
         val pending = kotlinx.coroutines.CompletableDeferred<ByteArray?>()
         val completed = kotlinx.coroutines.CompletableDeferred<Unit>()
         val requests = java.util.Collections.synchronizedList(mutableListOf<SessionArtworkRequest>())
@@ -233,7 +235,8 @@ class SessionPlaybackPlayerTest {
             assertTrue(requests.isEmpty())
             assertNull(artworkPlayer.mediaMetadata.artworkData)
             observations.value = session.observation.value
-            await { artworkPlayer.mediaMetadata.artworkData != null }
+            // SessionArtworkLoader executes on Dispatchers.IO, outside the test scheduler.
+            driver.await("initial artwork loaded") { artworkPlayer.mediaMetadata.artworkData != null }
             assertTrue(delivered.contains(listOf(1.toByte())))
             assertTrue(byteArrayOf(1).contentEquals(artworkPlayer.mediaMetadata.artworkData))
             assertEquals(MediaMetadata.PICTURE_TYPE_FRONT_COVER, artworkPlayer.mediaMetadata.artworkDataType)
@@ -246,20 +249,25 @@ class SessionPlaybackPlayerTest {
                 epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = listOf(
                     EpgEvent.create(EventId(3), ChannelId(1), now - 1.hours, now + 1.hours, title = "Next show"))))))
             observations.value = session.observation.value
-            scheduler.advanceTimeBy(1_100)
+            advanceTimeBy(1_100)
             settle()
             assertEquals(1, requests.size)
             live(false, channelId = ChannelId(2))
-            await { requests.size == 2 }
+            // The request is recorded by the real IO loader.
+            driver.await("second artwork requested") { requests.size == 2 }
             assertNull(artworkPlayer.mediaMetadata.artworkData)
             live(false)
-            await { byteArrayOf(1).contentEquals(artworkPlayer.mediaMetadata.artworkData) }
+            // Even a cached artwork result is delivered through Dispatchers.IO.
+            driver.await("cached artwork restored") { byteArrayOf(1).contentEquals(artworkPlayer.mediaMetadata.artworkData) }
             live(false, channelId = ChannelId(2))
-            await { requests.size == 3 }
+            // The retry also enters the real IO loader.
+            driver.await("retry artwork requested") { requests.size == 3 }
             live(false)
-            await { byteArrayOf(1).contentEquals(artworkPlayer.mediaMetadata.artworkData) }
+            // The cached current target crosses IO while the stale request is still pending.
+            driver.await("current artwork restored") { byteArrayOf(1).contentEquals(artworkPlayer.mediaMetadata.artworkData) }
             pending.complete(byteArrayOf(2))
-            await("late artwork request completed") { completed.isCompleted }
+            // Completion belongs to the non-cancellable request on Dispatchers.IO.
+            driver.await("late artwork request completed") { completed.isCompleted }
             settle()
             assertTrue(byteArrayOf(1).contentEquals(artworkPlayer.mediaMetadata.artworkData))
             assertEquals(3, requests.size) // Successful identities are cached; failures retry.
@@ -696,7 +704,7 @@ class SessionPlaybackPlayerTest {
         settle()
         assertFalse(wrapper.playWhenReady)
         // The fake stream renders no frame: the refresh ends after its budget on the runtime's clock.
-        scheduler.advanceTimeBy(PAUSED_SEEK_NUDGE_MILLIS)
+        advanceTimeBy(PAUSED_SEEK_NUDGE_MILLIS)
         await { !runtime.livePause.value.pausedSeekRefresh }
         settle()
         assertFalse(player.playWhenReady)
@@ -1097,8 +1105,16 @@ class SessionPlaybackPlayerTest {
         player.setMediaSource(SilenceMediaSource.Factory().setDurationUs(60_000_000).createMediaSource())
         player.prepare()
         await { wrapper.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM) }
-        wrapper.seekTo(12_000)
+        val position = player.currentPosition
+        val seeks = sessionSeeks
+        whileCommandsBlocked {
+            wrapper.seekTo(12_000)
+            settle()
+            assertEquals(position, player.currentPosition)
+            assertEquals(seeks, sessionSeeks)
+        }
         await { player.currentPosition >= 12_000 }
+        assertEquals(seeks + 1, sessionSeeks)
         assertTrue(player.currentPosition < 13_000)
         assertTrue(connection.speeds.isEmpty())
     }
@@ -1138,17 +1154,28 @@ class SessionPlaybackPlayerTest {
     }
 
     @Test fun targetsOfTheSameKindReplaceEachOtherWithoutAStop() = exercise {
+        val initial = session.observation.value
+        session.publish(SessionObservation.create(sessionState = initial.sessionState,
+            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(
+                Channel.create(ChannelId(1)), Channel.create(ChannelId(2))))),
+            epgState = initial.epgState,
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(listOf(
+                DvrEntry.create(DvrEntryId(1), state = DvrEntryState.COMPLETED),
+                DvrEntry.create(DvrEntryId(2), state = DvrEntryState.COMPLETED))))))
         live(false)
         playerLog.clear()
         answerNextSubscribe(2)
-        assertTrue(runtime.playLive(liveSelection())?.isStarted == true)
+        assertTrue(runtime.playLive(requireNotNull(currentLivePlaybackSelection(
+            session.observation.value, ChannelId(2))))?.isStarted == true)
         settle()
-        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
         assertFalse(playerLog.toString(), "stop" in playerLog)
         recording()
         playerLog.clear()
-        recording()
-        assertEquals(AppPlaybackTarget.Recording(DvrEntryId(1)), runtime.activeTarget.value)
+        assertTrue(runtime.playRecording(requireNotNull(currentRecordingPlaybackSelection(
+            session.observation.value, DvrEntryId(2))), RecordingPlaybackStart.START_OVER)?.isStarted == true)
+        settle()
+        assertEquals(AppPlaybackTarget.Recording(DvrEntryId(2)), runtime.activeTarget.value)
         assertFalse(playerLog.toString(), "stop" in playerLog)
     }
 
@@ -1389,7 +1416,7 @@ class SessionPlaybackPlayerTest {
         settle()
         // The screen has not taken the event yet when the viewer tunes (zap settle window).
         runtime.notePlaybackIntent()
-        screen.scheduler.advanceUntilIdle()
+        screen.scheduler.runCurrent()
         await("exactly one subscription unsubscribed") { connection.unsubscribeCount == 1 }
         assertEquals(emptyList<Unit>(), stops)
     }
@@ -1687,11 +1714,15 @@ class SessionPlaybackPlayerTest {
         assertEquals(AppPlaybackState.Idle, runtime.state.value)
     }
 
-    @Test fun enteringWithoutAUserStopNotesIntentThatBeatsAnEarlierQueuedStop() = exercise {
+    @Test fun enteringAndReenteringWithoutAUserStopEachAdvancePlaybackIntent() = exercise {
         live(false)
+        val opening = runtime.notePlaybackIntent()
         val entry = requireNotNull(runtime.enterPlayerScreen())
+        assertTrue(entry > opening)
         assertFalse(runtime.isPlaybackIntentStopped(entry))
-        assertNotNull(runtime.enterPlayerScreen()) // re-entry
+        val reentry = requireNotNull(runtime.enterPlayerScreen())
+        assertTrue(reentry > entry)
+        assertFalse(runtime.isPlaybackIntentStopped(reentry))
         assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
     }
 
@@ -1790,13 +1821,13 @@ class SessionPlaybackPlayerTest {
             events = listOf(EpgEvent.create(EventId(1), ChannelId(1), start = now - 1.hours,
                 stop = now + 1.hours, title = "Programme")),
         ))))
-        scheduler.advanceTimeBy(1_000)
+        advanceTimeBy(1_000)
         await { wrapper.mediaMetadata.subtitle == "Programme" }
         assertEquals(androidx.media3.common.C.TIME_UNSET, wrapper.duration)
         // The fake stream has no rendered wall-clock mapping: after Pause it cannot borrow Now.
         wrapper.pause()
         await { !player.playWhenReady && !runtime.liveStartUndisturbed.value }
-        scheduler.advanceTimeBy(1_000) // Resample the session timeline after the pause is applied.
+        advanceTimeBy(1_000) // Resample the session timeline after the pause is applied.
         await { wrapper.mediaMetadata.subtitle == null }
         assertTrue(wrapper.isCurrentMediaItemLive)
         assertTrue(wrapper.isCurrentMediaItemDynamic)
@@ -1873,10 +1904,12 @@ class SessionPlaybackPlayerTest {
         assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
     }
 
-    private fun exercise(block: suspend Fixture.() -> Unit) = runTest(timeout = 15.seconds) {
+    private fun exercise(realThreads: Boolean = false, block: suspend Fixture.() -> Unit) = runTest(timeout = 15.seconds) {
         val fixture = Fixture(CoroutineScope(StandardTestDispatcher(testScheduler) + SupervisorJob()), testScheduler)
         try {
-            fixture.driver.exercise(this, 15_000) { fixture.block() }
+            // Only the artwork cases run SessionArtworkLoader on production Dispatchers.IO.
+            fixture.driver.exercise(this, timeoutMillis = if (realThreads) 15_000 else null,
+                settle = fixture::settle) { fixture.block() }
         }
         finally {
             fixture.observation.cancel()
@@ -1891,6 +1924,7 @@ class SessionPlaybackPlayerTest {
 
     private class Fixture(val scope: CoroutineScope, val scheduler: TestCoroutineScheduler) {
         val driver = PlaybackTestDriver(scheduler)
+        private val work = StandardTestDispatcher(scheduler)
         private val context = ApplicationProvider.getApplicationContext<Application>()
         var focusRequests = 0
         var focusGranted = true
@@ -1914,7 +1948,7 @@ class SessionPlaybackPlayerTest {
                 connection.subscribe(id, channelId, options).also {
                     subscriptions.value = connection.subscribeCount
                 }
-        }, Dispatchers.Default).apply { startAdmission() }
+        }, work).apply { startAdmission() }
         val session = FakeTvheadendSession(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(Channel.create(ChannelId(1), name = "Channel One")))),
@@ -1924,10 +1958,10 @@ class SessionPlaybackPlayerTest {
             )))),
         )).apply { scriptLivePlaybackSuccess(manager); scriptRecordingPlaybackSuccess() }
         val settings = PlayerSettingsStore(InMemoryPreferencesDataStore())
-        private val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.IO,
+        private val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, work,
             readProfileForEditing = { ServerProfileEditReadResult.Missing }).also { owner -> scope.launch { owner.run() } }
-        // Stalled streams must not advance Robolectric time past SDK Handler watchdogs.
-        val player = ExoPlayer.Builder(context).setClock(FakeClock(false)).build()
+        private val clock = FakeClock(false)
+        val player = ExoPlayer.Builder(context).setClock(clock).build()
         /** The SDK's Player stops and the playlists they leave, in order: a stop releases the decoders. */
         val playerLog: MutableList<String> = java.util.Collections.synchronizedList(mutableListOf())
         /** Runs as each [playerLog] entry is made, so a test can cancel a start at that point. */
@@ -1941,7 +1975,7 @@ class SessionPlaybackPlayerTest {
                 logPlayer("stop")
                 player.stop()
             }
-        }).also { it.launchIn(scope) }
+        }, workDispatcher = work).also { it.launchIn(scope) }
         init {
             player.addListener(object : Player.Listener {
                 override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
@@ -2138,7 +2172,7 @@ class SessionPlaybackPlayerTest {
                 assertEquals(1, pendingSessionStops())
                 val opening = runtime.notePlaybackIntent()
                 entry = requireNotNull(runtime.enterPlayerScreen())
-                assertEquals(opening + 1, entry) // not joined to the older pending Stop
+                assertTrue(entry > opening) // not joined to the older pending Stop
                 stops = collectSessionStops()
             }
             // Drained: the Stop has had its check, and was skipped.
@@ -2187,9 +2221,13 @@ class SessionPlaybackPlayerTest {
             commands.serialize(onClosed = {}) {}
         }
 
-        fun await(label: String = "session playback condition", predicate: () -> Boolean) =
-            driver.await(label, predicate = predicate)
+        fun await(label: String = "session playback condition", predicate: () -> Boolean) {
+            settle()
+            driver.awaitCurrent(label, predicate)
+        }
 
-        fun settle() = driver.settle(player)
+        fun settle() = driver.settleLive(player)
+
+        fun advanceTimeBy(millis: Long) = driver.advanceLive(player, clock, millis)
     }
 }

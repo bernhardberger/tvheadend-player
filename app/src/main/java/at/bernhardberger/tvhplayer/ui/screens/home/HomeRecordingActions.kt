@@ -101,6 +101,7 @@ internal fun HomeRecordingActions(
                 opened.stop?.epochSeconds, androidx.compose.ui.platform.LocalConfiguration.current.locales[0]),
             summary = opened.summary?.takeIf(String::isNotBlank) ?: opened.description.orEmpty(),
             recordingState = opened.state,
+            recordingRule = opened.rule,
             resumePositionMs = offeredResumePosition(admission)?.inWholeMilliseconds,
             playbackIndicator = watchingIndicator(opened.id),
             actions = recordingContextActions(opened, admission, canModify, canWatchChannel = watchLive != null,
@@ -118,7 +119,9 @@ internal fun HomeRecordingActions(
                     BrowseContextAction.WATCH_LIVE -> watchLive?.invoke()
                     BrowseContextAction.STOP -> capability?.let { pendingMutation = DvrMutationAction.Stop(it, opened.id) }
                     BrowseContextAction.CANCEL -> capability?.let { pendingMutation = DvrMutationAction.Cancel(it, opened.id) }
-                    BrowseContextAction.DELETE -> capability?.let { pendingMutation = DvrMutationAction.Delete(it, opened.id) }
+                    BrowseContextAction.DELETE, BrowseContextAction.REMOVE_ENTRY -> capability?.let {
+                        pendingMutation = DvrMutationAction.Delete(it, opened.id)
+                    }
                     BrowseContextAction.MARK_WATCHED, BrowseContextAction.MARK_UNWATCHED -> {
                         mutationBusy = true
                         scope.launch {
@@ -161,6 +164,7 @@ internal fun HomeRecordingActions(
         }
         val visibility = remember(mutation) { MutableTransitionState(false).apply { targetState = true } }
         RecordingConfirmationDialog(visibility = visibility, action = action, title = opened.title.orEmpty(),
+            removeEntry = deleteRemovesEntryOnly(opened),
             backEnabled = !mutationBusy,
             channelName = channel?.name ?: opened.channelName.orEmpty(),
             dateAndTime = at.bernhardberger.tvhplayer.ui.common.formatRecordingSchedule(opened.start?.epochSeconds,

@@ -190,21 +190,13 @@ class HomeCaptureTest {
         capture("../presentation/store-home-warm", "home-activity-0")
     }
 
-    @Category(VisualCapture::class)
-    @Test
-    fun warm() = atEvening {
-        show(Kind.WARM)
-        capture("5-warm", "home-activity-0")
-    }
-
-    @Category(VisualCapture::class)
     @Test fun rowRailOverlap() = atEvening {
         show(Kind.BROWSE)
         settle("home-recent-0")
         key(Key.DirectionDown)
         settle("home-onnow-0")
         key(Key.DirectionRight)
-        capture("row-rail-overlap", "home-onnow-1")
+        settle("home-onnow-1")
         assertTrue("focused card clears mask", bounds("home-onnow-1").left >= 130.dp)
     }
 
@@ -273,22 +265,15 @@ class HomeCaptureTest {
     }
 
     @Category(VisualCapture::class)
-    @Test fun warmWithoutArtwork() = atEvening {
-        show(Kind.WARM, noArtwork = true)
-        capture("17-warm-no-art", "home-activity-0")
-    }
-
-    @Category(VisualCapture::class)
-    @Test fun warmWithoutArtworkLargeFont() = atEvening {
-        show(Kind.WARM, noArtwork = true, fontScale = 1.3f)
-        capture("18-warm-no-art-font-130", "home-activity-0")
-    }
-
-    @Category(VisualCapture::class)
     @Test
     fun firstRun() = atEvening {
         show(Kind.FIRST_RUN)
         capture("6-first-run", "home-onnow-0")
+    }
+
+    @Test fun firstRunKeepsTheInitialRowInItsSlot() = atEvening {
+        show(Kind.FIRST_RUN)
+        settle("home-onnow-0")
         assertTop("home-onnow-0", HomeImmersiveSlot.value)
     }
 
@@ -305,42 +290,47 @@ class HomeCaptureTest {
     @Category(VisualCapture::class)
     @Test fun loadingFirstMetadata() = atEvening {
         show(Kind.LOADING, screen = true)
+        compose.mainClock.advanceTimeBy(1_700)
+        capture("12-loading", "home-view-button")
+    }
+
+    @Test fun loadingFirstMetadataWaitsBeforeShowingWithoutRecovery() = atEvening {
+        show(Kind.LOADING, screen = true)
         compose.onNodeWithTag("home-loading").assertDoesNotExist()
         compose.mainClock.advanceTimeBy(1_700)
         compose.onNodeWithTag("home-loading").assertExists()
         compose.onNodeWithText("Loading channels…").assertExists()
         compose.onNodeWithTag("home-recovery").assertDoesNotExist()
-        capture("12-loading", "home-view-button")
     }
 
     @Category(VisualCapture::class)
     @Test fun channelsButNoHistoryRecordingsOrEpg() = atEvening {
         show(Kind.EMPTY, screen = true)
-        compose.onNodeWithText("Browse channels").assertExists()
         capture("13-empty", "home-recovery")
+    }
+
+    @Test fun channelsWithoutHistoryOfferBrowsing() = atEvening {
+        show(Kind.EMPTY, screen = true)
+        compose.onNodeWithText("Browse channels").assertExists()
     }
 
     @Category(VisualCapture::class)
     @Test fun offlineRecovery() = atEvening {
         show(Kind.OFFLINE, screen = true)
-        compose.onNodeWithTag("connection-problem-badge", useUnmergedTree = true).assertExists()
         capture("14-offline", "tv-recovery-primary")
     }
 
-    @Category(VisualCapture::class)
+    @Test fun offlineRecoveryShowsConnectionProblem() = atEvening {
+        show(Kind.OFFLINE, screen = true)
+        compose.onNodeWithTag("connection-problem-badge", useUnmergedTree = true).assertExists()
+    }
+
     @Test fun defaultLargeFont() = atEvening {
         show(Kind.BROWSE, fontScale = 1.3f)
-        capture("15-default-font-130", "home-recent-0")
+        settle("home-recent-0")
         assertFocusedHeadingTop("home-heading-RECENT_CHANNELS")
     }
 
-    @Category(VisualCapture::class)
-    @Test fun warmLargeFont() = atEvening {
-        show(Kind.WARM, fontScale = 1.3f)
-        capture("16-warm-font-130", "home-activity-0")
-    }
-
-    @Category(VisualCapture::class)
     @Test fun wholeCardsFillAndNextCardPeeksInMargin() = atEvening {
         show(Kind.BROWSE, longOnNow = true)
         settle("home-recent-0")
@@ -375,29 +365,28 @@ class HomeCaptureTest {
     fun activityThree() = activity(3)
 
     /** Production choreography sampled at 50 ms, including the interrupted/retargetable page. */
-    @Category(VisualCapture::class)
     @Test
     fun immersiveMotionStripsAndSlots() = atEvening {
         show(Kind.BROWSE)
         settle("home-recent-0")
         compose.mainClock.autoAdvance = false
-        strip("down-into", Key.DirectionDown, "home-onnow-0", expanded = true)
+        strip("down-into", Key.DirectionDown, "home-onnow-0", expanded = true, captureImage = false)
         assertTop("home-onnow-0", HomeImmersiveSlot.value)
         assertImmersiveFits()
         val keyline = bounds("home-onnow-0").left.value
-        strip("right", Key.DirectionRight, "home-onnow-1", expanded = true)
+        strip("right", Key.DirectionRight, "home-onnow-1", expanded = true, captureImage = false)
         assertEquals("focused On now card stays on the start keyline", keyline, bounds("home-onnow-1").left.value, 2f)
         key(Key.DirectionLeft)
         compose.mainClock.advanceTimeBy(600)
         awaitFocus("home-onnow-0")
         assertEquals(keyline, bounds("home-onnow-0").left.value, 2f)
-        strip("down-out", Key.DirectionDown, "home-genre-0", expanded = false)
+        strip("down-out", Key.DirectionDown, "home-genre-0", expanded = false, captureImage = false)
         assertFocusedHeadingTop("home-heading-GENRES")
         val collapsed = bounds("home-onnow-0")
         assertTrue("collapsed On now pictures peek above the genre heading: $collapsed", collapsed.top < 76.dp && collapsed.bottom > 0.dp)
-        strip("up-into", Key.DirectionUp, "home-onnow-0", expanded = true)
+        strip("up-into", Key.DirectionUp, "home-onnow-0", expanded = true, captureImage = false)
         assertTop("home-onnow-0", HomeImmersiveSlot.value)
-        strip("up-out", Key.DirectionUp, "home-recent-0", expanded = false)
+        strip("up-out", Key.DirectionUp, "home-recent-0", expanded = false, captureImage = false)
         assertFocusedHeadingTop("home-heading-RECENT_CHANNELS")
         key(Key.DirectionUp)
         compose.mainClock.advanceTimeBy(600)
@@ -408,7 +397,6 @@ class HomeCaptureTest {
         awaitFocus("home-recent-0")
     }
 
-    @Category(VisualCapture::class)
     @Test
     fun warmImmersiveKeepsSlotWithoutArtwork() = atEvening {
         show(Kind.WARM)
@@ -421,7 +409,6 @@ class HomeCaptureTest {
         assertEquals(1f, layerAlpha("home-on-now-block"), 0.02f)
     }
 
-    @Category(VisualCapture::class)
     @Test
     fun lastRowNeverMovesDownOnEntry() = atEvening {
         show(Kind.BROWSE)
@@ -439,14 +426,6 @@ class HomeCaptureTest {
         }
         awaitFocus("home-upcoming-0")
         assertTrue("last card fits the canvas", bounds("home-upcoming-0").bottom <= 540.dp)
-        capture("20-upcoming", "home-upcoming-0")
-        repeat(10) {
-            if (compose.onAllNodes(hasTestTag("home-all-scheduled") and isFocused()).fetchSemanticsNodes().isEmpty()) {
-                key(Key.DirectionRight)
-                compose.mainClock.advanceTimeBy(400)
-            }
-        }
-        capture("20b-upcoming-end", "home-all-scheduled")
     }
 
     @Category(VisualCapture::class)
@@ -472,7 +451,6 @@ class HomeCaptureTest {
         strip("up-out", Key.DirectionUp, "home-recent-0", expanded = false)
     }
 
-    @Category(VisualCapture::class)
     @Test
     fun rapidVerticalMovesRetargetAndReturnToHeader() = atEvening {
         show(Kind.BROWSE)
@@ -499,7 +477,6 @@ class HomeCaptureTest {
         assertEquals(1f, layerAlpha("home-section-RECENT_CHANNELS"), 0.02f)
     }
 
-    @Category(VisualCapture::class)
     @Test
     fun verticalEntryRestoresScrolledCards() = atEvening {
         show(Kind.BROWSE, longOnNow = true)
@@ -522,7 +499,6 @@ class HomeCaptureTest {
         assertTop("home-onnow-13", HomeImmersiveSlot.value)
     }
 
-    @Category(VisualCapture::class)
     @Test
     fun firstRunHeaderRoundTripAnimatesWithoutDisplacingBlock() = atEvening {
         show(Kind.FIRST_RUN)
@@ -530,12 +506,11 @@ class HomeCaptureTest {
         key(Key.DirectionUp)
         settle("home-tags-button")
         compose.mainClock.autoAdvance = false
-        strip("first-run-header-down", Key.DirectionDown, "home-onnow-0", expanded = true)
+        strip("first-run-header-down", Key.DirectionDown, "home-onnow-0", expanded = true, captureImage = false)
         assertTop("home-onnow-0", HomeImmersiveSlot.value)
         assertEquals(0f, layerScope("home-on-now-block").translationY, 0.1f)
     }
 
-    @Category(VisualCapture::class)
     @Test
     fun rawReferenceClocksAndInterruptedOrdinaryMoves() {
         val focused = mutableStateOf<HomeSectionKind?>(HomeSectionKind.RECENT_CHANNELS)
@@ -668,13 +643,13 @@ class HomeCaptureTest {
         assertEquals(expected, layerAlpha("home-on-now-block"), 0.02f)
     }
 
-    private fun strip(name: String, key: Key, tag: String, expanded: Boolean) {
+    private fun strip(name: String, key: Key, tag: String, expanded: Boolean, captureImage: Boolean = true) {
         key(key)
         compose.mainClock.advanceTimeByFrame()
         compose.mainClock.advanceTimeByFrame()
         awaitFocus(tag)
-        val strip = Bitmap.createBitmap(320 * 12, 180, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(strip)
+        val strip = if (captureImage) Bitmap.createBitmap(320 * 12, 180, Bitmap.Config.ARGB_8888) else null
+        val canvas = strip?.let(::Canvas)
         var previousBlockTop: Float? = null
         var blockBottomGap: Float? = null
         val rowTops = mutableListOf<Float>()
@@ -715,17 +690,21 @@ class HomeCaptureTest {
                     previousBlockTop = top
                 }
             }
-            val bitmap = draw()
-            canvas.drawBitmap(bitmap, null, android.graphics.Rect(frame * 320, 0, (frame + 1) * 320, 180), null)
-            bitmap.recycle()
+            if (canvas != null) {
+                val bitmap = draw()
+                canvas.drawBitmap(bitmap, null, android.graphics.Rect(frame * 320, 0, (frame + 1) * 320, 180), null)
+                bitmap.recycle()
+            }
         }
         assertSettledOpacity(expanded)
         if (name == "up-out") assertTrue("Up-out row travels monotonically: $rowTops",
             rowTops.zipWithNext().all { (a, b) -> b >= a - 0.5f })
         if (name.endsWith("down-into")) assertTrue("Down-in row travels monotonically: $rowTops",
             rowTops.zipWithNext().all { (a, b) -> b <= a + 0.5f })
-        CaptureOutput.writePng(File(out, "strips/$name.png"), strip)
-        strip.recycle()
+        if (strip != null) {
+            CaptureOutput.writePng(File(out, "strips/$name.png"), strip)
+            strip.recycle()
+        }
     }
 
     private fun activity(items: Int) = atEvening {

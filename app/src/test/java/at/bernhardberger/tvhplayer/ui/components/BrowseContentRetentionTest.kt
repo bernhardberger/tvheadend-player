@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import java.lang.ref.WeakReference
+import java.lang.ref.ReferenceQueue
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -21,6 +22,7 @@ import org.robolectric.annotation.Config
 @Config(sdk = [34], application = Application::class)
 class BrowseContentRetentionTest {
     @get:Rule val compose = createComposeRule()
+    private val collected = ReferenceQueue<Payload>()
 
     private class Payload(val revision: Int) {
         // Stand in for a metadata snapshot without server data or SDK internals.
@@ -38,7 +40,7 @@ class BrowseContentRetentionTest {
         }
         repeat(40) { revision ->
             compose.runOnIdle {
-                obsolete += WeakReference(payload.value)
+                obsolete += WeakReference(payload.value, collected)
                 payload.value = Payload(revision + 1)
             }
             compose.waitForIdle()
@@ -65,7 +67,7 @@ class BrowseContentRetentionTest {
         compose.mainClock.autoAdvance = false
         repeat(40) { revision ->
             compose.runOnIdle {
-                obsolete += WeakReference(payload.value)
+                obsolete += WeakReference(payload.value, collected)
                 val next = (revision + 1) % 2
                 motion.select(next, listOf(0, 1))
                 selected.intValue = next
@@ -90,7 +92,8 @@ class BrowseContentRetentionTest {
         repeat(10) {
             Runtime.getRuntime().gc()
             if (obsolete.count { it.get() != null } <= 4) return
-            Thread.sleep(50)
+            // GC is a JVM thread, not a Compose timer. Wait for its observable result.
+            collected.remove(50)
         }
         val retained = obsolete.count { it.get() != null }
         assertTrue("Retained $retained of 40 obsolete browse payloads", retained <= 4)

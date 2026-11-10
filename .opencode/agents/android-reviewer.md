@@ -38,7 +38,8 @@ Independently review one frozen, tested TVHeadend Player package packet.
   helpers, and real-clock waits (sleeps, `delay` settling, polling with
   timeouts) where virtual time or a signal would do; name the existing test,
   fixture or virtual-time API to use instead. Note when the
-  test diff is far larger than the production change it covers.
+  test diff is far larger than the production change it covers, and when a
+  changed test class runs noticeably slower without a stated reason.
 - Rendered visual quality belongs to `tv-ux-reviewer`; physical video, audio,
   motion, overscan, remote feel, and deinterlacing remain human/device evidence.
 - For every finding report severity, exact `path:line`, violated requirement,

@@ -4,7 +4,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
@@ -150,28 +149,6 @@ private class PiconPlaceholderPainter(
         translate((size.width - side) / 2f, (size.height - side) / 2f) {
             with(icon) { draw(Size(side, side), alpha = opacity, colorFilter = colorFilter) }
         }
-    }
-}
-
-@Composable
-fun PiconPlaceholder(
-    modifier: Modifier = Modifier,
-    initials: String? = null,
-    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
-) {
-    if (!initials.isNullOrBlank()) {
-        androidx.tv.material3.Text(
-            text = initials,
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.primary,
-        )
-    } else {
-        Icon(
-            painter = painterResource(R.drawable.ic_live_tv_outlined),
-            contentDescription = null,
-            tint = tint,
-            modifier = modifier,
-        )
     }
 }
 

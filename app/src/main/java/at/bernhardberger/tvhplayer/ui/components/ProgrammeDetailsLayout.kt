@@ -38,20 +38,6 @@ internal fun Modifier.programmeDetailsFrame(): Modifier =
     padding(start = 130.dp, end = 130.dp, top = 156.dp)
 
 @Composable
-internal fun ProgrammeDetailsLayout(
-    modifier: Modifier = Modifier,
-    reading: @Composable () -> Unit,
-    actions: @Composable ColumnScope.() -> Unit,
-) {
-    Row(modifier.fillMaxSize().padding(bottom = 40.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-        reading()
-        Column(Modifier.width(DetailsColumnWidth).fillMaxHeight().testTag("details-actions"),
-            verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.CenterHorizontally,
-            content = actions)
-    }
-}
-
-@Composable
 internal fun ProgrammeDetailsInformation(
     title: String?,
     subtitle: String?,

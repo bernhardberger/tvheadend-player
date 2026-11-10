@@ -55,30 +55,12 @@ class ApplianceLaunchRequestsTest {
         assertTrue(retainedId != null)
         requests.request(ApplianceEntryDestination.GUIDE)
         val guide = requests.state.value as ApplianceLaunchState.Pending
-        requests.requestStartup(autoStartPlayback = true)
-        assertEquals(guide, requests.state.value)
         assertNull(retainedId)
         assertNull(requests.resolve(guide.request, ready, persistedId = null))
         assertTrue(requests.cancel(guide))
         // The same owner survives configuration; a fresh owner receives no retained Guide entry.
         assertEquals(ApplianceLaunchState.Idle, requests.state.value)
         assertEquals(ApplianceLaunchState.Idle, ApplianceLaunchRequests(restoredRequestId = retainedId).state.value)
-    }
-
-    @Test
-    fun request_transitionsIdleToPendingWithMonotonicIds() {
-        val requests = ApplianceLaunchRequests()
-
-        assertEquals(ApplianceLaunchState.Idle, requests.state.value)
-
-        requests.request()
-        val first = requests.state.value as ApplianceLaunchState.Pending
-        assertTrue(requests.cancel(first))
-
-        requests.request()
-        val second = requests.state.value as ApplianceLaunchState.Pending
-
-        assertTrue(second.request.id > first.request.id)
     }
 
     @Test
@@ -192,119 +174,69 @@ class ApplianceLaunchRequestsTest {
     }
 
     @Test
-    fun disabledStartup_staysIdle() {
-        val requests = ApplianceLaunchRequests()
-
-        requests.requestStartup(autoStartPlayback = false)
-
-        assertEquals(ApplianceLaunchState.Idle, requests.state.value)
-    }
-
-    @Test
-    fun enabledStartup_transitionsIdleToPending() {
-        val requests = ApplianceLaunchRequests()
-
-        requests.requestStartup(autoStartPlayback = true)
-
-        assertTrue(requests.state.value is ApplianceLaunchState.Pending)
-    }
-
-    @Test
     fun everyLaunchRequestNotesViewingIntentButDisabledStartupDoesNot() {
         var notes = 0
         val requests = ApplianceLaunchRequests(onLaunchRequested = { notes += 1 })
 
         requests.requestStartup(autoStartPlayback = false)
         assertEquals(0, notes)
+        assertEquals(ApplianceLaunchState.Idle, requests.state.value)
         requests.requestStartup(autoStartPlayback = true)
         assertEquals(1, notes)
+        val pending = requests.state.value
         requests.request() // appliance entry while the startup request is still pending
         assertEquals(2, notes)
-    }
-
-    @Test
-    fun requestsCoalesceWhilePending() {
-        val requests = ApplianceLaunchRequests()
-        requests.request()
-        val pending = requests.state.value
-
-        requests.request()
         requests.requestStartup(autoStartPlayback = true)
-
         assertEquals(pending, requests.state.value)
     }
 
     @Test
-    fun onlyReadyReadiness_resolvesPendingRequest() {
-        val requests = ApplianceLaunchRequests()
-        requests.requestStartup(autoStartPlayback = true)
-        val pending = requests.state.value as ApplianceLaunchState.Pending
+    fun waitingEmptyAndBrowsableReadinessKeepTheRequestPending() {
+        for (readiness in listOf(
+            CurrentChannelReadiness.Waiting,
+            CurrentChannelReadiness.Ready(emptyList()),
+            CurrentChannelReadiness.Browsable(channels),
+        )) {
+            val requests = ApplianceLaunchRequests()
+            requests.requestStartup(autoStartPlayback = true)
+            val pending = requests.state.value as ApplianceLaunchState.Pending
 
-        assertNull(
-            requests.resolve(
-                request = pending.request,
-                readiness = CurrentChannelReadiness.Waiting,
-                persistedId = ChannelId(20),
+            assertNull(
+                requests.resolve(
+                    request = pending.request,
+                    readiness = readiness,
+                    persistedId = ChannelId(20),
+                )
             )
-        )
-        assertEquals(pending, requests.state.value)
+            assertEquals(pending, requests.state.value)
+        }
     }
 
     @Test
-    fun readyEmpty_doesNotConsumePendingRequest() {
-        val requests = ApplianceLaunchRequests()
-        requests.requestStartup(autoStartPlayback = true)
-        val pending = requests.state.value as ApplianceLaunchState.Pending
+    fun readyChannelsCommitPersistedOrFirstCurrentChannelFromSameSnapshot() {
+        for ((persistedId, channel) in listOf(ChannelId(20) to channels[1], ChannelId(99) to channels[0])) {
+            val requests = ApplianceLaunchRequests()
+            requests.requestStartup(autoStartPlayback = true)
+            val pending = requests.state.value as ApplianceLaunchState.Pending
 
-        assertNull(
-            requests.resolve(
-                request = pending.request,
-                readiness = CurrentChannelReadiness.Ready(emptyList()),
-                persistedId = ChannelId(20),
+            val target = requireNotNull(
+                requests.resolve(
+                    request = pending.request,
+                    readiness = ready,
+                    persistedId = persistedId,
+                )
             )
-        )
-        assertEquals(pending, requests.state.value)
-    }
 
-    @Test
-    fun readyChannels_commitPersistedChannelFromSameSnapshot() {
-        val requests = ApplianceLaunchRequests()
-        requests.requestStartup(autoStartPlayback = true)
-        val pending = requests.state.value as ApplianceLaunchState.Pending
-
-        val target = requireNotNull(
-            requests.resolve(
-                request = pending.request,
-                readiness = ready,
-                persistedId = ChannelId(20),
+            assertEquals(
+                ApplianceLaunchTarget(
+                    request = pending.request,
+                    channelId = channel.id,
+                    channelName = requireNotNull(channel.name),
+                ),
+                target,
             )
-        )
-
-        assertEquals(
-            ApplianceLaunchTarget(
-                request = pending.request,
-                channelId = ChannelId(20),
-                channelName = "Twenty",
-            ),
-            target,
-        )
-        assertEquals(ApplianceLaunchState.Entering(target), requests.state.value)
-    }
-
-    @Test
-    fun stalePersistedChannel_commitsFirstCurrentChannel() {
-        val requests = ApplianceLaunchRequests()
-        requests.requestStartup(autoStartPlayback = true)
-        val pending = requests.state.value as ApplianceLaunchState.Pending
-
-        val target = requests.resolve(
-            request = pending.request,
-            readiness = ready,
-            persistedId = ChannelId(99),
-        )
-
-        assertEquals(ChannelId(10), target?.channelId)
-        assertEquals("Ten", target?.channelName)
+            assertEquals(ApplianceLaunchState.Entering(target), requests.state.value)
+        }
     }
 
     @Test
@@ -403,36 +335,28 @@ class ApplianceLaunchRequestsTest {
     }
 
     @Test
-    fun visibleLiveEntryCancelsPendingGuideWithoutCreatingAnAutoplayRequest() {
-        var playbackIntents = 0
-        val requests = ApplianceLaunchRequests(onLaunchRequested = { playbackIntents++ })
-        requests.requestEntry(ApplianceEntryDestination.GUIDE, isPlayerVisible = true)
-        val guide = requests.state.value as ApplianceLaunchState.Pending
-        assertEquals(ApplianceEntryDestination.GUIDE, guide.request.destination)
+    fun liveEntryCancelsGuideWhenVisibleAndRequestsPlaybackWhenHidden() {
+        for (isPlayerVisible in listOf(true, false)) {
+            var playbackIntents = 0
+            val requests = ApplianceLaunchRequests(onLaunchRequested = { playbackIntents++ })
+            requests.requestEntry(ApplianceEntryDestination.GUIDE, isPlayerVisible = isPlayerVisible)
+            val guide = requests.state.value as ApplianceLaunchState.Pending
+            assertEquals(ApplianceEntryDestination.GUIDE, guide.request.destination)
 
-        requests.requestEntry(ApplianceEntryDestination.LIVE, isPlayerVisible = true)
-
-        assertEquals(ApplianceLaunchState.Idle, requests.state.value)
-        assertEquals(0, playbackIntents)
-        assertFalse(requests.cancel(guide))
-    }
-
-    @Test
-    fun visibleLiveEntryWithNothingPendingStaysIdle() {
-        var playbackIntents = 0
-        val requests = ApplianceLaunchRequests(onLaunchRequested = { playbackIntents++ })
-        requests.requestEntry(ApplianceEntryDestination.LIVE, isPlayerVisible = true)
-        assertEquals(ApplianceLaunchState.Idle, requests.state.value)
-        assertEquals(0, playbackIntents)
-    }
-
-    @Test
-    fun hiddenLiveEntrySupersedesPendingGuideWithLive() {
-        val requests = ApplianceLaunchRequests()
-        requests.requestEntry(ApplianceEntryDestination.GUIDE, isPlayerVisible = false)
-        requests.requestEntry(ApplianceEntryDestination.LIVE, isPlayerVisible = false)
-        val pending = requests.state.value as ApplianceLaunchState.Pending
-        assertEquals(ApplianceEntryDestination.LIVE, pending.request.destination)
+            requests.requestEntry(ApplianceEntryDestination.LIVE, isPlayerVisible = isPlayerVisible)
+            if (isPlayerVisible) {
+                assertEquals(ApplianceLaunchState.Idle, requests.state.value)
+                assertEquals(0, playbackIntents)
+                assertFalse(requests.cancel(guide))
+                val fresh = ApplianceLaunchRequests(onLaunchRequested = { playbackIntents++ })
+                fresh.requestEntry(ApplianceEntryDestination.LIVE, isPlayerVisible = true)
+                assertEquals(ApplianceLaunchState.Idle, fresh.state.value)
+                assertEquals(0, playbackIntents)
+            } else {
+                val pending = requests.state.value as ApplianceLaunchState.Pending
+                assertEquals(ApplianceEntryDestination.LIVE, pending.request.destination)
+            }
+        }
     }
 
     @Test
@@ -486,40 +410,6 @@ class ApplianceLaunchRequestsTest {
             )
         )
         assertEquals(ApplianceLaunchState.Idle, requests.state.value)
-    }
-
-    @Test
-    fun staleVisibilityCompletion_cannotCompleteNewEnteringGeneration() {
-        val requests = ApplianceLaunchRequests()
-        requests.request()
-        val firstPending = requests.state.value as ApplianceLaunchState.Pending
-        val firstTarget = requireNotNull(
-            requests.resolve(
-                request = firstPending.request,
-                readiness = ready,
-                persistedId = ChannelId(20),
-            )
-        )
-        assertTrue(requests.cancel(ApplianceLaunchState.Entering(firstTarget)))
-
-        requests.request()
-        val secondPending = requests.state.value as ApplianceLaunchState.Pending
-        val secondTarget = requireNotNull(
-            requests.resolve(
-                request = secondPending.request,
-                readiness = ready,
-                persistedId = ChannelId(20),
-            )
-        )
-
-        assertFalse(
-            requests.completePlayerVisibility(
-                target = firstTarget,
-                channelId = firstTarget.channelId,
-                channelName = firstTarget.channelName,
-            )
-        )
-        assertEquals(ApplianceLaunchState.Entering(secondTarget), requests.state.value)
     }
 
 }

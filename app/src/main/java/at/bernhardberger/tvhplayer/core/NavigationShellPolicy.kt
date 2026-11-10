@@ -1,3 +1,6 @@
+// This policy file also owns the shell's Back and navigation-rail decisions.
+@file:Suppress("MatchingDeclarationName")
+
 package at.bernhardberger.tvhplayer.core
 
 enum class BrowseShellBackAction {
@@ -5,11 +8,6 @@ enum class BrowseShellBackAction {
     FOCUS_ROOT_DESTINATION,
     AWAIT_ROOT_DESTINATION,
     DELEGATE_TO_ROOT,
-}
-
-enum class SettingsBackAction {
-    FOCUS_CURRENT_CATEGORY,
-    DELEGATE_TO_GLOBAL_NAVIGATION,
 }
 
 fun <T> browseShellBackAction(
@@ -24,14 +22,6 @@ fun <T> browseShellBackAction(
     drawerRoute != rootRoute -> BrowseShellBackAction.FOCUS_ROOT_DESTINATION
     currentRoute != rootRoute -> BrowseShellBackAction.AWAIT_ROOT_DESTINATION
     else -> BrowseShellBackAction.DELEGATE_TO_ROOT
-}
-
-fun settingsBackAction(
-    contentPaneFocused: Boolean,
-): SettingsBackAction = if (contentPaneFocused) {
-    SettingsBackAction.FOCUS_CURRENT_CATEGORY
-} else {
-    SettingsBackAction.DELEGATE_TO_GLOBAL_NAVIGATION
 }
 
 /**

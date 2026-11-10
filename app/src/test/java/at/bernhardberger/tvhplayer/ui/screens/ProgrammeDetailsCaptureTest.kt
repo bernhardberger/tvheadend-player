@@ -19,9 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.focus.FocusRequester
@@ -39,10 +37,10 @@ import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.LocalWarmPlayback
-import at.bernhardberger.tvhplayer.ui.WarmPlaybackScrim
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsPage
 import at.bernhardberger.tvhplayer.core.programmeDetailsActions
 import at.bernhardberger.tvhplayer.core.recordingDetailsActions
+import at.bernhardberger.tvhplayer.ui.common.AppClock
 import java.io.File
 import java.util.Locale
 import java.util.TimeZone
@@ -52,6 +50,7 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.junit.Assert
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -70,6 +69,8 @@ class ProgrammeDetailsCaptureTest {
     @get:Rule val compose = createComposeRule()
     private val oldLocale = Locale.getDefault()
     private val oldZone = TimeZone.getDefault()
+    private val oldClock = AppClock.systemUses24Hour
+    private val oldFormat = AppClock.format
     private lateinit var view: View
     private val session = FakeSessionObservation(SessionObservation.create(
         sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
@@ -84,6 +85,8 @@ class ProgrammeDetailsCaptureTest {
     @Before fun prepare() {
         Locale.setDefault(Locale.US)
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+        AppClock.format = at.bernhardberger.tvhplayer.settings.ClockFormat.SYSTEM
+        AppClock.systemUses24Hour = true
         images.install(FixtureArt.imageLoader(ApplicationProvider.getApplicationContext(), mapOf(
             ArtworkId(1) to FixtureArt.picon("ridge-earth"), ArtworkId(2) to FixtureArt.art("ridge-light"),
             ArtworkId(3) to FixtureArt.art("still-ridge-light"))))
@@ -91,6 +94,8 @@ class ProgrammeDetailsCaptureTest {
     @After fun release() {
         Locale.setDefault(oldLocale)
         TimeZone.setDefault(oldZone)
+        AppClock.systemUses24Hour = oldClock
+        AppClock.format = oldFormat
     }
 
     @Test fun guideArtLongDescription() = capture("guide-art-long", guide = true)
@@ -101,82 +106,6 @@ class ProgrammeDetailsCaptureTest {
     @Test fun playerGeometryMatchesModalHosts() = capture("player-geometry", guide = false, player = true)
     @Test fun guideWithoutButtonsTrapsPanelFocusAndBackCloses() = emptyPanel(guide = true)
     @Test fun recordingWithoutButtonsTrapsPanelFocusAndBackCloses() = emptyPanel(guide = false)
-
-    @Test @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
-    fun framedRecordingPlaying() = framedCapture("01-recording-playing", recording = true)
-
-    @Test @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
-    fun framedLiveFromRail() = framedCapture("02-live-from-rail")
-
-    @Test @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
-    fun framedBrowseOverWarmVideo() = framedCapture("02-browse-warm", browse = true)
-
-    @Test @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
-    fun framedScrolledToAirings() = framedCapture("03-scrolled", scrolled = true)
-
-    @Test @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
-    fun framedNoPicture() = framedCapture("04-no-picture", art = false)
-
-    @Test @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
-    fun framedLongTitle() = framedCapture("05-long-title", longTitle = true)
-
-    private fun framedCapture(name: String, recording: Boolean = false, browse: Boolean = false,
-        art: Boolean = true, longTitle: Boolean = false, scrolled: Boolean = false) {
-        val event = EpgEvent.create(EventId(1), channel.id, start, start + 7200.seconds,
-            title = if (longTitle) "Ridge Light: The Extraordinary Winter Expedition Beyond the Arctic Circle and Across the Frozen North" else "Ridge Light",
-            subtitle = "Beyond the Arctic Circle", summary = description, genre = "Documentary",
-            image = ArtworkId(2).takeIf { art })
-        val entry = DvrEntry.create(DvrEntryId(1), channelId = channel.id, channelName = channel.name,
-            title = event.title, subtitle = event.subtitle, description = description, image = event.image,
-            start = start, stop = event.stop, playPosition = 3723.seconds, state = DvrEntryState.COMPLETED)
-        val next = EpgEvent.create(EventId(2), channel.id, start + 86400.seconds, start + 93600.seconds,
-            title = event.title, image = event.image)
-        val actions = if (recording) listOf(at.bernhardberger.tvhplayer.core.BrowseContextAction.CONTINUE_WATCHING,
-            at.bernhardberger.tvhplayer.core.BrowseContextAction.START_OVER,
-            at.bernhardberger.tvhplayer.core.BrowseContextAction.MARK_WATCHED,
-            at.bernhardberger.tvhplayer.core.BrowseContextAction.DELETE)
-        else programmeDetailsActions(event, start.epochSeconds + 480, null, null, true, true)
-        compose.setContent {
-            CompositionLocalProvider(LocalDensity provides Density(2f, 1f)) {
-                TVHeadendPlayerTheme {
-                    view = LocalView.current
-                    ProvideArtworkSession(session) {
-                        Box(Modifier.fillMaxSize()) {
-                            // Deterministic video stand-in only; this does not exercise playback.
-                            coil3.compose.AsyncImage(at.bernhardberger.tvhplayer.core.AppArtworkSource(session, ArtworkId(3)),
-                                null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                            val details: @androidx.compose.runtime.Composable () -> Unit = {
-                                ProgrammeDetailsPage(event.takeUnless { recording }, entry.takeIf { recording }, channel,
-                                    start.epochSeconds + 480, actions, {}, {},
-                                    related = if (recording) emptyList() else listOf(next), channelOf = { channel },
-                                    recordingAdmission = admitted(entry).takeIf { recording })
-                            }
-                            if (browse) {
-                                // The navigation shell, not the browse host, owns this context and scrim.
-                                WarmPlaybackScrim()
-                                CompositionLocalProvider(LocalWarmPlayback provides true, content = details)
-                            } else PlayerDetailsSurface(content = details)
-                        }
-                    }
-                }
-            }
-        }
-        compose.onNodeWithTag(if (recording) "details-continue_watching" else "details-watch").assertIsFocused()
-        compose.onNodeWithTag("details-framed-art", useUnmergedTree = true).assertExists()
-        compose.onNodeWithTag("details-hero", useUnmergedTree = true).assertDoesNotExist()
-        if (!art) compose.onNodeWithTag("programme-fallback-mark", useUnmergedTree = true).assertExists()
-        if (scrolled) {
-            compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
-            compose.onNodeWithTag("details-card-2").assertIsFocused()
-        }
-        compose.mainClock.advanceTimeBy(1500)
-        compose.waitForIdle()
-        if (scrolled) compose.onNodeWithTag("details-framed-art", useUnmergedTree = true).assertIsNotDisplayed()
-        val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
-        compose.runOnIdle { view.draw(Canvas(bitmap)) }
-        CaptureOutput.writePng(File("../build/review/framed-art", "$name-en-font1.0.png"), bitmap)
-        bitmap.recycle()
-    }
 
     @Test @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
     fun warmRecordingFromBrowse() = warmRecording(player = false)
@@ -420,8 +349,7 @@ class ProgrammeDetailsCaptureTest {
         compose.waitForIdle()
         if (!player) compose.onNodeWithText("Close").assertDoesNotExist()
         if (failed) {
-            compose.onNodeWithTag("details-delete").assertIsFocused()
-            compose.onNodeWithTag("details-delete").assertIsFocused()
+            compose.onNodeWithTag("details-remove_entry").assertIsFocused()
             compose.onNodeWithTag("details-description").assertDoesNotExist()
         }
         // All origins now use the shared full-page geometry.

@@ -23,6 +23,7 @@ class ConnectionNoticeSource(
     private val observations: StateFlow<SessionObservation>,
     private val profileGeneration: StateFlow<Long>,
     private val notices: NoticeCenter,
+    private val switchInProgress: StateFlow<Boolean> = MutableStateFlow(false),
 ) {
     private val _lossAnnounced = MutableStateFlow(false)
     val lossAnnounced: StateFlow<Boolean> = _lossAnnounced.asStateFlow()
@@ -34,17 +35,37 @@ class ConnectionNoticeSource(
         var lost = false
         var loginRejected = false
         var lossJob: Job? = null
-        combine(profileGeneration, observations) { generation, observation -> generation to observation }
-            .collect { (generation, observation) ->
+        var lossOwed = false
+        var suppressed = false
+        combine(profileGeneration, observations, switchInProgress) { generation, observation, switching ->
+            Triple(generation, observation, switching)
+        }
+            .collect { (generation, observation, switching) ->
                 notices.prune()
                 // combine can already have queued a pair when either live input advances.
                 if (generation != profileGeneration.value || observation !== observations.value) return@collect
+                if (switching || switchInProgress.value) {
+                    lossJob?.cancel()
+                    lossJob = null
+                    // Keep the in-use connection's baseline: cancellation before handover
+                    // can return here still Connecting, without another Ready observation.
+                    suppressed = true
+                    return@collect
+                }
+                if (suppressed && observation.sessionState is SessionState.Ready) {
+                    // Fallback recovery is silent; the switch has its own outcome notice.
+                    lost = false
+                    lossOwed = false
+                    _lossAnnounced.value = false
+                }
+                suppressed = false
                 val context = NoticeContext(generation, observation.currentSession?.generationIdentity)
                 if (generation != profile) {
                     retired = ready
                     profile = generation
                     ready = null
                     lost = false
+                    lossOwed = false
                     _lossAnnounced.value = false
                     loginRejected = false
                     lossJob?.cancel()
@@ -61,6 +82,7 @@ class ConnectionNoticeSource(
                         }
                         ready = identity
                         lost = false
+                        lossOwed = false
                         _lossAnnounced.value = false
                         loginRejected = false
                     }
@@ -68,31 +90,39 @@ class ConnectionNoticeSource(
                     state is SessionState.Unavailable && state.reason == SessionFailure.AUTHENTICATION_REJECTED -> {
                         lossJob?.cancel()
                         lossJob = null
+                        lossOwed = false
                         if (!loginRejected) {
                             loginRejected = notices.post(Notice.Connection(ConnectionNoticeKind.LOGIN_REJECTED), context)
                         }
                     }
-                    state == SessionState.Connecting || (state is SessionState.Unavailable &&
+                    (lossOwed && state !is SessionState.Ready) || state == SessionState.Connecting ||
+                        (state is SessionState.Unavailable &&
                         state.reason.recoveryDisposition == SessionRecoveryDisposition.AUTOMATIC_BACKOFF) -> {
                         if (!lost && lossJob == null) {
+                            // Suppression can cancel the job while the original reconnect
+                            // advances to Synchronizing (or another non-Ready state).
+                            lossOwed = true
                             val expectedProfile = profile
                             lossJob = launch {
                                 delay(3_000)
                                 lossJob = null
                                 val current = observations.value
                                 val currentState = current.sessionState
-                                val reconnecting = currentState == SessionState.Connecting ||
+                                val reconnecting = (lossOwed && currentState !is SessionState.Ready) ||
+                                    currentState == SessionState.Connecting ||
                                     currentState == SessionState.Synchronizing ||
                                     (currentState is SessionState.Unavailable &&
                                         currentState.reason.recoveryDisposition == SessionRecoveryDisposition.AUTOMATIC_BACKOFF)
                                 val currentContext = NoticeContext(expectedProfile, current.currentSession?.generationIdentity)
-                                if (profileGeneration.value == expectedProfile && reconnecting) {
+                                if (!switchInProgress.value && profileGeneration.value == expectedProfile &&
+                                    reconnecting) {
                                     val saved = deriveCurrentChannelReadiness(
                                         connected = false,
                                         authority = current.channelCatalogAuthority,
                                         channels = current.channelCatalogForDisplay?.channels.orEmpty(),
                                     ) is CurrentChannelReadiness.Browsable
                                     lost = notices.post(Notice.Connection(ConnectionNoticeKind.LOST, saved), currentContext)
+                                    lossOwed = !lost
                                     _lossAnnounced.value = lost
                                 }
                             }
@@ -102,6 +132,7 @@ class ConnectionNoticeSource(
                     else -> {
                         lossJob?.cancel()
                         lossJob = null
+                        lossOwed = false
                     }
                 }
             }

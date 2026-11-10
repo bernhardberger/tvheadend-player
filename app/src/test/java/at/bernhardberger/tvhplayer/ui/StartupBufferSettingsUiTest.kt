@@ -1,33 +1,25 @@
 package at.bernhardberger.tvhplayer.ui
 
 import android.app.Application
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.view.View
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.Density
 import at.bernhardberger.tvhplayer.settings.STARTUP_BUFFER_AUTOMATIC
-import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.ui.components.depth.rememberDepthNavigationState
 import at.bernhardberger.tvhplayer.ui.screens.SettingsScreenNavigation
 import at.bernhardberger.tvhplayer.ui.screens.settings.*
 import at.bernhardberger.tvhplayer.viewmodels.SettingsPlayerUiState
-import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import org.junit.experimental.categories.Category
-import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
@@ -35,8 +27,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * The Start-up buffer choice level under Settings > Player, in English and
- * German at font 1.0 and 1.3. Captures go to build/outputs/startup-buffer-captures.
+ * The Start-up buffer choice level under Settings > Player, in English and enlarged German.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-xhdpi")
@@ -52,11 +43,6 @@ class StartupBufferSettingsUiTest {
     }
 
     @Test fun english() = level("en", 1f)
-    @Category(VisualCapture::class)
-    @Test fun englishLargeText() = level("en", 1.3f)
-    @Category(VisualCapture::class)
-    @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
-    fun german() = level("de", 1f)
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
     fun germanLargeText() = level("de", 1.3f)
 
@@ -71,11 +57,9 @@ class StartupBufferSettingsUiTest {
             else "Shorter starts faster; longer protects against dropouts."
         var ui by mutableStateOf(SettingsPlayerUiState())
         var selections = 0
-        lateinit var view: View
         compose.setContent {
             CompositionLocalProvider(LocalDensity provides Density(2f, scale)) {
                 TVHeadendPlayerTheme {
-                    view = LocalView.current
                     val navigation = rememberDepthNavigationState("root")
                     val levels = listOf(
                         settingsLevel("root", "Settings", listOf(settingsRow("player", "Open player", child = SettingsSection.PLAYER.name))),
@@ -109,7 +93,6 @@ class StartupBufferSettingsUiTest {
         assertFalse("Start-up buffer title is cut off", overflows(title))
         key(Key.DirectionDown)
         compose.onNode(isFocused() and hasText(title) and hasText(automatic)).assertExists()
-        capture(view, "$locale-player-font$scale")
 
         key(Key.DirectionCenter)
         compose.onNode(isFocused() and hasText(automatic)).assertIsSelected()
@@ -129,7 +112,6 @@ class StartupBufferSettingsUiTest {
         for (label in listOf(half, if (german) "1 Sek." else "1s", oneAndHalf, if (german) "2 Sek." else "2s", if (german) "3 Sek." else "3s")) {
             compose.onNode(hasText(label) and hasClickAction()).assertIsNotSelected()
         }
-        capture(view, "$locale-level-font$scale")
 
         // Back leaves the level without choosing.
         key(Key.Back)
@@ -146,7 +128,6 @@ class StartupBufferSettingsUiTest {
         // Reopening starts on the stored choice; Automatic shows the learned level.
         key(Key.DirectionCenter)
         compose.onNode(isFocused() and hasText(half)).assertIsSelected()
-        capture(view, "$locale-level-fixed-font$scale")
         compose.runOnIdle { ui = ui.copy(startupBufferLearnedMillis = 1500) }
         key(Key.DirectionUp)
         val learned = if (german) "Automatisch • 1,5 Sek." else "Automatic • 1.5s"
@@ -174,12 +155,4 @@ class StartupBufferSettingsUiTest {
         compose.waitForIdle()
     }
 
-    private fun capture(view: View, name: String) = compose.runOnIdle {
-        assertEquals(1920, view.width)
-        assertEquals(1080, view.height)
-        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-        view.draw(Canvas(bitmap))
-        CaptureOutput.writePng(File("build/outputs/startup-buffer-captures", "$name.png"), bitmap)
-        bitmap.recycle()
-    }
 }

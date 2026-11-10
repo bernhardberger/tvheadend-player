@@ -66,13 +66,13 @@ class CachedStartupTransitionTest {
     @Test
     fun profileReplacementCancelsPendingEntryAndCannotRearmOnReconnect() {
         val requests = ApplianceLaunchRequests()
-        val profile = ServerProfileReadResult.anonymous("offline.invalid")
+        val profile = ServerProfileReadResult.anonymous(at.bernhardberger.tvheadend.sdk.core.ServerProfileId.generate(), "offline.invalid")
         requests.observeProfile(profile)
         requests.requestStartup(true)
         val pending = requests.state.value as ApplianceLaunchState.Pending
         requests.observeProfile(profile)
         assertEquals(pending, requests.state.value)
-        requests.observeProfile(ServerProfileReadResult.anonymous("replacement.invalid"))
+        requests.observeProfile(ServerProfileReadResult.anonymous(at.bernhardberger.tvheadend.sdk.core.ServerProfileId.generate(), "replacement.invalid"))
         val ready = CurrentChannelReadiness.Ready(listOf(Channel.create(ChannelId(1))))
         assertNull(requests.resolve(pending.request, ready, ChannelId(1)))
         assertEquals(ApplianceLaunchState.Idle, requests.state.value)

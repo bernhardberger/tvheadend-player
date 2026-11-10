@@ -248,38 +248,8 @@ class BrowseCohesionEvidenceTest {
         Locale.setDefault(originalLocale)
     }
 
-    @Category(VisualCapture::class) @Test @Config(qualifiers = PseudoLocaleEvidence.QUALIFIERS_EN_XA)
-    fun pseudoEnXaChannels() = pseudoChannels()
-    @Category(VisualCapture::class) @Test @Config(qualifiers = PseudoLocaleEvidence.QUALIFIERS_AR_XB)
-    fun pseudoArXbChannels() = pseudoChannels()
-    @Category(VisualCapture::class) @Test @Config(qualifiers = PseudoLocaleEvidence.QUALIFIERS_EN_XA)
-    fun pseudoEnXaGuide() = pseudoGuide()
-    @Category(VisualCapture::class) @Test @Config(qualifiers = PseudoLocaleEvidence.QUALIFIERS_AR_XB)
-    fun pseudoArXbGuide() = pseudoGuide()
-    @Category(VisualCapture::class) @Test @Config(qualifiers = PseudoLocaleEvidence.QUALIFIERS_EN_XA)
-    fun pseudoEnXaRecordings() = pseudoRecordings()
     @Category(VisualCapture::class) @Test @Config(qualifiers = PseudoLocaleEvidence.QUALIFIERS_AR_XB)
     fun pseudoArXbRecordings() = pseudoRecordings(rtl = true)
-
-    private fun pseudoChannels() {
-        showChannels(1f)
-        awaitFocus(hasTestTag("channel-row-1"))
-        capture("channels-current", 1f, "Channels current programme; first row", hasTestTag("channel-row-1"))
-        key(Key.DirectionDown)
-        key(Key.DirectionDown)
-        awaitFocus(hasTestTag("channel-row-3"))
-        capture("channels-missing-epg", 1f, "Channels third row with no EPG", hasTestTag("channel-row-3"))
-    }
-
-    private fun pseudoGuide() {
-        showGuide(1f)
-        key(Key.DirectionDown)
-        capture("guide-current", 1f, "Guide first channel current programme", hasText(CURRENT_TITLE))
-        key(Key.DirectionCenter)
-        compose.onNodeWithTag("programme-details-page").assertIsDisplayed()
-        capture("guide-details", 1f, "Guide current programme details; first action", hasAnyAncestor(hasTestTag("programme-details-page")),
-            fullscreenDetails = true)
-    }
 
     private fun pseudoRecordings(rtl: Boolean = false) {
         showRecordings(1f)
@@ -476,7 +446,7 @@ class BrowseCohesionEvidenceTest {
             session, FakeServerProfileStore(), settings, Dispatchers.IO,
             readProfileForEditing = { ServerProfileEditReadResult.Missing },
         )
-        val model = ChannelsViewModel(session, ChannelTagSettingsStore(preferences()))
+        val model = ChannelsViewModel(session, ChannelTagSettingsStore(preferences()), profiles.liveProfile)
         models.put("channels", model)
         player = ExoPlayer.Builder(context()).build()
         val runtime = AppPlaybackRuntime(

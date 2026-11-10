@@ -6,6 +6,7 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationKind
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
 import at.bernhardberger.tvheadend.sdk.core.DvrProgressResult
+import at.bernhardberger.tvheadend.sdk.core.ServerProfileId
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import at.bernhardberger.tvhplayer.playback.BackgroundPlaybackNotice
 
@@ -15,6 +16,38 @@ enum class PauseUnavailableReason { SETTINGS_OFF, CHANNEL_UNAVAILABLE }
 
 /** User feedback policy, with no resources or presentation dependencies. */
 sealed interface Notice {
+    data class ServerConnectionFailed(val name: String) : Notice {
+        override val key = "server-connection-failed"
+        override val severity = NoticeSeverity.FAILURE
+    }
+    data class ServerSignInRejected(val name: String) : Notice {
+        override val key = "server-sign-in-rejected"
+        override val severity = NoticeSeverity.FAILURE
+    }
+    data object ServerProfileWriteFailed : Notice {
+        override val key = "server-profile-write-failed"
+        override val severity = NoticeSeverity.FAILURE
+    }
+    data class ServerProfileRemoved(
+        val id: ServerProfileId,
+        /** Display-only name from serverProfileDisplayName; never include in diagnostics. */
+        val name: String,
+    ) : Notice {
+        override val key = "server-profile-removed:${id.value}"
+        override val severity = NoticeSeverity.INFO
+    }
+
+    /** A user-started switch signed in and became the connection in use. [name] is display-only. */
+    data class ServerSwitched(val id: ServerProfileId, val name: String) : Notice {
+        override val key = "server-switched:${id.value}"
+        override val severity = NoticeSeverity.INFO
+    }
+
+    data object ServerProfileAlreadyExists : Notice {
+        override val key = "server-profile-already-exists"
+        override val severity = NoticeSeverity.INFO
+    }
+
     val key: String
     val severity: NoticeSeverity
 

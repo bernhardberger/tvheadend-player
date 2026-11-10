@@ -6,8 +6,8 @@ import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.KeyEvent
@@ -37,16 +37,16 @@ class TvTextFieldOpenKeyTest {
 
     @Test
     fun aTextFieldOpensOnlyWhenOkIsReleased() {
-        showFields()
-        compose.onNodeWithTag("text").requestFocus()
-        assertOkOpensOnRelease("text-id", AndroidKeyEvent.KEYCODE_DPAD_CENTER)
-    }
-
-    @Test
-    fun aPasswordFieldOpensOnlyWhenOkIsReleased() {
-        showFields()
-        compose.onNodeWithTag("password").requestFocus()
-        assertOkOpensOnRelease("password-id", AndroidKeyEvent.KEYCODE_ENTER)
+        val editing = mutableStateOf<String?>(null)
+        showFields(editing)
+        for ((tag, id, code) in listOf(
+            Triple("text", "text-id", AndroidKeyEvent.KEYCODE_DPAD_CENTER),
+            Triple("password", "password-id", AndroidKeyEvent.KEYCODE_ENTER),
+        )) {
+            compose.runOnIdle { editing.value = null }
+            compose.onNodeWithTag(tag).requestFocus()
+            assertOkOpensOnRelease(id, code)
+        }
     }
 
     @Test
@@ -100,9 +100,9 @@ class TvTextFieldOpenKeyTest {
         compose.waitForIdle()
     }
 
-    private fun showFields() {
+    private fun showFields(editing: MutableState<String?> = mutableStateOf(null)) {
         compose.setContent {
-            var editingId by remember { mutableStateOf<String?>(null) }
+            var editingId by editing
             TVHeadendPlayerTheme {
                 Column {
                     TvOutlinedTextField(

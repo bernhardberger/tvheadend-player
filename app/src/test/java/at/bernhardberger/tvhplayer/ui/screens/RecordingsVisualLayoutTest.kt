@@ -1492,9 +1492,10 @@ class RecordingsVisualLayoutTest {
         compose.onNodeWithText("Details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("details-play").assertIsFocused()
         publish(entries.map { if (it.id == DvrEntryId(2))
-            DvrEntry.create(it.id, title = it.title, state = DvrEntryState.FILE_MISSING, files = emptyList()) else it })
+            DvrEntry.create(it.id, title = it.title, state = DvrEntryState.REMOVED, files = emptyList()) else it })
         compose.onNodeWithTag("details-play").assertDoesNotExist()
         compose.onNodeWithTag("details-delete").assertDoesNotExist()
+        compose.onNodeWithTag("details-remove_entry").assertDoesNotExist()
         focused("recording-list-entry-3")
         repeat(3) { key(Key.DirectionUp) }
         key(Key.DirectionRight)

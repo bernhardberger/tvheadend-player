@@ -65,14 +65,19 @@ class AppNoticeHostTest {
             }
         }
         val plain = compose.onNodeWithTag("app-notice").fetchSemanticsNode().boundsInRoot
+        compose.onNodeWithTag("app-notice").assertIsDisplayed().assertContentDescriptionEquals(message)
+        compose.onAllNodes(isFocused()).assertCountEquals(0)
         assertTrue(plain.width < 324f)
         assertEquals(44f, plain.height, .5f)
         assertEquals(512f, plain.bottom, .5f)
         assertEquals(480f, plain.center.x, .5f)
         compose.runOnIdle { message = "A long notice headline that needs enough room to remain readable ".repeat(3) }
         compose.onNodeWithTag("app-notice").assertWidthIsEqualTo(556.dp).assertHeightIsEqualTo(64.dp)
+            .assertContentDescriptionEquals(message)
         compose.runOnIdle { details = true }
         compose.onNodeWithTag("app-notice").assertWidthIsEqualTo(556.dp).assertHeightIsEqualTo(64.dp)
+            .assertContentDescriptionEquals("$message. A long programme title • Documentary, Tomorrow 18:30")
+        compose.onAllNodes(isFocused()).assertCountEquals(0)
         compose.onNodeWithTag("app-notice-icon", useUnmergedTree = true).assertWidthIsEqualTo(32.dp).assertHeightIsEqualTo(32.dp)
     }
 

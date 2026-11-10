@@ -27,7 +27,6 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.source.SampleStream
 import androidx.media3.exoplayer.source.SilenceMediaSource
 import androidx.media3.test.utils.FakeClock
-import androidx.media3.test.utils.robolectric.RobolectricUtil
 import androidx.media3.test.utils.robolectric.TestPlayerRunHelper
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
@@ -64,10 +63,10 @@ import at.bernhardberger.tvheadend.sdk.testing.SubscriptionBinaryFixture
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import java.util.concurrent.CountDownLatch
 import org.junit.Assert.assertEquals
@@ -90,8 +89,10 @@ class LiveStartBufferPlayerTest {
     private val context get() = ApplicationProvider.getApplicationContext<Application>()
 
     @Test
-    fun aRealPlayerPreparesPlaysAndReleasesThroughTheSdkHandle() {
-        val player = control.configure(ExoPlayer.Builder(context).setClock(FakeClock(true))).build()
+    fun aRealPlayerPreparesPlaysAndReleasesThroughTheSdkHandle() = runTest {
+        val driver = PlaybackTestDriver(testScheduler, waitTimeoutMillis = 10_000)
+        val clock = FakeClock(false)
+        val player = control.configure(ExoPlayer.Builder(context).setClock(clock)).build()
         var error: PlaybackException? = null
         player.addListener(object : Player.Listener {
             override fun onPlayerError(value: PlaybackException) { error = value }
@@ -99,7 +100,8 @@ class LiveStartBufferPlayerTest {
         player.setMediaSource(SilenceMediaSource(10_000_000L))
         player.prepare()
         player.play()
-        idleUntil { error != null || player.isPlaying }
+        driver.advanceLive(player, clock, 100)
+        driver.awaitCurrent("silence source startup") { error != null || player.isPlaying }
         assertNull(error)
         assertTrue(player.isPlaying)
         assertEquals(Player.STATE_READY, player.playbackState)
@@ -110,8 +112,10 @@ class LiveStartBufferPlayerTest {
     }
 
     @Test
-    fun aNonLiveStartIsDecidedByTheDelegate() {
-        val player = control.configure(ExoPlayer.Builder(context).setClock(FakeClock(true)))
+    fun aNonLiveStartIsDecidedByTheDelegate() = runTest {
+        val driver = PlaybackTestDriver(testScheduler, waitTimeoutMillis = 10_000)
+        val clock = FakeClock(false)
+        val player = control.configure(ExoPlayer.Builder(context).setClock(clock))
             .setRenderersFactory { _, _, _, _, _ -> arrayOf<Renderer>(SampleSink(C.TRACK_TYPE_AUDIO)) }
             .build()
         // A live threshold this file cannot meet: non-live policy must start this item.
@@ -124,7 +128,11 @@ class LiveStartBufferPlayerTest {
             player.setMediaSource(source)
             player.prepare()
             player.play()
-            idleUntil { player.playerError != null || player.isPlaying }
+            // The progressive loader still extracts the WAV prefix on a real Media3 thread.
+            driver.await("progressive tracks") { !player.currentTracks.isEmpty || player.playerError != null }
+            driver.advanceLive(player, clock, 100)
+            // The real Media3 progressive loader may still be filling the startup buffer.
+            driver.await("non-live startup") { player.playerError != null || player.isPlaying }
             assertNull(player.playerError)
             assertTrue(player.isPlaying)
             assertTrue(player.isLoading)
@@ -142,30 +150,39 @@ class LiveStartBufferPlayerTest {
 
     private fun liveBufferExercise(skip: Boolean) = runTest {
         val driver = PlaybackTestDriver(testScheduler, waitTimeoutMillis = 10_000)
-        fun awaitMain(condition: () -> Boolean) = driver.await("live buffer condition", predicate = condition)
-        val scope = CoroutineScope(coroutineContext + SupervisorJob())
-        val player = control.configure(ExoPlayer.Builder(context).setClock(FakeClock(true)))
+        val work = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(work + SupervisorJob())
+        val clock = FakeClock(false)
+        val player = control.configure(ExoPlayer.Builder(context).setClock(clock))
             .setRenderersFactory { _, _, _, _, _ -> arrayOf<Renderer>(SampleSink(consume = skip)) }
             .build()
+        fun awaitMain(condition: () -> Boolean) {
+            driver.settleLive(player)
+            driver.awaitCurrent("live buffer condition", condition)
+        }
         val connection = ScriptedSubscriptionConnection().apply {
             scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 120)))
         }
-        val manager = createSubscriptionManager(connection, Dispatchers.Default).apply { startAdmission() }
+        val manager = createSubscriptionManager(connection, work).apply { startAdmission() }
         val session = FakeTvheadendSession(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(Channel.create(ChannelId(1))))),
             epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
         )).apply { scriptLivePlaybackSuccess(manager) }
-        val coordinator = createTvheadendPlaybackCoordinator(player, control).also { it.launchIn(scope) }
-        driver.exercise(this, 60_000) { try {
+        val coordinator = createTvheadendPlaybackCoordinator(player, control, workDispatcher = work).also { it.launchIn(scope) }
+        try {
             // Far more than ordinary startup buffering, so the live threshold holds the start.
             liveStartBuffer.duration = 60_000.milliseconds
-            val result = coordinator.setLiveTarget(session, requireNotNull(session.observation.value.currentSession), ChannelId(1),
-                LivePlaybackOptions(timeshiftPeriod = 120.seconds))
+            val installing = async { coordinator.setLiveTarget(session, requireNotNull(session.observation.value.currentSession), ChannelId(1),
+                LivePlaybackOptions(timeshiftPeriod = 120.seconds)) }
+            driver.settleLive(player)
+            driver.awaitCurrent("live target installed") { installing.isCompleted }
+            val result = installing.await()
             assertTrue(result is LivePlaybackTargetResult.Bound && result.result.isStarted)
             if (player.playbackState == Player.STATE_IDLE) player.prepare()
             player.play()
+            driver.settleLive(player)
             connection.awaitCollectionRegistered()
             connection.emit(SubscriptionEvent.Started(listOf(
                 stream(1, SubscriptionStreamType.MPEG2_VIDEO), stream(2, SubscriptionStreamType.MPEG2_AUDIO),
@@ -174,6 +191,7 @@ class LiveStartBufferPlayerTest {
             // The period exposes its tracks from the first packets; the player selects them before buffering.
             awaitMain { player.playerError != null || !player.currentTracks.isEmpty }
             repeat(100) { emitPair(connection, 8 + it) }
+            driver.advanceLive(player, clock, 1_000)
             awaitMain { player.playerError != null || player.totalBufferedDuration >= 3_000 }
             assertNull(player.playerError)
             TestPlayerRunHelper.advance(player).untilPendingCommandsAreFullyHandled()
@@ -182,6 +200,7 @@ class LiveStartBufferPlayerTest {
 
             // Lowering the live threshold below what is buffered lets the same start begin.
             liveStartBuffer.duration = 2_000.milliseconds
+            driver.advanceLive(player, clock, 100)
             awaitMain { player.playerError != null || player.isPlaying }
             assertNull(player.playerError)
             assertTrue(player.isPlaying)
@@ -189,25 +208,33 @@ class LiveStartBufferPlayerTest {
                 connection.emit(SubscriptionEvent.Timeshift(1_000_000, 0, 0, 120_000_000, 100))
                 liveStartBuffer.duration = 60_000.milliseconds
                 val returning = async { coordinator.returnToLive() }
-                awaitMain { connection.seekTargets.isNotEmpty() }
+                driver.settleLive(player)
+                driver.awaitCurrent("return-to-live seek admitted") { connection.seekTargets.isNotEmpty() }
                 connection.emit(SubscriptionEvent.Skipped(true, SkipOutcome.ACCEPTED, 0, null))
-                awaitMain { returning.isCompleted }
+                driver.settleLive(player)
+                driver.awaitCurrent("return-to-live completed") { returning.isCompleted }
                 assertEquals(TimeshiftCommandResult.ACCEPTED, returning.await())
+                driver.advanceLive(player, clock, 100)
                 awaitMain { player.playbackState == Player.STATE_BUFFERING }
                 repeat(100) { emitPair(connection, it) }
+                driver.advanceLive(player, clock, 1_000)
                 awaitMain { player.totalBufferedDuration >= 3_000 }
                 assertEquals(Player.STATE_BUFFERING, player.playbackState)
                 liveStartBuffer.duration = 2_000.milliseconds
+                driver.advanceLive(player, clock, 100)
                 awaitMain { player.isPlaying }
                 // The one-shot mark has been consumed. Withhold packets until an ordinary stall.
                 liveStartBuffer.duration = 60_000.milliseconds
-                awaitMain { player.playbackState == Player.STATE_BUFFERING }
+                driver.advanceLive(player, clock, 5_000)
+                driver.awaitCurrent("buffer drained into an ordinary stall") { player.playbackState == Player.STATE_BUFFERING }
                 repeat(20) { emitPair(connection, 100 + it) }
+                driver.advanceLive(player, clock, 100)
                 awaitMain { player.totalBufferedDuration >= 700 }
                 TestPlayerRunHelper.advance(player).untilPendingCommandsAreFullyHandled()
                 assertTrue(player.totalBufferedDuration < 1_500)
                 assertEquals(Player.STATE_BUFFERING, player.playbackState)
                 repeat(35) { emitPair(connection, 120 + it) }
+                driver.advanceLive(player, clock, 100)
                 awaitMain { player.isPlaying }
                 assertTrue(player.totalBufferedDuration < 3_000)
                 assertNull(player.playerError)
@@ -217,7 +244,7 @@ class LiveStartBufferPlayerTest {
             manager.closeAndJoin()
             session.shutdown()
             player.release()
-        } }
+        }
     }
 
     /** Accepts video samples and is ready whenever the stream has one; decodes nothing. */
@@ -279,10 +306,6 @@ class LiveStartBufferPlayerTest {
             put("fmt ".toByteArray()); putInt(16); putShort(1); putShort(1); putInt(8_000); putInt(16_000); putShort(2); putShort(16)
             put("data".toByteArray()); putInt(size)
         }.array()
-    }
-
-    private fun idleUntil(condition: () -> Boolean) {
-        RobolectricUtil.runMainLooperUntil(condition, 10_000, androidx.media3.common.util.Clock.DEFAULT)
     }
 
     private fun stream(index: Long, type: SubscriptionStreamType) = SubscriptionStream(

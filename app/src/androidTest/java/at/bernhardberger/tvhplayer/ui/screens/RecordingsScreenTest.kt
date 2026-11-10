@@ -1518,7 +1518,7 @@ class RecordingsScreenTest {
         composeRule.onNodeWithTag("programme-details-page").assertIsDisplayed()
         composeRule.onNodeWithText("Cancelled Show").assertIsDisplayed()
         composeRule.onAllNodesWithTag("details-cancel").assertCountEquals(0)
-        composeRule.onNodeWithTag("details-delete").assertIsFocused()
+        composeRule.onNodeWithTag("details-remove_entry").assertIsFocused()
     }
 
     @Test

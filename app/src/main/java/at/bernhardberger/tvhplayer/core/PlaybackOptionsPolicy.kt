@@ -77,18 +77,3 @@ fun playbackOptionsCategories(): List<PlaybackOptionsPage> =
             PlaybackOptionsPage.DISPLAY,
             PlaybackOptionsPage.STATS,
         )
-
-fun adjacentPlaybackOptionsPage(
-    current: PlaybackOptionsPage,
-    direction: Int,
-): PlaybackOptionsPage {
-    val pages = playbackOptionsCategories()
-    val index = pages.indexOf(current).takeIf { it >= 0 } ?: 0
-    val next = (index + direction).floorMod(pages.size)
-    return pages[next]
-}
-
-private fun Int.floorMod(modulus: Int): Int {
-    val r = this % modulus
-    return if (r < 0) r + modulus else r
-}

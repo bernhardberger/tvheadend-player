@@ -8,6 +8,10 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import at.bernhardberger.tvhplayer.settings.ServerSettings
+import at.bernhardberger.tvhplayer.settings.dataStore
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import at.bernhardberger.tvheadend.sdk.core.ServerProfileId
 import at.bernhardberger.tvhplayer.ui.components.awaitBrowsePreparation
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchState
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyMode
@@ -50,9 +54,9 @@ class HomeNavigationJourneyTest {
         fixture.app(emptyChannels = true)
         compose.onNodeWithText("Connection settings").performSemanticsAction(SemanticsActions.OnClick)
         fixture.settle()
-        compose.onNodeWithText("Set up connection", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("Add connection", useUnmergedTree = true).assertExists()
         fixture.restoreWithPendingGuide()
-        compose.onNodeWithText("Set up connection", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("Add connection", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("epg-screen").assertDoesNotExist()
         compose.onNodeWithTag("home-header").assertDoesNotExist()
         compose.runOnIdle { assertEquals(ApplianceLaunchState.Idle, fixture.launchRequests.state.value) }
@@ -317,8 +321,11 @@ class HomeNavigationJourneyTest {
     @Test fun realBackKeyCycleFromThePlayerReturnsToTheRecentChannelCardWithTheRailClosed() {
         // Playback is not confirmed offline, so seed what a confirmed first picture records.
         runBlocking {
-            LastPlayedChannelStore(ApplicationProvider.getApplicationContext()).run {
-                setChannelId(ChannelId(3)); setChannelId(ChannelId(2))
+            val context = ApplicationProvider.getApplicationContext<Application>()
+            val profileId = ServerProfileId.generate()
+            context.dataStore.edit { it[stringPreferencesKey("activeServerProfileId")] = profileId.value }
+            LastPlayedChannelStore(context).run {
+                setChannelId(profileId, ChannelId(3)); setChannelId(profileId, ChannelId(2))
             }
         }
         fixture.app()

@@ -94,6 +94,7 @@ import at.bernhardberger.tvhplayer.core.GuideDeferredOriginResolution
 import at.bernhardberger.tvhplayer.core.GuideEntryFocusTarget
 import at.bernhardberger.tvhplayer.core.GuideScopeExitFocusTarget
 import at.bernhardberger.tvhplayer.core.GuidePendingNavigationAction
+import at.bernhardberger.tvhplayer.core.GuidePreparationNavigation
 import at.bernhardberger.tvhplayer.core.guidePendingNavigationAction
 import at.bernhardberger.tvhplayer.core.ProgrammeCategory
 import at.bernhardberger.tvhplayer.core.ProgrammeRecordingTarget
@@ -446,6 +447,11 @@ fun EpgGridScreen(
     var coverageTagId by remember { mutableStateOf(channelScope.activeTagId) }
     var lastPlayedId by remember { mutableStateOf<ChannelId?>(null) }
     var programmeFocusOwned by remember { mutableStateOf(true) }
+    // Keys drop transient contexts; take() checks composition-to-effect changes; clear() handles Back/leave.
+    val preparationNavigation = remember(channelScopeState, guideActive, initialFocusEnabled,
+        programmeFocusOwned, detailsEvent, showTimePanel, openPanel, showContextMenu) {
+        GuidePreparationNavigation()
+    }
     var preparationEntryToScope by remember { mutableStateOf(false) }
     val mayFocusProgramme by rememberUpdatedState(
         initialFocusEnabled && programmeFocusOwned &&
@@ -480,6 +486,7 @@ fun EpgGridScreen(
     val projectionBehind = !indexCurrent || preparedIndex?.input != indexInput
 
     fun focusGuideHeader(): Boolean = runCatching {
+        preparationNavigation.clear()
         programmeFocusOwned = false
         guideDateFocus.requestFocus()
     }.getOrDefault(false)
@@ -735,6 +742,7 @@ fun EpgGridScreen(
     }
 
     fun releaseProgrammeFocus() {
+        preparationNavigation.clear()
         suppressActivationRelease = false
         scopeEntryRequested = false
         programmeFocusOwned = false
@@ -1561,11 +1569,21 @@ fun EpgGridScreen(
     val programmeBackEnabled = guideActive && initialFocusEnabled && programmeFocusOwned &&
         detailsEvent == null && !showTimePanel && openPanel == null
     val backCycle = key(channelScope.activeTagId) { rememberBackKeyCycle(programmeBackEnabled) }
-    BackHandler(enabled = programmeBackEnabled) { if (!backToNow()) backToRail() }
+    BackHandler(enabled = programmeBackEnabled) {
+        preparationNavigation.clear()
+        if (!backToNow()) backToRail()
+    }
 
     fun moveFocus(direction: EpgFocusDirection): Boolean {
-        if (!indexCurrent) return true
-        if (channelViewModel.scope.value != channelScopeState) return true
+        if (channelViewModel.scope.value != channelScopeState) {
+            preparationNavigation.clear()
+            return true
+        }
+        if (!indexCurrent) {
+            preparationNavigation.press(direction)
+            return true
+        }
+        preparationNavigation.clear()
         when (guidePendingNavigationAction(
             direction = direction,
             frontierDirection = frontierRequest?.direction,
@@ -1737,6 +1755,16 @@ fun EpgGridScreen(
         }
     }
 
+    LaunchedEffect(indexCurrent, indexAuthority, preparationNavigation) {
+        preparationNavigation.take(
+            indexCurrent = indexCurrent && preparedIndex?.input?.windowStartSec == windowStartSec,
+            scopeCurrent = channelViewModel.scope.value == channelScopeState,
+            guideActive = guideActive && initialFocusEnabled,
+            gridOwned = programmeFocusOwned,
+            overlayOpen = detailsEvent != null || showTimePanel || openPanel != null || showContextMenu,
+        )?.let { moveFocus(it) }
+    }
+
     LaunchedEffect(detailsEvent, restoreDetailsFocus, initialFocusEnabled, indexCurrent) {
         if (!indexCurrent) return@LaunchedEffect
         if (detailsEvent == null && restoreDetailsFocus) {
@@ -1884,6 +1912,7 @@ fun EpgGridScreen(
                 .semantics { if (detailsEvent != null || openPanel != null || showTimePanel) hideFromAccessibility() }
                 .focusProperties {
                     // As in Channels: entering from the rail returns to the remembered programme.
+                    onExit = { preparationNavigation.clear() }
                     onEnter = {
                         val awayFromNavigation = if (layoutDirection == LayoutDirection.Ltr) {
                             FocusDirection.Right
@@ -1896,6 +1925,7 @@ fun EpgGridScreen(
                 .backKeyCycleFocus(backCycle)
                 .onPreviewKeyEvent { event ->
                     if (event.key == Key.Back) {
+                        preparationNavigation.clear()
                         return@onPreviewKeyEvent backCycle.handle(event.type == KeyEventType.KeyDown,
                             event.nativeKeyEvent.repeatCount, event.nativeKeyEvent.isCanceled,
                             enabled = programmeBackEnabled) {

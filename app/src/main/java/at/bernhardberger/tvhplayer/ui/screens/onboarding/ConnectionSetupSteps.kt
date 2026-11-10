@@ -56,6 +56,9 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.OutlinedButton
+import androidx.tv.material3.OutlinedButtonDefaults
+import at.bernhardberger.tvhplayer.ui.components.serverAddress
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.android.DiscoveredTvheadendServer
 import at.bernhardberger.tvheadend.sdk.core.DEFAULT_HTSP_PORT
@@ -88,9 +91,15 @@ private const val PASSWORD_FIELD = "setup-password"
 
 /**
  * Back keeps the draft and unwinds the wizard; the first step leaves for TV home or Settings.
+ * [profileName] names the stored server while a password is entered again. [confirmSwitch] draws
+ * the question asked before a test that stops what plays (see [ConnectionSetupState.confirmingSwitch]).
  */
 @Composable
-internal fun ConnectionSetupFlow(state: ConnectionSetupState) {
+internal fun ConnectionSetupFlow(
+    state: ConnectionSetupState,
+    profileName: String? = null,
+    confirmSwitch: (@Composable (form: ConnectionFormState, onSwitch: () -> Unit, onKeep: () -> Unit) -> Unit)? = null,
+) {
     BackHandler(enabled = state.step.previous(state.mode) != null) { state.back() }
     Box(Modifier.fillMaxSize()) {
         when (state.step) {
@@ -98,7 +107,7 @@ internal fun ConnectionSetupFlow(state: ConnectionSetupState) {
             SetupStep.WELCOME -> Unit
             SetupStep.ADDRESS -> AddressStep(state)
             SetupStep.FIND_SERVER -> FindServerStep(state)
-            SetupStep.SIGN_IN -> SignInStep(state)
+            SetupStep.SIGN_IN -> SignInStep(state, profileName)
             SetupStep.CONNECTING -> ConnectStep(state)
             SetupStep.FAILED -> FailureStep(state, state.failure ?: SetupFailure.OTHER)
             SetupStep.DONE -> DoneStep(state)
@@ -108,6 +117,9 @@ internal fun ConnectionSetupFlow(state: ConnectionSetupState) {
             SetupWelcome(state)
         }
     }
+    // Over the step, so it takes focus and Back until the user answers.
+    if (state.confirmingSwitch && confirmSwitch != null)
+        confirmSwitch(state.form, state::confirmSwitch, state::keepWatching)
 }
 
 @Composable
@@ -193,7 +205,7 @@ private fun FoundServerRow(state: ConnectionSetupState, server: DiscoveredTvhead
     }
     GuidedStepAction(
         title = server.name,
-        subtitle = stringResource(R.string.onboarding_found_server_detail, server.host, server.port),
+        subtitle = serverAddress(server.host, server.port.toString()),
         icon = R.drawable.ic_dns,
         onClick = { state.chooseServer(server) },
         modifier = Modifier
@@ -378,7 +390,7 @@ private fun LabelledField(label: String, enabled: Boolean, isError: Boolean, fie
 }
 
 @Composable
-private fun SignInStep(state: ConnectionSetupState) {
+private fun SignInStep(state: ConnectionSetupState, profileName: String?) {
     val username = remember { FocusRequester() }
     val password = remember { FocusRequester() }
     val connect = remember { FocusRequester() }
@@ -392,10 +404,20 @@ private fun SignInStep(state: ConnectionSetupState) {
     }
     GuidedStepLayout(guidance = {
         GuidedStepGuidance(
-            title = stringResource(R.string.onboarding_sign_in_title),
-            body = stringResource(R.string.onboarding_sign_in_body),
+            title = stringResource(
+                if (state.mode == SetupMode.PASSWORD) R.string.server_password_title
+                else R.string.onboarding_sign_in_title,
+            ),
+            body = if (state.mode == SetupMode.PASSWORD) {
+                val account = stringResource(
+                    R.string.server_user_on_host, state.form.username.trim(), state.form.host.trim(),
+                )
+                stringResource(R.string.server_password_body, account, profileName ?: account)
+            } else {
+                stringResource(R.string.onboarding_sign_in_body)
+            },
             stepper = { SetupStepper(SetupStage.SIGN_IN.ordinal) },
-            meta = stringResource(R.string.onboarding_change_address_detail, state.form.host.trim(), state.form.port.trim()),
+            meta = serverAddress(state.form.host, state.form.port),
         )
     }) {
         SignInFields(
@@ -432,7 +454,7 @@ private fun ConnectStep(state: ConnectionSetupState) {
     }
     GuidedStepLayout(guidance = {
         GuidedStepGuidance(title = title, body = body, stepper = { SetupStepper(SetupStage.CONNECT.ordinal) },
-            meta = stringResource(R.string.onboarding_change_address_detail, host, form.port))
+            meta = serverAddress(host, form.port))
     }) {
         ConnectingStatus(Modifier.testTag("setup-connecting"))
     }
@@ -554,12 +576,13 @@ private fun FailureStep(state: ConnectionSetupState, failure: SetupFailure) {
     val host = form.host.trim()
     val port = form.port.trim()
     val meta = if (form.username.isBlank()) {
-        stringResource(R.string.onboarding_failure_meta_anonymous, host, port)
+        serverAddress(host, port)
     } else {
-        stringResource(R.string.onboarding_failure_meta, host, port, form.username)
+        stringResource(R.string.server_detail_separator, serverAddress(host, port), form.username)
     }
     val reason = if (failure.showsHint) text.paragraph(failure.condition) else text.reason(failure.condition)
-    val body = if (state.mode == SetupMode.EDIT) stringResource(R.string.onboarding_edit_failure_body, reason) else reason
+    val body = if (state.mode.keepsSavedConnection)
+        stringResource(R.string.onboarding_edit_failure_body, reason) else reason
     GuidedStepLayout(
         guidance = {
             GuidedStepGuidance(
@@ -604,7 +627,7 @@ private fun SetupActionButton(
         SetupAction.CHANGE_ADDRESS -> {
             title = R.string.onboarding_change_address
             icon = R.drawable.ic_edit
-            subtitle = stringResource(R.string.onboarding_change_address_detail, host, form.port.trim())
+            subtitle = serverAddress(host, form.port)
         }
         SetupAction.CHANGE_SIGN_IN -> {
             title = R.string.onboarding_change_sign_in
@@ -668,11 +691,22 @@ private fun DoneStep(state: ConnectionSetupState) {
         // Keep the button's own layout unpadded: Column can otherwise constrain it to zero
         // after the success copy grows (notably at 1.3x fonts), leaving no focusable target.
         Spacer(Modifier.height(24.dp))
-        Button(
-            onClick = state::save,
-            modifier = arrivalFocus().testTag("setup-start-watching"),
-        ) {
-            Text(stringResource(if (state.mode == SetupMode.EDIT) R.string.onboarding_save_connection else R.string.onboarding_start_watching))
+        Row(horizontalArrangement = Arrangement.spacedBy(TvSpacing12)) {
+            Button(
+                onClick = { state.save() },
+                modifier = arrivalFocus().testTag("setup-start-watching"),
+            ) {
+                Text(stringResource(if (state.mode == SetupMode.EDIT) R.string.onboarding_save_connection else R.string.onboarding_start_watching))
+            }
+            if (state.offersName) {
+                OutlinedButton(
+                    onClick = { state.save(addName = true) },
+                    modifier = Modifier.testTag("setup-add-name"),
+                    colors = OutlinedButtonDefaults.colors(contentColor = MaterialTheme.colorScheme.onSurface),
+                ) {
+                    Text(stringResource(R.string.server_add_name))
+                }
+            }
         }
         SaveFailedText(form.feedback)
     }

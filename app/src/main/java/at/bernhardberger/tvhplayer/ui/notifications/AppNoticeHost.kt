@@ -1,4 +1,5 @@
 package at.bernhardberger.tvhplayer.ui.notifications
+import at.bernhardberger.tvhplayer.notices.matches
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -85,7 +86,7 @@ internal fun AppNoticeHost(queue: NoticeCenter, context: NoticeContext) {
         queue.show(next.id, timeout)
     }
     if (allowed) state.active?.takeIf {
-        it.notice.context == context && queue.remaining(it.expiresAt) > 0
+        it.notice.matches(context) && queue.remaining(it.expiresAt) > 0
     }?.let {
         val formatted = NoticeFormatter(LocalContext.current).format(it.notice.notice)
         AppNoticePresentation(formatted.headline, detail = formatted.detail, icon = formatted.icon)
@@ -139,6 +140,7 @@ internal fun AppNoticePresentation(
                         AppNoticeIcon.DELETE -> R.drawable.ic_delete_outlined
                         AppNoticeIcon.CONNECTED -> R.drawable.ic_power
                         AppNoticeIcon.DISCONNECTED -> R.drawable.ic_power_off
+                        AppNoticeIcon.SIGN_IN_REJECTED -> R.drawable.ic_lock
                     }), contentDescription = null, modifier = Modifier.size(16.dp),
                         tint = if (icon == AppNoticeIcon.RECORDING) recordingMarkColor(focused = false) else LocalContentColor.current)
                 }

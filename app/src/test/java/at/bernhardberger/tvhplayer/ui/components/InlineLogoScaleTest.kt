@@ -17,9 +17,6 @@ class InlineLogoScaleTest {
     @Test fun squareAndPortraitLogosStayInsideTheTextLine() {
         assertEquals(14f, drawn(Size(100f, 100f)).height, 0.01f)
         assertEquals(14f, drawn(Size(75f, 100f)).height, 0.01f)
-    }
-
-    @Test fun wideLogosKeepTheBoxWidth() {
         assertEquals(36f, drawn(Size(300f, 100f)).width, 0.01f)
         assertEquals(36f, drawn(Size(500f, 100f)).width, 0.01f)
     }

@@ -33,6 +33,12 @@ class RecordingMarkLayoutPolicyTest {
             assertEquals(listOf(RecordingMarkStop(0), RecordingMarkStop(20, mark)), recordingMarkStops(listOf(mark), 140))
             assertEquals(RecordingMarkStop(140, mark, atEnd = true), recordingMarkStops(listOf(mark), 141).last())
         }
+        for ((kind, start) in listOf(AD_BREAK to 0L, CUT to 40L)) {
+            val mark = RecordingMark(kind, start, 300)
+            val expected = if (start == 0L) listOf(RecordingMarkStop(0, mark))
+                else listOf(RecordingMarkStop(0), RecordingMarkStop(start, mark))
+            assertEquals(expected, recordingMarkStops(listOf(mark), 100))
+        }
     }
 
     @Test
@@ -88,34 +94,11 @@ class RecordingMarkLayoutPolicyTest {
 
     @Test
     fun aMarkAtZeroIsTheStartStop() {
-        val ad = RecordingMark(AD_BREAK, 0, 30)
-        assertEquals(listOf(RecordingMarkStop(0, ad), RecordingMarkStop(30, ad, atEnd = true)), recordingMarkStops(listOf(ad), 100))
-    }
-
-    @Test
-    fun everyStopIsASeekableMarkPositionAndNothingOutsideTheDuration() {
-        val marks = listOf(RecordingMark(AD_BREAK, 10, 20), RecordingMark(CUT, 30, 40), RecordingMark(CHAPTER, 120))
-        val stops = recordingMarkStops(marks, 100)
-        assertEquals(listOf(0L, 10L, 20L, 30L, 40L), stops.map { it.positionMs })
-        // Each stop is the start, a mark's start or an interval's end: a position the marks row may seek.
-        assertTrue(stops.all { stop ->
-            stop.positionMs == 0L || marks.any { it.startMs == stop.positionMs || (it.kind != CHAPTER && it.endMs == stop.positionMs) }
-        })
-        assertTrue(recordingMarkStops(marks, 0).isEmpty())
-    }
-
-    @Test
-    fun aLoneMarkAtZeroIsAStopOfItsOwn() {
-        val chapter = RecordingMark(CHAPTER, 0, name = "Opening")
-        assertEquals(listOf(RecordingMarkStop(0, chapter)), recordingMarkStops(listOf(chapter), 100))
-    }
-
-    @Test
-    fun aGrowingRecordingKeepsAStartWhoseEndIsStillAhead() {
-        val atStart = RecordingMark(AD_BREAK, 0, 300)
-        assertEquals(listOf(RecordingMarkStop(0, atStart)), recordingMarkStops(listOf(atStart), 100))
-        val inside = RecordingMark(CUT, 40, 300)
-        assertEquals(listOf(RecordingMarkStop(0), RecordingMarkStop(40, inside)), recordingMarkStops(listOf(inside), 100))
+        for (mark in listOf(RecordingMark(AD_BREAK, 0, 30), RecordingMark(CHAPTER, 0, name = "Opening"))) {
+            val expected = if (mark.kind == CHAPTER) listOf(RecordingMarkStop(0, mark))
+                else listOf(RecordingMarkStop(0, mark), RecordingMarkStop(30, mark, atEnd = true))
+            assertEquals(expected, recordingMarkStops(listOf(mark), 100))
+        }
     }
 
     @Test

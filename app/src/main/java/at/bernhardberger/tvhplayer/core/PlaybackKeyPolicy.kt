@@ -21,12 +21,6 @@ enum class ChannelKeyAction {
     TUNE,
 }
 
-enum class PlaybackOverlayFocusTarget {
-    TIMESHIFT_TOGGLE,
-    CHANNELS,
-    CONTROLS_CLUSTER,
-}
-
 enum class PlayerSurface {
     LIVE,
     RECORDING,
@@ -83,21 +77,6 @@ fun liveMediaKeyAction(timeshiftAvailable: Boolean, livePause: LivePauseAvailabi
     livePauseAccepted(timeshiftAvailable, livePause) -> LiveMediaKeyAction.DISPATCH
     livePauseUnavailable(livePause) -> LiveMediaKeyAction.REVEAL_WITH_REASON
     else -> LiveMediaKeyAction.PASS_THROUGH
-}
-
-fun initialPlaybackOverlayFocus(timeshiftAvailable: Boolean): PlaybackOverlayFocusTarget =
-    PlaybackOverlayFocusTarget.CONTROLS_CLUSTER
-
-fun shouldRevealPlaybackControls(controlsVisible: Boolean, keyCode: Int): Boolean {
-    if (controlsVisible) return false
-    return when (keyCode) {
-        KeyEvent.KEYCODE_DPAD_CENTER,
-        KeyEvent.KEYCODE_ENTER,
-        KeyEvent.KEYCODE_NUMPAD_ENTER,
-        KeyEvent.KEYCODE_DPAD_UP,
-        KeyEvent.KEYCODE_DPAD_DOWN -> true
-        else -> false
-    }
 }
 
 fun playbackSuppressesRevealingKey(

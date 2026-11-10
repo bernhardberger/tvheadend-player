@@ -21,7 +21,9 @@ fun OnboardingScreen(
     settingsStore: AppProfileOwner = koinInject(),
 ) {
     val context = LocalContext.current.applicationContext
-    val state = rememberConnectionSetupState(session, settingsStore, discovery = { discoverServers(context) })
+    val state = rememberConnectionSetupState(session, settingsStore, discovery = { discoverServers(context) },
+        sessionLock = settingsStore.connectionChanges,
+        connectionGeneration = { settingsStore.configurationGeneration.value })
     Surface(
         modifier = Modifier.fillMaxSize(),
         colors = SurfaceDefaults.colors(

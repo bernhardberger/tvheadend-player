@@ -52,6 +52,7 @@ import at.bernhardberger.tvhplayer.ui.components.ProgrammeEyebrow
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackMarker
 import at.bernhardberger.tvhplayer.ui.TvTextColors
+import at.bernhardberger.tvhplayer.ui.components.rule
 import at.bernhardberger.tvhplayer.ui.components.watchingIndicator
 import at.bernhardberger.tvhplayer.ui.components.progressColor
 import at.bernhardberger.tvhplayer.ui.components.programmeProgress
@@ -320,7 +321,7 @@ private fun GuideHeadlineContent(
     val recording = event?.let { observation.dvrEntryForEvent(it) }?.takeUnless(::recordingWasRemoved)
     val mark = recording?.state?.takeIf {
         recordingIsRunning(recording) || it == DvrEntryState.SCHEDULED || it == DvrEntryState.COMPLETED ||
-            it == DvrEntryState.COMPLETED_ERROR || it == DvrEntryState.FILE_MISSING || it == DvrEntryState.MISSED
+            it == DvrEntryState.COMPLETED_ERROR || it == DvrEntryState.MISSED
     }
     ProgrammeHeadline(
         eyebrow = {
@@ -333,11 +334,11 @@ private fun GuideHeadlineContent(
                     ) { ChannelPlaybackMarker(indicator) }
                     when (mark) {
                         DvrEntryState.COMPLETED -> StatusBadge(stringResource(R.string.details_recorded), StatusBadgeTone.NEUTRAL,
-                            Modifier.testTag("recording-badge-recorded"), icon = R.drawable.ic_fiber_manual_record)
+                            Modifier.testTag("recording-badge-recorded"), icon = R.drawable.ic_video_library)
                         DvrEntryState.MISSED -> StatusBadge(stringResource(R.string.recording_state_missed), StatusBadgeTone.ERROR,
                             Modifier.testTag("recording-badge-missed"), icon = R.drawable.ic_error_outlined,
                             contentDescription = stringResource(R.string.recording_notice_missed))
-                        else -> RecordingBadge(mark)
+                        else -> RecordingBadge(mark, rule = recording?.rule)
                     }
                 }
             }

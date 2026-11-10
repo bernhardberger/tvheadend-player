@@ -52,11 +52,6 @@ class PlaybackStallWatchTest {
         assertNull(watch.onSample(buffering(10_000), STALL_BUFFERING_MILLIS * 2 - 1))
     }
 
-    @Test fun aReportedStallNeedsAFullWindowAgain() {
-        assertEquals(PlaybackStall.BUFFERING, watch.feed(STALL_BUFFERING_MILLIS) { buffering(10_000) })
-        assertNull(watch.onSample(buffering(10_000), STALL_BUFFERING_MILLIS + STALL_POLL_MILLIS))
-    }
-
     @Test fun theClockRunningWithoutAFrameIsAPictureStall() {
         assertEquals(PlaybackStall.PICTURE, watch.feed(PICTURE_STALL_MILLIS) { now -> playing(position = now) })
     }

@@ -111,15 +111,8 @@ fun DvrArchiveFolder.runningRecordings(): List<DvrEntry> =
 fun chooseDvrConfig(configs: List<DvrConfiguration>, preferredId: DvrConfigId? = null): DvrConfigId? =
     (configs.firstOrNull { it.id == preferredId } ?: configs.firstOrNull { it.name.isBlank() } ?: configs.firstOrNull())?.id
 
-/**
- * Matches Tvheadend's web UI Removed classification for completed entries in
- * dvr_entry_is_finished (src/dvr/dvr_db.c), reported as "File missing" by
- * src/htsp_server.c. This covers deletions before and after a server restart,
- * files removed outside Tvheadend, and recordings that never wrote a file once
- * Tvheadend has reloaded them. HTSP exposes nothing finer (fileremoved is not exposed).
- * Interim policy until the SDK exposes a dedicated removed state.
- */
-fun recordingWasRemoved(entry: DvrEntry): Boolean = entry.state == DvrEntryState.FILE_MISSING
+/** Removed entries may remain on the server until retention expires, but are no recording in Player. */
+fun recordingWasRemoved(entry: DvrEntry): Boolean = entry.state == DvrEntryState.REMOVED
 
 fun partitionDvrLibrary(entries: List<DvrEntry>): DvrLibraryPartition = DvrLibraryPartition(
     archive = entries
@@ -139,7 +132,6 @@ fun partitionDvrLibrary(entries: List<DvrEntry>): DvrLibraryPartition = DvrLibra
                 DvrEntryState.MISSED,
                 DvrEntryState.INVALID,
                 DvrEntryState.COMPLETED_ERROR,
-                DvrEntryState.FILE_MISSING,
             )
         }
         .sortedByDescending { it.start?.epochSeconds ?: Long.MIN_VALUE },
@@ -201,7 +193,6 @@ fun groupDvrProblems(entries: List<DvrEntry>): Map<DvrProblemBucket, List<DvrEnt
                 // A missed recording failed to happen; only one never meant to happen is canceled.
                 DvrProblemBucket.FAILED -> it.state in setOf(
                     DvrEntryState.COMPLETED_ERROR,
-                    DvrEntryState.FILE_MISSING,
                     DvrEntryState.MISSED,
                 )
                 DvrProblemBucket.CANCELLED -> it.state == DvrEntryState.INVALID

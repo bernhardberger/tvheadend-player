@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.ui.screens.recordings
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackMarker
 import at.bernhardberger.tvhplayer.ui.components.errorMarkColor
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
+import at.bernhardberger.tvhplayer.ui.components.rule
 import at.bernhardberger.tvhplayer.ui.components.watchingIndicator
 import at.bernhardberger.tvhplayer.ui.components.recordingViewerPosition
 import at.bernhardberger.tvhplayer.ui.components.progressColor
@@ -466,7 +467,7 @@ internal fun RecordingMetadataPane(
                     androidx.compose.runtime.CompositionLocalProvider(
                         androidx.tv.material3.LocalContentColor provides TvTextColors.secondary,
                     ) { ChannelPlaybackMarker(watchingIndicator(entry.id)) }
-                    RecordingBadge(entry.state)
+                    RecordingBadge(entry.state, rule = entry.rule)
                 }
             },
             title = entry.title.orEmpty(),
@@ -540,7 +541,6 @@ internal fun RecordingMetadataPane(
 /** A failed or cancelled recording's state in the words its notice uses. */
 @Composable
 private fun problemStateLabel(state: DvrEntryState?): String? = when (state) {
-    DvrEntryState.FILE_MISSING -> R.string.error_303_title
     DvrEntryState.MISSED -> R.string.recording_notice_missed
     DvrEntryState.COMPLETED_ERROR -> R.string.recording_notice_failed
     DvrEntryState.INVALID -> R.string.recording_notice_canceled
@@ -549,11 +549,8 @@ private fun problemStateLabel(state: DvrEntryState?): String? = when (state) {
 
 /** The rule a scheduled recording comes from, with its mark, when the server says it has one. */
 @Composable
-private fun recordingRuleLabel(entry: DvrEntry): Pair<String, Int>? = when {
-    entry.autorecRuleId != null -> stringResource(R.string.recording_from_series_rule) to R.drawable.ic_event
-    entry.timerecRuleId != null -> stringResource(R.string.recording_from_timer_rule) to R.drawable.ic_schedule
-    else -> null
-}
+private fun recordingRuleLabel(entry: DvrEntry): Pair<String, Int>? =
+    entry.rule?.let { stringResource(it.label) to R.drawable.ic_schedule_rule }
 
 /**
  * A Schedule or Problems list in Archive's first column, with the focused recording's pane where
@@ -953,6 +950,7 @@ internal fun RecordingListRow(
                     Spacer(Modifier.width(TvSpacing8))
                     RecordingStatusIndicator(
                         state = markState,
+                        rule = entry.rule,
                         focused = focused,
                         modifier = Modifier.testTag("recording-list-state-$itemKey"),
                     )
@@ -1084,7 +1082,6 @@ private enum class RecordingOverlineMark(@DrawableRes val icon: Int, val tag: St
 /** A completed recording is the normal case and carries no mark; running and scheduled ones carry theirs at the row's end. */
 private fun recordingStateMark(state: DvrEntryState?): RecordingOverlineMark? = when (state) {
     DvrEntryState.COMPLETED_ERROR,
-    DvrEntryState.FILE_MISSING,
     DvrEntryState.MISSED -> RecordingOverlineMark.FAILED
     DvrEntryState.INVALID -> RecordingOverlineMark.CANCELLED
     else -> null
@@ -1251,8 +1248,7 @@ internal fun dvrStateLabel(state: DvrEntryState?): String = stringResource(
         DvrEntryState.MISSED -> R.string.recording_state_missed
         DvrEntryState.INVALID -> R.string.recording_state_cancelled
         DvrEntryState.RECORDING_ERROR -> R.string.recording_state_recording_errors
-        DvrEntryState.COMPLETED_ERROR,
-        DvrEntryState.FILE_MISSING -> R.string.recording_state_failed
+        DvrEntryState.COMPLETED_ERROR -> R.string.recording_state_failed
         else -> R.string.recording_state_unknown
     }
 )

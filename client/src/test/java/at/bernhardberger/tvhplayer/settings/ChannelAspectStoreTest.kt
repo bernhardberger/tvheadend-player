@@ -4,6 +4,9 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.ServerProfileId
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import java.io.File
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -26,7 +29,7 @@ class ChannelAspectStoreTest {
     @Test
     fun aChannelWithoutAnEntryUsesAutoAndEachChannelKeepsItsOwnMode() = runTest {
         val data = InMemoryPreferencesDataStore()
-        val profile = AudioChoiceStore(data).profileIdentity()
+        val profile = selectProfile(data)
         val store = ChannelAspectStore(data)
         assertEquals(AspectRatioMode.FIT, store.choices.first().modeFor(ChannelId(1)))
 
@@ -43,7 +46,7 @@ class ChannelAspectStoreTest {
     @Test
     fun choosingAutoForgetsOnlyThatChannelsEntry() = runTest {
         val data = InMemoryPreferencesDataStore()
-        val profile = AudioChoiceStore(data).profileIdentity()
+        val profile = selectProfile(data)
         val store = ChannelAspectStore(data)
         store.set(profile, ChannelId(1), AspectRatioMode.FORCE_16_9)
         store.set(profile, ChannelId(2), AspectRatioMode.FORCE_4_3)
@@ -58,17 +61,16 @@ class ChannelAspectStoreTest {
     @Test
     fun aReplacedServerIdentityCannotInheritModesAndTheOldOnesReturnWithTheOldIdentity() = runTest {
         val data = InMemoryPreferencesDataStore()
-        val audio = AudioChoiceStore(data)
-        val original = audio.profileIdentity()
+        val original = selectProfile(data)
         val store = ChannelAspectStore(data)
         store.set(original, ChannelId(1), AspectRatioMode.FORCE_16_9)
 
-        val replacement = audio.profileIdentity(replace = true)
+        val replacement = selectProfile(data)
         assertEquals(AspectRatioMode.FIT, store.choices.first().modeFor(ChannelId(1)))
         store.set(replacement, ChannelId(1), AspectRatioMode.FORCE_4_3)
         assertEquals(AspectRatioMode.FORCE_4_3, store.choices.first().modeFor(ChannelId(1)))
 
-        data.edit { it[stringPreferencesKey("explicit_audio_profile_v1")] = original }
+        data.edit { it[activeProfileKey] = original }
         assertEquals(AspectRatioMode.FORCE_16_9, store.choices.first().modeFor(ChannelId(1)))
     }
 
@@ -82,7 +84,7 @@ class ChannelAspectStoreTest {
     @Test
     fun aChoiceReportsWhetherItWasStored() = runTest {
         val data = InMemoryPreferencesDataStore()
-        val profile = AudioChoiceStore(data).profileIdentity()
+        val profile = selectProfile(data)
         val store = ChannelAspectStore(data)
         assertTrue(store.set(profile, ChannelId(1), AspectRatioMode.FORCE_16_9))
         assertTrue("forgetting an entry is stored too", store.set(profile, ChannelId(1), AspectRatioMode.FIT))
@@ -91,7 +93,7 @@ class ChannelAspectStoreTest {
     @Test
     fun anUnreadableStoredValueReadsAsAutoAndIsReplacedByTheNextChoice() = runTest {
         val data = InMemoryPreferencesDataStore()
-        val profile = AudioChoiceStore(data).profileIdentity()
+        val profile = selectProfile(data)
         data.edit { it[stringPreferencesKey("channel_aspect_modes_v1")] = """[{"profile":"p","channel":1,"mode":"WIDEST"}]""" }
         val store = ChannelAspectStore(data)
         assertEquals(AspectRatioMode.FIT, store.choices.first().modeFor(ChannelId(1)))
@@ -102,7 +104,7 @@ class ChannelAspectStoreTest {
     @Test
     fun retentionIsBoundedAndUpdatingAModeKeepsItRecent() = runTest {
         val data = InMemoryPreferencesDataStore()
-        val profile = AudioChoiceStore(data).profileIdentity()
+        val profile = selectProfile(data)
         val store = ChannelAspectStore(data)
         for (id in 1L..256L) store.set(profile, ChannelId(id), AspectRatioMode.FORCE_16_9)
         store.set(profile, ChannelId(1), AspectRatioMode.FORCE_4_3)
@@ -120,7 +122,7 @@ class ChannelAspectStoreTest {
         val firstJob = SupervisorJob()
         val first = PreferenceDataStoreFactory.create(scope = CoroutineScope(firstJob + Dispatchers.IO), produceFile = { file })
         try {
-            val profile = AudioChoiceStore(first).profileIdentity()
+            val profile = selectProfile(first)
             ChannelAspectStore(first).set(profile, ChannelId(5), AspectRatioMode.FORCE_16_9)
         } finally {
             firstJob.cancelAndJoin()
@@ -139,8 +141,7 @@ class ChannelAspectStoreTest {
     @Test
     fun aDelayedChoiceForAReplacedProfileIsDroppedWithoutChangingEitherProfilesEntry() = runTest {
         val data = InMemoryPreferencesDataStore()
-        val audio = AudioChoiceStore(data)
-        val original = audio.profileIdentity()
+        val original = selectProfile(data)
         val store = ChannelAspectStore(data)
         store.set(original, ChannelId(1), AspectRatioMode.FORCE_16_9)
         val captured = store.choices.first()
@@ -150,13 +151,18 @@ class ChannelAspectStoreTest {
             store.set(captured.profile, ChannelId(1), AspectRatioMode.FORCE_4_3)
         }
 
-        val replacement = audio.profileIdentity(replace = true)
+        val replacement = selectProfile(data)
         assertEquals(replacement, store.choices.first().profile)
         release.complete(Unit)
         assertFalse(pending.await())
         assertEquals(AspectRatioMode.FIT, store.choices.first().modeFor(ChannelId(1)))
 
-        data.edit { it[stringPreferencesKey("explicit_audio_profile_v1")] = original }
+        data.edit { it[activeProfileKey] = original }
         assertEquals(AspectRatioMode.FORCE_16_9, store.choices.first().modeFor(ChannelId(1)))
+    }
+    private suspend fun selectProfile(data: DataStore<Preferences>): String {
+        val id = ServerProfileId.generate()
+        PlayerSettingsStore(data).useProfile(id)
+        return id.value
     }
 }

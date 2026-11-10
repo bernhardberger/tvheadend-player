@@ -1,8 +1,11 @@
 package at.bernhardberger.tvhplayer.debug
 
 import android.content.Context
-import at.bernhardberger.tvheadend.sdk.android.TvheadendServerProfileStore
-import at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
+import at.bernhardberger.tvheadend.sdk.core.ServerProfileListResult
+import at.bernhardberger.tvheadend.sdk.core.ServerProfileWriteResult
+import at.bernhardberger.tvhplayer.settings.existingServerProfile
 import org.json.JSONObject
 import java.io.File
 
@@ -51,15 +54,29 @@ internal class TestCredentialProvisioner(private val context: Context) {
         var result = "failed"
         try {
             val payload = readPayload(stagingFile) ?: return
-            val profileStore = TvheadendServerProfileStore(context)
-            check(
-                profileStore.storePassword(
+            val owner = org.koin.core.context.GlobalContext.get()
+                .get<at.bernhardberger.tvhplayer.settings.AppProfileOwner>()
+            val profiles = owner.profiles.filterNotNull().first() as? ServerProfileListResult.Available
+                ?: error("Profile store unavailable")
+            val existing = existingServerProfile(profiles.profiles, payload.host, payload.htspPort, payload.username)
+            if (existing == null) {
+                check(owner.addPassword(
                     host = payload.host,
                     port = payload.htspPort,
                     username = payload.username,
                     password = payload.password,
-                ) is ServerProfileReadResult.Available,
-            )
+                ) is at.bernhardberger.tvhplayer.settings.SaveServerProfileResult.Applied)
+            } else {
+                check(owner.updatePassword(
+                    id = existing,
+                    host = payload.host,
+                    port = payload.htspPort,
+                    username = payload.username,
+                    password = payload.password,
+                    label = profiles.profiles.first { it.id == existing }.label,
+                ) is at.bernhardberger.tvhplayer.settings.SaveServerProfileResult.Applied)
+                check(owner.setActive(existing) is ServerProfileWriteResult.Applied)
+            }
             result = "ok"
         } finally {
             stagingFile.delete()

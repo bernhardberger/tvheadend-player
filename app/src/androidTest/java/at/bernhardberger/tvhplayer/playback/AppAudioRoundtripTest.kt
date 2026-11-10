@@ -42,6 +42,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -49,11 +50,12 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class AppAudioRoundtripTest {
     @Test
-    fun audioIdentityIoFailureKeepsExistingProfileButRejectsUnsafeAccountReplacement() = runBlocking {
+    fun appPreferenceIoFailureDisconnectsWithoutChangingStoredProfileIdentity() = runBlocking {
         withTimeout(20.seconds) {
             val context = InstrumentationRegistry.getInstrumentation().targetContext
             val profileStore = TvheadendServerProfileStore(context)
-            check(profileStore.storeAnonymous("offline.invalid", 9982) is at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult.Available)
+            val id = (profileStore.addAnonymous("offline.invalid", 9982, activate = true) as
+                at.bernhardberger.tvheadend.sdk.core.ServerProfileWriteResult.Applied).id
             val failingStore = object : androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences> {
                 override val data = kotlinx.coroutines.flow.flow<androidx.datastore.preferences.core.Preferences> {
                     throw java.io.IOException("Injected audio preference failure")
@@ -66,22 +68,16 @@ class AppAudioRoundtripTest {
             val owner = AppProfileOwner(session, profileStore, PlayerSettingsStore(failingStore), Dispatchers.IO)
             val job = launch { owner.run() }
             try {
-                assertTrue(owner.serverProfile.filterNotNull().first() is at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult.Available)
+                assertEquals(at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult.Unavailable, owner.serverProfile.filterNotNull().first())
                 org.junit.Assert.assertNull(owner.audioProfileId)
-                var rejected = false
-                try {
-                    owner.saveServer("replacement.invalid", 9982)
-                } catch (_: java.io.IOException) {
-                    rejected = true
-                }
-                assertTrue(rejected)
-                val retained = profileStore.loadProfile() as at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult.Available
+                val retained = profileStore.loadActive() as at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult.Available
+                assertEquals(id, retained.id)
                 assertEquals("offline.invalid", retained.host)
-                assertTrue(owner.serverProfile.value is at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult.Available)
+                assertFalse(at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall.CONNECT in session.calls)
             } finally {
                 job.cancelAndJoin()
                 session.shutdown()
-                profileStore.clearProfile()
+                profileStore.clearAll()
             }
         }
     }
@@ -93,7 +89,7 @@ class AppAudioRoundtripTest {
                 val context = InstrumentationRegistry.getInstrumentation().targetContext
                 val settings = PlayerSettingsStore(context)
                 val profileStore = TvheadendServerProfileStore(context)
-                check(profileStore.storeAnonymous("offline.invalid", 9982) is at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult.Available)
+                check(profileStore.addAnonymous("offline.invalid", 9982, activate = true) is at.bernhardberger.tvheadend.sdk.core.ServerProfileWriteResult.Applied)
                 val session = FakeTvheadendSession(testSessionObservation(channels = (1L..2L).map { id ->
                     Channel.create(
                         id = ChannelId(id), name = "Channel $id", uuid = null, number = id,
@@ -151,8 +147,9 @@ class AppAudioRoundtripTest {
                     tune(2)
                     tune(1, audioTracks(missing = true))
                     assertTrue(controlled.parameters.overrides.isEmpty())
-                    // Profile edits cannot transfer an old channel ID's explicit choice.
+                    // Editing preserves the stable profile identity and its channel choices.
                     profiles.saveServer("replacement.invalid", 9982)
+                    assertEquals(profileIdentity, profiles.audioProfileId)
                     tune(1)
                     assertTrue(controlled.parameters.overrides.isEmpty())
                 } finally {
@@ -163,7 +160,7 @@ class AppAudioRoundtripTest {
                     runtime.detach()
                     controlled.player.release()
                     scope.cancel()
-                    profileStore.clearProfile()
+                    profileStore.clearAll()
                 }
             }
         }

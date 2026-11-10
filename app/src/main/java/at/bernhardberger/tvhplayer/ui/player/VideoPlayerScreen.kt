@@ -383,7 +383,6 @@ fun VideoPlayerScreen(
     val activeLivePlayback = livePlaybackObservation as? LivePlaybackObservation.Active
     val sdkTimeshiftState = activeLivePlayback?.timeshiftState ?: LiveTimeshiftState.Unavailable
     val subscriptionFailure = activeLivePlayback?.subscriptionIssue
-    val diagnostics by videoPlayerViewModel.diagnostics.collectAsStateWithLifecycle()
     val channelScope by channelsVm.scope.collectAsStateWithLifecycle()
     // One source: the rows come from the scope whose observation their saved logos use.
     val channels = channelScope.scope.visibleChannels
@@ -481,11 +480,7 @@ fun VideoPlayerScreen(
         channelId = currentChannelId,
         requestedSelection = requestedLiveSelection,
     )
-    var initialPlaybackResolved by remember { mutableStateOf(false) }
-    var initialPlaybackSelection by remember { mutableStateOf<LivePlaybackSelection?>(null) }
-    var initialPlaybackEpoch by remember { mutableStateOf<Long?>(null) }
-    var initialPlaybackIntent by remember { mutableStateOf<Long?>(null) }
-    var initialPlaybackToken by remember { mutableLongStateOf(-1L) }
+    val initialPlayback = remember { InitialLivePlaybackState() }
     var initialStartupTarget by remember { mutableStateOf<at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget?>(null) }
     var admittedStartupTarget by remember { mutableStateOf(startupTarget) }
     var initialPlaybackAdopted by remember { mutableStateOf(false) }
@@ -575,19 +570,6 @@ fun VideoPlayerScreen(
         }
     }
 
-    // Only Stats for nerds needs full diagnostics.
-    @Composable
-    fun DiagnosticsEffect() {
-    val diagnosticsWanted = layerState.core.statsVisible
-    DisposableEffect(diagnosticsWanted) {
-        videoPlayerViewModel.setDiagnosticsEnabled(diagnosticsWanted)
-        onDispose {
-            if (diagnosticsWanted) videoPlayerViewModel.setDiagnosticsEnabled(false)
-        }
-    }
-    }
-    DiagnosticsEffect()
-
     var lastPlayedChannelId by remember { mutableStateOf<ChannelId?>(null) }
     // Counts ON_START: each start runs the entry/resume effect below again, even when a
     // stopped window never composed the stop in between (its frame clock is paused).
@@ -642,11 +624,11 @@ fun VideoPlayerScreen(
         try {
             awaitCancellation()
         } finally {
-            val selection = initialPlaybackSelection
-            val intent = initialPlaybackIntent
+            val selection = initialPlayback.selection
+            val intent = initialPlayback.intent
             if (initialStartupTarget == target && !initialPlaybackAdopted && !startupOutcomeDelivered &&
                 selection != null && intent != null
-            ) retireCancelledStartup(selection, intent, initialPlaybackEpoch)
+            ) retireCancelledStartup(selection, intent, initialPlayback.epoch)
         }
     }
 
@@ -654,10 +636,10 @@ fun VideoPlayerScreen(
     val runLiveStart: suspend (LivePlaybackSelection, Long, Long?) -> Unit = { playbackSelection, requestToken, requestIntent ->
         val startupOwner = startupTarget
         if (startupOwner != null) {
-            initialPlaybackSelection = playbackSelection
-            initialPlaybackIntent = requestIntent
-            initialPlaybackEpoch = null
-            initialPlaybackToken = requestToken
+            initialPlayback.selection = playbackSelection
+            initialPlayback.intent = requestIntent
+            initialPlayback.epoch = null
+            initialPlayback.token = requestToken
             initialStartupTarget = startupOwner
             initialPlaybackAdopted = false
             startupOutcomeDelivered = false
@@ -675,18 +657,20 @@ fun VideoPlayerScreen(
                     videoPlayerViewModel.stopAfterLoss()
                 },
                 onResolved = { result ->
-                    initialPlaybackResolved = true
+                    initialPlayback.resolved = true
                     if (result?.isStarted == true) {
                         lastPlayedChannelId = currentChannelId
                         requestedChannelFailed = false
-                        initialPlaybackSelection = playbackSelection
-                        initialPlaybackIntent = requestIntent
-                        initialPlaybackEpoch = requestIntent?.let { playbackRuntime.installedLiveTargetEpoch(playbackSelection, it) }
-                        initialPlaybackToken = requestToken
+                        initialPlayback.selection = playbackSelection
+                        initialPlayback.intent = requestIntent
+                        initialPlayback.epoch = requestIntent?.let {
+                            playbackRuntime.installedLiveTargetEpoch(playbackSelection, it)
+                        }
+                        initialPlayback.token = requestToken
                         initialStartupTarget = startupOwner
                         initialPlaybackAdopted = false
                         adoptedPlaying = false
-                        if (startupOwner != null && (initialPlaybackEpoch == null ||
+                        if (startupOwner != null && (initialPlayback.epoch == null ||
                                 playbackRuntime.liveTargetPresentation(playbackSelection, requestIntent) == null)
                         ) requestedChannelFailed = true
                     }
@@ -745,13 +729,13 @@ fun VideoPlayerScreen(
         ) {
             lastPlayedChannelId = currentChannelId
             requestedLiveSelection = null
-            initialPlaybackResolved = true
+            initialPlayback.resolved = true
             // A warm entry adopted the playing channel: it serves this screen's intent.
             liveIntent?.let(playbackRuntime::notePlaybackIntentServed)
-            initialPlaybackSelection = authorizedLiveSelection
-            initialPlaybackIntent = liveIntent
-            initialPlaybackEpoch = adoptionPresentation?.epoch
-            initialPlaybackToken = liveRequestToken
+            initialPlayback.selection = authorizedLiveSelection
+            initialPlayback.intent = liveIntent
+            initialPlayback.epoch = adoptionPresentation?.epoch
+            initialPlayback.token = liveRequestToken
             initialStartupTarget = startupTarget
             initialPlaybackAdopted = true
             startupOutcomeDelivered = false
@@ -764,7 +748,7 @@ fun VideoPlayerScreen(
         if (playbackState is AppPlaybackState.Failed && requestedLiveSelection == null) {
             return@LaunchedEffect
         }
-        if (initialPlaybackResolved && requestedLiveSelection == null) return@LaunchedEffect
+        if (initialPlayback.resolved && requestedLiveSelection == null) return@LaunchedEffect
         val playbackSelection = authorizedLiveSelection ?: run {
             // A current session without the channel: it is gone after sync, or never existed.
             if (currentSession != null) requestedChannelFailed = true
@@ -777,11 +761,7 @@ fun VideoPlayerScreen(
         runLiveStart(playbackSelection, liveRequestToken, liveIntent)
     }
 
-    LaunchedEffect(confirmedPlayingChannelId) {
-        if (confirmedPlayingChannelId != null) {
-            lastPlayedChannelStore.setChannelId(currentChannelId)
-        }
-    }
+    PersistConfirmedChannel(confirmedPlayingChannelId, channelScope, observation, lastPlayedChannelStore)
 
     fun openInfo(fromKey: Boolean = false) {
         infoRailChannelId = null
@@ -1164,16 +1144,16 @@ fun VideoPlayerScreen(
     AutoHideEligibility()
     @Composable
     fun StartupOutcome() {
-    val initialPresentation = if (startupTarget == null) null else initialPlaybackSelection?.let {
+    val initialPresentation = if (startupTarget == null) null else initialPlayback.selection?.let {
         playbackRuntime.liveTargetPresentation(it, liveIntent)
     }
     val startupOutcome = at.bernhardberger.tvhplayer.core.mainStartupPlaybackOutcome(
-        expectedEpoch = initialPlaybackEpoch.takeIf {
-            initialPlaybackToken == liveRequestToken && initialStartupTarget == startupTarget
+        expectedEpoch = initialPlayback.epoch.takeIf {
+            initialPlayback.token == liveRequestToken && initialStartupTarget == startupTarget
         },
         presentation = initialPresentation,
         recovery = requestedChannelFailed || currentSubscriptionFailure != null ||
-            (initialPlaybackSelection != null && currentSession !== initialPlaybackSelection?.currentSession) ||
+            (initialPlayback.selection != null && currentSession !== initialPlayback.selection?.currentSession) ||
             currentLiveInterrupted || recoveryVisible || channelUnavailable ||
             playbackState is AppPlaybackState.Recovering || playbackState is AppPlaybackState.Failed,
         adoptedPlaying = adoptedPlaying,
@@ -1820,19 +1800,17 @@ fun VideoPlayerScreen(
             )
         }
 
-        PlaybackStatsVisibility(
+        LivePlayerDiagnostics(
+            viewModel = videoPlayerViewModel,
+            enabled = layerState.core.statsVisible,
             visible = foregroundLayer == PlayerForegroundLayer.STATS,
+            aspectRatio = aspectRatio,
+            timeshiftState = effectiveTimeshiftState,
+            playbackRuntime = playbackRuntime,
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .padding(top = 36.dp, end = 48.dp),
-        ) {
-            PlaybackStatsOverlay(
-                diagnostics = diagnostics,
-                aspectRatio = aspectRatio,
-                timeshiftState = effectiveTimeshiftState,
-                frameRate = playbackRuntime.frameRate,
-            )
-        }
+        )
 
         PlayerPanelVisibility(
             value = layerState.core.optionsPage?.let { it to layerState.core.optionsQuickList },
@@ -1896,6 +1874,30 @@ fun VideoPlayerScreen(
     }
     CompositionLocalProvider(LocalPlayerModalRegistry provides playerModals) {
         PlayerContent()
+    }
+}
+
+private class InitialLivePlaybackState {
+    var resolved by mutableStateOf(false)
+    var selection by mutableStateOf<LivePlaybackSelection?>(null)
+    var epoch by mutableStateOf<Long?>(null)
+    var intent by mutableStateOf<Long?>(null)
+    var token by mutableLongStateOf(-1L)
+}
+
+@Composable
+private fun PersistConfirmedChannel(
+    channelId: ChannelId?,
+    scope: at.bernhardberger.tvhplayer.viewmodels.ChannelScopeState,
+    observation: SessionObservation,
+    store: LastPlayedChannelStore,
+) {
+    val target = at.bernhardberger.tvhplayer.stores.recentChannelToPersist(
+        scope.profileId, channelId,
+        observation.currentSession != null && scope.observation?.currentSession === observation.currentSession,
+    )
+    LaunchedEffect(target) {
+        target?.let { (profileId, confirmedChannel) -> store.setChannelId(profileId, confirmedChannel) }
     }
 }
 

@@ -22,6 +22,11 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChannelScopeIntentTest {
+    private val profileId = ServerProfileId.generate()
+    private val profilePreferences = androidx.datastore.preferences.core.preferencesOf(
+        androidx.datastore.preferences.core.stringPreferencesKey("activeServerProfileId") to
+            profileId.value,
+    )
     private val models = ViewModelStore()
     private val a = ChannelTag.create(ChannelTagId(1), name = "A")
     private val b = ChannelTag.create(ChannelTagId(2), name = "B")
@@ -38,16 +43,120 @@ class ChannelScopeIntentTest {
         Dispatchers.resetMain()
     }
 
+    @Test fun switchingProfilesReloadsTheirOwnTagPreferencesAndStampsLaterWrites() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val data = InMemoryPreferencesDataStore()
+        suspend fun selectProfile(id: ServerProfileId) {
+            data.updateData { current -> current.toMutablePreferences().apply {
+                this[androidx.datastore.preferences.core.stringPreferencesKey("activeServerProfileId")] = id.value
+            } }
+        }
+        val settings = ChannelTagSettingsStore(data)
+        val first = ServerProfileId.generate()
+        val second = ServerProfileId.generate()
+        selectProfile(first)
+        settings.save(settings.settings.first().copy(activeTagId = a.id))
+        selectProfile(second)
+        settings.save(settings.settings.first().copy(activeTagId = b.id))
+        selectProfile(first)
+        val firstCatalog = ChannelCatalog.create(channels = catalog.channels.take(1), tags = listOf(a))
+        val secondCatalog = ChannelCatalog.create(channels = catalog.channels.drop(1), tags = listOf(b))
+        val source = session(ChannelRepositoryState.Current(firstCatalog))
+        val liveProfile = kotlinx.coroutines.flow.MutableStateFlow<ServerProfileId?>(first)
+        val model = ChannelsViewModel(source, settings, liveProfile)
+        models.put("scope", model)
+        runCurrent()
+        assertEquals(first, model.scope.value.profileId)
+        assertEquals(a.id, model.scope.value.scope.activeTagId)
+        // A successful setup trial has B's catalog before the user saves it. Cancelling it
+        // must not normalize A's selected tag or visible scopes against B's unrelated tags.
+        liveProfile.value = null
+        source.publish(SessionObservation.create(channelState = ChannelRepositoryState.Current(secondCatalog)))
+        runCurrent()
+        assertEquals("A trial must not clear the saved connection's tag", a.id, settings.settings.first().activeTagId)
+        source.publish(SessionObservation.create(channelState = ChannelRepositoryState.Current(firstCatalog)))
+        liveProfile.value = first
+        runCurrent()
+        liveProfile.value = null
+        source.publish(SessionObservation.create(channelState = ChannelRepositoryState.Current(secondCatalog)))
+        runCurrent()
+        // The session publication can arrive before the preferences collector receives B.
+        liveProfile.value = second
+        runCurrent()
+        assertEquals("Publishing B must not normalize A's preferences", a.id, settings.settings.first().activeTagId)
+        source.publish(SessionObservation.create(channelState = ChannelRepositoryState.Current(
+            ChannelCatalog.create(channels = secondCatalog.channels),
+        )))
+        runCurrent()
+        selectProfile(second)
+        runCurrent()
+        assertEquals(second, model.scope.value.profileId)
+        assertNull(settings.settings.first().activeTagId)
+        source.publish(SessionObservation.create(channelState = ChannelRepositoryState.Current(secondCatalog)))
+        model.selectTag(null)
+        runCurrent()
+        selectProfile(first)
+        liveProfile.value = first
+        source.publish(SessionObservation.create(channelState = ChannelRepositoryState.Current(firstCatalog)))
+        runCurrent()
+        assertEquals(a.id, model.scope.value.scope.activeTagId)
+        selectProfile(second)
+        liveProfile.value = second
+        source.publish(SessionObservation.create(channelState = ChannelRepositoryState.Current(secondCatalog)))
+        runCurrent()
+        assertNull(model.scope.value.scope.activeTagId)
+    }
+
+    @Test fun retryAfterCollectorFailureRestoresProfileTracking() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val base = InMemoryPreferencesDataStore(profilePreferences)
+        val first = ServerProfileId.from(requireNotNull(profilePreferences[
+            androidx.datastore.preferences.core.stringPreferencesKey("activeServerProfileId")]))
+        val second = ServerProfileId.generate()
+        val seed = ChannelTagSettingsStore(base)
+        seed.save(seed.settings.first().copy(activeTagId = a.id))
+        val fail = CompletableDeferred<Unit>()
+        var collections = 0
+        val data = object : DataStore<Preferences> by base {
+            override val data = flow {
+                if (++collections == 1) {
+                    emit(base.data.first())
+                    fail.await()
+                    throw IOException("Synthetic collector failure")
+                }
+                emitAll(base.data)
+            }
+        }
+        val model = ChannelsViewModel(session(ChannelRepositoryState.Current(catalog)), ChannelTagSettingsStore(data), kotlinx.coroutines.flow.MutableStateFlow<ServerProfileId?>(profileId))
+        models.put("scope", model)
+        runCurrent()
+        assertEquals(first, model.scope.value.profileId)
+        fail.complete(Unit)
+        runCurrent()
+        assertTrue(model.settingsFailure.value)
+        model.retrySettings()
+        runCurrent()
+        assertFalse(model.settingsFailure.value)
+        base.updateData { current -> current.toMutablePreferences().apply {
+            this[androidx.datastore.preferences.core.stringPreferencesKey("activeServerProfileId")] = second.value
+        } }
+        seed.save(seed.settings.first().copy(activeTagId = b.id))
+        runCurrent()
+        assertEquals(second, model.scope.value.profileId)
+        assertEquals(b.id, model.scope.value.scope.activeTagId)
+        assertTrue(collections >= 2)
+    }
+
     @Test fun selectionAndReversalAreImmediateWhilePersistenceIsBlocked() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val writeGate = CompletableDeferred<Unit>()
         var blockWrites = false
-        val data = InMemoryPreferencesDataStore(beforeUpdate = {
+        val data = InMemoryPreferencesDataStore(profilePreferences, beforeUpdate = {
             if (blockWrites) writeGate.await()
         })
         val settings = ChannelTagSettingsStore(data)
-        settings.save(ChannelTagPreferences(activeTagId = a.id))
-        val model = ChannelsViewModel(session(ChannelRepositoryState.Current(catalog)), settings)
+        settings.save(settings.settings.first().copy(activeTagId = a.id))
+        val model = ChannelsViewModel(session(ChannelRepositoryState.Current(catalog)), settings, kotlinx.coroutines.flow.MutableStateFlow<ServerProfileId?>(profileId))
         models.put("scope", model)
         runCurrent()
         assertEquals(a.id, model.scope.value.scope.activeTagId)
@@ -66,11 +175,11 @@ class ChannelScopeIntentTest {
     @Test fun currentCatalogDoesNotWriteAnOldScopeOverAValidSelection() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         var writes = 0
-        val settings = ChannelTagSettingsStore(InMemoryPreferencesDataStore(beforeUpdate = {
+        val settings = ChannelTagSettingsStore(InMemoryPreferencesDataStore(profilePreferences, beforeUpdate = {
             check(++writes <= 32) { "Tag write-back did not settle after one selection" }
         }))
-        settings.save(ChannelTagPreferences(activeTagId = a.id))
-        val model = ChannelsViewModel(session(ChannelRepositoryState.Current(catalog)), settings)
+        settings.save(settings.settings.first().copy(activeTagId = a.id))
+        val model = ChannelsViewModel(session(ChannelRepositoryState.Current(catalog)), settings, kotlinx.coroutines.flow.MutableStateFlow<ServerProfileId?>(profileId))
         models.put("scope", model)
         runCurrent()
         model.selectTag(b.id)
@@ -82,14 +191,14 @@ class ChannelScopeIntentTest {
 
     @Test fun lateHydrationCannotUndoNewInputOrPublishDefaultAllChannels() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val base = InMemoryPreferencesDataStore()
-        ChannelTagSettingsStore(base).save(ChannelTagPreferences(activeTagId = a.id))
+        val base = InMemoryPreferencesDataStore(profilePreferences)
+        ChannelTagSettingsStore(base).let { it.save(it.settings.first().copy(activeTagId = a.id)) }
         val readGate = CompletableDeferred<Unit>()
         val delayed = object : DataStore<Preferences> by base {
             override val data = flow { readGate.await(); emitAll(base.data) }
         }
         val settings = ChannelTagSettingsStore(delayed)
-        val model = ChannelsViewModel(session(ChannelRepositoryState.Current(catalog)), settings)
+        val model = ChannelsViewModel(session(ChannelRepositoryState.Current(catalog)), settings, kotlinx.coroutines.flow.MutableStateFlow<ServerProfileId?>(profileId))
         models.put("scope", model)
         runCurrent()
         assertFalse(model.scope.value.settingsLoaded)
@@ -104,10 +213,10 @@ class ChannelScopeIntentTest {
     @Test fun failureKeepsLatestScopeAndRetryPersistsIt() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         var fail = true
-        val settings = ChannelTagSettingsStore(InMemoryPreferencesDataStore(beforeUpdate = {
+        val settings = ChannelTagSettingsStore(InMemoryPreferencesDataStore(profilePreferences, beforeUpdate = {
             if (fail) throw IOException("test write failure")
         }))
-        val model = ChannelsViewModel(session(ChannelRepositoryState.Current(catalog)), settings)
+        val model = ChannelsViewModel(session(ChannelRepositoryState.Current(catalog)), settings, kotlinx.coroutines.flow.MutableStateFlow<ServerProfileId?>(profileId))
         models.put("scope", model)
         runCurrent()
         model.selectTag(b.id)
@@ -123,11 +232,11 @@ class ChannelScopeIntentTest {
 
     @Test fun staleCatalogPreservesPreferenceAndCurrentRemovalNormalizesOnce() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val settings = ChannelTagSettingsStore(InMemoryPreferencesDataStore())
-        settings.save(ChannelTagPreferences(activeTagId = b.id))
+        val settings = ChannelTagSettingsStore(InMemoryPreferencesDataStore(profilePreferences))
+        settings.save(settings.settings.first().copy(activeTagId = b.id))
         val missingB = ChannelCatalog.create(channels = catalog.channels.take(1), tags = listOf(a))
         val session = session(ChannelRepositoryState.Stale(missingB))
-        val model = ChannelsViewModel(session, settings)
+        val model = ChannelsViewModel(session, settings, kotlinx.coroutines.flow.MutableStateFlow<ServerProfileId?>(profileId))
         models.put("scope", model)
         runCurrent()
         assertEquals(b.id, settings.settings.first().activeTagId)
@@ -146,7 +255,7 @@ class ChannelScopeIntentTest {
     @Test fun aScopeKeepsTheObservationItWasResolvedFrom() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val session = session(ChannelRepositoryState.Stale(catalog))
-        val model = ChannelsViewModel(session, ChannelTagSettingsStore(InMemoryPreferencesDataStore()))
+        val model = ChannelsViewModel(session, ChannelTagSettingsStore(InMemoryPreferencesDataStore(profilePreferences)), kotlinx.coroutines.flow.MutableStateFlow<ServerProfileId?>(profileId))
         models.put("scope", model)
         runCurrent()
         assertSame(session.observation.value, model.scope.value.observation)
@@ -161,7 +270,7 @@ class ChannelScopeIntentTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val channels = ChannelRepositoryState.Current(catalog)
         val session = session(channels)
-        val model = ChannelsViewModel(session, ChannelTagSettingsStore(InMemoryPreferencesDataStore()))
+        val model = ChannelsViewModel(session, ChannelTagSettingsStore(InMemoryPreferencesDataStore(profilePreferences)), kotlinx.coroutines.flow.MutableStateFlow<ServerProfileId?>(profileId))
         models.put("scope", model)
         runCurrent()
         val before = model.scope.value
@@ -181,7 +290,7 @@ class ChannelScopeIntentTest {
     @Test fun epgUpdatesWithinTheSameSessionDoNotRepublishTheScope() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val session = session(ChannelRepositoryState.Current(catalog))
-        val model = ChannelsViewModel(session, ChannelTagSettingsStore(InMemoryPreferencesDataStore()))
+        val model = ChannelsViewModel(session, ChannelTagSettingsStore(InMemoryPreferencesDataStore(profilePreferences)), kotlinx.coroutines.flow.MutableStateFlow<ServerProfileId?>(profileId))
         models.put("scope", model)
         runCurrent()
         val before = model.scope.value
@@ -199,8 +308,8 @@ class ChannelScopeIntentTest {
     @Test fun delayedObsoleteWriteCannotReplaceNewerVisibilityAndTag() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val gate = CompletableDeferred<Unit>()
-        val settings = ChannelTagSettingsStore(InMemoryPreferencesDataStore(beforeUpdate = { gate.await() }))
-        val model = ChannelsViewModel(session(ChannelRepositoryState.Current(catalog)), settings)
+        val settings = ChannelTagSettingsStore(InMemoryPreferencesDataStore(profilePreferences, beforeUpdate = { gate.await() }))
+        val model = ChannelsViewModel(session(ChannelRepositoryState.Current(catalog)), settings, kotlinx.coroutines.flow.MutableStateFlow<ServerProfileId?>(profileId))
         models.put("scope", model)
         runCurrent()
         model.selectTag(b.id)
@@ -217,8 +326,8 @@ class ChannelScopeIntentTest {
 
     @Test fun readFailureRetriesWithoutReplacingThePendingSelection() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val base = InMemoryPreferencesDataStore()
-        ChannelTagSettingsStore(base).save(ChannelTagPreferences(activeTagId = a.id))
+        val base = InMemoryPreferencesDataStore(profilePreferences)
+        ChannelTagSettingsStore(base).let { it.save(it.settings.first().copy(activeTagId = a.id)) }
         var fail = true
         val failing = object : DataStore<Preferences> by base {
             override val data = flow {
@@ -226,7 +335,7 @@ class ChannelScopeIntentTest {
                 emitAll(base.data)
             }
         }
-        val model = ChannelsViewModel(session(ChannelRepositoryState.Current(catalog)), ChannelTagSettingsStore(failing))
+        val model = ChannelsViewModel(session(ChannelRepositoryState.Current(catalog)), ChannelTagSettingsStore(failing), kotlinx.coroutines.flow.MutableStateFlow<ServerProfileId?>(profileId))
         models.put("scope", model)
         runCurrent()
         assertTrue(model.settingsFailure.value)
@@ -243,7 +352,7 @@ class ChannelScopeIntentTest {
     @Test fun visibilityReversalsUseCurrentIntentAndPreserveTheLastScope() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val model = ChannelsViewModel(session(ChannelRepositoryState.Current(catalog)),
-            ChannelTagSettingsStore(InMemoryPreferencesDataStore()))
+            ChannelTagSettingsStore(InMemoryPreferencesDataStore(profilePreferences)), kotlinx.coroutines.flow.MutableStateFlow<ServerProfileId?>(profileId))
         models.put("scope", model)
         runCurrent()
         model.toggleScopeVisibility(b.id)
@@ -257,14 +366,14 @@ class ChannelScopeIntentTest {
 
     @Test fun staleVisibilityEditPreservesTagsAbsentFromTheRetainedCatalog() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val settings = ChannelTagSettingsStore(InMemoryPreferencesDataStore())
-        settings.save(ChannelTagPreferences(visibility = at.bernhardberger.tvhplayer.core.ChannelScopeVisibility(
+        val settings = ChannelTagSettingsStore(InMemoryPreferencesDataStore(profilePreferences))
+        settings.save(settings.settings.first().copy(visibility = at.bernhardberger.tvhplayer.core.ChannelScopeVisibility(
             configured = true, allChannelsVisible = false, visibleTagIds = setOf(a.id, b.id),
         )))
         val source = session(ChannelRepositoryState.Stale(ChannelCatalog.create(
             channels = catalog.channels.take(1), tags = listOf(a),
         )))
-        val model = ChannelsViewModel(source, settings)
+        val model = ChannelsViewModel(source, settings, kotlinx.coroutines.flow.MutableStateFlow<ServerProfileId?>(profileId))
         models.put("scope", model)
         runCurrent()
         model.toggleScopeVisibility(null)

@@ -23,7 +23,7 @@ class RecordingEndActionTest {
     @Test
     fun otherStatesOfferNeitherStopNorCancel() {
         listOf(DvrEntryState.COMPLETED, DvrEntryState.MISSED, DvrEntryState.INVALID,
-            DvrEntryState.COMPLETED_ERROR, DvrEntryState.FILE_MISSING,
+            DvrEntryState.COMPLETED_ERROR, DvrEntryState.REMOVED,
             DvrEntryState.UNKNOWN)
             .forEach { assertNull(endAction(it)) }
         assertNull(endAction(null))

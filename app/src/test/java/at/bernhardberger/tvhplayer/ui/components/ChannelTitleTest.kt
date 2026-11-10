@@ -5,22 +5,8 @@ import org.junit.Test
 
 class ChannelTitleTest {
 
-    @Test
-    fun includesChannelNumberInlineWhenAvailable() {
-        assertEquals("12 ORF III", channelTitleText(number = 12, name = "ORF III"))
-    }
-
-    @Test
-    fun omitsNumberSpacingWhenNumberIsUnavailable() {
-        assertEquals("ORF III", channelTitleText(number = null, name = "ORF III"))
-    }
-
-    @Test
-    fun omitsNameSpacingWhenNameIsBlank() {
-        assertEquals("12", channelTitleText(number = 12, name = "  "))
-    }
-
     @Test fun visibilityOnlyChangesNumberPresentationAndKeepsUnnamedChannelsIdentifiable() {
+        assertEquals("12 ORF III", channelTitleText(number = 12, name = "ORF III"))
         for (shown in listOf(true, false)) {
             assertEquals(if (shown) "12 ORF III" else "ORF III",
                 channelTitleText(12, "ORF III", showNumbers = shown))

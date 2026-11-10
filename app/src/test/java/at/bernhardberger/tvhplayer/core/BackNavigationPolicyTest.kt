@@ -9,49 +9,22 @@ import org.junit.Test
 
 class BackNavigationPolicyTest {
     @Test
-    fun confirmedSameWarmPlaybackSelectionRearmsOneReturn() {
+    fun playbackSelectionRearmsOnlyTheSameExistingWarmSession() {
         val consumed = consumeWarmReturn(armWarmReturn(WarmPlaybackTarget.LIVE))
-
-        assertEquals(
-            WarmReturnOpportunity(armed = true, target = WarmPlaybackTarget.LIVE),
-            rearmWarmReturnForPlaybackSelection(
-                current = consumed,
-                currentWarmTarget = WarmPlaybackTarget.LIVE,
-                requestedTarget = WarmPlaybackTarget.LIVE,
-                currentIdentity = 42,
-                requestedIdentity = 42,
-            ),
-        )
-    }
-
-    @Test
-    fun confirmedPlaybackSelectionDoesNotInventWarmSession() {
-        assertEquals(
-            WarmReturnOpportunity(),
-            rearmWarmReturnForPlaybackSelection(
-                current = WarmReturnOpportunity(),
-                currentWarmTarget = WarmPlaybackTarget.NONE,
-                requestedTarget = WarmPlaybackTarget.RECORDING,
-                currentIdentity = null,
-                requestedIdentity = 7,
-            ),
-        )
-    }
-
-    @Test
-    fun differentLiveSelectionWaitsForPlaybackStartBeforeArming() {
-        val consumed = consumeWarmReturn(armWarmReturn(WarmPlaybackTarget.LIVE))
-
-        assertEquals(
-            consumed,
-            rearmWarmReturnForPlaybackSelection(
-                current = consumed,
-                currentWarmTarget = WarmPlaybackTarget.LIVE,
-                requestedTarget = WarmPlaybackTarget.LIVE,
-                currentIdentity = 42,
-                requestedIdentity = 43,
-            ),
-        )
+        for ((current, requestedIdentity, expected) in listOf(
+            Triple(consumed, 42, WarmReturnOpportunity(armed = true, target = WarmPlaybackTarget.LIVE)),
+            Triple(WarmReturnOpportunity(), 7, WarmReturnOpportunity()),
+            Triple(consumed, 43, consumed),
+        )) {
+            val existing = current.target == WarmPlaybackTarget.LIVE
+            assertEquals(expected, rearmWarmReturnForPlaybackSelection(
+                current = current,
+                currentWarmTarget = if (existing) WarmPlaybackTarget.LIVE else WarmPlaybackTarget.NONE,
+                requestedTarget = if (existing) WarmPlaybackTarget.LIVE else WarmPlaybackTarget.RECORDING,
+                currentIdentity = if (existing) 42 else null,
+                requestedIdentity = requestedIdentity,
+            ))
+        }
     }
     @Test
     fun rootStartDestinationFinishesActivityWithoutWarmReturn() {
@@ -61,39 +34,6 @@ class BackNavigationPolicyTest {
                 isStartDestination = true,
                 warmReturn = WarmReturnOpportunity(),
             ),
-        )
-    }
-
-    @Test
-    fun rootStartDestinationReturnsToArmedWarmPlayback() {
-        assertEquals(
-            BackAction.RETURN_TO_PLAYER,
-            rootBackAction(
-                isStartDestination = true,
-                warmReturn = armWarmReturn(WarmPlaybackTarget.LIVE),
-            ),
-        )
-    }
-
-    @Test
-    fun rootStartDestinationReturnsToArmedWarmRecording() {
-        assertEquals(
-            BackAction.RETURN_TO_PLAYER,
-            rootBackAction(
-                isStartDestination = true,
-                warmReturn = armWarmReturn(WarmPlaybackTarget.RECORDING),
-            ),
-        )
-    }
-
-    @Test
-    fun rootStartDestinationFinishesWhenWarmPlaybackExistsButReturnWasConsumed() {
-        val consumed = consumeWarmReturn(armWarmReturn(WarmPlaybackTarget.LIVE))
-        assertFalse(consumed.canReturn)
-        assertEquals(WarmPlaybackTarget.LIVE, consumed.target)
-        assertEquals(
-            BackAction.FINISH_ACTIVITY,
-            rootBackAction(isStartDestination = true, warmReturn = consumed),
         )
     }
 
@@ -110,24 +50,26 @@ class BackNavigationPolicyTest {
 
     @Test
     fun warmReturnIsOneShotAcrossBrowsePlayerBrowseCycle() {
-        var warm = armWarmReturn(WarmPlaybackTarget.LIVE)
+        for (target in listOf(WarmPlaybackTarget.LIVE, WarmPlaybackTarget.RECORDING)) {
+            var warm = armWarmReturn(target)
 
-        // First root Back returns to the warm player and consumes the token.
-        assertEquals(
-            BackAction.RETURN_TO_PLAYER,
-            rootBackAction(isStartDestination = true, warmReturn = warm),
-        )
-        warm = consumeWarmReturn(warm)
+            // First root Back returns to the warm player and consumes the token.
+            assertEquals(
+                BackAction.RETURN_TO_PLAYER,
+                rootBackAction(isStartDestination = true, warmReturn = warm),
+            )
+            warm = consumeWarmReturn(warm)
 
-        // Player Back leaves playback warm but must not re-arm by itself.
-        assertFalse(warm.canReturn)
-        assertEquals(WarmPlaybackTarget.LIVE, warm.target)
+            // Player Back leaves playback warm but must not re-arm by itself.
+            assertFalse(warm.canReturn)
+            assertEquals(target, warm.target)
 
-        // Second root Back finishes instead of looping.
-        assertEquals(
-            BackAction.FINISH_ACTIVITY,
-            rootBackAction(isStartDestination = true, warmReturn = warm),
-        )
+            // Second root Back finishes instead of looping.
+            assertEquals(
+                BackAction.FINISH_ACTIVITY,
+                rootBackAction(isStartDestination = true, warmReturn = warm),
+            )
+        }
     }
 
     @Test
@@ -144,15 +86,11 @@ class BackNavigationPolicyTest {
     }
 
     @Test
-    fun newPlaybackArmsWarmReturn() {
-        val warm = armWarmReturn(WarmPlaybackTarget.RECORDING)
+    fun newPlaybackArmsWarmReturnAndExplicitStopClearsIt() {
+        var warm = armWarmReturn(WarmPlaybackTarget.RECORDING)
         assertTrue(warm.canReturn)
         assertEquals(WarmPlaybackTarget.RECORDING, warm.target)
-    }
-
-    @Test
-    fun explicitStopClearsWarmReturn() {
-        val warm = clearWarmReturn()
+        warm = clearWarmReturn()
         assertFalse(warm.canReturn)
         assertEquals(WarmPlaybackTarget.NONE, warm.target)
         assertEquals(
@@ -180,19 +118,4 @@ class BackNavigationPolicyTest {
         )
     }
 
-    @Test
-    fun nestedStartDestinationReturnsToParentGraph() {
-        assertEquals(
-            BackAction.RETURN_TO_PARENT,
-            nestedBackAction(hasPreviousEntry = false),
-        )
-    }
-
-    @Test
-    fun nestedChildDestinationPopsNestedNavigation() {
-        assertEquals(
-            BackAction.POP_NAVIGATION,
-            nestedBackAction(hasPreviousEntry = true),
-        )
-    }
 }

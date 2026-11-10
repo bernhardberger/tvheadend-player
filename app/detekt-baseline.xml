@@ -1157,7 +1157,6 @@
     <ID>TopLevelPropertyNaming:PlayerErrorSurfaces.kt:internal const val PlayerChannelMessageDetailTag = "player-channel-unavailable-detail"</ID>
     <ID>TopLevelPropertyNaming:PlayerErrorSurfaces.kt:internal const val PlayerChannelMessageTag = "player-channel-unavailable"</ID>
     <ID>TopLevelPropertyNaming:PlayerErrorSurfaces.kt:private const val NoDeadline = Long.MIN_VALUE</ID>
-    <ID>TopLevelPropertyNaming:PlayerIdentityCard.kt:/** The [PlayerChromeActions.restoreFocus] token that returns focus to the controls' [PlayerTopIdentity]. */ internal const val PlayerIdentityCardTag = "player-identity-card"</ID>
     <ID>TopLevelPropertyNaming:PlayerTopIdentity.kt:/** How much of a page's opening the identity takes to give way to the strip. */ private const val IdentityPageMorphMs = 200f</ID>
     <ID>TopLevelPropertyNaming:PlayerTopIdentity.kt:/** The identity's share of the strip's chip: 48dp of 64dp. */ private const val IdentityMorphShrink = 0.25f</ID>
     <ID>TopLevelPropertyNaming:PlayerTopIdentity.kt:/** The live top identity's test tag. */ internal const val PlayerTopIdentityTag = "player-top-identity"</ID>

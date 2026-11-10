@@ -1,13 +1,9 @@
 package at.bernhardberger.tvhplayer.ui
 
 import android.app.Application
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.*
 import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -19,8 +15,7 @@ import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.settings.*
-import at.bernhardberger.tvhplayer.testutil.CaptureOutput
-import at.bernhardberger.tvhplayer.testutil.VisualCapture
+import at.bernhardberger.tvhplayer.testutil.leaveTouchModeBeforeComposing
 import at.bernhardberger.tvhplayer.ui.components.depth.*
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.ui.screens.*
@@ -29,12 +24,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
-import org.junit.experimental.categories.Category
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], qualifiers = "en-w960dp-h540dp-land-mdpi", application = Application::class)
@@ -47,7 +40,7 @@ class SettingsConnectionDepthTest {
     private var setupOpen by mutableStateOf(false)
     private var degraded by mutableStateOf(false)
 
-    /** Settings with the Connection page whose Set up row opens the setup over it, as the screen does. */
+    /** Settings with the Connection list and its server's level, whose Set up row opens the setup over it. */
     @Composable
     private fun SettingsWithSetup(
         navigation: DepthNavigationState,
@@ -55,62 +48,58 @@ class SettingsConnectionDepthTest {
         contentPadding: androidx.compose.foundation.layout.PaddingValues = TvFullScreenPadding,
         initialFocusEnabled: Boolean = true,
         isCurrent: Boolean = true,
-    ) = SettingsScreenNavigation(navigation, listOf(settingsRootLevel(),
-        settingsConnectionOverview("Connected", "tvheadend.local", 9982, degraded = degraded,
-            onSetUp = { setupOpen = true })),
+        onCancelSwitch: (() -> Unit)? = null,
+    ) = SettingsScreenNavigation(navigation, listOf(settingsRootLevel()) +
+        fixtureConnectionLevels("Connected", showRetry = degraded,
+            actions = ServerProfileActions(onSetUp = { setupOpen = true })),
         initialFocusEnabled = initialFocusEnabled, contentPadding = contentPadding, isCurrent = isCurrent,
         setup = if (setupOpen) { { setup { setupOpen = false } } } else null,
-        onCloseSetup = { setupOpen = false })
+        onCloseSetup = { setupOpen = false }, onCancelSwitch = onCancelSwitch)
 
-    @Test @Category(VisualCapture::class)
-    fun captureSettingsConnectionEntryAndPrefilledWizard() {
+    @Test fun setupBackTakesPrecedenceOverPendingSwitchCancellation() {
+        var cancellations = 0
         val editor = Editor()
-        lateinit var view: View
+        setupOpen = true
+        compose.leaveTouchModeBeforeComposing()
         compose.setContent {
-            view = LocalView.current
             TVHeadendPlayerTheme {
-                androidx.tv.material3.Surface {
-                    val navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.CONNECTION.name)
-                    SideRail(currentRoute = AppDestination.SETTINGS,
-                        onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
-                    SettingsWithSetup(navigation, { onSaved ->
-                        SettingsConnection(editor, session, { restores++ }, onSaved = onSaved)
-                    }, contentPadding = padding, initialFocusEnabled = !drawerActive)
-                    }
+                SettingsSetupFrame {
+                    SettingsWithSetup(rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.CONNECTION.name),
+                        { saved -> editor.Screen(ConnectionFormState(), saved) }, onCancelSwitch = { cancellations++ })
                 }
             }
         }
-        press(Key.DirectionDown)
-        press(Key.DirectionUp)
-        compose.onNodeWithText("Connection").assertIsFocused()
-        capture(view, "settings-entry")
-        press(Key.DirectionCenter)
-        compose.onNodeWithText("Set up connection").assertIsFocused()
-        capture(view, "settings-connection-page")
-        press(Key.DirectionCenter)
         compose.onNodeWithTag("setup-continue").assertIsFocused()
-        val bounds = compose.onNodeWithTag("setup-find-server").fetchSemanticsNode().boundsInRoot
-        assertEquals(696f, bounds.center.x, 0.5f)
-        assertEquals(110f, bounds.center.y, 0.5f)
-        capture(view, "settings-prefilled-wizard")
+        press(Key.Back)
+        assertFalse(setupOpen)
+        assertEquals(0, cancellations)
+        press(Key.Back)
+        assertEquals(1, cancellations)
     }
 
-    private fun capture(view: View, name: String) {
-        compose.mainClock.advanceTimeBy(1_000)
-        compose.runOnIdle {
-            val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-            view.draw(Canvas(bitmap))
-            val directory = File("build/outputs/onboarding-captures")
-            CaptureOutput.writePng(File(directory, "$name.png"), bitmap)
-            CaptureOutput.writeText(File(directory, "$name.txt")) {
-                "canvas=960x540dp; locale=en; fontScale=1.0; focus=${when (name) {
-                    "settings-entry" -> "Connection"
-                    "settings-connection-page" -> "Set up connection"
-                    else -> "setup-continue"
-                }}; Settings inside SideRail; fictional offline data"
+    @Test fun dialogBackTakesPrecedenceOverPendingSwitchCancellation() {
+        var cancellations = 0
+        var question by mutableStateOf(true)
+        compose.leaveTouchModeBeforeComposing()
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                SettingsSetupFrame {
+                    SettingsScreenNavigation(
+                        rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.CONNECTION.name),
+                        listOf(settingsRootLevel()),
+                        dialog = if (question) ({ RemoveServerDialog("Living room", false, {}, { question = false }) }) else null,
+                        onCancelSwitch = { cancellations++ })
+                }
             }
-            bitmap.recycle()
         }
+        compose.onNodeWithTag(REMOVE_KEEP).assertIsFocused()
+        press(Key.Back)
+        compose.mainClock.advanceTimeBy(1_000)
+        compose.waitForIdle()
+        assertFalse(question)
+        assertEquals(0, cancellations)
+        press(Key.Back)
+        assertEquals(1, cancellations)
     }
 
     @Composable
@@ -129,6 +118,7 @@ class SettingsConnectionDepthTest {
         }
         compose.onNodeWithText("Connection").assertIsFocused()
         press(Key.DirectionCenter)
+        press(Key.DirectionCenter)
         compose.onNodeWithText("Set up connection").assertIsFocused()
         assertEquals(0, editor.loads)
         press(Key.DirectionRight) // Dedicated leaf actions do not enter on Right.
@@ -143,8 +133,8 @@ class SettingsConnectionDepthTest {
         compose.onNodeWithText("Find servers on my network").assertIsDisplayed()
         compose.onAllNodes(hasSetTextAction()).assertCountEquals(0)
         // Settings stays where it was under the setup.
-        assertEquals(2, navigation.stack.frames.size)
-        assertEquals(SettingsSection.CONNECTION.name, navigation.stack.active.levelId)
+        assertEquals(3, navigation.stack.frames.size)
+        assertEquals(serverProfileRowId(fixtureActiveServer.id), navigation.stack.active.levelId)
         repeat(2) { press(Key.DirectionUp) }
         compose.onNodeWithTag("setup-host").assertIsFocused()
         press(Key.DirectionCenter)
@@ -224,6 +214,7 @@ class SettingsConnectionDepthTest {
             assertEquals(saved, editor.serverSettings.value)
         }
         press(Key.DirectionCenter)
+        press(Key.DirectionCenter)
         compose.onNodeWithText("Set up connection").assertIsFocused()
 
         // Leaving while the test runs cancels it, which disconnects the draft and restores the saved connection.
@@ -264,8 +255,7 @@ class SettingsConnectionDepthTest {
                 }
             }
         }
-        press(Key.DirectionCenter)
-        press(Key.DirectionCenter)
+        repeat(3) { press(Key.DirectionCenter) }
         press(Key.DirectionUp)
         compose.onNodeWithTag("setup-port").assertIsFocused()
         press(Key.DirectionLeft) // A step keeps Left, so it cannot drop what was entered.
@@ -275,7 +265,7 @@ class SettingsConnectionDepthTest {
         assertFalse(setupOpen)
         compose.onNodeWithText("Set up connection").assertIsFocused()
         compose.onNodeWithTag("nav-settings").assertIsNotFocused()
-        assertEquals(2, navigation.stack.frames.size)
+        assertEquals(3, navigation.stack.frames.size)
         assertEquals("", form.password)
         assertEquals(0, editor.saves)
     }
@@ -289,8 +279,7 @@ class SettingsConnectionDepthTest {
                 SettingsWithSetup(navigation, { onSaved -> editor.Screen(form, onSaved) })
             }
         }
-        press(Key.DirectionCenter)
-        press(Key.DirectionCenter)
+        repeat(3) { press(Key.DirectionCenter) }
         connect()
         compose.runOnIdle { session.publish(unavailable()) }
         compose.onNodeWithTag("setup-action-try_again").assertIsFocused()
@@ -336,6 +325,7 @@ class SettingsConnectionDepthTest {
         }
         assertEquals(0, editor.loads)
         compose.onNodeWithText("Connection").assertIsFocused()
+        press(Key.DirectionCenter)
         press(Key.DirectionCenter)
         compose.onNodeWithText("Set up connection").assertIsFocused()
         val parent = navigation.stack.active

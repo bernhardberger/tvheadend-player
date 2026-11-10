@@ -73,6 +73,7 @@ import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
+import at.bernhardberger.tvhplayer.testutil.assertMainSettled
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.ProvideAppArtwork
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
@@ -160,7 +161,7 @@ class LivePlayerServerWaitTest {
         compose.onRoot().performKeyInput { keyDown(Key.DirectionCenter) }
         session.publish(ready())
         settle()
-        compose.waitUntil(10_000) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1)) }
+        assertMainSettled("the waiting start installs when the session arrives") { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1)) }
         compose.onRoot().performKeyInput { keyUp(Key.DirectionCenter) }
         settle()
         assertEquals(0, unconsumed)
@@ -194,7 +195,7 @@ class LivePlayerServerWaitTest {
         compose.runOnIdle {
             scope.launch { runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(1)))) }
         }
-        compose.waitUntil(10_000) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1)) }
+        assertMainSettled("the warm target is installed") { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1)) }
         settle()
         val before = binds()
         // The connection is lost while this screen is away; a new screen opens with the target still active.
@@ -206,7 +207,7 @@ class LivePlayerServerWaitTest {
         assertEquals(1, waits())
         session.publish(ready())
         settle()
-        compose.waitUntil(10_000) { binds() > before }
+        assertMainSettled("the reconnect binds a new stream") { binds() > before }
     }
 
     @Test fun aProfileSavedDuringTheOutageRetunesNothingAway() {
@@ -214,7 +215,7 @@ class LivePlayerServerWaitTest {
         compose.runOnIdle {
             scope.launch { runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(1)))) }
         }
-        compose.waitUntil(10_000) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1)) }
+        assertMainSettled("the warm target is installed") { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1)) }
         settle()
         val before = binds()
         compose.runOnIdle { visible.value = false }
@@ -222,12 +223,12 @@ class LivePlayerServerWaitTest {
         settle()
         val generation = profiles.configurationGeneration.value
         compose.runOnIdle { scope.launch { profiles.saveServer("other.test", 9982) } }
-        compose.waitUntil(10_000) { profiles.configurationGeneration.value > generation }
+        assertMainSettled("the in-memory profile save completes") { profiles.configurationGeneration.value > generation }
         session.publish(ready())
         settle()
         val retunes = mutableListOf<PlaybackTargetResult?>()
         compose.runOnIdle { scope.launch { retunes += runtime.retuneAfterReconnect() } }
-        compose.waitUntil(10_000) { retunes.isNotEmpty() }
+        assertMainSettled("the retune returns its result") { retunes.isNotEmpty() }
         assertEquals(listOf(null), retunes)
         assertEquals("channel one of another server is not this one", before, binds())
     }
@@ -239,7 +240,7 @@ class LivePlayerServerWaitTest {
         compose.runOnIdle {
             scope.launch { runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(1)))) }
         }
-        compose.waitUntil(10_000) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1)) }
+        assertMainSettled("the warm target is installed") { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1)) }
         settle()
         val before = binds()
         compose.runOnIdle { visible.value = false }
@@ -249,13 +250,9 @@ class LivePlayerServerWaitTest {
         settle()
         val retunes = mutableListOf<PlaybackTargetResult?>()
         compose.runOnIdle { scope.launch { retunes += runtime.retuneAfterReconnect() } }
-        // Compose's clock does not complete the runtime's asynchronous retune.
-        compose.waitUntil(10_000) {
-            compose.waitForIdle()
-            retunes.isNotEmpty()
-        }
+        assertMainSettled("the retune returns its result") { retunes.isNotEmpty() }
         assertEquals(listOf(PlaybackTargetResult.STARTED), retunes)
-        compose.waitUntil(10_000) { binds() > before }
+        assertMainSettled("the completed retune has bound its stream") { binds() > before }
         compose.runOnIdle { visible.value = true }
         settle()
         assertEquals("the returning screen adopts the retuned target", before + 1, binds())
@@ -337,12 +334,12 @@ class LivePlayerServerWaitTest {
         }
         val data = InMemoryData()
         val settings = PlayerSettingsStore(data)
-        profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.IO,
+        profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.Main.immediate,
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
         scope.launch { profiles.run() }
-        val channels = ChannelsViewModel(session, ChannelTagSettingsStore(InMemoryData()))
+        val channels = ChannelsViewModel(session, ChannelTagSettingsStore(InMemoryData()), profiles.liveProfile)
         models.put("channels", channels)
-        compose.waitUntil(10_000) { channels.scope.value.scope.visibleChannels.size == 3 }
+        assertMainSettled("the fake channel catalog is collected") { channels.scope.value.scope.visibleChannels.size == 3 }
         player = ExoPlayer.Builder(context).build()
         val coordinator = createTvheadendPlaybackCoordinator(player).also { it.launchIn(scope) }
         runtime = AppPlaybackRuntime(player, session, coordinator, settings, profiles, scope,

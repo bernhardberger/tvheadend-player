@@ -921,7 +921,7 @@ class HomeActionsTest {
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create()))
         val session = FakeTvheadendSession(observation())
         val vm = at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel(session,
-            at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore(at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore()))
+            at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore(at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore()), kotlinx.coroutines.flow.MutableStateFlow<at.bernhardberger.tvheadend.sdk.core.ServerProfileId?>(null))
         val viewModels = androidx.lifecycle.ViewModelStore().apply { put("channels", vm) }
         compose.runOnIdle {
             val previous = requireNotNull(vm.scope.value.observation)
@@ -941,7 +941,7 @@ class HomeActionsTest {
                     onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
                     onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> },
                     lastPlayedStore = at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore(
-                        androidx.test.core.app.ApplicationProvider.getApplicationContext()))
+                        androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()))
             }
         } }
         compose.mainClock.advanceTimeBy(1_000)
@@ -965,7 +965,7 @@ class HomeActionsTest {
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(channel))),
             epgState = EpgRepositoryState.Current(EpgSnapshot.create(listOf(event)))))
         val vm = at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel(session,
-            at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore(at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore()))
+            at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore(at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore()), kotlinx.coroutines.flow.MutableStateFlow<at.bernhardberger.tvheadend.sdk.core.ServerProfileId?>(null))
         val viewModels = androidx.lifecycle.ViewModelStore().apply { put("channels", vm) }
         val memory = mutableStateOf<HomeFocusKey?>(null)
         val dependencies = org.koin.dsl.koinApplication { modules(module {
@@ -978,7 +978,7 @@ class HomeActionsTest {
                     onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
                     onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> }, focusMemory = memory,
                     lastPlayedStore = at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore(
-                        androidx.test.core.app.ApplicationProvider.getApplicationContext()))
+                        androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()))
             }
         } }
         compose.onNodeWithTag("home-view-button").assertDoesNotExist()

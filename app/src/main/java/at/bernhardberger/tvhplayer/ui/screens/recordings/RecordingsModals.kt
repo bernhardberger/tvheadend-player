@@ -17,6 +17,7 @@ internal fun RecordingConfirmationDialog(
     backEnabled: Boolean,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
+    removeEntry: Boolean = false,
     channelName: String = "",
     dateAndTime: String = "",
     visibility: MutableTransitionState<Boolean> = remember { MutableTransitionState(false).apply { targetState = true } },
@@ -26,21 +27,26 @@ internal fun RecordingConfirmationDialog(
         title = stringResource(when (action) {
             PendingRecordingAction.STOP -> R.string.stop_recording_confirm_title
             PendingRecordingAction.CANCEL -> R.string.cancel_recording_confirm_title
-            PendingRecordingAction.DELETE -> R.string.delete_recording_confirm_title
+            PendingRecordingAction.DELETE ->
+                if (removeEntry) R.string.remove_entry_confirm_title else R.string.delete_recording_confirm_title
         }),
         message = stringResource(when (action) {
             PendingRecordingAction.STOP -> R.string.stop_recording_confirm_message
             PendingRecordingAction.CANCEL -> R.string.cancel_recording_confirm_message
-            PendingRecordingAction.DELETE -> R.string.delete_recording_confirm_message
+            PendingRecordingAction.DELETE ->
+                if (removeEntry) R.string.remove_entry_confirm_message else R.string.delete_recording_confirm_message
         }, title, channelName, dateAndTime),
         firstLabel = stringResource(if (action == PendingRecordingAction.DELETE) R.string.keep else R.string.keep_recording),
-        secondLabel = stringResource(when (action) {
-            PendingRecordingAction.STOP -> R.string.stop_recording
-            PendingRecordingAction.CANCEL -> R.string.cancel_recording
-            PendingRecordingAction.DELETE -> R.string.delete_recording
-        }),
+        secondLabel = stringResource(recordingConfirmationActionLabel(action, removeEntry)),
         onFirst = onDismiss, onSecond = onConfirm, onDismiss = onDismiss,
         backEnabled = backEnabled,
         firstTag = "recording-confirmation-back", secondTag = "recording-confirmation-confirm",
     )
 }
+
+private fun recordingConfirmationActionLabel(action: PendingRecordingAction, removeEntry: Boolean): Int =
+    when (action) {
+        PendingRecordingAction.STOP -> R.string.stop_recording
+        PendingRecordingAction.CANCEL -> R.string.cancel_recording
+        PendingRecordingAction.DELETE -> if (removeEntry) R.string.remove_entry else R.string.delete_recording
+    }

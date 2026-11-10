@@ -1,7 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
-import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentTarget
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftTimeline
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftWallClockMapping
@@ -32,10 +31,6 @@ data class ProgrammeWindow(
     val start: Instant = requireNotNull(event).start,
     val stop: Instant = requireNotNull(event).stop,
 )
-
-/** Timestamp lookup includes display-only history; command selection must use live metadata. */
-internal fun currentProgrammeEvent(observation: SessionObservation, displayed: EpgEvent?): EpgEvent? =
-    displayed?.takeIf { observation.event(it.id) == it }
 
 /**
  * A preview with missing metadata must never borrow the committed/current broadcast title.

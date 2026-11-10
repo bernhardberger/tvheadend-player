@@ -43,7 +43,6 @@ import at.bernhardberger.tvhplayer.viewmodels.VideoPlayerViewModel
 import coil3.ImageLoader
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -77,6 +76,7 @@ val appModule = module {
     single(createdAtStart = true) {
         at.bernhardberger.tvhplayer.notices.ConnectionNoticeSource(
             get<SdkRuntimeOwner>().session.observation, get<AppProfileOwner>().configurationGeneration, get(),
+            get<AppProfileOwner>().switchInProgress,
         ).also { source ->
             get<CoroutineScope>(qualifier = named("application")).launch { source.run() }
         }
@@ -98,10 +98,7 @@ val appModule = module {
             profileStore = TvheadendServerProfileStore(androidContext()),
             playerSettings = playerSettings,
             ioDispatcher = get(qualifier = named("io")),
-            clearAppArtwork = {
-                clearAppArtworkBestEffort { get<RemoteLogoCache>().clear() }
-            },
-            clearRecentChannels = { get<LastPlayedChannelStore>().clear() },
+            noticeCenter = { get() },
         )
         val audioOutput = TvheadendAudioOutputProvider(androidContext())
         val liveStartBuffer = TvheadendLiveStartBuffer(500.milliseconds)
@@ -204,7 +201,9 @@ val appModule = module {
         )
     }
     viewModel { VideoPlayerViewModel(playbackRuntime = get(), session = get()) }
-    viewModel { ChannelsViewModel(session = get(), tagSettings = get()) }
+    viewModel {
+        ChannelsViewModel(session = get(), tagSettings = get(), liveProfile = get<AppProfileOwner>().liveProfile)
+    }
     viewModel { SettingsStorageViewModel(get<SdkRuntimeOwner>().session.cache, get(), get(),
         clearRemoteLogos = { get<RemoteLogoCache>().clear() }) }
     viewModel {
@@ -215,16 +214,5 @@ val appModule = module {
             profileOwner = get(),
             uiSettingsStore = get(),
         )
-    }
-}
-
-internal suspend fun clearAppArtworkBestEffort(clear: suspend () -> Unit) {
-    try {
-        clear()
-    } catch (cancelled: CancellationException) {
-        throw cancelled
-    } catch (_: Throwable) {
-        // Cache failures must not undo a saved profile; never log URLs or paths.
-        android.util.Log.w("AppModule", "Could not clear app artwork cache")
     }
 }

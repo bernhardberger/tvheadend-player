@@ -1489,7 +1489,7 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
     @Test fun aServerDeletedRecordingHasNoGuideCellMarkOrHeadlineBadge() {
         show(headline = true, recordings = listOf(
             DvrEntry.create(DvrEntryId(1), eventId = EventId(110),
-                state = DvrEntryState.FILE_MISSING, files = emptyList()),
+                state = DvrEntryState.REMOVED, files = emptyList()),
         ))
         key(Key.DirectionDown)
         focused(title(1, 0))
@@ -1503,7 +1503,27 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         assertFalse(description, description.contains(context().getString(R.string.recording_state_failed)))
     }
 
-    @Test fun aFinishedRecordingIsTheDotAndAFailedOrMissedOneTheErrorMarkAndTheHeadlineBadgesThem() {
+    @Test fun aRemovedEntryDoesNotHideTheScheduledMarkForTheSameEvent() {
+        show(headline = true, recordings = listOf(
+            DvrEntry.create(DvrEntryId(1), eventId = EventId(110),
+                state = DvrEntryState.REMOVED, files = emptyList()),
+            DvrEntry.create(DvrEntryId(2), eventId = EventId(110), state = DvrEntryState.SCHEDULED),
+        ))
+        key(Key.DirectionDown)
+        focused(title(1, 0))
+        compose.onNode(
+            hasTestTag("guide-cell-recording-mark") and hasAnyAncestor(hasContentDescription(title(1, 0), substring = true)),
+            useUnmergedTree = true,
+        ).assertIsDisplayed()
+        compose.mainClock.advanceTimeBy(GuideHeadlineSettleMs + 300)
+        compose.waitForIdle()
+        compose.onNode(
+            hasTestTag("recording-badge-scheduled") and hasAnyAncestor(hasTestTag("guide-headline")),
+            useUnmergedTree = true,
+        ).assertIsDisplayed()
+    }
+
+    @Test fun aFinishedRecordingIsTheRecordedMarkAndAFailedOrMissedOneTheErrorMarkAndTheHeadlineBadgesThem() {
         // Past programmes come from the history fixture: channel 1 recorded, 2 failed, 4 missed.
         fun recording(id: Long, channel: Int, state: DvrEntryState) =
             DvrEntry.create(DvrEntryId(id), eventId = EventId(channel * 100L + 9), state = state)
@@ -1554,6 +1574,24 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         assertTrue(description(4, -1), description(4, -1).contains(context().getString(R.string.recording_notice_missed)))
         assertFalse(description(4, -1), description(4, -1).contains(context().getString(R.string.recording_state_failed)))
         headlineBadge("recording-badge-missed")
+        assertNoPlayback()
+    }
+
+    @Test fun aRecordingScheduledByARuleSaysSoUntilItRuns() {
+        val series = AutorecRuleId("series")
+        show(recordings = listOf(
+            DvrEntry.create(DvrEntryId(1), eventId = EventId(110), state = DvrEntryState.RECORDING, autorecRuleId = series),
+            DvrEntry.create(DvrEntryId(2), eventId = EventId(111), state = DvrEntryState.SCHEDULED, autorecRuleId = series),
+            DvrEntry.create(DvrEntryId(3), eventId = EventId(112), state = DvrEntryState.SCHEDULED),
+        ))
+        fun description(offset: Int) = compose.onNode(hasContentDescription(title(1, offset), substring = true))
+            .fetchSemanticsNode().config.getOrElseNullable(SemanticsProperties.ContentDescription) { null }.orEmpty().joinToString()
+        val rule = context().getString(R.string.recording_from_series_rule)
+        assertTrue(description(1), description(1).contains(rule))
+        assertFalse("A one-off is plainly scheduled", description(2).contains(rule))
+        assertTrue(description(2), description(2).contains(context().getString(R.string.recording_state_scheduled)))
+        assertFalse("A running recording is the dot, whatever scheduled it", description(0).contains(rule))
+        assertTrue(description(0), description(0).contains(context().getString(R.string.recording_state_recording)))
         assertNoPlayback()
     }
 

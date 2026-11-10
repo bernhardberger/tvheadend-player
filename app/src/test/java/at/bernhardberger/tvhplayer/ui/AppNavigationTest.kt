@@ -56,6 +56,7 @@ class AppNavigationTest {
             ChannelsKey,
             GuideKey,
             RecordingsKey,
+            SettingsKey(SettingsSection.CONNECTION),
             SettingsKey(SettingsSection.PLAYER),
             LivePlayerKey(channelId = 42, channelName = "News / HD"),
             RecordingPlayerKey(recordingId = 7, start = RecordingStartMode.START_OVER),

@@ -53,6 +53,7 @@ import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
+import at.bernhardberger.tvhplayer.testutil.assertMainSettled
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import at.bernhardberger.tvhplayer.viewmodels.VideoPlayerViewModel
@@ -108,7 +109,7 @@ class LiveZapStartOwnershipTest {
         key(Key.ChannelUp)
         settle()
         settingsData.open.value = true
-        compose.waitUntil(10_000) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(2)) }
+        assertMainSettled("opening admission installs the key start") { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(2)) }
         settle()
         assertEquals(2, admissions.get())
         assertEquals(2, binds())
@@ -122,7 +123,7 @@ class LiveZapStartOwnershipTest {
         key(Key.Three)
         key(Key.DirectionCenter)
         settingsData.open.value = true
-        compose.waitUntil(10_000) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(3)) }
+        assertMainSettled("opening admission installs only the latest start") { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(3)) }
         settle()
         assertEquals(2, binds())
     }
@@ -156,8 +157,8 @@ class LiveZapStartOwnershipTest {
         stopWhileTheKeyStartIsAdmitted()
         // A stopped window composes nothing: the return is its first composition since the key.
         compose.runOnUiThread { lifecycle.currentState = Lifecycle.State.RESUMED }
-        compose.waitUntil(10_000) {
-            compose.mainClock.advanceTimeBy(16)
+        compose.mainClock.advanceTimeUntil {
+            drainWithoutFrames()
             runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(2))
         }
         settle()
@@ -174,8 +175,8 @@ class LiveZapStartOwnershipTest {
         drainWithoutFrames()
         assertEquals(0, binds())
         compose.runOnUiThread { lifecycle.currentState = Lifecycle.State.RESUMED }
-        compose.waitUntil(10_000) {
-            compose.mainClock.advanceTimeBy(16)
+        compose.mainClock.advanceTimeUntil {
+            drainWithoutFrames()
             runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1))
         }
         settle()
@@ -210,9 +211,8 @@ class LiveZapStartOwnershipTest {
     }
 
     /** Lets the runtime run on without advancing the frame clock: nothing recomposes. */
-    private fun drainWithoutFrames() = repeat(50) {
+    private fun drainWithoutFrames() {
         shadowOf(Looper.getMainLooper()).idle()
-        Thread.sleep(10)
     }
 
     private fun binds() = session.calls.count { it == FakeSessionCall.BIND_LIVE_PLAYBACK }
@@ -239,12 +239,12 @@ class LiveZapStartOwnershipTest {
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
         )).apply { scriptLivePlaybackSuccess() }
         val settings = PlayerSettingsStore(settingsData)
-        val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.IO,
+        val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.Main.immediate,
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
         scope.launch { profiles.run() }
-        val channels = ChannelsViewModel(session, ChannelTagSettingsStore(InMemoryData()))
+        val channels = ChannelsViewModel(session, ChannelTagSettingsStore(InMemoryData()), profiles.liveProfile)
         models.put("channels", channels)
-        compose.waitUntil(10_000) { channels.scope.value.scope.visibleChannels.size == 3 }
+        assertMainSettled("the fake channel catalog is collected") { channels.scope.value.scope.visibleChannels.size == 3 }
         player = ExoPlayer.Builder(context).build()
         val coordinator = createTvheadendPlaybackCoordinator(player).also { it.launchIn(scope) }
         runtime = AppPlaybackRuntime(player, session, coordinator, settings, profiles, scope,
@@ -278,12 +278,12 @@ class LiveZapStartOwnershipTest {
         if (entryHeld) {
             // The entry effect's own start is admitted and held. (A held entry start is
             // restarted once while the session settles, so the count is taken afterwards.)
-            compose.waitUntil(10_000) { admissions.get() >= 1 }
+            assertMainSettled("the entry effect has reached the held admission") { admissions.get() >= 1 }
             settle()
             compose.mainClock.autoAdvance = false
             return
         }
-        compose.waitUntil(10_000) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1)) }
+        assertMainSettled("the entry effect installs its start") { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1)) }
         settle()
         assertEquals(1, binds())
         // Number and settle timers run only when a test advances the clock.

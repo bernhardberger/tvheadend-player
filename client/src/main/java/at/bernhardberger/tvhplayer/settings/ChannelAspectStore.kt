@@ -27,8 +27,7 @@ data class ChannelAspects internal constructor(val profile: String?, private val
 }
 
 /**
- * Display mode per channel, scoped by the per-server identity that [AudioChoiceStore] keeps (it is
- * replaced whenever the server profile changes, so channel ids of another server never match).
+ * Display mode per channel, scoped by the stable SDK server profile identifier.
  * Auto is the absence of an entry. Recordings use their channel's entry.
  */
 class ChannelAspectStore(private val dataStore: DataStore<Preferences>) {
@@ -40,7 +39,7 @@ class ChannelAspectStore(private val dataStore: DataStore<Preferences>) {
     /** Re-emits only when the server identity or its modes change. */
     val choices: Flow<ChannelAspects> = dataStore.data
         .map { preferences ->
-            val profile = AudioChoiceStore.profileIdentityIn(preferences) ?: return@map ChannelAspects.None
+            val profile = preferences[activeProfileKey] ?: return@map ChannelAspects.None
             ChannelAspects(
                 profile,
                 decode(preferences[key]).filter { it.profile == profile }.associate { it.channel to it.mode },
@@ -56,13 +55,22 @@ class ChannelAspectStore(private val dataStore: DataStore<Preferences>) {
         if (profile == null) return false
         var stored = false
         dataStore.edit { preferences ->
-            if (AudioChoiceStore.profileIdentityIn(preferences) != profile) return@edit
+            if (preferences[activeProfileKey] != profile) return@edit
             val others = decode(preferences[key]).filterNot { it.profile == profile && it.channel == channel.value }
             val entries = if (mode == AspectRatioMode.FIT) others else others + Entry(profile, channel.value, mode)
-            preferences[key] = Json.encodeToString(entries.takeLast(MAX_ENTRIES))
+            preferences[key] = Json.encodeToString(
+                entries.filterNot { it.profile == profile } +
+                    entries.filter { it.profile == profile }.takeLast(MAX_ENTRIES),
+            )
             stored = true
         }
         return stored
+    }
+
+    internal suspend fun removeProfile(profile: String) {
+        dataStore.edit {
+            it[key] = Json.encodeToString(decode(it[key]).filterNot { entry -> entry.profile == profile })
+        }
     }
 
     private fun decode(value: String?): List<Entry> {

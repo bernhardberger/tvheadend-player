@@ -27,7 +27,6 @@ import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
-import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -174,53 +173,6 @@ class AppPlaybackRuntimeTest {
     }
 
     @Test
-    fun missingOrContradictoryTimingIsNotAMeasuredLivePosition() {
-        val measurements = listOf(
-            null to null,
-            null to 10.minutes,
-            30.minutes to null,
-            Duration.INFINITE to Duration.ZERO,
-            30.minutes to Duration.INFINITE,
-            1.minutes to 10.minutes,
-            (-1).minutes to Duration.ZERO,
-        )
-        measurements.forEach { (buffer, behind) ->
-            val state = measuredTimeshiftPresentation(buffer, behind, true, 1.hours)
-            assertTrue(state.available)
-            assertTrue(state.paused)
-            assertFalse(state.timingKnown)
-            assertFalse(at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation(state).atLiveEdge)
-            assertFalse(at.bernhardberger.tvhplayer.core.canSeekTimeshiftBackward(state))
-            assertFalse(at.bernhardberger.tvhplayer.core.canSeekTimeshiftForward(state))
-            assertFalse(at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange(state).positionKnown)
-        }
-        val measuredLive = measuredTimeshiftPresentation(Duration.ZERO, Duration.ZERO, false)
-        assertTrue(measuredLive.timingKnown)
-        assertTrue(at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation(measuredLive).atLiveEdge)
-    }
-
-    @Test
-    fun grantedCapacityIsDisplayEvidenceNotAvailableHistory() {
-        val state = measuredTimeshiftPresentation(
-            bufferedDuration = 30.minutes,
-            positionBehindLive = 10.minutes,
-            serverPaused = true,
-            grantedPeriod = 1.hours,
-        )
-        assertEquals(3_600_000L, state.capacityMs)
-        assertEquals(-1_800_000L, state.bufferStartMs)
-        assertEquals(-600_000L, state.positionMs)
-        val unknown = measuredTimeshiftPresentation(null, null, null, Duration.INFINITE)
-        assertNull(unknown.capacityMs)
-        assertEquals(0L, unknown.bufferStartMs)
-        val missingBuffer = measuredTimeshiftPresentation(null, 10.minutes, true, 1.hours)
-        assertEquals(0L, missingBuffer.bufferStartMs)
-        assertEquals(-600_000L, missingBuffer.positionMs)
-        assertFalse(missingBuffer.timingKnown)
-        assertFalse(unknown.timingKnown)
-    }
-
-    @Test
     fun enabledTimeshiftRequestsTheFixedProductPeriod() {
         assertEquals(2.hours, requestedLiveTimeshiftPeriod(timeshiftEnabled = true))
     }
@@ -235,36 +187,6 @@ class AppPlaybackRuntimeTest {
         assertEquals(
             AppTimeshiftState(),
             LiveTimeshiftState.Unavailable.toAppPresentation(),
-        )
-    }
-
-    @Test
-    fun nullMeasuredTimeshiftDoesNotInventSeekableHistory() {
-        assertEquals(
-            AppTimeshiftState(available = true, timingKnown = false),
-            measuredTimeshiftPresentation(
-                bufferedDuration = null,
-                positionBehindLive = null,
-                serverPaused = false,
-            ),
-        )
-    }
-
-    @Test
-    fun measuredTimeshiftPreservesObservedBufferPositionAndPause() {
-        assertEquals(
-            AppTimeshiftState(
-                available = true,
-                paused = true,
-                bufferStartMs = -120_000L,
-                positionMs = -30_000L,
-                serverBehindLiveMs = 30_000L,
-            ),
-            measuredTimeshiftPresentation(
-                bufferedDuration = 2.minutes,
-                positionBehindLive = 30.seconds,
-                serverPaused = true,
-            ),
         )
     }
 
@@ -290,26 +212,6 @@ class AppPlaybackRuntimeTest {
             AppPlaybackState.Failed(AppPlaybackFailureReason.RECORDING_READ_FAILED),
             state,
         )
-    }
-
-    @Test
-    fun olderTargetCompletionCannotSurviveANewerStop() {
-        val epoch = PlaybackPresentationEpoch()
-        var target: AppPlaybackTarget? = null
-        var state: AppPlaybackState = AppPlaybackState.Starting
-        val targetCommand = epoch.begin()
-        val stopCommand = epoch.begin()
-
-        assertFalse(epoch.publishIfCurrent(targetCommand) {
-            target = AppPlaybackTarget.Live(ChannelId(9))
-        })
-        assertTrue(epoch.publishIfCurrent(stopCommand) {
-            target = null
-            state = AppPlaybackState.Idle
-        })
-
-        assertNull(target)
-        assertEquals(AppPlaybackState.Idle, state)
     }
 
     @Test
@@ -354,7 +256,7 @@ class AppPlaybackRuntimeTest {
         assertFalse(
             fence.matches(
                 activeTarget = AppPlaybackTarget.Recording(DvrEntryId(9)),
-                activeTargetEpoch = 21L,
+                activeTargetEpoch = 20L,
                 observation = observations.observation.value,
             ),
         )
@@ -376,6 +278,13 @@ class AppPlaybackRuntimeTest {
         assertFalse(
             fence.matches(
                 activeTarget = AppPlaybackTarget.Live(ChannelId(13)),
+                activeTargetEpoch = 22L,
+                observation = observations.observation.value,
+            ),
+        )
+        assertFalse(
+            fence.matches(
+                activeTarget = AppPlaybackTarget.Live(channel.id),
                 activeTargetEpoch = 23L,
                 observation = observations.observation.value,
             ),
@@ -1327,12 +1236,13 @@ class AppPlaybackRuntimeTest {
     }
 
     @Test
-    fun nonRecordingForegroundActionsInvokeOnlyTheirOwnedEffect() = runTest {
+    fun foregroundActionsInvokeOnlyTheirOwnedEffect() = runTest {
         val cases = listOf(
             ForegroundPlaybackAction.None to emptyList(),
             ForegroundPlaybackAction.StopLive to listOf("stop-live"),
             ForegroundPlaybackAction.PauseRecording to listOf("pause-recording"),
             ForegroundPlaybackAction.ResumeLive(ChannelId(7)) to listOf("resume-live:7"),
+            ForegroundPlaybackAction.ResumeRecording to listOf("resume-recording"),
         )
 
         cases.forEach { (action, expected) ->
@@ -1347,21 +1257,6 @@ class AppPlaybackRuntimeTest {
 
             assertEquals(action.toString(), expected, events)
         }
-    }
-
-    @Test
-    fun recordingForegroundResumeUsesOnlyTheExistingPlayerTarget() = runTest {
-        val events = mutableListOf<String>()
-
-        executeForegroundPlaybackAction(
-            action = ForegroundPlaybackAction.ResumeRecording,
-            stopLive = { events += "stop-live" },
-            pauseRecording = { events += "pause-recording" },
-            resumeLive = { events += "resume-live:$it" },
-            resumeRecording = { events += "resume-recording" },
-        )
-
-        assertEquals(listOf("resume-recording"), events)
     }
 
     private fun currentObservation(
