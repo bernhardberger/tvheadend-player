@@ -46,7 +46,9 @@ fun programmeDetailsActions(
             ProgrammeAction.RECORD -> if (liveProgramme) add(BrowseContextAction.RECORD)
             ProgrammeAction.STOP_RECORDING -> add(BrowseContextAction.STOP)
             ProgrammeAction.CANCEL_RECORDING -> add(BrowseContextAction.CANCEL)
-            ProgrammeAction.WATCH_FROM_START -> if (recording != null) add(BrowseContextAction.PLAY)
+            ProgrammeAction.WATCH_FROM_START -> if (recording != null) {
+                add(if (nowSec < event.stop.epochSeconds) BrowseContextAction.START_OVER else BrowseContextAction.PLAY)
+            }
         }
     }
     if (canWatchChannel) add(BrowseContextAction.SHOW_GUIDE)
