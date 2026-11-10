@@ -31,6 +31,8 @@ import coil3.intercept.Interceptor
 import coil3.request.SuccessResult
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.runBlocking
+import kotlin.coroutines.EmptyCoroutineContext
+import at.bernhardberger.tvhplayer.testutil.setContentWithArtworkSampling
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Rule
@@ -55,7 +57,7 @@ class ChannelAccentTest {
         dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
     )).captureCurrentSession()
     private val store = ChannelAccentStore()
-    private val accents = ChannelAccents(store) { _, id -> "profile-${id.value}" }
+    private val accents = ChannelAccents(store, EmptyCoroutineContext) { _, id -> "profile-${id.value}" }
     private val loads = AtomicInteger()
     private val loader = ImageLoader.Builder(app).components {
         add(Interceptor { chain ->
@@ -70,7 +72,7 @@ class ChannelAccentTest {
     private fun show(): List<Color> {
         val returned = mutableListOf<Color>()
         compose.mainClock.autoAdvance = false
-        compose.setContent {
+        compose.setContentWithArtworkSampling {
             CompositionLocalProvider(LocalChannelAccents provides accents) {
                 ProvideArtworkSession(session) {
                     val colour = rememberChannelAccent(ChannelIcon.ImageCache(ArtworkId(1)), ChannelId(1))
@@ -94,12 +96,11 @@ class ChannelAccentTest {
     @Test fun anUnknownColourStartsNeutralAndEndsOnTheSampledColourWhichIsStored() {
         val returned = show()
         assertEquals("the first frame", neutral, returned.first())
-        // ChannelAccents samples on Dispatchers.Default, which has no injected dispatcher.
-        compose.waitUntil(10_000) { store["profile-1"] != null }
+        compose.mainClock.advanceTimeUntil { store["profile-1"] != null }
         val sampled = Color(0xFF000000.toInt() or store["profile-1"]!!)
         assertNotEquals(neutral, sampled)
-        // Dispatchers.Default's result still has to resume the Main effect after storing the colour.
-        compose.waitUntil(10_000) { compose.mainClock.advanceTimeByFrame(); returned.last() == sampled }
+        // Include the effect publication and crossfade, not just the store write.
+        compose.mainClock.advanceTimeUntil { returned.last() == sampled }
         compose.mainClock.advanceTimeBy(1_000)
         compose.waitForIdle()
         assertEquals("it ends on the sampled colour", sampled, returned.last())

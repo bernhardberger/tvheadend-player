@@ -19,6 +19,7 @@ import at.bernhardberger.tvhplayer.stores.ChannelAccentStore
 import coil3.request.SuccessResult
 import coil3.toBitmap
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -36,10 +37,16 @@ import kotlinx.coroutines.withContext
  * [sample] is the one sampler for callers and for the fill-in pass ([fillIn]); a key is never sampled
  * twice at the same time. The defaults keep nothing beyond the process and have no keys.
  */
-class ChannelAccents(
-    private val store: ChannelAccentStore = ChannelAccentStore(),
-    private val cacheKey: (CurrentSessionObservation, ArtworkId) -> String? = { _, _ -> null },
+class ChannelAccents internal constructor(
+    private val store: ChannelAccentStore,
+    private val samplingContext: CoroutineContext,
+    private val cacheKey: (CurrentSessionObservation, ArtworkId) -> String?,
 ) {
+    constructor(
+        store: ChannelAccentStore = ChannelAccentStore(),
+        cacheKey: (CurrentSessionObservation, ArtworkId) -> String? = { _, _ -> null },
+    ) : this(store, Dispatchers.Default, cacheKey)
+
     private val sampling = ConcurrentHashMap<String, Mutex>()
     /** Keys whose picon did not load for now: not tried again in this process until the store is cleared. */
     private val failed = ConcurrentHashMap.newKeySet<String>()
@@ -57,17 +64,17 @@ class ChannelAccents(
      */
     suspend fun sample(context: Context, picon: Any): Int? {
         // Remote logos use the same small decode, but never enter the SDK's persistent accent store.
-        if (picon !is AppArtworkSource) return DetailsArtColors.sample(context, picon)
+        if (picon !is AppArtworkSource) return DetailsArtColors.sample(context, picon, samplingContext)
         val session = picon.currentSession ?: return key(picon)?.let {
             store.load()
             store[it]
         }
-        val key = cacheKey(session, picon.id) ?: return samplePicon(context, picon)
+        val key = cacheKey(session, picon.id) ?: return samplePicon(context, picon, samplingContext)
         store.load()
         sampling.computeIfAbsent(key) { Mutex() }.withLock {
             store[key]?.let { return it }
             if (key in failed) return null
-            val rgb = samplePicon(context, picon)
+            val rgb = samplePicon(context, picon, samplingContext)
             // The key holds for the session that loaded the picon: a result that outlived it is dropped.
             if (cacheKey(session, picon.id) != key) return null
             if (rgb == null) failed += key else store.put(key, rgb)
@@ -123,8 +130,8 @@ class ChannelAccents(
 private data class FillInTarget(val session: SessionGenerationIdentity, val picons: Set<ArtworkId>)
 
 /** Neutral for a picon there is no picture of; null when the picon does not load for now. */
-private suspend fun samplePicon(context: Context, picon: AppArtworkSource): Int? =
-    withContext(Dispatchers.Default) {
+private suspend fun samplePicon(context: Context, picon: AppArtworkSource, samplingContext: CoroutineContext): Int? =
+    withContext(samplingContext) {
         val result = loadArtworkSample(context, picon)
         val bitmap = (result as? SuccessResult)?.image?.toBitmap() ?: run {
             val failure = ((result as? ErrorResult)?.throwable as? TvheadendArtworkLoadException)?.failure

@@ -5,6 +5,7 @@ import android.util.LruCache
 import androidx.palette.graphics.Palette
 import coil3.request.SuccessResult
 import coil3.toBitmap
+import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -24,8 +25,8 @@ internal object DetailsArtColors {
     }
 
     // Only admission/publication take the lock; a slow decode never holds up other artwork.
-    suspend fun sample(context: Context, source: Any): Int? =
-        withContext(Dispatchers.Default) {
+    suspend fun sample(context: Context, source: Any, samplingContext: CoroutineContext = Dispatchers.Default): Int? =
+        withContext(samplingContext) {
             val started = synchronized(colors) {
                 colors.get(source)?.let { return@withContext it.rgb }
                 generation

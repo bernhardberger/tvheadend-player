@@ -34,6 +34,7 @@ import at.bernhardberger.tvhplayer.core.NEUTRAL_ACCENT_RGB
 import at.bernhardberger.tvhplayer.core.logoGlowPixels
 import at.bernhardberger.tvhplayer.images.ChannelAccents
 import kotlin.math.roundToInt
+import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -100,14 +101,19 @@ internal fun ChannelLogoGlow(
     var accentSettled by remember(channelId, picon) { mutableStateOf(false) }
     val accent = rememberChannelAccent(picon, channelId, onSettled = { accentSettled = true })
     val background = MaterialTheme.colorScheme.background
+    val samplingContext = LocalArtworkSamplingContext.current
     var size by remember { mutableStateOf(IntSize.Zero) }
     val key = LogoGlowKey(accent.toArgb() and 0xffffff, background.toArgb() and 0xffffff,
         (size.width / LogoGlowScale).coerceAtLeast(1), (size.height / LogoGlowScale).coerceAtLeast(1))
     // Kept with the key it was baked for: a glow of a colour not yet settled, or of an earlier
     // colour or size, is neither shown nor reported. A logo changed in place keeps its old colour
     // until the new one is sampled, so the key alone would still match.
-    val produced by produceState<Pair<LogoGlowKey, ImageBitmap>?>(null, key, accentSettled, size != IntSize.Zero) {
-        if (accentSettled && size != IntSize.Zero) value = key to (LogoGlows[key] ?: LogoGlows.bake(key))
+    val produced by produceState<Pair<LogoGlowKey, ImageBitmap>?>(
+        null, key, accentSettled, size != IntSize.Zero, samplingContext,
+    ) {
+        if (accentSettled && size != IntSize.Zero) {
+            value = key to (LogoGlows[key] ?: LogoGlows.bake(key, samplingContext))
+        }
     }
     val glow = produced?.takeIf { accentSettled && it.first == key }?.second
     val currentOnSettled by rememberUpdatedState(onSettled)
@@ -144,9 +150,10 @@ private object LogoGlows {
 
     operator fun get(key: LogoGlowKey): ImageBitmap? = synchronized(baked) { baked[key] }
 
-    suspend fun bake(key: LogoGlowKey): ImageBitmap = withContext(Dispatchers.Default) {
-        val pixels = logoGlowPixels(key.accent, key.background, key.width, key.height)
-        Bitmap.createBitmap(pixels, key.width, key.height, Bitmap.Config.ARGB_8888).asImageBitmap()
-            .also { synchronized(baked) { baked[key] = it } }
-    }
+    suspend fun bake(key: LogoGlowKey, samplingContext: CoroutineContext = Dispatchers.Default): ImageBitmap =
+        withContext(samplingContext) {
+            val pixels = logoGlowPixels(key.accent, key.background, key.width, key.height)
+            Bitmap.createBitmap(pixels, key.width, key.height, Bitmap.Config.ARGB_8888).asImageBitmap()
+                .also { synchronized(baked) { baked[key] = it } }
+        }
 }

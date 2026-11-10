@@ -51,6 +51,7 @@ internal fun artworkCardGlow(
 ): CardGlow {
     val focused by interactionSource.collectIsFocusedAsState()
     val context = LocalContext.current
+    val samplingContext = LocalArtworkSamplingContext.current
     val artwork = LocalArtworkContext.current
     val session = artwork.currentSession
     val accents = LocalChannelAccents.current
@@ -64,9 +65,9 @@ internal fun artworkCardGlow(
             if (picture != null) DetailsArtColors.stored(it) else accents.stored(it)
         }) }
         // Off-focus cards can use a cached colour, but do not start extra artwork decodes.
-        LaunchedEffect(source, focused) {
+        LaunchedEffect(source, focused, samplingContext) {
             if (focused && source != null && rgb == null) {
-                rgb = if (picture != null) DetailsArtColors.sample(context, source)
+                rgb = if (picture != null) DetailsArtColors.sample(context, source, samplingContext)
                     else accents.sample(context, source)
             }
         }

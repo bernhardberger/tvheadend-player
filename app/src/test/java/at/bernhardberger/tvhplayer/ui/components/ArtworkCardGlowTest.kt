@@ -28,6 +28,10 @@ import coil3.request.ErrorResult
 import coil3.request.SuccessResult
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.test.StandardTestDispatcher
+import at.bernhardberger.tvhplayer.testutil.setContentWithArtworkSampling
 import java.util.concurrent.atomic.AtomicInteger
 import org.junit.After
 import org.junit.Assert.*
@@ -53,14 +57,17 @@ class ArtworkCardGlowTest {
     private val art = ArtworkId(1)
     private val picon = ArtworkId(2)
     private val store = ChannelAccentStore()
-    private val accents = ChannelAccents(store) { _, id -> "glow-${id.value}" }
+    private val sampling = StandardTestDispatcher()
+    private val accents = ChannelAccents(store, sampling) { _, id -> "glow-${id.value}" }
     private val interaction = MutableInteractionSource()
     private val loads = AtomicInteger()
     private val release = CompletableDeferred<Unit>()
     private var fail = false
+    private var sampleJob: Job? = null
     private val loader = ImageLoader.Builder(ApplicationProvider.getApplicationContext()).components {
         add(Interceptor { chain ->
             loads.incrementAndGet()
+            sampleJob = currentCoroutineContext()[Job]
             release.await()
             if (fail) ErrorResult(null, chain.request, IllegalStateException("synthetic unavailable art"))
             else SuccessResult(Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888).apply {
@@ -76,7 +83,7 @@ class ArtworkCardGlowTest {
 
     private fun show(picture: ArtworkId? = null, logo: ArtworkId? = picon) {
         shownArt = picture
-        compose.setContent {
+        compose.setContentWithArtworkSampling(sampling) {
             CompositionLocalProvider(LocalChannelAccents provides accents) {
                 MaterialTheme {
                     ProvideArtworkSession(session) {
@@ -99,6 +106,8 @@ class ArtworkCardGlowTest {
     @Test fun noPictureOrLogoStaysNeutralWithoutDecoding() {
         show(logo = null)
         focus()
+        sampling.scheduler.runCurrent()
+        compose.waitForIdle()
         assertEquals(neutral, returned.last())
         assertEquals(0, loads.get())
     }
@@ -107,6 +116,8 @@ class ArtworkCardGlowTest {
         runBlocking { store.put("glow-2", 0x336699) }
         show()
         focus()
+        sampling.scheduler.runCurrent()
+        compose.waitForIdle()
         assertEquals(setOf(glow(Color(0xFF336699))), returned.toSet())
         assertEquals(0, loads.get())
     }
@@ -115,14 +126,16 @@ class ArtworkCardGlowTest {
         runBlocking { store.put("glow-2", 0x336699) }
         release.complete(Unit)
         show(picture = art)
-        assertEquals(neutral, returned.last())
+        compose.waitForIdle()
+        sampling.scheduler.runCurrent()
+        compose.waitForIdle()
         assertEquals(0, loads.get())
+        assertEquals(neutral, returned.last())
         focus()
-        // DetailsArtColors samples on Dispatchers.Default, with no injected dispatcher.
-        compose.waitUntil(10_000) { DetailsArtColors.stored(AppArtworkSource(session, art)) != null }
+        sampling.scheduler.runCurrent()
+        assertNotNull(DetailsArtColors.stored(AppArtworkSource(session, art)))
         val sampled = Color(0xFF000000.toInt() or requireNotNull(DetailsArtColors.stored(AppArtworkSource(session, art))))
-        // The Default sampler's Main continuation is a second signal after its cache write.
-        compose.waitUntil(10_000) { compose.mainClock.advanceTimeByFrame(); returned.last() == glow(sampled) }
+        compose.mainClock.advanceTimeUntil { returned.last() == glow(sampled) }
         assertNotEquals(glow(Color(0xFF336699)), returned.last())
         assertEquals(1, loads.get())
     }
@@ -131,11 +144,10 @@ class ArtworkCardGlowTest {
         release.complete(Unit)
         show()
         focus()
-        // ChannelAccents samples on Dispatchers.Default, with no injected dispatcher.
-        compose.waitUntil(10_000) { store["glow-2"] != null }
+        sampling.scheduler.runCurrent()
+        assertNotNull(store["glow-2"])
         val sampled = Color(0xFF000000.toInt() or requireNotNull(store["glow-2"]))
-        // The Default sampler's Main continuation is a second signal after its cache write.
-        compose.waitUntil(10_000) { compose.mainClock.advanceTimeByFrame(); returned.last() == glow(sampled) }
+        compose.mainClock.advanceTimeUntil { returned.last() == glow(sampled) }
         assertEquals(1, loads.get())
     }
 
@@ -145,9 +157,10 @@ class ArtworkCardGlowTest {
         runBlocking { store.put("glow-2", 0x336699) }
         show(picture = art)
         focus()
-        // The image interceptor is reached from DetailsArtColors' real Default worker.
-        compose.waitUntil(10_000) { loads.get() == 1 }
-        compose.mainClock.advanceTimeBy(1_000)
+        sampling.scheduler.runCurrent()
+        assertEquals(1, loads.get())
+        // The Coil request has returned; drain its caller's publication, not just interceptor entry.
+        assertTrue(requireNotNull(sampleJob).isCompleted)
         compose.waitForIdle()
         assertEquals(setOf(neutral), returned.toSet())
     }
@@ -159,9 +172,12 @@ class ArtworkCardGlowTest {
         assertEquals(glow(Color(0xFF336699)), returned.last())
         compose.runOnIdle { shownArt = art }
         compose.waitForIdle()
+        sampling.scheduler.runCurrent()
+        compose.waitForIdle()
         assertEquals(neutral, returned.last())
         compose.runOnIdle { shownArt = null }
         release.complete(Unit)
+        sampling.scheduler.runCurrent()
         compose.mainClock.advanceTimeBy(1_000)
         compose.waitForIdle()
         assertEquals(glow(Color(0xFF336699)), returned.last())

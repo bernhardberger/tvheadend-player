@@ -72,6 +72,8 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 import kotlin.math.abs
 import kotlin.time.Instant
+import kotlin.coroutines.EmptyCoroutineContext
+import at.bernhardberger.tvhplayer.testutil.setContentWithArtworkSampling
 
 /**
  * A focused card's glow fades out on every side instead of ending in a straight cut where its row
@@ -291,7 +293,7 @@ class CardGlowRoomTest {
         // Glow colour, background and scroll settle; the logo glow is baked off the main thread.
         compose.mainClock.advanceTimeBy(1_500)
         awaitChannelColors(focused)
-        // LogoGlows bakes on Dispatchers.Default, outside Compose idle.
+        // The shared ChannelsLayoutFixture has no sampling-context provider: LogoGlows uses real Default workers.
         compose.waitUntil(10_000) {
             compose.onAllNodesWithTag("channels-logo-glow").fetchSemanticsNodes().isEmpty() ||
                 compose.onAllNodesWithTag("channels-immersive-picon").fetchSemanticsNodes().isNotEmpty()
@@ -307,7 +309,7 @@ class CardGlowRoomTest {
         val art = observation.eventAt(ChannelId(focused.toLong()), Instant.fromEpochSeconds(System.currentTimeMillis() / 1000))
             ?.image?.takeIf { fixture.channelsView.showsProgramArt }
         val picture = art?.let { AppArtworkSource(requireNotNull(observation.currentSession), it) }
-        // DetailsArtColors and ChannelAccents sample on non-injectable Dispatchers.Default workers.
+        // The shared fixture cannot provide the sampling context here; these still use real Default workers.
         // Wait for their palette results before advancing the colour animations, not just for the backdrop.
         compose.waitUntil(10_000) {
             (picture == null || DetailsArtColors.stored(picture) != null) && ChannelsLayoutFixture.PICONS.indices.all { index ->
@@ -335,11 +337,11 @@ class CardGlowRoomTest {
         images.install(FixtureArt.imageLoader(ApplicationProvider.getApplicationContext<Application>(), mapOf(
             ArtworkId(1) to FixtureArt.picon("ridge-earth"), ArtworkId(2) to FixtureArt.picon("harbor-sport"),
         )))
-        // The cards sample their colours off the main thread, where waiting for idle does not see them.
+        // Keep the rail's accent sampling on the effect clock, including publication before the colour animation.
         val accentStore = ChannelAccentStore()
-        val accents = ChannelAccents(accentStore) { _, id -> "rail-${id.value}" }
+        val accents = ChannelAccents(accentStore, EmptyCoroutineContext) { _, id -> "rail-${id.value}" }
         val state = PlayerChannelBrowserState().apply { onNow.focusedId = channels.first().id }
-        compose.setContent {
+        compose.setContentWithArtworkSampling {
             CompositionLocalProvider(LocalDensity provides Density(1f, 1f), LocalChannelAccents provides accents) {
                 TVHeadendPlayerTheme {
                     view = LocalView.current
@@ -366,8 +368,7 @@ class CardGlowRoomTest {
         compose.onRoot().performKeyInput { pressKey(key) }
         val focus = hasTestTag("player-channel-card-$focused")
         compose.waitUntil(10_000) { compose.onAllNodes(focus and isFocused()).fetchSemanticsNodes().isNotEmpty() }
-        // ChannelAccents samples on Dispatchers.Default, outside Compose idle.
-        compose.waitUntil(10_000) { accentStore["rail-1"] != null && accentStore["rail-2"] != null }
+        compose.mainClock.advanceTimeUntil { accentStore["rail-1"] != null && accentStore["rail-2"] != null }
         compose.mainClock.advanceTimeBy(1_500)
         compose.waitForIdle()
         check(name, bounds(focus), sides)
