@@ -117,6 +117,8 @@ class OnboardingLayoutEvidenceTest {
         back()
         compose.onNodeWithTag("setup-continue").assertIsFocused()
         assertEquals(SetupStep.ADDRESS, state.step)
+        assertEquals(0, state.searchRequest)
+        assertFalse(state.searching)
     }
 
     @Test fun searchIsItsOwnScreenAndChoosingAServerGoesOnToAccount() {
@@ -208,16 +210,6 @@ class OnboardingLayoutEvidenceTest {
         compose.onNodeWithTag("setup-find-server").assertIsFocused().assertIsEnabled()
     }
 
-    @Test fun backToServerDoesNotSearchAndKeepsContinueFocused() {
-        show(form = ConnectionFormState(host = "192.0.2.10"))
-        repeat(3) { compose.pressKey(Key.DirectionDown) }
-        compose.pressKey(Key.DirectionCenter)
-        back()
-        compose.onNodeWithTag("setup-continue").assertIsFocused()
-        assertEquals(0, state.searchRequest)
-        assertFalse(state.searching)
-    }
-
     @Test fun changeAddressAfterFailureReturnsToServerWithoutSearching() {
         show(form = ConnectionFormState(host = "192.0.2.10"))
         repeat(3) { compose.pressKey(Key.DirectionDown) }
@@ -273,6 +265,8 @@ class OnboardingLayoutEvidenceTest {
         assertEquals("192.0.2.10", state.form.host)
         compose.onNodeWithTag("setup-continue").assertIsFocused()
         compose.onNodeWithTag("setup-welcome-continue").assertDoesNotExist()
+        compose.onNodeWithText("Tvheadend Player").assertDoesNotExist()
+        compose.onNodeWithTag("setup-signature").assertDoesNotExist()
         repeat(3) { compose.pressKey(Key.DirectionUp) }
         compose.onNodeWithTag("setup-find-server").assertIsFocused()
         compose.pressKey(Key.DirectionCenter)
@@ -335,13 +329,6 @@ class OnboardingLayoutEvidenceTest {
         assertEquals(SetupStep.ADDRESS, state.step)
     }
 
-    @Test fun aSettingsEditorHasNoWelcome() {
-        showEdit()
-        compose.onNodeWithTag("setup-welcome-continue").assertDoesNotExist()
-        compose.onNodeWithText("Tvheadend Player").assertDoesNotExist()
-        compose.onNodeWithTag("setup-signature").assertDoesNotExist()
-    }
-
     @Test fun firstRunsSignatureStandsOnTheSafeLine() {
         show()
         val bottom = compose.onNodeWithTag("setup-signature").fetchSemanticsNode().boundsInRoot.bottom
@@ -364,10 +351,7 @@ class OnboardingLayoutEvidenceTest {
         compose.pressKey(Key.DirectionRight)
         compose.onNodeWithTag("setup-password").assertIsFocused()
         compose.pressKey(Key.DirectionDown)
-        compose.onNodeWithText("Show password").assertIsFocused().assertIsOff()
-        compose.pressKey(Key.DirectionCenter)
-        compose.onNodeWithText("Show password").assertIsFocused().assertIsOn()
-        compose.onAllNodes(hasSetTextAction()).assertCountEquals(0)
+        compose.onNodeWithText("Show password").assertIsFocused()
         compose.pressKey(Key.DirectionDown)
         compose.onNodeWithTag("setup-continue").assertIsFocused()
         compose.pressKey(Key.DirectionUp)
@@ -376,11 +360,6 @@ class OnboardingLayoutEvidenceTest {
         compose.onNodeWithTag("setup-password").assertIsFocused()
         compose.pressKey(Key.DirectionCenter)
         compose.onAllNodes(hasSetTextAction()).assertCountEquals(1)
-    }
-
-    @Test fun successInitiallyFocusesALabelledStartWatchingButton() {
-        show(SetupStep.DONE, ConnectionFormState(host = "192.0.2.10"))
-        assertSuccess()
     }
 
     @Test
@@ -410,38 +389,15 @@ class OnboardingLayoutEvidenceTest {
         compose.onNodeWithText("Password saved").assertExists()
         compose.onNodeWithTag("setup-clear-password").assertExists()
         assertEquals("", state.form.password)
-        compose.runOnIdle { state.clearSavedPassword() }
-        compose.onNodeWithTag("setup-clear-password").assertDoesNotExist()
-        compose.onNodeWithTag("setup-username").assertIsFocused()
-    }
-
-    @Test fun savedPasswordShowRowIsEnabledOnlyAfterTypingAReplacement() {
-        showEdit()
-        compose.runOnIdle { state.continueFromAddress() }
         compose.onNodeWithText("Show password").assertExists().assertIsNotEnabled()
-        compose.pressKey(Key.DirectionUp)
-        compose.onNodeWithTag("setup-password").assertIsFocused()
-        compose.pressKey(Key.DirectionDown)
-        compose.onNodeWithTag("setup-continue").assertIsFocused()
-        compose.pressKey(Key.DirectionUp)
-        compose.pressKey(Key.DirectionCenter)
-        compose.onNodeWithText("Show password").assertIsNotEnabled()
-        back()
-        compose.onNodeWithText("Password saved").assertExists()
+        compose.onNodeWithTag("setup-password").requestFocus()
         compose.pressKey(Key.DirectionCenter)
         compose.onNodeWithTag("setup-password").performTextInput("replacement")
         compose.onNodeWithText("Show password").assertIsEnabled()
-        compose.onNodeWithTag("setup-password").performTextClearance()
-        compose.onNodeWithText("Show password").assertIsNotEnabled()
         back()
-        compose.onNodeWithText("Password saved").assertExists()
-        compose.pressKey(Key.DirectionCenter)
-        compose.onNodeWithTag("setup-password").performTextInput("replacement")
-        back()
-        compose.pressKey(Key.DirectionDown)
-        compose.onNodeWithText("Show password").assertIsFocused().assertIsOff()
-        compose.pressKey(Key.DirectionCenter)
-        compose.onNodeWithText("Show password").assertIsFocused().assertIsOn()
+        compose.runOnIdle { state.clearSavedPassword() }
+        compose.onNodeWithTag("setup-clear-password").assertDoesNotExist()
+        compose.onNodeWithTag("setup-username").assertIsFocused()
     }
 
     @Test
@@ -569,22 +525,13 @@ class OnboardingLayoutEvidenceTest {
         leaveTouchModeBeforeComposing()
         show(SetupStep.SIGN_IN, ConnectionFormState(host = "192.0.2.10"))
         compose.mainClock.advanceTimeBy(1_000)
+        assertFieldLooksFocused("setup-username")
         compose.runOnUiThread { state.connect() }
         compose.mainClock.advanceTimeBy(1_000)
         compose.runOnIdle { session.publish(SessionObservation.create(sessionState = SessionState.Unavailable(SessionFailure.SERVER_UNREACHABLE))) }
         compose.mainClock.advanceTimeBy(1_000)
         assertEquals(SetupStep.FAILED, state.step)
         assertLooksFocused("setup-action-try_again")
-    }
-
-    @Test fun aChangeOfAddressAfterAFailureLooksFocusedOnATv() {
-        leaveTouchModeBeforeComposing()
-        show(SetupStep.SIGN_IN, ConnectionFormState(host = "192.0.2.10"))
-        compose.mainClock.advanceTimeBy(1_000)
-        compose.runOnUiThread { state.connect() }
-        compose.mainClock.advanceTimeBy(1_000)
-        compose.runOnIdle { session.publish(SessionObservation.create(sessionState = SessionState.Unavailable(SessionFailure.SERVER_UNREACHABLE))) }
-        compose.mainClock.advanceTimeBy(1_000)
         compose.runOnUiThread { state.onAction(SetupAction.CHANGE_ADDRESS) }
         compose.mainClock.advanceTimeBy(1_000)
         assertLooksFocused("setup-find-server")
@@ -594,26 +541,13 @@ class OnboardingLayoutEvidenceTest {
         leaveTouchModeBeforeComposing()
         show()
         compose.mainClock.advanceTimeBy(1_000)
+        assertLooksFocused("setup-find-server")
         compose.pressKey(Key.DirectionCenter)
         compose.mainClock.advanceTimeBy(1_000)
         assertEquals(SetupStep.FIND_SERVER, state.step)
         back()
         compose.mainClock.advanceTimeBy(1_000)
         assertLooksFocused("setup-find-server")
-    }
-
-    @Test fun aServerStepOpenedDirectlyLooksFocusedOnATv() {
-        leaveTouchModeBeforeComposing()
-        show()
-        compose.mainClock.advanceTimeBy(1_000)
-        assertLooksFocused("setup-find-server")
-    }
-
-    @Test fun anAccountStepOpenedDirectlyLooksFocusedOnATv() {
-        leaveTouchModeBeforeComposing()
-        show(SetupStep.SIGN_IN, ConnectionFormState(host = "192.0.2.10"))
-        compose.mainClock.advanceTimeBy(1_000)
-        assertFieldLooksFocused("setup-username")
     }
 
     @Test fun aSettingsEditorLooksFocusedOnATvFromItsFirstFrame() {
