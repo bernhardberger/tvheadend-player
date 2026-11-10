@@ -23,9 +23,11 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performKeyPress
 import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.input.key.Key
@@ -59,6 +61,7 @@ import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
+import at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
@@ -77,6 +80,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.CoroutineDispatcher
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -195,7 +200,14 @@ class GuidePlayerReturnFocusTest {
     }
 
     @Test fun genreEntryWithoutPlayerReturnWinsOverUnsettledPreferredChannelCoverage() {
-        guide(null, genreRequest = at.bernhardberger.tvhplayer.core.ProgrammeCategory.SPORT, settledCoverage = false)
+        val acquisition = StandardTestDispatcher()
+        val session = guide(null, genreRequest = at.bernhardberger.tvhplayer.core.ProgrammeCategory.SPORT,
+            settledCoverage = false, coverageContext = acquisition)
+        focused("Channel 2 hour 0")
+        assertEquals(0, session.calls.count { it == FakeSessionCall.EPG_ACQUIRE_COVERAGE_BATCH })
+        acquisition.scheduler.runCurrent()
+        compose.waitForIdle()
+        assertTrue(session.calls.any { it == FakeSessionCall.EPG_ACQUIRE_COVERAGE_BATCH })
         focused("Channel 2 hour 0")
         compose.runOnIdle { assertEquals(0, playRequests) }
     }
@@ -373,7 +385,8 @@ class GuidePlayerReturnFocusTest {
 
     private fun guide(request: PlayerReturnFocus?, channelsLoaded: Boolean = true, offline: Boolean = false,
         genreRequest: at.bernhardberger.tvhplayer.core.ProgrammeCategory? = null,
-        settledCoverage: Boolean = true, upcomingSport: Boolean = false): FakeTvheadendSession {
+        settledCoverage: Boolean = true, upcomingSport: Boolean = false,
+        coverageContext: CoroutineDispatcher = Dispatchers.Default): FakeTvheadendSession {
         val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<Application>()
         val session = FakeTvheadendSession(observation(channelsLoaded, offline, settledCoverage, upcomingSport))
         val settings = PlayerSettingsStore(preferences())
@@ -400,6 +413,7 @@ class GuidePlayerReturnFocusTest {
             NoticeContext(profiles.configurationGeneration.value, session.observation.value.currentSession?.generationIdentity)
         }
         compose.setContentWithBrowsePreparation {
+            CompositionLocalProvider(LocalGuideCoverageAcquisitionContext provides coverageContext) {
             org.koin.compose.KoinIsolatedContext(settingsApplication) {
             TVHeadendPlayerTheme {
                 back = requireNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
@@ -419,6 +433,7 @@ class GuidePlayerReturnFocusTest {
                 )
                 }
             }
+        }
         }
         }
         compose.waitForIdle()
