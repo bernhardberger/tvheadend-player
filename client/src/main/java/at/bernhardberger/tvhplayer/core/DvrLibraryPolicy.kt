@@ -59,7 +59,7 @@ data class DvrArchiveFolder(
 
     fun folderAt(targetPath: List<String>): DvrArchiveFolder? {
         if (targetPath.isEmpty()) return this
-        val child = folders.firstOrNull { it.name == targetPath.first() } ?: return null
+        val child = folders.firstOrNull { it.path.lastOrNull() == targetPath.first() } ?: return null
         return child.folderAt(targetPath.drop(1))
     }
 }

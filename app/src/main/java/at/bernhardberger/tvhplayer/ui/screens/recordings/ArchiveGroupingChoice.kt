@@ -85,7 +85,7 @@ internal fun ArchiveGroupingButton(
                     Key.DirectionRight -> ({})
                     else -> return@onPreviewKeyEvent false
                 }
-                if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) move?.invoke()
+                if (event.type == KeyEventType.KeyUp && !event.nativeKeyEvent.isCanceled) move?.invoke()
                 true
             }
             .testTag("recordings-grouping-button"),

@@ -20,8 +20,8 @@ enum class DvrArchiveGrouping {
 }
 
 /**
- * Names the app supplies for the virtual groupings. A null name means the entry has no channel
- * (or no genre) and goes to the one group labeled [noChannel] (or [noGenre]), listed last.
+ * Display names for virtual groupings. Missing channel IDs/categories go to the group labeled
+ * [noChannel]/[noGenre], listed last. Names never determine group identity.
  */
 class DvrArchiveNaming(
     val channelName: (DvrEntry) -> String?,
@@ -33,8 +33,8 @@ class DvrArchiveNaming(
 
 /**
  * Folders keeps the server's tree. Channels and Genres give a root with one virtual folder per
- * group (recordings newest first inside, group path equal to its name so [DvrArchiveFolder.folderAt]
- * resolves it); None gives a root holding every recording newest first.
+ * group (recordings newest first inside, stable IDs in paths, display-only names); None gives a
+ * root holding every recording newest first.
  */
 fun buildDvrArchive(
     entries: List<DvrEntry>,
@@ -65,8 +65,8 @@ fun buildDvrArchive(
             offersRecordingNow = false)
     }
     val lastGroup = when (grouping) {
-        DvrArchiveGrouping.CHANNELS -> naming.noChannel
-        DvrArchiveGrouping.GENRES -> naming.noGenre
+        DvrArchiveGrouping.CHANNELS -> "channel:unassigned"
+        DvrArchiveGrouping.GENRES -> "genre:unassigned"
         else -> null
     }
     return if (sort == DvrArchiveSort.NEWEST) tree else tree.arranged(sort, lastGroup)
@@ -91,7 +91,7 @@ enum class DvrArchiveSort {
 
 /**
  * Re-sorts every level of the tree. Ties are broken by the newest start and recordings without a
- * known title or size come last; the group named [lastGroup] (the catch-all) stays after the rest.
+ * known title or size come last; the group identified by [lastGroup] (the catch-all) stays last.
  */
 private fun DvrArchiveFolder.arranged(sort: DvrArchiveSort, lastGroup: String?): DvrArchiveFolder {
     val collator = Collator.getInstance().apply { strength = Collator.SECONDARY }
@@ -100,7 +100,7 @@ private fun DvrArchiveFolder.arranged(sort: DvrArchiveSort, lastGroup: String?):
     val groupOrder = archiveGroupOrder(sort, collator)
     fun DvrArchiveFolder.sorted(): DvrArchiveFolder = copy(
         folders = folders.map { it.sorted() }
-            .sortedWith(compareBy<DvrArchiveFolder> { lastGroup != null && it.name == lastGroup && path.isEmpty() }
+            .sortedWith(compareBy<DvrArchiveFolder> { lastGroup != null && it.path == listOf(lastGroup) }
                 .then(groupOrder)),
         recordings = recordings.sortedWith(recordingOrder),
     )
@@ -145,21 +145,28 @@ private fun virtualGroups(
     channelLogo: Boolean = false,
     genreCategory: Boolean = false,
 ): DvrArchiveFolder {
-    val named = entries.groupBy { nameOf(it)?.takeIf(String::isNotBlank) }
+    val prefix = if (channelLogo) "channel" else "genre"
+    val unassigned = "$prefix:unassigned"
+    val named = entries.groupBy { entry ->
+        val identity = if (channelLogo) entry.channelId?.value else programmeCategory(entry.contentGenre)?.name
+        if (identity == null) unassigned else "$prefix:$identity"
+    }
     // Only a named channel group carries its channel (the row draws its logo); every other group keeps the folder icon.
-    fun folder(name: String, members: List<DvrEntry>, named: Boolean) = DvrArchiveFolder(
-        name = name,
-        path = listOf(name),
+    fun folder(identity: String, members: List<DvrEntry>) = DvrArchiveFolder(
+        name = if (identity == unassigned) unnamed
+            else members.firstNotNullOfOrNull { nameOf(it)?.takeIf(String::isNotBlank) } ?: unnamed,
+        path = listOf(identity),
         folders = emptyList(),
         recordings = members.newestFirst(),
-        channelId = if (named && channelLogo) members.firstNotNullOfOrNull { it.channelId } else null,
-        genreCategory = if (named && genreCategory) programmeCategory(members.first().contentGenre) else null,
+        channelId = if (identity != unassigned && channelLogo) members.first().channelId else null,
+        genreCategory = if (identity != unassigned && genreCategory)
+            programmeCategory(members.first().contentGenre) else null,
     )
-    val groups = named.filterKeys { it != null }.map { (name, members) ->
-        folder(checkNotNull(name), members, named = true)
+    val groups = named.filterKeys { it != unassigned }.map { (identity, members) ->
+        folder(identity, members)
     }
         .sortedWith(order)
-    val rest = named[null]?.let { folder(unnamed, it, named = false) }
+    val rest = named[unassigned]?.let { folder(unassigned, it) }
     return DvrArchiveFolder("", emptyList(), groups + listOfNotNull(rest), emptyList())
 }
 

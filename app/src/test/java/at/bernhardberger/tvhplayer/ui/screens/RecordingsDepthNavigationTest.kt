@@ -18,6 +18,22 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class RecordingsDepthNavigationTest {
+    @Test fun virtualGroupPathsRoundTripWithoutDisplayLabelsBecomingLevels() {
+        val entries = listOf("News", "News", "No channel", "News/Local", null).mapIndexed { index, name ->
+            DvrEntry.create(DvrEntryId(index.toLong() + 1), state = DvrEntryState.COMPLETED,
+                channelId = name?.let { at.bernhardberger.tvheadend.sdk.core.ChannelId(index.toLong() + 1) }, channelName = name)
+        }
+        val naming = at.bernhardberger.tvhplayer.core.DvrArchiveNaming(
+            { it.channelName }, { null }, { null }, "No channel", "No genre",
+        )
+        val root = buildDvrArchive(entries, at.bernhardberger.tvhplayer.core.DvrArchiveGrouping.CHANNELS, naming)
+        assertEquals(entries.size, root.folders.size)
+        root.folders.forEach { folder ->
+            val id = archiveLevelId(folder.path)
+            assertEquals(folder.path, at.bernhardberger.tvhplayer.ui.screens.recordings.archiveLevelPath(id))
+            assertEquals(folder.recordings.map { "recording:${it.id.value}" }, archiveLevelItems(root, id)?.map { it.key })
+        }
+    }
     @Test fun removedDeepBranchPopsToNearestAncestorAndRetainsItsViewport() {
         val parent = DvrArchiveFolder("Series", listOf("Series"), emptyList(), listOf(entry(1), entry(2)))
         val root = DvrArchiveFolder("", emptyList(), listOf(parent), emptyList())

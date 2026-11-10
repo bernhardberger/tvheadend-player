@@ -63,6 +63,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -434,25 +435,13 @@ internal fun RecordingsScreenContent(
         detailsObservation = current
     }
 
-    var chosenView by remember(view) { mutableStateOf(view) }
+    var pendingView by rememberPendingArchiveView(view)
+    val chosenView = pendingView ?: view
     val chosenGrouping = chosenView.grouping
     var groupChoiceOpen by remember { mutableStateOf(false) }
     var requestPillFocus by remember { mutableStateOf(false) }
     val pillFocus = remember { FocusRequester() }
-    val noChannelLabel = stringResource(R.string.recordings_group_no_channel)
-    val noGenreLabel = stringResource(R.string.recordings_group_no_genre)
-    val resources = LocalContext.current.resources
-    val naming = remember(channelsById, resources, noChannelLabel, noGenreLabel) {
-        DvrArchiveNaming(
-            channelName = { entry -> entry.channelId?.let(channelsById::get)?.name ?: entry.channelName },
-            channelNumber = { entry -> entry.channelId?.let(channelsById::get)?.number?.toInt() },
-            genreName = { entry ->
-                programmeCategory(entry.contentGenre)?.let { resources.getString(programmeCategoryLabelRes(it)) }
-            },
-            noChannel = noChannelLabel,
-            noGenre = noGenreLabel,
-        )
-    }
+    val naming = rememberArchiveNaming(channelsById)
     // The watched rule is the one behind the check mark: it needs the saved position the observation offers.
     val hideWatched = chosenView.hideWatched
     fun archiveFor(presentation: RecordingLibraryPresentation): DvrArchiveFolder =
@@ -1439,7 +1428,7 @@ internal fun RecordingsScreenContent(
                             ),
                         )
                     }
-                    chosenView = choice
+                    pendingView = choice
                     onViewChange(choice)
                 }
             },
@@ -1454,3 +1443,31 @@ internal fun RecordingsScreenContent(
 
 /** Below this width the disk-space text would show little more than an ellipsis, so it hides. */
 private val RecordingSpaceMinWidth = 96.dp
+
+/** Ignore older settings echoes until the latest optimistic selection is acknowledged. */
+@Composable
+private fun rememberPendingArchiveView(view: DvrArchiveView): MutableState<DvrArchiveView?> {
+    val pending = remember { mutableStateOf<DvrArchiveView?>(null) }
+    LaunchedEffect(view, pending.value) {
+        if (pending.value == view) pending.value = null
+    }
+    return pending
+}
+
+@Composable
+private fun rememberArchiveNaming(channelsById: Map<ChannelId, Channel>): DvrArchiveNaming {
+    val noChannelLabel = stringResource(R.string.recordings_group_no_channel)
+    val noGenreLabel = stringResource(R.string.recordings_group_no_genre)
+    val resources = LocalContext.current.resources
+    return remember(channelsById, resources, noChannelLabel, noGenreLabel) {
+        DvrArchiveNaming(
+            channelName = { entry -> entry.channelId?.let(channelsById::get)?.name ?: entry.channelName },
+            channelNumber = { entry -> entry.channelId?.let(channelsById::get)?.number?.toInt() },
+            genreName = { entry ->
+                programmeCategory(entry.contentGenre)?.let { resources.getString(programmeCategoryLabelRes(it)) }
+            },
+            noChannel = noChannelLabel,
+            noGenre = noGenreLabel,
+        )
+    }
+}

@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
@@ -94,7 +95,7 @@ class RecordingsVisualLayoutTest {
     private val screenShown = mutableStateOf(true)
     private val endPaddingState = mutableStateOf<Dp?>(null)
     private val connectionState = mutableStateOf<ConnectionUiState>(ConnectionUiState.Ready)
-    private var startView = DvrArchiveView()
+    private var startView by mutableStateOf(DvrArchiveView())
     private var nowSeconds: () -> Long = { System.currentTimeMillis() / 1000L }
     private val viewChanges = mutableListOf<DvrArchiveView>()
 
@@ -419,7 +420,21 @@ class RecordingsVisualLayoutTest {
         compose.onNodeWithText("Archive").assertIsFocused()
         key(Key.DirectionDown)
         focused(GROUPING_PILL)
-        key(Key.DirectionDown)
+        fun nativeDown(action: Int, repeat: Int = 0, flags: Int = 0) {
+            compose.onRoot().performKeyPress(androidx.compose.ui.input.key.KeyEvent(
+                android.view.KeyEvent(0L, 0L, action, android.view.KeyEvent.KEYCODE_DPAD_DOWN, repeat, 0,
+                    android.view.KeyCharacterMap.VIRTUAL_KEYBOARD, 0, flags),
+            ))
+            compose.waitForIdle()
+        }
+        nativeDown(android.view.KeyEvent.ACTION_DOWN)
+        nativeDown(android.view.KeyEvent.ACTION_DOWN, repeat = 1)
+        nativeDown(android.view.KeyEvent.ACTION_DOWN, repeat = 2)
+        focused(GROUPING_PILL)
+        nativeDown(android.view.KeyEvent.ACTION_UP, flags = android.view.KeyEvent.FLAG_CANCELED)
+        focused(GROUPING_PILL)
+        nativeDown(android.view.KeyEvent.ACTION_DOWN)
+        nativeDown(android.view.KeyEvent.ACTION_UP)
         focused("recordings-folder-Documentaries")
         // Inside a folder there is no pill, and the way up to the tabs is as it was.
         key(Key.DirectionRight)
@@ -433,7 +448,8 @@ class RecordingsVisualLayoutTest {
     @Test @Config(qualifiers = "fr-w960dp-h540dp-land-mdpi")
     fun theRootHeadingEndsBeforeTheViewOptionsButton() {
         show(scale = 2f)
-        compose.waitUntil(10_000) { compose.onAllNodesWithTag(GROUPING_PILL).fetchSemanticsNodes().isNotEmpty() }
+        compose.mainClock.advanceTimeUntil { compose.onAllNodesWithTag(GROUPING_PILL).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitForIdle()
         // The preview column carries the first folder's heading; the root's is the one left-most.
         val headings = compose.onAllNodesWithTag("archive-level-heading", useUnmergedTree = true)
         val root = (0 until headings.fetchSemanticsNodes().size).map { headings[it] }
@@ -497,15 +513,26 @@ class RecordingsVisualLayoutTest {
         focused("recordings-view-sort")
         key(Key.DirectionRight)
         focused("recordings-sort-option-newest")
+        key(Key.DirectionDown)
+        key(Key.DirectionCenter)
+        focused("recordings-sort-option-name")
+        // Persisted settings can acknowledge Channels after the viewer has already chosen Name.
+        compose.runOnIdle { startView = DvrArchiveView(grouping = DvrArchiveGrouping.CHANNELS) }
+        compose.onNodeWithTag("recordings-sort-option-name").assertIsSelected()
         key(Key.Back)
-        gone("recordings-sort-option-newest")
+        gone("recordings-sort-option-name")
         focused("recordings-view-sort")
+        key(Key.DirectionDown)
+        key(Key.DirectionCenter)
+        val latest = DvrArchiveView(DvrArchiveGrouping.CHANNELS, DvrArchiveSort.NAME, true)
+        compose.runOnIdle { assertEquals(latest, viewChanges.last()); startView = latest }
+        focused("recordings-hide-watched")
+        compose.runOnIdle { startView = latest.copy(hideWatched = false) }
+        compose.onNodeWithTag("recordings-hide-watched").assertIsOff()
         key(Key.DirectionLeft)
         gone("recordings-grouping-panel")
         focused(GROUPING_PILL)
         compose.onNodeWithTag("recordings-folder-Documentaries").assertDoesNotExist()
-        key(Key.DirectionDown)
-        focused("recordings-folder-Ridge Earth HD")
         assertNoCommands()
     }
 
@@ -539,6 +566,7 @@ class RecordingsVisualLayoutTest {
         startView = DvrArchiveView(grouping = DvrArchiveGrouping.NONE)
         show(entries = listOf(
             recording(1, "Bravo", "b.ts"), recording(2, "Alpha", "a.ts", playCount = 1), recording(3, "Charlie", "c.ts"),
+            recording(4, "Zulu", "Zulu/z.ts"),
         ))
         focused("recording-list-entry-1")
         compose.onAllNodesWithTag("archive-date-divider", useUnmergedTree = true).fetchSemanticsNodes().let {
@@ -571,6 +599,17 @@ class RecordingsVisualLayoutTest {
         compose.onNodeWithTag("recording-list-entry-2").assertDoesNotExist()
         assertTrue(bounds("recording-list-entry-1").top < bounds("recording-list-entry-3").top)
         assertTrue(compose.onAllNodesWithTag("archive-date-divider", useUnmergedTree = true).fetchSemanticsNodes().isEmpty())
+        key(Key.DirectionCenter)
+        focused("recordings-view-group")
+        key(Key.DirectionCenter)
+        focused("recordings-grouping-option-none")
+        repeat(3) { key(Key.DirectionUp) }
+        key(Key.DirectionCenter)
+        key(Key.Back)
+        key(Key.Back)
+        gone("recordings-grouping-panel")
+        // Group rows precede loose recordings, even when the recording's title sorts before the group's.
+        assertTrue(bounds("recordings-folder-Zulu").top < bounds("recording-list-entry-1").top)
         assertNoCommands()
     }
 
@@ -578,9 +617,10 @@ class RecordingsVisualLayoutTest {
         startView = DvrArchiveView(hideWatched = true)
         // Recording 1 carries a saved position in the fixture (partly watched), so these two start at 2.
         show(entries = listOf(recording(2, "Alpha", "a.ts", playCount = 1), recording(3, "Bravo", "b.ts", playCount = 2)))
-        compose.waitUntil(10_000) {
+        compose.mainClock.advanceTimeUntil {
             compose.onAllNodes(hasText("Archive") and isFocused()).fetchSemanticsNodes().isNotEmpty()
         }
+        compose.waitForIdle()
         compose.onNodeWithText("Everything here is watched.").assertIsDisplayed()
         compose.onNodeWithText("Turn off Hide watched in View options.").assertIsDisplayed()
         compose.onNodeWithText("Archive").assertIsFocused()
@@ -674,7 +714,7 @@ class RecordingsVisualLayoutTest {
         compose.mainClock.advanceTimeBy(1_500)
         capture("5-genres-root", 1f, outputs = out)
         repeat(4) { key(Key.DirectionDown) }
-        focused("recordings-folder-Children")
+        focused("recordings-folder-genre:CHILDREN")
         compose.mainClock.advanceTimeBy(1_500)
         capture("5b-genres-children-focused", 1f, outputs = out)
         toPill()
@@ -1872,15 +1912,17 @@ class RecordingsVisualLayoutTest {
     }
 
     private fun focused(tag: String) {
-        compose.waitUntil(10_000) {
+        compose.mainClock.advanceTimeUntil {
             compose.onAllNodes(hasTestTag(tag) and isFocused()).fetchSemanticsNodes().isNotEmpty()
         }
+        compose.waitForIdle()
         compose.onNodeWithTag(tag).assertIsFocused().assertIsDisplayed()
     }
 
     /** Waits for a panel page to finish leaving: its fade keeps it composed for a moment. */
-    private fun gone(tag: String) = compose.waitUntil(10_000) {
-        compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isEmpty()
+    private fun gone(tag: String) {
+        compose.mainClock.advanceTimeUntil { compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isEmpty() }
+        compose.waitForIdle()
     }
 
     private fun bounds(tag: String): Rect = compose.onNodeWithTag(tag, useUnmergedTree = true)
