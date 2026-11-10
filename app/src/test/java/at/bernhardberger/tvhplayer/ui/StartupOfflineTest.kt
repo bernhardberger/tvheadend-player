@@ -67,6 +67,7 @@ import at.bernhardberger.tvhplayer.stores.ChannelAccentStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.GuidePositionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
+import at.bernhardberger.tvhplayer.testutil.awaitScheduledWork
 import at.bernhardberger.tvhplayer.ui.player.LivePlayerServerWaitTag
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
@@ -84,6 +85,7 @@ import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -112,6 +114,7 @@ class StartupOfflineTest {
     @get:Rule val compose = createComposeRule()
     private val context = ApplicationProvider.getApplicationContext<Application>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val profileDispatcher = StandardTestDispatcher()
     private val catalog = ChannelCatalog.create((1..3L).map { Channel.create(ChannelId(it), name = "Name $it", number = it) })
     private lateinit var player: ExoPlayer
     private lateinit var session: FakeTvheadendSession
@@ -136,7 +139,7 @@ class StartupOfflineTest {
 
         session.publish(ready(catalog))
         settle()
-        compose.waitUntil(10_000) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1)) }
+        compose.awaitScheduledWork(profileDispatcher) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1)) }
         settle()
         assertEquals(1, binds())
         assertEquals(0, compose.onAllNodes(hasTestTag(LivePlayerServerWaitTag), useUnmergedTree = true).fetchSemanticsNodes().size)
@@ -208,7 +211,7 @@ class StartupOfflineTest {
         confirmRow(3)
         session.publish(ready(catalog))
         settle()
-        compose.waitUntil(10_000) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(3)) }
+        compose.awaitScheduledWork(profileDispatcher) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(3)) }
         settle()
         assertEquals(1, binds())
     }
@@ -345,7 +348,7 @@ class StartupOfflineTest {
     @Test fun okWithAReadySessionStartsThatChannelAndBackLeavesItPlaying() {
         app(ready(catalog))
         confirmRow(2, awaitWait = false)
-        compose.waitUntil(10_000) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(2)) }
+        compose.awaitScheduledWork(profileDispatcher) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(2)) }
         settle()
         assertEquals(1, binds())
         assertEquals(0, compose.onAllNodes(hasTestTag(LivePlayerServerWaitTag), useUnmergedTree = true).fetchSemanticsNodes().size)
@@ -360,7 +363,7 @@ class StartupOfflineTest {
     @Test fun aServerRestartWhileBrowsingRetunesTheWarmChannelOnce() {
         app(ready(catalog))
         confirmRow(2, awaitWait = false)
-        compose.waitUntil(10_000) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(2)) }
+        compose.awaitScheduledWork(profileDispatcher) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(2)) }
         settle()
         key(Key.Back)
         settle()
@@ -371,7 +374,7 @@ class StartupOfflineTest {
         settle()
         session.publish(ready(catalog))
         settle()
-        compose.waitUntil(10_000) { binds() == 2 }
+        compose.awaitScheduledWork(profileDispatcher) { binds() == 2 && runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(2)) }
         settle()
         assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
         // Returning to the player adopts the retuned channel.
@@ -385,7 +388,7 @@ class StartupOfflineTest {
     @Test fun reopeningThePlayerAsTheServerReturnsStillRetunesTheWarmChannelOnce() {
         app(ready(catalog))
         confirmRow(2, awaitWait = false)
-        compose.waitUntil(10_000) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(2)) }
+        compose.awaitScheduledWork(profileDispatcher) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(2)) }
         settle()
         key(Key.Back)
         settle()
@@ -405,7 +408,7 @@ class StartupOfflineTest {
         playerData.readGate = null
         gate.complete(Unit)
         settle()
-        compose.waitUntil(10_000) { binds() == 2 }
+        compose.awaitScheduledWork(profileDispatcher) { binds() == 2 && runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(2)) }
         settle()
         assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
         assertEquals(2, binds())
@@ -424,7 +427,7 @@ class StartupOfflineTest {
         assertTrue(description, description.contains("2 Name 2"))
         session.publish(ready(catalog))
         settle()
-        compose.waitUntil(10_000) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(2)) }
+        compose.awaitScheduledWork(profileDispatcher) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(2)) }
         settle()
         assertEquals(1, binds())
         // One Back leaves the one player.
@@ -441,11 +444,14 @@ class StartupOfflineTest {
         compose.onAllNodes(hasTestTag("main-startup-status"), useUnmergedTree = true).fetchSemanticsNodes().size
 
     /** Both clocks: frames, and the Handler clock startup's deadlines use. */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     private fun advance(millis: Long) {
         repeat((millis / 50).toInt()) {
+            profileDispatcher.scheduler.runCurrent()
             shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(50))
             compose.mainClock.advanceTimeBy(50)
         }
+        // Dispatchers.Default browse preparation remains real; this idle only drains UI work.
         compose.waitForIdle()
     }
 
@@ -456,11 +462,13 @@ class StartupOfflineTest {
 
     /** Home is the landing destination; these journeys browse the channel rows. */
     private fun openChannels() {
+        // Home's Dispatchers.Default browse preparation must finish before it exposes the rail.
         compose.waitUntil(15_000) {
             compose.onAllNodes(hasTestTag("nav-channels")).fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithTag("nav-channels")
             .performSemanticsAction(SemanticsActions.OnClick)
+        // Channel preparation still runs on Dispatchers.Default, outside Compose's idle tracking.
         compose.waitForIdle()
     }
 
@@ -493,9 +501,12 @@ class StartupOfflineTest {
         compose.waitForIdle()
     }
 
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     private fun settle() {
         repeat(10) {
+            profileDispatcher.scheduler.runCurrent()
             compose.mainClock.advanceTimeBy(100)
+            // Dispatchers.Default browse preparation remains real; this idle only drains UI work.
             compose.waitForIdle()
         }
     }
@@ -523,7 +534,7 @@ class StartupOfflineTest {
         val data = InMemoryData().also { playerData = it }
         val settings = PlayerSettingsStore(data)
         val profiles = AppProfileOwner(session, FakeServerProfileStore(profile),
-            settings, Dispatchers.IO, readProfileForEditing = { ServerProfileEditReadResult.Missing })
+            settings, profileDispatcher, readProfileForEditing = { ServerProfileEditReadResult.Missing })
         scope.launch { profiles.run() }
         player = ExoPlayer.Builder(context).build()
         val coordinator = createTvheadendPlaybackCoordinator(player).also { it.launchIn(scope) }
@@ -571,6 +582,7 @@ class StartupOfflineTest {
         }
         if (!awaitRows) return
         openChannels()
+        // Dispatchers.Default's serial browse-preparation lane builds the channel rows.
         compose.waitUntil(15_000) {
             compose.onAllNodes(hasTestTag("channel-row-1")).fetchSemanticsNodes().isNotEmpty()
         }
