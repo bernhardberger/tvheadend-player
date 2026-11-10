@@ -175,6 +175,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CoroutineDispatcher
 import org.junit.After
 import org.junit.Before
 import org.junit.Assert.assertEquals
@@ -1655,7 +1656,7 @@ class LivePlayerChromeScreenTest {
         }
         val settingsData = GatedPreferences()
         try {
-            screen(opener = opener, settingsData = settingsData)
+            screen(opener = opener, settingsData = settingsData, workDispatcher = subscriptionDispatcher)
             val now = System.currentTimeMillis() / 1_000L
             val events = (1..2L).flatMap { channel -> listOf(
                 EpgEvent.create(EventId(channel * 10), ChannelId(channel), Instant.fromEpochSeconds(now - 2_700),
@@ -1716,9 +1717,10 @@ class LivePlayerChromeScreenTest {
             startLiveSubscription(connection, 720, 0)
             playerReady()
             assertMainSettled("the driven player reports Playing") { runtime.state.value is AppPlaybackState.Playing }
-            // Forced READY is not the SDK's grant publication. Drive the bind handoff and wait
-            // for that observation before sampling; the new subscription has no timing status.
-            compose.mainClock.advanceTimeUntil {
+            // The source worker resumes after the gated opener on subscriptionDispatcher.
+            // Media3 can still bind when its real playback thread creates the period, so wait
+            // for the grant signal without advancing Compose or coroutine virtual time.
+            compose.waitUntil(5_000) {
                 grantDispatcher.scheduler.runCurrent()
                 idleMainLooper()
                 (runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)
@@ -2643,6 +2645,7 @@ class LivePlayerChromeScreenTest {
         acceptStartupOutcome: () -> Boolean = { true },
         onStartupOutcome: (MainStartupPlaybackOutcome) -> Unit = {},
         scheduleCompletion: CompletableDeferred<Unit>? = null,
+        workDispatcher: CoroutineDispatcher = Dispatchers.IO,
     ) {
         val now = System.currentTimeMillis() / 1_000L
         session = FakeTvheadendSession(observation(now, if (!epg) emptyList() else listOf(
@@ -2680,7 +2683,7 @@ class LivePlayerChromeScreenTest {
         models.put("channels", channels)
         assertMainSettled("the fake channel catalog is collected") { channels.scope.value.scope.visibleChannels.size == if (missingRequestedChannel) 2 else 3 }
         player = ExoPlayer.Builder(context).build()
-        val coordinator = createTvheadendPlaybackCoordinator(player).also { it.launchIn(scope) }
+        val coordinator = createTvheadendPlaybackCoordinator(player, workDispatcher = workDispatcher).also { it.launchIn(scope) }
         val base = player
         val controlled = object : ExoPlayer by base {
             override fun getPlaybackState(): Int = if (forcedReady) Player.STATE_READY else base.playbackState
