@@ -98,6 +98,7 @@ class RecordingConfirmationStateTest {
                     dvrMutationActions = actions, notices = notices)
             }
         }
+        // Browse preparation runs on Dispatchers.Default, outside the Compose clock.
         compose.waitUntil(10_000) {
             compose.onAllNodesWithTag("recording-list-entry-1").fetchSemanticsNodes().isNotEmpty()
         }
@@ -152,8 +153,11 @@ class RecordingConfirmationStateTest {
         compose.onNodeWithTag("recording-confirmation-back").assertIsFocused()
         compose.onNodeWithTag("recording-confirmation-confirm").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
-        // The list without the recording is prepared off the main thread, which waitForIdle does not wait for.
-        compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("recording-list-entry-1")).fetchSemanticsNodes().isEmpty() }
+        // Dispatchers.Default prepares the new list; removal alone does not prove the focus handoff.
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(hasTestTag("recording-list-entry-1")).fetchSemanticsNodes().isEmpty() &&
+                compose.onAllNodes(hasTestTag("recording-list-entry-2") and isFocused()).fetchSemanticsNodes().isNotEmpty()
+        }
         compose.onNodeWithTag("recording-list-entry-2").assertIsFocused()
         compose.runOnIdle { assertEquals(1, calls) }
     }
@@ -211,8 +215,12 @@ class RecordingConfirmationStateTest {
             compose.onNodeWithTag("recording-confirmation-back").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
             compose.onNodeWithTag("recording-confirmation-confirm").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
         }
-        // The archive without the folder is prepared off the main thread, which waitForIdle does not wait for.
-        compose.waitUntil(10_000) { state.archivePath == if (emptyRoot) emptyList<String>() else listOf("Series") }
+        // Dispatchers.Default prepares the archive; wait for the focus handoff as well as its new path.
+        val returnTarget = hasText(if (emptyRoot) "Archive" else if (source == "menu") "Before" else "Next") and hasClickAction()
+        compose.waitUntil(10_000) {
+            state.archivePath == (if (emptyRoot) emptyList<String>() else listOf("Series")) &&
+                compose.onAllNodes(returnTarget and isFocused()).fetchSemanticsNodes().isNotEmpty()
+        }
         compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
         compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
         if (emptyRoot) {

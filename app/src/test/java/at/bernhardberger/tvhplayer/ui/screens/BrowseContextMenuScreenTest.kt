@@ -1419,6 +1419,7 @@ class BrowseContextMenuScreenTest {
         }
         if (firstLeg) compose.setContent { screenContent.value?.invoke() }
         compose.waitForIdle()
+        // Browse preparation runs on Dispatchers.Default, outside the Compose clock.
         compose.waitUntil(10_000) {
             compose.onAllNodesWithTag(if (guideDetails) "details-watch" else if (guideMenu) "browse-context-menu" else if (recordings) "recording-list-entry-1" else "channel-row-1").fetchSemanticsNodes().isNotEmpty()
         }

@@ -92,6 +92,7 @@ class ChannelsPlayerReturnFocusTest {
 
     private fun assertRowFocused(id: Int) {
         val row = hasTestTag("channel-row-$id")
+        // Browse preparation runs on Dispatchers.Default, outside the Compose clock.
         compose.waitUntil(10_000) {
             compose.onAllNodes(row and isFocused()).fetchSemanticsNodes().isNotEmpty()
         }

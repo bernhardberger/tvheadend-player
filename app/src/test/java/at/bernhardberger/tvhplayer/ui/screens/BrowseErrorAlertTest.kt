@@ -287,6 +287,7 @@ class BrowseErrorAlertTest {
     }
 
     private fun awaitFocus(tag: String) {
+        // Restoring browse focus can await preparation on Dispatchers.Default.
         compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag(tag) and isFocused()).fetchSemanticsNodes().isNotEmpty() }
     }
 

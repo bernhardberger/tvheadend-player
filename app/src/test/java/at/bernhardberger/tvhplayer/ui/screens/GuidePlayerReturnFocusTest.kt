@@ -319,6 +319,7 @@ class GuidePlayerReturnFocusTest {
     }
 
     private fun focused(title: String) {
+        // Guide preparation/frontier searches run on Dispatchers.Default, outside the Compose clock.
         runCatching { compose.waitUntil(10_000) { compose.onAllNodes(hasText(title) and isFocused()).fetchSemanticsNodes().isNotEmpty() } }
             .onFailure {
                 val f = compose.onAllNodes(isFocused()).fetchSemanticsNodes().map { it.config.toString() }

@@ -209,6 +209,7 @@ class HomeNavigationJourneyTest {
                 fixture.settle()
             }
         }
+        // Browse preparation runs on Dispatchers.Default, outside the Compose clock.
         compose.waitUntil(15_000) {
             compose.mainClock.advanceTimeBy(50)
             compose.awaitBrowsePreparation()
@@ -320,6 +321,7 @@ class HomeNavigationJourneyTest {
 
     @Test fun realBackKeyCycleFromThePlayerReturnsToTheRecentChannelCardWithTheRailClosed() {
         // Playback is not confirmed offline, so seed what a confirmed first picture records.
+        // The real preferences DataStore performs these setup writes on its IO worker.
         runBlocking {
             val context = ApplicationProvider.getApplicationContext<Application>()
             val profileId = ServerProfileId.generate()

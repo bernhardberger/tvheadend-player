@@ -760,6 +760,7 @@ class ProgrammeDetailsPageTest {
             ArtworkId(1) to FixtureArt.picon("ridge-earth"),
             ArtworkId(2) to Bitmap.createBitmap(16, 9, Bitmap.Config.ARGB_8888).apply { eraseColor(android.graphics.Color.WHITE) })))
         show()
+        // DetailsArtColors samples on Dispatchers.Default; no test dispatcher parameter is exposed.
         compose.waitUntil(10_000) {
             at.bernhardberger.tvhplayer.images.DetailsArtColors.stored(AppArtworkSource(requireNotNull(session), ArtworkId(2))) != null
         }
@@ -853,7 +854,7 @@ class ProgrammeDetailsPageTest {
         val logoAtTop = logoTop()
         compose.onNodeWithTag("details-logo-glow", useUnmergedTree = true).assertExists()
         val background = android.graphics.Color.rgb(19, 19, 19)
-        // Baked off the main thread; the plain background shows until then.
+        // Channel accent/glow baking runs on Dispatchers.Default; the plain background shows until then.
         compose.waitUntil(10_000) { snapshot().let { it.getPixel(1910, 5).also { _ -> it.recycle() } } != background }
         val top = snapshot()
         // Lit at the top right, the page's own background toward the left.

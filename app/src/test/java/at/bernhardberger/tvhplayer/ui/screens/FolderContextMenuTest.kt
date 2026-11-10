@@ -219,6 +219,7 @@ class FolderContextMenuTest {
             }
         }
         val first = "recordings-folder-" + entries.first().folder.orEmpty().joinToString("/")
+        // Browse preparation runs on Dispatchers.Default, outside the Compose clock.
         compose.waitUntil(10_000) { compose.onAllNodesWithTag(first).fetchSemanticsNodes().isNotEmpty() }
         return session
     }

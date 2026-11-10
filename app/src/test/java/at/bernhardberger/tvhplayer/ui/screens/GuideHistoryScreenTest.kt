@@ -221,6 +221,7 @@ class GuideHistoryScreenTest {
             }
         }
         fun focused(title: String) {
+            // Guide preparation/frontier searches run on Dispatchers.Default, outside the Compose clock.
             compose.waitUntil(10_000) { compose.onAllNodes(hasText(title) and isFocused()).fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithText(title).assertIsFocused()
         }
@@ -235,6 +236,7 @@ class GuideHistoryScreenTest {
                 compose.onAllNodes(hasTestTag("guide-date-button") and isFocused()).fetchSemanticsNodes().isNotEmpty()
             }
         }
+        // Browse preparation runs on Dispatchers.Default, outside the Compose clock.
         compose.waitUntil(10_000) { compose.onAllNodes(hasText("Channel 1 hour 0")).fetchSemanticsNodes().isNotEmpty() }
         key(Key.DirectionDown)
         focused("Channel 1 hour 0")
@@ -420,6 +422,7 @@ class GuideHistoryScreenTest {
         key(Key.DirectionLeft)
         focused("Channel 1 hour -1")
         compose.runOnIdle { session.publish(observation(false)) }
+        // Replacing the guide index runs on Dispatchers.Default, outside the Compose clock.
         compose.waitUntil(10_000) { compose.onAllNodes(hasText("Channel 1 hour -1")).fetchSemanticsNodes().isEmpty() }
         dateFocused()
         key(Key.DirectionDown)
@@ -428,6 +431,7 @@ class GuideHistoryScreenTest {
         key(Key.DirectionLeft)
         focused("Channel 1 hour -1")
         compose.runOnIdle { session.replaceGeneration(observation(false)) }
+        // Replacing the guide index runs on Dispatchers.Default, outside the Compose clock.
         compose.waitUntil(10_000) { compose.onAllNodes(hasText("Channel 1 hour -1")).fetchSemanticsNodes().isEmpty() }
         dateFocused()
         key(Key.DirectionDown)

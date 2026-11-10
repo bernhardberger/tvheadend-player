@@ -408,6 +408,7 @@ class InProgressRecordingResumeTest {
             if (handoff == null) content() else PlayerEntryOverlays(handoff, playerShown = { false }, content = content)
         }
         if (fromPlayer) { compose.waitForIdle(); return starts }
+        // Browse preparation runs on Dispatchers.Default, outside the Compose clock.
         compose.waitUntil(10_000) {
             compose.onAllNodes(hasTestTag("recording-list-entry-1")).fetchSemanticsNodes().isNotEmpty()
         }

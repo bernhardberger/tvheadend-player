@@ -15,12 +15,16 @@ import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.testutil.awaitScheduledWork
 import at.bernhardberger.tvhplayer.notices.*
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.notifications.NoticeFormatter
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withContext
+import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -92,15 +96,16 @@ class ProgrammeDvrSdkAdoptionTest {
         val session = at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession(observation(state))
         val opening = session.observation.value
         val release = CompletableDeferred<Unit>()
+        val dispatcher = StandardTestDispatcher()
         var started = 0
         var cancelled = false
-        suspend fun result(): DvrMutationResult.Failed {
+        suspend fun result(): DvrMutationResult.Failed = withContext(dispatcher) {
             started++
             try { release.await() } catch (exception: kotlinx.coroutines.CancellationException) {
                 cancelled = true
                 throw exception
             }
-            return DvrMutationResult.Failed(TvheadendFailure.SERVER_REJECTED, false, null)
+            DvrMutationResult.Failed(TvheadendFailure.SERVER_REJECTED, false, null)
         }
         val actions = DvrMutationActions(scheduleEntry = { _, _ -> result() }, stopEntry = { _, _ -> result() },
             cancelEntry = { _, _ -> result() }, deleteEntry = { _, _ -> error("unexpected delete") },
@@ -121,7 +126,7 @@ class ProgrammeDvrSdkAdoptionTest {
                     showContextMenu = !details, onShowDetails = {},
                     mutations = actions, notices = notices, mutationScope = scope, mutationInFlight = inFlight,
                     onPlay = { _, _ -> }, onPlayRecording = {}, onClose = { opened = false },
-                    returnFocusRequester = origin, settingsStore = UiSettingsStore(context))
+                    returnFocusRequester = origin, settingsStore = UiSettingsStore(InMemoryPreferencesDataStore()))
             }
         }
         val actionText = when (state) {
@@ -139,17 +144,18 @@ class ProgrammeDvrSdkAdoptionTest {
             compose.waitForIdle()
         }
         compose.onNodeWithText("Origin card").assertIsFocused()
-        if (!stale) compose.waitUntil(5_000) { compose.waitForIdle(); started == 1 }
+        compose.awaitScheduledWork(dispatcher) { started == if (stale) 0 else 1 }
         assertEquals(if (stale) 0 else 1, started)
         assertFalse(cancelled)
         if (reopen) {
             compose.onNodeWithText("Origin card").performKeyInput { pressKey(Key.DirectionCenter) }
             compose.onNodeWithText("Record").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+            compose.awaitScheduledWork(dispatcher) { started == 1 }
             assertEquals(1, started)
         }
         compose.runOnIdle { release.complete(Unit) }
         compose.waitForIdle()
-        if (!stale) compose.waitUntil(5_000) { compose.waitForIdle(); notices.state.value.candidate != null }
+        if (!stale) compose.awaitScheduledWork(dispatcher) { notices.state.value.candidate != null }
         assertFalse(cancelled)
     }
 
@@ -243,6 +249,7 @@ class ProgrammeDvrSdkAdoptionTest {
 
     /** A deleted entry is no recording for the programme: Record still creates one. */
     @Test fun recordCreatesAProgrammeRecordingWhenTheOnlyEntryWasDeleted() {
+        val dispatcher = StandardTestDispatcher()
         val session = at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession(observation(deleted()))
         val opening = session.observation.value
         var scheduled = 0
@@ -251,18 +258,20 @@ class ProgrammeDvrSdkAdoptionTest {
                 ProgrammeDetailsHost(event, opening, opening, { session.observation.value }, { 2000L },
                     showContextMenu = true, onShowDetails = {},
                     mutations = DvrMutationActions(
-                        scheduleEntry = { _, _ -> scheduled++; DvrMutationResult.Confirmed(DvrEntryId(3)) },
+                        scheduleEntry = { _, _ -> withContext(dispatcher) {
+                            scheduled++; DvrMutationResult.Confirmed(DvrEntryId(3))
+                        } },
                         stopEntry = { _, _ -> error("unexpected stop") }, cancelEntry = { _, _ -> error("unexpected cancel") },
                         deleteEntry = { _, _ -> error("unexpected delete") },
                         updateWatchStateCommand = { _, _, _ -> error("Unexpected watch-state update") }),
                     notices = NoticeCenter({ 0L }) { NoticeContext(0, opening.currentSession?.generationIdentity) },
                     mutationScope = rememberCoroutineScope(), mutationInFlight = remember { mutableStateOf(null) },
                     onPlay = { _, _ -> }, onPlayRecording = {}, onClose = {},
-                    settingsStore = UiSettingsStore(context))
+                    settingsStore = UiSettingsStore(InMemoryPreferencesDataStore()))
             }
         }
         compose.onNodeWithText("Record").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.waitUntil(5_000) { compose.waitForIdle(); scheduled == 1 }
+        compose.awaitScheduledWork(dispatcher) { scheduled == 1 }
     }
 
     @Test fun rejectedServerMessageReachesNoticeWithoutEnteringDiagnostics() = rejected("No free adapter")
