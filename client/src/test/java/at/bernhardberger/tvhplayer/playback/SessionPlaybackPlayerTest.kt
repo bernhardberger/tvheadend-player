@@ -1180,6 +1180,27 @@ class SessionPlaybackPlayerTest {
     }
 
     @Test fun aChannelThatFailsAfterTheRecordingStoppedLeavesNoTargetBehind() = exercise {
+        val initial = session.observation.value
+        val requested = liveSelection()
+        for (noSession in listOf(false, true)) {
+            session.publish(if (noSession) SessionObservation.create() else SessionObservation.create(
+                sessionState = initial.sessionState,
+                channelState = ChannelRepositoryState.Current(ChannelCatalog.create(emptyList())),
+                epgState = initial.epgState,
+                dvrState = initial.dvrState,
+            ))
+            val unavailable = runtime.playLive(requested)
+            val expected = if (noSession) PlaybackTargetResult.NOT_READY else PlaybackTargetResult.TARGET_UNAVAILABLE
+            assertEquals(expected, unavailable)
+            assertTrue(runtime.state.value is AppPlaybackState.Failed)
+            val failure = runtime.state.value as AppPlaybackState.Failed
+            assertEquals(expected, failure.targetResult)
+            assertEquals(AppPlaybackFailureReason.OTHER, failure.reason)
+            assertEquals(AppPlaybackTarget.Live(ChannelId(1)), failure.target)
+            assertNull(runtime.activeTarget.value)
+            runtime.stop()
+        }
+        session.publish(initial)
         recording()
         val stops = collectSessionStops()
         playerLog.clear()
@@ -1187,7 +1208,7 @@ class SessionPlaybackPlayerTest {
         session.scriptLivePlaybackFailure(PlaybackBindingResult.TargetUnavailable)
         val result = runtime.playLive(liveSelection())
         settle()
-        assertFalse(result.toString(), result?.isStarted == true)
+        assertEquals(PlaybackTargetResult.TARGET_UNAVAILABLE, result)
         assertEquals("stop", playerLog.first())
         assertEquals(null, runtime.activeTarget.value)
         assertEquals(null, runtime.recordingSelection.value)
@@ -1518,6 +1539,19 @@ class SessionPlaybackPlayerTest {
         assertFalse(runtime.isPlaybackIntentStopped(entry))
         assertEquals(emptyList<Unit>(), stops)
         // The registration ended with the skipped Stop: the next entry notes intent again.
+        assertTrue(requireNotNull(runtime.enterPlayerScreen()) > entry)
+        whileCommandsBlocked {
+            val cancelled = runtime.stopFromSession { true }
+            settle()
+            entry = requireNotNull(runtime.enterPlayerScreen())
+            cancelled.cancel()
+            cancelled.join()
+        }
+        settle()
+        assertEquals(0, connection.unsubscribeCount)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        assertFalse(runtime.isPlaybackIntentStopped(entry))
+        assertEquals(emptyList<Unit>(), stops)
         assertTrue(requireNotNull(runtime.enterPlayerScreen()) > entry)
     }
 

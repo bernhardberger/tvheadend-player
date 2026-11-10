@@ -247,12 +247,19 @@ class StallWatchdogRuntimeTest {
         idleFor(STALL_BUFFERING_MILLIS + 2 * STALL_POLL_MILLIS)
         await { runtime.videoPresentation.value.epoch != first && runtime.activeTarget.value != null && player.playWhenReady }
 
+        forcedPosition = { STOOD_AT_MILLIS }
         stuckBuffering()
         idleFor(STALL_BUFFERING_MILLIS + 2 * STALL_POLL_MILLIS)
         await { runtime.state.value is AppPlaybackState.Failed }
 
         assertEquals(AppPlaybackFailureReason.RECORDING_READ_FAILED, (runtime.state.value as AppPlaybackState.Failed).reason)
         assertNull(runtime.activeTarget.value)
+        forcedPosition = null
+        val retry = scope.async { runtime.retryRecording() }
+        await { retry.isCompleted }
+        assertTrue(retry.await()?.isStarted == true)
+        assertEquals(STOOD_AT_MILLIS,
+            coordinator.pendingRecordingRecoveryPosition.value?.inWholeMilliseconds ?: player.currentPosition)
     }
 
     @Test fun aZapCancelledWhileTheOldTargetStopsLetsTheRetiredTargetGo() = exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {

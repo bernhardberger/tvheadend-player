@@ -193,9 +193,11 @@ class AudioInterruptionRuntimeTest {
 
     @Test fun timeshiftTransientPausesServerOnceAndGainResumesWithoutRetune() = exercise {
         live(timeshift = true)
+        assertFalse(runtime.hasAudioInterruption)
         assertEquals(1, focus.requests.size)
         focus.send(AudioInterruption.TRANSIENT_LOSS)
         await { connection.speeds == listOf(0) }
+        assertTrue(runtime.hasAudioInterruption)
         assertFalse(player.playWhenReady)
         focus.send(AudioInterruption.TRANSIENT_LOSS)
         settle()
@@ -206,6 +208,7 @@ class AudioInterruptionRuntimeTest {
         assertEquals(1, connection.subscribeCount)
         focus.send(AudioInterruption.GAIN)
         await { player.playWhenReady && connection.speeds == listOf(0, 100) }
+        assertFalse(runtime.hasAudioInterruption)
         assertEquals(1, connection.subscribeCount)
         assertNull(player.playerError)
     }
@@ -2213,6 +2216,12 @@ class AudioInterruptionRuntimeTest {
     @Test fun exhaustedLiveRequiresPlayIntentAsWellAsNoSuppression() = exercise {
         live(timeshift = false)
         player.pause()
+        val requests = focus.requests.size
+        val ignored = runtime.setSessionPlayWhenReady(true) { true }
+        await { ignored.isCompleted }
+        assertEquals(requests, focus.requests.size)
+        assertFalse(player.playWhenReady)
+        assertEquals(1, connection.subscribeCount)
         suppress(true)
         exhaust()
         suppress(false)

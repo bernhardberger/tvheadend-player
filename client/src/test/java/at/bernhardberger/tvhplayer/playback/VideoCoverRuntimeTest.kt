@@ -1256,7 +1256,13 @@ class VideoCoverRuntimeTest {
             runtime.nudgePausedSeek(confirmation = PausedSeekConfirmation.KEY_FRAME_QUEUED)
             await { player.playWhenReady }
             // A re-enabled video renderer counts afresh: one frame there is the new picture.
-            forcedVideoDecoderCounters = DecoderCounters().also { it.renderedOutputBufferCount = 1 }
+            val fresh = DecoderCounters()
+            forcedVideoDecoderCounters = fresh
+            advance(MOTION_POLL_MILLIS)
+            assertTrue(runtime.livePause.value.pausedSeekRefresh)
+            assertTrue(player.playWhenReady)
+            assertEquals(0f, player.volume)
+            fresh.renderedOutputBufferCount = 1
             advance(MOTION_POLL_MILLIS)
             await { !runtime.livePause.value.pausedSeekRefresh }
             assertFalse(player.playWhenReady)
