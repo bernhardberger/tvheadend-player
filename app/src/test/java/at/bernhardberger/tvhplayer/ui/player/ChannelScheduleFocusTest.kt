@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.testutil.holdBack
+
 import android.app.Application
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.*
@@ -252,12 +254,10 @@ class ChannelScheduleFocusTest {
         key(true)
         key(false, flags = android.view.KeyEvent.FLAG_CANCELED)
         assertEquals(0, closed)
-        key(true)
-        key(true, repeat = 1, flags = android.view.KeyEvent.FLAG_LONG_PRESS)
-        key(true, repeat = 2)
-        assertEquals(0, closed)
-        compose.onNodeWithTag("schedule-row-46").assertIsFocused()
-        key(false)
+        holdBack(::key) {
+            assertEquals(0, closed)
+            compose.onNodeWithTag("schedule-row-46").assertIsFocused()
+        }
         assertEquals(1, closed)
     }
 

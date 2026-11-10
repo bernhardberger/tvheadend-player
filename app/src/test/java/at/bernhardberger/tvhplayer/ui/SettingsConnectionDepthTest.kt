@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui
 
+import at.bernhardberger.tvhplayer.testutil.holdBack
+
 import android.app.Application
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.*
@@ -153,11 +155,7 @@ class SettingsConnectionDepthTest {
         backKey(true)
         backKey(false, flags = android.view.KeyEvent.FLAG_CANCELED)
         compose.onAllNodes(hasSetTextAction()).assertCountEquals(1)
-        backKey(true)
-        backKey(true, repeat = 1, flags = android.view.KeyEvent.FLAG_LONG_PRESS)
-        backKey(true, repeat = 2)
-        compose.onAllNodes(hasSetTextAction()).assertCountEquals(1)
-        backKey(false)
+        holdBack(::backKey) { compose.onAllNodes(hasSetTextAction()).assertCountEquals(1) }
         compose.onAllNodes(hasSetTextAction()).assertCountEquals(0)
         compose.onNodeWithTag("setup-host").assertIsFocused()
         assertEquals("draft.invalid", form.host)

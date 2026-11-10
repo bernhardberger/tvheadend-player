@@ -61,7 +61,9 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.pressKey
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.emptyPreferences
+import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
+import at.bernhardberger.tvhplayer.testutil.holdBack
+import at.bernhardberger.tvhplayer.testutil.pressBack
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.lifecycle.Lifecycle
@@ -934,16 +936,12 @@ class LivePlayerChromeScreenTest {
         screen()
         publishMatchingFutureProgramme()
         key(Key.Info)
-        compose.runOnUiThread {
-            view.dispatchKeyEvent(AndroidKeyEvent(AndroidKeyEvent.ACTION_DOWN, AndroidKeyEvent.KEYCODE_BACK))
-        }
-        key(Key.DirectionDown)
-        compose.onNodeWithTag("details-card-12").assertIsFocused()
-        key(Key.DirectionCenter)
-        compose.onNodeWithTag("details-record").performSemanticsAction(SemanticsActions.RequestFocus)
-        compose.onNodeWithTag("details-record").assertIsFocused()
-        compose.runOnUiThread {
-            view.dispatchKeyEvent(AndroidKeyEvent(AndroidKeyEvent.ACTION_UP, AndroidKeyEvent.KEYCODE_BACK))
+        pressBack(::hardwareBack) {
+            key(Key.DirectionDown)
+            compose.onNodeWithTag("details-card-12").assertIsFocused()
+            key(Key.DirectionCenter)
+            compose.onNodeWithTag("details-record").performSemanticsAction(SemanticsActions.RequestFocus)
+            compose.onNodeWithTag("details-record").assertIsFocused()
         }
         settle()
         assertTrue(exists("programme-details-page"))
@@ -1072,14 +1070,10 @@ class LivePlayerChromeScreenTest {
         var closes = 0
         screen(onClose = { closes++ })
         assertTrue(exists("player-banner"))
-        compose.runOnUiThread {
-            view.dispatchKeyEvent(AndroidKeyEvent(AndroidKeyEvent.ACTION_DOWN, AndroidKeyEvent.KEYCODE_BACK))
-        }
-        settleFrames()
-        assertTrue(exists("player-banner"))
-        assertEquals(0, closes)
-        compose.runOnUiThread {
-            view.dispatchKeyEvent(AndroidKeyEvent(AndroidKeyEvent.ACTION_UP, AndroidKeyEvent.KEYCODE_BACK))
+        pressBack(::hardwareBack) {
+            settleFrames()
+            assertTrue(exists("player-banner"))
+            assertEquals(0, closes)
         }
         settle()
         assertFalse(exists("player-banner"))
@@ -1115,22 +1109,21 @@ class LivePlayerChromeScreenTest {
     }
 
     private fun holdBack(beforeRelease: () -> Unit = {}) {
-        compose.runOnUiThread {
-            view.dispatchKeyEvent(AndroidKeyEvent(AndroidKeyEvent.ACTION_DOWN, AndroidKeyEvent.KEYCODE_BACK))
-            view.dispatchKeyEvent(AndroidKeyEvent(0, 0, AndroidKeyEvent.ACTION_DOWN,
-                AndroidKeyEvent.KEYCODE_BACK, 1, 0, 0, 0, AndroidKeyEvent.FLAG_LONG_PRESS))
-            view.dispatchKeyEvent(AndroidKeyEvent(0, 0, AndroidKeyEvent.ACTION_DOWN, AndroidKeyEvent.KEYCODE_BACK, 2))
-        }
-        settleFrames()
-        beforeRelease()
-        compose.runOnUiThread {
-            view.dispatchKeyEvent(AndroidKeyEvent(AndroidKeyEvent.ACTION_UP, AndroidKeyEvent.KEYCODE_BACK))
+        holdBack(::hardwareBack) {
+            settleFrames()
+            beforeRelease()
         }
         settle()
     }
 
+    private fun hardwareBack(down: Boolean, repeat: Int, flags: Int) = compose.runOnUiThread {
+        val action = if (down) AndroidKeyEvent.ACTION_DOWN else AndroidKeyEvent.ACTION_UP
+        view.dispatchKeyEvent(if (repeat == 0 && flags == 0) AndroidKeyEvent(action, AndroidKeyEvent.KEYCODE_BACK)
+            else AndroidKeyEvent(0, 0, action, AndroidKeyEvent.KEYCODE_BACK, repeat, 0, 0, 0, flags))
+    }
+
     @Test fun pauseWithTimeshiftOffPostsOneNoticeWithoutTimelineFeedback() {
-        val data = InMemoryData()
+        val data = InMemoryPreferencesDataStore()
         runTest { PlayerSettingsStore(data).setTimeshiftEnabled(false) }
         screen(settingsData = data)
         assertMainSettled("in-memory settings disable pause") { runtime.livePause.value.availability == LivePauseAvailability.OFF }
@@ -2378,7 +2371,7 @@ class LivePlayerChromeScreenTest {
         opener: SubscriptionOpener? = null,
         recordingScheduled: Boolean = false,
         recordingProfile: DvrConfigId? = null,
-        settingsData: DataStore<Preferences> = InMemoryData(),
+        settingsData: DataStore<Preferences> = InMemoryPreferencesDataStore(),
         settleOnEntry: Boolean = true,
         contentAllowed: () -> Boolean = { true },
         startup: Boolean = false,
@@ -2408,7 +2401,7 @@ class LivePlayerChromeScreenTest {
             else scriptLivePlaybackSuccess(SubscriptionOpener { _, _, _ -> awaitCancellation() })
         }
         val settings = PlayerSettingsStore(settingsData)
-        val uiSettings = at.bernhardberger.tvhplayer.settings.UiSettingsStore(InMemoryData())
+        val uiSettings = at.bernhardberger.tvhplayer.settings.UiSettingsStore(InMemoryPreferencesDataStore())
         recordingProfile?.let { runTest { uiSettings.setRecordingProfile(it) } }
         val screenSession = object : TvheadendSession by session {
             override val dvrRepository = object : DvrRepository by session.dvrRepository {
@@ -2423,7 +2416,7 @@ class LivePlayerChromeScreenTest {
         val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.Main.immediate,
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
         scope.launch { profiles.run() }
-        val channels = ChannelsViewModel(session, ChannelTagSettingsStore(InMemoryData()), profiles.liveProfile)
+        val channels = ChannelsViewModel(session, ChannelTagSettingsStore(InMemoryPreferencesDataStore()), profiles.liveProfile)
         models.put("channels", channels)
         assertMainSettled("the fake channel catalog is collected") { channels.scope.value.scope.visibleChannels.size == if (missingRequestedChannel) 2 else 3 }
         player = ExoPlayer.Builder(context).build()
@@ -2487,18 +2480,13 @@ class LivePlayerChromeScreenTest {
         }
     }
 
-    private open class InMemoryData : DataStore<Preferences> {
-        val state = MutableStateFlow(emptyPreferences())
-        override val data: Flow<Preferences> get() = state
-        override suspend fun updateData(transform: suspend (Preferences) -> Preferences) =
-            transform(state.value).also { state.value = it }
-    }
-
-    private class GatedPreferences : InMemoryData() {
+    private class GatedPreferences(
+        private val store: DataStore<Preferences> = InMemoryPreferencesDataStore(),
+    ) : DataStore<Preferences> by store {
         val open = MutableStateFlow(true)
         override val data: Flow<Preferences> = flow {
             open.first { it }
-            emitAll(state)
+            emitAll(store.data)
         }
     }
 }

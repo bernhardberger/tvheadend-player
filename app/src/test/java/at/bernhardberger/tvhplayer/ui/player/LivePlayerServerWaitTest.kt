@@ -23,9 +23,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.emptyPreferences
+import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
@@ -89,7 +87,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import org.junit.After
@@ -322,12 +319,12 @@ class LivePlayerServerWaitTest {
                     Channel.create(ChannelId(it), name = "Name $it", number = it, icon = LOGO.takeIf { _ -> it == 1L }?.let { ChannelIcon.ImageCache(it) })
                 }))), profile)
         }
-        val data = InMemoryData()
+        val data = InMemoryPreferencesDataStore()
         val settings = PlayerSettingsStore(data)
         profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.Main.immediate,
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
         scope.launch { profiles.run() }
-        val channels = ChannelsViewModel(session, ChannelTagSettingsStore(InMemoryData()), profiles.liveProfile)
+        val channels = ChannelsViewModel(session, ChannelTagSettingsStore(InMemoryPreferencesDataStore()), profiles.liveProfile)
         models.put("channels", channels)
         assertMainSettled("the fake channel catalog is collected") { channels.scope.value.scope.visibleChannels.size == 3 }
         player = ExoPlayer.Builder(context).build()
@@ -360,13 +357,6 @@ class LivePlayerServerWaitTest {
         }
         compose.settleFrames(10)
         if (initial.currentSession == null) compose.waitUntil(10_000) { waits() == 1 }
-    }
-
-    private class InMemoryData : DataStore<Preferences> {
-        val state = MutableStateFlow(emptyPreferences())
-        override val data: Flow<Preferences> get() = state
-        override suspend fun updateData(transform: suspend (Preferences) -> Preferences) =
-            transform(state.value).also { state.value = it }
     }
 
     private fun string(id: Int): String = ApplicationProvider.getApplicationContext<Application>().getString(id)

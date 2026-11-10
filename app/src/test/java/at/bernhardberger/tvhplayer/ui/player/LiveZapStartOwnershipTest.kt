@@ -18,7 +18,7 @@ import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.emptyPreferences
+import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
@@ -232,7 +232,7 @@ class LiveZapStartOwnershipTest {
         val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.Main.immediate,
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
         scope.launch { profiles.run() }
-        val channels = ChannelsViewModel(session, ChannelTagSettingsStore(InMemoryData()), profiles.liveProfile)
+        val channels = ChannelsViewModel(session, ChannelTagSettingsStore(InMemoryPreferencesDataStore()), profiles.liveProfile)
         models.put("channels", channels)
         assertMainSettled("the fake channel catalog is collected") { channels.scope.value.scope.visibleChannels.size == 3 }
         player = ExoPlayer.Builder(context).build()
@@ -280,19 +280,14 @@ class LiveZapStartOwnershipTest {
         compose.mainClock.autoAdvance = false
     }
 
-    private open class InMemoryData : DataStore<Preferences> {
-        val state = MutableStateFlow(emptyPreferences())
-        override val data: Flow<Preferences> get() = state
-        override suspend fun updateData(transform: suspend (Preferences) -> Preferences) =
-            transform(state.value).also { state.value = it }
-    }
-
     /** Preferences whose readers wait while [open] is false: the runtime reads them after admission. */
-    private class GatedPreferences : InMemoryData() {
+    private class GatedPreferences(
+        private val store: DataStore<Preferences> = InMemoryPreferencesDataStore(),
+    ) : DataStore<Preferences> by store {
         val open = MutableStateFlow(true)
         override val data: Flow<Preferences> = flow {
             open.first { it }
-            emitAll(state)
+            emitAll(store.data)
         }
     }
 }

@@ -20,9 +20,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.tv.material3.MaterialTheme
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.emptyPreferences
+import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
@@ -453,12 +451,7 @@ class WatchingProgressTest {
             epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = listOf(event))),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(listOf(recording, second))),
         )).apply { scriptRecordingPlaybackSuccess(); scriptLivePlaybackSuccess(); scriptStreamProfiles(emptyList()) }
-        val settings = PlayerSettingsStore(object : DataStore<Preferences> {
-            private val state = MutableStateFlow(emptyPreferences())
-            override val data: Flow<Preferences> get() = state
-            override suspend fun updateData(transform: suspend (Preferences) -> Preferences) =
-                transform(state.value).also { state.value = it }
-        })
+        val settings = PlayerSettingsStore(InMemoryPreferencesDataStore())
         val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.Main.immediate,
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
         val coordinator = createTvheadendPlaybackCoordinator(object : ExoPlayer by player {

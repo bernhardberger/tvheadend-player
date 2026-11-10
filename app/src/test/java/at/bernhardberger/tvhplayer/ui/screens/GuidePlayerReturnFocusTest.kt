@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.testutil.holdBack
+
 import at.bernhardberger.tvhplayer.testutil.pressKey
 import at.bernhardberger.tvhplayer.testutil.setContentWithBrowsePreparation
 import androidx.compose.foundation.background
@@ -143,11 +145,7 @@ class GuidePlayerReturnFocusTest {
         backKey(true)
         backKey(false, flags = android.view.KeyEvent.FLAG_CANCELED)
         focused("Channel 1 hour 3")
-        backKey(true)
-        backKey(true, repeat = 1, flags = android.view.KeyEvent.FLAG_LONG_PRESS)
-        backKey(true, repeat = 2)
-        focused("Channel 1 hour 3")
-        backKey(false)
+        holdBack(::backKey) { focused("Channel 1 hour 3") }
         focused("Channel 1 hour 0")
         backKey(false)
         focused("Channel 1 hour 0")
