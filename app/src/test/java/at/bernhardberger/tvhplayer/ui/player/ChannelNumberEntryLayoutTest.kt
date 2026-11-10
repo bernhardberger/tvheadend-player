@@ -143,7 +143,7 @@ class ChannelNumberEntryLayoutTest {
                                 state = playerStateCell(false),
                                 recordingNow = false,
                                 picon = ChannelIcon.ImageCache(LOGO),
-                                artwork = programme.image,
+                                artwork = programme.image?.let(ChannelIcon::ImageCache),
                             ),
                             timeline = PlayerChromeTimeline.Live(
                                 timeshift = timeshift, nowSec = NOW, programme = programme, committedTimeshift = timeshift,

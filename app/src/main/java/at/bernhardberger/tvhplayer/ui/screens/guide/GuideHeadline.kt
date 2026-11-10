@@ -42,6 +42,7 @@ import at.bernhardberger.tvhplayer.ui.TvSpacing4
 import at.bernhardberger.tvhplayer.core.EpgFocusColumn
 import at.bernhardberger.tvhplayer.core.EpgFocusTarget
 import at.bernhardberger.tvhplayer.core.programmeAgeRating
+import at.bernhardberger.tvhplayer.core.programmeArtwork
 import at.bernhardberger.tvhplayer.core.recordingIsRunning
 import at.bernhardberger.tvhplayer.core.recordingWasRemoved
 import at.bernhardberger.tvhplayer.core.visibleChannelNumber
@@ -167,7 +168,7 @@ internal fun GuideHeadlineBackground(
             logoTop = logoTop,
             endInset = endInset,
             modifier = modifier,
-            picture = { id -> programme()?.event?.takeIf { it.channelId == id }?.image },
+            picture = { id -> programme()?.event?.takeIf { it.channelId == id }?.let(::programmeArtwork) },
             pictureHeight = logoTop + headlineDrop + guideHeadlineHeight() + GuideHeadlineRulerGap + GuideHeadlinePictureReach,
             // Together with the 12dp ruler gap, this reserves at least 20dp above the timeline.
             logoMaxHeight = guideHeadlineLogoMaxHeight(),

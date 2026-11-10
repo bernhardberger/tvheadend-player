@@ -204,7 +204,7 @@ class DetailsTintTest {
         compose.setContentWithArtworkSampling {
             TVHeadendPlayerTheme {
                 ProvideArtworkSession(session) {
-                    val tint = rememberDetailsTint(art, ChannelIcon.ImageCache(picon)).value
+                    val tint = rememberDetailsTint(ChannelIcon.ImageCache(art), ChannelIcon.ImageCache(picon)).value
                     SideEffect { returned += tint }
                 }
             }
@@ -248,7 +248,7 @@ class DetailsTintTest {
         compose.setContentWithArtworkSampling {
             TVHeadendPlayerTheme {
                 ProvideArtworkSession(session) {
-                    val tint = rememberDetailsTint(art, ChannelIcon.ImageCache(picon)).value
+                    val tint = rememberDetailsTint(ChannelIcon.ImageCache(art), ChannelIcon.ImageCache(picon)).value
                     SideEffect { returned += tint }
                 }
             }

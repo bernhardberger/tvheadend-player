@@ -6,6 +6,13 @@ import android.graphics.BitmapFactory
 import android.graphics.Color
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.RemoteArtworkUrl
+import at.bernhardberger.tvhplayer.core.AppArtworkSource
+import coil3.ImageLoader
+import coil3.asImage
+import coil3.decode.DataSource
+import coil3.intercept.Interceptor
+import coil3.request.SuccessResult
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
@@ -86,6 +93,24 @@ class SessionArtworkLoaderTest {
             } finally {
                 imageLoader.shutdown()
             }
+        }
+        val remote = requireNotNull(RemoteArtworkUrl.parse("https://192.0.2.1/recording.jpg"))
+        val requested = mutableListOf<Any>()
+        val remoteLoader = ImageLoader.Builder(context).components {
+            add(Interceptor { chain ->
+                requested += chain.request.data
+                SuccessResult(photo.asImage(), chain.request, DataSource.MEMORY)
+            })
+        }.build()
+        try {
+            val loader = AppSessionArtworkLoader(context, session, remoteLoader)
+            assertNotNull(loader.load(recording.copy(recordingImage = null, recordingRemoteImage = remote), observation))
+            assertEquals(listOf(remote.url), requested)
+            requested.clear()
+            assertNotNull(loader.load(recording.copy(recordingRemoteImage = remote), observation))
+            assertEquals(listOf(AppArtworkSource(recording.session, picture)), requested)
+        } finally {
+            remoteLoader.shutdown()
         }
     }
 }

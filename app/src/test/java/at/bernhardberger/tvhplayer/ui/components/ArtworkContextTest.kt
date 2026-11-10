@@ -6,8 +6,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
@@ -30,6 +33,15 @@ import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
+import at.bernhardberger.tvhplayer.core.programmeArtwork
+import at.bernhardberger.tvhplayer.core.programmeArtworkModel
+import at.bernhardberger.tvhplayer.core.recordingArtwork
+import at.bernhardberger.tvhplayer.ui.screens.ProgrammeContextMenu
+import at.bernhardberger.tvhplayer.ui.screens.ChannelsImmersiveBackground
+import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.RemoteArtworkUrl
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import coil3.ImageLoader
 import coil3.asImage
@@ -63,6 +75,101 @@ class ArtworkContextTest {
     private val requests = mutableListOf<Any>()
     private var logoCompositions = 0
     private var observationCompositions = 0
+
+    @Test fun failedPanePictureShowsTheLogoButASuccessfulReplacementHasNoLogoPlate() {
+        val failed = ChannelIcon.parse("https://192.0.2.1/programme.png") as ChannelIcon.RemoteUrl
+        val art = mutableStateOf<ChannelIcon>(failed)
+        show(FakeTvheadendSession(observation(ready, 1)), failedModel = failed.url) {
+            TVHeadendPlayerTheme {
+                ProgrammePanePicture(art.value, ChannelIcon.ImageCache(LOGO), ChannelId(1), "pane-logo",
+                    Modifier.size(268.dp, 151.dp))
+            }
+        }
+        compose.onNodeWithTag("pane-logo").assertExists()
+        assertTrue(requests.any { it is AppArtworkSource && it.id == LOGO })
+        compose.runOnIdle { art.value = requireNotNull(ChannelIcon.parse("https://192.0.2.1/replacement.png")) }
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeUntil { compose.onAllNodesWithTag("pane-logo").fetchSemanticsNodes().isEmpty() }
+        compose.onNodeWithTag("pane-logo").assertDoesNotExist()
+    }
+
+    @Test fun failedImmersivePictureShowsTheSameLogoFallbackAsNoPicture() {
+        val failed = ChannelIcon.parse("https://192.0.2.1/programme.png") as ChannelIcon.RemoteUrl
+        val art = mutableStateOf<ChannelIcon?>(failed)
+        val observation = observation(ready, 1)
+        val refreshed = mutableStateOf(observation)
+        show(FakeTvheadendSession(observation), failedModel = failed.url) {
+            TVHeadendPlayerTheme {
+                ChannelsImmersiveBackground(listOf(requireNotNull(observation.channel(ChannelId(1)))),
+                    { ChannelId(1) }, refreshed.value, { 0L }, 0.dp, 0.dp,
+                    modifier = Modifier.size(960.dp, 540.dp), picture = { art.value })
+            }
+        }
+        compose.onNodeWithTag("channels-logo-glow").assertExists()
+        compose.mainClock.advanceTimeUntil {
+            compose.onAllNodesWithTag("channels-immersive-picon").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("channels-immersive-picon").assertExists()
+        compose.runOnIdle { art.value = requireNotNull(ChannelIcon.parse("https://192.0.2.1/replacement.png")) }
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeUntil {
+            compose.onAllNodesWithTag("channels-immersive-picon").fetchSemanticsNodes().isEmpty()
+        }
+        compose.onNodeWithTag("channels-logo-glow").assertDoesNotExist()
+        compose.onNodeWithTag("channels-immersive-picon").assertDoesNotExist()
+        val attempts = requests.count { it == failed.url }
+        compose.runOnIdle {
+            refreshed.value = observation(ready, 2)
+            art.value = failed
+        }
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeUntil {
+            compose.onAllNodesWithTag("channels-immersive-picon").fetchSemanticsNodes().isNotEmpty()
+        }
+        assertTrue("Returning to the picture retries its transient failure", requests.count { it == failed.url } > attempts)
+    }
+
+    @Test fun failedDetailsPictureShowsTheSameLogoFallbackAsNoPicture() {
+        val remote = requireNotNull(RemoteArtworkUrl.parse("https://192.0.2.1/programme.png"))
+        val observation = observation(ready, 1)
+        val event = requireNotNull(observation.event(EventId(1))).withRemoteImage(remote)
+        show(FakeTvheadendSession(observation), failedModel = remote.url) {
+            TVHeadendPlayerTheme {
+                ProgrammeDetailsPage(event, null, observation.channel(ChannelId(1)), 0L, emptyList(), {}, {})
+            }
+        }
+        compose.onNodeWithTag("details-logo-glow").assertExists()
+        compose.onNodeWithTag("details-hero-logo").assertExists()
+    }
+
+    @Test fun programmeRemotePictureUsesTheRemoteLogoPath() {
+        val remote = requireNotNull(RemoteArtworkUrl.parse("https://192.0.2.1/programme.png"))
+        val event = EpgEvent.create(EventId(1), ChannelId(1), Instant.fromEpochSeconds(0), Instant.fromEpochSeconds(3600))
+            .withRemoteImage(remote)
+        assertEquals(remote.url, programmeArtwork(event)?.let { programmeArtworkModel(it, null) })
+        // The SDK makes a cache selector and a remote URL mutually exclusive for one image.
+        val cached = EpgEvent.create(event.id, event.channelId, event.start, event.stop, image = LOGO)
+        assertEquals(AppArtworkSource(null, LOGO), programmeArtwork(cached)?.let { programmeArtworkModel(it, null) })
+        val observation = observation(ready, guide = 1)
+        show(FakeTvheadendSession(observation)) {
+            ProgrammeContextMenu(event, null, null, 0, false, observation.currentSession, observation,
+                false, { _, _ -> }, {})
+        }
+        assertEquals(listOf(remote.url), requests)
+    }
+
+    @Test fun recordingPictureAndFanartPreferCacheThenRemoteAndKeepTheLogoFallback() {
+        val remote = requireNotNull(RemoteArtworkUrl.parse("https://192.0.2.1/recording.png"))
+        val fanart = requireNotNull(RemoteArtworkUrl.parse("https://192.0.2.1/fanart.png"))
+        val entry = DvrEntry.create(DvrEntryId(1))
+        assertNull(recordingArtwork(entry))
+        assertEquals(ChannelIcon.parse(remote.url), recordingArtwork(entry.withRemoteImages(remote, fanart)))
+        assertEquals(ChannelIcon.parse(fanart.url), recordingArtwork(entry.withRemoteImages(null, fanart)))
+        assertEquals(ChannelIcon.ImageCache(LOGO), recordingArtwork(
+            DvrEntry.create(entry.id, image = LOGO).withRemoteImages(null, fanart)))
+        assertEquals(ChannelIcon.ImageCache(LOGO), recordingArtwork(
+            DvrEntry.create(entry.id, fanartImage = LOGO).withRemoteImages(remote, null)))
+    }
 
     @Test fun remoteLogoLoadsBeforeReadyAndKeepsItsModelAtReady() {
         val session = FakeTvheadendSession()
@@ -177,6 +284,7 @@ class ArtworkContextTest {
 
     private fun show(
         session: FakeTvheadendSession,
+        failedModel: Any? = null,
         content: @Composable () -> Unit = {
             ObservationReader(session)
             Logo()
@@ -186,7 +294,11 @@ class ArtworkContextTest {
             .components {
                 add(Interceptor { chain ->
                     requests += chain.request.data
-                    SuccessResult(Bitmap.createBitmap(8, 4, Bitmap.Config.ARGB_8888).asImage(), chain.request, DataSource.MEMORY)
+                    if (chain.request.data == failedModel) {
+                        ErrorResult(null, chain.request, IllegalStateException("Fixture missing image"))
+                    } else {
+                        SuccessResult(Bitmap.createBitmap(8, 4, Bitmap.Config.ARGB_8888).asImage(), chain.request, DataSource.MEMORY)
+                    }
                 })
             }
             .coroutineContext(Dispatchers.Main.immediate)

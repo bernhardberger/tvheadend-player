@@ -28,6 +28,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 import at.bernhardberger.tvhplayer.core.recordingIsRunning
+import at.bernhardberger.tvhplayer.core.programmeArtwork
 import at.bernhardberger.tvhplayer.core.deviceFaultDetail
 import at.bernhardberger.tvhplayer.core.livePauseUnavailable
 import androidx.compose.runtime.rememberUpdatedState
@@ -1593,7 +1594,7 @@ fun VideoPlayerScreen(
         recordingNow = currentChannelId in recordingChannelIds,
         picon = currentChannel?.icon,
         // The info bar's artwork tile.
-        artwork = controlsEvent?.image,
+        artwork = controlsEvent?.let(::programmeArtwork),
         channelId = currentChannelId,
     )
     }

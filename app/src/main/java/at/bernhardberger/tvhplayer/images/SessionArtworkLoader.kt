@@ -23,7 +23,7 @@ import kotlinx.coroutines.CancellationException
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-/** Uses the app's authenticated Coil pipeline, never a controller-supplied URI. */
+/** Uses app-resolved cache/remote Coil models, never a controller-supplied URI. */
 internal class AppSessionArtworkLoader(
     private val context: Context,
     private val tvheadend: TvheadendSession,
@@ -31,15 +31,19 @@ internal class AppSessionArtworkLoader(
 ) : SessionArtworkLoader {
     override suspend fun load(request: SessionArtworkRequest, observation: SessionObservation): ByteArray? {
         if (request.target is AppPlaybackTarget.Recording) {
-            request.recordingImage?.let { image ->
-                loadEncoded(AppArtworkSource(request.session, image), picon = false)?.let { return it }
+            val picture = request.recordingImage?.let { AppArtworkSource(request.session, it) }
+                ?: request.recordingRemoteImage?.url
+            picture?.let {
+                loadEncoded(it, picon = false)?.let { bytes -> return bytes }
             }
         }
         request.channelIcon?.let {
             loadEncoded(channelLogoModel(it, request.session, tvheadend, observation), picon = true)
                 ?.let { bytes -> return bytes }
         }
-        if (request.channelIcon != null || request.recordingImage != null) throw IOException("Session artwork unavailable")
+        if (request.channelIcon != null || request.recordingImage != null || request.recordingRemoteImage != null) {
+            throw IOException("Session artwork unavailable")
+        }
         return null
     }
 

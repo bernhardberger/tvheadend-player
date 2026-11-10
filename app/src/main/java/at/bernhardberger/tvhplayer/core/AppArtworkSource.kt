@@ -4,6 +4,8 @@ import at.bernhardberger.tvheadend.sdk.android.TvheadendArtwork
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
@@ -26,6 +28,18 @@ data class AppArtworkSource(
 ) {
     override fun toString(): String = "AppArtworkSource(currentSession=$currentSession, id=$id, saved=$saved)"
 }
+
+/** Reuse the SDK's cache-or-remote selector for programme pictures as well as logos. */
+internal fun programmeArtwork(event: EpgEvent): ChannelIcon? =
+    event.image?.let(ChannelIcon::ImageCache) ?: ChannelIcon.parse(event.remoteImage?.url)
+
+internal fun recordingArtwork(entry: DvrEntry): ChannelIcon? =
+    (entry.image ?: entry.fanartImage)?.let(ChannelIcon::ImageCache)
+        ?: ChannelIcon.parse((entry.remoteImage ?: entry.remoteFanartImage)?.url)
+
+/** Remote pictures follow the same unauthenticated Coil path as remote channel logos. */
+internal fun programmeArtworkModel(art: ChannelIcon, session: CurrentSessionObservation?): Any =
+    channelLogoModel(art, session, null, null)
 
 /** Shared logo model resolution for Compose and non-UI consumers. */
 @OptIn(ExperimentalTvheadendApi::class)

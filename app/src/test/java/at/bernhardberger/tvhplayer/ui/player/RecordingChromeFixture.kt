@@ -95,7 +95,7 @@ internal fun RecordingChromeFixture(
             state = playerStateCell(paused),
             recordingNow = growing,
             picon = picon?.let { ChannelIcon.ImageCache(it) },
-            artwork = artwork,
+            artwork = artwork?.let(ChannelIcon::ImageCache),
             withoutChannel = withoutChannel,
         ),
         timeline = PlayerChromeTimeline.Recording(

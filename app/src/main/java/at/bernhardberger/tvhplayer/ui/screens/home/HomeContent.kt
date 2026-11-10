@@ -95,6 +95,7 @@ import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.HomeFocusKey
+import at.bernhardberger.tvhplayer.core.recordingArtwork
 import at.bernhardberger.tvhplayer.core.HomeInput
 import at.bernhardberger.tvhplayer.core.HomePlaying
 import at.bernhardberger.tvhplayer.core.HomeSection
@@ -1464,7 +1465,7 @@ private fun HomeShelfRow(
                             onCardFocus(index, "recording:${recording.id.value}")
                         }
                     },
-                art = recording.image ?: recording.fanartImage,
+                art = recordingArtwork(recording),
                 picon = channel?.icon,
                 title = {
                     AnimatedVisibility(
@@ -1503,7 +1504,7 @@ private fun HomeShelfRow(
                 ),
                 picture = {
                     ProgrammeArtwork(
-                        image = recording.image ?: recording.fanartImage,
+                        image = recordingArtwork(recording),
                         channelIcon = channel?.icon,
                         progress = progress,
                         modifier = Modifier.fillMaxSize(),

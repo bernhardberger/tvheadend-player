@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,6 +29,7 @@ import androidx.compose.ui.layout.Measurable
 import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
@@ -39,7 +41,6 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.ui.TvGridColumnWidth
@@ -48,6 +49,8 @@ import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.TvTextColors
 import at.bernhardberger.tvhplayer.ui.player.playerMinutesLeft
 import at.bernhardberger.tvhplayer.ui.player.programmeFactsSegments
+import at.bernhardberger.tvhplayer.core.programmeArtworkModel
+import coil3.compose.AsyncImage
 
 /**
  * The pane beside a list is the kit's four-column card, 268 by 151, and the headline below keeps
@@ -87,23 +90,30 @@ private const val PictureLogoHeightFraction = 0.5f
  */
 @Composable
 internal fun ProgrammePanePicture(
-    art: ArtworkId?,
+    art: ChannelIcon?,
     logo: ChannelIcon?,
     accent: ChannelId?,
     logoTag: String,
     modifier: Modifier = Modifier,
 ) {
-    if (art != null && LocalArtworkContext.current.currentSession != null) {
-        ProgrammeArtwork(art, channelIcon = null, progress = null, modifier)
-    } else {
-        // The logo cards' ambient colour; with no text on it, it keeps its strength to the bottom.
-        Box(modifier.clip(MaterialTheme.shapes.small).background(TvSurfaceColors.containerLowest)) {
+    val session = LocalArtworkContext.current.currentSession
+    val model = remember(art, session) {
+        if (art != null && session != null) programmeArtworkModel(art, session) else null
+    }
+    val load = rememberPictureLoad(model)
+    Box(modifier.clip(MaterialTheme.shapes.small).background(TvSurfaceColors.containerLowest)) {
+        if (model == null || load.needsFallback) {
+            // The logo cards' ambient colour; with no text on it, it keeps its strength to the bottom.
             if (accent != null) ChannelAccentFill(logo, accent, Modifier.fillMaxSize(), bottomShare = 1f)
             PiconBox(logo,
                 Modifier.align(Alignment.Center).fillMaxWidth(PictureLogoWidthFraction).fillMaxHeight(PictureLogoHeightFraction)
                     .testTag(logoTag),
                 ground = if (accent != null) channelAccentGround(logo, accent, depth = 0.5f, bottomShare = 1f)
                     else TvSurfaceColors.containerLowest)
+        }
+        if (model != null && !load.failed) {
+            AsyncImage(model, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(),
+                onSuccess = load::onSuccess, onError = { load.onError() })
         }
     }
 }

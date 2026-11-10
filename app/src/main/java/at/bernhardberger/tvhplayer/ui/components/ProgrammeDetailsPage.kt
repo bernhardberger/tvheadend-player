@@ -247,7 +247,9 @@ internal fun ProgrammeDetailsPage(
         if (it) 1f else 0f
     }
     val warmPlayback = LocalWarmPlayback.current
-    val art = (event?.image ?: recording?.image).takeUnless { warmPlayback }
+    val picture = (event?.let(::programmeArtwork) ?: recording?.let(::recordingArtwork)).takeUnless { warmPlayback }
+    var pictureFailed by remember(picture, LocalArtworkContext.current.currentSession) { mutableStateOf(false) }
+    val art = picture.takeUnless { pictureFailed }
     val picon = channel?.icon.takeUnless { warmPlayback }
     // The picture's colour, or the logo's should the picture fail. Without a picture the logo's
     // colour glows over the page instead, opaque in itself.
@@ -321,7 +323,8 @@ internal fun ProgrammeDetailsPage(
             }
             if (art != null) DetailsBackdrop(art, background, backdrop, reading = { readingProgress.value },
                 textAreas = textAreas.values.toList(), scrolledTextTop = headingKeyline.toFloat() / viewport.coerceAtLeast(1),
-                readingTextTop = with(density) { DetailsSafeEdge.toPx() } / viewport.coerceAtLeast(1))
+                readingTextTop = with(density) { DetailsSafeEdge.toPx() } / viewport.coerceAtLeast(1),
+                onError = { pictureFailed = true })
             else if (glowChannel != null) {
                 ChannelLogoGlow(picon, glowChannel, Modifier.testTag("details-logo-glow"), scrolled = backdrop)
                 DetailsHeroLogo(picon,
@@ -374,7 +377,8 @@ internal fun ProgrammeDetailsPage(
                             contentAlignment = Alignment.BottomStart) {
                         framedChannel?.let { framed ->
                             // The rail preview's hero, the picture or the channel's colour with its logo.
-                            ProgrammeHero(event?.image ?: recording?.image, framed.id,
+                            ProgrammeHero(event?.let(::programmeArtwork) ?: recording?.let(::recordingArtwork),
+                                framed.id,
                                 framed.number?.toString().orEmpty(), framed.icon,
                                 Modifier.align(Alignment.BottomEnd)
                                     .size(PlayerChromeTokens.channelCardWidth, PlayerChromeTokens.channelCardHeight)
@@ -715,10 +719,10 @@ private fun AiringCard(
         onLongClick = contextMenu.onLongClick,
         modifier = modifier.then(contextMenu.modifier)
             .semantics { contentDescription = listOfNotNull(time, spokenEpisode, channelName).joinToString(", ") },
-        art = item.image,
+        art = programmeArtwork(item),
         picon = channel?.icon,
         picture = {
-            ProgrammeArtwork(item.image, channel?.icon, item.progress(nowSec).takeIf { running },
+            ProgrammeArtwork(programmeArtwork(item), channel?.icon, item.progress(nowSec).takeIf { running },
                 Modifier.fillMaxSize(),
                 plateModifier = Modifier.testTag("details-card-plate-${item.id.value}"),
                 progressModifier = Modifier.testTag("details-card-progress-${item.id.value}"))
@@ -766,11 +770,11 @@ private const val DetailsHeroWidthFraction = 758f / 960f
  * all text, dims it further, so bright art stays behind its lines.
  */
 @Composable
-private fun DetailsBackdrop(art: ArtworkId, background: State<Color>, blur: () -> Float, reading: () -> Float,
-    textAreas: List<DetailsBackdropTextArea>, scrolledTextTop: Float, readingTextTop: Float) {
+private fun DetailsBackdrop(art: ChannelIcon, background: State<Color>, blur: () -> Float, reading: () -> Float,
+    textAreas: List<DetailsBackdropTextArea>, scrolledTextTop: Float, readingTextTop: Float, onError: () -> Unit) {
     val session = LocalArtworkContext.current.currentSession ?: return
     val context = LocalPlatformContext.current
-    val source = remember(session, art) { AppArtworkSource(session, art) }
+    val source = remember(session, art) { programmeArtworkModel(art, session) }
     val sharp = remember(source, context) {
         ImageRequest.Builder(context).data(source).allowHardware(false).build()
     }
@@ -806,7 +810,7 @@ private fun DetailsBackdrop(art: ArtworkId, background: State<Color>, blur: () -
         AsyncImage(sharp, null, contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize()
                 .graphicsLayer { this.alpha = if (blur() >= 1f && blurredLoaded) 0f else 1f }
-                .testTag("details-hero"), onSuccess = { sharpImage = it.result.image })
+                .testTag("details-hero"), onSuccess = { sharpImage = it.result.image }, onError = { onError() })
         AsyncImage(blurred, null, contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize().graphicsLayer { this.alpha = blur() }.testTag("details-hero-blurred"),
             onSuccess = { blurredLoaded = true; blurredImage = it.result.image })
@@ -877,10 +881,11 @@ private const val DetailsReadingDimAlpha = .6f
  */
 @Composable
 internal fun DetailsHero(
-    image: ArtworkId,
+    image: ChannelIcon,
     modifier: Modifier,
     onSettled: (() -> Unit)? = null,
     height: Dp? = null,
+    onError: (() -> Unit)? = null,
 ) {
     val session = LocalArtworkContext.current.currentSession
     if (session == null) {
@@ -889,7 +894,7 @@ internal fun DetailsHero(
     }
     val context = LocalPlatformContext.current
     val request = remember(session, image, context, height != null) {
-        ImageRequest.Builder(context).data(AppArtworkSource(session, image))
+        ImageRequest.Builder(context).data(programmeArtworkModel(image, session))
             .transformations(if (height != null) GuideScrimTransformation else CinematicScrimTransformation).build()
     }
     AsyncImage(request, null,
@@ -901,7 +906,7 @@ internal fun DetailsHero(
             )
             .testTag("details-hero"),
         onSuccess = { onSettled?.invoke() },
-        onError = { onSettled?.invoke() })
+        onError = { onError?.invoke(); onSettled?.invoke() })
 }
 
 /**

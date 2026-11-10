@@ -91,7 +91,7 @@ class RemoteLogoCacheTest {
         assertEquals(DataSource.NETWORK, result.dataSource)
         assertEquals(1, requests.get())
         assertNotNull(cache.diskCache.openSnapshot(requireNotNull(result.diskCacheKey))?.also { it.close() })
-        assertEquals(16L * 1024 * 1024, cache.diskCache.maxSize)
+        assertEquals(64L * 1024 * 1024, cache.diskCache.maxSize)
         online.shutdown()
         cache.diskCache.shutdown()
 
