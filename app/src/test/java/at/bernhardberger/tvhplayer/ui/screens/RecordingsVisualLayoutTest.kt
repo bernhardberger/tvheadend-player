@@ -2,6 +2,10 @@ package at.bernhardberger.tvhplayer.ui.screens
 
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
+import at.bernhardberger.tvhplayer.testutil.VisualCapture
+import at.bernhardberger.tvhplayer.testutil.tagBounds
+import at.bernhardberger.tvhplayer.testutil.pressKey
+import org.junit.experimental.categories.Category
 
 import android.app.Application
 import at.bernhardberger.tvhplayer.testutil.CaptureOutput
@@ -148,6 +152,7 @@ class RecordingsVisualLayoutTest {
     /** The README scene: the previous evening's Ridge Light, partly watched, under a 2026-10-04 20:15 clock, xhdpi. */
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    @Category(VisualCapture::class)
     fun presentation() {
         presentationLibrary()
         key(Key.DirectionRight)
@@ -160,6 +165,7 @@ class RecordingsVisualLayoutTest {
     /** The same library at the Archive's top level: the server's folders, then the recordings outside them. */
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    @Category(VisualCapture::class)
     fun presentationFolders() {
         presentationLibrary()
         compose.mainClock.advanceTimeBy(1_500)
@@ -227,6 +233,7 @@ class RecordingsVisualLayoutTest {
     /** Store archive: a complete, partly watched drama, distinct from tonight's live scenes. */
     @Test @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    @Category(VisualCapture::class)
     fun storeRecording() {
         presentationLibrary(store = true)
         key(Key.DirectionDown)
@@ -239,6 +246,7 @@ class RecordingsVisualLayoutTest {
     /** Store library: the running match is visible without opening the virtual folder. */
     @Test @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    @Category(VisualCapture::class)
     fun storeRecordingNow() {
         presentationLibrary(store = true)
         repeat(2) { key(Key.DirectionUp) }
@@ -261,10 +269,6 @@ class RecordingsVisualLayoutTest {
         assertEquals(130f, bounds("recordings-header").left, .1f)
         assertEquals(902f, bounds("recordings-header").right, .1f)
         focused("recordings-folder-Documentaries")
-        key(Key.DirectionUp)
-        compose.onNodeWithText("Archive").assertIsFocused()
-        key(Key.DirectionDown)
-        focused("recordings-folder-Documentaries")
         assertNoCommands()
     }
 
@@ -284,18 +288,23 @@ class RecordingsVisualLayoutTest {
     }
 
     @Test fun missingScheduleDeepLinkUsesNormalInitialFocus() {
-        screenState.open(at.bernhardberger.tvhplayer.core.DvrLibraryMode.SCHEDULE, DvrEntryId(99))
-        show(entries = listOf(recording(40, "Scheduled expedition", null, DvrEntryState.SCHEDULED),
-            recording(99, "Already finished", null, DvrEntryState.COMPLETED)))
-        compose.onNodeWithTag("recording-list-entry-40").assertIsFocused().assertIsDisplayed()
-        compose.onNodeWithTag("details-cancel").assertDoesNotExist()
+        scheduleDeepLinkUsesNormalInitialFocus(started = false)
     }
 
     @Test fun startedScheduleDeepLinkUsesNormalInitialFocus() {
+        scheduleDeepLinkUsesNormalInitialFocus(started = true)
+    }
+
+    private fun scheduleDeepLinkUsesNormalInitialFocus(started: Boolean) {
         screenState.open(at.bernhardberger.tvhplayer.core.DvrLibraryMode.SCHEDULE, DvrEntryId(99))
-        show(entries = listOf(recording(98, "Recording now", null, DvrEntryState.RECORDING, startEpochSeconds = 1_790_000_000),
-            recording(99, "Just started", null, DvrEntryState.RECORDING, startEpochSeconds = 1_790_000_100)))
-        compose.onNodeWithTag("recording-list-entry-98").assertIsFocused().assertIsDisplayed()
+        val entries = if (started) listOf(
+            recording(98, "Recording now", null, DvrEntryState.RECORDING, startEpochSeconds = 1_790_000_000),
+            recording(99, "Just started", null, DvrEntryState.RECORDING, startEpochSeconds = 1_790_000_100),
+        ) else listOf(recording(40, "Scheduled expedition", null, DvrEntryState.SCHEDULED),
+            recording(99, "Already finished", null, DvrEntryState.COMPLETED))
+        show(entries = entries)
+        compose.onNodeWithTag("recording-list-entry-${if (started) 98 else 40}").assertIsFocused().assertIsDisplayed()
+        compose.onNodeWithTag("details-cancel").assertDoesNotExist()
     }
 
     @Test fun scheduleDeepLinkWaitsForTheFirstLoadedSnapshot() {
@@ -524,9 +533,18 @@ class RecordingsVisualLayoutTest {
     }
 
     @Test fun scheduleAndProblemsKeepNativeRowsAndTruthfulStatus() {
-        show()
+        scheduleAndProblemsKeepNativeRowsAndTruthfulStatus(endPadding = null)
+    }
+
+    @Test fun largerCallerEndPaddingIsPreservedWithoutDoublingFocusReserve() {
+        scheduleAndProblemsKeepNativeRowsAndTruthfulStatus(endPadding = 100.dp)
+    }
+
+    private fun scheduleAndProblemsKeepNativeRowsAndTruthfulStatus(endPadding: Dp?) {
+        show(endPadding = endPadding)
         focused("recordings-folder-Documentaries")
         val archiveRow = bounds("recordings-folder-Documentaries")
+        if (endPadding != null) assertEquals(860f, bounds("recordings-header").right, .1f)
         key(Key.DirectionUp)
         compose.onNodeWithText("Archive").assertIsFocused()
         key(Key.DirectionRight)
@@ -535,6 +553,7 @@ class RecordingsVisualLayoutTest {
         focused("recording-list-entry-20")
         assertOverlineAboveTitle(20)
         assertArchiveColumns(20, archiveRow, "Tomorrow's documentary")
+        if (endPadding != null) assertTrue(bounds("recording-metadata-pane").right <= 860f)
         // A scheduled row carries its clock at the end, as channel rows do; the overline keeps only times.
         assertTrailingStateMark(20, "Scheduled")
         // The pane is passive: Right stays on the row, as on an Archive recording.
@@ -548,6 +567,7 @@ class RecordingsVisualLayoutTest {
         focused("recording-list-entry-21")
         assertOverlineAboveTitle(21)
         assertArchiveColumns(21, archiveRow, "Unfinished expedition")
+        if (endPadding != null) assertTrue(bounds("recording-metadata-pane").right <= 860f)
         // Without a reason from the server the pane says what happened in its notice's words.
         compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-failure")) and hasText("Recording failed"),
             useUnmergedTree = true).assertIsDisplayed()
@@ -575,11 +595,10 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionCenter)
         focused("recording-list-entry-1")
         val archivePane = bounds("recording-metadata-pane")
-        capture("archive-multi-item", 1f)
         key(Key.DirectionDown)
         focused("recording-list-entry-2")
         // Archive spacing is unchanged: record its existing overlap, but still require complete focus growth.
-        capture("archive-middle-focus", 1f, assertMiddleFocus(2, checkNeighbourClearance = false))
+        assertMiddleFocus(2, checkNeighbourClearance = false)
         key(Key.DirectionUp)
         key(Key.DirectionUp)
         compose.onNodeWithText("Archive").assertIsFocused()
@@ -591,11 +610,10 @@ class RecordingsVisualLayoutTest {
         // The focused entry's pane takes the place and size of the Archive's recording preview.
         assertEquals(archivePane, bounds("recording-metadata-pane"))
         assertPaneTitle("Scheduled expedition 1")
-        capture("schedule-multi-item", 1f)
         key(Key.DirectionDown)
         focused("recording-list-entry-41")
         assertPaneTitle("Scheduled expedition 2")
-        capture("schedule-middle-focus", 1f, assertMiddleFocus(41))
+        assertMiddleFocus(41)
         key(Key.DirectionUp)
         key(Key.DirectionUp)
         key(Key.DirectionRight)
@@ -605,34 +623,10 @@ class RecordingsVisualLayoutTest {
         assertDenseListGeometry(firstRowTop)
         assertEquals(archivePane, bounds("recording-metadata-pane"))
         assertPaneTitle("Unfinished expedition 1")
-        capture("problems-multi-item", 1f)
         key(Key.DirectionDown)
         focused("recording-list-entry-61")
         assertPaneTitle("Unfinished expedition 2")
-        capture("problems-middle-focus", 1f, assertMiddleFocus(61))
-        assertNoCommands()
-    }
-
-    @Test fun largerCallerEndPaddingIsPreservedWithoutDoublingFocusReserve() {
-        show(endPadding = 100.dp)
-        focused("recordings-folder-Documentaries")
-        val archiveRow = bounds("recordings-folder-Documentaries")
-        assertEquals(860f, bounds("recordings-header").right, .1f)
-        key(Key.DirectionUp)
-        key(Key.DirectionRight)
-        key(Key.DirectionDown)
-        focused("recording-list-entry-20")
-        assertArchiveColumns(20, archiveRow, "Tomorrow's documentary")
-        assertTrue(bounds("recording-metadata-pane").right <= 860f)
-        // A scheduled row carries its clock at the end, as channel rows do; the overline keeps only times.
-        assertTrailingStateMark(20, "Scheduled")
-        capture("schedule-end100", 1f)
-        key(Key.DirectionUp)
-        key(Key.DirectionRight)
-        key(Key.DirectionDown)
-        focused("recording-list-entry-21")
-        assertArchiveColumns(21, archiveRow, "Unfinished expedition")
-        assertTrue(bounds("recording-metadata-pane").right <= 860f)
+        assertMiddleFocus(61)
         assertNoCommands()
     }
 
@@ -720,58 +714,40 @@ class RecordingsVisualLayoutTest {
         assertNoCommands()
     }
 
-    @Test
-    @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
-    fun germanLargeMetadataRetainsNativeTypographyAndWholeLineEllipsis() {
-        Locale.setDefault(Locale.GERMANY)
-        show(scale = 1.3f, entries = listOf(recording(1,
-            "Die außergewöhnliche Reise der Polarlichter: Eine Winterexpedition durch die Arktis",
-            "Dokumentationen/Expedition.ts")))
-        focused("recordings-folder-Dokumentationen")
-        key(Key.DirectionCenter)
-        focused("recording-list-entry-1")
-        assertOverlineAboveTitle(1)
-        compose.onNodeWithTag("recording-metadata-pane", useUnmergedTree = true).assertIsDisplayed()
-        capture("metadata-de-font1.3", 1.3f)
-        assertNoCommands()
-    }
-
     @Test fun stoppedEarlyOverlineFitsOneLine() {
-        show(entries = listOf(recording(1, "Ridge Light", "Documentaries/ridge.ts", recordedMinutes = 20)))
-        focused("recordings-folder-Documentaries")
-        key(Key.DirectionCenter)
-        focused("recording-list-entry-1")
-        compose.onNode(hasTestTag("recording-list-metadata-1") and hasText("• 20m Stopped early", substring = true),
-            useUnmergedTree = true).assertIsDisplayed()
-        // The early stop shows as a marker after the length; its words are only for accessibility.
-        compose.onNodeWithTag("recording-list-stopped-early", useUnmergedTree = true).assertIsDisplayed()
-        assertEquals(1, textLayout("recording-list-metadata-1").lineCount)
+        stoppedEarlyHintStaysWholeInTheRow(german = false)
     }
 
     @Test
     @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
     fun germanLargeStoppedEarlyHintStaysWholeInTheRow() {
-        Locale.setDefault(Locale.GERMANY)
-        show(scale = 1.3f, entries = listOf(recording(1,
-            "Die außergewöhnliche Reise der Polarlichter: Eine Winterexpedition durch die Arktis",
-            "Dokumentationen/Expedition.ts", recordedMinutes = 20)))
-        focused("recordings-folder-Dokumentationen")
+        stoppedEarlyHintStaysWholeInTheRow(german = true)
+    }
+
+    private fun stoppedEarlyHintStaysWholeInTheRow(german: Boolean) {
+        if (german) Locale.setDefault(Locale.GERMANY)
+        show(scale = if (german) 1.3f else 1f, entries = listOf(recording(1,
+            if (german) "Die außergewöhnliche Reise der Polarlichter: Eine Winterexpedition durch die Arktis" else "Ridge Light",
+            if (german) "Dokumentationen/Expedition.ts" else "Documentaries/ridge.ts", recordedMinutes = 20)))
+        focused("recordings-folder-${if (german) "Dokumentationen" else "Documentaries"}")
         key(Key.DirectionCenter)
         focused("recording-list-entry-1")
         assertOverlineAboveTitle(1)
         val results = mutableListOf<TextLayoutResult>()
         compose.onNode(hasTestTag("recording-list-metadata-1") and
-            hasText("Vorzeitig beendet", substring = true), useUnmergedTree = true)
+            hasText(if (german) "Vorzeitig beendet" else "• 20m Stopped early", substring = true), useUnmergedTree = true)
             .assertIsDisplayed()
             .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(results) }
         val hint = results.single()
         val shown = hint.layoutInput.text.text.substring(0, hint.getLineEnd(hint.lineCount - 1, visibleEnd = true))
         assertTrue("'$shown' lines=${hint.lineCount} size=${hint.size} c=${hint.layoutInput.constraints}",
-            shown.endsWith("20 Min. Vorzeitig beendet"))
+            shown.endsWith(if (german) "20 Min. Vorzeitig beendet" else "20m Stopped early"))
+        compose.onNodeWithTag("recording-list-stopped-early", useUnmergedTree = true).assertIsDisplayed()
+        assertEquals(1, hint.lineCount)
         assertFalse("The stopped-early marker must remain whole", hint.hasVisualOverflow)
         // A plain completed recording does not repeat its state.
         compose.onNode(hasTestTag("recording-list-metadata-1") and
-            hasText("Abgeschlossen", substring = true), useUnmergedTree = true).assertDoesNotExist()
+            hasText(if (german) "Abgeschlossen" else "Completed", substring = true), useUnmergedTree = true).assertDoesNotExist()
         val subtitle = compose.onNodeWithTag("recording-list-supporting-1", useUnmergedTree = true)
             .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
         assertTrue("The line below the title must stay inside its row",
@@ -820,26 +796,18 @@ class RecordingsVisualLayoutTest {
         capture("problems-missed", 1f)
     }
 
-    @Test fun missedRecordingPaneBadgeSaysMissedInTheErrorTone() {
-        val entry = recording(30, "Missed match", null, DvrEntryState.MISSED)
+    @Test fun missedAndCanceledPaneBadgesNameTheirState() {
+        val entry = mutableStateOf(recording(30, "Missed match", null, DvrEntryState.MISSED))
         compose.setContent {
             TVHeadendPlayerTheme {
-                at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingMetadataPane(entry, null, null)
+                at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingMetadataPane(entry.value, null, null)
             }
         }
         compose.onNodeWithTag("recording-badge-missed", useUnmergedTree = true).assertIsDisplayed()
         compose.onNodeWithContentDescription("Recording missed").assertExists()
         compose.onNodeWithText("recorded", substring = true, useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithText("Canceled", useUnmergedTree = true).assertDoesNotExist()
-    }
-
-    @Test fun invalidRecordingPaneBadgeSaysCanceledInTheNeutralTone() {
-        val entry = recording(31, "Dropped entry", null, DvrEntryState.INVALID)
-        compose.setContent {
-            TVHeadendPlayerTheme {
-                at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingMetadataPane(entry, null, null)
-            }
-        }
+        compose.runOnIdle { entry.value = recording(31, "Dropped entry", null, DvrEntryState.INVALID) }
         compose.onNodeWithTag("recording-badge-cancelled", useUnmergedTree = true).assertIsDisplayed()
         compose.onNodeWithText("Canceled", useUnmergedTree = true).assertIsDisplayed()
         compose.onNodeWithText("Failed", useUnmergedTree = true).assertDoesNotExist()
@@ -1544,7 +1512,7 @@ class RecordingsVisualLayoutTest {
 
     private fun key(key: Key) {
         if (key == Key.Back) compose.runOnIdle { backDispatcher.onBackPressed() }
-        else compose.onRoot().performKeyInput { pressKey(key) }
+        else compose.pressKey(key)
         compose.waitForIdle()
     }
 
@@ -1555,8 +1523,7 @@ class RecordingsVisualLayoutTest {
         compose.onNodeWithTag(tag).assertIsFocused().assertIsDisplayed()
     }
 
-    private fun bounds(tag: String): Rect = compose.onNodeWithTag(tag, useUnmergedTree = true)
-        .fetchSemanticsNode().boundsInRoot
+    private fun bounds(tag: String): Rect = compose.tagBounds(tag)
 
     private fun assertTrailingStateMark(id: Int, description: String) {
         compose.onNodeWithTag("recording-list-state-$id", useUnmergedTree = true)
