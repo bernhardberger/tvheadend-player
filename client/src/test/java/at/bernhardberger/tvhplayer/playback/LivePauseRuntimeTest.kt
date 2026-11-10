@@ -496,7 +496,7 @@ class LivePauseRuntimeTest {
 
     @Test fun focusLossWhilePausePendsKeepsThePausedIntentThroughGrantAndGain() {
         for (loss in listOf(AudioInterruption.TRANSIENT_LOSS, AudioInterruption.PERMANENT_LOSS)) {
-            exercise {
+            for (rejected in listOf(false, true)) exercise {
                 val gate = startingLive()
                 assertNull(runtime.pauseTimeshiftPlayback())
                 val callback = focus.requests.last()
@@ -508,6 +508,9 @@ class LivePauseRuntimeTest {
                 assertFalse(player.playWhenReady)
                 assertTrue(runtime.livePause.value.pending)
 
+                if (rejected) beforeSpeed = { speed ->
+                    if (speed == 0) connection.scriptSpeed(SubscriptionOperationResult.Failed(TvheadendFailure.SERVER_REJECTED))
+                }
                 grant(gate)
                 await { runtime.livePause.value == LivePauseState(LivePauseAvailability.READY, pending = true) }
                 playerReady()
@@ -527,6 +530,7 @@ class LivePauseRuntimeTest {
                 }
                 assertEquals(requests, focus.requestCount)
 
+                if (rejected) connection.scriptSpeed(SubscriptionOperationResult.Ok(Unit))
                 val resume = scope.async { runtime.resumeTimeshift() }
                 await { resume.isCompleted }
                 assertEquals(TimeshiftCommandResult.ACCEPTED, resume.await())
@@ -534,43 +538,54 @@ class LivePauseRuntimeTest {
                 assertEquals(listOf(0, 100), connection.speeds)
                 assertTrue(player.playWhenReady)
                 assertEquals(requests + 1, focus.requestCount)
-                assertNull(runtime.livePauseNotice.value)
+                assertEquals(rejected, runtime.livePauseNotice.value != null)
             }
         }
     }
 
-    @Test fun pauseDuringAPendingChannelChangeReplacesTheNewChannelsStartupPlayAndHoldsItOnce() = exercise {
-        live()
-        val intent = runtime.notePlaybackIntent().also(runtime::noteLiveSelection)
-        assertEquals(LivePauseState(LivePauseAvailability.STARTING, selectionPending = true), runtime.livePause.value)
-        assertNull(runtime.pauseTimeshiftPlayback())
-        assertEquals(LivePauseState(LivePauseAvailability.STARTING, pending = true, selectionPending = true),
-            runtime.livePause.value)
-        settle()
-        // Nothing reaches the channel still installed.
-        assertEquals(emptyList<Int>(), connection.speeds)
-        val playRequested = trackPlayRequests()
+    @Test fun pauseDuringAPendingChannelChangeReplacesTheNewChannelsStartupPlayAndHoldsItOnce() {
+        for (muted in listOf(false, true)) exercise {
+            live()
+            if (muted) {
+                connection.scriptSpeed(SubscriptionOperationResult.Failed(TvheadendFailure.SERVER_REJECTED))
+                focus.requests.last()(AudioInterruption.NOISY)
+                await { runtime.isInterruptionMuted }
+                connection.scriptSpeed(SubscriptionOperationResult.Ok(Unit))
+            }
+            val speeds = connection.speeds.size
+            val intent = runtime.notePlaybackIntent().also(runtime::noteLiveSelection)
+            assertEquals(LivePauseState(LivePauseAvailability.STARTING, selectionPending = true), runtime.livePause.value)
+            assertNull(runtime.pauseTimeshiftPlayback())
+            assertEquals(LivePauseState(LivePauseAvailability.STARTING, pending = true, selectionPending = true),
+                runtime.livePause.value)
+            settle()
+            // Nothing reaches the channel still installed.
+            assertEquals(emptyList<Int>(), connection.speeds.drop(speeds))
+            val playRequested = trackPlayRequests()
 
-        val gate = pendingZap(channel = 2, intent = intent)
-        settle()
-        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
-        assertFalse(player.playWhenReady)
-        assertFalse(playRequested())
-        assertEquals(LivePauseState(LivePauseAvailability.STARTING, pending = true), runtime.livePause.value)
-        assertEquals(emptyList<Int>(), connection.speeds)
+            val gate = pendingZap(channel = 2, intent = intent)
+            settle()
+            assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+            assertFalse(runtime.hasAudioInterruption)
+            assertFalse(androidx.media3.common.C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes)
+            assertFalse(player.playWhenReady)
+            assertFalse(playRequested())
+            assertEquals(LivePauseState(LivePauseAvailability.STARTING, pending = true), runtime.livePause.value)
+            assertEquals(emptyList<Int>(), connection.speeds.drop(speeds))
 
-        grant(gate)
-        await { runtime.livePause.value == LivePauseState(LivePauseAvailability.READY, pending = true) }
-        settle()
-        assertEquals(emptyList<Int>(), connection.speeds)
-        playerReady()
-        await { connection.speeds.isNotEmpty() }
-        settle()
-        assertEquals(listOf(0), connection.speeds)
-        assertEquals(LivePauseState(LivePauseAvailability.READY), runtime.livePause.value)
-        assertFalse(player.playWhenReady)
-        assertFalse(playRequested())
-        assertNull(runtime.livePauseNotice.value)
+            grant(gate)
+            await { runtime.livePause.value == LivePauseState(LivePauseAvailability.READY, pending = true) }
+            settle()
+            assertEquals(emptyList<Int>(), connection.speeds.drop(speeds))
+            playerReady()
+            await { connection.speeds.size > speeds }
+            settle()
+            assertEquals(listOf(0), connection.speeds.drop(speeds))
+            assertEquals(LivePauseState(LivePauseAvailability.READY), runtime.livePause.value)
+            assertFalse(player.playWhenReady)
+            assertFalse(playRequested())
+            assertNull(runtime.livePauseNotice.value)
+        }
     }
 
     @Test fun pauseQueuedBehindAStartingChannelChangeIsHeldAtOnceForTheNewChannel() = exercise {
