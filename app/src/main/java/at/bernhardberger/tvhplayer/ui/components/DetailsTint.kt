@@ -6,9 +6,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.tv.material3.MaterialTheme
-import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
-import at.bernhardberger.tvhplayer.core.AppArtworkSource
+import at.bernhardberger.tvhplayer.core.programmeArtworkModel
 import at.bernhardberger.tvhplayer.core.detailsTintRgb
 import at.bernhardberger.tvhplayer.images.DetailsArtColors
 
@@ -19,7 +18,7 @@ import at.bernhardberger.tvhplayer.images.DetailsArtColors
  */
 @Composable
 internal fun rememberDetailsTint(
-    art: ArtworkId?,
+    art: ChannelIcon?,
     picon: ChannelIcon?,
     onSettled: (() -> Unit)? = null,
 ): State<Color> {
@@ -32,7 +31,9 @@ internal fun rememberDetailsTint(
     // As the logo's: before a session its saved copy names the stored colour. Art needs the session.
     val logo by remember(artwork, picon) { derivedStateOf { picon?.let(artwork::logo) } }
     val piconSource = logo
-    val artSource = remember(session, art) { session?.let { current -> art?.let { AppArtworkSource(current, it) } } }
+    val artSource = remember(session, art) {
+        session?.let { current -> art?.let { programmeArtworkModel(it, current) } }
+    }
     val source = if (art != null) artSource else piconSource
     // Replacing a page/source must not inherit the previous page's seed or animation.
     return key(source, piconSource, art != null, accents) {

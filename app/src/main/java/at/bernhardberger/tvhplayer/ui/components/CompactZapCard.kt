@@ -48,7 +48,8 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.common.formatDurationMinutes
-import at.bernhardberger.tvhplayer.core.AppArtworkSource
+import at.bernhardberger.tvhplayer.core.programmeArtwork
+import at.bernhardberger.tvhplayer.core.programmeArtworkModel
 import at.bernhardberger.tvhplayer.images.LogoHaloTransformation
 import at.bernhardberger.tvhplayer.images.ScrimTransformation
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
@@ -100,14 +101,15 @@ internal fun CompactZapCard(
     val textBlockHeight = compactZapTextBlockHeight()
     val imageHeight = maxOf(compactZapCardMinHeight(), preferredHeight ?: 0.dp)
     val currentSession = LocalArtworkContext.current.currentSession
-    val artwork = currentEvent?.image?.takeIf { programmePicture && currentSession != null }
+    val artwork = currentEvent?.let(::programmeArtwork)?.takeIf { programmePicture && currentSession != null }
     var artworkFailed by remember(artwork, currentSession) { mutableStateOf(false) }
     val showArtwork = artwork != null && !artworkFailed
     val context = LocalPlatformContext.current
     val textTop = ((imageHeight - textBlockHeight) / imageHeight).coerceIn(0f, 1f)
     // A channel-led card's scrim is drawn into its picture once rather than over it every frame.
     val artworkModel = remember(artwork, currentSession, channelLed, textTop) {
-        val source = if (artwork != null && currentSession != null) AppArtworkSource(currentSession, artwork) else null
+        val source = if (artwork != null && currentSession != null) programmeArtworkModel(artwork, currentSession)
+            else null
         if (source == null || !channelLed) source
         else ImageRequest.Builder(context).data(source).transformations(compactZapTextScrim(textTop)).build()
     }

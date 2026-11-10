@@ -81,7 +81,7 @@ class ArtworkCardGlowTest {
                 MaterialTheme {
                     ProvideArtworkSession(session) {
                         val fallback = glow(MaterialTheme.colorScheme.onSurface)
-                        val result = artworkCardGlow(shownArt, logo?.let { ChannelIcon.ImageCache(it) }, interaction)
+                        val result = artworkCardGlow(shownArt?.let { ChannelIcon.ImageCache(it) }, logo?.let { ChannelIcon.ImageCache(it) }, interaction)
                         SideEffect { neutral = fallback; returned += result }
                     }
                 }

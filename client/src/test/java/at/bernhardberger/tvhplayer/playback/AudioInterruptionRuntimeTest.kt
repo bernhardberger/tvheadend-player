@@ -63,6 +63,50 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class)
 class AudioInterruptionRuntimeTest {
+    @Test fun anErrorClearedDuringItsDispatchDoesNotFailTheReplacement() = exercise {
+        live(timeshift = false)
+        live(timeshift = false, channel = 2)
+        val replacement = player.currentMediaItem
+        val states = mutableListOf<AppPlaybackState>()
+        val observing = scope.launch(kotlinx.coroutines.test.UnconfinedTestDispatcher(scheduler)) {
+            runtime.state.collect { states += it }
+        }
+        val errorCycleFinished = CompletableDeferred<Unit>()
+        player.addListener(object : Player.Listener {
+            override fun onPlayerError(error: PlaybackException) {
+                // The SDK repairs the replacement in this dispatch, before onEvents.
+                player.prepare()
+            }
+
+            override fun onEvents(player: Player, events: Player.Events) {
+                if (events.contains(Player.EVENT_PLAYER_ERROR)) errorCycleFinished.complete(Unit)
+            }
+        })
+        player.createMessage { _, _ ->
+            throw ExoPlaybackException.createForSource(IOException("retired stream"), PlaybackException.ERROR_CODE_IO_UNSPECIFIED)
+        }.send()
+        await("repaired player error cycle") { errorCycleFinished.isCompleted }
+        settle()
+        observing.cancelAndJoin()
+        assertNull(player.playerError)
+        assertFalse("A repaired predecessor error must never publish Failed", states.any { it is AppPlaybackState.Failed })
+        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+        assertSame(replacement, player.currentMediaItem)
+        assertEquals(AppPlaybackState.Starting, runtime.state.value)
+        assertEquals(Player.STATE_BUFFERING, player.playbackState)
+        assertTrue(player.playWhenReady)
+    }
+
+    @Test fun anErrorStillSetAfterItsDispatchFailsTheActiveTarget() = exercise {
+        live(timeshift = false)
+        player.createMessage { _, _ ->
+            throw ExoPlaybackException.createForSource(IOException("stream failed"), PlaybackException.ERROR_CODE_IO_UNSPECIFIED)
+        }.send()
+        await("active target failure") { runtime.state.value is AppPlaybackState.Failed }
+        assertNotNull(player.playerError)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), (runtime.state.value as AppPlaybackState.Failed).target)
+    }
+
     @Test fun personalOutputDisconnectRestoresPassthroughWithoutResumingNoisyPausedPlayback() = exercise {
         live(timeshift = true)
         outputs.personalOutputConnected.value = true
@@ -2661,7 +2705,7 @@ class AudioInterruptionRuntimeTest {
     private class Fixture(
         val scope: CoroutineScope,
         granted: Boolean,
-        private val scheduler: TestCoroutineScheduler,
+        val scheduler: TestCoroutineScheduler,
     ) {
         val driver = PlaybackTestDriver(scheduler)
         private val context = ApplicationProvider.getApplicationContext<Application>()
@@ -2963,6 +3007,8 @@ class AudioInterruptionRuntimeTest {
                 it.onPlayerErrorChanged(error)
                 it.onPlayerError(error)
             }
+            val events = Player.Events(androidx.media3.common.FlagSet.Builder().add(Player.EVENT_PLAYER_ERROR).build())
+            playerListeners.toList().forEach { it.onEvents(runtimePlayer, events) }
         }
 
         fun suppress(suppressed: Boolean) {

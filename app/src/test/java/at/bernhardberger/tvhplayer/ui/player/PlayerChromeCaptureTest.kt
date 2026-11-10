@@ -253,7 +253,7 @@ class PlayerChromeCaptureTest {
                                 state = playerStateCell(false),
                                 recordingNow = false,
                                 picon = ChannelIcon.ImageCache(ArtworkId(201 + playingIndex)),
-                                artwork = programme.image,
+                                artwork = programme.image?.let(ChannelIcon::ImageCache),
                             ),
                             window = if (concert) ProgrammeWindow(programme, Instant.fromEpochSeconds(now), 75f / 180f,
                                 65f / 180f, 75f / 180f, 75f / 180f, true)
@@ -569,7 +569,7 @@ class PlayerChromeCaptureTest {
             state = state,
             recordingNow = scene == Scene.CONTROLS_BEHIND || scene == Scene.BANNER_BEHIND,
             picon = if (scene == Scene.CONTROLS_NO_LOGO) null else ChannelIcon.ImageCache(LOGO),
-            artwork = programme.image.takeUnless { noEpg },
+            artwork = programme.image.takeUnless { noEpg }?.let(ChannelIcon::ImageCache),
         )
         when (scene) {
             // As the player shows them: the closed rail peeks under the controls; with a logo the

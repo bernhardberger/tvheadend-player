@@ -1,6 +1,5 @@
 package at.bernhardberger.tvhplayer.ui.player
 
-import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvhplayer.core.PlayerStateCell
@@ -36,7 +35,7 @@ internal data class PlayerChromeContent(
     val recordingNow: Boolean = false,
     val picon: ChannelIcon? = null,
     /** The programme's artwork, the identity card's backdrop. */
-    val artwork: ArtworkId? = null,
+    val artwork: ChannelIcon? = null,
     /** The channel whose colour is the identity card's backdrop without [artwork]. */
     val channelId: at.bernhardberger.tvheadend.sdk.core.ChannelId? = null,
     /** A recording with no channel: the artwork's place shows the recordings symbol instead of an empty channel. */

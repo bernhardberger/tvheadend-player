@@ -42,7 +42,9 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.core.AppArtworkSource
+import at.bernhardberger.tvhplayer.core.programmeArtwork
+import at.bernhardberger.tvhplayer.core.recordingArtwork
+import at.bernhardberger.tvhplayer.core.programmeArtworkModel
 import at.bernhardberger.tvhplayer.core.recordingElapsedProgress
 import at.bernhardberger.tvhplayer.core.visibleChannelNumber
 import at.bernhardberger.tvhplayer.ui.TvCardProgressStripHeight
@@ -82,10 +84,10 @@ internal fun HomeActivityCard(
     val recordingNow = entry?.state == DvrEntryState.RECORDING || entry?.state == DvrEntryState.RECORDING_ERROR
     val viewer = if (playingRecording) recordingViewerPosition(entry?.id) else null
     val session = LocalArtworkContext.current.currentSession
-    val image = (if (recordingOnly) entry?.image ?: entry?.fanartImage
-        else running?.image ?: entry?.image ?: entry?.fanartImage)?.takeIf { session != null }
+    val image = (if (recordingOnly) entry?.let(::recordingArtwork)
+        else running?.let(::programmeArtwork) ?: entry?.let(::recordingArtwork))?.takeIf { session != null }
     val icon = channel?.icon
-    val model = remember(session, image) { image?.let { AppArtworkSource(session, it) } }
+    val model = remember(session, image) { image?.let { programmeArtworkModel(it, session) } }
     val load = rememberPictureLoad(model)
     val pictured = model != null && !load.failed
     val interaction = remember { MutableInteractionSource() }

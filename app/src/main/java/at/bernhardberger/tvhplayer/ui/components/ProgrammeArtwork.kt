@@ -77,14 +77,14 @@ internal fun rememberPictureLoad(model: Any?): PictureLoad {
 /** Non-focusable artwork shared by airing cards and browse menus. */
 @Composable
 internal fun ProgrammeArtwork(
-    image: ArtworkId?, channelIcon: ChannelIcon?, progress: Float?,
+    image: ChannelIcon?, channelIcon: ChannelIcon?, progress: Float?,
     modifier: Modifier = Modifier,
     plateModifier: Modifier = Modifier, progressModifier: Modifier = Modifier,
     progressColor: Color = MaterialTheme.colorScheme.primary,
 ) {
     val session = LocalArtworkContext.current.currentSession
     val model = remember(session, image) {
-        if (image != null && session != null) AppArtworkSource(session, image) else null
+        if (image != null && session != null) programmeArtworkModel(image, session) else null
     }
     val load = rememberPictureLoad(model)
     Box(modifier.clip(MaterialTheme.shapes.small).background(TvSurfaceColors.containerLowest)) {

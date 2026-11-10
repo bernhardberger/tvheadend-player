@@ -35,6 +35,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.PlaybackException
 import androidx.media3.datasource.BaseDataSource
 import androidx.media3.datasource.DataSpec
+import androidx.media3.exoplayer.ExoPlaybackException
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
@@ -428,7 +429,9 @@ class WatchingProgressTest {
         val listeners = mutableListOf<Player.Listener>()
         var ready = false
         var positionMs = 900_000L
+        var forcedPlayerError: ExoPlaybackException? = null
         val player = object : ExoPlayer by base {
+            override fun getPlayerError() = forcedPlayerError ?: base.playerError
             override fun getPlaybackState() = if (ready) Player.STATE_READY else base.playbackState
             override fun isPlaying() = ready && base.playWhenReady
             override fun getCurrentPosition() = positionMs
@@ -539,7 +542,13 @@ class WatchingProgressTest {
             assertEquals("Live install", at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult.STARTED,
                 runBlocking { live.await() })
             compose.runOnIdle {
-                listeners.toList().forEach { it.onPlayerError(PlaybackException("scripted failure", null, PlaybackException.ERROR_CODE_DECODING_FAILED)) }
+                val error = ExoPlaybackException.createForUnexpected(
+                    RuntimeException("scripted failure"), PlaybackException.ERROR_CODE_DECODING_FAILED,
+                )
+                forcedPlayerError = error
+                listeners.toList().forEach { it.onPlayerError(error) }
+                val events = Player.Events(androidx.media3.common.FlagSet.Builder().add(Player.EVENT_PLAYER_ERROR).build())
+                listeners.toList().forEach { it.onEvents(player, events) }
             }
             compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Failed }
             compose.waitForIdle()
@@ -784,7 +793,7 @@ class WatchingProgressTest {
                                         RecordingProgressCapability.SUPPORTED).recordingPlaybackAdmission(recording), true,
                                         playing = true), {}, {}, summary = event.summary.orEmpty(),
                                     recordingState = recording.state, playbackIndicator = watchingIndicator(recording.id)) {
-                                    ProgrammeArtwork(recording.image, channel.icon, recordingViewerPosition(recording.id)?.fraction,
+                                    ProgrammeArtwork(recording.image?.let(ChannelIcon::ImageCache), channel.icon, recordingViewerPosition(recording.id)?.fraction,
                                         Modifier.fillMaxSize(), progressColor = progressColor(true))
                                 }
                                 "programme-continue" -> ProgrammeDetailsPage(event, null, channel, now,

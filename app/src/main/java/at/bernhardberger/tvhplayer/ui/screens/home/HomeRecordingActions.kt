@@ -143,7 +143,7 @@ internal fun HomeRecordingActions(
                 }
             },
             artwork = { ProvideArtworkSession(capability, observation) {
-                ProgrammeArtwork(opened.image ?: opened.fanartImage, channel?.icon, null, Modifier.fillMaxSize())
+                ProgrammeArtwork(recordingArtwork(opened), channel?.icon, null, Modifier.fillMaxSize())
             } },
         )
     } else {

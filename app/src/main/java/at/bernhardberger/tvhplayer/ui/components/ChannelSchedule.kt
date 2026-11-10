@@ -41,6 +41,7 @@ import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.core.programmeCategory
+import at.bernhardberger.tvhplayer.core.programmeArtwork
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.TvNavigationRailGradientRunout
 import at.bernhardberger.tvhplayer.ui.TvSpacing12
@@ -407,7 +408,7 @@ private fun ScheduleSkeletonRow(timeWidth: Dp) {
  * keeps only the picture's height so rows with and without one stand equally tall.
  */
 @Composable
-private fun ScheduleArtworkSlot(image: ArtworkId?) {
+private fun ScheduleArtworkSlot(image: ChannelIcon?) {
     Box(Modifier.height(ScheduleArtworkSize.height), contentAlignment = Alignment.Center) {
         if (image != null) ProgrammeArtwork(image, null, null, Modifier.size(ScheduleArtworkSize.width, ScheduleArtworkSize.height))
     }
@@ -492,7 +493,7 @@ private fun ChannelScheduleRow(
                 }
             }
         },
-        trailingContent = { ScheduleArtworkSlot(event.image) },
+        trailingContent = { ScheduleArtworkSlot(programmeArtwork(event)) },
         modifier = modifier.then(contextMenu.modifier).fillMaxWidth()
             .onFocusChanged { focused = it.isFocused }.testTag("schedule-row-${event.id.value}"),
     )

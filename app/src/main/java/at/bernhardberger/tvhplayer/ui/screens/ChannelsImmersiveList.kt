@@ -77,7 +77,6 @@ import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.ProvideTextStyle
 import androidx.tv.material3.Text
-import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
@@ -159,6 +158,8 @@ import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.request.transformations
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
+import at.bernhardberger.tvhplayer.core.programmeArtwork
+import at.bernhardberger.tvhplayer.core.programmeArtworkModel
 import at.bernhardberger.tvhplayer.ui.components.rememberPictureLoad
 import at.bernhardberger.tvhplayer.ui.components.ChannelAccentFill
 import at.bernhardberger.tvhplayer.ui.components.channelAccentGround
@@ -226,7 +227,9 @@ internal fun ChannelsImmersiveBackground(
     endInset: Dp,
     modifier: Modifier = Modifier,
     programArt: Boolean = true,
-    picture: (ChannelId) -> ArtworkId? = { observation.eventAt(it, Instant.fromEpochSeconds(nowSec()))?.image },
+    picture: (ChannelId) -> ChannelIcon? = {
+        observation.eventAt(it, Instant.fromEpochSeconds(nowSec()))?.let(::programmeArtwork)
+    },
     pictureHeight: Dp? = null,
     logoMaxHeight: Dp = Dp.Infinity,
     order: List<ChannelId> = emptyList(),
@@ -237,6 +240,7 @@ internal fun ChannelsImmersiveBackground(
     val session = observation.currentSession != null
     val artwork = LocalArtworkContext.current
     var revealed by remember { mutableStateOf<ChannelBackdrop?>(null) }
+    var failedPictures by remember(artwork.currentSession, observation) { mutableStateOf(emptySet<ChannelIcon>()) }
     fun backdropOf(id: ChannelId?): ChannelBackdrop {
         val art = id?.takeIf { programArt && session }?.let(picture)
         val channel = channels.firstOrNull { it.id == id }
@@ -264,7 +268,7 @@ internal fun ChannelsImmersiveBackground(
             LaunchedEffect(Unit) { onReady() }
             return@FocusBackdrop
         }
-        val art = shown.art
+        val art = shown.art?.takeUnless { it in failedPictures }
         if (art == null) {
             // The logo's colour glows from the top right, as on the details page, under the sharp
             // logo. Shown once the glow is baked and the logo loaded, so the logo comes with it.
@@ -284,13 +288,14 @@ internal fun ChannelsImmersiveBackground(
             val tint = rememberDetailsTint(art, shown.icon, onSettled = { tintSettled = true })
             Box(Modifier.fillMaxSize().drawBehind { drawRect(tint.value) }.testTag("channels-backdrop"))
             DetailsHero(art, Modifier.align(Alignment.TopEnd).testTag("channels-immersive-art"),
-                onSettled = { pictureSettled = true }, height = pictureHeight)
+                onSettled = { pictureSettled = true }, height = pictureHeight,
+                onError = { failedPictures = failedPictures + art })
         }
     }
     // The sharp logo belongs to the content: it moves with it as the drawer opens, while the
     // backdrop beneath stays put. It comes and changes as the backdrop fades in, which also
     // waits for the logo to be there.
-    val logo = revealed?.takeIf { it.art == null && it.logo }
+    val logo = revealed?.takeIf { (it.art == null || it.art in failedPictures) && it.logo }
     Crossfade(logo, modifier, BrowseMotionPolicy.backdropFade(), label = "immersiveLogo") { shown ->
         if (shown == null) return@Crossfade
         Box(Modifier.fillMaxSize()) {
@@ -308,7 +313,7 @@ internal fun ChannelsImmersiveBackground(
  * [logo], there with the session or before it as a saved copy or remote URL. It carries the channel's [icon], so
  * a backdrop fading out still draws after its channel has left the list.
  */
-private data class ChannelBackdrop(val channel: ChannelId?, val art: ArtworkId?, val icon: ChannelIcon?, val logo: Boolean)
+private data class ChannelBackdrop(val channel: ChannelId?, val art: ChannelIcon?, val icon: ChannelIcon?, val logo: Boolean)
 
 /** What the immersive list's cards need from the screen. */
 internal class ChannelsImmersiveCards(
@@ -509,13 +514,13 @@ internal fun ChannelsRowCard(
     val programme = running?.title?.takeIf { it.isNotBlank() }
     val tag = "$tagPrefix-${channel.id.value}"
     val session = LocalArtworkContext.current.currentSession
-    val art = running?.image?.takeIf { programmePicture && session != null }
+    val art = running?.let(::programmeArtwork)?.takeIf { programmePicture && session != null }
     val context = LocalPlatformContext.current
     val textHeight = with(LocalDensity.current) { MaterialTheme.typography.titleSmall.lineHeight.toDp() } +
         ImmersiveCardTextBottom
     // A picture card has no text on it, so no scrim.
     val artModel = remember(art, session) {
-        if (art == null || session == null) null else AppArtworkSource(session, art)
+        if (art == null || session == null) null else programmeArtworkModel(art, session)
     }
     val artLoad = rememberPictureLoad(artModel)
     val showsArt = artModel != null && artLoad.loaded
@@ -770,7 +775,8 @@ internal fun ChannelsListArt(
         val channel = channels.firstOrNull { it.id == id } ?: return@AnimatedContent
         val now = nowSec()
         val art = remember(frame.observation, id, now, programArt) {
-            if (programArt) frame.observation.eventAt(channel.id, Instant.fromEpochSeconds(now))?.image else null
+            if (programArt) frame.observation.eventAt(channel.id, Instant.fromEpochSeconds(now))?.let(::programmeArtwork)
+                else null
         }
         ProgrammePanePicture(art, channel.icon, channel.id, "channels-list-art-logo", Modifier.fillMaxSize())
     }

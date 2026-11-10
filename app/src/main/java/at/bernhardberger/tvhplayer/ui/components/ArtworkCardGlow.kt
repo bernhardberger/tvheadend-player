@@ -16,9 +16,8 @@ import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.CardGlow
 import androidx.tv.material3.Glow
 import androidx.tv.material3.MaterialTheme
-import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
-import at.bernhardberger.tvhplayer.core.AppArtworkSource
+import at.bernhardberger.tvhplayer.core.programmeArtworkModel
 import at.bernhardberger.tvhplayer.images.DetailsArtColors
 
 /**
@@ -45,7 +44,7 @@ internal fun Modifier.cardGlowRoom(horizontal: Dp = 0.dp, top: Dp = 0.dp, bottom
 /** Native focus glow, coloured by the card's picture, or its logo when there is no picture. */
 @Composable
 internal fun artworkCardGlow(
-    art: ArtworkId?,
+    art: ChannelIcon?,
     picon: ChannelIcon?,
     interactionSource: InteractionSource,
 ): CardGlow {
@@ -55,7 +54,7 @@ internal fun artworkCardGlow(
     val session = artwork.currentSession
     val accents = LocalChannelAccents.current
     val logo by remember(artwork, picon) { derivedStateOf { picon?.let(artwork::logo) } }
-    val picture = remember(session, art) { session?.let { current -> art?.let { AppArtworkSource(current, it) } } }
+    val picture = remember(session, art) { session?.let { current -> art?.let { programmeArtworkModel(it, current) } } }
     val source = picture ?: logo
     val neutral = MaterialTheme.colorScheme.onSurface
     // A changed picture/profile must never inherit another card's colour, even for one frame.

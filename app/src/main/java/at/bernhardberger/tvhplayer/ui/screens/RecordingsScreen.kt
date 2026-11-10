@@ -16,6 +16,7 @@ import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.common.formatDateRange
 import at.bernhardberger.tvhplayer.ui.common.formatFileSize
 import at.bernhardberger.tvhplayer.core.summarizeDvrFolder
+import at.bernhardberger.tvhplayer.core.recordingArtwork
 import at.bernhardberger.tvhplayer.core.runningRecordings
 import at.bernhardberger.tvhplayer.core.folderContextActions
 import at.bernhardberger.tvhplayer.core.folderActionTargets
@@ -1110,7 +1111,7 @@ internal fun RecordingsScreenContent(
                 }
             },
             artwork = {
-                val artwork = (opened.image ?: opened.fanartImage)?.takeIf { selectedCapability != null }
+                val artwork = recordingArtwork(opened)?.takeIf { selectedCapability != null }
                 ProvideArtworkSession(selectedCapability, observation) {
                     val viewerFraction = recordingViewerPosition(opened.id)?.fraction
                     val running = recordingIsRunning(opened)

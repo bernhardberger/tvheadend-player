@@ -17,11 +17,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
-import at.bernhardberger.tvhplayer.core.AppArtworkSource
+import at.bernhardberger.tvhplayer.core.programmeArtworkModel
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
@@ -29,10 +28,10 @@ import at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers
 import at.bernhardberger.tvhplayer.ui.components.rememberChannelAccent
 import coil3.compose.SubcomposeAsyncImage
 
-/** Pass the existing TvheadendArtworkLoader and the current session capability, never a raw URL. */
+/** Cache selectors use the current session; remote pictures use the channel-logo loading path. */
 @Composable
 fun ProgrammeHero(
-    image: ArtworkId?,
+    image: ChannelIcon?,
     channelId: ChannelId,
     channelNumber: String,
     picon: ChannelIcon?,
@@ -69,7 +68,7 @@ fun ProgrammeHero(
             }
         }
         if (artwork != null && currentSession != null) {
-            SubcomposeAsyncImage(AppArtworkSource(currentSession, artwork), null,
+            SubcomposeAsyncImage(programmeArtworkModel(artwork, currentSession), null,
                 modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop,
                 loading = { fallback() }, error = { fallback() })
         } else fallback()

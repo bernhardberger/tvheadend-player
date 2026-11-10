@@ -38,12 +38,11 @@ import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
-import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
 import at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers
-import at.bernhardberger.tvhplayer.core.AppArtworkSource
+import at.bernhardberger.tvhplayer.core.programmeArtworkModel
 import at.bernhardberger.tvhplayer.core.PlayerStateCell
 import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
 import at.bernhardberger.tvhplayer.ui.TvOverlayFooterGradientRunout
@@ -322,7 +321,7 @@ internal fun PlayerPresentedLiveTimeline(
  */
 @Composable
 private fun ProgrammeArtworkTile(
-    artwork: ArtworkId?,
+    artwork: ChannelIcon?,
     picon: ChannelIcon?,
     channelId: ChannelId?,
     channelNumber: String,
@@ -337,7 +336,7 @@ private fun ProgrammeArtworkTile(
         // Under the picture too, so loading shows the same channel ground as a missing picture.
         if (withoutChannel) RecordingArtworkFallback() else ChannelArtworkFallback(picon, channelId, channelNumber)
         if (id != null && currentSession != null && !failed) {
-            AsyncImage(AppArtworkSource(currentSession, id), null,
+            AsyncImage(programmeArtworkModel(id, currentSession), null,
                 Modifier.fillMaxSize().testTag("player-info-artwork"), contentScale = ContentScale.Crop, onError = { failed = true })
         }
     }
