@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.4.15
+
+### Playback
+
+- Recordings from channels that list an audio description track but never
+  send it, like Channel 4 HD and ITV HD on Freeview, play again. Before, they
+  failed with *FAILED_RUNTIME_CHECK (1004)*, finished or still running. The
+  empty track is left out (#26).
+- Switching to another channel or recording right after one failed starts it
+  instead of showing the old error.
+
+### Home
+
+- The *Right now* card says *Back to live TV* or *Back to recording* instead
+  of showing a grey *Recording* badge, and its icon shows whether playback is
+  playing or paused (#27).
+- After playback fails, the card doesn't offer to go back to it, and Back on
+  Home doesn't reopen the error. Opening that channel or recording again
+  starts it anew instead of showing the error screen (#27, #29).
+- *Continue watching* marks recordings that are still running with the red
+  dot.
+
+### Guide
+
+- A program that's being recorded offers *Watch from beginning* right after
+  *Watch* in its menu and details, when the recording can be played while it
+  runs (#28).
+- A direction pressed while the Guide is still loading isn't lost anymore. The
+  last press is applied once it's ready.
+
+### Pictures
+
+- Program and recording pictures show up when Tvheadend's image cache is off
+  and the guide links them over http, like pictures from an XMLTV guide (#22).
+
 ## 0.4.14
 
 ### Recordings
