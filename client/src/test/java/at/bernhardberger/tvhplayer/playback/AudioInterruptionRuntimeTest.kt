@@ -95,12 +95,14 @@ class AudioInterruptionRuntimeTest {
 
     @Test fun anErrorStillSetAfterItsDispatchFailsTheActiveTarget() = exercise {
         live(timeshift = false)
+        assertTrue(runtime.liveStartUndisturbed.value)
         player.createMessage { _, _ ->
             throw ExoPlaybackException.createForSource(IOException("stream failed"), PlaybackException.ERROR_CODE_IO_UNSPECIFIED)
         }.send()
         await("active target failure") { runtime.state.value is AppPlaybackState.Failed }
         assertNotNull(player.playerError)
         assertEquals(AppPlaybackTarget.Live(ChannelId(1)), (runtime.state.value as AppPlaybackState.Failed).target)
+        assertFalse(runtime.liveStartUndisturbed.value)
     }
 
     @Test fun personalOutputDisconnectRestoresPassthroughWithoutResumingNoisyPausedPlayback() = exercise {
@@ -748,6 +750,8 @@ class AudioInterruptionRuntimeTest {
         recording()
         assertEquals(false, liveDuringRecordingInstall)
         assertFalse(startupBuffer.isLiveTarget)
+        assertNotNull(runtime.recordingSelection.value)
+        assertNotNull(runtime.recordingAdmission.value)
 
         var liveDuringLiveInstall: Boolean? = null
         beforeLiveBinding = { liveDuringLiveInstall = startupBuffer.isLiveTarget }
@@ -760,6 +764,8 @@ class AudioInterruptionRuntimeTest {
         startSubscription(connection.awaitCollectionRegistered())
         await { install.isCompleted }
         assertTrue(install.await()?.isStarted == true)
+        assertNull(runtime.recordingSelection.value)
+        assertNull(runtime.recordingAdmission.value)
 
         // A failed recording replacement leaves the live target, and the live threshold, in place.
         beforeRecordingBinding = { throw IllegalStateException("Synthetic binding failure") }
@@ -995,8 +1001,11 @@ class AudioInterruptionRuntimeTest {
     }
 
     @Test fun viewerRetryFromFailedShowsStartingWhileTheTunerIsAcquired() = exercise {
+        val firstInstall = mutableListOf<AppPlaybackState>()
+        beforeLiveBinding = { firstInstall += runtime.state.value }
         session.scriptLivePlaybackFailure(PlaybackBindingResult.TargetUnavailable)
         val failed = runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(1))))
+        assertEquals(listOf(AppPlaybackState.Starting), firstInstall)
         assertFalse(failed?.isStarted == true)
         assertTrue(runtime.state.value is AppPlaybackState.Failed)
         session.scriptLivePlaybackSuccess(manager)
@@ -2478,6 +2487,8 @@ class AudioInterruptionRuntimeTest {
 
     @Test fun failedRecordingInstallationRetriesCoordinatorCleanupWithoutExternalPlaylistClear() {
         for (interruptedLive in listOf(false, true)) exercise {
+            var acquiring: AppPlaybackState? = null
+            beforeRecordingBinding = { acquiring = runtime.state.value }
             if (interruptedLive) {
                 live(timeshift = false)
                 focus.send(AudioInterruption.NOISY)
@@ -2492,6 +2503,9 @@ class AudioInterruptionRuntimeTest {
             }
             await { failed.isCompleted }
             assertEquals(PlaybackTargetResult.PLAYER_UNAVAILABLE, failed.await())
+            if (!interruptedLive) assertEquals(AppPlaybackState.Starting, acquiring)
+            assertTrue(runtime.state.value is AppPlaybackState.Failed)
+            assertEquals(AppPlaybackTarget.Recording(DvrEntryId(1)), (runtime.state.value as AppPlaybackState.Failed).target)
             assertFalse(runtime.hasAudioInterruption)
             assertFalse(audioDisabled())
             val remaining = player.currentMediaItem
@@ -2554,11 +2568,13 @@ class AudioInterruptionRuntimeTest {
 
     @Test fun departedLivePermanentlyWithdrawsAttributionAndDoesNotReclaimReplacement() = exercise {
         live(timeshift = false)
+        assertTrue(runtime.liveStartUndisturbed.value)
         val replacement = androidx.media3.common.MediaItem.fromUri("file:///replacement")
         player.setMediaItem(replacement)
         player.play()
         await { runtime.livePlaybackObservation.value == LivePlaybackObservation.Departed }
         await { runtime.activeTarget.value == null }
+        assertFalse(runtime.liveStartUndisturbed.value)
         runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
         signalPlayIntent()
         settle()

@@ -642,6 +642,9 @@ class LivePauseRuntimeTest {
         assertFalse(runtime.liveStartUndisturbed.value)
         assertNull(runtime.pauseTimeshiftPlayback())
         assertEquals(TimeshiftCommandResult.ACCEPTED, runtime.resumeTimeshift())
+        assertNull(runtime.pauseTimeshiftPlayback())
+        runtime.play()
+        settle()
         assertFalse(runtime.liveStartUndisturbed.value)
         assertEquals(LivePauseState(LivePauseAvailability.STARTING, selectionPending = true), runtime.livePause.value)
         beforeSettingsRead = {}
@@ -745,6 +748,14 @@ class LivePauseRuntimeTest {
         }
         await { install.isCompleted }
         assertTrue(install.await()?.isStarted == true)
+        assertFalse(runtime.liveStartUndisturbed.value)
+        assertEquals(LivePauseState(), runtime.livePause.value)
+        val stop = scope.async { runtime.stop() }
+        await { stop.isCompleted }
+        assertEquals(LivePauseState(), runtime.livePause.value)
+        live()
+        assertTrue(runtime.liveStartUndisturbed.value)
+        runtime.detach()
         assertFalse(runtime.liveStartUndisturbed.value)
     }
 

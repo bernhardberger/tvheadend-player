@@ -649,8 +649,8 @@ class VideoCoverRuntimeTest {
             assertEquals(shown, runtime.videoPresentation.value)
         }
 
-    @Test fun replacementStopsTheWatchOfThePictureItReplaces() =
-        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+    @Test fun replacementStopsTheWatchOfThePictureItReplaces() {
+        for (departed in listOf(false, true)) exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
             val counters = countVideoFrames()
             live()
             forcedVideoFormat = videoFormat("old")
@@ -665,7 +665,25 @@ class VideoCoverRuntimeTest {
             renderFrames(counters)
             assertEquals("the replaced picture is no longer watched", reads, videoDecoderCounterReads)
             assertEquals(AppVideoPresentation(epoch = epoch, visible = false), runtime.videoPresentation.value)
+            forcedVideoFormat = videoFormat("new")
+            renderFirstFrame()
+            renderFrames(counters)
+            assertTrue(runtime.videoPresentation.value.visible)
+            if (departed) {
+                player.setMediaItem(androidx.media3.common.MediaItem.fromUri("file:///replacement"))
+                player.play()
+                await { runtime.activeTarget.value == null }
+            } else {
+                val stopped = scope.async { runtime.stop() }
+                await { stopped.isCompleted }
+            }
+            val ended = runtime.videoPresentation.value
+            assertFalse(ended.visible)
+            assertNotEquals(epoch, ended.epoch)
+            renderFrames(counters)
+            assertEquals(ended, runtime.videoPresentation.value)
         }
+    }
 
     @Test fun bufferingStopsTheWatchOfTheCoveredPictureUntilItIsReadyAgain() =
         exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
@@ -848,27 +866,32 @@ class VideoCoverRuntimeTest {
             assertEquals(AppVideoPresentation(epoch = epoch, visible = true), runtime.videoPresentation.value)
         }
 
-    @Test fun viewerPauseShowsTheReadyPictureOfAPlayingStartCutShort() =
-        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+    @Test fun viewerPauseShowsTheReadyPictureOfAPlayingStartCutShort() {
+        for (transportPause in listOf(false, true)) exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
             val counters = countVideoFrames()
             val epoch = startCutShort(paused = false)
             playerReady()
             renderFrames(counters, 0)
             assertEquals(AppVideoPresentation(epoch = epoch, visible = false), runtime.videoPresentation.value)
-            runtime.pause()
+            if (transportPause) runtime.pauseTimeshiftPlayback() else runtime.pause()
             await { runtime.videoPresentation.value.visible }
             assertFalse(player.playWhenReady)
             assertEquals(AppVideoPresentation(epoch = epoch, visible = true), runtime.videoPresentation.value)
         }
+    }
 
-    @Test fun failedReplacementKeepsThePlayingTargetThatStaysCoveredUntilItsPictureMovesAgain() =
-        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+    @Test fun failedReplacementKeepsThePlayingTargetThatStaysCoveredUntilItsPictureMovesAgain() {
+        for (paused in listOf(false, true)) exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
             val counters = countVideoFrames()
             live(timeshift = false)
             renderFirstFrame()
             renderFrames(counters)
             val kept = runtime.videoPresentation.value
             assertTrue(kept.visible)
+            if (paused) {
+                runtime.pause()
+                await { !player.playWhenReady }
+            }
             session.scriptLivePlaybackFailure(PlaybackBindingResult.TargetUnavailable)
             val install = scope.async {
                 runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(2))))
@@ -876,13 +899,14 @@ class VideoCoverRuntimeTest {
             await { install.isCompleted }
 
             assertFalse(install.await()?.isStarted == true)
-            assertTrue(player.playWhenReady)
+            assertEquals(!paused, player.playWhenReady)
             // Paused for the attempt and resumed: its last frame stands until its audio runs again.
             renderFrames(counters, 0)
-            assertEquals(kept.copy(visible = false), runtime.videoPresentation.value)
+            assertEquals(kept.copy(visible = paused), runtime.videoPresentation.value)
             renderFrames(counters)
             assertEquals(kept, runtime.videoPresentation.value)
         }
+    }
 
     @Test fun firstFrameOfTheNewTargetDuringItsInstallCountsOnceInstalled() =
         exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {

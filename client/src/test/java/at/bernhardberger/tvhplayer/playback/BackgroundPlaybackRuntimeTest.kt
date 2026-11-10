@@ -904,6 +904,15 @@ class BackgroundPlaybackRuntimeTest {
         val stopped = scope.async { runtime.stop() }
         await { stopped.isCompleted }
         assertNull(runtime.frameRate.requested.value.rate)
+        live(frameDurationUs = 40_000L)
+        await { runtime.frameRate.requested.value.rate == 50f }
+        val replacement = androidx.media3.common.MediaItem.fromUri("file:///replacement")
+        player.setMediaItem(replacement)
+        player.play()
+        await { runtime.activeTarget.value == null }
+        assertEquals(SurfaceFrameRateRequest(), runtime.frameRate.requested.value)
+        assertNull(runtime.frameRate.declared.value)
+        assertEquals(replacement, player.currentMediaItem)
     }
 
     @Test fun detachStopsTheDeclarationsAndForgetsTheRequest() {

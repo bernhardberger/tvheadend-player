@@ -213,6 +213,11 @@ class RecordingRecoveryPositionTest {
                     settleMain()
                     assertTrue("deliberate destination: ${player.currentPosition}", player.currentPosition < 25 * ONE_MINUTE)
                     assertNull(runtime.recordingSkipPrompt.value)
+                    runtime.stop()
+                    assertTrue(runtime.recordingCutpoints.value.isEmpty())
+                    assertTrue(runtime.recordingMarks.value.isEmpty())
+                    assertTrue(runtime.recordingChapters.value.isEmpty())
+                    assertNull(runtime.recordingSkipPrompt.value)
                 }
             }
         }
@@ -256,6 +261,9 @@ class RecordingRecoveryPositionTest {
 
     @Test fun retryAfterAReadErrorContinuesWhereTheRecordingStood() = exercise {
         play(FIRST)
+        val installed = player.currentMediaItem
+        assertNull(restore(FIRST))
+        assertSame(installed, player.currentMediaItem)
         failAtTwentyMinutes()
         val failure = runtime.state.value as AppPlaybackState.Failed
         assertEquals(AppPlaybackFailureReason.RECORDING_READ_FAILED, failure.reason)
