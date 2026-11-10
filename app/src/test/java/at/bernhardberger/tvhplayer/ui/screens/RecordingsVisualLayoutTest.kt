@@ -62,10 +62,10 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
-import at.bernhardberger.tvhplayer.ui.components.awaitBrowsePreparation
-import at.bernhardberger.tvhplayer.ui.components.browsePreparationLane
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
+import at.bernhardberger.tvhplayer.testutil.awaitScheduledWork
+import at.bernhardberger.tvhplayer.ui.components.LocalBrowsePreparationContext
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 
 /** Offline production screen and shell, with real D-pad focus and no server/player. */
@@ -87,6 +87,7 @@ class RecordingsVisualLayoutTest {
     private val screenShown = mutableStateOf(true)
     private val endPaddingState = mutableStateOf<Dp?>(null)
     private val connectionState = mutableStateOf<ConnectionUiState>(ConnectionUiState.Ready)
+    private val preparationContext = mutableStateOf<CoroutineContext>(EmptyCoroutineContext)
 
     @Before fun prepare() {
         oldLocale = Locale.getDefault()
@@ -311,26 +312,17 @@ class RecordingsVisualLayoutTest {
     @Test fun scheduleDeepLinkWaitsForTheMatchingPreparedSnapshot() {
         screenState.open(at.bernhardberger.tvhplayer.core.DvrLibraryMode.SCHEDULE)
         show(empty = true)
-        val entered = CountDownLatch(1)
-        val release = CountDownLatch(1)
-        browsePreparationLane.dispatch(EmptyCoroutineContext) {
-            entered.countDown()
-            check(release.await(10, TimeUnit.SECONDS)) { "Test did not release preparation" }
+        val preparation = StandardTestDispatcher()
+        compose.runOnIdle { preparationContext.value = preparation }
+        publish((40L..49L).map { recording(it, "Scheduled expedition ${it - 39}", null,
+            DvrEntryState.SCHEDULED, startEpochSeconds = 1_900_000_000L + it * 3600) }, awaitPreparation = false)
+        compose.runOnIdle {
+            screenState.open(at.bernhardberger.tvhplayer.core.DvrLibraryMode.SCHEDULE, DvrEntryId(48))
         }
-        assertTrue(entered.await(10, TimeUnit.SECONDS))
-        try {
-            publish((40L..49L).map { recording(it, "Scheduled expedition ${it - 39}", null,
-                DvrEntryState.SCHEDULED, startEpochSeconds = 1_900_000_000L + it * 3600) }, awaitPreparation = false)
-            compose.runOnIdle {
-                screenState.open(at.bernhardberger.tvhplayer.core.DvrLibraryMode.SCHEDULE, DvrEntryId(48))
-            }
-            compose.waitForIdle()
-            compose.runOnIdle { assertEquals("The old empty projection cannot judge the new snapshot",
-                DvrEntryId(48), screenState.requestedScheduleEntryId.value) }
-        } finally {
-            release.countDown()
-        }
-        compose.awaitBrowsePreparation()
+        compose.waitForIdle()
+        compose.runOnIdle { assertEquals("The old empty projection cannot judge the new snapshot",
+            DvrEntryId(48), screenState.requestedScheduleEntryId.value) }
+        compose.awaitScheduledWork(preparation) { screenState.requestedScheduleEntryId.value == null }
         compose.mainClock.advanceTimeBy(600)
         compose.onNodeWithTag("recording-list-entry-48").assertIsFocused().assertIsDisplayed()
         compose.runOnIdle { assertNull(screenState.requestedScheduleEntryId.value) }
@@ -904,7 +896,7 @@ class RecordingsVisualLayoutTest {
                 start = Instant.fromEpochSeconds(now - 300), stop = Instant.fromEpochSeconds(now + 3_300),
                 channelName = "Ridge Earth HD"),
         ))
-        compose.waitUntil(10_000) { compose.onAllNodes(isFocused()).fetchSemanticsNodes().isNotEmpty() }
+        focused("recordings-recording-now-folder")
         key(Key.DirectionUp)
         key(Key.DirectionRight)
         compose.onNodeWithText("Schedule").assertIsFocused()
@@ -955,7 +947,7 @@ class RecordingsVisualLayoutTest {
 
     @Test fun emptyLibraryKeepsModeTabsReachableWithoutCommands() {
         show(empty = true)
-        compose.waitUntil(10_000) {
+        compose.mainClock.advanceTimeUntil(10_000) {
             compose.onAllNodes(hasText("Archive") and isFocused()).fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithText("No recordings are available.").assertIsDisplayed()
@@ -973,7 +965,7 @@ class RecordingsVisualLayoutTest {
         connectionState.value = ConnectionUiState.SyncingChannels
         show(empty = true, diskSpace = space)
         // The loading handoff still parks focus on the tabs; the skeleton takes none.
-        compose.waitUntil(10_000) {
+        compose.mainClock.advanceTimeUntil(10_000) {
             compose.onAllNodes(hasText("Archive") and isFocused()).fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithTag("recordings-skeleton").assertIsDisplayed()
@@ -990,10 +982,7 @@ class RecordingsVisualLayoutTest {
 
         compose.runOnIdle { connectionState.value = ConnectionUiState.Ready }
         publish(listOf(recording(1, LONG_TITLE, "Documentaries/northern.ts"), recording(5, "Harbor Lights Live", "concert.ts")))
-        // The archive is prepared off the main thread, which waitForIdle does not wait for.
-        compose.waitUntil(10_000) {
-            compose.onAllNodes(hasTestTag("recordings-archive-list"), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
-        }
+        compose.onNodeWithTag("recordings-archive-list", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("recordings-skeleton").assertDoesNotExist()
         assertEquals(header, bounds("recordings-header"))
         assertEquals(tabs, bounds("recordings-mode-tabs"))
@@ -1012,12 +1001,14 @@ class RecordingsVisualLayoutTest {
     private fun preparationSkeletonStaysInPlace(scale: Float) {
         connectionState.value = ConnectionUiState.SyncingChannels
         show(scale = scale, empty = true)
-        compose.waitUntil(10_000) {
+        compose.mainClock.advanceTimeUntil(10_000) {
             compose.onAllNodes(hasText("Archive") and isFocused()).fetchSemanticsNodes().isNotEmpty()
         }
         val syncing = bounds("recordings-skeleton")
         compose.runOnIdle { screenShown.value = false }
         compose.waitForIdle()
+        val preparation = StandardTestDispatcher()
+        compose.runOnIdle { preparationContext.value = preparation }
         // A new entry prepares its first frame: the focus anchor shows the same skeleton, not "Loading…".
         compose.mainClock.autoAdvance = false
         try {
@@ -1035,7 +1026,7 @@ class RecordingsVisualLayoutTest {
         } finally {
             compose.mainClock.autoAdvance = true
         }
-        compose.waitUntil(10_000) {
+        compose.awaitScheduledWork(preparation) {
             compose.onAllNodesWithTag("browse-preparing", useUnmergedTree = true).fetchSemanticsNodes().isEmpty()
         }
         assertEquals(syncing, bounds("recordings-skeleton"))
@@ -1121,7 +1112,7 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionUp)
         compose.onNodeWithText("Archive").assertIsFocused()
         publish(listOf(recording(1, "Remaining", "Documentaries/remaining.ts")))
-        compose.waitUntil(10_000) { screenState.archivePath == listOf("Documentaries") }
+        compose.runOnIdle { assertEquals(listOf("Documentaries"), screenState.archivePath) }
         compose.onNodeWithText("Archive").assertIsFocused()
         key(Key.DirectionDown)
         focused("recording-list-entry-1")
@@ -1457,7 +1448,7 @@ class RecordingsVisualLayoutTest {
                     dvrDiskSpaceState = it.dvrDiskSpaceState)
             })
         }
-        if (awaitPreparation) compose.awaitBrowsePreparation()
+        if (awaitPreparation) compose.waitForIdle()
     }
 
     private fun show(scale: Float = 1f, empty: Boolean = false, entries: List<DvrEntry>? = null, endPadding: Dp? = null,
@@ -1491,7 +1482,10 @@ class RecordingsVisualLayoutTest {
         }
         compose.setContent {
             val liveObservation by session.observation.collectAsState()
-            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, scale)) {
+            CompositionLocalProvider(
+                LocalDensity provides Density(LocalDensity.current.density, scale),
+                LocalBrowsePreparationContext provides preparationContext.value,
+            ) {
                 TVHeadendPlayerTheme {
                     view = LocalView.current
                     backDispatcher = requireNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
@@ -1525,7 +1519,7 @@ class RecordingsVisualLayoutTest {
                 }
             }
         }
-        compose.awaitBrowsePreparation()
+        compose.waitForIdle()
     }
 
     private fun recording(id: Long, title: String, path: String?, state: DvrEntryState = DvrEntryState.COMPLETED,
