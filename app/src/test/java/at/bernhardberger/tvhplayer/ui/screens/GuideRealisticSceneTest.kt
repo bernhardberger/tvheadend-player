@@ -46,6 +46,13 @@ import at.bernhardberger.tvhplayer.settings.UiSettings
 import at.bernhardberger.tvhplayer.settings.GuideView
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.testutil.CaptureOutput
+import at.bernhardberger.tvhplayer.testutil.pressKey
+import at.bernhardberger.tvhplayer.ui.components.LocalBrowsePreparationContext
+import at.bernhardberger.tvhplayer.ui.components.LocalArtworkSamplingContext
+import at.bernhardberger.tvhplayer.ui.components.LocalChannelAccents
+import at.bernhardberger.tvhplayer.images.ChannelAccents
+import at.bernhardberger.tvhplayer.stores.ChannelAccentStore
+import kotlin.coroutines.EmptyCoroutineContext
 import at.bernhardberger.tvhplayer.ui.common.AppClock
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore
@@ -109,6 +116,7 @@ class GuideRealisticSceneTest {
     private val models = ViewModelStore()
     private val runtimeScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val position = GuidePositionStore()
+    private val accents = ChannelAccents(ChannelAccentStore(), EmptyCoroutineContext) { _, _ -> null }
     private lateinit var player: ExoPlayer
     private lateinit var view: View
     private lateinit var session: FakeTvheadendSession
@@ -172,7 +180,7 @@ class GuideRealisticSceneTest {
             // Northline World retains its declared icon ID, but its image really fails.
             (channel.icon as? ChannelIcon.ImageCache)?.artworkId?.takeUnless { record.getString("channel_id") == "ch-northline-world" }
                 ?.let { it to FixtureArt.picon(record.getString("picon").removeSuffix(".png")) }
-        }.toMap()))
+        }.toMap()).newBuilder().coroutineContext(Dispatchers.Main.immediate).build())
     }
 
     @After fun release() {
@@ -211,7 +219,7 @@ class GuideRealisticSceneTest {
         capture("guide-fixture-recording-now")
 
         moveToChannel(6)
-        compose.waitUntil(10_000) {
+        compose.mainClock.advanceTimeUntil(10_000) {
             compose.onAllNodes(hasText("Northline World") and hasAnyAncestor(hasTestTag("epg-channel-header-6")),
                 useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
         }
@@ -548,6 +556,7 @@ class GuideRealisticSceneTest {
 
     @Test fun u5HeadlineOffGivesTheGridTheHeadlinesRoom() {
         showAt("2026-09-15T19:40:00")
+        compose.onNodeWithTag("guide-headline").assertExists()
         openViewOptions()
         keyUntilTag(Key.DirectionDown, "guide-view-headline")
         key(Key.Enter)
@@ -579,6 +588,7 @@ class GuideRealisticSceneTest {
     @Test fun u5RecordingNowAndScheduledMarksShowBesideTheirTitles() {
         showAt("2026-09-15T20:00:00")
         // Without the headline the window around 20:00 shows Northline Tonight (recording) and Amber Stage (scheduled twice by a series rule) together.
+        compose.onNodeWithTag("guide-headline").assertExists()
         runBlocking { uiSettings.setGuideView(GuideView(headline = false)) }
         compose.waitUntil(10_000) { compose.onAllNodesWithTag("guide-headline").fetchSemanticsNodes().isEmpty() }
         moveToChannel(9)
@@ -609,7 +619,7 @@ class GuideRealisticSceneTest {
             showAt("2026-09-15T19:40:00", holdCoverage = coverage)
             // Only a row with nothing in the window shows placeholders; Harbor Sport Plus's guide has ended.
             val row = channelIds.getValue("ch-harbor-sport-plus").value
-            compose.waitUntil(10_000) {
+            compose.mainClock.advanceTimeUntil(10_000) {
                 compose.onAllNodes(hasTestTag("guide-row-skeleton") and
                     hasAnyAncestor(hasTestTag("epg-channel-row-$row"))).fetchSemanticsNodes().isNotEmpty()
             }
@@ -627,7 +637,10 @@ class GuideRealisticSceneTest {
         keyUntilTag(Key.DirectionDown, "channels-tags-2")
         key(Key.Enter)
         tagFocused("channels-tags-button")
-        compose.waitUntil(10_000) {
+        compose.onNodeWithTag("channels-tags-button").assert(hasContentDescription("No guide data", substring = true))
+        val selectedChannel = channelIds.getValue("ch-harbor-sport-plus").value
+        compose.mainClock.advanceTimeUntil(10_000) {
+            compose.onAllNodes(hasTestTag("epg-channel-row-$selectedChannel")).fetchSemanticsNodes().isNotEmpty() &&
             compose.onAllNodes(hasText(context().getString(R.string.epg_no_data))).fetchSemanticsNodes().isNotEmpty()
         }
         capture("u5-empty")
@@ -770,7 +783,9 @@ class GuideRealisticSceneTest {
             val current = eventsByFixtureId.values.single { it.id == currentId }
             key(if (current.start > event.start) Key.DirectionLeft else Key.DirectionRight)
             // Focus follows the selection a frame later, and the window scrolls it into view after that.
-            compose.waitUntil(10_000) { position.position.value?.eventId != currentId }
+            compose.mainClock.advanceTimeUntil(10_000) {
+                position.position.value?.let { it.eventId != null && it.eventId != currentId } == true
+            }
             val selected = checkNotNull(position.position.value).eventId
             focused(checkNotNull(eventsByFixtureId.values.single { it.id == selected }.title))
             focusedChannel(checkNotNull(event.channelId).value.toInt())
@@ -863,6 +878,9 @@ class GuideRealisticSceneTest {
         compose.setContent {
             KoinIsolatedContext(koinApplication { modules(noticeModule) }) {
                 CompositionLocalProvider(LocalDensity provides Density(1f, fontScale),
+                    LocalBrowsePreparationContext provides EmptyCoroutineContext,
+                    LocalArtworkSamplingContext provides EmptyCoroutineContext,
+                    LocalChannelAccents provides accents,
                     at.bernhardberger.tvhplayer.ui.startup.LocalMainStartupKeyCycleOwner provides activityKeyOwner) {
                     TVHeadendPlayerTheme {
                         view = LocalView.current
@@ -894,7 +912,7 @@ class GuideRealisticSceneTest {
                 }
             }
         }
-        compose.waitUntil(10_000) {
+        compose.mainClock.advanceTimeUntil(10_000) {
             compose.onAllNodes(hasTestTag("guide-date-button") and isFocused()).fetchSemanticsNodes().isNotEmpty()
         }
         assertNotNull(model.observation.value.currentSession)
@@ -977,13 +995,12 @@ class GuideRealisticSceneTest {
     }
 
     private fun key(key: Key) {
-        compose.onRoot().performKeyInput { pressKey(key) }
-        compose.waitForIdle()
+        compose.pressKey(key)
     }
 
     private fun focused(title: String) {
         // Focus can reach a cell a frame before the window scrolls it into view.
-        compose.waitUntil(10_000) {
+        compose.mainClock.advanceTimeUntil(10_000) {
             compose.onAllNodes(hasText(title) and isFocused()).fetchSemanticsNodes().isNotEmpty() &&
                 compose.onNode(hasText(title) and isFocused()).isDisplayed()
         }
@@ -1053,7 +1070,7 @@ class GuideRealisticSceneTest {
 
     private fun focusedChannel(channel: Int) {
         val target = isFocused() and hasAnyAncestor(hasTestTag("epg-channel-row-$channel"))
-        compose.waitUntil(10_000) { compose.onAllNodes(target).fetchSemanticsNodes().isNotEmpty() }
+        compose.mainClock.advanceTimeUntil(10_000) { compose.onAllNodes(target).fetchSemanticsNodes().isNotEmpty() }
         compose.onNode(target).assertIsDisplayed().assertIsFocused()
     }
 

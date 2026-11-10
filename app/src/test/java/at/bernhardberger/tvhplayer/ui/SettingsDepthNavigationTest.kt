@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui
 
+import at.bernhardberger.tvhplayer.testutil.pressKey
+
 import android.app.Application
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import android.graphics.Bitmap
@@ -618,8 +620,9 @@ class SettingsDepthNavigationTest {
         compose.onNodeWithText("Archive").assertIsFocused().assertIsNotSelected()
         assertEquals("removed", runBlocking { store.settings.first().recordingProfileId?.value })
         press(Key.DirectionCenter)
+        // Real DataStore IO: await the persisted recording profile, not just the picker state.
         compose.waitUntil { runBlocking { store.settings.first().recordingProfileId == archive } }
-        // Persistence can publish before the selecting coroutine pops the picker and restores focus.
+        // Observed UI after DataStore IO: persistence can precede picker pop and focus restoration.
         compose.waitUntilExactlyOneExists(hasText("Recording profile") and isFocused())
         compose.onNodeWithText("Recording profile").assertIsFocused()
         assertEquals(archive, runBlocking { UiSettingsStore(RuntimeEnvironment.getApplication()).settings.first().recordingProfileId })
@@ -982,8 +985,9 @@ class SettingsDepthNavigationTest {
             compose.onNodeWithText(autoplay).assertIsFocused().assertIsOff()
             assertFalse(runBlocking { store.settings.first().autoStartPlayback })
             press(Key.DirectionCenter)
+            // Real DataStore IO: await persisted autoplay enablement.
             compose.waitUntil { runBlocking { store.settings.first().autoStartPlayback } }
-            // DataStore emits off the Compose idling resource: wait for the row to show the stored value.
+            // Observed UI after DataStore IO: the row must collect the independently emitted value.
             compose.waitUntil { compose.onAllNodes(hasText(autoplay) and isOn()).fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithText(autoplay).assertIsFocused().assertIsOn()
             press(Key.Back)
@@ -991,7 +995,9 @@ class SettingsDepthNavigationTest {
             press(Key.DirectionCenter)
             compose.onNodeWithText(autoplay).assertIsFocused().assertIsOn()
             press(Key.DirectionCenter)
+            // Real DataStore IO: await persisted autoplay disablement.
             compose.waitUntil { !runBlocking { store.settings.first().autoStartPlayback } }
+            // Observed UI after DataStore IO: the row must collect the independently emitted value.
             compose.waitUntil { compose.onAllNodes(hasText(autoplay) and isOff()).fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithText(autoplay).assertIsFocused().assertIsOff()
             press(Key.Back)
@@ -999,8 +1005,7 @@ class SettingsDepthNavigationTest {
     }
 
     private fun press(key: Key) {
-        compose.onRoot().performKeyInput { pressKey(key) }
-        compose.waitForIdle()
+        compose.pressKey(key)
     }
 
     /** A dialog reader is a second window, so keys go to its focused reading box. */

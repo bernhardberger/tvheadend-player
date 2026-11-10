@@ -11,6 +11,7 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
 import androidx.media3.exoplayer.ExoPlayer
@@ -27,7 +28,10 @@ import at.bernhardberger.tvhplayer.playback.*
 import at.bernhardberger.tvhplayer.settings.*
 import at.bernhardberger.tvhplayer.stores.*
 import at.bernhardberger.tvhplayer.viewmodels.*
-import at.bernhardberger.tvhplayer.ui.components.awaitBrowsePreparation
+import at.bernhardberger.tvhplayer.ui.components.LocalBrowsePreparationContext
+import at.bernhardberger.tvhplayer.testutil.pressKey
+import at.bernhardberger.tvhplayer.testutil.settleFrames
+import kotlin.coroutines.EmptyCoroutineContext
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyMode
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionOpener
 import kotlinx.coroutines.*
@@ -71,7 +75,7 @@ internal class NavigationJourneyFixture(
     }
 
     fun focus(tag: String) {
-        compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag(tag)).fetchSemanticsNodes().isNotEmpty() }
+        compose.mainClock.advanceTimeUntil(10_000) { compose.onAllNodes(hasTestTag(tag)).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag(tag).performSemanticsAction(SemanticsActions.RequestFocus) { it() }
         compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag(tag) and isFocused()).fetchSemanticsNodes().isNotEmpty() }
         settle()
@@ -156,49 +160,48 @@ internal class NavigationJourneyFixture(
                     }
                 }
             }
-            KoinIsolatedContext(koinApplication { modules(dependencies) }) {
-                TVHeadendPlayerTheme {
-                    back = requireNotNull(androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
-                    AppRoot(startupState = MainStartupState.Ready(server, autoStartPlayback = autoStartPlayback),
-                        runtimeServerSettings = server, applianceLaunchRequests = launchRequests,
-                        onPlayerVisibilityChanged = { playerVisible = it }, onRequestExit = {},
-                        registerActivityKeyContract = { contract ->
-                            startupKeyMode = contract.mode
-                            {}
-                        })
+            CompositionLocalProvider(LocalBrowsePreparationContext provides EmptyCoroutineContext) {
+                KoinIsolatedContext(koinApplication { modules(dependencies) }) {
+                    TVHeadendPlayerTheme {
+                        back = requireNotNull(androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
+                        AppRoot(startupState = MainStartupState.Ready(server, autoStartPlayback = autoStartPlayback),
+                            runtimeServerSettings = server, applianceLaunchRequests = launchRequests,
+                            onPlayerVisibilityChanged = { playerVisible = it }, onRequestExit = {},
+                            registerActivityKeyContract = { contract ->
+                                startupKeyMode = contract.mode
+                                {}
+                            })
+                    }
                 }
             }
         }
         if (guideEntry) {
-            compose.waitUntil(15_000) {
-                compose.mainClock.advanceTimeByFrame()
-                compose.awaitBrowsePreparation()
-                compose.onAllNodes(hasTestTag("epg-screen")).fetchSemanticsNodes().isNotEmpty()
+            compose.mainClock.advanceTimeUntil(15_000) {
+                compose.onAllNodes(hasTestTag("guide-date-button")).fetchSemanticsNodes().isNotEmpty()
             }
             settle()
             return
         }
         if (autoStartPlayback) {
+            settle()
+            // The coordinator installs the target on the real ExoPlayer playback thread.
             compose.waitUntil(15_000) {
-                compose.mainClock.advanceTimeByFrame()
-                compose.awaitBrowsePreparation()
                 playerVisible && runtime.activeTarget.value is AppPlaybackTarget.Live
             }
             return
         }
-        compose.waitUntil(15_000) { compose.onAllNodes(hasTestTag("nav-channels")).fetchSemanticsNodes().isNotEmpty() }
+        compose.mainClock.advanceTimeUntil(15_000) { compose.onAllNodes(hasTestTag("nav-channels")).fetchSemanticsNodes().isNotEmpty() }
         if (emptyChannels) {
             settle()
             return
         }
         compose.onNodeWithTag("nav-channels").performSemanticsAction(SemanticsActions.OnClick)
-        compose.waitUntil(15_000) { compose.onAllNodes(hasTestTag("channel-row-1")).fetchSemanticsNodes().isNotEmpty() }
+        compose.mainClock.advanceTimeUntil(15_000) { compose.onAllNodes(hasTestTag("channel-row-1")).fetchSemanticsNodes().isNotEmpty() }
         settle()
     }
 
     fun key(key: Key) {
-        compose.onRoot().performKeyInput { pressKey(key) }
-        compose.waitForIdle()
+        compose.pressKey(key)
         settle()
     }
 
@@ -241,14 +244,11 @@ internal class NavigationJourneyFixture(
             session.publish(SessionObservation.create(current.sessionState, current.channelState, current.epgState,
                 DvrRepositoryState.Current(DvrSnapshot.create(entries))))
         }
-        compose.awaitBrowsePreparation()
+        compose.waitForIdle()
     }
 
     fun settle() {
-        repeat(10) {
-            compose.mainClock.advanceTimeBy(100)
-            compose.awaitBrowsePreparation()
-        }
+        compose.settleFrames(10, 100)
     }
 
     private companion object {

@@ -1,5 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.testutil.pressKey
+import at.bernhardberger.tvhplayer.testutil.settleFrames
+
 import at.bernhardberger.tvhplayer.core.playerKeyAction
 import at.bernhardberger.tvhplayer.core.PlayerKeyAction
 import android.app.Application
@@ -908,10 +911,7 @@ class PlaybackOptionsRemoteKeyTest {
     }
 
     private fun frames() {
-        repeat(4) {
-            compose.mainClock.advanceTimeByFrame()
-            compose.waitForIdle()
-        }
+        compose.settleFrames(4, 16)
     }
 
     private fun advance(millis: Long) {
@@ -920,8 +920,7 @@ class PlaybackOptionsRemoteKeyTest {
     }
 
     private fun press(key: Key) {
-        compose.onRoot().performKeyInput { pressKey(key) }
-        frames()
+        compose.pressKey(key, settleFrames = 4, frameMillis = 16)
     }
 
     private fun keyDown(key: Key) {
