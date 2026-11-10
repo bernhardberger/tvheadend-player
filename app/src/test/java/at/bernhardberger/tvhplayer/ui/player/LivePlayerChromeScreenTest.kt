@@ -106,6 +106,8 @@ import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
+import at.bernhardberger.tvheadend.sdk.media3.LivePlaybackObservation
+import at.bernhardberger.tvheadend.sdk.media3.LiveTimeshiftState
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
 import at.bernhardberger.tvheadend.sdk.playback.StreamIndex
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionConfirmation
@@ -170,6 +172,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.withContext
 import org.junit.After
 import org.junit.Before
 import org.junit.Assert.assertEquals
@@ -1636,9 +1640,15 @@ class LivePlayerChromeScreenTest {
             scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 3_600L)))
         }
         val manager = createSubscriptionManager(connection, UnconfinedTestDispatcher()).apply { startAdmission() }
+        val grantDispatcher = StandardTestDispatcher()
+        val opener = SubscriptionOpener { channel, consumer, period ->
+            val subscription = manager.open(channel, consumer, period)
+            // Hold the new subscription's bind handoff independently of the forced READY callback.
+            if (connection.subscribeCount > 1) withContext(grantDispatcher) { subscription } else subscription
+        }
         val settingsData = GatedPreferences()
         try {
-            screen(opener = manager, settingsData = settingsData)
+            screen(opener = opener, settingsData = settingsData)
             val now = System.currentTimeMillis() / 1_000L
             val events = (1..2L).flatMap { channel -> listOf(
                 EpgEvent.create(EventId(channel * 10), ChannelId(channel), Instant.fromEpochSeconds(now - 2_700),
@@ -1697,6 +1707,14 @@ class LivePlayerChromeScreenTest {
             startLiveSubscription(connection, 720, 0)
             playerReady()
             compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Playing }
+            // Forced READY is not the SDK's grant publication. Drive the bind handoff and wait
+            // for that observation before sampling; the new subscription has no timing status.
+            compose.mainClock.advanceTimeUntil {
+                grantDispatcher.scheduler.runCurrent()
+                idleMainLooper()
+                (runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)
+                    ?.timeshiftState is LiveTimeshiftState.Available
+            }
             settle()
             val unknown = runBlocking { runtime.sampleTimeshiftPresentation() }
             assertTrue("timeshift granted", unknown.available)
