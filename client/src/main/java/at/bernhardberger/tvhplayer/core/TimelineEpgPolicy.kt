@@ -98,6 +98,27 @@ fun shouldWaitForGuideCoverage(
 
 enum class GuidePendingNavigationAction { WAIT, RESTORE_ORIGIN, HEADER, MOVE }
 
+/** One consumed direction, not a queue of held-key repeats. */
+class GuidePreparationNavigation {
+    private var pending: EpgFocusDirection? = null
+
+    fun press(direction: EpgFocusDirection) { pending = direction }
+
+    fun clear() { pending = null }
+
+    fun take(
+        indexCurrent: Boolean,
+        scopeCurrent: Boolean = true,
+        guideActive: Boolean = true,
+        gridOwned: Boolean = true,
+        overlayOpen: Boolean = false,
+    ): EpgFocusDirection? {
+        if (!scopeCurrent || !guideActive || !gridOwned || overlayOpen) clear()
+        if (!indexCurrent) return null
+        return pending.also { clear() }
+    }
+}
+
 /** Cancels navigation intent, never grants coverage to an unknown destination. */
 fun guidePendingNavigationAction(
     direction: EpgFocusDirection,

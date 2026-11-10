@@ -84,6 +84,8 @@ import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.ui.components.rememberPreparedBrowseData
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.test.performKeyPress
 import at.bernhardberger.tvhplayer.ui.components.awaitBrowsePreparation
 import at.bernhardberger.tvhplayer.ui.components.awaitBrowsePreparationLane
 import at.bernhardberger.tvhplayer.ui.components.browsePreparationLane
@@ -788,7 +790,15 @@ class GuideNavigationTest : GuideScreenFixture() {
         assertEquals(window, checkNotNull(position.position.value).windowStartSec)
     }
 
-    @Test fun downDuringWindowIndexPreparationIsConsumedWithoutMoving() {
+    @Test fun directionDuringWindowIndexPreparationIsConsumedAndLatestPressReplayedOnce() {
+        preparationPress(back = false)
+    }
+
+    @Test fun backDuringWindowIndexPreparationDropsThePendingDirection() {
+        preparationPress(back = true)
+    }
+
+    private fun preparationPress(back: Boolean) {
         val release = java.util.concurrent.CountDownLatch(1)
         val held = java.util.concurrent.CountDownLatch(1)
         val holdPreparation = mutableStateOf(false)
@@ -802,9 +812,11 @@ class GuideNavigationTest : GuideScreenFixture() {
             }
         })
         key(Key.DirectionDown)
-        focused(title(1, 0))
+        compose.awaitBrowsePreparation()
+        compose.onNodeWithText(title(1, 0)).assertIsFocused()
         key(Key.DirectionRight)
-        focused(title(1, 1))
+        compose.awaitBrowsePreparation()
+        compose.onNodeWithText(title(1, 1)).assertIsFocused()
         try {
             compose.runOnIdle { holdPreparation.value = true }
             compose.waitForIdle()
@@ -812,11 +824,28 @@ class GuideNavigationTest : GuideScreenFixture() {
             keyWhilePreparing(Key.DirectionRight) // 22:00–23:00 shifts the 19:30–22:30 window.
             val before = position.position.value
             keyWhilePreparing(Key.DirectionDown)
+            keyWhilePreparing(Key.DirectionRight)
             assertEquals(before, position.position.value)
+            if (back) compose.onRoot().performKeyPress(KeyEvent(android.view.KeyEvent(0, 0,
+                android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_BACK, 0)))
             release.countDown()
-            focused(title(1, 2))
-            key(Key.DirectionDown)
-            focused(title(2, 2))
+            compose.awaitBrowsePreparation()
+            compose.mainClock.advanceTimeByFrame()
+            compose.awaitBrowsePreparation()
+            if (back) {
+                // Back down cancels the queued direction even while its release is still pending.
+                compose.onNodeWithText(title(1, 2)).assertIsFocused()
+                compose.onRoot().performKeyPress(KeyEvent(android.view.KeyEvent(0, 0,
+                    android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_BACK, 0)))
+                compose.awaitBrowsePreparation()
+                compose.mainClock.advanceTimeByFrame()
+                compose.awaitBrowsePreparation()
+                compose.onNodeWithTag("nav-epg").assertIsFocused()
+            } else {
+                compose.onNodeWithText(title(1, 3)).assertIsFocused()
+                key(Key.DirectionDown)
+                compose.onNodeWithText(title(2, 3)).assertIsFocused()
+            }
         } finally {
             release.countDown()
         }

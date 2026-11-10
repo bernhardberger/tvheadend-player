@@ -11,6 +11,36 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TimelineEpgFocusPolicyTest {
+    @Test fun preparationKeepsOnlyTheLatestDirectionAndReplaysOnce() {
+        val navigation = GuidePreparationNavigation()
+        navigation.press(EpgFocusDirection.RIGHT)
+        assertNull(navigation.take(indexCurrent = false))
+        assertEquals(EpgFocusDirection.RIGHT, navigation.take(indexCurrent = true))
+        assertNull(navigation.take(indexCurrent = true))
+        repeat(20) { navigation.press(EpgFocusDirection.RIGHT) }
+        assertEquals(EpgFocusDirection.RIGHT, navigation.take(indexCurrent = true))
+        assertNull(navigation.take(indexCurrent = true))
+        navigation.press(EpgFocusDirection.UP)
+        navigation.press(EpgFocusDirection.LEFT)
+        assertEquals(EpgFocusDirection.LEFT, navigation.take(indexCurrent = true))
+        assertNull(navigation.take(indexCurrent = true))
+    }
+
+    @Test fun preparationDropsDirectionsWhenTheirContextEnds() {
+        val navigation = GuidePreparationNavigation()
+        val invalidations: List<() -> Unit> = listOf(
+            { navigation.take(false, scopeCurrent = false) },
+            { navigation.take(false, guideActive = false) },
+            { navigation.take(false, gridOwned = false) },
+            { navigation.take(false, overlayOpen = true) },
+        )
+        for (invalidate in invalidations) {
+            navigation.press(EpgFocusDirection.DOWN)
+            invalidate()
+            assertNull(navigation.take(indexCurrent = true))
+        }
+    }
+
     @Test fun nowPointSequenceCrossesAGapAndReturnsToItsOrigin() {
         val rows = listOf(row(1, event(11, 0, 30), event(12, 30, 120)),
             row(2, event(21, 30, 120)), row(3, event(31, 0, 30), event(32, 30, 120)))
