@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.Color
 import android.view.View
 import android.os.Looper
 import at.bernhardberger.tvhplayer.testutil.CaptureOutput
+import at.bernhardberger.tvhplayer.testutil.assertMainSettled
 import java.io.File
 import org.robolectric.annotation.GraphicsMode
 import androidx.compose.ui.semantics.SemanticsActions
@@ -136,6 +137,7 @@ import at.bernhardberger.tvhplayer.core.PlayerSurface
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
+import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.components.ProvideWatchingProgress
 import at.bernhardberger.tvhplayer.playback.LivePauseAvailability
 import at.bernhardberger.tvhplayer.playback.PlaybackAudioFocus
@@ -171,7 +173,6 @@ import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.withContext
 import org.junit.After
@@ -199,6 +200,7 @@ class LivePlayerChromeScreenTest {
     private val context = ApplicationProvider.getApplicationContext<Application>()
     private val models = ViewModelStore()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val subscriptionDispatcher = StandardTestDispatcher()
     private lateinit var player: ExoPlayer
     private lateinit var view: View
     private lateinit var runtime: AppPlaybackRuntime
@@ -222,6 +224,7 @@ class LivePlayerChromeScreenTest {
     // The preferencesDataStore delegate is a sandbox singleton, not a per-Application fixture.
     // Snapshot the real store rather than replacing production persistence or leaving channel 2
     // selected for the next screen test. There is deliberately no production reset API.
+    // These persistence calls await DataStore's real Dispatchers.IO file worker.
     @Suppress("UNCHECKED_CAST")
     private val lastPlayedPreferences by lazy {
         Class.forName("at.bernhardberger.tvhplayer.settings.ServerSettingsKt")
@@ -251,7 +254,7 @@ class LivePlayerChromeScreenTest {
         models.clear()
         scope.cancel()
         if (::player.isInitialized) player.release()
-        compose.waitUntil(5_000) { idleMainLooper(); scope.coroutineContext[Job]!!.isCompleted }
+        assertSubscriptionSettled("the screen's Main scope finishes cancellation") { scope.coroutineContext[Job]!!.isCompleted }
     }
 
     @Test fun startupPlayerTunesBehindCoverWithoutFocusOrKeysAndShowsOnlyThePassiveBannerFromItsFrame() {
@@ -269,7 +272,7 @@ class LivePlayerChromeScreenTest {
         assertEquals("covered keys cannot zap", AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
         assertFalse(exists("player-actions"))
         playerReady()
-        compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Playing }
+        assertMainSettled("the driven player reports Playing") { runtime.state.value is AppPlaybackState.Playing }
         settle()
         assertTrue("Playing alone is not a video frame", outcomes.isEmpty())
         compose.runOnIdle { playerListeners.toList().forEach { it.onRenderedFirstFrame() } }
@@ -316,8 +319,7 @@ class LivePlayerChromeScreenTest {
     @Test fun startupPlayerReportsItsExistingUnavailableOutcomeSoCoverCanRelease() {
         val outcomes = mutableListOf<MainStartupPlaybackOutcome>()
         screen(failing = true, contentAllowed = { false }, startup = true, onStartupOutcome = { outcomes += it })
-        // A late player failure posts to Android Main. Advancing Compose's clock alone does not
-        // drain Robolectric's looper or deliver the recomposed startup outcome.
+        // Media3's real ExoPlayer playback thread reports the undecodable stream's failure.
         compose.mainClock.autoAdvance = true
         compose.waitUntil(5_000) {
             compose.waitForIdle()
@@ -331,7 +333,7 @@ class LivePlayerChromeScreenTest {
         screen(contentAllowed = { false }, startup = true, onStartupOutcome = { outcomes += it })
         playerReady()
         settle()
-        compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Playing }
+        assertMainSettled("the driven player reports Playing") { runtime.state.value is AppPlaybackState.Playing }
         compose.runOnIdle { playerListeners.toList().forEach { it.onRenderedFirstFrame() } }
         settle()
         assertEquals(listOf(MainStartupPlaybackOutcome.PRESENTED), outcomes)
@@ -388,7 +390,7 @@ class LivePlayerChromeScreenTest {
             assertEquals(ApplianceLaunchState.Idle, requests.state.value)
         }
         settle()
-        compose.waitUntil(5_000) { idleMainLooper(); runtime.state.value is AppPlaybackState.Idle }
+        assertMainSettled("startup cancellation retires its tune") { runtime.state.value is AppPlaybackState.Idle }
         assertEquals(null, runtime.activeTarget.value)
         assertFalse(player.playWhenReady)
         root.activePlaybackChanged(null, null)
@@ -501,7 +503,7 @@ class LivePlayerChromeScreenTest {
         // The screen gives its request the failure back on this result (liveRetryRequestFailure).
         val results = mutableListOf<PlaybackTargetResult?>()
         compose.runOnIdle { video.retryLiveNow(viewerRetry = false) { results += it } }
-        compose.waitUntil(5_000) { idleMainLooper(); results.isNotEmpty() }
+        assertMainSettled("the retry returns its result") { results.isNotEmpty() }
         assertEquals(listOf(PlaybackTargetResult.NOT_READY), results)
     }
 
@@ -511,7 +513,7 @@ class LivePlayerChromeScreenTest {
             afterTargetPlay = { owner.lifecycle.currentState = Lifecycle.State.CREATED },
             onStartupOutcome = { outcomes += it })
         settle()
-        compose.waitUntil(5_000) { idleMainLooper(); runtime.state.value is AppPlaybackState.Idle }
+        assertMainSettled("startup cancellation retires its tune") { runtime.state.value is AppPlaybackState.Idle }
         assertEquals(null, runtime.activeTarget.value)
         assertFalse(player.playWhenReady)
         assertTrue(outcomes.isEmpty())
@@ -525,7 +527,7 @@ class LivePlayerChromeScreenTest {
         compose.runOnIdle { session.replaceGeneration(session.observation.value) }
         settle()
         assertEquals(listOf(MainStartupPlaybackOutcome.RECOVERY), outcomes)
-        compose.waitUntil(5_000) { idleMainLooper(); runtime.state.value is AppPlaybackState.Idle }
+        assertMainSettled("startup cancellation retires its tune") { runtime.state.value is AppPlaybackState.Idle }
         assertEquals(null, runtime.activeTarget.value)
         assertFalse(player.playWhenReady)
     }
@@ -734,7 +736,7 @@ class LivePlayerChromeScreenTest {
                 it.onIsPlayingChanged(false)
             }
         }
-        compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Buffering }
+        assertMainSettled("the driven player reports Buffering") { runtime.state.value is AppPlaybackState.Buffering }
         settle()
         assertEquals("a stall after a presented tune is not another tune", "Buffering", description("player-busy-indicator"))
         val ring = compose.onNodeWithTag("player-busy-indicator", useUnmergedTree = true).fetchSemanticsNode()
@@ -746,14 +748,14 @@ class LivePlayerChromeScreenTest {
         assertFalse(exists("player-hidden-slot"))
         assertEquals(ring.boundsInRoot, compose.onNodeWithTag("player-busy-indicator", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot)
         playerReady()
-        compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Playing }
+        assertMainSettled("the driven player reports Playing") { runtime.state.value is AppPlaybackState.Playing }
         settle()
         assertFalse("resuming removes the ring", exists("player-busy-indicator"))
     }
 
     @Test fun backWhilePausedLeavesOnlyTheChipAtTheBottomStart() = timeshiftPlaying { pauses ->
         compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.waitUntil(3_000) { idleMainLooper(); false in pauses }
+        assertSubscriptionSettled("the pause command reaches the player") { false in pauses }
         settle()
         assertEquals("the state cell shows the real state", "Paused", description("player-state"))
         assertFalse("no status slot in the info bar", exists("player-status-slot"))
@@ -873,17 +875,18 @@ class LivePlayerChromeScreenTest {
         val connection = ScriptedSubscriptionConnection().apply {
             scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 3_600L)))
         }
-        val manager = createSubscriptionManager(connection, Dispatchers.Default).apply { startAdmission() }
+        val manager = createSubscriptionManager(connection, subscriptionDispatcher).apply { startAdmission() }
         try {
             screen(opener = manager, onClose = onClose)
             startLiveSubscription(connection, height = 1080L, signal = 53739L, timeshift = true)
             playerReady()
-            compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Playing }
+            assertMainSettled("the driven player reports Playing") { runtime.state.value is AppPlaybackState.Playing }
             playerListeners.toList().forEach { it.onRenderedFirstFrame() }
-            compose.waitUntil(5_000) { runtime.videoPresentation.value.visible }
+            assertMainSettled("the driven frame is presented") { runtime.videoPresentation.value.visible }
+            // Media3's ExoPlayer playback thread binds the grant after collection registration.
             compose.waitUntil(5_000) { idleMainLooper(); runtime.livePause.value.availability == LivePauseAvailability.READY }
             if (mapPosition) {
-                runBlocking {
+                runTest(subscriptionDispatcher) {
                     // A displayed-content mapping is required to select a seek target.
                     connection.emit(SubscriptionEvent.Packet(
                         at.bernhardberger.tvheadend.sdk.playback.MuxFrameType.I, StreamIndex(1),
@@ -892,7 +895,7 @@ class LivePlayerChromeScreenTest {
                     ))
                 }
                 settle()
-                assertNotNull(runBlocking { runtime.sampleTimeshiftPresentation() }.playbackTarget)
+                assertNotNull(sampleTimeshift().playbackTarget)
             }
             val pauses = mutableListOf<Boolean>()
             compose.runOnIdle {
@@ -902,7 +905,7 @@ class LivePlayerChromeScreenTest {
             }
             block(pauses)
         } finally {
-            runBlocking { manager.closeAndJoin() }
+            runTest(subscriptionDispatcher) { manager.closeAndJoin() }
         }
     }
 
@@ -910,7 +913,7 @@ class LivePlayerChromeScreenTest {
     @Test fun backDownRenewsQuickListUntilReleaseRestoresSelection() {
         screen()
         playerReady()
-        compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Playing }
+        assertMainSettled("the driven player reports Playing") { runtime.state.value is AppPlaybackState.Playing }
         publishTracks(Tracks(listOf(audioTrack("a1", "en", true), audioTrack("a2", "de", false))))
         val start = player.trackSelectionParameters
         press(Key.MediaAudioTrack)
@@ -1067,7 +1070,7 @@ class LivePlayerChromeScreenTest {
     }) { assertTrue(exists("playback-options-display")); assertFalse(exists("player-actions")) }
     @Test fun holdBackOverQuickListClosesOnlyTheList() = holdGoesBack({
         playerReady()
-        compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Playing }
+        assertMainSettled("the driven player reports Playing") { runtime.state.value is AppPlaybackState.Playing }
         publishTracks(Tracks(listOf(audioTrack("a1", "en", true), audioTrack("a2", "de", false))))
         key(Key.MediaAudioTrack); assertTrue(exists("playback-options-track-list"))
     }) { assertFalse(exists("playback-options-track-list")); assertFalse(exists("player-actions")) }
@@ -1083,7 +1086,7 @@ class LivePlayerChromeScreenTest {
         var closes = 0
         timeshiftPlaying(onClose = { closes++ }) { pauses ->
             key(Key.DirectionCenter)
-            compose.waitUntil(3_000) { idleMainLooper(); false in pauses }
+            assertSubscriptionSettled("the pause command reaches the player") { false in pauses }
             key(Key.Back)
             assertFalse(exists("player-banner")); assertFalse(exists("player-actions"))
             assertEquals("Paused", description("player-hidden-slot"))
@@ -1206,9 +1209,9 @@ class LivePlayerChromeScreenTest {
 
     @Test fun pauseWithTimeshiftOffPostsOneNoticeWithoutTimelineFeedback() {
         val data = InMemoryData()
-        runBlocking { PlayerSettingsStore(data).setTimeshiftEnabled(false) }
+        runTest { PlayerSettingsStore(data).setTimeshiftEnabled(false) }
         screen(settingsData = data)
-        compose.waitUntil(5_000) { idleMainLooper(); runtime.livePause.value.availability == LivePauseAvailability.OFF }
+        assertMainSettled("in-memory settings disable pause") { runtime.livePause.value.availability == LivePauseAvailability.OFF }
         key(Key.DirectionDown)
         compose.onNodeWithTag("player-pause").assertIsFocused()
         repeat(3) { key(Key.DirectionCenter) }
@@ -1224,11 +1227,12 @@ class LivePlayerChromeScreenTest {
         val connection = ScriptedSubscriptionConnection().apply {
             scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 0L)))
         }
-        val manager = createSubscriptionManager(connection, Dispatchers.Default).apply { startAdmission() }
+        val manager = createSubscriptionManager(connection, subscriptionDispatcher).apply { startAdmission() }
         try {
             screen(opener = manager)
             startLiveSubscription(connection, height = 1080L, signal = 53739L)
             playerReady()
+            // Media3's ExoPlayer playback thread binds the grant after collection registration.
             compose.waitUntil(5_000) { idleMainLooper(); runtime.livePause.value.availability == LivePauseAvailability.UNAVAILABLE }
             key(Key.DirectionDown)
             compose.onNodeWithTag("player-pause").assertIsFocused()
@@ -1239,7 +1243,7 @@ class LivePlayerChromeScreenTest {
             assertFalse(exists("player-window-title"))
             assertFalse(exists("player-seek-feedback"))
         } finally {
-            runBlocking { manager.closeAndJoin() }
+            runTest(subscriptionDispatcher) { manager.closeAndJoin() }
         }
     }
 
@@ -1259,14 +1263,14 @@ class LivePlayerChromeScreenTest {
     @Test fun playerBannerHidesFiveSecondsAfterThisTunesFirstFrame() {
         screen()
         playerReady()
-        compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Playing }
+        assertMainSettled("the driven player reports Playing") { runtime.state.value is AppPlaybackState.Playing }
         // Playing without a picture: no video diagnostics does not prove audio-only.
         repeat(4) { settle() }
         assertTrue("no frame of this tune yet: the Banner stays", exists("player-banner"))
         assertEquals("Playing without a frame is still tuning", "Tuning", description("player-busy-indicator"))
 
         playerListeners.toList().forEach { it.onRenderedFirstFrame() }
-        compose.waitUntil(5_000) { runtime.videoPresentation.value.visible }
+        assertMainSettled("the driven frame is presented") { runtime.videoPresentation.value.visible }
         compose.mainClock.advanceTimeBy(4_800)
         compose.waitForIdle()
         assertTrue("before 5000 ms after the first frame", exists("player-banner"))
@@ -1286,7 +1290,7 @@ class LivePlayerChromeScreenTest {
         forcedTracks = audioOnly
         playerListeners.toList().forEach { it.onTracksChanged(audioOnly) }
         playerReady()
-        compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Playing }
+        assertMainSettled("the driven player reports Playing") { runtime.state.value is AppPlaybackState.Playing }
         compose.mainClock.advanceTimeBy(4_000)
         compose.waitForIdle()
         assertTrue(exists("player-banner"))
@@ -1359,7 +1363,7 @@ class LivePlayerChromeScreenTest {
         val connection = ScriptedSubscriptionConnection().apply {
             scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, null)))
         }
-        val manager = createSubscriptionManager(connection, Dispatchers.Default).apply { startAdmission() }
+        val manager = createSubscriptionManager(connection, subscriptionDispatcher).apply { startAdmission() }
         try {
             screen(opener = manager)
             val tracks = Tracks(listOf(
@@ -1370,10 +1374,10 @@ class LivePlayerChromeScreenTest {
             ))
             forcedTracks = tracks
             compose.runOnIdle { playerListeners.toList().forEach { it.onTracksChanged(tracks) } }
-            // Events reach only a registered collection; the media period registers it off the main thread.
-            val registered = scope.async(Dispatchers.Default) { connection.awaitCollectionRegistered() }
-            compose.waitUntil(5_000) { registered.isCompleted }
-            runBlocking {
+            // Media3's real ExoPlayer playback thread registers the media period's collection.
+            val registered = scope.async(start = CoroutineStart.UNDISPATCHED) { connection.awaitCollectionRegistered() }
+            compose.waitUntil(5_000) { idleMainLooper(); registered.isCompleted }
+            runTest(subscriptionDispatcher) {
                 connection.emit(SubscriptionEvent.Started(listOf(
                     SubscriptionStream(index = StreamIndex(1), type = SubscriptionStreamType.H264,
                         language = null, compositionId = null, ancillaryId = null, width = 1920, height = 1080,
@@ -1388,7 +1392,7 @@ class LivePlayerChromeScreenTest {
                 diagnostics.video == null && diagnostics.audio == null && diagnostics.live == null)
             // Trial: the stream badges have no place on the live chrome, with the tracks known.
             playerReady()
-            compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Playing }
+            assertMainSettled("the driven player reports Playing") { runtime.state.value is AppPlaybackState.Playing }
             settle()
             assertTrue(exists("player-banner"))
             val badges = badgeDescription("player-banner")
@@ -1420,6 +1424,7 @@ class LivePlayerChromeScreenTest {
             compose.onNodeWithTag("playback-options-stats").performSemanticsAction(SemanticsActions.RequestFocus)
             key(Key.DirectionCenter)
             key(Key.DirectionCenter)
+            // Media3's ExoPlayer playback thread publishes the bound subscription's diagnostics.
             compose.waitUntil(5_000) { idleMainLooper(); runtime.diagnostics.value.live != null }
             key(Key.Back)
             key(Key.Back)
@@ -1427,10 +1432,10 @@ class LivePlayerChromeScreenTest {
             key(Key.Back)
             assertTrue(exists("playback-stats-overlay"))
             key(Key.Back)
-            compose.waitUntil(5_000) { idleMainLooper(); runtime.diagnostics.value.live == null }
+            assertSubscriptionSettled("closing Stats clears live diagnostics") { runtime.diagnostics.value.live == null }
             assertFalse(exists("playback-stats-overlay"))
         } finally {
-            runBlocking { manager.closeAndJoin() }
+            runTest(subscriptionDispatcher) { manager.closeAndJoin() }
         }
     }
 
@@ -1438,7 +1443,7 @@ class LivePlayerChromeScreenTest {
         val connection = ScriptedSubscriptionConnection().apply {
             scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, null)))
         }
-        val manager = createSubscriptionManager(connection, Dispatchers.Default).apply { startAdmission() }
+        val manager = createSubscriptionManager(connection, subscriptionDispatcher).apply { startAdmission() }
         try {
             screen(opener = manager)
             // Diagnostics on, as with Stats open: A's frontend diagnostics are present too.
@@ -1454,9 +1459,10 @@ class LivePlayerChromeScreenTest {
             forcedAudioFormat = audioA
             compose.runOnIdle { playerListeners.toList().forEach { it.onTracksChanged(tracksA) } }
             startLiveSubscription(connection, height = 1080L, signal = 53739L) // 82 %
+            // Media3's ExoPlayer playback thread publishes the bound subscription's diagnostics.
             compose.waitUntil(5_000) { idleMainLooper(); runtime.diagnostics.value.live?.frontend != null }
             playerReady()
-            compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Playing }
+            assertMainSettled("the driven player reports Playing") { runtime.state.value is AppPlaybackState.Playing }
             settle()
             val badgesA = badgeDescription("player-banner")
             for (absent in listOf("lines", "Video", "Audio")) {
@@ -1482,7 +1488,7 @@ class LivePlayerChromeScreenTest {
             }
 
             // B plays with its own facts.
-            compose.waitUntil(5_000) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(2)) }
+            assertMainSettled("the key installs the next channel") { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(2)) }
             val videoB = Format.Builder().setSampleMimeType(MimeTypes.VIDEO_H264).setWidth(1280).setHeight(720).build()
             val tracksB = Tracks(listOf(
                 Tracks.Group(TrackGroup(videoB), false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(true)),
@@ -1492,12 +1498,13 @@ class LivePlayerChromeScreenTest {
             forcedAudioFormat = null
             compose.runOnIdle { playerListeners.toList().forEach { it.onTracksChanged(tracksB) } }
             startLiveSubscription(connection, height = 720L, signal = 32768L) // 50 %
+            // Media3's ExoPlayer playback thread publishes the new subscription's diagnostics.
             compose.waitUntil(5_000) {
                 idleMainLooper()
                 runtime.diagnostics.value.live?.frontend?.relativeSnrPercent?.let { it < 60.0 } == true
             }
             playerReady()
-            compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Playing }
+            assertMainSettled("the driven player reports Playing") { runtime.state.value is AppPlaybackState.Playing }
             settle()
             assertTrue(exists("player-info-bar"))
             val badgesB = identityDescription() + " | " + badgeDescription("player-footer")
@@ -1507,7 +1514,7 @@ class LivePlayerChromeScreenTest {
             assertFalse(badgesB.contains("1080"))
             assertFalse(badgesB.contains("82 percent"))
         } finally {
-            runBlocking { manager.closeAndJoin() }
+            runTest(subscriptionDispatcher) { manager.closeAndJoin() }
         }
     }
 
@@ -1517,10 +1524,10 @@ class LivePlayerChromeScreenTest {
         signal: Long,
         timeshift: Boolean = false,
     ) {
-        // Events reach only a registered collection; the media period registers it off the main thread.
+        // Media3's real ExoPlayer playback thread registers the media period's collection.
         val registered = scope.async(start = CoroutineStart.UNDISPATCHED) { connection.awaitCollectionRegistered() }
         compose.waitUntil(5_000) { idleMainLooper(); registered.isCompleted }
-        runBlocking {
+        runTest(subscriptionDispatcher) {
             val registration = registered.await()
             connection.emit(registration, SubscriptionEvent.Started(listOf(
                 SubscriptionStream(index = StreamIndex(1), type = SubscriptionStreamType.H264,
@@ -1558,7 +1565,7 @@ class LivePlayerChromeScreenTest {
         val connection = ScriptedSubscriptionConnection().apply {
             scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 3_600L)))
         }
-        val manager = createSubscriptionManager(connection, UnconfinedTestDispatcher()).apply { startAdmission() }
+        val manager = createSubscriptionManager(connection, subscriptionDispatcher).apply { startAdmission() }
         val settingsData = GatedPreferences()
         try {
             screen(opener = manager, settingsData = settingsData, settleOnEntry = zap)
@@ -1592,7 +1599,7 @@ class LivePlayerChromeScreenTest {
                 if (pauseBeforeZap) {
                     key(Key.MediaPause)
                     assertFalse("the previous channel's player is paused", player.playWhenReady)
-                    assertTrue("the previous channel's server is paused", runBlocking { runtime.sampleTimeshiftPresentation() }.paused)
+                    assertTrue("the previous channel's server is paused", sampleTimeshift().paused)
                 }
                 val now = System.currentTimeMillis() / 1_000L
                 session.publish(observation(now, listOf(
@@ -1617,8 +1624,8 @@ class LivePlayerChromeScreenTest {
             startLiveSubscription(connection, 720, 0)
             playerReady()
             frames(20)
-            assertFalse("confirmed without timing", runBlocking { runtime.sampleTimeshiftPresentation() }.timingKnown)
-            runBlocking {
+            assertFalse("confirmed without timing", sampleTimeshift().timingKnown)
+            runTest(subscriptionDispatcher) {
                 connection.emit(SubscriptionEvent.Timeshift(60_000_000L, 0L, 0L, 60_000_000L, null, null))
                 connection.emit(SubscriptionEvent.Packet(
                     at.bernhardberger.tvheadend.sdk.playback.MuxFrameType.I, StreamIndex(1),
@@ -1627,9 +1634,9 @@ class LivePlayerChromeScreenTest {
                 ))
             }
             frames(32)
-            assertTrue("timing became known", runBlocking { runtime.sampleTimeshiftPresentation() }.timingKnown)
+            assertTrue("timing became known", sampleTimeshift().timingKnown)
         } finally {
-            try { closeScreen() } finally { runBlocking { manager.closeAndJoin() } }
+            try { closeScreen() } finally { runTest(subscriptionDispatcher) { manager.closeAndJoin() } }
         }
     }
 
@@ -1639,7 +1646,7 @@ class LivePlayerChromeScreenTest {
         val connection = ScriptedSubscriptionConnection().apply {
             scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 3_600L)))
         }
-        val manager = createSubscriptionManager(connection, UnconfinedTestDispatcher()).apply { startAdmission() }
+        val manager = createSubscriptionManager(connection, subscriptionDispatcher).apply { startAdmission() }
         val grantDispatcher = StandardTestDispatcher()
         val opener = SubscriptionOpener { channel, consumer, period ->
             val subscription = manager.open(channel, consumer, period)
@@ -1659,15 +1666,17 @@ class LivePlayerChromeScreenTest {
             session.publish(observation(now, events))
             startLiveSubscription(connection, 1080, 0, timeshift = true)
             playerReady()
-            compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Playing }
+            assertMainSettled("the driven player reports Playing") { runtime.state.value is AppPlaybackState.Playing }
             settle()
             if (pauseBeforeZap) {
+                // Media3's ExoPlayer playback thread binds the grant after collection registration.
                 compose.waitUntil(5_000) { idleMainLooper(); runtime.livePause.value.availability == LivePauseAvailability.READY }
                 key(Key.MediaPause)
-                assertTrue("A's server timeshift is paused", runBlocking { runtime.sampleTimeshiftPresentation() }.paused)
+                assertTrue("A's server timeshift is paused", sampleTimeshift().paused)
                 settingsData.open.value = false
             }
             if (returnToSameChannel) {
+                // Media3's ExoPlayer playback thread binds the grant after collection registration.
                 compose.waitUntil(5_000) { idleMainLooper(); runtime.livePause.value.availability == LivePauseAvailability.READY }
                 // A transport command ends the undisturbed-live-start token without relying
                 // on Center's layer-dependent toggle behavior or pausing the old sample.
@@ -1691,7 +1700,7 @@ class LivePlayerChromeScreenTest {
                 // Exercise several sampling ticks while the paused A is still installed.
                 settle()
                 assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
-                assertTrue(runBlocking { runtime.sampleTimeshiftPresentation() }.paused)
+                assertTrue(sampleTimeshift().paused)
                 settingsData.open.value = true
             }
             if (returnToSameChannel) {
@@ -1703,10 +1712,10 @@ class LivePlayerChromeScreenTest {
             }
             if (pauseDuringTune) compose.onRoot().performKeyInput { pressKey(Key.MediaPause) }
             settle()
-            compose.waitUntil(5_000) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(channel)) }
+            assertMainSettled("the key installs the selected channel") { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(channel)) }
             startLiveSubscription(connection, 720, 0)
             playerReady()
-            compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Playing }
+            assertMainSettled("the driven player reports Playing") { runtime.state.value is AppPlaybackState.Playing }
             // Forced READY is not the SDK's grant publication. Drive the bind handoff and wait
             // for that observation before sampling; the new subscription has no timing status.
             compose.mainClock.advanceTimeUntil {
@@ -1716,7 +1725,7 @@ class LivePlayerChromeScreenTest {
                     ?.timeshiftState is LiveTimeshiftState.Available
             }
             settle()
-            val unknown = runBlocking { runtime.sampleTimeshiftPresentation() }
+            val unknown = sampleTimeshift()
             assertTrue("timeshift granted", unknown.available)
             assertFalse("no status coordinates yet", unknown.timingKnown)
             if (!pauseDuringTune) assertScreenProgramme(channel, "confirmed without timing")
@@ -1732,7 +1741,7 @@ class LivePlayerChromeScreenTest {
             assertNotNull("controls retain the live state", liveState())
             if (!pauseDuringTune) {
                 assertScreenProgramme(channel, "controls after timing notice delay")
-                runBlocking {
+                runTest(subscriptionDispatcher) {
                     connection.emit(SubscriptionEvent.Timeshift(60_000_000L, 0L, 0L, 60_000_000L, null, null))
                     // Establish the SDK's displayed-content mapping, not only its reader bounds.
                     connection.emit(SubscriptionEvent.Packet(
@@ -1742,19 +1751,19 @@ class LivePlayerChromeScreenTest {
                     ))
                 }
                 settle()
-                val known = runBlocking { runtime.sampleTimeshiftPresentation() }
+                val known = sampleTimeshift()
                 assertTrue("status supplies timing", known.timingKnown)
                 assertTrue("real known timing has a target", known.playbackTarget != null)
                 assertScreenProgramme(channel, "timing known")
                 // The first status had no wall clock. A subsequent status gives the SDK the
                 // mapping needed to resolve the committed programme window.
-                runBlocking {
+                runTest(subscriptionDispatcher) {
                     connection.emit(SubscriptionEvent.Timeshift(61_000_000L, 0L, 0L, 61_000_000L,
                         null, Instant.fromEpochMilliseconds(System.currentTimeMillis())))
                 }
                 compose.mainClock.advanceTimeBy(300)
                 compose.waitForIdle()
-                val mapped = runBlocking { runtime.sampleTimeshiftPresentation() }
+                val mapped = sampleTimeshift()
                 val window = programmeWindow(mapped) { time -> events.firstOrNull {
                     it.channelId == ChannelId(channel) && time >= it.start && time < it.stop
                 } }
@@ -1764,7 +1773,7 @@ class LivePlayerChromeScreenTest {
         } finally {
             // Dispose request effects and release the media period before closing its manager,
             // including when an assertion interrupts a pending admission/subscription.
-            try { closeScreen() } finally { runBlocking { manager.closeAndJoin() } }
+            try { closeScreen() } finally { runTest(subscriptionDispatcher) { manager.closeAndJoin() } }
         }
     }
 
@@ -2092,6 +2101,7 @@ class LivePlayerChromeScreenTest {
     }
 
     @Test fun recentCardTunedElsewhereReopensTheRowOnItsFirstCardFromTheFirstFrame() {
+        // The singleton preferences DataStore owns a real Dispatchers.IO file writer.
         runBlocking { LastPlayedChannelStore(context).run { setChannelId(ChannelId(3)); setChannelId(ChannelId(2)) } }
         screen()
         publishRailProgrammes()
@@ -2337,6 +2347,7 @@ class LivePlayerChromeScreenTest {
 
     @Test fun recentRowRemembersItsSelectionAndReopensDirectlyOnCards() {
         // Channel 2 played last, before channel 3.
+        // The singleton preferences DataStore owns a real Dispatchers.IO file writer.
         runBlocking { LastPlayedChannelStore(context).run { setChannelId(ChannelId(3)); setChannelId(ChannelId(2)) } }
         screen()
         openRows()
@@ -2415,7 +2426,24 @@ class LivePlayerChromeScreenTest {
         settle()
     }
 
-    private fun idleMainLooper() = shadowOf(Looper.getMainLooper()).idle()
+    private fun idleMainLooper() {
+        subscriptionDispatcher.scheduler.runCurrent()
+        shadowOf(Looper.getMainLooper()).idle()
+        subscriptionDispatcher.scheduler.runCurrent()
+        shadowOf(Looper.getMainLooper()).idle()
+    }
+
+    private fun assertSubscriptionSettled(message: String, condition: () -> Boolean) {
+        idleMainLooper()
+        assertTrue(message, condition())
+    }
+
+    private fun sampleTimeshift(): AppTimeshiftState {
+        var sample: AppTimeshiftState? = null
+        // The coordinator samples Media3's real playback thread; subscription commands use our scheduler.
+        runTest(subscriptionDispatcher) { sample = runtime.sampleTimeshiftPresentation() }
+        return requireNotNull(sample)
+    }
 
     /** Live's controls name the channel and its badges in the top identity's description. */
     private fun identityDescription(): String = compose.onNodeWithTag(PlayerTopIdentityTag, useUnmergedTree = true)
@@ -2431,14 +2459,15 @@ class LivePlayerChromeScreenTest {
         val connection = ScriptedSubscriptionConnection().apply {
             scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 3_600L)))
         }
-        val manager = createSubscriptionManager(connection, Dispatchers.Default).apply { startAdmission() }
+        val manager = createSubscriptionManager(connection, subscriptionDispatcher).apply { startAdmission() }
         try {
             screen(opener = manager)
             startLiveSubscription(connection, height = 1080L, signal = 53739L, timeshift = true)
             playerReady()
-            compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Playing }
+            assertMainSettled("the driven player reports Playing") { runtime.state.value is AppPlaybackState.Playing }
             playerListeners.toList().forEach { it.onRenderedFirstFrame() }
-            compose.waitUntil(5_000) { runtime.videoPresentation.value.visible }
+            assertMainSettled("the driven frame is presented") { runtime.videoPresentation.value.visible }
+            // Media3's ExoPlayer playback thread binds the grant after collection registration.
             compose.waitUntil(5_000) { idleMainLooper(); runtime.livePause.value.availability == LivePauseAvailability.READY }
             val pauses = mutableListOf<Boolean>()
             compose.runOnIdle {
@@ -2449,7 +2478,7 @@ class LivePlayerChromeScreenTest {
             assertTrue(exists("player-banner"))
 
             compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
-            compose.waitUntil(3_000) { idleMainLooper(); false in pauses }
+            assertSubscriptionSettled("the pause command reaches the player") { false in pauses }
             settle()
             assertTrue("pausing keeps the Banner", exists("player-banner"))
             assertFalse("pausing opens no actions", exists("player-actions"))
@@ -2458,11 +2487,11 @@ class LivePlayerChromeScreenTest {
             assertTrue("paused: the Banner stays", exists("player-banner"))
 
             compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
-            compose.waitUntil(3_000) { idleMainLooper(); pauses.lastOrNull() == true }
+            assertSubscriptionSettled("the resume command reaches the player") { pauses.lastOrNull() == true }
             assertFalse("resuming opens no actions either", exists("player-actions"))
 
         } finally {
-            runBlocking { manager.closeAndJoin() }
+            runTest(subscriptionDispatcher) { manager.closeAndJoin() }
         }
     }
 
@@ -2568,10 +2597,11 @@ class LivePlayerChromeScreenTest {
         settleFrames()
     }
 
-    private fun settleFrames() = repeat(3) { compose.mainClock.advanceTimeByFrame(); compose.waitForIdle() }
+    private fun settleFrames() = repeat(3) { idleMainLooper(); compose.mainClock.advanceTimeByFrame(); compose.waitForIdle() }
 
     private fun settle() {
         repeat(20) {
+            idleMainLooper()
             compose.mainClock.advanceTimeBy(100)
             compose.waitForIdle()
         }
@@ -2632,7 +2662,7 @@ class LivePlayerChromeScreenTest {
         }
         val settings = PlayerSettingsStore(settingsData)
         val uiSettings = at.bernhardberger.tvhplayer.settings.UiSettingsStore(InMemoryData())
-        recordingProfile?.let { runBlocking { uiSettings.setRecordingProfile(it) } }
+        recordingProfile?.let { runTest { uiSettings.setRecordingProfile(it) } }
         val screenSession = object : TvheadendSession by session {
             override val dvrRepository = object : DvrRepository by session.dvrRepository {
                 override suspend fun scheduleEntry(currentSession: CurrentSessionObservation, request: DvrScheduleRequest): DvrMutationResult<DvrEntryId> {
@@ -2643,12 +2673,12 @@ class LivePlayerChromeScreenTest {
                 }
             }
         }
-        val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.IO,
+        val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.Main.immediate,
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
         scope.launch { profiles.run() }
         val channels = ChannelsViewModel(session, ChannelTagSettingsStore(InMemoryData()), profiles.liveProfile)
         models.put("channels", channels)
-        compose.waitUntil(10_000) { channels.scope.value.scope.visibleChannels.size == if (missingRequestedChannel) 2 else 3 }
+        assertMainSettled("the fake channel catalog is collected") { channels.scope.value.scope.visibleChannels.size == if (missingRequestedChannel) 2 else 3 }
         player = ExoPlayer.Builder(context).build()
         val coordinator = createTvheadendPlaybackCoordinator(player).also { it.launchIn(scope) }
         val base = player
@@ -2700,7 +2730,10 @@ class LivePlayerChromeScreenTest {
             }
         }
         if (settleOnEntry) {
-            compose.waitUntil(10_000) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1)) }
+            compose.mainClock.advanceTimeUntil {
+                idleMainLooper()
+                runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1))
+            }
             settle()
             compose.mainClock.autoAdvance = false
             settle()
