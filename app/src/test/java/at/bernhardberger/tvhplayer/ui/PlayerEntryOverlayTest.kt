@@ -727,7 +727,7 @@ class PlayerEntryOverlayTest {
             single { notices }
             single { ConnectionNoticeSource(session.observation, profiles.configurationGeneration, notices) }
             viewModel { AppConnectionViewModel(get(), get(), get()) }
-            viewModel { ChannelsViewModel(get(), get()) }
+            viewModel { ChannelsViewModel(get(), get(), get<AppProfileOwner>().liveProfile) }
             viewModel { VideoPlayerViewModel(get(), get()) }
             viewModel { SettingsStorageViewModel(session.cache, get(), ChannelAccentStore()) {} }
             viewModel { SettingsPlayerViewModel(get(), get(), get(), get(), get()) }

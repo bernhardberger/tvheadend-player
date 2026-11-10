@@ -12,6 +12,7 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
 import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.RetainedMetadataAuthority
+import at.bernhardberger.tvheadend.sdk.core.ServerProfileId
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.core.channelCatalogAuthority
@@ -46,6 +47,7 @@ data class ChannelScopeState(
 class ChannelsViewModel(
     private val session: TvheadendSession,
     private val tagSettings: ChannelTagSettingsStore,
+    private val liveProfile: StateFlow<ServerProfileId?>,
 ) : ViewModel() {
     val observation: StateFlow<SessionObservation> = session.observation
 
@@ -72,6 +74,9 @@ class ChannelsViewModel(
             observation.distinctUntilChanged { previous, current ->
                 previous.channelState == current.channelState && previous.currentSession === current.currentSession
             }.collect { publishScope() }
+        }
+        viewModelScope.launch {
+            liveProfile.collect { publishScope() }
         }
     }
 
@@ -148,8 +153,9 @@ class ChannelsViewModel(
             orderedChannels = orderBrowseChannels(catalog.channels)
         }
         val current = channelState.channelCatalogAuthority == RetainedMetadataAuthority.CURRENT
+        val normalize = current && requested.profileId == liveProfile.value
         var effective = requested
-        if (current && !requested.visibility.isAllChannelsVisible() &&
+        if (normalize && !requested.visibility.isAllChannelsVisible() &&
             catalog.tags.none { requested.visibility.isTagVisible(it.id) }
         ) {
             effective = requested.copy(visibility = requested.visibility.copy(allChannelsVisible = true))
@@ -157,7 +163,7 @@ class ChannelsViewModel(
         val resolved = profileTrace("P44:channelScope") {
             resolveOrderedChannelScope(orderedChannels, catalog.tags, effective.activeTagId, effective.visibility)
         }
-        if (current && resolved.fallback != null) {
+        if (normalize && resolved.fallback != null) {
             effective = effective.copy(activeTagId = resolved.activeTagId)
             mutableUnavailableTagNotice.value = resolved.fallback == TagScopeFallback.TAG_UNAVAILABLE
         }
@@ -169,6 +175,7 @@ class ChannelsViewModel(
     }
 
     private fun enqueueSave() {
+        if (preferences?.profileId != liveProfile.value) return
         unsavedPreferences = preferences
         if (saveJob?.isActive == true) return
         saveJob = viewModelScope.launch {

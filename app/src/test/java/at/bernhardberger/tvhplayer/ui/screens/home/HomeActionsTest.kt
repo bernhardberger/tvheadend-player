@@ -921,7 +921,7 @@ class HomeActionsTest {
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create()))
         val session = FakeTvheadendSession(observation())
         val vm = at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel(session,
-            at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore(at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore()))
+            at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore(at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore()), kotlinx.coroutines.flow.MutableStateFlow<at.bernhardberger.tvheadend.sdk.core.ServerProfileId?>(null))
         val viewModels = androidx.lifecycle.ViewModelStore().apply { put("channels", vm) }
         compose.runOnIdle {
             val previous = requireNotNull(vm.scope.value.observation)
@@ -965,7 +965,7 @@ class HomeActionsTest {
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(channel))),
             epgState = EpgRepositoryState.Current(EpgSnapshot.create(listOf(event)))))
         val vm = at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel(session,
-            at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore(at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore()))
+            at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore(at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore()), kotlinx.coroutines.flow.MutableStateFlow<at.bernhardberger.tvheadend.sdk.core.ServerProfileId?>(null))
         val viewModels = androidx.lifecycle.ViewModelStore().apply { put("channels", vm) }
         val memory = mutableStateOf<HomeFocusKey?>(null)
         val dependencies = org.koin.dsl.koinApplication { modules(module {

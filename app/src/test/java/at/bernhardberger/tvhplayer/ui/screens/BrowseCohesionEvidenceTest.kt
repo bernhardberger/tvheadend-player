@@ -446,7 +446,7 @@ class BrowseCohesionEvidenceTest {
             session, FakeServerProfileStore(), settings, Dispatchers.IO,
             readProfileForEditing = { ServerProfileEditReadResult.Missing },
         )
-        val model = ChannelsViewModel(session, ChannelTagSettingsStore(preferences()))
+        val model = ChannelsViewModel(session, ChannelTagSettingsStore(preferences()), profiles.liveProfile)
         models.put("channels", model)
         player = ExoPlayer.Builder(context()).build()
         val runtime = AppPlaybackRuntime(

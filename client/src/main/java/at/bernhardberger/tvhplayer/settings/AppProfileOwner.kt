@@ -1,8 +1,6 @@
 package at.bernhardberger.tvhplayer.settings
 
 import at.bernhardberger.tvheadend.sdk.core.SessionCommandResult
-import at.bernhardberger.tvheadend.sdk.core.SessionFailure
-import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
@@ -47,8 +45,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
-
-private const val MAX_SERVER_PORT = 65535
 
 /** Connection-form operations backed by the process-owned SDK profile store. */
 interface ConnectionProfileEditor {
@@ -104,6 +100,18 @@ class AppProfileOwner(
     private var activeSwitch: Job? = null
     /** Trial and fallback share a session, but neither is the in-use connection's status. */
     val switchInProgress: StateFlow<Boolean> = mutableSwitchInProgress.asStateFlow()
+    private val mutableLiveProfile = MutableStateFlow<ServerProfileId?>(null)
+    /** The published session identity; absent until a trial is committed or restored. */
+    val liveProfile: StateFlow<ServerProfileId?> = mutableLiveProfile.asStateFlow()
+    private var setupTrialConnection = false
+
+    /** Setup holds the connection lock, but keeps this guard across its test-to-save handoff. */
+    fun setSetupTrialConnection(trial: Boolean) = synchronized(switchLifecycle) {
+        setupTrialConnection = trial
+        mutableLiveProfile.value = publishedProfileId(
+            mutableServerProfile.value, trial || mutableSwitchInProgress.value,
+        )
+    }
 
     /**
      * Serializes setup tests (including their non-cancellable cleanup) with saved-profile
@@ -160,6 +168,7 @@ class AppProfileOwner(
                 attempt?.cancelAndJoin()
                 discoveryJob.cancelAndJoin()
                 mutableSwitchInProgress.value = false
+                mutableLiveProfile.value = null
             }
         }
     }
@@ -175,25 +184,7 @@ class AppProfileOwner(
         id: ServerProfileId,
         applyAvailable: (host: String, port: Int, username: String, password: String) -> Unit,
     ) = serverMutex.withLock {
-        when (val result = readProfileForEditing(id)) {
-            is ServerProfileEditReadResult.Anonymous -> applyAvailable(
-                result.host,
-                result.port,
-                "",
-                "",
-            )
-            is ServerProfileEditReadResult.Password -> applyAvailable(
-                result.host,
-                result.port,
-                result.username,
-                result.password,
-            )
-            ServerProfileEditReadResult.Missing -> Unit
-            ServerProfileEditReadResult.Unavailable -> {
-                val summary = (profiles.value as? ServerProfileListResult.Available)?.profiles?.find { it.id == id }
-                if (summary != null) applyAvailable(summary.host, summary.port, summary.username.orEmpty(), "")
-            }
-        }
+        readServerForEditing(id, readProfileForEditing, profiles, applyAvailable)
     }
 
     override suspend fun saveServer(host: String, htspPort: Int) {
@@ -225,7 +216,9 @@ class AppProfileOwner(
         return mutate {
             val list = profileStore.profiles() as? ServerProfileListResult.Available
                 ?: return@mutate SaveServerProfileResult.Unavailable
-            duplicate(list, host, port, null)?.let { return@mutate SaveServerProfileResult.AlreadyExists(it) }
+            duplicate(list, host, port, null, noticeCenter)?.let {
+                return@mutate SaveServerProfileResult.AlreadyExists(it)
+            }
             saveResult(refreshAfterWrite(profileStore.addAnonymous(host, port, normalizedLabel, activate = true)))
         }
     }
@@ -242,7 +235,9 @@ class AppProfileOwner(
         return mutate {
             val list = profileStore.profiles() as? ServerProfileListResult.Available
                 ?: return@mutate SaveServerProfileResult.Unavailable
-            duplicate(list, host, port, username)?.let { return@mutate SaveServerProfileResult.AlreadyExists(it) }
+            duplicate(list, host, port, username, noticeCenter)?.let {
+                return@mutate SaveServerProfileResult.AlreadyExists(it)
+            }
             saveResult(refreshAfterWrite(
                 profileStore.addPassword(host, port, username, password, normalizedLabel, activate = true),
             ))
@@ -255,7 +250,7 @@ class AppProfileOwner(
         return mutate {
             val list = profileStore.profiles() as? ServerProfileListResult.Available
                 ?: return@mutate SaveServerProfileResult.Unavailable
-            duplicate(list, host, port, null, excluding = id)?.let {
+            duplicate(list, host, port, null, noticeCenter, excluding = id)?.let {
                 return@mutate SaveServerProfileResult.AlreadyExists(it)
             }
             saveResult(refreshAfterWrite(
@@ -277,7 +272,7 @@ class AppProfileOwner(
         return mutate {
             val list = profileStore.profiles() as? ServerProfileListResult.Available
                 ?: return@mutate SaveServerProfileResult.Unavailable
-            duplicate(list, host, port, username, excluding = id)?.let {
+            duplicate(list, host, port, username, noticeCenter, excluding = id)?.let {
                 return@mutate SaveServerProfileResult.AlreadyExists(it)
             }
             saveResult(refreshAfterWrite(
@@ -379,18 +374,23 @@ class AppProfileOwner(
         if (switchOwnerClosed) throw CancellationException("Profile owner stopped before switch execution")
         activeSwitch = caller[Job]
         mutableSwitchInProgress.value = true
+        mutableLiveProfile.value = null
     }
 
     private fun endSwitch() = synchronized(switchLifecycle) {
         activeSwitch = null
         mutableSwitchInProgress.value = false
+        mutableLiveProfile.value = publishedProfileId(mutableServerProfile.value, setupTrialConnection)
     }
 
     private suspend fun publishSwitchedProfile(id: ServerProfileId, target: ServerProfileReadResult.Available) {
-        mutableConfigurationGeneration.value += 1
         playerSettings.useProfile(id)
+        val profiles = profileStore.profiles()
+        // No suspension follows the generation change: a partial publication still belongs to
+        // the original generation and must roll back, just like a failed persistence operation.
+        mutableConfigurationGeneration.value += 1
         audioProfileId = id.value
-        mutableProfiles.value = profileStore.profiles()
+        mutableProfiles.value = profiles
         mutableServerProfile.value = target
     }
 
@@ -400,27 +400,14 @@ class AppProfileOwner(
         previous: ServerProfileReadResult,
         failureNotice: Notice?,
     ) {
-        if (persisted && previousId != null) {
-            profileStore.setActive(previousId)
-            mutableProfiles.value = profileStore.profiles()
-        }
-        applyServerProfile(previous)
+        val restored = if (persisted) {
+            readBackSwitchRollback(profileStore, previousId, mutableProfiles, noticeCenter)
+        } else previous
+        applyServerProfile(restored)
         postSwitchNotice(noticeCenter, failureNotice)
     }
 
     suspend fun remove(id: ServerProfileId): ServerProfileWriteResult = mutate { removeProfile(id) }
-
-    private fun duplicate(
-        list: ServerProfileListResult.Available,
-        host: String,
-        port: Int,
-        username: String?,
-        excluding: ServerProfileId? = null,
-    ): ServerProfileId? {
-        return existingServerProfile(list.profiles.filterNot { it.id == excluding }, host, port, username)?.also {
-            noticeCenter()?.let { center -> center.post(Notice.ServerProfileAlreadyExists, center.context()) }
-        }
-    }
 
     private suspend fun refreshAfterWrite(
         result: ServerProfileWriteResult,
@@ -433,12 +420,6 @@ class AppProfileOwner(
             applyServerProfile(profileStore.loadActive())
         }
         return result
-    }
-
-    private fun validateServerAddress(host: String, port: Int) {
-        require(host.isNotBlank() && host.none(Char::isISOControl) && port in 1..MAX_SERVER_PORT) {
-            "Invalid server address"
-        }
     }
 
     private suspend fun removeProfile(id: ServerProfileId): ServerProfileWriteResult {
@@ -567,7 +548,7 @@ class AppProfileOwner(
     private suspend fun commitServer(host: String, htspPort: Int) = serverMutex.withLock {
         val list = profileStore.profiles() as? ServerProfileListResult.Available ?: error("Server profiles unavailable")
         val id = list.activeId
-        duplicate(list, host, htspPort, null, excluding = id)?.let {
+        duplicate(list, host, htspPort, null, noticeCenter, excluding = id)?.let {
             if (id == null) check(refreshAfterWrite(profileStore.setActive(it)) is ServerProfileWriteResult.Applied)
             return@withLock
         }
@@ -584,7 +565,7 @@ class AppProfileOwner(
     ) = serverMutex.withLock {
         val list = profileStore.profiles() as? ServerProfileListResult.Available ?: error("Server profiles unavailable")
         val id = list.activeId
-        duplicate(list, host, htspPort, username, excluding = id)?.let {
+        duplicate(list, host, htspPort, username, noticeCenter, excluding = id)?.let {
             if (id == null) check(refreshAfterWrite(profileStore.setActive(it)) is ServerProfileWriteResult.Applied)
             return@withLock
         }
@@ -716,10 +697,12 @@ class AppProfileOwner(
             // The released profile is still unavailable to the app.
         }
         mutableServerProfile.value = ServerProfileReadResult.Unavailable
+        mutableLiveProfile.value = null
     }
 
     private suspend fun applyServerProfile(profile: ServerProfileReadResult) {
         val id = (profile as? ServerProfileReadResult.Available)?.id
+        mutableLiveProfile.value = null
         audioProfileId = null
         session.disconnect()
         playerSettings.useProfile(id)
@@ -730,6 +713,7 @@ class AppProfileOwner(
         }
         audioProfileId = id?.value
         mutableServerProfile.value = profile
+        setSetupTrialConnection(false)
     }
 }
 
@@ -740,14 +724,6 @@ private sealed class ProfileCommand {
 
     final override fun toString(): String = "ProfileCommand(<redacted>)"
 }
-
-private suspend fun awaitSwitchOutcome(session: TvheadendSession, before: SessionObservation): SessionState =
-    session.observation.first {
-        it !== before && (it.sessionState is SessionState.Ready || it.sessionState is SessionState.Unavailable)
-    }.sessionState
-
-private fun connectionFailedNotice(list: ServerProfileListResult.Available, id: ServerProfileId): Notice =
-    Notice.ServerConnectionFailed(serverProfileDisplayName(list.profiles.first { it.id == id }))
 
 private fun switchGenerationMatches(generationState: StateFlow<Long>, generation: Long, committed: Boolean): Boolean =
     generationState.value == generation || committed && generationState.value == generation + 1
@@ -764,7 +740,13 @@ private fun shouldRestoreSwitch(
     previousId: ServerProfileId?,
     generationMatches: () -> Boolean,
 ): Boolean =
-    if (!committed || !caller.isActive) switchCanRestore(persisted, previousId) && generationMatches() else false
+    when {
+        // Without an old selection, failed publication must reconcile the persisted target,
+        // even though a completed switch cannot roll back to "no connection".
+        !committed -> generationMatches()
+        !caller.isActive -> switchCanRestore(persisted, previousId) && generationMatches()
+        else -> false
+    }
 
 private fun switchCanRestore(persisted: Boolean, previousId: ServerProfileId?): Boolean =
     !persisted || previousId != null
@@ -775,23 +757,6 @@ private fun saveResult(result: ServerProfileWriteResult): SaveServerProfileResul
         ServerProfileWriteResult.NotFound -> SaveServerProfileResult.NotFound
         ServerProfileWriteResult.Unavailable -> SaveServerProfileResult.Unavailable
     }
-}
-
-private fun postSwitchNotice(noticeCenter: () -> NoticeCenter?, notice: Notice?) {
-    notice?.let { value -> noticeCenter()?.let { it.post(value, it.context()) } }
-}
-
-private fun switchedProfileNotice(list: ServerProfileListResult.Available, id: ServerProfileId): Notice? =
-    list.profiles.firstOrNull { it.id == id }?.let { Notice.ServerSwitched(id, serverProfileDisplayName(it)) }
-
-private fun failedSwitchNotice(
-    list: ServerProfileListResult.Available,
-    id: ServerProfileId,
-    outcome: SessionState.Unavailable,
-): Notice {
-    val name = list.profiles.first { it.id == id }.let(::serverProfileDisplayName)
-    return if (outcome.reason == SessionFailure.AUTHENTICATION_REJECTED)
-        Notice.ServerSignInRejected(name) else Notice.ServerConnectionFailed(name)
 }
 
 private sealed class ServerProfileCommand : ProfileCommand()

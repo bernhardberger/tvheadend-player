@@ -381,7 +381,7 @@ class GuidePlayerReturnFocusTest {
         val settings = PlayerSettingsStore(preferences())
         val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.IO,
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
-        val model = ChannelsViewModel(session, ChannelTagSettingsStore(preferences()))
+        val model = ChannelsViewModel(session, ChannelTagSettingsStore(preferences()), profiles.liveProfile)
         models.put("channels", model)
         // Usually warm (shared scope already loaded); a reconnect can compose it empty.
         compose.waitUntil(10_000) {

@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.ui.screens.settings
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileId
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileListResult
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileSummary
+import at.bernhardberger.tvheadend.sdk.core.ServerProfileWriteResult
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.ConnectionProfileEditor
 import at.bernhardberger.tvhplayer.settings.SaveServerProfileResult
@@ -59,9 +60,15 @@ internal class ProfileSetupEditor(
                 val active = (owner.profiles.value as? ServerProfileListResult.Available)?.activeId
                 when {
                     active == result.id -> Unit
-                    activate -> owner.setActive(result.id)
+                    activate -> {
+                        if (owner.setActive(result.id) !is ServerProfileWriteResult.Applied) {
+                            owner.connectionChanges.withLock { restoreActive() }
+                            error("Server not activated")
+                        }
+                    }
                     else -> owner.connectionChanges.withLock { restoreActive() }
                 }
+                owner.setSetupTrialConnection(false)
             }
             is SaveServerProfileResult.AlreadyExists -> {
                 onAlreadyExists(result.id)

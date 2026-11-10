@@ -27,6 +27,61 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppProfileOwnerTest {
+    @Test fun failedIdentityPublicationRestoresThePersistedConnectionAndPreferences() {
+        listOf(Triple(false, false, true), Triple(true, false, true), Triple(true, true, true),
+            Triple(false, false, false), Triple(true, false, false)).forEach { (failList, rejectRollback, active) -> runTest {
+        val stored = FakeServerProfileStore()
+        val first = (stored.addAnonymous("first.invalid", activate = active) as ServerProfileWriteResult.Applied).id
+        val second = (stored.addAnonymous("second.invalid") as ServerProfileWriteResult.Applied).id
+        val gate = CompletableDeferred<Unit>()
+        var failPublication = false
+        suspend fun failPublication() {
+            gate.await()
+            failPublication = false
+            throw java.io.IOException("Synthetic publication failure")
+        }
+        val data = InMemoryPreferencesDataStore(beforeUpdate = {
+            if (failPublication && !failList) failPublication()
+        })
+        val store = object : ServerProfileStore by stored {
+            override suspend fun profiles(): ServerProfileListResult {
+                if (failPublication && failList) failPublication()
+                return stored.profiles()
+            }
+            override suspend fun setActive(id: ServerProfileId): ServerProfileWriteResult =
+                if (id == first && rejectRollback) ServerProfileWriteResult.Unavailable else stored.setActive(id)
+        }
+        val settings = PlayerSettingsStore(data)
+        val session = FakeTvheadendSession()
+        val notices = NoticeCenter({ testScheduler.currentTime }, { NoticeContext(0, null) })
+        val owner = AppProfileOwner(session, store, settings, StandardTestDispatcher(testScheduler),
+            { ServerProfileEditReadResult.Missing }, { notices })
+        backgroundScope.launch { owner.run() }; runCurrent()
+        failPublication = true
+        var failed = false
+        val attempt = backgroundScope.launch {
+            try { owner.switchActive(second) } catch (_: java.io.IOException) { failed = true }
+        }
+        runCurrent()
+        session.publish(readyObservation())
+        runCurrent()
+        assertEquals(second, (stored.profiles() as ServerProfileListResult.Available).activeId)
+        assertFalse(attempt.isCompleted)
+        assertNull(owner.liveProfile.value)
+        gate.complete(Unit)
+        runCurrent()
+        assertTrue(failed)
+        val expected = if (rejectRollback || !active) second else first
+        assertEquals(expected, (stored.profiles() as ServerProfileListResult.Available).activeId)
+        assertEquals(expected, (owner.profiles.value as ServerProfileListResult.Available).activeId)
+        assertEquals(expected, (owner.serverProfile.value as ServerProfileReadResult.Available).id)
+        assertEquals(expected, ChannelTagSettingsStore(data).settings.first().profileId)
+        if (rejectRollback || !active) assertEquals(Notice.ServerProfileWriteFailed, notices.state.value.candidate?.notice)
+        assertEquals(expected, owner.liveProfile.value)
+        assertFalse(owner.connectionChanges.isLocked)
+        } }
+    }
+
     @Test fun closingTheOwnerCancelsAndJoinsTheCallersPendingSwitch() = runTest {
         val store = FakeServerProfileStore()
         val first = (store.addAnonymous("first.invalid", activate = true) as ServerProfileWriteResult.Applied).id
@@ -183,9 +238,11 @@ class AppProfileOwnerTest {
         val owner = owner(session, stored)
         val cancelled = backgroundScope.launch { owner.switchActive(next) }
         runCurrent()
+        assertNull(owner.liveProfile.value)
         assertEquals(first, (stored.profiles() as ServerProfileListResult.Available).activeId)
         cancelled.cancelAndJoin()
         assertEquals(first, (owner.serverProfile.value as ServerProfileReadResult.Available).id)
+        assertEquals(first, owner.liveProfile.value)
         assertFalse(owner.connectionChanges.isLocked)
         val attempt = backgroundScope.async { owner.switchActive(next) }
         runCurrent()
@@ -194,6 +251,7 @@ class AppProfileOwnerTest {
         runCurrent()
         assertEquals(ServerProfileWriteResult.Applied(next), attempt.await())
         assertEquals(next, (stored.profiles() as ServerProfileListResult.Available).activeId)
+        assertEquals(next, owner.liveProfile.value)
     }
 
     @Test fun successfulUserSwitchPostsOneSwitchedNoticeAndSwitchingToTheActiveConnectionPostsNone() = runTest {
@@ -381,12 +439,15 @@ class AppProfileOwnerTest {
         val restore = CompletableDeferred<Unit>()
         val cleanup = backgroundScope.launch {
             owner.connectionChanges.withLock {
+                owner.setSetupTrialConnection(true)
                 session.disconnect()
                 restore.await()
                 session.connect(previous)
+                owner.setSetupTrialConnection(false)
             }
         }
         runCurrent()
+        assertNull(owner.liveProfile.value)
         val calls = session.calls.toList()
         val switch = backgroundScope.async { owner.setActive(next) }
         runCurrent()
@@ -397,6 +458,7 @@ class AppProfileOwnerTest {
         assertTrue(cleanup.isCompleted)
         assertEquals(ServerProfileWriteResult.Applied(next), switch.await())
         assertEquals(next, (owner.serverProfile.value as ServerProfileReadResult.Available).id)
+        assertEquals(next, owner.liveProfile.value)
         assertEquals(calls + listOf(FakeSessionCall.CONNECT, FakeSessionCall.DISCONNECT, FakeSessionCall.CONNECT), session.calls)
     }
 

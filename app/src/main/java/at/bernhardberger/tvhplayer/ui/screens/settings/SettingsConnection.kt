@@ -56,7 +56,7 @@ internal fun SettingsConnection(
         interruptsPlayback = interruptsPlayback,
         existingProfile = existingProfile,
         onAddName = onAddName,
-        beforeTest = beforeTest,
+        beforeTest = { (settingsStore as? AppProfileOwner)?.setSetupTrialConnection(true); beforeTest() },
         sessionLock = sessionLock,
         connectionGeneration = connectionGeneration,
     )
@@ -109,5 +109,6 @@ internal fun rememberSavedConnectionRestore(
     {
         val active = owner.serverProfile.value as? ServerProfileReadResult.Available
         if (active != null) session.connect(active.profile) else session.disconnect()
+        owner.setSetupTrialConnection(false)
     }
 }

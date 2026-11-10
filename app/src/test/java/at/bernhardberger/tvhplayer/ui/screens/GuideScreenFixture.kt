@@ -306,7 +306,7 @@ abstract class GuideScreenFixture {
         val tagSettings = ChannelTagSettingsStore(preferences())
         if (activeTag) runBlocking { tagSettings.save(tagSettings.settings.first().copy(activeTagId = ChannelTagId(1))) }
         if (activeGroup != null) runBlocking { tagSettings.save(tagSettings.settings.first().copy(activeTagId = activeGroup)) }
-        model = ChannelsViewModel(session, tagSettings)
+        model = ChannelsViewModel(session, tagSettings, profiles.liveProfile)
         models.put("channels", model)
         player = ExoPlayer.Builder(context()).build()
         val runtime = AppPlaybackRuntime(player, session, createTvheadendPlaybackCoordinator(player).also {
