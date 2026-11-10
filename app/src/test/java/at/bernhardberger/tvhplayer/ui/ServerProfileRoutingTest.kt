@@ -232,6 +232,7 @@ class ServerProfileRoutingTest {
         }
         app(ServerSettings(host = "living.example.invalid"))
         compose.onNodeWithTag("setup-welcome-continue").assertDoesNotExist()
+        // Home's Dispatchers.Default browse preparation must finish before it exposes the rail.
         compose.waitUntil(15_000) { compose.onAllNodes(hasTestTag("nav-settings")).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("nav-settings").performSemanticsAction(SemanticsActions.OnClick)
         settle()
@@ -252,6 +253,7 @@ class ServerProfileRoutingTest {
             first.id
         }
         app(ServerSettings(host = "living.example.invalid"))
+        // Home's Dispatchers.Default browse preparation must finish before it exposes the rail.
         compose.waitUntil(15_000) { compose.onAllNodes(hasTestTag("nav-settings")).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("nav-settings").performSemanticsAction(SemanticsActions.OnClick)
         settle()
@@ -281,6 +283,7 @@ class ServerProfileRoutingTest {
     private fun settle() {
         repeat(10) {
             compose.mainClock.advanceTimeBy(100)
+            // Dispatchers.Default browse preparation remains real; this idle only drains UI work.
             compose.waitForIdle()
             compose.runOnIdle {
                 val bitmap = android.graphics.Bitmap.createBitmap(view.width, view.height, android.graphics.Bitmap.Config.ARGB_8888)
