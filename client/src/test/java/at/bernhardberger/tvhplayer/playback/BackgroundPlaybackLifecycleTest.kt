@@ -48,8 +48,8 @@ class BackgroundPlaybackLifecycleTest {
     @Test fun repeatedBackgroundDoesNotReplaceOriginalResumeIntentOrDeadline() {
         val lifecycle = kept()
         assertEquals(ForegroundPlaybackAction.None, lifecycle.onBackgrounded(live, 7, false, true, true, 10.minutes, true, 100))
-        assertEquals(ForegroundPlaybackAction.ResumeKeptLive(7, true), lifecycle.onForegrounded(live, 7, 600_001))
-        assertEquals(ForegroundPlaybackAction.None, lifecycle.onForegrounded(live, 7, 600_002))
+        assertEquals(ForegroundPlaybackAction.ResumeKeptLive(7, true), lifecycle.onForegrounded(live, 7, 600_101))
+        assertEquals(ForegroundPlaybackAction.None, lifecycle.onForegrounded(live, 7, 600_102))
     }
 
     @Test fun unlimitedKeepLimitSaturatesDeadlineInsteadOfExpiring() {

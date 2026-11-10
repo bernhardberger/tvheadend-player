@@ -494,75 +494,49 @@ class LivePauseRuntimeTest {
         assertEquals(listOf(0), connection.speeds.drop(speeds))
     }
 
-    @Test fun transientLossWhilePausePendsKeepsThePausedIntentThroughGrantAndGain() = exercise {
-        val gate = startingLive()
-        assertNull(runtime.pauseTimeshiftPlayback())
-        val callback = focus.requests.last()
-        val requests = focus.requestCount
+    @Test fun focusLossWhilePausePendsKeepsThePausedIntentThroughGrantAndGain() {
+        for (loss in listOf(AudioInterruption.TRANSIENT_LOSS, AudioInterruption.PERMANENT_LOSS)) {
+            exercise {
+                val gate = startingLive()
+                assertNull(runtime.pauseTimeshiftPlayback())
+                val callback = focus.requests.last()
+                val requests = focus.requestCount
 
-        callback(AudioInterruption.TRANSIENT_LOSS)
-        settle()
-        assertFalse(runtime.isInterruptionMuted)
-        assertFalse(player.playWhenReady)
-        assertTrue(runtime.livePause.value.pending)
+                callback(loss)
+                settle()
+                assertFalse(runtime.isInterruptionMuted)
+                assertFalse(player.playWhenReady)
+                assertTrue(runtime.livePause.value.pending)
 
-        grant(gate)
-        await { runtime.livePause.value == LivePauseState(LivePauseAvailability.READY, pending = true) }
-        playerReady()
-        await { connection.speeds.isNotEmpty() }
-        settle()
-        assertEquals(listOf(0), connection.speeds)
-        assertFalse(runtime.livePause.value.pending)
-        assertFalse(runtime.isInterruptionMuted)
-        assertFalse(player.playWhenReady)
+                grant(gate)
+                await { runtime.livePause.value == LivePauseState(LivePauseAvailability.READY, pending = true) }
+                playerReady()
+                await { connection.speeds.isNotEmpty() }
+                settle()
+                assertEquals(listOf(0), connection.speeds)
+                assertFalse(runtime.livePause.value.pending)
+                assertFalse(runtime.isInterruptionMuted)
+                assertFalse(player.playWhenReady)
 
-        callback(AudioInterruption.GAIN)
-        settle()
-        assertEquals(listOf(0), connection.speeds)
-        assertFalse(runtime.isInterruptionMuted)
-        assertFalse(player.playWhenReady)
-        assertEquals(requests, focus.requestCount)
+                if (loss == AudioInterruption.TRANSIENT_LOSS) {
+                    callback(AudioInterruption.GAIN)
+                    settle()
+                    assertEquals(listOf(0), connection.speeds)
+                    assertFalse(runtime.isInterruptionMuted)
+                    assertFalse(player.playWhenReady)
+                }
+                assertEquals(requests, focus.requestCount)
 
-        val resume = scope.async { runtime.resumeTimeshift() }
-        await { resume.isCompleted }
-        assertEquals(TimeshiftCommandResult.ACCEPTED, resume.await())
-        settle()
-        assertEquals(listOf(0, 100), connection.speeds)
-        assertTrue(player.playWhenReady)
-        assertEquals(requests + 1, focus.requestCount)
-        assertNull(runtime.livePauseNotice.value)
-    }
-
-    @Test fun permanentLossWhilePausePendsKeepsThePausedIntentThroughGrant() = exercise {
-        val gate = startingLive()
-        assertNull(runtime.pauseTimeshiftPlayback())
-        val requests = focus.requestCount
-
-        focus.requests.last()(AudioInterruption.PERMANENT_LOSS)
-        settle()
-        assertFalse(runtime.isInterruptionMuted)
-        assertFalse(player.playWhenReady)
-        assertTrue(runtime.livePause.value.pending)
-
-        grant(gate)
-        await { runtime.livePause.value == LivePauseState(LivePauseAvailability.READY, pending = true) }
-        playerReady()
-        await { connection.speeds.isNotEmpty() }
-        settle()
-        assertEquals(listOf(0), connection.speeds)
-        assertFalse(runtime.livePause.value.pending)
-        assertFalse(runtime.isInterruptionMuted)
-        assertFalse(player.playWhenReady)
-        assertEquals(requests, focus.requestCount)
-
-        val resume = scope.async { runtime.resumeTimeshift() }
-        await { resume.isCompleted }
-        assertEquals(TimeshiftCommandResult.ACCEPTED, resume.await())
-        settle()
-        assertEquals(listOf(0, 100), connection.speeds)
-        assertTrue(player.playWhenReady)
-        assertEquals(requests + 1, focus.requestCount)
-        assertNull(runtime.livePauseNotice.value)
+                val resume = scope.async { runtime.resumeTimeshift() }
+                await { resume.isCompleted }
+                assertEquals(TimeshiftCommandResult.ACCEPTED, resume.await())
+                settle()
+                assertEquals(listOf(0, 100), connection.speeds)
+                assertTrue(player.playWhenReady)
+                assertEquals(requests + 1, focus.requestCount)
+                assertNull(runtime.livePauseNotice.value)
+            }
+        }
     }
 
     @Test fun pauseDuringAPendingChannelChangeReplacesTheNewChannelsStartupPlayAndHoldsItOnce() = exercise {

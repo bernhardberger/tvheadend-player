@@ -193,9 +193,14 @@ class StartupBufferControllerTest {
         settle()
         assertEquals(StartupBufferLearningState(), harness.learned())
 
+        // Arm a fresh start so the preceding seek cannot mask pause cancellation.
+        harness.ready()
+        harness.liveStart()
         // Pausing cuts the window: no trouble, and the 30 s never complete.
         harness.pause()
         harness.buffering()
+        harness.resume()
+        harness.ready()
         advanceTimeBy(60_000)
         settle()
         assertEquals(StartupBufferLearningState(), harness.learned())
@@ -243,6 +248,10 @@ class StartupBufferControllerTest {
         harness.controller.timeshiftSeekFinished(accepted = true)
         advanceTimeBy(StartupBufferController.SKIP_LEARNING_GRACE_MS - 1)
         runCurrent()
+        harness.buffering()
+        settle()
+        assertEquals(StartupBufferLearningState(), harness.learned())
+        harness.ready()
         advanceTimeBy(2)
         runCurrent()
         // The start after the skip is watched, so a later rebuffer is trouble.

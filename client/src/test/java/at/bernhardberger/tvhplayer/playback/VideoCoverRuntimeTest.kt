@@ -1083,18 +1083,21 @@ class VideoCoverRuntimeTest {
         }
 
     @Test fun aPausedSeekRefreshWithoutARenderedFramePausesAgainAfterItsBudget() {
-        val trace = NudgeTrace()
-        exercise(PlaybackRuntimePolicy.fromPlayerSettings(trace = trace)) {
-            pausedTunneledTimeshift()
-            runtime.nudgePausedSeek(confirmation = PausedSeekConfirmation.KEY_FRAME_QUEUED)
-            await { player.playWhenReady }
-            advance(PAUSED_SEEK_NUDGE_MILLIS - MOTION_POLL_MILLIS)
-            assertTrue(player.playWhenReady)
-            advance(MOTION_POLL_MILLIS)
-            await { !runtime.livePause.value.pausedSeekRefresh }
-            assertFalse(player.playWhenReady)
-            assertEquals(listOf(0f, 0.37f), volumeWrites)
-            assertEquals(listOf(PausedSeekNudgePhase.START, PausedSeekNudgePhase.TIMEOUT), trace.phases)
+        for (countersPresent in listOf(true, false)) {
+            val trace = NudgeTrace()
+            exercise(PlaybackRuntimePolicy.fromPlayerSettings(trace = trace)) {
+                pausedTunneledTimeshift()
+                runtime.nudgePausedSeek(confirmation = PausedSeekConfirmation.KEY_FRAME_QUEUED)
+                await { player.playWhenReady }
+                if (!countersPresent) forcedVideoDecoderCounters = null
+                advance(PAUSED_SEEK_NUDGE_MILLIS - MOTION_POLL_MILLIS)
+                assertTrue(player.playWhenReady)
+                advance(MOTION_POLL_MILLIS)
+                await { !runtime.livePause.value.pausedSeekRefresh }
+                assertFalse(player.playWhenReady)
+                assertEquals(listOf(0f, 0.37f), volumeWrites)
+                assertEquals(listOf(PausedSeekNudgePhase.START, PausedSeekNudgePhase.TIMEOUT), trace.phases)
+            }
         }
     }
 
@@ -1258,22 +1261,6 @@ class VideoCoverRuntimeTest {
             await { !runtime.livePause.value.pausedSeekRefresh }
             assertFalse(player.playWhenReady)
             assertEquals(listOf(PausedSeekNudgePhase.START, PausedSeekNudgePhase.SHOWN), trace.phases)
-        }
-    }
-
-    @Test fun withoutVideoCountersAPausedSeekRefreshWaitsForItsBudget() {
-        val trace = NudgeTrace()
-        exercise(PlaybackRuntimePolicy.fromPlayerSettings(trace = trace)) {
-            pausedTunneledTimeshift()
-            runtime.nudgePausedSeek(confirmation = PausedSeekConfirmation.KEY_FRAME_QUEUED)
-            await { player.playWhenReady }
-            forcedVideoDecoderCounters = null
-            advance(PAUSED_SEEK_NUDGE_MILLIS - MOTION_POLL_MILLIS)
-            assertTrue(player.playWhenReady)
-            advance(MOTION_POLL_MILLIS)
-            await { !runtime.livePause.value.pausedSeekRefresh }
-            assertFalse(player.playWhenReady)
-            assertEquals(listOf(PausedSeekNudgePhase.START, PausedSeekNudgePhase.TIMEOUT), trace.phases)
         }
     }
 

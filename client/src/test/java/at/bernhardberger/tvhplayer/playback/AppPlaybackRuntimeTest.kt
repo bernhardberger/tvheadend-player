@@ -215,26 +215,6 @@ class AppPlaybackRuntimeTest {
     }
 
     @Test
-    fun olderTargetCompletionCannotSurviveANewerStop() {
-        val epoch = PlaybackPresentationEpoch()
-        var target: AppPlaybackTarget? = null
-        var state: AppPlaybackState = AppPlaybackState.Starting
-        val targetCommand = epoch.begin()
-        val stopCommand = epoch.begin()
-
-        assertFalse(epoch.publishIfCurrent(targetCommand) {
-            target = AppPlaybackTarget.Live(ChannelId(9))
-        })
-        assertTrue(epoch.publishIfCurrent(stopCommand) {
-            target = null
-            state = AppPlaybackState.Idle
-        })
-
-        assertNull(target)
-        assertEquals(AppPlaybackState.Idle, state)
-    }
-
-    @Test
     fun onlyTheLatestSuccessfulTargetCanPublishPresentation() {
         val epoch = PlaybackPresentationEpoch()
         var target: AppPlaybackTarget? = null
@@ -276,7 +256,7 @@ class AppPlaybackRuntimeTest {
         assertFalse(
             fence.matches(
                 activeTarget = AppPlaybackTarget.Recording(DvrEntryId(9)),
-                activeTargetEpoch = 21L,
+                activeTargetEpoch = 20L,
                 observation = observations.observation.value,
             ),
         )
@@ -298,6 +278,13 @@ class AppPlaybackRuntimeTest {
         assertFalse(
             fence.matches(
                 activeTarget = AppPlaybackTarget.Live(ChannelId(13)),
+                activeTargetEpoch = 22L,
+                observation = observations.observation.value,
+            ),
+        )
+        assertFalse(
+            fence.matches(
+                activeTarget = AppPlaybackTarget.Live(channel.id),
                 activeTargetEpoch = 23L,
                 observation = observations.observation.value,
             ),
@@ -1249,12 +1236,13 @@ class AppPlaybackRuntimeTest {
     }
 
     @Test
-    fun nonRecordingForegroundActionsInvokeOnlyTheirOwnedEffect() = runTest {
+    fun foregroundActionsInvokeOnlyTheirOwnedEffect() = runTest {
         val cases = listOf(
             ForegroundPlaybackAction.None to emptyList(),
             ForegroundPlaybackAction.StopLive to listOf("stop-live"),
             ForegroundPlaybackAction.PauseRecording to listOf("pause-recording"),
             ForegroundPlaybackAction.ResumeLive(ChannelId(7)) to listOf("resume-live:7"),
+            ForegroundPlaybackAction.ResumeRecording to listOf("resume-recording"),
         )
 
         cases.forEach { (action, expected) ->
@@ -1269,21 +1257,6 @@ class AppPlaybackRuntimeTest {
 
             assertEquals(action.toString(), expected, events)
         }
-    }
-
-    @Test
-    fun recordingForegroundResumeUsesOnlyTheExistingPlayerTarget() = runTest {
-        val events = mutableListOf<String>()
-
-        executeForegroundPlaybackAction(
-            action = ForegroundPlaybackAction.ResumeRecording,
-            stopLive = { events += "stop-live" },
-            pauseRecording = { events += "pause-recording" },
-            resumeLive = { events += "resume-live:$it" },
-            resumeRecording = { events += "resume-recording" },
-        )
-
-        assertEquals(listOf("resume-recording"), events)
     }
 
     private fun currentObservation(

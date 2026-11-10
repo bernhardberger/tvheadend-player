@@ -466,7 +466,7 @@ class AudioInterruptionRuntimeTest {
         focus.send(AudioInterruption.PERMANENT_LOSS)
         await { !player.playWhenReady }
         connection.scriptSpeed(SubscriptionOperationResult.Failed(TvheadendFailure.SERVER_REJECTED))
-        assertNotEquals(TimeshiftCommandResult.ACCEPTED, runtime.resumeTimeshift())
+        assertEquals(TimeshiftCommandResult.SERVER_REJECTED, runtime.resumeTimeshift())
         assertTrue(player.playWhenReady)
         connection.scriptSpeed(SubscriptionOperationResult.Ok(Unit))
         assertEquals(TimeshiftCommandResult.ACCEPTED, runtime.resumeTimeshift())
@@ -781,9 +781,12 @@ class AudioInterruptionRuntimeTest {
         awaitSecondRecoveryBackoff()
         val subscriptions = connection.subscribeCount
         val requests = focus.requests.size
+        val installing = mutableListOf<AppPlaybackState>()
+        beforeLiveBinding = { installing += runtime.state.value }
         connection.scriptSpeed(SubscriptionOperationResult.Failed(TvheadendFailure.SERVER_REJECTED))
         focus.send(AudioInterruption.TRANSIENT_LOSS)
         await { connection.subscribeCount == subscriptions + 1 }
+        assertEquals(listOf(AppPlaybackState.Recovering(PlaybackRecoveryReason.LIVE_ENDED, 0L)), installing)
         startSubscription(connection.awaitCollectionRegistered())
         await { player.playWhenReady && runtime.state.value !is AppPlaybackState.Recovering }
         assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
@@ -1175,22 +1178,6 @@ class AudioInterruptionRuntimeTest {
         advanceRecoveryTime(300)
         settle()
         assertEquals(2, connection.subscribeCount)
-    }
-
-    @Test fun resumedRecoveryStaysPresentedAsRecoveringUntilItRetunes() = exercise {
-        awaitSecondRecoveryBackoff()
-        val subscriptions = connection.subscribeCount
-        val installing = mutableListOf<AppPlaybackState>()
-        beforeLiveBinding = { installing += runtime.state.value }
-        // A rejected hold goes on muted and resumes the stopped attempt in the same command,
-        // while that attempt is still unwinding.
-        connection.scriptSpeed(SubscriptionOperationResult.Failed(TvheadendFailure.SERVER_REJECTED))
-        focus.send(AudioInterruption.TRANSIENT_LOSS)
-        await { connection.subscribeCount == subscriptions + 1 }
-        assertEquals(listOf(AppPlaybackState.Recovering(PlaybackRecoveryReason.LIVE_ENDED, 0L)), installing)
-        startSubscription(connection.awaitCollectionRegistered())
-        await { player.playWhenReady && runtime.state.value !is AppPlaybackState.Recovering }
-        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
     }
 
     @Test fun stoppedAttemptUnwindingAfterTheResumeDoesNotRepublishOverIt() = exercise {
