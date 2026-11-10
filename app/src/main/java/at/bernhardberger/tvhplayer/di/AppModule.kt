@@ -201,7 +201,9 @@ val appModule = module {
         )
     }
     viewModel { VideoPlayerViewModel(playbackRuntime = get(), session = get()) }
-    viewModel { ChannelsViewModel(session = get(), tagSettings = get()) }
+    viewModel {
+        ChannelsViewModel(session = get(), tagSettings = get(), liveProfile = get<AppProfileOwner>().liveProfile)
+    }
     viewModel { SettingsStorageViewModel(get<SdkRuntimeOwner>().session.cache, get(), get(),
         clearRemoteLogos = { get<RemoteLogoCache>().clear() }) }
     viewModel {

@@ -840,7 +840,7 @@ class GuideRealisticSceneTest {
         val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.IO,
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
         if (playerJourney) runtimeScope.launch { profiles.run() }
-        val model = ChannelsViewModel(session, ChannelTagSettingsStore(preferences()))
+        val model = ChannelsViewModel(session, ChannelTagSettingsStore(preferences()), profiles.liveProfile)
         models.put("channels", model)
         player = ExoPlayer.Builder(context()).build()
         val coordinator = createTvheadendPlaybackCoordinator(player).also { if (playerJourney) it.launchIn(runtimeScope) }

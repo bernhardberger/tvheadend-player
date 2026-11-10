@@ -153,7 +153,7 @@ class ChannelObservationProjectionTest {
         val settings = ChannelTagSettingsStore(context)
         settings.save(settings.settings.first().copy(activeTagId = firstTag.id))
         val session = FakeTvheadendSession(observation(ChannelRepositoryState.Stale(catalog)))
-        val model = ChannelsViewModel(session, settings)
+        val model = ChannelsViewModel(session, settings, kotlinx.coroutines.flow.MutableStateFlow(settings.settings.first().profileId))
         models.put("channels", model)
         model.scope.first { !it.channelCatalogCurrent && it.scope.activeTagId == firstTag.id }
         session.publish(observation(ChannelRepositoryState.Current(catalog)))

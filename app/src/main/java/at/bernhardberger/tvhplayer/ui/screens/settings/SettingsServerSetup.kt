@@ -36,7 +36,7 @@ internal fun AddServer(
         interruptsPlayback = { interruption() != PlaybackInterruption.NONE },
         existingProfile = existingProfile,
         onAddName = onAddName,
-        beforeTest = stopPlaying,
+        beforeTest = { owner.setSetupTrialConnection(true); stopPlaying() },
         sessionLock = owner.connectionChanges,
         connectionGeneration = { owner.configurationGeneration.value },
         confirmSwitch = { form, onSwitch, onKeep ->
@@ -86,7 +86,7 @@ internal fun EditServer(
         // Testing a server that isn't in use stops playback without asking (owner decision).
         // Checked before the test, so a duplicate stops nothing; the save would refuse it anyway.
         existingProfile = existingProfile,
-        beforeTest = { if (!active) stopPlaying() },
+        beforeTest = { owner.setSetupTrialConnection(true); if (!active) stopPlaying() },
         sessionLock = owner.connectionChanges,
         connectionGeneration = { owner.configurationGeneration.value },
         confirmSwitch = { form, onSwitch, onKeep ->

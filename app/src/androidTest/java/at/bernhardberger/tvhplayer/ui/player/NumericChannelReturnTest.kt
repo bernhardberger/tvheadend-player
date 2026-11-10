@@ -88,7 +88,7 @@ class NumericChannelReturnTest(private val tagged: Boolean, private val completi
                 noticeCenter = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) { at.bernhardberger.tvhplayer.notices.NoticeContext(0, null) })
         }
         val video = withContext(Dispatchers.Main) { VideoPlayerViewModel(runtime, session) }
-        val catalog = withContext(Dispatchers.Main) { ChannelsViewModel(session, tags) }
+        val catalog = withContext(Dispatchers.Main) { ChannelsViewModel(session, tags, profiles.liveProfile) }
         models.put("video", video)
         models.put("channels", catalog)
         catalog.scope.first { it.scope.visibleChannels.size == if (tagged) 2 else 3 }

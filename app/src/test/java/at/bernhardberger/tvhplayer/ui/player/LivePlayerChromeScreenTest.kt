@@ -2628,7 +2628,7 @@ class LivePlayerChromeScreenTest {
         val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.IO,
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
         scope.launch { profiles.run() }
-        val channels = ChannelsViewModel(session, ChannelTagSettingsStore(InMemoryData()))
+        val channels = ChannelsViewModel(session, ChannelTagSettingsStore(InMemoryData()), profiles.liveProfile)
         models.put("channels", channels)
         compose.waitUntil(10_000) { channels.scope.value.scope.visibleChannels.size == if (missingRequestedChannel) 2 else 3 }
         player = ExoPlayer.Builder(context).build()
