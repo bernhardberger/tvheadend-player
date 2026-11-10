@@ -1,17 +1,18 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.testutil.pressKey
+import at.bernhardberger.tvhplayer.testutil.settleFrames
 import android.app.Application
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
@@ -54,30 +55,28 @@ class PlayerChannelBrowserTest {
                 }
             }
         }
-        settle()
+        compose.settleFrames(1, frameMillis = 600)
     }
 
-    private fun settle() { compose.mainClock.advanceTimeBy(600); compose.waitForIdle() }
-    private fun key(key: Key) { compose.onRoot().performKeyInput { pressKey(key) }; settle() }
     private fun focused(id: Long) = compose.onNodeWithTag("player-channel-card-$id").assertIsFocused()
 
     @Test fun rowsReopenDirectlyOnTheirIndependentCardAndViewport() {
         screen()
         focused(1)
-        repeat(9) { key(Key.DirectionRight) }
+        repeat(9) { compose.pressKey(Key.DirectionRight, settleFrames = 1, frameMillis = 600) }
         focused(10)
         val onNowViewport = state.onNow.listState.firstVisibleItemIndex to state.onNow.listState.firstVisibleItemScrollOffset
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown, settleFrames = 1, frameMillis = 600)
         assertEquals(PlayerChannelRow.RECENT, state.row)
         focused(16)
-        repeat(5) { key(Key.DirectionRight) }
+        repeat(5) { compose.pressKey(Key.DirectionRight, settleFrames = 1, frameMillis = 600) }
         focused(11)
         val recentViewport = state.recent.listState.firstVisibleItemIndex to state.recent.listState.firstVisibleItemScrollOffset
-        compose.runOnIdle { shown = false }; settle()
-        compose.runOnIdle { shown = true }; settle()
+        compose.runOnIdle { shown = false }; compose.settleFrames(1, frameMillis = 600)
+        compose.runOnIdle { shown = true }; compose.settleFrames(1, frameMillis = 600)
         focused(11)
         assertEquals(recentViewport, state.recent.listState.firstVisibleItemIndex to state.recent.listState.firstVisibleItemScrollOffset)
-        key(Key.DirectionUp)
+        compose.pressKey(Key.DirectionUp, settleFrames = 1, frameMillis = 600)
         focused(10)
         assertEquals(onNowViewport, state.onNow.listState.firstVisibleItemIndex to state.onNow.listState.firstVisibleItemScrollOffset)
         assertTrue(picks.isEmpty())
@@ -86,14 +85,14 @@ class PlayerChannelBrowserTest {
 
     @Test fun downStopsAtTheLastRowAndUpFromTheFirstClosesTheRail() {
         screen()
-        key(Key.DirectionDown)
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown, settleFrames = 1, frameMillis = 600)
+        compose.pressKey(Key.DirectionDown, settleFrames = 1, frameMillis = 600)
         assertEquals(PlayerChannelRow.RECENT, state.row)
         focused(16)
-        key(Key.DirectionUp)
+        compose.pressKey(Key.DirectionUp, settleFrames = 1, frameMillis = 600)
         assertEquals(PlayerChannelRow.ON_NOW, state.row)
         assertTrue(closes.isEmpty())
-        key(Key.DirectionUp)
+        compose.pressKey(Key.DirectionUp, settleFrames = 1, frameMillis = 600)
         assertEquals(listOf(android.view.KeyEvent.KEYCODE_DPAD_UP), closes)
     }
 
@@ -103,27 +102,27 @@ class PlayerChannelBrowserTest {
         compose.onNode(hasText("Sport") and hasAnyAncestor(hasTestTag("player-channel-row-ON_NOW"))).assertExists()
         hint("Back to TV").assertCountEquals(1)
         hint("Sport").assertCountEquals(0)
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown, settleFrames = 1, frameMillis = 600)
         hint("Sport").assertCountEquals(1)
         hint("Back to TV").assertCountEquals(0)
-        key(Key.DirectionUp)
+        compose.pressKey(Key.DirectionUp, settleFrames = 1, frameMillis = 600)
         hint("Back to TV").assertCountEquals(1)
     }
 
     @Test fun leftFromAFirstCardStaysOnItInEitherRow() {
         screen()
-        key(Key.DirectionLeft)
+        compose.pressKey(Key.DirectionLeft, settleFrames = 1, frameMillis = 600)
         focused(1)
-        key(Key.DirectionRight)
+        compose.pressKey(Key.DirectionRight, settleFrames = 1, frameMillis = 600)
         focused(2)
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown, settleFrames = 1, frameMillis = 600)
         focused(16)
-        key(Key.DirectionLeft)
+        compose.pressKey(Key.DirectionLeft, settleFrames = 1, frameMillis = 600)
         focused(16)
-        key(Key.DirectionRight)
+        compose.pressKey(Key.DirectionRight, settleFrames = 1, frameMillis = 600)
         focused(15)
-        key(Key.DirectionUp)
-        key(Key.DirectionLeft)
+        compose.pressKey(Key.DirectionUp, settleFrames = 1, frameMillis = 600)
+        compose.pressKey(Key.DirectionLeft, settleFrames = 1, frameMillis = 600)
         focused(1)
     }
 
@@ -132,7 +131,7 @@ class PlayerChannelBrowserTest {
         fun title(row: PlayerChannelRow) = compose.onNodeWithTag("player-channel-row-${row.name}")
             .fetchSemanticsNode().boundsInRoot.top
         val onNow = title(PlayerChannelRow.ON_NOW)
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown, settleFrames = 1, frameMillis = 600)
         assertEquals(onNow, title(PlayerChannelRow.RECENT), .5f)
     }
 
@@ -140,7 +139,7 @@ class PlayerChannelBrowserTest {
         recent = emptyList()
         screen()
         compose.onNodeWithTag("player-channel-row-RECENT").assertDoesNotExist()
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown, settleFrames = 1, frameMillis = 600)
         focused(1)
         assertEquals(PlayerChannelRow.ON_NOW, state.row)
         assertTrue(closes.isEmpty())
@@ -148,14 +147,14 @@ class PlayerChannelBrowserTest {
 
     @Test fun removedChannelFallsBackAndNewSessionDropsBothCollections() {
         screen()
-        key(Key.DirectionRight)
+        compose.pressKey(Key.DirectionRight, settleFrames = 1, frameMillis = 600)
         focused(2)
-        compose.runOnIdle { channels = channels.filterNot { it.id == ChannelId(2) } }; settle()
+        compose.runOnIdle { channels = channels.filterNot { it.id == ChannelId(2) } }; compose.settleFrames(1, frameMillis = 600)
         assertEquals("removed ID uses playing fallback", ChannelId(1), state.onNow.focusedId)
         focused(1)
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown, settleFrames = 1, frameMillis = 600)
         focused(16)
-        compose.runOnIdle { state = PlayerChannelBrowserState() }; settle()
+        compose.runOnIdle { state = PlayerChannelBrowserState() }; compose.settleFrames(1, frameMillis = 600)
         focused(1)
         assertEquals(PlayerChannelRow.ON_NOW, state.row)
         assertNull(state.recent.focusedId)
@@ -163,33 +162,33 @@ class PlayerChannelBrowserTest {
 
     @Test fun aRowChangeReleasedWhileTheRailWasAwayDoesNotSwallowTheNextPress() {
         screen()
-        key(Key.DirectionDown)
-        compose.onRoot().performKeyInput { keyDown(Key.DirectionUp) }; settle()
+        compose.pressKey(Key.DirectionDown, settleFrames = 1, frameMillis = 600)
+        compose.onRoot().performKeyInput { keyDown(Key.DirectionUp) }; compose.settleFrames(1, frameMillis = 600)
         assertEquals(PlayerChannelRow.ON_NOW, state.row)
-        compose.runOnIdle { shown = false }; settle()
+        compose.runOnIdle { shown = false }; compose.settleFrames(1, frameMillis = 600)
         compose.onRoot().performKeyInput { keyUp(Key.DirectionUp) }
-        compose.runOnIdle { shown = true }; settle()
-        key(Key.DirectionUp)
+        compose.runOnIdle { shown = true }; compose.settleFrames(1, frameMillis = 600)
+        compose.pressKey(Key.DirectionUp, settleFrames = 1, frameMillis = 600)
         assertEquals(listOf(android.view.KeyEvent.KEYCODE_DPAD_UP), closes)
     }
 
     @Test fun aRowThatEmptiesDoesNotComeBackFocused() {
         screen()
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown, settleFrames = 1, frameMillis = 600)
         assertEquals(PlayerChannelRow.RECENT, state.row)
         val history = recent
-        compose.runOnIdle { recent = emptyList() }; settle()
+        compose.runOnIdle { recent = emptyList() }; compose.settleFrames(1, frameMillis = 600)
         assertEquals(PlayerChannelRow.ON_NOW, state.row)
-        compose.runOnIdle { recent = history }; settle()
+        compose.runOnIdle { recent = history }; compose.settleFrames(1, frameMillis = 600)
         assertEquals(PlayerChannelRow.ON_NOW, state.row)
         focused(1)
     }
 
     @Test fun newSessionOnTheSameRowStartsOverOnThePlayingChannel() {
         screen()
-        repeat(3) { key(Key.DirectionRight) }
+        repeat(3) { compose.pressKey(Key.DirectionRight, settleFrames = 1, frameMillis = 600) }
         focused(4)
-        compose.runOnIdle { state = PlayerChannelBrowserState() }; settle()
+        compose.runOnIdle { state = PlayerChannelBrowserState() }; compose.settleFrames(1, frameMillis = 600)
         focused(1)
         assertEquals(PlayerChannelRow.ON_NOW, state.row)
         assertEquals(ChannelId(1), state.onNow.focusedId)
@@ -202,11 +201,11 @@ class PlayerChannelBrowserTest {
                 it[androidx.compose.ui.semantics.SemanticsActions.OnLongClick].action!!
         }
         val (click, longClick) = actions()
-        compose.runOnIdle { active = false }; settle()
+        compose.runOnIdle { active = false }; compose.settleFrames(1, frameMillis = 600)
         compose.runOnIdle { click(); longClick() }
-        compose.runOnIdle { active = true }; settle()
+        compose.runOnIdle { active = true }; compose.settleFrames(1, frameMillis = 600)
         val (keptClick, keptLongClick) = actions()
-        compose.runOnIdle { shown = false }; settle()
+        compose.runOnIdle { shown = false }; compose.settleFrames(1, frameMillis = 600)
         compose.runOnIdle { keptClick(); keptLongClick() }
         assertTrue(picks.isEmpty())
         assertTrue(details.isEmpty())
@@ -214,24 +213,24 @@ class PlayerChannelBrowserTest {
 
     @Test fun heldUpMovesOnlyOneRowAndASecondPressReturnsToControls() {
         screen()
-        key(Key.DirectionDown)
-        compose.onRoot().performKeyInput { withKeyDown(Key.DirectionUp) { advanceEventTime(1_200) } }; settle()
+        compose.pressKey(Key.DirectionDown, settleFrames = 1, frameMillis = 600)
+        compose.onRoot().performKeyInput { withKeyDown(Key.DirectionUp) { advanceEventTime(1_200) } }; compose.settleFrames(1, frameMillis = 600)
         focused(1)
         assertTrue(closes.isEmpty())
-        key(Key.DirectionUp)
+        compose.pressKey(Key.DirectionUp, settleFrames = 1, frameMillis = 600)
         assertEquals(listOf(android.view.KeyEvent.KEYCODE_DPAD_UP), closes)
     }
 
     @Test fun onlyAHeldLeftOrRightScrollsAndReleasingEndsIt() {
         screen()
-        key(Key.DirectionRight)
-        key(Key.DirectionRight)
+        compose.pressKey(Key.DirectionRight, settleFrames = 1, frameMillis = 600)
+        compose.pressKey(Key.DirectionRight, settleFrames = 1, frameMillis = 600)
         assertFalse("separate presses are steps", state.scrolling)
         compose.onRoot().performKeyInput { keyDown(Key.DirectionRight); advanceEventTime(1_200) }
         compose.waitForIdle()
         assertTrue("a held key repeats", state.scrolling)
         compose.onRoot().performKeyInput { keyUp(Key.DirectionRight) }
-        settle()
+        compose.settleFrames(1, frameMillis = 600)
         assertFalse("releasing ends the scroll", state.scrolling)
         assertTrue(picks.isEmpty())
     }
@@ -240,19 +239,19 @@ class PlayerChannelBrowserTest {
         screen()
         val card = compose.onNodeWithTag("player-channel-card-1")
         card.assert(SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsActions.OnLongClick))
-        compose.onRoot().performKeyInput { withKeyDown(Key.DirectionCenter) { advanceEventTime(1_200) } }; settle()
+        compose.onRoot().performKeyInput { withKeyDown(Key.DirectionCenter) { advanceEventTime(1_200) } }; compose.settleFrames(1, frameMillis = 600)
         assertEquals(listOf(ChannelId(1)), details)
         assertTrue(picks.isEmpty())
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter, settleFrames = 1, frameMillis = 600)
         assertEquals(listOf(ChannelId(1)), picks)
     }
 
     @Test fun withoutProgrammeHoldIsHandledButShortClickStillTunes() {
         screen(events = false)
-        compose.onRoot().performKeyInput { withKeyDown(Key.Enter) { advanceEventTime(1_200) } }; settle()
+        compose.onRoot().performKeyInput { withKeyDown(Key.Enter) { advanceEventTime(1_200) } }; compose.settleFrames(1, frameMillis = 600)
         assertTrue(details.isEmpty())
         assertTrue(picks.isEmpty())
-        key(Key.Enter)
+        compose.pressKey(Key.Enter, settleFrames = 1, frameMillis = 600)
         assertEquals(listOf(ChannelId(1)), picks)
     }
 
@@ -260,7 +259,7 @@ class PlayerChannelBrowserTest {
         screen()
         val click = compose.onNodeWithTag("player-channel-card-1").fetchSemanticsNode()
             .config[androidx.compose.ui.semantics.SemanticsActions.OnClick].action!!
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown, settleFrames = 1, frameMillis = 600)
         compose.runOnIdle { click() }
         assertEquals(PlayerChannelRow.RECENT, state.row)
         assertTrue(picks.isEmpty())

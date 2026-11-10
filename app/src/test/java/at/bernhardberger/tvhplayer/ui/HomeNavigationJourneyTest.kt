@@ -12,7 +12,6 @@ import at.bernhardberger.tvhplayer.settings.dataStore
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileId
-import at.bernhardberger.tvhplayer.ui.components.awaitBrowsePreparation
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchState
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyMode
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
@@ -209,10 +208,7 @@ class HomeNavigationJourneyTest {
                 fixture.settle()
             }
         }
-        // Browse preparation runs on Dispatchers.Default, outside the Compose clock.
-        compose.waitUntil(15_000) {
-            compose.mainClock.advanceTimeBy(50)
-            compose.awaitBrowsePreparation()
+        compose.mainClock.advanceTimeUntil(15_000) {
             compose.onAllNodes(hasTestTag("home-header")).fetchSemanticsNodes().isNotEmpty() &&
                 compose.onAllNodes(hasTestTag("home-onnow-0")).fetchSemanticsNodes().isNotEmpty()
         }

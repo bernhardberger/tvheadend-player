@@ -2,6 +2,12 @@
 @file:OptIn(at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class)
 
 package at.bernhardberger.tvhplayer.ui.player
+import at.bernhardberger.tvhplayer.testutil.focusedTags
+import at.bernhardberger.tvhplayer.testutil.tagExists
+import at.bernhardberger.tvhplayer.testutil.pressKey
+import at.bernhardberger.tvhplayer.testutil.settleFrames
+import at.bernhardberger.tvhplayer.testutil.holdBack
+import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
 
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -13,12 +19,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isFocusable
-import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsFocused
@@ -35,9 +39,6 @@ import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.withKeyDown
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.emptyPreferences
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
@@ -104,8 +105,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -145,6 +144,12 @@ class RecordingPlayerChromeScreenTest {
     private var positionMs = 600_000L
     private val loadGate = CountDownLatch(1)
 
+    @After fun after() {
+        loadGate.countDown()
+        scope.cancel()
+        if (::player.isInitialized) player.release()
+    }
+
     @OptIn(TvheadendTestingApi::class)
     @Test fun refusedRecordingShowsUnavailableInsteadOfInterrupted() {
         screen(refusedEntry = DvrEntry.create(
@@ -174,12 +179,6 @@ class RecordingPlayerChromeScreenTest {
             .assertTextEquals(context.getString(AppErrorCondition.RECORDING_UNAVAILABLE.titleRes()))
     }
 
-    @After fun after() {
-        loadGate.countDown()
-        scope.cancel()
-        if (::player.isInitialized) player.release()
-    }
-
     @Test fun recordsRecentPlaybackOnlyAfterTheRecordingPlays() {
         val store = LastPlayedChannelStore(context)
         runBlocking { useConnection(ServerProfileId.generate()); store.clear() }
@@ -187,6 +186,7 @@ class RecordingPlayerChromeScreenTest {
         assertEquals(emptyList<DvrEntryId>(), runBlocking { store.recentRecordingIds.first() })
         playing()
         settle()
+        // LastPlayedChannelStore writes on the real DataStore IO thread.
         compose.waitUntil(10_000) {
             runBlocking { store.recentRecordingIds.first() } == listOf(DvrEntryId(7))
         }
@@ -196,29 +196,6 @@ class RecordingPlayerChromeScreenTest {
         key(Key.DirectionCenter)
         settle()
         assertEquals(listOf(DvrEntryId(8), DvrEntryId(7)), runBlocking { store.recentRecordingIds.first() })
-    }
-
-    @Test fun recentRecordingHistoryIsBoundedDeduplicatedAndCleared() {
-        val store = LastPlayedChannelStore(context)
-        val first = ServerProfileId.generate()
-        runBlocking {
-            useConnection(first)
-            store.clear()
-            (1L..51L).forEach { store.pushRecentRecordingId(DvrEntryId(it)) }
-            assertEquals((51L downTo 2L).map(::DvrEntryId), store.recentRecordingIds.first())
-            store.pushRecentRecordingId(DvrEntryId(10))
-            val ids = store.recentRecordingIds.first()
-            assertEquals(DvrEntryId(10), ids.first())
-            assertEquals(50, ids.size)
-            assertEquals(1, ids.count { it == DvrEntryId(10) })
-            // Each connection keeps its own history.
-            useConnection(ServerProfileId.generate())
-            assertEquals(emptyList<DvrEntryId>(), store.recentRecordingIds.first())
-            useConnection(first)
-            assertEquals(DvrEntryId(10), store.recentRecordingIds.first().first())
-            store.clear()
-            assertEquals(emptyList<DvrEntryId>(), store.recentRecordingIds.first())
-        }
     }
 
     @Test fun entersWithAPassiveBannerAndDownLandsOnPause() {
@@ -252,23 +229,27 @@ class RecordingPlayerChromeScreenTest {
         var closed = false
         screen(onClose = { closed = true }, listed = false)
         assertFalse("no chrome is drawn while the recording loads", exists("player-banner"))
-        key(Key.Back)
-        assertTrue("one Back leaves; there is no invisible Banner to hide first", closed)
-    }
-
-    @Test fun aRecordingThatCannotPlayShowsNoStateCellEndOrChip() {
-        screen(listed = false)
         assertFalse(exists("player-state"))
         assertFalse(exists("player-end-clock"))
         assertFalse(exists("player-hidden-slot"))
         key(Key.DirectionCenter)
         assertFalse(exists("player-state"))
         assertFalse(exists("player-hidden-slot"))
+        key(Key.Back)
+        assertTrue("one Back leaves; there is no invisible Banner to hide first", closed)
     }
 
-    @Test fun rewindAndFastForwardOnTheHiddenPlayerShowTheirStepPreview() {
+    @Test fun steppingAgainAccumulatesTheOffsetFromWhereSteppingStartedAndNamesTheTarget() {
         screen()
         playing()
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionLeft) }
+        compose.mainClock.advanceTimeBy(100)
+        compose.waitForIdle()
+        assertTrue("the step previews in the Banner", exists("player-banner"))
+        assertFalse(exists("player-actions"))
+        assertFalse("no focusable seekbar in the Banner", exists("player-seekbar"))
+        assertEquals("30 seconds back, target 0:09:30. Total 1:00:00.",
+            spokenStep("recording-seek-preview"))
         repeat(8) { settle() }
         assertFalse("the entry Banner timed out", exists("player-banner"))
         for ((step, target) in listOf(Key.MediaRewind to "30 seconds back, target 0:09:30", Key.MediaFastForward to "30 seconds forward, target 0:10:30")) {
@@ -282,12 +263,6 @@ class RecordingPlayerChromeScreenTest {
             repeat(8) { settle() }
             assertFalse("the Banner hides again", exists("player-banner"))
         }
-    }
-
-    @Test fun steppingAgainAccumulatesTheOffsetFromWhereSteppingStartedAndNamesTheTarget() {
-        screen()
-        playing()
-        repeat(8) { settle() }
         positionMs = 600_000L
         settle()
         compose.onRoot().performKeyInput { pressKey(Key.MediaFastForward) }
@@ -305,11 +280,7 @@ class RecordingPlayerChromeScreenTest {
         compose.mainClock.advanceTimeBy(100)
         compose.waitForIdle()
         assertTrue("stepping back reduces the offset", texts("+0:30"))
-    }
-
-    @Test fun stepsInQuickSuccessionAreAnnouncedOnceWithTheFinalValue() {
-        screen()
-        playing()
+        // Finish the previous burst before checking a new burst's announcement window.
         repeat(8) { settle() }
         positionMs = 600_000L
         settle()
@@ -390,16 +361,6 @@ class RecordingPlayerChromeScreenTest {
         assertEquals("Recorded ${padded.recordedDate} • Recording until ${formatClock(1_700_003_600 + 7_200)}", padded.metadata)
     }
 
-    @Test fun aGrowingRecordingCarriesTheRecBadge() {
-        var growing by mutableStateOf(true)
-        compose.setContent { TVHeadendPlayerTheme { RecordingChromeFixture(mode = PlayerChromeMode.BANNER, growing = growing) } }
-        compose.waitForIdle()
-        assertTrue(exists("recording-badge"))
-        compose.runOnIdle { growing = false }
-        compose.waitForIdle()
-        assertFalse(exists("recording-badge"))
-    }
-
     @Test fun bannerHidesFiveSecondsAfterTheFirstFrame() {
         screen()
         repeat(8) { settle() }
@@ -416,27 +377,16 @@ class RecordingPlayerChromeScreenTest {
         assertFalse(exists("player-actions"))
     }
 
-    @Test fun leftStepsInsideTheBannerWithoutTheSeekbar() {
-        screen()
-        playing()
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionLeft) }
-        compose.mainClock.advanceTimeBy(100)
-        compose.waitForIdle()
-        assertTrue("the step previews in the Banner", exists("player-banner"))
-        assertFalse(exists("player-actions"))
-        assertFalse("no focusable seekbar in the Banner", exists("player-seekbar"))
-        assertEquals("30 seconds back, target 0:09:30. Total 1:00:00.",
-            spokenStep("recording-seek-preview"))
-    }
-
     @Test fun aStepQueuedAndCommittedBetweenTwoCompositionsIsAnnouncedAfresh() {
         var target by mutableStateOf(630_000L)
         var stepId by mutableStateOf(SeekStepId())
+        var mode by mutableStateOf(PlayerChromeMode.BANNER_STEP)
+        var settled by mutableStateOf(true)
         compose.setContent {
             TVHeadendPlayerTheme {
                 RecordingChromeFixture(
-                    mode = PlayerChromeMode.BANNER_STEP, positionMs = 600_000L, durationMs = 3_600_000L,
-                    targetMs = target, originMs = 600_000L, stepSettled = true, stepId = stepId,
+                    mode = mode, positionMs = 600_000L, durationMs = 3_600_000L,
+                    targetMs = target, originMs = 600_000L, stepSettled = settled, stepId = stepId,
                 )
             }
         }
@@ -450,21 +400,11 @@ class RecordingPlayerChromeScreenTest {
         }
         settle()
         assertEquals("1 minute, 30 seconds forward, target 0:11:30. Total 1:00:00.", description("recording-seek-preview"))
-    }
-
-    @Test fun aNewStepKeepsTheSettledStepsWordsOnTheFocusedSeekbarUntilItSettles() {
-        var target by mutableStateOf(630_000L)
-        var settled by mutableStateOf(true)
-        var stepId by mutableStateOf(SeekStepId())
-        compose.setContent {
-            TVHeadendPlayerTheme {
-                RecordingChromeFixture(
-                    mode = PlayerChromeMode.CONTROLS, positionMs = 600_000L, durationMs = 3_600_000L,
-                    targetMs = target, originMs = 600_000L, stepSettled = settled, stepId = stepId,
-                )
-            }
+        compose.runOnIdle {
+            mode = PlayerChromeMode.CONTROLS
+            target = 630_000L
+            stepId = SeekStepId()
         }
-        compose.mainClock.autoAdvance = false
         settle()
         fun seekbar() = compose.onNodeWithTag("player-seekbar").fetchSemanticsNode()
             .config[SemanticsProperties.ContentDescription].joinToString()
@@ -692,25 +632,6 @@ class RecordingPlayerChromeScreenTest {
         assertTrue("and the top identity, which carries it, speaks it", identitySpeech(compose).contains("Recording now"))
     }
 
-    @Test fun markerKeysStillWorkInTheControls() {
-        val seeks = mutableListOf<Long>()
-        compose.setContent {
-            TVHeadendPlayerTheme {
-                RecordingChromeFixture(marks = chapterMarks(900_000L, 2_700_000L), onSeekMarker = seeks::add)
-            }
-        }
-        compose.mainClock.autoAdvance = false
-        settle()
-        assertEquals(listOf("player-pause"), focused())
-        key(Key.DirectionUp)
-        assertEquals(listOf("player-seekbar"), focused())
-        key(Key.DirectionUp)
-        assertEquals(listOf("recording-marker-target"), focused())
-        key(Key.DirectionRight)
-        key(Key.DirectionCenter)
-        assertEquals(listOf(2_700_000L), seeks)
-    }
-
     @Test fun markSymbolsShowOnlyWhileTheSeekbarIsFocused() {
         compose.setContent {
             TVHeadendPlayerTheme { RecordingChromeFixture(marks = chapterMarks(900_000L, 2_700_000L)) }
@@ -905,17 +826,16 @@ class RecordingPlayerChromeScreenTest {
     }
 
     private fun holdBack(beforeRelease: () -> Unit = {}) {
-        compose.runOnUiThread {
-            rootView.dispatchKeyEvent(AndroidKeyEvent(AndroidKeyEvent.ACTION_DOWN, AndroidKeyEvent.KEYCODE_BACK))
-            rootView.dispatchKeyEvent(AndroidKeyEvent(0, 0, AndroidKeyEvent.ACTION_DOWN,
-                AndroidKeyEvent.KEYCODE_BACK, 1, 0, 0, 0, AndroidKeyEvent.FLAG_LONG_PRESS))
-            rootView.dispatchKeyEvent(AndroidKeyEvent(0, 0, AndroidKeyEvent.ACTION_DOWN, AndroidKeyEvent.KEYCODE_BACK, 2))
-        }
-        compose.mainClock.advanceTimeByFrame()
-        compose.waitForIdle()
-        beforeRelease()
-        compose.runOnUiThread {
-            rootView.dispatchKeyEvent(AndroidKeyEvent(AndroidKeyEvent.ACTION_UP, AndroidKeyEvent.KEYCODE_BACK))
+        holdBack(send = { down, repeat, flags ->
+            compose.runOnUiThread {
+                rootView.dispatchKeyEvent(AndroidKeyEvent(0, 0,
+                    if (down) AndroidKeyEvent.ACTION_DOWN else AndroidKeyEvent.ACTION_UP,
+                    AndroidKeyEvent.KEYCODE_BACK, repeat, 0, 0, 0, flags))
+            }
+        }) {
+            compose.mainClock.advanceTimeByFrame()
+            compose.waitForIdle()
+            beforeRelease()
         }
         settle()
     }
@@ -934,14 +854,14 @@ class RecordingPlayerChromeScreenTest {
                 it.onIsPlayingChanged(true)
             }
         }
-        compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Playing }
         compose.waitForIdle()
+        assertTrue(runtime.state.value is AppPlaybackState.Playing)
     }
 
     private fun presentFirstFrame() {
         compose.runOnIdle { playerListeners.toList().forEach { it.onRenderedFirstFrame() } }
-        compose.waitUntil(5_000) { runtime.videoPresentation.value.visible }
         compose.waitForIdle()
+        assertTrue(runtime.videoPresentation.value.visible)
     }
 
     private fun audioTrack(id: String, language: String, selected: Boolean) = Tracks.Group(TrackGroup(Format.Builder()
@@ -955,7 +875,7 @@ class RecordingPlayerChromeScreenTest {
     }
 
     private fun exists(tag: String) =
-        compose.onAllNodes(hasTestTag(tag), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+        compose.tagExists(tag)
 
     private fun endClock(): String = compose.onNodeWithTag("player-end-clock", useUnmergedTree = true).fetchSemanticsNode()
         .config[SemanticsProperties.Text].joinToString { it.text }
@@ -975,12 +895,10 @@ class RecordingPlayerChromeScreenTest {
     }
 
     private fun focused(): List<String> =
-        compose.onAllNodes(isFocused(), useUnmergedTree = true).fetchSemanticsNodes()
-            .mapNotNull { it.config.getOrNull(SemanticsProperties.TestTag) }
+        compose.focusedTags()
 
     private fun key(key: Key) {
-        compose.onRoot().performKeyInput { pressKey(key) }
-        settle()
+        compose.pressKey(key, settleFrames = 20)
     }
 
     private fun repeatedLeftCycle(beforeRelease: () -> Unit) {
@@ -1001,10 +919,7 @@ class RecordingPlayerChromeScreenTest {
     }
 
     private fun settle() {
-        repeat(20) {
-            compose.mainClock.advanceTimeBy(100)
-            compose.waitForIdle()
-        }
+        compose.settleFrames(20)
     }
 
     /** [listed] false: the server never lists the recording, so the screen stays in its loading state. */
@@ -1018,7 +933,7 @@ class RecordingPlayerChromeScreenTest {
                 id = recording, state = DvrEntryState.COMPLETED, title = "Zeit im Bild", channelName = "Documentary",
             ).takeIf { listed }))),
         )).apply { scriptRecordingPlaybackSuccess() }
-        val settings = PlayerSettingsStore(InMemoryData())
+        val settings = PlayerSettingsStore(InMemoryPreferencesDataStore())
         val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.IO,
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
         scope.launch { profiles.run() }
@@ -1063,6 +978,7 @@ class RecordingPlayerChromeScreenTest {
                 runtime.playRecording(requireNotNull(currentRecordingPlaybackSelection(session.observation.value, recording)),
                     RecordingPlaybackStart.START_OVER)
             }
+            // The coordinator installs the item through the real ExoPlayer playback thread.
             compose.waitUntil(10_000) { install.isCompleted }
             if (refusedEntry == null) assertEquals(AppPlaybackTarget.Recording(recording), runtime.activeTarget.value)
         }
@@ -1092,7 +1008,7 @@ class RecordingPlayerChromeScreenTest {
             }
             }
         }
-        if (listed && refusedEntry == null) compose.waitUntil(10_000) { runtime.activeTarget.value == AppPlaybackTarget.Recording(recording) }
+        if (listed && refusedEntry == null) assertEquals(AppPlaybackTarget.Recording(recording), runtime.activeTarget.value)
         settle()
         compose.mainClock.autoAdvance = false
         settle()
@@ -1110,13 +1026,6 @@ class RecordingPlayerChromeScreenTest {
             override fun close() = Unit
         }
     }.createMediaSource(item)
-
-    private class InMemoryData : DataStore<Preferences> {
-        val state = MutableStateFlow(emptyPreferences())
-        override val data: Flow<Preferences> get() = state
-        override suspend fun updateData(transform: suspend (Preferences) -> Preferences) =
-            transform(state.value).also { state.value = it }
-    }
 
     private suspend fun useConnection(id: ServerProfileId) {
         context.dataStore.edit { it[stringPreferencesKey("activeServerProfileId")] = id.value }

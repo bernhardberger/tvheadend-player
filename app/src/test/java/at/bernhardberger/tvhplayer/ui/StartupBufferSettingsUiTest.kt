@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui
 
+import at.bernhardberger.tvhplayer.testutil.pressKey
 import android.app.Application
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -74,7 +75,7 @@ class StartupBufferSettingsUiTest {
                 }
             }
         }
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         // Long titles wrap to a second line instead of being cut off.
         val timeshift = "Timeshift"
         val timeshiftDescription = if (german) "Live-TV pausieren und zurückspulen" else "Pause and rewind live TV"
@@ -85,16 +86,16 @@ class StartupBufferSettingsUiTest {
         var downs = 0
         while (focusedRows(title).isEmpty()) {
             check(++downs < 20) { "Start-up buffer row not reachable" }
-            key(Key.DirectionDown)
+            compose.pressKey(Key.DirectionDown)
         }
-        key(Key.DirectionUp)
+        compose.pressKey(Key.DirectionUp)
         // Unavailable while disconnected, the profile row still takes focus and shows why.
         compose.onNode(isFocused() and hasText(if (german) "Streamprofil" else "Stream profile")).assertIsNotEnabled()
         assertFalse("Start-up buffer title is cut off", overflows(title))
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         compose.onNode(isFocused() and hasText(title) and hasText(automatic)).assertExists()
 
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         compose.onNode(isFocused() and hasText(automatic)).assertIsSelected()
         // The explanation belongs to the level: it sits under the heading, outside
         // every row, not focusable, and no option carries it.
@@ -114,25 +115,25 @@ class StartupBufferSettingsUiTest {
         }
 
         // Back leaves the level without choosing.
-        key(Key.Back)
+        compose.pressKey(Key.Back)
         compose.onNode(isFocused() and hasText(title)).assertExists()
         assertEquals(0, selections)
 
-        key(Key.DirectionCenter)
-        key(Key.DirectionDown)
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionCenter)
         assertEquals(1, selections)
         assertEquals(500, ui.startupBufferMillis)
         compose.onNode(isFocused() and hasText(title) and hasText(half)).assertExists()
 
         // Reopening starts on the stored choice; Automatic shows the learned level.
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         compose.onNode(isFocused() and hasText(half)).assertIsSelected()
         compose.runOnIdle { ui = ui.copy(startupBufferLearnedMillis = 1500) }
-        key(Key.DirectionUp)
+        compose.pressKey(Key.DirectionUp)
         val learned = if (german) "Automatisch • 1,5 Sek." else "Automatic • 1.5s"
         compose.onNode(isFocused() and hasText(learned)).assertIsNotSelected()
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         assertEquals(STARTUP_BUFFER_AUTOMATIC, ui.startupBufferMillis)
         compose.onNode(isFocused() and hasText(title) and hasText(learned)).assertExists()
     }
@@ -149,10 +150,5 @@ class StartupBufferSettingsUiTest {
 
     private fun focusedRows(title: String) =
         compose.onAllNodes(isFocused() and hasText(title)).fetchSemanticsNodes()
-
-    private fun key(key: Key) {
-        compose.onRoot().performKeyInput { pressKey(key) }
-        compose.waitForIdle()
-    }
 
 }

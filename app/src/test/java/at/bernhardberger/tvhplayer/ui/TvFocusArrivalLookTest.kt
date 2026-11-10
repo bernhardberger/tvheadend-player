@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui
 
+import at.bernhardberger.tvhplayer.testutil.pressKey
+import at.bernhardberger.tvhplayer.testutil.settleFrames
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -97,7 +99,7 @@ class TvFocusArrivalLookTest {
         schedule { ChannelSchedule(null, emptyList(), NOW, NOW, loading, false, { null }, {}, {}, {}) }
         compose.onNodeWithContentDescription("Loading schedule").assertIsFocused()
         compose.runOnIdle { loading = false }
-        settle()
+        compose.settleFrames(1, frameMillis = 1000)
         assertLightFill(compose.onNodeWithText("Close"), "Close")
     }
 
@@ -106,7 +108,7 @@ class TvFocusArrivalLookTest {
         var data by mutableStateOf(emptyList<EpgEvent>())
         schedule { ChannelSchedule(null, data, NOW, NOW, data.isEmpty(), false, { null }, {}, {}, {}) }
         compose.runOnIdle { data = PROGRAMMES }
-        settle()
+        compose.settleFrames(1, frameMillis = 1000)
         assertLooksAsWhenRefocused("schedule-row-2", Key.DirectionDown, Key.DirectionUp)
     }
 
@@ -116,7 +118,7 @@ class TvFocusArrivalLookTest {
         shelf { channels }
         compose.onNodeWithTag("player-channel-card-1").assertIsFocused()
         compose.runOnIdle { channels = emptyList() }
-        settle()
+        compose.settleFrames(1, frameMillis = 1000)
         assertLightFill(compose.onNodeWithTag("player-shelf-close"), "Close")
     }
 
@@ -126,7 +128,7 @@ class TvFocusArrivalLookTest {
         shelf { channels }
         compose.onNodeWithTag("player-shelf-close").assertIsFocused()
         compose.runOnIdle { channels = CHANNELS }
-        settle()
+        compose.settleFrames(1, frameMillis = 1000)
         assertLooksAsWhenRefocused("player-channel-card-1", Key.DirectionRight, Key.DirectionLeft)
     }
 
@@ -135,10 +137,10 @@ class TvFocusArrivalLookTest {
         val state = PlayerChannelBrowserState()
         var recent by mutableStateOf(CHANNELS.reversed())
         browser(state) { recent }
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown, settleFrames = 1, frameMillis = 1000)
         assertEquals(PlayerChannelRow.RECENT, state.row)
         compose.runOnIdle { recent = emptyList() }
-        settle()
+        compose.settleFrames(1, frameMillis = 1000)
         assertEquals(PlayerChannelRow.ON_NOW, state.row)
         assertLooksAsWhenRefocused("player-channel-card-1", Key.DirectionRight, Key.DirectionLeft)
     }
@@ -147,7 +149,7 @@ class TvFocusArrivalLookTest {
         leaveTouchModeBeforeComposing()
         val state = PlayerChannelBrowserState()
         browser(state) { CHANNELS.reversed() }
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown, settleFrames = 1, frameMillis = 1000)
         assertLooksAsWhenRefocused("player-channel-card-6", Key.DirectionRight, Key.DirectionLeft)
     }
 
@@ -169,10 +171,10 @@ class TvFocusArrivalLookTest {
             }
         }
         assertLightFill(compose.onNodeWithTag("settings-row-PLAYER"), "root row")
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter, settleFrames = 1, frameMillis = 1000)
         assertLooksAsWhenRefocused("settings-row-autoplay", Key.DirectionDown, Key.DirectionUp)
-        key(Key.DirectionDown)
-        key(Key.DirectionRight)
+        compose.pressKey(Key.DirectionDown, settleFrames = 1, frameMillis = 1000)
+        compose.pressKey(Key.DirectionRight, settleFrames = 1, frameMillis = 1000)
         assertLooksAsWhenRefocused("settings-row-ON", Key.DirectionDown, Key.DirectionUp)
     }
 
@@ -180,7 +182,7 @@ class TvFocusArrivalLookTest {
         leaveTouchModeBeforeComposing()
         depth(DepthStack(listOf(DepthFrame("root", "root-30"))))
         assertLooksAsWhenRefocused("root-30", Key.DirectionDown, Key.DirectionUp)
-        key(Key.DirectionRight)
+        compose.pressKey(Key.DirectionRight, settleFrames = 1, frameMillis = 1000)
         assertLooksAsWhenRefocused("child-30", Key.DirectionDown, Key.DirectionUp)
     }
 
@@ -188,7 +190,7 @@ class TvFocusArrivalLookTest {
         leaveTouchModeBeforeComposing()
         depth(DepthStack(listOf(DepthFrame("root", "root-1"))))
         compose.onNodeWithTag("root-1").assertIsFocused()
-        key(Key.PageDown)
+        compose.pressKey(Key.PageDown, settleFrames = 1, frameMillis = 1000)
         val paged = compose.onNode(hasTestTagPrefix("root-") and isFocused()).fetchSemanticsNode().config[SemanticsProperties.TestTag]
         assertTrue("page key moved on, to $paged", paged != "root-1")
         assertLooksAsWhenRefocused(paged, Key.DirectionDown, Key.DirectionUp)
@@ -215,7 +217,7 @@ class TvFocusArrivalLookTest {
             }
         }
         compose.awaitBrowsePreparation()
-        settle()
+        compose.settleFrames(1, frameMillis = 1000)
         assertLooksAsWhenRefocused("recordings-mode-archive", Key.DirectionRight, Key.DirectionLeft)
     }
 
@@ -225,7 +227,7 @@ class TvFocusArrivalLookTest {
         val tracks = (1..40).map { PlaybackOptionTrack("a$it", "Track $it", selected = it == 30) }
         options({ page }, audio = tracks)
         compose.runOnIdle { page = PlaybackOptionsPage.AUDIO }
-        settle()
+        compose.settleFrames(1, frameMillis = 1000)
         assertDrawnLightUntilLeft("playback-options-track-a30")
     }
 
@@ -234,7 +236,7 @@ class TvFocusArrivalLookTest {
         var page by mutableStateOf(PlaybackOptionsPage.ROOT)
         options({ page }, subtitles = listOf(PlaybackOptionTrack("s1", "German")))
         compose.runOnIdle { page = PlaybackOptionsPage.SUBTITLES }
-        settle()
+        compose.settleFrames(1, frameMillis = 1000)
         assertDrawnLightUntilLeft("playback-options-subtitles-off")
     }
 
@@ -277,7 +279,7 @@ class TvFocusArrivalLookTest {
         }
         val arrival = fill()
         assertTrue("the focused $tag has a light fill, its middle row is at $arrival", arrival > 0.5f)
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown, settleFrames = 1, frameMillis = 1000)
         val left = fill()
         assertTrue("$tag darkens once left, its middle row is at $left", left < 0.5f)
     }
@@ -294,17 +296,17 @@ class TvFocusArrivalLookTest {
                 availableDestinations = destinations) { _, _ -> Button(onClick = {}, Modifier.testTag("rail-content")) { Text("Content") } }
         }
         compose.onNodeWithTag("nav-epg").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
-        settle()
+        compose.settleFrames(1, frameMillis = 1000)
         compose.onNodeWithTag("nav-epg").assertIsFocused()
         compose.runOnIdle { destinations = setOf(AppDestination.HOME, AppDestination.CHANNELS) }
-        settle()
+        compose.settleFrames(1, frameMillis = 1000)
         assertLooksAsWhenRefocused("nav-home", Key.DirectionDown, Key.DirectionUp)
     }
 
     /** Dark as the app is: an unfocused row is see-through, and the bare test window behind it is light. */
     private fun host(content: @Composable () -> Unit) {
         compose.setContent { TVHeadendPlayerTheme { Box(Modifier.fillMaxSize().background(Color.Black)) { content() } } }
-        settle()
+        compose.settleFrames(1, frameMillis = 1000)
     }
 
     /** Without its overlay frame, whose dialog semantics the capture can't follow; the frame holds no focus. */
@@ -324,8 +326,6 @@ class TvFocusArrivalLookTest {
         }
     }
 
-    private fun settle() { compose.mainClock.advanceTimeBy(1_000); compose.waitForIdle() }
-    private fun key(key: Key) { compose.onRoot().performKeyInput { pressKey(key) }; settle() }
 
     private fun leaveTouchModeBeforeComposing() = compose.leaveTouchModeBeforeComposing()
 
@@ -337,7 +337,7 @@ class TvFocusArrivalLookTest {
     }
 
     private fun assertLooksAsWhenRefocused(tag: String, away: Key, back: Key) =
-        compose.onNodeWithTag(tag).assertLooksAsWhenRefocused(tag, { key(away) }, { key(back) })
+        compose.onNodeWithTag(tag).assertLooksAsWhenRefocused(tag, { compose.pressKey(away, settleFrames = 1, frameMillis = 1000) }, { compose.pressKey(back, settleFrames = 1, frameMillis = 1000) })
 
     private companion object {
         const val NOW = 1789246200L

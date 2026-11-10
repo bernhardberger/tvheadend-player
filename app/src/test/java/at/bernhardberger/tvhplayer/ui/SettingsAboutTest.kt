@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui
 
+import at.bernhardberger.tvhplayer.testutil.holdBack
+
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -120,11 +122,7 @@ class SettingsAboutTest {
         backKey(true)
         backKey(false, flags = android.view.KeyEvent.FLAG_CANCELED)
         compose.onNodeWithTag("player-info-reading").assertIsFocused()
-        backKey(true)
-        backKey(true, repeat = 1, flags = android.view.KeyEvent.FLAG_LONG_PRESS)
-        backKey(true, repeat = 2)
-        compose.onNodeWithTag("player-info-reading").assertIsFocused()
-        backKey(false)
+        holdBack(::backKey) { compose.onNodeWithTag("player-info-reading").assertIsFocused() }
         compose.onNodeWithText("Licenses").assertIsFocused()
         press(Key.DirectionDown)
         compose.onNodeWithText("Privacy policy").assertIsFocused()

@@ -4,8 +4,9 @@ import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
-import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -28,7 +29,6 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /** Prototype review captures of each Channels layout, option and panel; static composition only. */
-@Category(VisualCapture::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi",
     instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
@@ -37,6 +37,7 @@ class ChannelsLayoutCaptureTest {
     @get:Rule val images = ImageLoaderRule()
     @get:Rule val compose = createComposeRule()
     private val fixture = ChannelsLayoutFixture(compose, images)
+    private var backdropChannel = ChannelId(1)
 
     @org.junit.Before fun freezeSceneClock() {
         // Match the presentation scene so captures compare channel titles, not wall-clock drift.
@@ -44,12 +45,12 @@ class ChannelsLayoutCaptureTest {
     }
 
     /** The README scene: Immersive with the app's default view, Ridge Light on air under a 20:15 clock, xhdpi. */
-    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
     fun presentation() = presentation("channels", ChannelsView(), card(1))
 
     /** Store lead: a live match, recording badge and the surrounding evening lineup. */
-    @Test @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi",
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
     fun storeChannels() = atEvening {
         fixture.show(ChannelsView(), fixture.fixtureArt(), presentation = true, recordingNow = 2, scheduledNext = 1)
@@ -59,77 +60,17 @@ class ChannelsLayoutCaptureTest {
     }
 
     /** The same evening as a grid with View options → Program art on, so the cards carry the program pictures. */
-    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
     fun presentationGrid() = presentation("channels-grid",
         ChannelsView(ChannelsLayout.GRID, programArt = setOf(ChannelsLayout.IMMERSIVE, ChannelsLayout.GRID)), card(1))
 
-    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
-    fun gridWithoutNamesTopAndScrolled() = atEvening {
-        fixture.show(ChannelsView(ChannelsLayout.GRID, programArt = setOf(ChannelsLayout.GRID),
-            channelNames = emptySet()), fixture.fixtureArt(), presentation = true)
-        capture("grid-no-names-top", card(1), outputs = "build/outputs/041-guide-channels")
-        repeat(2) { fixture.key(Key.DirectionDown) }
-        capture("grid-no-names-scrolled", card(9), outputs = "build/outputs/041-guide-channels")
-    }
-
-    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
-    fun gridWallTopScrolledLastRowAndViewOptions() = atEvening {
-        // Harbor Kickoff records, as in the Immersive and List wall captures.
-        fixture.show(ChannelsView(ChannelsLayout.GRID, programArt = setOf(ChannelsLayout.GRID)),
-            fixture.fixtureArt(), presentation = true, channelCount = 30, recordingNow = 2, scheduledNext = 1)
-        capture("grid-top", card(1), outputs = "build/outputs/043-channels")
-        fixture.key(Key.DirectionDown)
-        capture("grid-scrolled", card(5), outputs = "build/outputs/043-channels")
-        repeat(6) { fixture.key(Key.DirectionDown) }
-        capture("grid-last-row", card(29), outputs = "build/outputs/043-channels")
-        repeat(7) { fixture.key(Key.DirectionUp) }
-        fixture.awaitFocus(card(1))
-        fixture.key(Key.DirectionUp)
-        fixture.key(Key.DirectionRight)
-        fixture.key(Key.DirectionCenter)
-        capture("grid-view-options-root", hasTestTag("channels-view-layout"), outputs = "build/outputs/043-channels")
-        fixture.key(Key.DirectionRight)
-        fixture.awaitFocus(hasTestTag("channels-view-layout-grid"))
-        listOf("layout-immersive", "layout-list", "layout-grid").forEach {
-            compose.onNodeWithTag("channels-view-$it").assertIsDisplayed()
-        }
-        capture("grid-view-options-layout", hasTestTag("channels-view-layout-grid"), outputs = "build/outputs/043-channels")
-        fixture.key(Key.Back)
-        fixture.awaitFocus(hasTestTag("channels-view-layout"))
-        repeat(2) { fixture.key(Key.DirectionDown) }
-        listOf("layout", "program-art", "channel-names").forEach {
-            compose.onNodeWithTag("channels-view-$it").assertIsDisplayed()
-        }
-        capture("grid-view-options", hasTestTag("channels-view-channel-names"), outputs = "build/outputs/043-channels")
-    }
-
-    /** The channel being watched also records: orange bar, and the recording badge stays. */
-    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
-    fun gridWatchedRecording() = atEvening {
-        fixture.show(ChannelsView(ChannelsLayout.GRID, programArt = setOf(ChannelsLayout.GRID)),
-            fixture.fixtureArt(), presentation = true, channelCount = 30, recordingNow = 2, playingLive = ChannelId(2))
-        capture("grid-watched-recording", card(1), outputs = "build/outputs/043-channels")
-    }
-
-    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
-    fun wallRegressionImmersive() = atEvening {
-        fixture.show(ChannelsView(), fixture.fixtureArt(), presentation = true, recordingNow = 2, scheduledNext = 1)
-        capture("immersive", card(1), outputs = "build/outputs/043-channels")
-    }
-
-    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
-    fun wallRegressionList() = atEvening {
-        fixture.show(ChannelsView(ChannelsLayout.LIST), fixture.fixtureArt(), presentation = true, recordingNow = 2, scheduledNext = 1)
-        capture("list", row(1), outputs = "build/outputs/043-channels")
-    }
-
     /** The same evening as a list. */
-    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
     fun presentationList() = presentation("channels-list", ChannelsView(ChannelsLayout.LIST), row(1))
 
-    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
     fun presentationListWithoutChannelNumbers() = atEvening {
         try {
@@ -143,7 +84,7 @@ class ChannelsLayoutCaptureTest {
     }
 
     /** Immersive with program pictures switched off: how the screen looks when the guide has no art. */
-    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
     fun presentationLogos() = presentation("channels-logos", ChannelsView(programArt = emptySet()), card(1))
 
@@ -151,7 +92,7 @@ class ChannelsLayoutCaptureTest {
      * Back from the player, Northline News keeps playing behind Channels. Left past Ridge Earth's
      * card opens the side menu on Channels, its now-playing header above.
      */
-    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
     fun presentationDrawer() = atEvening {
         fixture.show(ChannelsView(), fixture.fixtureArt(), presentation = true, recordingNow = 2, scheduledNext = 1,
@@ -161,7 +102,7 @@ class ChannelsLayoutCaptureTest {
         repeat(2) { fixture.key(Key.DirectionLeft) }
         fixture.awaitFocus(card(1))
         fixture.key(Key.DirectionLeft)
-        capture("drawer", hasTestTag("nav-channels"), outputs = "build/outputs/presentation")
+        capture("drawer", hasTestTag("nav-channels"), outputs = "build/outputs/presentation", background = false)
     }
 
     private fun presentation(name: String, view: ChannelsView, focus: SemanticsMatcher) = atEvening {
@@ -185,11 +126,10 @@ class ChannelsLayoutCaptureTest {
     private fun card(id: Int) = hasTestTag("channel-card-$id")
     private fun row(id: Int) = hasTestTag("channel-row-$id")
     private val tagsButton = hasTestTag("channels-tags-button")
-    private val viewButton = hasTestTag("channels-view-button")
 
     private fun Boolean.slug() = if (this) "programme" else "logo"
 
-    @Test fun list() {
+    @Test @Category(VisualCapture::class) fun list() {
         fixture.show(ChannelsView(ChannelsLayout.LIST), fixture.fixtureArt())
         capture("list-1-first-row", row(1))
         fixture.key(Key.DirectionDown)
@@ -203,72 +143,29 @@ class ChannelsLayoutCaptureTest {
         capture("list-4-header-group-button", tagsButton)
     }
 
-    /** Logos on the rows' own fill: light marks (15), the missing-logo icon (16) and dark marks (17, 18), each with and without focus. */
-    @Test fun listLogoInk() {
-        fixture.show(ChannelsView(ChannelsLayout.LIST), fixture.fixtureArt(withoutPicon = setOf(16)))
-        repeat(14) { fixture.key(Key.DirectionDown) }
-        capture("list-7-light-logo", row(15))
-        fixture.key(Key.DirectionDown)
-        capture("list-8-missing-logo", row(16))
-        fixture.key(Key.DirectionDown)
-        capture("list-9-dark-logo", row(17))
-    }
-
-    @Test fun listSingleGroup() {
-        fixture.show(ChannelsView(ChannelsLayout.LIST), fixture.fixtureArt(), tags = false)
-        capture("list-5-single-group", row(1))
-    }
-
-    @Test fun listPlaying() = playing(ChannelsLayout.LIST, ::row)
-    @Test fun gridPlaying() {
-        fixture.show(ChannelsView(ChannelsLayout.GRID), fixture.fixtureArt(), warmPlayback = true,
-            playerReturn = PlayerReturnFocus(ChannelId(1), ChannelId(1)), video = FixtureArt.art("harbor-lights-live"))
-        capture("grid-playing-1-same-channel", card(1))
-        fixture.key(Key.DirectionRight)
-        capture("grid-playing-2-other-channel", card(2))
-    }
-    @Test fun immersivePlaying() = playing(ChannelsLayout.IMMERSIVE, ::card)
-    @Test fun listRecording() = recording(ChannelsLayout.LIST, ::row)
-    @Test fun immersiveRecording() = recording(ChannelsLayout.IMMERSIVE, ::card)
-    @Test fun gridRecording() = recording(ChannelsLayout.GRID, ::card)
-
-    /** Channel 1 plays behind the screen: focus on it, on another channel, then on a header button. */
-    private fun playing(layout: ChannelsLayout, item: (Int) -> SemanticsMatcher, slug: String = layout.name.lowercase()) {
-        fixture.show(ChannelsView(layout), fixture.fixtureArt(), warmPlayback = true,
-            playerReturn = PlayerReturnFocus(ChannelId(1), ChannelId(1)), video = FixtureArt.art("harbor-lights-live"))
-        capture("$slug-playing-1-same-channel", item(1))
-        fixture.key(if (layout == ChannelsLayout.LIST) Key.DirectionDown else Key.DirectionRight)
-        capture("$slug-playing-2-other-channel", item(2))
-        fixture.key(if (layout == ChannelsLayout.LIST) Key.DirectionRight else Key.DirectionUp)
-        capture("$slug-playing-3-button", tagsButton)
-    }
-
-    /** Channel 1's next programme is scheduled; channel 2 records now. */
-    private fun recording(layout: ChannelsLayout, item: (Int) -> SemanticsMatcher, slug: String = layout.name.lowercase()) {
-        fixture.show(ChannelsView(layout), fixture.fixtureArt(), recordingNow = 2, scheduledNext = 1)
-        capture("$slug-dvr-1-next-scheduled", item(1))
-        fixture.key(if (layout == ChannelsLayout.LIST) Key.DirectionDown else Key.DirectionRight)
-        capture("$slug-dvr-2-recording", item(2))
-    }
-
     // One composition per test: every layout x option combination is its own test.
-    @Test fun gridProgramme() = grid(cardArt = true)
-    @Test fun gridLogo() = grid(cardArt = false)
-    @Test fun immersiveProgramme() = immersive(cardArt = true)
+    @Test @Category(VisualCapture::class) fun gridProgramme() = grid(cardArt = true)
+    @Test @Category(VisualCapture::class) fun immersiveProgramme() = immersive(cardArt = true)
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
     fun rowRailOverlap() {
         fixture.show(ChannelsView(ChannelsLayout.IMMERSIVE, setOf(ChannelsLayout.IMMERSIVE)), fixture.fixtureArt(), presentation = true)
         fixture.awaitFocus(card(1))
         fixture.key(Key.DirectionRight)
-        capture("row-rail-overlap", card(2))
+        fixture.awaitFocus(card(2))
+        compose.mainClock.advanceTimeBy(1_500)
+        compose.waitForIdle()
+        compose.onNodeWithTag("channels-immersive-background").assertExists()
+        compose.onNodeWithTag("channels-immersive-art").assertExists()
+        val bitmap = draw()
+        compose.waitForIdle()
+        val settled = draw()
+        assertTrue("row-rail-overlap captured mid-animation", bitmap.sameAs(settled))
+        bitmap.recycle()
+        settled.recycle()
         val bounds = compose.onNode(card(2)).fetchSemanticsNode().boundsInRoot
         assertTrue("focused card clears mask", bounds.left >= 260f)
     }
-    @Test fun immersiveLogo() = immersive(cardArt = false)
-    @Test fun viewOptionsList() = viewOptions(ChannelsLayout.LIST)
-    @Test fun viewOptionsGrid() = viewOptions(ChannelsLayout.GRID)
-    @Test fun viewOptionsImmersive() = viewOptions(ChannelsLayout.IMMERSIVE)
 
     private fun grid(cardArt: Boolean, slug: String = "grid") {
         val columns = ChannelsGridColumns
@@ -299,63 +196,26 @@ class ChannelsLayoutCaptureTest {
         capture("$slug-${picture.slug()}-5-other-group", card(7))
     }
 
-    @Test fun groupPickerAndEmptyGroup() {
-        fixture.show(ChannelsView(ChannelsLayout.GRID), fixture.fixtureArt(), emptyGroup = true)
-        fixture.awaitFocus(card(1))
-        fixture.key(Key.DirectionUp)
-        fixture.key(Key.DirectionCenter)
-        capture("panel-1-group-picker", hasTestTag("channels-tags-all"))
-        repeat(3) { fixture.key(Key.DirectionDown) }
-        fixture.key(Key.DirectionCenter)
-        capture("panel-2-empty-group", hasTestTag("channels-show-all"))
-    }
-
-    private fun viewOptions(layout: ChannelsLayout) {
-        fixture.show(ChannelsView(layout), fixture.fixtureArt())
-        fixture.awaitFocus(if (layout == ChannelsLayout.LIST) row(1) else card(1))
-        fixture.key(Key.DirectionUp)
-        fixture.key(Key.DirectionRight)
-        fixture.key(Key.DirectionCenter)
-        capture("panel-3-view-options-${layout.name.lowercase()}", hasTestTag("channels-view-layout"))
-        fixture.key(Key.DirectionRight)
-        capture("panel-3-view-layout-${layout.name.lowercase()}", hasTestTag("channels-view-layout-${layout.name.lowercase()}"))
-    }
-
-    @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
-    @Test fun germanLargeTextHeaderAndPanels() {
-        fixture.show(ChannelsView(ChannelsLayout.GRID), fixture.fixtureArt(), manyTags = true, scale = 1.3f)
-        fixture.awaitFocus(card(1))
-        fixture.key(Key.DirectionUp)
-        fixture.key(Key.DirectionCenter)
-        fixture.awaitFocus(hasTestTag("channels-tags-all"))
-        fixture.key(Key.DirectionDown)
-        fixture.key(Key.DirectionDown)
-        fixture.key(Key.DirectionCenter)
-        // Nachrichten und Wetter: channels 1, 8 and 15.
-        fixture.awaitFocus(card(1))
-        fixture.key(Key.DirectionUp)
-        capture("de-1.3-1-header", tagsButton, locale = "de", fontScale = 1.3f)
-        fixture.key(Key.DirectionCenter)
-        capture("de-1.3-2-group-picker", hasTestTag("channels-tags-2"), locale = "de", fontScale = 1.3f)
-        fixture.key(Key.Back)
-        fixture.awaitFocus(tagsButton)
-        fixture.key(Key.DirectionRight)
-        fixture.key(Key.DirectionCenter)
-        capture("de-1.3-3-view-options", hasTestTag("channels-view-layout"), locale = "de", fontScale = 1.3f)
-    }
-
     private fun capture(name: String, focus: SemanticsMatcher, locale: String = "en", fontScale: Float = 1f,
-        outputs: String = "build/outputs/u4-channel-views") {
+        outputs: String = "build/outputs/u4-channel-views", background: Boolean = true) {
         fixture.awaitFocus(focus)
-        // The background follows focus after a pause and a fade; a logo's glow is baked off the
-        // main thread first, and the logo comes with it.
-        compose.mainClock.advanceTimeBy(1_500)
-        compose.waitUntil(10_000) {
-            compose.onAllNodesWithTag("channels-logo-glow").fetchSemanticsNodes().isEmpty() ||
-                compose.onAllNodesWithTag("channels-immersive-picon").fetchSemanticsNodes().isNotEmpty()
-        }
+        compose.onNode(focus).fetchSemanticsNode().config.getOrNull(SemanticsProperties.TestTag)
+            ?.removePrefix("channel-card-")?.toLongOrNull()?.let { backdropChannel = ChannelId(it) }
+        // Browse, image loading and glow baking run on the fixture's controlled Main context.
+        // Finish the incoming headline before checking its expected artwork branch.
         compose.mainClock.advanceTimeBy(1_500)
         compose.waitForIdle()
+        if (fixture.channelsView.layout == ChannelsLayout.IMMERSIVE && background) {
+            compose.onNodeWithTag("channels-immersive-background").assertExists()
+            val art = fixture.programmeArt(backdropChannel)
+                .takeIf { ChannelsLayout.IMMERSIVE in fixture.channelsView.programArt }
+            if (art != null) {
+                compose.onNodeWithTag("channels-immersive-art").assertExists()
+            } else {
+                compose.onNodeWithTag("channels-logo-glow").assertExists()
+                compose.onNodeWithTag("channels-immersive-picon").assertExists()
+            }
+        }
         val bitmap = draw()
         compose.waitForIdle()
         val settled = draw()
@@ -369,7 +229,7 @@ class ChannelsLayoutCaptureTest {
             shell=TVHeadendPlayerTheme + SideRail; background=theme background, no video
             view=${fixture.channelsView}
             focus=${focus.description} reached by D-pad
-            art=fictional fixture pack; channels 8-18 picon-only without EPG; channel 6 EPG without art${if (outputs == "build/outputs/043-channels" && name.startsWith("grid-")) "; wall lineup=30 channels; 19-30 repeat fixture networks/picons without EPG" else ""}
+            art=fictional fixture pack; channels 8-18 picon-only without EPG; channel 6 EPG without art
             evidenceLimit=static composition only; not physical-TV focus feel, motion or overscan
             """.trimIndent() + "\n"
         }

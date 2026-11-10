@@ -23,9 +23,12 @@ import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
-import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.performKeyInput
-import androidx.compose.ui.test.pressKey
+import at.bernhardberger.tvhplayer.testutil.pressKey
+import at.bernhardberger.tvhplayer.testutil.setContentWithArtworkSampling
+import at.bernhardberger.tvhplayer.stores.ChannelAccentStore
+import kotlin.coroutines.EmptyCoroutineContext
+import kotlinx.coroutines.Dispatchers
+import coil3.SingletonImageLoader
 import androidx.compose.ui.unit.Density
 import androidx.test.core.app.ApplicationProvider
 import androidx.navigation3.runtime.entryProvider
@@ -99,6 +102,7 @@ internal class ChannelsLayoutFixture(
     private val images: ImageLoaderRule,
     private val accents: ChannelAccents? = null,
 ) {
+    private val testAccents = accents ?: ChannelAccents(ChannelAccentStore(), EmptyCoroutineContext) { _, _ -> null }
     var selected by mutableStateOf<ChannelId?>(null)
     var channelsView by mutableStateOf(ChannelsView())
     var plays = 0
@@ -107,6 +111,10 @@ internal class ChannelsLayoutFixture(
         private set
 
     val context: Application get() = ApplicationProvider.getApplicationContext()
+    // This fixture is instrumented: use the same Robolectric wall clock as its guide and screen.
+    fun programmeArt(channelId: ChannelId) = shownObservation.eventAt(
+        channelId, Instant.fromEpochSeconds(System.currentTimeMillis() / 1000),
+    )?.image
 
     fun show(
         view: ChannelsView,
@@ -138,16 +146,20 @@ internal class ChannelsLayoutFixture(
         )
         selected = playerReturn?.playingChannelId
         channelsView = view
-        imageLoader?.let(images::install)
+        images.install((imageLoader ?: SingletonImageLoader.get(context)).newBuilder()
+            .coroutineContext(Dispatchers.Main.immediate)
+            .fetcherCoroutineContext(Dispatchers.Main.immediate)
+            .decoderCoroutineContext(Dispatchers.Main.immediate)
+            .build())
         // Live at the live edge, as the runtime reports it while browse keeps the channel warm.
         val nowPlaying = playingLive?.let {
             railNowPlaying(AppPlaybackTarget.Live(it), AppPlaybackState.Playing, observation, null, false)
         }
         val livePosition = mutableStateOf(playingLive?.let { LiveViewerPosition(it, System.currentTimeMillis() / 1000, behindLive = false) })
-        compose.setContent {
+        compose.setContentWithArtworkSampling {
             CompositionLocalProvider(
                 LocalDensity provides Density(LocalDensity.current.density, scale),
-                LocalChannelAccents provides (accents ?: LocalChannelAccents.current),
+                LocalChannelAccents provides testAccents,
                 LocalWarmPlayback provides warmPlayback,
                 LocalWatchingTarget provides nowPlaying?.target,
                 LocalWatchingChannel provides playingLive,
@@ -250,12 +262,11 @@ internal class ChannelsLayoutFixture(
     })
 
     fun key(key: Key) {
-        compose.onRoot().performKeyInput { pressKey(key) }
-        compose.waitForIdle()
+        compose.pressKey(key)
     }
 
     fun awaitFocus(target: SemanticsMatcher) {
-        compose.waitUntil(10_000) {
+        compose.mainClock.advanceTimeUntil(10_000) {
             compose.onAllNodes(target and isFocused()).fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNode(target and isFocused()).assertIsFocused().assertIsDisplayed()

@@ -1,5 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.testutil.holdBack
+
+import at.bernhardberger.tvhplayer.testutil.pressKey
 import at.bernhardberger.tvhplayer.testutil.setContentWithBrowsePreparation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -22,16 +25,16 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performKeyPress
 import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.performKeyInput
-import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -60,6 +63,7 @@ import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
+import at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
@@ -78,6 +82,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.CoroutineDispatcher
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -110,15 +116,15 @@ class GuidePlayerReturnFocusTest {
         // An out-of-scope playing channel restores the saved past-window position.
         guide(PlayerReturnFocus(ChannelId(99), ChannelId(1)))
         focused("Channel 1 hour -2")
-        key(Key.DirectionLeft)
-        key(Key.DirectionLeft)
+        compose.pressKey(Key.DirectionLeft)
+        compose.pressKey(Key.DirectionLeft)
         focused("Channel 1 hour -4")
-        key(Key.DirectionRight)
+        compose.pressKey(Key.DirectionRight)
         focused("Channel 1 hour -3")
         compose.onRoot().performKeyPress(KeyEvent(android.view.KeyEvent(0, 0,
             android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_BACK, 0)))
         // Moving to the next cached programme replaces the prepared window while Back is held.
-        key(Key.DirectionRight)
+        compose.pressKey(Key.DirectionRight)
         focused("Channel 1 hour -2")
         compose.onRoot().performKeyPress(KeyEvent(android.view.KeyEvent(0, 0,
             android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_BACK, 0)))
@@ -127,7 +133,7 @@ class GuidePlayerReturnFocusTest {
 
     @Test fun backFromFutureWaitsForItsOwnUncanceledReleaseBeforeReturningToNow() {
         guide(PlayerReturnFocus(ChannelId(1), ChannelId(1)))
-        repeat(3) { key(Key.DirectionRight) }
+        repeat(3) { compose.pressKey(Key.DirectionRight) }
         focused("Channel 1 hour 3")
         fun backKey(down: Boolean, repeat: Int = 0, flags: Int = 0) {
             compose.onRoot().performKeyPress(KeyEvent(android.view.KeyEvent(0, 0,
@@ -139,11 +145,7 @@ class GuidePlayerReturnFocusTest {
         backKey(true)
         backKey(false, flags = android.view.KeyEvent.FLAG_CANCELED)
         focused("Channel 1 hour 3")
-        backKey(true)
-        backKey(true, repeat = 1, flags = android.view.KeyEvent.FLAG_LONG_PRESS)
-        backKey(true, repeat = 2)
-        focused("Channel 1 hour 3")
-        backKey(false)
+        holdBack(::backKey) { focused("Channel 1 hour 3") }
         focused("Channel 1 hour 0")
         backKey(false)
         focused("Channel 1 hour 0")
@@ -180,13 +182,13 @@ class GuidePlayerReturnFocusTest {
         guide(PlayerReturnFocus(ChannelId(1), ChannelId(1)))
         focused("Channel 1 hour 0")
         // Only the last arrival is compared: leaving and returning on the way would move the window.
-        repeat(3) { key(Key.DirectionRight) }
+        repeat(3) { compose.pressKey(Key.DirectionRight) }
         focused("Channel 1 hour 3")
         assertCellLooksAsWhenRefocused("Channel 1 hour 3", Key.DirectionDown, Key.DirectionUp)
     }
 
     private fun assertCellLooksAsWhenRefocused(title: String, away: Key, back: Key) = compose.onNodeWithText(title)
-        .assertLooksAsWhenRefocused(title, { key(away) }, { key(back) })
+        .assertLooksAsWhenRefocused(title, { compose.pressKey(away) }, { compose.pressKey(back) })
 
     @Test fun genreEntryStartsAtNowAndFocusesFirstMatchingChannel() {
         guide(PlayerReturnFocus(ChannelId(1), ChannelId(1)),
@@ -196,7 +198,14 @@ class GuidePlayerReturnFocusTest {
     }
 
     @Test fun genreEntryWithoutPlayerReturnWinsOverUnsettledPreferredChannelCoverage() {
-        guide(null, genreRequest = at.bernhardberger.tvhplayer.core.ProgrammeCategory.SPORT, settledCoverage = false)
+        val acquisition = StandardTestDispatcher()
+        val session = guide(null, genreRequest = at.bernhardberger.tvhplayer.core.ProgrammeCategory.SPORT,
+            settledCoverage = false, coverageContext = acquisition)
+        focused("Channel 2 hour 0")
+        assertEquals(0, session.calls.count { it == FakeSessionCall.EPG_ACQUIRE_COVERAGE_BATCH })
+        acquisition.scheduler.runCurrent()
+        compose.waitForIdle()
+        assertTrue(session.calls.any { it == FakeSessionCall.EPG_ACQUIRE_COVERAGE_BATCH })
         focused("Channel 2 hour 0")
         compose.runOnIdle { assertEquals(0, playRequests) }
     }
@@ -228,9 +237,9 @@ class GuidePlayerReturnFocusTest {
         compose.runOnIdle { back.onBackPressed() }
         compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
         focused("Channel 1 hour 0")
-        key(Key.Menu)
+        compose.pressKey(Key.Menu)
         compose.onNodeWithText("Watch").assertIsFocused()
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         assertEquals(1, playRequests)
     }
 
@@ -262,9 +271,9 @@ class GuidePlayerReturnFocusTest {
     @Test fun historicalContextMenuCanWatchTheChannelWithoutRequiringALiveEvent() {
         guide(PlayerReturnFocus(ChannelId(99), ChannelId(1)))
         focused("Channel 1 hour -2")
-        key(Key.Menu)
+        compose.pressKey(Key.Menu)
         compose.onNodeWithText("Watch channel").assertIsFocused()
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         assertEquals(1, playRequests)
     }
 
@@ -282,7 +291,7 @@ class GuidePlayerReturnFocusTest {
     @Test fun secondReturnOnRetainedCompositionIsPositionedAgain() {
         guide(PlayerReturnFocus(playingChannelId = ChannelId(1), originChannelId = ChannelId(1)))
         focused("Channel 1 hour 0")
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         focused("Channel 2 hour 0")
         // Player on top, then Back again: an equal but distinct return request.
         compose.runOnIdle { focusEnabled = false; playerReturn = null }
@@ -311,11 +320,11 @@ class GuidePlayerReturnFocusTest {
     @Test fun offlineGuideOkOpensDetailsWhoseWatchPlaysTheChannel() {
         guide(PlayerReturnFocus(playingChannelId = ChannelId(1), originChannelId = ChannelId(1)), offline = true)
         focused("Channel 1 hour 0")
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         compose.waitUntil(10_000) {
             compose.onAllNodes(androidx.compose.ui.test.hasTestTag("details-watch") and isFocused()).fetchSemanticsNodes().isNotEmpty()
         }
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         assertEquals(1, playRequests)
     }
 
@@ -337,8 +346,6 @@ class GuidePlayerReturnFocusTest {
 
     private var playerReturn by mutableStateOf<PlayerReturnFocus?>(null)
     private var focusEnabled by mutableStateOf(true)
-
-    private fun key(key: Key) { compose.onRoot().performKeyInput { pressKey(key) }; compose.waitForIdle() }
 
     private fun event(channel: Long, offset: Int) = EpgEvent.create(EventId(channel * 100 + offset + 10),
         channelId = ChannelId(channel), title = "Channel $channel hour $offset",
@@ -376,7 +383,8 @@ class GuidePlayerReturnFocusTest {
 
     private fun guide(request: PlayerReturnFocus?, channelsLoaded: Boolean = true, offline: Boolean = false,
         genreRequest: at.bernhardberger.tvhplayer.core.ProgrammeCategory? = null,
-        settledCoverage: Boolean = true, upcomingSport: Boolean = false): FakeTvheadendSession {
+        settledCoverage: Boolean = true, upcomingSport: Boolean = false,
+        coverageContext: CoroutineDispatcher = Dispatchers.Default): FakeTvheadendSession {
         val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<Application>()
         val session = FakeTvheadendSession(observation(channelsLoaded, offline, settledCoverage, upcomingSport))
         val settings = PlayerSettingsStore(preferences())
@@ -403,6 +411,7 @@ class GuidePlayerReturnFocusTest {
             NoticeContext(profiles.configurationGeneration.value, session.observation.value.currentSession?.generationIdentity)
         }
         compose.setContentWithBrowsePreparation {
+            CompositionLocalProvider(LocalGuideCoverageAcquisitionContext provides coverageContext) {
             org.koin.compose.KoinIsolatedContext(settingsApplication) {
             TVHeadendPlayerTheme {
                 back = requireNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
@@ -422,6 +431,7 @@ class GuidePlayerReturnFocusTest {
                 )
                 }
             }
+        }
         }
         }
         compose.waitForIdle()

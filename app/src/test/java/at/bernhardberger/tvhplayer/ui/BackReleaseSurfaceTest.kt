@@ -23,6 +23,7 @@ import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.ui.components.CentredDialog
 import at.bernhardberger.tvhplayer.ui.components.depth.*
 import at.bernhardberger.tvhplayer.ui.screens.BrowseSidePanel
+import at.bernhardberger.tvhplayer.testutil.holdBack
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -48,11 +49,7 @@ class BackReleaseSurfaceTest {
         key(true)
         key(false, flags = NativeKey.FLAG_CANCELED)
         unchanged()
-        key(true)
-        key(true, repeat = 1, flags = NativeKey.FLAG_LONG_PRESS)
-        key(true, repeat = 2)
-        unchanged()
-        key(false)
+        holdBack(::key, beforeRelease = unchanged)
     }
 
     @Test fun browsePanelWaitsForItsOwnUncanceledRelease() {

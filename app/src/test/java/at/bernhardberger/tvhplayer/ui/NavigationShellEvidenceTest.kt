@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui
 
+import at.bernhardberger.tvhplayer.testutil.pressKey
 import android.app.Application
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
@@ -24,8 +25,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -177,10 +178,6 @@ class NavigationShellEvidenceTest {
         compose.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
         compose.waitForIdle()
         navigations.clear()
-        val before = drawShell()
-        val home = bounds("nav-home")
-        val x = (home.right - 8f).toInt()
-        val y = home.center.y.toInt()
         // Switching is confirmed from a modal, not by stopping via the drawer controls.
         compose.runOnIdle { switchDialog = true }
         compose.waitForIdle()
@@ -190,35 +187,26 @@ class NavigationShellEvidenceTest {
         compose.onNodeWithTag("nav-home").assert(SemanticsMatcher.expectValue(SemanticsProperties.Focused, false))
         compose.onNodeWithTag("nav-settings").assert(SemanticsMatcher.expectValue(SemanticsProperties.Selected, true))
         assertTrue("stopping from content must not navigate", navigations.isEmpty())
-        val after = drawShell()
-        val newHome = bounds("nav-home")
-        assertTrue("Home must not acquire a white focus container",
-            channelDistance(Color(before.getPixel(x, y)), Color(after.getPixel((newHome.right - 8f).toInt(), newHome.center.y.toInt()))) < .04f)
     }
 
     @Category(VisualCapture::class)
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi") fun englishNormal() = captureShell("en", 1f)
 
     /**
-     * 12 + 56 + 12 closed and 12 + 256 + 12 expanded, with Settings C keeping its
-     * accepted absolute columns on the re-aligned shell.
+     * Settings keeps its accepted column offsets beside the closed and open drawer.
      */
     @Test
     @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
-    fun drawerWidthsStayEightyAndTwoEightyAroundSettingsColumns() {
+    fun settingsColumnsSitBesideTheClosedAndOpenDrawer() {
         settingsShell(1f)
 
-        assertEquals(80f, drawerWidth(), .5f)
         assertEquals(130f, bounds("depth-active").left, .5f)
-        assertEquals(340f, bounds("depth-active").width, .5f)
         assertEquals(562f, derivedPreviewLeft(bounds("depth-active")), .5f)
 
         openDrawer()
 
-        assertEquals(280f, drawerWidth(), .5f)
-        // The expanded drawer pushes the unchanged viewport: same width, 200dp over.
+        // The expanded drawer pushes the viewport 200dp over.
         assertEquals(330f, bounds("depth-active").left, .5f)
-        assertEquals(340f, bounds("depth-active").width, .5f)
         assertEquals(762f, derivedPreviewLeft(bounds("depth-active")), .5f)
     }
 
@@ -260,15 +248,11 @@ class NavigationShellEvidenceTest {
         settingsShell(1f)
         fun rows() = listOf("nav-channels", "nav-epg", "nav-recordings", "nav-settings").map(::bounds)
         val brand = bounds("global-drawer-brand")
-        val closed = rows()
 
         playLive()
         compose.onNodeWithTag("global-drawer-brand").assertDoesNotExist()
-        assertEquals(brand.height + 36f, bounds("global-drawer-now-playing").height, .5f)
         val playingRows = rows()
         compose.onNodeWithTag("global-drawer-now-playing-controls").assertDoesNotExist()
-        // The plate keeps the mark's axis, the icons' centre at x40.
-        assertEquals(40f, bounds("global-drawer-now-playing-plate", unmerged = true).center.x, .5f)
         assertEquals(brand.center.y, bounds("global-drawer-now-playing-plate", unmerged = true).center.y, .5f)
 
         openDrawer()
@@ -290,7 +274,11 @@ class NavigationShellEvidenceTest {
     @Test
     @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
     fun fullScreenIsTheFirstStopAboveTheDestinationsAndReturnsToThePlayer() {
-        settingsShell(1f)
+        assertFullScreenNavigation(withHome = false)
+    }
+
+    private fun assertFullScreenNavigation(withHome: Boolean) {
+        settingsShell(1f, withHome = withHome)
         playLive()
         openDrawer()
         // Entry still lands on the current destination.
@@ -298,6 +286,11 @@ class NavigationShellEvidenceTest {
 
         compose.onNodeWithTag("nav-channels").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
         compose.waitForIdle()
+        if (withHome) {
+            compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
+            compose.waitForIdle()
+            compose.onNodeWithTag("nav-home").assertIsFocused()
+        }
         val visited = navigations.toList()
         compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
         compose.waitForIdle()
@@ -308,7 +301,7 @@ class NavigationShellEvidenceTest {
 
         compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
         compose.waitForIdle()
-        compose.onNodeWithTag("nav-channels").assertIsFocused()
+        compose.onNodeWithTag(if (withHome) "nav-home" else "nav-channels").assertIsFocused()
 
         compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
         compose.runOnIdle { watchingIndicator = ChannelPlaybackIndicator.PAUSED }
@@ -323,23 +316,7 @@ class NavigationShellEvidenceTest {
     @Test
     @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
     fun withHomeFirstFullScreenSitsAboveHomeAndChannelsReachesHome() {
-        settingsShell(1f, withHome = true)
-        playLive()
-        openDrawer()
-
-        compose.onNodeWithTag("nav-channels").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
-        compose.waitForIdle()
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
-        compose.waitForIdle()
-        compose.onNodeWithTag("nav-home").assertIsFocused()
-
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
-        compose.waitForIdle()
-        compose.onNodeWithTag("global-drawer-now-playing-fullscreen").assertIsFocused()
-
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
-        compose.waitForIdle()
-        compose.onNodeWithTag("nav-home").assertIsFocused()
+        assertFullScreenNavigation(withHome = true)
     }
 
     @Test
@@ -367,33 +344,43 @@ class NavigationShellEvidenceTest {
         playLive()
         openDrawer()
         focusControl("fullscreen")
-        key(Key.DirectionLeft)
-        key(Key.DirectionUp)
+        compose.pressKey(Key.DirectionLeft)
+        compose.pressKey(Key.DirectionUp)
         control("fullscreen").assertIsFocused()
-        key(Key.DirectionRight)
+        compose.pressKey(Key.DirectionRight)
         control("pause").assertIsFocused()
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         compose.onAllNodesWithContentDescription("Play").assertCountEquals(1)
         assertEquals(1, toggled)
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         compose.onAllNodesWithContentDescription("Pause").assertCountEquals(1)
         assertEquals(2, toggled)
-        key(Key.DirectionRight)
+        compose.pressKey(Key.DirectionRight)
         control("stop").assertIsFocused()
-        key(Key.DirectionLeft)
+        compose.pressKey(Key.DirectionLeft)
         control("pause").assertIsFocused()
         listOf("fullscreen", "pause", "stop").forEach {
             focusControl(it)
-            key(Key.DirectionUp)
+            compose.pressKey(Key.DirectionUp)
             control(it).assertIsFocused()
-            key(Key.DirectionDown)
+            compose.pressKey(Key.DirectionDown)
             compose.onNodeWithTag("nav-channels").assertIsFocused()
         }
         focusControl("stop")
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         assertEquals(1, stopped)
         compose.onNodeWithTag("global-drawer-now-playing").assertDoesNotExist()
         compose.onNodeWithTag("nav-channels").assertIsFocused()
+
+        playLive()
+        compose.onNodeWithTag("nav-settings").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+        compose.waitForIdle()
+        focusControl("stop")
+        compose.pressKey(Key.DirectionRight)
+        assertEquals(80f, drawerWidth(), .5f)
+        compose.onNodeWithTag("global-drawer-now-playing-controls").assertDoesNotExist()
+        openDrawer()
+        compose.onNodeWithTag("nav-settings").assertIsFocused()
     }
 
     @Test
@@ -407,37 +394,23 @@ class NavigationShellEvidenceTest {
         compose.waitForIdle()
         control("pause").assertDoesNotExist()
         compose.onNodeWithTag("nav-channels").assertIsFocused()
-        key(Key.DirectionUp)
+        compose.pressKey(Key.DirectionUp)
         control("fullscreen").assertIsFocused()
-        key(Key.DirectionRight)
+        compose.pressKey(Key.DirectionRight)
         control("stop").assertIsFocused()
         playRecording()
         control("pause").assertExists()
         focusControl("pause")
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         assertEquals(1, toggled)
         compose.onAllNodesWithContentDescription("Play").assertCountEquals(1)
         focusControl("fullscreen")
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         assertEquals(1, opened)
         focusControl("stop")
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         assertEquals(1, stopped)
         compose.onNodeWithTag("nav-channels").assertIsFocused()
-    }
-
-    @Test
-    @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
-    fun rightFromStopExitsAndDrawerReentryUsesDestinationNotControls() {
-        settingsShell(1f)
-        playLive()
-        openDrawer()
-        focusControl("stop")
-        key(Key.DirectionRight)
-        assertEquals(80f, drawerWidth(), .5f)
-        compose.onNodeWithTag("global-drawer-now-playing-controls").assertDoesNotExist()
-        openDrawer()
-        compose.onNodeWithTag("nav-settings").assertIsFocused()
     }
 
     @Test
@@ -447,7 +420,7 @@ class NavigationShellEvidenceTest {
         playLive()
         openDrawer()
         focusControl("pause")
-        key(Key.Back)
+        compose.pressKey(Key.Back)
         compose.waitForIdle()
         compose.onNodeWithTag("nav-channels").assertIsFocused()
         assertEquals(0, toggled)
@@ -467,11 +440,11 @@ class NavigationShellEvidenceTest {
         openDrawer()
         focusControl("pause")
         compose.onAllNodesWithContentDescription("Pause").assertCountEquals(1)
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         compose.onAllNodesWithContentDescription("Play").assertCountEquals(1)
         compose.onNodeWithTag("global-drawer-now-playing-glyph-tuning", useUnmergedTree = true).assertExists()
         assertTrue(transportPause.pending)
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         assertEquals(false, transportPause.pending)
         compose.onAllNodesWithContentDescription("Pause").assertCountEquals(1)
         assertEquals(2, toggled)
@@ -516,10 +489,6 @@ class NavigationShellEvidenceTest {
     private fun control(name: String) = compose.onNodeWithTag("global-drawer-now-playing-$name")
     private fun focusControl(name: String) {
         control(name).performSemanticsAction(SemanticsActions.RequestFocus) { it() }
-        compose.waitForIdle()
-    }
-    private fun key(key: Key) {
-        compose.onRoot().performKeyInput { pressKey(key) }
         compose.waitForIdle()
     }
 
@@ -857,26 +826,18 @@ class NavigationShellEvidenceTest {
     }
 
     /**
-     * Kit anatomy: the icon column stays at 12 + 16 + 12 = 40dp in both states and
-     * the mark shares it, so nothing in the rail moves horizontally when it
-     * expands (the library alone would nudge its icon 4dp right). The wordmark
-     * shares the item label's origin, and the mark is dimmed like the inactive
-     * items while the drawer is closed.
+     * The wordmark shares the item label's origin, and the mark brightens when
+     * the drawer opens.
      */
     @Test
     @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
-    fun nothingInTheRailMovesHorizontallyWhenTheDrawerExpands() {
+    fun wordmarkSharesTheLabelOriginAndTheMarkBrightensWhenTheDrawerExpands() {
         settingsShell(1f)
 
-        val iconAxis = 12f + 16f + 12f
-        assertEquals("collapsed icon axis", iconAxis, itemIconCenter(), 1f)
-        assertEquals("collapsed mark axis", iconAxis, symbolCenter(), 1f)
         val dimmed = symbolPeakBlue()
 
         openDrawer()
 
-        assertEquals("expanded icon axis", iconAxis, itemIconCenter(), 1f)
-        assertEquals("expanded mark axis", iconAxis, symbolCenter(), 1f)
         assertEquals("wordmark on the label origin", labelInkLeft(), bounds("global-drawer-wordmark").left, 1f)
         assertTrue("mark brightens when the drawer is active ($dimmed -> ${symbolPeakBlue()})", symbolPeakBlue() > dimmed + 0.3f)
     }

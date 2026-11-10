@@ -49,6 +49,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.semantics
@@ -173,6 +174,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlin.time.Instant as KotlinInstant
 import kotlinx.coroutines.flow.first
 import org.koin.compose.koinInject
@@ -180,6 +182,9 @@ import at.bernhardberger.tvhplayer.ui.components.InsetBringIntoViewSpec
 
 private const val CHANNEL_PAGE_SIZE = 6
 private const val GUIDE_COVERAGE_NAVIGATION_TIMEOUT_MS = 10_000L
+
+/** Tests can drive coverage acquisition with their own dispatcher. */
+internal val LocalGuideCoverageAcquisitionContext = staticCompositionLocalOf<CoroutineDispatcher> { Dispatchers.Default }
 
 private data class FrontierRequest(
     val channelId: ChannelId,
@@ -327,6 +332,7 @@ fun EpgGridScreen(
     }
     }
     val coroutineScope = rememberCoroutineScope()
+    val coverageAcquisitionContext = LocalGuideCoverageAcquisitionContext.current
     val detailsMutationInFlight = remember { mutableStateOf<DvrMutationAction?>(null) }
     val dvrMutationActions = remember(session.dvrRepository) {
         DvrMutationActions(session.dvrRepository)
@@ -632,9 +638,9 @@ fun EpgGridScreen(
             windowStartSec = displayAnchorSec,
         ) { channelIds ->
             // The SDK takes its metadata monitor before its first suspension. Keep that
-            // potentially contended non-UI call off Main; request generations and their
+            // potentially contended non-UI call off Main by default; request generations and their
             // completion remain owned by the composition's main-thread coroutine.
-            withContext(Dispatchers.Default) {
+            withContext(coverageAcquisitionContext) {
                 profileTrace("P48:coverageAcquire") { }
                 session.epgRepository.acquireCoverageBatch(capability, channelIds, through)
             }

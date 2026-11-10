@@ -1,10 +1,11 @@
 package at.bernhardberger.tvhplayer.ui
 
+import at.bernhardberger.tvhplayer.testutil.pressKey
 import android.app.Application
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
@@ -18,7 +19,6 @@ import at.bernhardberger.tvhplayer.ui.screens.settings.connectionScopeName
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalDensity
@@ -29,8 +29,6 @@ import at.bernhardberger.tvhplayer.ui.screens.settings.settingsStreamProfileLeve
 import at.bernhardberger.tvhplayer.ui.screens.settings.settingsChannelTagsLevel
 import at.bernhardberger.tvhplayer.ui.screens.settings.AD_BREAKS_LEVEL
 import at.bernhardberger.tvhplayer.core.ChannelScopeVisibility
-import androidx.compose.ui.test.performKeyInput
-import androidx.compose.ui.test.pressKey
 import at.bernhardberger.tvhplayer.settings.AdBreakMode
 import at.bernhardberger.tvhplayer.settings.SkipLanding
 import at.bernhardberger.tvhplayer.ui.components.depth.rememberDepthNavigationState
@@ -154,32 +152,32 @@ class RecordingMarksSettingsUiTest {
                 Box(Modifier.fillMaxSize()) { SettingsScreenNavigation(navigation, levels) }
             }
         }
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         downTo("Ad breaks")
         compose.onNode(isFocused() and hasText("Ad breaks") and hasText("Ask")).assertExists()
         compose.onNode(hasText("Recording marks", ignoreCase = true)).assertExists()
 
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         compose.onNode(isFocused() and hasText("Ask")).assertIsSelected()
         compose.onNodeWithTag("settings-description-$AD_BREAKS_LEVEL").assertDoesNotExist()
         compose.onNode(hasText("Skip automatically")).assertIsNotSelected()
         compose.onNode(hasText("Off") and hasText("Ad breaks play like the rest. They still show on the timeline."))
             .assertExists()
-        key(Key.DirectionDown)
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionCenter)
         assertEquals(listOf(AdBreakMode.AUTOMATIC), modes)
         compose.onNode(isFocused() and hasText("Ad breaks") and hasText("Skip automatically")).assertExists()
 
         downTo("Skip cuts")
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         assertEquals(listOf(false), cuts)
 
         downTo("Skip lands")
         compose.onNode(isFocused() and hasText("Skip lands") and hasText("At the end")).assertExists()
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         compose.onNode(isFocused() and hasText("At the end")).assertIsSelected()
-        key(Key.DirectionDown)
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionCenter)
         assertEquals(listOf(SkipLanding.TWO_SECONDS_BEFORE), landings)
         compose.onNode(isFocused() and hasText("Skip lands") and hasText("2 s before the end")).assertExists()
     }
@@ -188,12 +186,8 @@ class RecordingMarksSettingsUiTest {
         var downs = 0
         while (compose.onAllNodes(isFocused() and hasText(title)).fetchSemanticsNodes().isEmpty()) {
             check(++downs < 20) { "$title row not reachable" }
-            key(Key.DirectionDown)
+            compose.pressKey(Key.DirectionDown)
         }
     }
 
-    private fun key(key: Key) {
-        compose.onRoot().performKeyInput { pressKey(key) }
-        compose.waitForIdle()
-    }
 }

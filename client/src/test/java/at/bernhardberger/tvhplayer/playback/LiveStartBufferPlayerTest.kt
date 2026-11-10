@@ -29,18 +29,8 @@ import androidx.media3.exoplayer.source.SilenceMediaSource
 import androidx.media3.test.utils.FakeClock
 import androidx.media3.test.utils.robolectric.TestPlayerRunHelper
 import androidx.test.core.app.ApplicationProvider
-import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.Channel
-import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
-import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
-import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
-import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
-import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
-import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
-import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
-import at.bernhardberger.tvheadend.sdk.core.SessionObservation
-import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.media3.LivePlaybackOptions
 import at.bernhardberger.tvheadend.sdk.media3.LivePlaybackTargetResult
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandResult
@@ -48,18 +38,14 @@ import at.bernhardberger.tvheadend.sdk.media3.TvheadendLiveStartBuffer
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendLoadControl
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.media3.isTvheadendLive
-import at.bernhardberger.tvheadend.sdk.playback.MuxFrameType
 import at.bernhardberger.tvheadend.sdk.playback.SkipOutcome
-import at.bernhardberger.tvheadend.sdk.playback.StreamIndex
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionConfirmation
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionEvent
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionOperationResult
-import at.bernhardberger.tvheadend.sdk.playback.SubscriptionStream
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionStreamType
 import at.bernhardberger.tvheadend.sdk.playback.createSubscriptionManager
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvheadend.sdk.testing.ScriptedSubscriptionConnection
-import at.bernhardberger.tvheadend.sdk.testing.SubscriptionBinaryFixture
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
@@ -164,12 +150,7 @@ class LiveStartBufferPlayerTest {
             scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 120)))
         }
         val manager = createSubscriptionManager(connection, work).apply { startAdmission() }
-        val session = FakeTvheadendSession(SessionObservation.create(
-            sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
-            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(Channel.create(ChannelId(1))))),
-            epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
-            dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
-        )).apply { scriptLivePlaybackSuccess(manager) }
+        val session = FakeTvheadendSession(currentPlaybackObservation(channels = listOf(Channel.create(ChannelId(1))))).apply { scriptLivePlaybackSuccess(manager) }
         val coordinator = createTvheadendPlaybackCoordinator(player, control, workDispatcher = work).also { it.launchIn(scope) }
         try {
             // Far more than ordinary startup buffering, so the live threshold holds the start.
@@ -185,12 +166,12 @@ class LiveStartBufferPlayerTest {
             driver.settleLive(player)
             connection.awaitCollectionRegistered()
             connection.emit(SubscriptionEvent.Started(listOf(
-                stream(1, SubscriptionStreamType.MPEG2_VIDEO), stream(2, SubscriptionStreamType.MPEG2_AUDIO),
+                subscriptionStream(1, SubscriptionStreamType.MPEG2_VIDEO), subscriptionStream(2, SubscriptionStreamType.MPEG2_AUDIO),
             ), null))
-            repeat(8) { emitPair(connection, it) }
+            repeat(8) { emitVideoAudioPair(connection, it) }
             // The period exposes its tracks from the first packets; the player selects them before buffering.
             awaitMain { player.playerError != null || !player.currentTracks.isEmpty }
-            repeat(100) { emitPair(connection, 8 + it) }
+            repeat(100) { emitVideoAudioPair(connection, 8 + it) }
             driver.advanceLive(player, clock, 1_000)
             awaitMain { player.playerError != null || player.totalBufferedDuration >= 3_000 }
             assertNull(player.playerError)
@@ -216,7 +197,7 @@ class LiveStartBufferPlayerTest {
                 assertEquals(TimeshiftCommandResult.ACCEPTED, returning.await())
                 driver.advanceLive(player, clock, 100)
                 awaitMain { player.playbackState == Player.STATE_BUFFERING }
-                repeat(100) { emitPair(connection, it) }
+                repeat(100) { emitVideoAudioPair(connection, it) }
                 driver.advanceLive(player, clock, 1_000)
                 awaitMain { player.totalBufferedDuration >= 3_000 }
                 assertEquals(Player.STATE_BUFFERING, player.playbackState)
@@ -227,13 +208,13 @@ class LiveStartBufferPlayerTest {
                 liveStartBuffer.duration = 60_000.milliseconds
                 driver.advanceLive(player, clock, 5_000)
                 driver.awaitCurrent("buffer drained into an ordinary stall") { player.playbackState == Player.STATE_BUFFERING }
-                repeat(20) { emitPair(connection, 100 + it) }
+                repeat(20) { emitVideoAudioPair(connection, 100 + it) }
                 driver.advanceLive(player, clock, 100)
                 awaitMain { player.totalBufferedDuration >= 700 }
                 TestPlayerRunHelper.advance(player).untilPendingCommandsAreFullyHandled()
                 assertTrue(player.totalBufferedDuration < 1_500)
                 assertEquals(Player.STATE_BUFFERING, player.playbackState)
-                repeat(35) { emitPair(connection, 120 + it) }
+                repeat(35) { emitVideoAudioPair(connection, 120 + it) }
                 driver.advanceLive(player, clock, 100)
                 awaitMain { player.isPlaying }
                 assertTrue(player.totalBufferedDuration < 3_000)
@@ -308,20 +289,4 @@ class LiveStartBufferPlayerTest {
         }.array()
     }
 
-    private fun stream(index: Long, type: SubscriptionStreamType) = SubscriptionStream(
-        index = StreamIndex(index), type = type, language = null, compositionId = null, ancillaryId = null,
-        width = null, height = null, frameDuration = null, aspectNumerator = null, aspectDenominator = null,
-        audioType = null, audioVersion = null, channelCount = null, rate = null, rdsUecp = null,
-    )
-
-    private suspend fun emitPair(connection: ScriptedSubscriptionConnection, index: Int) {
-        val time = index * 40_000L
-        // Same synthetic MPEG-2 video and MPEG-1 Layer II audio as AudioInterruptionBufferContractTest.
-        val video = byteArrayOf(0, 0, 1, 0xb3.toByte(), 0x14, 0, 0xf0.toByte(), 0x13,
-            0xff.toByte(), 0xff.toByte(), 0xe0.toByte(), 0x18,
-            0, 0, 1, 0xb8.toByte(), 0, 0, 0, 0x40, 0, 0, 1, 0, 0, 8, 0, 0)
-        val audio = ByteArray(417).apply { this[0] = 0xff.toByte(); this[1] = 0xfd.toByte(); this[2] = 0x80.toByte(); this[3] = 0xc0.toByte() }
-        connection.emit(SubscriptionEvent.Packet(MuxFrameType.I, StreamIndex(1), time, time, 40_000, SubscriptionBinaryFixture(video)))
-        connection.emit(SubscriptionEvent.Packet(MuxFrameType.I, StreamIndex(2), time, time, 40_000, SubscriptionBinaryFixture(audio)))
-    }
 }

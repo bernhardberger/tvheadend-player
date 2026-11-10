@@ -91,8 +91,8 @@ import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
 
 /**
- * The floating side panel on every player surface that uses it, in English and
- * German at font 1.0 and 1.3: inset 24 dp from the end, top and bottom edges at
+ * The floating side panel on every player surface that uses it, in English at
+ * font 1.0: inset 24 dp from the end, top and bottom edges at
  * its width, with no row text cut. Live programme info is the full-screen player
  * page now and is captured by PlayerChromeCaptureTest. Captures go to
  * build/outputs/playback-panel-captures for visual review.
@@ -100,7 +100,6 @@ import org.robolectric.shadows.ShadowDialog
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-xhdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Category(VisualCapture::class)
 @OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
 class PlaybackPanelCaptureTest {
     @get:Rule val compose = createComposeRule()
@@ -111,17 +110,17 @@ class PlaybackPanelCaptureTest {
         shadowOf(app.packageManager).setSystemFeature("android.software.leanback", true)
     }
 
+    @Category(VisualCapture::class)
     @Test fun english() = panels("en", 1f)
 
     @OptIn(ExperimentalTestApi::class)
     @Test fun browseListFadesAndFocus() {
-        val view = panelScene {
+        panelScene {
             GuideFilterPanel(ProgrammeCategory.entries.first(), true, {}, {})
         }
         val list = compose.onNode(SemanticsMatcher.keyIsDefined(ListBottomFadeVisible))
         assertTrue(list.fetchSemanticsNode().config[ListBottomFadeVisible])
         assertFalse(list.fetchSemanticsNode().config[ListTopFadeVisible])
-        capture(view, "guide-filter-top-en-font1.0", output = "043-panels").recycle()
         ProgrammeCategory.entries.forEachIndexed { index, category ->
             if (index > 0) compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
             compose.waitForIdle()
@@ -137,7 +136,6 @@ class PlaybackPanelCaptureTest {
         assertTrue(list.fetchSemanticsNode().config[ListTopFadeVisible])
         val panel = compose.onNodeWithTag("guide-genre-panel").getUnclippedBoundsInRoot()
         assertEquals("Long list reaches panel edge", panel.bottom.value, list.getUnclippedBoundsInRoot().bottom.value, 0.5f)
-        capture(view, "guide-filter-bottom-en-font1.0", output = "043-panels").recycle()
     }
 
     @Test fun fittingBrowseListHasNoFadesAndDoesNotStretch() {
@@ -162,7 +160,7 @@ class PlaybackPanelCaptureTest {
                 add(BrowsePanelEntry.Choice("group-$index", "Channel group ${index + 1}", index == 5, {}))
             }
         }
-        val view = panelScene {
+        panelScene {
             BrowseSidePanel("Tags", "section-panel", {}) { BrowsePanelList(entries, radio = false) }
         }
         val list = compose.onNode(SemanticsMatcher.keyIsDefined(ListBottomFadeVisible))
@@ -170,17 +168,15 @@ class PlaybackPanelCaptureTest {
         compose.waitForIdle()
         assertTrue(list.fetchSemanticsNode().config[ListTopFadeVisible])
         compose.onNodeWithTag("group-5").assertIsFocused()
-        capture(view, "section-under-title-en-font1.0", output = "043-panels").recycle()
     }
 
     @OptIn(ExperimentalTestApi::class)
     @Test fun guideTimeRootAndLevel() {
         val now = Instant.parse("2026-11-03T12:00:00Z").epochSecond
-        val view = panelScene {
+        panelScene {
             GuideTimePanel(now, now + 7200, GuideWindowBounds(now - 21600, now + 7 * 86400), ZoneId.of("UTC"), { now }, {}, {}, {})
         }
         compose.onNodeWithTag("guide-time-day-0").assertIsFocused()
-        capture(view, "guide-time-root-en-font1.0", output = "043-panels").recycle()
         val rootList = compose.onAllNodes(SemanticsMatcher.keyIsDefined(ListBottomFadeVisible)).fetchSemanticsNodes()
         assertEquals(1, rootList.size)
         assertTrue("Day list scrolls", rootList.first().config[ListBottomFadeVisible])
@@ -190,7 +186,6 @@ class PlaybackPanelCaptureTest {
         compose.onRoot().performKeyInput { repeat(4) { pressKey(Key.DirectionDown) } }
         compose.waitForIdle()
         compose.onNodeWithTag("guide-time-preset-22").assertIsFocused()
-        capture(view, "guide-time-en-font1.0", output = "043-panels").recycle()
         compose.onRoot().performKeyInput { pressKey(Key.Back) }
         compose.onNodeWithTag("guide-time-day-0").assertIsFocused()
         repeat(7) {
@@ -204,44 +199,39 @@ class PlaybackPanelCaptureTest {
     }
 
     @Test fun playerListUnchanged() {
-        val view = panelScene {
+        panelScene {
             PlaybackOptionsSheet(PlaybackOptionsPage.AUDIO,
                 PlaybackOptionsTrackListTest.player(PlaybackOptionsTrackListTest.orfTracks()),
                 false, AspectRatioMode.FIT, false, {}, {}, {}, audioAutomatic = true, onAutomaticAudio = {})
         }
         compose.onNodeWithTag("playback-options-track-automatic").assertIsFocused()
         assertTrue(compose.onNodeWithTag("playback-options-track-list").fetchSemanticsNode().config[ListBottomFadeVisible])
-        capture(view, "player-audio-en-font1.0", output = "043-panels").recycle()
     }
 
     @OptIn(ExperimentalTestApi::class)
     @Test fun playerRootAndAudioLevel() {
-        val view = panelScene {
+        panelScene {
             var page by remember { mutableStateOf(PlaybackOptionsPage.ROOT) }
             PlaybackOptionsSheet(page,
                 PlaybackOptionsTrackListTest.player(PlaybackOptionsTrackListTest.orfTracks()),
                 false, AspectRatioMode.FIT, false, { page = it }, {}, {}, audioAutomatic = true, onAutomaticAudio = {})
         }
         compose.onNodeWithTag("playback-options-audio").assertIsFocused()
-        capture(view, "player-root-en-font1.0", output = "043-panels").recycle()
         compose.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
         compose.waitForIdle()
         compose.onNodeWithTag("playback-options-track-automatic").assertIsFocused()
-        capture(view, "player-audio-level-en-font1.0", output = "043-panels").recycle()
     }
 
     @OptIn(ExperimentalTestApi::class)
     @Test fun guideViewRootAndRowsLevel() {
-        val view = panelScene {
+        panelScene {
             var options by remember { mutableStateOf(GuideView()) }
             GuideViewOptionsPanel(options, { options = it }, {})
         }
         compose.onNodeWithTag("guide-view-rows").assertIsFocused()
-        capture(view, "guide-view-root-en-font1.0", output = "043-panels").recycle()
         compose.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
         compose.waitForIdle()
         compose.onNodeWithTag("guide-view-rows-dense").assertIsFocused()
-        capture(view, "guide-view-rows-en-font1.0", output = "043-panels").recycle()
     }
 
     /** Match the browse shell, early-morning bounds and 12-hour clock of the integrated report. */
@@ -250,14 +240,13 @@ class PlaybackPanelCaptureTest {
         AppClock.systemUses24Hour = false
         try {
             val now = Instant.parse("2026-11-03T01:32:00Z").epochSecond
-            val view = panelScene {
+            panelScene {
                 SideRail(currentRoute = AppDestination.GUIDE, onRootBack = {}, onNavigate = {}) { _, _ ->
                     GuideTimePanel(now, now + 7200, GuideWindowBounds(now - 21600, now + 7 * 86400),
                         ZoneId.of("UTC"), { now }, {}, {}, {})
                 }
             }
             compose.onNodeWithTag("guide-time-day-0").assertIsFocused()
-            capture(view, "guide-time-current-day-en-font1.0", output = "043-panels").recycle()
             val first = compose.onNodeWithTag("guide-time-now")
             val full = first.getUnclippedBoundsInRoot()
             val clipped = first.fetchSemanticsNode().boundsInRoot
@@ -271,12 +260,10 @@ class PlaybackPanelCaptureTest {
         }
     }
 
-    private fun panelScene(content: @Composable () -> Unit): View {
-        lateinit var view: View
+    private fun panelScene(content: @Composable () -> Unit) {
         compose.setContent {
             CompositionLocalProvider(LocalDensity provides Density(2f, 1f)) {
                 TVHeadendPlayerTheme {
-                    view = LocalView.current
                     val still = remember { FixtureArt.art("still-ridge-light").asImageBitmap() }
                     Box(Modifier.fillMaxSize()) {
                         Image(still, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
@@ -286,16 +273,7 @@ class PlaybackPanelCaptureTest {
             }
         }
         compose.waitForIdle()
-        return view
     }
-
-    @Test fun englishLargeText() = panels("en", 1.3f)
-
-    @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
-    fun german() = panels("de", 1f)
-
-    @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
-    fun germanLargeText() = panels("de", 1.3f)
 
     /** Centred confirmations dim the backdrop once and keep the safe pill visibly focused. */
     @Test fun recordingAndGuideModals() {
@@ -314,7 +292,7 @@ class PlaybackPanelCaptureTest {
         // At first idle, with no key pressed, Back has focus and draws it: the tv
         // focused fill, not the unfocused outline alone.
         assertEquals(listOf("recording-confirmation-back"), focusedNodes())
-        val recording = capture(view, "modal-recording-en-font1.0", white = true)
+        val recording = draw(view, white = true)
         val back = compose.onNodeWithTag("recording-confirmation-back").getUnclippedBoundsInRoot()
         val fill = lightFillShare(recording, back.left.value, back.top.value, back.right.value, back.bottom.value)
         assertTrue("Back draws the focused fill, share $fill", fill > 0.3f)
@@ -323,7 +301,7 @@ class PlaybackPanelCaptureTest {
         guide = true
         compose.waitForIdle()
         println("Focus modal-guide-en-font1.0: ${focusedNodes()}")
-        val guideCapture = capture(view, "modal-guide-en-font1.0", white = true)
+        val guideCapture = draw(view, white = true)
         assertEquals("Single 60% guide scrim", android.graphics.Color.rgb(102, 102, 102), guideCapture.getPixel(0, 0))
         guideCapture.recycle()
     }
@@ -429,17 +407,23 @@ class PlaybackPanelCaptureTest {
             }
     }
 
-    /** Saves a capture of [view] and returns it; the caller recycles it. */
-    private fun capture(view: View, name: String, white: Boolean = false, output: String = "playback-panel-captures"): Bitmap = compose.runOnIdle {
+    /** Draws [view] for pixel assertions; the caller recycles it. */
+    private fun draw(view: View, white: Boolean = false): Bitmap = compose.runOnIdle {
         assertEquals(1920, view.width)
         assertEquals(1080, view.height)
         val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         if (white) canvas.drawColor(android.graphics.Color.WHITE)
         view.draw(canvas)
-        val directory = File("build/outputs/$output").apply { mkdirs() }
-        File(directory, "$name.png").outputStream().use { check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
         bitmap
+    }
+
+    /** Saves a capture of [view] and returns it; the caller recycles it. */
+    private fun capture(view: View, name: String): Bitmap {
+        val bitmap = draw(view)
+        val directory = File("build/outputs/playback-panel-captures").apply { mkdirs() }
+        File(directory, "$name.png").outputStream().use { check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+        return bitmap
     }
 
     private companion object {

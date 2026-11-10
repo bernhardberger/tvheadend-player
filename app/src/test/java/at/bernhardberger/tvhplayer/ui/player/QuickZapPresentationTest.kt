@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.testutil.pressKey
+import at.bernhardberger.tvhplayer.testutil.changeState
 import at.bernhardberger.tvhplayer.ui.TvCardFocusedScale
 import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import android.app.Application
@@ -21,10 +23,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
@@ -148,7 +150,7 @@ class QuickZapPresentationTest {
 
     @Test fun playbackMarkersShareNeutralSlotThroughPauseAndTune() {
         content()
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         card(2).assertIsFocused()
         val playingBounds = compose.onNodeWithTag("channel-playing-indicator", useUnmergedTree = true)
             .fetchSemanticsNode().boundsInRoot
@@ -294,7 +296,7 @@ class QuickZapPresentationTest {
 
     private fun cornerGeometry() {
         content(fontScale = 1f)
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         card(2).assertIsFocused()
         fun verify(state: String, expectedScale: Float) {
             // The pinned rail keeps card 1 off-screen, left of the keyline; card 3 rests unfocused.
@@ -369,14 +371,14 @@ class QuickZapPresentationTest {
     // The rail is composed only while it is open, so a reopened rail starts on the playing channel again.
     @Test fun reopenedRailStartsOnThePlayingChannelAgain() {
         content()
-        key(Key.DirectionDown)
-        repeat(7) { key(Key.DirectionRight) }
+        compose.pressKey(Key.DirectionDown)
+        repeat(7) { compose.pressKey(Key.DirectionRight) }
         card(9).assertIsFocused()
         for (close in listOf(Key.DirectionUp, Key.Back)) {
-            key(close)
+            compose.pressKey(close)
             compose.onNodeWithTag("player-pause").assertIsFocused()
             assertFalse(layers.channelDrawerOpen)
-            key(Key.DirectionDown)
+            compose.pressKey(Key.DirectionDown)
             card(2).assertIsFocused()
         }
         assertEquals(0, picks)
@@ -386,15 +388,15 @@ class QuickZapPresentationTest {
 
     private fun stableReentry(fontScale: Float) {
         content(fontScale = fontScale)
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         for ((id, close) in listOf(3 to Key.DirectionUp, 4 to Key.Back)) {
-            key(Key.DirectionRight)
+            compose.pressKey(Key.DirectionRight)
             card(id).assertIsFocused()
-            key(Key.DirectionCenter)
+            compose.pressKey(Key.DirectionCenter)
             val before = card(id).fetchSemanticsNode().boundsInRoot
-            key(close)
+            compose.pressKey(close)
             compose.onNodeWithTag("player-pause").assertIsFocused()
-            key(Key.DirectionDown)
+            compose.pressKey(Key.DirectionDown)
             card(id).assertIsFocused()
             assertEquals(before, card(id).fetchSemanticsNode().boundsInRoot)
         }
@@ -404,31 +406,31 @@ class QuickZapPresentationTest {
     @Test fun externalConfirmationAfterNullSupersedesPendingLocalPick() {
         confirmPicks = false
         content()
-        key(Key.DirectionDown)
-        key(Key.DirectionRight)
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionRight)
+        compose.pressKey(Key.DirectionCenter)
         compose.runOnIdle { playing = null }
-        key(Key.DirectionRight)
-        key(Key.Back)
+        compose.pressKey(Key.DirectionRight)
+        compose.pressKey(Key.Back)
         compose.runOnIdle { playing = ChannelId(10) }
         compose.onNodeWithTag("player-pause").assertIsFocused()
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         val distant = card(10).assertIsFocused().fetchSemanticsNode().boundsInRoot
         assertTrue("distant card is brought on screen safely: $distant", distant.left >= 48f && distant.right <= 912f)
         // The different confirmation consumed the old intent: a later channel 3
         // confirmation is external now, not the still-pending local pick.
-        key(Key.Back)
+        compose.pressKey(Key.Back)
         compose.runOnIdle { playing = null }
         compose.runOnIdle { playing = ChannelId(3) }
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         card(3).assertIsFocused()
         assertEquals(1, picks)
     }
 
     @Test fun activePlaybackConfirmationAndMetadataRefreshDoNotStealBrowseFocus() {
         content()
-        key(Key.DirectionDown)
-        repeat(2) { key(Key.DirectionRight) }
+        compose.pressKey(Key.DirectionDown)
+        repeat(2) { compose.pressKey(Key.DirectionRight) }
         val before = card(4).assertIsFocused().fetchSemanticsNode().boundsInRoot
         compose.runOnIdle {
             playing = ChannelId(8)
@@ -436,8 +438,8 @@ class QuickZapPresentationTest {
         }
         card(4).assertIsFocused()
         assertEquals(before, card(4).fetchSemanticsNode().boundsInRoot)
-        key(Key.Back)
-        key(Key.DirectionDown)
+        compose.pressKey(Key.Back)
+        compose.pressKey(Key.DirectionDown)
         // The confirmed external change re-anchors the rail once it has closed.
         card(8).assertIsFocused()
         assertEquals(0, picks)
@@ -445,23 +447,23 @@ class QuickZapPresentationTest {
 
     @Test fun confirmedTuneWhileOpenReanchorsOnlyAfterClose() {
         content()
-        key(Key.DirectionDown)
-        repeat(2) { key(Key.DirectionRight) }
+        compose.pressKey(Key.DirectionDown)
+        repeat(2) { compose.pressKey(Key.DirectionRight) }
         val before = card(4).assertIsFocused().fetchSemanticsNode().boundsInRoot
         // A completed numeric tune: awaiting presentation, then confirmed.
         compose.runOnIdle { playing = null }
         compose.runOnIdle { playing = ChannelId(8) }
         card(4).assertIsFocused()
         assertEquals(before, card(4).fetchSemanticsNode().boundsInRoot)
-        key(Key.DirectionRight)
+        compose.pressKey(Key.DirectionRight)
         card(5).assertIsFocused()
-        key(Key.Back)
+        compose.pressKey(Key.Back)
         compose.onNodeWithTag("player-pause").assertIsFocused()
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         val anchored = card(8).assertIsFocused().fetchSemanticsNode().boundsInRoot
         // Without a further change, reopening keeps the re-anchored card and viewport.
-        key(Key.Back)
-        key(Key.DirectionDown)
+        compose.pressKey(Key.Back)
+        compose.pressKey(Key.DirectionDown)
         card(8).assertIsFocused()
         assertEquals(anchored, card(8).fetchSemanticsNode().boundsInRoot)
         assertEquals(0, picks)
@@ -470,9 +472,9 @@ class QuickZapPresentationTest {
     @Test fun activeReorderKeepsIdentityAndInitialMissingPlayingUsesFirstCard() {
         playing = ChannelId(99)
         content()
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         card(1).assertIsFocused()
-        key(Key.DirectionRight)
+        compose.pressKey(Key.DirectionRight)
         compose.runOnIdle { catalog = channels.filterNot { it.id == ChannelId(2) } + channels[1] }
         card(2).assertIsFocused()
         val bounds = card(2).fetchSemanticsNode().boundsInRoot
@@ -490,7 +492,7 @@ class QuickZapPresentationTest {
             return bitmap.getPixel(x.toInt(), y.toInt()).also { bitmap.recycle() }
         }
         assertEquals(focusColor, pixel(button.center.x, button.top + 8f))
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         val bounds = card(2).fetchSemanticsNode().boundsInRoot
         // The card scales in drawing only; its semantics keep the resting bounds.
         val scale = TvCardFocusedScale
@@ -503,19 +505,19 @@ class QuickZapPresentationTest {
         content()
         compose.onNodeWithTag("player-pause").assertIsFocused()
         compose.onNodeWithTag("player-channel-card-2").assertDoesNotExist()
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         card(2).assertIsFocused()
         assertEquals(0, picks)
         compose.onNodeWithTag("player-pause").assertDoesNotExist()
-        key(Key.DirectionRight)
+        compose.pressKey(Key.DirectionRight)
         card(3).assertIsFocused()
         val before = card(3).fetchSemanticsNode().boundsInRoot
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         card(3).assertIsFocused()
         assertEquals(1, picks)
         assertEquals(before, card(3).fetchSemanticsNode().boundsInRoot)
         assertTrue(layers.channelDrawerOpen)
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         assertFalse(layers.channelDrawerOpen)
         compose.onNodeWithTag("player-pause").assertIsFocused()
         assertEquals(1, picks)
@@ -523,8 +525,8 @@ class QuickZapPresentationTest {
 
     @Test fun horizontalViewportReachesScreenEdgesButFocusedCardsStaySafe() {
         content()
-        key(Key.DirectionDown)
-        repeat(7) { key(Key.DirectionRight) }
+        compose.pressKey(Key.DirectionDown)
+        repeat(7) { compose.pressKey(Key.DirectionRight) }
         val focused = card(9).assertIsFocused().fetchSemanticsNode().boundsInRoot
         assertTrue("focused left safe: $focused", focused.left >= 48f)
         assertTrue("focused right safe: $focused", focused.right <= 912f)
@@ -537,14 +539,14 @@ class QuickZapPresentationTest {
 
     @Test fun pinnedRailKeepsTheFocusedCardOnTheStartKeylineUntilTheListEnds() {
         content()
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         val keyline = card(2).assertIsFocused().fetchSemanticsNode().boundsInRoot.left
         assertTrue("keyline is screen-safe: $keyline", keyline >= 48f)
-        key(Key.DirectionLeft)
+        compose.pressKey(Key.DirectionLeft)
         assertEquals(keyline, card(1).assertIsFocused().fetchSemanticsNode().boundsInRoot.left, .5f)
-        repeat(4) { key(Key.DirectionRight) }
+        repeat(4) { compose.pressKey(Key.DirectionRight) }
         assertEquals(keyline, card(5).assertIsFocused().fetchSemanticsNode().boundsInRoot.left, .5f)
-        repeat(7) { key(Key.DirectionRight) }
+        repeat(7) { compose.pressKey(Key.DirectionRight) }
         val last = card(12).assertIsFocused().fetchSemanticsNode().boundsInRoot
         assertTrue("the row stops at its end, so focus leaves the keyline: $last", last.left > keyline + 1f)
         assertTrue("last card stays safe: $last", last.right <= 912f)
@@ -553,8 +555,8 @@ class QuickZapPresentationTest {
     // A target that is not composed yet costs a synchronous beyond-bounds search per repeat.
     @Test fun heldLeftFindsEachPinnedTargetAlreadyComposed() {
         content()
-        key(Key.DirectionDown)
-        repeat(9) { key(Key.DirectionRight) }
+        compose.pressKey(Key.DirectionDown)
+        repeat(9) { compose.pressKey(Key.DirectionRight) }
         card(11).assertIsFocused()
         compose.mainClock.autoAdvance = false
         for (target in 10 downTo 3) {
@@ -570,12 +572,12 @@ class QuickZapPresentationTest {
 
     @Test fun browsingRailStepsFocusWithChannelKeysInsteadOfTuning() {
         content()
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         val keyline = card(2).assertIsFocused().fetchSemanticsNode().boundsInRoot.left
-        key(Key.ChannelUp)
+        compose.pressKey(Key.ChannelUp)
         assertEquals(keyline, card(3).assertIsFocused().fetchSemanticsNode().boundsInRoot.left, .5f)
-        key(Key.ChannelDown)
-        key(Key.ChannelDown)
+        compose.pressKey(Key.ChannelDown)
+        compose.pressKey(Key.ChannelDown)
         card(1).assertIsFocused()
         assertEquals(0, picks)
         assertTrue(layers.channelDrawerOpen)
@@ -584,9 +586,9 @@ class QuickZapPresentationTest {
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
     fun largeLocalizedCardsStayCompactAndMissingEpgHasNoInventedProgress() {
         content(fontScale = 1.3f, bright = true)
-        key(Key.DirectionDown)
-        key(Key.DirectionRight)
-        key(Key.DirectionRight)
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionRight)
+        compose.pressKey(Key.DirectionRight)
         card(4).assertIsFocused()
         val bounds = card(4).fetchSemanticsNode().boundsInRoot
         assertTrue(bounds.top >= 360f)
@@ -601,7 +603,7 @@ class QuickZapPresentationTest {
     @Test fun transitionKeepsTheOpeningPressFromActivatingCards() {
         content()
         compose.mainClock.autoAdvance = false
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         compose.mainClock.advanceTimeBy(96)
         assertEquals(0, picks)
         compose.mainClock.autoAdvance = true
@@ -613,17 +615,17 @@ class QuickZapPresentationTest {
         content()
         for (close in listOf(Key.DirectionUp, Key.Back)) {
             repeat(4) {
-                if (!isFocused("player-settings")) key(Key.DirectionRight)
+                if (!isFocused("player-settings")) compose.pressKey(Key.DirectionRight)
             }
             compose.onNodeWithTag("player-settings").assertIsFocused()
-            key(Key.DirectionDown)
+            compose.pressKey(Key.DirectionDown)
             card(2).assertIsFocused()
             // The row it came from gives way: nothing of it takes focus or is announced.
             compose.onNodeWithTag("player-settings").assertDoesNotExist()
             // The key that opened the rail does not also move or activate anything in it.
             assertEquals(0, picks)
             assertTrue(layers.channelDrawerOpen)
-            key(close)
+            compose.pressKey(close)
             assertFalse(layers.channelDrawerOpen)
             compose.onNodeWithTag("player-settings").assertIsFocused()
         }
@@ -732,11 +734,6 @@ class QuickZapPresentationTest {
         return rail
     }
 
-    private fun change(block: () -> Unit) = compose.runOnIdle {
-        block()
-        androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications()
-    }
-
     @Test fun detachedRailOpenedTogetherWithTheControlsStandsOpen() {
         var controls by mutableStateOf(true)
         var expanded by mutableStateOf(false)
@@ -746,7 +743,7 @@ class QuickZapPresentationTest {
         compose.waitForIdle()
         compose.mainClock.autoAdvance = false
         // A shortcut, such as the contents key, opens the rail from the hidden player.
-        change { controls = true; expanded = true }
+        compose.changeState { controls = true; expanded = true }
         compose.mainClock.advanceTimeByFrame()
         compose.waitForIdle()
         assertEquals("the rail stands open instead of rising from the peek", 1f, rail.expansion.value, 0f)
@@ -758,13 +755,13 @@ class QuickZapPresentationTest {
         val rail = detachedRail({ controls })
         assertEquals(1f, rail.layerAlpha(), 0f)
         compose.mainClock.autoAdvance = false
-        change { controls = false }
+        compose.changeState { controls = false }
         compose.mainClock.advanceTimeByFrame()
         compose.mainClock.advanceTimeBy(PlayerMotion.MediumMs * 3L / 4L)
         compose.waitForIdle()
         val leaving = rail.layerAlpha()
         assertTrue("most of the way out: $leaving", leaving > 0f && leaving < 0.8f)
-        change { controls = true }
+        compose.changeState { controls = true }
         compose.mainClock.advanceTimeByFrame()
         compose.waitForIdle()
         val returning = rail.layerAlpha()
@@ -797,7 +794,7 @@ class QuickZapPresentationTest {
         compose.onNodeWithTag("rail-card").assertExists()
 
         compose.mainClock.autoAdvance = false
-        change { controls = false }
+        compose.changeState { controls = false }
         compose.mainClock.advanceTimeByFrame()
         compose.waitForIdle()
         assertFalse("the leaving rail gives focus up on the first exit frame", focused)
@@ -852,7 +849,7 @@ class QuickZapPresentationTest {
         // Read the passive row's geometry before opening can scroll it.
         val peeking = compose.onNodeWithTag("player-channel-card-9", useUnmergedTree = true)
             .fetchSemanticsNode().boundsInRoot.center.x
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         card(9).assertIsFocused()
         assertEquals("the peek already shows the entry card at its opening position",
             peeking, card(9).fetchSemanticsNode().boundsInRoot.center.x, 0.5f)
@@ -862,13 +859,13 @@ class QuickZapPresentationTest {
     @Test fun visitedPeekKeepsItsBrowsingFocusAfterAClosedChannelChange() {
         playing = ChannelId(1)
         content(peek = true)
-        key(Key.DirectionDown)
-        key(Key.DirectionRight)
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionRight)
         card(2).assertIsFocused()
-        key(Key.Back)
+        compose.pressKey(Key.Back)
         compose.runOnIdle { playing = ChannelId(9) }
         compose.waitForIdle()
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         card(2).assertIsFocused()
         assertEquals(0, picks)
     }
@@ -982,5 +979,5 @@ class QuickZapPresentationTest {
         start = Instant.fromEpochSeconds(0), stop = Instant.fromEpochSeconds(3600),
     )
     private fun card(id: Int) = compose.onNodeWithTag("player-channel-card-$id")
-    private fun key(key: Key) { compose.onRoot().performKeyInput { pressKey(key) }; compose.waitForIdle() }
+
 }

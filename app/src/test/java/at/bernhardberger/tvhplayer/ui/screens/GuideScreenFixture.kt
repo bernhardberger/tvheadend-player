@@ -84,9 +84,6 @@ import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.ui.components.rememberPreparedBrowseData
-import at.bernhardberger.tvhplayer.ui.components.awaitBrowsePreparation
-import at.bernhardberger.tvhplayer.ui.components.awaitBrowsePreparationLane
-import at.bernhardberger.tvhplayer.ui.components.browsePreparationLane
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.common.programmeCategoryLabelRes
@@ -138,14 +135,25 @@ import kotlin.math.roundToInt
 import kotlin.time.Instant
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
+import at.bernhardberger.tvhplayer.ui.components.LocalBrowsePreparationContext
+import at.bernhardberger.tvhplayer.ui.components.LocalArtworkSamplingContext
+import at.bernhardberger.tvhplayer.ui.components.LocalChannelAccents
+import at.bernhardberger.tvhplayer.images.ChannelAccents
+import at.bernhardberger.tvhplayer.stores.ChannelAccentStore
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestDispatcher
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 
 /**
  * Offline native production Guide composition shared by [GuideVisualLayoutTest] and
  * [GuideNavigationTest]: the fake session, player, rules and the [show] scene.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 abstract class GuideScreenFixture {
     @get:Rule val images = ImageLoaderRule()
-    // v2 keeps effects on the UI scheduler after Guide's Dispatchers.Default work completes.
+    // Effects and test-owned Guide work share the controlled UI scheduler.
     @get:Rule val compose = createComposeRule()
     val models = ViewModelStore()
     val runtimeScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -173,6 +181,9 @@ abstract class GuideScreenFixture {
     var navigationRequests = 0
     var guideActive by mutableStateOf(true)
     var browseReturn by mutableStateOf(false)
+    var preparationContext by mutableStateOf<CoroutineContext>(EmptyCoroutineContext)
+    val acquisition = StandardTestDispatcher()
+    private val accents = ChannelAccents(ChannelAccentStore(), EmptyCoroutineContext) { _, _ -> null }
 
     val hour = Instant.parse("2026-10-04T20:00:00Z").epochSeconds
     val now = hour + 15 * 60
@@ -238,6 +249,7 @@ abstract class GuideScreenFixture {
         playingChannel: ChannelId? = null, activeGroup: ChannelTagId? = null, playerReturn: PlayerReturnFocus? = null,
         lastPlayedChannel: ChannelId? = null, rating: EpgRating? = null, events: List<EpgEvent>? = null,
         channelNames: List<String>? = null, uiPreferences: DataStore<Preferences> = preferences(),
+        coverageAcquisitionContext: kotlinx.coroutines.CoroutineDispatcher = acquisition,
         preparationBlocker: @Composable () -> Unit = {}) {
         val channels = channelNames?.mapIndexed { index, name ->
             Channel.create(ChannelId(index + 1L), name = name, number = index + 1L, icon = ChannelIcon.ImageCache(ArtworkId(index + 1)),
@@ -319,6 +331,7 @@ abstract class GuideScreenFixture {
             session.scriptLivePlaybackSuccess()
             runtimeScope.launch { runtime.playLive(checkNotNull(at.bernhardberger.tvhplayer.playback.currentLivePlaybackSelection(
                 session.observation.value, playingChannel))) }
+            // The real coordinator/ExoPlayer installation thread owns this signal.
             compose.waitUntil(5_000) {
                 org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
                 runtime.activeTarget.value == at.bernhardberger.tvhplayer.playback.AppPlaybackTarget.Live(playingChannel)
@@ -342,7 +355,11 @@ abstract class GuideScreenFixture {
         compose.setContent {
             preparationBlocker()
             KoinIsolatedContext(koinApplication { modules(noticeModule) }) {
-            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, scale), LocalLayoutDirection provides direction) {
+            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, scale), LocalLayoutDirection provides direction,
+                LocalBrowsePreparationContext provides preparationContext,
+                LocalGuideCoverageAcquisitionContext provides coverageAcquisitionContext,
+                LocalArtworkSamplingContext provides EmptyCoroutineContext,
+                LocalChannelAccents provides accents) {
                 TVHeadendPlayerTheme {
                     view = LocalView.current
                     lineColor = MaterialTheme.colorScheme.primary.toArgb()
@@ -378,15 +395,15 @@ abstract class GuideScreenFixture {
         if (!connecting) {
             if (playerReturn != null) {
                 // savedTimelineReturn fixtures request header focus for geometry setup only, not return-policy evidence.
-                compose.waitUntil(10_000) { compose.onAllNodesWithTag("guide-date-button").fetchSemanticsNodes().isNotEmpty() }
+                compose.waitForIdle()
+                compose.onNodeWithTag("guide-date-button").assertExists()
                 compose.onNodeWithTag("guide-date-button").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
             }
             dateFocused()
             assertNotNull("The fixture must exercise a current SDK capability, not cached-only rows", model.observation.value.currentSession)
-            // The entry's coverage request reaches the session off the main thread; count from
-            // after it, or a busy machine records it late as if navigation had asked.
+            // Drive entry acquisition before counting later navigation requests.
             if (entryCoverage && beforeCoverageBatch == null) {
-                compose.waitUntil(5_000) { FakeSessionCall.EPG_ACQUIRE_COVERAGE_BATCH in session.calls }
+                runAcquisition()
                 val entryCalls = session.calls.toList()
                 assertEquals("Entry asks for coverage once", 1, entryCalls.count { it == FakeSessionCall.EPG_ACQUIRE_COVERAGE_BATCH })
                 callsAtEntry = entryCalls.size
@@ -471,6 +488,8 @@ abstract class GuideScreenFixture {
     }
 
     fun assertNoPlayback(additionalCoverageCalls: Int = 0) {
+        compose.waitForIdle()
+        runAcquisition()
         assertEquals(0, playbackRequests)
         assertEquals(0, navigationRequests)
         assertEquals(List(additionalCoverageCalls) { FakeSessionCall.EPG_ACQUIRE_COVERAGE_BATCH }, session.calls.drop(callsAtEntry))
@@ -482,11 +501,32 @@ abstract class GuideScreenFixture {
     fun bounds(tag: String): Rect = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
     // A key reaches the screen once it has prepared what it shows, as on a device where that takes milliseconds.
     fun key(key: Key) {
-        compose.awaitBrowsePreparation()
+        compose.waitForIdle()
+        runAcquisition()
         keyWhilePreparing(key)
+        runAcquisition()
+    }
+    /** No Compose frame advances: frontier requests must enter before the cached shift can cancel them. */
+    fun runAcquisition() {
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+        acquisition.scheduler.runCurrent()
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+    }
+    fun releasePreparation() {
+        (preparationContext as? TestDispatcher)?.scheduler?.runCurrent()
+        compose.waitForIdle()
+    }
+    fun awaitGuideWork(condition: () -> Boolean) {
+        runAcquisition()
+        compose.mainClock.advanceTimeUntil(1_000) {
+            (preparationContext as? TestDispatcher)?.scheduler?.runCurrent()
+            runAcquisition()
+            condition()
+        }
     }
     fun keyWhilePreparing(key: Key) {
         compose.onRoot().performKeyInput { pressKey(key) }
+        runAcquisition()
         compose.waitForIdle()
     }
     fun dateButtonText(day: String, startSec: Long) = context().getString(R.string.epg_date_button, day,
@@ -504,8 +544,12 @@ abstract class GuideScreenFixture {
     fun focused(text: String) = focused(hasText(text), text)
     fun focused(matcher: SemanticsMatcher, text: String) {
         try {
-            compose.waitUntil(10_000) { compose.onAllNodes(matcher and isFocused()).fetchSemanticsNodes().isNotEmpty() }
+            awaitGuideWork {
+                compose.onAllNodes(matcher and isFocused()).fetchSemanticsNodes().isNotEmpty()
+            }
             compose.onNode(matcher and isFocused()).assertIsDisplayed().assertIsFocused()
+            compose.waitForIdle()
+            runAcquisition()
         } catch (failure: Throwable) {
             // Failure-only synthetic fixture evidence; retain the original cause and deadline.
             println("Guide focus failure: expected=$text position=${position.position.value}")

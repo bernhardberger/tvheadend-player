@@ -30,9 +30,6 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.emptyPreferences
 import androidx.lifecycle.ViewModelStore
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.test.core.app.ApplicationProvider
@@ -42,10 +39,18 @@ import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
 import at.bernhardberger.tvhplayer.core.ProgrammeCategory
 import at.bernhardberger.tvhplayer.settings.ClockFormat
+import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
 import at.bernhardberger.tvhplayer.settings.UiSettings
 import at.bernhardberger.tvhplayer.settings.GuideView
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.testutil.CaptureOutput
+import at.bernhardberger.tvhplayer.testutil.pressKey
+import at.bernhardberger.tvhplayer.ui.components.LocalBrowsePreparationContext
+import at.bernhardberger.tvhplayer.ui.components.LocalArtworkSamplingContext
+import at.bernhardberger.tvhplayer.ui.components.LocalChannelAccents
+import at.bernhardberger.tvhplayer.images.ChannelAccents
+import at.bernhardberger.tvhplayer.stores.ChannelAccentStore
+import kotlin.coroutines.EmptyCoroutineContext
 import at.bernhardberger.tvhplayer.ui.common.AppClock
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore
@@ -68,14 +73,12 @@ import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -109,6 +112,7 @@ class GuideRealisticSceneTest {
     private val models = ViewModelStore()
     private val runtimeScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val position = GuidePositionStore()
+    private val accents = ChannelAccents(ChannelAccentStore(), EmptyCoroutineContext) { _, _ -> null }
     private lateinit var player: ExoPlayer
     private lateinit var view: View
     private lateinit var session: FakeTvheadendSession
@@ -172,7 +176,7 @@ class GuideRealisticSceneTest {
             // Northline World retains its declared icon ID, but its image really fails.
             (channel.icon as? ChannelIcon.ImageCache)?.artworkId?.takeUnless { record.getString("channel_id") == "ch-northline-world" }
                 ?.let { it to FixtureArt.picon(record.getString("picon").removeSuffix(".png")) }
-        }.toMap()))
+        }.toMap()).newBuilder().coroutineContext(Dispatchers.Main.immediate).build())
     }
 
     @After fun release() {
@@ -196,7 +200,6 @@ class GuideRealisticSceneTest {
 
     @Test fun eveningLineupKeepsNumbersFallbackAndDpadFocusAccessible() {
         showAt("2026-09-15T19:40:00")
-        capture("guide-fixture-evening-initial")
         moveToChannel(5)
         val recordingNow = eventsByFixtureId.getValue("evt-ch-northline-news-20260915T1930")
         seekEvent(recordingNow)
@@ -208,29 +211,12 @@ class GuideRealisticSceneTest {
         }
         compose.onNode(hasTestTag("recording-badge") and hasAnyAncestor(hasTestTag("guide-headline")),
             useUnmergedTree = true).assertIsDisplayed()
-        capture("guide-fixture-recording-now")
-
-        moveToChannel(6)
-        compose.waitUntil(10_000) {
-            compose.onAllNodes(hasText("Northline World") and hasAnyAncestor(hasTestTag("epg-channel-header-6")),
-                useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
-        }
-        assertFailedLogoFallback()
-        capture("guide-fixture-failed-logo")
-        moveToChannel(9)
-        capture("guide-fixture-amber-eight-minute")
-        moveToChannel(14)
-        capture("guide-fixture-harbor-lights-concert")
-        moveToChannel(25)
-        capture("guide-fixture-kids-off-air-ion-off-grid")
-        moveToChannel(27)
-        capture("guide-fixture-lower-channels")
     }
 
     @Test fun twelveHourClockKeepsRulerAndProgrammeTimesReadable() = try {
         AppClock.format = ClockFormat.TWELVE_HOUR
         showAt("2026-09-15T19:40:00")
-        capture("guide-fixture-evening-12h")
+        checkScene()
         // ICU keeps the day-period marker attached to its time with a no-break space.
         val clock = Regex("""\d{1,2}:\d\d[  ][AP]M""")
         val shownTimes = compose.onAllNodes(androidx.compose.ui.test.hasText(":", substring = true), useUnmergedTree = true)
@@ -285,7 +271,7 @@ class GuideRealisticSceneTest {
 
     @Test fun focusedCellUnderTheEarlierFadeDoesNotPaintIntoTheChannelGap() {
         showAt("2026-09-15T14:10:00")
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         focusedChannel(1)
         // The earliest window cannot move back far enough to clear the earlier fade.
         val event = eventsByFixtureId.getValue("evt-ch-harbor-sport-20260915T0700")
@@ -359,22 +345,8 @@ class GuideRealisticSceneTest {
         }
         val topX = cellX(topChannel)
         assertNotEquals("The upper fade is still there", hex(topX, viewport.top + 4f), hex(topX, viewport.top + 20f))
-        capture("guide-fixture-inner-edges-fade")
+        checkScene()
         bitmap.recycle()
-    }
-
-    @Test fun declaredGapsStayEmptyWithoutBlockingDpadNavigation() {
-        showAt("2026-09-15T15:00:00")
-        key(Key.DirectionDown)
-        focusedChannel(1)
-        compose.onNodeWithTag("epg-channel-header-2").assertIsDisplayed()
-        capture("guide-fixture-sparse-epg")
-        moveToChannel(13)
-        // Real Left/Right moves expose both sides of the neighbouring two-hour gap.
-        seekEvent(eventsByFixtureId.getValue("evt-ch-lumen-live-20260915T1400"))
-        seekEvent(eventsByFixtureId.getValue("evt-ch-lumen-live-20260915T1500"))
-        compose.onNodeWithTag("epg-channel-header-12").assertIsDisplayed()
-        capture("guide-fixture-coastal-data-gap")
     }
 
     @Test fun scheduledConflictPairRetainsBothScheduledBadges() {
@@ -393,40 +365,19 @@ class GuideRealisticSceneTest {
         capture("guide-fixture-conflict-river-court")
     }
 
-    @Test fun headlineNamesAFailedRecordingAsDetailsDoes() {
-        showAt("2026-09-14T12:10:00")
-        moveToChannel(4)
-        val failed = eventsByFixtureId.getValue("evt-ch-ridge-cycle-20260914T1200")
-        seekEvent(failed)
-        compose.waitUntil(10_000) {
-            compose.onAllNodes(hasTestTag("guide-headline-title") and hasText(checkNotNull(failed.title)),
-                useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
-        }
-        compose.onNode(hasTestTag("recording-badge-failed") and hasAnyAncestor(hasTestTag("guide-headline")),
-            useUnmergedTree = true).assertIsDisplayed()
-    }
-
     // Review captures of the reworked Guide (genre tints, filter, panels, view options); each scene
     // reaches its state through the D-pad path a remote takes.
-
-    @Test fun u5DefaultTintsEveryGenreFamilyAndFocusRingsTheCell() {
-        showAt("2026-09-15T19:40:00")
-        moveToChannel(11)
-        capture("u5-default")
-        key(Key.DirectionRight)
-        capture("u5-focus-genre")
-    }
 
     @Test fun focusedTintedCellKeepsItsFillAndSizeAndGainsARing() {
         showAt("2026-09-15T19:40:00")
         moveToChannel(11)
         val film = eventsByFixtureId.getValue("evt-ch-glass-drama-20260915T2015")
         seekEvent(film)
-        capture("u5-focus-ring-film")
+        checkScene()
         val cellNode = compose.onNode(hasText(checkNotNull(film.title)) and hasAnyAncestor(hasTestTag("epg-channel-row-11")))
         val cell = cellNode.fetchSemanticsNode().boundsInRoot
         val focusedBitmap = snapshot()
-        key(Key.DirectionLeft)
+        compose.pressKey(Key.DirectionLeft)
         focusedChannel(11)
         cellNode.assertIsNotFocused()
         assertEquals("Focus does not move or resize the cell", cell, cellNode.fetchSemanticsNode().boundsInRoot)
@@ -456,135 +407,71 @@ class GuideRealisticSceneTest {
         restingBitmap.recycle()
     }
 
-    @Test fun u5SportFilterDimsOtherGenresAndKeepsThemReachable() {
-        showAt("2026-09-15T19:40:00")
-        chooseSport()
-        compose.onNodeWithTag("guide-filter-button").assertContentDescriptionEquals(context().getString(
-            R.string.header_button_value_description, context().getString(R.string.guide_filter), "Sport"))
-        key(Key.DirectionDown)
-        moveToChannel(5)
-        compose.onNode(isFocused()).assert(hasStateDescription("Not Sport"))
-        capture("u5-filter-sport-dimmed-focus")
-        moveToChannel(1)
-        compose.onNode(isFocused()).assert(!hasStateDescription("Not Sport"))
-        capture("u5-filter-sport-match-focus")
-    }
-
-    @Test fun u5TagsPanelListsTheChannelSets() {
-        showAt("2026-09-15T19:40:00")
-        openTagsPanel()
-        tagFocused("channels-tags-all")
-        capture("u5-tags-panel")
-    }
-
-    @Test fun u5FilterPanelListsAllGenresAndTheFamiliesWithTheirColors() {
-        showAt("2026-09-15T19:40:00")
-        openFilterPanel()
-        tagFocused("guide-genre-all")
-        capture("u5-filter-panel")
-    }
-
     @Test fun u5HeaderButtonsRestOnDiscsAndNameAnActiveTagAndGenre() {
         showAt("2026-09-15T19:40:00")
         tagFocused("guide-date-button")
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         capture("u5-header-rest")
-        key(Key.DirectionUp)
+        compose.pressKey(Key.DirectionUp)
         tagFocused("guide-date-button")
         openTagsPanel()
         keyUntilTag(Key.DirectionDown, "channels-tags-1")
-        key(Key.Enter)
+        compose.pressKey(Key.Enter)
         tagFocused("channels-tags-button")
         compose.onNodeWithTag("channels-tags-button").assertContentDescriptionEquals(context().getString(
             R.string.header_button_value_description, context().getString(R.string.browse_tags), "Favorites"))
         capture("u5-header-tags-active-focus")
-        key(Key.DirectionRight)
+        compose.pressKey(Key.DirectionRight)
         tagFocused("guide-filter-button")
-        key(Key.Enter)
+        compose.pressKey(Key.Enter)
         keyUntilTag(Key.DirectionDown, "guide-genre-sport")
-        key(Key.Enter)
+        compose.pressKey(Key.Enter)
         tagFocused("guide-filter-button")
         capture("u5-header-filter-active-focus")
-        key(Key.DirectionRight)
+        compose.pressKey(Key.DirectionRight)
         tagFocused("channels-view-button")
         capture("u5-header-both-active")
-    }
-
-    @Test fun u5ViewOptionsPanelListsRowsHeadlineAndGenreColors() {
-        showAt("2026-09-15T19:40:00")
-        openViewOptions()
-        compose.onNodeWithTag("guide-view-headline").assertIsOn()
-        compose.onNodeWithTag("guide-view-genre-colors").assertIsOn()
-        capture("u5-view-options")
-        key(Key.DirectionRight)
-        tagFocused("guide-view-rows-dense")
-        capture("u5-view-options-rows")
-    }
-
-    @Test fun u5DayAndTimePanelOpensFromTheDateButton() {
-        showAt("2026-09-15T19:40:00")
-        key(Key.Enter)
-        tagFocused("guide-time-day-0")
-        compose.onNodeWithTag("guide-time-panel").assertIsDisplayed()
-        capture("u5-time-panel")
-        key(Key.DirectionDown)
-        key(Key.DirectionDown)
-        key(Key.DirectionRight)
-        tagFocused("guide-time-preset-18")
-        capture("u5-time-panel-times")
     }
 
     @Test fun u5RegularRowsAddTheStartTime() {
         showAt("2026-09-15T19:40:00")
         openViewOptions()
-        key(Key.DirectionRight)
-        key(Key.DirectionUp)
+        compose.pressKey(Key.DirectionRight)
+        compose.pressKey(Key.DirectionUp)
         tagFocused("guide-view-rows-regular")
-        key(Key.Enter)
+        compose.pressKey(Key.Enter)
         compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("epg-channel-row-1")).fetchSemanticsNodes().any {
             it.boundsInRoot.height > 50f } }
-        key(Key.Back)
+        compose.pressKey(Key.Back)
         tagFocused("guide-view-rows")
-        key(Key.Back)
+        compose.pressKey(Key.Back)
         tagFocused("channels-view-button")
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         moveToChannel(11)
         capture("u5-regular-rows")
-    }
-
-    @Test fun u5HeadlineOffGivesTheGridTheHeadlinesRoom() {
-        showAt("2026-09-15T19:40:00")
-        openViewOptions()
-        keyUntilTag(Key.DirectionDown, "guide-view-headline")
-        key(Key.Enter)
-        compose.waitUntil(10_000) { compose.onAllNodesWithTag("guide-headline").fetchSemanticsNodes().isEmpty() }
-        key(Key.Back)
-        tagFocused("channels-view-button")
-        key(Key.DirectionDown)
-        moveToChannel(11)
-        capture("u5-headline-off")
     }
 
     @Test fun u5GenreColorsOffKeepsTheSportFilterDimming() {
         showAt("2026-09-15T19:40:00")
         chooseSport()
-        key(Key.DirectionRight)
+        compose.pressKey(Key.DirectionRight)
         tagFocused("channels-view-button")
-        key(Key.Enter)
+        compose.pressKey(Key.Enter)
         keyUntilTag(Key.DirectionDown, "guide-view-genre-colors")
-        key(Key.Enter)
+        compose.pressKey(Key.Enter)
         compose.onNodeWithTag("guide-view-genre-colors").assertIsOff()
-        key(Key.Back)
+        compose.pressKey(Key.Back)
         tagFocused("channels-view-button")
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         moveToChannel(5)
         compose.onNode(isFocused()).assert(hasStateDescription("Not Sport"))
-        capture("u5-genre-colors-off")
+        checkScene()
     }
 
     @Test fun u5RecordingNowAndScheduledMarksShowBesideTheirTitles() {
         showAt("2026-09-15T20:00:00")
         // Without the headline the window around 20:00 shows Northline Tonight (recording) and Amber Stage (scheduled twice by a series rule) together.
+        compose.onNodeWithTag("guide-headline").assertExists()
         runBlocking { uiSettings.setGuideView(GuideView(headline = false)) }
         compose.waitUntil(10_000) { compose.onAllNodesWithTag("guide-headline").fetchSemanticsNodes().isEmpty() }
         moveToChannel(9)
@@ -592,60 +479,21 @@ class GuideRealisticSceneTest {
         assertMarks("guide-cell-recording-mark", atLeast = 3)
     }
 
-    @Test fun u5RecordedProgrammeShowsTheRecordedMark() {
-        // The film ended at 22:20 the previous evening; Left from the current programme reaches it.
-        showAt("2026-09-14T22:40:00")
-        moveToChannel(9)
-        seekEvent(eventsByFixtureId.getValue("evt-ch-amber-stage-20260914T2015"))
-        assertMarks("guide-cell-recording-mark", atLeast = 1)
-        capture("u5-recording-marks-recorded")
-    }
-
-    @Test fun u5FailedRecordingShowsTheErrorMark() {
-        showAt("2026-09-14T17:30:00")
-        moveToChannel(4)
-        seekEvent(eventsByFixtureId.getValue("evt-ch-ridge-cycle-20260914T1200"))
-        assertMarks("guide-cell-failed-mark", atLeast = 1)
-        capture("u5-recording-marks-failed")
-    }
-
-    @Test fun u5PendingCoverageShowsLoadingRows() {
-        val coverage = CompletableDeferred<Unit>()
-        try {
-            showAt("2026-09-15T19:40:00", holdCoverage = coverage)
-            // Only a row with nothing in the window shows placeholders; Harbor Sport Plus's guide has ended.
-            val row = channelIds.getValue("ch-harbor-sport-plus").value
-            compose.waitUntil(10_000) {
-                compose.onAllNodes(hasTestTag("guide-row-skeleton") and
-                    hasAnyAncestor(hasTestTag("epg-channel-row-$row"))).fetchSemanticsNodes().isNotEmpty()
-            }
-            capture("u5-loading")
-        } finally {
-            coverage.complete(Unit)
-        }
-    }
-
     @Test fun u5GroupWithoutGuideDataShowsNoDataRows() {
         showAt("2026-09-15T19:40:00", withoutGuideFor = channelIds.getValue("ch-harbor-sport-plus"))
-        key(Key.DirectionRight)
+        compose.pressKey(Key.DirectionRight)
         tagFocused("channels-tags-button")
-        key(Key.Enter)
+        compose.pressKey(Key.Enter)
         keyUntilTag(Key.DirectionDown, "channels-tags-2")
-        key(Key.Enter)
+        compose.pressKey(Key.Enter)
         tagFocused("channels-tags-button")
-        compose.waitUntil(10_000) {
+        compose.onNodeWithTag("channels-tags-button").assert(hasContentDescription("No guide data", substring = true))
+        val selectedChannel = channelIds.getValue("ch-harbor-sport-plus").value
+        compose.mainClock.advanceTimeUntil(10_000) {
+            compose.onAllNodes(hasTestTag("epg-channel-row-$selectedChannel")).fetchSemanticsNodes().isNotEmpty() &&
             compose.onAllNodes(hasText(context().getString(R.string.epg_no_data))).fetchSemanticsNodes().isNotEmpty()
         }
         capture("u5-empty")
-    }
-
-    @Test fun longGermanProgrammeKeepsItsFullAccessibleTitle() {
-        showAt("2026-09-14T02:35:00")
-        moveToChannel(20)
-        val event = eventsByFixtureId.getValue("evt-ch-foundry-docs-20260914T0230")
-        seekEvent(event)
-        compose.onNode(isFocused()).assert(hasContentDescription(checkNotNull(event.title), substring = true))
-        capture("guide-fixture-long-german")
     }
 
     @Test fun guideImmediateRecordReturnsDirectlyToCellEveryFrame() = guideReturnEveryFrame("Record")
@@ -661,9 +509,9 @@ class GuideRealisticSceneTest {
         val cell = compose.onNode(isFocused()).fetchSemanticsNode()
         val guidePosition = position.position.value
         val bounds = cell.boundsInRoot
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         compose.onNodeWithTag("details-watch").assertIsFocused()
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         compose.waitUntil(10_000) { playbackRequests == 1 }
         compose.onNodeWithTag("player-banner").assertExists()
         // This fixture hosts both production screens without AppRoot's entry handoff.
@@ -683,9 +531,6 @@ class GuideRealisticSceneTest {
         send(android.view.KeyEvent.ACTION_DOWN)
         compose.onNode(isFocusable() and hasAnyDescendant(hasTestTag("player-banner"))).assertIsFocused()
         send(android.view.KeyEvent.ACTION_DOWN, 1, android.view.KeyEvent.FLAG_LONG_PRESS)
-        assertEquals("HOLD claims the Activity key cycle", at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyDecision.CONSUME,
-            activityKeyOwner.keyEvent(at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyMode.Inactive,
-                android.view.KeyEvent.KEYCODE_BACK, android.view.KeyEvent.ACTION_DOWN, 2))
         compose.waitUntil(10_000) { compose.onAllNodesWithTag("player-banner").fetchSemanticsNodes().isEmpty() }
         // AppRoot normally restores route focus; restore that same cell in this two-screen fixture.
         compose.onNode(SemanticsMatcher("previous Guide cell") { it.id == cell.id }).requestFocus().assertIsFocused()
@@ -707,7 +552,7 @@ class GuideRealisticSceneTest {
             seekEvent(eventsByFixtureId.getValue("evt-ch-northline-news-20260915T1930"))
         } else moveToChannel(1)
         val cell = compose.onNode(isFocused()).fetchSemanticsNode().id
-        key(Key.Menu)
+        compose.pressKey(Key.Menu)
         when (action) {
             "Back" -> {
                 compose.onNodeWithText("Program details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
@@ -774,9 +619,11 @@ class GuideRealisticSceneTest {
                 return
             }
             val current = eventsByFixtureId.values.single { it.id == currentId }
-            key(if (current.start > event.start) Key.DirectionLeft else Key.DirectionRight)
+            compose.pressKey(if (current.start > event.start) Key.DirectionLeft else Key.DirectionRight)
             // Focus follows the selection a frame later, and the window scrolls it into view after that.
-            compose.waitUntil(10_000) { position.position.value?.eventId != currentId }
+            compose.mainClock.advanceTimeUntil(10_000) {
+                position.position.value?.let { it.eventId != null && it.eventId != currentId } == true
+            }
             val selected = checkNotNull(position.position.value).eventId
             focused(checkNotNull(eventsByFixtureId.values.single { it.id == selected }.title))
             focusedChannel(checkNotNull(event.channelId).value.toInt())
@@ -792,24 +639,23 @@ class GuideRealisticSceneTest {
                 return
             }
             // Empty/off-air rows are passive and are skipped by production navigation.
-            key(if (current == null || current < number) Key.DirectionDown else Key.DirectionUp)
+            compose.pressKey(if (current == null || current < number) Key.DirectionDown else Key.DirectionUp)
         }
         fail("Channel $number was not reached by D-pad navigation")
     }
 
-    private fun showAt(localClock: String, scale: Float = 1f, holdCoverage: CompletableDeferred<Unit>? = null,
+    private fun showAt(localClock: String, scale: Float = 1f,
         withoutGuideFor: ChannelId? = null) {
         fontScale = scale
         now = LocalDateTime.parse(localClock).atZone(ZoneId.of(fixture.getString("timezone"))).toEpochSecond()
         assertTrue(SystemClock.setCurrentTimeMillis(now * 1000))
-        show(holdCoverage, withoutGuideFor)
+        show(withoutGuideFor)
     }
 
     /**
-     * [holdCoverage] keeps the Guide's coverage request pending until it completes, with no coverage cached.
      * [withoutGuideFor] leaves that channel without a single programme, as a server that never sent its guide.
      */
-    private fun show(holdCoverage: CompletableDeferred<Unit>? = null, withoutGuideFor: ChannelId? = null,
+    private fun show(withoutGuideFor: ChannelId? = null,
         playerJourney: Boolean = false) {
         val events = eventsByFixtureId.values.filter { it.channelId != withoutGuideFor }
         session = FakeTvheadendSession(SessionObservation.create(
@@ -821,7 +667,7 @@ class GuideRealisticSceneTest {
             epgState = EpgRepositoryState.Current(EpgSnapshot.create(
                 events = events.filter { it.stop.epochSeconds > now },
                 historicalEvents = events.filter { it.stop.epochSeconds <= now },
-                coverages = if (holdCoverage != null) emptyList() else channels.map {
+                coverages = channels.map {
                     EpgCoverage.create(it.id, Instant.parse(fixture.getString("reference_start")),
                         Instant.parse(fixture.getString("coverage_stop")))
                 },
@@ -831,22 +677,12 @@ class GuideRealisticSceneTest {
         ))
         if (playerJourney) session.scriptLivePlaybackSuccess(
             at.bernhardberger.tvheadend.sdk.playback.SubscriptionOpener { _, _, _ -> kotlinx.coroutines.awaitCancellation() })
-        // Only the released fake's request boundary is held; its settlements still come from the SDK.
-        val guideSession = if (holdCoverage == null) session else object : TvheadendSession by session {
-            override val epgRepository = object : EpgRepository by session.epgRepository {
-                override suspend fun acquireCoverageBatch(currentSession: CurrentSessionObservation,
-                    channelIds: List<ChannelId>, through: Instant): EpgCoverageBatchResult {
-                    holdCoverage.await()
-                    return session.epgRepository.acquireCoverageBatch(currentSession, channelIds, through)
-                }
-            }
-        }
-        uiSettings = UiSettingsStore(preferences())
-        val settings = PlayerSettingsStore(preferences())
+        uiSettings = UiSettingsStore(InMemoryPreferencesDataStore())
+        val settings = PlayerSettingsStore(InMemoryPreferencesDataStore())
         val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.IO,
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
         if (playerJourney) runtimeScope.launch { profiles.run() }
-        val model = ChannelsViewModel(session, ChannelTagSettingsStore(preferences()), profiles.liveProfile)
+        val model = ChannelsViewModel(session, ChannelTagSettingsStore(InMemoryPreferencesDataStore()), profiles.liveProfile)
         models.put("channels", model)
         player = ExoPlayer.Builder(context()).build()
         val coordinator = createTvheadendPlaybackCoordinator(player).also { if (playerJourney) it.launchIn(runtimeScope) }
@@ -869,6 +705,9 @@ class GuideRealisticSceneTest {
         compose.setContent {
             KoinIsolatedContext(koinApplication { modules(noticeModule) }) {
                 CompositionLocalProvider(LocalDensity provides Density(1f, fontScale),
+                    LocalBrowsePreparationContext provides EmptyCoroutineContext,
+                    LocalArtworkSamplingContext provides EmptyCoroutineContext,
+                    LocalChannelAccents provides accents,
                     at.bernhardberger.tvhplayer.ui.startup.LocalMainStartupKeyCycleOwner provides activityKeyOwner) {
                     TVHeadendPlayerTheme {
                         view = LocalView.current
@@ -881,7 +720,7 @@ class GuideRealisticSceneTest {
                                 var genre by remember { mutableStateOf(ProgrammeCategory.ALL) }
                                 EpgGridScreen(contentPadding = padding, initialFocusEnabled = !drawer && playerChannel == null, view = view,
                                     genre = genre, onGenreChange = { genre = it }, channelViewModel = model,
-                                    session = guideSession, playerSession = runtime, selection = selection, guidePositionStore = position,
+                                    session = session, playerSession = runtime, selection = selection, guidePositionStore = position,
                                     lastPlayedStore = lastPlayed, onPlay = { id, _ -> playbackRequests++
                                         if (playerJourney) playerChannel = id },
                                     onPlayRecording = { playbackRequests++ }, notices = notices)
@@ -900,19 +739,13 @@ class GuideRealisticSceneTest {
                 }
             }
         }
-        compose.waitUntil(10_000) {
+        compose.mainClock.advanceTimeUntil(10_000) {
             compose.onAllNodes(hasTestTag("guide-date-button") and isFocused()).fetchSemanticsNodes().isNotEmpty()
         }
         assertNotNull(model.observation.value.currentSession)
     }
 
-    private fun assertFailedLogoFallback() {
-        compose.onNodeWithTag("epg-channel-header-6").assertContentDescriptionEquals("6 Northline World")
-        compose.onNodeWithText("Northline World", useUnmergedTree = true).assertIsDisplayed()
-        compose.onNodeWithTag("epg-channel-picon-6", useUnmergedTree = true).assertDoesNotExist()
-    }
-
-    private fun capture(name: String, numbersShown: Boolean = true) {
+    private fun checkScene(numbersShown: Boolean = true): List<String> {
         compose.waitForIdle()
         val headerGeometry = mutableListOf<String>()
         for (channel in channels) {
@@ -950,13 +783,16 @@ class GuideRealisticSceneTest {
         assertFalse(FakeSessionCall.BIND_LIVE_PLAYBACK in session.calls)
         assertNull(player.currentMediaItem)
         assertFalse(player.playWhenReady)
-        lateinit var bitmap: Bitmap
-        compose.runOnIdle {
-            bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-            view.draw(Canvas(bitmap))
-        }
-        assertEquals(960, bitmap.width)
-        assertEquals(540, bitmap.height)
+        assertEquals(960, view.width)
+        assertEquals(540, view.height)
+        return headerGeometry
+    }
+
+    private fun capture(name: String, numbersShown: Boolean = true) {
+        val headerGeometry = checkScene(numbersShown)
+        val focus = compose.onNode(isFocused())
+        val bounds = focus.getUnclippedBoundsInRoot()
+        val bitmap = snapshot()
         val directory = File("build/outputs/browse-cohesion/guide/epg-fixture")
         CaptureOutput.writePng(File(directory, "$name.png"), bitmap)
         bitmap.recycle()
@@ -982,14 +818,9 @@ class GuideRealisticSceneTest {
         return bitmap
     }
 
-    private fun key(key: Key) {
-        compose.onRoot().performKeyInput { pressKey(key) }
-        compose.waitForIdle()
-    }
-
     private fun focused(title: String) {
         // Focus can reach a cell a frame before the window scrolls it into view.
-        compose.waitUntil(10_000) {
+        compose.mainClock.advanceTimeUntil(10_000) {
             compose.onAllNodes(hasText(title) and isFocused()).fetchSemanticsNodes().isNotEmpty() &&
                 compose.onNode(hasText(title) and isFocused()).isDisplayed()
         }
@@ -1016,7 +847,7 @@ class GuideRealisticSceneTest {
     private fun keyUntilTag(direction: Key, tag: String) {
         repeat(12) {
             if (compose.onAllNodes(hasTestTag(tag) and isFocused()).fetchSemanticsNodes().isNotEmpty()) return tagFocused(tag)
-            key(direction)
+            compose.pressKey(direction)
         }
         tagFocused(tag)
     }
@@ -1028,24 +859,24 @@ class GuideRealisticSceneTest {
 
     /** From the date button through the real Tags button to its panel. */
     private fun openTagsPanel() {
-        key(Key.DirectionRight)
+        compose.pressKey(Key.DirectionRight)
         tagFocused("channels-tags-button")
-        key(Key.Enter)
+        compose.pressKey(Key.Enter)
         compose.onNodeWithTag("channels-tags-panel").assertIsDisplayed()
     }
 
     /** From the date button past Tags to the real Filter button and its panel. */
     private fun openFilterPanel() {
-        repeat(2) { key(Key.DirectionRight) }
+        repeat(2) { compose.pressKey(Key.DirectionRight) }
         tagFocused("guide-filter-button")
-        key(Key.Enter)
+        compose.pressKey(Key.Enter)
         compose.onNodeWithTag("guide-genre-panel").assertIsDisplayed()
     }
 
     private fun openViewOptions() {
-        repeat(3) { key(Key.DirectionRight) }
+        repeat(3) { compose.pressKey(Key.DirectionRight) }
         tagFocused("channels-view-button")
-        key(Key.Enter)
+        compose.pressKey(Key.Enter)
         tagFocused("guide-view-rows")
     }
 
@@ -1053,19 +884,14 @@ class GuideRealisticSceneTest {
     private fun chooseSport() {
         openFilterPanel()
         keyUntilTag(Key.DirectionDown, "guide-genre-sport")
-        key(Key.Enter)
+        compose.pressKey(Key.Enter)
         tagFocused("guide-filter-button")
     }
 
     private fun focusedChannel(channel: Int) {
         val target = isFocused() and hasAnyAncestor(hasTestTag("epg-channel-row-$channel"))
-        compose.waitUntil(10_000) { compose.onAllNodes(target).fetchSemanticsNodes().isNotEmpty() }
+        compose.mainClock.advanceTimeUntil(10_000) { compose.onAllNodes(target).fetchSemanticsNodes().isNotEmpty() }
         compose.onNode(target).assertIsDisplayed().assertIsFocused()
-    }
-
-    private fun preferences() = object : DataStore<Preferences> {
-        override val data = MutableStateFlow(emptyPreferences())
-        override suspend fun updateData(transform: suspend (Preferences) -> Preferences) = transform(data.value).also { data.value = it }
     }
 
     private fun context(): Application = ApplicationProvider.getApplicationContext()

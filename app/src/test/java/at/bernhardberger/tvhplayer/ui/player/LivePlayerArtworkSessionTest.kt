@@ -7,9 +7,7 @@ import android.app.Application
 import android.graphics.Bitmap
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.emptyPreferences
+import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
@@ -65,8 +63,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.After
@@ -136,12 +132,12 @@ class LivePlayerArtworkSessionTest {
             .coroutineContext(Dispatchers.Main.immediate)
             .diskCache(null)
             .build())
-        val settingsData = InMemoryData()
+        val settingsData = InMemoryPreferencesDataStore()
         val settings = PlayerSettingsStore(settingsData)
         val profiles = AppProfileOwner(playerSession, FakeServerProfileStore(), settings, profileDispatcher,
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
         scope.launch { profiles.run() }
-        val channels = ChannelsViewModel(playerSession, ChannelTagSettingsStore(InMemoryData()), profiles.liveProfile)
+        val channels = ChannelsViewModel(playerSession, ChannelTagSettingsStore(InMemoryPreferencesDataStore()), profiles.liveProfile)
         models.put("channels", channels)
         compose.awaitScheduledWork(profileDispatcher) { channels.scope.value.scope.visibleChannels.size == 1 }
         player = ExoPlayer.Builder(context).build()
@@ -176,13 +172,6 @@ class LivePlayerArtworkSessionTest {
             synchronized(requests) { requests.filterIsInstance<AppArtworkSource>().any { it.id == LOGO } }
         }
         compose.waitForIdle()
-    }
-
-    private class InMemoryData : DataStore<Preferences> {
-        val state = MutableStateFlow(emptyPreferences())
-        override val data: Flow<Preferences> get() = state
-        override suspend fun updateData(transform: suspend (Preferences) -> Preferences) =
-            transform(state.value).also { state.value = it }
     }
 
     private companion object {

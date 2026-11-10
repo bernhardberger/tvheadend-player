@@ -802,13 +802,14 @@ class RecordingRecoveryPositionTest {
             driver.await("loader reported read failure", diagnostics = { failurePlayback() }) { media.loadErrorReported }
             // Analytics posts before the playback thread finishes its loader-error callback.
             driver.settle(player)
-            driver.advanceLive(player, clock, 100)
-            driver.awaitCurrent("failed load prefix ready: ${failurePlayback()}") {
-                player.isPlaying || player.playerError != null
+            // Keep the existing five-second startup/consumption envelope, but stop as soon
+            // as the two-second prefix fails. Acknowledge every step on the playback thread.
+            repeat(50) {
+                if (player.playerError != null) return
+                driver.advanceLive(player, clock, 100)
+                driver.settle(player)
             }
-            // Includes the short prefix's startup transition and its two seconds of consumption.
-            driver.advanceLive(player, clock, 5_000)
-            driver.awaitCurrent("armed read failure: ${failurePlayback()}") { player.playerError != null }
+            assertNotNull("armed read failure: ${failurePlayback()}", player.playerError)
         }
 
         fun awaitPlayback(condition: () -> Boolean) {
@@ -824,7 +825,13 @@ class RecordingRecoveryPositionTest {
                 driver.advanceLive(player, clock, 100)
             }
             driver.settle(player)
-            driver.awaitCurrent("recording playback: ${playback()}", condition)
+            // The five-second prefix bounds consumption; allow another 500 ms for startup.
+            repeat(55) {
+                if (condition()) return
+                driver.advanceLive(player, clock, 100)
+                driver.settle(player)
+            }
+            assertTrue("recording playback: ${playback()}", condition())
         }
 
         // Real progressive extraction and playback-thread notifications must reach the main looper.

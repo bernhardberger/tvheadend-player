@@ -1,20 +1,10 @@
 package at.bernhardberger.tvhplayer.playback
 
 import androidx.media3.common.Player
-import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.Channel
-import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
-import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
-import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
-import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
-import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
-import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
-import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
-import at.bernhardberger.tvheadend.sdk.core.SessionObservation
-import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.media3.LiveTimeshiftState
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackRecoveryReason
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackStopResult
@@ -48,7 +38,7 @@ class AppPlaybackRuntimeTest {
     @OptIn(at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi::class)
     fun arrivingChaptersDoNotDiscardAnInFlightCutpointResponse() = runTest {
         val entry = DvrEntry.create(id = DvrEntryId(4), state = at.bernhardberger.tvheadend.sdk.core.DvrEntryState.COMPLETED)
-        val fake = at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession(currentObservation(recordings = listOf(entry)))
+        val fake = at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession(currentPlaybackObservation(recordings = listOf(entry)))
         val response = CompletableDeferred<Unit>()
         val points = listOf(at.bernhardberger.tvheadend.sdk.core.DvrCutpoint(
             Duration.ZERO, 10.seconds, at.bernhardberger.tvheadend.sdk.core.DvrCutpointAction.SCENE_MARKER,
@@ -78,7 +68,7 @@ class AppPlaybackRuntimeTest {
     fun successfulMarkerResponsesPublishAndLateResponsesCannotRestoreRetiredMarkers() = runTest {
         for (retirement in listOf("stop", "reinstall", "generation", "replacement", "cancel")) {
             val entry = DvrEntry.create(id = DvrEntryId(4), state = at.bernhardberger.tvheadend.sdk.core.DvrEntryState.COMPLETED)
-            val fake = at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession(currentObservation(recordings = listOf(entry)))
+            val fake = at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession(currentPlaybackObservation(recordings = listOf(entry)))
             val points = listOf(at.bernhardberger.tvheadend.sdk.core.DvrCutpoint(
                 Duration.ZERO, 10.seconds, at.bernhardberger.tvheadend.sdk.core.DvrCutpointAction.SCENE_MARKER,
             ))
@@ -109,8 +99,8 @@ class AppPlaybackRuntimeTest {
             assertTrue(query.chapterStartsMs.value.isEmpty())
             when (retirement) {
                 "reinstall" -> query.use(binding) // Same object is still fenced by installation revision.
-                "generation" -> fake.replaceGeneration(currentObservation(recordings = listOf(entry)))
-                "replacement" -> fake.publish(currentObservation(recordings = listOf(
+                "generation" -> fake.replaceGeneration(currentPlaybackObservation(recordings = listOf(entry)))
+                "replacement" -> fake.publish(currentPlaybackObservation(recordings = listOf(
                     DvrEntry.create(id = entry.id, state = at.bernhardberger.tvheadend.sdk.core.DvrEntryState.COMPLETED, title = "Replacement"),
                 )))
                 "cancel" -> job.cancel()
@@ -125,7 +115,7 @@ class AppPlaybackRuntimeTest {
     @OptIn(at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class)
     fun markerQueryUsesSdkAdmissionAndClearsOnStopOrReinstallation() = runTest {
         val entry = DvrEntry.create(id = DvrEntryId(4), state = at.bernhardberger.tvheadend.sdk.core.DvrEntryState.COMPLETED)
-        val fake = at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession(currentObservation(recordings = listOf(entry)))
+        val fake = at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession(currentPlaybackObservation(recordings = listOf(entry)))
         fake.scriptRecordingPlaybackSuccess()
         val binding = (fake.bindRecordingPlayback(fake.captureCurrentSession(), entry.id) as
             at.bernhardberger.tvheadend.sdk.core.PlaybackBindingResult.Bound).binding
@@ -148,7 +138,7 @@ class AppPlaybackRuntimeTest {
         query.use(binding)
         assertTrue(query.chapterStartsMs.value.isEmpty())
         assertTrue(query.revision.value > initialRevision)
-        fake.replaceGeneration(currentObservation(recordings = listOf(entry)))
+        fake.replaceGeneration(currentPlaybackObservation(recordings = listOf(entry)))
         assertFalse(query.isCurrent(binding))
         query.refresh(binding)
         assertTrue(query.cutpoints.value.isEmpty())
@@ -158,13 +148,13 @@ class AppPlaybackRuntimeTest {
     @OptIn(at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class)
     fun markerQueryRejectsSameIdReplacementInTheSameSession() = runTest {
         val entry = DvrEntry.create(id = DvrEntryId(4), state = at.bernhardberger.tvheadend.sdk.core.DvrEntryState.COMPLETED)
-        val fake = at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession(currentObservation(recordings = listOf(entry)))
+        val fake = at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession(currentPlaybackObservation(recordings = listOf(entry)))
         fake.scriptRecordingPlaybackSuccess()
         val binding = (fake.bindRecordingPlayback(fake.captureCurrentSession(), entry.id) as
             at.bernhardberger.tvheadend.sdk.core.PlaybackBindingResult.Bound).binding
         val query = RecordingMarkerQuery()
         query.use(binding)
-        fake.publish(currentObservation(recordings = listOf(
+        fake.publish(currentPlaybackObservation(recordings = listOf(
             DvrEntry.create(id = entry.id, state = at.bernhardberger.tvheadend.sdk.core.DvrEntryState.COMPLETED, title = "Replacement"),
         )))
         assertFalse(query.isCurrent(binding))
@@ -243,7 +233,7 @@ class AppPlaybackRuntimeTest {
     @Test
     fun liveRecoveryFenceRejectsARecordingReplacement() {
         val channel = Channel.create(id = ChannelId(7), name = "Seven")
-        val observations = FakeSessionObservation(currentObservation(channels = listOf(channel)))
+        val observations = FakeSessionObservation(currentPlaybackObservation(channels = listOf(channel)))
         val fence = LiveRecoveryFence(
             reason = PlaybackRecoveryReason.LIVE_ENDED,
             selection = LivePlaybackSelection(
@@ -265,7 +255,7 @@ class AppPlaybackRuntimeTest {
     @Test
     fun liveRecoveryFenceRejectsANewerLiveTarget() {
         val channel = Channel.create(id = ChannelId(11), name = "Eleven")
-        val observations = FakeSessionObservation(currentObservation(channels = listOf(channel)))
+        val observations = FakeSessionObservation(currentPlaybackObservation(channels = listOf(channel)))
         val fence = LiveRecoveryFence(
             reason = PlaybackRecoveryReason.LIVE_ENDED,
             selection = LivePlaybackSelection(
@@ -294,7 +284,7 @@ class AppPlaybackRuntimeTest {
     @Test
     fun liveRecoveryFenceAcceptsOnlyTheSameTargetEpochGenerationAndReason() {
         val channel = Channel.create(id = ChannelId(17), name = "Seventeen")
-        val observations = FakeSessionObservation(currentObservation(channels = listOf(channel)))
+        val observations = FakeSessionObservation(currentPlaybackObservation(channels = listOf(channel)))
         val target = AppPlaybackTarget.Live(channel.id)
         val selection = LivePlaybackSelection(
             currentSession = observations.captureCurrentSession(),
@@ -315,7 +305,7 @@ class AppPlaybackRuntimeTest {
         )
         assertEquals(PlaybackRecoveryReason.AUDIO_RECOVERY_EXHAUSTED, fence.reason)
 
-        observations.publish(currentObservation(channels = listOf(channel)))
+        observations.publish(currentPlaybackObservation(channels = listOf(channel)))
         assertFalse(
             fence.matches(
                 activeTarget = target,
@@ -364,7 +354,7 @@ class AppPlaybackRuntimeTest {
     @Test
     fun failedRecoveryWithItsHealthyReadyTargetRepublishesAfterOwnershipClears() = runTest {
         val channel = Channel.create(id = ChannelId(23), name = "Twenty-three")
-        val observations = FakeSessionObservation(currentObservation(channels = listOf(channel)))
+        val observations = FakeSessionObservation(currentPlaybackObservation(channels = listOf(channel)))
         val target = AppPlaybackTarget.Live(channel.id)
         val fence = LiveRecoveryFence(
             reason = PlaybackRecoveryReason.LIVE_ENDED,
@@ -422,7 +412,7 @@ class AppPlaybackRuntimeTest {
         val recovering = Channel.create(id = ChannelId(23), name = "Twenty-three")
         val replacement = Channel.create(id = ChannelId(24), name = "Twenty-four")
         val observations = FakeSessionObservation(
-            currentObservation(channels = listOf(recovering, replacement)),
+            currentPlaybackObservation(channels = listOf(recovering, replacement)),
         )
         val fence = LiveRecoveryFence(
             reason = PlaybackRecoveryReason.LIVE_ENDED,
@@ -535,13 +525,13 @@ class AppPlaybackRuntimeTest {
     @Test
     fun priorGenerationLiveProofCannotAuthorizeAnUnobservedReconnectTarget() {
         val channel = Channel.create(id = ChannelId(7), name = "Seven")
-        val observations = FakeSessionObservation(currentObservation(channels = listOf(channel)))
+        val observations = FakeSessionObservation(currentPlaybackObservation(channels = listOf(channel)))
         val staleSelection = LivePlaybackSelection(
             currentSession = observations.captureCurrentSession(),
             channelId = channel.id,
         )
 
-        observations.publish(currentObservation())
+        observations.publish(currentPlaybackObservation())
 
         assertNull(
             resolveLivePlaybackSelection(
@@ -555,12 +545,12 @@ class AppPlaybackRuntimeTest {
     @Test
     fun reconnectReauthorizesLiveIntentOnlyWithTheGenerationThatObservedIt() {
         val channel = Channel.create(id = ChannelId(11), name = "Eleven")
-        val observations = FakeSessionObservation(currentObservation(channels = listOf(channel)))
+        val observations = FakeSessionObservation(currentPlaybackObservation(channels = listOf(channel)))
         val staleSelection = LivePlaybackSelection(
             currentSession = observations.captureCurrentSession(),
             channelId = channel.id,
         )
-        observations.publish(currentObservation(channels = listOf(channel)))
+        observations.publish(currentPlaybackObservation(channels = listOf(channel)))
 
         val currentObservation = observations.observation.value
         val resolved = requireNotNull(
@@ -580,11 +570,11 @@ class AppPlaybackRuntimeTest {
     fun priorGenerationRecordingProofCannotAuthorizeAnUnobservedReconnectTarget() {
         val recording = DvrEntry.create(id = DvrEntryId(12))
         val observations = FakeSessionObservation(
-            currentObservation(recordings = listOf(recording)),
+            currentPlaybackObservation(recordings = listOf(recording)),
         )
         val staleProof = observations.captureCurrentSession()
 
-        observations.publish(currentObservation())
+        observations.publish(currentPlaybackObservation())
 
         assertNotSame(staleProof, observations.observation.value.currentSession)
         assertNull(
@@ -1124,7 +1114,7 @@ class AppPlaybackRuntimeTest {
         val recordingId = DvrEntryId(42)
         val recording = DvrEntry.create(id = recordingId)
         val observations = FakeSessionObservation(
-            currentObservation(recordings = listOf(recording)),
+            currentPlaybackObservation(recordings = listOf(recording)),
         )
         val currentSelection = RecordingPlaybackSelection(
             currentSession = observations.captureCurrentSession(),
@@ -1175,13 +1165,13 @@ class AppPlaybackRuntimeTest {
     fun recordingRouteRestorationRequiresCurrentGenerationAuthority() {
         val recording = DvrEntry.create(id = DvrEntryId(47))
         val observations = FakeSessionObservation(
-            currentObservation(recordings = listOf(recording)),
+            currentPlaybackObservation(recordings = listOf(recording)),
         )
         val staleSelection = RecordingPlaybackSelection(
             currentSession = observations.captureCurrentSession(),
             recordingId = recording.id,
         )
-        observations.publish(currentObservation(recordings = listOf(recording)))
+        observations.publish(currentPlaybackObservation(recordings = listOf(recording)))
         val currentSelection = requireNotNull(
             currentRecordingPlaybackSelection(observations.observation.value, recording.id),
         )
@@ -1259,18 +1249,4 @@ class AppPlaybackRuntimeTest {
         }
     }
 
-    private fun currentObservation(
-        channels: List<Channel> = emptyList(),
-        recordings: List<DvrEntry> = emptyList(),
-    ): SessionObservation = SessionObservation.create(
-        sessionState = SessionState.Ready(
-            ServerCapabilities.create(
-                streaming = CapabilityAccess.ALLOWED,
-                dvrWrite = CapabilityAccess.ALLOWED,
-            ),
-        ),
-        channelState = ChannelRepositoryState.Current(ChannelCatalog.create(channels = channels)),
-        epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
-        dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = recordings)),
-    )
 }

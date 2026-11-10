@@ -2,6 +2,8 @@
 
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.testutil.tagExists
+import at.bernhardberger.tvhplayer.testutil.tagBounds
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -15,8 +17,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.key.Key
@@ -199,7 +201,7 @@ class PlayerTimelineGeometryTest {
             val bounds = frames.indices.map { at ->
                 compose.runOnIdle { index = at }
                 settle()
-                "${frames[at].name} at font $fontScale" to bounds("player-timeline-track")
+                "${frames[at].name} at font $fontScale" to compose.tagBounds("player-timeline-track")
             }
             assertSameBar(bounds)
         }
@@ -230,10 +232,10 @@ class PlayerTimelineGeometryTest {
             compose.runOnIdle { index = at }
             settle()
             val name = frames[at].name
-            assertFalse("'$name': the row has no tag box", exists("player-end-tag-slot"))
+            assertFalse("'$name': the row has no tag box", compose.tagExists("player-end-tag-slot"))
             if (name == "playback unavailable") {
-                assertFalse("'$name': no state to announce", exists("player-live-state"))
-                assertFalse("'$name': no end clock either", exists("player-end-clock"))
+                assertFalse("'$name': no state to announce", compose.tagExists("player-live-state"))
+                assertFalse("'$name': no end clock either", compose.tagExists("player-end-clock"))
                 continue
             }
             val isBehind = name in behind || name == "timing known, no window"
@@ -241,9 +243,9 @@ class PlayerTimelineGeometryTest {
             assertEquals("'$name': the announced state", if (isBehind) "Behind live" else "Live", liveState())
             compose.onNodeWithTag("player-live-state", useUnmergedTree = true)
                 .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
-            val row = bounds("player-timeline-labels")
-            val track = bounds("player-timeline-track")
-            val bounds = bounds("player-live-state")
+            val row = compose.tagBounds("player-timeline-labels")
+            val track = compose.tagBounds("player-timeline-track")
+            val bounds = compose.tagBounds("player-live-state")
             box?.let { assertEquals("'$name': the distance's box does not move", it, bounds) }
             box = bounds
             assertTrue("'$name': the box has a size, so its announcement is heard with nothing drawn", bounds.width > 0f && bounds.height > 0f)
@@ -253,13 +255,13 @@ class PlayerTimelineGeometryTest {
             assertTrue("'$name': the distance box stays above the bar row", bounds.bottom < row.top)
             // Start, bar, end: the start label's box, the bar and the end clock's box fill the row.
             assertTrue("'$name': the bar leaves room for the start box", track.left > row.left)
-            if (exists("player-end-clock")) {
-                assertTrue("'$name': the end clock follows the bar", bounds("player-end-clock").left > track.right)
-                assertEquals("'$name': the end clock ends with the row", row.right, bounds("player-end-clock").right, 0.5f)
+            if (compose.tagExists("player-end-clock")) {
+                assertTrue("'$name': the end clock follows the bar", compose.tagBounds("player-end-clock").left > track.right)
+                assertEquals("'$name': the end clock ends with the row", row.right, compose.tagBounds("player-end-clock").right, 0.5f)
             }
-            if (exists("player-distance")) {
-                val drawn = bounds("player-distance")
-                val end = if (exists("player-end-clock")) bounds("player-end-clock").right else row.right
+            if (compose.tagExists("player-distance")) {
+                val drawn = compose.tagBounds("player-distance")
+                val end = if (compose.tagExists("player-end-clock")) compose.tagBounds("player-end-clock").right else row.right
                 assertEquals("'$name': the distance's right edge is the end clock's", end, drawn.right, 0.5f)
                 assertTrue("'$name': above the bar row", drawn.bottom <= row.top)
                 val style = compose.onNodeWithTag("player-distance", useUnmergedTree = true).fetchSemanticsNode().let { node ->
@@ -302,11 +304,11 @@ class PlayerTimelineGeometryTest {
                 compose.runOnIdle { info = data; behind = true }
                 settle()
                 val case = "$name at font $fontScale"
-                val drawn = bounds("player-distance")
-                val box = bounds("player-live-state")
-                val line = bounds(tag)
-                val row = bounds("player-timeline-labels")
-                assertEquals("$case: the distance ends with the end clock", bounds("player-end-clock").right, drawn.right, 0.5f)
+                val drawn = compose.tagBounds("player-distance")
+                val box = compose.tagBounds("player-live-state")
+                val line = compose.tagBounds(tag)
+                val row = compose.tagBounds("player-timeline-labels")
+                assertEquals("$case: the distance ends with the end clock", compose.tagBounds("player-end-clock").right, drawn.right, 0.5f)
                 assertTrue("$case: the line leaves a gap before the distance's box: $line vs $box", line.right < box.left)
                 // The lines keep their places, so without Next the last place is empty and the distance
                 // stands in it, below the line.
@@ -319,8 +321,8 @@ class PlayerTimelineGeometryTest {
                 offset = above
                 compose.runOnIdle { behind = false }
                 settle()
-                assertFalse("$case: nothing is drawn at the live edge", exists("player-distance"))
-                assertEquals("$case: the reserve stays at the live edge, so the line does not re-wrap", line, bounds(tag))
+                assertFalse("$case: nothing is drawn at the live edge", compose.tagExists("player-distance"))
+                assertEquals("$case: the reserve stays at the live edge, so the line does not re-wrap", line, compose.tagBounds(tag))
             }
         }
     }
@@ -338,10 +340,10 @@ class PlayerTimelineGeometryTest {
         }
         compose.waitForIdle()
         val tags = listOf("player-info-bar", "player-info-title", "player-info-last-row", "player-info-last-text")
-        val resting = tags.map { bounds(it) }
+        val resting = tags.map { compose.tagBounds(it) }
         compose.runOnIdle { reserve = 74.dp }
         compose.waitForIdle()
-        assertEquals("no info bound changes with the reserve", resting, tags.map { bounds(it) })
+        assertEquals("no info bound changes with the reserve", resting, tags.map { compose.tagBounds(it) })
     }
 
     @Test fun aRecordingsBarRowShowsItsLengthAndOnlyGrowingRecordingsShowBehindLiveAcrossStepsAndPause() {
@@ -373,14 +375,14 @@ class PlayerTimelineGeometryTest {
                     if (stillRecording) "30:00 behind live" else null, distance())
                 assertEquals("$case: only a growing recording announces a live state",
                     if (stillRecording) "Behind live" else null, liveState())
-                assertFalse("$case: no tag box", exists("player-end-tag-slot"))
+                assertFalse("$case: no tag box", compose.tagExists("player-end-tag-slot"))
                 assertEquals("$case: the length alone, without a mark", "1:00:00", text("player-end-clock"))
-                assertEquals("$case: the length ends with the row", bounds("player-timeline-labels").right, bounds("player-end-clock").right, 0.5f)
+                assertEquals("$case: the length ends with the row", compose.tagBounds("player-timeline-labels").right, compose.tagBounds("player-end-clock").right, 0.5f)
                 val texts = compose.onAllNodes(androidx.compose.ui.test.hasAnyAncestor(hasTestTag("player-timeline-labels")), useUnmergedTree = true)
                     .fetchSemanticsNodes().flatMap { it.config.getOrElse(SemanticsProperties.Text) { emptyList() } }.joinToString(" ") { it.text }
                 assertFalse("$case: no recording dot in the row: $texts", texts.contains("●"))
                 // The badge beside the top identity's name, not the bar row, says the recording still runs.
-                assertEquals("$case: the badge", stillRecording, exists("recording-badge"))
+                assertEquals("$case: the badge", stillRecording, compose.tagExists("recording-badge"))
                 assertEquals("$case: the identity speaks it: ${identitySpeech(compose)}", stillRecording,
                     identitySpeech(compose).contains("Recording now"))
             }
@@ -406,13 +408,13 @@ class PlayerTimelineGeometryTest {
             compose.runOnIdle { mode = layer; position = 3_397_000; duration = 3_600_000; growing = true }
             settle()
             assertEquals("3:23 behind live", distance())
-            val track = bounds("player-timeline-track")
-            val box = bounds("player-live-state")
+            val track = compose.tagBounds("player-timeline-track")
+            val box = compose.tagBounds("player-live-state")
             compose.runOnIdle { position = 3_598_000 }
             settle()
             assertNull("$layer: no annotation within the live-head tolerance", distance())
             assertEquals("Live", liveState())
-            assertEquals(box, bounds("player-live-state"))
+            assertEquals(box, compose.tagBounds("player-live-state"))
             compose.runOnIdle { duration = null }
             settle()
             assertNull("$layer: unknown length is not a live-head claim", liveState())
@@ -422,7 +424,7 @@ class PlayerTimelineGeometryTest {
             assertNull("$layer: completed recordings have no behind-live label", distance())
             assertNull(liveState())
             assertEquals("1:00:00", text("player-end-clock"))
-            assertEquals("$layer: the track never moves", track, bounds("player-timeline-track"))
+            assertEquals("$layer: the track never moves", track, compose.tagBounds("player-timeline-track"))
         }
     }
 
@@ -458,11 +460,11 @@ class PlayerTimelineGeometryTest {
                 val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
                 node.config[androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult].action!!(layouts)
                 assertFalse("$case: full wording fits without truncation", layouts.single().hasVisualOverflow)
-                assertEquals("$case: flush with the end label", bounds("player-end-clock").right, node.boundsInRoot.right, 0.5f)
-                box?.let { assertEquals("$case: fixed label box", it, bounds("player-live-state")) }
-                track?.let { assertEquals("$case: fixed track", it, bounds("player-timeline-track")) }
-                box = bounds("player-live-state")
-                track = bounds("player-timeline-track")
+                assertEquals("$case: flush with the end label", compose.tagBounds("player-end-clock").right, node.boundsInRoot.right, 0.5f)
+                box?.let { assertEquals("$case: fixed label box", it, compose.tagBounds("player-live-state")) }
+                track?.let { assertEquals("$case: fixed track", it, compose.tagBounds("player-timeline-track")) }
+                box = compose.tagBounds("player-live-state")
+                track = compose.tagBounds("player-timeline-track")
             }
         }
     }
@@ -513,7 +515,7 @@ class PlayerTimelineGeometryTest {
             val bounds = frames.indices.map { at ->
                 compose.runOnIdle { index = at }
                 settle()
-                "${frames[at].name} at font $fontScale" to bounds("player-timeline-track")
+                "${frames[at].name} at font $fontScale" to compose.tagBounds("player-timeline-track")
             }
             assertSameBar(bounds)
         }
@@ -534,23 +536,23 @@ class PlayerTimelineGeometryTest {
         val timeline = live(window = airingWindow)
         compose.setContent { LiveChrome(Frame("", mode, timeline)) }
         settle()
-        val banner = bounds("player-timeline-track")
-        val cell = bounds("player-state")
+        val banner = compose.tagBounds("player-timeline-track")
+        val cell = compose.tagBounds("player-state")
         assertNotNull(cell)
-        assertTrue("the Banner has its state cell", exists("player-state"))
+        assertTrue("the Banner has its state cell", compose.tagExists("player-state"))
 
         compose.runOnIdle { mode = PlayerChromeMode.CONTROLS }
         settle()
-        val controls = bounds("player-timeline-track")
-        assertFalse("the controls have no state cell", exists("player-state"))
+        val controls = compose.tagBounds("player-timeline-track")
+        assertFalse("the controls have no state cell", compose.tagExists("player-state"))
         assertEquals("the bar extends left into the cell and its gap", banner.left - controls.left, cell.width + px(8.dp), 1f)
         assertEquals("its end stays", banner.right, controls.right, 0.5f)
 
         compose.runOnIdle { mode = PlayerChromeMode.BANNER }
         settle()
-        assertEquals("back in the Banner the cell's room returns", banner.left, bounds("player-timeline-track").left, 0.5f)
-        assertEquals(banner.right, bounds("player-timeline-track").right, 0.5f)
-        assertTrue(exists("player-state"))
+        assertEquals("back in the Banner the cell's room returns", banner.left, compose.tagBounds("player-timeline-track").left, 0.5f)
+        assertEquals(banner.right, compose.tagBounds("player-timeline-track").right, 0.5f)
+        assertTrue(compose.tagExists("player-state"))
     }
 
     @Test fun theBarMovesIntoTheStateCellsRoomWithTheHandoverAndNotInstantly() {
@@ -558,18 +560,18 @@ class PlayerTimelineGeometryTest {
         val timeline = live(window = airingWindow)
         compose.setContent { LiveChrome(Frame("", mode, timeline)) }
         settle()
-        val banner = bounds("player-timeline-track").left
+        val banner = compose.tagBounds("player-timeline-track").left
         compose.mainClock.autoAdvance = false
         compose.runOnIdle { mode = PlayerChromeMode.CONTROLS }
         compose.mainClock.advanceTimeByFrame()
         compose.waitForIdle()
-        assertEquals("the first frame still has the Banner's layout", banner, bounds("player-timeline-track").left, 1f)
+        assertEquals("the first frame still has the Banner's layout", banner, compose.tagBounds("player-timeline-track").left, 1f)
         // Two frames pass before the rise starts; then it takes the panel duration.
         compose.mainClock.advanceTimeBy(PlayerMotion.PanelMs / 2L + 50)
-        val midway = bounds("player-timeline-track").left
+        val midway = compose.tagBounds("player-timeline-track").left
         compose.mainClock.advanceTimeBy(PlayerMotion.PanelMs.toLong() + 200)
         compose.waitForIdle()
-        val settled = bounds("player-timeline-track").left
+        val settled = compose.tagBounds("player-timeline-track").left
         assertTrue("midway is between the layouts: $settled < $midway < $banner", midway < banner - 0.5f && midway > settled + 0.5f)
     }
 
@@ -688,7 +690,7 @@ class PlayerTimelineGeometryTest {
         settle()
         assertTrue("the title is actually painted, not merely in semantics", brightest("player-info-title") > 0.5f)
         org.junit.Assert.assertArrayEquals("the same title remains painted after the notice delay", titleBeforeNotice, titlePixels())
-        assertFalse("the automatic notice must not replace the programme", exists("player-window-title"))
+        assertFalse("the automatic notice must not replace the programme", compose.tagExists("player-window-title"))
     }
 
     @Test fun aTimingGapHoldsTheAxisFillClocksAndDistanceAcrossLayers() {
@@ -710,7 +712,7 @@ class PlayerTimelineGeometryTest {
             assertEquals(start, leadingText())
             assertEquals(end, text("player-end-clock"))
             assertEquals("0:30 behind live", text("player-distance"))
-            if (exists("player-seekbar")) assertFalse("held rendering must not grant seeking",
+            if (compose.tagExists("player-seekbar")) assertFalse("held rendering must not grant seeking",
                 compose.onNodeWithTag("player-seekbar").fetchSemanticsNode().config.contains(androidx.compose.ui.semantics.SemanticsActions.CustomActions))
         }
     }
@@ -762,12 +764,12 @@ class PlayerTimelineGeometryTest {
         for (layer in listOf(PlayerChromeMode.BANNER, PlayerChromeMode.CONTROLS)) {
             compose.runOnIdle { mode = layer }
             settle()
-            assertTrue(exists("player-timeline-track"))
+            assertTrue(compose.tagExists("player-timeline-track"))
             assertNull("a new request has no held coordinates", fillFraction())
             assertNull("an unknown distance draws nothing", distance())
             assertNull("and claims no state", liveState())
             assertEquals("", leadingText())
-            assertFalse(exists("player-end-clock"))
+            assertFalse(compose.tagExists("player-end-clock"))
         }
     }
 
@@ -775,7 +777,7 @@ class PlayerTimelineGeometryTest {
         compose.setContent { LiveChrome(Frame("", PlayerChromeMode.CONTROLS,
             live(AppTimeshiftState(available = true, paused = true, timingKnown = false), programme = null), PlayerStateCell.PAUSED)) }
         settle()
-        assertTrue(exists("player-timeline-track"))
+        assertTrue(compose.tagExists("player-timeline-track"))
         assertNull("an unknown distance draws nothing", distance())
         assertNull("and claims no state", liveState())
         assertFalse("no seek actions", compose.onNodeWithTag("player-seekbar").fetchSemanticsNode().config
@@ -786,7 +788,7 @@ class PlayerTimelineGeometryTest {
         compose.setContent { LiveChrome(Frame("", PlayerChromeMode.BANNER,
             live(AppTimeshiftState(), programme = null).copy(timeshiftExpected = true), PlayerStateCell.PAUSED)) }
         settle()
-        assertTrue(exists("player-timeline-track"))
+        assertTrue(compose.tagExists("player-timeline-track"))
         assertNull("an unknown distance draws nothing", distance())
         assertNull("and does not claim live", liveState())
     }
@@ -811,7 +813,7 @@ class PlayerTimelineGeometryTest {
     private var rootView: android.view.View? = null
 
     private fun titlePixels(): IntArray {
-        val rect = bounds("player-info-title")
+        val rect = compose.tagBounds("player-info-title")
         val view = requireNotNull(rootView)
         val bitmap = android.graphics.Bitmap.createBitmap(view.width, view.height, android.graphics.Bitmap.Config.ARGB_8888)
         compose.runOnIdle { view.draw(android.graphics.Canvas(bitmap)) }
@@ -828,7 +830,7 @@ class PlayerTimelineGeometryTest {
      */
     private fun brightest(tag: String, exceptChip: Rect? = null): Float =
         // The chip's tag sits inside its 8dp padding; a pixel it only partly covers is still its own.
-        probe(bounds(tag), exceptChip?.inflate(px(8.dp) + 1f)) { r, g, b -> maxOf(r, g, b) }
+        probe(compose.tagBounds(tag), exceptChip?.inflate(px(8.dp) + 1f)) { r, g, b -> maxOf(r, g, b) }
 
     /**
      * The most coloured drawn pixel within [rect] of the root, 0 (black to white, such as the footer
@@ -858,10 +860,10 @@ class PlayerTimelineGeometryTest {
         .config[SemanticsProperties.ContentDescription].joinToString(". ")
 
     /** Live's drawn distance behind live; null where nothing is drawn. */
-    private fun distance(): String? = if (exists("player-distance")) text("player-distance") else null
+    private fun distance(): String? = if (compose.tagExists("player-distance")) text("player-distance") else null
 
     /** The state live TV announces from its distance box; null where there is no box or it is silent. */
-    private fun liveState(): String? = if (!exists("player-live-state")) null else
+    private fun liveState(): String? = if (!compose.tagExists("player-live-state")) null else
         compose.onNodeWithTag("player-live-state", useUnmergedTree = true).fetchSemanticsNode().config
             .getOrNull(SemanticsProperties.ContentDescription)?.joinToString()
 
@@ -870,8 +872,8 @@ class PlayerTimelineGeometryTest {
 
     /** The start label: the first text in the bar row's start box, before the track. */
     private fun leadingText(): String {
-        val track = bounds("player-timeline-track")
-        val row = bounds("player-timeline-labels")
+        val track = compose.tagBounds("player-timeline-track")
+        val row = compose.tagBounds("player-timeline-labels")
         return compose.onAllNodes(androidx.compose.ui.test.hasText(":", substring = true), useUnmergedTree = true).fetchSemanticsNodes()
             .filter { it.boundsInRoot.right <= track.left + 1f && it.boundsInRoot.center.y in row.top..row.bottom }
             .joinToString { it.config[SemanticsProperties.Text].joinToString { t -> t.text } }
@@ -883,7 +885,7 @@ class PlayerTimelineGeometryTest {
             compose.onAllNodes(hasTestTag(tag), useUnmergedTree = true).fetchSemanticsNodes()
         }
         if (fills.isEmpty()) return null
-        val track = bounds("player-timeline-track")
+        val track = compose.tagBounds("player-timeline-track")
         return (fills.maxOf { it.boundsInRoot.right } - track.left) / track.width
     }
 
@@ -895,25 +897,25 @@ class PlayerTimelineGeometryTest {
         compose.setContent { LiveChrome(Frame("", PlayerChromeMode.CONTROLS, live(window = airingWindow), cell, busy = busy)) }
         settle()
         val tags = listOf("player-timeline-track", "player-info-title", "player-info-last-row", "player-pause", "player-stop", "player-settings", PlayerTopIdentityTag, "player-info-artwork-tile")
-        val before = tags.associateWith(::bounds)
+        val before = tags.associateWith { compose.tagBounds(it) }
         val focusedBefore = compose.onNode(isFocused()).fetchSemanticsNode().id
         for (next in listOf(PlayerBusyStatus.TUNING, PlayerBusyStatus.BUFFERING, null)) {
             compose.runOnIdle { busy = next }
             settle()
-            assertEquals(next != null, exists("player-busy-indicator"))
-            assertFalse("no ring in Pause", exists("player-pause-busy"))
+            assertEquals(next != null, compose.tagExists("player-busy-indicator"))
+            assertFalse("no ring in Pause", compose.tagExists("player-pause-busy"))
             val pause = compose.onNodeWithTag("player-pause").fetchSemanticsNode().config
             assertFalse("no busy announcement", pause.contains(SemanticsProperties.StateDescription))
             assertFalse("no busy live region", pause.contains(SemanticsProperties.LiveRegion))
             assertTrue("still focusable", pause.contains(SemanticsProperties.Focused))
             compose.onNodeWithTag("player-pause").assertContentDescriptionIs("Pause")
             assertEquals("busy never moves focus", focusedBefore, compose.onNode(isFocused()).fetchSemanticsNode().id)
-            tags.forEach { assertEquals("$next: $it does not move", before[it], bounds(it)) }
+            tags.forEach { assertEquals("$next: $it does not move", before[it], compose.tagBounds(it)) }
         }
         compose.runOnIdle { cell = PlayerStateCell.PAUSED }
         settle()
         compose.onNodeWithTag("player-pause").assertContentDescriptionIs("Play")
-        assertFalse(exists("player-pause-busy"))
+        assertFalse(compose.tagExists("player-pause-busy"))
         assertFalse(compose.onNodeWithTag("player-pause").fetchSemanticsNode().config.contains(SemanticsProperties.StateDescription))
     }
 
@@ -922,15 +924,15 @@ class PlayerTimelineGeometryTest {
         compose.setContent { LiveChrome(Frame("", PlayerChromeMode.BANNER, live(window = airingWindow), busy = busy)) }
         settle()
         val tags = listOf("player-timeline-track", "player-info-title", "player-info-last-row", "player-state")
-        val before = tags.associateWith(::bounds)
+        val before = tags.associateWith { compose.tagBounds(it) }
         for (next in listOf(PlayerBusyStatus.TUNING, PlayerBusyStatus.BUFFERING, null)) {
             compose.runOnIdle { busy = next }
             settle()
-            assertEquals(next != null, exists("player-busy-indicator"))
+            assertEquals(next != null, compose.tagExists("player-busy-indicator"))
             compose.onNodeWithTag("player-state", useUnmergedTree = true).assertContentDescriptionIs("Playing")
-            assertFalse(exists("player-pause"))
-            assertFalse(exists("player-pause-busy"))
-            tags.forEach { assertEquals("$next: $it does not move", before[it], bounds(it)) }
+            assertFalse(compose.tagExists("player-pause"))
+            assertFalse(compose.tagExists("player-pause-busy"))
+            tags.forEach { assertEquals("$next: $it does not move", before[it], compose.tagBounds(it)) }
         }
     }
 
@@ -999,17 +1001,17 @@ class PlayerTimelineGeometryTest {
     private fun assertBannerReadout(name: String, setMode: (PlayerChromeMode) -> Unit) {
         compose.runOnIdle { setMode(PlayerChromeMode.BANNER) }
         settle()
-        val resting = infoTextTags.filter(::exists).associateWith(::brightest)
+        val resting = infoTextTags.filter { compose.tagExists(it) }.associateWith(::brightest)
         assertTrue("$name: the info bar has text", resting.isNotEmpty() && resting.values.all { it > 0.5f })
         compose.runOnIdle { setMode(PlayerChromeMode.BANNER_STEP) }
         settle()
-        val chip = bounds("timeshift-preview-target")
-        val track = bounds("player-timeline-track")
-        assertFalse("$name: the Banner draws no thumb", exists("player-seekbar-thumb"))
+        val chip = compose.tagBounds("timeshift-preview-target")
+        val track = compose.tagBounds("player-timeline-track")
+        assertFalse("$name: the Banner draws no thumb", compose.tagExists("player-seekbar-thumb"))
         assertEquals("$name: the chip's bottom is on the bar row's top", track.top, chip.bottom, 1f)
         assertTrue("$name: clamped to the bar", chip.left >= track.left - 1f && chip.right <= track.right + 1f)
         for ((tag, before) in resting) {
-            assertTrue("$name: $tag stays shown", exists(tag))
+            assertTrue("$name: $tag stays shown", compose.tagExists(tag))
             assertEquals("$name: $tag keeps full alpha", before, brightest(tag, exceptChip = chip), 0.05f)
         }
     }
@@ -1021,14 +1023,14 @@ class PlayerTimelineGeometryTest {
      * visible pixel), none is overlapped while shown.
      */
     private fun assertReadoutClear(name: String) {
-        val chip = bounds("timeshift-preview-target")
-        val track = bounds("player-timeline-track")
-        val thumbTop = bounds("player-seekbar-thumb").top
+        val chip = compose.tagBounds("timeshift-preview-target")
+        val track = compose.tagBounds("player-timeline-track")
+        val thumbTop = compose.tagBounds("player-seekbar-thumb").top
         assertTrue("$name: 8dp is the gap", ReadoutThumbGap >= 8.dp)
         assertEquals("$name: the chip's bottom is the gap above the thumb's top", thumbTop - px(ReadoutThumbGap), chip.bottom, 1.5f)
         assertTrue("$name: centred within the bar", chip.center.x >= track.left - 0.5f && chip.center.x <= track.right + 0.5f)
         assertTrue("$name: clamped to the bar", chip.left >= track.left - 1f && chip.right <= track.right + 1f)
-        val texts = infoTextTags.filter(::exists).map { it to bounds(it) }
+        val texts = infoTextTags.filter { compose.tagExists(it) }.map { it to compose.tagBounds(it) }
         assertTrue("$name: the info bar has text above", texts.isNotEmpty())
         assertTrue("$name: the pixel probe sees the chip's own text", brightest("timeshift-preview-target") > 0.5f)
         for ((tag, text) in texts) {
@@ -1067,10 +1069,10 @@ class PlayerTimelineGeometryTest {
             compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
             settle()
         }
-        val clearChip = bounds("timeshift-preview-target")
-        val text = bounds("player-distance")
-        val box = bounds("player-live-state")
-        val track = bounds("player-timeline-track")
+        val clearChip = compose.tagBounds("timeshift-preview-target")
+        val text = compose.tagBounds("player-distance")
+        val box = compose.tagBounds("player-live-state")
+        val track = compose.tagBounds("player-timeline-track")
         assertEquals("1:02:10 behind live", distance())
         assertFalse("$layer: far from the end the chip is clear of the distance: $clearChip vs $text", clearChip.overlaps(text))
         assertTrue("$layer: clear of the chip, the distance is painted in its colour", mostColoured(text) > 0.4f)
@@ -1078,21 +1080,21 @@ class PlayerTimelineGeometryTest {
 
         compose.runOnIdle { near = true }
         settle()
-        val chip = bounds("timeshift-preview-target")
+        val chip = compose.tagBounds("timeshift-preview-target")
         assertTrue("$layer: near the end the chip lies over the distance: $chip vs $text", chip.overlaps(text))
         assertTrue("$layer: and leaves part of it beside the chip: $chip vs $text", text.right > chip.right + px(8.dp))
-        assertEquals("$layer: the distance's text keeps its place", text, bounds("player-distance"))
+        assertEquals("$layer: the distance's text keeps its place", text, compose.tagBounds("player-distance"))
         assertEquals("$layer: no pixel of the distance is painted beside the chip", 0f,
             mostColoured(Rect(chip.right, text.top, text.right, text.bottom)), 0.05f)
         assertEquals("$layer: nor anywhere else in its place", 0f, mostColoured(text), 0.05f)
-        assertEquals("$layer: the state's box keeps its bounds", box, bounds("player-live-state"))
+        assertEquals("$layer: the state's box keeps its bounds", box, compose.tagBounds("player-live-state"))
         assertEquals("$layer: and its announcement", "Behind live", liveState())
         assertEquals("$layer: the distance stays in the tree", "1:02:10 behind live", distance())
-        assertEquals("$layer: the bar does not move", track, bounds("player-timeline-track"))
+        assertEquals("$layer: the bar does not move", track, compose.tagBounds("player-timeline-track"))
 
         compose.runOnIdle { near = false }
         settle()
-        assertEquals("$layer: the chip is back where it was", clearChip, bounds("timeshift-preview-target"))
+        assertEquals("$layer: the chip is back where it was", clearChip, compose.tagBounds("timeshift-preview-target"))
         assertTrue("$layer: clear of the chip again, the distance is painted again", mostColoured(text) > 0.4f)
     }
 
@@ -1186,11 +1188,6 @@ class PlayerTimelineGeometryTest {
             compose.waitForIdle()
         }
     }
-
-    private fun exists(tag: String) =
-        compose.onAllNodes(hasTestTag(tag), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
-
-    private fun bounds(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
 
     private fun px(value: androidx.compose.ui.unit.Dp) = with(compose.density) { value.toPx() }
 

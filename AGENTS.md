@@ -96,9 +96,10 @@ repository-local domain overlays, then the focused skill, then local style.
   A regression test counts only after it has failed against the pre-fix code.
   Assert the rule or outcome, not incidental values: exact dp, copied UI text,
   call order and internal structure only where they are the contract. Reuse
-  `testutil/` and the screen `*Fixture.kt` builders instead of local copies. A
-  scenario written to prove something for one review belongs in the opt-in
-  capture lane or is deleted after the decision. Merging or deleting redundant
+  `testutil/` and the screen `*Fixture.kt` builders instead of local copies.
+  Remote presses and clock steps use `pressKey` and `settleFrames` from
+  `testutil/ComposeRemote.kt`. A scenario written to prove something for one
+  review belongs in the opt-in capture lane or is deleted after the decision. Merging or deleting redundant
   tests in touched code is in scope. Tests run on virtual time: `runTest` and
   test dispatchers, the Compose `mainClock`, Robolectric looper idling, Media3
   `FakeClock` with `TestPlayerRunHelper`; wait for a signal, never poll the real

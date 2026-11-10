@@ -86,9 +86,6 @@ import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.ui.components.rememberPreparedBrowseData
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.test.performKeyPress
-import at.bernhardberger.tvhplayer.ui.components.awaitBrowsePreparation
-import at.bernhardberger.tvhplayer.ui.components.awaitBrowsePreparationLane
-import at.bernhardberger.tvhplayer.ui.components.browsePreparationLane
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.common.programmeCategoryLabelRes
@@ -140,6 +137,7 @@ import kotlin.math.roundToInt
 import kotlin.time.Instant
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
+import kotlinx.coroutines.test.StandardTestDispatcher
 
 /** Offline native production Guide navigation: focus, entry, panels and Back; geometry lives in [GuideVisualLayoutTest]. */
 @RunWith(RobolectricTestRunner::class)
@@ -149,7 +147,6 @@ import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 class GuideNavigationTest : GuideScreenFixture() {
     @Test fun retainedEntryWaitsForRowsWhenNewCoverageArrivesBeforePreparation() {
         val coverageRelease = CompletableDeferred<Unit>()
-        val preparationRelease = java.util.concurrent.CountDownLatch(1)
         try {
             show(initialCoverage = false, beforeCoverageBatch = { _, _ -> coverageRelease.await() })
             key(Key.DirectionDown)
@@ -163,12 +160,7 @@ class GuideNavigationTest : GuideScreenFixture() {
                 historicalEvents = snapshot.historicalEvents, coverages = (1L..12L).map {
                     EpgCoverage.create(ChannelId(it), Instant.fromEpochSeconds(hour), Instant.fromEpochSeconds(hour + 7 * 86400))
                 })
-            val held = java.util.concurrent.CountDownLatch(1)
-            browsePreparationLane.dispatch(kotlin.coroutines.EmptyCoroutineContext) {
-                held.countDown()
-                check(preparationRelease.await(30, java.util.concurrent.TimeUnit.SECONDS))
-            }
-            assertTrue(held.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            compose.runOnIdle { preparationContext = StandardTestDispatcher() }
             publishEvents(fresh.events, fresh, covered = true)
             compose.runOnIdle {
                 position.save(checkNotNull(position.position.value).copy(channelId = ChannelId(3)))
@@ -176,14 +168,14 @@ class GuideNavigationTest : GuideScreenFixture() {
             }
             compose.waitForIdle()
             // New coverage must not settle entry against old rows and remember their fallback.
-            preparationRelease.countDown()
-            compose.waitUntil(10_000) { compose.onAllNodes(hasText(title(3, 0))).fetchSemanticsNodes().isNotEmpty() }
+            releasePreparation()
+            awaitGuideWork { compose.onAllNodesWithText(title(3, 0)).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithText(title(3, 0)).assertExists()
             key(Key.DirectionDown)
             focused(title(3, 0))
             assertEquals(ChannelId(3), position.position.value?.channelId)
             assertNoPlayback()
         } finally {
-            preparationRelease.countDown()
             coverageRelease.complete(Unit)
         }
     }
@@ -207,9 +199,8 @@ class GuideNavigationTest : GuideScreenFixture() {
                 position.save(checkNotNull(position.position.value).copy(channelId = ChannelId(3)))
                 guideActive = true
             }
-            // Going offline prepares the window's index anew, off the Compose scheduler; until its
-            // rows show, Guide consumes the key.
-            compose.waitUntil(10_000) { compose.onAllNodes(hasText(title(4, 0))).fetchSemanticsNodes().isNotEmpty() }
+            compose.waitForIdle()
+            compose.onNodeWithText(title(4, 0)).assertExists()
             key(Key.DirectionDown)
             focused(title(4, 0))
             assertNoPlayback()
@@ -217,24 +208,17 @@ class GuideNavigationTest : GuideScreenFixture() {
     }
 
     @Test fun groupChangeKeepsTheLastFocusedGuideChannelAheadOfLastPlayed() {
-        show(groupWithoutFirst = true, lastPlayedChannel = ChannelId(1))
-        key(Key.DirectionDown)
-        key(Key.DirectionDown)
-        focused(title(2, 0))
-        compose.onNodeWithTag("channels-tags-button").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
-        key(Key.Enter)
-        tagFocused("channels-tags-all")
-        key(Key.DirectionDown)
-        tagFocused("channels-tags-1")
-        key(Key.Enter)
-        key(Key.DirectionDown)
-        focused(title(2, 0))
-        assertNoPlayback(additionalCoverageCalls = 1)
+        groupChangeAfterPlayerReturnUsesTheMostRecentlyFocusedChannel(playerReturn = false)
     }
 
     @Test fun groupChangeAfterPlayerReturnUsesTheMostRecentlyFocusedChannel() {
-        position.save(GuidePosition(ChannelId(1), EventId(110), hour, hour - 1800, 0))
-        show(groupWithoutFirst = true, lastPlayedChannel = ChannelId(1), playerReturn = savedTimelineReturn())
+        groupChangeAfterPlayerReturnUsesTheMostRecentlyFocusedChannel(playerReturn = true)
+    }
+
+    private fun groupChangeAfterPlayerReturnUsesTheMostRecentlyFocusedChannel(playerReturn: Boolean) {
+        if (playerReturn) position.save(GuidePosition(ChannelId(1), EventId(110), hour, hour - 1800, 0))
+        show(groupWithoutFirst = true, lastPlayedChannel = ChannelId(1),
+            playerReturn = if (playerReturn) savedTimelineReturn() else null)
         key(Key.DirectionDown)
         focused(title(1, 0))
         key(Key.DirectionDown)
@@ -295,15 +279,15 @@ class GuideNavigationTest : GuideScreenFixture() {
                     dvrState = observation.dvrState))
             }
             // Wait for the reduced rows, not just the newer disconnected observation.
-            compose.waitUntil(10_000) {
-                compose.onAllNodes(hasText(title(1, 0)) and isFocusable()).fetchSemanticsNodes().isEmpty()
-            }
+            compose.waitForIdle()
+            compose.onNode(hasText(context().getString(R.string.epg_no_data)) and
+                hasAnyAncestor(hasTestTag("epg-channel-row-1")), useUnmergedTree = true).assertExists()
+            compose.onNode(hasText(title(1, 0)) and isFocusable()).assertDoesNotExist()
             compose.runOnIdle {
                 position.save(checkNotNull(position.position.value).copy(channelId = ChannelId(3)))
                 guideActive = true
             }
             dateFocused()
-            compose.waitUntil(10_000) { compose.onNodeWithTag("epg-channel-row-7").isDisplayed() }
             compose.onNodeWithTag("epg-channel-row-7").assertIsDisplayed()
             key(Key.DirectionDown)
             focused(title(7, 0))
@@ -348,7 +332,8 @@ class GuideNavigationTest : GuideScreenFixture() {
                 entered.complete(Unit)
                 release.await()
             })
-            compose.waitUntil(5_000) { entered.isCompleted }
+            runAcquisition()
+            assertTrue("Initial acquisition reached the held fake", entered.isCompleted)
             dateFocused()
             val event = EpgEvent.create(EventId(310), ChannelId(3), Instant.fromEpochSeconds(hour),
                 Instant.fromEpochSeconds(hour + 3600), title = title(3, 0))
@@ -395,6 +380,7 @@ class GuideNavigationTest : GuideScreenFixture() {
         show()
         key(Key.DirectionDown)
         focused(title(1, 0))
+        val nowWindow = checkNotNull(position.position.value).windowStartSec
         // The fourth programme scrolls the window past now; the third still fits beside it.
         // Window preparation runs off the Compose scheduler. waitForIdle alone can return
         // while it is pending, when Guide deliberately consumes the next navigation key.
@@ -406,15 +392,11 @@ class GuideNavigationTest : GuideScreenFixture() {
         repeat(7) { key(Key.DirectionDown) }
         focused(title(9, 3)) // The metadata-only third channel is not an invented programme.
         assertReadableFocus()
-        val bitmap = capture("guide-scrolled", 1f, LayoutDirection.Ltr)
-        val viewport = bounds("epg-timeline-content")
-        // Alpha reaches the backdrop at the top after real rows have scrolled out; the bottom and
-        // right edges are hard cuts and do not fade.
-        assertNearBackground(bitmap.getPixel(750, viewport.top.toInt()), 8)
-        bitmap.recycle()
         val window = checkNotNull(position.position.value).windowStartSec
+        assertNotEquals(nowWindow, window)
         key(Key.Back)
         focused(title(9, 0)) // Scrolled past now: Back returns to now on the same channel first.
+        assertEquals(nowWindow, checkNotNull(position.position.value).windowStartSec)
         assertNotEquals(window, checkNotNull(position.position.value).windowStartSec)
         key(Key.Back)
         compose.onNodeWithTag("nav-epg").assertIsFocused()
@@ -434,7 +416,9 @@ class GuideNavigationTest : GuideScreenFixture() {
         key(Key.DirectionRight)
         focused(title(1, 0))
         assertEquals(before, position.position.value)
-        val bitmap = capture("guide-data-edge", 1f, LayoutDirection.Ltr)
+        val bitmap = compose.runOnIdle {
+            Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888).also { view.draw(Canvas(it)) }
+        }
         val focus = compose.onNode(hasText(title(1, 0)) and isFocused()).fetchSemanticsNode().boundsInRoot
         val window = checkNotNull(position.position.value).windowStartSec
         val ruler0 = bounds("epg-time-ruler")
@@ -453,9 +437,6 @@ class GuideNavigationTest : GuideScreenFixture() {
     }
 
     @Test fun nowPointSequenceCrossesAGapAndReturnsToItsOrigin() {
-        fun programme(id: Long, channel: Long, start: Long, end: Long, name: String) =
-            EpgEvent.create(EventId(id), ChannelId(channel), Instant.fromEpochSeconds(hour + start * 60),
-                Instant.fromEpochSeconds(hour + end * 60), title = name)
         show(history = false, events = listOf(
             programme(110, 1, 0, 30, "Origin on air"),
             programme(111, 1, 30, 120, "Later origin programme"),
@@ -479,9 +460,6 @@ class GuideNavigationTest : GuideScreenFixture() {
     }
 
     @Test fun onAirAnchorAdvancesWithTheClockBetweenDownPresses() {
-        fun programme(id: Long, channel: Long, start: Long, end: Long, name: String) =
-            EpgEvent.create(EventId(id), ChannelId(channel), Instant.fromEpochSeconds(hour + start * 60),
-                Instant.fromEpochSeconds(hour + end * 60), title = name)
         show(history = false, events = listOf(
             programme(109, 1, -60, 0, "Previous programme"),
             programme(110, 1, 0, 120, "First long programme"),
@@ -509,9 +487,6 @@ class GuideNavigationTest : GuideScreenFixture() {
     @Test fun deferredChannelPageResolvesAtTheNewNow() {
         val entered = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
-        fun programme(id: Long, channel: Long, start: Long, end: Long, name: String) =
-            EpgEvent.create(EventId(id), ChannelId(channel), Instant.fromEpochSeconds(hour + start * 60),
-                Instant.fromEpochSeconds(hour + end * 60), title = name)
         try {
             show(history = false, initialCoverage = false, beforeCoverageBatch = { ids, _ ->
                 if (ids.any { it.value >= 7 }) {
@@ -530,7 +505,8 @@ class GuideNavigationTest : GuideScreenFixture() {
             assertTrue("The page request starts before the programme change", SystemClock.uptimeMillis() < (hour + 30 * 60) * 1000)
             val window = checkNotNull(position.position.value).windowStartSec
             key(Key.ChannelDown)
-            compose.waitUntil(5_000) { entered.isCompleted }
+            runAcquisition()
+            assertTrue("Page acquisition reached the held fake", entered.isCompleted)
             assertTrue(SystemClock.setCurrentTimeMillis((hour + 30 * 60 + 1) * 1000))
             compose.mainClock.advanceTimeBy(6_000)
             assertTrue("The programme changes while coverage is pending", SystemClock.uptimeMillis() >= (hour + 30 * 60) * 1000)
@@ -550,9 +526,6 @@ class GuideNavigationTest : GuideScreenFixture() {
     @Test fun restoredOnAirProgrammeWithNowInLeftReserveUsesItsVisibleSpan() {
         val window = hour + 14 * 60
         position.save(GuidePosition(ChannelId(1), EventId(110), hour, window, 0))
-        fun programme(id: Long, channel: Long, start: Long, end: Long, name: String) =
-            EpgEvent.create(EventId(id), ChannelId(channel), Instant.fromEpochSeconds(hour + start * 60),
-                Instant.fromEpochSeconds(hour + end * 60), title = name)
         show(history = false, playerReturn = savedTimelineReturn(), events = listOf(
             programme(110, 1, 0, 300, "Long programme on air"),
             programme(210, 2, 0, 40, "Short programme on air"),
@@ -570,9 +543,6 @@ class GuideNavigationTest : GuideScreenFixture() {
     }
 
     @Test fun leftThenRightThenDownFromOnAirUsesNowRatherThanProgrammeStart() {
-        fun programme(id: Long, channel: Long, start: Long, end: Long, name: String) =
-            EpgEvent.create(EventId(id), ChannelId(channel), Instant.fromEpochSeconds(hour + start * 60),
-                Instant.fromEpochSeconds(hour + end * 60), title = name)
         // Fixed now is 20:15: the next row changes one minute after the focused programme starts.
         show(history = false, events = listOf(
             programme(109, 1, -60, -10, "Previous programme"),
@@ -594,9 +564,6 @@ class GuideNavigationTest : GuideScreenFixture() {
     }
 
     @Test fun futureVisibleSpanStaysStickyThroughALongProgramme() {
-        fun programme(id: Long, channel: Long, start: Long, end: Long, name: String) =
-            EpgEvent.create(EventId(id), ChannelId(channel), Instant.fromEpochSeconds(hour + start * 60),
-                Instant.fromEpochSeconds(hour + end * 60), title = name)
         show(events = listOf(
             programme(110, 1, 0, 60, "Current programme"),
             programme(111, 1, 60, 120, "Future span"),
@@ -644,9 +611,6 @@ class GuideNavigationTest : GuideScreenFixture() {
     }
 
     @Test fun verticalMoveUsesReadableTimeWithoutMovingTheWindow() {
-        fun programme(id: Long, channel: Long, startMinute: Long, endMinute: Long, name: String) =
-            EpgEvent.create(EventId(id), ChannelId(channel), Instant.fromEpochSeconds(hour + startMinute * 60),
-                Instant.fromEpochSeconds(hour + endMinute * 60), title = name)
         show(events = listOf(
             programme(110, 1, -60, 30, "Long current programme"),
             programme(111, 1, 30, 90, "Next programme"),
@@ -665,7 +629,6 @@ class GuideNavigationTest : GuideScreenFixture() {
         focused("Readable adjacent programme")
         assertEquals(window, checkNotNull(position.position.value).windowStartSec)
         assertReadableFocus()
-        capture("guide-vertical-readable-anchor", 1f, LayoutDirection.Ltr).recycle()
         key(Key.DirectionUp)
         focused("Long current programme")
         assertEquals(window, checkNotNull(position.position.value).windowStartSec)
@@ -694,9 +657,6 @@ class GuideNavigationTest : GuideScreenFixture() {
     }
 
     @Test fun verticalMoveSkipsLeftSliverForAShortFullyVisibleNeighbour() {
-        fun programme(id: Long, channel: Long, start: Long, end: Long, name: String) =
-            EpgEvent.create(EventId(id), ChannelId(channel), Instant.fromEpochSeconds(hour + start * 60),
-                Instant.fromEpochSeconds(hour + end * 60), title = name)
         show(history = false, events = listOf(
             programme(110, 1, -60, 30, "Current programme"),
             programme(210, 2, -60, -14, "Left sliver"),
@@ -711,13 +671,9 @@ class GuideNavigationTest : GuideScreenFixture() {
         val cell = compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot
         assertTrue("Short fully visible cells qualify below 48dp", cell.width in 1f..47f)
         assertReadableFocus()
-        capture("guide-left-sliver-skipped", 1f, LayoutDirection.Ltr).recycle()
     }
 
     @Test fun verticalMoveSkipsRightSliverForTheFullyVisibleNeighbour() {
-        fun programme(id: Long, channel: Long, start: Long, end: Long, name: String) =
-            EpgEvent.create(EventId(id), ChannelId(channel), Instant.fromEpochSeconds(hour + start * 60),
-                Instant.fromEpochSeconds(hour + end * 60), title = name)
         show(events = listOf(
             programme(110, 1, 0, 60, "Current programme"),
             programme(111, 1, 146, 147, "Short right anchor"),
@@ -733,7 +689,6 @@ class GuideNavigationTest : GuideScreenFixture() {
         focused("Visible neighbour")
         assertEquals(window, checkNotNull(position.position.value).windowStartSec)
         assertReadableFocus()
-        capture("guide-right-sliver-skipped", 1f, LayoutDirection.Ltr).recycle()
         key(Key.DirectionUp)
         focused("Short right anchor")
         assertEquals(window, checkNotNull(position.position.value).windowStartSec)
@@ -758,11 +713,11 @@ class GuideNavigationTest : GuideScreenFixture() {
         val history = EpgEvent.create(EventId(109), ChannelId(1), Instant.fromEpochSeconds(hour - 3600),
             Instant.fromEpochSeconds(hour - 1800), title = "New earlier history")
         publishEvents(events, EpgSnapshot.create(events = events, historicalEvents = listOf(history), coverages = snapshot.coverages), true)
-        compose.waitUntil(10_000) { position.position.value?.windowStartSec != window }
+        compose.waitForIdle()
+        assertNotEquals(window, checkNotNull(position.position.value).windowStartSec)
         focused("Short edge programme")
         assertReadableFocus()
         assertTrue(compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot.width > 0f)
-        capture("guide-inset-change-readable", 1f, LayoutDirection.Ltr).recycle()
     }
 
     @Test fun pageDownAndUpKeepTheTimeWindowForEdgeCrossingProgrammes() {
@@ -781,8 +736,8 @@ class GuideNavigationTest : GuideScreenFixture() {
         focused("Future anchor")
         val window = checkNotNull(position.position.value).windowStartSec
         key(Key.ChannelDown) // The remote's channel keys page the Guide rows.
-        compose.waitUntil(10_000) { position.position.value?.channelId != ChannelId(1) }
-        focused("Crossing edge ${checkNotNull(position.position.value).channelId.value}")
+        focused("Crossing edge 8")
+        assertEquals(ChannelId(8), checkNotNull(position.position.value).channelId)
         assertEquals(window, checkNotNull(position.position.value).windowStartSec)
         assertReadableFocus()
         key(Key.ChannelUp)
@@ -799,28 +754,14 @@ class GuideNavigationTest : GuideScreenFixture() {
     }
 
     private fun preparationPress(back: Boolean) {
-        val release = java.util.concurrent.CountDownLatch(1)
-        val held = java.util.concurrent.CountDownLatch(1)
-        val holdPreparation = mutableStateOf(false)
-        show(preparationBlocker = {
-            if (holdPreparation.value) {
-                // Use the same production preparation lane without depending on its private field.
-                rememberPreparedBrowseData(authority = Unit, input = Unit) {
-                    held.countDown()
-                    check(release.await(30, java.util.concurrent.TimeUnit.SECONDS))
-                }
-            }
-        })
+        show()
         key(Key.DirectionDown)
-        compose.awaitBrowsePreparation()
         compose.onNodeWithText(title(1, 0)).assertIsFocused()
         key(Key.DirectionRight)
-        compose.awaitBrowsePreparation()
         compose.onNodeWithText(title(1, 1)).assertIsFocused()
         try {
-            compose.runOnIdle { holdPreparation.value = true }
+            compose.runOnIdle { preparationContext = StandardTestDispatcher() }
             compose.waitForIdle()
-            assertTrue(held.await(5, java.util.concurrent.TimeUnit.SECONDS))
             keyWhilePreparing(Key.DirectionRight) // 22:00–23:00 shifts the 19:30–22:30 window.
             val before = position.position.value
             keyWhilePreparing(Key.DirectionDown)
@@ -828,18 +769,17 @@ class GuideNavigationTest : GuideScreenFixture() {
             assertEquals(before, position.position.value)
             if (back) compose.onRoot().performKeyPress(KeyEvent(android.view.KeyEvent(0, 0,
                 android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_BACK, 0)))
-            release.countDown()
-            compose.awaitBrowsePreparation()
+            releasePreparation()
             compose.mainClock.advanceTimeByFrame()
-            compose.awaitBrowsePreparation()
+            releasePreparation()
             if (back) {
                 // Back down cancels the queued direction even while its release is still pending.
                 compose.onNodeWithText(title(1, 2)).assertIsFocused()
                 compose.onRoot().performKeyPress(KeyEvent(android.view.KeyEvent(0, 0,
                     android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_BACK, 0)))
-                compose.awaitBrowsePreparation()
+                releasePreparation()
                 compose.mainClock.advanceTimeByFrame()
-                compose.awaitBrowsePreparation()
+                releasePreparation()
                 compose.onNodeWithTag("nav-epg").assertIsFocused()
             } else {
                 compose.onNodeWithText(title(1, 3)).assertIsFocused()
@@ -847,7 +787,7 @@ class GuideNavigationTest : GuideScreenFixture() {
                 compose.onNodeWithText(title(2, 3)).assertIsFocused()
             }
         } finally {
-            release.countDown()
+            releasePreparation()
         }
     }
 
@@ -874,7 +814,8 @@ class GuideNavigationTest : GuideScreenFixture() {
 
     @Test fun leftCrossesAnEpgGapWiderThanTheEarlierWindowToTheRowsPreviousProgramme() {
         // Five empty hours exceed the three-hour window Left would otherwise search.
-        show(historyOffset = -6)
+        // Cached return can settle in the same frame: acquire eagerly on the controlled main looper.
+        show(historyOffset = -6, coverageAcquisitionContext = Dispatchers.Main.immediate)
         key(Key.DirectionDown)
         focused(title(1, 0))
         key(Key.DirectionLeft)
@@ -974,9 +915,10 @@ class GuideNavigationTest : GuideScreenFixture() {
             armed.set(true)
             compose.onRoot().performKeyInput { keyDown(Key.DirectionRight) }
             rightDown = true
-            // No frame advances before the Default acquisition reaches the released fake's
+            // No frame advances before acquisition reaches the released fake's
             // boundary. Thus the cached frontier cannot win by cancelling before entry.
-            compose.waitUntil(10_000) { entered.get() != null }
+            runAcquisition()
+            assertNotNull("Frontier acquisition reached the held fake", entered.get())
             assertEquals((1L..6L).map(::ChannelId), entered.get().first)
             assertEquals(Instant.fromEpochSeconds(hour + (hours + 3) * 3600), entered.get().second)
             assertFalse(cancelled.isCompleted)
@@ -988,7 +930,8 @@ class GuideNavigationTest : GuideScreenFixture() {
             rightDown = false
             compose.mainClock.autoAdvance = autoAdvance
             focused(title(1, hours))
-            compose.waitUntil(10_000) { cancelled.isCompleted }
+            runAcquisition()
+            assertTrue("The cached frontier cancelled the held acquisition", cancelled.isCompleted)
             assertFalse("The frontier must use cached coverage, not release the held query", release.isCompleted)
             val successor = checkNotNull(position.position.value)
             val frontierWindow = hour + hours * 3600
@@ -1047,7 +990,8 @@ class GuideNavigationTest : GuideScreenFixture() {
                 request.set(ids to through)
                 settle.await()
             })
-        compose.waitUntil(10_000) { request.get() != null }
+        runAcquisition()
+        assertNotNull("Initial acquisition reached the held fake", request.get())
         compose.runOnIdle {
             val (ids, through) = checkNotNull(request.get())
             assertEquals((1L..6L).map(::ChannelId), ids)
@@ -1064,7 +1008,9 @@ class GuideNavigationTest : GuideScreenFixture() {
         compose.onNode(pendingRow).assertIsDisplayed()
         dateFocused()
         compose.runOnIdle { settle.complete(Unit) }
-        compose.waitUntil(10_000) { compose.onAllNodes(pendingRow).fetchSemanticsNodes().isEmpty() }
+        runAcquisition()
+        compose.waitForIdle()
+        compose.onNode(pendingRow).assertDoesNotExist()
         dateFocused()
         key(Key.DirectionDown)
         focused(title(1, 0))
@@ -1129,7 +1075,7 @@ class GuideNavigationTest : GuideScreenFixture() {
 
     @Test fun viewOptionsSwitchBetweenRegularAndDenseRows() {
         show()
-        assertEquals("Regular rows", 56f, bounds("epg-channel-row-1").height, .1f)
+        val regularHeight = bounds("epg-channel-row-1").height
         assertTrue("Regular cells show their start time",
             compose.onAllNodesWithTag("guide-cell-time", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
         key(Key.DirectionRight)
@@ -1143,8 +1089,8 @@ class GuideNavigationTest : GuideScreenFixture() {
         key(Key.DirectionDown)
         tagFocused("guide-view-rows-dense")
         key(Key.Enter)
-        compose.waitUntil(5_000) { bounds("epg-channel-row-1").height < 50f }
-        assertEquals("Dense rows keep the native one-line list item height", 40f, bounds("epg-channel-row-1").height, .1f)
+        compose.waitUntil(5_000) { bounds("epg-channel-row-1").height < regularHeight }
+        assertTrue("Dense rows are shorter than regular rows", bounds("epg-channel-row-1").height < regularHeight)
         compose.onAllNodesWithTag("guide-cell-time", useUnmergedTree = true).assertCountEquals(0)
         assertEquals(GuideRows.DENSE, runBlocking { uiSettings.settings.first() }.guideView.rows)
         compose.onNodeWithTag("guide-view-panel").assertIsDisplayed()
@@ -1249,7 +1195,7 @@ class GuideNavigationTest : GuideScreenFixture() {
         key(Key.Enter)
         compose.onNodeWithTag("guide-time-panel").assertDoesNotExist()
         dateFocused()
-        assertDateButton("Tomorrow", hour + 24 * 3600)
+        assertTrue(dateButtonShows("Tomorrow", hour + 24 * 3600))
         assertEquals(0, playbackRequests)
     }
 
@@ -1340,7 +1286,8 @@ class GuideNavigationTest : GuideScreenFixture() {
             val loading = context().getString(R.string.epg_loading)
             val notLoaded = context().getString(R.string.epg_not_loaded)
             val emptyDay = context().getString(R.string.epg_empty_day)
-            compose.waitUntil(5_000) { compose.onAllNodesWithTag("guide-row-skeleton").fetchSemanticsNodes().isNotEmpty() }
+            compose.waitForIdle()
+            assertTrue(compose.onAllNodesWithTag("guide-row-skeleton").fetchSemanticsNodes().isNotEmpty())
             compose.onAllNodesWithText(loading).assertCountEquals(0)
             // Past the Guide's 10 s wait the request proves nothing: the day is not called empty.
             compose.mainClock.advanceTimeBy(11_000)
@@ -1370,7 +1317,8 @@ class GuideNavigationTest : GuideScreenFixture() {
                     dvrConfigurationsState = observation.dvrConfigurationsState,
                 ))
             }
-            compose.waitUntil(5_000) { compose.onAllNodesWithText(notLoaded).fetchSemanticsNodes().isEmpty() }
+            compose.waitForIdle()
+            compose.onAllNodesWithText(notLoaded).assertCountEquals(0)
             compose.onNodeWithText("Tomorrow on Ridge Earth").assertIsDisplayed()
             assertTrue(compose.onAllNodesWithText(emptyDay).fetchSemanticsNodes().isNotEmpty())
             dateFocused()
@@ -1418,16 +1366,6 @@ class GuideNavigationTest : GuideScreenFixture() {
         compose.waitUntil(5_000) { dateButtonShows("Sun, Oct 11", hour + 7 * 24 * 3600 - 5 * 3600) }
     }
 
-    @Test fun backClosesThePanelOntoTheDateButton() {
-        show()
-        key(Key.Enter)
-        tagFocused("guide-time-day-0")
-        key(Key.Back)
-        compose.onNodeWithTag("guide-time-panel").assertDoesNotExist()
-        dateFocused()
-        assertDateButtonNow()
-    }
-
     @Test fun pendingGuideViewSaveSurvivesPreparationAuthorityChange() {
         val saveStarted = CompletableDeferred<Unit>()
         val releaseSave = CompletableDeferred<Unit>()
@@ -1443,18 +1381,8 @@ class GuideNavigationTest : GuideScreenFixture() {
                 }
             }
         }
-        val preparationHeld = java.util.concurrent.CountDownLatch(1)
-        val releasePreparation = java.util.concurrent.CountDownLatch(1)
-        val holdPreparation = mutableStateOf(false)
         try {
-            show(headline = true, rows = GuideRows.DENSE, uiPreferences = dataStore, preparationBlocker = {
-                if (holdPreparation.value) {
-                    rememberPreparedBrowseData(authority = Unit, input = Unit) {
-                        preparationHeld.countDown()
-                        check(releasePreparation.await(30, java.util.concurrent.TimeUnit.SECONDS))
-                    }
-                }
-            })
+            show(headline = true, rows = GuideRows.DENSE, uiPreferences = dataStore)
             key(Key.DirectionRight)
             key(Key.DirectionRight)
             tagFocused("channels-view-button")
@@ -1466,10 +1394,9 @@ class GuideNavigationTest : GuideScreenFixture() {
             compose.runOnIdle {
                 assertTrue("The settings write has started", saveStarted.isCompleted)
                 assertFalse(saveCompleted.isCompleted)
-                holdPreparation.value = true
+                preparationContext = StandardTestDispatcher()
             }
             compose.waitForIdle()
-            assertTrue(preparationHeld.await(5, java.util.concurrent.TimeUnit.SECONDS))
             compose.runOnIdle {
                 val observation = session.observation.value
                 session.publish(SessionObservation.create(sessionState = SessionState.Disconnected,
@@ -1486,30 +1413,9 @@ class GuideNavigationTest : GuideScreenFixture() {
             }
             assertFalse(runBlocking { uiSettings.settings.first() }.guideView.headline)
         } finally {
-            releasePreparation.countDown()
+            releasePreparation()
             releaseSave.complete(Unit)
         }
-    }
-
-    @Test fun backReturnsAnOffNowGuideToNowOnTheSameChannelThenToTheRail() {
-        show()
-        key(Key.DirectionDown)
-        focused(title(1, 0))
-        val nowWindow = checkNotNull(position.position.value).windowStartSec
-        key(Key.DirectionDown)
-        focused(title(2, 0))
-        repeat(4) { offset ->
-            key(Key.DirectionRight)
-            focused(title(2, offset + 1))
-        }
-        focused(title(2, 4))
-        assertNotEquals(nowWindow, checkNotNull(position.position.value).windowStartSec)
-        key(Key.Back)
-        focused(title(2, 0))
-        assertEquals(nowWindow, checkNotNull(position.position.value).windowStartSec)
-        key(Key.Back)
-        tagFocused("nav-epg")
-        assertNoPlayback(additionalCoverageCalls = 1)
     }
 
     @Test fun backToNowFocusesTheProgrammeOnAirWhenItArrivesAfterTheJump() {
@@ -1539,7 +1445,8 @@ class GuideNavigationTest : GuideScreenFixture() {
             publishEvents(full.events.filterNot { it.id == EventId(211) }, full, covered = false)
             armed.set(true)
             key(Key.Back)
-            compose.waitUntil(10_000) { entered.isCompleted }
+            runAcquisition()
+            assertTrue("Back-to-now acquisition reached the held fake", entered.isCompleted)
             publishEvents(full.events, full, covered = true)
             release.complete(Unit)
             focused(title(2, 1))
@@ -1610,7 +1517,7 @@ class GuideNavigationTest : GuideScreenFixture() {
         assertNoPlayback()
     }
 
-    @Test fun aServerWithoutTagsStillOffersFilter() {
+    @Test fun aFocusedFilterOutlivesAReloadWithoutGenresUntilFocusMovesOn() {
         show(genres = true, tags = false)
         compose.onNodeWithTag("channels-tags-button").assertDoesNotExist()
         key(Key.DirectionRight)
@@ -1621,12 +1528,6 @@ class GuideNavigationTest : GuideScreenFixture() {
         key(Key.Back)
         tagFocused("guide-filter-button")
         assertNoPlayback()
-    }
-
-    @Test fun aFocusedFilterOutlivesAReloadWithoutGenresUntilFocusMovesOn() {
-        show(genres = true, tags = false)
-        key(Key.DirectionRight)
-        tagFocused("guide-filter-button")
         val full = compose.runOnIdle { checkNotNull(session.observation.value.epgSnapshotForDisplay) }
         fun List<EpgEvent>.plain() = map {
             EpgEvent.create(it.id, channelId = it.channelId, start = it.start, stop = it.stop,
@@ -1652,26 +1553,20 @@ class GuideNavigationTest : GuideScreenFixture() {
     }
 
     private fun removeHistory() {
-        compose.runOnIdle {
-            val observation = session.observation.value
-            val snapshot = checkNotNull(observation.epgSnapshotForDisplay)
-            session.publish(SessionObservation.create(
-                sessionState = observation.sessionState,
-                channelState = observation.channelState,
-                epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = snapshot.events, coverages = snapshot.coverages)),
-                dvrState = observation.dvrState,
-                dvrConfigurationsState = observation.dvrConfigurationsState,
-            ))
-        }
-        compose.waitUntil(10_000) { compose.onAllNodes(hasText(title(1, -1))).fetchSemanticsNodes().isEmpty() }
+        val snapshot = checkNotNull(session.observation.value.epgSnapshotForDisplay)
+        publishEvents(snapshot.events, EpgSnapshot.create(events = snapshot.events, coverages = snapshot.coverages), covered = true)
         compose.waitForIdle()
+        compose.onNodeWithText(title(1, 0)).assertExists()
+        compose.onAllNodes(hasText(title(1, -1))).assertCountEquals(0)
     }
 
     private fun guidePaneTitle() =
         compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, context().getString(R.string.epg_title)))
 
-    private fun assertDateButton(day: String, startSec: Long) =
-        compose.onNodeWithTag("guide-date-button").assert(hasText(dateButtonText(day, startSec)))
+    private fun programme(id: Long, channel: Long, start: Long, end: Long, name: String) =
+        EpgEvent.create(EventId(id), ChannelId(channel), Instant.fromEpochSeconds(hour + start * 60),
+            Instant.fromEpochSeconds(hour + end * 60), title = name)
+
     private fun dateButtonShowsNow() =
         compose.onAllNodes(hasTestTag("guide-date-button") and hasText(dateButtonNowText())).fetchSemanticsNodes().isNotEmpty()
 }

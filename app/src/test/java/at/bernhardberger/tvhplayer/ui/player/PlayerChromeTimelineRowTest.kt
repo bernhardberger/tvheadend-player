@@ -2,11 +2,11 @@
 
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.testutil.tagExists
 import android.app.Application
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
@@ -74,21 +74,21 @@ class PlayerChromeTimelineRowTest {
 
     @Test fun anAvailableChannelsBannerShowsTheStateCellAndAnnouncesTheLiveState() {
         chrome(PlayerChromeMode.BANNER, live())
-        assertTrue(exists("player-state"))
-        assertTrue(exists("player-live-state"))
+        assertTrue(compose.tagExists("player-state"))
+        assertTrue(compose.tagExists("player-live-state"))
     }
 
     @Test fun anAvailableChannelsControlsAnnounceTheLiveStateAndShowNoStateCell() {
         chrome(PlayerChromeMode.CONTROLS, live())
-        assertFalse(exists("player-state"))
-        assertTrue(exists("player-live-state"))
+        assertFalse(compose.tagExists("player-state"))
+        assertTrue(compose.tagExists("player-live-state"))
     }
 
     @Test fun anUnavailableChannelsControlsShowNoStateCellOrLiveState() {
         chrome(PlayerChromeMode.CONTROLS, live(liveAvailable = false))
-        assertTrue("the controls stay", exists("player-actions"))
-        assertFalse(exists("player-state"))
-        assertFalse(exists("player-live-state"))
+        assertTrue("the controls stay", compose.tagExists("player-actions"))
+        assertFalse(compose.tagExists("player-state"))
+        assertFalse(compose.tagExists("player-live-state"))
     }
 
     @Test fun theHiddenChipShowsTheRealStateOnlyWhileHiddenAndAvailable() {
@@ -106,15 +106,15 @@ class PlayerChromeTimelineRowTest {
     @Test fun theStepReadoutWithinToleranceOfTheVerifiedEdgeIsLiveEvenWithAnExtrapolatedAxis() {
         compose.setContent { TVHeadendPlayerTheme { TimeshiftSeekPreviewTimeline(extrapolated, TimeshiftSeekDecision(-4_000, -4_000, false)) } }
         compose.waitForIdle()
-        assertTrue(exists("timeshift-preview-live"))
+        assertTrue(compose.tagExists("timeshift-preview-live"))
         assertTrue(texts("Live"))
     }
 
     @Test fun theStepReadoutBeyondToleranceOfTheVerifiedEdgeIsTheDistanceFromIt() {
         compose.setContent { TVHeadendPlayerTheme { TimeshiftSeekPreviewTimeline(extrapolated, TimeshiftSeekDecision(-6_000, -6_000, false)) } }
         compose.waitForIdle()
-        assertFalse(exists("timeshift-preview-live"))
-        assertTrue(exists("timeshift-preview-behind"))
+        assertFalse(compose.tagExists("timeshift-preview-live"))
+        assertTrue(compose.tagExists("timeshift-preview-behind"))
         assertTrue(texts("−0:06"))
     }
 
@@ -139,7 +139,7 @@ class PlayerChromeTimelineRowTest {
         compose.waitForIdle()
         assertTrue(texts("+3:00"))
         assertEquals(formatClock(now - 120), targetPosition())
-        assertTrue(exists("timeshift-preview-ahead"))
+        assertTrue(compose.tagExists("timeshift-preview-ahead"))
     }
 
     @Test fun aLiveStepWithoutKnownTimingShowsTheDistanceBehindLiveAsTheTarget() {
@@ -164,7 +164,7 @@ class PlayerChromeTimelineRowTest {
         }
         seekbar(-4_000)
         compose.waitForIdle()
-        assertTrue(exists("timeshift-preview-live"))
+        assertTrue(compose.tagExists("timeshift-preview-live"))
         assertTrue(texts("Live"))
     }
 
@@ -178,7 +178,7 @@ class PlayerChromeTimelineRowTest {
             }
         }
         compose.waitForIdle()
-        assertFalse(exists("timeshift-preview-live"))
+        assertFalse(compose.tagExists("timeshift-preview-live"))
         assertTrue(texts("−0:06"))
     }
 
@@ -259,7 +259,7 @@ class PlayerChromeTimelineRowTest {
         )
         compose.runOnIdle { decision = null }
         restFor(2_000)
-        assertFalse(exists("timeshift-seek-preview"))
+        assertFalse(compose.tagExists("timeshift-seek-preview"))
     }
 
     @Test fun aCancelledStepAnnouncesNothingLate() {
@@ -268,7 +268,7 @@ class PlayerChromeTimelineRowTest {
         assertEquals("", spoken("timeshift-seek-preview"))
         compose.runOnIdle { decision = null }
         restFor(2_000)
-        assertFalse("the preview is gone and nothing is left to speak", exists("timeshift-seek-preview"))
+        assertFalse("the preview is gone and nothing is left to speak", compose.tagExists("timeshift-seek-preview"))
     }
 
     @Test fun aTickingBufferDoesNotAnnounceTheSameStepAgain() {
@@ -361,7 +361,7 @@ class PlayerChromeTimelineRowTest {
         assertEquals(1, announcements)
         assertNull("announced, the preview is retired", owner.preview)
         restFor(2_000)
-        assertFalse(exists("timeshift-seek-preview"))
+        assertFalse(compose.tagExists("timeshift-seek-preview"))
         assertEquals(1, announcements)
         owner.dispose()
     }
@@ -512,8 +512,8 @@ class PlayerChromeTimelineRowTest {
     @Test fun aPreviewIntoAGapShowsTheBufferAxisNotTheCommittedProgrammesEnd() {
         chrome(PlayerChromeMode.CONTROLS, live(committedState.copy(positionMs = -500_000), committedState = committedState,
             committedWindow = committedWindow, previewing = true))
-        assertFalse("no borrowed end clock", exists("player-end-clock") && endClock() == formatClock(programme.stop.epochSeconds))
-        assertFalse("no programme clock on the left", exists("player-window-start"))
+        assertFalse("no borrowed end clock", compose.tagExists("player-end-clock") && endClock() == formatClock(programme.stop.epochSeconds))
+        assertFalse("no programme clock on the left", compose.tagExists("player-window-start"))
     }
 
     // 4. The ticking distance is confined to the leaf.
@@ -560,7 +560,7 @@ class PlayerChromeTimelineRowTest {
         preview(atEdge.copy(timingKnown = true))
         compose.waitForIdle()
         assertTrue(texts(formatClock(now - 600)))
-        assertTrue(exists("timeshift-preview-buffer-start"))
+        assertTrue(compose.tagExists("timeshift-preview-buffer-start"))
     }
 
     @Test fun withoutKnownTimingTheStepShowsNoBufferStartClock() {
@@ -572,15 +572,15 @@ class PlayerChromeTimelineRowTest {
             }
         }
         compose.waitForIdle()
-        assertFalse(exists("timeshift-preview-buffer-start"))
+        assertFalse(compose.tagExists("timeshift-preview-buffer-start"))
     }
 
     // 6. A step to the live edge leads with the play glyph, never fast-forward.
 
     @Test fun aLiveBannerStepAtTheEdgeLeadsWithTheLiveGlyph() {
         chrome(PlayerChromeMode.BANNER_STEP, live(step = TimeshiftSeekDecision(0, 30_000, true)))
-        assertTrue(exists("timeshift-preview-live"))
-        assertFalse(exists("timeshift-preview-ahead"))
+        assertTrue(compose.tagExists("timeshift-preview-live"))
+        assertFalse(compose.tagExists("timeshift-preview-ahead"))
     }
 
     @Test fun aGrowingRecordingsBannerStepAtItsHeadLeadsWithTheLiveGlyph() {
@@ -591,8 +591,8 @@ class PlayerChromeTimelineRowTest {
             }
         }
         settle()
-        assertTrue(exists("timeshift-preview-live"))
-        assertFalse(exists("timeshift-preview-ahead"))
+        assertTrue(compose.tagExists("timeshift-preview-live"))
+        assertFalse(compose.tagExists("timeshift-preview-ahead"))
     }
 
     private fun targetPosition(): String = compose.onNodeWithTag("timeshift-preview-target-position", useUnmergedTree = true)
@@ -639,9 +639,6 @@ class PlayerChromeTimelineRowTest {
             compose.waitForIdle()
         }
     }
-
-    private fun exists(tag: String) =
-        compose.onAllNodes(androidx.compose.ui.test.hasTestTag(tag), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
 
     private fun texts(text: String) = compose.onAllNodes(hasText(text), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
 

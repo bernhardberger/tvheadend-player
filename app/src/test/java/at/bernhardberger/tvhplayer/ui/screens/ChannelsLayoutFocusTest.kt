@@ -127,13 +127,20 @@ class ChannelsLayoutFocusTest {
     }
 
     @Test fun gridWallScrollsTheHeaderAwayAndRestoresItWithFirstRowReachability() {
-        fixture.show(grid, channelCount = 30)
+        gridWallScrollsTheHeaderAwayAndRestoresItWithFirstRowReachability(1f)
+    }
+
+    private fun gridWallScrollsTheHeaderAwayAndRestoresItWithFirstRowReachability(scale: Float) {
+        fixture.show(grid, scale = scale, channelCount = 30)
         fixture.awaitFocus(card(1))
-        compose.onNodeWithTag("channels-immersive-hero").assertDoesNotExist()
-        compose.onNodeWithTag("channels-immersive-background").assertDoesNotExist()
         val headerTop = compose.onNodeWithTag("channels-header").getUnclippedBoundsInRoot().top
         val firstTop = compose.onNode(card(1)).getUnclippedBoundsInRoot().top.value
         assertEquals("resting first row", 116f, firstTop, 1f)
+        if (scale == 1.3f) {
+            val headerBottom = compose.onNode(tagsButton).getUnclippedBoundsInRoot().bottom.value
+            assertTrue("cards clear the enlarged header: first row $firstTop, controls bottom $headerBottom",
+                firstTop > headerBottom)
+        }
         val fourth = compose.onNode(card(13)).getUnclippedBoundsInRoot()
         val screen = compose.onRoot().getUnclippedBoundsInRoot()
         assertTrue("fourth row peeks past the bottom: $fourth; screen: $screen", fourth.bottom > screen.bottom)
@@ -142,7 +149,6 @@ class ChannelsLayoutFocusTest {
         compose.waitForIdle()
         val scrolledHeader = compose.onNodeWithTag("channels-header").getUnclippedBoundsInRoot()
         assertTrue("scrolled header: $scrolledHeader; initial top: $headerTop", scrolledHeader.bottom.value <= 0f)
-        assertEquals("scrolled focus line", 48f, compose.onNode(card(5)).getUnclippedBoundsInRoot().top.value, 1f)
         val above = compose.onNode(card(1)).getUnclippedBoundsInRoot()
         assertTrue("preceding row is cut by the physical top: $above", above.top < screen.top && above.bottom > screen.top)
         assertEquals("viewport reaches the physical top", 0f,
@@ -183,20 +189,13 @@ class ChannelsLayoutFocusTest {
     }
 
     @Test fun gridWallKeepsItsPeekAndPhysicalFocusLineAtLargerFontScale() {
-        fixture.show(grid, scale = 1.3f, channelCount = 30)
-        fixture.awaitFocus(card(1))
-        val firstTop = compose.onNode(card(1)).getUnclippedBoundsInRoot().top.value
-        val headerBottom = compose.onNode(tagsButton).getUnclippedBoundsInRoot().bottom.value
-        assertTrue("cards clear the enlarged header: first row $firstTop, controls bottom $headerBottom",
-            firstTop > headerBottom)
-        assertTrue(compose.onNode(card(13)).getUnclippedBoundsInRoot().bottom >
-            compose.onRoot().getUnclippedBoundsInRoot().bottom)
+        gridWallScrollsTheHeaderAwayAndRestoresItWithFirstRowReachability(1.3f)
         fixture.key(Key.DirectionDown)
         fixture.awaitFocus(card(5))
         assertEquals(48f, compose.onNode(card(5)).getUnclippedBoundsInRoot().top.value, 1f)
         fixture.key(Key.DirectionUp)
         fixture.awaitFocus(card(1))
-        assertEquals(firstTop, compose.onNode(card(1)).getUnclippedBoundsInRoot().top.value, 1f)
+        assertEquals(116f, compose.onNode(card(1)).getUnclippedBoundsInRoot().top.value, 1f)
     }
 
     @Test fun gridWallKeepsANoticeClearOfTheHeader() {
@@ -208,7 +207,7 @@ class ChannelsLayoutFocusTest {
         assertTrue("notice: $notice; header: $header", notice.top >= header.bottom)
     }
 
-    @Test fun gridPanelHasThreeLayoutsAndTwoSwitchesAndKeepsTheRememberedCard() {
+    @Test fun viewOptionsApplyLiveKeepTheFocusedChannelAndBackReturnsToTheButton() {
         fixture.show(grid)
         fixture.awaitFocus(card(1))
         fixture.key(Key.DirectionRight)
@@ -245,8 +244,11 @@ class ChannelsLayoutFocusTest {
         fixture.key(Key.DirectionCenter)
         fixture.awaitFocus(option("layout-grid"))
         fixture.key(Key.DirectionUp)
+        fixture.awaitFocus(option("layout-list"))
         fixture.key(Key.DirectionCenter)
         compose.onNodeWithTag("channels-list").assertExists()
+        compose.onNodeWithTag("channels-view-panel").assertExists()
+        fixture.awaitFocus(option("layout-list"))
         fixture.key(Key.DirectionUp)
         fixture.key(Key.DirectionCenter)
         fixture.awaitFocus(option("layout-immersive"))
@@ -261,9 +263,27 @@ class ChannelsLayoutFocusTest {
         fixture.awaitFocus(viewButton)
         fixture.key(Key.DirectionDown)
         fixture.awaitFocus(card(2))
+        fixture.key(Key.DirectionUp)
+        fixture.key(Key.DirectionRight)
+        fixture.awaitFocus(viewButton)
+        fixture.key(Key.DirectionCenter)
+        fixture.awaitFocus(option("layout"))
+        fixture.key(Key.DirectionRight)
+        fixture.awaitFocus(option("layout-grid"))
+        fixture.key(Key.DirectionUp)
+        fixture.awaitFocus(option("layout-list"))
+        fixture.key(Key.DirectionCenter)
+        fixture.awaitFocus(option("layout-list"))
+        fixture.key(Key.Back)
+        fixture.awaitFocus(option("layout"))
+        fixture.key(Key.Back)
+        fixture.awaitFocus(viewButton)
+        assertEquals(ChannelsLayout.LIST, fixture.channelsView.layout)
+        fixture.key(Key.DirectionDown)
+        fixture.awaitFocus(row(2))
     }
 
-    @Test fun upFromTheFirstRowReachesTheHeaderAndDownReturnsToTheRememberedCard() {
+    @Test fun leftFromTheFirstHeaderButtonAndTheFirstColumnReachTheRail() {
         fixture.show(grid)
         fixture.awaitFocus(card(1))
         repeat(2) { fixture.key(Key.DirectionRight) }
@@ -278,10 +298,7 @@ class ChannelsLayoutFocusTest {
         fixture.awaitFocus(viewButton)
         fixture.key(Key.DirectionDown)
         fixture.awaitFocus(card(3))
-    }
-
-    @Test fun leftFromTheFirstHeaderButtonAndTheFirstColumnReachTheRail() {
-        fixture.show(grid)
+        repeat(2) { fixture.key(Key.DirectionLeft) }
         fixture.awaitFocus(card(1))
         fixture.key(Key.DirectionUp)
         fixture.awaitFocus(tagsButton)
@@ -315,7 +332,7 @@ class ChannelsLayoutFocusTest {
         assertEquals("Focus alone never tunes", 0, fixture.plays)
     }
 
-    @Test fun groupPickerOpensOnTheCurrentGroupAndBackClosesWithoutChange() {
+    @Test fun tagsPanelOpensOnTheActiveTagAndBackReturnsToTheNamedButton() {
         fixture.show(list)
         fixture.awaitFocus(row(1))
         fixture.key(Key.DirectionUp)
@@ -330,11 +347,6 @@ class ChannelsLayoutFocusTest {
         assertTag("All channels")
         fixture.key(Key.DirectionDown)
         fixture.awaitFocus(row(1))
-    }
-
-    @Test fun tagsPanelOpensOnTheActiveTagAndBackReturnsToTheNamedButton() {
-        fixture.show(list)
-        fixture.awaitFocus(row(1))
         fixture.key(Key.DirectionUp)
         fixture.awaitFocus(tagsButton)
         assertTag("All channels")
@@ -344,6 +356,8 @@ class ChannelsLayoutFocusTest {
         fixture.key(Key.DirectionUp)
         fixture.awaitFocus(tagsButton)
         fixture.key(Key.DirectionCenter)
+        fixture.awaitFocus(group(2))
+        fixture.key(Key.DirectionDown)
         fixture.awaitFocus(group(2))
         fixture.key(Key.Back)
         compose.onNodeWithTag("channels-tags-panel").assertDoesNotExist()
@@ -375,33 +389,6 @@ class ChannelsLayoutFocusTest {
         fixture.key(Key.DirectionLeft)
         awaitRail()
         assertEquals("Focus alone never tunes", 0, fixture.plays)
-    }
-
-    @Test fun viewOptionsApplyLiveKeepTheFocusedChannelAndBackReturnsToTheButton() {
-        fixture.show(grid)
-        fixture.awaitFocus(card(1))
-        fixture.key(Key.DirectionRight)
-        fixture.awaitFocus(card(2))
-        fixture.key(Key.DirectionUp)
-        fixture.key(Key.DirectionRight)
-        fixture.awaitFocus(viewButton)
-        fixture.key(Key.DirectionCenter)
-        fixture.awaitFocus(option("layout"))
-        fixture.key(Key.DirectionRight)
-        fixture.awaitFocus(option("layout-grid"))
-        fixture.key(Key.DirectionUp)
-        fixture.awaitFocus(option("layout-list"))
-        fixture.key(Key.DirectionCenter)
-        compose.onNodeWithTag("channels-list").assertExists()
-        compose.onNodeWithTag("channels-view-panel").assertExists()
-        fixture.awaitFocus(option("layout-list"))
-        fixture.key(Key.Back)
-        fixture.awaitFocus(option("layout"))
-        fixture.key(Key.Back)
-        fixture.awaitFocus(viewButton)
-        assertEquals(ChannelsLayout.LIST, fixture.channelsView.layout)
-        fixture.key(Key.DirectionDown)
-        fixture.awaitFocus(row(2))
     }
 
     @Test fun viewOptionsOfferProgramArtForTheCardLayoutsAndEachKeepsItsValue() {
@@ -530,23 +517,22 @@ class ChannelsLayoutFocusTest {
     }
 
     @Test fun listHeaderStartEdgeReachesTheRailInAnEmptyGroup() {
-        fixture.show(list, emptyGroup = true, allChannels = false)
-        fixture.awaitFocus(row(1))
-        fixture.key(Key.DirectionUp)
-        pickGroup(group(9), steps = 2)
-        fixture.awaitFocus(tagsButton)
-        // No row to go back to, so the start edge leads to the rail as on the other layouts.
-        fixture.key(Key.DirectionLeft)
-        awaitRail()
+        listHeaderStartEdgeSkipsAllChannelsInAnEmptyGroup(allChannels = false)
     }
 
     @Test fun listHeaderStartEdgeSkipsAllChannelsInAnEmptyGroup() {
-        fixture.show(list, emptyGroup = true)
+        listHeaderStartEdgeSkipsAllChannelsInAnEmptyGroup(allChannels = true)
+    }
+
+    private fun listHeaderStartEdgeSkipsAllChannelsInAnEmptyGroup(allChannels: Boolean) {
+        fixture.show(list, emptyGroup = true, allChannels = allChannels)
         fixture.awaitFocus(row(1))
         fixture.key(Key.DirectionUp)
-        pickGroup(group(9), steps = 3)
-        fixture.awaitFocus(hasTestTag("channels-show-all"))
-        fixture.key(Key.DirectionUp)
+        pickGroup(group(9), steps = if (allChannels) 3 else 2)
+        if (allChannels) {
+            fixture.awaitFocus(hasTestTag("channels-show-all"))
+            fixture.key(Key.DirectionUp)
+        }
         fixture.awaitFocus(tagsButton)
         fixture.key(Key.DirectionLeft)
         awaitRail()
@@ -673,6 +659,7 @@ class ChannelsLayoutFocusTest {
     @Test fun immersiveDownStaysAndUpReachesTheHeader() {
         fixture.show(immersive)
         fixture.awaitFocus(card(1))
+        assertImmersiveHeaderSlot()
         assertTag("All channels")
         fixture.key(Key.DirectionRight)
         fixture.awaitFocus(card(2))
@@ -685,9 +672,7 @@ class ChannelsLayoutFocusTest {
         assertEquals("Focus alone never tunes", 0, fixture.plays)
     }
 
-    @Test fun immersiveBodyStartsAtTheTopPaddingAndItsHeaderButtonsStayInTheTopSlot() {
-        fixture.show(immersive)
-        fixture.awaitFocus(card(1))
+    private fun assertImmersiveHeaderSlot() {
         val header = compose.onNodeWithTag("channels-header").fetchSemanticsNode()
         // The body starts at the top content padding, where the header sits, instead of below it.
         val body = header.parent!!.children.first { it.id != header.id }
@@ -700,9 +685,6 @@ class ChannelsLayoutFocusTest {
             assertTrue("$it starts in the slot", bounds.top >= top - .5f)
             assertTrue("$it ends in the slot", bounds.bottom <= top + slot + .5f)
         }
-        // The row below still reaches the buttons with Up.
-        fixture.key(Key.DirectionUp)
-        fixture.awaitFocus(tagsButton)
     }
 
     @Test fun headerNamesTheScreenAsItsPaneTitleAndTheTagsButtonShowsTheGroup() {
@@ -710,11 +692,6 @@ class ChannelsLayoutFocusTest {
         fixture.awaitFocus(row(1))
         compose.onNodeWithTag("channels-header").assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Channels"))
         compose.onNode(hasText("Channels") and hasAnyAncestor(hasTestTag("channels-header")), useUnmergedTree = true).assertDoesNotExist()
-        assertTag("All channels")
-        fixture.key(Key.DirectionUp)
-        fixture.awaitFocus(tagsButton)
-        pickGroup(group(1), steps = 1)
-        assertTag("Favorites")
     }
 
     @Test fun immersiveRowRunsUnderTheRailAndKeepsItsKeyline() {
@@ -735,7 +712,8 @@ class ChannelsLayoutFocusTest {
         fixture.show(immersive.toggledProgramArt())
         fixture.awaitFocus(card(1))
         // The logo comes with its glow, which is baked off the main thread.
-        compose.waitUntil(10_000) { compose.onAllNodesWithTag("channels-immersive-picon").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitForIdle()
+        compose.onNodeWithTag("channels-immersive-picon").assertExists()
         compose.mainClock.advanceTimeBy(1_500)
         compose.waitForIdle()
         val logo = compose.onNodeWithTag("channels-immersive-picon").getUnclippedBoundsInRoot().left
@@ -778,22 +756,15 @@ class ChannelsLayoutFocusTest {
     }
 
     private fun assertHeroWaitsForAHeldKey(keyCode: Int, reached: SemanticsMatcher) {
-        fun press(action: Int, repeat: Int = 0) {
-            compose.onRoot().performKeyPress(androidx.compose.ui.input.key.KeyEvent(android.view.KeyEvent(
-                0L, 0L, action, keyCode, repeat)))
-            compose.waitForIdle()
-        }
-        fun headline() = compose.onNode(hasTestTag("channels-headline-channel") and hasAnyAncestor(hasTestTag("channels-immersive-hero")))
-            .fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.Text].joinToString()
         val start = headline()
-        press(android.view.KeyEvent.ACTION_DOWN)
+        press(keyCode)
         val afterPress = headline()
         assertNotEquals("a single press changes the info at once", start, afterPress)
-        press(android.view.KeyEvent.ACTION_DOWN, repeat = 1)
+        press(keyCode, repeat = 1)
         fixture.awaitFocus(reached)
         compose.mainClock.advanceTimeBy(600)
         assertEquals("the last info stays while the key is held", afterPress, headline())
-        press(android.view.KeyEvent.ACTION_UP)
+        press(keyCode, action = android.view.KeyEvent.ACTION_UP)
         compose.mainClock.advanceTimeBy(600)
         assertNotEquals("it catches up once focus rests", afterPress, headline())
     }
@@ -806,13 +777,6 @@ class ChannelsLayoutFocusTest {
 
     /** Repeats that run out of the content: the release lands in the header, which only ends it by focus. */
     private fun assertAHoldLeavingTheContentEndsThere(along: Int, reached: SemanticsMatcher) {
-        fun press(keyCode: Int, repeat: Int, action: Int = android.view.KeyEvent.ACTION_DOWN) {
-            compose.onRoot().performKeyPress(androidx.compose.ui.input.key.KeyEvent(android.view.KeyEvent(
-                0L, 0L, action, keyCode, repeat)))
-            compose.waitForIdle()
-        }
-        fun headline() = compose.onNode(hasTestTag("channels-headline-channel") and hasAnyAncestor(hasTestTag("channels-immersive-hero")))
-            .fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.Text].joinToString()
         press(along, 0)
         val afterPress = headline()
         press(along, 1)
@@ -826,6 +790,15 @@ class ChannelsLayoutFocusTest {
         assertNotEquals("the info catches up though the release never reached the content", afterPress, headline())
     }
 
+    private fun press(keyCode: Int, repeat: Int = 0, action: Int = android.view.KeyEvent.ACTION_DOWN) {
+        compose.onRoot().performKeyPress(androidx.compose.ui.input.key.KeyEvent(android.view.KeyEvent(
+            0L, 0L, action, keyCode, repeat)))
+        compose.waitForIdle()
+    }
+
+    private fun headline() = compose.onNode(hasTestTag("channels-headline-channel") and hasAnyAncestor(hasTestTag("channels-immersive-hero")))
+        .fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.Text].joinToString()
+
     @Test fun aHoldThatLeavesTheListEndsThere() {
         fixture.show(list)
         fixture.awaitFocus(row(1))
@@ -836,11 +809,6 @@ class ChannelsLayoutFocusTest {
         fixture.show(ChannelsView(ChannelsLayout.IMMERSIVE, setOf(ChannelsLayout.IMMERSIVE)), fixture.fixtureArt())
         fixture.awaitFocus(card(1))
         val right = android.view.KeyEvent.KEYCODE_DPAD_RIGHT
-        fun press(action: Int, repeat: Int) {
-            compose.onRoot().performKeyPress(androidx.compose.ui.input.key.KeyEvent(android.view.KeyEvent(
-                0L, 0L, action, right, repeat)))
-            compose.waitForIdle()
-        }
         fun settle() {
             compose.mainClock.advanceTimeBy(2_500)
             compose.waitForIdle()
@@ -849,19 +817,19 @@ class ChannelsLayoutFocusTest {
         fun picture() = compose.onRoot().captureToImage().toPixelMap().let { pixels ->
             List(40) { x -> List(20) { y -> pixels[pixels.width / 2 + x * pixels.width / 90, pixels.height / 8 + y * pixels.height / 80] } }.flatten()
         }
-        press(android.view.KeyEvent.ACTION_DOWN, 0)
-        press(android.view.KeyEvent.ACTION_UP, 0)
+        press(right)
+        press(right, action = android.view.KeyEvent.ACTION_UP)
         settle()
         val rested = picture()
-        press(android.view.KeyEvent.ACTION_DOWN, 0)
+        press(right)
         settle()
         val stepped = picture()
         assertNotEquals("each channel has its own backdrop here", rested, stepped)
-        press(android.view.KeyEvent.ACTION_DOWN, 1)
+        press(right, repeat = 1)
         fixture.awaitFocus(card(4))
         settle()
         assertEquals("the backdrop stays while the key is held", stepped, picture())
-        press(android.view.KeyEvent.ACTION_UP, 0)
+        press(right, action = android.view.KeyEvent.ACTION_UP)
         settle()
         assertNotEquals("it changes once the key rests", stepped, picture())
     }
@@ -869,28 +837,37 @@ class ChannelsLayoutFocusTest {
     @Test @GraphicsMode(GraphicsMode.Mode.NATIVE) fun theNameBelowACardPastTheKeylineIsMutedWithIt() {
         fixture.show(ChannelsView(ChannelsLayout.IMMERSIVE, channelNames = setOf(ChannelsLayout.IMMERSIVE)))
         fixture.awaitFocus(card(1))
-        fun brightestOf(tag: String): Float {
-            val bounds = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-            val pixels = compose.onRoot().captureToImage().toPixelMap()
-            var brightest = 0f
-            for (x in bounds.left.toInt().coerceAtLeast(0) until bounds.right.toInt().coerceAtMost(pixels.width)) {
-                for (y in bounds.top.toInt() until bounds.bottom.toInt().coerceAtMost(pixels.height)) {
-                    val pixel = pixels[x, y]
-                    brightest = maxOf(brightest, pixel.red, pixel.green, pixel.blue)
-                }
-            }
-            return brightest
-        }
+        assertTrue("the focused card's label is brighter", brightest(1) > brightest(2) + 0.2f)
         // Neither has focus when measured.
-        val inPlace = brightestOf("channels-immersive-2-identity")
+        val inPlace = brightest(2, luminance = false)
         fixture.key(Key.DirectionRight)
         fixture.awaitFocus(card(2))
+        assertTrue("the label follows focus", brightest(2) > brightest(1) + 0.2f)
         fixture.key(Key.DirectionRight)
         fixture.awaitFocus(card(3))
         compose.waitForIdle()
-        val past = brightestOf("channels-immersive-2-identity")
+        val past = brightest(2, luminance = false)
         // The rail's own icons, in the same band, set the floor of what this can see.
         assertTrue("the name fades with its card: $past vs $inPlace", past < inPlace * 0.6f)
+    }
+
+    private fun brightest(id: Int, luminance: Boolean = true): Float {
+        val tag = "channels-immersive-$id-identity"
+        if (luminance) {
+            return compose.onNodeWithTag(tag, useUnmergedTree = true).captureToImage().toPixelMap().let { pixels ->
+                (0 until pixels.width).maxOf { x -> (0 until pixels.height).maxOf { y -> pixels[x, y].luminance() } }
+            }
+        }
+        val bounds = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val pixels = compose.onRoot().captureToImage().toPixelMap()
+        var brightest = 0f
+        for (x in bounds.left.toInt().coerceAtLeast(0) until bounds.right.toInt().coerceAtMost(pixels.width)) {
+            for (y in bounds.top.toInt() until bounds.bottom.toInt().coerceAtMost(pixels.height)) {
+                val pixel = pixels[x, y]
+                brightest = maxOf(brightest, pixel.red, pixel.green, pixel.blue)
+            }
+        }
+        return brightest
     }
 
     @Test fun immersiveGroupPickerReturnsToEachGroupsCard() {
@@ -930,7 +907,6 @@ class ChannelsLayoutFocusTest {
         compose.onNodeWithTag("channels-backdrop").assertExists()
         repeat(7) { fixture.key(Key.DirectionRight) }
         fixture.awaitFocus(card(8))
-        compose.waitUntil(10_000) { compose.onAllNodesWithTag("channels-immersive-picon").fetchSemanticsNodes().isNotEmpty() }
         compose.mainClock.advanceTimeBy(1_500)
         compose.waitForIdle()
         compose.onNodeWithTag("channels-immersive-art").assertDoesNotExist()
@@ -979,7 +955,8 @@ class ChannelsLayoutFocusTest {
         compose.onNodeWithTag("channels-logo-glow").assertExists()
         compose.onNodeWithTag("channels-immersive-picon").assertDoesNotExist()
         logos.complete(Unit)
-        compose.waitUntil(10_000) { compose.onAllNodesWithTag("channels-immersive-picon").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitForIdle()
+        compose.onNodeWithTag("channels-immersive-picon").assertExists()
     }
 
     @Test fun aGuideStillOnItsWayShowsPlaceholderLinesInsteadOfNoEpg() {
@@ -1001,11 +978,11 @@ class ChannelsLayoutFocusTest {
         compose.onNodeWithTag("channels-immersive-art").assertExists()
         repeat(7) { fixture.key(Key.DirectionRight) }
         fixture.awaitFocus(card(8))
-        compose.waitUntil(10_000) { compose.onAllNodesWithTag("channels-immersive-picon").fetchSemanticsNodes().isNotEmpty() }
         compose.mainClock.advanceTimeBy(1_500)
         compose.waitForIdle()
         compose.onNodeWithTag("channels-immersive-art").assertDoesNotExist()
         compose.onNodeWithTag("channels-immersive-picon").assertExists()
+        compose.onNodeWithTag("channels-immersive-title").assertTextEquals("No program information")
     }
 
     @Test fun immersiveBackgroundMatchesLogoCardsWithTheLogo() {
@@ -1016,20 +993,6 @@ class ChannelsLayoutFocusTest {
         compose.waitForIdle()
         compose.onNodeWithTag("channels-immersive-art").assertDoesNotExist()
         compose.onNodeWithTag("channels-immersive-picon").assertExists()
-    }
-
-    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
-    fun immersiveChannelLabelsAreMutedExceptUnderTheFocusedCard() {
-        fixture.show(immersive.toggledChannelNames())
-        fixture.awaitFocus(card(1))
-        fun brightest(id: Int) = compose.onNodeWithTag("channels-immersive-$id-identity", useUnmergedTree = true)
-            .captureToImage().toPixelMap().let { pixels ->
-                (0 until pixels.width).maxOf { x -> (0 until pixels.height).maxOf { y -> pixels[x, y].luminance() } }
-            }
-        assertTrue("the focused card's label is brighter", brightest(1) > brightest(2) + 0.2f)
-        fixture.key(Key.DirectionRight)
-        fixture.awaitFocus(card(2))
-        assertTrue("the label follows focus", brightest(2) > brightest(1) + 0.2f)
     }
 
     @Test fun onlyImmersiveDrawsABackdrop() {
@@ -1070,6 +1033,8 @@ class ChannelsLayoutFocusTest {
         fixture.show(immersive, imageLoader = fixture.fixtureArt(), playerReturn = PlayerReturnFocus(ChannelId(1), ChannelId(1)),
             warmPlayback = true)
         fixture.awaitFocus(card(1))
+        compose.onNodeWithTag("channels-immersive-background").assertDoesNotExist()
+        compose.onNodeWithTag("channels-immersive-art").assertDoesNotExist()
         // By default the picture card's logo plate names the channel and nothing goes below.
         compose.onNodeWithTag("channels-immersive-1-art-picon", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("channels-immersive-1-identity", useUnmergedTree = true).assertDoesNotExist()
@@ -1085,10 +1050,4 @@ class ChannelsLayoutFocusTest {
         compose.onNode(playing, useUnmergedTree = true).assertExists()
     }
 
-    @Test fun immersiveBackgroundDrawsNothingOverWarmPlayback() {
-        fixture.show(immersive, playerReturn = PlayerReturnFocus(ChannelId(1), ChannelId(1)), warmPlayback = true)
-        fixture.awaitFocus(card(1))
-        compose.onNodeWithTag("channels-immersive-background").assertDoesNotExist()
-        compose.onNodeWithTag("channels-immersive-art").assertDoesNotExist()
-    }
 }

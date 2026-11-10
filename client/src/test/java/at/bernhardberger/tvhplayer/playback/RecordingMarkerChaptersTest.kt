@@ -20,23 +20,13 @@ import androidx.media3.common.Timeline
 import androidx.media3.common.util.Clock
 import android.os.Looper
 import androidx.media3.extractor.metadata.Chapter
-import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
-import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
-import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrCutpoint
 import at.bernhardberger.tvheadend.sdk.core.DvrCutpointAction
 import at.bernhardberger.tvheadend.sdk.core.DvrCutpointsResult
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
-import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
-import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
-import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
-import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
 import at.bernhardberger.tvheadend.sdk.core.PlaybackBindingResult
-import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
-import at.bernhardberger.tvheadend.sdk.core.SessionObservation
-import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.core.TvheadendTestResultFactory
 import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
@@ -53,8 +43,8 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.plus
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.plus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertTrue
@@ -854,14 +844,7 @@ class RecordingMarkerChaptersTest {
         cutpoints: (suspend () -> DvrCutpointsResult)? = null,
     ) {
         private val entry = DvrEntry.create(id = DvrEntryId(4), state = DvrEntryState.COMPLETED)
-        val session = FakeTvheadendSession(SessionObservation.create(
-            sessionState = SessionState.Ready(ServerCapabilities.create(
-                streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED,
-            )),
-            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(channels = emptyList())),
-            epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
-            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = listOf(entry))),
-        ))
+        val session = FakeTvheadendSession(currentPlaybackObservation(recordings = listOf(entry)))
         val response = CompletableDeferred<Unit>()
         val binding = (TvheadendTestResultFactory.boundCompletedRecordingPlayback(
             session, session.captureCurrentSession(), entry.id,
@@ -903,14 +886,7 @@ class RecordingMarkerChaptersTest {
     @OptIn(TvheadendTestingApi::class, ExperimentalCoroutinesApi::class)
     fun lateSpansSkipOncePreservePausedIntentAndRestoreMutedVolumeOnExitOrClear() = runTest {
         val entry = DvrEntry.create(id = DvrEntryId(4), state = DvrEntryState.COMPLETED)
-        val session = FakeTvheadendSession(SessionObservation.create(
-            sessionState = SessionState.Ready(ServerCapabilities.create(
-                streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED,
-            )),
-            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(channels = emptyList())),
-            epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
-            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = listOf(entry))),
-        ))
+        val session = FakeTvheadendSession(currentPlaybackObservation(recordings = listOf(entry)))
         val response = CompletableDeferred<Unit>()
         val points = listOf(
             DvrCutpoint(1_000.milliseconds, 2_000.milliseconds, DvrCutpointAction.COMMERCIAL_BREAK),
@@ -1051,14 +1027,7 @@ class RecordingMarkerChaptersTest {
     @OptIn(TvheadendTestingApi::class, ExperimentalCoroutinesApi::class)
     fun lateChaptersAndMarkerSeeksAreGatedByInstallationItemIdentityAndRevision() = runTest {
         val entry = DvrEntry.create(id = DvrEntryId(4), state = DvrEntryState.COMPLETED)
-        val session = FakeTvheadendSession(SessionObservation.create(
-            sessionState = SessionState.Ready(ServerCapabilities.create(
-                streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED,
-            )),
-            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(channels = emptyList())),
-            epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
-            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = listOf(entry))),
-        ))
+        val session = FakeTvheadendSession(currentPlaybackObservation(recordings = listOf(entry)))
         val binding = (TvheadendTestResultFactory.boundCompletedRecordingPlayback(
             session, session.captureCurrentSession(), entry.id,
         ) as PlaybackBindingResult.Bound).binding

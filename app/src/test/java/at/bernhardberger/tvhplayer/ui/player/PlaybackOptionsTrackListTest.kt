@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.testutil.pressKey
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -23,9 +24,6 @@ import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.performKeyInput
-import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.DpRect
@@ -122,7 +120,7 @@ class PlaybackOptionsTrackListTest {
         capture(view, "$name-top")
 
         TRACK_IDS.forEach { id ->
-            key(Key.DirectionDown)
+            compose.pressKey(Key.DirectionDown)
             compose.onNodeWithTag(rowTag(id)).assertIsFocused()
             assertRowFullyInList(id)
             assertFade(focusedId = id)
@@ -140,7 +138,7 @@ class PlaybackOptionsTrackListTest {
 
         // Back up: the top fade shows while the list can scroll back and never covers focus.
         (listOf("automatic") + TRACK_IDS).dropLast(1).reversed().forEach { id ->
-            key(Key.DirectionUp)
+            compose.pressKey(Key.DirectionUp)
             compose.onNodeWithTag(rowTag(id)).assertIsFocused()
             assertRowFullyInList(id)
             assertFade(focusedId = id)
@@ -210,11 +208,6 @@ class PlaybackOptionsTrackListTest {
     // Track keys are "<track type>:<group id>:<format id>"; audio is track type 1.
     private fun rowTag(id: String) =
         if (id == "automatic") "playback-options-track-automatic" else "playback-options-track-1:$id:$id"
-
-    private fun key(key: Key) {
-        compose.onRoot().performKeyInput { pressKey(key) }
-        compose.waitForIdle()
-    }
 
     private fun capture(view: View, name: String) = compose.runOnIdle {
         assertEquals(1920, view.width)

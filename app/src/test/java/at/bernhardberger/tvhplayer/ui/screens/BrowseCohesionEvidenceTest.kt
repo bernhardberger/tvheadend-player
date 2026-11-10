@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.testutil.pressKey
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
 import at.bernhardberger.tvhplayer.settings.ChannelsLayout
@@ -24,10 +25,10 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.positionInRoot
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
@@ -43,7 +44,6 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -254,7 +254,7 @@ class BrowseCohesionEvidenceTest {
     private fun pseudoRecordings(rtl: Boolean = false) {
         showRecordings(1f)
         capture("recordings-root", 1f, "Archive root; Documentaries folder", hasTestTag("recordings-folder-Documentaries"))
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         compose.mainClock.advanceTimeBy(2_000); compose.waitForIdle()
         val entered = compose.onAllNodes(hasTestTag("recording-list-entry-1") and isFocused()).fetchSemanticsNodes().firstOrNull()
         if (rtl && entered != null && entered.boundsInRoot.let { it.width == 0f && it.height == 0f }) {
@@ -281,8 +281,8 @@ class BrowseCohesionEvidenceTest {
         capture("channels-current", 1f, "Channels current programme; first row", hasTestTag("channel-row-1"))
         compose.onNodeWithTag("channels-headline-channel")
             .assertTextContains("Ridge Earth HD", substring = true)
-        key(Key.DirectionDown)
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         awaitFocus(hasTestTag("channel-row-3"))
         compose.onNode(
             hasText("No program information") and hasAnyAncestor(hasTestTag("channel-row-3")),
@@ -296,14 +296,14 @@ class BrowseCohesionEvidenceTest {
         showChannels(1.3f)
         // Channels enters its first row; the group sits behind the header button.
         awaitFocus(hasTestTag("channel-row-1"))
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         capture("channels-long-font1.3", 1.3f, "Channels long channel and programme text", hasTestTag("channel-row-2"))
     }
 
     @Test
     fun guideCurrentProgrammeOpensDetailsWithoutPlaybackOrMutation() {
         showGuide(1f)
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         capture("guide-current", 1f, "Guide first channel current programme", hasText(CURRENT_TITLE))
         // The picture fills the space above the grid and reaches only a little past the headline.
         val art = compose.onNodeWithTag("channels-immersive-art", useUnmergedTree = true).getUnclippedBoundsInRoot()
@@ -317,7 +317,7 @@ class BrowseCohesionEvidenceTest {
         assertEquals(header.left.value, headline.left.value, .5f)
         val timing = compose.onNodeWithTag("guide-headline-metadata", useUnmergedTree = true).getUnclippedBoundsInRoot()
         assertEquals(headline.bottom.value, timing.bottom.value, .5f)
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         compose.onNodeWithText("Watch").assertIsDisplayed()
         capture("guide-details", 1f, "Guide current programme details; first action", hasText("Watch"), fullscreenDetails = true)
         compose.onNodeWithText("Close").assertDoesNotExist()
@@ -325,7 +325,7 @@ class BrowseCohesionEvidenceTest {
 
     @Test fun guideDetailsCrossfadeKeepsTheBrowseViewportStationary() {
         showGuide(1f)
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         val origin = compose.onNodeWithTag("epg-programme-viewport", useUnmergedTree = true).fetchSemanticsNode().layoutInfo.coordinates
         val before = origin.positionInRoot()
         val width = origin.size.width
@@ -362,9 +362,9 @@ class BrowseCohesionEvidenceTest {
     @Test
     fun guideLargeTextKeepsCurrentLongProgrammeFocused() {
         showGuide(1.3f)
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         awaitFocus(hasText(CURRENT_TITLE))
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         capture("guide-long-font1.3", 1.3f, "Guide second channel current long programme", hasText(LONG_TITLE))
     }
 
@@ -372,7 +372,7 @@ class BrowseCohesionEvidenceTest {
     fun recordingsRootAndFolderBrowsingDoNotPlayOrMutate() {
         showRecordings(1f)
         capture("recordings-root", 1f, "Archive root; Documentaries folder", hasTestTag("recordings-folder-Documentaries"))
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         capture("recordings-folder", 1f, "Archive inside Documentaries; first recording", hasTestTag("recording-list-entry-1"))
         compose.onNodeWithTag("recording-metadata-pane", useUnmergedTree = true).assertIsDisplayed()
     }
@@ -381,9 +381,9 @@ class BrowseCohesionEvidenceTest {
     fun recordingsLargeTextDetailsOfferResumeWithoutDispatch() {
         showRecordings(1.3f)
         awaitFocus(hasTestTag("recordings-folder-Documentaries"))
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         awaitFocus(hasTestTag("recording-list-entry-1"))
-        key(Key.Menu)
+        compose.pressKey(Key.Menu)
         compose.onNodeWithText("Details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("programme-details-page").assertIsDisplayed()
         compose.onNodeWithText("Resume").assertIsDisplayed()
@@ -622,11 +622,6 @@ class BrowseCohesionEvidenceTest {
     }
 
     private fun context(): Application = ApplicationProvider.getApplicationContext()
-
-    private fun key(key: Key) {
-        compose.onRoot().performKeyInput { pressKey(key) }
-        compose.waitForIdle()
-    }
 
     private fun awaitFocus(target: SemanticsMatcher) {
         compose.waitUntil(10_000) {

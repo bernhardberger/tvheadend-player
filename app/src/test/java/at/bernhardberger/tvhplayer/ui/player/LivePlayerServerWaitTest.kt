@@ -3,6 +3,8 @@
 
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.testutil.settleFrames
+import at.bernhardberger.tvhplayer.testutil.pressKey
 import android.app.Application
 import android.graphics.Bitmap
 import androidx.compose.foundation.layout.Box
@@ -21,9 +23,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.emptyPreferences
+import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
@@ -87,7 +87,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import org.junit.After
@@ -130,10 +129,10 @@ class LivePlayerServerWaitTest {
 
     @Test fun backWithdrawsTheWaitSoASessionArrivingDuringTheExitTunesNothing() {
         screen()
-        key(Key.Back)
+        compose.pressKey(Key.Back)
         assertEquals(1, closes)
         session.publish(ready())
-        settle()
+        compose.settleFrames(10)
         assertEquals(0, binds())
         assertEquals(null, runtime.activeTarget.value)
     }
@@ -148,11 +147,11 @@ class LivePlayerServerWaitTest {
             advanceEventTime(800)
             keyUp(Key.DirectionDown)
         }
-        settle()
+        compose.settleFrames(10)
         assertEquals(0, unconsumed)
         assertEquals(1, waits())
         assertEquals(0, closes)
-        key(Key.Back)
+        compose.pressKey(Key.Back)
         assertEquals(1, closes)
     }
 
@@ -160,10 +159,10 @@ class LivePlayerServerWaitTest {
         screen()
         compose.onRoot().performKeyInput { keyDown(Key.DirectionCenter) }
         session.publish(ready())
-        settle()
+        compose.settleFrames(10)
         assertMainSettled("the waiting start installs when the session arrives") { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1)) }
         compose.onRoot().performKeyInput { keyUp(Key.DirectionCenter) }
-        settle()
+        compose.settleFrames(10)
         assertEquals(0, unconsumed)
         assertEquals(0, compose.onAllNodes(hasTestTag("player-actions"), useUnmergedTree = true).fetchSemanticsNodes().size)
     }
@@ -196,17 +195,17 @@ class LivePlayerServerWaitTest {
             scope.launch { runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(1)))) }
         }
         assertMainSettled("the warm target is installed") { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1)) }
-        settle()
+        compose.settleFrames(10)
         val before = binds()
         // The connection is lost while this screen is away; a new screen opens with the target still active.
         compose.runOnIdle { visible.value = false }
         session.publish(SessionObservation.create(sessionState = SessionState.Connecting, channelState = ChannelRepositoryState.Stale(catalog)))
-        settle()
+        compose.settleFrames(10)
         compose.runOnIdle { visible.value = true }
-        settle()
+        compose.settleFrames(10)
         assertEquals(1, waits())
         session.publish(ready())
-        settle()
+        compose.settleFrames(10)
         assertMainSettled("the reconnect binds a new stream") { binds() > before }
     }
 
@@ -216,16 +215,16 @@ class LivePlayerServerWaitTest {
             scope.launch { runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(1)))) }
         }
         assertMainSettled("the warm target is installed") { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1)) }
-        settle()
+        compose.settleFrames(10)
         val before = binds()
         compose.runOnIdle { visible.value = false }
         session.publish(SessionObservation.create(sessionState = SessionState.Connecting, channelState = ChannelRepositoryState.Stale(catalog)))
-        settle()
+        compose.settleFrames(10)
         val generation = profiles.configurationGeneration.value
         compose.runOnIdle { scope.launch { profiles.saveServer("other.test", 9982) } }
         assertMainSettled("the in-memory profile save completes") { profiles.configurationGeneration.value > generation }
         session.publish(ready())
-        settle()
+        compose.settleFrames(10)
         val retunes = mutableListOf<PlaybackTargetResult?>()
         compose.runOnIdle { scope.launch { retunes += runtime.retuneAfterReconnect() } }
         assertMainSettled("the retune returns its result") { retunes.isNotEmpty() }
@@ -241,20 +240,20 @@ class LivePlayerServerWaitTest {
             scope.launch { runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(1)))) }
         }
         assertMainSettled("the warm target is installed") { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1)) }
-        settle()
+        compose.settleFrames(10)
         val before = binds()
         compose.runOnIdle { visible.value = false }
         session.publish(SessionObservation.create(sessionState = SessionState.Connecting, channelState = ChannelRepositoryState.Stale(catalog)))
-        settle()
+        compose.settleFrames(10)
         session.publish(ready())
-        settle()
+        compose.settleFrames(10)
         val retunes = mutableListOf<PlaybackTargetResult?>()
         compose.runOnIdle { scope.launch { retunes += runtime.retuneAfterReconnect() } }
         assertMainSettled("the retune returns its result") { retunes.isNotEmpty() }
         assertEquals(listOf(PlaybackTargetResult.STARTED), retunes)
         assertMainSettled("the completed retune has bound its stream") { binds() > before }
         compose.runOnIdle { visible.value = true }
-        settle()
+        compose.settleFrames(10)
         assertEquals("the returning screen adopts the retuned target", before + 1, binds())
     }
 
@@ -263,13 +262,13 @@ class LivePlayerServerWaitTest {
         compose.runOnIdle {
             connection.value = ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.AUTOMATIC_BACKOFF)
         }
-        settle()
+        compose.settleFrames(10)
         compose.onNode(hasText(string(R.string.error_110_title))).assertExists()
         compose.onNodeWithTag("tv-recovery-primary").assert(hasText("Connection settings")).assertIsFocused()
         assertEquals(0, compose.onAllNodes(hasText("Retry"), useUnmergedTree = true).fetchSemanticsNodes().size)
         assertEquals(0, compose.onAllNodes(hasTestTag("tv-recovery-secondary"), useUnmergedTree = true).fetchSemanticsNodes().size)
         // Connection settings leaves through the screen's close.
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         assertEquals(1, closes)
     }
 
@@ -278,7 +277,7 @@ class LivePlayerServerWaitTest {
         compose.runOnIdle {
             connection.value = ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.EXPLICIT_RETRY)
         }
-        settle()
+        compose.settleFrames(10)
         compose.onNode(hasText(string(R.string.error_101_title))).assertExists()
         compose.onNodeWithTag("tv-recovery-primary").assert(hasText("Retry")).assertIsFocused()
         compose.onNodeWithTag("tv-recovery-secondary").assert(hasText("Connection settings"))
@@ -296,18 +295,6 @@ class LivePlayerServerWaitTest {
     private fun waits() = compose.onAllNodes(hasTestTag(LivePlayerServerWaitTag), useUnmergedTree = true).fetchSemanticsNodes().size
 
     private fun binds() = session.calls.count { it == FakeSessionCall.BIND_LIVE_PLAYBACK }
-
-    private fun key(key: Key) {
-        compose.onRoot().performKeyInput { pressKey(key) }
-        compose.waitForIdle()
-    }
-
-    private fun settle() {
-        repeat(10) {
-            compose.mainClock.advanceTimeBy(100)
-            compose.waitForIdle()
-        }
-    }
 
     private fun ready() = SessionObservation.create(
         sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
@@ -332,12 +319,12 @@ class LivePlayerServerWaitTest {
                     Channel.create(ChannelId(it), name = "Name $it", number = it, icon = LOGO.takeIf { _ -> it == 1L }?.let { ChannelIcon.ImageCache(it) })
                 }))), profile)
         }
-        val data = InMemoryData()
+        val data = InMemoryPreferencesDataStore()
         val settings = PlayerSettingsStore(data)
         profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.Main.immediate,
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
         scope.launch { profiles.run() }
-        val channels = ChannelsViewModel(session, ChannelTagSettingsStore(InMemoryData()), profiles.liveProfile)
+        val channels = ChannelsViewModel(session, ChannelTagSettingsStore(InMemoryPreferencesDataStore()), profiles.liveProfile)
         models.put("channels", channels)
         assertMainSettled("the fake channel catalog is collected") { channels.scope.value.scope.visibleChannels.size == 3 }
         player = ExoPlayer.Builder(context).build()
@@ -368,15 +355,8 @@ class LivePlayerServerWaitTest {
                 } }
             }
         }
-        settle()
+        compose.settleFrames(10)
         if (initial.currentSession == null) compose.waitUntil(10_000) { waits() == 1 }
-    }
-
-    private class InMemoryData : DataStore<Preferences> {
-        val state = MutableStateFlow(emptyPreferences())
-        override val data: Flow<Preferences> get() = state
-        override suspend fun updateData(transform: suspend (Preferences) -> Preferences) =
-            transform(state.value).also { state.value = it }
     }
 
     private fun string(id: Int): String = ApplicationProvider.getApplicationContext<Application>().getString(id)

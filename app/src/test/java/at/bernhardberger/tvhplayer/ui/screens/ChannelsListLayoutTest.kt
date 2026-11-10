@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.testutil.pressKey
 import android.app.Application
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.settings.ChannelsLayout
@@ -18,10 +19,10 @@ import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
@@ -44,7 +45,6 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
@@ -124,7 +124,7 @@ import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 @Config(sdk = [34], application = Application::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @OptIn(ExperimentalFoundationApi::class)
-class ChannelsStandardLayoutEvidenceTest {
+class ChannelsListLayoutTest {
     @get:Rule val images = ImageLoaderRule { testImageLoader(ApplicationProvider.getApplicationContext<Application>()) }
     @get:Rule val compose = createComposeRule()
     private lateinit var view: View
@@ -153,12 +153,10 @@ class ChannelsStandardLayoutEvidenceTest {
         val slot = inRow(PLAYING, "channel-playing-indicator").bounds()
         val recording = inRow(PLAYING, "channel-recording-indicator").bounds()
         val title = inRow(PLAYING, "channel-title").bounds()
-        capture("en-font1-playing-row-current-bright-video")
         compose.runOnIdle { playbackIndicator = ChannelPlaybackIndicator.PAUSED }
         assertEquals(slot, inRow(PLAYING, "channel-paused-indicator").bounds())
         assertEquals(recording, inRow(PLAYING, "channel-recording-indicator").bounds())
         assertEquals(title, inRow(PLAYING, "channel-title").bounds())
-        capture("en-font1-paused-row-current-bright-video")
         compose.mainClock.autoAdvance = false
         compose.runOnIdle { playbackIndicator = ChannelPlaybackIndicator.TUNING }
         compose.waitForIdle()
@@ -166,7 +164,6 @@ class ChannelsStandardLayoutEvidenceTest {
         compose.mainClock.advanceTimeBy(96)
         assertEquals(slot, inRow(PLAYING, "channel-tuning-indicator").bounds())
         assertEquals(recording, inRow(PLAYING, "channel-recording-indicator").bounds())
-        capture("en-font1-tuning-row-current-96ms-bright-video")
         compose.runOnIdle { playbackIndicator = ChannelPlaybackIndicator.NONE }
         compose.waitForIdle()
         compose.mainClock.advanceTimeByFrame()
@@ -186,9 +183,9 @@ class ChannelsStandardLayoutEvidenceTest {
         row(1).assertIsFocused()
         headlineChannel().assertTextContains(title(1))
 
-        key(Key.DirectionUp)
+        compose.pressKey(Key.DirectionUp)
         tagsButton().assertIsFocused()
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         row(1).assertIsFocused()
 
         // A group change enters the playing channel of the new scope.
@@ -197,9 +194,9 @@ class ChannelsStandardLayoutEvidenceTest {
         tagsButton().assertContentDescriptionEquals("Tags, Favourites")
         headlineChannel().assertTextContains(title(PLAYING))
 
-        key(Key.DirectionLeft)
+        compose.pressKey(Key.DirectionLeft)
         compose.onNodeWithTag("nav-channels").assertIsFocused()
-        key(Key.DirectionRight)
+        compose.pressKey(Key.DirectionRight)
         row(PLAYING).assertIsFocused()
     }
 
@@ -210,16 +207,13 @@ class ChannelsStandardLayoutEvidenceTest {
         pickGroup(steps = 0)
         row(1).assertIsFocused()
         assertEquals("relocation key does not tune", 0, playbackRequests)
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         assertEquals("next confirm activates the native row", 1, playbackRequests)
-    }
-
-    @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
-    fun missingEpgDoesNotReplaceTheExistingSessionActivationPolicy() {
-        channelsShell(1f)
-        enterAndFocus(NO_EPG)
+        compose.runOnIdle { playbackRequests = 0 }
+        repeat(NO_EPG - 1) { compose.pressKey(Key.DirectionDown) }
+        row(NO_EPG).assertIsFocused()
         assertEquals("focus only previews", 0, playbackRequests)
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         assertEquals("explicit OK retains the current-session activation policy", 1, playbackRequests)
     }
 
@@ -229,7 +223,7 @@ class ChannelsStandardLayoutEvidenceTest {
         channelsShell(1f)
         // Focus rests on the header so every asserted row is at its unscaled layout
         // size; the library's focus scale is checked separately at the end.
-        key(Key.DirectionUp)
+        compose.pressKey(Key.DirectionUp)
         tagsButton().assertIsFocused()
 
         // No title is drawn; Tags and View options end on the trailing inset.
@@ -298,7 +292,7 @@ class ChannelsStandardLayoutEvidenceTest {
 
         // The focused row keeps the library's own focus scale, uncancelled, and the
         // list reserves it horizontally instead of clipping.
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         enterAndFocus(1)
         val focusedPicon = inRow(1, "channel-picon").bounds()
         assertTrue("focused content is scaled (${focusedPicon.width})", focusedPicon.width > 72f)
@@ -357,7 +351,6 @@ class ChannelsStandardLayoutEvidenceTest {
 
         // No EPG: the title line alone, no time segments and no progress, same anchors.
         val missing = row(NO_EPG).bounds()
-        inRow(NO_EPG, "channel-programme-title").assertTextEquals("No program information")
         compose.onAllNodesWithTag("channel-programme-start", useUnmergedTree = true)
             .fetchSemanticsNodes().none { it.boundsInRoot.top in missing.top..missing.bottom }
             .let { assertTrue("no start time on a channel without EPG", it) }
@@ -384,7 +377,7 @@ class ChannelsStandardLayoutEvidenceTest {
         assertTrue("list draws a partial row beneath the fade", rows.any { it.boundsInRoot.bottom > 540f - ListBottomFadeHeight.value })
 
         // Walk to the end: focus never enters the fade, and keeps its breathing room.
-        repeat(CHANNEL_COUNT) { key(Key.DirectionDown) }
+        repeat(CHANNEL_COUNT) { compose.pressKey(Key.DirectionDown) }
         row(CHANNEL_COUNT).assertIsFocused()
         val last = row(CHANNEL_COUNT).bounds()
         assertTrue("focused last row bottom ${last.bottom} must clear the fade with 8dp room", last.bottom <= 540f - ListBottomReserve.value + 2f)
@@ -478,7 +471,7 @@ class ChannelsStandardLayoutEvidenceTest {
         // The list column reaching up beside the header settles the down walk with the topmost
         // logos just clear of the fade at both scales, so the Up walk below proves it.
         val downTarget = if (fontScale == 1f) 8 else 12
-        repeat(downTarget - 1) { key(Key.DirectionDown) }
+        repeat(downTarget - 1) { compose.pressKey(Key.DirectionDown) }
         row(downTarget).assertIsFocused()
         assertFocusedShapePixels(downTarget, rowHeight, scrolled = true)
         // Earlier rows are not cut at the list's band beside the header: they run on beneath the
@@ -491,15 +484,15 @@ class ChannelsStandardLayoutEvidenceTest {
         )
         capture("en-font$fontScale-top-fade-down-scrolled-bright-video")
 
-        repeat(CHANNEL_COUNT - downTarget) { key(Key.DirectionDown) }
-        repeat(CHANNEL_COUNT - 8) { key(Key.DirectionUp) }
+        repeat(CHANNEL_COUNT - downTarget) { compose.pressKey(Key.DirectionDown) }
+        repeat(CHANNEL_COUNT - 8) { compose.pressKey(Key.DirectionUp) }
         row(8).assertIsFocused()
         assertFocusedShapePixels(8, rowHeight, scrolled = true)
         assertTopFadePixels(7)
         capture("en-font$fontScale-top-fade-up-scrolled-bright-video")
 
         for (channel in 7 downTo 1) {
-            key(Key.DirectionUp)
+            compose.pressKey(Key.DirectionUp)
             row(channel).assertIsFocused()
             assertFocusedShapePixels(channel, if (channel == NO_EPG) noEpgRowHeight else rowHeight, scrolled = channel != 1)
         }
@@ -532,24 +525,24 @@ class ChannelsStandardLayoutEvidenceTest {
         // A non-focused neighbor gives the native unscaled height after offscreen restoration.
         val rowHeight = row(CHANNEL_COUNT - 1).bounds().height
         assertFocusedShapePixels(CHANNEL_COUNT, rowHeight, scrolled = true)
-        repeat(CHANNEL_COUNT - 8) { key(Key.DirectionUp) }
+        repeat(CHANNEL_COUNT - 8) { compose.pressKey(Key.DirectionUp) }
         row(8).assertIsFocused()
         assertFocusedShapePixels(8, rowHeight, scrolled = true)
         assertTopFadePixels(7)
         val position = row(8).bounds()
 
-        key(Key.DirectionLeft)
+        compose.pressKey(Key.DirectionLeft)
         compose.onNodeWithTag("nav-channels").assertIsFocused()
-        key(Key.DirectionRight)
+        compose.pressKey(Key.DirectionRight)
         row(8).assertIsFocused()
         assertEquals("drawer re-entry preserves the scrolled anchor", position, row(8).bounds())
         assertFocusedShapePixels(8, rowHeight, scrolled = true)
 
-        key(Key.ChannelDown)
+        compose.pressKey(Key.ChannelDown)
         val pageDownChannel = requireNotNull(selected).value.toInt()
         assertTrue("Channel Down still pages forward", pageDownChannel > 8)
         assertFocusedShapePixels(pageDownChannel, rowHeight, scrolled = true)
-        key(Key.ChannelUp)
+        compose.pressKey(Key.ChannelUp)
         val pageUpChannel = requireNotNull(selected).value.toInt()
         assertTrue("Channel Up still pages backward", pageUpChannel < pageDownChannel)
         assertFocusedShapePixels(pageUpChannel, rowHeight, scrolled = pageUpChannel != 1)
@@ -565,7 +558,7 @@ class ChannelsStandardLayoutEvidenceTest {
         assertFocusedShapePixels(7, rowHeight, scrolled = false)
         assertEquals("new scope's first row keeps the original top reserve", detail("channels-list-column").bounds().top + 4f, row(7).bounds().top, .5f)
         // A change while the rail has focus only previews the group's anchor.
-        key(Key.DirectionLeft)
+        compose.pressKey(Key.DirectionLeft)
         compose.onNodeWithTag("nav-channels").assertIsFocused()
         compose.runOnIdle { activeTag = ChannelTagId(1) }
         compose.waitForIdle()
@@ -575,13 +568,10 @@ class ChannelsStandardLayoutEvidenceTest {
             "scope preview clears the destination's fade even when leaving the top boundary",
             previewTop >= detail("channels-list-column").bounds().top + 56f,
         )
-        key(Key.DirectionRight)
+        compose.pressKey(Key.DirectionRight)
         row(PLAYING).assertIsFocused()
         assertEquals("native focus does not need to repair the preview anchor", previewTop, row(PLAYING).bounds().top, .5f)
         assertFocusedShapePixels(PLAYING, rowHeight, scrolled = true)
-        assertEquals("focus and scope changes never activate playback", 0, playbackRequests)
-        key(Key.DirectionCenter)
-        assertEquals("OK still activates the native row", 1, playbackRequests)
     }
 
     /** Inspect the actual opaque native pill, including its 1.05 overflow, not just semantics. */
@@ -668,13 +658,6 @@ class ChannelsStandardLayoutEvidenceTest {
     }
 
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
-    fun shortProgrammeKeepsThreeSynopsisLinesUnderThePicture() {
-        channelsShell(1f)
-        enterAndFocus(1)
-        assertDescriptionFits(3)
-    }
-
-    @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
     fun enlargedLongProgrammeKeepsWholeLinesUnderThePicture() {
         channelsShell(1.3f)
         enterAndFocus(LONG_TEXT)
@@ -692,8 +675,9 @@ class ChannelsStandardLayoutEvidenceTest {
         channelsShell(fontScale)
         enterAndFocus(1)
         for (channel in 1..NO_EPG) {
-            if (channel > 1) key(Key.DirectionDown)
+            if (channel > 1) compose.pressKey(Key.DirectionDown)
             row(channel).assertIsFocused()
+            if (channel == 1 && fontScale == 1f) assertDescriptionFits(3)
             val picture = detail("channels-list-art").bounds()
             assertEquals("the picture keeps the pane's top", 80f, picture.top, .5f)
             assertEquals("the kit's four-column card", 268f, picture.width, .5f)
@@ -742,29 +726,29 @@ class ChannelsStandardLayoutEvidenceTest {
         val prefix = "en-font1.0"
         row(1).assertIsFocused()
         captureBackgrounds("$prefix-entry-first-row-focused")
-        key(Key.DirectionUp)
+        compose.pressKey(Key.DirectionUp)
         tagsButton().assertIsFocused()
         captureBackgrounds("$prefix-header-group-button-focused")
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
 
         enterAndFocus(PLAYING)
         captureBackgrounds("$prefix-row-focused-playing-recording")
 
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         row(LONG_TEXT).assertIsFocused()
         // The long programme keeps three whole synopsis lines.
         assertDescriptionFits(3)
         captureBackgrounds("$prefix-long-programme")
 
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         row(NO_EPG).assertIsFocused()
         captureBackgrounds("$prefix-missing-epg")
 
-        repeat(CHANNEL_COUNT) { key(Key.DirectionDown) }
+        repeat(CHANNEL_COUNT) { compose.pressKey(Key.DirectionDown) }
         row(CHANNEL_COUNT).assertIsFocused()
         captureBackgrounds("$prefix-bottom-row-focused")
 
-        key(Key.DirectionLeft)
+        compose.pressKey(Key.DirectionLeft)
         compose.onNodeWithTag("nav-channels").assertIsFocused()
         captureBackgrounds("$prefix-expanded-drawer")
     }
@@ -993,20 +977,15 @@ class ChannelsStandardLayoutEvidenceTest {
     /** Entry focuses the first-channel anchor; further Downs reach row [n]. */
     private fun enterAndFocus(n: Int) {
         row(1).assertIsFocused()
-        repeat(n - 1) { key(Key.DirectionDown) }
+        repeat(n - 1) { compose.pressKey(Key.DirectionDown) }
         row(n).assertIsFocused()
-    }
-
-    private fun key(key: Key) {
-        compose.onRoot().performKeyInput { pressKey(key) }
-        compose.waitForIdle()
     }
 
     private fun header() = compose.onNodeWithTag("channels-header")
     private fun tagsButton() = compose.onNodeWithTag("channels-tags-button")
 
     /** Up from the first row, OK on the Tags button, [steps] Downs in the picker and OK. */
-    private fun pickGroup(steps: Int, move: (Key) -> Unit = ::key) {
+    private fun pickGroup(steps: Int, move: (Key) -> Unit = compose::pressKey) {
         move(Key.DirectionUp)
         tagsButton().assertIsFocused()
         move(Key.DirectionCenter)

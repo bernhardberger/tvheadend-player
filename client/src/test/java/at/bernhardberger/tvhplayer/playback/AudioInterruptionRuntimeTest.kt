@@ -2793,11 +2793,9 @@ class AudioInterruptionRuntimeTest {
                 return connection.speed(id, speed)
             }
         }, workDispatcher).apply { startAdmission() }
-        val session = FakeTvheadendSession(SessionObservation.create(
-            sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
-            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(Channel.create(ChannelId(1)), Channel.create(ChannelId(2))))),
-            epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
-            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(listOf(DvrEntry.create(id = DvrEntryId(1), state = DvrEntryState.COMPLETED)))),
+        val session = FakeTvheadendSession(currentPlaybackObservation(
+            channels = listOf(Channel.create(ChannelId(1)), Channel.create(ChannelId(2))),
+            recordings = listOf(DvrEntry.create(id = DvrEntryId(1), state = DvrEntryState.COMPLETED)),
         )).apply {
             scriptLivePlaybackSuccess(manager)
             scriptRecordingPlaybackSuccess()

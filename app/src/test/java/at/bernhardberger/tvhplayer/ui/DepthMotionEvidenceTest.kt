@@ -221,7 +221,7 @@ class DepthMotionEvidenceTest {
     }
 
     /**
-     * First Back after entering the second Settings level: the preview slot must
+     * Back from the second and deeper Settings levels: the preview slot must
      * keep exactly one production column for the whole slide and the 100ms after
      * handoff. Semantics on the preview are cleared, so this samples pixels of
      * real General / App language rows, not a synthetic band.
@@ -236,23 +236,6 @@ class DepthMotionEvidenceTest {
         assertTrue("settled child has a preview", slotHasInk(child, PREVIEW_LEFT, PREVIEW_RIGHT))
         write("first-back-settled-child", child)
 
-        compose.mainClock.autoAdvance = false
-        compose.onRoot().performKeyInput { pressKey(Key.Back) }
-        samplePreviewHandoff("first-back", requireOccupied = true)
-        settle()
-        assertTrue("landed root has a preview", slotHasInk(draw(), PREVIEW_LEFT, PREVIEW_RIGHT))
-        compose.onNodeWithText("General").assertIsFocused()
-    }
-
-    /**
-     * Deeper first-Back (General → language, then Back) and a second root→General
-     * Back must not empty or double the preview either.
-     */
-    @Test
-    fun firstBackFromDeeperSettingsKeepsOneProductionPreview() {
-        shell()
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.waitForIdle()
         compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.waitForIdle()
         compose.onNodeWithText("Follow system").assertIsFocused()
@@ -268,6 +251,7 @@ class DepthMotionEvidenceTest {
         compose.onRoot().performKeyInput { pressKey(Key.Back) }
         samplePreviewHandoff("deeper-back-to-root", requireOccupied = true)
         settle()
+        assertTrue("landed root has a preview", slotHasInk(draw(), PREVIEW_LEFT, PREVIEW_RIGHT))
         compose.onNodeWithText("General").assertIsFocused()
 
         compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
@@ -571,9 +555,6 @@ class DepthMotionEvidenceTest {
             compose.onNodeWithText("App language").assertIsFocused()
         }
     }
-
-    private fun dummyWidthAt(frames: List<Pair<String, Pair<IntRange, Float>>>, label: String) =
-        frames.first { it.first == label }.second
 
     /** One entry per animation frame: label and the icon's drawn ink span. */
     private fun drawerFrames(name: String, rtl: Boolean = false): List<Pair<String, Pair<IntRange, Float>>> =

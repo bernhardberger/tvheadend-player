@@ -3,6 +3,7 @@
 
 package at.bernhardberger.tvhplayer.ui
 
+import at.bernhardberger.tvhplayer.testutil.pressKey
 import android.app.Application
 import android.os.Looper
 import androidx.compose.ui.input.key.Key
@@ -16,10 +17,7 @@ import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performSemanticsAction
-import androidx.compose.ui.test.pressKey
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
@@ -134,7 +132,7 @@ class StartupOfflineTest {
         assertTrue(description, description.contains("1 Name 1") && description.contains("Connecting to your Tvheadend server"))
         // The opening OK activated nothing: no action exists or holds focus in the wait.
         assertEquals(0, compose.onAllNodes(hasClickAction() and isFocused()).fetchSemanticsNodes().size)
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         assertEquals(0, binds())
 
         session.publish(ready(catalog))
@@ -176,9 +174,9 @@ class StartupOfflineTest {
         compose.waitUntil(10_000) {
             compose.onAllNodes(hasTestTag("tv-recovery-primary") and isFocused()).fetchSemanticsNodes().isNotEmpty()
         }
-        key(Key.DirectionRight)
+        compose.pressKey(Key.DirectionRight)
         compose.onNode(hasTestTag("tv-recovery-secondary") and hasText("Connection settings", substring = true)).assertIsFocused()
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         settle()
         // Connection settings show the server list.
         compose.waitUntil(10_000) { compose.onAllNodes(hasText("Add connection"), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
@@ -190,7 +188,7 @@ class StartupOfflineTest {
     @Test fun backLeavesTheWaitToItsRowAndCancelsItsTune() {
         app()
         confirmRow(2)
-        key(Key.Back)
+        compose.pressKey(Key.Back)
         compose.waitUntil(10_000) {
             compose.onAllNodes(hasTestTag("channel-row-2") and isFocused()).fetchSemanticsNodes().isNotEmpty()
         }
@@ -204,7 +202,7 @@ class StartupOfflineTest {
     @Test fun aReplacedPendingTargetTunesOnlyTheSecondChannel() {
         app()
         confirmRow(1)
-        key(Key.Back)
+        compose.pressKey(Key.Back)
         compose.waitUntil(10_000) {
             compose.onAllNodes(hasTestTag("channel-row-1") and isFocused()).fetchSemanticsNodes().isNotEmpty()
         }
@@ -268,7 +266,7 @@ class StartupOfflineTest {
         advance(1_000)
         assertEquals(0, startupScreens())
         compose.onNode(hasText("Retry") and isFocused()).assertIsFocused()
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         advance(1_000)
         compose.onNodeWithTag("home-header").fetchSemanticsNode()
         compose.onNodeWithTag("home-recovery").assertIsFocused()
@@ -352,7 +350,7 @@ class StartupOfflineTest {
         settle()
         assertEquals(1, binds())
         assertEquals(0, compose.onAllNodes(hasTestTag(LivePlayerServerWaitTag), useUnmergedTree = true).fetchSemanticsNodes().size)
-        key(Key.Back)
+        compose.pressKey(Key.Back)
         settle()
         compose.waitUntil(10_000) {
             compose.onAllNodes(hasTestTag("channel-row-2") and isFocused()).fetchSemanticsNodes().isNotEmpty()
@@ -365,7 +363,7 @@ class StartupOfflineTest {
         confirmRow(2, awaitWait = false)
         compose.awaitScheduledWork(profileDispatcher) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(2)) }
         settle()
-        key(Key.Back)
+        compose.pressKey(Key.Back)
         settle()
         compose.waitUntil(10_000) {
             compose.onAllNodes(hasTestTag("channel-row-2") and isFocused()).fetchSemanticsNodes().isNotEmpty()
@@ -378,7 +376,7 @@ class StartupOfflineTest {
         settle()
         assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
         // Returning to the player adopts the retuned channel.
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         settle()
         compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("channel-row-2")).fetchSemanticsNodes().isEmpty() }
         settle()
@@ -390,7 +388,7 @@ class StartupOfflineTest {
         confirmRow(2, awaitWait = false)
         compose.awaitScheduledWork(profileDispatcher) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(2)) }
         settle()
-        key(Key.Back)
+        compose.pressKey(Key.Back)
         settle()
         compose.waitUntil(10_000) {
             compose.onAllNodes(hasTestTag("channel-row-2") and isFocused()).fetchSemanticsNodes().isNotEmpty()
@@ -402,7 +400,7 @@ class StartupOfflineTest {
         session.publish(ready(catalog))
         settle()
         assertEquals(1, binds())
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         settle()
         compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("channel-row-2")).fetchSemanticsNodes().isEmpty() }
         playerData.readGate = null
@@ -431,7 +429,7 @@ class StartupOfflineTest {
         settle()
         assertEquals(1, binds())
         // One Back leaves the one player.
-        key(Key.Back)
+        compose.pressKey(Key.Back)
         settle()
         compose.waitUntil(10_000) {
             compose.onAllNodes(hasTestTag("channel-row-2") and isFocused()).fetchSemanticsNodes().isNotEmpty()
@@ -476,13 +474,13 @@ class StartupOfflineTest {
             }
             when {
                 focusedRow == id -> return@repeat
-                focusedRow != null && focusedRow > id -> key(Key.DirectionUp)
-                else -> key(Key.DirectionDown)
+                focusedRow != null && focusedRow > id -> compose.pressKey(Key.DirectionUp)
+                else -> compose.pressKey(Key.DirectionDown)
             }
         }
         compose.onNodeWithTag("channel-row-$id").assertIsFocused()
         if (!confirm) return
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         settle()
         if (!awaitWait) return
         compose.waitUntil(10_000) {
@@ -492,11 +490,6 @@ class StartupOfflineTest {
     }
 
     private fun binds() = session.calls.count { it == FakeSessionCall.BIND_LIVE_PLAYBACK }
-
-    private fun key(key: Key) {
-        compose.onRoot().performKeyInput { pressKey(key) }
-        compose.waitForIdle()
-    }
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     private fun settle() {
@@ -587,7 +580,7 @@ class StartupOfflineTest {
             .performSemanticsAction(SemanticsActions.RequestFocus)
         compose.waitUntil(10_000) { compose.onAllNodes(isFocused()).fetchSemanticsNodes().isNotEmpty() }
         if (compose.onAllNodes(hasTestTag("nav-channels") and isFocused()).fetchSemanticsNodes().isNotEmpty()) {
-            key(Key.DirectionRight)
+            compose.pressKey(Key.DirectionRight)
         }
     }
 
