@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.components
 
+import at.bernhardberger.tvhplayer.testutil.tagBounds
 import android.app.Application
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
@@ -51,8 +52,6 @@ class ProgrammeHeadlineTest {
         }
     }
 
-    private fun bounds(tag: String): Rect = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-
     private fun barBounds(): Rect = compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo),
         useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
 
@@ -60,7 +59,7 @@ class ProgrammeHeadlineTest {
         showTiming(600, progress = .4f, minutesLeft = 40)
         compose.onNodeWithTag("t-time-left", useUnmergedTree = true).assertTextEquals("40m left")
         assertTrue("the time line comes first, then the bar, then the label",
-            bounds("t-metadata").left <= barBounds().left && barBounds().right <= bounds("t-time-left").left)
+            compose.tagBounds("t-metadata").left <= barBounds().left && barBounds().right <= compose.tagBounds("t-time-left").left)
     }
 
     @Test fun timeLeftNeedsTheBar() {
@@ -71,8 +70,8 @@ class ProgrammeHeadlineTest {
     @Test @GraphicsMode(GraphicsMode.Mode.NATIVE) fun aNarrowColumnShrinksTheBarAndKeepsTheLabel() {
         showTiming(200, progress = .4f, minutesLeft = 40)
         val bar = barBounds()
-        val label = bounds("t-time-left")
+        val label = compose.tagBounds("t-time-left")
         assertTrue("the bar gives way rather than the label: $bar", bar.width in 1f..159f)
-        assertTrue("the label stays inside the column: $label", label.right <= bounds("headline").right && bar.right <= label.left)
+        assertTrue("the label stays inside the column: $label", label.right <= compose.tagBounds("headline").right && bar.right <= label.left)
     }
 }

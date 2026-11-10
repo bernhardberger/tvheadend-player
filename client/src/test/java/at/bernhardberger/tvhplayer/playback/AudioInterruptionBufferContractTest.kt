@@ -67,12 +67,7 @@ class AudioInterruptionBufferContractTest {
             scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 0)))
         }
         val manager = createSubscriptionManager(connection, work).apply { startAdmission() }
-        val session = FakeTvheadendSession(SessionObservation.create(
-            sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
-            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(Channel.create(ChannelId(1))))),
-            epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
-            dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
-        )).apply { scriptLivePlaybackSuccess(manager) }
+        val session = FakeTvheadendSession(currentPlaybackObservation(channels = listOf(Channel.create(ChannelId(1))))).apply { scriptLivePlaybackSuccess(manager) }
         val recoveries = mutableListOf<PlaybackRecoveryReason>()
         val coordinator = createTvheadendPlaybackCoordinator(capturingPlayer, workDispatcher = work, onRecoveryRequired = {
             assertEquals(0, player.mediaItemCount)
@@ -100,9 +95,9 @@ class AudioInterruptionBufferContractTest {
             }, 0)
             connection.awaitCollectionRegistered()
             connection.emit(SubscriptionEvent.Started(listOf(
-                stream(1, SubscriptionStreamType.MPEG2_VIDEO), stream(2, SubscriptionStreamType.MPEG2_AUDIO),
+                subscriptionStream(1, SubscriptionStreamType.MPEG2_VIDEO), subscriptionStream(2, SubscriptionStreamType.MPEG2_AUDIO),
             ), null))
-            repeat(8) { emitPair(connection, it) }
+            repeat(8) { emitVideoAudioPair(connection, it) }
             await { livePeriod.maybeThrowPrepareError(); prepared }
             val groups = livePeriod.trackGroups
             assertEquals(2, groups.length)
@@ -120,7 +115,7 @@ class AudioInterruptionBufferContractTest {
             var lastPosition = 0L
             // 5,120 packets per track exceed the SDK's 4,096-sample cap if disabled audio is retained.
             for (batch in 0 until 80) {
-                repeat(64) { emitPair(connection, 8 + batch * 64 + it) }
+                repeat(64) { emitVideoAudioPair(connection, 8 + batch * 64 + it) }
                 val expectedEnd = (8L + batch * 64 + 62) * 40_000
                 await {
                     livePeriod.maybeThrowPrepareError()
@@ -156,20 +151,4 @@ class AudioInterruptionBufferContractTest {
         } }
     }
 
-    private fun stream(index: Long, type: SubscriptionStreamType) = SubscriptionStream(
-        index = StreamIndex(index), type = type, language = null, compositionId = null, ancillaryId = null,
-        width = null, height = null, frameDuration = null, aspectNumerator = null, aspectDenominator = null,
-        audioType = null, audioVersion = null, channelCount = null, rate = null, rdsUecp = null,
-    )
-
-    private suspend fun emitPair(connection: ScriptedSubscriptionConnection, index: Int) {
-        val time = index * 40_000L
-        // Synthetic MPEG-2 sequence/picture headers and an MPEG-1 Layer II frame. No decoding needed.
-        val video = byteArrayOf(0, 0, 1, 0xb3.toByte(), 0x14, 0, 0xf0.toByte(), 0x13,
-            0xff.toByte(), 0xff.toByte(), 0xe0.toByte(), 0x18,
-            0, 0, 1, 0xb8.toByte(), 0, 0, 0, 0x40, 0, 0, 1, 0, 0, 8, 0, 0)
-        val audio = ByteArray(417).apply { this[0] = 0xff.toByte(); this[1] = 0xfd.toByte(); this[2] = 0x80.toByte(); this[3] = 0xc0.toByte() }
-        connection.emit(SubscriptionEvent.Packet(MuxFrameType.I, StreamIndex(1), time, time, 40_000, SubscriptionBinaryFixture(video)))
-        connection.emit(SubscriptionEvent.Packet(MuxFrameType.I, StreamIndex(2), time, time, 40_000, SubscriptionBinaryFixture(audio)))
-    }
 }

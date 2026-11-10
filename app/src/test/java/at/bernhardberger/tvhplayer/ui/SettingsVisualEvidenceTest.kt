@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui
 
+import at.bernhardberger.tvhplayer.testutil.pressKey
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -72,17 +73,17 @@ class SettingsVisualEvidenceTest {
             }
         }
         compose.onNode(isFocused() and hasText("While browsing")).assertExists()
-        press(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         compose.onNodeWithText("Show picture").assertIsFocused().assertIsSelected()
-        press(Key.DirectionDown)
-        press(Key.DirectionCenter)
-        press(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         compose.onNodeWithText("Sound only").assertIsFocused().assertIsSelected()
-        press(Key.DirectionDown)
-        press(Key.DirectionCenter)
-        press(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         compose.onNodeWithText("Stop").assertIsFocused().assertIsSelected()
-        press(Key.Back)
+        compose.pressKey(Key.Back)
         compose.onNode(isFocused() and hasText("While browsing") and hasText("Stop")).assertExists()
     }
 
@@ -121,11 +122,11 @@ class SettingsVisualEvidenceTest {
         }
         val state = if (installed) "installed" else "missing"
         capture("en-font1.0-appliance-$state-root")
-        press(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         capture("en-font1.0-appliance-$state")
         if (!installed) {
-            press(Key.DirectionDown)
-            press(Key.DirectionCenter)
+            compose.pressKey(Key.DirectionDown)
+            compose.pressKey(Key.DirectionCenter)
             capture("en-font1.0-appliance-missing-reader", reader = true)
         }
     }
@@ -176,14 +177,14 @@ class SettingsVisualEvidenceTest {
             navigation.update(DepthStack(listOf(DepthFrame(SETTINGS_ROOT, SettingsSection.CONNECTION.name))))
         }
         capture("$prefix-connection-preview", writeImages = captures)
-        press(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         compose.onNodeWithTag("settings-row-${serverProfileRowId(fixtureActiveServer.id)}").assertIsFocused()
         compose.onNodeWithText(resources.getString(at.bernhardberger.tvhplayer.R.string.connection_try_again)).assertIsDisplayed()
         compose.onNodeWithText(resources.getString(at.bernhardberger.tvhplayer.R.string.setup_connection),
             useUnmergedTree = true).assertIsDisplayed() // Preview of the focused server's level.
         compose.onAllNodes(hasSetTextAction()).assertCountEquals(0)
         capture("$prefix-connection-overview", writeImages = captures)
-        press(Key.Back)
+        compose.pressKey(Key.Back)
         compose.runOnIdle { navigation.update(DepthStack(listOf(DepthFrame(SETTINGS_ROOT, SettingsSection.GENERAL.name)), visit = navigation.stack.visit + 1)) }
         // Accepted Settings C geometry on the 80dp Material for TV drawer shell.
         val activeColumn = compose.onNodeWithTag("depth-active").fetchSemanticsNode().boundsInRoot
@@ -192,32 +193,32 @@ class SettingsVisualEvidenceTest {
         assertEquals(340f, activeColumn.width, .5f)
         if (fontScale == 1f) assertRowTops(76f, 136f, 204f, 264f, 324f, 384f, 444f)
         capture("$prefix-root", writeImages = captures)
-        press(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         capture("$prefix-root-middle-focus", middleFocus = true, writeImages = captures)
-        press(Key.DirectionUp)
-        press(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionUp)
+        compose.pressKey(Key.DirectionCenter)
         if (fontScale == 1f) assertRowTops(76f, 144f, 212f, if (locale == "de") 289f else 280f)
         capture("$prefix-general", writeImages = captures)
-        press(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         capture("$prefix-general-middle-focus", middleFocus = true, writeImages = captures)
-        press(Key.DirectionUp)
-        press(Key.DirectionRight)
+        compose.pressKey(Key.DirectionUp)
+        compose.pressKey(Key.DirectionRight)
         // Match the accepted board: Follow system is both focused and selected.
         capture("$prefix-language", writeImages = captures)
-        press(Key.Back)
-        press(Key.DirectionDown)
-        press(Key.DirectionRight)
+        compose.pressKey(Key.Back)
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionRight)
         capture("$prefix-clock-format", writeImages = captures)
-        press(Key.Back)
-        press(Key.DirectionDown)
-        press(Key.DirectionDown)
-        press(Key.DirectionDown)
+        compose.pressKey(Key.Back)
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         val row = compose.onNodeWithText(cacheLabel)
         row.assertIsFocused()
         val bounds = row.fetchSemanticsNode().boundsInRoot
         capture("$prefix-cache-idle", writeImages = captures)
-        press(Key.DirectionCenter)
-        press(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         assertEquals(1, cacheCalls)
         for (state in listOf(CacheClearState.CLEARING, CacheClearState.FAILED, CacheClearState.CLEARED)) {
             compose.runOnIdle { cacheState = state }
@@ -235,20 +236,20 @@ class SettingsVisualEvidenceTest {
             }
             capture("$prefix-cache-${state.name.lowercase()}", writeImages = captures)
             if (state == CacheClearState.FAILED) {
-                press(Key.DirectionCenter)
+                compose.pressKey(Key.DirectionCenter)
                 assertEquals(2, cacheCalls)
             }
         }
         compose.runOnIdle { cacheState = CacheClearState.IDLE }
-        press(Key.Back)
-        repeat(5) { press(Key.DirectionDown) } // Connection, Channel groups, Playback, Audio & subtitles, Appliance
-        press(Key.DirectionCenter)
+        compose.pressKey(Key.Back)
+        repeat(5) { compose.pressKey(Key.DirectionDown) } // Connection, Channel groups, Playback, Audio & subtitles, Appliance
+        compose.pressKey(Key.DirectionCenter)
         compose.onNodeWithText(setupLabel).assertIsFocused()
         capture("$prefix-appliance-setup", writeImages = captures)
         assertEquals(0, setupCalls)
-        press(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         assertEquals(1, setupCalls) // Opens the companion directly; its screen owns the disclosure.
-        press(Key.Back)
+        compose.pressKey(Key.Back)
         assertEquals(SETTINGS_ROOT, navigation.stack.active.levelId)
     }
 
@@ -276,18 +277,18 @@ class SettingsVisualEvidenceTest {
                 }
             }
         }
-        press(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         capture("en-font1.0-playback")
-        repeat(7) { press(Key.DirectionDown) } // Past the Recording marks group to Profile.
-        press(Key.DirectionCenter)
+        repeat(7) { compose.pressKey(Key.DirectionDown) } // Past the Recording marks group to Profile.
+        compose.pressKey(Key.DirectionCenter)
         compose.onNode(isFocused() and hasText("Direct streaming")).assertIsSelected()
         capture("en-font1.0-stream-profile")
-        press(Key.Back)
-        press(Key.DirectionDown)
+        compose.pressKey(Key.Back)
+        compose.pressKey(Key.DirectionDown)
         capture("en-font1.0-playback-middle-focus")
-        press(Key.Back)
-        press(Key.DirectionDown)
-        press(Key.DirectionCenter)
+        compose.pressKey(Key.Back)
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionCenter)
         compose.onNodeWithText("Audio language").assertIsFocused()
         capture("en-font1.0-audio-subtitles")
     }
@@ -314,11 +315,11 @@ class SettingsVisualEvidenceTest {
                 }
             }
         }
-        press(Key.DirectionCenter)
-        repeat(4) { press(Key.DirectionDown) }
+        compose.pressKey(Key.DirectionCenter)
+        repeat(4) { compose.pressKey(Key.DirectionDown) }
         compose.onNode(isFocused() and hasText("Ad breaks")).assertExists()
         capture("en-font1.0-playback-recording-marks")
-        press(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         compose.onNode(isFocused() and hasText("Ask")).assertIsSelected()
         capture("en-font1.0-ad-breaks")
     }
@@ -344,7 +345,7 @@ class SettingsVisualEvidenceTest {
                 }
             }
         }
-        press(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         compose.mainClock.advanceTimeBy(1000)
         compose.waitForIdle()
         lateinit var bitmap: Bitmap
@@ -374,11 +375,6 @@ class SettingsVisualEvidenceTest {
         return at.bernhardberger.tvhplayer.viewmodels.SettingsPlayerUiState(connected = true, audioLanguages = listOf("en"),
             profiles = at.bernhardberger.tvheadend.sdk.core.StreamProfilesResult.Available.create(profiles, requireNotNull(sdk.currentSession)),
             selectedProfileId = profiles.first().id)
-    }
-
-    private fun press(key: Key) {
-        compose.onRoot().performKeyInput { pressKey(key) }
-        compose.waitForIdle()
     }
 
     private fun activeRows(): List<Rect> = compose.onAllNodes(

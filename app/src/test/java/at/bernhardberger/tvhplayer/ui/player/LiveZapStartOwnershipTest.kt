@@ -3,6 +3,8 @@
 
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.testutil.settleFrames
+import at.bernhardberger.tvhplayer.testutil.pressKey
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
 
@@ -106,11 +108,11 @@ class LiveZapStartOwnershipTest {
         screen()
         // The key's start is still waiting when the key's recomposition runs the entry effect.
         settingsData.open.value = false
-        key(Key.ChannelUp)
-        settle()
+        compose.pressKey(Key.ChannelUp)
+        compose.settleFrames(20)
         settingsData.open.value = true
         assertMainSettled("opening admission installs the key start") { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(2)) }
-        settle()
+        compose.settleFrames(20)
         assertEquals(2, admissions.get())
         assertEquals(2, binds())
     }
@@ -119,12 +121,12 @@ class LiveZapStartOwnershipTest {
         screen()
         // The runtime admits the next start and holds it before installation.
         settingsData.open.value = false
-        key(Key.ChannelUp)
-        key(Key.Three)
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.ChannelUp)
+        compose.pressKey(Key.Three)
+        compose.pressKey(Key.DirectionCenter)
         settingsData.open.value = true
         assertMainSettled("opening admission installs only the latest start") { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(3)) }
-        settle()
+        compose.settleFrames(20)
         assertEquals(2, binds())
     }
 
@@ -132,15 +134,15 @@ class LiveZapStartOwnershipTest {
         screen()
         // Each key's start supersedes the one before; leaving cancels the last one.
         settingsData.open.value = false
-        key(Key.ChannelUp)
-        key(Key.Three)
-        key(Key.DirectionCenter)
-        key(Key.Two)
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.ChannelUp)
+        compose.pressKey(Key.Three)
+        compose.pressKey(Key.DirectionCenter)
+        compose.pressKey(Key.Two)
+        compose.pressKey(Key.DirectionCenter)
         compose.runOnIdle { lifecycle.currentState = Lifecycle.State.CREATED }
-        settle()
+        compose.settleFrames(20)
         settingsData.open.value = true
-        settle()
+        compose.settleFrames(20)
         assertEquals(1, binds())
         assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
     }
@@ -161,7 +163,7 @@ class LiveZapStartOwnershipTest {
             drainWithoutFrames()
             runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(2))
         }
-        settle()
+        compose.settleFrames(20)
         // Entry, the cancelled key start and its one restart.
         assertEquals(3, admissions.get())
         assertEquals(2, binds())
@@ -179,19 +181,19 @@ class LiveZapStartOwnershipTest {
             drainWithoutFrames()
             runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1))
         }
-        settle()
+        compose.settleFrames(20)
         assertEquals(entryAdmissions + 1, admissions.get())
         assertEquals(1, binds())
     }
 
     @Test fun numberTypedBeforeLeavingNeverTunes() {
         screen()
-        key(Key.Two)
+        compose.pressKey(Key.Two)
         compose.runOnIdle { lifecycle.currentState = Lifecycle.State.CREATED }
         compose.mainClock.advanceTimeBy(CHANNEL_NUMBER_READY_BOUND_MS + 2_000)
-        settle()
+        compose.settleFrames(20)
         compose.runOnIdle { lifecycle.currentState = Lifecycle.State.RESUMED }
-        settle()
+        compose.settleFrames(20)
         assertEquals(1, binds())
         assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
     }
@@ -216,18 +218,6 @@ class LiveZapStartOwnershipTest {
     }
 
     private fun binds() = session.calls.count { it == FakeSessionCall.BIND_LIVE_PLAYBACK }
-
-    private fun key(key: Key) {
-        compose.onRoot().performKeyInput { pressKey(key) }
-        compose.waitForIdle()
-    }
-
-    private fun settle() {
-        repeat(20) {
-            compose.mainClock.advanceTimeBy(100)
-            compose.waitForIdle()
-        }
-    }
 
     private fun screen(entryHeld: Boolean = false) {
         session = FakeTvheadendSession(SessionObservation.create(
@@ -279,12 +269,12 @@ class LiveZapStartOwnershipTest {
             // The entry effect's own start is admitted and held. (A held entry start is
             // restarted once while the session settles, so the count is taken afterwards.)
             assertMainSettled("the entry effect has reached the held admission") { admissions.get() >= 1 }
-            settle()
+            compose.settleFrames(20)
             compose.mainClock.autoAdvance = false
             return
         }
         assertMainSettled("the entry effect installs its start") { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1)) }
-        settle()
+        compose.settleFrames(20)
         assertEquals(1, binds())
         // Number and settle timers run only when a test advances the clock.
         compose.mainClock.autoAdvance = false

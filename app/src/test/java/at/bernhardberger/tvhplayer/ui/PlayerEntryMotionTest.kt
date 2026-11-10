@@ -1,8 +1,9 @@
 package at.bernhardberger.tvhplayer.ui
 
+import at.bernhardberger.tvhplayer.testutil.drawnBrightness
+import at.bernhardberger.tvhplayer.testutil.tagBounds
+import at.bernhardberger.tvhplayer.testutil.changeState
 import android.app.Application
-import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.view.View
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
@@ -18,7 +19,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
@@ -62,36 +62,36 @@ class PlayerEntryMotionTest {
         shell(motionEnabled = true) { Box(Modifier.fillMaxSize().testTag("player")) }
         val rail = Rect(0f, 0f, 40f, 40f)
         val beside = Rect(48f, 0f, 88f, 40f)
-        val full = ink(rail)
+        val full = compose.drawnBrightness(view, rail)
         assertTrue(full > 0f)
 
         compose.mainClock.autoAdvance = false
-        change { showRail.value = false }
+        compose.changeState { showRail.value = false }
         val steps = (1..PlayerMotion.DestinationMs / 50).map {
             compose.mainClock.advanceTimeBy(50)
-            ink(rail)
+            compose.drawnBrightness(view, rail)
         }
         assertTrue("the rail is still there after the first step: $steps", steps.first() in 1f..full)
         assertTrue("the rail fades in steps: $steps", steps.zipWithNext().all { (a, b) -> b <= a })
         assertTrue("the rail is partly faded midway: $steps", steps[steps.size / 2] in 1f..(full * 0.9f))
-        assertEquals("the rail does not move", 0f, ink(beside))
+        assertEquals("the rail does not move", 0f, compose.drawnBrightness(view, beside))
         compose.onNodeWithTag("player").assertExists()
 
         compose.mainClock.advanceTimeBy(64)
-        assertEquals(0f, ink(rail))
+        assertEquals(0f, compose.drawnBrightness(view, rail))
     }
 
     @Test fun theRailFadesOutOnTheEmphasizedDecelerateCurve() {
         shell(motionEnabled = true) { Box(Modifier.fillMaxSize()) }
         val rail = Rect(0f, 0f, 40f, 40f)
-        val full = ink(rail)
+        val full = compose.drawnBrightness(view, rail)
 
         compose.mainClock.autoAdvance = false
-        change { showRail.value = false }
+        compose.changeState { showRail.value = false }
         compose.mainClock.advanceTimeBy(96)
         // Decelerating: a third of the way in, most of the fade is done (ease-in-out would have 80% left).
-        assertTrue("the rail has mostly faded a third in: ${ink(rail)} of $full", ink(rail) < full / 2)
-        assertTrue("the rail is still fading a third in", ink(rail) > 0f)
+        assertTrue("the rail has mostly faded a third in: ${compose.drawnBrightness(view, rail)} of $full", compose.drawnBrightness(view, rail) < full / 2)
+        assertTrue("the rail is still fading a third in", compose.drawnBrightness(view, rail) > 0f)
     }
 
     @Test fun thePlayerFadesOutAcceleratingWhileBrowseDeceleratesIn() {
@@ -101,22 +101,22 @@ class PlayerEntryMotionTest {
             Box(Modifier.fillMaxSize()) { Box(Modifier.offset(100.dp, 0.dp).size(40.dp).background(Color.White)) }
         }
         val rail = Rect(0f, 0f, 40f, 40f)
-        val playerFull = ink(playerArea)
+        val playerFull = compose.drawnBrightness(view, playerArea)
         assertTrue(playerFull > 0f)
-        assertEquals(0f, ink(rail))
+        assertEquals(0f, compose.drawnBrightness(view, rail))
 
         compose.mainClock.autoAdvance = false
-        change { showRail.value = true }
+        compose.changeState { showRail.value = true }
         compose.mainClock.advanceTimeBy(96)
-        val playerMidway = ink(playerArea)
-        val railMidway = ink(rail)
+        val playerMidway = compose.drawnBrightness(view, playerArea)
+        val railMidway = compose.drawnBrightness(view, rail)
         val railFull = 40f * 40f * 3 * 255
         assertTrue("the player holds on while it accelerates away: $playerMidway of $playerFull", playerMidway > playerFull * 0.7f)
         assertTrue("browse decelerates in: $railMidway of $railFull", railMidway > railFull * 0.6f)
 
         compose.mainClock.advanceTimeBy(PlayerMotion.DestinationExitMs - 96L + 64)
-        assertEquals("the exit is over within DestinationExitMs", 0f, ink(playerArea))
-        assertEquals("browse is fully in", railFull, ink(rail))
+        assertEquals("the exit is over within DestinationExitMs", 0f, compose.drawnBrightness(view, playerArea))
+        assertEquals("browse is fully in", railFull, compose.drawnBrightness(view, rail))
     }
 
     @Test fun theBannerIsPresentFromThePlayersFirstFrameAndFadesInWithItOnly() {
@@ -134,35 +134,35 @@ class PlayerEntryMotionTest {
             )
         }
         compose.mainClock.autoAdvance = false
-        change { showRail.value = false }
+        compose.changeState { showRail.value = false }
         compose.mainClock.advanceTimeByFrame()
         compose.onNodeWithTag("player-banner").assertExists()
-        val header = bounds("player-header")
-        val footer = bounds("player-footer")
-        val footerInk = mutableListOf(ink(footer))
+        val header = compose.tagBounds("player-header")
+        val footer = compose.tagBounds("player-footer")
+        val footerInk = mutableListOf(compose.drawnBrightness(view, footer))
         repeat(PlayerMotion.DestinationMs / 50) {
             compose.mainClock.advanceTimeBy(50)
-            footerInk += ink(footer)
-            assertEquals("no header travel", header, bounds("player-header"))
-            assertEquals("no footer travel", footer, bounds("player-footer"))
+            footerInk += compose.drawnBrightness(view, footer)
+            assertEquals("no header travel", header, compose.tagBounds("player-header"))
+            assertEquals("no footer travel", footer, compose.tagBounds("player-footer"))
         }
         compose.mainClock.advanceTimeBy(64)
-        val settled = ink(footer)
+        val settled = compose.drawnBrightness(view, footer)
         assertTrue("the Banner fades in with the player: $footerInk", footerInk.first() < settled / 2)
         assertTrue("the Banner fades in steps: $footerInk", footerInk.zipWithNext().all { (a, b) -> b >= a })
         compose.mainClock.advanceTimeBy(500)
-        assertEquals("no second animation after the fade", settled, ink(footer))
+        assertEquals("no second animation after the fade", settled, compose.drawnBrightness(view, footer))
     }
 
     @Test fun withoutAnimationsTheShellsSwapInOneFrame() {
         shell(motionEnabled = false) { Box(Modifier.fillMaxSize().testTag("player")) }
         val rail = Rect(0f, 0f, 40f, 40f)
-        assertTrue(ink(rail) > 0f)
+        assertTrue(compose.drawnBrightness(view, rail) > 0f)
 
         compose.mainClock.autoAdvance = false
-        change { showRail.value = false }
+        compose.changeState { showRail.value = false }
         compose.mainClock.advanceTimeByFrame()
-        assertEquals(0f, ink(rail))
+        assertEquals(0f, compose.drawnBrightness(view, rail))
         compose.onNodeWithTag("player").assertExists()
     }
 
@@ -184,10 +184,10 @@ class PlayerEntryMotionTest {
         compose.onNodeWithTag("item-2").requestFocus().assertIsFocused()
 
         compose.mainClock.autoAdvance = false
-        change { showRail.value = false }
+        compose.changeState { showRail.value = false }
         compose.mainClock.advanceTimeBy(100)
         compose.onNodeWithTag("player").assertIsFocused()
-        change { showRail.value = true }
+        compose.changeState { showRail.value = true }
         compose.mainClock.advanceTimeBy(PlayerMotion.DestinationExitMs + 100L)
         compose.mainClock.autoAdvance = true
         compose.waitForIdle()
@@ -216,27 +216,4 @@ class PlayerEntryMotionTest {
         compose.waitForIdle()
     }
 
-    /** Applies a state change so the next frame sees it even while the clock is paused. */
-    private fun change(block: () -> Unit) = compose.runOnIdle {
-        block()
-        Snapshot.sendApplyNotifications()
-    }
-
-    private fun bounds(tag: String): Rect = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-
-    /** Summed brightness drawn now inside [area] (mdpi: dp are pixels). */
-    private fun ink(area: Rect): Float = compose.runOnIdle {
-        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-        view.draw(Canvas(bitmap))
-        var sum = 0f
-        for (x in area.left.toInt() until area.right.toInt().coerceAtMost(bitmap.width)) {
-            for (y in area.top.toInt() until area.bottom.toInt().coerceAtMost(bitmap.height)) {
-                val pixel = bitmap.getPixel(x, y)
-                sum += android.graphics.Color.red(pixel) + android.graphics.Color.green(pixel) +
-                    android.graphics.Color.blue(pixel)
-            }
-        }
-        bitmap.recycle()
-        sum
-    }
 }

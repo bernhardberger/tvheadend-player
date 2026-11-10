@@ -1,10 +1,11 @@
 package at.bernhardberger.tvhplayer.ui
 
+import at.bernhardberger.tvhplayer.testutil.pressKey
 import android.app.Application
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
@@ -14,9 +15,6 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.performKeyInput
-import androidx.compose.ui.test.pressKey
 import at.bernhardberger.tvhplayer.settings.FrameRateSwitching
 import at.bernhardberger.tvhplayer.ui.components.depth.rememberDepthNavigationState
 import at.bernhardberger.tvhplayer.ui.screens.SettingsScreenNavigation
@@ -69,15 +67,15 @@ class FrameRateSettingsUiTest {
                 Box(Modifier.fillMaxSize()) { SettingsScreenNavigation(navigation, levels) }
             }
         }
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         var downs = 0
         while (compose.onAllNodes(isFocused() and hasText(title)).fetchSemanticsNodes().isEmpty()) {
             check(++downs < 20) { "Frame rate row not reachable" }
-            key(Key.DirectionDown)
+            compose.pressKey(Key.DirectionDown)
         }
         compose.onNode(isFocused() and hasText(title) and hasText("Only if seamless")).assertExists()
 
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         compose.onNode(isFocused() and hasText("Only if seamless")).assertIsSelected()
         compose.onNode(hasText("Always")).assertIsNotSelected()
         // Each option carries its own help instead of one description for the page.
@@ -86,22 +84,18 @@ class FrameRateSettingsUiTest {
             .assertExists()
 
         // Back leaves without choosing.
-        key(Key.Back)
+        compose.pressKey(Key.Back)
         compose.onNode(isFocused() and hasText(title)).assertExists()
         assertEquals(emptyList<FrameRateSwitching>(), picks)
 
-        key(Key.DirectionCenter)
-        key(Key.DirectionDown)
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionCenter)
         assertEquals(listOf(FrameRateSwitching.OFF), picks)
         compose.onNode(isFocused() and hasText(title) and hasText("Off")).assertExists()
 
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         compose.onNode(isFocused() and hasText("Off")).assertIsSelected()
     }
 
-    private fun key(key: Key) {
-        compose.onRoot().performKeyInput { pressKey(key) }
-        compose.waitForIdle()
-    }
 }

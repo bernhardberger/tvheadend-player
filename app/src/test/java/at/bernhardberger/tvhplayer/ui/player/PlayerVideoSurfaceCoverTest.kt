@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.testutil.changeState
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -10,7 +11,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
@@ -432,7 +432,7 @@ class PlayerVideoSurfaceCoverTest {
         compose.onNodeWithTag("video-cover").assertDoesNotExist()
 
         // A new tune covers the old picture in its first frame.
-        change { visible.value = false; fade.value = PlayerMotion.ZapPictureMs }
+        compose.changeState { visible.value = false; fade.value = PlayerMotion.ZapPictureMs }
         compose.mainClock.advanceTimeByFrame()
         assertEquals(0f, light())
 
@@ -463,7 +463,7 @@ class PlayerVideoSurfaceCoverTest {
         val visible = mutableStateOf(false)
         cover(visible, mutableStateOf(0))
         compose.mainClock.autoAdvance = false
-        change { visible.value = true }
+        compose.changeState { visible.value = true }
         compose.mainClock.advanceTimeByFrame()
         assertEquals(1f, light(), 0.01f)
         compose.onNodeWithTag("video-cover").assertDoesNotExist()
@@ -503,17 +503,12 @@ class PlayerVideoSurfaceCoverTest {
 
     /** Light through the cover, sampled per 25 ms from the frame the picture appears to the fade's end. */
     private fun lift(visible: androidx.compose.runtime.MutableState<Boolean>, millis: Int): List<Float> {
-        change { visible.value = true }
+        compose.changeState { visible.value = true }
         compose.mainClock.advanceTimeByFrame()
         return listOf(light()) + (1..(PlayerMotion.PictureHoldMs + millis) / 25).map {
             compose.mainClock.advanceTimeBy(25)
             light()
         }
-    }
-
-    private fun change(block: () -> Unit) = compose.runOnIdle {
-        block()
-        Snapshot.sendApplyNotifications()
     }
 
     /** 0 under a fully opaque cover, 1 with the white backdrop fully visible. */

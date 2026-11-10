@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui
 
+import at.bernhardberger.tvhplayer.testutil.changeState
 import android.app.Application
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -7,7 +8,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
@@ -40,7 +40,7 @@ class PlayerEntryBackTest {
         playerHandlesBack.value = false
         shell()
         compose.mainClock.autoAdvance = false
-        change { showRail.value = false }
+        compose.changeState { showRail.value = false }
 
         val presses = backEachFrame()
 
@@ -54,7 +54,7 @@ class PlayerEntryBackTest {
         railHandlesBack.value = false
         shell()
         compose.mainClock.autoAdvance = false
-        change { showRail.value = true }
+        compose.changeState { showRail.value = true }
 
         val presses = backEachFrame()
 
@@ -96,8 +96,4 @@ class PlayerEntryBackTest {
         return presses
     }
 
-    private fun change(block: () -> Unit) = compose.runOnIdle {
-        block()
-        Snapshot.sendApplyNotifications()
-    }
 }

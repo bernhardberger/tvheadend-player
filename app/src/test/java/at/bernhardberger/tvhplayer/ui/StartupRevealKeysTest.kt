@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui
 
+import at.bernhardberger.tvhplayer.testutil.changeState
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -10,10 +11,9 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -85,7 +85,7 @@ class StartupRevealKeysTest {
         }
         frames()
         // Autoplay's handoff: the startup screen starts dissolving into the first video frames.
-        change { state = state.copy(presentation = MainStartupPresentation.Inactive, revealRequestId = 1) }
+        compose.changeState { state = state.copy(presentation = MainStartupPresentation.Inactive, revealRequestId = 1) }
         frames()
         assertEquals(0, revealed)
         assertEquals(1, startupScreens())
@@ -125,7 +125,7 @@ class StartupRevealKeysTest {
         val covered = pixel(view)
         assertTrue("the startup screen covers the player", covered != android.graphics.Color.RED)
 
-        change { state = state.copy(presentation = MainStartupPresentation.Inactive, revealRequestId = 1) }
+        compose.changeState { state = state.copy(presentation = MainStartupPresentation.Inactive, revealRequestId = 1) }
         // Apply the handoff and launch its effect before giving the animation its first frame.
         compose.mainClock.advanceTimeByFrame()
         compose.waitForIdle()
@@ -169,10 +169,6 @@ class StartupRevealKeysTest {
     }
 
     /** Publish the handoff before advancing the paused clock, rather than racing snapshot delivery. */
-    private fun change(block: () -> Unit) = compose.runOnIdle {
-        block()
-        Snapshot.sendApplyNotifications()
-    }
 
     private fun startupScreens() = compose.onAllNodes(hasTestTag("main-startup-root")).fetchSemanticsNodes().size
 }

@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui
 
+import at.bernhardberger.tvhplayer.testutil.pressKey
 import android.app.Application
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -69,17 +70,12 @@ class AudioPreferenceUiTest {
         }
         compose.runOnIdle { assertEquals(1, listeners.size) }
         compose.onNodeWithTag("playback-options-track-automatic").assertIsFocused().assertIsNotSelected()
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         assertEquals(1, choices)
         compose.onNodeWithTag("playback-options-track-automatic").assertIsSelected()
         compose.runOnIdle { mounted = false }
         compose.waitForIdle()
         assertTrue(listeners.isEmpty())
-    }
-
-    private fun key(key: Key) {
-        compose.onRoot().performKeyInput { pressKey(key) }
-        compose.waitForIdle()
     }
 
     private fun settings(locale: String, scale: Float) {
@@ -104,54 +100,54 @@ class AudioPreferenceUiTest {
         val format = if (locale == "de") "Audioformat" else "Audio format"
         val description = if (locale == "de") "Audiodeskription" else "Audio description"
         val passthrough = if (locale == "de") "Audio-Passthrough" else "Audio passthrough"
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         compose.onNodeWithText(first).assertIsFocused() // The page opens on its first row.
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         compose.onNodeWithText(if (locale == "de") "Englisch" else "English").assertIsFocused().assertIsSelected()
         assertEquals(0, selections)
-        key(Key.Back)
+        compose.pressKey(Key.Back)
         compose.onNodeWithText(first).assertIsFocused()
-        key(Key.DirectionCenter)
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionDown)
         assertEquals(0, selections)
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         assertEquals(1, selections)
         compose.onNodeWithText(first).assertIsFocused()
-        key(Key.DirectionDown) // second slot is available, third is not yet available
+        compose.pressKey(Key.DirectionDown) // second slot is available, third is not yet available
         compose.onNodeWithText(if (locale == "de") "Zweite Audiosprache" else "Second audio language").assertIsFocused()
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         compose.onNodeWithText(format).assertIsFocused()
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         compose.onNodeWithText(if (locale == "de") "Automatisch" else "Automatic").assertIsFocused().assertIsSelected()
-        key(Key.DirectionDown)
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionCenter)
         assertEquals(AudioFormatPreference.PREFER_DOLBY, ui.audioFormat)
         compose.onNodeWithText(format).assertIsFocused()
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         compose.onNodeWithText(passthrough).assertIsFocused()
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         compose.onNodeWithText(description).assertIsFocused().assertIsOff()
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         compose.onNodeWithText(description).assertIsFocused().assertIsOn()
-        key(Key.DirectionDown)
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionCenter)
         compose.onNodeWithText(if (locale == "de") "Untertiteleinstellungen des Systems verwenden" else "Follow system caption settings").assertIsFocused().assertIsSelected()
-        key(Key.Back)
+        compose.pressKey(Key.Back)
         assertEquals(2, selections)
 
         // A fully populated configuration exercises the progressive third row and scroll geometry.
         compose.runOnIdle { ui = ui.copy(audioLanguages = listOf("en", "de", "fr")) }
-        key(Key.DirectionUp)
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionUp)
+        compose.pressKey(Key.DirectionDown)
         compose.onNodeWithText(if (locale == "de") "Untertitelsprache" else "Subtitle language").assertIsFocused()
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         compose.onNodeWithText(if (locale == "de") "Untertiteleinstellungen des Systems verwenden" else "Follow system caption settings")
             .assertIsFocused().assertIsSelected()
-        key(Key.Back)
-        key(Key.DirectionUp)
+        compose.pressKey(Key.Back)
+        compose.pressKey(Key.DirectionUp)
         compose.onNodeWithText(description).assertIsFocused()
         // The longer list may scroll the third row out while description has focus; it stays reachable.
-        repeat(3) { key(Key.DirectionUp) } // Audio passthrough, Audio format, Third audio language
+        repeat(3) { compose.pressKey(Key.DirectionUp) } // Audio passthrough, Audio format, Third audio language
         compose.onNodeWithText(if (locale == "de") "Dritte Audiosprache" else "Third audio language").assertIsFocused().assertIsDisplayed()
     }
 
@@ -172,21 +168,21 @@ class AudioPreferenceUiTest {
         }
         compose.onNodeWithTag("playback-options-track-automatic").assertIsFocused().assertIsSelected()
         compose.onNodeWithTag("playback-options-track-de").assertIsNotSelected()
-        key(Key.DirectionDown)
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionCenter)
         assertEquals(1, explicitCalls)
         compose.onNodeWithTag("playback-options-track-de").assertIsSelected()
-        key(Key.DirectionUp)
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionUp)
+        compose.pressKey(Key.DirectionCenter)
         assertEquals(1, automaticCalls)
         compose.onNodeWithTag("playback-options-track-automatic").assertIsFocused().assertIsSelected()
-        key(Key.DirectionUp)
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionUp)
+        compose.pressKey(Key.DirectionCenter)
         compose.onNodeWithTag("playback-options-audio").assertIsFocused()
         compose.runOnIdle { tracks = emptyList() }
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         compose.onNodeWithTag("playback-options-track-automatic").assertIsFocused()
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         assertEquals(2, automaticCalls)
     }
 

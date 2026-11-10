@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.components
 
+import at.bernhardberger.tvhplayer.testutil.pressKey
 import android.app.Application
 import android.text.InputType
 import android.view.View
@@ -7,10 +8,10 @@ import android.view.inputmethod.EditorInfo
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Column
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalView
@@ -27,9 +28,6 @@ import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.performKeyInput
-import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
@@ -53,15 +51,15 @@ class TvPasswordFieldTest {
     fun theKeyboardIsAPasswordKeyboardWithoutSuggestionsShownOrHidden() {
         show(value = SECRET)
         compose.onNodeWithTag(FIELD).requestFocus()
-        press(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         assertPasswordKeyboard()
         assertFieldText(MASKED)
         back()
         pressUntilRowIsFocused()
-        press(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         assertFieldText(SECRET)
         compose.onNodeWithTag(FIELD).requestFocus()
-        press(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         assertPasswordKeyboard()
     }
 
@@ -69,16 +67,16 @@ class TvPasswordFieldTest {
     fun okOnTheRowTogglesTheTextWithoutOpeningTheField() {
         show(value = SECRET)
         compose.onNodeWithTag(FIELD).requestFocus()
-        press(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         compose.onNodeWithText(SHOW_PASSWORD).assertIsFocused().assertIsOff()
         assertFieldText(MASKED)
 
-        press(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         compose.onNodeWithText(SHOW_PASSWORD).assertIsFocused().assertIsOn()
         assertFieldText(SECRET)
         compose.onNodeWithTag("editing").assertTextEquals("none")
 
-        press(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         compose.onNodeWithText(SHOW_PASSWORD).assertIsFocused().assertIsOff()
         assertFieldText(MASKED)
         compose.onNodeWithTag("editing").assertTextEquals("none")
@@ -97,13 +95,13 @@ class TvPasswordFieldTest {
     fun theRowIsBetweenTheFieldAndWhatFollows() {
         show(value = SECRET)
         compose.onNodeWithTag(FIELD).requestFocus()
-        press(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         compose.onNodeWithText(SHOW_PASSWORD).assertIsFocused()
-        press(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         compose.onNodeWithTag("after").assertIsFocused()
-        press(Key.DirectionUp)
+        compose.pressKey(Key.DirectionUp)
         compose.onNodeWithText(SHOW_PASSWORD).assertIsFocused()
-        press(Key.DirectionUp)
+        compose.pressKey(Key.DirectionUp)
         compose.onNodeWithTag(FIELD).assertIsFocused()
     }
 
@@ -114,9 +112,9 @@ class TvPasswordFieldTest {
         assertFieldText(SAVED)
         compose.onNodeWithText(SHOW_PASSWORD).assertIsNotEnabled().assertIsOff()
         // The disabled row keeps its place but the D-pad passes over it.
-        press(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         compose.onNodeWithTag("after").assertIsFocused()
-        press(Key.DirectionUp)
+        compose.pressKey(Key.DirectionUp)
         compose.onNodeWithTag(FIELD).assertIsFocused()
     }
 
@@ -124,14 +122,14 @@ class TvPasswordFieldTest {
     fun aReplacementPasswordEnablesTheRow() {
         show(value = "", presentationValue = SAVED)
         compose.onNodeWithTag(FIELD).requestFocus()
-        press(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         compose.onNodeWithTag("editing").assertTextEquals("password-id")
         compose.runOnIdle { value = "replacement" }
         back()
         compose.onNodeWithText(SHOW_PASSWORD).assertIsOff()
-        press(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         compose.onNodeWithText(SHOW_PASSWORD).assertIsFocused()
-        press(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         assertFieldText("replacement")
         // Emptied again, the saved password is back: it is not revealed, and nothing to toggle.
         compose.runOnIdle { value = "" }
@@ -142,7 +140,7 @@ class TvPasswordFieldTest {
     private var value by mutableStateOf("")
 
     private fun pressUntilRowIsFocused() {
-        press(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         compose.onNodeWithText(SHOW_PASSWORD).assertIsFocused()
     }
 
@@ -163,11 +161,6 @@ class TvPasswordFieldTest {
 
     private fun back() {
         compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
-        compose.waitForIdle()
-    }
-
-    private fun press(key: Key) {
-        compose.onRoot().performKeyInput { pressKey(key) }
         compose.waitForIdle()
     }
 

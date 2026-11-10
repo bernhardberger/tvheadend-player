@@ -1,5 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.testutil.tagExists
+import at.bernhardberger.tvhplayer.testutil.tagBounds
+import at.bernhardberger.tvhplayer.testutil.pressKey
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -12,10 +15,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
@@ -36,12 +39,10 @@ import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performSemanticsAction
-import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -131,7 +132,7 @@ class PlayerFooterLayoutEvidenceTest {
                 }
             }
         }
-        val footer = bounds("player-footer")
+        val footer = compose.tagBounds("player-footer")
         assertEquals(540f, footer.bottom, 1f)
         // The run-out, the content and the player's 28dp bottom margin.
         assertEquals(px(56.dp + 28.dp + 20.dp).toDouble(), footer.height.toDouble(), 1.0)
@@ -149,8 +150,8 @@ class PlayerFooterLayoutEvidenceTest {
                 )
             }
         }
-        val track = bounds("player-timeline-track")
-        val labels = bounds("player-timeline-labels")
+        val track = compose.tagBounds("player-timeline-track")
+        val labels = compose.tagBounds("player-timeline-labels")
         assertEquals(labels.center.y, track.center.y, 1f)
         assertTrue(labels.left <= track.left + 1f)
         assertTrue(labels.right >= track.right - 1f)
@@ -168,62 +169,62 @@ class PlayerFooterLayoutEvidenceTest {
             fontScale = 1f,
         )
         compose.onNodeWithTag("player-pause").assertIsFocused()
-        val track = bounds("player-timeline-track")
-        val actions = bounds("player-actions")
-        val seekbar = bounds("player-seekbar")
+        val track = compose.tagBounds("player-timeline-track")
+        val actions = compose.tagBounds("player-actions")
+        val seekbar = compose.tagBounds("player-seekbar")
         // The focus/semantics node is the track, after the 12dp the timeline keeps above its row under the programme block.
         assertEquals(px(56.dp + 12.dp).toDouble(),
-            (seekbar.top - bounds("player-footer").top - bounds("player-info-bar").height).toDouble(), 1.0)
-        assertEquals("a medium icon button", px(40.dp), bounds("player-pause").height, 1f)
+            (seekbar.top - compose.tagBounds("player-footer").top - compose.tagBounds("player-info-bar").height).toDouble(), 1.0)
+        assertEquals("a medium icon button", px(40.dp), compose.tagBounds("player-pause").height, 1f)
         assertInline(track)
-        assertFalse("the controls have no state cell", exists("player-state"))
-        val end = bounds("player-end-clock")
-        val distance = bounds("player-live-state")
+        assertFalse("the controls have no state cell", compose.tagExists("player-state"))
+        val end = compose.tagBounds("player-end-clock")
+        val distance = compose.tagBounds("player-live-state")
         compose.onNodeWithTag("player-distance", useUnmergedTree = true).assertDoesNotExist()
 
         compose.runOnIdle { behind = true }
-        assertEquals(track, bounds("player-timeline-track"))
-        assertEquals(actions, bounds("player-actions"))
-        assertEquals("the end clock keeps its place as playback falls behind", end, bounds("player-end-clock"))
-        assertEquals("the distance's box keeps its place as the distance appears", distance, bounds("player-live-state"))
+        assertEquals(track, compose.tagBounds("player-timeline-track"))
+        assertEquals(actions, compose.tagBounds("player-actions"))
+        assertEquals("the end clock keeps its place as playback falls behind", end, compose.tagBounds("player-end-clock"))
+        assertEquals("the distance's box keeps its place as the distance appears", distance, compose.tagBounds("player-live-state"))
         compose.onNodeWithTag("player-distance", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("player-go-live").assertDoesNotExist()
 
         compose.runOnIdle { feedback = "Reached the available buffer limit" }
-        assertEquals(track, bounds("player-timeline-track"))
-        assertEquals(actions, bounds("player-actions"))
-        assertEquals(end, bounds("player-end-clock"))
-        assertEquals(distance, bounds("player-live-state"))
-        val message = bounds("player-window-title")
+        assertEquals(track, compose.tagBounds("player-timeline-track"))
+        assertEquals(actions, compose.tagBounds("player-actions"))
+        assertEquals(end, compose.tagBounds("player-end-clock"))
+        assertEquals(distance, compose.tagBounds("player-live-state"))
+        val message = compose.tagBounds("player-window-title")
         assertTrue("feedback ends before the distance: $message vs $distance", message.right <= distance.left)
         assertTrue("feedback paints above the bar row", message.bottom <= track.top + 1f)
 
         compose.runOnIdle { feedback = null; previewing = true }
-        key(Key.DirectionUp)
-        assertEquals(track.top, bounds("player-timeline-track").top, 1f)
-        assertEquals(track.bottom, bounds("player-timeline-track").bottom, 1f)
+        compose.pressKey(Key.DirectionUp)
+        assertEquals(track.top, compose.tagBounds("player-timeline-track").top, 1f)
+        assertEquals(track.bottom, compose.tagBounds("player-timeline-track").bottom, 1f)
         compose.onNodeWithTag("player-actions").assertDoesNotExist()
-        assertEquals("the end clock keeps its room during a step", end, bounds("player-end-clock"))
-        assertEquals("the distance keeps its place during a step", distance, bounds("player-live-state"))
-        val target = bounds("timeshift-preview-target")
+        assertEquals("the end clock keeps its room during a step", end, compose.tagBounds("player-end-clock"))
+        assertEquals("the distance keeps its place during a step", distance, compose.tagBounds("player-live-state"))
+        val target = compose.tagBounds("timeshift-preview-target")
         val progress = compose.onNodeWithTag("player-seekbar").fetchSemanticsNode()
             .config[SemanticsProperties.ProgressBarRangeInfo].current
-        val resting = bounds("player-timeline-track")
+        val resting = compose.tagBounds("player-timeline-track")
         assertEquals(resting.left + resting.width * progress, target.center.x, 1.5f)
         assertTrue(target.left >= resting.left - 1f && target.right <= resting.right + 1f)
         assertTrue(target.bottom <= resting.top + 1f)
-        assertTrue(bounds("player-timeline-status").contains(target.center))
+        assertTrue(compose.tagBounds("player-timeline-status").contains(target.center))
         compose.onNodeWithTag("player-seekbar").assertExists()
     }
 
     @Test
     fun theBarRowKeepsTheLeftLabelTheBarAndTheEndClockApartWithTheDistanceAboveTheEnd() {
         show(behind = { true }, feedback = { null }, previewing = { false }, fontScale = 1f)
-        val track = bounds("player-timeline-track")
-        val start = bounds("player-window-start")
-        val end = bounds("player-end-clock")
-        val labels = bounds("player-timeline-labels")
-        assertFalse("the controls have no state cell", exists("player-state"))
+        val track = compose.tagBounds("player-timeline-track")
+        val start = compose.tagBounds("player-window-start")
+        val end = compose.tagBounds("player-end-clock")
+        val labels = compose.tagBounds("player-timeline-labels")
+        assertFalse("the controls have no state cell", compose.tagExists("player-state"))
         assertEquals("the left label leads the row", labels.left, start.left, 1f)
         assertTrue("the left label sits before the bar", start.right <= track.left + 1f)
         assertTrue("the end clock does not overlap the bar: $end vs $track", end.left >= track.right - 1f)
@@ -238,7 +239,7 @@ class PlayerFooterLayoutEvidenceTest {
             .config[SemanticsProperties.Text].joinToString { it.text })
         assertEquals("the end box starts one label gap after the bar",
             track.right + px(8.dp), labels.right - px(requireNotNull(endpointWidths).trailing), 1f)
-        val distance = bounds("player-distance")
+        val distance = compose.tagBounds("player-distance")
         assertEquals("the distance's right edge is the end clock's", end.right, distance.right, 0.5f)
         assertTrue("the distance sits above the bar row: $distance vs $labels", distance.bottom <= labels.top)
         compose.onNodeWithTag("player-end-tag-slot", useUnmergedTree = true).assertDoesNotExist()
@@ -247,9 +248,9 @@ class PlayerFooterLayoutEvidenceTest {
     @Test
     fun aLengthShorterThanItsBoxEndsTheRowAndLeavesItsRoomBesideTheBar() {
         show(behind = { false }, feedback = { null }, previewing = { false }, fontScale = 1f, recording = true, recordingDurationMs = 2_700_000)
-        val track = bounds("player-timeline-track")
-        val end = bounds("player-end-clock")
-        val labels = bounds("player-timeline-labels")
+        val track = compose.tagBounds("player-timeline-track")
+        val end = compose.tagBounds("player-end-clock")
+        val labels = compose.tagBounds("player-timeline-labels")
         val box = px(requireNotNull(endpointWidths).trailing)
         assertEquals("45:00", compose.onNodeWithTag("player-end-clock", useUnmergedTree = true).fetchSemanticsNode()
             .config[SemanticsProperties.Text].joinToString { it.text })
@@ -270,7 +271,7 @@ class PlayerFooterLayoutEvidenceTest {
             .config[SemanticsProperties.ContentDescription]
         assertEquals(1, descriptions.size)
         assertTrue(descriptions.none { it == "Playing" || it == "Live" })
-        assertFalse("the controls have no state cell", exists("player-state"))
+        assertFalse("the controls have no state cell", compose.tagExists("player-state"))
         for ((tag, description) in listOf("player-live-state" to "Live")) {
             val config = compose.onNodeWithTag(tag).fetchSemanticsNode().config
             assertEquals(listOf(description), config[SemanticsProperties.ContentDescription])
@@ -289,9 +290,9 @@ class PlayerFooterLayoutEvidenceTest {
             backdrop = { backdrop.value },
         )
         compose.onNodeWithTag("player-pause").assertIsFocused()
-        key(Key.DirectionUp)
+        compose.pressKey(Key.DirectionUp)
         compose.onNodeWithTag("player-seekbar").assertIsFocused()
-        key(Key.DirectionUp)
+        compose.pressKey(Key.DirectionUp)
         // Artwork is passive; Up cannot move focus out of the timeline.
         compose.onNodeWithTag("player-seekbar").assertIsFocused()
         compose.onNodeWithTag("player-go-live").assertDoesNotExist()
@@ -305,7 +306,7 @@ class PlayerFooterLayoutEvidenceTest {
         compose.onNodeWithTag("player-pause").assertIsFocused()
         compose.onNodeWithTag("player-live-status").assertDoesNotExist()
         compose.onNodeWithTag("player-go-live").assertDoesNotExist()
-        assertInline(bounds("player-timeline-track"))
+        assertInline(compose.tagBounds("player-timeline-track"))
         recordPair("en-font1.0-960x540-mdpi-d1", "live-normal-focus-pause", "player-pause", backdrop)
     }
 
@@ -313,7 +314,7 @@ class PlayerFooterLayoutEvidenceTest {
     fun captureSeekingPreview() {
         val backdrop = mutableStateOf(Backdrop.WHITE)
         show(behind = { true }, feedback = { null }, previewing = { true }, fontScale = 1f, backdrop = { backdrop.value })
-        key(Key.DirectionUp)
+        compose.pressKey(Key.DirectionUp)
         compose.onNodeWithTag("player-seekbar").assertExists()
         compose.onNodeWithTag("timeshift-preview-target", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("player-go-live").assertDoesNotExist()
@@ -338,36 +339,36 @@ class PlayerFooterLayoutEvidenceTest {
         val kind = if (recording) "recording" else "live"
         val timelineTag = "player-seekbar"
         val actionsTag = "player-actions"
-        val resting = bounds("player-timeline-track")
+        val resting = compose.tagBounds("player-timeline-track")
         // The timeline's 8dp below its row and the 4dp gap above the actions, on the 28dp bottom margin.
-        assertEquals(px(4.dp + 8.dp), bounds(actionsTag).top - bounds(timelineTag).bottom, 1f)
-        assertEquals(512f, bounds(actionsTag).bottom, 1f)
+        assertEquals(px(4.dp + 8.dp), compose.tagBounds(actionsTag).top - compose.tagBounds(timelineTag).bottom, 1f)
+        assertEquals(512f, compose.tagBounds(actionsTag).bottom, 1f)
         recordPair("de-font1.3-960x540-mdpi-d1", "$kind-resting", "player-pause", backdrop)
-        key(Key.DirectionUp)
+        compose.pressKey(Key.DirectionUp)
         compose.onNodeWithTag(timelineTag).assertIsFocused()
         recordPair("de-font1.3-960x540-mdpi-d1", "$kind-focused", timelineTag, backdrop)
         compose.runOnIdle { previewing = true }
         compose.onNodeWithTag("player-pause").assertDoesNotExist()
         compose.onNodeWithTag("timeshift-preview-target", useUnmergedTree = true).assertExists()
         recordPair("de-font1.3-960x540-mdpi-d1", "$kind-seeking", timelineTag, backdrop)
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         compose.onNodeWithTag("player-pause").assertIsFocused()
         assertTrue(previewing) // Owner deliberately leaves the dispatched seek pending.
         assertEquals(1, commits)
-        key(Key.DirectionUp)
-        key(Key.DirectionUp)
+        compose.pressKey(Key.DirectionUp)
+        compose.pressKey(Key.DirectionUp)
         // Without markers above it, Up stays on the timeline and commits the pending preview.
         compose.onNodeWithTag("player-seekbar").assertIsFocused()
         assertTrue(previewing)
         assertEquals(2, commits)
         compose.runOnIdle { standalone = true }
-        val previewTrack = bounds("player-timeline-track")
+        val previewTrack = compose.tagBounds("player-timeline-track")
         // A quick step plays in the Banner, which rests one action row lower than the controls.
         val drop = with(compose.density) { PlayerBannerDrop.toPx() }
         assertEquals(resting.top + drop, previewTrack.top, 1f)
         assertEquals(resting.bottom + drop, previewTrack.bottom, 1f)
         // The Banner keeps the state cell's room before the bar; the controls hand it to the bar.
-        assertEquals(resting.left + bounds("player-state").width + px(8.dp), previewTrack.left, 1f)
+        assertEquals(resting.left + compose.tagBounds("player-state").width + px(8.dp), previewTrack.left, 1f)
         assertEquals(resting.right, previewTrack.right, 1f)
     }
 
@@ -375,13 +376,13 @@ class PlayerFooterLayoutEvidenceTest {
         var commits = 0
         show(behind = { true }, feedback = { null }, previewing = { true }, fontScale = 1.3f,
             recording = true, marks = chapterMarks(900_000L, 2_700_000L), onCommitSeek = { commits++ })
-        key(Key.DirectionUp)
-        key(Key.DirectionUp)
+        compose.pressKey(Key.DirectionUp)
+        compose.pressKey(Key.DirectionUp)
         compose.onNodeWithTag("recording-marker-target").assertIsFocused()
         assertEquals(1, commits)
-        key(Key.Back)
+        compose.pressKey(Key.Back)
         compose.onNodeWithTag("player-seekbar").assertIsFocused()
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         compose.onNodeWithTag("player-pause").assertIsFocused()
     }
 
@@ -398,18 +399,18 @@ class PlayerFooterLayoutEvidenceTest {
             recording = true, backdrop = { backdrop.value },
             marks = chapterMarks(900_000L, 2_700_000L, 3_599_999L),
             markerNavigation = navigation, markerRevision = 42L, onSeekMarker = seeks::add)
-        key(Key.DirectionUp)
-        key(Key.DirectionUp)
-        val track = bounds("player-timeline-track")
-        assertTrue(track.left > bounds("player-timeline-labels").left + 8f)
-        assertTrue(track.right < bounds("player-timeline-labels").right - 8f)
-        assertEquals(track, bounds("player-seekbar"))
+        compose.pressKey(Key.DirectionUp)
+        compose.pressKey(Key.DirectionUp)
+        val track = compose.tagBounds("player-timeline-track")
+        assertTrue(track.left > compose.tagBounds("player-timeline-labels").left + 8f)
+        assertTrue(track.right < compose.tagBounds("player-timeline-labels").right - 8f)
+        assertEquals(track, compose.tagBounds("player-seekbar"))
         fun assertMarker(fraction: Float) {
             compose.onNodeWithTag("recording-marker-target").assertIsFocused()
             assertEquals(42L, navigation.ownerRevision)
-            val button = bounds("recording-marker-target")
-            val label = bounds("recording-marker-overlay")
-            val tick = bounds("recording-selected-marker")
+            val button = compose.tagBounds("recording-marker-target")
+            val label = compose.tagBounds("recording-marker-overlay")
+            val tick = compose.tagBounds("recording-selected-marker")
             val position = track.left + track.width * fraction
             assertEquals(position.coerceIn(track.left + 0.5f, track.right - 0.5f), tick.center.x, 1f)
             // The pill centres on its tick and may reach past the track over the endpoint labels,
@@ -424,32 +425,32 @@ class PlayerFooterLayoutEvidenceTest {
             assertTrue(button.right <= maxOf(track.right, screen.right - margin) + 1f)
         }
         assertMarker(0.25f) // midpoint entry chooses the earlier of the two equally distant marks
-        key(Key.DirectionRight)
+        compose.pressKey(Key.DirectionRight)
         assertMarker(0.75f)
         recordPair(if (fontScale == 1f) "en-font1.0-960x540-mdpi-d1" else "de-font1.3-960x540-mdpi-d1",
             "recording-marker-selected-75", "recording-marker-target", backdrop)
-        key(Key.DirectionLeft)
+        compose.pressKey(Key.DirectionLeft)
         assertMarker(0.25f)
-        key(Key.DirectionLeft)
+        compose.pressKey(Key.DirectionLeft)
         assertMarker(0f)
-        key(Key.DirectionRight)
-        key(Key.DirectionRight)
-        key(Key.DirectionRight)
+        compose.pressKey(Key.DirectionRight)
+        compose.pressKey(Key.DirectionRight)
+        compose.pressKey(Key.DirectionRight)
         assertMarker(3_599_999f / 3_600_000f)
         // Up above the markers closes them and returns to the timeline; artwork stays passive.
-        key(Key.DirectionUp)
+        compose.pressKey(Key.DirectionUp)
         assertFalse(navigation.open)
         compose.onNodeWithTag("player-seekbar").assertIsFocused()
-        key(Key.DirectionUp)
+        compose.pressKey(Key.DirectionUp)
         assertMarker(0.25f)
-        key(Key.Back)
+        compose.pressKey(Key.Back)
         compose.onNodeWithTag("player-seekbar").assertIsFocused()
-        key(Key.DirectionUp)
+        compose.pressKey(Key.DirectionUp)
         assertMarker(0.25f)
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         compose.onNodeWithTag("player-seekbar").assertIsFocused()
-        key(Key.DirectionUp)
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionUp)
+        compose.pressKey(Key.DirectionCenter)
         assertEquals(listOf(900_000L), seeks)
         compose.onNodeWithTag("player-seekbar").assertIsFocused()
     }
@@ -461,7 +462,7 @@ class PlayerFooterLayoutEvidenceTest {
     private fun previewDismissal(recording: Boolean) {
         var preview by mutableStateOf(true)
         show(behind = { true }, feedback = { null }, previewing = { preview }, fontScale = 1.3f, recording = recording)
-        key(Key.DirectionUp)
+        compose.pressKey(Key.DirectionUp)
         val timeline = "player-seekbar"
         compose.onNodeWithTag(timeline).assertIsFocused()
         compose.onNodeWithTag("player-pause").assertDoesNotExist()
@@ -470,7 +471,7 @@ class PlayerFooterLayoutEvidenceTest {
         compose.onNodeWithTag(timeline).assertIsFocused()
         compose.onNodeWithTag("player-pause").assertExists()
         compose.onNodeWithTag("timeshift-preview-target", useUnmergedTree = true).assertDoesNotExist()
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         compose.onNodeWithTag("player-pause").assertIsFocused()
     }
 
@@ -500,7 +501,7 @@ class PlayerFooterLayoutEvidenceTest {
         }
         compose.onNodeWithTag("departing-action").assertIsFocused()
         compose.mainClock.autoAdvance = false
-        key(Key.Back)
+        compose.pressKey(Key.Back)
         compose.waitForIdle()
         compose.mainClock.advanceTimeByFrame()
         compose.onNodeWithTag("back-root").assertIsFocused()
@@ -539,7 +540,7 @@ class PlayerFooterLayoutEvidenceTest {
 
     @Test fun idlePauseIsTransparentButNativeFocusAndPressStillPaint() {
         show(behind = { false }, feedback = { null }, previewing = { false }, fontScale = 1f)
-        val pause = bounds("player-pause")
+        val pause = compose.tagBounds("player-pause")
         fun sample(x: Float, y: Float): Int = draw().let { bitmap ->
             bitmap.getPixel(x.toInt(), y.toInt()).also { bitmap.recycle() }
         }
@@ -548,7 +549,7 @@ class PlayerFooterLayoutEvidenceTest {
         compose.waitForIdle()
         val pressed = sample(pause.center.x, pause.top + 8f)
         compose.onRoot().performKeyInput { keyUp(Key.DirectionCenter) }
-        key(Key.DirectionRight)
+        compose.pressKey(Key.DirectionRight)
         compose.onNodeWithTag("player-stop").assertIsFocused()
         val idle = sample(pause.center.x, pause.top + 8f)
         assertEquals(sample(pause.left - 8f, pause.top + 8f), idle)
@@ -569,7 +570,7 @@ class PlayerFooterLayoutEvidenceTest {
             }
         }
         fun brightness(): Long {
-            val rect = bounds("endpoint")
+            val rect = compose.tagBounds("endpoint")
             val bitmap = draw()
             var sum = 0L
             for (y in rect.top.toInt() until rect.bottom.toInt()) {
@@ -611,9 +612,9 @@ class PlayerFooterLayoutEvidenceTest {
         val feedback = compose.onNodeWithText("Diese Position ist nicht mehr im Puffer.")
         feedback.assertExists()
         val message = feedback.fetchSemanticsNode().boundsInRoot
-        val track = bounds("player-timeline-track")
-        val end = bounds("player-end-clock")
-        val distance = bounds("player-distance")
+        val track = compose.tagBounds("player-timeline-track")
+        val end = compose.tagBounds("player-end-clock")
+        val distance = compose.tagBounds("player-distance")
         assertTrue("message $message track $track", message.bottom <= track.top + 1f)
         assertTrue("the end clock keeps clear of the bar: $end $track", end.left >= track.right - 1f)
         assertTrue("the message ends before the distance: $message $distance", message.right <= distance.left)
@@ -635,11 +636,11 @@ class PlayerFooterLayoutEvidenceTest {
         val labels = compose.onNodeWithTag("player-timeline-labels", useUnmergedTree = true)
         val text = compose.onNodeWithText("0:30:00", useUnmergedTree = true)
         val original = text.fetchSemanticsNode().boundsInRoot
-        val track = bounds("player-timeline-track")
+        val track = compose.tagBounds("player-timeline-track")
         recordPair("en-font1.0-960x540-mdpi-d1", "recording-playing-endpoints", "player-pause", backdrop)
         compose.runOnIdle { paused = true }
         assertEquals(original, text.fetchSemanticsNode().boundsInRoot)
-        assertEquals(track, bounds("player-timeline-track"))
+        assertEquals(track, compose.tagBounds("player-timeline-track"))
         assertTrue(labels.fetchSemanticsNode().boundsInRoot.width > 0)
         val description = compose.onNodeWithTag("player-seekbar").fetchSemanticsNode()
             .config[SemanticsProperties.ContentDescription].joinToString()
@@ -711,7 +712,7 @@ class PlayerFooterLayoutEvidenceTest {
             val node = compose.onNodeWithTag("sampled-seekbar").fetchSemanticsNode()
             assertEquals(fraction, node.config[SemanticsProperties.ProgressBarRangeInfo].current, 0.00001f)
             assertTrue(node.config[SemanticsProperties.ContentDescription].joinToString().contains(if (atLive) "Live" else "0:30"))
-            assertEquals(fraction, bounds("player-timeline-fill").width / bounds("player-timeline-track").width, 0.005f)
+            assertEquals(fraction, compose.tagBounds("player-timeline-fill").width / compose.tagBounds("player-timeline-track").width, 0.005f)
         }
         assertSample(atLive = true)
         compose.onNodeWithText("−1:30").assertExists()
@@ -725,7 +726,7 @@ class PlayerFooterLayoutEvidenceTest {
         compose.onNodeWithText("−0:30", useUnmergedTree = true).assertExists()
         capture("$locale-font$fontScale-missing-epg-full-preview", focus = "none")
         compose.runOnIdle { standalone = true }
-        assertEquals(2f / 3, bounds("player-timeline-fill").width / bounds("player-timeline-track").width, 0.005f)
+        assertEquals(2f / 3, compose.tagBounds("player-timeline-fill").width / compose.tagBounds("player-timeline-track").width, 0.005f)
         // The step is spoken once it has been dispatched.
         compose.runOnIdle { settled = true }
         compose.waitForIdle()
@@ -760,10 +761,10 @@ class PlayerFooterLayoutEvidenceTest {
         var preview by mutableStateOf(true)
         show({ false }, { null }, { preview }, 1f, paused = { true }, timingKnown = { false },
             programmeWindowsAvailable = false)
-        key(Key.DirectionUp)
+        compose.pressKey(Key.DirectionUp)
         compose.onNodeWithTag("player-seekbar").assertIsFocused()
-        val track = bounds("player-timeline-track")
-        val slot = bounds("player-timeline-labels")
+        val track = compose.tagBounds("player-timeline-track")
+        val slot = compose.tagBounds("player-timeline-labels")
         compose.runOnIdle { preview = false }
         compose.onNodeWithTag("player-seekbar").assertIsFocused()
         compose.onNodeWithText("00:00").assertDoesNotExist()
@@ -776,14 +777,14 @@ class PlayerFooterLayoutEvidenceTest {
             .assert(androidx.compose.ui.test.SemanticsMatcher.keyNotDefined(SemanticsProperties.ProgressBarRangeInfo))
         compose.onNodeWithTag("player-seekbar")
             .assert(androidx.compose.ui.test.SemanticsMatcher.keyNotDefined(SemanticsProperties.ProgressBarRangeInfo))
-        assertEquals(slot, bounds("player-timeline-labels"))
-        assertEquals(track.top, bounds("player-timeline-track").top, 0f)
-        assertEquals(track.bottom, bounds("player-timeline-track").bottom, 0f)
+        assertEquals(slot, compose.tagBounds("player-timeline-labels"))
+        assertEquals(track.top, compose.tagBounds("player-timeline-track").top, 0f)
+        assertEquals(track.bottom, compose.tagBounds("player-timeline-track").bottom, 0f)
         compose.onNodeWithTag("player-seekbar").assert(androidx.compose.ui.test.SemanticsMatcher("paused timing unavailable") {
             it.config[SemanticsProperties.ContentDescription].joinToString().contains("Paused", ignoreCase = true)
         })
         capture("en-font1.0-960x540-mdpi-d1-paused-dismissed-unknown", focus = "player-seekbar")
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         compose.onNodeWithTag("player-pause").assertIsFocused()
     }
 
@@ -802,17 +803,17 @@ class PlayerFooterLayoutEvidenceTest {
     @Test
     fun focusGrowthSurvivesSeekbarReturnAndSettledFrame() {
         show({ false }, { null }, { false }, 1f)
-        val nominalActions = bounds("player-actions")
-        val track = bounds("player-timeline-track")
-        key(Key.DirectionUp)
+        val nominalActions = compose.tagBounds("player-actions")
+        val track = compose.tagBounds("player-timeline-track")
+        compose.pressKey(Key.DirectionUp)
         compose.onNodeWithTag("player-seekbar").assertIsFocused()
         compose.mainClock.autoAdvance = false
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         compose.onNodeWithTag("player-pause").assertIsFocused()
         compose.mainClock.advanceTimeByFrame()
         compose.mainClock.advanceTimeBy(96)
         val mid = draw()
-        val button = bounds("player-pause")
+        val button = compose.tagBounds("player-pause")
         val x = button.center.x.toInt()
         val y = nominalActions.top.toInt() - 1
         val midOverflow = android.graphics.Color.red(mid.getPixel(x, y))
@@ -825,8 +826,8 @@ class PlayerFooterLayoutEvidenceTest {
         assertTrue("mid-fade overflow cropped: $midOverflow", midOverflow > 90)
         assertTrue("settled overflow cropped: $settledOverflow", settledOverflow > 150)
         assertEquals("the action row stays fully opaque across seekbar focus", settledInterior, midInterior)
-        assertEquals(nominalActions, bounds("player-actions"))
-        assertEquals(track, bounds("player-timeline-track"))
+        assertEquals(nominalActions, compose.tagBounds("player-actions"))
+        assertEquals(track, compose.tagBounds("player-timeline-track"))
         capture("en-font1.0-960x540-mdpi-d1-white-focus-settled")
         mid.recycle(); settled.recycle()
     }
@@ -972,25 +973,14 @@ class PlayerFooterLayoutEvidenceTest {
     }
 
     private fun assertInline(track: androidx.compose.ui.geometry.Rect) {
-        val start = bounds("player-window-start")
-        val end = bounds("player-end-clock")
+        val start = compose.tagBounds("player-window-start")
+        val end = compose.tagBounds("player-end-clock")
         assertTrue(start.center.y >= track.top - 1f && start.center.y <= track.bottom + 1f)
         assertTrue(end.center.y >= track.top - 1f && end.center.y <= track.bottom + 1f)
         assertTrue(start.right <= track.left + 1f)
         assertTrue(end.left >= track.right - 1f)
-        assertTrue(bounds("player-timeline-labels").bottom <= track.bottom + px(8.dp))
+        assertTrue(compose.tagBounds("player-timeline-labels").bottom <= track.bottom + px(8.dp))
     }
-
-    private fun key(key: Key) {
-        compose.onRoot().performKeyInput { pressKey(key) }
-        compose.waitForIdle()
-    }
-
-    private fun exists(tag: String) =
-        compose.onAllNodes(androidx.compose.ui.test.hasTestTag(tag), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
-
-    private fun bounds(tag: String) =
-        compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
 
     private fun px(value: androidx.compose.ui.unit.Dp) = with(compose.density) { value.toPx() }
 
@@ -1013,7 +1003,7 @@ class PlayerFooterLayoutEvidenceTest {
                 appendLine("fontScale=${if (prefix.contains("font1.3")) "1.3" else "1.0"}")
                 appendLine("backdrop=${next.fileName}")
                 appendLine("focus=$focusedTag")
-                appendLine("focusedBottomPx=${bounds(focusedTag).bottom}")
+                appendLine("focusedBottomPx=${compose.tagBounds(focusedTag).bottom}")
             }
             for (directory in captureDirectories()) {
                 CaptureOutput.writeText(File(directory, "$name.txt")) { note }

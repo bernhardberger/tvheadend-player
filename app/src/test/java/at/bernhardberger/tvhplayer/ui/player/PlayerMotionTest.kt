@@ -1,16 +1,14 @@
 package at.bernhardberger.tvhplayer.ui.player
 
-import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvhplayer.testutil.drawnBrightness
+import at.bernhardberger.tvhplayer.testutil.changeState
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvhplayer.ui.components.PlaybackOptionsOverlayFrame
 
 import android.app.Application
-import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.view.View
 import androidx.compose.foundation.focusable
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Text
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.foundation.background
@@ -23,11 +21,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshots.Snapshot
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.focus.FocusRequester
@@ -53,14 +49,11 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertCountEquals
-import androidx.compose.ui.test.assertContentDescriptionEquals
-import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -68,7 +61,6 @@ import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
-import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.core.PlayerForegroundContext
 import at.bernhardberger.tvhplayer.core.PlayerForegroundLayer
@@ -88,7 +80,6 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import kotlin.time.Instant
 
 /**
  * Player motion never holds focus, keys or semantics: leaving content gives them up on
@@ -118,7 +109,7 @@ class PlayerMotionTest {
         compose.onNodeWithTag("controls-action").assertIsFocused()
 
         compose.mainClock.autoAdvance = false
-        change { visible = false }
+        compose.changeState { visible = false }
         compose.mainClock.advanceTimeByFrame()
 
         assertTrue("controls still fade out", composed)
@@ -188,7 +179,7 @@ class PlayerMotionTest {
         val firstRow = rootRowTags.single { compose.onNodeWithTag(it).isFocusedNow() }
 
         compose.mainClock.autoAdvance = false
-        change {
+        compose.changeState {
             open = false
             restore = true
         }
@@ -196,7 +187,7 @@ class PlayerMotionTest {
         compose.onNodeWithTag("player-settings").assertIsFocused()
 
         // Reopen 32 ms into the 150 ms exit.
-        change { open = true }
+        compose.changeState { open = true }
         repeat(2) { compose.mainClock.advanceTimeByFrame() }
         compose.onAllNodesWithTag("playback-options-overlay").assertCountEquals(1)
         compose.onNodeWithTag(firstRow).assertIsFocused()
@@ -222,19 +213,19 @@ class PlayerMotionTest {
         compose.onNode(isFocused() and hasText("Fill 16:9")).assertExists()
 
         compose.mainClock.autoAdvance = false
-        change { page = PlaybackOptionsPage.ROOT }
+        compose.changeState { page = PlaybackOptionsPage.ROOT }
         repeat(2) { compose.mainClock.advanceTimeByFrame() }
         compose.onNodeWithTag("playback-options-display").assertIsFocused()
 
         // Back to the display page 32 ms in, while it is still leaving.
-        change { page = PlaybackOptionsPage.DISPLAY }
+        compose.changeState { page = PlaybackOptionsPage.DISPLAY }
         repeat(2) { compose.mainClock.advanceTimeByFrame() }
         compose.onNode(isFocused() and hasText("Fill 16:9")).assertExists()
         compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
         assertEquals(listOf(AspectRatioMode.FORCE_16_9), aspectChanges)
 
         // And forward to the root again, while it is still leaving.
-        change { page = PlaybackOptionsPage.ROOT }
+        compose.changeState { page = PlaybackOptionsPage.ROOT }
         repeat(2) { compose.mainClock.advanceTimeByFrame() }
         compose.onNodeWithTag("playback-options-display").assertIsFocused()
         compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
@@ -259,7 +250,7 @@ class PlayerMotionTest {
         compose.onAllNodesWithTag("playback-options-title").assertCountEquals(1)
 
         compose.mainClock.autoAdvance = false
-        change { page = PlaybackOptionsPage.STATS }
+        compose.changeState { page = PlaybackOptionsPage.STATS }
         compose.mainClock.advanceTimeByFrame()
         compose.onAllNodesWithTag("playback-options-title").assertCountEquals(1)
         compose.onAllNodesWithTag("playback-options-header-back").assertCountEquals(1)
@@ -290,21 +281,21 @@ class PlayerMotionTest {
         val track = fill().fetchSemanticsNode().size.width / 0.2f
 
         compose.mainClock.autoAdvance = false
-        change { progress = 0.8f }
+        compose.changeState { progress = 0.8f }
         compose.mainClock.advanceTimeByFrame()
         compose.mainClock.advanceTimeBy(64)
         val gliding = fill().fetchSemanticsNode().size.width / track
         assertTrue("within a programme the fill glides, was $gliding", gliding > 0.21f && gliding < 0.79f)
         compose.mainClock.advanceTimeBy(1_000)
 
-        change {
+        compose.changeState {
             progress = 0.3f
             key = "channel-2" to 7L
         }
         compose.mainClock.advanceTimeByFrame()
         assertEquals(0.3f, fill().fetchSemanticsNode().size.width / track, 0.01f)
 
-        change {
+        compose.changeState {
             progress = 0.9f
             key = "channel-2" to 8L
         }
@@ -327,16 +318,16 @@ class PlayerMotionTest {
                 }
             }
         }
-        change { layers.showControls() }
+        compose.changeState { layers.showControls() }
         compose.waitForIdle()
         val settled = chromeTops()
         compose.mainClock.autoAdvance = false
         fun hide() {
-            change { layers.core.chrome.hideControls() }
+            compose.changeState { layers.core.chrome.hideControls() }
             compose.mainClock.advanceTimeBy(1_000)
             compose.onNodeWithTag("player-footer").assertDoesNotExist()
         }
-        fun zap(to: Long) = change {
+        fun zap(to: Long) = compose.changeState {
             channel = ChannelId(to)
             layers.onChannelTuneRequested()
         }
@@ -351,7 +342,7 @@ class PlayerMotionTest {
         // A viewer's reveal still moves header down and footer up into place, and a zap
         // during that entry neither restarts nor cancels it.
         hide()
-        change { layers.showControls() }
+        compose.changeState { layers.showControls() }
         repeat(2) { compose.mainClock.advanceTimeByFrame() }
         val (headerTop, footerTop) = chromeTops()
         assertTrue("the header did not come down", headerTop < settled.first)
@@ -387,14 +378,14 @@ class PlayerMotionTest {
         compose.onNodeWithTag("player-banner").assertExists()
         val bannerTop = tops().single()
         val infoArea = compose.onNodeWithTag("player-info-bar", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        val bannerInk = ink(view, infoArea)
+        val bannerInk = compose.drawnBrightness(view, infoArea)
         compose.mainClock.autoAdvance = false
 
-        change { layers.showControls() }
+        compose.changeState { layers.showControls() }
         compose.mainClock.advanceTimeByFrame()
         assertEquals("the Banner left at once, without a second copy", 1, tops().size)
         assertEquals("the info jumped on reveal", bannerTop, tops().single(), 0.5f)
-        assertEquals("the taken-over info was not drawn on the first frame", bannerInk, ink(view, infoArea), bannerInk * 0.05f)
+        assertEquals("the taken-over info was not drawn on the first frame", bannerInk, compose.drawnBrightness(view, infoArea), bannerInk * 0.05f)
         compose.mainClock.advanceTimeBy(PlayerMotion.PanelMs / 2L)
         val rising = tops().single()
         assertTrue("the info did not rise gradually, was $rising", rising < bannerTop - 0.5f)
@@ -415,25 +406,25 @@ class PlayerMotionTest {
         val end = digits("1").right
 
         for (next in listOf("12", "123")) {
-            change { number = next }
+            compose.changeState { number = next }
             compose.waitForIdle()
             compose.onNodeWithText(next.dropLast(1)).assertDoesNotExist()
             assertEquals("the field is sized for the whole number at once", pending, width())
             assertEquals("$next grew from the field's end", end, digits(next).right, 0.5f)
         }
         val settled = digits("123")
-        change { target = ChannelNumberTarget.Channel("123", "One", null) }
+        compose.changeState { target = ChannelNumberTarget.Channel("123", "One", null) }
         compose.waitForIdle()
         compose.onNodeWithText("One").assertExists()
         assertTrue("the destination follows the field", width() > pending)
         assertTrue(compose.onNodeWithText("One").fetchSemanticsNode().boundsInRoot.left > settled.right)
         assertEquals(settled, digits("123"))
-        change { target = ChannelNumberTarget.None }
+        compose.changeState { target = ChannelNumberTarget.None }
         compose.waitForIdle()
         compose.onNodeWithText("No channel").assertExists()
         compose.onNodeWithText("One").assertDoesNotExist()
         assertEquals(settled, digits("123"))
-        change { target = ChannelNumberTarget.Pending }
+        compose.changeState { target = ChannelNumberTarget.Pending }
         compose.waitForIdle()
         compose.onNodeWithTag("channel-number-target").assertDoesNotExist()
         assertEquals("pending has no destination compartment", pending, width())
@@ -454,30 +445,30 @@ class PlayerMotionTest {
         // Tabular digits: the one digit is one cell wide, at the end of the three-digit field.
         val one = compose.onNodeWithTag("channel-number-digits").fetchSemanticsNode().boundsInRoot
         fun cell(index: Int) = Rect(one.right - (3 - index) * one.width, one.top, one.right - (2 - index) * one.width, one.bottom)
-        val lastAtRest = ink(view, cell(2))
+        val lastAtRest = compose.drawnBrightness(view, cell(2))
         assertTrue(lastAtRest > 0f)
-        assertEquals(0f, ink(view, cell(1)))
+        assertEquals(0f, compose.drawnBrightness(view, cell(1)))
         compose.mainClock.autoAdvance = false
 
-        change { number = "12" }
+        compose.changeState { number = "12" }
         compose.mainClock.advanceTimeByFrame()
-        assertEquals("the earlier digit starts from where it stood", 0f, ink(view, cell(1)), lastAtRest * 0.05f)
-        val arriving = ink(view, cell(2))
+        assertEquals("the earlier digit starts from where it stood", 0f, compose.drawnBrightness(view, cell(1)), lastAtRest * 0.05f)
+        val arriving = compose.drawnBrightness(view, cell(2))
         compose.mainClock.advanceTimeBy(PlayerMotion.ShortMs / 2L)
-        val pushing = ink(view, cell(1))
+        val pushing = compose.drawnBrightness(view, cell(1))
         assertTrue("the earlier digit slides start-ward: $pushing", pushing > 0f)
-        assertTrue("the new digit fades in at the end: $arriving", ink(view, cell(2)) > arriving)
+        assertTrue("the new digit fades in at the end: $arriving", compose.drawnBrightness(view, cell(2)) > arriving)
 
         // A digit mid-push: the earlier digits carry on from where they are; none is lost or snaps home.
-        change { number = "123" }
+        compose.changeState { number = "123" }
         compose.mainClock.advanceTimeByFrame()
         compose.onNodeWithText("123").assertExists()
-        assertEquals("the first digit did not jump to its rest", 0f, ink(view, cell(0)), lastAtRest * 0.05f)
-        assertTrue("the first digit did not restart from the end", ink(view, cell(1)) > 0f)
+        assertEquals("the first digit did not jump to its rest", 0f, compose.drawnBrightness(view, cell(0)), lastAtRest * 0.05f)
+        assertTrue("the first digit did not restart from the end", compose.drawnBrightness(view, cell(1)) > 0f)
         // The fading-in end digit stays in its cell as the next one pushes it, never end-ward past the field.
-        assertEquals("nothing spills past the field's end", 0f, ink(view, cell(3)))
+        assertEquals("nothing spills past the field's end", 0f, compose.drawnBrightness(view, cell(3)))
         compose.mainClock.advanceTimeBy(PlayerMotion.ShortMs + 100L)
-        for (index in 0..2) assertTrue("cell $index holds its digit", ink(view, cell(index)) > 0f)
+        for (index in 0..2) assertTrue("cell $index holds its digit", compose.drawnBrightness(view, cell(index)) > 0f)
     }
 
     @Test fun reducedMotionSnapsAppendedDigitsToRestOnTheNextFrame() {
@@ -502,29 +493,29 @@ class PlayerMotionTest {
         compose.waitForIdle()
         val one = compose.onNodeWithTag("channel-number-digits").fetchSemanticsNode().boundsInRoot
         fun cell(index: Int) = Rect(one.right - (3 - index) * one.width, one.top, one.right - (2 - index) * one.width, one.bottom)
-        val firstAtRest = ink(view, cell(2))
+        val firstAtRest = compose.drawnBrightness(view, cell(2))
         assertTrue(firstAtRest > 0f)
         compose.mainClock.autoAdvance = false
 
         if (interrupt) {
-            change { number = "12" }
+            compose.changeState { number = "12" }
             compose.mainClock.advanceTimeByFrame()
             compose.mainClock.advanceTimeBy(48L)
-            val sliding = ink(view, cell(1))
+            val sliding = compose.drawnBrightness(view, cell(1))
             assertTrue("the append to interrupt is still sliding: $sliding of $firstAtRest", sliding in 1f..(firstAtRest * 0.95f))
         }
-        change {
+        compose.changeState {
             motionScale.scaleFactor = 0f
             number = if (interrupt) "123" else "12"
         }
         compose.mainClock.advanceTimeByFrame()
         val occupied = (3 - number.length)..2
-        val nextFrame = occupied.map { ink(view, cell(it)) }
+        val nextFrame = occupied.map { compose.drawnBrightness(view, cell(it)) }
         assertEquals("the earlier digit snaps straight to its rest cell", firstAtRest, nextFrame.first(), firstAtRest * 0.01f)
         assertTrue("every digit is drawn at rest on the next frame: $nextFrame", nextFrame.all { it > 0f })
         compose.mainClock.advanceTimeBy(PlayerMotion.ShortMs + 100L)
         occupied.forEachIndexed { index, position ->
-            assertEquals("digit $index did not move after the next frame", nextFrame[index], ink(view, cell(position)), firstAtRest * 0.01f)
+            assertEquals("digit $index did not move after the next frame", nextFrame[index], compose.drawnBrightness(view, cell(position)), firstAtRest * 0.01f)
         }
     }
 
@@ -545,17 +536,17 @@ class PlayerMotionTest {
             Rect(row.left + IdentityInset.toPx(), row.center.y - ChipHeight.toPx() / 2,
                 row.left + (IdentityInset + ChipWidth).toPx(), row.center.y + ChipHeight.toPx() / 2)
         }
-        assertTrue("an empty tile waits for the match", ink(view, chip) > 0f)
-        change { target = ChannelNumberTarget.None }
+        assertTrue("an empty tile waits for the match", compose.drawnBrightness(view, chip) > 0f)
+        compose.changeState { target = ChannelNumberTarget.None }
         compose.waitForIdle()
-        assertTrue("no channel keeps the empty tile", ink(view, chip) > 0f)
+        assertTrue("no channel keeps the empty tile", compose.drawnBrightness(view, chip) > 0f)
         val digits = compose.onNodeWithTag("channel-number-digits").fetchSemanticsNode().boundsInRoot
         val name = compose.onNodeWithTag("channel-number-target").fetchSemanticsNode().boundsInRoot
 
-        change { target = ChannelNumberTarget.Channel("12", "Harbor", null) }
+        compose.changeState { target = ChannelNumberTarget.Channel("12", "Harbor", null) }
         compose.waitForIdle()
         compose.onNodeWithTag("channel-number-picon", useUnmergedTree = true).assertDoesNotExist()
-        assertEquals("the chip is left empty, without a tile", 0f, ink(view, chip))
+        assertEquals("the chip is left empty, without a tile", 0f, compose.drawnBrightness(view, chip))
         assertEquals("the number stands once", 1, compose.onAllNodesWithText("12", useUnmergedTree = true).fetchSemanticsNodes().size)
         assertEquals(digits, compose.onNodeWithTag("channel-number-digits").fetchSemanticsNode().boundsInRoot)
         assertEquals(name.left, compose.onNodeWithText("Harbor").fetchSemanticsNode().boundsInRoot.left, 0.5f)
@@ -572,7 +563,7 @@ class PlayerMotionTest {
         assertEquals(listOf("1"), spoken()[SemanticsProperties.ContentDescription])
         compose.mainClock.autoAdvance = false
 
-        change { number = "12"; target = ChannelNumberTarget.Channel("12", "Harbor Sport HD", null) }
+        compose.changeState { number = "12"; target = ChannelNumberTarget.Channel("12", "Harbor Sport HD", null) }
         repeat(10) { frame ->
             compose.mainClock.advanceTimeByFrame()
             assertEquals("frame $frame: one announcement while the entry moves", listOf("12, Harbor Sport HD"),
@@ -583,11 +574,11 @@ class PlayerMotionTest {
             assertTrue(part, compose.onNodeWithTag(part, useUnmergedTree = true).fetchSemanticsNode().config
                 .contains(SemanticsProperties.HideFromAccessibility))
         }
-        change { number = "999"; target = ChannelNumberTarget.None }
+        compose.changeState { number = "999"; target = ChannelNumberTarget.None }
         compose.mainClock.advanceTimeByFrame()
         assertEquals(listOf("999, No channel"), spoken()[SemanticsProperties.ContentDescription])
 
-        change { number = ""; target = ChannelNumberTarget.Pending }
+        compose.changeState { number = ""; target = ChannelNumberTarget.Pending }
         compose.mainClock.advanceTimeByFrame()
         compose.onNodeWithText("999").assertExists()
         assertFalse("a leaving entry is silent", spoken().contains(SemanticsProperties.LiveRegion))
@@ -609,14 +600,14 @@ class PlayerMotionTest {
         val layouts = mutableMapOf<ChannelNumberPlate, List<Rect>>()
         val gapInk = mutableMapOf<ChannelNumberPlate, Float>()
         for (style in ChannelNumberPlate.entries) {
-            change { plate = style }
+            compose.changeState { plate = style }
             compose.waitForIdle()
             layouts[style] = tags.map { compose.onNodeWithTag(it, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot } +
                 compose.onNodeWithTag("channel-number-digits").fetchSemanticsNode().boundsInRoot
             // Between the chip and the field only the plate draws.
             val row = layouts.getValue(style).first()
             val gap = with(compose.density) { row.left + (IdentityInset + ChipWidth).toPx() + 2f }
-            gapInk[style] = ink(view, Rect(gap, row.center.y - 4f, gap + 10f, row.center.y + 4f))
+            gapInk[style] = compose.drawnBrightness(view, Rect(gap, row.center.y - 4f, gap + 10f, row.center.y + 4f))
         }
         assertEquals(layouts[ChannelNumberPlate.Dark], layouts[ChannelNumberPlate.Light])
         assertEquals(layouts[ChannelNumberPlate.Dark], layouts[ChannelNumberPlate.None])
@@ -638,29 +629,29 @@ class PlayerMotionTest {
         }
         compose.waitForIdle()
         compose.mainClock.autoAdvance = false
-        change { number = "1" }
+        compose.changeState { number = "1" }
         compose.mainClock.advanceTimeByFrame()
         val row = compose.onNodeWithTag("number").fetchSemanticsNode().boundsInRoot
         val gapX = with(compose.density) { row.left + (IdentityInset + ChipWidth).toPx() + 2f }
         val gap = Rect(gapX, row.center.y - 4f, gapX + 10f, row.center.y + 4f)
-        fun plate() = ink(view, gap)
+        fun plate() = compose.drawnBrightness(view, gap)
 
         compose.mainClock.advanceTimeBy(PlayerMotion.DestinationMs / 3L)
         val growing = plate()
         assertTrue("the plate grows in: $growing", growing > 0f)
-        change { number = "12" }
+        compose.changeState { number = "12" }
         compose.mainClock.advanceTimeByFrame()
         assertTrue("a digit kept the plate growing", plate() >= growing)
         compose.mainClock.advanceTimeBy(PlayerMotion.DestinationMs + 100L)
         val rest = plate()
         assertTrue(rest > growing)
 
-        change { number = "" }
+        compose.changeState { number = "" }
         compose.mainClock.advanceTimeByFrame()
         compose.mainClock.advanceTimeBy(PlayerMotion.DestinationExitMs / 3L)
         val leaving = plate()
         assertTrue("the plate recedes: $leaving of $rest", leaving < rest)
-        change { number = "5" }
+        compose.changeState { number = "5" }
         compose.mainClock.advanceTimeByFrame()
         compose.onNodeWithText("5").assertExists()
         compose.onNodeWithText("12").assertDoesNotExist()
@@ -685,7 +676,7 @@ class PlayerMotionTest {
         compose.mainClock.autoAdvance = false
 
         // Back or the timeout without a match: the content fades where it is.
-        change { number = "" }
+        compose.changeState { number = "" }
         compose.mainClock.advanceTimeByFrame()
         compose.mainClock.advanceTimeBy(PlayerMotion.FastMs / 2L)
         assertEquals(restDigits, digits())
@@ -693,12 +684,12 @@ class PlayerMotionTest {
         compose.onNodeWithTag("number").assertDoesNotExist()
 
         compose.mainClock.autoAdvance = true
-        change { number = "12" }
+        compose.changeState { number = "12" }
         compose.waitForIdle()
         assertEquals(restDigits, digits())
         compose.mainClock.autoAdvance = false
         // Committed: the number's start moves onto the field's start (one missing digit) with the name.
-        change { settles = true; number = "" }
+        compose.changeState { settles = true; number = "" }
         compose.mainClock.advanceTimeByFrame()
         compose.mainClock.advanceTimeBy(PlayerMotion.DestinationExitMs / 2L)
         val sliding = digits().left
@@ -711,13 +702,13 @@ class PlayerMotionTest {
 
         // A leading zero: "01" settles as channel 1's own number, its name where the identity's name will be.
         compose.mainClock.autoAdvance = true
-        change { settles = false; target = ChannelNumberTarget.Channel("1", "One", null); number = "01" }
+        compose.changeState { settles = false; target = ChannelNumberTarget.Channel("1", "One", null); number = "01" }
         compose.waitForIdle()
         val typed = digits()
         val space = name().left - typed.right
         val fieldStart = typed.right - 3 * advance
         compose.mainClock.autoAdvance = false
-        change { settles = true; number = "" }
+        compose.changeState { settles = true; number = "" }
         compose.mainClock.advanceTimeByFrame()
         compose.onNodeWithTag("channel-number-digits").assertTextEquals("1")
         compose.mainClock.advanceTimeBy(PlayerMotion.DestinationExitMs - 20L)
@@ -756,7 +747,7 @@ class PlayerMotionTest {
             PlayerChromeMode.HIDDEN to { context = context.copy(controlsVisible = false); bannerVisible = false },
         )) {
             compose.mainClock.autoAdvance = true
-            change(shown)
+            compose.changeState(shown)
             compose.waitForIdle()
             assertEquals(expected, mode)
             val chrome = expected != PlayerChromeMode.HIDDEN
@@ -766,7 +757,7 @@ class PlayerMotionTest {
             compose.mainClock.autoAdvance = false
             // Typed, then cleared: Back and the digit timer both clear the entry.
             for (typed in listOf(true, false)) {
-                change { context = context.copy(numberEntryVisible = typed) }
+                compose.changeState { context = context.copy(numberEntryVisible = typed) }
                 repeat(12) { frame ->
                     compose.mainClock.advanceTimeByFrame()
                     assertEquals("$expected typed=$typed frame $frame: the entry kept the chrome it found", expected, mode)
@@ -815,30 +806,30 @@ class PlayerMotionTest {
         val chip = identity("player-top-identity-logo")
         val name = identity("player-top-identity-name")
         // The identity alone, as the entry's plate covers it: it gives way quickly and returns softly.
-        val rest = ink(view, name)
+        val rest = compose.drawnBrightness(view, name)
         assertTrue("the identity is drawn at rest", rest > 0f)
         compose.mainClock.autoAdvance = false
 
-        change { number = "1" }
+        compose.changeState { number = "1" }
         compose.mainClock.advanceTimeByFrame()
         compose.mainClock.advanceTimeBy(PlayerMotion.FastMs / 2L)
-        val crossing = ink(view, name)
+        val crossing = compose.drawnBrightness(view, name)
         assertTrue("the identity fades as the entry comes in: $crossing of $rest", crossing > 0f && crossing < rest)
         compose.mainClock.advanceTimeBy(200)
-        assertEquals("the identity has given way to the entry", 0f, ink(view, name), rest * 0.01f)
+        assertEquals("the identity has given way to the entry", 0f, compose.drawnBrightness(view, name), rest * 0.01f)
 
-        change { number = "" }
+        compose.changeState { number = "" }
         compose.mainClock.advanceTimeByFrame()
         compose.mainClock.advanceTimeBy(PlayerMotion.ShortMs / 2L)
-        val returning = ink(view, name)
+        val returning = compose.drawnBrightness(view, name)
         assertTrue("the identity returns as the entry leaves: $returning of $rest", returning > 0f && returning < rest)
         compose.mainClock.advanceTimeBy(200)
-        assertEquals("the identity is back", rest, ink(view, name), rest * 0.01f)
+        assertEquals("the identity is back", rest, compose.drawnBrightness(view, name), rest * 0.01f)
 
         // The entry takes the identity's place: same top edge and height, its chip on the identity's chip,
         // its field starting where the identity's number and name start.
         compose.mainClock.autoAdvance = true
-        change { withEntry = true; number = "1" }
+        compose.changeState { withEntry = true; number = "1" }
         compose.waitForIdle()
         val entry = compose.onNodeWithTag("number").fetchSemanticsNode().boundsInRoot
         assertEquals(bounds.left, entry.left, 0.5f)
@@ -864,22 +855,16 @@ class PlayerMotionTest {
         }
         compose.waitForIdle()
         compose.mainClock.autoAdvance = false
-        change { visible = true }
+        compose.changeState { visible = true }
         repeat(3) { compose.mainClock.advanceTimeByFrame() }
         // Three frames are well inside the 200 ms entrance.
         compose.onNodeWithTag("tv-recovery-primary").assertIsFocused()
 
-        change { visible = false }
+        compose.changeState { visible = false }
         compose.mainClock.advanceTimeByFrame()
         compose.onNodeWithTag("tv-recovery-overlay").assertDoesNotExist()
         compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
         assertEquals(0, retries)
-    }
-
-    /** Applies a state change so the next frame sees it even while the clock is paused. */
-    private fun change(block: () -> Unit) = compose.runOnIdle {
-        block()
-        Snapshot.sendApplyNotifications()
     }
 
     private fun fill(): SemanticsNodeInteraction =
@@ -889,21 +874,6 @@ class PlayerMotionTest {
     private fun chromeTops(): Pair<Float, Float> = headerTop() to
         compose.onNodeWithTag("player-footer").fetchSemanticsNode().boundsInRoot.top
 
-    /** Summed brightness of [view] as drawn now inside [area] (mdpi: dp are pixels). */
-    private fun ink(view: View, area: Rect): Float = compose.runOnIdle {
-        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-        view.draw(Canvas(bitmap))
-        var sum = 0f
-        for (x in area.left.toInt() until area.right.toInt().coerceAtMost(bitmap.width)) {
-            for (y in area.top.toInt() until area.bottom.toInt().coerceAtMost(bitmap.height)) {
-                val pixel = bitmap.getPixel(x, y)
-                sum += android.graphics.Color.red(pixel) + android.graphics.Color.green(pixel) +
-                    android.graphics.Color.blue(pixel)
-            }
-        }
-        bitmap.recycle()
-        sum
-    }
 
     /**
      * Opens a panel over controls, closes it and checks the first frames of the handover:
@@ -937,7 +907,7 @@ class PlayerMotionTest {
         compose.onNode(isFocused()).assertExists()
 
         compose.mainClock.autoAdvance = false
-        change {
+        compose.changeState {
             open = false
             restore = true
         }

@@ -1090,11 +1090,9 @@ class BackgroundPlaybackRuntimeTest {
                 return connection.subscribe(id, channelId, options)
             }
         }, work).apply { startAdmission() }
-        val session = FakeTvheadendSession(SessionObservation.create(
-            sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
-            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(Channel.create(ChannelId(1)), Channel.create(ChannelId(2))))),
-            epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
-            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(listOf(recording()))),
+        val session = FakeTvheadendSession(currentPlaybackObservation(
+            channels = listOf(Channel.create(ChannelId(1)), Channel.create(ChannelId(2))),
+            recordings = listOf(recording()),
         )).apply { scriptLivePlaybackSuccess(manager); scriptRecordingPlaybackSuccess() }
         /** Runs before each settings read; the runtime reads settings after admitting a start. */
         var beforeSettingsRead: suspend () -> Unit = {}

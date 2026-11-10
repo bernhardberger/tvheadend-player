@@ -1,5 +1,10 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.testutil.tagExists
+import at.bernhardberger.tvhplayer.testutil.tagBounds
+import at.bernhardberger.tvhplayer.testutil.settleFrames
+import at.bernhardberger.tvhplayer.testutil.pressKey
+import at.bernhardberger.tvhplayer.testutil.focusedTags
 import android.app.Application
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
@@ -17,15 +22,12 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isFocusable
-import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
-import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.withKeyDown
-import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import org.junit.Assert.assertEquals
@@ -50,9 +52,9 @@ class PlayerIdentityCardTest {
 
     @Test fun missingEpgStillOffersLabelledDetails() {
         recording(info = PlayerInfoBarData("101", "Ridge Earth", "", ""))
-        key(Key.DirectionRight); key(Key.DirectionRight)
+        compose.pressKey(Key.DirectionRight, settleFrames = 20); compose.pressKey(Key.DirectionRight, settleFrames = 20)
         assertEquals(listOf("Program details"), description())
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter, settleFrames = 20)
         assertEquals(1, infos)
     }
 
@@ -78,44 +80,44 @@ class PlayerIdentityCardTest {
             }
         }
         compose.mainClock.autoAdvance = false
-        settle()
-        key(Key.DirectionRight)
-        assertEquals(listOf("player-stop"), focused())
-        key(Key.DirectionRight)
-        assertEquals(listOf("player-info"), focused())
+        compose.settleFrames(20)
+        compose.pressKey(Key.DirectionRight, settleFrames = 20)
+        assertEquals(listOf("player-stop"), compose.focusedTags())
+        compose.pressKey(Key.DirectionRight, settleFrames = 20)
+        assertEquals(listOf("player-info"), compose.focusedTags())
         if (recording) compose.onNodeWithTag("timeshift-preview-target", useUnmergedTree = true).assertIsDisplayed()
         else compose.onNodeWithText("Persistent seek feedback", useUnmergedTree = true).assertIsDisplayed()
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter, settleFrames = 20)
         assertEquals("OK reaches programme details", 1, infos)
     }
 
     @Test fun theDetailsButtonIsBetweenStopAndSettingsAndOpensOnce() {
         recording()
-        assertEquals(listOf("player-pause"), focused())
-        key(Key.DirectionRight)
-        assertEquals(listOf("player-stop"), focused())
-        key(Key.DirectionRight)
-        assertEquals(listOf("player-info"), focused())
+        assertEquals(listOf("player-pause"), compose.focusedTags())
+        compose.pressKey(Key.DirectionRight, settleFrames = 20)
+        assertEquals(listOf("player-stop"), compose.focusedTags())
+        compose.pressKey(Key.DirectionRight, settleFrames = 20)
+        assertEquals(listOf("player-info"), compose.focusedTags())
         assertEquals(listOf("Program details"), description())
-        assertFalse("no channel to change: no arrows", exists("player-top-identity-previous"))
-        key(Key.DirectionRight)
-        assertEquals(listOf("player-settings"), focused())
-        key(Key.DirectionLeft)
-        assertEquals(listOf("player-info"), focused())
+        assertFalse("no channel to change: no arrows", compose.tagExists("player-top-identity-previous"))
+        compose.pressKey(Key.DirectionRight, settleFrames = 20)
+        assertEquals(listOf("player-settings"), compose.focusedTags())
+        compose.pressKey(Key.DirectionLeft, settleFrames = 20)
+        assertEquals(listOf("player-info"), compose.focusedTags())
         assertEquals(0, infos)
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter, settleFrames = 20)
         assertEquals("OK opens Info once", 1, infos)
-        key(Key.DirectionUp)
-        assertEquals(listOf("player-seekbar"), focused())
-        key(Key.DirectionDown)
-        assertEquals("Down returns to details", listOf("player-info"), focused())
+        compose.pressKey(Key.DirectionUp, settleFrames = 20)
+        assertEquals(listOf("player-seekbar"), compose.focusedTags())
+        compose.pressKey(Key.DirectionDown, settleFrames = 20)
+        assertEquals("Down returns to details", listOf("player-info"), compose.focusedTags())
     }
 
     @Test fun theBannersIdentityIsAPictureWithoutFocus() {
         recording(PlayerChromeMode.BANNER)
-        assertTrue(exists(PlayerTopIdentityTag))
+        assertTrue(compose.tagExists(PlayerTopIdentityTag))
         assertEquals(0, compose.onAllNodes(hasTestTag(PlayerTopIdentityTag) and isFocusable(), useUnmergedTree = true).fetchSemanticsNodes().size)
-        assertEquals(emptyList<String>(), focused())
+        assertEquals(emptyList<String>(), compose.focusedTags())
     }
 
     /** One chrome: a recording's layout is live's, at the same canvas and font scale. */
@@ -142,21 +144,21 @@ class PlayerIdentityCardTest {
             }
             compose.mainClock.autoAdvance = false
         }
-        settle()
-        val identity = bounds(PlayerTopIdentityTag)
-        val tile = bounds("player-info-artwork-tile")
-        val labels = bounds("player-timeline-labels")
+        compose.settleFrames(20)
+        val identity = compose.tagBounds(PlayerTopIdentityTag)
+        val tile = compose.tagBounds("player-info-artwork-tile")
+        val labels = compose.tagBounds("player-timeline-labels")
         return buildMap {
             put("identity", identity)
             put("artwork", tile)
-            put("placeholder", bounds("player-info-artwork-fallback"))
-            put("title", bounds("player-info-title"))
+            put("placeholder", compose.tagBounds("player-info-artwork-fallback"))
+            put("title", compose.tagBounds("player-info-title"))
             put("timeline", labels.left to labels.right)
             put("timeline top", labels.top)
-            put("info top", bounds("player-info-bar").top)
+            put("info top", compose.tagBounds("player-info-bar").top)
             if (mode == PlayerChromeMode.CONTROLS) {
-                put("actions", listOf("player-pause", "player-stop", "player-settings").map(::bounds))
-                put("timeline to actions", bounds("player-pause").top - labels.bottom)
+                put("actions", listOf("player-pause", "player-stop", "player-settings").map { compose.tagBounds(it) })
+                put("timeline to actions", compose.tagBounds("player-pause").top - labels.bottom)
             }
         }
     }
@@ -190,7 +192,7 @@ class PlayerIdentityCardTest {
             }
         }
         val full = listOf("player-info-bar", "player-info-title", "player-info-programme", "player-info-last-row")
-            .associateWith(::bounds)
+            .associateWith { compose.tagBounds(it) }
         val cases = mapOf(
             "no subtitle" to info.copy(subtitle = null),
             "no Next" to info.copy(next = null),
@@ -201,79 +203,79 @@ class PlayerIdentityCardTest {
         for ((name, case) in cases) {
             compose.runOnIdle { info = case }
             compose.waitForIdle()
-            assertEquals("$name: the bar keeps its height", full.getValue("player-info-bar").height, bounds("player-info-bar").height, 0.5f)
-            assertEquals("$name: the title keeps its place", full.getValue("player-info-title").top, bounds("player-info-title").top, 0.5f)
-            assertEquals("$name: the slot stands on the bar's top", bounds("player-info-bar").top, bounds("slot").top, 0.5f)
-            if (exists("player-info-programme")) assertEquals("$name: the programme line keeps its place",
-                full.getValue("player-info-programme").top, bounds("player-info-programme").top, 0.5f)
-            if (exists("player-info-last-row")) assertEquals("$name: the last row keeps its place",
-                full.getValue("player-info-last-row").top, bounds("player-info-last-row").top, 0.5f)
+            assertEquals("$name: the bar keeps its height", full.getValue("player-info-bar").height, compose.tagBounds("player-info-bar").height, 0.5f)
+            assertEquals("$name: the title keeps its place", full.getValue("player-info-title").top, compose.tagBounds("player-info-title").top, 0.5f)
+            assertEquals("$name: the slot stands on the bar's top", compose.tagBounds("player-info-bar").top, compose.tagBounds("slot").top, 0.5f)
+            if (compose.tagExists("player-info-programme")) assertEquals("$name: the programme line keeps its place",
+                full.getValue("player-info-programme").top, compose.tagBounds("player-info-programme").top, 0.5f)
+            if (compose.tagExists("player-info-last-row")) assertEquals("$name: the last row keeps its place",
+                full.getValue("player-info-last-row").top, compose.tagBounds("player-info-last-row").top, 0.5f)
         }
     }
 
     @Test fun theTimeLeadsAsAnEyebrowAboveTheTitleAndTheSubtitleStandsUnderIt() {
         recording(info = PlayerInfoBarData("1", "One", "Title", "20:15–21:45", subtitle = "Episode", next = "21:45 News"))
-        assertFalse("the channel stands at the top, not in the info bar", exists("player-info-eyebrow"))
-        val title = bounds("player-info-title")
-        val programme = bounds("player-info-programme")
-        val subtitle = bounds("player-info-subtitle")
-        val last = bounds("player-info-last-row")
+        assertFalse("the channel stands at the top, not in the info bar", compose.tagExists("player-info-eyebrow"))
+        val title = compose.tagBounds("player-info-title")
+        val programme = compose.tagBounds("player-info-programme")
+        val subtitle = compose.tagBounds("player-info-subtitle")
+        val last = compose.tagBounds("player-info-last-row")
         assertTrue("the time and metadata stand above the title", programme.bottom <= title.top + 0.5f)
         assertTrue("the subtitle stands under the title", title.bottom <= subtitle.top + 0.5f)
         assertTrue("the last row stands under them", subtitle.bottom <= last.top + 0.5f)
-        assertEquals("the artwork and the text share the bar's top", bounds("player-info-bar").top, bounds("player-info-artwork-tile").top, 1f)
+        assertEquals("the artwork and the text share the bar's top", compose.tagBounds("player-info-bar").top, compose.tagBounds("player-info-artwork-tile").top, 1f)
     }
 
     @Test fun withoutASeekableTimelineUpStaysInTheActionRow() {
         recording(canSeek = false)
-        assertEquals(listOf("player-pause"), focused())
-        key(Key.DirectionRight)
-        assertEquals(listOf("player-stop"), focused())
-        key(Key.DirectionUp)
-        assertEquals("Up stays on the action", listOf("player-stop"), focused())
+        assertEquals(listOf("player-pause"), compose.focusedTags())
+        compose.pressKey(Key.DirectionRight, settleFrames = 20)
+        assertEquals(listOf("player-stop"), compose.focusedTags())
+        compose.pressKey(Key.DirectionUp, settleFrames = 20)
+        assertEquals("Up stays on the action", listOf("player-stop"), compose.focusedTags())
         assertEquals(0, infos)
     }
 
     @Test fun theKeyThatMovesFocusToOrFromTheTimelineDoesNotActOnItsNewTarget() {
         recording()
-        key(Key.DirectionUp)
+        compose.pressKey(Key.DirectionUp, settleFrames = 20)
         // Held Up stays on the timeline; passive artwork is not a focus target.
         compose.onRoot().performKeyInput { withKeyDown(Key.DirectionUp) { advanceEventTime(1_200) } }
-        settle()
-        assertEquals(listOf("player-seekbar"), focused())
+        compose.settleFrames(20)
+        assertEquals(listOf("player-seekbar"), compose.focusedTags())
         // Held Down returns to Pause and goes no further.
         compose.onRoot().performKeyInput { withKeyDown(Key.DirectionDown) { advanceEventTime(1_200) } }
-        settle()
-        assertEquals(listOf("player-pause"), focused())
+        compose.settleFrames(20)
+        assertEquals(listOf("player-pause"), compose.focusedTags())
         assertEquals(0, infos)
     }
 
     @Test fun closingInfoReturnsFocusToDetailsHoweverInfoWasOpened() {
         // Info opened by the remote's INFO key: focus was on Pause, not on the (i) button.
         recording()
-        assertEquals(listOf("player-pause"), focused())
+        assertEquals(listOf("player-pause"), compose.focusedTags())
         compose.runOnIdle { panelOpen = true }
-        settle()
-        assertEquals("the covered controls hold no focus", emptyList<String>(), focused())
+        compose.settleFrames(20)
+        assertEquals("the covered controls hold no focus", emptyList<String>(), compose.focusedTags())
         compose.runOnIdle { panelOpen = false; restoreFocus = "player-info" }
-        settle()
-        assertEquals(listOf("player-info"), focused())
+        compose.settleFrames(20)
+        assertEquals(listOf("player-info"), compose.focusedTags())
         assertEquals("the restore is acknowledged once", 1, restores)
         // And opened from the (i) button itself.
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter, settleFrames = 20)
         assertEquals(1, infos)
         compose.runOnIdle { panelOpen = true }
-        settle()
+        compose.settleFrames(20)
         compose.runOnIdle { panelOpen = false; restoreFocus = "player-info" }
-        settle()
-        assertEquals(listOf("player-info"), focused())
+        compose.settleFrames(20)
+        assertEquals(listOf("player-info"), compose.focusedTags())
         assertEquals(2, restores)
     }
 
     @Test fun detailsReportsItsFocusAsAControlSoAPanelCanReturnToIt() {
         recording()
-        key(Key.DirectionRight)
-        key(Key.DirectionRight)
+        compose.pressKey(Key.DirectionRight, settleFrames = 20)
+        compose.pressKey(Key.DirectionRight, settleFrames = 20)
         assertEquals("player-info", reported.last())
     }
 
@@ -285,20 +287,20 @@ class PlayerIdentityCardTest {
             }
         }
         compose.mainClock.autoAdvance = false
-        settle()
-        assertEquals(listOf("player-pause"), focused())
-        key(Key.DirectionUp)
-        assertEquals(listOf("player-seekbar"), focused())
-        key(Key.DirectionUp)
+        compose.settleFrames(20)
+        assertEquals(listOf("player-pause"), compose.focusedTags())
+        compose.pressKey(Key.DirectionUp, settleFrames = 20)
+        assertEquals(listOf("player-seekbar"), compose.focusedTags())
+        compose.pressKey(Key.DirectionUp, settleFrames = 20)
         assertTrue("Up from the seekbar opens the markers", navigation.open)
-        key(Key.DirectionUp)
+        compose.pressKey(Key.DirectionUp, settleFrames = 20)
         assertFalse("Up above the markers closes them", navigation.open)
-        assertEquals(listOf("player-seekbar"), focused())
+        assertEquals(listOf("player-seekbar"), compose.focusedTags())
         assertFalse(navigation.open)
-        key(Key.DirectionUp)
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionUp, settleFrames = 20)
+        compose.pressKey(Key.DirectionDown, settleFrames = 20)
         assertFalse(navigation.open)
-        assertEquals("Down still closes the markers onto the seekbar", listOf("player-seekbar"), focused())
+        assertEquals("Down still closes the markers onto the seekbar", listOf("player-seekbar"), compose.focusedTags())
         assertEquals(0, infos)
     }
 
@@ -325,13 +327,8 @@ class PlayerIdentityCardTest {
             }
         }
         compose.mainClock.autoAdvance = false
-        settle()
+        compose.settleFrames(20)
     }
-
-    private fun bounds(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-
-    private fun exists(tag: String) =
-        compose.onAllNodes(hasTestTag(tag), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
 
     private fun description(): List<String>? = compose.onNodeWithTag("player-info")
         .fetchSemanticsNode().config.getOrNull(SemanticsProperties.ContentDescription)
@@ -339,19 +336,4 @@ class PlayerIdentityCardTest {
     private fun stateDescription(): String? = compose.onNodeWithTag(PlayerTopIdentityTag, useUnmergedTree = true)
         .fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription)
 
-    private fun focused(): List<String> =
-        compose.onAllNodes(isFocused(), useUnmergedTree = true).fetchSemanticsNodes()
-            .mapNotNull { it.config.getOrNull(SemanticsProperties.TestTag) }
-
-    private fun key(key: Key) {
-        compose.onRoot().performKeyInput { pressKey(key) }
-        settle()
-    }
-
-    private fun settle() {
-        repeat(20) {
-            compose.mainClock.advanceTimeBy(100)
-            compose.waitForIdle()
-        }
-    }
 }

@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.testutil.pressKey
 import at.bernhardberger.tvhplayer.testutil.setContentWithBrowsePreparation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -24,14 +25,12 @@ import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import org.junit.Assert.assertEquals
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.performKeyInput
-import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -110,15 +109,15 @@ class GuidePlayerReturnFocusTest {
         // An out-of-scope playing channel restores the saved past-window position.
         guide(PlayerReturnFocus(ChannelId(99), ChannelId(1)))
         focused("Channel 1 hour -2")
-        key(Key.DirectionLeft)
-        key(Key.DirectionLeft)
+        compose.pressKey(Key.DirectionLeft)
+        compose.pressKey(Key.DirectionLeft)
         focused("Channel 1 hour -4")
-        key(Key.DirectionRight)
+        compose.pressKey(Key.DirectionRight)
         focused("Channel 1 hour -3")
         compose.onRoot().performKeyPress(KeyEvent(android.view.KeyEvent(0, 0,
             android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_BACK, 0)))
         // Moving to the next cached programme replaces the prepared window while Back is held.
-        key(Key.DirectionRight)
+        compose.pressKey(Key.DirectionRight)
         focused("Channel 1 hour -2")
         compose.onRoot().performKeyPress(KeyEvent(android.view.KeyEvent(0, 0,
             android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_BACK, 0)))
@@ -127,7 +126,7 @@ class GuidePlayerReturnFocusTest {
 
     @Test fun backFromFutureWaitsForItsOwnUncanceledReleaseBeforeReturningToNow() {
         guide(PlayerReturnFocus(ChannelId(1), ChannelId(1)))
-        repeat(3) { key(Key.DirectionRight) }
+        repeat(3) { compose.pressKey(Key.DirectionRight) }
         focused("Channel 1 hour 3")
         fun backKey(down: Boolean, repeat: Int = 0, flags: Int = 0) {
             compose.onRoot().performKeyPress(KeyEvent(android.view.KeyEvent(0, 0,
@@ -180,13 +179,13 @@ class GuidePlayerReturnFocusTest {
         guide(PlayerReturnFocus(ChannelId(1), ChannelId(1)))
         focused("Channel 1 hour 0")
         // Only the last arrival is compared: leaving and returning on the way would move the window.
-        repeat(3) { key(Key.DirectionRight) }
+        repeat(3) { compose.pressKey(Key.DirectionRight) }
         focused("Channel 1 hour 3")
         assertCellLooksAsWhenRefocused("Channel 1 hour 3", Key.DirectionDown, Key.DirectionUp)
     }
 
     private fun assertCellLooksAsWhenRefocused(title: String, away: Key, back: Key) = compose.onNodeWithText(title)
-        .assertLooksAsWhenRefocused(title, { key(away) }, { key(back) })
+        .assertLooksAsWhenRefocused(title, { compose.pressKey(away) }, { compose.pressKey(back) })
 
     @Test fun genreEntryStartsAtNowAndFocusesFirstMatchingChannel() {
         guide(PlayerReturnFocus(ChannelId(1), ChannelId(1)),
@@ -228,9 +227,9 @@ class GuidePlayerReturnFocusTest {
         compose.runOnIdle { back.onBackPressed() }
         compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
         focused("Channel 1 hour 0")
-        key(Key.Menu)
+        compose.pressKey(Key.Menu)
         compose.onNodeWithText("Watch").assertIsFocused()
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         assertEquals(1, playRequests)
     }
 
@@ -262,9 +261,9 @@ class GuidePlayerReturnFocusTest {
     @Test fun historicalContextMenuCanWatchTheChannelWithoutRequiringALiveEvent() {
         guide(PlayerReturnFocus(ChannelId(99), ChannelId(1)))
         focused("Channel 1 hour -2")
-        key(Key.Menu)
+        compose.pressKey(Key.Menu)
         compose.onNodeWithText("Watch channel").assertIsFocused()
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         assertEquals(1, playRequests)
     }
 
@@ -282,7 +281,7 @@ class GuidePlayerReturnFocusTest {
     @Test fun secondReturnOnRetainedCompositionIsPositionedAgain() {
         guide(PlayerReturnFocus(playingChannelId = ChannelId(1), originChannelId = ChannelId(1)))
         focused("Channel 1 hour 0")
-        key(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         focused("Channel 2 hour 0")
         // Player on top, then Back again: an equal but distinct return request.
         compose.runOnIdle { focusEnabled = false; playerReturn = null }
@@ -311,11 +310,11 @@ class GuidePlayerReturnFocusTest {
     @Test fun offlineGuideOkOpensDetailsWhoseWatchPlaysTheChannel() {
         guide(PlayerReturnFocus(playingChannelId = ChannelId(1), originChannelId = ChannelId(1)), offline = true)
         focused("Channel 1 hour 0")
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         compose.waitUntil(10_000) {
             compose.onAllNodes(androidx.compose.ui.test.hasTestTag("details-watch") and isFocused()).fetchSemanticsNodes().isNotEmpty()
         }
-        key(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
         assertEquals(1, playRequests)
     }
 
@@ -337,8 +336,6 @@ class GuidePlayerReturnFocusTest {
 
     private var playerReturn by mutableStateOf<PlayerReturnFocus?>(null)
     private var focusEnabled by mutableStateOf(true)
-
-    private fun key(key: Key) { compose.onRoot().performKeyInput { pressKey(key) }; compose.waitForIdle() }
 
     private fun event(channel: Long, offset: Int) = EpgEvent.create(EventId(channel * 100 + offset + 10),
         channelId = ChannelId(channel), title = "Channel $channel hour $offset",

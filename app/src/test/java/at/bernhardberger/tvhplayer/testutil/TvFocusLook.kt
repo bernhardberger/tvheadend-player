@@ -1,16 +1,37 @@
 package at.bernhardberger.tvhplayer.testutil
 
 import androidx.activity.ComponentActivity
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.view.View
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.PixelMap
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.AndroidComposeTestRule
+import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import kotlin.math.abs
 import org.junit.Assert.assertTrue
 import org.robolectric.util.ReflectionHelpers
 import org.robolectric.util.ReflectionHelpers.ClassParameter
+
+/** Summed brightness of [view] drawn now inside [area] (mdpi: dp are pixels). */
+internal fun ComposeContentTestRule.drawnBrightness(view: View, area: Rect): Float = runOnIdle {
+    val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+    view.draw(Canvas(bitmap))
+    var sum = 0f
+    for (x in area.left.toInt() until area.right.toInt().coerceAtMost(bitmap.width)) {
+        for (y in area.top.toInt() until area.bottom.toInt().coerceAtMost(bitmap.height)) {
+            val pixel = bitmap.getPixel(x, y)
+            sum += android.graphics.Color.red(pixel) + android.graphics.Color.green(pixel) +
+                android.graphics.Color.blue(pixel)
+        }
+    }
+    bitmap.recycle()
+    sum
+}
 
 /** A TV is not in touch mode, the test default: only then does a view hand focus over as it attaches. */
 internal fun AndroidComposeTestRule<*, ComponentActivity>.leaveTouchModeBeforeComposing() {
