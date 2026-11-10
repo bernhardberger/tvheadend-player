@@ -165,8 +165,9 @@ class ServerProfileRoutingTest {
                     view = androidx.compose.ui.platform.LocalView.current
                     val profile by owner.serverProfile.collectAsStateWithLifecycle()
                     val profiles by owner.profiles.collectAsStateWithLifecycle()
+                    val launchState by launchRequests.state.collectAsStateWithLifecycle()
                     AppRoot(
-                        startupState = MainStartupState.Ready(startup, autoStartPlayback = launchRequests.state.value != ApplianceLaunchState.Idle),
+                        startupState = MainStartupState.Ready(startup, autoStartPlayback = launchState != ApplianceLaunchState.Idle),
                         runtimeServerSettings = profile?.toServerSettings(),
                         applianceLaunchRequests = launchRequests,
                         onPlayerVisibilityChanged = {},
