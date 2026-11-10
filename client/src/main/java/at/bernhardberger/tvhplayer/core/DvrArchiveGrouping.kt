@@ -20,8 +20,8 @@ enum class DvrArchiveGrouping {
 }
 
 /**
- * Display names for virtual groupings. Missing channel IDs/categories go to the group labeled
- * [noChannel]/[noGenre], listed last. Names never determine group identity.
+ * Channels group by the trimmed displayed name; genres group by category. Missing names/categories
+ * go to the group labeled [noChannel]/[noGenre], listed last.
  */
 class DvrArchiveNaming(
     val channelName: (DvrEntry) -> String?,
@@ -33,7 +33,7 @@ class DvrArchiveNaming(
 
 /**
  * Folders keeps the server's tree. Channels and Genres give a root with one virtual folder per
- * group (recordings newest first inside, stable IDs in paths, display-only names); None gives a
+ * group (recordings newest first inside, safe identity components in paths); None gives a
  * root holding every recording newest first.
  */
 fun buildDvrArchive(
@@ -148,26 +148,39 @@ private fun virtualGroups(
     val prefix = if (channelLogo) "channel" else "genre"
     val unassigned = "$prefix:unassigned"
     val named = entries.groupBy { entry ->
-        val identity = if (channelLogo) entry.channelId?.value else programmeCategory(entry.contentGenre)?.name
-        if (identity == null) unassigned else "$prefix:$identity"
+        virtualGroupIdentity(entry, nameOf, channelLogo) ?: unassigned
     }
     // Only a named channel group carries its channel (the row draws its logo); every other group keeps the folder icon.
-    fun folder(identity: String, members: List<DvrEntry>) = DvrArchiveFolder(
-        name = if (identity == unassigned) unnamed
-            else members.firstNotNullOfOrNull { nameOf(it)?.takeIf(String::isNotBlank) } ?: unnamed,
-        path = listOf(identity),
-        folders = emptyList(),
-        recordings = members.newestFirst(),
-        channelId = if (identity != unassigned && channelLogo) members.first().channelId else null,
-        genreCategory = if (identity != unassigned && genreCategory)
-            programmeCategory(members.first().contentGenre) else null,
-    )
+    fun folder(identity: String, members: List<DvrEntry>): DvrArchiveFolder {
+        val recordings = members.newestFirst()
+        return DvrArchiveFolder(
+            name = if (identity == unassigned) unnamed
+                else members.firstNotNullOfOrNull { nameOf(it)?.takeIf(String::isNotBlank) }
+                    ?.let { if (channelLogo) it.trim() else it } ?: unnamed,
+            path = listOf(identity),
+            folders = emptyList(),
+            recordings = recordings,
+            channelId = if (identity != unassigned && channelLogo)
+                recordings.firstNotNullOfOrNull { it.channelId } else null,
+            genreCategory = if (identity != unassigned && genreCategory)
+                programmeCategory(members.first().contentGenre) else null,
+        )
+    }
     val groups = named.filterKeys { it != unassigned }.map { (identity, members) ->
         folder(identity, members)
     }
         .sortedWith(order)
     val rest = named[unassigned]?.let { folder(unassigned, it) }
     return DvrArchiveFolder("", emptyList(), groups + listOfNotNull(rest), emptyList())
+}
+
+private fun virtualGroupIdentity(entry: DvrEntry, nameOf: (DvrEntry) -> String?, channelLogo: Boolean): String? =
+    if (channelLogo) channelGroupIdentity(nameOf(entry))
+    else programmeCategory(entry.contentGenre)?.name?.let { "genre:$it" }
+
+/** Escape percent first so a literal escape sequence cannot collide with a slash-containing name. */
+private fun channelGroupIdentity(name: String?): String? = name?.trim()?.takeIf(String::isNotEmpty)?.let {
+    "channel:name:${it.replace("%", "%25").replace("/", "%2F")}"
 }
 
 /** The date label a flat list shows above a run of recordings. */

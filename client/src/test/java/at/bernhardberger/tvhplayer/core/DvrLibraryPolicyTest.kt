@@ -101,17 +101,56 @@ class DvrLibraryPolicyTest {
         val distinct = buildDvrArchive(
             listOf(oldNews, newNews, orphan, duplicate, collision, slash), DvrArchiveGrouping.CHANNELS, naming(),
         )
-        assertEquals(5, distinct.folders.size)
-        assertEquals(5, distinct.folders.map { it.path }.distinct().size)
+        assertEquals(4, distinct.folders.size)
+        assertEquals(4, distinct.folders.map { it.path }.distinct().size)
         distinct.folders.forEach { folder ->
             assertEquals(folder, distinct.folderAt(folder.path))
             assertTrue(folder.path.none { '/' in it })
         }
-        assertEquals(listOf(duplicate), distinct.folders.single { it.channelId == ChannelId(20) }.recordings)
+        assertEquals(listOf(duplicate, newNews, oldNews), distinct.folders.single { it.name == "News" }.recordings)
         val sorted = buildDvrArchive(
             listOf(oldNews, orphan, duplicate, collision, slash), DvrArchiveGrouping.CHANNELS, naming(), DvrArchiveSort.NAME,
         )
         assertEquals(listOf(orphan), sorted.folders.last().recordings)
+    }
+
+    @Test fun rescannedChannelsMergeByTrimmedDisplayedNameAndUseTheNewestAvailableLogo() {
+        val old = onChannel(1, 100, " News ", channelId = 2)
+        val rescanned = onChannel(2, 300, "News", channelId = 20)
+        val deleted = onChannel(3, 400, "News", channelId = null)
+        val root = buildDvrArchive(listOf(old, deleted, rescanned), DvrArchiveGrouping.CHANNELS, naming())
+
+        val folder = root.folders.single { old in it.recordings }
+        assertEquals(ChannelId(20), folder.channelId)
+        assertEquals(1, root.folders.size)
+        assertEquals("News", folder.name)
+        assertEquals(listOf(deleted, rescanned, old), folder.recordings)
+    }
+
+    @Test fun deletedChannelsKeepTheirNamedFolderWithoutALogoAndNamesMatchExactly() {
+        val deleted = onChannel(1, 100, " News ", channelId = null)
+        val lowerCase = onChannel(2, 200, "news", channelId = null)
+        val root = buildDvrArchive(listOf(deleted, lowerCase), DvrArchiveGrouping.CHANNELS, naming())
+
+        assertEquals(setOf("News", "news"), root.folders.map { it.name }.toSet())
+        assertTrue(root.folders.all { it.channelId == null })
+        assertEquals(listOf(deleted), root.folders.single { it.name == "News" }.recordings)
+    }
+
+    @Test fun onlyNamelessChannelsUseTheCatchAllEvenWhenARealNameMatchesItsLabelOrKey() {
+        val blank = onChannel(1, 100, " \t ", channelId = 2)
+        val missing = onChannel(2, 200, null, channelId = 3)
+        val realLabel = onChannel(3, 300, "No channel", channelId = null)
+        val realKey = onChannel(4, 400, "unassigned", channelId = null)
+        val root = buildDvrArchive(listOf(blank, missing, realLabel, realKey),
+            DvrArchiveGrouping.CHANNELS, naming(), DvrArchiveSort.NAME)
+
+        assertEquals(3, root.folders.size)
+        assertEquals(3, root.folders.map { it.path }.distinct().size)
+        assertEquals(listOf(missing, blank), root.folders.last().recordings)
+        assertNull(root.folders.last().channelId)
+        assertEquals(listOf(realLabel), root.folders.first { it.name == "No channel" }.recordings)
+        assertEquals(listOf(realKey), root.folders.single { it.name == "unassigned" }.recordings)
     }
 
     @Test fun genresGroupingMakesOneFolderPerGenreNewestFirstNoGenreLast() {

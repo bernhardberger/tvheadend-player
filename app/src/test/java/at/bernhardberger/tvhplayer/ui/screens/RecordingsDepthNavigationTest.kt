@@ -19,7 +19,7 @@ import org.junit.Test
 
 class RecordingsDepthNavigationTest {
     @Test fun virtualGroupPathsRoundTripWithoutDisplayLabelsBecomingLevels() {
-        val entries = listOf("News", "News", "No channel", "News/Local", null).mapIndexed { index, name ->
+        val entries = listOf("News", " News ", "No channel", "News/Local", null, "News%2FLocal").mapIndexed { index, name ->
             DvrEntry.create(DvrEntryId(index.toLong() + 1), state = DvrEntryState.COMPLETED,
                 channelId = name?.let { at.bernhardberger.tvheadend.sdk.core.ChannelId(index.toLong() + 1) }, channelName = name)
         }
@@ -27,7 +27,8 @@ class RecordingsDepthNavigationTest {
             { it.channelName }, { null }, { null }, "No channel", "No genre",
         )
         val root = buildDvrArchive(entries, at.bernhardberger.tvhplayer.core.DvrArchiveGrouping.CHANNELS, naming)
-        assertEquals(entries.size, root.folders.size)
+        assertEquals(entries.size - 1, root.folders.size)
+        assertEquals(entries.take(2), root.folders.single { it.name == "News" }.recordings)
         root.folders.forEach { folder ->
             val id = archiveLevelId(folder.path)
             assertEquals(folder.path, at.bernhardberger.tvhplayer.ui.screens.recordings.archiveLevelPath(id))
