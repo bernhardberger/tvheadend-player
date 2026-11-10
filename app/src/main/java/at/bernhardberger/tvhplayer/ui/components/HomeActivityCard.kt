@@ -147,13 +147,19 @@ internal fun HomeActivityCard(
                     ),
                 ),
             )
-            if (playing || entry != null) {
+            // The loaded item's own state, as on every other surface: playing, paused or tuning.
+            val playback = when {
+                !playing -> ChannelPlaybackIndicator.NONE
+                playingRecording -> watchingIndicator(entry?.id)
+                else -> channelWatchingIndicator(channel?.id)
+            }
+            if (playback != ChannelPlaybackIndicator.NONE || entry != null) {
                 Row(
                     Modifier.align(if (pictured) Alignment.TopEnd else Alignment.TopStart).padding(12.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    if (playing) {
+                    if (playback != ChannelPlaybackIndicator.NONE) {
                         Box(
                             Modifier
                                 .background(TvLogoPlateColor, MaterialTheme.shapes.extraSmall)
@@ -163,56 +169,58 @@ internal fun HomeActivityCard(
                                 LocalContentColor provides TvTextColors.primary,
                             ) {
                                 // REC below already owns the recording dot; keep only playback here.
-                                ChannelNowIndicators(playingNow = true, recordingNow = false)
+                                ChannelNowIndicators(
+                                    playingNow = false,
+                                    recordingNow = false,
+                                    playbackIndicator = playback,
+                                )
                             }
                         }
                     }
                     if (recordingNow) entry?.let { RecordingBadge(it.state) }
                 }
             }
-            Row(
+            Column(
                 Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(16.dp).mutedTextPastRowStart(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Column(
-                    Modifier.weight(1f).alignBy(LastBaseline),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    ProgrammeEyebrow(picon = icon, text = channelLabel, modifier = Modifier.fillMaxWidth()) {
-                        if (playingRecording && !recordingNow) {
-                            StatusBadge(stringResource(R.string.home_activity_recording), StatusBadgeTone.NEUTRAL)
-                        }
-                    }
-                    Text(
-                        title,
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = TvTextColors.primary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                ProgrammeEyebrow(picon = icon, text = channelLabel, modifier = Modifier.fillMaxWidth())
+                Text(
+                    title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = TvTextColors.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                // Only this last row shares its width with the action hint; the title above keeps the full card.
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     val timesLine = if (playingRecording && viewer?.fraction != null) {
                         playerMinutesLeft(((viewer.durationMs - viewer.positionMs).coerceAtLeast(0L) + 59_999L).div(60_000L).toInt())
                     } else activityTimesLine(event, entry, playing, nowSec)
-                    timesLine.takeIf(String::isNotEmpty)?.let { times ->
-                        Text(
-                            times,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = TvTextColors.secondary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                    Text(
+                        timesLine,
+                        Modifier.weight(1f).alignBy(LastBaseline),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = TvTextColors.secondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Row(
+                        Modifier.alignBy(LastBaseline),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        val hintColor = if (focused) TvTextColors.primary else TvTextColors.secondary
+                        Icon(painterResource(if (playing) R.drawable.ic_fullscreen else R.drawable.ic_play_arrow),
+                            contentDescription = null, modifier = Modifier.size(18.dp), tint = hintColor)
+                        Text(stringResource(when {
+                            !playing -> R.string.watch
+                            playingRecording -> R.string.home_back_to_recording
+                            else -> R.string.home_back_to_live_tv
+                        }),
+                            style = MaterialTheme.typography.labelMedium, color = hintColor, maxLines = 1,
+                            overflow = TextOverflow.Ellipsis)
                     }
-                }
-                Row(
-                    Modifier.alignBy(LastBaseline),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    val hintColor = if (focused) TvTextColors.primary else TvTextColors.secondary
-                    Icon(painterResource(if (playing) R.drawable.ic_fullscreen else R.drawable.ic_play_arrow),
-                        contentDescription = null, modifier = Modifier.size(18.dp), tint = hintColor)
-                    Text(stringResource(if (playing) R.string.home_back_to_player else R.string.watch),
-                        style = MaterialTheme.typography.labelMedium, color = hintColor, maxLines = 1)
                 }
             }
             val progress = if (playingRecording) viewer?.fraction else if (recordingOnly) {

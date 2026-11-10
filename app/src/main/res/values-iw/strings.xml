@@ -741,7 +741,8 @@
     <string name="home_browse_by_genre">עיון לפי סוגה</string>
     <string name="home_continue_watching">המשך צפייה</string>
     <string name="home_recently_recorded">הקלטות חדשות</string>
-    <string name="home_back_to_player">חזרה לנגן</string>
+    <string name="home_back_to_live_tv">חזרה לשידור חי</string>
+    <string name="home_back_to_recording">חזרה להקלטה</string>
     <string name="home_recording_starts_at">התחלה ב־%1$s</string>
     <string name="home_all_recordings">כל ההקלטות</string>
     <string name="home_activity_watching_live">צפייה בשידור חי</string>

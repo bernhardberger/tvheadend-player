@@ -59,6 +59,7 @@ import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchRequests
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchState
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget
+import at.bernhardberger.tvhplayer.core.WarmReturnOpportunity
 import at.bernhardberger.tvhplayer.core.ApplianceEntryDestination
 import at.bernhardberger.tvhplayer.core.ApplianceEntryPolicy
 import at.bernhardberger.tvhplayer.core.ApplianceGuideEntryAction
@@ -600,10 +601,15 @@ fun AppRoot(
     val activeTarget by playbackRuntime.activeTarget.collectAsStateWithLifecycle()
     val videoPresentation by playbackRuntime.videoPresentation.collectAsStateWithLifecycle()
     val activeChannelId = (activeTarget as? AppPlaybackTarget.Live)?.channelId
+    // A failed or ended target stays active for Retry; browse shows and returns to it only while it plays.
+    val browsePlaying = playingTarget(activeTarget, playbackState)
+    val playingChannelId = (browsePlaying as? AppPlaybackTarget.Live)?.channelId
+    val playingRecordingId = (browsePlaying as? AppPlaybackTarget.Recording)?.recordingId
     val activeRecordingId = (activeTarget as? AppPlaybackTarget.Recording)?.recordingId
     val recordingSelection by playbackRuntime.recordingSelection.collectAsStateWithLifecycle()
     val playbackObservation by tvheadendSession.observation.collectAsStateWithLifecycle()
-    val warmRecordingId = warmRecordingId(activeTarget, recordingSelection, playbackObservation.currentSession)
+    val warmRecordingId = warmRecordingId(browsePlaying, recordingSelection, playbackObservation.currentSession)
+    val playingNow = { playingIds(playbackRuntime.activeTarget.value, playbackRuntime.state.value) }
     // Created once here: the surface and both player screens read this one value.
     val targetAspect = rememberTargetAspect(activeTarget, playerSettingsStore) {
         playbackObservation.dvrEntry(it)?.channelId
@@ -834,7 +840,7 @@ fun AppRoot(
             ApplianceGuideEntryAction.OPEN_GUIDE -> {
                 coldStart.settle()
                 if (currentDestination != GuideKey) {
-                    playbackOrchestrator.browseNavigationSelected(activeChannelId, activeRecordingId)
+                    playbackOrchestrator.browseNavigationSelected(playingChannelId, playingRecordingId)
                     if (backStack.isEmpty()) navigationStartDestination = GuideKey
                     navigateTopLevel(GuideKey)
                 }
@@ -843,8 +849,8 @@ fun AppRoot(
             ApplianceGuideEntryAction.WAIT -> Unit
         }
     }
-    LaunchedEffect(activeChannelId, activeRecordingId) {
-        playbackOrchestrator.activePlaybackChanged(activeChannelId, activeRecordingId)
+    LaunchedEffect(playingChannelId, playingRecordingId) {
+        playbackOrchestrator.activePlaybackChanged(playingChannelId, playingRecordingId)
     }
 
     LaunchedEffect(playbackState, activeRecordingId, currentDestination) {
@@ -923,13 +929,25 @@ fun AppRoot(
             )
         }
     }
-    val returnToWarmPlayer: () -> Unit = {
+    // Back with no player to return to: what rootBackAction does for an unarmed return.
+    val backWithoutWarmPlayer: () -> Unit = {
+        val action = rootBackAction(currentDestination == HomeKey, WarmReturnOpportunity())
+        when (action) {
+            BackAction.FINISH_ACTIVITY -> onRequestExit()
+            BackAction.POP_NAVIGATION -> if (!backStack.navigateBackTowardHome()) onRequestExit()
+            else -> Unit
+        }
+    }
+    val returnToWarmPlayer: (() -> Unit) -> Unit = { onUnavailable ->
         playerEntry.request(playbackSelectionScope) {
             browseSteps.withdrawPending()
             browseSteps.joinStart()
             if (browseStop?.isCompleted == false) return@request
-            val channelId = (playbackRuntime.activeTarget.value as? AppPlaybackTarget.Live)?.channelId
-            val recordingId = (playbackRuntime.activeTarget.value as? AppPlaybackTarget.Recording)?.recordingId
+            val (channelId, recordingId) = playingNow()
+            if (!playbackOrchestrator.canReturnToPlayer(channelId, recordingId)) {
+                onUnavailable()
+                return@request
+            }
             playbackOrchestrator.browseNavigationSelected(channelId, recordingId)
             when (val target = playbackOrchestrator.consumeWarmPlayerTarget(
                 activeChannelId = channelId,
@@ -949,14 +967,17 @@ fun AppRoot(
             return@rootBack
         }
         if (currentDestination == HomeKey && browseSteps.starting) {
-            returnToWarmPlayer()
+            returnToWarmPlayer(backWithoutWarmPlayer)
             return@rootBack
         }
 
         when (
             rootBackAction(
                 isStartDestination = currentDestination == HomeKey,
-                warmReturn = warmReturn,
+                warmReturn = playingNow().let { (channelId, recordingId) ->
+                    if (playbackOrchestrator.canReturnToPlayer(channelId, recordingId)) warmReturn
+                    else WarmReturnOpportunity()
+                },
             )
         ) {
             BackAction.FINISH_ACTIVITY -> onRequestExit()
@@ -964,9 +985,7 @@ fun AppRoot(
                 if (!backStack.navigateBackTowardHome()) onRequestExit()
             }
             BackAction.RETURN_TO_PARENT -> Unit
-            BackAction.RETURN_TO_PLAYER -> {
-                returnToWarmPlayer()
-            }
+            BackAction.RETURN_TO_PLAYER -> returnToWarmPlayer(backWithoutWarmPlayer)
         }
     }
     val browseBackHandler = remember { mutableStateOf(handleRootBack) }
@@ -988,8 +1007,8 @@ fun AppRoot(
             browseSteps.joinStart()
             browseStop?.join()
             val target = playbackOrchestrator.requestLivePlayer(
-                activeChannelId = (playbackRuntime.activeTarget.value as? AppPlaybackTarget.Live)?.channelId,
-                activeRecordingId = (playbackRuntime.activeTarget.value as? AppPlaybackTarget.Recording)?.recordingId,
+                activeChannelId = playingNow().first,
+                activeRecordingId = playingNow().second,
                 requestedChannelId = channelId,
                 requestedChannelName = name,
                 viewingIntent = viewingIntent,
@@ -1010,7 +1029,8 @@ fun AppRoot(
         browseSteps.withdrawPending()
         val currentTarget = playbackRuntime.activeTarget.value
         val currentSelection = playbackRuntime.recordingSelection.value
-        val stillWarm = browseStop?.isCompleted != false && warmRecordingId(currentTarget, currentSelection,
+        val stillWarm = browseStop?.isCompleted != false && warmRecordingId(
+            playingTarget(currentTarget, playbackRuntime.state.value), currentSelection,
             tvheadendSession.observation.value.currentSession) == id
         if (stillWarm) {
             beforeRequest()
@@ -1067,14 +1087,14 @@ fun AppRoot(
                                 }
                             },
                             channelsVm = channelsVm,
-                            playingChannelId = activeChannelId,
+                            playingChannelId = playingChannelId,
                             playingRecordingId = warmRecordingId,
                             connectionUiState = connectionUiState,
                             connectionFailure = browseConnectionFailure,
                             onRetry = retryBrowseConnection,
                             onOpenConnectionSettings = { navigateTopLevel(SettingsKey(SettingsSection.CONNECTION)) },
                             onBrowseChannels = {
-                                playbackOrchestrator.browseNavigationSelected(activeChannelId, activeRecordingId)
+                                playbackOrchestrator.browseNavigationSelected(playingChannelId, playingRecordingId)
                                 navigateTopLevel(ChannelsKey)
                             },
                             onPlay = requestLivePlayer,
@@ -1091,8 +1111,8 @@ fun AppRoot(
                                     browseSteps.joinStart()
                                     browseStop?.join()
                                     val target = playbackOrchestrator.requestRecordingPlayer(
-                                        activeChannelId = (playbackRuntime.activeTarget.value as? AppPlaybackTarget.Live)?.channelId,
-                                        activeRecordingId = (playbackRuntime.activeTarget.value as? AppPlaybackTarget.Recording)?.recordingId,
+                                        activeChannelId = playingNow().first,
+                                        activeRecordingId = playingNow().second,
                                         requestedRecordingId = selection.recordingId,
                                         startPlayback = { playbackRuntime.playRecording(selection, intent) },
                                     ) ?: return@request
@@ -1115,7 +1135,7 @@ fun AppRoot(
                             contentAllowed = contentAllowed,
                             contentPadding = contentPadding,
                             initialFocusEnabled = !drawerActive && currentDestination == ChannelsKey,
-                            playingChannelId = activeChannelId,
+                            playingChannelId = playingChannelId,
                             playerReturn = playerReturnFor(ChannelsKey),
                             view = uiSettings.channelsView,
                             connectionUiState = connectionUiState,
@@ -1131,8 +1151,8 @@ fun AppRoot(
                                     browseSteps.joinStart()
                                     browseStop?.join()
                                     val target = playbackOrchestrator.requestRecordingPlayer(
-                                        activeChannelId = (playbackRuntime.activeTarget.value as? AppPlaybackTarget.Live)?.channelId,
-                                        activeRecordingId = (playbackRuntime.activeTarget.value as? AppPlaybackTarget.Recording)?.recordingId,
+                                        activeChannelId = playingNow().first,
+                                        activeRecordingId = playingNow().second,
                                         requestedRecordingId = selection.recordingId,
                                         startPlayback = { playbackRuntime.playRecording(selection, RecordingPlaybackStart.START_OVER) },
                                     ) ?: return@request
@@ -1170,8 +1190,8 @@ fun AppRoot(
                                     browseSteps.joinStart()
                                     browseStop?.join()
                                     val target = playbackOrchestrator.requestRecordingPlayer(
-                                        activeChannelId = (playbackRuntime.activeTarget.value as? AppPlaybackTarget.Live)?.channelId,
-                                        activeRecordingId = (playbackRuntime.activeTarget.value as? AppPlaybackTarget.Recording)?.recordingId,
+                                        activeChannelId = playingNow().first,
+                                        activeRecordingId = playingNow().second,
                                         requestedRecordingId = recordingId,
                                         startPlayback = {
                                             playbackRuntime.playRecording(
@@ -1221,8 +1241,8 @@ fun AppRoot(
                                     browseSteps.joinStart()
                                     browseStop?.join()
                                     val target = playbackOrchestrator.requestRecordingPlayer(
-                                        activeChannelId = (playbackRuntime.activeTarget.value as? AppPlaybackTarget.Live)?.channelId,
-                                        activeRecordingId = (playbackRuntime.activeTarget.value as? AppPlaybackTarget.Recording)?.recordingId,
+                                        activeChannelId = playingNow().first,
+                                        activeRecordingId = playingNow().second,
                                         requestedRecordingId = recordingId,
                                         startPlayback = {
                                             playbackRuntime.playRecording(
@@ -1270,8 +1290,8 @@ fun AppRoot(
                                         browseSteps.joinStart()
                                         browseStop?.join()
                                         val target = playbackOrchestrator.requestRecordingPlayer(
-                                            (playbackRuntime.activeTarget.value as? AppPlaybackTarget.Live)?.channelId,
-                                            (playbackRuntime.activeTarget.value as? AppPlaybackTarget.Recording)?.recordingId,
+                                            playingNow().first,
+                                            playingNow().second,
                                             selection.recordingId,
                                             startPlayback = { playbackRuntime.playRecording(selection, RecordingPlaybackStart.START_OVER) },
                                         ) ?: return@request
@@ -1504,8 +1524,8 @@ fun AppRoot(
                                 // playback remains active. Returning from the player via
                                 // Back does not go through this path and must not re-arm.
                                 playbackOrchestrator.browseNavigationSelected(
-                                    activeChannelId = activeChannelId,
-                                    activeRecordingId = activeRecordingId,
+                                    activeChannelId = playingChannelId,
+                                    activeRecordingId = playingRecordingId,
                                 )
                                 navigateTopLevel(
                                     destination.toTopLevelKey(
@@ -1547,7 +1567,7 @@ fun AppRoot(
                             playbackObservation.eventAt(channelId, kotlin.time.Instant.fromEpochSeconds(atSec))
                         },
                         // The same warm return as Continue watching: the player opens on what plays.
-                        onOpenNowPlaying = returnToWarmPlayer,
+                        onOpenNowPlaying = { returnToWarmPlayer {} },
                         content = { contentPadding, drawerActive ->
                             content(contentPadding, drawerActive, contentAllowed, railBackStack)
                         },

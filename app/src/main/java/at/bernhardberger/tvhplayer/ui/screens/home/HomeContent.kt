@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
@@ -113,7 +114,9 @@ import at.bernhardberger.tvhplayer.ui.TvBrowseLeadingInset
 import at.bernhardberger.tvhplayer.ui.TvBrowseTrailingInset
 import at.bernhardberger.tvhplayer.ui.TvCardFocusedScale
 import at.bernhardberger.tvhplayer.ui.TvGridGutter
+import at.bernhardberger.tvhplayer.ui.TvLogoPlateColor
 import at.bernhardberger.tvhplayer.ui.TvTextColors
+import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.formatRecordedDuration
@@ -1098,7 +1101,7 @@ private fun HomeActivityRow(
         val label = stringResource(
             when {
                 playing != null && item.recording != null -> R.string.home_activity_watching_and_recording
-                playing is HomePlaying.Recording -> R.string.home_back_to_player
+                playing is HomePlaying.Recording -> R.string.home_back_to_recording
                 playing != null -> R.string.home_activity_watching_live
                 else -> R.string.home_activity_recording
             },
@@ -1506,6 +1509,19 @@ private fun HomeShelfRow(
                         modifier = Modifier.fillMaxSize(),
                         progressColor = progressColor(watching = true),
                     )
+                    // Only a recording that is still running carries the red mark; a finished one has none.
+                    val runningState = recording.state?.takeIf { recordingIsRunning(recording) }
+                    if (runningState != null) Box(
+                        Modifier.align(Alignment.TopEnd).padding(8.dp)
+                            .background(TvLogoPlateColor, MaterialTheme.shapes.extraSmall)
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                            .testTag("home-shelf-rec-${recording.id.value}"),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CompositionLocalProvider(LocalContentColor provides TvTextColors.primary) {
+                            RecordingStatusIndicator(runningState)
+                        }
+                    }
                 },
             )
         }

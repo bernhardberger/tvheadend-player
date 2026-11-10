@@ -718,7 +718,8 @@
     <string name="home_browse_by_genre">Nach Genre stöbern</string>
     <string name="home_continue_watching">Weiterschauen</string>
     <string name="home_recently_recorded">Neue Aufnahmen</string>
-    <string name="home_back_to_player">Zur Wiedergabe</string>
+    <string name="home_back_to_live_tv">Zurück zum Live-TV</string>
+    <string name="home_back_to_recording">Zurück zur Aufnahme</string>
     <string name="home_recording_starts_at">Beginn um %1$s</string>
     <string name="home_all_recordings">Alle Aufnahmen</string>
     <string name="home_activity_watching_live">Live ansehen</string>

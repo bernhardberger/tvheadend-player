@@ -757,7 +757,8 @@
     <string name="home_browse_by_genre">Огляд за жанрами</string>
     <string name="home_continue_watching">Продовжити перегляд</string>
     <string name="home_recently_recorded">Нові записи</string>
-    <string name="home_back_to_player">До програвача</string>
+    <string name="home_back_to_live_tv">Назад до ефіру</string>
+    <string name="home_back_to_recording">Назад до запису</string>
     <string name="home_recording_starts_at">Початок о %1$s</string>
     <string name="home_all_recordings">Усі записи</string>
     <string name="home_activity_watching_live">Перегляд прямого ефіру</string>

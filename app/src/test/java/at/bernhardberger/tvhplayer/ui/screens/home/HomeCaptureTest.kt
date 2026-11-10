@@ -754,9 +754,13 @@ class HomeCaptureTest {
                         }
                         at.bernhardberger.tvhplayer.ui.components.HomeActivityCard(channel, null, running, false, scene.nowSec,
                             268.dp, "Recording only", {}, Modifier.testTag("activity-recording-only"))
-                        at.bernhardberger.tvhplayer.ui.components.HomeActivityCard(scene.input.channels.first { it.id == ChannelId(6) }, null,
-                            finished, true, scene.nowSec, 268.dp, "Finished recording playback", {},
-                            Modifier.testTag("activity-finished"), playingRecording = true)
+                        // A finished recording is loaded and paused: no badge, the card's own state shows.
+                        CompositionLocalProvider(LocalWatchingTarget provides AppPlaybackTarget.Recording(finished.id),
+                            at.bernhardberger.tvhplayer.ui.components.LocalWatchingIndicator provides ChannelPlaybackIndicator.PAUSED) {
+                            at.bernhardberger.tvhplayer.ui.components.HomeActivityCard(scene.input.channels.first { it.id == ChannelId(6) }, null,
+                                finished, true, scene.nowSec, 268.dp, "Finished recording playback", {},
+                                Modifier.testTag("activity-finished"), playingRecording = true)
+                        }
                     }
                 }
             }
@@ -766,12 +770,22 @@ class HomeCaptureTest {
         listOf("activity-live-recording", "activity-recording-only").forEach { tag ->
             compose.onAllNodes(hasTestTag("recording-badge") and hasAnyAncestor(hasTestTag(tag)), useUnmergedTree = true).assertCountEquals(1)
         }
-        listOf("activity-live-recording", "activity-finished").forEach { tag ->
-            compose.onNode(hasTestTag("channel-playing-indicator") and hasAnyAncestor(hasTestTag(tag)), useUnmergedTree = true).assertExists()
-        }
+        compose.onNode(hasTestTag("channel-playing-indicator") and hasAnyAncestor(hasTestTag("activity-live-recording")), useUnmergedTree = true).assertExists()
+        compose.onNode(hasTestTag("channel-paused-indicator") and hasAnyAncestor(hasTestTag("activity-finished")), useUnmergedTree = true).assertExists()
         compose.onNode(hasTestTag("recording-badge") and hasAnyAncestor(hasTestTag("activity-finished")), useUnmergedTree = true).assertDoesNotExist()
-        compose.onAllNodes(hasContentDescription("Recording") and hasAnyAncestor(hasTestTag("activity-finished")), useUnmergedTree = true).assertCountEquals(1)
+        compose.onAllNodes(hasContentDescription("Recording") and hasAnyAncestor(hasTestTag("activity-finished")), useUnmergedTree = true).assertCountEquals(0)
         capture("21-activity-recording-marks", "activity-live-recording")
+        compose.onNodeWithTag("activity-finished").requestFocus()
+        capture("21b-activity-finished-paused", "activity-finished")
+    }
+
+    /** Continue watching with a running and a finished recording: only the running one carries the red mark. */
+    @Category(VisualCapture::class)
+    @Test fun continueShelfMarksOnlyRunningRecordings() = atEvening {
+        runningResume = mapOf(DvrEntryId(1) to 15L)
+        show(Kind.WARM)
+        compose.onAllNodes(hasTestTag("home-shelf-0"))[0].requestFocus()
+        capture("22-continue-running-and-finished", "home-shelf-0")
     }
 
     private enum class Kind { BROWSE, WARM, FIRST_RUN, LOADING, EMPTY, OFFLINE }
@@ -1048,7 +1062,7 @@ class HomeCaptureTest {
             recentChannelIds = if (firstRun) emptyList() else recentIds.map { ChannelId(it.toLong()) },
             dvrEntries = dvrEntries(kind, activityItems, now),
             admission = { entry ->
-                resumeMinutes[entry.id]
+                (resumeMinutes + runningResume)[entry.id]
                     ?.let {
                         TvheadendTestResultFactory.completedRecordingAdmission(
                             it.minutes,
@@ -1068,6 +1082,8 @@ class HomeCaptureTest {
             nowSec = now,
         )
     }
+
+    private var runningResume = emptyMap<DvrEntryId, Long>()
 
     private val resumeMinutes = mapOf(
         DvrEntryId(201) to 85L,

@@ -726,7 +726,8 @@
     <string name="home_browse_by_genre">Περιήγηση ανά είδος</string>
     <string name="home_continue_watching">Συνέχιση προβολής</string>
     <string name="home_recently_recorded">Νέες εγγραφές</string>
-    <string name="home_back_to_player">Πίσω στην αναπαραγωγή</string>
+    <string name="home_back_to_live_tv">Πίσω στο ζωντανό</string>
+    <string name="home_back_to_recording">Πίσω στην εγγραφή</string>
     <string name="home_recording_starts_at">Έναρξη στις %1$s</string>
     <string name="home_all_recordings">Όλες οι εγγραφές</string>
     <string name="home_activity_watching_live">Ζωντανή προβολή</string>

@@ -10,6 +10,7 @@ import androidx.compose.runtime.setValue
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.core.CurrentChannelReadiness
@@ -96,6 +97,19 @@ internal sealed interface PlayerRouteTarget {
     data class Recording(
         val recordingId: DvrEntryId,
     ) : PlayerRouteTarget
+}
+
+/**
+ * What browse treats as playing: the active target while it can still play. A failed or ended target stays
+ * active so the player's Retry keeps working, but Home, Channels and the warm return must not offer it.
+ */
+internal fun playingTarget(target: AppPlaybackTarget?, state: AppPlaybackState): AppPlaybackTarget? =
+    target.takeUnless { state is AppPlaybackState.Failed || state is AppPlaybackState.Finished }
+
+/** The channel and recording ids of [playingTarget], for the warm return and for adopting a request. */
+internal fun playingIds(target: AppPlaybackTarget?, state: AppPlaybackState): Pair<ChannelId?, DvrEntryId?> {
+    val playing = playingTarget(target, state)
+    return (playing as? AppPlaybackTarget.Live)?.channelId to (playing as? AppPlaybackTarget.Recording)?.recordingId
 }
 
 /** A recording can be returned to only while both its identity and owning session still match. */
@@ -187,6 +201,14 @@ internal class AppRootPlaybackOrchestrator {
         val target = warmPlaybackTarget(activeChannelId, activeRecordingId)
         if (target != WarmPlaybackTarget.NONE) warmReturn = rearmWarmReturn(target)
     }
+
+    /** A selected warm return is usable only while the playing id it targets is still there. */
+    fun canReturnToPlayer(activeChannelId: ChannelId?, activeRecordingId: DvrEntryId?): Boolean =
+        warmReturn.canReturn && when (warmReturn.target) {
+            WarmPlaybackTarget.LIVE -> activeChannelId != null
+            WarmPlaybackTarget.RECORDING -> activeRecordingId != null
+            WarmPlaybackTarget.NONE -> false
+        }
 
     /**
      * A warm return starts nothing, so [noteViewingIntent] records the viewer's return before

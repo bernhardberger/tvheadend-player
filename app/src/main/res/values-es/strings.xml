@@ -741,7 +741,8 @@
     <string name="home_browse_by_genre">Explorar por género</string>
     <string name="home_continue_watching">Seguir viendo</string>
     <string name="home_recently_recorded">Nuevas grabaciones</string>
-    <string name="home_back_to_player">Volver al reproductor</string>
+    <string name="home_back_to_live_tv">Volver al directo</string>
+    <string name="home_back_to_recording">Volver a la grabación</string>
     <string name="home_recording_starts_at">Empieza a las %1$s</string>
     <string name="home_all_recordings">Todas las grabaciones</string>
     <string name="home_activity_watching_live">Viendo en directo</string>

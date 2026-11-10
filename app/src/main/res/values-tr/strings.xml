@@ -726,7 +726,8 @@
     <string name="home_browse_by_genre">Türe göre göz at</string>
     <string name="home_continue_watching">İzlemeye devam et</string>
     <string name="home_recently_recorded">Yeni kayıtlar</string>
-    <string name="home_back_to_player">Oynatıcıya dön</string>
+    <string name="home_back_to_live_tv">Canlı TV\'ye dön</string>
+    <string name="home_back_to_recording">Kayda dön</string>
     <string name="home_recording_starts_at">Başlangıç: %1$s</string>
     <string name="home_all_recordings">Tüm kayıtlar</string>
     <string name="home_activity_watching_live">Canlı izleniyor</string>

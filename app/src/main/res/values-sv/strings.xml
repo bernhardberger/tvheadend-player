@@ -726,7 +726,8 @@
     <string name="home_browse_by_genre">Bläddra efter genre</string>
     <string name="home_continue_watching">Fortsätt titta</string>
     <string name="home_recently_recorded">Nya inspelningar</string>
-    <string name="home_back_to_player">Tillbaka till spelaren</string>
+    <string name="home_back_to_live_tv">Tillbaka till live</string>
+    <string name="home_back_to_recording">Till inspelningen</string>
     <string name="home_recording_starts_at">Börjar %1$s</string>
     <string name="home_all_recordings">Alla inspelningar</string>
     <string name="home_activity_watching_live">Tittar direkt</string>
