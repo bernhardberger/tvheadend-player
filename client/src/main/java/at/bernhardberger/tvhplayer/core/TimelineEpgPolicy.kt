@@ -113,7 +113,8 @@ class GuidePreparationNavigation {
         gridOwned: Boolean = true,
         overlayOpen: Boolean = false,
     ): EpgFocusDirection? {
-        if (!scopeCurrent || !guideActive || !gridOwned || overlayOpen) clear()
+        val contextOwned = scopeCurrent && guideActive && gridOwned
+        if (!contextOwned || overlayOpen) clear()
         if (!indexCurrent) return null
         return pending.also { clear() }
     }
