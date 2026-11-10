@@ -4,6 +4,8 @@ import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
@@ -37,6 +39,7 @@ class ChannelsLayoutCaptureTest {
     @get:Rule val images = ImageLoaderRule()
     @get:Rule val compose = createComposeRule()
     private val fixture = ChannelsLayoutFixture(compose, images)
+    private var backdropChannel = ChannelId(1)
 
     @org.junit.Before fun freezeSceneClock() {
         // Match the presentation scene so captures compare channel titles, not wall-clock drift.
@@ -153,7 +156,7 @@ class ChannelsLayoutCaptureTest {
         repeat(2) { fixture.key(Key.DirectionLeft) }
         fixture.awaitFocus(card(1))
         fixture.key(Key.DirectionLeft)
-        capture("drawer", hasTestTag("nav-channels"), outputs = "build/outputs/presentation")
+        capture("drawer", hasTestTag("nav-channels"), outputs = "build/outputs/presentation", background = false)
     }
 
     private fun presentation(name: String, view: ChannelsView, focus: SemanticsMatcher) = atEvening {
@@ -228,11 +231,11 @@ class ChannelsLayoutCaptureTest {
     private fun playing(layout: ChannelsLayout, item: (Int) -> SemanticsMatcher, slug: String = layout.name.lowercase()) {
         fixture.show(ChannelsView(layout), fixture.fixtureArt(), warmPlayback = true,
             playerReturn = PlayerReturnFocus(ChannelId(1), ChannelId(1)), video = FixtureArt.art("harbor-lights-live"))
-        capture("$slug-playing-1-same-channel", item(1))
+        capture("$slug-playing-1-same-channel", item(1), background = false)
         fixture.key(if (layout == ChannelsLayout.LIST) Key.DirectionDown else Key.DirectionRight)
-        capture("$slug-playing-2-other-channel", item(2))
+        capture("$slug-playing-2-other-channel", item(2), background = false)
         fixture.key(if (layout == ChannelsLayout.LIST) Key.DirectionRight else Key.DirectionUp)
-        capture("$slug-playing-3-button", tagsButton)
+        capture("$slug-playing-3-button", tagsButton, background = false)
     }
 
     /** Channel 1's next programme is scheduled; channel 2 records now. */
@@ -335,17 +338,25 @@ class ChannelsLayoutCaptureTest {
     }
 
     private fun capture(name: String, focus: SemanticsMatcher, locale: String = "en", fontScale: Float = 1f,
-        outputs: String = "build/outputs/u4-channel-views") {
+        outputs: String = "build/outputs/u4-channel-views", background: Boolean = true) {
         fixture.awaitFocus(focus)
-        // The background follows focus after a pause and a fade; a logo's glow is baked off the
-        // main thread first, and the logo comes with it.
-        compose.mainClock.advanceTimeBy(1_500)
-        compose.waitUntil(10_000) {
-            compose.onAllNodesWithTag("channels-logo-glow").fetchSemanticsNodes().isEmpty() ||
-                compose.onAllNodesWithTag("channels-immersive-picon").fetchSemanticsNodes().isNotEmpty()
-        }
+        compose.onNode(focus).fetchSemanticsNode().config.getOrNull(SemanticsProperties.TestTag)
+            ?.removePrefix("channel-card-")?.toLongOrNull()?.let { backdropChannel = ChannelId(it) }
+        // Browse, image loading and glow baking run on the fixture's controlled Main context.
+        // Finish the incoming headline before checking its expected artwork branch.
         compose.mainClock.advanceTimeBy(1_500)
         compose.waitForIdle()
+        if (fixture.channelsView.layout == ChannelsLayout.IMMERSIVE && background) {
+            compose.onNodeWithTag("channels-immersive-background").assertExists()
+            val art = fixture.programmeArt(backdropChannel)
+                .takeIf { ChannelsLayout.IMMERSIVE in fixture.channelsView.programArt }
+            if (art != null) {
+                compose.onNodeWithTag("channels-immersive-art").assertExists()
+            } else {
+                compose.onNodeWithTag("channels-logo-glow").assertExists()
+                compose.onNodeWithTag("channels-immersive-picon").assertExists()
+            }
+        }
         val bitmap = draw()
         compose.waitForIdle()
         val settled = draw()

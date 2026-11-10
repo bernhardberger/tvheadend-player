@@ -709,7 +709,8 @@ class ChannelsLayoutFocusTest {
         fixture.show(immersive.toggledProgramArt())
         fixture.awaitFocus(card(1))
         // The logo comes with its glow, which is baked off the main thread.
-        compose.waitUntil(10_000) { compose.onAllNodesWithTag("channels-immersive-picon").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitForIdle()
+        compose.onNodeWithTag("channels-immersive-picon").assertExists()
         compose.mainClock.advanceTimeBy(1_500)
         compose.waitForIdle()
         val logo = compose.onNodeWithTag("channels-immersive-picon").getUnclippedBoundsInRoot().left
@@ -904,7 +905,6 @@ class ChannelsLayoutFocusTest {
         compose.onNodeWithTag("channels-backdrop").assertExists()
         repeat(7) { fixture.key(Key.DirectionRight) }
         fixture.awaitFocus(card(8))
-        compose.waitUntil(10_000) { compose.onAllNodesWithTag("channels-immersive-picon").fetchSemanticsNodes().isNotEmpty() }
         compose.mainClock.advanceTimeBy(1_500)
         compose.waitForIdle()
         compose.onNodeWithTag("channels-immersive-art").assertDoesNotExist()
@@ -953,7 +953,9 @@ class ChannelsLayoutFocusTest {
         compose.onNodeWithTag("channels-logo-glow").assertExists()
         compose.onNodeWithTag("channels-immersive-picon").assertDoesNotExist()
         logos.complete(Unit)
-        compose.waitUntil(10_000) { compose.onAllNodesWithTag("channels-immersive-picon").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitForIdle()
+        compose.onNodeWithTag("channels-immersive-picon").assertExists()
+        compose.onNodeWithTag("channels-immersive-title").assertTextEquals("No program information")
     }
 
     @Test fun aGuideStillOnItsWayShowsPlaceholderLinesInsteadOfNoEpg() {
@@ -975,11 +977,11 @@ class ChannelsLayoutFocusTest {
         compose.onNodeWithTag("channels-immersive-art").assertExists()
         repeat(7) { fixture.key(Key.DirectionRight) }
         fixture.awaitFocus(card(8))
-        compose.waitUntil(10_000) { compose.onAllNodesWithTag("channels-immersive-picon").fetchSemanticsNodes().isNotEmpty() }
         compose.mainClock.advanceTimeBy(1_500)
         compose.waitForIdle()
         compose.onNodeWithTag("channels-immersive-art").assertDoesNotExist()
         compose.onNodeWithTag("channels-immersive-picon").assertExists()
+        compose.onNodeWithTag("channels-immersive-title").assertTextEquals("No program information")
     }
 
     @Test fun immersiveBackgroundMatchesLogoCardsWithTheLogo() {

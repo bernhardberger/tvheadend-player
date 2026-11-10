@@ -2,6 +2,10 @@
 @file:OptIn(at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class)
 
 package at.bernhardberger.tvhplayer.ui.player
+import at.bernhardberger.tvhplayer.testutil.focusedTags
+import at.bernhardberger.tvhplayer.testutil.tagExists
+import at.bernhardberger.tvhplayer.testutil.pressKey
+import at.bernhardberger.tvhplayer.testutil.settleFrames
 
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -13,12 +17,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isFocusable
-import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsFocused
@@ -187,6 +189,7 @@ class RecordingPlayerChromeScreenTest {
         assertEquals(emptyList<DvrEntryId>(), runBlocking { store.recentRecordingIds.first() })
         playing()
         settle()
+        // LastPlayedChannelStore writes on the real DataStore IO thread.
         compose.waitUntil(10_000) {
             runBlocking { store.recentRecordingIds.first() } == listOf(DvrEntryId(7))
         }
@@ -921,14 +924,14 @@ class RecordingPlayerChromeScreenTest {
                 it.onIsPlayingChanged(true)
             }
         }
-        compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Playing }
         compose.waitForIdle()
+        assertTrue(runtime.state.value is AppPlaybackState.Playing)
     }
 
     private fun presentFirstFrame() {
         compose.runOnIdle { playerListeners.toList().forEach { it.onRenderedFirstFrame() } }
-        compose.waitUntil(5_000) { runtime.videoPresentation.value.visible }
         compose.waitForIdle()
+        assertTrue(runtime.videoPresentation.value.visible)
     }
 
     private fun audioTrack(id: String, language: String, selected: Boolean) = Tracks.Group(TrackGroup(Format.Builder()
@@ -942,7 +945,7 @@ class RecordingPlayerChromeScreenTest {
     }
 
     private fun exists(tag: String) =
-        compose.onAllNodes(hasTestTag(tag), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+        compose.tagExists(tag)
 
     private fun endClock(): String = compose.onNodeWithTag("player-end-clock", useUnmergedTree = true).fetchSemanticsNode()
         .config[SemanticsProperties.Text].joinToString { it.text }
@@ -962,19 +965,14 @@ class RecordingPlayerChromeScreenTest {
     }
 
     private fun focused(): List<String> =
-        compose.onAllNodes(isFocused(), useUnmergedTree = true).fetchSemanticsNodes()
-            .mapNotNull { it.config.getOrNull(SemanticsProperties.TestTag) }
+        compose.focusedTags()
 
     private fun key(key: Key) {
-        compose.onRoot().performKeyInput { pressKey(key) }
-        settle()
+        compose.pressKey(key, settleFrames = 20)
     }
 
     private fun settle() {
-        repeat(20) {
-            compose.mainClock.advanceTimeBy(100)
-            compose.waitForIdle()
-        }
+        compose.settleFrames(20)
     }
 
     /** [listed] false: the server never lists the recording, so the screen stays in its loading state. */
@@ -1033,6 +1031,7 @@ class RecordingPlayerChromeScreenTest {
                 runtime.playRecording(requireNotNull(currentRecordingPlaybackSelection(session.observation.value, recording)),
                     RecordingPlaybackStart.START_OVER)
             }
+            // The coordinator installs the item through the real ExoPlayer playback thread.
             compose.waitUntil(10_000) { install.isCompleted }
             if (refusedEntry == null) assertEquals(AppPlaybackTarget.Recording(recording), runtime.activeTarget.value)
         }
@@ -1062,7 +1061,7 @@ class RecordingPlayerChromeScreenTest {
             }
             }
         }
-        if (listed && refusedEntry == null) compose.waitUntil(10_000) { runtime.activeTarget.value == AppPlaybackTarget.Recording(recording) }
+        if (listed && refusedEntry == null) assertEquals(AppPlaybackTarget.Recording(recording), runtime.activeTarget.value)
         settle()
         compose.mainClock.autoAdvance = false
         settle()

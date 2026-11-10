@@ -5,6 +5,10 @@
 )
 
 package at.bernhardberger.tvhplayer.ui.player
+import at.bernhardberger.tvhplayer.testutil.focusedTags
+import at.bernhardberger.tvhplayer.testutil.tagExists
+import at.bernhardberger.tvhplayer.testutil.pressKey
+import at.bernhardberger.tvhplayer.testutil.settleFrames
 
 import android.app.Application
 import android.view.KeyEvent as AndroidKeyEvent
@@ -2574,7 +2578,7 @@ class LivePlayerChromeScreenTest {
     }
 
     private fun exists(tag: String) =
-        compose.onAllNodes(hasTestTag(tag), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+        compose.tagExists(tag)
 
     /** The closed rail stays composed to peek, cleared from what accessibility reads; the merged tree respects that. */
     private fun railOpen() = compose.onAllNodes(hasTestTag("player-channel-browser")).fetchSemanticsNodes().isNotEmpty()
@@ -2585,27 +2589,25 @@ class LivePlayerChromeScreenTest {
     }).fetchSemanticsNodes().map { it.config.getOrNull(SemanticsProperties.TestTag) ?: "untagged ${it.id}" }
 
     private fun focused(): List<String> =
-        compose.onAllNodes(isFocused(), useUnmergedTree = true).fetchSemanticsNodes()
-            .mapNotNull { it.config.getOrNull(SemanticsProperties.TestTag) }
+        compose.focusedTags()
 
     private fun key(key: Key) {
-        compose.onRoot().performKeyInput { pressKey(key) }
+        compose.pressKey(key, settleFrames = 0)
         settle()
     }
 
     /** Presses [key] and lets a few frames pass, short of any entry timer. */
     private fun press(key: Key) {
-        compose.onRoot().performKeyInput { pressKey(key) }
+        compose.pressKey(key, settleFrames = 0)
         settleFrames()
     }
 
-    private fun settleFrames() = repeat(3) { idleMainLooper(); compose.mainClock.advanceTimeByFrame(); compose.waitForIdle() }
+    private fun settleFrames() = repeat(3) { idleMainLooper(); compose.settleFrames(1, frameMillis = 16) }
 
     private fun settle() {
         repeat(20) {
             idleMainLooper()
-            compose.mainClock.advanceTimeBy(100)
-            compose.waitForIdle()
+            compose.settleFrames(1)
         }
     }
 
