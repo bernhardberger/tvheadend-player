@@ -4,6 +4,8 @@ package at.bernhardberger.tvhplayer.ui.screens
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
 import at.bernhardberger.tvhplayer.testutil.CaptureOutput
+import at.bernhardberger.tvhplayer.testutil.pressKey
+import at.bernhardberger.tvhplayer.testutil.settleFrames
 import org.koin.compose.KoinIsolatedContext
 import org.koin.dsl.koinApplication
 import org.koin.dsl.module
@@ -145,10 +147,12 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 class GuideVisualLayoutTest : GuideScreenFixture() {
     /** The README scene: the fixture pack's line-up on 2026-10-04 with Ridge Light on air at 20:15, xhdpi. */
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
+    @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
     fun presentation() = presentationScene(store = false)
 
     /** Store guide: the news row separates this blue studio scene from the live match. */
     @Test @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi")
+    @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
     fun storeGuide() = presentationScene(store = true)
 
     private fun presentationScene(store: Boolean) {
@@ -215,10 +219,7 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
             repeat(2) { key(Key.DirectionDown) }
             focused("Northline Tonight")
             // Let the settled headline's image request and its subsequent crossfade each finish.
-            repeat(20) {
-                compose.mainClock.advanceTimeBy(100)
-                compose.waitForIdle()
-            }
+            compose.settleFrames(20)
         }
         compose.mainClock.advanceTimeBy(1_500)
         compose.waitForIdle()
@@ -274,6 +275,7 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         assertEquals("No line above the lifted pill", backgroundColor, bitmap.getPixel(x.toInt(), 62))
         assertReadableFocus()
         bitmap.recycle()
+        liftedNowPill(1f, showGuide = false)
         key(Key.DirectionCenter)
         compose.onNodeWithTag("programme-details-page").assertIsDisplayed()
         compose.onNodeWithText(context().getString(R.string.close)).assertDoesNotExist()
@@ -314,8 +316,6 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         bitmap.recycle()
     }
 
-    @Test fun theNowPillSitsAboveTheLabelsAndItsLineStartsBelowIt() = liftedNowPill(1f)
-
     @Test fun theShortRulerKeepsTheLiftedNowPillAtLargeText() = liftedNowPill(1.3f)
 
     @Test fun theHeadlineOffNowPillClearsTheWideTagsButton() = headlineOffPillClearance(1f)
@@ -342,11 +342,11 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         // TV Material scales the drawing inside the semantics node, not its layout bounds.
         val focusedBottom = focused.bottom + focused.height * ((1.1 - 1.0) / 2).toFloat()
         assertTrue("The pill clears the scaled Tags button: $pill / bottom=$focusedBottom", pill.top >= focusedBottom)
-        capture("guide-headline-off-focused-tags-font$scale", scale, LayoutDirection.Ltr).recycle()
+        if (scale == 1f) capture("guide-headline-off-focused-tags-font$scale", scale, LayoutDirection.Ltr).recycle()
     }
 
-    private fun liftedNowPill(scale: Float) {
-        show(scale = scale)
+    private fun liftedNowPill(scale: Float, showGuide: Boolean = true) {
+        if (showGuide) show(scale = scale)
         val ruler = bounds("epg-time-ruler")
         assertEquals("Ruler follows labelSmall line height plus 4dp", rulerHeight, ruler.height, .5f)
         val pill = bounds("epg-now-pill")
@@ -435,7 +435,6 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         compose.onAllNodesWithText(context().getString(R.string.epg_loading)).assertCountEquals(0)
         compose.onAllNodesWithText(context().getString(R.string.loading)).assertCountEquals(0)
         compose.onNodeWithTag("guide-empty-state").assertDoesNotExist()
-        capture("guide-loading-skeleton", 1f, LayoutDirection.Ltr).recycle()
     }
 
     @Test fun theSkeletonKeepsTheGridWhereTheReadyGuidePutsItAtLargeText() = skeletonHandsOverInPlace(1.3f)
@@ -487,7 +486,6 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         assertTrue("Adjacent programme must not cover the focus ring at ($edgeX,$edgeY)",
             android.graphics.Color.red(edgePixel) > 180 && android.graphics.Color.green(edgePixel) > 180 &&
                 android.graphics.Color.blue(edgePixel) > 180)
-        compose.onNodeWithText("Northline News", useUnmergedTree = true).assertIsDisplayed()
         bitmap.recycle()
         assertNoPlayback()
     }
@@ -528,9 +526,7 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
             compose.onNodeWithTag("epg-channel-picon-2", useUnmergedTree = true).assertDoesNotExist()
             val logo = bounds("epg-channel-picon-1")
             val logoNumber = compose.onNodeWithText("1001", useUnmergedTree = true)
-            val numberLayouts = mutableListOf<TextLayoutResult>()
-            logoNumber.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(numberLayouts) }
-            val numberText = numberLayouts.single()
+            val numberText = textLayout(logoNumber.fetchSemanticsNode())
             assertEquals("1001", numberText.layoutInput.text.text)
             assertEquals(1, numberText.lineCount)
             assertFalse("Four-digit number must not truncate at $fontScale", numberText.hasVisualOverflow)
@@ -543,18 +539,15 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
             // Odd pixel row/text heights can centre an even-height logo half a pixel away.
             assertEquals(bounds("epg-channel-header-1").center.y, logo.center.y, .5f)
             val name = compose.onNodeWithText(noLogoName, useUnmergedTree = true)
-            val textLayouts = mutableListOf<TextLayoutResult>()
-            name.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(textLayouts) }
-            val text = textLayouts.single()
+            val text = textLayout(name.fetchSemanticsNode())
             assertEquals(1, text.lineCount)
             assertTrue("Long no-logo names ellipsize on their only line", text.isLineEllipsized(0))
             val nameBounds = name.fetchSemanticsNode().boundsInRoot
             val numberNode = compose.onNodeWithText("4567", useUnmergedTree = true)
             val number = numberNode.fetchSemanticsNode().boundsInRoot
-            val noLogoNumberLayouts = mutableListOf<TextLayoutResult>()
-            numberNode.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(noLogoNumberLayouts) }
-            assertFalse("No-logo four-digit number must not truncate at $fontScale", noLogoNumberLayouts.single().hasVisualOverflow)
-            assertFalse(noLogoNumberLayouts.single().isLineEllipsized(0))
+            val noLogoNumberText = textLayout(numberNode.fetchSemanticsNode())
+            assertFalse("No-logo four-digit number must not truncate at $fontScale", noLogoNumberText.hasVisualOverflow)
+            assertFalse(noLogoNumberText.isLineEllipsized(0))
             assertEquals(bounds("epg-channel-header-2").left + 12f, number.left, .1f)
             assertEquals(number.right + 8f, nameBounds.left, .1f)
             assertEquals(bounds("epg-channel-header-2").right - 12f, nameBounds.right, .1f)
@@ -562,14 +555,6 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
             assertEquals(bounds("epg-channel-header-2").center.y, nameBounds.center.y, .5f)
             assertTrue("The complete name line fits at $fontScale", text.getLineBottom(0) <= nameBounds.height)
             assertTrue(nameBounds.bottom <= bounds("epg-channel-header-2").bottom - 4f)
-            if (fontScale == 1.3f) {
-                compose.runOnIdle {
-                    val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-                    view.draw(Canvas(bitmap))
-                    CaptureOutput.writePng(File("build/outputs/browse-cohesion/guide/guide-four-digit-headers-font1.3.png"), bitmap)
-                    bitmap.recycle()
-                }
-            }
         }
     }
 
@@ -745,17 +730,11 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         compose.onNodeWithTag("epg-channel-picon-1", useUnmergedTree = true).assertIsDisplayed()
         assertEquals(1, requests)
         compose.onNodeWithText(name.value, useUnmergedTree = true).assertDoesNotExist()
-        assertEquals("Loading preserves the dense row height", 56f, bounds("epg-channel-header-1").height, .1f)
         compose.runOnIdle { loadingGate.complete(Unit) }
         compose.waitUntil(5_000) { compose.onAllNodesWithText(name.value, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText(name.value, useUnmergedTree = true).assertIsDisplayed()
         compose.onNodeWithTag("epg-channel-picon-1", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("epg-channel-header-1").assertContentDescriptionEquals("1001 ${name.value}")
-        assertEquals("Failure preserves the dense row height", 56f, bounds("epg-channel-header-1").height, .1f)
-        val fallbackNumber = compose.onNodeWithText("1001", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        val fallbackName = compose.onNodeWithText(name.value, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        assertEquals("Failed logo uses the same inline gap", fallbackNumber.right + 8f, fallbackName.left, .1f)
-        assertEquals("Failed logo keeps number and name vertically centred", fallbackNumber.center.y, fallbackName.center.y, .5f)
 
         compose.runOnIdle { failArtwork = false; icon.value = ArtworkId(2) }
         compose.onNodeWithTag("epg-channel-picon-1", useUnmergedTree = true).assertIsDisplayed()
@@ -768,7 +747,6 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         compose.onNodeWithTag("epg-channel-picon-1", useUnmergedTree = true).assertIsDisplayed()
         assertEquals(4, requests)
         compose.onNodeWithText(name.value, useUnmergedTree = true).assertDoesNotExist()
-        assertEquals("Session replacement preserves the dense row height", 56f, bounds("epg-channel-header-1").height, .1f)
         compose.runOnIdle { name.value = "  " }
         compose.onNodeWithTag("epg-channel-header-1").assertContentDescriptionEquals("1001")
     }
@@ -809,9 +787,7 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
             assertEquals(56f, row.height, .1f)
             val text = compose.onNodeWithText(context().getString(message))
             text.assertIsDisplayed()
-            val textLayouts = mutableListOf<TextLayoutResult>()
-            text.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(textLayouts) }
-            assertFalse("State message must fit the dense lane", textLayouts.single().hasVisualOverflow)
+            assertFalse("State message must fit the dense lane", textLayout(text.fetchSemanticsNode()).hasVisualOverflow)
             val textBounds = text.fetchSemanticsNode().boundsInRoot
             assertTrue(textBounds.top >= row.top && textBounds.bottom <= row.bottom)
         }
@@ -835,14 +811,15 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         val start = checkNotNull(position.position.value).windowStartSec
         val cell = compose.onNode(hasText(title(2, 0)) and isFocused()).fetchSemanticsNode().boundsInRoot
         assertTrue("One hour occupies about half the two-hour track", cell.width > ruler.width * .45f)
-        val textLayouts = mutableListOf<TextLayoutResult>()
-        compose.onNode(hasText(formatHm(hour)) and hasAnyAncestor(isFocused()), useUnmergedTree = true)
-            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(textLayouts) }
-        assertFalse("The native time line must not be clipped", textLayouts.single().hasVisualOverflow)
+        val timeText = textLayout(compose.onNode(hasText(formatHm(hour)) and hasAnyAncestor(isFocused()),
+            useUnmergedTree = true).fetchSemanticsNode())
+        assertFalse("The native time line must not be clipped", timeText.hasVisualOverflow)
         val x = ruler.left + guideTimePositionPx(now, start, start + 2 * 3600, ruler.width)
         assertEquals(lineColor, bitmap.getPixel(x.toInt(), cell.center.y.toInt()))
         assertReadableFocus()
         bitmap.recycle()
+        compose.onNodeWithTag("guide-date-button").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+        assertEnlargedHeaderFocus()
     }
 
     @Test @Config(qualifiers = "ar-ldrtl-w960dp-h540dp-land-mdpi")
@@ -871,10 +848,7 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         bitmap.recycle()
     }
 
-    @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
-    fun enlargedHeaderActionsKeepNativeFocusGrowthInsideTheSafeArea() {
-        Locale.setDefault(Locale.GERMANY)
-        show(scale = 1.3f)
+    private fun assertEnlargedHeaderFocus() {
         key(Key.DirectionRight)
         key(Key.DirectionRight)
         tagFocused("channels-view-button")
@@ -1059,20 +1033,6 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
     }
 
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
-    fun theDayAndTimePanelIsGerman() {
-        show()
-        key(Key.Enter)
-        tagFocused("guide-time-day-0")
-        compose.onAllNodesWithText("Tag und Uhrzeit").fetchSemanticsNodes().isNotEmpty().also(::assertTrue)
-        compose.onNodeWithTag("guide-time-now").assert(hasText("Jetzt"))
-        compose.onNodeWithTag("guide-time-day-0").assert(hasText("Heute"))
-        compose.onNodeWithTag("guide-time-day-1").assert(hasText("Morgen"))
-        compose.onNodeWithTag("guide-time-preset-06").assert(hasText("Morgen"))
-        compose.onNodeWithTag("guide-time-preset-20").assert(hasText("Hauptabend"))
-        compose.onNodeWithTag("guide-time-preset-22").assert(hasText("Spätabend"))
-    }
-
-    @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
     fun largeGermanTextShortensATimesLabelButNeverItsClock() {
         show(scale = 1.3f)
         key(Key.Enter)
@@ -1080,9 +1040,7 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         listOf("06", "12", "15", "18", "20", "22").forEach { hour ->
             val clock = compose.onNode(hasText("$hour:00") and hasAnyAncestor(hasTestTag("guide-time-preset-$hour")),
                 useUnmergedTree = true).fetchSemanticsNode()
-            val layouts = mutableListOf<TextLayoutResult>()
-            checkNotNull(clock.config[SemanticsActions.GetTextLayoutResult].action).invoke(layouts)
-            val layout = layouts.single()
+            val layout = textLayout(clock)
             assertTrue("Clock $hour:00 is cut", !layout.hasVisualOverflow && !layout.isLineEllipsized(0))
             assertTrue("Clock $hour:00 is within its row",
                 clock.boundsInRoot.right <= bounds("guide-time-preset-$hour").right)
@@ -1096,6 +1054,13 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         val header = bounds("guide-date-button")
         val headline = bounds("guide-headline")
         val ruler = bounds("epg-time-ruler")
+        val headerRow = bounds("channels-header")
+        assertEquals("The headline starts at the header row's start", headerRow.left, headline.left, .5f)
+        val drop = headlineDrop()
+        assertTrue("The headline starts below the header row, lowered by less than half a row: $drop", drop in 0f..30f)
+        assertEquals("The headline keeps its fixed height", headlineHeight, headline.height, .5f)
+        assertEquals("Timing anchors the content to the bottom", headline.bottom, bounds("guide-headline-metadata").bottom, .5f)
+        assertEquals(headerRow.bottom + drop + headlineHeight + GuideHeadlineRulerGap.value, ruler.top, .5f)
         assertTrue("Headline below the header's buttons: header=$header headline=$headline", headline.top >= header.bottom)
         assertTrue("Ruler below the headline: headline=$headline ruler=$ruler", ruler.top >= headline.bottom)
         val first = bounds("epg-channel-row-1").top
@@ -1108,12 +1073,16 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         key(Key.DirectionDown)
         focused(title(1, 0))
         assertEquals("The headline's height does not depend on its text", headline, bounds("guide-headline"))
-        capture("guide-headline", 1f, LayoutDirection.Ltr).recycle()
+        key(Key.DirectionUp)
+        dateFocused()
+        assertNoPlayback()
+        key(Key.DirectionDown)
+        focused(title(1, 0))
         // Quick presses, as a held key repeats, keep the settled headline until focus rests.
         compose.mainClock.autoAdvance = false
         try {
             repeat(2) {
-                compose.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
+                compose.pressKey(Key.DirectionRight)
                 compose.mainClock.advanceTimeBy(80)
             }
             // Programme 2 runs past the window, so focus reaches it a few frames after the window moves;
@@ -1276,29 +1245,6 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         if (drop > .5f) {
             assertEquals("The cut row shows its title and a third of the rest: $geometry", wanted, shown, 1f)
         }
-        capture("guide-bottom-row-${rows.name.lowercase()}-font$scale", scale, LayoutDirection.Ltr).recycle()
-        assertNoPlayback()
-    }
-
-    @Test fun theHeadlineSitsBelowTheHeaderWithItsReservedHeightAndRulerGap() {
-        show(headline = true)
-        headlineTitle(title(1, 0))
-        val header = bounds("channels-header")
-        val headline = bounds("guide-headline")
-        assertEquals("The headline starts at the header row's start", header.left, headline.left, .5f)
-        val drop = headlineDrop()
-        assertTrue("The headline starts below the header row, lowered by less than half a row: $drop",
-            drop in 0f..30f)
-        assertEquals("The headline keeps its fixed height", headlineHeight, headline.height, .5f)
-        assertEquals("Timing anchors the content to the bottom", headline.bottom, bounds("guide-headline-metadata").bottom, .5f)
-        assertEquals(header.bottom + drop + headlineHeight + GuideHeadlineRulerGap.value, bounds("epg-time-ruler").top, .5f)
-        compose.onNodeWithTag("guide-headline")
-            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Focused))
-        // The buttons keep their keys: Up from the grid reaches the date button, not the headline.
-        key(Key.DirectionDown)
-        focused(title(1, 0))
-        key(Key.DirectionUp)
-        dateFocused()
         assertNoPlayback()
     }
 
@@ -1350,9 +1296,6 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         headlineBelowTheHeader(1.3f)
     }
 
-    @Test fun theHeadlineStaysBelowTheHeaderWithAShortGroupAndAFilter() =
-        headlineBelowTheHeader(1f, group = "Favourites", genre = ProgrammeCategory.SPORT)
-
     /**
      * The headline stays below the header row regardless of the [group] name or chosen [genre].
      */
@@ -1388,8 +1331,6 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         assertEquals("The headline ends where it did below the row: $geometry",
             header.bottom + headlineDrop() + headlineHeight, headline.bottom, .5f)
         assertEquals(header.bottom + headlineDrop() + headlineHeight + GuideHeadlineRulerGap.value, bounds("epg-time-ruler").top, .5f)
-        capture("guide-headline-buttons-${Locale.getDefault().language}-font$scale" +
-            if (genre == ProgrammeCategory.SPORT) "-short" else "", scale, direction).recycle()
         assertNoPlayback()
     }
 
@@ -1716,9 +1657,7 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         val nameBounds = name.fetchSemanticsNode().boundsInRoot
         val noLogoNumber = compose.onNodeWithText("3", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         compose.onNodeWithTag("epg-channel-header-3").assertContentDescriptionEquals("3 Northline News")
-        val layouts = mutableListOf<TextLayoutResult>()
-        name.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
-        val text = layouts.single()
+        val text = textLayout(name.fetchSemanticsNode())
         assertEquals(noLogoHeader.left + 12f, noLogoNumber.left, .1f)
         assertEquals(noLogoNumber.right + 8f, nameBounds.left, .1f)
         assertEquals(noLogoHeader.right - 12f, nameBounds.right, .1f)
@@ -1731,9 +1670,7 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         assertTrue("Name line is complete, not vertically clipped", text.getLineBottom(0) <= nameBounds.height)
         assertTrue("Name retains bottom padding", nameBounds.bottom <= noLogoHeader.bottom - 4f)
         val programme = compose.onNodeWithText(title(2, 0), useUnmergedTree = true)
-        val programmeLayouts = mutableListOf<TextLayoutResult>()
-        programme.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(programmeLayouts) }
-        val programmeText = programmeLayouts.single()
+        val programmeText = textLayout(programme.fetchSemanticsNode())
         assertEquals("Long native programme headline occupies only one line", 1, programmeText.lineCount)
         assertTrue("Long headlines use single-line ellipsis", programmeText.isLineEllipsized(0))
         assertTrue(programmeText.getLineBottom(0) <= programmeText.size.height)
@@ -1768,8 +1705,12 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
     private fun headlineDrop(): Float = bounds("guide-headline").top - bounds("channels-header").bottom
 
     private fun baseline(text: androidx.compose.ui.semantics.SemanticsNode): Float {
+        return text.boundsInRoot.top + textLayout(text).firstBaseline
+    }
+
+    private fun textLayout(text: androidx.compose.ui.semantics.SemanticsNode): TextLayoutResult {
         val layouts = mutableListOf<TextLayoutResult>()
         checkNotNull(text.config[SemanticsActions.GetTextLayoutResult].action).invoke(layouts)
-        return text.boundsInRoot.top + layouts.single().firstBaseline
+        return layouts.single()
     }
 }

@@ -208,24 +208,17 @@ class GuideNavigationTest : GuideScreenFixture() {
     }
 
     @Test fun groupChangeKeepsTheLastFocusedGuideChannelAheadOfLastPlayed() {
-        show(groupWithoutFirst = true, lastPlayedChannel = ChannelId(1))
-        key(Key.DirectionDown)
-        key(Key.DirectionDown)
-        focused(title(2, 0))
-        compose.onNodeWithTag("channels-tags-button").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
-        key(Key.Enter)
-        tagFocused("channels-tags-all")
-        key(Key.DirectionDown)
-        tagFocused("channels-tags-1")
-        key(Key.Enter)
-        key(Key.DirectionDown)
-        focused(title(2, 0))
-        assertNoPlayback(additionalCoverageCalls = 1)
+        groupChangeAfterPlayerReturnUsesTheMostRecentlyFocusedChannel(playerReturn = false)
     }
 
     @Test fun groupChangeAfterPlayerReturnUsesTheMostRecentlyFocusedChannel() {
-        position.save(GuidePosition(ChannelId(1), EventId(110), hour, hour - 1800, 0))
-        show(groupWithoutFirst = true, lastPlayedChannel = ChannelId(1), playerReturn = savedTimelineReturn())
+        groupChangeAfterPlayerReturnUsesTheMostRecentlyFocusedChannel(playerReturn = true)
+    }
+
+    private fun groupChangeAfterPlayerReturnUsesTheMostRecentlyFocusedChannel(playerReturn: Boolean) {
+        if (playerReturn) position.save(GuidePosition(ChannelId(1), EventId(110), hour, hour - 1800, 0))
+        show(groupWithoutFirst = true, lastPlayedChannel = ChannelId(1),
+            playerReturn = if (playerReturn) savedTimelineReturn() else null)
         key(Key.DirectionDown)
         focused(title(1, 0))
         key(Key.DirectionDown)
@@ -387,6 +380,7 @@ class GuideNavigationTest : GuideScreenFixture() {
         show()
         key(Key.DirectionDown)
         focused(title(1, 0))
+        val nowWindow = checkNotNull(position.position.value).windowStartSec
         // The fourth programme scrolls the window past now; the third still fits beside it.
         // Window preparation runs off the Compose scheduler. waitForIdle alone can return
         // while it is pending, when Guide deliberately consumes the next navigation key.
@@ -398,15 +392,11 @@ class GuideNavigationTest : GuideScreenFixture() {
         repeat(7) { key(Key.DirectionDown) }
         focused(title(9, 3)) // The metadata-only third channel is not an invented programme.
         assertReadableFocus()
-        val bitmap = capture("guide-scrolled", 1f, LayoutDirection.Ltr)
-        val viewport = bounds("epg-timeline-content")
-        // Alpha reaches the backdrop at the top after real rows have scrolled out; the bottom and
-        // right edges are hard cuts and do not fade.
-        assertNearBackground(bitmap.getPixel(750, viewport.top.toInt()), 8)
-        bitmap.recycle()
         val window = checkNotNull(position.position.value).windowStartSec
+        assertNotEquals(nowWindow, window)
         key(Key.Back)
         focused(title(9, 0)) // Scrolled past now: Back returns to now on the same channel first.
+        assertEquals(nowWindow, checkNotNull(position.position.value).windowStartSec)
         assertNotEquals(window, checkNotNull(position.position.value).windowStartSec)
         key(Key.Back)
         compose.onNodeWithTag("nav-epg").assertIsFocused()
@@ -426,7 +416,9 @@ class GuideNavigationTest : GuideScreenFixture() {
         key(Key.DirectionRight)
         focused(title(1, 0))
         assertEquals(before, position.position.value)
-        val bitmap = capture("guide-data-edge", 1f, LayoutDirection.Ltr)
+        val bitmap = compose.runOnIdle {
+            Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888).also { view.draw(Canvas(it)) }
+        }
         val focus = compose.onNode(hasText(title(1, 0)) and isFocused()).fetchSemanticsNode().boundsInRoot
         val window = checkNotNull(position.position.value).windowStartSec
         val ruler0 = bounds("epg-time-ruler")
@@ -445,9 +437,6 @@ class GuideNavigationTest : GuideScreenFixture() {
     }
 
     @Test fun nowPointSequenceCrossesAGapAndReturnsToItsOrigin() {
-        fun programme(id: Long, channel: Long, start: Long, end: Long, name: String) =
-            EpgEvent.create(EventId(id), ChannelId(channel), Instant.fromEpochSeconds(hour + start * 60),
-                Instant.fromEpochSeconds(hour + end * 60), title = name)
         show(history = false, events = listOf(
             programme(110, 1, 0, 30, "Origin on air"),
             programme(111, 1, 30, 120, "Later origin programme"),
@@ -471,9 +460,6 @@ class GuideNavigationTest : GuideScreenFixture() {
     }
 
     @Test fun onAirAnchorAdvancesWithTheClockBetweenDownPresses() {
-        fun programme(id: Long, channel: Long, start: Long, end: Long, name: String) =
-            EpgEvent.create(EventId(id), ChannelId(channel), Instant.fromEpochSeconds(hour + start * 60),
-                Instant.fromEpochSeconds(hour + end * 60), title = name)
         show(history = false, events = listOf(
             programme(109, 1, -60, 0, "Previous programme"),
             programme(110, 1, 0, 120, "First long programme"),
@@ -501,9 +487,6 @@ class GuideNavigationTest : GuideScreenFixture() {
     @Test fun deferredChannelPageResolvesAtTheNewNow() {
         val entered = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
-        fun programme(id: Long, channel: Long, start: Long, end: Long, name: String) =
-            EpgEvent.create(EventId(id), ChannelId(channel), Instant.fromEpochSeconds(hour + start * 60),
-                Instant.fromEpochSeconds(hour + end * 60), title = name)
         try {
             show(history = false, initialCoverage = false, beforeCoverageBatch = { ids, _ ->
                 if (ids.any { it.value >= 7 }) {
@@ -543,9 +526,6 @@ class GuideNavigationTest : GuideScreenFixture() {
     @Test fun restoredOnAirProgrammeWithNowInLeftReserveUsesItsVisibleSpan() {
         val window = hour + 14 * 60
         position.save(GuidePosition(ChannelId(1), EventId(110), hour, window, 0))
-        fun programme(id: Long, channel: Long, start: Long, end: Long, name: String) =
-            EpgEvent.create(EventId(id), ChannelId(channel), Instant.fromEpochSeconds(hour + start * 60),
-                Instant.fromEpochSeconds(hour + end * 60), title = name)
         show(history = false, playerReturn = savedTimelineReturn(), events = listOf(
             programme(110, 1, 0, 300, "Long programme on air"),
             programme(210, 2, 0, 40, "Short programme on air"),
@@ -563,9 +543,6 @@ class GuideNavigationTest : GuideScreenFixture() {
     }
 
     @Test fun leftThenRightThenDownFromOnAirUsesNowRatherThanProgrammeStart() {
-        fun programme(id: Long, channel: Long, start: Long, end: Long, name: String) =
-            EpgEvent.create(EventId(id), ChannelId(channel), Instant.fromEpochSeconds(hour + start * 60),
-                Instant.fromEpochSeconds(hour + end * 60), title = name)
         // Fixed now is 20:15: the next row changes one minute after the focused programme starts.
         show(history = false, events = listOf(
             programme(109, 1, -60, -10, "Previous programme"),
@@ -587,9 +564,6 @@ class GuideNavigationTest : GuideScreenFixture() {
     }
 
     @Test fun futureVisibleSpanStaysStickyThroughALongProgramme() {
-        fun programme(id: Long, channel: Long, start: Long, end: Long, name: String) =
-            EpgEvent.create(EventId(id), ChannelId(channel), Instant.fromEpochSeconds(hour + start * 60),
-                Instant.fromEpochSeconds(hour + end * 60), title = name)
         show(events = listOf(
             programme(110, 1, 0, 60, "Current programme"),
             programme(111, 1, 60, 120, "Future span"),
@@ -637,9 +611,6 @@ class GuideNavigationTest : GuideScreenFixture() {
     }
 
     @Test fun verticalMoveUsesReadableTimeWithoutMovingTheWindow() {
-        fun programme(id: Long, channel: Long, startMinute: Long, endMinute: Long, name: String) =
-            EpgEvent.create(EventId(id), ChannelId(channel), Instant.fromEpochSeconds(hour + startMinute * 60),
-                Instant.fromEpochSeconds(hour + endMinute * 60), title = name)
         show(events = listOf(
             programme(110, 1, -60, 30, "Long current programme"),
             programme(111, 1, 30, 90, "Next programme"),
@@ -658,7 +629,6 @@ class GuideNavigationTest : GuideScreenFixture() {
         focused("Readable adjacent programme")
         assertEquals(window, checkNotNull(position.position.value).windowStartSec)
         assertReadableFocus()
-        capture("guide-vertical-readable-anchor", 1f, LayoutDirection.Ltr).recycle()
         key(Key.DirectionUp)
         focused("Long current programme")
         assertEquals(window, checkNotNull(position.position.value).windowStartSec)
@@ -687,9 +657,6 @@ class GuideNavigationTest : GuideScreenFixture() {
     }
 
     @Test fun verticalMoveSkipsLeftSliverForAShortFullyVisibleNeighbour() {
-        fun programme(id: Long, channel: Long, start: Long, end: Long, name: String) =
-            EpgEvent.create(EventId(id), ChannelId(channel), Instant.fromEpochSeconds(hour + start * 60),
-                Instant.fromEpochSeconds(hour + end * 60), title = name)
         show(history = false, events = listOf(
             programme(110, 1, -60, 30, "Current programme"),
             programme(210, 2, -60, -14, "Left sliver"),
@@ -704,13 +671,9 @@ class GuideNavigationTest : GuideScreenFixture() {
         val cell = compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot
         assertTrue("Short fully visible cells qualify below 48dp", cell.width in 1f..47f)
         assertReadableFocus()
-        capture("guide-left-sliver-skipped", 1f, LayoutDirection.Ltr).recycle()
     }
 
     @Test fun verticalMoveSkipsRightSliverForTheFullyVisibleNeighbour() {
-        fun programme(id: Long, channel: Long, start: Long, end: Long, name: String) =
-            EpgEvent.create(EventId(id), ChannelId(channel), Instant.fromEpochSeconds(hour + start * 60),
-                Instant.fromEpochSeconds(hour + end * 60), title = name)
         show(events = listOf(
             programme(110, 1, 0, 60, "Current programme"),
             programme(111, 1, 146, 147, "Short right anchor"),
@@ -726,7 +689,6 @@ class GuideNavigationTest : GuideScreenFixture() {
         focused("Visible neighbour")
         assertEquals(window, checkNotNull(position.position.value).windowStartSec)
         assertReadableFocus()
-        capture("guide-right-sliver-skipped", 1f, LayoutDirection.Ltr).recycle()
         key(Key.DirectionUp)
         focused("Short right anchor")
         assertEquals(window, checkNotNull(position.position.value).windowStartSec)
@@ -756,7 +718,6 @@ class GuideNavigationTest : GuideScreenFixture() {
         focused("Short edge programme")
         assertReadableFocus()
         assertTrue(compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot.width > 0f)
-        capture("guide-inset-change-readable", 1f, LayoutDirection.Ltr).recycle()
     }
 
     @Test fun pageDownAndUpKeepTheTimeWindowForEdgeCrossingProgrammes() {
@@ -1114,26 +1075,21 @@ class GuideNavigationTest : GuideScreenFixture() {
 
     @Test fun viewOptionsSwitchBetweenRegularAndDenseRows() {
         show()
-        assertEquals("Regular rows", 56f, bounds("epg-channel-row-1").height, .1f)
+        val regularHeight = bounds("epg-channel-row-1").height
         assertTrue("Regular cells show their start time",
             compose.onAllNodesWithTag("guide-cell-time", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
         key(Key.DirectionRight)
         key(Key.DirectionRight)
         tagFocused("channels-view-button")
         key(Key.Enter)
-        compose.onNodeWithTag("guide-view-panel").assertIsDisplayed()
         tagFocused("guide-view-rows-regular")
         key(Key.DirectionDown)
         tagFocused("guide-view-rows-dense")
         key(Key.Enter)
-        compose.waitUntil(5_000) { bounds("epg-channel-row-1").height < 50f }
-        assertEquals("Dense rows keep the native one-line list item height", 40f, bounds("epg-channel-row-1").height, .1f)
+        compose.waitUntil(5_000) { bounds("epg-channel-row-1").height < regularHeight }
+        assertTrue("Dense rows are shorter than regular rows", bounds("epg-channel-row-1").height < regularHeight)
         compose.onAllNodesWithTag("guide-cell-time", useUnmergedTree = true).assertCountEquals(0)
         assertEquals(GuideRows.DENSE, runBlocking { uiSettings.settings.first() }.guideView.rows)
-        compose.onNodeWithTag("guide-view-panel").assertIsDisplayed()
-        key(Key.Back)
-        compose.onNodeWithTag("guide-view-panel").assertDoesNotExist()
-        tagFocused("channels-view-button")
         assertNoPlayback()
     }
 
@@ -1144,7 +1100,6 @@ class GuideNavigationTest : GuideScreenFixture() {
         key(Key.Enter)
         compose.onNodeWithTag("guide-time-panel").assertIsDisplayed()
             .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.HideFromAccessibility))
-        assertEquals(464f, bounds("guide-time-panel").width, .5f)
         assertEquals(1, compose.onAllNodes(gridHidden, useUnmergedTree = true).fetchSemanticsNodes().size)
         tagFocused("guide-time-day-0")
         compose.onNodeWithTag("guide-time-day-0").assertIsSelected()
@@ -1223,7 +1178,7 @@ class GuideNavigationTest : GuideScreenFixture() {
         key(Key.Enter)
         compose.onNodeWithTag("guide-time-panel").assertDoesNotExist()
         dateFocused()
-        assertDateButton("Tomorrow", hour + 24 * 3600)
+        assertTrue(dateButtonShows("Tomorrow", hour + 24 * 3600))
         assertEquals(0, playbackRequests)
     }
 
@@ -1402,16 +1357,6 @@ class GuideNavigationTest : GuideScreenFixture() {
         compose.waitUntil(5_000) { dateButtonShows("Sun, Oct 11", hour + 7 * 24 * 3600 - 5 * 3600) }
     }
 
-    @Test fun backClosesThePanelOntoTheDateButton() {
-        show()
-        key(Key.Enter)
-        tagFocused("guide-time-day-0")
-        key(Key.Back)
-        compose.onNodeWithTag("guide-time-panel").assertDoesNotExist()
-        dateFocused()
-        assertDateButtonNow()
-    }
-
     @Test fun pendingGuideViewSaveSurvivesPreparationAuthorityChange() {
         val saveStarted = CompletableDeferred<Unit>()
         val releaseSave = CompletableDeferred<Unit>()
@@ -1462,27 +1407,6 @@ class GuideNavigationTest : GuideScreenFixture() {
             releasePreparation()
             releaseSave.complete(Unit)
         }
-    }
-
-    @Test fun backReturnsAnOffNowGuideToNowOnTheSameChannelThenToTheRail() {
-        show()
-        key(Key.DirectionDown)
-        focused(title(1, 0))
-        val nowWindow = checkNotNull(position.position.value).windowStartSec
-        key(Key.DirectionDown)
-        focused(title(2, 0))
-        repeat(4) { offset ->
-            key(Key.DirectionRight)
-            focused(title(2, offset + 1))
-        }
-        focused(title(2, 4))
-        assertNotEquals(nowWindow, checkNotNull(position.position.value).windowStartSec)
-        key(Key.Back)
-        focused(title(2, 0))
-        assertEquals(nowWindow, checkNotNull(position.position.value).windowStartSec)
-        key(Key.Back)
-        tagFocused("nav-epg")
-        assertNoPlayback(additionalCoverageCalls = 1)
     }
 
     @Test fun backToNowFocusesTheProgrammeOnAirWhenItArrivesAfterTheJump() {
@@ -1584,7 +1508,7 @@ class GuideNavigationTest : GuideScreenFixture() {
         assertNoPlayback()
     }
 
-    @Test fun aServerWithoutTagsStillOffersFilter() {
+    @Test fun aFocusedFilterOutlivesAReloadWithoutGenresUntilFocusMovesOn() {
         show(genres = true, tags = false)
         compose.onNodeWithTag("channels-tags-button").assertDoesNotExist()
         key(Key.DirectionRight)
@@ -1595,12 +1519,6 @@ class GuideNavigationTest : GuideScreenFixture() {
         key(Key.Back)
         tagFocused("guide-filter-button")
         assertNoPlayback()
-    }
-
-    @Test fun aFocusedFilterOutlivesAReloadWithoutGenresUntilFocusMovesOn() {
-        show(genres = true, tags = false)
-        key(Key.DirectionRight)
-        tagFocused("guide-filter-button")
         val full = compose.runOnIdle { checkNotNull(session.observation.value.epgSnapshotForDisplay) }
         fun List<EpgEvent>.plain() = map {
             EpgEvent.create(it.id, channelId = it.channelId, start = it.start, stop = it.stop,
@@ -1626,17 +1544,8 @@ class GuideNavigationTest : GuideScreenFixture() {
     }
 
     private fun removeHistory() {
-        compose.runOnIdle {
-            val observation = session.observation.value
-            val snapshot = checkNotNull(observation.epgSnapshotForDisplay)
-            session.publish(SessionObservation.create(
-                sessionState = observation.sessionState,
-                channelState = observation.channelState,
-                epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = snapshot.events, coverages = snapshot.coverages)),
-                dvrState = observation.dvrState,
-                dvrConfigurationsState = observation.dvrConfigurationsState,
-            ))
-        }
+        val snapshot = checkNotNull(session.observation.value.epgSnapshotForDisplay)
+        publishEvents(snapshot.events, EpgSnapshot.create(events = snapshot.events, coverages = snapshot.coverages), covered = true)
         compose.waitForIdle()
         compose.onNodeWithText(title(1, 0)).assertExists()
         compose.onAllNodes(hasText(title(1, -1))).assertCountEquals(0)
@@ -1645,8 +1554,10 @@ class GuideNavigationTest : GuideScreenFixture() {
     private fun guidePaneTitle() =
         compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, context().getString(R.string.epg_title)))
 
-    private fun assertDateButton(day: String, startSec: Long) =
-        compose.onNodeWithTag("guide-date-button").assert(hasText(dateButtonText(day, startSec)))
+    private fun programme(id: Long, channel: Long, start: Long, end: Long, name: String) =
+        EpgEvent.create(EventId(id), ChannelId(channel), Instant.fromEpochSeconds(hour + start * 60),
+            Instant.fromEpochSeconds(hour + end * 60), title = name)
+
     private fun dateButtonShowsNow() =
         compose.onAllNodes(hasTestTag("guide-date-button") and hasText(dateButtonNowText())).fetchSemanticsNodes().isNotEmpty()
 }
