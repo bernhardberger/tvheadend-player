@@ -92,12 +92,10 @@ class AudioPassthroughStartupTest {
                 if (admitted) listOf(DvrEntry.create(DvrEntryId(1), state = DvrEntryState.COMPLETED)) else emptyList())),
         )
         val session = if (admitted) FakeTvheadendSession(observation) else FakeTvheadendSession()
-        val connection = ScriptedSubscriptionConnection()
-        val manager = createSubscriptionManager(connection, work).apply { startAdmission() }
-        if (admitted) {
-            session.scriptLivePlaybackSuccess(manager)
-            session.scriptRecordingPlaybackSuccess()
-        }
+        val connection = if (admitted && !recordingFirst) ScriptedSubscriptionConnection() else null
+        val manager = connection?.let { createSubscriptionManager(it, work).apply { startAdmission() } }
+        manager?.let { session.scriptLivePlaybackSuccess(it) }
+        if (admitted && recordingFirst) session.scriptRecordingPlaybackSuccess()
         val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, work,
             readProfileForEditing = { ServerProfileEditReadResult.Missing }).also { owner -> runtimeScope.launch { owner.run() } }
         val output = TvheadendAudioOutputProvider(context)
@@ -122,8 +120,8 @@ class AudioPassthroughStartupTest {
         val selection = requireNotNull(observation.currentSession)
         val driver = PlaybackTestDriver(testScheduler)
         suspend fun requestTarget() {
-            val subscriptions = connection.subscribeCount
-            if (admitted && !recordingFirst) connection.scriptSubscribe(
+            val subscriptions = connection?.subscribeCount ?: 0
+            connection?.scriptSubscribe(
                 SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 0)))
             val request = runtimeScope.async {
                 if (recordingFirst) runtime.playRecording(RecordingPlaybackSelection(selection, DvrEntryId(1)), RecordingPlaybackStart.START_OVER)
@@ -131,7 +129,7 @@ class AudioPassthroughStartupTest {
             }
             try {
                 driver.settleLive(player)
-                if (admitted && !recordingFirst) {
+                if (connection != null) {
                     driver.awaitCurrent("live subscription opened") {
                         connection.subscribeCount == subscriptions + 1
                     }
@@ -173,7 +171,7 @@ class AudioPassthroughStartupTest {
             runtimeScope.cancel()
             player.release()
             session.shutdown()
-            manager.closeAndJoin()
+            manager?.closeAndJoin()
         }
     }
 }
