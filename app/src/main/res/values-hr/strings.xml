@@ -747,7 +747,8 @@
     <string name="home_browse_by_genre">Pregledaj po žanru</string>
     <string name="home_continue_watching">Nastavi gledati</string>
     <string name="home_recently_recorded">Nove snimke</string>
-    <string name="home_back_to_player">Natrag na reproduktor</string>
+    <string name="home_back_to_live_tv">Natrag na TV uživo</string>
+    <string name="home_back_to_recording">Natrag na snimku</string>
     <string name="home_recording_starts_at">Počinje u %1$s</string>
     <string name="home_all_recordings">Sve snimke</string>
     <string name="home_activity_watching_live">Gledanje uživo</string>

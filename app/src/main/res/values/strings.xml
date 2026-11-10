@@ -970,7 +970,10 @@
     <string name="home_browse_by_genre">Browse by genre</string>
     <string name="home_continue_watching">Continue watching</string>
     <string name="home_recently_recorded">New recordings</string>
-    <string name="home_back_to_player">Back to player</string>
+    <!-- Home activity card action while a live channel is loaded in the player. Max 18. -->
+    <string name="home_back_to_live_tv">Back to live TV</string>
+    <!-- Home activity card action while a recording is loaded in the player. Max 18. -->
+    <string name="home_back_to_recording">Back to recording</string>
     <string name="home_recording_starts_at">Starts at %1$s</string>
     <string name="home_all_recordings">All recordings</string>
     <string name="home_activity_watching_live">Watching live</string>

@@ -762,7 +762,8 @@
     <string name="home_browse_by_genre">Обзор по жанрам</string>
     <string name="home_continue_watching">Продолжить просмотр</string>
     <string name="home_recently_recorded">Новые записи</string>
-    <string name="home_back_to_player">К проигрывателю</string>
+    <string name="home_back_to_live_tv">Вернуться к эфиру</string>
+    <string name="home_back_to_recording">Вернуться к записи</string>
     <string name="home_recording_starts_at">Начало в %1$s</string>
     <string name="home_all_recordings">Все записи</string>
     <string name="home_activity_watching_live">Просмотр прямого эфира</string>

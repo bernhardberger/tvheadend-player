@@ -29,6 +29,7 @@ import at.bernhardberger.tvheadend.sdk.media3.TimeshiftWallClockMapping
 import at.bernhardberger.tvhplayer.ui.common.isRunning
 import at.bernhardberger.tvhplayer.ui.common.progress
 import at.bernhardberger.tvhplayer.ui.LocalPlayerEntryHandoff
+import at.bernhardberger.tvhplayer.ui.playingTarget
 import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
 import kotlinx.coroutines.delay
 
@@ -169,7 +170,9 @@ internal fun ProvideWatchingProgress(runtime: AppPlaybackRuntime, content: @Comp
         }
     }
     val goLive: suspend () -> Unit = remember(runtime) { { runtime.goLive(); runtime.play() } }
-    CompositionLocalProvider(LocalWatchingChannel provides channel, LocalWatchingTarget provides target,
+    // A failed or ended target is not "playing" for the pages that read the local (details, rail, Home).
+    CompositionLocalProvider(LocalWatchingChannel provides channel,
+        LocalWatchingTarget provides playingTarget(target, playback),
         LocalWatchingGoLive provides goLive,
         LocalRecordingPlaybackSelection provides recordingSelection,
         LocalWatchingIndicator provides indicator, LocalRecordingPosition provides position,

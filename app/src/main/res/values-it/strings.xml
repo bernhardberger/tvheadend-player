@@ -746,7 +746,8 @@
     <string name="home_browse_by_genre">Sfoglia per genere</string>
     <string name="home_continue_watching">Continua a guardare</string>
     <string name="home_recently_recorded">Nuove registrazioni</string>
-    <string name="home_back_to_player">Torna al lettore</string>
+    <string name="home_back_to_live_tv">Torna alla diretta</string>
+    <string name="home_back_to_recording">Torna alla registrazione</string>
     <string name="home_recording_starts_at">Inizio alle %1$s</string>
     <string name="home_all_recordings">Tutte le registrazioni</string>
     <string name="home_activity_watching_live">Visione in diretta</string>
