@@ -1105,8 +1105,16 @@ class SessionPlaybackPlayerTest {
         player.setMediaSource(SilenceMediaSource.Factory().setDurationUs(60_000_000).createMediaSource())
         player.prepare()
         await { wrapper.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM) }
-        wrapper.seekTo(12_000)
+        val position = player.currentPosition
+        val seeks = sessionSeeks
+        whileCommandsBlocked {
+            wrapper.seekTo(12_000)
+            settle()
+            assertEquals(position, player.currentPosition)
+            assertEquals(seeks, sessionSeeks)
+        }
         await { player.currentPosition >= 12_000 }
+        assertEquals(seeks + 1, sessionSeeks)
         assertTrue(player.currentPosition < 13_000)
         assertTrue(connection.speeds.isEmpty())
     }
@@ -1146,17 +1154,28 @@ class SessionPlaybackPlayerTest {
     }
 
     @Test fun targetsOfTheSameKindReplaceEachOtherWithoutAStop() = exercise {
+        val initial = session.observation.value
+        session.publish(SessionObservation.create(sessionState = initial.sessionState,
+            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(
+                Channel.create(ChannelId(1)), Channel.create(ChannelId(2))))),
+            epgState = initial.epgState,
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(listOf(
+                DvrEntry.create(DvrEntryId(1), state = DvrEntryState.COMPLETED),
+                DvrEntry.create(DvrEntryId(2), state = DvrEntryState.COMPLETED))))))
         live(false)
         playerLog.clear()
         answerNextSubscribe(2)
-        assertTrue(runtime.playLive(liveSelection())?.isStarted == true)
+        assertTrue(runtime.playLive(requireNotNull(currentLivePlaybackSelection(
+            session.observation.value, ChannelId(2))))?.isStarted == true)
         settle()
-        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
         assertFalse(playerLog.toString(), "stop" in playerLog)
         recording()
         playerLog.clear()
-        recording()
-        assertEquals(AppPlaybackTarget.Recording(DvrEntryId(1)), runtime.activeTarget.value)
+        assertTrue(runtime.playRecording(requireNotNull(currentRecordingPlaybackSelection(
+            session.observation.value, DvrEntryId(2))), RecordingPlaybackStart.START_OVER)?.isStarted == true)
+        settle()
+        assertEquals(AppPlaybackTarget.Recording(DvrEntryId(2)), runtime.activeTarget.value)
         assertFalse(playerLog.toString(), "stop" in playerLog)
     }
 
@@ -1695,11 +1714,15 @@ class SessionPlaybackPlayerTest {
         assertEquals(AppPlaybackState.Idle, runtime.state.value)
     }
 
-    @Test fun enteringWithoutAUserStopNotesIntentThatBeatsAnEarlierQueuedStop() = exercise {
+    @Test fun enteringAndReenteringWithoutAUserStopEachAdvancePlaybackIntent() = exercise {
         live(false)
+        val opening = runtime.notePlaybackIntent()
         val entry = requireNotNull(runtime.enterPlayerScreen())
+        assertTrue(entry > opening)
         assertFalse(runtime.isPlaybackIntentStopped(entry))
-        assertNotNull(runtime.enterPlayerScreen()) // re-entry
+        val reentry = requireNotNull(runtime.enterPlayerScreen())
+        assertTrue(reentry > entry)
+        assertFalse(runtime.isPlaybackIntentStopped(reentry))
         assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
     }
 
@@ -2149,7 +2172,7 @@ class SessionPlaybackPlayerTest {
                 assertEquals(1, pendingSessionStops())
                 val opening = runtime.notePlaybackIntent()
                 entry = requireNotNull(runtime.enterPlayerScreen())
-                assertEquals(opening + 1, entry) // not joined to the older pending Stop
+                assertTrue(entry > opening) // not joined to the older pending Stop
                 stops = collectSessionStops()
             }
             // Drained: the Stop has had its check, and was skipped.
