@@ -86,9 +86,6 @@ import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.ui.components.rememberPreparedBrowseData
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.test.performKeyPress
-import at.bernhardberger.tvhplayer.ui.components.awaitBrowsePreparation
-import at.bernhardberger.tvhplayer.ui.components.awaitBrowsePreparationLane
-import at.bernhardberger.tvhplayer.ui.components.browsePreparationLane
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.common.programmeCategoryLabelRes
@@ -140,6 +137,7 @@ import kotlin.math.roundToInt
 import kotlin.time.Instant
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
+import kotlinx.coroutines.test.StandardTestDispatcher
 
 /** Offline native production Guide navigation: focus, entry, panels and Back; geometry lives in [GuideVisualLayoutTest]. */
 @RunWith(RobolectricTestRunner::class)
@@ -149,7 +147,6 @@ import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 class GuideNavigationTest : GuideScreenFixture() {
     @Test fun retainedEntryWaitsForRowsWhenNewCoverageArrivesBeforePreparation() {
         val coverageRelease = CompletableDeferred<Unit>()
-        val preparationRelease = java.util.concurrent.CountDownLatch(1)
         try {
             show(initialCoverage = false, beforeCoverageBatch = { _, _ -> coverageRelease.await() })
             key(Key.DirectionDown)
@@ -163,12 +160,7 @@ class GuideNavigationTest : GuideScreenFixture() {
                 historicalEvents = snapshot.historicalEvents, coverages = (1L..12L).map {
                     EpgCoverage.create(ChannelId(it), Instant.fromEpochSeconds(hour), Instant.fromEpochSeconds(hour + 7 * 86400))
                 })
-            val held = java.util.concurrent.CountDownLatch(1)
-            browsePreparationLane.dispatch(kotlin.coroutines.EmptyCoroutineContext) {
-                held.countDown()
-                check(preparationRelease.await(30, java.util.concurrent.TimeUnit.SECONDS))
-            }
-            assertTrue(held.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            compose.runOnIdle { preparationContext = StandardTestDispatcher() }
             publishEvents(fresh.events, fresh, covered = true)
             compose.runOnIdle {
                 position.save(checkNotNull(position.position.value).copy(channelId = ChannelId(3)))
@@ -176,14 +168,14 @@ class GuideNavigationTest : GuideScreenFixture() {
             }
             compose.waitForIdle()
             // New coverage must not settle entry against old rows and remember their fallback.
-            preparationRelease.countDown()
-            compose.waitUntil(10_000) { compose.onAllNodes(hasText(title(3, 0))).fetchSemanticsNodes().isNotEmpty() }
+            releasePreparation()
+            awaitGuideWork { compose.onAllNodesWithText(title(3, 0)).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithText(title(3, 0)).assertExists()
             key(Key.DirectionDown)
             focused(title(3, 0))
             assertEquals(ChannelId(3), position.position.value?.channelId)
             assertNoPlayback()
         } finally {
-            preparationRelease.countDown()
             coverageRelease.complete(Unit)
         }
     }
@@ -207,9 +199,8 @@ class GuideNavigationTest : GuideScreenFixture() {
                 position.save(checkNotNull(position.position.value).copy(channelId = ChannelId(3)))
                 guideActive = true
             }
-            // Going offline prepares the window's index anew, off the Compose scheduler; until its
-            // rows show, Guide consumes the key.
-            compose.waitUntil(10_000) { compose.onAllNodes(hasText(title(4, 0))).fetchSemanticsNodes().isNotEmpty() }
+            compose.waitForIdle()
+            compose.onNodeWithText(title(4, 0)).assertExists()
             key(Key.DirectionDown)
             focused(title(4, 0))
             assertNoPlayback()
@@ -295,15 +286,15 @@ class GuideNavigationTest : GuideScreenFixture() {
                     dvrState = observation.dvrState))
             }
             // Wait for the reduced rows, not just the newer disconnected observation.
-            compose.waitUntil(10_000) {
-                compose.onAllNodes(hasText(title(1, 0)) and isFocusable()).fetchSemanticsNodes().isEmpty()
-            }
+            compose.waitForIdle()
+            compose.onNode(hasText(context().getString(R.string.epg_no_data)) and
+                hasAnyAncestor(hasTestTag("epg-channel-row-1")), useUnmergedTree = true).assertExists()
+            compose.onNode(hasText(title(1, 0)) and isFocusable()).assertDoesNotExist()
             compose.runOnIdle {
                 position.save(checkNotNull(position.position.value).copy(channelId = ChannelId(3)))
                 guideActive = true
             }
             dateFocused()
-            compose.waitUntil(10_000) { compose.onNodeWithTag("epg-channel-row-7").isDisplayed() }
             compose.onNodeWithTag("epg-channel-row-7").assertIsDisplayed()
             key(Key.DirectionDown)
             focused(title(7, 0))
@@ -348,7 +339,8 @@ class GuideNavigationTest : GuideScreenFixture() {
                 entered.complete(Unit)
                 release.await()
             })
-            compose.waitUntil(5_000) { entered.isCompleted }
+            runAcquisition()
+            assertTrue("Initial acquisition reached the held fake", entered.isCompleted)
             dateFocused()
             val event = EpgEvent.create(EventId(310), ChannelId(3), Instant.fromEpochSeconds(hour),
                 Instant.fromEpochSeconds(hour + 3600), title = title(3, 0))
@@ -530,7 +522,8 @@ class GuideNavigationTest : GuideScreenFixture() {
             assertTrue("The page request starts before the programme change", SystemClock.uptimeMillis() < (hour + 30 * 60) * 1000)
             val window = checkNotNull(position.position.value).windowStartSec
             key(Key.ChannelDown)
-            compose.waitUntil(5_000) { entered.isCompleted }
+            runAcquisition()
+            assertTrue("Page acquisition reached the held fake", entered.isCompleted)
             assertTrue(SystemClock.setCurrentTimeMillis((hour + 30 * 60 + 1) * 1000))
             compose.mainClock.advanceTimeBy(6_000)
             assertTrue("The programme changes while coverage is pending", SystemClock.uptimeMillis() >= (hour + 30 * 60) * 1000)
@@ -758,7 +751,8 @@ class GuideNavigationTest : GuideScreenFixture() {
         val history = EpgEvent.create(EventId(109), ChannelId(1), Instant.fromEpochSeconds(hour - 3600),
             Instant.fromEpochSeconds(hour - 1800), title = "New earlier history")
         publishEvents(events, EpgSnapshot.create(events = events, historicalEvents = listOf(history), coverages = snapshot.coverages), true)
-        compose.waitUntil(10_000) { position.position.value?.windowStartSec != window }
+        compose.waitForIdle()
+        assertNotEquals(window, checkNotNull(position.position.value).windowStartSec)
         focused("Short edge programme")
         assertReadableFocus()
         assertTrue(compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot.width > 0f)
@@ -781,8 +775,8 @@ class GuideNavigationTest : GuideScreenFixture() {
         focused("Future anchor")
         val window = checkNotNull(position.position.value).windowStartSec
         key(Key.ChannelDown) // The remote's channel keys page the Guide rows.
-        compose.waitUntil(10_000) { position.position.value?.channelId != ChannelId(1) }
-        focused("Crossing edge ${checkNotNull(position.position.value).channelId.value}")
+        focused("Crossing edge 8")
+        assertEquals(ChannelId(8), checkNotNull(position.position.value).channelId)
         assertEquals(window, checkNotNull(position.position.value).windowStartSec)
         assertReadableFocus()
         key(Key.ChannelUp)
@@ -799,28 +793,14 @@ class GuideNavigationTest : GuideScreenFixture() {
     }
 
     private fun preparationPress(back: Boolean) {
-        val release = java.util.concurrent.CountDownLatch(1)
-        val held = java.util.concurrent.CountDownLatch(1)
-        val holdPreparation = mutableStateOf(false)
-        show(preparationBlocker = {
-            if (holdPreparation.value) {
-                // Use the same production preparation lane without depending on its private field.
-                rememberPreparedBrowseData(authority = Unit, input = Unit) {
-                    held.countDown()
-                    check(release.await(30, java.util.concurrent.TimeUnit.SECONDS))
-                }
-            }
-        })
+        show()
         key(Key.DirectionDown)
-        compose.awaitBrowsePreparation()
         compose.onNodeWithText(title(1, 0)).assertIsFocused()
         key(Key.DirectionRight)
-        compose.awaitBrowsePreparation()
         compose.onNodeWithText(title(1, 1)).assertIsFocused()
         try {
-            compose.runOnIdle { holdPreparation.value = true }
+            compose.runOnIdle { preparationContext = StandardTestDispatcher() }
             compose.waitForIdle()
-            assertTrue(held.await(5, java.util.concurrent.TimeUnit.SECONDS))
             keyWhilePreparing(Key.DirectionRight) // 22:00–23:00 shifts the 19:30–22:30 window.
             val before = position.position.value
             keyWhilePreparing(Key.DirectionDown)
@@ -828,18 +808,17 @@ class GuideNavigationTest : GuideScreenFixture() {
             assertEquals(before, position.position.value)
             if (back) compose.onRoot().performKeyPress(KeyEvent(android.view.KeyEvent(0, 0,
                 android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_BACK, 0)))
-            release.countDown()
-            compose.awaitBrowsePreparation()
+            releasePreparation()
             compose.mainClock.advanceTimeByFrame()
-            compose.awaitBrowsePreparation()
+            releasePreparation()
             if (back) {
                 // Back down cancels the queued direction even while its release is still pending.
                 compose.onNodeWithText(title(1, 2)).assertIsFocused()
                 compose.onRoot().performKeyPress(KeyEvent(android.view.KeyEvent(0, 0,
                     android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_BACK, 0)))
-                compose.awaitBrowsePreparation()
+                releasePreparation()
                 compose.mainClock.advanceTimeByFrame()
-                compose.awaitBrowsePreparation()
+                releasePreparation()
                 compose.onNodeWithTag("nav-epg").assertIsFocused()
             } else {
                 compose.onNodeWithText(title(1, 3)).assertIsFocused()
@@ -847,7 +826,7 @@ class GuideNavigationTest : GuideScreenFixture() {
                 compose.onNodeWithText(title(2, 3)).assertIsFocused()
             }
         } finally {
-            release.countDown()
+            releasePreparation()
         }
     }
 
@@ -874,7 +853,8 @@ class GuideNavigationTest : GuideScreenFixture() {
 
     @Test fun leftCrossesAnEpgGapWiderThanTheEarlierWindowToTheRowsPreviousProgramme() {
         // Five empty hours exceed the three-hour window Left would otherwise search.
-        show(historyOffset = -6)
+        // Cached return can settle in the same frame: acquire eagerly on the controlled main looper.
+        show(historyOffset = -6, coverageAcquisitionContext = Dispatchers.Main.immediate)
         key(Key.DirectionDown)
         focused(title(1, 0))
         key(Key.DirectionLeft)
@@ -974,9 +954,10 @@ class GuideNavigationTest : GuideScreenFixture() {
             armed.set(true)
             compose.onRoot().performKeyInput { keyDown(Key.DirectionRight) }
             rightDown = true
-            // No frame advances before the Default acquisition reaches the released fake's
+            // No frame advances before acquisition reaches the released fake's
             // boundary. Thus the cached frontier cannot win by cancelling before entry.
-            compose.waitUntil(10_000) { entered.get() != null }
+            runAcquisition()
+            assertNotNull("Frontier acquisition reached the held fake", entered.get())
             assertEquals((1L..6L).map(::ChannelId), entered.get().first)
             assertEquals(Instant.fromEpochSeconds(hour + (hours + 3) * 3600), entered.get().second)
             assertFalse(cancelled.isCompleted)
@@ -988,7 +969,8 @@ class GuideNavigationTest : GuideScreenFixture() {
             rightDown = false
             compose.mainClock.autoAdvance = autoAdvance
             focused(title(1, hours))
-            compose.waitUntil(10_000) { cancelled.isCompleted }
+            runAcquisition()
+            assertTrue("The cached frontier cancelled the held acquisition", cancelled.isCompleted)
             assertFalse("The frontier must use cached coverage, not release the held query", release.isCompleted)
             val successor = checkNotNull(position.position.value)
             val frontierWindow = hour + hours * 3600
@@ -1047,7 +1029,8 @@ class GuideNavigationTest : GuideScreenFixture() {
                 request.set(ids to through)
                 settle.await()
             })
-        compose.waitUntil(10_000) { request.get() != null }
+        runAcquisition()
+        assertNotNull("Initial acquisition reached the held fake", request.get())
         compose.runOnIdle {
             val (ids, through) = checkNotNull(request.get())
             assertEquals((1L..6L).map(::ChannelId), ids)
@@ -1064,7 +1047,9 @@ class GuideNavigationTest : GuideScreenFixture() {
         compose.onNode(pendingRow).assertIsDisplayed()
         dateFocused()
         compose.runOnIdle { settle.complete(Unit) }
-        compose.waitUntil(10_000) { compose.onAllNodes(pendingRow).fetchSemanticsNodes().isEmpty() }
+        runAcquisition()
+        compose.waitForIdle()
+        compose.onNode(pendingRow).assertDoesNotExist()
         dateFocused()
         key(Key.DirectionDown)
         focused(title(1, 0))
@@ -1335,7 +1320,8 @@ class GuideNavigationTest : GuideScreenFixture() {
             val loading = context().getString(R.string.epg_loading)
             val notLoaded = context().getString(R.string.epg_not_loaded)
             val emptyDay = context().getString(R.string.epg_empty_day)
-            compose.waitUntil(5_000) { compose.onAllNodesWithTag("guide-row-skeleton").fetchSemanticsNodes().isNotEmpty() }
+            compose.waitForIdle()
+            assertTrue(compose.onAllNodesWithTag("guide-row-skeleton").fetchSemanticsNodes().isNotEmpty())
             compose.onAllNodesWithText(loading).assertCountEquals(0)
             // Past the Guide's 10 s wait the request proves nothing: the day is not called empty.
             compose.mainClock.advanceTimeBy(11_000)
@@ -1365,7 +1351,8 @@ class GuideNavigationTest : GuideScreenFixture() {
                     dvrConfigurationsState = observation.dvrConfigurationsState,
                 ))
             }
-            compose.waitUntil(5_000) { compose.onAllNodesWithText(notLoaded).fetchSemanticsNodes().isEmpty() }
+            compose.waitForIdle()
+            compose.onAllNodesWithText(notLoaded).assertCountEquals(0)
             compose.onNodeWithText("Tomorrow on Ridge Earth").assertIsDisplayed()
             assertTrue(compose.onAllNodesWithText(emptyDay).fetchSemanticsNodes().isNotEmpty())
             dateFocused()
@@ -1440,18 +1427,8 @@ class GuideNavigationTest : GuideScreenFixture() {
                 }
             }
         }
-        val preparationHeld = java.util.concurrent.CountDownLatch(1)
-        val releasePreparation = java.util.concurrent.CountDownLatch(1)
-        val holdPreparation = mutableStateOf(false)
         try {
-            show(headline = true, rows = GuideRows.DENSE, uiPreferences = dataStore, preparationBlocker = {
-                if (holdPreparation.value) {
-                    rememberPreparedBrowseData(authority = Unit, input = Unit) {
-                        preparationHeld.countDown()
-                        check(releasePreparation.await(30, java.util.concurrent.TimeUnit.SECONDS))
-                    }
-                }
-            })
+            show(headline = true, rows = GuideRows.DENSE, uiPreferences = dataStore)
             key(Key.DirectionRight)
             key(Key.DirectionRight)
             tagFocused("channels-view-button")
@@ -1463,10 +1440,9 @@ class GuideNavigationTest : GuideScreenFixture() {
             compose.runOnIdle {
                 assertTrue("The settings write has started", saveStarted.isCompleted)
                 assertFalse(saveCompleted.isCompleted)
-                holdPreparation.value = true
+                preparationContext = StandardTestDispatcher()
             }
             compose.waitForIdle()
-            assertTrue(preparationHeld.await(5, java.util.concurrent.TimeUnit.SECONDS))
             compose.runOnIdle {
                 val observation = session.observation.value
                 session.publish(SessionObservation.create(sessionState = SessionState.Disconnected,
@@ -1483,7 +1459,7 @@ class GuideNavigationTest : GuideScreenFixture() {
             }
             assertFalse(runBlocking { uiSettings.settings.first() }.guideView.headline)
         } finally {
-            releasePreparation.countDown()
+            releasePreparation()
             releaseSave.complete(Unit)
         }
     }
@@ -1536,7 +1512,8 @@ class GuideNavigationTest : GuideScreenFixture() {
             publishEvents(full.events.filterNot { it.id == EventId(211) }, full, covered = false)
             armed.set(true)
             key(Key.Back)
-            compose.waitUntil(10_000) { entered.isCompleted }
+            runAcquisition()
+            assertTrue("Back-to-now acquisition reached the held fake", entered.isCompleted)
             publishEvents(full.events, full, covered = true)
             release.complete(Unit)
             focused(title(2, 1))
@@ -1660,8 +1637,9 @@ class GuideNavigationTest : GuideScreenFixture() {
                 dvrConfigurationsState = observation.dvrConfigurationsState,
             ))
         }
-        compose.waitUntil(10_000) { compose.onAllNodes(hasText(title(1, -1))).fetchSemanticsNodes().isEmpty() }
         compose.waitForIdle()
+        compose.onNodeWithText(title(1, 0)).assertExists()
+        compose.onAllNodes(hasText(title(1, -1))).assertCountEquals(0)
     }
 
     private fun guidePaneTitle() =

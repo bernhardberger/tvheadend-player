@@ -84,9 +84,6 @@ import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.ui.components.rememberPreparedBrowseData
-import at.bernhardberger.tvhplayer.ui.components.awaitBrowsePreparation
-import at.bernhardberger.tvhplayer.ui.components.awaitBrowsePreparationLane
-import at.bernhardberger.tvhplayer.ui.components.browsePreparationLane
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.common.programmeCategoryLabelRes
@@ -138,6 +135,7 @@ import kotlin.math.roundToInt
 import kotlin.time.Instant
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
+import kotlinx.coroutines.test.StandardTestDispatcher
 
 /** Offline native production composition; never a replacement Guide or a playback test. */
 @RunWith(RobolectricTestRunner::class)
@@ -430,10 +428,8 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         show(connecting = true)
         // The preparation anchor draws a skeleton too; the capture needs the screen's own, which
         // takes focus once its background preparation lands.
-        compose.waitUntil(5_000) {
-            compose.onAllNodesWithTag("browse-preparing", useUnmergedTree = true).fetchSemanticsNodes().isEmpty() &&
-                compose.onAllNodesWithTag("guide-skeleton", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
-        }
+        compose.waitForIdle()
+        compose.onNodeWithTag("browse-preparing", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("guide-skeleton", useUnmergedTree = true).assertIsDisplayed()
             .assertContentDescriptionEquals(context().getString(R.string.epg_loading))
         compose.onAllNodesWithText(context().getString(R.string.epg_loading)).assertCountEquals(0)
@@ -453,6 +449,7 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         // A new session starts a new preparation, which shows the whole-screen skeleton, header
         // row included, for at least the frame that sees the session.
         compose.mainClock.autoAdvance = false
+        compose.runOnIdle { preparationContext = StandardTestDispatcher() }
         compose.runOnIdle { session.publish(readyObservation) }
         compose.mainClock.advanceTimeByFrame()
         val preparing = hasTestTag("guide-skeleton") and hasAnyAncestor(hasTestTag("browse-preparing"))
@@ -460,10 +457,10 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         val skeletonHeadline = if (!headline) null else compose.onNode(hasTestTag("guide-headline") and
             hasAnyAncestor(hasTestTag("browse-preparing")), useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         compose.mainClock.autoAdvance = true
-        compose.waitUntil(5_000) {
-            compose.onAllNodesWithTag("browse-preparing", useUnmergedTree = true).fetchSemanticsNodes().isEmpty() &&
-                compose.onAllNodesWithTag("epg-time-ruler").fetchSemanticsNodes().isNotEmpty()
-        }
+        releasePreparation()
+        dateFocused()
+        compose.onNodeWithTag("browse-preparing", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("epg-time-ruler").assertExists()
         assertEquals("The ruler stays where the skeleton drew it at font $scale", skeletonTop, bounds("epg-time-ruler").top, .5f)
         if (skeletonHeadline != null) {
             val ready = bounds("guide-headline")
@@ -1121,13 +1118,13 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
             }
             // Programme 2 runs past the window, so focus reaches it a few frames after the window moves;
             // wait for it frame by frame, well inside the settle that follows the last press. The moved
-            // window's rows are prepared in the background on real time, which the held clock does not see.
+            // window's rows use the controlled effect context, without advancing the held clock.
             val lastPress = compose.mainClock.currentTime - 80
             val programme2 = hasText(title(1, 2)) and isFocused()
             while (compose.onAllNodes(programme2).fetchSemanticsNodes().isEmpty() &&
                 compose.mainClock.currentTime - lastPress < GuideHeadlineSettleMs - 40
             ) {
-                awaitBrowsePreparationLane()
+                compose.waitForIdle()
                 compose.mainClock.advanceTimeByFrame()
             }
             // Focus rests on programme 2 while the headline still shows programme 0.
@@ -1165,7 +1162,8 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
             key(Key.DirectionDown)
             focused(title(1, 0))
             headlineTitle(title(1, 0))
-            compose.waitUntil(5_000) { compose.onAllNodesWithTag("channels-immersive-picon").fetchSemanticsNodes().isNotEmpty() }
+            compose.waitForIdle()
+            compose.onNodeWithTag("channels-immersive-picon").assertExists()
             key(Key.DirectionUp)
             dateFocused()
             key(Key.DirectionRight)
@@ -1186,7 +1184,8 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
                 coverages = full.coverages), covered = true)
             armed.set(true)
             key(Key.Enter)
-            compose.waitUntil(10_000) { entered.isCompleted }
+            runAcquisition()
+            assertTrue("Scope acquisition reached the held fake", entered.isCompleted)
             // Well past the settle while they load: still the programme, never "no information".
             compose.mainClock.advanceTimeBy(GuideHeadlineSettleMs * 4)
             compose.waitForIdle()
@@ -1196,11 +1195,11 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
             compose.mainClock.autoAdvance = false
             publishEvents(full.events, full, covered = true)
             release.complete(Unit)
+            runAcquisition()
             val next = hasTestTag("guide-headline-title") and hasText(title(2, 0))
             var framesAfterSwitch = 0
             for (frame in 0 until 600) {
-                // The new group's rows are prepared in the background on real time, which the held clock does not see.
-                awaitBrowsePreparationLane()
+                compose.waitForIdle()
                 compose.mainClock.advanceTimeByFrame()
                 assertTrue("logo missing at frame $frame",
                     compose.onAllNodesWithTag("channels-immersive-picon").fetchSemanticsNodes().isNotEmpty())
@@ -1453,7 +1452,8 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         // Deliberate aspect-ratio stress variants of the same fictional mark; no real picons.
         val art = at.bernhardberger.tvhplayer.testutil.FixtureArt
         val logo = Bitmap.createScaledBitmap(art.picon("ridge-earth"), width, height, true)
-        loader = art.imageLoader(context(), mapOf(ArtworkId(1) to logo))
+        loader = art.imageLoader(context(), mapOf(ArtworkId(1) to logo)).newBuilder()
+            .coroutineContext(Dispatchers.Main.immediate).build()
         images.install(loader)
         show(headline = true, history = false, channelNames = listOf("Ridge Earth"), events = listOf(
             EpgEvent.create(EventId(110), ChannelId(1), Instant.fromEpochSeconds(hour),
@@ -1462,9 +1462,8 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         ))
         key(Key.DirectionDown)
         focused("Ridge Light")
-        compose.waitUntil(10_000) {
-            compose.onAllNodesWithTag("channels-immersive-picon").fetchSemanticsNodes().isNotEmpty()
-        }
+        compose.waitForIdle()
+        compose.onNodeWithTag("channels-immersive-picon").assertExists()
         compose.mainClock.advanceTimeBy(1_500)
         compose.waitForIdle()
     }
@@ -1473,7 +1472,8 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
     private fun headlineLogoBelowTheRow(scale: Float) {
         show(scale = scale, headline = true)
         headlineTitle(title(1, 0))
-        compose.waitUntil(5_000) { compose.onAllNodesWithTag("channels-immersive-picon").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitForIdle()
+        compose.onNodeWithTag("channels-immersive-picon").assertExists()
         val header = bounds("channels-header")
         val logo = bounds("channels-immersive-picon")
         assertTrue("The logo starts below the header row: logo=$logo header=$header", logo.top >= header.bottom - .5f)
