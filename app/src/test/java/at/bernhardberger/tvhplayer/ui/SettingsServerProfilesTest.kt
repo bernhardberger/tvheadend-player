@@ -272,12 +272,19 @@ class SettingsServerProfilesTest {
     }
 
     @Test fun unreachableSwitchShowsCantConnectAndKeepsThePreviousConnection() {
-        stored(); settings(); unreachableNextConnection = true
-        press(Key.DirectionDown); press(Key.DirectionCenter); press(Key.DirectionCenter)
+        stored(); settings()
+        press(Key.DirectionDown)
+        listOf(false, true).forEach { rejected ->
+        unreachableNextConnection = !rejected
+        rejectNextConnection = rejected
+        press(Key.DirectionCenter); press(Key.DirectionCenter)
         settle()
         assertTrue(!owner.connectionChanges.isLocked)
-        compose.onNodeWithText("Can’t connect to kids on tvheadend.home.arpa").assertIsDisplayed()
+        val posted = notices.state.value.run { listOfNotNull(active?.notice) + pending }.map { it.notice }
+        assertTrue(posted.any { if (rejected) it is Notice.ServerSignInRejected else it is Notice.ServerConnectionFailed })
         assertEquals(id(1), activeId)
+        compose.onNodeWithTag(row(2)).assertIsFocused()
+        }
     }
 
     @Test fun editingAndRemovingAreIgnoredWhileAnAttemptOwnsTheConnection() {
@@ -299,31 +306,22 @@ class SettingsServerProfilesTest {
 
     @Test fun backCancelsAnAttemptAndKeepsSettingsOnThePreviousConnection() {
         stored(); settings()
+        press(Key.DirectionDown)
+        listOf(false, true).forEach { dispatcher ->
+        trialStarted = false
         connectionGate = kotlinx.coroutines.CompletableDeferred()
-        press(Key.DirectionDown); press(Key.DirectionCenter); press(Key.DirectionCenter)
+        press(Key.DirectionCenter); press(Key.DirectionCenter)
         settle()
         assertTrue(trialStarted)
         assertEquals(id(1), activeId)
-        press(Key.Back)
+        if (dispatcher) compose.runOnIdle { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        else press(Key.Back)
         settle()
         assertTrue(!owner.connectionChanges.isLocked)
         assertEquals(id(1), activeId)
         assertEquals(SettingsSection.CONNECTION.name, navigation.stack.active.levelId)
         compose.onNodeWithTag(row(2)).assertIsFocused()
-    }
-
-    @Test fun dispatcherBackCancelsTheAttemptRatherThanPoppingTheConnectionList() {
-        stored(); settings()
-        connectionGate = kotlinx.coroutines.CompletableDeferred()
-        press(Key.DirectionDown); press(Key.DirectionCenter); press(Key.DirectionCenter)
-        settle()
-        assertTrue(trialStarted)
-        compose.runOnIdle { compose.activity.onBackPressedDispatcher.onBackPressed() }
-        settle()
-        assertTrue(!owner.connectionChanges.isLocked)
-        assertEquals(id(1), activeId)
-        assertEquals(SettingsSection.CONNECTION.name, navigation.stack.active.levelId)
-        compose.onNodeWithTag(row(2)).assertIsFocused()
+        }
     }
 
     @Test fun passwordNeededSelectionDuringAnAttemptRestoresThenOpensPasswordSetup() {
@@ -341,17 +339,6 @@ class SettingsServerProfilesTest {
         assertTrue(!owner.connectionChanges.isLocked)
         assertEquals(id(1), activeId)
         compose.onNodeWithTag("setup-password").assertIsFocused()
-    }
-
-    @Test fun failedSwitchKeepsSettingsAndShowsTheTypedNotice() {
-        stored(); settings()
-        rejectNextConnection = true
-        press(Key.DirectionDown); press(Key.DirectionCenter); press(Key.DirectionCenter)
-        settle()
-        assertTrue(!owner.connectionChanges.isLocked)
-        compose.onNodeWithText("Couldn’t sign in to kids on tvheadend.home.arpa. Check the username and password.").assertIsDisplayed()
-        assertEquals(id(1), activeId)
-        compose.onNodeWithTag(row(2)).assertIsFocused()
     }
 
     @Test fun cancellingBeforeHandoverRestoresTheInUseConnectionsDegradedWarning() {
@@ -534,6 +521,15 @@ class SettingsServerProfilesTest {
         compose.onNodeWithTag("settings-row-$SERVER_USE").assertIsFocused()
         assertEquals(id(1), activeId)
         assertTrue(stopsAt.isEmpty())
+        compose.runOnIdle { interruption = PlaybackInterruption.RECORDING }
+        press(Key.DirectionCenter)
+        compose.onNodeWithText("The recording stops", substring = true).assertIsDisplayed()
+        press(Key.Back)
+        compose.onNodeWithTag(SWITCH_KEEP).assertDoesNotExist()
+        compose.onNodeWithTag("settings-row-$SERVER_USE").assertIsFocused()
+        assertEquals(id(1), activeId)
+        assertTrue(stopsAt.isEmpty())
+        compose.runOnIdle { interruption = PlaybackInterruption.LIVE }
         press(Key.DirectionCenter)
         press(Key.DirectionRight)
         compose.onNodeWithTag(SWITCH_CONFIRM).assertIsFocused()
@@ -592,20 +588,6 @@ class SettingsServerProfilesTest {
         compose.waitForIdle()
         compose.onNodeWithTag(REMOVE_KEEP).assertDoesNotExist()
         assertEquals(3, (owner.profiles.value as ServerProfileListResult.Available).profiles.size)
-    }
-
-    @Test fun backDismissesTheSwitchQuestion() {
-        stored(active = 1)
-        interruption = PlaybackInterruption.RECORDING
-        settings()
-        press(Key.DirectionDown)
-        press(Key.DirectionCenter)
-        press(Key.DirectionCenter)
-        compose.onNodeWithText("The recording stops", substring = true).assertIsDisplayed()
-        press(Key.Back)
-        compose.onNodeWithTag(SWITCH_KEEP).assertDoesNotExist()
-        compose.onNodeWithTag("settings-row-$SERVER_USE").assertIsFocused()
-        assertEquals(id(1), activeId)
     }
 
     @Test fun addingAServerThatIsStoredOpensItsLevelWithTheNotice() {

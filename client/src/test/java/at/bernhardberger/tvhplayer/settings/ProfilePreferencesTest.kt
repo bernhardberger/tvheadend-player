@@ -93,16 +93,10 @@ class ProfilePreferencesTest {
         assertEquals(profiles[2].id, existingServerProfile(profiles, "first.invalid", 9982, "viewer"))
         assertNull(existingServerProfile(profiles, "first.invalid", 9983, "viewer"))
         assertNull(existingServerProfile(profiles, "first.invalid", 9982, "other"))
-    }
-
-    @Test fun unreadablePasswordProfileWithoutUsernameDoesNotMatchAnAnonymousProfile() = runTest {
-        val store = FakeServerProfileStore()
-        val id = (store.addPassword("first.invalid", username = "viewer", password = "synthetic") as
-            at.bernhardberger.tvheadend.sdk.core.ServerProfileWriteResult.Applied).id
-        store.scriptCredentialsUnavailable(id, forgetUsername = true)
-        val profiles = (store.profiles() as ServerProfileListResult.Available).profiles
-        assertNull(existingServerProfile(profiles, "first.invalid", 9982, null))
-        assertNull(existingServerProfile(profiles, "first.invalid", 9982, "viewer"))
+        store.scriptCredentialsUnavailable(profiles[2].id, forgetUsername = true)
+        val unreadable = (store.profiles() as ServerProfileListResult.Available).profiles.filter { it.id == profiles[2].id }
+        assertNull(existingServerProfile(unreadable, "first.invalid", 9982, null))
+        assertNull(existingServerProfile(unreadable, "first.invalid", 9982, "viewer"))
     }
 
     @Test fun perProfileDataIsIsolatedRestoredAndRemovalDeletesOnlyRequestedProfile() = runTest {

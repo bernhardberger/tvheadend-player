@@ -35,12 +35,9 @@ class AppProfileDiscoveryTest {
             }
         }
         val observations = FakeSessionObservation(SessionObservation.create())
-        val session = object : TvheadendSession by FakeTvheadendSession() {
-            override val observation = observations.observation
-            override suspend fun getStreamProfiles(currentSession: CurrentSessionObservation): StreamProfilesResult {
-                discovered = true
-                return available(streamId, currentSession)
-            }
+        val session = discoverySession(observations) { currentSession ->
+            discovered = true
+            available(streamId, currentSession)
         }
         val owner = AppProfileOwner(session, store, settings, StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Missing })
         backgroundScope.launch { owner.run() }; runCurrent()
@@ -57,14 +54,10 @@ class AppProfileDiscoveryTest {
         val started = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
         val observations = FakeSessionObservation(currentObservation("server"))
-        val fake = FakeTvheadendSession()
-        val session = object : TvheadendSession by fake {
-            override val observation = observations.observation
-            override suspend fun getStreamProfiles(currentSession: CurrentSessionObservation): StreamProfilesResult {
-                started.complete(Unit)
-                release.await()
-                return available(streamId, currentSession)
-            }
+        val session = discoverySession(observations) { currentSession ->
+            started.complete(Unit)
+            release.await()
+            available(streamId, currentSession)
         }
         val stored = FakeServerProfileStore()
         val id = (stored.addAnonymous("first.invalid", activate = true) as ServerProfileWriteResult.Applied).id
@@ -88,10 +81,7 @@ class AppProfileDiscoveryTest {
         val release = CompletableDeferred<Unit>()
         val observations = FakeSessionObservation(currentObservation("server"))
         val current = checkNotNull(observations.observation.value.currentSession)
-        val session = object : TvheadendSession by FakeTvheadendSession() {
-            override val observation = observations.observation
-            override suspend fun getStreamProfiles(currentSession: CurrentSessionObservation): StreamProfilesResult = available(streamId, currentSession)
-        }
+        val session = discoverySession(observations)
         val data = object : DataStore<Preferences> by InMemoryPreferencesDataStore() {
             override val data = flow<Preferences> {
                 started.complete(Unit)
@@ -120,13 +110,10 @@ class AppProfileDiscoveryTest {
         val release = CompletableDeferred<Unit>()
         val observations = FakeSessionObservation(currentObservation("server"))
         val current = checkNotNull(observations.observation.value.currentSession)
-        val session = object : TvheadendSession by FakeTvheadendSession() {
-            override val observation = observations.observation
-            override suspend fun getStreamProfiles(currentSession: CurrentSessionObservation): StreamProfilesResult {
-                started.complete(Unit)
-                release.await()
-                return available(streamId, currentSession)
-            }
+        val session = discoverySession(observations) { currentSession ->
+            started.complete(Unit)
+            release.await()
+            available(streamId, currentSession)
         }
         val stored = FakeServerProfileStore()
         stored.addAnonymous("first.invalid", activate = true)
@@ -191,6 +178,13 @@ class AppProfileDiscoveryTest {
         runCurrent()
         assertTrue(failed.await().isFailure)
         assertNotNull(owner.serverProfile.value)
+        owner.selectStreamProfile(streamId)
+        assertNull(owner.selectedStreamProfileId.value)
+        owner.selectStreamProfile(secondId)
+        assertEquals(secondId, owner.selectedStreamProfileId.value)
+        owner.selectStreamProfile(null)
+        assertNull(owner.selectedStreamProfileId.value)
+        assertNull(settings.resolveStreamProfileSelection(profiles.profiles) { true })
         pauseSelection = true
         val selection = async { owner.selectStreamProfile(secondId) }
         runCurrent()
@@ -204,6 +198,14 @@ class AppProfileDiscoveryTest {
         close.await()
         assertEquals(secondId, owner.selectedStreamProfileId.value)
         assertEquals(secondId, settings.resolveStreamProfileSelection(profiles.profiles) { true })
+    }
+
+    private fun discoverySession(
+        observations: FakeSessionObservation,
+        discover: suspend (CurrentSessionObservation) -> StreamProfilesResult = { available(streamId, it) },
+    ): TvheadendSession = object : TvheadendSession by FakeTvheadendSession() {
+        override val observation = observations.observation
+        override suspend fun getStreamProfiles(currentSession: CurrentSessionObservation): StreamProfilesResult = discover(currentSession)
     }
 
     private fun currentObservation(name: String): SessionObservation = SessionObservation.create(

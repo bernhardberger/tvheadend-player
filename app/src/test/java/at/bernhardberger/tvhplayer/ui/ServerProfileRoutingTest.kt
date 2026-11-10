@@ -9,9 +9,6 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.activity.ComponentActivity
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.emptyPreferences
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.test.core.app.ApplicationProvider
@@ -61,8 +58,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -113,7 +108,7 @@ class ServerProfileRoutingTest {
     }
 
     private fun app(startup: ServerSettings) {
-        val settings = PlayerSettingsStore(InMemoryData())
+        val settings = PlayerSettingsStore(InMemoryPreferencesDataStore())
         val gatedStore = object : ServerProfileStore by store {
             override suspend fun remove(id: ServerProfileId): ServerProfileWriteResult {
                 removalGate?.await()
@@ -150,8 +145,8 @@ class ServerProfileRoutingTest {
             single { runtime }
             single { owner }
             single { settings }
-            single { ChannelTagSettingsStore(InMemoryData()) }
-            single { UiSettingsStore(InMemoryData()) }
+            single { ChannelTagSettingsStore(InMemoryPreferencesDataStore()) }
+            single { UiSettingsStore(InMemoryPreferencesDataStore()) }
             single { LastPlayedChannelStore(context) }
             single { ChannelSelectionStore() }
             single { GuidePositionStore() }
@@ -211,12 +206,6 @@ class ServerProfileRoutingTest {
         compose.onNodeWithTag("settings-row-${SettingsSection.CONNECTION.name}").assertIsFocused()
         compose.onNode(hasText("No connection in use. Choose one to watch TV again."), useUnmergedTree = true).assertExists()
         assertNull(runtime.activeTarget.value)
-    }
-
-    @Test fun serversWithNoneInUseOpenSettingsConnectionNotWelcome() {
-        storedWithNoneInUse()
-        app(ServerSettings())
-        assertSettingsConnection()
     }
 
     @Test fun launchAndApplianceEntriesWithNoneInUseOpenSettingsConnectionInsteadOfPlaying() {
@@ -301,10 +290,4 @@ class ServerProfileRoutingTest {
         }
     }
 
-    private class InMemoryData : DataStore<Preferences> {
-        val state = MutableStateFlow(emptyPreferences())
-        override val data: Flow<Preferences> get() = state
-        override suspend fun updateData(transform: suspend (Preferences) -> Preferences) =
-            transform(state.value).also { state.value = it }
-    }
 }
