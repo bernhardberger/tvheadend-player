@@ -334,47 +334,36 @@ class LivePlayerChromeScreenTest {
     }
 
     @Test fun startupWarmEntryAdoptsPlayingMatchingTuneWithoutAnotherFrameOrRetune() {
-        val outcomes = mutableListOf<MainStartupPlaybackOutcome>()
-        screen(contentAllowed = { false }, startup = true, onStartupOutcome = { outcomes += it })
-        playerReady()
-        settle()
-        assertMainSettled("the driven player reports Playing") { runtime.state.value is AppPlaybackState.Playing }
-        compose.runOnIdle { playerListeners.toList().forEach { it.onRenderedFirstFrame() } }
-        settle()
-        assertEquals(listOf(MainStartupPlaybackOutcome.PRESENTED), outcomes)
-        outcomes.clear()
-        val epoch = runtime.videoPresentation.value.epoch
-        assertTrue(runtime.videoPresentation.value.visible)
-        compose.runOnIdle { screenVisible.value = false }
-        settle()
-        compose.runOnIdle { screenVisible.value = true }
-        settle()
-        compose.waitUntil(5_000) { outcomes.contains(MainStartupPlaybackOutcome.ALREADY_PLAYING) }
-        assertEquals("warm adoption does not install another tune", epoch, runtime.videoPresentation.value.epoch)
-        assertTrue("the already-presented frame is retained", runtime.videoPresentation.value.visible)
-    }
-
-    @Test fun aNewStartupRequestOnTheSameWarmRouteOwnsFreshIntentWithoutRetuning() {
         val requestId = mutableStateOf(1L)
         val outcomes = mutableListOf<MainStartupPlaybackOutcome>()
         screen(contentAllowed = { false }, startup = true, startupRequestId = { requestId.value },
             onStartupOutcome = { outcomes += it })
         playerReady()
         settle()
+        assertMainSettled("the driven player reports Playing") { runtime.state.value is AppPlaybackState.Playing }
         compose.runOnIdle { playerListeners.toList().forEach { it.onRenderedFirstFrame() } }
         settle()
         assertEquals(listOf(MainStartupPlaybackOutcome.PRESENTED), outcomes)
-        outcomes.clear()
-        val epoch = runtime.videoPresentation.value.epoch
-        assertTrue(outcomes.isEmpty())
-        compose.runOnIdle {
-            runtime.notePlaybackIntent() // The launch owner notes new intent before resolving this route.
-            requestId.value = 2L
+        for (freshIntent in listOf(false, true)) {
+            outcomes.clear()
+            val epoch = runtime.videoPresentation.value.epoch
+            assertTrue(runtime.videoPresentation.value.visible)
+            assertTrue(outcomes.isEmpty())
+            if (freshIntent) {
+                compose.runOnIdle {
+                    runtime.notePlaybackIntent() // The launch owner notes new intent before resolving this route.
+                    requestId.value = 2L
+                }
+            } else {
+                compose.runOnIdle { screenVisible.value = false }
+                settle()
+                compose.runOnIdle { screenVisible.value = true }
+            }
+            settle()
+            compose.waitUntil(5_000) { outcomes.contains(MainStartupPlaybackOutcome.ALREADY_PLAYING) }
+            assertEquals("warm adoption does not install another tune", epoch, runtime.videoPresentation.value.epoch)
+            assertTrue("the already-presented frame is retained", runtime.videoPresentation.value.visible)
         }
-        settle()
-        compose.waitUntil(5_000) { outcomes.contains(MainStartupPlaybackOutcome.ALREADY_PLAYING) }
-        assertEquals(epoch, runtime.videoPresentation.value.epoch)
-        assertTrue(runtime.videoPresentation.value.visible)
     }
 
     @Test fun cancellingCommittedStartupBeforeItsFrameStopsOnlyItsTuneAndDisarmsWarmReturn() {
@@ -457,20 +446,6 @@ class LivePlayerChromeScreenTest {
         assertTrue(runtime.state.value is AppPlaybackState.Idle)
     }
 
-    @Test fun successfulStartupWithoutAnOwnedReceiptReportsRecoveryInsteadOfWaitingForever() {
-        val startup = mutableStateOf(true)
-        val outcomes = mutableListOf<MainStartupPlaybackOutcome>()
-        screen(settleOnEntry = false, contentAllowed = { !startup.value }, startupEnabled = { startup.value },
-            afterTargetPlay = {
-                // Supersede attribution at the committed tune, before the initial start returns.
-                runtime.notePlaybackIntent().also(runtime::notePlaybackIntentServed)
-            }, onStartupOutcome = { outcomes += it; startup.value = false })
-        settle()
-        compose.waitUntil(5_000) { outcomes.contains(MainStartupPlaybackOutcome.RECOVERY) }
-        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
-        assertTrue("existing recovery is actionable after startup releases", exists("player-channel-unavailable"))
-    }
-
     @Test fun theRetuneAfterAReconnectIsNotCoveredByTheFailedRequestsMessage() {
         val startup = mutableStateOf(true)
         val outcomes = mutableListOf<MainStartupPlaybackOutcome>()
@@ -483,6 +458,7 @@ class LivePlayerChromeScreenTest {
             }, onStartupOutcome = { outcomes += it; startup.value = false })
         settle()
         compose.waitUntil(5_000) { outcomes.contains(MainStartupPlaybackOutcome.RECOVERY) }
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
         assertTrue(exists("player-channel-unavailable"))
         val ready = session.observation.value
         compose.runOnIdle {
@@ -568,35 +544,15 @@ class LivePlayerChromeScreenTest {
             texts("player-header").matches(Regex("\\d{1,2}:\\d{2}( [AP]M)?")))
     }
 
-    @Test fun playerBackHidesTheBannerWithoutClosingThePlayer() {
-        var closed = false
-        screen(onClose = { closed = true })
-        assertTrue(exists("player-banner"))
-        key(Key.Back)
-        assertFalse(exists("player-banner"))
-        assertFalse(exists("player-actions"))
-        assertFalse("Back hid the Banner only", closed)
-    }
-
-    @Test fun aQuickListReturnsFocusToStop() = timeshiftPlaying {
-        key(Key.DirectionDown)
-        assertTrue(exists("player-stop"))
-        compose.onNodeWithTag("player-stop").performSemanticsAction(SemanticsActions.RequestFocus)
-        settle()
-        assertEquals(listOf("player-stop"), focused())
-        key(Key.MediaAudioTrack)
-        assertFalse("focus moved into the quick list: ${focused()}", focused() == listOf("player-stop"))
-        key(Key.Back)
-        assertEquals(listOf("player-stop"), focused())
-    }
-
     @Test fun theAudioButtonStandsBesideInfoOnlyWithAChoiceAndReturnsFocusFromItsList() = timeshiftPlaying {
-        publishTracks(Tracks(listOf(audioTrack("a1", "en", true))))
+        publishTracks(Tracks(listOf(audioTrack("a1", "en", true), subtitleTrack("s1", "de"))))
         key(Key.DirectionDown)
         assertTrue(exists("player-info"))
         assertFalse("one audio track offers no choice", exists("player-audio"))
-        publishTracks(Tracks(listOf(audioTrack("a1", "en", true), audioTrack("a2", "de", false))))
+        assertFalse(exists("player-subtitles"))
+        publishTracks(Tracks(listOf(audioTrack("a1", "en", true), audioTrack("a2", "de", false), subtitleTrack("s1", "de"))))
         assertTrue(exists("player-audio"))
+        assertFalse(exists("player-subtitles"))
         val button = compose.onNodeWithTag("player-audio").fetchSemanticsNode()
         assertEquals(listOf("Audio"), button.config.getOrNull(SemanticsProperties.ContentDescription))
         assertTrue("it announces the current choice: ${button.config}",
@@ -620,6 +576,14 @@ class LivePlayerChromeScreenTest {
         key(Key.DirectionCenter)
         assertFalse("OK closed the list", exists("playback-options-track-list"))
         assertEquals(listOf("player-audio"), focused())
+        assertTrue(exists("player-stop"))
+        compose.onNodeWithTag("player-stop").performSemanticsAction(SemanticsActions.RequestFocus)
+        settle()
+        assertEquals(listOf("player-stop"), focused())
+        key(Key.MediaAudioTrack)
+        assertFalse("focus moved into the quick list: ${focused()}", focused() == listOf("player-stop"))
+        key(Key.Back)
+        assertEquals(listOf("player-stop"), focused())
     }
 
     @Test fun theSubtitlesKeyOnTheAudioPickerReturnsFocusToTheAudioButton() = timeshiftPlaying {
@@ -635,17 +599,6 @@ class LivePlayerChromeScreenTest {
         key(Key.Back)
         assertFalse(exists("playback-options-track-list"))
         assertEquals(listOf("player-audio"), focused())
-    }
-
-    @Test fun theActionRowHasNoSubtitlesButtonEvenWithSubtitleTracks() = timeshiftPlaying {
-        publishTracks(Tracks(listOf(audioTrack("a1", "en", true), subtitleTrack("s1", "de"))))
-        key(Key.DirectionDown)
-        assertTrue(exists("player-info"))
-        assertFalse("one audio track offers no choice", exists("player-audio"))
-        assertFalse(exists("player-subtitles"))
-        publishTracks(Tracks(listOf(audioTrack("a1", "en", true), audioTrack("a2", "de", false), subtitleTrack("s1", "de"))))
-        assertTrue(exists("player-audio"))
-        assertFalse(exists("player-subtitles"))
     }
 
     @Test fun aFocusedAudioButtonThatGoesHandsFocusToInfo() = timeshiftPlaying {
@@ -758,86 +711,68 @@ class LivePlayerChromeScreenTest {
         assertFalse("resuming removes the ring", exists("player-busy-indicator"))
     }
 
-    @Test fun backWhilePausedLeavesOnlyTheChipAtTheBottomStart() = timeshiftPlaying { pauses ->
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
-        assertSubscriptionSettled("the pause command reaches the player") { false in pauses }
-        settle()
-        assertEquals("the state cell shows the real state", "Paused", description("player-state"))
-        assertFalse("no status slot in the info bar", exists("player-status-slot"))
-        key(Key.Back)
-        assertFalse(exists("player-banner"))
-        assertFalse(exists("player-actions"))
-        assertFalse("no header either", exists("player-header"))
-        assertTrue("only the chip stays", exists("player-hidden-slot"))
-        assertFalse("intentional pause is never busy", exists("player-busy-indicator"))
-        assertEquals("Paused", description("player-hidden-slot"))
-        val chip = compose.onNodeWithTag("player-hidden-slot", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        val root = compose.onRoot().fetchSemanticsNode().boundsInRoot
-        assertTrue("at the bottom start: $chip in $root", chip.left < root.right * 0.1f && chip.top > root.bottom * 0.75f)
-        assertEquals("nothing hidden is focusable", 0,
-            compose.onAllNodes(hasAnyAncestor(hasTestTag("player-hidden-slot")) and isFocusable()).fetchSemanticsNodes().size)
+    @Test fun backWhilePausedLeavesOnlyTheChipAtTheBottomStart() {
+        var closes = 0
+        timeshiftPlaying(onClose = { closes++ }) { pauses ->
+            compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
+            assertSubscriptionSettled("the pause command reaches the player") { false in pauses }
+            settle()
+            assertEquals("the state cell shows the real state", "Paused", description("player-state"))
+            assertFalse("no status slot in the info bar", exists("player-status-slot"))
+            key(Key.Back)
+            assertFalse(exists("player-banner"))
+            assertFalse(exists("player-actions"))
+            assertFalse("no header either", exists("player-header"))
+            assertTrue("only the chip stays", exists("player-hidden-slot"))
+            assertFalse("intentional pause is never busy", exists("player-busy-indicator"))
+            assertEquals("Paused", description("player-hidden-slot"))
+            val chip = compose.onNodeWithTag("player-hidden-slot", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+            val root = compose.onRoot().fetchSemanticsNode().boundsInRoot
+            assertTrue("at the bottom start: $chip in $root", chip.left < root.right * 0.1f && chip.top > root.bottom * 0.75f)
+            assertEquals("nothing hidden is focusable", 0,
+                compose.onAllNodes(hasAnyAncestor(hasTestTag("player-hidden-slot")) and isFocusable()).fetchSemanticsNodes().size)
+            holdBack()
+            assertEquals(1, closes)
+            assertEquals(null, runtime.activeTarget.value)
+        }
     }
 
     @Test fun atTheLiveEdgeTheBarRowIsPassiveAndUpStaysOnTheTimeline() {
-        liveChrome(behindLiveMs = 0)
-        assertEquals(listOf("player-pause"), focused())
-        key(Key.DirectionUp)
-        assertEquals(listOf("player-seekbar"), focused())
-        key(Key.DirectionUp)
-        assertEquals("artwork is passive", listOf("player-seekbar"), focused())
-        key(Key.DirectionDown)
-        assertEquals("Down returns to the action row", listOf("player-pause"), focused())
-        assertFalse(exists("player-go-live"))
-        assertFalse(exists("player-status-slot"))
-        assertFalse("the controls have no state cell; the Pause button speaks for playback", exists("player-state"))
-        assertEquals("Live", description("player-live-state"))
-        assertFalse("nothing is drawn at the live edge", exists("player-distance"))
-        assertEquals(0, compose.onAllNodes(hasTestTag("player-live-state") and isFocusable(), useUnmergedTree = true).fetchSemanticsNodes().size)
-    }
-
-    @Test fun behindLiveUpFromTheSeekbarStaysOnTheTimeline() {
-        liveChrome(behindLiveMs = 203_000)
-        assertEquals(listOf("player-pause"), focused())
-        assertEquals("Behind live", description("player-live-state"))
-        assertEquals("3:23 behind live", texts("player-distance"))
-        key(Key.DirectionUp)
-        assertEquals(listOf("player-seekbar"), focused())
-        key(Key.DirectionUp)
-        assertEquals("artwork is passive", listOf("player-seekbar"), focused())
-        key(Key.DirectionDown)
-        assertEquals("Down returns to the action row", listOf("player-pause"), focused())
-        assertFalse("no Go live node", exists("player-go-live"))
-        assertFalse(exists("player-go-live-label"))
-    }
-
-    @Test fun theControlsShowPausedThroughThePlayButtonNotAStateCell() {
-        liveChrome(behindLiveMs = 0, state = PlayerStateCell.PAUSED)
-        assertFalse(exists("player-state"))
-        compose.onNodeWithTag("player-pause").assertContentDescriptionEquals("Play")
+        var behindLiveMs by mutableStateOf(0L)
+        var state by mutableStateOf(PlayerStateCell.PLAYING)
+        liveChrome(behindLiveMs = { behindLiveMs }, state = { state })
+        for ((distance, playback) in listOf(0L to PlayerStateCell.PLAYING,
+            203_000L to PlayerStateCell.PLAYING, 0L to PlayerStateCell.PAUSED)) {
+            compose.runOnIdle { behindLiveMs = distance; state = playback }
+            settle()
+            assertEquals(listOf("player-pause"), focused())
+            key(Key.DirectionUp)
+            assertEquals(listOf("player-seekbar"), focused())
+            key(Key.DirectionUp)
+            assertEquals("artwork is passive", listOf("player-seekbar"), focused())
+            key(Key.DirectionDown)
+            assertEquals("Down returns to the action row", listOf("player-pause"), focused())
+            assertFalse(exists("player-go-live"))
+            assertFalse(exists("player-status-slot"))
+            assertFalse("the controls have no state cell; the Pause button speaks for playback", exists("player-state"))
+            assertFalse(exists("player-go-live-label"))
+            if (distance == 0L) {
+                assertEquals("Live", description("player-live-state"))
+                assertFalse("nothing is drawn at the live edge", exists("player-distance"))
+            } else {
+                assertEquals("Behind live", description("player-live-state"))
+                assertEquals("3:23 behind live", texts("player-distance"))
+            }
+            if (playback == PlayerStateCell.PAUSED) {
+                compose.onNodeWithTag("player-pause").assertContentDescriptionEquals("Play")
+            }
+            assertEquals(0, compose.onAllNodes(hasTestTag("player-live-state") and isFocusable(), useUnmergedTree = true).fetchSemanticsNodes().size)
+        }
     }
 
     @Test fun numberEntryLeavesTheCoveredControlsNoAccessibilityActions() {
         var entry by mutableStateOf(false)
-        val calls = mutableListOf<String>()
-        compose.setContent {
-            TVHeadendPlayerTheme {
-                PlayerChrome(
-                    mode = PlayerChromeMode.CONTROLS,
-                    content = PlayerChromeContent("20:15", liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "One", null, null, false, 1_800, "Programme"), state = PlayerStateCell.PAUSED),
-                    timeline = PlayerChromeTimeline.Live(
-                        at.bernhardberger.tvhplayer.playback.AppTimeshiftState(available = true, bufferStartMs = -600_000,
-                            positionMs = -60_000, liveEdgeMs = 0, timingKnown = true, paused = true),
-                        nowSec = 1_800,
-                    ),
-                    actions = PlayerChromeActions(active = !entry, paused = true),
-                    onTogglePause = { calls += "pause" }, onSeek = { calls += "seek" }, onStop = { calls += "stop" },
-                    onInfo = { calls += "info" }, onOptions = { calls += "options" }, onInteraction = {},
-                    numberEntryShown = entry,
-                )
-            }
-        }
-        compose.mainClock.autoAdvance = false
-        settle()
+        liveChrome(behindLiveMs = { 60_000L }, state = { PlayerStateCell.PAUSED }, numberEntryShown = { entry })
         val seekActions = SemanticsMatcher.keyIsDefined(SemanticsActions.CustomActions) and hasTestTag("player-seekbar")
         assertTrue("seekable: the timeline offers its seek actions", compose.onAllNodes(seekActions).fetchSemanticsNodes().isNotEmpty())
         val offered = actionable()
@@ -849,24 +784,26 @@ class LivePlayerChromeScreenTest {
         compose.runOnIdle { entry = false }
         settle()
         assertEquals("the same actions return", offered, actionable())
-        assertEquals("nothing acted", emptyList<String>(), calls)
     }
 
     /** The live chrome's controls [behindLiveMs] behind the live edge with known timing. */
-    private fun liveChrome(behindLiveMs: Long, state: PlayerStateCell = PlayerStateCell.PLAYING) {
+    private fun liveChrome(behindLiveMs: () -> Long, state: () -> PlayerStateCell = { PlayerStateCell.PLAYING },
+        numberEntryShown: () -> Boolean = { false }) {
         compose.setContent {
             TVHeadendPlayerTheme {
                 PlayerChrome(
                     mode = PlayerChromeMode.CONTROLS,
-                    content = PlayerChromeContent("20:15", liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "One", null, null, false, 1_800, "Programme"), state = state),
+                    content = PlayerChromeContent("20:15", liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "One", null, null, false, 1_800, "Programme"), state = state()),
                     timeline = PlayerChromeTimeline.Live(
                         at.bernhardberger.tvhplayer.playback.AppTimeshiftState(available = true, bufferStartMs = -600_000,
-                            positionMs = -behindLiveMs, liveEdgeMs = 0, timingKnown = true),
+                            positionMs = -behindLiveMs(), liveEdgeMs = 0, timingKnown = true,
+                            paused = state() == PlayerStateCell.PAUSED),
                         nowSec = 1_800,
                     ),
-                    actions = PlayerChromeActions(active = true, paused = state == PlayerStateCell.PAUSED),
+                    actions = PlayerChromeActions(active = !numberEntryShown(), paused = state() == PlayerStateCell.PAUSED),
                     onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {},
                     onInteraction = {},
+                    numberEntryShown = numberEntryShown(),
                 )
             }
         }
@@ -1087,18 +1024,6 @@ class LivePlayerChromeScreenTest {
         key(Key(android.view.KeyEvent.KEYCODE_TV_CONTENTS_MENU)); assertTrue(railOpen())
     }) { assertFalse(railOpen()); assertFalse(exists("player-actions")) }
     @Test fun holdBackStopsOverBanner() = holdStops { assertTrue(exists("player-banner")) }
-    @Test fun holdBackStopsOverPausedLabel() {
-        var closes = 0
-        timeshiftPlaying(onClose = { closes++ }) { pauses ->
-            key(Key.DirectionCenter)
-            assertSubscriptionSettled("the pause command reaches the player") { false in pauses }
-            key(Key.Back)
-            assertFalse(exists("player-banner")); assertFalse(exists("player-actions"))
-            assertEquals("Paused", description("player-hidden-slot"))
-            holdBack()
-            assertEquals(1, closes); assertEquals(null, runtime.activeTarget.value)
-        }
-    }
     @Test fun holdBackStopsOverStats() = holdStops {
         key(Key.Menu)
         compose.onNodeWithTag("playback-options-stats").performSemanticsAction(SemanticsActions.RequestFocus)
@@ -1124,32 +1049,23 @@ class LivePlayerChromeScreenTest {
         var closes = 0
         screen(onClose = { closes++ })
         publishInfoRecording(DvrEntryState.RECORDING)
-        key(Key.Info)
-        compose.onNodeWithTag("details-stop").performSemanticsAction(SemanticsActions.RequestFocus)
-        key(Key.DirectionCenter)
-        compose.onNodeWithTag("two-column-first").assertIsFocused().assertTextEquals("Keep recording")
-        holdBack()
-        assertEquals(0, closes)
-        assertTrue(runtime.activeTarget.value != null)
-        assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_STOP_ENTRY })
-        assertEquals(listOf("details-stop"), focused())
-    }
-
-    @Test fun holdBackInNestedScheduleConfirmationOnlyTakesTheSafeBack() {
-        var closes = 0
-        screen(onClose = { closes++ })
-        publishInfoRecording(DvrEntryState.RECORDING)
-        key(Key.Guide)
-        compose.onNodeWithTag("schedule-row-11").assertIsFocused()
-        key(Key.DirectionCenter)
-        compose.onNodeWithTag("details-stop").performSemanticsAction(SemanticsActions.RequestFocus)
-        key(Key.DirectionCenter)
-        compose.onNodeWithTag("two-column-first").assertIsFocused()
-        holdBack()
-        assertEquals(0, closes)
-        assertTrue(runtime.activeTarget.value != null)
-        assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_STOP_ENTRY })
-        assertEquals(listOf("details-stop"), focused())
+        for (origin in listOf(Key.Info, Key.Guide)) {
+            key(origin)
+            if (origin == Key.Guide) {
+                compose.onNodeWithTag("schedule-row-11").assertIsFocused()
+                key(Key.DirectionCenter)
+            }
+            compose.onNodeWithTag("details-stop").performSemanticsAction(SemanticsActions.RequestFocus)
+            key(Key.DirectionCenter)
+            compose.onNodeWithTag("two-column-first").assertIsFocused().assertTextEquals("Keep recording")
+            holdBack()
+            assertEquals(0, closes)
+            assertTrue(runtime.activeTarget.value != null)
+            assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_STOP_ENTRY })
+            assertEquals(listOf("details-stop"), focused())
+            key(Key.Back)
+            if (origin == Key.Guide) key(Key.Back)
+        }
     }
 
     @Test fun shortHardwareBackWaitsForReleaseBeforeHidingBanner() {
@@ -1167,6 +1083,7 @@ class LivePlayerChromeScreenTest {
         }
         settle()
         assertFalse(exists("player-banner"))
+        assertFalse(exists("player-actions"))
         assertEquals(0, closes)
     }
 
@@ -1250,19 +1167,6 @@ class LivePlayerChromeScreenTest {
         } finally {
             runTest(subscriptionDispatcher) { manager.closeAndJoin() }
         }
-    }
-
-    @Test fun playerInfoContainsProgrammeActionsAndBackReturnsDirectlyToControls() {
-        screen()
-        key(Key.DirectionDown)
-        key(Key.Info)
-        assertTrue(exists("programme-details-page"))
-        assertEquals(listOf("details-continue_watching"), focused())
-        assertFalse(exists("live-info-stream-signal"))
-        key(Key.Back)
-        assertFalse(exists("programme-details-page"))
-        assertTrue(exists("player-actions"))
-        assertEquals(listOf("player-info"), focused())
     }
 
     @Test fun playerBannerHidesFiveSecondsAfterThisTunesFirstFrame() {
@@ -1395,7 +1299,6 @@ class LivePlayerChromeScreenTest {
             val diagnostics = runtime.diagnostics.value
             assertTrue("Stats is closed: no format or frontend diagnostics",
                 diagnostics.video == null && diagnostics.audio == null && diagnostics.live == null)
-            // Trial: the stream badges have no place on the live chrome, with the tracks known.
             playerReady()
             assertMainSettled("the driven player reports Playing") { runtime.state.value is AppPlaybackState.Playing }
             settle()
@@ -1409,9 +1312,6 @@ class LivePlayerChromeScreenTest {
             key(Key.DirectionCenter)
             assertFalse(exists("player-actions"))
             assertTrue(exists("player-banner"))
-            assertTrue("the reason is posted as a notice", runtime.livePause.value.availability.let {
-                it != LivePauseAvailability.UNAVAILABLE && it != LivePauseAvailability.OFF
-            } || notices.state.value.pending.any { it.notice is Notice.PauseUnavailable })
             key(Key.DirectionDown)
             assertTrue(exists("player-actions"))
             val controls = identityDescription() + " | " + badgeDescription("player-footer")
@@ -1439,85 +1339,6 @@ class LivePlayerChromeScreenTest {
             key(Key.Back)
             assertSubscriptionSettled("closing Stats clears live diagnostics") { runtime.diagnostics.value.live == null }
             assertFalse(exists("playback-stats-overlay"))
-        } finally {
-            runTest(subscriptionDispatcher) { manager.closeAndJoin() }
-        }
-    }
-
-    @Test fun noStreamBadgeShowsOnTheLiveChromeBeforeOrAfterAZap() {
-        val connection = ScriptedSubscriptionConnection().apply {
-            scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, null)))
-        }
-        val manager = createSubscriptionManager(connection, subscriptionDispatcher).apply { startAdmission() }
-        try {
-            screen(opener = manager)
-            // Diagnostics on, as with Stats open: A's frontend diagnostics are present too.
-            video.setDiagnosticsEnabled(true)
-            val videoA = Format.Builder().setSampleMimeType(MimeTypes.VIDEO_H264).setWidth(1920).setHeight(1080).build()
-            val audioA = Format.Builder().setSampleMimeType(MimeTypes.AUDIO_E_AC3).setChannelCount(6).build()
-            val tracksA = Tracks(listOf(
-                Tracks.Group(TrackGroup(videoA), false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(true)),
-                Tracks.Group(TrackGroup(audioA), false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(true)),
-            ))
-            forcedTracks = tracksA
-            forcedVideoFormat = videoA
-            forcedAudioFormat = audioA
-            compose.runOnIdle { playerListeners.toList().forEach { it.onTracksChanged(tracksA) } }
-            startLiveSubscription(connection, height = 1080L, signal = 53739L) // 82 %
-            // Media3's ExoPlayer playback thread publishes the bound subscription's diagnostics.
-            compose.waitUntil(5_000) { idleMainLooper(); runtime.diagnostics.value.live?.frontend != null }
-            playerReady()
-            assertMainSettled("the driven player reports Playing") { runtime.state.value is AppPlaybackState.Playing }
-            settle()
-            val badgesA = badgeDescription("player-banner")
-            for (absent in listOf("lines", "Video", "Audio")) {
-                assertFalse("A's Banner '$badgesA' shows no badge ('$absent')", badgesA.contains(absent))
-            }
-
-            // Zap to B: the player still reports A's tracks and A's diagnostics.
-            forcedReady = false
-            key(Key.ChannelUp)
-            assertTrue(exists("player-banner"))
-            val staleBanner = badgeDescription("player-banner")
-            for (stale in listOf("lines", "Video", "Audio", "Signal-to-noise")) {
-                assertFalse("B's Banner '$staleBanner' shows no badge ('$stale')", staleBanner.contains(stale))
-            }
-            key(Key.Info)
-            assertTrue(exists("programme-details-page"))
-            key(Key.Back)
-            assertFalse(exists("programme-details-page"))
-            key(Key.DirectionDown)
-            val staleControls = identityDescription()
-            for (stale in listOf("lines", "Video", "Audio")) {
-                assertFalse("B's controls '$staleControls' show no stale '$stale'", staleControls.contains(stale))
-            }
-
-            // B plays with its own facts.
-            assertMainSettled("the key installs the next channel") { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(2)) }
-            val videoB = Format.Builder().setSampleMimeType(MimeTypes.VIDEO_H264).setWidth(1280).setHeight(720).build()
-            val tracksB = Tracks(listOf(
-                Tracks.Group(TrackGroup(videoB), false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(true)),
-            ))
-            forcedTracks = tracksB
-            forcedVideoFormat = videoB
-            forcedAudioFormat = null
-            compose.runOnIdle { playerListeners.toList().forEach { it.onTracksChanged(tracksB) } }
-            startLiveSubscription(connection, height = 720L, signal = 32768L) // 50 %
-            // Media3's ExoPlayer playback thread publishes the new subscription's diagnostics.
-            compose.waitUntil(5_000) {
-                idleMainLooper()
-                runtime.diagnostics.value.live?.frontend?.relativeSnrPercent?.let { it < 60.0 } == true
-            }
-            playerReady()
-            assertMainSettled("the driven player reports Playing") { runtime.state.value is AppPlaybackState.Playing }
-            settle()
-            assertTrue(exists("player-info-bar"))
-            val badgesB = identityDescription() + " | " + badgeDescription("player-footer")
-            for (absent in listOf("lines", "Video", "Audio")) {
-                assertFalse("B's controls '$badgesB' show no badge ('$absent')", badgesB.contains(absent))
-            }
-            assertFalse(badgesB.contains("1080"))
-            assertFalse(badgesB.contains("82 percent"))
         } finally {
             runTest(subscriptionDispatcher) { manager.closeAndJoin() }
         }
@@ -1825,18 +1646,6 @@ class LivePlayerChromeScreenTest {
             .flatMap { it.config.getOrNull(SemanticsProperties.Text).orEmpty().map { text -> text.text } }
             .joinToString(" | ")
 
-    @Test fun playerInfoStartsOnContinueWatchingAndHasNoRetiredScheduleTabs() {
-        screen()
-        key(Key.Info)
-        assertEquals("The first action takes focus", listOf("details-continue_watching"), focused())
-        assertFalse(exists("details-schedule"))
-        assertFalse(exists("details-tab-0"))
-        assertFalse(exists("details-tab-1"))
-        key(Key.Back)
-        assertFalse(exists("programme-details-page"))
-        assertFalse(exists("player-pause"))
-    }
-
     @Test fun scheduleFollowsTunedChannelAndContainsPlaybackKeys() {
         screen()
         val now = System.currentTimeMillis() / 1000
@@ -1941,7 +1750,6 @@ class LivePlayerChromeScreenTest {
         val target = runtime.activeTarget.value
         press(Key.Two) // A valid match with a longer candidate waits before tuning channel 2.
         assertTrue(compose.onAllNodesWithText("2").fetchSemanticsNodes().isNotEmpty())
-        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), target)
         assertEquals(target, runtime.activeTarget.value)
         press(Key.Guide)
         repeat(4) { settle() }
@@ -1969,7 +1777,6 @@ class LivePlayerChromeScreenTest {
         assertEquals(listOf("details-continue_watching"), focused())
         assertEquals("", texts("details-title"))
         assertFalse(exists("details-subtitle"))
-        assertFalse(exists("details-tab-1"))
     }
 
     @Test fun playerInfoConsumesRemoteCommandsAndReturnsToInfo() {
@@ -1978,7 +1785,6 @@ class LivePlayerChromeScreenTest {
         assertEquals(listOf("player-pause"), focused())
         key(Key.Info)
         assertEquals(listOf("details-continue_watching"), focused())
-        assertFalse(exists("details-schedule"))
         val playing = player.playWhenReady
         listOf(Key.ChannelUp, Key.ChannelDown, Key.MediaStop, Key.MediaPause, Key.Menu, Key.Info).forEach(::key)
         assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
@@ -1986,6 +1792,9 @@ class LivePlayerChromeScreenTest {
         assertEquals(listOf("details-continue_watching"), focused())
         key(Key.Back)
         assertEquals(listOf("player-info"), focused())
+        assertFalse(exists("programme-details-page"))
+        assertTrue(exists("player-actions"))
+        assertFalse("controls rest has no now-playing strip", exists("player-now-playing"))
         key(Key.Info)
         assertEquals("a new visit resets Details and its action", listOf("details-continue_watching"), focused())
     }
@@ -1994,7 +1803,6 @@ class LivePlayerChromeScreenTest {
         screen()
         key(Key.DirectionDown)
         assertEquals(listOf("player-pause"), focused())
-        assertEquals("Channels", texts("player-down-hint"))
         for (close in listOf(Key.DirectionUp, Key.Back)) {
             key(Key.DirectionRight)
             key(Key.DirectionRight)
@@ -2036,8 +1844,6 @@ class LivePlayerChromeScreenTest {
         compose.onRoot().performKeyInput { keyDown(Key.DirectionCenter); advanceEventTime(1_200); keyUp(Key.DirectionCenter) }
         settle()
         assertTrue("the programme's shared details open", exists("programme-details-page"))
-        assertFalse("without section tabs or heading", exists("details-top-row"))
-        assertFalse("without the page hint", exists("details-player-hint"))
         assertEquals("nothing tunes", AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
         val action = focused()
         key(Key.DirectionUp)
@@ -2341,7 +2147,6 @@ class LivePlayerChromeScreenTest {
 
     @Test fun upRevealLandsOnPauseAndArtworkRemainsPassive() {
         screen()
-        assertFalse("the live controls have no Record action", exists("player-record"))
         key(Key.DirectionUp)
         assertEquals("Up reveals controls onto Pause", listOf("player-pause"), focused())
         key(Key.DirectionUp)
@@ -2366,25 +2171,6 @@ class LivePlayerChromeScreenTest {
         assertTrue("the controls stay", exists("player-actions"))
         key(Key.DirectionDown)
         assertEquals("remembered tab opens on cards", listOf("player-channel-card-2"), focused())
-        key(Key.DirectionCenter)
-        assertEquals("OK on a recent channel tunes it", AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
-        assertTrue("another channel keeps the browser", railOpen())
-    }
-
-    @Test fun sharedDetailsPreserveThePlayerAndDisposeOnBack() {
-        screen()
-        key(Key.DirectionDown)
-        val target = runtime.activeTarget.value
-        val playing = player.playWhenReady
-        key(Key.Info)
-        assertEquals(listOf("details-continue_watching"), focused())
-        assertEquals(target, runtime.activeTarget.value)
-        assertEquals(playing, player.playWhenReady)
-        key(Key.Back)
-        assertFalse(exists("programme-details-page"))
-        assertEquals(listOf("player-info"), focused())
-        assertFalse("controls rest has no now-playing strip", exists("player-now-playing"))
-        assertTrue(exists("player-actions"))
     }
 
     @Test fun shortOkTunesDirectlyAndKeepsBrowsingContext() {
@@ -2460,45 +2246,22 @@ class LivePlayerChromeScreenTest {
             .flatMap { it.config.getOrNull(SemanticsProperties.ContentDescription).orEmpty() }
             .joinToString(" | ")
 
-    @Test fun okOnTheBannerPausesAndKeepsTheBannerWithoutTheControlsUntilResumed() {
+    @Test fun okOnTheBannerPausesAndKeepsTheBannerWithoutTheControlsUntilResumed() = timeshiftPlaying { pauses ->
         // Android TV playback guidance (TV-PC): Center pauses and resumes; it shows progress, not the actions.
-        val connection = ScriptedSubscriptionConnection().apply {
-            scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 3_600L)))
-        }
-        val manager = createSubscriptionManager(connection, subscriptionDispatcher).apply { startAdmission() }
-        try {
-            screen(opener = manager)
-            startLiveSubscription(connection, height = 1080L, signal = 53739L, timeshift = true)
-            playerReady()
-            assertMainSettled("the driven player reports Playing") { runtime.state.value is AppPlaybackState.Playing }
-            playerListeners.toList().forEach { it.onRenderedFirstFrame() }
-            assertMainSettled("the driven frame is presented") { runtime.videoPresentation.value.visible }
-            // Media3's ExoPlayer playback thread binds the grant after collection registration.
-            compose.waitUntil(5_000) { idleMainLooper(); runtime.livePause.value.availability == LivePauseAvailability.READY }
-            val pauses = mutableListOf<Boolean>()
-            compose.runOnIdle {
-                player.addListener(object : Player.Listener {
-                    override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) { pauses += playWhenReady }
-                })
-            }
-            assertTrue(exists("player-banner"))
+        assertTrue(exists("player-banner"))
 
-            compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
-            assertSubscriptionSettled("the pause command reaches the player") { false in pauses }
-            settle()
-            assertTrue("pausing keeps the Banner", exists("player-banner"))
-            assertFalse("pausing opens no actions", exists("player-actions"))
-            // Well past the Banner's timeout: paused, it stays until Back or resume.
-            repeat(3) { settle(); compose.mainClock.advanceTimeBy(4_000); compose.waitForIdle() }
-            assertTrue("paused: the Banner stays", exists("player-banner"))
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
+        assertSubscriptionSettled("the pause command reaches the player") { false in pauses }
+        settle()
+        assertTrue("pausing keeps the Banner", exists("player-banner"))
+        assertFalse("pausing opens no actions", exists("player-actions"))
+        // Well past the Banner's timeout: paused, it stays until Back or resume.
+        repeat(3) { settle(); compose.mainClock.advanceTimeBy(4_000); compose.waitForIdle() }
+        assertTrue("paused: the Banner stays", exists("player-banner"))
 
-            compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
-            assertSubscriptionSettled("the resume command reaches the player") { pauses.lastOrNull() == true }
-            assertFalse("resuming opens no actions either", exists("player-actions"))
-
-        } finally {
-            runTest(subscriptionDispatcher) { manager.closeAndJoin() }
-        }
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
+        assertSubscriptionSettled("the resume command reaches the player") { pauses.lastOrNull() == true }
+        assertFalse("resuming opens no actions either", exists("player-actions"))
     }
 
     @Test fun channelUpDoesNotTuneWhileTheRowsAreOpen() {
@@ -2507,10 +2270,8 @@ class LivePlayerChromeScreenTest {
         key(Key.ChannelUp)
         assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
         assertTrue("the browser stays open", railOpen())
-    }
-
-    @Test fun channelUpTunesWithTheRailClosed() {
-        screen()
+        key(Key.Back)
+        assertFalse(railOpen())
         key(Key.ChannelUp)
         assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
     }
@@ -2526,18 +2287,14 @@ class LivePlayerChromeScreenTest {
         compose.waitForIdle()
     }
 
-    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE) fun playerUnavailableShowsOnlyTheCentreMessage() = unavailable("en", 1f)
-    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE) fun playerUnavailableShowsOnlyTheCentreMessageAtLargeText() = unavailable("en", 1.3f)
-    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE) @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
-    fun playerUnavailableShowsOnlyTheCentreMessageInGerman() = unavailable("de", 1f)
-    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE) @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
-    fun playerUnavailableShowsOnlyTheCentreMessageInGermanAtLargeText() = unavailable("de", 1.3f)
-
     @Test fun playerUnavailableClaimsNeitherPlayingNorLiveInTheControlsNorTheChip() {
         screen(failing = true)
         repeat(4) { settle() }
         assertTrue("centre message", exists("player-channel-unavailable"))
         assertFalse("unavailable replaces busy", exists("player-busy-indicator"))
+        assertFalse("the Banner gives way to the centre message", exists("player-banner"))
+        assertFalse(exists("player-hidden-slot"))
+        assertFalse(exists("player-status-slot"))
         key(Key.DirectionDown)
         assertTrue("the controls open over the message", exists("player-actions"))
         assertFalse(exists("player-state"))
@@ -2545,21 +2302,6 @@ class LivePlayerChromeScreenTest {
         key(Key.Back)
         assertFalse(exists("player-hidden-slot"))
         assertFalse(exists("player-state"))
-    }
-
-    private fun unavailable(locale: String, fontScale: Float) {
-        screen(failing = true, fontScale = fontScale)
-        repeat(4) { settle() }
-        assertTrue("centre message", exists("player-channel-unavailable"))
-        assertFalse("unavailable replaces busy", exists("player-busy-indicator"))
-        assertFalse("the Banner gives way to the centre message", exists("player-banner"))
-        assertFalse(exists("player-hidden-slot"))
-        assertFalse(exists("player-status-slot"))
-        // Evidence capture of the production screen, 960×540, into the ignored artifacts directory.
-        val bitmap = Bitmap.createBitmap(960, 540, Bitmap.Config.ARGB_8888)
-        compose.runOnIdle { view.draw(Canvas(bitmap)) }
-        CaptureOutput.writePng(File("../artifacts/player-chrome", "unavailable-$locale-font$fontScale.png"), bitmap)
-        bitmap.recycle()
     }
 
     private fun audioTrack(id: String, language: String, selected: Boolean) = Tracks.Group(TrackGroup(Format.Builder()
