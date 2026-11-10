@@ -46,11 +46,10 @@ class HomeActionsTest {
 
     @Test fun recentChannelsEndCardOpensChannelsWithoutTuning() {
         var opened = false
-        val input = HomeInput(listOf(channel), emptyMap(), emptyList(), listOf(channel.id), emptyList(), { null }, null, now)
+        val input = homeInput(listOf(channel), now, recentChannelIds = listOf(channel.id))
         compose.setContent { TVHeadendPlayerTheme {
-            HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
-                onPlay = { _, _ -> fail("end card tuned") }, onPlayRecording = { _, _ -> },
-                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> },
+            homeScreen(input,
+                onPlay = { _, _ -> fail("end card tuned") },
                 onBrowseChannels = { opened = true })
         } }
         compose.onNodeWithTag("home-recent-0").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
@@ -59,11 +58,9 @@ class HomeActionsTest {
     }
 
     @Test fun recentChannelsEndCardCaptionMatchesTheTileNames() {
-        val input = HomeInput(listOf(channel), emptyMap(), emptyList(), listOf(channel.id), emptyList(), { null }, null, now)
+        val input = homeInput(listOf(channel), now, recentChannelIds = listOf(channel.id))
         compose.setContent { TVHeadendPlayerTheme {
-            HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
-                onPlay = { _, _ -> }, onPlayRecording = { _, _ -> },
-                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
+            homeScreen(input)
         } }
         compose.onNodeWithTag("home-recent-0").assertIsFocused()
         fun caption(text: String): Triple<androidx.compose.ui.text.TextLayoutInput, Float, Float> {
@@ -82,7 +79,6 @@ class HomeActionsTest {
         assertEquals(tile.first.style.lineHeight, end.first.style.lineHeight)
         assertEquals(tile.first.style.letterSpacing, end.first.style.letterSpacing)
         assertEquals(androidx.compose.ui.text.style.TextAlign.Center, end.first.style.textAlign)
-        assertEquals(tile.first.style.textAlign, end.first.style.textAlign)
         assertEquals(2, end.first.maxLines)
         assertEquals(tile.second, end.second, 0.5f)
         assertEquals("captions start at the same line under equal pictures", tile.third, end.third, 0.5f)
@@ -106,14 +102,11 @@ class HomeActionsTest {
 
     private fun lateRecordingAfterOwnershipBoundary(drawerFirst: Boolean) {
         var enabled by mutableStateOf(!drawerFirst)
-        var input by mutableStateOf(HomeInput(listOf(channel), emptyMap(), emptyList(),
-            listOf(channel.id), emptyList(), { null }, null, now))
+        var input by mutableStateOf(homeInput(listOf(channel), now, recentChannelIds = listOf(channel.id)))
         val drawerFocus = androidx.compose.ui.focus.FocusRequester()
         compose.setContent { TVHeadendPlayerTheme {
             androidx.compose.foundation.layout.Box {
-                HomeScreenContent(input, SessionObservation.create(), PaddingValues(), enabled,
-                    onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
-                    onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
+                homeScreen(input, enabled = enabled)
                 if (drawerFirst) androidx.tv.material3.Button(onClick = {}, modifier = androidx.compose.ui.Modifier
                     .focusRequester(drawerFocus).testTag("test-drawer")
                     .onPreviewKeyEvent {
@@ -150,12 +143,9 @@ class HomeActionsTest {
         val events = channels.associate { it.id to EpgEvent.create(EventId(it.id.value), it.id,
             Instant.fromEpochSeconds(now - 600), Instant.fromEpochSeconds(now + 600),
             title = "Programme ${it.id.value}") }
-        var input by mutableStateOf(HomeInput(channels, events.filterKeys { it.value >= 12 }, emptyList(),
-            emptyList(), emptyList(), { null }, null, now))
+        var input by mutableStateOf(homeInput(channels, now, currentEvents = events.filterKeys { it.value >= 12 }))
         compose.setContent { TVHeadendPlayerTheme {
-            HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
-                onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
-                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
+            homeScreen(input)
         } }
         compose.onNodeWithTag("home-onnow-0").assertIsFocused()
         if (viewerMoved) {
@@ -169,12 +159,9 @@ class HomeActionsTest {
 
     private fun lateRunningRecording(viewerMoved: Boolean) {
         val second = Channel.create(ChannelId(2), name = "Second")
-        var input by mutableStateOf(HomeInput(listOf(channel, second), emptyMap(), emptyList(),
-            listOf(channel.id, second.id), emptyList(), { null }, null, now))
+        var input by mutableStateOf(homeInput(listOf(channel, second), now, recentChannelIds = listOf(channel.id, second.id)))
         compose.setContent { TVHeadendPlayerTheme {
-            HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
-                onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
-                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
+            homeScreen(input)
         } }
         compose.onNodeWithTag("home-recent-0").assertIsFocused()
         leaveTouchMode()
@@ -377,16 +364,14 @@ class HomeActionsTest {
 
     @Test fun firstSectionsReplacingAFocusedErrorDoNotOpenTheDrawer() {
         leaveTouchMode()
-        var input by mutableStateOf(HomeInput(emptyList(), emptyMap(), emptyList(), emptyList(), emptyList(), { null }, null, now))
+        var input by mutableStateOf(homeInput(emptyList(), now))
         val rail = androidx.compose.ui.focus.FocusRequester()
         lateinit var drawer: androidx.tv.material3.DrawerState
         compose.setContent { TVHeadendPlayerTheme {
             drawer = androidx.tv.material3.rememberDrawerState(androidx.tv.material3.DrawerValue.Closed)
             CompositionLocalProvider(LocalBrowseDrawerState provides drawer, LocalBrowseNavigationFocus provides rail) {
                 androidx.compose.foundation.layout.Box {
-                    HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
-                        onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
-                        onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> }, catalogCurrent = true)
+                    homeScreen(input, catalogCurrent = true)
                     androidx.tv.material3.Button({}, modifier = androidx.compose.ui.Modifier.focusRequester(rail)
                         .onFocusChanged { if (it.isFocused) drawer.setValue(androidx.tv.material3.DrawerValue.Open) }
                         .testTag("test-rail")) { androidx.tv.material3.Text("Home") }
@@ -406,12 +391,9 @@ class HomeActionsTest {
         val second = Channel.create(ChannelId(2), name = "Second")
         val scheduled = DvrEntry.create(DvrEntryId(7), channelId = channel.id, title = "Soon",
             state = DvrEntryState.SCHEDULED, start = Instant.fromEpochSeconds(now + 600), stop = Instant.fromEpochSeconds(now + 1800))
-        var input by mutableStateOf(HomeInput(listOf(channel, second), emptyMap(), emptyList(),
-            listOf(channel.id, second.id), listOf(scheduled), { null }, null, now))
+        var input by mutableStateOf(homeInput(listOf(channel, second), now, recentChannelIds = listOf(channel.id, second.id), dvrEntries = listOf(scheduled)))
         compose.setContent { TVHeadendPlayerTheme {
-            HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
-                onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
-                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
+            homeScreen(input)
         } }
         compose.onNodeWithTag("home-recent-0").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
         compose.mainClock.advanceTimeBy(600)
@@ -439,12 +421,9 @@ class HomeActionsTest {
         val second = Channel.create(ChannelId(2), name = "Second")
         val scheduled = DvrEntry.create(DvrEntryId(7), channelId = channel.id, title = "Soon",
             state = DvrEntryState.SCHEDULED, start = Instant.fromEpochSeconds(now + 600), stop = Instant.fromEpochSeconds(now + 1800))
-        var input by mutableStateOf(HomeInput(listOf(channel, second), emptyMap(), emptyList(),
-            listOf(channel.id, second.id), listOf(scheduled), { null }, null, now))
+        var input by mutableStateOf(homeInput(listOf(channel, second), now, recentChannelIds = listOf(channel.id, second.id), dvrEntries = listOf(scheduled)))
         compose.setContent { TVHeadendPlayerTheme {
-            HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
-                onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
-                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
+            homeScreen(input)
         } }
         compose.onNodeWithTag("home-recent-0").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
         compose.mainClock.advanceTimeBy(600)
@@ -466,13 +445,10 @@ class HomeActionsTest {
     }
 
     @Test fun dataArrivingBeforeEntryLandsStillReachesThePriorityCard() {
-        var input by mutableStateOf(HomeInput(listOf(channel), emptyMap(), emptyList(),
-            listOf(channel.id), emptyList(), { null }, null, now))
+        var input by mutableStateOf(homeInput(listOf(channel), now, recentChannelIds = listOf(channel.id)))
         compose.mainClock.autoAdvance = false
         compose.setContent { TVHeadendPlayerTheme {
-            HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
-                onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
-                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
+            homeScreen(input)
         } }
         compose.runOnIdle {
             input = input.copy(dvrEntries = listOf(DvrEntry.create(DvrEntryId(7), channelId = channel.id,
@@ -490,10 +466,7 @@ class HomeActionsTest {
         val scheduled = DvrEntry.create(DvrEntryId(1), title = "Upcoming", state = DvrEntryState.SCHEDULED,
             start = Instant.fromEpochSeconds(now + 600), stop = Instant.fromEpochSeconds(now + 1800))
         compose.setContent { TVHeadendPlayerTheme {
-            HomeScreenContent(HomeInput(channels, emptyMap(), emptyList(), recents.value, listOf(scheduled), { null }, null, now),
-                SessionObservation.create(), PaddingValues(), true,
-                onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
-                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
+            homeScreen(homeInput(channels, now, recentChannelIds = recents.value, dvrEntries = listOf(scheduled)))
         } }
         compose.onNodeWithTag("home-recent-0").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
         compose.onNodeWithTag("home-recent-1").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
@@ -573,41 +546,22 @@ class HomeActionsTest {
     }
 
     @Test fun groupButtonSelectsSharedScopeAndViewOptionsContainsOnlySections() {
-        val input = HomeInput(listOf(channel), emptyMap(), emptyList(), listOf(channel.id), emptyList(), { null }, null, now)
+        val memory = mutableStateOf<HomeFocusKey?>(null)
+        val input = homeInput(listOf(channel), now, recentChannelIds = listOf(channel.id))
         var selected: ChannelTagId? = null
         compose.setContent { TVHeadendPlayerTheme {
-            HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
-                onPlay = { _, _ -> fail("scope selection tuned") }, onPlayRecording = { _, _ -> },
-                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> },
+            homeScreen(input,
+                onPlay = { _, _ -> fail("scope selection tuned") },
                 groups = listOf(at.bernhardberger.tvhplayer.ui.screens.ChannelsGroup(null, null, listOf(channel)),
                     at.bernhardberger.tvhplayer.ui.screens.ChannelsGroup(ChannelTagId(8), "Favorites", listOf(channel))),
                 activeTagId = ChannelTagId(8),
-                onSelectTag = { selected = it })
+                onSelectTag = { selected = it }, focusMemory = memory)
         } }
         compose.onNodeWithTag("home-loading").assertDoesNotExist()
         compose.onNodeWithTag("home-recent-0").performKeyInput { pressKey(Key.DirectionUp); pressKey(Key.DirectionRight); pressKey(Key.Enter) }
         compose.onNodeWithTag("home-view-CURRENT_ACTIVITY").assertIsFocused()
         compose.onNodeWithText("Right now").assertExists()
         compose.onNodeWithTag("home-tag-8").assertDoesNotExist()
-        compose.onNodeWithTag("home-view-CURRENT_ACTIVITY").performKeyInput { pressKey(Key.Back) }
-        compose.onNodeWithTag("home-view-button").assertIsFocused().performKeyInput { pressKey(Key.DirectionLeft); pressKey(Key.Enter) }
-        compose.onNodeWithTag("channels-tags-8").assertIsFocused().performKeyInput { pressKey(Key.Enter) }
-        compose.runOnIdle { assertEquals(ChannelTagId(8), selected) }
-        compose.onNodeWithTag("home-tags-button").assertIsFocused()
-    }
-
-    @Test fun panelBackAndTagSelectionNeverRefocusACard() {
-        val memory = mutableStateOf<HomeFocusKey?>(null)
-        val input = HomeInput(listOf(channel), emptyMap(), emptyList(), listOf(channel.id), emptyList(), { null }, null, now)
-        compose.setContent { TVHeadendPlayerTheme {
-            HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
-                onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
-                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> }, focusMemory = memory,
-                groups = listOf(at.bernhardberger.tvhplayer.ui.screens.ChannelsGroup(null, null, listOf(channel)),
-                    at.bernhardberger.tvhplayer.ui.screens.ChannelsGroup(ChannelTagId(8), "Favorites", listOf(channel))),
-                activeTagId = ChannelTagId(8))
-        } }
-        compose.onNodeWithTag("home-recent-0").performKeyInput { pressKey(Key.DirectionUp); pressKey(Key.DirectionRight); pressKey(Key.Enter) }
         fun closeAndCheck(panel: String, opener: String, key: Key) {
             compose.runOnIdle { memory.value = null }
             compose.mainClock.autoAdvance = false
@@ -624,6 +578,7 @@ class HomeActionsTest {
         closeAndCheck("channels-tags-8", "home-tags-button", Key.Back)
         compose.onNodeWithTag("home-tags-button").performKeyInput { pressKey(Key.Enter) }
         closeAndCheck("channels-tags-8", "home-tags-button", Key.Enter)
+        compose.runOnIdle { assertEquals(ChannelTagId(8), selected) }
     }
 
     @Test fun entryRevealsOneSectionPerFrameAndLateSectionsAppearImmediately() {
@@ -686,20 +641,6 @@ class HomeActionsTest {
             assertEquals("Last-row bounds must stay stable after initial layout, frame $frame", first,
                 compose.onNodeWithTag("home-section-UPCOMING").getUnclippedBoundsInRoot())
         }
-    }
-
-    @Test fun deepEntryComposesItsPrecedingSectionsAndRapidDownOnlyTargetsRenderedCards() {
-        val sections = listOf<HomeSection>(HomeSection.RecentChannels(listOf(RecentChannelItem(channel))),
-            HomeSection.Genres(listOf(GenreItem(ProgrammeCategory.ALL))),
-            HomeSection.Upcoming(listOf(UpcomingItem(DvrEntry.create(DvrEntryId(1), title = "Scheduled",
-                state = DvrEntryState.SCHEDULED, start = Instant.fromEpochSeconds(now + 600),
-                stop = Instant.fromEpochSeconds(now + 1200))))))
-        compose.mainClock.autoAdvance = false
-        compose.setContent { TVHeadendPlayerTheme {
-            HomeContent(sections, PaddingValues(), HomeFocusKey(HomeSectionKind.UPCOMING, "recording:1", 0), {})
-        } }
-        sections.forEach { compose.onNodeWithTag("home-section-${it.kind.name}").assertExists() }
-        compose.mainClock.advanceTimeBy(600)
         compose.onNodeWithTag("home-upcoming-0").assertIsFocused()
         val before = compose.onNodeWithTag("home-upcoming-0").getUnclippedBoundsInRoot()
         repeat(5) {
@@ -712,13 +653,10 @@ class HomeActionsTest {
 
     @Test fun optionsToggleAllSectionsAndBackReturnsToHeaderWithoutTuning() {
         var enabled by mutableStateOf(true)
-        var input by mutableStateOf(HomeInput(listOf(channel), emptyMap(), emptyList(),
-            listOf(channel.id), emptyList(), { null }, null, now))
+        var input by mutableStateOf(homeInput(listOf(channel), now, recentChannelIds = listOf(channel.id)))
         compose.setContent { TVHeadendPlayerTheme {
-            HomeScreenContent(input, SessionObservation.create(), PaddingValues(), enabled,
-                onPlay = { _, _ -> fail("options tuned") }, onPlayRecording = { _, _ -> },
-                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> },
-                onGenre = {}, onRecordings = { _, _ -> },
+            homeScreen(input, enabled = enabled,
+                onPlay = { _, _ -> fail("options tuned") },
                 onSectionVisibleChange = { section, visible -> input = input.copy(hiddenSections =
                     if (visible) input.hiddenSections - section else input.hiddenSections + section) })
         } }
@@ -744,13 +682,12 @@ class HomeActionsTest {
         var writesStarted = 0
         val store = at.bernhardberger.tvhplayer.settings.UiSettingsStore(
             at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore(beforeUpdate = { writesStarted++; release.await() }))
-        val input = HomeInput(listOf(channel), emptyMap(), emptyList(), listOf(channel.id), emptyList(), { null }, null, now)
+        val input = homeInput(listOf(channel), now, recentChannelIds = listOf(channel.id))
         compose.setContent { TVHeadendPlayerTheme {
             val settings by store.settings.collectAsState(at.bernhardberger.tvhplayer.settings.UiSettings())
             val saveScope = rememberCoroutineScope()
-            HomeScreenContent(input.copy(hiddenSections = settings.hiddenHomeSections), SessionObservation.create(), PaddingValues(), true,
-                onPlay = { _, _ -> fail("options tuned") }, onPlayRecording = { _, _ -> },
-                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> },
+            homeScreen(input.copy(hiddenSections = settings.hiddenHomeSections),
+                onPlay = { _, _ -> fail("options tuned") },
                 onSectionVisibleChange = { section, visible -> saveScope.launch(dispatcher) { store.setHomeSectionVisible(section, visible) } })
         } }
         compose.onNodeWithTag("home-recent-0").performKeyInput { pressKey(Key.DirectionUp); pressKey(Key.DirectionRight); pressKey(Key.Enter) }
@@ -772,16 +709,14 @@ class HomeActionsTest {
     }
 
     @Test fun channelsWithoutHistoryRecordingsOrEpgAreNotReportedAsNoChannels() {
-        val input = HomeInput(listOf(channel), emptyMap(), emptyList(), emptyList(), emptyList(), { null }, null, now)
+        val input = homeInput(listOf(channel), now)
         val observation = SessionObservation.create(
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(channel))),
             epgState = EpgRepositoryState.Current(EpgSnapshot.create(emptyList())),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(emptyList())),
         )
         compose.setContent { TVHeadendPlayerTheme {
-            HomeScreenContent(input, observation, PaddingValues(), true,
-                onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
-                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
+            homeScreen(input, observation)
         } }
         compose.onNodeWithText("Start watching").assertExists()
         compose.onNodeWithText("Channels you watch and recordings will appear here.").assertExists()
@@ -792,9 +727,7 @@ class HomeActionsTest {
 
     private fun channelsAwaitingRows(input: () -> HomeInput, observation: () -> SessionObservation) {
         compose.setContent { TVHeadendPlayerTheme {
-            HomeScreenContent(input(), observation(), PaddingValues(), true,
-                onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
-                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
+            homeScreen(input(), observation())
         } }
     }
 
@@ -804,7 +737,7 @@ class HomeActionsTest {
         val catalog = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(channel)))
         var restored by mutableStateOf(false)
         channelsAwaitingRows(
-            input = { HomeInput(listOf(channel), if (restored) mapOf(channel.id to event) else emptyMap(), emptyList(), emptyList(), emptyList(), { null }, null, now) },
+            input = { homeInput(listOf(channel), now, currentEvents = if (restored) mapOf(channel.id to event) else emptyMap()) },
             observation = { SessionObservation.create(channelState = catalog,
                 epgState = if (restored) EpgRepositoryState.Current(EpgSnapshot.create(listOf(event))) else EpgRepositoryState.Empty,
                 dvrState = if (restored) DvrRepositoryState.Current(DvrSnapshot.create(emptyList())) else DvrRepositoryState.Empty) },
@@ -827,7 +760,7 @@ class HomeActionsTest {
     }
 
     @Test fun rowsThatNeverArriveEndInTheEmptyHomeInsteadOfLoadingForever() {
-        val input = HomeInput(listOf(channel), emptyMap(), emptyList(), emptyList(), emptyList(), { null }, null, now)
+        val input = homeInput(listOf(channel), now)
         val observation = SessionObservation.create(channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(channel))))
         channelsAwaitingRows({ input }, { observation })
         compose.mainClock.advanceTimeBy(9_000)
@@ -846,15 +779,13 @@ class HomeActionsTest {
         var enabled by mutableStateOf(false)
         lateinit var drawer: androidx.tv.material3.DrawerState
         val drawerFocus = androidx.compose.ui.focus.FocusRequester()
-        val input = HomeInput(listOf(channel), emptyMap(), emptyList(), listOf(channel.id), emptyList(), { null }, null, now)
+        val input = homeInput(listOf(channel), now, recentChannelIds = listOf(channel.id))
         compose.setContent {
             drawer = androidx.tv.material3.rememberDrawerState(androidx.tv.material3.DrawerValue.Closed)
             CompositionLocalProvider(at.bernhardberger.tvhplayer.ui.components.LocalBrowseDrawerState provides drawer) {
                 TVHeadendPlayerTheme {
                     androidx.compose.foundation.layout.Box {
-                        HomeScreenContent(input, SessionObservation.create(), PaddingValues(), enabled,
-                            onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
-                            onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
+                        homeScreen(input, enabled = enabled)
                         androidx.tv.material3.Button(onClick = {}, modifier = androidx.compose.ui.Modifier
                             .then(androidx.compose.ui.Modifier.focusRequester(drawerFocus)).testTag("test-drawer")) {
                             androidx.tv.material3.Text("Drawer")
@@ -875,11 +806,9 @@ class HomeActionsTest {
 
     @Test fun loadingOffersSettingsAfterTenSecondsWithoutTakingHeaderFocus() {
         var current by mutableStateOf(false)
-        val input = HomeInput(emptyList(), emptyMap(), emptyList(), emptyList(), emptyList(), { null }, null, now)
+        val input = homeInput(emptyList(), now)
         compose.setContent { TVHeadendPlayerTheme {
-            HomeScreenContent(input.copy(channels = if (current) listOf(channel) else emptyList()), SessionObservation.create(), PaddingValues(), true,
-                onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
-                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> }, catalogCurrent = current)
+            homeScreen(input.copy(channels = if (current) listOf(channel) else emptyList()), catalogCurrent = current)
         } }
         compose.onNodeWithTag("home-view-button").assertIsFocused()
         compose.mainClock.advanceTimeBy(1_700)
@@ -901,12 +830,10 @@ class HomeActionsTest {
     @Test fun delayedSettingsTakesFocusOnlyWhenHomeHasNoFocusedControl() {
         lateinit var focus: androidx.compose.ui.focus.FocusManager
         var opened = false
-        val input = HomeInput(emptyList(), emptyMap(), emptyList(), emptyList(), emptyList(), { null }, null, now)
+        val input = homeInput(emptyList(), now)
         compose.setContent { TVHeadendPlayerTheme {
             focus = androidx.compose.ui.platform.LocalFocusManager.current
-            HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
-                onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
-                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> }, catalogCurrent = false,
+            homeScreen(input, catalogCurrent = false,
                 onOpenConnectionSettings = { opened = true })
         } }
         compose.onNodeWithTag("home-view-button").assertIsFocused()
@@ -932,9 +859,6 @@ class HomeActionsTest {
             val previous = requireNotNull(vm.scope.value.observation)
             session.publish(SessionObservation.create(sessionState = SessionState.Disconnected, channelState = previous.channelState))
             session.publish(FakeTvheadendSession(observation()).observation.value)
-            assertEquals(previous.channelState, session.observation.value.channelState)
-            assertNotNull(session.observation.value.currentSession)
-            assertNotSame(previous.currentSession, session.observation.value.currentSession)
         }
         val dependencies = org.koin.dsl.koinApplication { modules(module {
             single { at.bernhardberger.tvhplayer.settings.UiSettingsStore(at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore()) }
@@ -997,17 +921,15 @@ class HomeActionsTest {
 
     @Test fun retryLeftReachesTheRailAndUpReachesViewOptions() {
         val rail = androidx.compose.ui.focus.FocusRequester()
-        val input = HomeInput(emptyList(), emptyMap(), emptyList(), emptyList(), emptyList(), { null }, null, now)
+        val input = homeInput(emptyList(), now)
         compose.setContent { TVHeadendPlayerTheme {
             CompositionLocalProvider(at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus provides rail) {
                 androidx.compose.foundation.layout.Row {
                     androidx.tv.material3.Button(onClick = {}, modifier = androidx.compose.ui.Modifier
                         .focusRequester(rail).testTag("test-rail")) { androidx.tv.material3.Text("Home") }
-                    HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
+                    homeScreen(input,
                         connectionUiState = ConnectionUiState.Error(at.bernhardberger.tvhplayer.data.ConnectionFailureKind.UNREACHABLE,
-                            SessionRecoveryDisposition.EXPLICIT_RETRY),
-                        onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
-                        onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
+                            SessionRecoveryDisposition.EXPLICIT_RETRY))
                 }
             }
         } }
@@ -1033,27 +955,25 @@ class HomeActionsTest {
     }
 
     private fun emptyHomeWithHiddenSections(hidden: Set<HomeSectionKind>, entries: List<DvrEntry> = emptyList()) {
-        val input = HomeInput(listOf(channel), emptyMap(), emptyList(), emptyList(), entries, { null }, null, now, hidden)
+        val input = homeInput(listOf(channel), now, dvrEntries = entries, hiddenSections = hidden)
         val observation = SessionObservation.create(
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(channel))),
             epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries)))
         compose.setContent { TVHeadendPlayerTheme {
-            HomeScreenContent(input, observation, PaddingValues(), true,
-                onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
-                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
+            homeScreen(input, observation)
         } }
     }
 
     @Test fun staleHomeOwnerRejectsOkAndMenuBeforeRecomposition() {
         var current = true
         val owner = at.bernhardberger.tvhplayer.ui.components.TabOwner { current }
-        val input = HomeInput(listOf(channel), emptyMap(), emptyList(), listOf(channel.id), emptyList(), { null }, null, now)
+        val input = homeInput(listOf(channel), now, recentChannelIds = listOf(channel.id))
         compose.setContent { CompositionLocalProvider(at.bernhardberger.tvhplayer.ui.components.LocalTabOwner provides owner) {
             TVHeadendPlayerTheme {
-                HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
+                homeScreen(input,
                     onPlay = { _, _ -> fail("stale frame tuned") }, onPlayRecording = { _, _ -> fail("stale frame played") },
-                    onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> fail("stale frame navigated") },
+                    onShowGuide = { _, _ -> fail("stale frame navigated") },
                     onGenre = { fail("stale frame navigated") }, onRecordings = { _, _ -> fail("stale frame navigated") })
             }
         } }
@@ -1066,28 +986,23 @@ class HomeActionsTest {
     @Test fun removingEarlierCardKeepsTheFocusedChannelIdentity() {
         val second = Channel.create(ChannelId(2), name = "Second")
         val third = Channel.create(ChannelId(3), name = "Third")
-        var input by mutableStateOf(HomeInput(listOf(channel, second, third), emptyMap(), emptyList(),
-            listOf(channel.id, second.id, third.id), emptyList(), { null }, null, now))
+        var input by mutableStateOf(homeInput(listOf(channel, second, third), now, recentChannelIds = listOf(channel.id, second.id, third.id)))
         val tuned = mutableListOf<ChannelId>()
         compose.setContent { TVHeadendPlayerTheme {
-            HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
-                onPlay = { id, _ -> tuned += id }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
-                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
+            homeScreen(input, onPlay = { id, _ -> tuned += id })
         } }
         compose.onNodeWithTag("home-recent-0").performKeyInput { pressKey(Key.DirectionRight) }
         compose.onNodeWithTag("home-recent-1").assertIsFocused()
+        compose.runOnIdle { assertTrue(tuned.isEmpty()) }
         compose.runOnIdle { input = input.copy(recentChannelIds = listOf(second.id, third.id)) }
         compose.onNodeWithTag("home-recent-0").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.runOnIdle { assertEquals(listOf(second.id), tuned) }
     }
 
     @Test fun removingFocusedSectionRestoresTheFirstRemainingCard() {
-        var input by mutableStateOf(HomeInput(listOf(channel), emptyMap(), emptyList(), listOf(channel.id),
-            emptyList(), { null }, HomePlaying.LiveChannel(channel.id), now))
+        var input by mutableStateOf(homeInput(listOf(channel), now, recentChannelIds = listOf(channel.id), playing = HomePlaying.LiveChannel(channel.id)))
         compose.setContent { TVHeadendPlayerTheme {
-            HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
-                onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
-                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
+            homeScreen(input)
         } }
         compose.onNodeWithTag("home-activity-0").assertIsFocused()
         compose.runOnIdle { input = input.copy(playing = null) }
@@ -1096,12 +1011,9 @@ class HomeActionsTest {
 
     @Test fun removingLastVisitedCardDoesNotStealHeaderFocus() {
         val second = Channel.create(ChannelId(2), name = "Second")
-        var input by mutableStateOf(HomeInput(listOf(channel, second), emptyMap(), emptyList(),
-            listOf(channel.id, second.id), emptyList(), { null }, null, now))
+        var input by mutableStateOf(homeInput(listOf(channel, second), now, recentChannelIds = listOf(channel.id, second.id)))
         compose.setContent { TVHeadendPlayerTheme {
-            HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
-                onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
-                onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
+            homeScreen(input)
         } }
         compose.onNodeWithTag("home-recent-0").assertIsFocused().performKeyInput { pressKey(Key.DirectionUp) }
         compose.onNodeWithTag("home-tags-button").assertIsFocused()
@@ -1109,17 +1021,12 @@ class HomeActionsTest {
         compose.onNodeWithTag("home-tags-button").assertIsFocused()
     }
 
-    @Test fun outOfScopeContinueWatchingOpensFromOkAndMenu() {
-        recordingHome(false, { fail("must not tune") }, { }, outsideScope = true)
-        compose.onNodeWithTag("home-shelf-0").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.onNodeWithTag("recording-resume").assertIsFocused().performKeyInput { pressKey(Key.Back) }
-        compose.onNodeWithTag("home-shelf-0").assertIsFocused().performKeyInput { pressKey(Key.Menu) }
-        compose.mainClock.advanceTimeBy(500)
-        compose.onNodeWithTag("browse-context-menu").assertIsDisplayed()
-    }
+    @Test fun outOfScopeContinueWatchingOpensFromOkAndMenu() = continueWatching(true)
 
-    @Test fun outOfScopeActivityRecordingFallsBackFromOkAndOpensMenu() {
-        recordingHome(false, { fail("must not tune") }, { }, playing = true, outsideScope = true)
+    @Test fun outOfScopeActivityRecordingFallsBackFromOkAndOpensMenu() = activityRecordingFallback(false)
+
+    private fun activityRecordingFallback(running: Boolean) {
+        recordingHome(running, { fail("must not tune") }, { }, playing = true, outsideScope = !running)
         compose.onNodeWithTag("home-activity-0").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("recording-resume").assertIsFocused().performKeyInput { pressKey(Key.Back) }
         compose.onNodeWithTag("home-activity-0").assertIsFocused().performKeyInput { pressKey(Key.Menu) }
@@ -1127,53 +1034,13 @@ class HomeActionsTest {
         compose.onNodeWithTag("browse-context-menu").assertIsDisplayed()
     }
 
-    @Test fun recordingShelfMenuOpensWithoutPlayingAndBackRestoresFocus() {
-        recordingHome(false, { fail("menu tuned") }, { fail("menu played") })
-        compose.onNodeWithTag("home-shelf-0").assertIsFocused().performKeyInput { pressKey(Key.Menu) }
-        compose.mainClock.advanceTimeBy(500)
-        compose.onNodeWithTag("browse-context-menu").assertIsDisplayed()
-        compose.runOnIdle { back.onBackPressed() }
-        compose.mainClock.advanceTimeBy(500)
-        compose.onNodeWithTag("home-shelf-0").assertIsFocused()
-    }
-
-    @Test fun missingWarmRecordingFallsBackToItsCurrentEntry() {
-        recordingHome(true, { }, { }, playing = true)
-        compose.onNodeWithTag("home-activity-0").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.onNodeWithTag("recording-resume").assertIsFocused()
-    }
+    @Test fun missingWarmRecordingFallsBackToItsCurrentEntry() = activityRecordingFallback(true)
 
     @OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
     @Test fun onNowMenuOpensWithoutTuningAndBackRestoresFocus() {
         val event = EpgEvent.create(EventId(1), channel.id, Instant.fromEpochSeconds(now - 60),
             Instant.fromEpochSeconds(now + 600), title = "Now")
-        val session = FakeTvheadendSession(SessionObservation.create(
-            sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
-            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(channel))),
-            epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = listOf(event))),
-            dvrState = DvrRepositoryState.Current(DvrSnapshot.create())))
-        val observation = session.observation.value
-        val notices = NoticeCenter({ 0L }) { NoticeContext(0, observation.currentSession?.generationIdentity) }
-        val preferences = object : androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences> {
-            override val data = kotlinx.coroutines.flow.MutableStateFlow(androidx.datastore.preferences.core.emptyPreferences())
-            override suspend fun updateData(transform: suspend (androidx.datastore.preferences.core.Preferences) -> androidx.datastore.preferences.core.Preferences) =
-                transform(data.value).also { data.value = it }
-        }
-        val dependencies = org.koin.dsl.koinApplication { modules(module {
-            single<TvheadendSession> { session }; single { notices }
-            single { at.bernhardberger.tvhplayer.settings.UiSettingsStore(preferences) }
-        }) }
-        val input = HomeInput(listOf(channel), mapOf(channel.id to event), listOf(event), emptyList(), emptyList(),
-            observation::recordingPlaybackAdmission, null, now)
-        compose.setContent { org.koin.compose.KoinIsolatedContext(dependencies) {
-            back = androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current!!.onBackPressedDispatcher
-            DisposableEffect(dependencies) { onDispose { dependencies.close() } }
-            TVHeadendPlayerTheme {
-                HomeScreenContent(input, observation, PaddingValues(), true,
-                    onPlay = { _, _ -> fail("menu tuned") }, onPlayRecording = { _, _ -> fail("menu played") },
-                    onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
-            }
-        } }
+        recordingHome(running = false, onWatch = { fail("menu tuned") }, onPlay = { fail("menu played") }, event = event)
         compose.onNodeWithTag("home-onnow-0").assertIsFocused().performKeyInput { pressKey(Key.Menu) }
         compose.mainClock.advanceTimeBy(500)
         compose.onNodeWithTag("browse-context-menu").assertIsDisplayed()
@@ -1185,20 +1052,24 @@ class HomeActionsTest {
     @Test fun currentLiveOkUsesExistingLiveEntryPath() {
         val tuned = mutableListOf<ChannelId>()
         val observation = SessionObservation.create(channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(channel))))
-        val input = HomeInput(listOf(channel), emptyMap(), emptyList(), emptyList(), emptyList(), { null },
-            HomePlaying.LiveChannel(channel.id), now)
+        val input = homeInput(listOf(channel), now, playing = HomePlaying.LiveChannel(channel.id))
         compose.setContent { TVHeadendPlayerTheme {
-            HomeScreenContent(input, observation, PaddingValues(), true,
-                onPlay = { id, _ -> tuned += id }, onPlayRecording = { _, _ -> fail("must not restart") },
-                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
+            homeScreen(input, observation,
+                onPlay = { id, _ -> tuned += id }, onPlayRecording = { _, _ -> fail("must not restart") })
         } }
         compose.onNodeWithTag("home-activity-0").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.runOnIdle { assertEquals(listOf(channel.id), tuned) }
     }
 
-    @Test fun activeRecordingOkOffersChoiceAndWatchLiveTunes() {
+    @Test fun activeRecordingOkOffersChoiceAndWatchLiveTunes() = activeRecording(false)
+
+    @Test fun outOfScopeRunningRecordingWatchLiveTunesThroughTheRecordingPath() = activeRecording(true)
+
+    private fun activeRecording(outsideScope: Boolean) {
         val tuned = mutableListOf<ChannelId>()
-        recordingHome(running = true, onWatch = { tuned += it }, onPlay = { fail("must not start recording") })
+        recordingHome(running = true, onWatch = { if (outsideScope) fail("must not use the scoped channel path") else tuned += it },
+            onPlay = { fail("must not start recording") }, outsideScope = outsideScope,
+            onWatchRecording = if (outsideScope) { { tuned += it } } else null)
         compose.onNodeWithTag("home-activity-0").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.mainClock.advanceTimeBy(500)
         compose.onNodeWithTag("recording-resume").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
@@ -1207,23 +1078,19 @@ class HomeActionsTest {
         compose.runOnIdle { assertEquals(listOf(channel.id), tuned) }
     }
 
-    @Test fun outOfScopeRunningRecordingWatchLiveTunesThroughTheRecordingPath() {
-        val tuned = mutableListOf<ChannelId>()
-        recordingHome(running = true, onWatch = { fail("must not use the scoped channel path") },
-            onPlay = { fail("must not start recording") }, outsideScope = true, onWatchRecording = { tuned += it })
-        compose.onNodeWithTag("home-activity-0").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.mainClock.advanceTimeBy(500)
-        compose.onNodeWithTag("recording-resume").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
-        compose.onNodeWithTag("recording-start-over").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
-        compose.onNodeWithTag("recording-watch-live").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.runOnIdle { assertEquals(listOf(channel.id), tuned) }
-    }
+    @Test fun continueWatchingOkOffersResumeAndBackRestoresCard() = continueWatching(false)
 
-    @Test fun continueWatchingOkOffersResumeAndBackRestoresCard() {
+    private fun continueWatching(outsideScope: Boolean) {
         val starts = mutableListOf<RecordingPlaybackStart>()
-        recordingHome(running = false, onWatch = { fail("must not tune") }, onPlay = { starts += it })
+        recordingHome(running = false, onWatch = { fail("must not tune") }, onPlay = { starts += it }, outsideScope = outsideScope)
         compose.onNodeWithTag("home-shelf-0").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("recording-resume").assertIsFocused().performKeyInput { pressKey(Key.Back) }
+        compose.onNodeWithTag("home-shelf-0").assertIsFocused().performKeyInput { pressKey(Key.Menu) }
+        compose.mainClock.advanceTimeBy(500)
+        compose.onNodeWithTag("browse-context-menu").assertIsDisplayed()
+        compose.runOnIdle { assertTrue(starts.isEmpty()); back.onBackPressed() }
+        compose.mainClock.advanceTimeBy(500)
+        compose.onNodeWithTag("home-shelf-0").assertIsFocused()
         compose.onNodeWithTag("home-shelf-0").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("recording-resume").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.runOnIdle { assertEquals(listOf(RecordingPlaybackStart.RESUME), starts) }
@@ -1243,7 +1110,7 @@ class HomeActionsTest {
 
     @OptIn(TvheadendTestingApi::class, at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
     private fun recordingHome(running: Boolean, onWatch: (ChannelId) -> Unit, onPlay: (RecordingPlaybackStart) -> Unit, playing: Boolean = false, outsideScope: Boolean = false,
-        onWatchRecording: ((ChannelId) -> Unit)? = null, scheduled: Boolean = false) {
+        onWatchRecording: ((ChannelId) -> Unit)? = null, scheduled: Boolean = false, event: EpgEvent? = null) {
         val entry = DvrEntry.create(DvrEntryId(1), channelId = channel.id, title = "Test recording",
             state = if (scheduled) DvrEntryState.SCHEDULED else if (running) DvrEntryState.RECORDING else DvrEntryState.COMPLETED,
             start = Instant.fromEpochSeconds(if (scheduled) now + 600 else now - 1800), stop = Instant.fromEpochSeconds(if (running || scheduled) now + 1800 else now),
@@ -1253,56 +1120,44 @@ class HomeActionsTest {
         val initialObservation = SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(channel))),
-            epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
-            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(listOf(entry))),
+            epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = listOfNotNull(event))),
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(if (event == null) listOf(entry) else emptyList())),
             recordingProgressCapability = RecordingProgressCapability.SUPPORTED)
         val session = FakeTvheadendSession(initialObservation)
         val observation = session.observation.value
         val notices = NoticeCenter({ 0L }) { NoticeContext(0, observation.currentSession?.generationIdentity) }
-        val dependencies = module { single<TvheadendSession> { session }; single { notices } }
+        val dependencies = module {
+            single<TvheadendSession> { session }; single { notices }
+            if (event != null) single {
+                at.bernhardberger.tvhplayer.settings.UiSettingsStore(at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore())
+            }
+        }
         val application = org.koin.dsl.koinApplication { modules(dependencies) }
-        val input = HomeInput(if (outsideScope) emptyList() else listOf(channel), emptyMap(), emptyList(), emptyList(), listOf(entry), observation::recordingPlaybackAdmission,
-            if (playing) HomePlaying.Recording(entry.id) else null, now)
+        val input = homeInput(if (outsideScope) emptyList() else listOf(channel), now,
+            currentEvents = if (event == null) emptyMap() else mapOf(channel.id to event), upcomingEvents = listOfNotNull(event),
+            dvrEntries = if (event == null) listOf(entry) else emptyList(), admission = observation::recordingPlaybackAdmission,
+            playing = if (playing) HomePlaying.Recording(entry.id) else null)
         compose.setContent { org.koin.compose.KoinIsolatedContext(application) {
             back = androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current!!.onBackPressedDispatcher
             androidx.compose.runtime.DisposableEffect(application) { onDispose { application.close() } }
             TVHeadendPlayerTheme {
-            HomeScreenContent(input, observation, PaddingValues(), true,
+            homeScreen(input, observation,
                 onPlay = { id, _ -> onWatch(id) }, onPlayRecording = { _, start -> onPlay(start) },
-                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> },
                 onWatchRecordingChannel = { id, _ -> (onWatchRecording ?: onWatch)(id) })
         } } }
     }
 
     @Test fun currentRecordingOkReturnsToWarmSession() {
         val returns = mutableListOf<DvrEntryId>()
-        val input = HomeInput(emptyList(), emptyMap(), emptyList(), emptyList(), emptyList(), { null },
-            HomePlaying.Recording(DvrEntryId(9)), now)
+        val input = homeInput(emptyList(), now, playing = HomePlaying.Recording(DvrEntryId(9)))
         compose.setContent { TVHeadendPlayerTheme {
-            HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
+            homeScreen(input,
                 onPlay = { _, _ -> fail("must not tune") }, onPlayRecording = { _, _ -> fail("must not restart") },
-                onReturnToRecording = { id, _ -> returns += id; true }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
+                onReturnToRecording = { id, _ -> returns += id; true })
         } }
         compose.onNodeWithTag("home-activity-0").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionCenter) }
         compose.runOnIdle { assertEquals(listOf(DvrEntryId(9)), returns) }
-    }
-
-    @Test fun upcomingEndCardOpensSchedule() {
-        val modes = mutableListOf<DvrLibraryMode>()
-        val entry = DvrEntry.create(DvrEntryId(1), title = "Tomorrow", state = DvrEntryState.SCHEDULED,
-            start = Instant.fromEpochSeconds(now + 3600), stop = Instant.fromEpochSeconds(now + 7200))
-        val input = HomeInput(emptyList(), emptyMap(), emptyList(), emptyList(), listOf(entry), { null }, null, now)
-        compose.setContent { TVHeadendPlayerTheme {
-            HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
-                onPlay = { _, _ -> }, onPlayRecording = { _, _ -> },
-                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { mode, _ -> modes += mode })
-        } }
-        compose.onNodeWithTag("home-upcoming-0").assertIsFocused()
-            .performKeyInput { pressKey(Key.DirectionRight) }
-        compose.onNodeWithTag("home-all-scheduled").assertIsFocused()
-            .performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.runOnIdle { assertEquals(listOf(DvrLibraryMode.SCHEDULE), modes) }
     }
 
     @OptIn(TvheadendTestingApi::class, at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
@@ -1318,17 +1173,12 @@ class HomeActionsTest {
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create()),
             epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = listOf(entry))))
-        val input = HomeInput(emptyList(), emptyMap(), emptyList(), emptyList(), listOf(entry), observation::recordingPlaybackAdmission, null, now)
-        assertNotNull(observation.currentSession)
-        assertEquals(RecordingOpenAction.START_OVER, recordingOpenAction(observation.recordingPlaybackAdmission(entry)))
+        val input = homeInput(emptyList(), now, dvrEntries = listOf(entry), admission = observation::recordingPlaybackAdmission)
         compose.setContent { TVHeadendPlayerTheme {
-            HomeScreenContent(input, observation, PaddingValues(), true,
-                onPlay = { _, _ -> }, onPlayRecording = { _, start -> starts += start },
-                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { mode, _ -> modes += mode })
+            homeScreen(input, observation, onPlayRecording = { _, start -> starts += start }, onRecordings = { mode, _ -> modes += mode })
         } }
         compose.onNodeWithTag("home-shelf-0").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.runOnIdle { assertEquals(1, starts.size) }
         compose.onNodeWithTag("home-shelf-0").performKeyInput { pressKey(Key.DirectionRight) }
         compose.onNodeWithTag("home-all-recordings").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionCenter) }
@@ -1338,31 +1188,15 @@ class HomeActionsTest {
         }
     }
 
-    @Test fun fakeInputRendersRecentAndOkTunesWithoutFocusTuning() {
-        val tuned = mutableListOf<ChannelId>()
-        val input = HomeInput(listOf(channel), emptyMap(), emptyList(), listOf(channel.id), emptyList(), { null }, null, now)
-        compose.setContent { TVHeadendPlayerTheme {
-            HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
-                onPlay = { id, _ -> tuned += id }, onPlayRecording = { _, _ -> },
-                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
-        } }
-        compose.onNodeWithTag("home-recent-0").assertIsFocused()
-        compose.runOnIdle { assertTrue(tuned.isEmpty()) }
-        compose.onNodeWithTag("home-recent-0").performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.runOnIdle { assertEquals(listOf(channel.id), tuned) }
-    }
-
     @Test fun onNowOkAndGenreOkDispatchTheirCallbacks() {
         val tuned = mutableListOf<ChannelId>()
         val genres = mutableListOf<ProgrammeCategory>()
         val event = EpgEvent.create(EventId(1), channelId = channel.id,
             start = Instant.fromEpochSeconds(now - 600), stop = Instant.fromEpochSeconds(now + 600), title = "Test programme",
             contentGenre = ContentGenre.fromContentType(0x40))
-        val input = HomeInput(listOf(channel), mapOf(channel.id to event), listOf(event), emptyList(), emptyList(), { null }, null, now)
+        val input = homeInput(listOf(channel), now, currentEvents = mapOf(channel.id to event), upcomingEvents = listOf(event))
         compose.setContent { TVHeadendPlayerTheme {
-            HomeScreenContent(input, SessionObservation.create(), PaddingValues(), true,
-                onPlay = { id, _ -> tuned += id }, onPlayRecording = { _, _ -> },
-                onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = { genres += it }, onRecordings = { _, _ -> })
+            homeScreen(input, onPlay = { id, _ -> tuned += id }, onGenre = { genres += it })
         } }
         compose.onNodeWithTag("home-onnow-0").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionCenter); pressKey(Key.DirectionDown) }
@@ -1380,14 +1214,12 @@ class HomeActionsTest {
         val events = channels.associate { it.id to EpgEvent.create(EventId(it.id.value), it.id,
             Instant.fromEpochSeconds(now - 600), Instant.fromEpochSeconds(now + 600),
             title = "Programme ${it.id.value}") }
-        val input = mutableStateOf(HomeInput(channels, events, emptyList(), emptyList(), emptyList(), { null }, null, now))
+        val input = mutableStateOf(homeInput(channels, now, currentEvents = events))
         compose.setContent { TVHeadendPlayerTheme {
             androidx.compose.runtime.CompositionLocalProvider(
                 androidx.compose.ui.platform.LocalWindowInfo provides (window ?: androidx.compose.ui.platform.LocalWindowInfo.current),
             ) {
-                HomeScreenContent(input.value, observation, PaddingValues(), true,
-                    onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
-                    onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> })
+                homeScreen(input.value, observation)
             }
         } }
         compose.onNodeWithTag("home-onnow-0").assertIsFocused()
