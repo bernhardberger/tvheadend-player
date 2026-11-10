@@ -400,7 +400,7 @@ class AppProfileOwner(
         previous: ServerProfileReadResult,
         failureNotice: Notice?,
     ) {
-        val restored = if (persisted && previousId != null) {
+        val restored = if (persisted) {
             readBackSwitchRollback(profileStore, previousId, mutableProfiles, noticeCenter)
         } else previous
         applyServerProfile(restored)
@@ -740,7 +740,13 @@ private fun shouldRestoreSwitch(
     previousId: ServerProfileId?,
     generationMatches: () -> Boolean,
 ): Boolean =
-    if (!committed || !caller.isActive) switchCanRestore(persisted, previousId) && generationMatches() else false
+    when {
+        // Without an old selection, failed publication must reconcile the persisted target,
+        // even though a completed switch cannot roll back to "no connection".
+        !committed -> generationMatches()
+        !caller.isActive -> switchCanRestore(persisted, previousId) && generationMatches()
+        else -> false
+    }
 
 private fun switchCanRestore(persisted: Boolean, previousId: ServerProfileId?): Boolean =
     !persisted || previousId != null

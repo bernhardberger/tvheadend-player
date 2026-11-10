@@ -28,9 +28,10 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppProfileOwnerTest {
     @Test fun failedIdentityPublicationRestoresThePersistedConnectionAndPreferences() {
-        listOf(false to false, true to false, true to true).forEach { (failList, rejectRollback) -> runTest {
+        listOf(Triple(false, false, true), Triple(true, false, true), Triple(true, true, true),
+            Triple(false, false, false), Triple(true, false, false)).forEach { (failList, rejectRollback, active) -> runTest {
         val stored = FakeServerProfileStore()
-        val first = (stored.addAnonymous("first.invalid", activate = true) as ServerProfileWriteResult.Applied).id
+        val first = (stored.addAnonymous("first.invalid", activate = active) as ServerProfileWriteResult.Applied).id
         val second = (stored.addAnonymous("second.invalid") as ServerProfileWriteResult.Applied).id
         val gate = CompletableDeferred<Unit>()
         var failPublication = false
@@ -70,12 +71,12 @@ class AppProfileOwnerTest {
         gate.complete(Unit)
         runCurrent()
         assertTrue(failed)
-        val expected = if (rejectRollback) second else first
+        val expected = if (rejectRollback || !active) second else first
         assertEquals(expected, (stored.profiles() as ServerProfileListResult.Available).activeId)
         assertEquals(expected, (owner.profiles.value as ServerProfileListResult.Available).activeId)
         assertEquals(expected, (owner.serverProfile.value as ServerProfileReadResult.Available).id)
         assertEquals(expected, ChannelTagSettingsStore(data).settings.first().profileId)
-        if (rejectRollback) assertEquals(Notice.ServerProfileWriteFailed, notices.state.value.candidate?.notice)
+        if (rejectRollback || !active) assertEquals(Notice.ServerProfileWriteFailed, notices.state.value.candidate?.notice)
         assertEquals(expected, owner.liveProfile.value)
         assertFalse(owner.connectionChanges.isLocked)
         } }

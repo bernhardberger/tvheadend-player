@@ -23,11 +23,11 @@ internal fun publishedProfileId(profile: ServerProfileReadResult?, trial: Boolea
 
 internal suspend fun readBackSwitchRollback(
     profileStore: ServerProfileStore,
-    previousId: ServerProfileId,
+    previousId: ServerProfileId?,
     profiles: MutableStateFlow<ServerProfileListResult?>,
     noticeCenter: () -> NoticeCenter?,
 ): ServerProfileReadResult {
-    if (profileStore.setActive(previousId) !is ServerProfileWriteResult.Applied) {
+    if (previousId == null || profileStore.setActive(previousId) !is ServerProfileWriteResult.Applied) {
         postSwitchNotice(noticeCenter, Notice.ServerProfileWriteFailed)
     }
     profiles.value = profileStore.profiles()
