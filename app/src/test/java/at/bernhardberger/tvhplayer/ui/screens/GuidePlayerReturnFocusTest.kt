@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.testutil.setContentWithBrowsePreparation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -319,7 +320,7 @@ class GuidePlayerReturnFocusTest {
     }
 
     private fun focused(title: String) {
-        runCatching { compose.waitUntil(10_000) { compose.onAllNodes(hasText(title) and isFocused()).fetchSemanticsNodes().isNotEmpty() } }
+        runCatching { compose.mainClock.advanceTimeUntil(timeoutMillis = 1_000) { compose.onAllNodes(hasText(title) and isFocused()).fetchSemanticsNodes().isNotEmpty() } }
             .onFailure {
                 val f = compose.onAllNodes(isFocused()).fetchSemanticsNodes().map { it.config.toString() }
                 val t = compose.onAllNodes(androidx.compose.ui.test.hasText("Channel", substring = true)).fetchSemanticsNodes().map { it.config.toString().take(80) }
@@ -401,7 +402,7 @@ class GuidePlayerReturnFocusTest {
         val notices = NoticeCenter(android.os.SystemClock::elapsedRealtime) {
             NoticeContext(profiles.configurationGeneration.value, session.observation.value.currentSession?.generationIdentity)
         }
-        compose.setContent {
+        compose.setContentWithBrowsePreparation {
             org.koin.compose.KoinIsolatedContext(settingsApplication) {
             TVHeadendPlayerTheme {
                 back = requireNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher

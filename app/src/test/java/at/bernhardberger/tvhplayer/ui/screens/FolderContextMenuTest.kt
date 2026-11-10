@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.testutil.setContentWithBrowsePreparation
 import android.app.Application
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
@@ -142,7 +143,7 @@ class FolderContextMenuTest {
         screenShown.value = false
         compose.onNodeWithTag("recordings-folder-Series").assertDoesNotExist()
         screenShown.value = true
-        compose.waitUntil(10_000) { compose.onAllNodesWithTag("recordings-folder-Series").fetchSemanticsNodes().isNotEmpty() }
+        compose.mainClock.advanceTimeUntil(timeoutMillis = 1_000) { compose.onAllNodesWithTag("recordings-folder-Series").fetchSemanticsNodes().isNotEmpty() }
         openFolderMenu()
         compose.onNodeWithText("Mark all as unwatched").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.runOnIdle { assertEquals(listOf(DvrEntryId(1) to true), watchCalls) }
@@ -211,7 +212,7 @@ class FolderContextMenuTest {
         notices = NoticeCenter({ 0L }) { NoticeContext(0, session.observation.value.currentSession?.generationIdentity) }
         // As in the app, the screen state outlives the screen.
         val state = RecordingsScreenState()
-        compose.setContent {
+        compose.setContentWithBrowsePreparation {
             TVHeadendPlayerTheme {
                 if (screenShown.value) RecordingsScreenContent(observation = session.observation.collectAsState().value,
                     currentObservation = { session.observation.value }, state = state,
@@ -219,7 +220,7 @@ class FolderContextMenuTest {
             }
         }
         val first = "recordings-folder-" + entries.first().folder.orEmpty().joinToString("/")
-        compose.waitUntil(10_000) { compose.onAllNodesWithTag(first).fetchSemanticsNodes().isNotEmpty() }
+        compose.mainClock.advanceTimeUntil(timeoutMillis = 1_000) { compose.onAllNodesWithTag(first).fetchSemanticsNodes().isNotEmpty() }
         return session
     }
 

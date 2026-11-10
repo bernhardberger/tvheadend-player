@@ -26,6 +26,7 @@ internal fun rememberDetailsTint(
     val currentOnSettled by rememberUpdatedState(onSettled)
     val neutral = MaterialTheme.colorScheme.background
     val context = LocalContext.current
+    val samplingContext = LocalArtworkSamplingContext.current
     val accents = LocalChannelAccents.current
     val artwork = LocalArtworkContext.current
     val session = artwork.currentSession
@@ -39,9 +40,9 @@ internal fun rememberDetailsTint(
         var seed by remember { mutableStateOf(source?.let {
             if (art != null) DetailsArtColors.stored(it) else accents.stored(it)
         }) }
-        LaunchedEffect(source, context) {
+        LaunchedEffect(source, context, samplingContext) {
             if (source != null && seed == null) {
-                seed = if (art != null) DetailsArtColors.sample(context, source)
+                seed = if (art != null) DetailsArtColors.sample(context, source, samplingContext)
                     else accents.sample(context, source)
                 if (seed == null && art != null && piconSource != null) {
                     seed = accents.stored(piconSource) ?: accents.sample(context, piconSource)

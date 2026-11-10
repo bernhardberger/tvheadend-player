@@ -95,12 +95,14 @@ class AudioInterruptionRuntimeTest {
 
     @Test fun anErrorStillSetAfterItsDispatchFailsTheActiveTarget() = exercise {
         live(timeshift = false)
+        assertTrue(runtime.liveStartUndisturbed.value)
         player.createMessage { _, _ ->
             throw ExoPlaybackException.createForSource(IOException("stream failed"), PlaybackException.ERROR_CODE_IO_UNSPECIFIED)
         }.send()
         await("active target failure") { runtime.state.value is AppPlaybackState.Failed }
         assertNotNull(player.playerError)
         assertEquals(AppPlaybackTarget.Live(ChannelId(1)), (runtime.state.value as AppPlaybackState.Failed).target)
+        assertFalse(runtime.liveStartUndisturbed.value)
     }
 
     @Test fun personalOutputDisconnectRestoresPassthroughWithoutResumingNoisyPausedPlayback() = exercise {
@@ -193,9 +195,11 @@ class AudioInterruptionRuntimeTest {
 
     @Test fun timeshiftTransientPausesServerOnceAndGainResumesWithoutRetune() = exercise {
         live(timeshift = true)
+        assertFalse(runtime.hasAudioInterruption)
         assertEquals(1, focus.requests.size)
         focus.send(AudioInterruption.TRANSIENT_LOSS)
         await { connection.speeds == listOf(0) }
+        assertTrue(runtime.hasAudioInterruption)
         assertFalse(player.playWhenReady)
         focus.send(AudioInterruption.TRANSIENT_LOSS)
         settle()
@@ -206,6 +210,7 @@ class AudioInterruptionRuntimeTest {
         assertEquals(1, connection.subscribeCount)
         focus.send(AudioInterruption.GAIN)
         await { player.playWhenReady && connection.speeds == listOf(0, 100) }
+        assertFalse(runtime.hasAudioInterruption)
         assertEquals(1, connection.subscribeCount)
         assertNull(player.playerError)
     }
@@ -270,9 +275,10 @@ class AudioInterruptionRuntimeTest {
         await { !player.playWhenReady }
         focus.send(AudioInterruption.GAIN)
         await { player.playWhenReady }
+        focus.send(AudioInterruption.TRANSIENT_LOSS)
+        await { !player.playWhenReady }
         runtime.pause()
         await { !player.playWhenReady }
-        focus.send(AudioInterruption.TRANSIENT_LOSS)
         focus.send(AudioInterruption.GAIN)
         settle()
         assertFalse(player.playWhenReady)
@@ -296,14 +302,23 @@ class AudioInterruptionRuntimeTest {
         current(AudioInterruption.GAIN)
         settle()
         assertFalse(player.playWhenReady)
+        val backgroundRequests = focus.requests.size
+        runtime.play()
+        settle()
+        assertEquals(backgroundRequests, focus.requests.size)
+        assertFalse(player.playWhenReady)
         val subscriptions = connection.subscribeCount
         runtime.onAppForegrounded()
         await { connection.subscribeCount > subscriptions }
         startSubscription(connection.awaitCollectionRegistered())
         await { runtime.activeTarget.value != null && player.playWhenReady }
         val beforeStop = focus.requests.last()
+        focus.send(AudioInterruption.NOISY)
+        await { audioDisabled() }
         val stop = scope.async { runtime.stop() }
         await { stop.isCompleted }
+        assertFalse(runtime.hasAudioInterruption)
+        assertFalse(audioDisabled())
         beforeStop(AudioInterruption.GAIN)
         settle()
         assertNull(runtime.activeTarget.value)
@@ -491,6 +506,7 @@ class AudioInterruptionRuntimeTest {
         live(timeshift = false)
         focus.send(AudioInterruption.NOISY)
         await { audioDisabled() }
+        val abandons = focus.abandons
         settings.setTimeshiftEnabled(true)
         connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 120)))
         runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
@@ -498,6 +514,7 @@ class AudioInterruptionRuntimeTest {
         val replacement = connection.awaitCollectionRegistered()
         startSubscription(replacement)
         await { player.playWhenReady }
+        assertTrue(focus.abandons > abandons)
         connection.emit(replacement, SubscriptionEvent.Timeshift(0, 0, 0, 120_000_000, 100))
         await { (runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)
             ?.timeshiftState is LiveTimeshiftState.Available }
@@ -733,16 +750,22 @@ class AudioInterruptionRuntimeTest {
         recording()
         assertEquals(false, liveDuringRecordingInstall)
         assertFalse(startupBuffer.isLiveTarget)
+        assertNotNull(runtime.recordingSelection.value)
+        assertNotNull(runtime.recordingAdmission.value)
 
+        var liveDuringLiveInstall: Boolean? = null
+        beforeLiveBinding = { liveDuringLiveInstall = startupBuffer.isLiveTarget }
         val subscriptions = connection.subscribeCount
         val install = scope.async {
             runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(2))))
         }
         await { connection.subscribeCount > subscriptions }
-        assertTrue("Live before the source starts", startupBuffer.isLiveTarget)
+        assertEquals(true, liveDuringLiveInstall)
         startSubscription(connection.awaitCollectionRegistered())
         await { install.isCompleted }
         assertTrue(install.await()?.isStarted == true)
+        assertNull(runtime.recordingSelection.value)
+        assertNull(runtime.recordingAdmission.value)
 
         // A failed recording replacement leaves the live target, and the live threshold, in place.
         beforeRecordingBinding = { throw IllegalStateException("Synthetic binding failure") }
@@ -978,8 +1001,11 @@ class AudioInterruptionRuntimeTest {
     }
 
     @Test fun viewerRetryFromFailedShowsStartingWhileTheTunerIsAcquired() = exercise {
+        val firstInstall = mutableListOf<AppPlaybackState>()
+        beforeLiveBinding = { firstInstall += runtime.state.value }
         session.scriptLivePlaybackFailure(PlaybackBindingResult.TargetUnavailable)
         val failed = runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(1))))
+        assertEquals(listOf(AppPlaybackState.Starting), firstInstall)
         assertFalse(failed?.isStarted == true)
         assertTrue(runtime.state.value is AppPlaybackState.Failed)
         session.scriptLivePlaybackSuccess(manager)
@@ -2125,33 +2151,40 @@ class AudioInterruptionRuntimeTest {
         assertEquals(1, pendingSessions)
     }
 
-    @Test fun recoveryInstallCleanupFailureBeforeCommitKeepsCleanupOwedAndVisible() = exercise {
-        live(timeshift = false)
-        var cleanup: Job? = null
-        escalateOnNextSource(PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED_PLAYER_CLEANUP_FAILED, reports = 2) {
-            suppress(true)
-            failCoordinatorStop = true
-            failCoordinatorRemoval = true
-            cleanup = scope.launch(start = CoroutineStart.UNDISPATCHED) {
-                commands.serialize(onClosed = {}) { coordinator.stop() }
+    @Test fun recoveryInstallCleanupFailureBeforeCommitKeepsCleanupOwedAndVisible() {
+        for (duplicateReport in listOf(false, true)) exercise {
+            live(timeshift = false)
+            var cleanup: Job? = null
+            escalateOnNextSource(PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED_PLAYER_CLEANUP_FAILED, reports = 2) {
+                suppress(true)
+                failCoordinatorStop = true
+                failCoordinatorRemoval = true
+                cleanup = scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                    commands.serialize(onClosed = {}) { coordinator.stop() }
+                }
             }
+            exhaust()
+            await { cleanup?.isCompleted == true && runtime.state.value is AppPlaybackState.Failed }
+            assertEquals(1, player.mediaItemCount)
+            assertEquals(AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER,
+                target = AppPlaybackTarget.Live(ChannelId(1))), runtime.state.value)
+            failCoordinatorStop = false
+            failCoordinatorRemoval = false
+            if (duplicateReport) {
+                runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED_PLAYER_CLEANUP_FAILED)
+                await { player.mediaItemCount == 0 && pendingSessions == 0 }
+                assertEquals(2, connection.subscribeCount)
+            }
+            suppress(false)
+            await { player.mediaItemCount == 0 && pendingSessions == 0 &&
+                (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis == 2_000L }
+            val subscriptions = connection.subscribeCount
+            assertEquals(0, player.mediaItemCount)
+            assertEquals(2_000L, (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis)
+            advanceRecoveryTime(2_001)
+            await { connection.subscribeCount == subscriptions + 1 }
+            assertFalse(coordinator.playerCleanupPending.value)
         }
-        exhaust()
-        await { cleanup?.isCompleted == true && runtime.state.value is AppPlaybackState.Failed }
-        assertEquals(1, player.mediaItemCount)
-        assertEquals(AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER,
-            target = AppPlaybackTarget.Live(ChannelId(1))), runtime.state.value)
-        failCoordinatorStop = false
-        failCoordinatorRemoval = false
-        suppress(false)
-        await { player.mediaItemCount == 0 && pendingSessions == 0 &&
-            (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis == 2_000L }
-        val subscriptions = connection.subscribeCount
-        assertEquals(0, player.mediaItemCount)
-        assertEquals(2_000L, (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis)
-        advanceRecoveryTime(2_001)
-        await { connection.subscribeCount == subscriptions + 1 }
-        assertFalse(coordinator.playerCleanupPending.value)
     }
 
     @Test fun failedRecoveryRetuneRestoresTheSameOwnedItemForLaterCleanup() = exercise {
@@ -2183,6 +2216,8 @@ class AudioInterruptionRuntimeTest {
         player.setMediaItem(androidx.media3.common.MediaItem.fromUri("file:///replacement"))
         await { runtime.activeTarget.value == null }
         assertTrue(audioDisabled())
+        assertFalse(runtime.hasAudioInterruption)
+        assertFalse(runtime.isInterruptionMuted)
         live(timeshift = false, channel = 2)
         assertFalse(audioDisabled())
     }
@@ -2213,6 +2248,12 @@ class AudioInterruptionRuntimeTest {
     @Test fun exhaustedLiveRequiresPlayIntentAsWellAsNoSuppression() = exercise {
         live(timeshift = false)
         player.pause()
+        val requests = focus.requests.size
+        val ignored = runtime.setSessionPlayWhenReady(true) { true }
+        await { ignored.isCompleted }
+        assertEquals(requests, focus.requests.size)
+        assertFalse(player.playWhenReady)
+        assertEquals(1, connection.subscribeCount)
         suppress(true)
         exhaust()
         suppress(false)
@@ -2288,7 +2329,10 @@ class AudioInterruptionRuntimeTest {
         live(timeshift = false)
         suppress(true)
         exhaust()
+        installManualAudio()
+        assertFalse(player.trackSelectionParameters.overrides.isEmpty())
         runtime.detach()
+        assertTrue(player.trackSelectionParameters.overrides.isEmpty())
         suppress(false)
         player.play()
         settle()
@@ -2441,32 +2485,47 @@ class AudioInterruptionRuntimeTest {
         assertFalse(remaining === player.currentMediaItem)
     }
 
-    @Test fun failedRecordingInstallationRetriesCoordinatorCleanupWithoutExternalPlaylistClear() = exercise {
-        failNextPrepare = true
-        failCoordinatorStop = true
-        failCoordinatorRemoval = true
-        val failed = scope.async {
-            runtime.playRecording(requireNotNull(currentRecordingPlaybackSelection(session.observation.value, DvrEntryId(1))),
-                RecordingPlaybackStart.START_OVER)
+    @Test fun failedRecordingInstallationRetriesCoordinatorCleanupWithoutExternalPlaylistClear() {
+        for (interruptedLive in listOf(false, true)) exercise {
+            var acquiring: AppPlaybackState? = null
+            beforeRecordingBinding = { acquiring = runtime.state.value }
+            if (interruptedLive) {
+                live(timeshift = false)
+                focus.send(AudioInterruption.NOISY)
+                await { runtime.isInterruptionMuted }
+            }
+            failNextPrepare = true
+            failCoordinatorStop = true
+            failCoordinatorRemoval = true
+            val failed = scope.async {
+                runtime.playRecording(requireNotNull(currentRecordingPlaybackSelection(session.observation.value, DvrEntryId(1))),
+                    RecordingPlaybackStart.START_OVER)
+            }
+            await { failed.isCompleted }
+            assertEquals(PlaybackTargetResult.PLAYER_UNAVAILABLE, failed.await())
+            if (!interruptedLive) assertEquals(AppPlaybackState.Starting, acquiring)
+            assertTrue(runtime.state.value is AppPlaybackState.Failed)
+            assertEquals(AppPlaybackTarget.Recording(DvrEntryId(1)), (runtime.state.value as AppPlaybackState.Failed).target)
+            assertFalse(runtime.hasAudioInterruption)
+            assertFalse(audioDisabled())
+            val remaining = player.currentMediaItem
+            assertNotNull(remaining)
+            assertTrue(coordinator.playerCleanupPending.value)
+            val blocked = scope.async { runtime.retryRecording() }
+            await { blocked.isCompleted }
+            assertEquals(PlaybackTargetResult.PLAYER_UNAVAILABLE, blocked.await())
+            assertSame(remaining, player.currentMediaItem)
+            assertEquals(1, player.mediaItemCount)
+            failCoordinatorStop = false
+            failCoordinatorRemoval = false
+            failNextPrepare = false
+            val recovered = scope.async { runtime.retryRecording() }
+            await { recovered.isCompleted }
+            assertTrue(recovered.await()?.isStarted == true)
+            assertFalse(coordinator.playerCleanupPending.value)
+            assertEquals(1, player.mediaItemCount)
+            assertFalse(remaining === player.currentMediaItem)
         }
-        await { failed.isCompleted }
-        assertEquals(PlaybackTargetResult.PLAYER_UNAVAILABLE, failed.await())
-        val remaining = player.currentMediaItem
-        assertNotNull(remaining)
-        assertTrue(coordinator.playerCleanupPending.value)
-        val blocked = scope.async { runtime.retryRecording() }
-        await { blocked.isCompleted }
-        assertEquals(PlaybackTargetResult.PLAYER_UNAVAILABLE, blocked.await())
-        assertSame(remaining, player.currentMediaItem)
-        assertEquals(1, player.mediaItemCount)
-        failCoordinatorStop = false
-        failCoordinatorRemoval = false
-        val recovered = scope.async { runtime.retryRecording() }
-        await { recovered.isCompleted }
-        assertTrue(recovered.await()?.isStarted == true)
-        assertFalse(coordinator.playerCleanupPending.value)
-        assertEquals(1, player.mediaItemCount)
-        assertFalse(remaining === player.currentMediaItem)
     }
 
     @Test fun stopRetriesFailedInstallationCleanupAndPreservesReplacementPlayback() = exercise {
@@ -2509,11 +2568,13 @@ class AudioInterruptionRuntimeTest {
 
     @Test fun departedLivePermanentlyWithdrawsAttributionAndDoesNotReclaimReplacement() = exercise {
         live(timeshift = false)
+        assertTrue(runtime.liveStartUndisturbed.value)
         val replacement = androidx.media3.common.MediaItem.fromUri("file:///replacement")
         player.setMediaItem(replacement)
         player.play()
         await { runtime.livePlaybackObservation.value == LivePlaybackObservation.Departed }
         await { runtime.activeTarget.value == null }
+        assertFalse(runtime.liveStartUndisturbed.value)
         runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
         signalPlayIntent()
         settle()

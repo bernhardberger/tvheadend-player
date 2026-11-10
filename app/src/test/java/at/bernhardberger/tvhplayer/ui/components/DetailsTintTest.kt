@@ -35,12 +35,10 @@ import coil3.intercept.Interceptor
 import coil3.request.ErrorResult
 import coil3.request.SuccessResult
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
+import kotlin.coroutines.EmptyCoroutineContext
+import at.bernhardberger.tvhplayer.testutil.setContentWithArtworkSampling
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Instant
 import org.junit.*
@@ -67,7 +65,7 @@ class DetailsTintTest {
     private val art = ArtworkId(1)
     private val picon = ArtworkId(2)
     private val store = ChannelAccentStore()
-    private val accents = ChannelAccents(store) { _, id -> "tint-test-${id.value}" }
+    private val accents = ChannelAccents(store, EmptyCoroutineContext) { _, id -> "tint-test-${id.value}" }
     private val releaseSample = CompletableDeferred<Unit>()
     private var fail = false
     private var artBitmap = {
@@ -104,7 +102,7 @@ class DetailsTintTest {
         runBlocking { store.put(TvheadendTestResultFactory.cachedArtwork(profile, picon).cacheKey, 0x336699) }
         val returned = mutableListOf<Color>()
         compose.mainClock.autoAdvance = false
-        compose.setContent {
+        compose.setContentWithArtworkSampling {
             CompositionLocalProvider(LocalChannelAccents provides accents) {
                 TVHeadendPlayerTheme {
                     ProvideAppArtwork(tvheadend) {
@@ -129,7 +127,7 @@ class DetailsTintTest {
         if (stored) runBlocking { store.put("tint-test-2", 0x336699) }
         else releaseSample.complete(Unit)
         showPage(hasArt = false)
-        compose.waitUntil(10_000) { store["tint-test-2"] != null }
+        assertNotNull(store["tint-test-2"])
         awaitGlow()
         val accent = if (stored) 0x336699 else requireNotNull(store["tint-test-2"])
         assertNear(1919, 0, Color(0xFF000000.toInt() or accent).copy(alpha = .55f)
@@ -149,7 +147,7 @@ class DetailsTintTest {
         val settled = mutableListOf<Pair<ChannelId, ArtworkId?>>()
         var shown by mutableStateOf(noLogo)
         var logo by mutableStateOf(picon)
-        compose.setContent {
+        compose.setContentWithArtworkSampling {
             CompositionLocalProvider(LocalChannelAccents provides accents, LocalDensity provides Density(2f)) {
                 TVHeadendPlayerTheme {
                     view = LocalView.current
@@ -166,7 +164,7 @@ class DetailsTintTest {
         }
         val initial = if (changedInPlace) sampled to picon else noLogo to null
         val next = sampled to if (changedInPlace) replaced else picon
-        compose.waitUntil(10_000) { initial in settled }
+        compose.mainClock.advanceTimeUntil { initial in settled }
         if (changedInPlace) awaitGlow()
         compose.runOnIdle { if (changedInPlace) logo = replaced else shown = sampled }
         compose.mainClock.advanceTimeBy(1000)
@@ -175,7 +173,7 @@ class DetailsTintTest {
         assertEquals(listOf(initial), settled)
         assertPixel(1919, 0, neutral.toArgb())
         releaseSample.complete(Unit)
-        compose.waitUntil(10_000) { next in settled }
+        compose.mainClock.advanceTimeUntil { next in settled }
         if (!changedInPlace) assertEquals(listOf(initial, next), settled)
         val sampledKey = if (changedInPlace) "tint-test-5" else "tint-test-2"
         assertNear(1919, 0, Color(0xFF000000.toInt() or requireNotNull(store[sampledKey])).copy(alpha = .55f)
@@ -187,7 +185,14 @@ class DetailsTintTest {
         releaseSample.complete(Unit)
         runBlocking { store.put("tint-test-2", 0x336699) }
         showPage()
-        compose.waitUntil(10_000) { samples.get() > 0 }
+        // Include the effect's fallback publication, not merely interceptor entry.
+        val expected = Color(0xFF000000.toInt() or detailsTintRgb(0x336699)).toArgb()
+        compose.mainClock.advanceTimeUntil {
+            val shown = pixel(20, 20)
+            samples.get() > 0 && listOf(16, 8, 0).all { shift ->
+                kotlin.math.abs((shown shr shift and 0xff) - (expected shr shift and 0xff)) <= 1
+            }
+        }
         compose.mainClock.advanceTimeBy(1000)
         // The scrim over the missing art is the page's own colour.
         assertNear(20, 20, Color(0xFF000000.toInt() or detailsTintRgb(0x336699)), tolerance = 1)
@@ -196,7 +201,7 @@ class DetailsTintTest {
     @Test fun unknownArtStartsNeutralAndCrossfadesToTheSampledTint() {
         val returned = mutableListOf<Color>()
         compose.mainClock.autoAdvance = false
-        compose.setContent {
+        compose.setContentWithArtworkSampling {
             TVHeadendPlayerTheme {
                 ProvideArtworkSession(session) {
                     val tint = rememberDetailsTint(art, ChannelIcon.ImageCache(picon)).value
@@ -206,8 +211,8 @@ class DetailsTintTest {
         }
         assertEquals(neutral, returned.first())
         releaseSample.complete(Unit)
-        compose.waitUntil(10_000) { DetailsArtColors.stored(AppArtworkSource(session, art)) != null }
-        compose.waitUntil(10_000) { compose.mainClock.advanceTimeByFrame(); returned.last() == redTint }
+        compose.mainClock.advanceTimeUntil { DetailsArtColors.stored(AppArtworkSource(session, art)) != null }
+        compose.mainClock.advanceTimeUntil { returned.last() == redTint }
         assertTrue(returned.any { it != neutral && it != redTint })
     }
 
@@ -230,20 +235,17 @@ class DetailsTintTest {
 
     private fun sampleArt(id: ArtworkId): Int? {
         releaseSample.complete(Unit)
-        return runBlocking { DetailsArtColors.sample(ApplicationProvider.getApplicationContext(), AppArtworkSource(session, id)) }
+        var sampled: Int? = null
+        runTest { sampled = DetailsArtColors.sample(ApplicationProvider.getApplicationContext(), AppArtworkSource(session, id), EmptyCoroutineContext) }
+        return sampled
     }
 
     @Test fun cachedArtAppearsInTheFirstFrameWithoutAnotherSample() {
         releaseSample.complete(Unit)
-        val scope = CoroutineScope(Dispatchers.Default + Job())
-        try {
-            val sampled = scope.async { DetailsArtColors.sample(ApplicationProvider.getApplicationContext(), AppArtworkSource(session, art)) }
-            compose.waitUntil(10_000) { sampled.isCompleted }
-            assertNotNull(runBlocking { sampled.await() })
-        } finally { scope.cancel() }
+        assertNotNull(sampleArt(art))
         val returned = mutableListOf<Color>()
         compose.mainClock.autoAdvance = false
-        compose.setContent {
+        compose.setContentWithArtworkSampling {
             TVHeadendPlayerTheme {
                 ProvideArtworkSession(session) {
                     val tint = rememberDetailsTint(art, ChannelIcon.ImageCache(picon)).value
@@ -261,7 +263,7 @@ class DetailsTintTest {
         val channel = Channel.create(ChannelId(1), name = "Test", icon = picon.takeIf { hasPicon }?.let { ChannelIcon.ImageCache(it) })
         val event = EpgEvent.create(EventId(1), channel.id, Instant.fromEpochSeconds(0), Instant.fromEpochSeconds(3600),
             title = "Test programme", image = art.takeIf { hasArt })
-        compose.setContent {
+        compose.setContentWithArtworkSampling {
             CompositionLocalProvider(LocalChannelAccents provides accents, LocalWarmPlayback provides warm,
                 LocalDensity provides Density(2f)) {
                 TVHeadendPlayerTheme {
@@ -275,8 +277,8 @@ class DetailsTintTest {
         compose.waitForIdle()
     }
 
-    /** The glow is baked off the main thread; until then the page shows its plain background. */
-    private fun awaitGlow() = compose.waitUntil(10_000) { pixel(1919, 0) != neutral.toArgb() }
+    /** The effect clock covers both the sample publication and the glow bake. */
+    private fun awaitGlow() = compose.mainClock.advanceTimeUntil { pixel(1919, 0) != neutral.toArgb() }
 
     private fun pixel(x: Int, y: Int): Int {
         compose.waitForIdle()

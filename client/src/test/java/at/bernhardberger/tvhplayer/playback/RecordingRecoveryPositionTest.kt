@@ -138,6 +138,26 @@ class RecordingRecoveryPositionTest {
 
     @OptIn(TvheadendTestingApi::class)
     @Test fun refusedGrowingMatroskaRetainsItsDeferredReasonOnlyForItsSelection() = exercise(growing = true) {
+        val initial = session.observation.value
+        val missing = selection(FIRST)
+        for (noSession in listOf(false, true)) {
+            session.publish(if (noSession) SessionObservation.create() else observation(entries = emptyList()))
+            val unavailable = scope.async { runtime.playRecording(missing, RecordingPlaybackStart.START_OVER) }
+            awaitCurrent { unavailable.isCompleted }
+            val expected = if (noSession) PlaybackTargetResult.NOT_READY else PlaybackTargetResult.TARGET_UNAVAILABLE
+            assertEquals(expected, unavailable.await())
+            assertTrue(runtime.state.value is AppPlaybackState.Failed)
+            val failure = runtime.state.value as AppPlaybackState.Failed
+            assertEquals(expected, failure.targetResult)
+            assertEquals(AppPlaybackFailureReason.RECORDING_READ_FAILED, failure.reason)
+            assertEquals(AppPlaybackTarget.Recording(FIRST), failure.target)
+            assertEquals(missing, runtime.recordingSelection.value)
+            assertEquals(if (noSession) RecordingPlaybackAdmission.ObservationExpired else RecordingPlaybackAdmission.TargetUnavailable,
+                runtime.recordingAdmission.value)
+            assertNull(runtime.activeTarget.value)
+            runtime.stop()
+        }
+        session.publish(initial)
         session.publish(recordings(listOf(FIRST), null, DvrEntryState.RECORDING, true,
             files = listOf(TvheadendTestResultFactory.recordingFile(serverPath = "/rec/programme.mkv"))))
         val entry = requireNotNull(session.observation.value.dvrEntry(FIRST))
@@ -160,6 +180,12 @@ class RecordingRecoveryPositionTest {
         assertEquals(at.bernhardberger.tvhplayer.core.AppErrorCondition.RECORDING_NOT_STARTED,
             at.bernhardberger.tvhplayer.core.recordingErrorCondition(session.observation.value.dvrEntry(SECOND),
                 runtime.recordingAdmission.value, runtime.state.value as AppPlaybackState.Failed))
+        session.publish(recordings(listOf(FIRST), null, DvrEntryState.COMPLETED))
+        val replacement = selection(FIRST)
+        play(FIRST)
+        assertEquals(replacement, runtime.recordingSelection.value)
+        assertEquals(AppPlaybackTarget.Recording(FIRST), runtime.activeTarget.value)
+        assertTrue(runtime.recordingAdmission.value is RecordingPlaybackAdmission.Completed)
         runtime.stop()
         assertNull(runtime.recordingSelection.value)
         assertNull(runtime.recordingAdmission.value)
@@ -186,6 +212,11 @@ class RecordingRecoveryPositionTest {
                     awaitCurrent { runtime.recordingCutpoints.value == points }
                     settleMain()
                     assertTrue("deliberate destination: ${player.currentPosition}", player.currentPosition < 25 * ONE_MINUTE)
+                    assertNull(runtime.recordingSkipPrompt.value)
+                    runtime.stop()
+                    assertTrue(runtime.recordingCutpoints.value.isEmpty())
+                    assertTrue(runtime.recordingMarks.value.isEmpty())
+                    assertTrue(runtime.recordingChapters.value.isEmpty())
                     assertNull(runtime.recordingSkipPrompt.value)
                 }
             }
@@ -230,7 +261,13 @@ class RecordingRecoveryPositionTest {
 
     @Test fun retryAfterAReadErrorContinuesWhereTheRecordingStood() = exercise {
         play(FIRST)
+        val installed = player.currentMediaItem
+        assertNull(restore(FIRST))
+        assertSame(installed, player.currentMediaItem)
         failAtTwentyMinutes()
+        val failure = runtime.state.value as AppPlaybackState.Failed
+        assertEquals(AppPlaybackFailureReason.RECORDING_READ_FAILED, failure.reason)
+        assertEquals(AppPlaybackTarget.Recording(FIRST), failure.target)
         media.seekable = false
 
         assertTrue(runtime.retryRecording()?.isStarted == true)

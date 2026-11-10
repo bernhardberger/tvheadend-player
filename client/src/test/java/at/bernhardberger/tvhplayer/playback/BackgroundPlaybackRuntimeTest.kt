@@ -57,6 +57,18 @@ class BackgroundPlaybackRuntimeTest {
         scheduler.advanceTimeBy(1_200_000)
         settle()
         assertNotNull(runtime.activeTarget.value)
+        runtime.onAppBackgrounded()
+        await { connection.priorityChanges.size == 3 }
+        scheduler.advanceTimeBy(60_000)
+        runtime.onAppForegrounded()
+        await { connection.priorityChanges.size == 4 }
+        runtime.onAppBackgrounded()
+        await { connection.priorityChanges.size == 5 }
+        scheduler.advanceTimeBy(1_140_000)
+        settle()
+        assertNotNull(runtime.activeTarget.value)
+        scheduler.advanceTimeBy(60_000)
+        await { runtime.activeTarget.value == null }
     }
 
     @Test fun serverPausedChannelRemainsPausedOnReturn() = exercise {
@@ -477,51 +489,55 @@ class BackgroundPlaybackRuntimeTest {
         assertNull(runtime.backgroundNotice.value)
     }
 
-    @Test fun unavailableReplacementPauseStopsWithoutFocusOrAutoplayDespiteNormalSpeedObservation() = exercise {
-        live()
-        connection.emit(SubscriptionEvent.Speed(0))
-        await { !player.playWhenReady }
-        runtime.onAppBackgrounded()
-        await { connection.priorityChanges.size == 1 }
-        val playTransitions = mutableListOf<Boolean>()
-        player.addListener(object : Player.Listener {
-            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
-                playTransitions += playWhenReady
-            }
-        })
-        connection.scriptPriority(SubscriptionOperationResult.Failed(TvheadendFailure.NOT_SUPPORTED))
-        // The fresh subscription has no timeshift grant: pause must fail closed, not
-        // treat a locally paused player as evidence that the server accepted it.
-        connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 0)))
-        // The replacement is paused as soon as it is installed. Answer its subscription in scope,
-        // allowing the manager on the test scheduler to run after this pause callback returns.
-        val previousMediaItem = player.currentMediaItem
-        afterPause = {
-            if (player.currentMediaItem !== previousMediaItem && runtime.activeTarget.value != null) {
-                afterPause = {}
-                scope.launch {
-                    await { connection.subscribeCount == 2 }
-                    connection.awaitCollectionRegistered()
-                    startSubscription()
-                    connection.emit(SubscriptionEvent.Speed(100))
+    @Test fun unavailableReplacementPauseStopsWithoutFocusOrAutoplayDespiteNormalSpeedObservation() {
+        for (serverStopped in listOf(false, true)) exercise {
+            live()
+            connection.emit(SubscriptionEvent.Speed(0))
+            await { !player.playWhenReady }
+            runtime.onAppBackgrounded()
+            await { connection.priorityChanges.size == 1 }
+            val playTransitions = mutableListOf<Boolean>()
+            player.addListener(object : Player.Listener {
+                override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                    playTransitions += playWhenReady
+                }
+            })
+            connection.scriptPriority(SubscriptionOperationResult.Failed(TvheadendFailure.NOT_SUPPORTED))
+            // The fresh subscription has no timeshift grant: pause must fail closed, not
+            // treat a locally paused player as evidence that the server accepted it.
+            connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 0)))
+            // The replacement is paused as soon as it is installed. Answer its subscription in scope,
+            // allowing the manager on the test scheduler to run after this pause callback returns.
+            val previousMediaItem = player.currentMediaItem
+            afterPause = {
+                if (player.currentMediaItem !== previousMediaItem && runtime.activeTarget.value != null) {
+                    afterPause = {}
+                    scope.launch {
+                        await { connection.subscribeCount == 2 }
+                        connection.awaitCollectionRegistered()
+                        startSubscription()
+                        connection.emit(SubscriptionEvent.Speed(100))
+                        if (serverStopped) connection.emit(SubscriptionEvent.Stopped(SubscriptionCondition.NO_DETAIL, null))
+                    }
                 }
             }
+            runtime.onAppForegrounded()
+            // The paused replacement waits for its grant; reaching READY without one decides it.
+            await { runtime.livePause.value == LivePauseState(LivePauseAvailability.STARTING, pending = true) }
+            assertNull(runtime.backgroundNotice.value)
+            playerListeners.toList().forEach { it.onPlaybackStateChanged(Player.STATE_READY) }
+            val expectedNotice = if (serverStopped) BackgroundPlaybackNotice.INTERRUPTED else BackgroundPlaybackNotice.TUNER_LOST
+            await { runtime.backgroundNotice.value == expectedNotice }
+            settle()
+            assertNull(runtime.activeTarget.value)
+            assertFalse(player.playWhenReady)
+            assertFalse(playTransitions.contains(true))
+            assertEquals(1, focus.requestCount)
+            assertEquals(2, connection.subscribeCount)
+            runtime.onAppForegrounded()
+            settle()
+            assertEquals(2, connection.subscribeCount)
         }
-        runtime.onAppForegrounded()
-        // The paused replacement waits for its grant; reaching READY without one decides it.
-        await { runtime.livePause.value == LivePauseState(LivePauseAvailability.STARTING, pending = true) }
-        assertNull(runtime.backgroundNotice.value)
-        playerListeners.toList().forEach { it.onPlaybackStateChanged(Player.STATE_READY) }
-        await { runtime.backgroundNotice.value == BackgroundPlaybackNotice.TUNER_LOST }
-        settle()
-        assertNull(runtime.activeTarget.value)
-        assertFalse(player.playWhenReady)
-        assertFalse(playTransitions.contains(true))
-        assertEquals(1, focus.requestCount)
-        assertEquals(2, connection.subscribeCount)
-        runtime.onAppForegrounded()
-        settle()
-        assertEquals(2, connection.subscribeCount)
     }
 
     @Test fun acceptedReplacementPauseKeepsRetunedChannelPausedWithoutFocusOrNotice() = exercise {
@@ -650,6 +666,8 @@ class BackgroundPlaybackRuntimeTest {
         runtime.onAppForegrounded()
         settle()
         assertEquals(2, connection.subscribeCount)
+        live(channel = 2)
+        assertNull(runtime.backgroundNotice.value)
     }
 
     @Test fun backgroundReleasesAdmittedRecoveryAndRetunesOnlyOnForeground() = exercise {
@@ -704,18 +722,32 @@ class BackgroundPlaybackRuntimeTest {
         assertEquals(BackgroundPlaybackNotice.TUNER_LOST, runtime.backgroundNotice.value)
     }
 
-    @Test fun explicitStopCancelsTimerAndPendingRetune() = exercise {
-        live()
-        runtime.onAppBackgrounded()
-        await { connection.priorityChanges.size == 1 }
-        val stopped = scope.async { runtime.stop() }
-        await { stopped.isCompleted }
-        scheduler.advanceTimeBy(1_200_000)
-        runtime.onAppForegrounded()
-        settle()
-        assertEquals(1, connection.subscribeCount)
-        assertNull(runtime.activeTarget.value)
-        assertNull(runtime.backgroundNotice.value)
+    @Test fun explicitStopCancelsTimerAndPendingRetune() {
+        for (expired in listOf(false, true)) exercise {
+            live()
+            runtime.onAppBackgrounded()
+            await { connection.priorityChanges.size == 1 }
+            if (expired) {
+                scheduler.advanceTimeBy(1_200_000)
+                await { runtime.activeTarget.value == null }
+                returnAndRetune()
+                assertEquals(BackgroundPlaybackNotice.LIMIT_EXPIRED, runtime.backgroundNotice.value)
+                runtime.onAppBackgrounded()
+                await { connection.priorityChanges.size == 2 }
+                runtime.onDeviceStandby()
+                await { runtime.activeTarget.value == null }
+            }
+            val subscriptions = connection.subscribeCount
+            val stopped = scope.async { runtime.stop() }
+            await { stopped.isCompleted }
+            assertNull(runtime.backgroundNotice.value)
+            scheduler.advanceTimeBy(1_200_000)
+            runtime.onAppForegrounded()
+            settle()
+            assertEquals(subscriptions, connection.subscribeCount)
+            assertNull(runtime.activeTarget.value)
+            assertNull(runtime.backgroundNotice.value)
+        }
     }
 
     @Test fun replacementDropsOldTimerAndDoesNotResumeOldChannel() = exercise {
@@ -872,23 +904,59 @@ class BackgroundPlaybackRuntimeTest {
         val stopped = scope.async { runtime.stop() }
         await { stopped.isCompleted }
         assertNull(runtime.frameRate.requested.value.rate)
-    }
-
-    @Test fun detachStopsTheDeclarationsAndForgetsTheRequest() = exercise {
-        live(frameDurationUs = 33_367L)
-        await { runtime.frameRate.requested.value.rate == 59.94f }
-        val installed = requireNotNull(frameListener)
-
-        val detach = scope.async { runtime.detach() }
-        await { detach.isCompleted }
-        assertNull(frameListener)
+        live(frameDurationUs = 40_000L)
+        await { runtime.frameRate.requested.value.rate == 50f }
+        val replacement = androidx.media3.common.MediaItem.fromUri("file:///replacement")
+        player.setMediaItem(replacement)
+        player.play()
+        await { runtime.activeTarget.value == null }
         assertEquals(SurfaceFrameRateRequest(), runtime.frameRate.requested.value)
         assertNull(runtime.frameRate.declared.value)
+        assertEquals(replacement, player.currentMediaItem)
+    }
 
-        // A frame the player still delivers to the old listener changes nothing.
-        renderFrames(spacingUs = 20_000L, startUs = 10_000_000L, listener = installed)
-        assertNull(runtime.frameRate.measured())
-        assertEquals(SurfaceFrameRateRequest(), runtime.frameRate.requested.value)
+    @Test fun detachStopsTheDeclarationsAndForgetsTheRequest() {
+        for (duringInstall in listOf(false, true)) exercise {
+            live(timeshift = false, frameDurationUs = 33_367L)
+            await { runtime.frameRate.requested.value.rate == 59.94f }
+            val installed = requireNotNull(frameListener)
+            val callback = focus.requests.last()
+            callback(AudioInterruption.NOISY)
+            await { runtime.isInterruptionMuted }
+            val abandons = focus.abandons
+
+            if (duringInstall) {
+                var detached: kotlinx.coroutines.Job? = null
+                beforeLiveBinding = {
+                    detached = scope.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) { runtime.detach() }
+                }
+                val replacement = scope.async {
+                    runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(2))))
+                }
+                await { replacement.isCompleted && detached?.isCompleted == true }
+                assertEquals(PlaybackTargetResult.SHUT_DOWN, replacement.await())
+                assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+            } else {
+                val detach = scope.async { runtime.detach() }
+                await { detach.isCompleted }
+            }
+            assertNull(frameListener)
+            assertEquals(SurfaceFrameRateRequest(), runtime.frameRate.requested.value)
+            assertNull(runtime.frameRate.declared.value)
+            assertTrue(playerListeners.isEmpty())
+            assertTrue(focus.abandons > abandons)
+            assertFalse(runtime.hasAudioInterruption)
+            assertFalse(androidx.media3.common.C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes)
+
+            // A frame the player still delivers to the old listener changes nothing.
+            renderFrames(spacingUs = 20_000L, startUs = 10_000_000L, listener = installed)
+            assertNull(runtime.frameRate.measured())
+            assertEquals(SurfaceFrameRateRequest(), runtime.frameRate.requested.value)
+            callback(AudioInterruption.GAIN)
+            player.pause()
+            settle()
+            assertFalse(player.playWhenReady)
+        }
     }
 
     @Test fun aDeclarationGoneThroughALiveRestartGapKeepsTheRequest() = exercise {

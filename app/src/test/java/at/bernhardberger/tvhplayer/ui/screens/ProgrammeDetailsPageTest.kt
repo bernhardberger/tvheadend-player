@@ -9,23 +9,21 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.semantics.getOrNull
-import at.bernhardberger.tvhplayer.testutil.CaptureOutput
-import at.bernhardberger.tvhplayer.ui.components.RowChangeMs
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.Density
@@ -33,30 +31,39 @@ import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvheadend.sdk.core.*
+import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
 import at.bernhardberger.tvhplayer.core.*
+import at.bernhardberger.tvhplayer.images.ChannelAccents
+import at.bernhardberger.tvhplayer.stores.ChannelAccentStore
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
-import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
+import at.bernhardberger.tvhplayer.testutil.setContentWithArtworkSampling
 import at.bernhardberger.tvhplayer.ui.AppDestination
+import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.common.AppClock
+import at.bernhardberger.tvhplayer.ui.components.LocalChannelAccents
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsPage
+import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
+import at.bernhardberger.tvhplayer.ui.components.RowChangeMs
 import at.bernhardberger.tvhplayer.ui.components.programmeAboutFacts
 import at.bernhardberger.tvhplayer.ui.components.programmeAboutText
 import coil3.compose.AsyncImage
 import java.io.File
 import java.util.Locale
 import java.util.TimeZone
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
+import kotlinx.coroutines.Dispatchers
 import org.junit.*
+import org.junit.Rule
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
-import org.junit.Rule
-import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
-import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-xhdpi")
@@ -759,13 +766,12 @@ class ProgrammeDetailsPageTest {
         images.install(FixtureArt.imageLoader(ApplicationProvider.getApplicationContext(), mapOf(
             ArtworkId(1) to FixtureArt.picon("ridge-earth"),
             ArtworkId(2) to Bitmap.createBitmap(16, 9, Bitmap.Config.ARGB_8888).apply { eraseColor(android.graphics.Color.WHITE) })))
-        show()
-        compose.waitUntil(10_000) {
+        show(samplingContext = EmptyCoroutineContext)
+        compose.mainClock.advanceTimeUntil {
             at.bernhardberger.tvhplayer.images.DetailsArtColors.stored(AppArtworkSource(requireNotNull(session), ArtworkId(2))) != null
         }
-        // The off-thread measurement is outside Compose's test clock. Wait for the pending
-        // protective veil to relax before comparing the two settled backdrop states.
-        compose.waitUntil(5_000) {
+        // Include the measured protective veil, not just the palette cache write.
+        compose.mainClock.advanceTimeUntil {
             val frame = snapshot()
             val ready = android.graphics.Color.red(frame.getPixel(1900, 20)) > 26
             frame.recycle()
@@ -847,14 +853,13 @@ class ProgrammeDetailsPageTest {
 
 
     @Test fun withoutArtTheLogosGlowTurnsIntoAnEvenTintWhileTheLogoScrollsAway() {
-        show(future = true)
+        show(future = true, samplingContext = EmptyCoroutineContext)
         fun logoTop() = compose.onNodeWithTag("details-hero-logo", useUnmergedTree = true)
             .fetchSemanticsNode().boundsInRoot.top
         val logoAtTop = logoTop()
         compose.onNodeWithTag("details-logo-glow", useUnmergedTree = true).assertExists()
         val background = android.graphics.Color.rgb(19, 19, 19)
-        // Baked off the main thread; the plain background shows until then.
-        compose.waitUntil(10_000) { snapshot().let { it.getPixel(1910, 5).also { _ -> it.recycle() } } != background }
+        compose.mainClock.advanceTimeUntil { snapshot().let { it.getPixel(1910, 5).also { _ -> it.recycle() } } != background }
         val top = snapshot()
         // Lit at the top right, the page's own background toward the left.
         Assert.assertNotEquals(background, top.getPixel(1910, 5))
@@ -1117,7 +1122,8 @@ class ProgrammeDetailsPageTest {
         withRating: Boolean = false, longSynopsis: Boolean = false, todayCard: Boolean = false, longFacts: Boolean = false, runningCard: Boolean = false,
         warm: Boolean = false, longMeta: Boolean = false, longSubtitle: Boolean = false, pastYear: Boolean = false,
         recordingFacts: Boolean = false, cast: Boolean = false, stoppedEarly: Boolean = false,
-        warmMode: androidx.compose.runtime.State<at.bernhardberger.tvhplayer.settings.WarmPlaybackMode>? = null) {
+        warmMode: androidx.compose.runtime.State<at.bernhardberger.tvhplayer.settings.WarmPlaybackMode>? = null,
+        samplingContext: CoroutineContext = Dispatchers.Default) {
         val subtitle = if (longSubtitle && recordingFacts) "An extraordinary journey through the snowy mountains of the north, along the coast and across the wide valleys in the changing light of a long winter."
             else if (longSubtitle) "Eine außergewöhnliche Reise durch die verschneiten Berge des Nordens, entlang der Küste und über die weiten Täler im wechselnden Licht des langen Winters." else event.subtitle
         val shown = when {
@@ -1176,8 +1182,9 @@ class ProgrammeDetailsPageTest {
             subtitle = subtitle.takeIf { longSubtitle }, image = event.image.takeUnless { future }, summary = event.summary.takeUnless { future },
             playPosition = 3723.seconds, state = if (future) DvrEntryState.SCHEDULED else DvrEntryState.COMPLETED)
         val now = start.epochSeconds + if (future) -60 else 480
-        compose.setContent {
-            CompositionLocalProvider(LocalDensity provides Density(2f, fontScale),
+        val accents = ChannelAccents(ChannelAccentStore(), samplingContext) { _, _ -> null }
+        compose.setContentWithArtworkSampling(samplingContext) {
+            CompositionLocalProvider(LocalChannelAccents provides accents, LocalDensity provides Density(2f, fontScale),
                 at.bernhardberger.tvhplayer.ui.LocalWarmPlayback provides (warmMode?.let {
                     at.bernhardberger.tvhplayer.core.shouldShowWarmPlaybackScrim(true, false, it.value)
                 } ?: warm)) {

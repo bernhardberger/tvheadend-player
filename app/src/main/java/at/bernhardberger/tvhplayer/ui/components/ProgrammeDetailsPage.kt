@@ -96,7 +96,6 @@ import at.bernhardberger.tvhplayer.ui.common.formatMetadataNumber
 import java.util.Locale
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
@@ -818,8 +817,10 @@ private fun DetailsBackdrop(art: ArtworkId, background: State<Color>, blur: () -
  * already contains the small baked blur. The picture is cropped to the page's 16:9 viewport.
  */
 @Composable
-private fun rememberDetailsSamples(image: Image?): State<IntArray?> = produceState(null, image) {
-        if (image != null) value = withContext(Dispatchers.Default) {
+private fun rememberDetailsSamples(image: Image?): State<IntArray?> {
+    val samplingContext = LocalArtworkSamplingContext.current
+    return produceState(null, image, samplingContext) {
+        if (image != null) value = withContext(samplingContext) {
             val bitmap = image.toBitmap()
             val width = minOf(bitmap.width, bitmap.height * 16 / 9).coerceAtLeast(1)
             val height = minOf(bitmap.height, bitmap.width * 9 / 16).coerceAtLeast(1)
@@ -827,15 +828,17 @@ private fun rememberDetailsSamples(image: Image?): State<IntArray?> = produceSta
             bitmap.getPixels(pixels, 0, width, (bitmap.width - width) / 2, (bitmap.height - height) / 2, width, height)
             detailsBackdropSamples(pixels, width, height)
         }
+    }
 }
 
 @Composable
 private fun rememberDetailsDim(samples: IntArray?, sharp: Boolean, textTop: Float?,
     floor: Float = if (sharp) 0f else DetailsScrolledDimAlpha, areas: List<DetailsBackdropTextArea> = emptyList()): State<Float> {
     var measured by remember(samples, sharp, textTop) { mutableFloatStateOf(1f) }
-    LaunchedEffect(samples, sharp, textTop, floor, areas) {
+    val samplingContext = LocalArtworkSamplingContext.current
+    LaunchedEffect(samples, sharp, textTop, floor, areas, samplingContext) {
         val pixels = samples
-        if (pixels != null && textTop != null) measured = withContext(Dispatchers.Default) {
+        if (pixels != null && textTop != null) measured = withContext(samplingContext) {
             measuredDetailsDim(pixels, sharp, floor, textTop, areas)
         }
     }

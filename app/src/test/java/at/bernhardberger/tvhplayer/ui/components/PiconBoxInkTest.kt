@@ -47,7 +47,6 @@ import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
-import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import org.junit.Assert.assertEquals
@@ -73,7 +72,7 @@ class PiconBoxInkTest {
 
     @Test fun aWhiteLogoOnALightGroundIsDrawnDark() {
         show(ground = LIGHT_FILL)
-        compose.waitUntil(5_000) { pixels().dark > 0 }
+        compose.mainClock.advanceTimeUntil(timeoutMillis = 5_000) { pixels().dark > 0 }
         val shown = pixels()
         assertTrue("dark strokes expected, got $shown", shown.dark >= 200)
         assertEquals("no white strokes may stay: $shown", 0, shown.white)
@@ -81,7 +80,7 @@ class PiconBoxInkTest {
 
     @Test fun withoutAGroundTheLogoKeepsItsOwnPixels() {
         show(ground = null)
-        compose.waitUntil(5_000) { pixels().white > 0 }
+        compose.mainClock.advanceTimeUntil(timeoutMillis = 5_000) { pixels().white > 0 }
         val shown = pixels()
         assertTrue("white strokes expected, got $shown", shown.white >= 200)
         assertEquals("nothing may be darkened: $shown", 0, shown.dark)
@@ -89,7 +88,7 @@ class PiconBoxInkTest {
 
     @Test fun aThinLineDrawnFarSmallerStaysALineRatherThanDots() {
         show(ground = DARK_FILL, fill = DARK_FILL, width = 72, height = 40, logo = slopedLine())
-        compose.waitUntil(5_000) { litColumns().isNotEmpty() }
+        compose.mainClock.advanceTimeUntil(timeoutMillis = 5_000) { litColumns().isNotEmpty() }
         val lit = litColumns()
         val gaps = (lit.first()..lit.last()).count { it !in lit }
         assertTrue("the line spans ${lit.size} columns: $lit", lit.size >= 50)
@@ -113,7 +112,7 @@ class PiconBoxInkTest {
             }
         }
         // The first load fades in over the loading icon; then the white logo stands whole.
-        compose.waitUntil(5_000) { pixels().white >= WHOLE_LOGO }
+        compose.mainClock.advanceTimeUntil(timeoutMillis = 5_000) { pixels().white >= WHOLE_LOGO }
 
         compose.mainClock.autoAdvance = false
         ground = LIGHT_FILL
@@ -152,14 +151,14 @@ class PiconBoxInkTest {
             }
         }
         // Completion conditions, not latency budgets: both variants must actually be cached.
-        compose.waitUntil(5_000) { pixels().white >= WHOLE_LOGO }
-        compose.waitUntil(5_000) {
+        compose.mainClock.advanceTimeUntil(timeoutMillis = 5_000) { pixels().white >= WHOLE_LOGO }
+        compose.mainClock.advanceTimeUntil(timeoutMillis = 5_000) {
             compose.waitForIdle()
             loader.memoryCache!!.keys.size == 2
         }
         assertEquals(2, fetches.get())
         compose.runOnIdle { focused = true }
-        compose.waitUntil(5_000) { pixels().dark >= WHOLE_LOGO && pixels().white == 0 }
+        compose.mainClock.advanceTimeUntil(timeoutMillis = 5_000) { pixels().dark >= WHOLE_LOGO && pixels().white == 0 }
         assertEquals("focus must reuse the warmed bitmap", 2, fetches.get())
     }
 
@@ -181,21 +180,21 @@ class PiconBoxInkTest {
 
     @Test fun aPaneLogoOnItsOwnColourIsInkedForThatColour() {
         showPanePicture(ChannelId(1))
-        compose.waitUntil(5_000) { pixels("pane-logo").light > 0 }
+        compose.mainClock.advanceTimeUntil(timeoutMillis = 5_000) { pixels("pane-logo").light > 0 }
         val shown = pixels("pane-logo")
         assertTrue("the dim logo should be lightened on its dark colour: $shown", shown.light >= 200)
     }
 
     @Test fun aPaneLogoWithoutItsColourIsInkedForThePlainGround() {
         showPanePicture(accent = null)
-        compose.waitUntil(5_000) { pixels("pane-logo").light > 0 }
+        compose.mainClock.advanceTimeUntil(timeoutMillis = 5_000) { pixels("pane-logo").light > 0 }
         val shown = pixels("pane-logo")
         assertTrue("the dim logo should be lightened: $shown", shown.light >= 200)
     }
 
     private fun showPanePicture(accent: ChannelId?) {
         val session = readySession()
-        images.install(FixtureArt.imageLoader(ApplicationProvider.getApplicationContext<Application>(), mapOf(ArtworkId(1) to wordmark(DIM_BLUE))))
+        images.install(cachingLoader(mapOf(ArtworkId(1) to wordmark(DIM_BLUE))).newBuilder().crossfade(0).build())
         compose.setContent {
             CompositionLocalProvider(LocalDensity provides Density(1f, 1f)) {
                 TVHeadendPlayerTheme {
@@ -221,7 +220,7 @@ class PiconBoxInkTest {
 
     private fun show(ground: Color?, fill: Color = LIGHT_FILL, width: Int = 200, height: Int = 120, logo: Bitmap = wordmark()) {
         val session = readySession()
-        images.install(FixtureArt.imageLoader(ApplicationProvider.getApplicationContext<Application>(), mapOf(ArtworkId(1) to logo)))
+        images.install(cachingLoader(mapOf(ArtworkId(1) to logo)).newBuilder().crossfade(0).build())
         compose.setContent {
             CompositionLocalProvider(LocalDensity provides Density(1f, 1f)) {
                 TVHeadendPlayerTheme {

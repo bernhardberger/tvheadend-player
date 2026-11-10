@@ -33,6 +33,7 @@ import at.bernhardberger.tvhplayer.notices.NoticeContext
 import org.koin.dsl.module
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
+import at.bernhardberger.tvhplayer.testutil.awaitScheduledWork
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
@@ -736,10 +737,13 @@ class HomeActionsTest {
         compose.onNodeWithTag("home-recovery").assertIsFocused()
     }
 
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     @Test fun rapidOptionsChangesSurviveDelayedStoreWritesWithoutRenderedPreferencesCatchingUp() {
+        val dispatcher = kotlinx.coroutines.test.StandardTestDispatcher()
         val release = kotlinx.coroutines.CompletableDeferred<Unit>()
+        var writesStarted = 0
         val store = at.bernhardberger.tvhplayer.settings.UiSettingsStore(
-            at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore(beforeUpdate = { release.await() }))
+            at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore(beforeUpdate = { writesStarted++; release.await() }))
         val input = HomeInput(listOf(channel), emptyMap(), emptyList(), listOf(channel.id), emptyList(), { null }, null, now)
         compose.setContent { TVHeadendPlayerTheme {
             val settings by store.settings.collectAsState(at.bernhardberger.tvhplayer.settings.UiSettings())
@@ -747,17 +751,18 @@ class HomeActionsTest {
             HomeScreenContent(input.copy(hiddenSections = settings.hiddenHomeSections), SessionObservation.create(), PaddingValues(), true,
                 onPlay = { _, _ -> fail("options tuned") }, onPlayRecording = { _, _ -> },
                 onReturnToRecording = { _, _ -> false }, onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> },
-                onSectionVisibleChange = { section, visible -> saveScope.launch { store.setHomeSectionVisible(section, visible) } })
+                onSectionVisibleChange = { section, visible -> saveScope.launch(dispatcher) { store.setHomeSectionVisible(section, visible) } })
         } }
         compose.onNodeWithTag("home-recent-0").performKeyInput { pressKey(Key.DirectionUp); pressKey(Key.DirectionRight); pressKey(Key.Enter) }
         compose.onNodeWithTag("home-view-CURRENT_ACTIVITY").assertIsFocused()
             .performKeyInput { pressKey(Key.Enter); pressKey(Key.DirectionDown) }
         compose.onNodeWithTag("home-view-RECENT_CHANNELS").assertIsFocused().performKeyInput { pressKey(Key.Enter) }
+        compose.awaitScheduledWork(dispatcher) { writesStarted == 1 }
         compose.runOnIdle {
             assertTrue(kotlinx.coroutines.runBlocking { store.settings.first().hiddenHomeSections.isEmpty() })
             release.complete(Unit)
         }
-        compose.waitUntil(5_000) {
+        compose.awaitScheduledWork(dispatcher) {
             kotlinx.coroutines.runBlocking { store.settings.first().hiddenHomeSections.size == 2 }
         }
         compose.runOnIdle {
@@ -984,6 +989,7 @@ class HomeActionsTest {
         compose.onNodeWithTag("home-view-button").assertDoesNotExist()
         compose.onNodeWithTag("home-activity-0").assertDoesNotExist()
         compose.runOnIdle { assertNull(memory.value); release.complete(Unit) }
+        // Home browse preparation runs on Dispatchers.Default, outside the Compose clock.
         compose.waitUntil(5_000) { compose.onAllNodes(hasTestTag("home-onnow-0") and isFocused()).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("home-activity-0").assertDoesNotExist()
         compose.runOnIdle { assertEquals(HomeSectionKind.ON_NOW, memory.value?.section) }

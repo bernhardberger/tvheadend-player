@@ -50,6 +50,7 @@ import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
+import at.bernhardberger.tvhplayer.testutil.awaitScheduledWork
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.ProvideAppArtwork
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
@@ -67,6 +68,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotSame
@@ -90,6 +92,7 @@ class LivePlayerArtworkSessionTest {
     private val models = ViewModelStore()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val requests = Collections.synchronizedList(mutableListOf<Any>())
+    private val profileDispatcher = StandardTestDispatcher()
     private lateinit var player: ExoPlayer
 
     @After fun after() {
@@ -135,12 +138,12 @@ class LivePlayerArtworkSessionTest {
             .build())
         val settingsData = InMemoryData()
         val settings = PlayerSettingsStore(settingsData)
-        val profiles = AppProfileOwner(playerSession, FakeServerProfileStore(), settings, Dispatchers.IO,
+        val profiles = AppProfileOwner(playerSession, FakeServerProfileStore(), settings, profileDispatcher,
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
         scope.launch { profiles.run() }
         val channels = ChannelsViewModel(playerSession, ChannelTagSettingsStore(InMemoryData()), profiles.liveProfile)
         models.put("channels", channels)
-        compose.waitUntil(10_000) { channels.scope.value.scope.visibleChannels.size == 1 }
+        compose.awaitScheduledWork(profileDispatcher) { channels.scope.value.scope.visibleChannels.size == 1 }
         player = ExoPlayer.Builder(context).build()
         val coordinator = createTvheadendPlaybackCoordinator(player).also { it.launchIn(scope) }
         val runtime = AppPlaybackRuntime(player, playerSession, coordinator, settings, profiles, scope,
@@ -167,7 +170,11 @@ class LivePlayerArtworkSessionTest {
                 }
             }
         }
-        compose.waitUntil(10_000) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1)) }
+        compose.awaitScheduledWork(profileDispatcher) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1)) }
+        // Installing a target does not imply that its logo request has reached Coil yet.
+        compose.mainClock.advanceTimeUntil {
+            synchronized(requests) { requests.filterIsInstance<AppArtworkSource>().any { it.id == LOGO } }
+        }
         compose.waitForIdle()
     }
 

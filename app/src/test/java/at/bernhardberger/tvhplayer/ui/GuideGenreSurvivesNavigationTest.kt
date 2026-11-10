@@ -233,6 +233,7 @@ class GuideGenreSurvivesNavigationTest {
         val sportFilter = context.getString(R.string.header_button_value_description, context.getString(R.string.guide_filter), "Sport")
 
         openDestination("nav-channels", Key.DirectionDown, "nav-epg")
+        // Browse preparation runs on Dispatchers.Default, outside the Compose clock.
         compose.waitUntil(15_000) { compose.onAllNodes(hasTestTag("guide-filter-button")).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription(sportFilter).assertDoesNotExist()
 
@@ -251,10 +252,12 @@ class GuideGenreSurvivesNavigationTest {
         compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, context.getString(R.string.epg_title))).assertExists()
 
         openDestination("nav-epg", Key.DirectionUp, "nav-channels")
+        // Channels browse preparation runs on Dispatchers.Default, outside the Compose clock.
         compose.waitUntil(15_000) { compose.onAllNodes(hasTestTag("channel-row-1")).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription(sportFilter).assertDoesNotExist()
 
         openDestination("nav-channels", Key.DirectionDown, "nav-epg")
+        // Guide browse preparation runs on Dispatchers.Default, outside the Compose clock.
         compose.waitUntil(15_000) { compose.onAllNodes(hasTestTag("guide-filter-button")).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("guide-filter-button").assertContentDescriptionEquals(sportFilter)
         focus("guide-filter-button")
