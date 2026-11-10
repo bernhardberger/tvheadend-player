@@ -4,14 +4,12 @@
   <CurrentIssues>
     <ID>ClassNaming:BrowseCohesionEvidenceTest.kt:BrowseCohesionEvidenceTest</ID>
     <ID>ClassNaming:ChannelGuideDeviceAcceptanceTest.kt:ChannelGuideDeviceAcceptanceTest</ID>
-    <ID>ClassNaming:ChannelsStandardLayoutEvidenceTest.kt:ChannelsStandardLayoutEvidenceTest</ID>
     <ID>ClassNaming:DepthMotionEvidenceTest.kt:DepthMotionEvidenceTest</ID>
     <ID>ClassNaming:ExternalTargetAcceptanceRule.kt:ExternalTargetAcceptanceRule : TestRule</ID>
     <ID>ClassNaming:ForegroundPlaybackLifecycleDeviceAcceptanceTest.kt:ForegroundPlaybackLifecycleDeviceAcceptanceTest</ID>
     <ID>ClassNaming:NavigationShellEvidenceTest.kt:NavigationShellEvidenceTest</ID>
     <ID>ClassNaming:OnboardingLayoutEvidenceTest.kt:OnboardingLayoutEvidenceTest</ID>
     <ID>ClassNaming:PlayerChromeEvidenceTest.kt:PlayerChromeEvidenceTest</ID>
-    <ID>ClassNaming:PlayerFooterLayoutEvidenceTest.kt:PlayerFooterLayoutEvidenceTest</ID>
     <ID>ClassNaming:SettingsVisualEvidenceTest.kt:SettingsVisualEvidenceTest</ID>
     <ID>ClassNaming:TimeshiftCommandDeviceAcceptanceTest.kt:TimeshiftCommandDeviceAcceptanceTest</ID>
     <ID>ClassNaming:TranslationLocaleCaptureTest.kt:PseudoLocaleEvidence</ID>

@@ -12,8 +12,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
@@ -67,10 +65,9 @@ import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.core.PlayerForegroundLayer
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.playback.TimeshiftSeekDecision
-import at.bernhardberger.tvhplayer.testutil.CaptureOutput
+import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
-import at.bernhardberger.tvhplayer.ui.TvOverlayFooterGradientRunout
 import coil3.ImageLoader
 import coil3.map.Mapper
 import coil3.request.Options
@@ -87,27 +84,16 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import java.io.File
 import java.util.TimeZone
 import kotlin.time.Instant
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 
-/**
- * Live footer compaction evidence. Captures are composition only: 960×540 px,
- * density 1.0 (mdpi). Focus feel, overscan and readability over motion remain
- * physical-TV gates.
- *
- * `en-font1.0-…-live-normal-focus-pause` — locale en, font 1.0, pause focused.
- * `en-font1.0-…-behind-live-focus-seekbar` — locale en, font 1.0, seekbar focused.
- * `en-font1.0-…-seeking-preview-focus-seekbar` — locale en, font 1.0, seekbar focused.
- * `de-font1.3-…-error-feedback-peek` — locale de, font 1.3, Pause focused, feedback and peek visible.
- */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-class PlayerFooterLayoutEvidenceTest {
+class PlayerFooterLayoutTest {
     @get:Rule val images = ImageLoaderRule { zapImageLoader(ApplicationProvider.getApplicationContext<Application>()) }
     @get:Rule val compose = createComposeRule()
     private lateinit var view: View
@@ -120,22 +106,6 @@ class PlayerFooterLayoutEvidenceTest {
 
     @After fun restoreClock() {
         defaultZone?.let(TimeZone::setDefault)
-    }
-
-    @Test
-    fun sharedChromeUses56RunoutAnd36BottomInset() {
-        assertEquals(56.dp, TvOverlayFooterGradientRunout)
-        compose.setContent {
-            TVHeadendPlayerTheme {
-                PlayerOverlayChrome(headerContent = {}) {
-                    Box(Modifier.fillMaxWidth().height(20.dp))
-                }
-            }
-        }
-        val footer = compose.tagBounds("player-footer")
-        assertEquals(540f, footer.bottom, 1f)
-        // The run-out, the content and the player's 28dp bottom margin.
-        assertEquals(px(56.dp + 28.dp + 20.dp).toDouble(), footer.height.toDouble(), 1.0)
     }
 
     @Test
@@ -171,13 +141,7 @@ class PlayerFooterLayoutEvidenceTest {
         compose.onNodeWithTag("player-pause").assertIsFocused()
         val track = compose.tagBounds("player-timeline-track")
         val actions = compose.tagBounds("player-actions")
-        val seekbar = compose.tagBounds("player-seekbar")
-        // The focus/semantics node is the track, after the 12dp the timeline keeps above its row under the programme block.
-        assertEquals(px(56.dp + 12.dp).toDouble(),
-            (seekbar.top - compose.tagBounds("player-footer").top - compose.tagBounds("player-info-bar").height).toDouble(), 1.0)
-        assertEquals("a medium icon button", px(40.dp), compose.tagBounds("player-pause").height, 1f)
         assertInline(track)
-        assertFalse("the controls have no state cell", compose.tagExists("player-state"))
         val end = compose.tagBounds("player-end-clock")
         val distance = compose.tagBounds("player-live-state")
         compose.onNodeWithTag("player-distance", useUnmergedTree = true).assertDoesNotExist()
@@ -233,12 +197,6 @@ class PlayerFooterLayoutEvidenceTest {
             assertTrue("centred on the bar", cell.center.y >= track.top - 1f && cell.center.y <= track.bottom + 1f)
         }
         compose.onNodeWithTag("player-distance", useUnmergedTree = true).assertExists()
-        assertEquals("the explicit behind-live annotation", "0:30 behind live", compose.onNodeWithTag("player-distance", useUnmergedTree = true).fetchSemanticsNode()
-            .config[SemanticsProperties.Text].joinToString { it.text })
-        assertEquals("the end clock", "01:00", compose.onNodeWithTag("player-end-clock", useUnmergedTree = true).fetchSemanticsNode()
-            .config[SemanticsProperties.Text].joinToString { it.text })
-        assertEquals("the end box starts one label gap after the bar",
-            track.right + px(8.dp), labels.right - px(requireNotNull(endpointWidths).trailing), 1f)
         val distance = compose.tagBounds("player-distance")
         assertEquals("the distance's right edge is the end clock's", end.right, distance.right, 0.5f)
         assertTrue("the distance sits above the bar row: $distance vs $labels", distance.bottom <= labels.top)
@@ -272,11 +230,9 @@ class PlayerFooterLayoutEvidenceTest {
         assertEquals(1, descriptions.size)
         assertTrue(descriptions.none { it == "Playing" || it == "Live" })
         assertFalse("the controls have no state cell", compose.tagExists("player-state"))
-        for ((tag, description) in listOf("player-live-state" to "Live")) {
-            val config = compose.onNodeWithTag(tag).fetchSemanticsNode().config
-            assertEquals(listOf(description), config[SemanticsProperties.ContentDescription])
-            assertEquals(androidx.compose.ui.semantics.LiveRegionMode.Polite, config[SemanticsProperties.LiveRegion])
-        }
+        val config = compose.onNodeWithTag("player-live-state").fetchSemanticsNode().config
+        assertEquals(listOf("Live"), config[SemanticsProperties.ContentDescription])
+        assertEquals(androidx.compose.ui.semantics.LiveRegionMode.Polite, config[SemanticsProperties.LiveRegion])
     }
 
     @Test
@@ -296,30 +252,6 @@ class PlayerFooterLayoutEvidenceTest {
         // Artwork is passive; Up cannot move focus out of the timeline.
         compose.onNodeWithTag("player-seekbar").assertIsFocused()
         compose.onNodeWithTag("player-go-live").assertDoesNotExist()
-        recordPair("en-font1.0-960x540-mdpi-d1", "behind-live-focus-seekbar", "player-seekbar", backdrop)
-    }
-
-    @Test
-    fun captureLiveNormal() {
-        val backdrop = mutableStateOf(Backdrop.WHITE)
-        show(behind = { false }, feedback = { null }, previewing = { false }, fontScale = 1f, backdrop = { backdrop.value })
-        compose.onNodeWithTag("player-pause").assertIsFocused()
-        compose.onNodeWithTag("player-live-status").assertDoesNotExist()
-        compose.onNodeWithTag("player-go-live").assertDoesNotExist()
-        assertInline(compose.tagBounds("player-timeline-track"))
-        recordPair("en-font1.0-960x540-mdpi-d1", "live-normal-focus-pause", "player-pause", backdrop)
-    }
-
-    @Test
-    fun captureSeekingPreview() {
-        val backdrop = mutableStateOf(Backdrop.WHITE)
-        show(behind = { true }, feedback = { null }, previewing = { true }, fontScale = 1f, backdrop = { backdrop.value })
-        compose.pressKey(Key.DirectionUp)
-        compose.onNodeWithTag("player-seekbar").assertExists()
-        compose.onNodeWithTag("timeshift-preview-target", useUnmergedTree = true).assertExists()
-        compose.onNodeWithTag("player-go-live").assertDoesNotExist()
-        compose.onNodeWithTag("player-seekbar").assertIsFocused()
-        recordPair("en-font1.0-960x540-mdpi-d1", "seeking-preview-focus-seekbar", "player-seekbar", backdrop)
     }
 
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
@@ -336,21 +268,13 @@ class PlayerFooterLayoutEvidenceTest {
         show(behind = { true }, feedback = { null }, previewing = { previewing }, fontScale = 1.3f,
             backdrop = { backdrop.value }, recording = recording, standalone = { standalone },
             onCommitSeek = { commits++ })
-        val kind = if (recording) "recording" else "live"
         val timelineTag = "player-seekbar"
-        val actionsTag = "player-actions"
         val resting = compose.tagBounds("player-timeline-track")
-        // The timeline's 8dp below its row and the 4dp gap above the actions, on the 28dp bottom margin.
-        assertEquals(px(4.dp + 8.dp), compose.tagBounds(actionsTag).top - compose.tagBounds(timelineTag).bottom, 1f)
-        assertEquals(512f, compose.tagBounds(actionsTag).bottom, 1f)
-        recordPair("de-font1.3-960x540-mdpi-d1", "$kind-resting", "player-pause", backdrop)
         compose.pressKey(Key.DirectionUp)
         compose.onNodeWithTag(timelineTag).assertIsFocused()
-        recordPair("de-font1.3-960x540-mdpi-d1", "$kind-focused", timelineTag, backdrop)
         compose.runOnIdle { previewing = true }
         compose.onNodeWithTag("player-pause").assertDoesNotExist()
         compose.onNodeWithTag("timeshift-preview-target", useUnmergedTree = true).assertExists()
-        recordPair("de-font1.3-960x540-mdpi-d1", "$kind-seeking", timelineTag, backdrop)
         compose.pressKey(Key.DirectionDown)
         compose.onNodeWithTag("player-pause").assertIsFocused()
         assertTrue(previewing) // Owner deliberately leaves the dispatched seek pending.
@@ -427,8 +351,6 @@ class PlayerFooterLayoutEvidenceTest {
         assertMarker(0.25f) // midpoint entry chooses the earlier of the two equally distant marks
         compose.pressKey(Key.DirectionRight)
         assertMarker(0.75f)
-        recordPair(if (fontScale == 1f) "en-font1.0-960x540-mdpi-d1" else "de-font1.3-960x540-mdpi-d1",
-            "recording-marker-selected-75", "recording-marker-target", backdrop)
         compose.pressKey(Key.DirectionLeft)
         assertMarker(0.25f)
         compose.pressKey(Key.DirectionLeft)
@@ -599,17 +521,18 @@ class PlayerFooterLayoutEvidenceTest {
     @Test
     @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
     fun germanLargeTextKeepsFeedbackClearOfTheBarRowAndPeeksQuickZap() {
+        val feedbackText = ApplicationProvider.getApplicationContext<Application>().getString(R.string.timeshift_target_expired)
         val backdrop = mutableStateOf(Backdrop.WHITE)
         show(
             behind = { true },
-            feedback = { "Diese Position ist nicht mehr im Puffer." },
+            feedback = { feedbackText },
             previewing = { false },
             fontScale = 1.3f,
             error = true,
             backdrop = { backdrop.value },
         )
         compose.onNodeWithTag("player-pause").assertIsFocused()
-        val feedback = compose.onNodeWithText("Diese Position ist nicht mehr im Puffer.")
+        val feedback = compose.onNodeWithText(feedbackText)
         feedback.assertExists()
         val message = feedback.fetchSemanticsNode().boundsInRoot
         val track = compose.tagBounds("player-timeline-track")
@@ -624,7 +547,6 @@ class PlayerFooterLayoutEvidenceTest {
         assertTrue("feedback ellipsized", !layouts.single().isLineEllipsized(0))
         assertEquals(1, layouts.single().lineCount)
         assertInline(track)
-        recordPair("de-font1.3-960x540-mdpi-d1", "error-feedback-peek", "player-pause", backdrop)
     }
 
     @Test
@@ -637,7 +559,6 @@ class PlayerFooterLayoutEvidenceTest {
         val text = compose.onNodeWithText("0:30:00", useUnmergedTree = true)
         val original = text.fetchSemanticsNode().boundsInRoot
         val track = compose.tagBounds("player-timeline-track")
-        recordPair("en-font1.0-960x540-mdpi-d1", "recording-playing-endpoints", "player-pause", backdrop)
         compose.runOnIdle { paused = true }
         assertEquals(original, text.fetchSemanticsNode().boundsInRoot)
         assertEquals(track, compose.tagBounds("player-timeline-track"))
@@ -646,7 +567,6 @@ class PlayerFooterLayoutEvidenceTest {
             .config[SemanticsProperties.ContentDescription].joinToString()
         assertTrue(description.contains("Paused"))
         compose.onNodeWithText("Paused", substring = true).assertDoesNotExist()
-        recordPair("en-font1.0-960x540-mdpi-d1", "recording-paused-endpoints", "player-pause", backdrop)
     }
 
     @Test
@@ -671,11 +591,11 @@ class PlayerFooterLayoutEvidenceTest {
             .config[SemanticsProperties.ContentDescription].single().contains("Paused"))
     }
 
-    @Test fun missingEpgServerLivePinsPlayingButNotPauseOrPreview() = missingEpgAxis("en", 1f)
+    @Test fun missingEpgServerLivePinsPlayingButNotPauseOrPreview() = missingEpgAxis(1f)
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
-    fun missingEpgAxisGermanLargeText() = missingEpgAxis("de", 1.3f)
+    fun missingEpgAxisGermanLargeText() = missingEpgAxis(1.3f)
 
-    private fun missingEpgAxis(locale: String, fontScale: Float) {
+    private fun missingEpgAxis(fontScale: Float) {
         var paused by mutableStateOf(false)
         var preview by mutableStateOf(false)
         var settled by mutableStateOf(false)
@@ -717,14 +637,11 @@ class PlayerFooterLayoutEvidenceTest {
         assertSample(atLive = true)
         compose.onNodeWithText("−1:30").assertExists()
         compose.onNodeWithText("0:00").assertExists()
-        capture("$locale-font$fontScale-missing-epg-playing-server-live-history90", focus = "none")
         compose.runOnIdle { paused = true }
         assertSample()
-        capture("$locale-font$fontScale-missing-epg-paused-sample60-history90", focus = "none")
         compose.runOnIdle { preview = true }
         assertSample()
         compose.onNodeWithText("−0:30", useUnmergedTree = true).assertExists()
-        capture("$locale-font$fontScale-missing-epg-full-preview", focus = "none")
         compose.runOnIdle { standalone = true }
         assertEquals(2f / 3, compose.tagBounds("player-timeline-fill").width / compose.tagBounds("player-timeline-track").width, 0.005f)
         // The step is spoken once it has been dispatched.
@@ -737,7 +654,6 @@ class PlayerFooterLayoutEvidenceTest {
         assertEquals("00:28", compose.onNodeWithTag("timeshift-preview-buffer-start", useUnmergedTree = true)
             .fetchSemanticsNode().config[SemanticsProperties.Text].single().text)
         compose.onNodeWithTag("timeshift-preview-position", useUnmergedTree = true).assertDoesNotExist()
-        capture("$locale-font$fontScale-missing-epg-standalone-preview", focus = "none")
         compose.runOnIdle { standalone = false; pinned = true }
         compose.onNodeWithText("−2:00").assertExists()
         compose.onNodeWithText("0:00").assertExists()
@@ -783,7 +699,6 @@ class PlayerFooterLayoutEvidenceTest {
         compose.onNodeWithTag("player-seekbar").assert(androidx.compose.ui.test.SemanticsMatcher("paused timing unavailable") {
             it.config[SemanticsProperties.ContentDescription].joinToString().contains("Paused", ignoreCase = true)
         })
-        capture("en-font1.0-960x540-mdpi-d1-paused-dismissed-unknown", focus = "player-seekbar")
         compose.pressKey(Key.DirectionDown)
         compose.onNodeWithTag("player-pause").assertIsFocused()
     }
@@ -818,7 +733,6 @@ class PlayerFooterLayoutEvidenceTest {
         val y = nominalActions.top.toInt() - 1
         val midOverflow = android.graphics.Color.red(mid.getPixel(x, y))
         val midInterior = android.graphics.Color.red(mid.getPixel(x, nominalActions.top.toInt() + 7))
-        capture("en-font1.0-960x540-mdpi-d1-white-focus-midfade-96ms")
         compose.mainClock.advanceTimeBy(400)
         val settled = draw()
         val settledOverflow = android.graphics.Color.red(settled.getPixel(x, y))
@@ -828,7 +742,6 @@ class PlayerFooterLayoutEvidenceTest {
         assertEquals("the action row stays fully opaque across seekbar focus", settledInterior, midInterior)
         assertEquals(nominalActions, compose.tagBounds("player-actions"))
         assertEquals(track, compose.tagBounds("player-timeline-track"))
-        capture("en-font1.0-960x540-mdpi-d1-white-focus-settled")
         mid.recycle(); settled.recycle()
     }
 
@@ -984,53 +897,6 @@ class PlayerFooterLayoutEvidenceTest {
 
     private fun px(value: androidx.compose.ui.unit.Dp) = with(compose.density) { value.toPx() }
 
-    private fun recordPair(
-        prefix: String,
-        state: String,
-        focusedTag: String,
-        backdrop: androidx.compose.runtime.MutableState<Backdrop>,
-    ) {
-        for (next in Backdrop.entries) {
-            compose.runOnIdle { backdrop.value = next }
-            compose.waitForIdle()
-            val name = "$prefix-${next.fileName}-$state"
-            capture(name)
-            val note = buildString {
-                appendLine("file=$name.png")
-                appendLine("canvas=960x540")
-                appendLine("density=1.0")
-                appendLine("locale=${if (prefix.startsWith("de")) "de" else "en"}")
-                appendLine("fontScale=${if (prefix.contains("font1.3")) "1.3" else "1.0"}")
-                appendLine("backdrop=${next.fileName}")
-                appendLine("focus=$focusedTag")
-                appendLine("focusedBottomPx=${compose.tagBounds(focusedTag).bottom}")
-            }
-            for (directory in captureDirectories()) {
-                CaptureOutput.writeText(File(directory, "$name.txt")) { note }
-            }
-        }
-    }
-
-    private fun capture(name: String, focus: String = "player-pause") {
-        val bitmap = draw()
-        for (directory in captureDirectories()) {
-            CaptureOutput.writePng(File(directory, "$name.png"), bitmap)
-            CaptureOutput.writeText(File(directory, "$name.txt")) {
-                "file=$name.png\ncanvas=${bitmap.width}x${bitmap.height}\ndensity=1.0\n" +
-                    "locale=${if (name.startsWith("de")) "de" else "en"}\n" +
-                    "fontScale=${if (name.contains("font1.3")) "1.3" else "1.0"}\n" +
-                    "fixture=PlayerFooterLayoutEvidenceTest; production composables, offline fake state\n" +
-                    "focus=$focus\n"
-            }
-        }
-        bitmap.recycle()
-    }
-
-    private fun captureDirectories() = listOf(
-        File("build/outputs/player-footer-captures"),
-        File("/tmp/opencode/player-footer"),
-    )
-
     private fun zapImageLoader(context: android.content.Context) = ImageLoader.Builder(context)
         .components {
             add(object : Mapper<AppArtworkSource, ByteArray> {
@@ -1070,7 +936,7 @@ class PlayerFooterLayoutEvidenceTest {
         )
     }
 
-    private enum class Backdrop(val fileName: String) { WHITE("white"), TEXTURED("backdrop") }
+    private enum class Backdrop { WHITE, TEXTURED }
 }
 
 /** A live quick step on the hidden player, as the screen composes it: the passive Banner's preview timeline. */

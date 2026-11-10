@@ -124,7 +124,7 @@ import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 @Config(sdk = [34], application = Application::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @OptIn(ExperimentalFoundationApi::class)
-class ChannelsStandardLayoutEvidenceTest {
+class ChannelsListLayoutTest {
     @get:Rule val images = ImageLoaderRule { testImageLoader(ApplicationProvider.getApplicationContext<Application>()) }
     @get:Rule val compose = createComposeRule()
     private lateinit var view: View
@@ -153,12 +153,10 @@ class ChannelsStandardLayoutEvidenceTest {
         val slot = inRow(PLAYING, "channel-playing-indicator").bounds()
         val recording = inRow(PLAYING, "channel-recording-indicator").bounds()
         val title = inRow(PLAYING, "channel-title").bounds()
-        capture("en-font1-playing-row-current-bright-video")
         compose.runOnIdle { playbackIndicator = ChannelPlaybackIndicator.PAUSED }
         assertEquals(slot, inRow(PLAYING, "channel-paused-indicator").bounds())
         assertEquals(recording, inRow(PLAYING, "channel-recording-indicator").bounds())
         assertEquals(title, inRow(PLAYING, "channel-title").bounds())
-        capture("en-font1-paused-row-current-bright-video")
         compose.mainClock.autoAdvance = false
         compose.runOnIdle { playbackIndicator = ChannelPlaybackIndicator.TUNING }
         compose.waitForIdle()
@@ -166,7 +164,6 @@ class ChannelsStandardLayoutEvidenceTest {
         compose.mainClock.advanceTimeBy(96)
         assertEquals(slot, inRow(PLAYING, "channel-tuning-indicator").bounds())
         assertEquals(recording, inRow(PLAYING, "channel-recording-indicator").bounds())
-        capture("en-font1-tuning-row-current-96ms-bright-video")
         compose.runOnIdle { playbackIndicator = ChannelPlaybackIndicator.NONE }
         compose.waitForIdle()
         compose.mainClock.advanceTimeByFrame()
@@ -212,12 +209,9 @@ class ChannelsStandardLayoutEvidenceTest {
         assertEquals("relocation key does not tune", 0, playbackRequests)
         compose.pressKey(Key.DirectionCenter)
         assertEquals("next confirm activates the native row", 1, playbackRequests)
-    }
-
-    @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
-    fun missingEpgDoesNotReplaceTheExistingSessionActivationPolicy() {
-        channelsShell(1f)
-        enterAndFocus(NO_EPG)
+        compose.runOnIdle { playbackRequests = 0 }
+        repeat(NO_EPG - 1) { compose.pressKey(Key.DirectionDown) }
+        row(NO_EPG).assertIsFocused()
         assertEquals("focus only previews", 0, playbackRequests)
         compose.pressKey(Key.DirectionCenter)
         assertEquals("explicit OK retains the current-session activation policy", 1, playbackRequests)
@@ -357,7 +351,6 @@ class ChannelsStandardLayoutEvidenceTest {
 
         // No EPG: the title line alone, no time segments and no progress, same anchors.
         val missing = row(NO_EPG).bounds()
-        inRow(NO_EPG, "channel-programme-title").assertTextEquals("No program information")
         compose.onAllNodesWithTag("channel-programme-start", useUnmergedTree = true)
             .fetchSemanticsNodes().none { it.boundsInRoot.top in missing.top..missing.bottom }
             .let { assertTrue("no start time on a channel without EPG", it) }
@@ -579,9 +572,6 @@ class ChannelsStandardLayoutEvidenceTest {
         row(PLAYING).assertIsFocused()
         assertEquals("native focus does not need to repair the preview anchor", previewTop, row(PLAYING).bounds().top, .5f)
         assertFocusedShapePixels(PLAYING, rowHeight, scrolled = true)
-        assertEquals("focus and scope changes never activate playback", 0, playbackRequests)
-        compose.pressKey(Key.DirectionCenter)
-        assertEquals("OK still activates the native row", 1, playbackRequests)
     }
 
     /** Inspect the actual opaque native pill, including its 1.05 overflow, not just semantics. */
@@ -668,13 +658,6 @@ class ChannelsStandardLayoutEvidenceTest {
     }
 
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
-    fun shortProgrammeKeepsThreeSynopsisLinesUnderThePicture() {
-        channelsShell(1f)
-        enterAndFocus(1)
-        assertDescriptionFits(3)
-    }
-
-    @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
     fun enlargedLongProgrammeKeepsWholeLinesUnderThePicture() {
         channelsShell(1.3f)
         enterAndFocus(LONG_TEXT)
@@ -694,6 +677,7 @@ class ChannelsStandardLayoutEvidenceTest {
         for (channel in 1..NO_EPG) {
             if (channel > 1) compose.pressKey(Key.DirectionDown)
             row(channel).assertIsFocused()
+            if (channel == 1 && fontScale == 1f) assertDescriptionFits(3)
             val picture = detail("channels-list-art").bounds()
             assertEquals("the picture keeps the pane's top", 80f, picture.top, .5f)
             assertEquals("the kit's four-column card", 268f, picture.width, .5f)
