@@ -94,10 +94,11 @@ class ChannelAccentTest {
     @Test fun anUnknownColourStartsNeutralAndEndsOnTheSampledColourWhichIsStored() {
         val returned = show()
         assertEquals("the first frame", neutral, returned.first())
+        // ChannelAccents samples on Dispatchers.Default, which has no injected dispatcher.
         compose.waitUntil(10_000) { store["profile-1"] != null }
         val sampled = Color(0xFF000000.toInt() or store["profile-1"]!!)
         assertNotEquals(neutral, sampled)
-        // The sampler resumes off the test's clock; the crossfade then runs on it.
+        // Dispatchers.Default's result still has to resume the Main effect after storing the colour.
         compose.waitUntil(10_000) { compose.mainClock.advanceTimeByFrame(); returned.last() == sampled }
         compose.mainClock.advanceTimeBy(1_000)
         compose.waitForIdle()

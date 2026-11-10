@@ -291,6 +291,7 @@ class CardGlowRoomTest {
         // Glow colour, background and scroll settle; the logo glow is baked off the main thread.
         compose.mainClock.advanceTimeBy(1_500)
         awaitChannelColors(focused)
+        // LogoGlows bakes on Dispatchers.Default, outside Compose idle.
         compose.waitUntil(10_000) {
             compose.onAllNodesWithTag("channels-logo-glow").fetchSemanticsNodes().isEmpty() ||
                 compose.onAllNodesWithTag("channels-immersive-picon").fetchSemanticsNodes().isNotEmpty()
@@ -306,7 +307,7 @@ class CardGlowRoomTest {
         val art = observation.eventAt(ChannelId(focused.toLong()), Instant.fromEpochSeconds(System.currentTimeMillis() / 1000))
             ?.image?.takeIf { fixture.channelsView.showsProgramArt }
         val picture = art?.let { AppArtworkSource(requireNotNull(observation.currentSession), it) }
-        // Neither the focused picture's glow nor any visible logo card's fill is tracked by Compose idle.
+        // DetailsArtColors and ChannelAccents sample on non-injectable Dispatchers.Default workers.
         // Wait for their palette results before advancing the colour animations, not just for the backdrop.
         compose.waitUntil(10_000) {
             (picture == null || DetailsArtColors.stored(picture) != null) && ChannelsLayoutFixture.PICONS.indices.all { index ->
@@ -365,6 +366,7 @@ class CardGlowRoomTest {
         compose.onRoot().performKeyInput { pressKey(key) }
         val focus = hasTestTag("player-channel-card-$focused")
         compose.waitUntil(10_000) { compose.onAllNodes(focus and isFocused()).fetchSemanticsNodes().isNotEmpty() }
+        // ChannelAccents samples on Dispatchers.Default, outside Compose idle.
         compose.waitUntil(10_000) { accentStore["rail-1"] != null && accentStore["rail-2"] != null }
         compose.mainClock.advanceTimeBy(1_500)
         compose.waitForIdle()

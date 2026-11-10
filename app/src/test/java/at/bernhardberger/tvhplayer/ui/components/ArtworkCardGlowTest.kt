@@ -118,8 +118,10 @@ class ArtworkCardGlowTest {
         assertEquals(neutral, returned.last())
         assertEquals(0, loads.get())
         focus()
+        // DetailsArtColors samples on Dispatchers.Default, with no injected dispatcher.
         compose.waitUntil(10_000) { DetailsArtColors.stored(AppArtworkSource(session, art)) != null }
         val sampled = Color(0xFF000000.toInt() or requireNotNull(DetailsArtColors.stored(AppArtworkSource(session, art))))
+        // The Default sampler's Main continuation is a second signal after its cache write.
         compose.waitUntil(10_000) { compose.mainClock.advanceTimeByFrame(); returned.last() == glow(sampled) }
         assertNotEquals(glow(Color(0xFF336699)), returned.last())
         assertEquals(1, loads.get())
@@ -129,8 +131,10 @@ class ArtworkCardGlowTest {
         release.complete(Unit)
         show()
         focus()
+        // ChannelAccents samples on Dispatchers.Default, with no injected dispatcher.
         compose.waitUntil(10_000) { store["glow-2"] != null }
         val sampled = Color(0xFF000000.toInt() or requireNotNull(store["glow-2"]))
+        // The Default sampler's Main continuation is a second signal after its cache write.
         compose.waitUntil(10_000) { compose.mainClock.advanceTimeByFrame(); returned.last() == glow(sampled) }
         assertEquals(1, loads.get())
     }
@@ -141,6 +145,7 @@ class ArtworkCardGlowTest {
         runBlocking { store.put("glow-2", 0x336699) }
         show(picture = art)
         focus()
+        // The image interceptor is reached from DetailsArtColors' real Default worker.
         compose.waitUntil(10_000) { loads.get() == 1 }
         compose.mainClock.advanceTimeBy(1_000)
         compose.waitForIdle()

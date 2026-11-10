@@ -53,7 +53,7 @@ class TargetAspectTest {
 
     private fun choose(mode: AspectRatioMode) {
         compose.runOnIdle { aspect.select(mode) }
-        compose.waitUntil { compose.runOnIdle { aspect.mode == mode } }
+        compose.mainClock.advanceTimeUntil { aspect.mode == mode }
         compose.waitForIdle()
     }
 
@@ -143,12 +143,12 @@ class TargetAspectTest {
         val store = PlayerSettingsStore(delayed)
         show(store)
         compose.runOnIdle { aspect.select(AspectRatioMode.FORCE_4_3) }
-        compose.waitUntil { entered.isCompleted }
+        compose.mainClock.advanceTimeUntil { entered.isCompleted }
 
         runBlocking { data.edit { it[profileKey] = "replacement" } }
         compose.waitForIdle()
         release.complete(Unit)
-        compose.waitUntil { finished.isCompleted }
+        compose.mainClock.advanceTimeUntil { finished.isCompleted }
         compose.waitForIdle()
 
         assertEquals("new profile's same-numbered channel is untouched", AspectRatioMode.FIT, stored(store, one))
@@ -166,7 +166,7 @@ class TargetAspectTest {
         choose(AspectRatioMode.FORCE_4_3)
 
         runBlocking { data.edit { it[profileKey] = "replacement" } }
-        compose.waitUntil { compose.runOnIdle { aspect.mode == AspectRatioMode.FIT } }
+        compose.mainClock.advanceTimeUntil { aspect.mode == AspectRatioMode.FIT }
         assertEquals(AspectRatioMode.FIT, mode())
     }
 }

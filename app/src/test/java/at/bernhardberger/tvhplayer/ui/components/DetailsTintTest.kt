@@ -129,6 +129,7 @@ class DetailsTintTest {
         if (stored) runBlocking { store.put("tint-test-2", 0x336699) }
         else releaseSample.complete(Unit)
         showPage(hasArt = false)
+        // ChannelAccents samples on Dispatchers.Default, with no injected dispatcher.
         compose.waitUntil(10_000) { store["tint-test-2"] != null }
         awaitGlow()
         val accent = if (stored) 0x336699 else requireNotNull(store["tint-test-2"])
@@ -166,6 +167,7 @@ class DetailsTintTest {
         }
         val initial = if (changedInPlace) sampled to picon else noLogo to null
         val next = sampled to if (changedInPlace) replaced else picon
+        // LogoGlows bakes on Dispatchers.Default, including the initial neutral glow.
         compose.waitUntil(10_000) { initial in settled }
         if (changedInPlace) awaitGlow()
         compose.runOnIdle { if (changedInPlace) logo = replaced else shown = sampled }
@@ -175,6 +177,7 @@ class DetailsTintTest {
         assertEquals(listOf(initial), settled)
         assertPixel(1919, 0, neutral.toArgb())
         releaseSample.complete(Unit)
+        // Both the accent sample and the replacement glow bake run on Dispatchers.Default.
         compose.waitUntil(10_000) { next in settled }
         if (!changedInPlace) assertEquals(listOf(initial, next), settled)
         val sampledKey = if (changedInPlace) "tint-test-5" else "tint-test-2"
@@ -187,7 +190,14 @@ class DetailsTintTest {
         releaseSample.complete(Unit)
         runBlocking { store.put("tint-test-2", 0x336699) }
         showPage()
-        compose.waitUntil(10_000) { samples.get() > 0 }
+        // The Default sampler must finish and resume Main, not merely enter the image interceptor.
+        val expected = Color(0xFF000000.toInt() or detailsTintRgb(0x336699)).toArgb()
+        compose.waitUntil(10_000) {
+            val shown = pixel(20, 20)
+            samples.get() > 0 && listOf(16, 8, 0).all { shift ->
+                kotlin.math.abs((shown shr shift and 0xff) - (expected shr shift and 0xff)) <= 1
+            }
+        }
         compose.mainClock.advanceTimeBy(1000)
         // The scrim over the missing art is the page's own colour.
         assertNear(20, 20, Color(0xFF000000.toInt() or detailsTintRgb(0x336699)), tolerance = 1)
@@ -206,7 +216,9 @@ class DetailsTintTest {
         }
         assertEquals(neutral, returned.first())
         releaseSample.complete(Unit)
+        // DetailsArtColors samples on Dispatchers.Default, with no injected dispatcher.
         compose.waitUntil(10_000) { DetailsArtColors.stored(AppArtworkSource(session, art)) != null }
+        // Its Main continuation is a second signal after the Default worker's cache write.
         compose.waitUntil(10_000) { compose.mainClock.advanceTimeByFrame(); returned.last() == redTint }
         assertTrue(returned.any { it != neutral && it != redTint })
     }
@@ -230,6 +242,7 @@ class DetailsTintTest {
 
     private fun sampleArt(id: ArtworkId): Int? {
         releaseSample.complete(Unit)
+        // DetailsArtColors switches to its non-injectable Dispatchers.Default sampler.
         return runBlocking { DetailsArtColors.sample(ApplicationProvider.getApplicationContext(), AppArtworkSource(session, id)) }
     }
 
@@ -238,6 +251,7 @@ class DetailsTintTest {
         val scope = CoroutineScope(Dispatchers.Default + Job())
         try {
             val sampled = scope.async { DetailsArtColors.sample(ApplicationProvider.getApplicationContext(), AppArtworkSource(session, art)) }
+            // The cache warmup and the palette sample both run on real Default workers.
             compose.waitUntil(10_000) { sampled.isCompleted }
             assertNotNull(runBlocking { sampled.await() })
         } finally { scope.cancel() }

@@ -454,7 +454,7 @@ class WatchingProgressTest {
             override suspend fun updateData(transform: suspend (Preferences) -> Preferences) =
                 transform(state.value).also { state.value = it }
         })
-        val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.IO,
+        val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.Main.immediate,
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
         val coordinator = createTvheadendPlaybackCoordinator(object : ExoPlayer by player {
             override fun setMediaSource(mediaSource: MediaSource) = base.setMediaSource(if (liveFailure) mediaSource else loading(mediaSource.mediaItem))
@@ -473,12 +473,13 @@ class WatchingProgressTest {
         fun install(id: DvrEntryId) {
             val job = scope.async { runtime.playRecording(requireNotNull(currentRecordingPlaybackSelection(session.observation.value, id)),
                 RecordingPlaybackStart.START_OVER) }
+            // The SDK coordinator installs on Media3's real playback thread.
             compose.waitUntil(10_000) { job.isCompleted }
             compose.runOnIdle {
                 ready = true
                 listeners.toList().forEach { it.onPlaybackStateChanged(Player.STATE_READY); it.onIsPlayingChanged(true) }
             }
-            compose.waitUntil(5_000) { runtime.state.value == AppPlaybackState.Playing }
+            compose.mainClock.advanceTimeUntil(timeoutMillis = 5_000) { runtime.state.value == AppPlaybackState.Playing }
         }
         try {
             scope.launch { profiles.run() }
@@ -504,10 +505,10 @@ class WatchingProgressTest {
             }
             if (!liveFailure) {
                 install(recording.id)
-                compose.waitUntil(5_000) { seen.any { it.second?.recordingId == recording.id } }
+                compose.mainClock.advanceTimeUntil(timeoutMillis = 5_000) { seen.any { it.second?.recordingId == recording.id } }
                 compose.runOnIdle { positionMs = 120_000L; ready = false }
                 install(second.id)
-                compose.waitUntil(5_000) { seen.any { it.second?.recordingId == second.id } }
+                compose.mainClock.advanceTimeUntil(timeoutMillis = 5_000) { seen.any { it.second?.recordingId == second.id } }
                 compose.runOnIdle {
                     val next = seen.filter { it.first == AppPlaybackTarget.Recording(second.id) }
                     assertTrue(next.isNotEmpty())
@@ -515,19 +516,20 @@ class WatchingProgressTest {
                     assertTrue(next.all { it.second == null || it.second == RecordingViewerPosition(second.id, 120_000L, 7_200_000L) })
                     base.pause()
                 }
-                compose.waitUntil(5_000) { publishedIndicator == ChannelPlaybackIndicator.PAUSED }
+                compose.mainClock.advanceTimeUntil(timeoutMillis = 5_000) { publishedIndicator == ChannelPlaybackIndicator.PAUSED }
                 compose.runOnIdle { positionMs = 60_000L }
                 compose.mainClock.advanceTimeBy(1100)
-                compose.waitUntil(5_000) { seen.last().second?.positionMs == 60_000L }
+                compose.mainClock.advanceTimeUntil(timeoutMillis = 5_000) { seen.last().second?.positionMs == 60_000L }
                 compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.CREATED }
                 compose.runOnIdle { positionMs = 30_000L }
                 compose.mainClock.advanceTimeBy(2100)
                 compose.runOnIdle { assertEquals(60_000L, seen.last().second?.positionMs) }
                 compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.RESUMED }
-                compose.waitUntil(5_000) { seen.last().second?.positionMs == 30_000L }
+                compose.mainClock.advanceTimeUntil(timeoutMillis = 5_000) { seen.last().second?.positionMs == 30_000L }
                 return
             }
             val live = scope.async { runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, channel.id))) }
+            // The SDK coordinator binds through its real worker / Media3 playback thread.
             compose.waitUntil(10_000) {
                 // Profile resolution resumes on the Android looper, not Compose's frame clock.
                 org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
