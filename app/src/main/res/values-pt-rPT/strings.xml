@@ -357,7 +357,7 @@
     <string name="connection_try_again">Tentar novamente</string>
     <string name="connection_retry_description">O Tvheadend Player também tenta novamente por si</string>
     <string name="connection_notice_restored">Ligação restabelecida</string>
-    <string name="server_switched">Conectado a %1$s</string>
+    <string name="server_switched">Ligado a %1$s</string>
     <string name="connection_scope_line">Para %1$s</string>
     <string name="connection_notice_login_rejected">Início de sessão rejeitado</string>
     <string name="recording_action_permission">Esta conta não pode gerir gravações.</string>
