@@ -34,8 +34,9 @@ import androidx.media3.common.Tracks
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvhplayer.core.programmeArtwork
 import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
@@ -115,7 +116,7 @@ internal data class QuickZapPreviewSnapshot(
     val metadata: String,
     val summary: String?,
     val next: String?,
-    val image: ArtworkId?,
+    val image: ChannelIcon?,
     val subtitle: String? = null,
 )
 
@@ -144,7 +145,7 @@ internal fun QuickZapTrayPreview(
             summary = if (compact) null else event?.summary?.takeIf(String::isNotBlank) ?: event?.description?.takeIf(String::isNotBlank),
             subtitle = event?.subtitle?.takeIf(String::isNotBlank),
             next = next?.title?.takeIf(String::isNotBlank)?.let { title -> "${formatClock(next.start.epochSeconds)} $title" },
-            image = if (compact) null else event?.image,
+            image = if (compact) null else event?.let(::programmeArtwork),
         )
     }
     Box(modifier, contentAlignment = Alignment.BottomStart) {

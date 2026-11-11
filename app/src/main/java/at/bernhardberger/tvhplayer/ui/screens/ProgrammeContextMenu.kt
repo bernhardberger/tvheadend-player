@@ -55,8 +55,8 @@ internal fun ProgrammeContextMenu(
         artwork = {
             // The menu shows its pictures with the session it was opened with.
             ProvideArtworkSession(currentSession, observation) {
-                ProgrammeArtwork(event.image, channel?.icon, programmeProgress(event, nowSec),
-                    Modifier.fillMaxSize().testTag(if (event.image != null && currentSession != null)
+                ProgrammeArtwork(programmeArtwork(event), channel?.icon, programmeProgress(event, nowSec),
+                    Modifier.fillMaxSize().testTag(if (programmeArtwork(event) != null && currentSession != null)
                         "browse-context-artwork" else "browse-context-picon"),
                     plateModifier = Modifier.testTag("browse-context-plate"),
                     progressModifier = Modifier.testTag("browse-context-progress"),

@@ -746,7 +746,8 @@
     <string name="home_browse_by_genre">Răsfoiește după gen</string>
     <string name="home_continue_watching">Continuă vizionarea</string>
     <string name="home_recently_recorded">Înregistrări noi</string>
-    <string name="home_back_to_player">Înapoi la player</string>
+    <string name="home_back_to_live_tv">Înapoi la direct</string>
+    <string name="home_back_to_recording">Înapoi la înregistrare</string>
     <string name="home_recording_starts_at">Începe la %1$s</string>
     <string name="home_all_recordings">Toate înregistrările</string>
     <string name="home_activity_watching_live">Vizionare în direct</string>

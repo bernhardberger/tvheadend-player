@@ -16,6 +16,7 @@ import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
 import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import androidx.compose.ui.platform.testTag
 import at.bernhardberger.tvhplayer.core.playerStateCell
+import at.bernhardberger.tvhplayer.core.recordingArtwork
 import at.bernhardberger.tvhplayer.core.recordingBarEnd
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import androidx.compose.runtime.Composable
@@ -606,7 +607,7 @@ fun RecordingPlayerScreen(
                     state = chromeState,
                     recordingNow = growing,
                     picon = channel?.icon,
-                    artwork = entry.image ?: entry.fanartImage,
+                    artwork = recordingArtwork(entry),
                     channelId = entry.channelId,
                     withoutChannel = channel == null,
                 ),

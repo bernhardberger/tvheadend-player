@@ -687,7 +687,8 @@
     <string name="home_browse_by_genre">Explorar por gênero</string>
     <string name="home_continue_watching">Continuar assistindo</string>
     <string name="home_recently_recorded">Novas gravações</string>
-    <string name="home_back_to_player">Voltar ao player</string>
+    <string name="home_back_to_live_tv">Voltar à TV ao vivo</string>
+    <string name="home_back_to_recording">Voltar à gravação</string>
     <string name="home_recording_starts_at">Começa às %1$s</string>
     <string name="home_all_recordings">Todas as gravações</string>
     <string name="home_activity_watching_live">Assistindo ao vivo</string>

@@ -1,6 +1,10 @@
 package at.bernhardberger.tvhplayer.ui
 
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.media3.PlaybackRecoveryReason
+import at.bernhardberger.tvhplayer.playback.AppPlaybackFailureReason
+import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
 import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
@@ -39,6 +43,18 @@ class RecordingPlaybackRouteTest {
         assertNull(warmRecordingId(null, selection, current))
         assertNull(warmRecordingId(target, null, current))
         assertNull(warmRecordingId(target, selection, null))
+    }
+
+    @Test fun browseTreatsATargetAsPlayingOnlyWhileItCanPlay() {
+        val target = AppPlaybackTarget.Live(ChannelId(1))
+        listOf(AppPlaybackState.Starting, AppPlaybackState.Playing, AppPlaybackState.Buffering,
+            AppPlaybackState.Recovering(PlaybackRecoveryReason.LIVE_ENDED, 1_000L)).forEach {
+            assertEquals(target, playingTarget(target, it))
+        }
+        listOf(AppPlaybackState.Finished, AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER)).forEach {
+            assertNull(playingTarget(target, it))
+        }
+        assertNull(playingTarget(null, AppPlaybackState.Playing))
     }
 
     @Test

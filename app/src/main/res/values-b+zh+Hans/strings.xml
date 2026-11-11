@@ -686,7 +686,8 @@
     <string name="home_browse_by_genre">按类型浏览</string>
     <string name="home_continue_watching">继续观看</string>
     <string name="home_recently_recorded">最新录制</string>
-    <string name="home_back_to_player">返回播放器</string>
+    <string name="home_back_to_live_tv">返回直播</string>
+    <string name="home_back_to_recording">返回录像</string>
     <string name="home_recording_starts_at">%1$s 开始</string>
     <string name="home_all_recordings">全部录制内容</string>
     <string name="home_activity_watching_live">正在观看直播</string>

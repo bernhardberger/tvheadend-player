@@ -4,6 +4,9 @@ import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvhplayer.core.CurrentChannelReadiness
+import at.bernhardberger.tvhplayer.playback.AppPlaybackFailureReason
+import at.bernhardberger.tvhplayer.playback.AppPlaybackState
+import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
@@ -135,6 +138,34 @@ class AppRootPlaybackOrchestratorTest {
         assertEquals(PlayerRouteTarget.Live(ChannelId(22), "News HD"), target)
         assertEquals(0, playRequests)
         assertTrue(orchestrator.warmReturn.canReturn)
+    }
+
+    @Test
+    fun failedPlaybackIsStartedAnewAndOffersNoWarmReturn() = runTest {
+        val orchestrator = AppRootPlaybackOrchestrator()
+        val failed = AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER)
+        // The error screen keeps its target for Retry; browse sees it through playingIds.
+        val (channelId, recordingId) = playingIds(AppPlaybackTarget.Live(ChannelId(22)), failed)
+        orchestrator.activePlaybackChanged(channelId, recordingId)
+        assertFalse("A failed player is not a warm return", orchestrator.warmReturn.canReturn)
+        var playRequests = 0
+
+        orchestrator.requestLivePlayer(
+            activeChannelId = channelId,
+            activeRecordingId = recordingId,
+            requestedChannelId = ChannelId(22),
+            requestedChannelName = "News HD",
+            viewingIntent = 1L,
+            startPlayback = { playRequests += 1 },
+        )
+
+        assertEquals("Opening the failed channel again starts it anew", 1, playRequests)
+        assertEquals(ChannelId(22) to null, playingIds(AppPlaybackTarget.Live(ChannelId(22)), AppPlaybackState.Playing))
+
+        // An armed return that outlives the failure (rail re-arm, effect not yet run) cannot swallow Back.
+        orchestrator.activePlaybackChanged(ChannelId(22), null)
+        assertTrue(orchestrator.canReturnToPlayer(ChannelId(22), null))
+        assertFalse("A failed player cannot be returned to", orchestrator.canReturnToPlayer(channelId, recordingId))
     }
 
     @Test

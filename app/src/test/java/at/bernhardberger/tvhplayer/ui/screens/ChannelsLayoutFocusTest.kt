@@ -899,7 +899,8 @@ class ChannelsLayoutFocusTest {
     }
 
     @Test fun immersiveBackgroundShowsArtThenTheLogoWithoutArt() {
-        fixture.show(immersive, playerReturn = PlayerReturnFocus(ChannelId(1), ChannelId(1)))
+        fixture.show(immersive, imageLoader = fixture.fixtureArt(),
+            playerReturn = PlayerReturnFocus(ChannelId(1), ChannelId(1)))
         fixture.awaitFocus(card(1))
         compose.onNodeWithTag("channels-immersive-art").assertExists()
         compose.onNodeWithTag("channels-immersive-subtitle").assertTextEquals("Winter on the ridge")
@@ -973,7 +974,7 @@ class ChannelsLayoutFocusTest {
     }
 
     @Test fun immersiveBackgroundFollowsFocusAfterAnOrdinaryEntry() {
-        fixture.show(immersive)
+        fixture.show(immersive, imageLoader = fixture.fixtureArt())
         fixture.awaitFocus(card(1))
         compose.onNodeWithTag("channels-immersive-art").assertExists()
         repeat(7) { fixture.key(Key.DirectionRight) }

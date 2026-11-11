@@ -80,6 +80,7 @@ data class SessionArtworkRequest(
     val channelIcon: ChannelIcon?,
     val recordingImage: ArtworkId?,
     val session: CurrentSessionObservation,
+    val recordingRemoteImage: at.bernhardberger.tvheadend.sdk.core.RemoteArtworkUrl? = null,
 )
 
 enum class SessionPlaybackErrorKind { RECORDING, CHANNEL_UNAVAILABLE, CHANNEL }
@@ -426,7 +427,8 @@ private fun sessionArtworkRequest(target: AppPlaybackTarget?, observation: Sessi
         is AppPlaybackTarget.Live -> observation.channel(target.channelId)
         is AppPlaybackTarget.Recording -> recording?.channelId?.let(observation::channel)
     }
-    return SessionArtworkRequest(target, channel?.icon, recording?.image, session)
+    return SessionArtworkRequest(target, channel?.icon, recording?.image ?: recording?.fanartImage, session,
+        recording?.remoteImage ?: recording?.remoteFanartImage)
 }
 
 private data class SessionFailureKey(val kind: SessionPlaybackErrorKind, val code: Int, val target: AppPlaybackTarget?)

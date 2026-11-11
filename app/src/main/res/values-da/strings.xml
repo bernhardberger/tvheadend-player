@@ -731,7 +731,8 @@
     <string name="home_browse_by_genre">Gennemse efter genre</string>
     <string name="home_continue_watching">Se videre</string>
     <string name="home_recently_recorded">Nye optagelser</string>
-    <string name="home_back_to_player">Tilbage til afspilleren</string>
+    <string name="home_back_to_live_tv">Tilbage til live</string>
+    <string name="home_back_to_recording">Tilbage til optagelsen</string>
     <string name="home_recording_starts_at">Starter kl. %1$s</string>
     <string name="home_all_recordings">Alle optagelser</string>
     <string name="home_activity_watching_live">Ser live-tv</string>

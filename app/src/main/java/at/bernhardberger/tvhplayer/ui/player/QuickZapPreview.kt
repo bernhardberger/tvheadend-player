@@ -15,13 +15,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
 import at.bernhardberger.tvhplayer.ui.TvGridGutter
 import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
 import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.core.AppArtworkSource
+import at.bernhardberger.tvhplayer.core.programmeArtworkModel
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import coil3.compose.AsyncImage
 
 /**
@@ -35,7 +35,7 @@ fun QuickZapPreview(
     metadata: String,
     summary: String?,
     next: String?,
-    image: ArtworkId?,
+    image: ChannelIcon?,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
 ) {
@@ -70,7 +70,7 @@ fun QuickZapPreview(
             }
         }
         if (artwork != null && currentSession != null && !artworkFailed) AsyncImage(
-            AppArtworkSource(currentSession, artwork), null,
+            programmeArtworkModel(artwork, currentSession), null,
             modifier = Modifier.size(PlayerChromeTokens.channelCardWidth, PlayerChromeTokens.channelCardHeight)
                 .clip(PreviewArtworkShape),
             contentScale = ContentScale.Crop,

@@ -98,6 +98,7 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
+import at.bernhardberger.tvhplayer.core.recordingArtwork
 import at.bernhardberger.tvhplayer.core.AppError
 import at.bernhardberger.tvhplayer.core.AppErrorAction
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
@@ -453,7 +454,7 @@ internal fun RecordingMetadataPane(
     // Level with the first row, below the list's own top padding.
     Column(modifier.fillMaxSize().padding(top = 4.dp).testTag("recording-metadata-pane")) {
         ProgrammePanePicture(
-            art = LocalArtworkContext.current.currentSession?.let { entry.image ?: entry.fanartImage },
+            art = LocalArtworkContext.current.currentSession?.let { recordingArtwork(entry) },
             logo = piconPath, accent = entry.channelId, logoTag = "recording-metadata-logo",
             modifier = Modifier.width(ProgrammePaneWidth).aspectRatio(16f / 9f).testTag("recording-metadata-art"),
         )

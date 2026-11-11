@@ -700,7 +700,7 @@ class WatchingProgressTest {
                                         RecordingProgressCapability.SUPPORTED).recordingPlaybackAdmission(recording), true,
                                         playing = true), {}, {}, summary = event.summary.orEmpty(),
                                     recordingState = recording.state, playbackIndicator = watchingIndicator(recording.id)) {
-                                    ProgrammeArtwork(recording.image, channel.icon, recordingViewerPosition(recording.id)?.fraction,
+                                    ProgrammeArtwork(recording.image?.let(ChannelIcon::ImageCache), channel.icon, recordingViewerPosition(recording.id)?.fraction,
                                         Modifier.fillMaxSize(), progressColor = progressColor(true))
                                 }
                                 "zap", "zap-no-history" -> NowPlayingStrip(channel.id, "101", channel.name.orEmpty(), picon,

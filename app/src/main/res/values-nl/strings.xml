@@ -731,7 +731,8 @@
     <string name="home_browse_by_genre">Op genre zoeken</string>
     <string name="home_continue_watching">Verder kijken</string>
     <string name="home_recently_recorded">Nieuwe opnamen</string>
-    <string name="home_back_to_player">Terug naar speler</string>
+    <string name="home_back_to_live_tv">Terug naar live-tv</string>
+    <string name="home_back_to_recording">Terug naar opname</string>
     <string name="home_recording_starts_at">Begint om %1$s</string>
     <string name="home_all_recordings">Alle opnamen</string>
     <string name="home_activity_watching_live">Live kijken</string>

@@ -731,7 +731,8 @@
     <string name="home_browse_by_genre">Böngészés műfaj szerint</string>
     <string name="home_continue_watching">Nézés folytatása</string>
     <string name="home_recently_recorded">Új felvételek</string>
-    <string name="home_back_to_player">Vissza a lejátszóhoz</string>
+    <string name="home_back_to_live_tv">Vissza az élőhöz</string>
+    <string name="home_back_to_recording">Vissza a felvételhez</string>
     <string name="home_recording_starts_at">Kezdés: %1$s</string>
     <string name="home_all_recordings">Összes felvétel</string>
     <string name="home_activity_watching_live">Élő adás nézése</string>

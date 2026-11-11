@@ -409,7 +409,7 @@ class PlayerChromeEvidenceTest {
         }.build()
         images.install(failing)
         compose.setContent { TVHeadendPlayerTheme { Column(Modifier.width(800.dp)) {
-            ProvideArtworkSession(session) { QuickZapPreview("Failed title", "Failed metadata", null, null, ArtworkId(1)) }
+            ProvideArtworkSession(session) { QuickZapPreview("Failed title", "Failed metadata", null, null, ChannelIcon.ImageCache(ArtworkId(1))) }
             ProvideArtworkSession(session) { QuickZapPreview("Absent title", "Absent metadata", null, null, null) }
         } } }
         compose.waitForIdle()
@@ -526,13 +526,13 @@ class PlayerChromeEvidenceTest {
                             }
                             Scene.INFO, Scene.INFO_NO_LOGO, Scene.RECORDED -> InfoBar(info(scene == Scene.RECORDED), Modifier.fillMaxWidth().align(Alignment.BottomCenter))
                             Scene.HERO_ART, Scene.HERO_FALLBACK, Scene.HERO_NEUTRAL -> ProvideArtworkSession(session) { ProgrammeHero(
-                                if (scene == Scene.HERO_ART) ArtworkId(1) else null, ChannelId(101), "101",
+                                if (scene == Scene.HERO_ART) ChannelIcon.ImageCache(ArtworkId(1)) else null, ChannelId(101), "101",
                                 if (scene == Scene.HERO_NEUTRAL) null else ChannelIcon.parse("imagecache/2"),
                             ) }
                             Scene.PREVIEW_ART, Scene.PREVIEW_TEXT -> ProvideArtworkSession(session) { QuickZapPreview(
                                 "Die außergewöhnliche Reise durch die österreichischen Alpen", "20:15–21:45 • ${playerMinutesLeft(38)} • Natur",
                                 "Eine Reise durch die Bergwelt mit ihren Menschen und Geschichten. Entdecken Sie die Landschaft aus einer neuen Perspektive.",
-                                "21:45 Nachrichten", if (scene == Scene.PREVIEW_ART) ArtworkId(1) else null, Modifier.fillMaxWidth(),
+                                "21:45 Nachrichten", if (scene == Scene.PREVIEW_ART) ChannelIcon.ImageCache(ArtworkId(1)) else null, Modifier.fillMaxWidth(),
                             ) }
                         }
                     }

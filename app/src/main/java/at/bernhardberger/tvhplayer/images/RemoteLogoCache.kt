@@ -16,7 +16,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okio.Path.Companion.toOkioPath
 
-/** Only Coil's network fetcher writes here; the SDK owns its image-cache bytes separately. */
+/** Holds remote logos and remote programme pictures; the SDK owns its image-cache bytes separately. */
 class RemoteLogoCache(context: Context) : Interceptor {
     private val directory = context.cacheDir.resolve("remote-channel-logos")
     private val generationFile = AtomicFile(directory.resolve("generation"))
@@ -25,7 +25,7 @@ class RemoteLogoCache(context: Context) : Interceptor {
     val diskCache: DiskCache = DiskCache.Builder()
         // Keep the generation beside the entries: DiskCache.clear() removes its directory.
         .directory(directory.resolve("entries").toOkioPath())
-        .maxSizeBytes(16L * 1024 * 1024)
+        .maxSizeBytes(64L * 1024 * 1024)
         .build()
     @Volatile
     internal var memoryCache: MemoryCache? = null
