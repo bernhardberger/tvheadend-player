@@ -425,16 +425,7 @@ fun VideoPlayerScreen(
     var channelNumberCommitted by remember { mutableStateOf(false) }
     var timeshiftCommandToken by remember { mutableLongStateOf(0L) }
     var restoreToLiveAfterReconnect by remember { mutableStateOf(false) }
-    var infoRailChannelId by remember { mutableStateOf<ChannelId?>(null) }
-    // The control last focused in the controls, which closing Info returns to.
-    var lastChromeAction by remember { mutableStateOf<String?>(null) }
-    var infoReturnAction by remember { mutableStateOf<String?>(null) }
-    var infoInitialAction by remember { mutableStateOf<BrowseContextAction?>(null) }
-    var recordKeyInFlight by remember { mutableStateOf(false) }
-    // The control focused when number entry took the keys over the controls; focus returns there.
-    var numberEntryReturnAction by remember { mutableStateOf<String?>(null) }
-    // The control last focused in the controls, the live timeline included.
-    var lastChromeControl by remember { mutableStateOf<String?>(null) }
+    val remoteKeys = remember { LivePlayerRemoteKeyState() }
     val dvrMutationActions = remember(session) { DvrMutationActions(session.dvrRepository) }
     val rootFocus = remember { FocusRequester() }
 
@@ -782,9 +773,9 @@ fun VideoPlayerScreen(
 
     fun openInfo(fromKey: Boolean = false) {
         infoPinnedEventId = null
-        infoInitialAction = null
-        infoRailChannelId = null
-        infoReturnAction = if (fromKey && !layerState.core.chrome.controlsVisible) null else "player-info"
+        remoteKeys.infoInitialAction = null
+        remoteKeys.infoRailChannelId = null
+        remoteKeys.infoReturnAction = if (fromKey && !layerState.core.chrome.controlsVisible) null else "player-info"
         layerState.core.restoreInfoFocus = false
         layerState.openInfo(fromKey)
     }
@@ -793,7 +784,7 @@ fun VideoPlayerScreen(
         if (timelineState.seekPending) timelineState.commitPendingSeek()
         channelNumberInput = ""
         // A zap can close the schedule past a covered Info; closeInfo() sets the target again on a real return.
-        infoReturnAction = null
+        remoteKeys.infoReturnAction = null
     }
 
     fun dismissRecordingDialog() {
@@ -803,10 +794,11 @@ fun VideoPlayerScreen(
     fun closeInfo() {
         infoPinnedEventId = null
         layerState.dismissRecordingConfirmation()
-        val returnToRail = infoRailChannelId != null
+        val returnToRail = remoteKeys.infoRailChannelId != null
         layerState.closeInfo(returnToRail = returnToRail)
-        infoRailChannelId = null
-        infoReturnAction = if (returnToRail || !layerState.core.chrome.controlsVisible) null else "player-info"
+        remoteKeys.infoRailChannelId = null
+        remoteKeys.infoReturnAction =
+            if (returnToRail || !layerState.core.chrome.controlsVisible) null else "player-info"
     }
 
     /**
@@ -861,42 +853,45 @@ fun VideoPlayerScreen(
         }
     }
     val queueTimeshiftSeek = timeshiftSeekAction()
-    val queueScrubSeek by rememberUpdatedState(timeshiftSeekAction(automatic = true))
-    val latestTimeshift by rememberUpdatedState(effectiveTimeshiftState)
+    val queueScrubSeek = timeshiftSeekAction(automatic = true)
     fun commitScrub() {
         timelineState.commitPendingSeek { dispatchPlaybackAction(MediaPlaybackAction.PLAY) }
     }
-    LaunchedEffect(timelineState, timelineState.scrubSpeed) {
-        val speed = timelineState.scrubSpeed
-        if (speed == 0) return@LaunchedEffect
-        var previous = withFrameNanos { it }
-        var remainder = 0L
-        while (timelineState.scrubSpeed == speed) {
-            val frame = withFrameNanos { it }
-            if (timelineState.scrubSpeed != speed) return@LaunchedEffect
-            val scaled = (frame - previous) * speed + remainder
-            val delta = scaled / 1_000_000L
-            remainder = scaled % 1_000_000L
-            previous = frame
-            val state = latestTimeshift
-            if (!state.available) {
-                timelineState.cancelPendingSeek()
-                return@LaunchedEffect
-            }
-            val target = timelineState.preview?.decision?.targetMs ?: state.positionMs
-            val start = (state.bufferStartMs + 1_000L).coerceAtMost(state.liveEdgeMs)
-            val next = (target + delta).coerceIn(start, state.liveEdgeMs)
-            queueScrubSeek(next - target)
-            val reachedStart = speed < 0 && next <= start
-            val reachedLiveEdge = speed > 0 && next >= state.liveEdgeMs
-            if (reachedStart || reachedLiveEdge) {
-                commitScrub()
-                return@LaunchedEffect
+    @Composable
+    fun LiveScrubEffect() {
+        val latestQueueScrubSeek by rememberUpdatedState(queueScrubSeek)
+        val latestTimeshift by rememberUpdatedState(effectiveTimeshiftState)
+        LaunchedEffect(timelineState, timelineState.scrubSpeed) {
+            val speed = timelineState.scrubSpeed
+            if (speed == 0) return@LaunchedEffect
+            var previous = withFrameNanos { it }
+            var remainder = 0L
+            while (timelineState.scrubSpeed == speed) {
+                val frame = withFrameNanos { it }
+                if (timelineState.scrubSpeed != speed) return@LaunchedEffect
+                val scaled = (frame - previous) * speed + remainder
+                val delta = scaled / 1_000_000L
+                remainder = scaled % 1_000_000L
+                previous = frame
+                val state = latestTimeshift
+                if (!state.available) {
+                    timelineState.cancelPendingSeek()
+                    return@LaunchedEffect
+                }
+                val target = timelineState.preview?.decision?.targetMs ?: state.positionMs
+                val start = (state.bufferStartMs + 1_000L).coerceAtMost(state.liveEdgeMs)
+                val next = (target + delta).coerceIn(start, state.liveEdgeMs)
+                latestQueueScrubSeek(next - target)
+                val reachedStart = speed < 0 && next <= start
+                val reachedLiveEdge = speed > 0 && next >= state.liveEdgeMs
+                if (reachedStart || reachedLiveEdge) {
+                    commitScrub()
+                    return@LaunchedEffect
+                }
             }
         }
     }
-    var scrubKeyHeld by remember { mutableStateOf(false) }
-    var scrubKeyCode by remember { mutableStateOf<Int?>(null) }
+    LiveScrubEffect()
 
     /**
      * Runs a key's start now, before this key's recomposition or controls reveal. It
@@ -1128,7 +1123,7 @@ fun VideoPlayerScreen(
         committedWindow, effectiveTimeshiftState, nowEvent, liveStart)
 
     fun recordProgramme(programme: EpgEventEntry?) {
-        if (recordKeyInFlight) return
+        if (remoteKeys.recordKeyInFlight) return
         val opening = observation
         val capability = opening.currentSession
         if (programme == null || capability == null) {
@@ -1145,7 +1140,7 @@ fun VideoPlayerScreen(
             notices.postRecordUnavailable(programme, opening, nowSec)
         } else {
             val mutation = DvrMutationAction.CreateProgramme(programme.programmeRecordingTarget(capability), null)
-            recordKeyInFlight = true
+            remoteKeys.recordKeyInFlight = true
             scope.launch {
                 try {
                     val preferred = uiSettingsStore.settings.first().recordingProfileId
@@ -1159,7 +1154,7 @@ fun VideoPlayerScreen(
                     val context = notices.context()
                     notices.postDvrFailure(configured, dvrMutationActions.execute(configured), context)
                 } finally {
-                    recordKeyInFlight = false
+                    remoteKeys.recordKeyInFlight = false
                 }
             }
         }
@@ -1221,8 +1216,8 @@ fun VideoPlayerScreen(
     }
     val numberEntryUp = foregroundLayer == PlayerForegroundLayer.NUMBER_ENTRY
     LaunchedEffect(numberEntryUp, layerState.core.chrome.controlsVisible) {
-        if (!layerState.core.chrome.controlsVisible) numberEntryReturnAction = null
-        else if (numberEntryUp) numberEntryReturnAction = lastChromeControl
+        if (!layerState.core.chrome.controlsVisible) remoteKeys.numberEntryReturnAction = null
+        else if (numberEntryUp) remoteKeys.numberEntryReturnAction = remoteKeys.lastChromeControl
     }
     @Composable
     fun AutoHideEligibility() {
@@ -1451,7 +1446,7 @@ fun VideoPlayerScreen(
                         }, stopAndClose = stopAndClose,
                         activityKeyCycleOwner = activityKeyCycleOwner,
                         backOwner = playerModals.lastOrNull() ?: (foregroundLayer to when (foregroundLayer) {
-                            PlayerForegroundLayer.INFO -> infoRailChannelId ?: currentChannelId
+                            PlayerForegroundLayer.INFO -> remoteKeys.infoRailChannelId ?: currentChannelId
                             PlayerForegroundLayer.SCHEDULE -> layerState.scheduleDetails?.id ?: currentChannelId
                             PlayerForegroundLayer.OPTIONS_DETAIL, PlayerForegroundLayer.OPTIONS_QUICK_LIST -> layerState.core.optionsPage
                             else -> null
@@ -1481,7 +1476,8 @@ fun VideoPlayerScreen(
                 val keyContext = PlayerKeyContext(
                     surface = PlayerSurface.LIVE,
                     controlsVisible = layerState.core.chrome.controlsVisible,
-                    seekbarFocused = layerState.core.chrome.controlsVisible && lastChromeControl == "player-seekbar",
+                    seekbarFocused = layerState.core.chrome.controlsVisible &&
+                        remoteKeys.lastChromeControl == "player-seekbar",
                     timeshiftAvailable = effectiveTimeshiftState.available,
                     optionsOpen = layerState.core.optionsPage != null,
                     statsOpen = layerState.core.statsVisible,
@@ -1508,16 +1504,16 @@ fun VideoPlayerScreen(
                         }
                     } else if (event.type == KeyEventType.KeyDown) {
                         if (event.nativeKeyEvent.repeatCount == 0) {
-                            scrubKeyCode = keyCode
-                            scrubKeyHeld = false
-                        } else if (scrubKeyCode == keyCode) {
-                            scrubKeyHeld = true
+                            remoteKeys.scrubKeyCode = keyCode
+                            remoteKeys.scrubKeyHeld = false
+                        } else if (remoteKeys.scrubKeyCode == keyCode) {
+                            remoteKeys.scrubKeyHeld = true
                             queueTimeshiftSeek(playbackSeekStepMs(direction, event.nativeKeyEvent.repeatCount))
                             layerState.core.chrome.peekBanner()
                         }
-                    } else if (event.type == KeyEventType.KeyUp && scrubKeyCode == keyCode) {
-                        scrubKeyCode = null
-                        if (!scrubKeyHeld && !event.nativeKeyEvent.isCanceled) {
+                    } else if (event.type == KeyEventType.KeyUp && remoteKeys.scrubKeyCode == keyCode) {
+                        remoteKeys.scrubKeyCode = null
+                        if (!remoteKeys.scrubKeyHeld && !event.nativeKeyEvent.isCanceled) {
                             timelineState.startScrub(direction)
                             queueScrubSeek(direction.toLong())
                             layerState.core.chrome.peekBanner()
@@ -1640,7 +1636,7 @@ fun VideoPlayerScreen(
                         if (wasScrubbing) commitScrub()
                         openInfo(fromKey = true)
                         infoPinnedEventId = programme?.id.takeIf { wasScrubbing }
-                        infoInitialAction = initialAction
+                        remoteKeys.infoInitialAction = initialAction
                         return@onPreviewKeyEvent true
                     }
                     PlayerKeyAction.SCRUB_BACK,
@@ -1721,26 +1717,21 @@ fun VideoPlayerScreen(
     val compactTuning = busyStatus == PlayerBusyStatus.TUNING && statusPresentation == PlaybackStatusPresentation.COMPACT_TUNING
     val dvrEntries = observation.dvrEntries()
     val recordingChannelIds = remember(dvrEntries) { activeRecordingChannelIds(dvrEntries) }
-    val aspectRatio = targetAspect.mode
-    val previewId = visibleSeekPreview?.id
-    val onStepAnnounced = remember(timelineState, previewId) {
-        { previewId?.let(timelineState::stepAnnounced); Unit }
-    }
     val chromeState = playerStateCell(paused = livePaused)
+    val currentChannel = remember(observation, currentChannelId) {
+        observation.channel(currentChannelId)
+    }
+    @Composable
+    fun chromeContent(): PlayerChromeContent {
     val nextEvent = remember(observation, currentChannelId, nowSec) {
         observation.nextEvent(
             currentChannelId,
             kotlin.time.Instant.fromEpochSeconds(nowSec),
         )
     }
-    val currentChannel = remember(observation, currentChannelId) {
-        observation.channel(currentChannelId)
-    }
     // A slot window (no programme at the position) is an axis only: it has no Next line.
     val infoNextEvent = displayedNextEvent(visibleSeekPreview != null, displayedWindow,
         effectiveTimeshiftState, nextEvent, liveStart, nowEvent) { observation.nextEvent(currentChannelId, it) }
-    @Composable
-    fun chromeContent(): PlayerChromeContent {
     val unavailableTitle = stringResource(R.string.no_epg)
     val controlsEvent = infoEvent.takeUnless { channelUnavailable }
     // During a quick step the Next line follows the step's target programme, so the block keeps its height.
@@ -1781,6 +1772,10 @@ fun VideoPlayerScreen(
         }
         @Composable
         fun PlayerControls(keepControls: Boolean) {
+        val previewId = visibleSeekPreview?.id
+        val onStepAnnounced = remember(timelineState, previewId) {
+            { previewId?.let(timelineState::stepAnnounced); Unit }
+        }
         // The same availability as the options sheet's quick lists the buttons open.
         val trackButtons = rememberPlayerTrackButtons(
             player, available = !channelFailed && playingLiveChannelId == currentChannelId)
@@ -1833,10 +1828,10 @@ fun VideoPlayerScreen(
                 paused = !livePlayWhenReady(livePauseState, playWhenReady),
                 livePause = livePauseAvailability,
                 restoreFocus = when {
-                    infoReturnAction != null && !layerState.core.infoOpen -> infoReturnAction
+                    remoteKeys.infoReturnAction != null && !layerState.core.infoOpen -> remoteKeys.infoReturnAction
                     layerState.core.restoreInfoFocus -> "player-info"
                     layerState.core.restoreOptionsFocus -> "player-settings"
-                    numberEntryReturnAction != null -> numberEntryReturnAction
+                    remoteKeys.numberEntryReturnAction != null -> remoteKeys.numberEntryReturnAction
                     else -> layerState.core.restoreControl
                 },
                 tracks = trackButtons,
@@ -1861,11 +1856,11 @@ fun VideoPlayerScreen(
             onOptions = layerState.core::openOptions,
             onAudioList = layerState.core::showAudioPicker,
             onInteraction = layerState.core.chrome::onUserInteraction,
-            onActionFocused = { lastChromeAction = it; layerState.onActionFocused(it) },
-            onControlFocused = { lastChromeControl = it },
+            onActionFocused = { layerState.onActionFocused(it) },
+            onControlFocused = { remoteKeys.lastChromeControl = it },
             onFocusRestored = {
-                infoReturnAction = null
-                numberEntryReturnAction = null
+                remoteKeys.infoReturnAction = null
+                remoteKeys.numberEntryReturnAction = null
                 layerState.core.onFocusRestored()
             },
             onDownFromActions = openRailFromActions,
@@ -1899,8 +1894,8 @@ fun VideoPlayerScreen(
                     },
                     onOpenDetails = { channel, _, keyCode ->
                         keyCode?.let(layerState.core::beginOpeningKeyCycle)
-                        infoRailChannelId = channel.id
-                        infoReturnAction = null
+                        remoteKeys.infoRailChannelId = channel.id
+                        remoteKeys.infoReturnAction = null
                         layerState.core.restoreInfoFocus = false
                         layerState.openInfo()
                     },
@@ -1948,9 +1943,10 @@ fun VideoPlayerScreen(
         ) { }
         @Composable
         fun PlayerPanels() {
-        val detailsChannelId = infoRailChannelId ?: currentChannelId
+        val aspectRatio = targetAspect.mode
+        val detailsChannelId = remoteKeys.infoRailChannelId ?: currentChannelId
         val detailsChannel = channels.firstOrNull { it.id == detailsChannelId }
-        val detailsBaseEvent = if (infoRailChannelId == null) {
+        val detailsBaseEvent = if (remoteKeys.infoRailChannelId == null) {
             infoPinnedEventId?.let(observation::event) ?: infoEvent.takeIf { infoPinnedEventId == null }
         } else channelsVm.nowEvent(detailsChannelId, nowSec)
         if (layerState.scheduleOpen) PlayerChannelSchedule(
@@ -1965,7 +1961,7 @@ fun VideoPlayerScreen(
                 event = detailsBaseEvent, channel = detailsChannel, observation = observation,
                 currentObservation = { session.observation.value }, nowSec = nowSec,
                 mutations = dvrMutationActions, notices = notices, mutationScope = scope,
-                initialAction = infoInitialAction,
+                initialAction = remoteKeys.infoInitialAction,
                 settingsStore = uiSettingsStore,
                 onPlay = { id, _ -> channels.firstOrNull { it.id == id }?.let(onPickChannel) },
                 onShowGuide = onShowGuide, onClose = ::closeInfo,
@@ -2048,6 +2044,18 @@ fun VideoPlayerScreen(
     CompositionLocalProvider(LocalPlayerModalRegistry provides playerModals) {
         PlayerContent()
     }
+}
+
+private class LivePlayerRemoteKeyState {
+    var infoRailChannelId by mutableStateOf<ChannelId?>(null)
+    var infoReturnAction by mutableStateOf<String?>(null)
+    // The control focused before number entry took over the controls.
+    var numberEntryReturnAction by mutableStateOf<String?>(null)
+    var infoInitialAction by mutableStateOf<BrowseContextAction?>(null)
+    var recordKeyInFlight by mutableStateOf(false)
+    var lastChromeControl by mutableStateOf<String?>(null)
+    var scrubKeyHeld by mutableStateOf(false)
+    var scrubKeyCode by mutableStateOf<Int?>(null)
 }
 
 private class InitialLivePlaybackState {
