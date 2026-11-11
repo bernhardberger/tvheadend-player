@@ -1,6 +1,6 @@
 package at.bernhardberger.tvhplayer.core
 
-enum class ApplianceEntryDestination { LIVE, GUIDE }
+enum class ApplianceEntryDestination { LIVE, GUIDE, RECORDINGS }
 
 enum class ApplianceGuideEntryAction { WAIT, DROP, OPEN_GUIDE }
 
@@ -9,6 +9,7 @@ object ApplianceEntryPolicy {
     const val EXTRA_APPLIANCE_DESTINATION = "at.bernhardberger.tvhplayer.extra.APPLIANCE_DESTINATION"
     const val DESTINATION_LIVE = "live"
     const val DESTINATION_GUIDE = "guide"
+    const val DESTINATION_RECORDINGS = "recordings"
     const val ENTRY_ALIAS_CLASS_NAME = "at.bernhardberger.tvhplayer.ui.ApplianceEntryActivity"
 
     fun acceptsEntryIntent(
@@ -22,7 +23,11 @@ object ApplianceEntryPolicy {
     fun shouldCreateLaunchRequest(isPlayerVisible: Boolean): Boolean = !isPlayerVisible
 
     fun destination(value: String?): ApplianceEntryDestination =
-        if (value == DESTINATION_GUIDE) ApplianceEntryDestination.GUIDE else ApplianceEntryDestination.LIVE
+        when (value) {
+            DESTINATION_GUIDE -> ApplianceEntryDestination.GUIDE
+            DESTINATION_RECORDINGS -> ApplianceEntryDestination.RECORDINGS
+            else -> ApplianceEntryDestination.LIVE
+        }
 
     fun guideEntryAction(
         connectionState: ConnectionUiState,

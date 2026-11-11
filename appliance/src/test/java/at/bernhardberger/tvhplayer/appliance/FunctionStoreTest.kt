@@ -27,5 +27,12 @@ class FunctionStoreTest {
         assertEquals(ButtonBinding.Default, FunctionStore(context).functions.liveTv)
         assertEquals(-1, context.getSharedPreferences("companion_functions", 0).getInt("live_tv", 0))
         assertEquals(setOf(170, 4001), FunctionStore(context).functions.keys(CompanionFunction.LIVE_TV))
+        store.assign(CompanionFunction.GUIDE, ButtonBinding.Custom(173))
+        assertEquals(ButtonBinding.NotSet, FunctionStore(context).functions.recordings)
+        assertEquals(-2, context.getSharedPreferences("companion_functions", 0).getInt("recordings", 0))
+        store.assign(CompanionFunction.RECORDINGS, ButtonBinding.Default)
+        assertEquals(ButtonBinding.NotSet, FunctionStore(context).functions.guide)
+        assertEquals(setOf(173), FunctionStore(context).functions.keys(CompanionFunction.RECORDINGS))
+        assertEquals(-1, context.getSharedPreferences("companion_functions", 0).getInt("recordings", 0))
     }
 }

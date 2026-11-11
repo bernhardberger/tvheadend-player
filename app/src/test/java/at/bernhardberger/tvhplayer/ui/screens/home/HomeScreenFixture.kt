@@ -44,8 +44,10 @@ internal fun homeScreen(
     onSectionVisibleChange: (HomeSectionKind, Boolean) -> Unit = { _, _ -> },
     catalogCurrent: Boolean = observation.channelState.channelCatalogAuthority == RetainedMetadataAuthority.CURRENT,
     focusMemory: MutableState<HomeFocusKey?> = remember { mutableStateOf(null) },
+    onRecordKey: (ChannelId) -> BrowseContextAction? = { null },
 ) {
     HomeScreenContent(input, observation, PaddingValues(), enabled,
+        onRecordKey = onRecordKey,
         onPlay = onPlay, onPlayRecording = onPlayRecording, onReturnToRecording = onReturnToRecording,
         onShowGuide = onShowGuide, onGenre = onGenre, onRecordings = onRecordings,
         connectionUiState = connectionUiState, onOpenConnectionSettings = onOpenConnectionSettings,

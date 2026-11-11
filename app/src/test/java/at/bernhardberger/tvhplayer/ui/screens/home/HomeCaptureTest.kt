@@ -867,6 +867,7 @@ class HomeCaptureTest {
                                 nowSecProvider = { scene.nowSec },
                             ) { padding, _ ->
                                 if (screen) HomeScreenContent(scene.input, scene.observation, padding, true,
+                                    onRecordKey = { null },
                                     onPlay = { _, _ -> }, onPlayRecording = { _, _ -> }, onReturnToRecording = { _, _ -> false },
                                     onShowGuide = { _, _ -> }, onGenre = {}, onRecordings = { _, _ -> },
                                     groups = listOf(

@@ -58,3 +58,14 @@ fun nearestProgrammeAt(
     events: List<EpgEventEntry>,
     targetStartSec: Long,
 ): EpgEventEntry? = events.minByOrNull { abs(it.start.epochSeconds - targetStartSec) }
+
+fun recordUnavailableReason(
+    event: EpgEventEntry?,
+    nowSec: Long,
+    canModifyRecordings: Boolean,
+): at.bernhardberger.tvhplayer.notices.RecordUnavailableReason? = when {
+    event == null -> at.bernhardberger.tvhplayer.notices.RecordUnavailableReason.NO_PROGRAMME
+    event.stop.epochSeconds <= nowSec -> at.bernhardberger.tvhplayer.notices.RecordUnavailableReason.ENDED
+    !canModifyRecordings -> at.bernhardberger.tvhplayer.notices.RecordUnavailableReason.PERMISSION_DENIED
+    else -> null
+}

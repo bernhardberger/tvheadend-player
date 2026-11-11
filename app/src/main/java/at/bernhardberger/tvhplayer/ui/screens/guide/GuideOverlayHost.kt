@@ -32,6 +32,7 @@ internal fun GuideOverlayHost(
     onCloseDetails: () -> Unit,
     eventFocusRequesters: Map<EventId, FocusRequester>,
     onShowGuide: (ChannelId, EpgEventEntry?) -> Unit,
+    initialAction: at.bernhardberger.tvhplayer.core.BrowseContextAction? = null,
 ) {
     detailsEvent?.let { openingEvent ->
         val openingObservation = detailsObservation ?: return@let
@@ -45,6 +46,7 @@ internal fun GuideOverlayHost(
             onPlayRecording = onPlayRecording, onClose = onCloseDetails,
             returnFocusRequester = eventFocusRequesters[openingEvent.id],
             onShowGuide = onShowGuide,
+            initialAction = initialAction,
         )
     }
 }

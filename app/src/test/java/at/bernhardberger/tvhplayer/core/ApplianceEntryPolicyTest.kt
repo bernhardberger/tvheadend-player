@@ -44,6 +44,7 @@ class ApplianceEntryPolicyTest {
 
     @Test
     fun onlyTheExactGuideValueChangesTheLiveDefault() {
+        assertEquals("RECORDINGS", ApplianceEntryPolicy.destination("recordings").name)
         assertEquals(ApplianceEntryDestination.GUIDE, ApplianceEntryPolicy.destination("guide"))
         listOf(null, "live", "", "unknown", "GUIDE").forEach {
             assertEquals(ApplianceEntryDestination.LIVE, ApplianceEntryPolicy.destination(it))

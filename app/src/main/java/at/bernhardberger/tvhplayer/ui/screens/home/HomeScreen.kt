@@ -8,6 +8,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.type
+import at.bernhardberger.tvhplayer.ui.screens.DvrMutationActions
+import at.bernhardberger.tvhplayer.ui.screens.recordChannelProgramme
 import at.bernhardberger.tvhplayer.ui.components.TabOwner
 import at.bernhardberger.tvhplayer.ui.components.LocalTabOwner
 import at.bernhardberger.tvhplayer.ui.components.AppErrorAlert
@@ -68,6 +72,10 @@ internal fun HomeScreen(
     val settingsStore: UiSettingsStore = koinInject()
     val settings by settingsStore.settings.collectAsStateWithLifecycle<UiSettings?>(null)
     val saveScope = rememberCoroutineScope()
+    val recordSession: TvheadendSession = koinInject()
+    val recordNotices: at.bernhardberger.tvhplayer.notices.NoticeCenter = koinInject()
+    val recordMutations = remember(recordSession) { DvrMutationActions(recordSession.dvrRepository) }
+    val recordInFlight = remember { mutableStateOf<DvrMutationAction?>(null) }
     var hintNow by remember { mutableStateOf(System.currentTimeMillis()) }
     androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
         hintNow = System.currentTimeMillis()
@@ -114,6 +122,9 @@ internal fun HomeScreen(
     CompositionLocalProvider(LocalTabOwner provides owner) {
         ProvideArtworkSession(frame.second.currentSession, frame.third) {
         HomeScreenContent(frame.first.copy(hiddenSections = loadedSettings.hiddenHomeSections), frame.second, contentPadding, initialFocusEnabled,
+            onRecordKey = { channelId -> if (current(channelId)) recordMutations.recordChannelProgramme(channelId,
+                { recordSession.observation.value }, { System.currentTimeMillis() / 1000L }, settingsStore,
+                recordNotices, saveScope, recordInFlight) else null },
             updateHintShown = at.bernhardberger.tvhplayer.settings.whatsNewHintShown(
                 loadedSettings.whatsNewSeenVersion, at.bernhardberger.tvhplayer.BuildConfig.VERSION_CODE, lastUpdateTime, hintNow),
             onWhatsNewOpened = { saveScope.launch { settingsStore.markWhatsNewSeen(at.bernhardberger.tvhplayer.BuildConfig.VERSION_CODE) } },
@@ -194,6 +205,7 @@ internal fun HomeScreenContent(
     focusMemory: MutableState<HomeFocusKey?> = remember { mutableStateOf(null) },
     updateHintShown: Boolean = false,
     onWhatsNewOpened: () -> Unit = {},
+    onRecordKey: (ChannelId) -> BrowseContextAction?,
 ) {
     val nowSec = input.nowSec
     val owner = LocalTabOwner.current
@@ -211,10 +223,22 @@ internal fun HomeScreenContent(
     val viewFocus = remember { FocusRequester() }
     var channelMenu by remember { mutableStateOf<ChannelId?>(null) }
     var channelDetails by remember { mutableStateOf(false) }
+    var recordInitialAction by remember { mutableStateOf<BrowseContextAction?>(null) }
+    var cardFocused by remember { mutableStateOf(false) }
     var recording by remember { mutableStateOf<DvrEntry?>(null) }
     var recordingMenu by remember { mutableStateOf(false) }
     val mutationScope = rememberCoroutineScope()
     val mutationInFlight = remember { mutableStateOf<DvrMutationAction?>(null) }
+    fun recordFocusedProgramme(channelId: ChannelId) {
+        when (val action = onRecordKey(channelId)) {
+            BrowseContextAction.STOP, BrowseContextAction.CANCEL -> {
+                recordInitialAction = action
+                channelDetails = true
+                channelMenu = channelId
+            }
+            else -> Unit
+        }
+    }
     val closeBehindPlayer = rememberCloseBehindPlayer()
     fun openRecording(entry: DvrEntry, menu: Boolean) {
         if (owner?.isCurrent == false) return
@@ -302,11 +326,26 @@ internal fun HomeScreenContent(
             if (previous.item in HomeEndCardKeys && sections.any { it.kind == previous.section }) previous
             else homeRestoreFocus(sections, previous)
         } ?: homeInitialFocus(sections),
-        onFocused = { focused = it; followInitialFocus = false; restoreHeader = false },
-        modifier = modifier.onPreviewKeyEvent {
+        onFocused = { focused = it; cardFocused = true; followInitialFocus = false; restoreHeader = false },
+        modifier = modifier.onPreviewKeyEvent { key ->
             // Drawer entry may deliver only the release to Home; it is still viewer input.
             followInitialFocus = false
-            false
+            if (key.nativeKeyEvent.keyCode != android.view.KeyEvent.KEYCODE_MEDIA_RECORD) false
+            else {
+                if (key.type == KeyEventType.KeyDown && key.nativeKeyEvent.repeatCount == 0 &&
+                    contentFocusEnabled && cardFocused && owner?.isCurrent != false) {
+                    val focus = focused
+                    val section = sections.firstOrNull { it.kind == focus?.section }
+                    val channelId = when (section) {
+                        is HomeSection.CurrentActivity -> (section.items.getOrNull(focus?.position ?: -1)?.playing as? HomePlaying.LiveChannel)?.channelId
+                        is HomeSection.RecentChannels -> if (focus?.item == "all-channels") null else section.items.getOrNull(focus?.position ?: -1)?.channel?.id
+                        is HomeSection.OnNow -> section.items.getOrNull(focus?.position ?: -1)?.channel?.id
+                        else -> null
+                    }
+                    if (channelId != null) recordFocusedProgramme(channelId)
+                }
+                true
+            }
         },
         followInitialFocus = followInitialFocus && sections.isNotEmpty(),
         focusEnabled = contentFocusEnabled,
@@ -315,7 +354,7 @@ internal fun HomeScreenContent(
         onTags = { if (owner?.isCurrent != false) { restoreTagHeader = true; restoreHeader = true; tags = true } },
         restoreTags = restoreTagHeader,
         viewRequester = viewFocus, restoreHeader = restoreHeader,
-        onHeaderFocused = { restoreHeader = false },
+        onHeaderFocused = { cardFocused = false; restoreHeader = false },
         emptyFocus = errorFocus.takeUnless { loading && !loadingDelayed },
         onViewOptions = openOptions,
         emptyContent = {
@@ -363,7 +402,8 @@ internal fun HomeScreenContent(
         Box(Modifier.onPreviewKeyEvent { openingOwner?.isCurrent == false }) {
             ChannelContextMenu(id, observation, { nowSec }, mutationScope, mutationInFlight,
                 onPlay = onPlay, onShowGuide = onShowGuide,
-                onClose = { channelMenu = null }, showDetails = channelDetails,
+                onClose = { channelMenu = null; recordInitialAction = null }, showDetails = channelDetails,
+                initialAction = recordInitialAction,
                 onShowDetails = { channelDetails = true },
                 onPlayRecording = { onPlayRecording(it, RecordingPlaybackStart.START_OVER) })
         }

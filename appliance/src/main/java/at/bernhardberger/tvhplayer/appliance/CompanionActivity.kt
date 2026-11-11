@@ -206,7 +206,7 @@ class CompanionActivity : ComponentActivity() {
             CompanionRow.ACCESSIBILITY -> openFirst(
                 Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS), Intent(Settings.ACTION_SETTINGS))
             CompanionRow.STARTUP -> FunctionStore(this).setStartup(!functions.startup).also { refreshStatus() }
-            CompanionRow.LIVE_TV, CompanionRow.GUIDE -> Unit // Opened as pages by the screen.
+            CompanionRow.LIVE_TV, CompanionRow.GUIDE, CompanionRow.RECORDINGS -> Unit // Opened as pages by the screen.
             CompanionRow.HOME -> openFirst(Intent(Settings.ACTION_HOME_SETTINGS), Intent(Settings.ACTION_SETTINGS))
             CompanionRow.SYSTEM_HOME -> systemHome?.let { component ->
                 openScreen(homeIntent().setComponent(component).addFlags(

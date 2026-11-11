@@ -34,6 +34,7 @@ import org.koin.dsl.module
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
 import at.bernhardberger.tvhplayer.testutil.awaitScheduledWork
+import at.bernhardberger.tvhplayer.testutil.pressKey
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
@@ -46,13 +47,20 @@ class HomeActionsTest {
 
     @Test fun recentChannelsEndCardOpensChannelsWithoutTuning() {
         var opened = false
+        val recordTargets = mutableListOf<ChannelId>()
         val input = homeInput(listOf(channel), now, recentChannelIds = listOf(channel.id))
         compose.setContent { TVHeadendPlayerTheme {
             homeScreen(input,
+                onRecordKey = { recordTargets += it; null },
                 onPlay = { _, _ -> fail("end card tuned") },
                 onBrowseChannels = { opened = true })
         } }
+        compose.onNodeWithTag("home-recent-0").assertIsFocused()
+        compose.pressKey(Key(android.view.KeyEvent.KEYCODE_MEDIA_RECORD))
+        compose.runOnIdle { assertEquals(listOf(channel.id), recordTargets) }
         compose.onNodeWithTag("home-recent-0").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
+        compose.pressKey(Key(android.view.KeyEvent.KEYCODE_MEDIA_RECORD))
+        compose.runOnIdle { assertEquals(listOf(channel.id), recordTargets) }
         compose.onNodeWithTag("home-all-channels").assertIsFocused().performKeyInput { pressKey(Key.Enter) }
         compose.runOnIdle { assertTrue(opened) }
     }
@@ -890,6 +898,8 @@ class HomeActionsTest {
             session.publish(FakeTvheadendSession(observation()).observation.value)
         }
         val dependencies = org.koin.dsl.koinApplication { modules(module {
+            single<TvheadendSession> { session }
+            single { NoticeCenter({ 0L }) { NoticeContext(0, session.observation.value.currentSession?.generationIdentity) } }
             single { at.bernhardberger.tvhplayer.settings.UiSettingsStore(at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore()) }
         }) }
         compose.setContent { org.koin.compose.KoinIsolatedContext(dependencies) {
@@ -927,6 +937,8 @@ class HomeActionsTest {
         val viewModels = androidx.lifecycle.ViewModelStore().apply { put("channels", vm) }
         val memory = mutableStateOf<HomeFocusKey?>(null)
         val dependencies = org.koin.dsl.koinApplication { modules(module {
+            single<TvheadendSession> { session }
+            single { NoticeCenter({ 0L }) { NoticeContext(0, session.observation.value.currentSession?.generationIdentity) } }
             single { at.bernhardberger.tvhplayer.settings.UiSettingsStore(preferences) }
         }) }
         compose.setContent { org.koin.compose.KoinIsolatedContext(dependencies) {

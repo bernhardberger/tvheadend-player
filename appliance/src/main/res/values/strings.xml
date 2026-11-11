@@ -31,6 +31,8 @@
     <string name="function_live_tv_target">live TV</string>
     <string name="function_guide_title">Open the Guide</string>
     <string name="function_guide_target">the Guide</string>
+    <string name="function_recordings_title">Open recordings</string>
+    <string name="function_recordings_target">recordings</string>
     <string name="function_hint_default">Default button</string>
     <string name="function_hint_changed">Default: %1$s</string>
     <string name="function_hint_off">Function off</string>

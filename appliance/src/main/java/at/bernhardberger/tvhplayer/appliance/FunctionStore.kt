@@ -6,7 +6,7 @@ class FunctionStore(context: Context) {
     private val preferences = context.getSharedPreferences("companion_functions", Context.MODE_PRIVATE)
 
     val functions: CompanionFunctions
-        get() = CompanionFunctions(preferences.getBoolean("startup", false), read("live_tv"), read("guide"))
+        get() = CompanionFunctions(preferences.getBoolean("startup", false), read("live_tv"), read("guide"), read("recordings"))
 
     fun setStartup(enabled: Boolean) { preferences.edit().putBoolean("startup", enabled).apply() }
 
@@ -14,7 +14,8 @@ class FunctionStore(context: Context) {
         val change = functions.assign(function, binding)
         // One edit makes a move durable without a momentary duplicate assignment.
         preferences.edit().putInt("live_tv", encode(change.functions.liveTv))
-            .putInt("guide", encode(change.functions.guide)).apply()
+            .putInt("guide", encode(change.functions.guide))
+            .putInt("recordings", encode(change.functions.recordings)).apply()
         return change
     }
 

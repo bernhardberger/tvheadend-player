@@ -37,6 +37,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
@@ -471,7 +473,7 @@ fun AppRoot(
 ) {
     val applianceLaunchState by applianceLaunchRequests.state.collectAsStateWithLifecycle()
     val guideRequest = (applianceLaunchState as? ApplianceLaunchState.Pending)
-        ?.takeIf { it.request.destination == ApplianceEntryDestination.GUIDE }
+        ?.takeIf { it.request.destination != ApplianceEntryDestination.LIVE }
     val startupLoadingTiming = remember { MainStartupLoadingTiming() }
     var cancelBootstrapLaunchWhenReady by rememberSaveable { mutableStateOf(false) }
     val serverSettings = when (startupState) {
@@ -801,6 +803,7 @@ fun AppRoot(
         if (guideRequest == null) guideForegroundPlayer = visibleLivePlayer.takeUnless { applianceLaunchActive }
     }
     val guideInLivePlayer = visibleLivePlayer != null && guideForegroundPlayer == visibleLivePlayer &&
+        guideRequest?.request?.destination != ApplianceEntryDestination.RECORDINGS &&
         effectiveStartupPresentation == MainStartupPresentation.Inactive && revealingTarget == null
     val navigationAllowed = when (val launchState = applianceLaunchState) {
         ApplianceLaunchState.Idle ->
@@ -850,10 +853,12 @@ fun AppRoot(
         when (guideEntryAction) {
             ApplianceGuideEntryAction.OPEN_GUIDE -> {
                 coldStart.settle()
-                if (currentDestination != GuideKey) {
+                val destination = if (pending.request.destination == ApplianceEntryDestination.RECORDINGS)
+                    RecordingsKey else GuideKey
+                if (currentDestination != destination) {
                     playbackOrchestrator.browseNavigationSelected(playingChannelId, playingRecordingId)
-                    if (backStack.isEmpty()) navigationStartDestination = GuideKey
-                    navigateTopLevel(GuideKey)
+                    if (backStack.isEmpty()) navigationStartDestination = destination
+                    navigateTopLevel(destination)
                 }
             }
             ApplianceGuideEntryAction.DROP,
@@ -1446,6 +1451,17 @@ fun AppRoot(
     // Logos and programme pictures load with the latest current session; the provider recomposes
     // nothing for guide or recording updates.
     ProvideAppArtwork(tvheadendSession) {
+    Box(Modifier.fillMaxSize().onPreviewKeyEvent { event ->
+        val key = event.nativeKeyEvent
+        if (key.keyCode == android.view.KeyEvent.KEYCODE_DVR) {
+            if (key.action == android.view.KeyEvent.ACTION_DOWN && key.repeatCount == 0 &&
+                currentDestination != RecordingsKey && navigationAllowed) {
+                playbackOrchestrator.browseNavigationSelected(playingChannelId, playingRecordingId)
+                navigateTopLevel(RecordingsKey)
+            }
+            true
+        } else false
+    }.onKeyEvent { it.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_MEDIA_RECORD }) {
     MainStartupComposition(
         state = MainStartupCompositionState(
             presentation = effectiveStartupPresentation,
@@ -1606,6 +1622,7 @@ fun AppRoot(
             )
         },
     )
+    }
     }
 }
 

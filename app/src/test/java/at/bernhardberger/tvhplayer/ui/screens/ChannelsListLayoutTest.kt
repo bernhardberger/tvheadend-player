@@ -798,6 +798,7 @@ class ChannelsListLayoutTest {
                             onNavigate = {},
                         ) { padding, drawerActive ->
                             ChannelsScreenContent(
+                                onRecordKey = { null },
                                 view = ChannelsView(ChannelsLayout.LIST),
                                 contentPadding = padding,
                                 initialFocusEnabled = !drawerActive,

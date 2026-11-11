@@ -145,6 +145,19 @@ import kotlinx.coroutines.test.StandardTestDispatcher
     instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class GuideNavigationTest : GuideScreenFixture() {
+    @Test fun recordKeyOnScheduledProgrammeOpensCancelWithoutConfirming() {
+        show(recordings = listOf(DvrEntry.create(DvrEntryId(1), eventId = EventId(110),
+            channelId = ChannelId(1), state = DvrEntryState.SCHEDULED)))
+        key(Key.DirectionDown)
+        focused(title(1, 0))
+        key(Key(android.view.KeyEvent.KEYCODE_MEDIA_RECORD))
+        compose.onNodeWithTag("details-cancel").assertIsFocused()
+        key(Key(android.view.KeyEvent.KEYCODE_MEDIA_RECORD))
+        compose.onNodeWithTag("details-cancel").assertIsFocused()
+        compose.onNodeWithTag("two-column-first").assertDoesNotExist()
+        assertNoPlayback()
+    }
+
     @Test fun retainedEntryWaitsForRowsWhenNewCoverageArrivesBeforePreparation() {
         val coverageRelease = CompletableDeferred<Unit>()
         try {

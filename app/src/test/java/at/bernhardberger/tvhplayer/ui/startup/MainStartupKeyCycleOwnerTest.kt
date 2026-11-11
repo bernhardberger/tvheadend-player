@@ -348,6 +348,7 @@ class MainStartupKeyCycleOwnerTest {
             KeyEvent.KEYCODE_MEDIA_AUDIO_TRACK,
             KeyEvent.KEYCODE_CAPTIONS,
             KeyEvent.KEYCODE_GUIDE,
+            KeyEvent.KEYCODE_DVR,
             KeyEvent.KEYCODE_TV_NUMBER_ENTRY,
             KeyEvent.KEYCODE_BOOKMARK,
         )

@@ -1,4 +1,5 @@
 package at.bernhardberger.tvhplayer.ui.player
+import at.bernhardberger.tvhplayer.ui.screens.postRecordUnavailable
 
 import at.bernhardberger.tvhplayer.ui.screens.currentDvrConfigurations
 
@@ -1121,8 +1122,12 @@ fun VideoPlayerScreen(
 
     fun recordProgramme() {
         if (recordKeyInFlight) return
-        val programme = infoEvent ?: return
+        val programme = infoEvent
         val opening = observation
+        if (programme == null || opening.currentSession == null) {
+            notices.postRecordUnavailable(programme, opening, nowSec)
+            return
+        }
         val capability = opening.currentSession ?: return
         val recording = opening.dvrEntryForEvent(programme)?.takeUnless(::recordingWasRemoved)
         val canModify = opening.dvrState is DvrRepositoryState.Current &&
@@ -1130,7 +1135,10 @@ fun VideoPlayerScreen(
         val actions = programmeDetailsActions(programme, nowSec, recording,
             recording?.let(opening::recordingPlaybackAdmission), canModify,
             programme.channelId?.let(opening::channel) != null, liveProgramme = opening.event(programme.id) != null)
-        if (BrowseContextAction.RECORD !in actions) return
+        if (BrowseContextAction.RECORD !in actions) {
+            notices.postRecordUnavailable(programme, opening, nowSec)
+            return
+        }
         val mutation = DvrMutationAction.CreateProgramme(programme.programmeRecordingTarget(capability), null)
         recordKeyInFlight = true
         scope.launch {

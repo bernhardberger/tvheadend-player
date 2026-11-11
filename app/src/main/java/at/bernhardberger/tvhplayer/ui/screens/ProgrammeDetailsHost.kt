@@ -21,7 +21,6 @@ import at.bernhardberger.tvhplayer.ui.player.animateShown
 import at.bernhardberger.tvhplayer.ui.screens.guide.ConfirmProgrammeActionDialog
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.first
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.ui.rememberCloseBehindPlayer
 import at.bernhardberger.tvhplayer.ui.rememberPlayerEntryPending
@@ -151,28 +150,8 @@ internal fun ProgrammeDetailsHost(
         returnAction = null
     }
     fun executeDirect(mutation: DvrMutationAction) {
-        if (inFlight != null) return
-        inFlight = mutation
-        // Queue after this input dispatch so even an immediate result cannot admit a second click.
-        mutationScope.launch(kotlinx.coroutines.Dispatchers.Main) {
-            try {
-                val preferred = if (mutation is DvrMutationAction.CreateProgramme)
-                    settingsStore.settings.first().recordingProfileId else null
-                val current = currentObservation()
-                val request = currentDvrMutation(mutation, sessionObservation, current) ?: return@launch
-                if (request is DvrMutationAction.CreateProgramme &&
-                    current.dvrEntryForEvent(request.target.eventId)?.state in
-                    listOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)) return@launch
-                val configured = if (request is DvrMutationAction.CreateProgramme)
-                    request.copy(configId = chooseDvrConfig(current.currentDvrConfigurations(), preferred)) else request
-                val context = notices.context()
-                val result = mutations.execute(configured)
-                // Command failures survive navigation; NoticeCenter owns their context lifetime.
-                notices.postDvrFailure(configured, result, context)
-            } finally {
-                inFlight = null
-            }
-        }
+        mutations.launchMutation(mutation, sessionObservation, currentObservation, nowSecProvider,
+            settingsStore, notices, mutationScope, mutationInFlight)
     }
     val act: (EpgEvent, BrowseContextAction) -> Unit = action@{ programme, action ->
         if (action == BrowseContextAction.WATCH_LIVE) {
@@ -264,7 +243,20 @@ internal fun ProgrammeDetailsHost(
     val detailAlpha = animateShown(
         tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard),
         tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard), "browse-details-layer")
-    PlayerMotionFrame(leaving = closing, modifier = Modifier.onPreviewKeyEvent { closing || departing || entryPending() }) {
+    PlayerMotionFrame(leaving = closing, modifier = Modifier.onPreviewKeyEvent { key ->
+        if (closing || departing || entryPending()) true
+        else if (key.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_MEDIA_RECORD) {
+            if (showContextMenu || pendingAction != null) true
+            else if (actions.any { it == BrowseContextAction.STOP || it == BrowseContextAction.CANCEL }) false
+            else {
+                if (key.type == KeyEventType.KeyDown && key.nativeKeyEvent.repeatCount == 0) {
+                    if (BrowseContextAction.RECORD in actions) act(event, BrowseContextAction.RECORD)
+                    else notices.postRecordUnavailable(event, currentObservation(), nowSecProvider())
+                }
+                true
+            }
+        } else false
+    }) {
     AnimatedContent(targetState = showContextMenu, transitionSpec = {
         // Details owns its fade so the shell uses exactly the same progress.
         (if (targetState) fadeIn(tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard)) else EnterTransition.None)

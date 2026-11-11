@@ -1,4 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens
+import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
+import at.bernhardberger.tvhplayer.core.BrowseContextAction
 
 import at.bernhardberger.tvhplayer.ui.common.rememberCurrentEpochSeconds
 
@@ -187,6 +189,7 @@ internal fun restoredChannelId(
     ?: visibleChannelIds.firstOrNull()
 
 @Composable
+@OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
 fun ChannelsScreen(
     contentPadding: PaddingValues = PaddingValues(),
     initialFocusEnabled: Boolean = true,
@@ -214,8 +217,15 @@ fun ChannelsScreen(
     // The view is the screen's own, remembered for the whole app rather than per channel group.
     val settingsStore: UiSettingsStore = koinInject()
     val settingsScope = rememberCoroutineScope()
+    val recordSession: TvheadendSession = koinInject()
+    val recordNotices: at.bernhardberger.tvhplayer.notices.NoticeCenter = koinInject()
+    val recordMutations = remember(recordSession) { DvrMutationActions(recordSession.dvrRepository) }
+    val recordInFlight = remember { mutableStateOf<DvrMutationAction?>(null) }
 
     ChannelsScreenContent(
+        onRecordKey = { channelId -> recordMutations.recordChannelProgramme(channelId,
+            { recordSession.observation.value }, { System.currentTimeMillis() / 1000L }, settingsStore,
+            recordNotices, settingsScope, recordInFlight) },
         contentPadding = contentPadding,
         initialFocusEnabled = initialFocusEnabled,
         channelScopeState = channelScopeState,
@@ -242,9 +252,10 @@ fun ChannelsScreen(
     )
 }
 
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class, at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
 @Composable
 internal fun ChannelsScreenContent(
+    onRecordKey: (ChannelId) -> BrowseContextAction?,
     contentPadding: PaddingValues = PaddingValues(),
     initialFocusEnabled: Boolean = true,
     channelScopeState: ChannelScopeState,
@@ -311,6 +322,7 @@ internal fun ChannelsScreenContent(
     var browseHeld by remember { mutableStateOf(false) }
     var contextChannelId by remember { mutableStateOf<ChannelId?>(null) }
     var showProgrammeDetails by remember { mutableStateOf(false) }
+    var recordInitialAction by remember { mutableStateOf<BrowseContextAction?>(null) }
     var contentFocusOwned by remember { mutableStateOf(false) }
     var scopeEntryRequested by remember { mutableStateOf(false) }
     val rememberedChannelIds = remember {
@@ -656,6 +668,21 @@ internal fun ChannelsScreenContent(
     Box(
         Modifier
             .fillMaxSize()
+            .onPreviewKeyEvent { key ->
+                if (key.nativeKeyEvent.keyCode != android.view.KeyEvent.KEYCODE_MEDIA_RECORD) false
+                else {
+                    if (key.type == KeyEventType.KeyDown && key.nativeKeyEvent.repeatCount == 0 &&
+                        initialFocusEnabled && contentFocusOwned && contextChannelId == null && openPanel == null) {
+                        val action = focusedChannelId?.let(onRecordKey)
+                        if (action == BrowseContextAction.STOP || action == BrowseContextAction.CANCEL) {
+                            recordInitialAction = action
+                            showProgrammeDetails = true
+                            contextChannelId = focusedChannelId
+                        }
+                    }
+                    true
+                }
+            }
             .graphicsLayer { alpha = 1f - (detailsLayering?.detailsAlpha() ?: if (showProgrammeDetails) 1f else 0f) },
     ) {
         // Behind the header from the screen's top: it follows focus across groups, while the
@@ -1092,6 +1119,7 @@ internal fun ChannelsScreenContent(
             onPlayRecording = onPlayRecording,
             returnFocusRequester = rowFocusRequesters[channelId],
             showDetails = showProgrammeDetails,
+            initialAction = recordInitialAction,
             onShowDetails = { showProgrammeDetails = true },
             channelId = channelId,
             observation = observation,
@@ -1099,6 +1127,7 @@ internal fun ChannelsScreenContent(
             onShowGuide = onShowGuide,
             onClose = {
                 showProgrammeDetails = false
+                recordInitialAction = null
                 contextChannelId = null
                 if (!requestChannelFocus(channelId, preserveVisiblePosition = true)) {
                     // The menu's channel left the catalog; land where a removed focused row would.

@@ -176,6 +176,7 @@ class BrowseCohesionEvidenceTest {
                         SideRail(currentRoute = AppDestination.CHANNELS,
                             connectionDegraded = disconnected, onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                             ChannelsScreenContent(view = ChannelsView(ChannelsLayout.LIST), contentPadding = padding, initialFocusEnabled = !drawerActive,
+                                onRecordKey = { null },
                                 channelScopeState = resolveChannelScopeState(displayed.channelState, null),
                                 observation = displayed, tagNotice = false, selectedId = { null },
                                 playingChannelId = null, connectionUiState = if (disconnected) ConnectionUiState.Connecting else ConnectionUiState.Ready,
@@ -416,6 +417,7 @@ class BrowseCohesionEvidenceTest {
             var selected by remember { mutableStateOf<ChannelId?>(null) }
             var activeTag by remember { mutableStateOf<ChannelTagId?>(null) }
             ChannelsScreenContent(
+                onRecordKey = { null },
                 view = ChannelsView(ChannelsLayout.LIST),
                 contentPadding = padding,
                 initialFocusEnabled = !drawerActive,

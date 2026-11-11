@@ -26,6 +26,17 @@ class ProgrammeActionPolicyTest {
     private val beforeStart = 1_799_999_900L
 
     @Test
+    fun recordUnavailableReasonsFollowProgrammeAndPermissionEligibility() {
+        assertEquals(at.bernhardberger.tvhplayer.notices.RecordUnavailableReason.NO_PROGRAMME,
+            recordUnavailableReason(null, beforeStart, false))
+        assertEquals(at.bernhardberger.tvhplayer.notices.RecordUnavailableReason.ENDED,
+            recordUnavailableReason(event, event.stop.epochSeconds, false))
+        assertEquals(at.bernhardberger.tvhplayer.notices.RecordUnavailableReason.PERMISSION_DENIED,
+            recordUnavailableReason(event, beforeStart, false))
+        assertEquals(null, recordUnavailableReason(event, beforeStart, true))
+    }
+
+    @Test
     fun airingProgrammeOffersWatchThenRecord() {
         assertEquals(listOf(ProgrammeAction.WATCH, ProgrammeAction.RECORD),
             programmeActions(event, event.start.epochSeconds, null))

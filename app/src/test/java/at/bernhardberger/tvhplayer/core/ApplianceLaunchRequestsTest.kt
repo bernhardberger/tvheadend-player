@@ -9,6 +9,22 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ApplianceLaunchRequestsTest {
+    @Test fun recordingsOverridesAutoplayWithoutRetentionOrPlaybackAndSurvivesStartup() {
+        var retainedId: Long? = null
+        var playbackRequests = 0
+        val requests = ApplianceLaunchRequests(onRetainedRequestIdChanged = { retainedId = it },
+            onLaunchRequested = { playbackRequests++ })
+        requests.requestStartup(true)
+        requests.requestEntry(ApplianceEntryDestination.RECORDINGS, isPlayerVisible = true)
+        val pending = requests.state.value as ApplianceLaunchState.Pending
+        assertEquals(ApplianceEntryDestination.RECORDINGS, pending.request.destination)
+        assertNull(retainedId)
+        assertNull(requests.resolve(pending.request, ready, null))
+        requests.requestStartup(true)
+        assertEquals(pending, requests.state.value)
+        assertEquals(1, playbackRequests)
+        assertTrue(requests.cancel(pending))
+    }
     private val channels = listOf(
         Channel.create(ChannelId(10), name = "Ten"),
         Channel.create(ChannelId(20), name = "Twenty"),

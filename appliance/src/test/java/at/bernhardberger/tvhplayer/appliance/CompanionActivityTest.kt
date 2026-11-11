@@ -33,7 +33,7 @@ class CompanionActivityTest {
     @Test fun stoppingTheActivityCancelsAnActiveCapture() {
         val controller = Robolectric.buildActivity(CompanionActivity::class.java).create().start().resume()
         CompanionServiceState.setConnected(true)
-        assertTrue(CompanionServiceState.startCapture(CompanionFunction.GUIDE))
+        assertTrue(CompanionServiceState.startCapture(CompanionFunction.RECORDINGS))
         controller.pause().stop()
         assertEquals(CaptureState.Cancelled, CompanionServiceState.captureState.value)
         controller.destroy()
