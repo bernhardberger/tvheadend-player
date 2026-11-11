@@ -194,7 +194,7 @@ behave like the TV's own tuner app:
 It works with Tvheadend Player from Google Play or from the releases here. It
 updates itself from the GitHub releases and installs updates only while the TV
 is in standby. Its screens are in English only. I built it for my mum's TVs and
-have only tested it on TCL Google TVs so far. The companion is still a work in
+run it on all of ours, TCL Google TVs and an Nvidia Shield. The companion is still a work in
 progress, so expect rough edges and changes between releases.
 
 | | |
