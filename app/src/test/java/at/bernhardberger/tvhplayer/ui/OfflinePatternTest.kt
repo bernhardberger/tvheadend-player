@@ -72,7 +72,6 @@ class OfflinePatternTest {
         compose.onNodeWithText("Try again").assertDoesNotExist()
         compose.onNodeWithText("fixture").assertIsFocused()
         press(Key.DirectionCenter)
-        press(Key.DirectionDown) // The level opens on the selected "Use this connection", above Edit.
         compose.onNodeWithText("Edit connection").assertIsFocused()
         press(Key.DirectionCenter)
         compose.onNodeWithText("Server").assertIsFocused()

@@ -519,22 +519,19 @@ class SettingsServerProfilesTest {
         assertInUse(row(1))
     }
 
-    @Test fun useThisConnectionIsInertOnTheServerInUse() {
+    @Test fun theServerInUseHasNoUseActionAndOpensOnEdit() {
         stored(active = 1)
         settings()
         press(Key.DirectionCenter)
-        compose.onNodeWithTag("settings-row-$SERVER_USE").assert(hasText("In use", substring = true))
-        // It stays reachable, but choosing what is already chosen switches nothing and asks nothing.
-        compose.onNodeWithTag("settings-row-$SERVER_USE").performSemanticsAction(SemanticsActions.RequestFocus)
-        press(Key.DirectionCenter)
-        compose.onNodeWithTag(SWITCH_KEEP).assertDoesNotExist()
-        compose.onNodeWithTag("settings-row-$SERVER_USE").assertIsFocused()
+        compose.onNodeWithTag("settings-row-$SERVER_USE").assertDoesNotExist()
+        compose.onNodeWithTag("settings-row-$EDIT_CONNECTION").assertIsFocused()
         assertEquals(id(1), activeId)
         assertEquals(serverProfileRowId(id(1)), navigation.stack.active.levelId)
-        // Not connected, the row says what is wrong in place of "In use".
+        // Connecting does not introduce an action on the connection already in use.
         compose.runOnIdle { presentation = AppConnectionPresentation(ConnectionUiState.Connecting) }
         compose.waitForIdle()
-        compose.onNodeWithTag("settings-row-$SERVER_USE").assert(hasText("Connecting…", substring = true))
+        compose.onNodeWithTag("settings-row-$SERVER_USE").assertDoesNotExist()
+        compose.onNodeWithTag("settings-row-$EDIT_CONNECTION").assertIsFocused()
     }
 
     @Test fun theRootConnectionRowDropsConnectedForItsIconAndKeepsOtherWords() {
@@ -687,7 +684,6 @@ class SettingsServerProfilesTest {
         settings()
         val startup = session.calls.toList()
         press(Key.DirectionCenter)
-        press(Key.DirectionDown) // The level opens on the selected "Use this connection", above Edit.
         press(Key.DirectionCenter)
         type("setup-host", "192.168.1.20")
         compose.onNodeWithTag("setup-continue").performSemanticsAction(SemanticsActions.RequestFocus)
@@ -747,7 +743,7 @@ class SettingsServerProfilesTest {
         press(Key.DirectionDown)
         compose.onNodeWithTag(row(2)).assert(hasText("Password needed", substring = true))
         press(Key.DirectionCenter)
-        compose.onNodeWithTag("settings-row-$SERVER_PASSWORD").performSemanticsAction(SemanticsActions.RequestFocus)
+        compose.onNodeWithTag("settings-row-$SERVER_PASSWORD").assertIsFocused()
         press(Key.DirectionCenter)
         compose.onNodeWithText("Enter the password again").assertIsDisplayed()
         settle()
@@ -788,7 +784,8 @@ class SettingsServerProfilesTest {
         capture("02-connection-profile-list", "Living room")
         capture("switcher3-08-connection-list-in-use-text", "Living room")
         press(Key.DirectionCenter)
-        compose.onNodeWithTag("settings-row-$SERVER_USE").assert(hasText("In use", substring = true))
+        compose.onNodeWithTag("settings-row-$SERVER_USE").assertDoesNotExist()
+        compose.onNodeWithTag("settings-row-$EDIT_CONNECTION").assertIsFocused()
         capture("10-connection-in-use-level", "Edit connection")
         press(Key.Back)
         compose.onNodeWithTag(row(1)).assertIsFocused()
@@ -803,6 +800,11 @@ class SettingsServerProfilesTest {
         repeat(3) { press(Key.DirectionDown) }
         compose.onNodeWithTag(row(4)).assertIsFocused()
         capture("09-password-unreadable-list", "Cabin")
+        press(Key.DirectionCenter)
+        compose.onNodeWithTag("settings-row-$SERVER_PASSWORD").assertIsFocused()
+        compose.onNodeWithTag("settings-row-$SERVER_USE").assertDoesNotExist()
+        capture("18-password-needed-level", "Enter password")
+        press(Key.Back)
         press(Key.DirectionDown)
         compose.onNodeWithTag("settings-row-$ADD_SERVER").assertIsFocused()
         capture("connection-list-with-avatars", "Add connection")
@@ -853,7 +855,7 @@ class SettingsServerProfilesTest {
         settle()
         presentation = AppConnectionPresentation(ConnectionUiState.Ready)
         settle()
-        capture("17-names-connected-notice", "Use this connection")
+        capture("17-names-connected-notice", "Edit connection")
     }
 
     @Test fun addAndNameReturnsToTheNamedConnection() {
