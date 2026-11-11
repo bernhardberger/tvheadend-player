@@ -112,6 +112,8 @@ import org.junit.Test
 import org.junit.experimental.categories.Category
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.testutil.VisualCapture
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
+import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
 import org.junit.runner.RunWith
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
 import org.robolectric.RobolectricTestRunner
@@ -180,6 +182,10 @@ class PlayerChromeCaptureTest {
 
     @Category(VisualCapture::class)
     @Test fun english() = captures("en", 1f)
+
+    @Category(VisualCapture::class)
+    @Test fun recordingStartup() = captures("en", 1f,
+        scenes = setOf(Scene.RECORDING_STARTING, Scene.RECORDING_STARTING_CONTROLS))
 
     @Test fun programmeAiringsAndRailBadgeGeometry() = captures("en", 1f, assertionsOnly = true)
 
@@ -302,7 +308,7 @@ class PlayerChromeCaptureTest {
         // Player (i) focus and the channel rail's Recent row.
         INFO_FOCUSED, RECORDING_INFO_FOCUSED, RECENT_OPEN, BROWSER_NOW, BROWSER_EMPTY,
         // The audio button beside Info, focused.
-        AUDIO_FOCUSED,
+        AUDIO_FOCUSED, RECORDING_STARTING, RECORDING_STARTING_CONTROLS,
     }
 
     /** [Scene.CONTROLS_REVEAL_MID] composes the Banner, then the controls take it over. */
@@ -312,6 +318,7 @@ class PlayerChromeCaptureTest {
         locale: String,
         fontScale: Float,
         assertionsOnly: Boolean = false,
+        scenes: Set<Scene>? = null,
     ) {
         lateinit var view: View
         var scene by mutableStateOf(Scene.CONTROLS_LIVE)
@@ -321,7 +328,9 @@ class PlayerChromeCaptureTest {
                 TVHeadendPlayerTheme {
                     view = LocalView.current
                     Box(Modifier.fillMaxSize()) {
-                        Image(brightStill.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                        if (scene == Scene.RECORDING_STARTING || scene == Scene.RECORDING_STARTING_CONTROLS) {
+                            Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black))
+                        } else Image(brightStill.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                         Scene(scene)
                     }
                 }
@@ -336,7 +345,8 @@ class PlayerChromeCaptureTest {
         }
         // Recording and state scenes are captured in English at font scale 1.0 only.
         for (next in Scene.entries.filter {
-            if (assertionsOnly) it in setOf(Scene.PROGRAMME_AIRINGS, Scene.RAIL_PEEK)
+            if (scenes != null) it in scenes
+            else if (assertionsOnly) it in setOf(Scene.PROGRAMME_AIRINGS, Scene.RAIL_PEEK)
             else it < Scene.BANNER_LIVE || locale == "en" && fontScale == 1f
         }) {
             compose.runOnIdle { scene = next; revealControls = false }
@@ -461,6 +471,11 @@ class PlayerChromeCaptureTest {
             if (next == Scene.PROGRAMME_INFO_NO_EPG) {
                 compose.onNodeWithTag("details-continue_watching").assertIsFocused()
             }
+            val loadingMessage = ApplicationProvider.getApplicationContext<Application>().getString(R.string.recording_loading)
+            if (next == Scene.RECORDING_STARTING) compose.onNodeWithText(loadingMessage).assertExists()
+            if (next == Scene.RECORDING_STARTING_CONTROLS) {
+                compose.onNodeWithTag("player-pause").assertIsFocused()
+            }
             // No status slot and no Go live: the state cell lives in the bar row.
             compose.onNodeWithTag("player-status-slot", useUnmergedTree = true).assertDoesNotExist()
             compose.onNodeWithTag("player-go-live", useUnmergedTree = true).assertDoesNotExist()
@@ -471,7 +486,7 @@ class PlayerChromeCaptureTest {
             }
             val directory = File("../artifacts/player-chrome").apply { if (!assertionsOnly) mkdirs() }
             val name = "${next.name.lowercase(Locale.ROOT).replace('_', '-')}-$locale-font$fontScale.png"
-            if (!assertionsOnly) File(directory, name).outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            if (!assertionsOnly) CaptureOutput.writePng(File(directory, name), bitmap)
             bitmap.recycle()
             if (next == Scene.PROGRAMME_MORE_INFO) {
                 repeat(60) {
@@ -662,15 +677,17 @@ class PlayerChromeCaptureTest {
                 recordingBarEnd(positionMs = 1_045_000, durationMs = 4_350_000, growing = false),
                 Modifier.align(Alignment.BottomStart).padding(playerHiddenChipPadding()))
             Scene.RECORDING_BANNER, Scene.RECORDING_STEP, Scene.RECORDING_CONTROLS, Scene.RECORDING_GROWING, Scene.RECORDING_CONTROLS_STEP, Scene.RECORDING_INFO_FOCUSED,
-            Scene.RECORDING_STEP_FORWARD, Scene.RECORDING_CONTROLS_STEP_FORWARD -> {
+            Scene.RECORDING_STEP_FORWARD, Scene.RECORDING_CONTROLS_STEP_FORWARD,
+            Scene.RECORDING_STARTING, Scene.RECORDING_STARTING_CONTROLS -> {
                 val growing = scene == Scene.RECORDING_GROWING
-                val position = 1_045_000L
+                val position = if (scene == Scene.RECORDING_STARTING || scene == Scene.RECORDING_STARTING_CONTROLS) 0L else 1_045_000L
                 val duration = 4_350_000L
                 ProvideArtworkSession(session) { RecordingChromeFixture(
                     mode = when (scene) {
                         Scene.RECORDING_STEP, Scene.RECORDING_STEP_FORWARD ->
                             PlayerChromeMode.BANNER_STEP
-                        Scene.RECORDING_CONTROLS, Scene.RECORDING_CONTROLS_STEP, Scene.RECORDING_CONTROLS_STEP_FORWARD, Scene.RECORDING_INFO_FOCUSED -> PlayerChromeMode.CONTROLS
+                        Scene.RECORDING_CONTROLS, Scene.RECORDING_CONTROLS_STEP, Scene.RECORDING_CONTROLS_STEP_FORWARD, Scene.RECORDING_INFO_FOCUSED,
+                        Scene.RECORDING_STARTING_CONTROLS -> PlayerChromeMode.CONTROLS
                         else -> PlayerChromeMode.BANNER
                     },
                     // 0:17:25 of 1:12:30; a quick step back 30 s previews 0:16:55.
@@ -693,6 +710,8 @@ class PlayerChromeCaptureTest {
                     marks = chapterMarks(900_000L, 2_700_000L).takeIf { scene == Scene.RECORDING_CONTROLS }.orEmpty(),
                     modifier = Modifier.align(Alignment.BottomCenter),
                 ) }
+                TvRecoveryOverlay(visible = scene == Scene.RECORDING_STARTING,
+                    message = stringResource(R.string.recording_loading), opaque = false)
             }
         }
         PlayerBusyIndicator(when (scene) {

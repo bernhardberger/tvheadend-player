@@ -85,6 +85,7 @@ import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.data.ConnectionState
+import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
@@ -160,7 +161,84 @@ class RecordingPlayerChromeScreenTest {
         assertEquals(null, runtime.activeTarget.value)
         compose.onNodeWithTag("tv-recovery-title")
             .assertTextEquals(context.getString(AppErrorCondition.RECORDING_UNAVAILABLE.titleRes()))
+        assertFalse("loading must not cover a terminal failure", loadingShown())
     }
+
+    @Test fun loadingStaysUntilTheFirstFrameAndDoesNotReturnForBuffering() {
+        val server = screen()
+        compose.mainClock.advanceTimeBy(800)
+        compose.waitForIdle()
+        assertTrue("loading stays after admission while the player starts", loadingShown())
+        playingWithoutFrame()
+        assertTrue("READY alone is not a presented frame", loadingShown())
+        publishTracks(Tracks(listOf(audioTrack("a1", "en", true))))
+        settle()
+        assertFalse(runtime.videoPresentation.value.visible)
+        assertFalse("audio-only presentation dismisses loading without a video frame", loadingShown())
+        compose.runOnIdle {
+            forcedReady = false
+            playerListeners.toList().forEach { it.onPlaybackStateChanged(Player.STATE_BUFFERING) }
+        }
+        compose.mainClock.advanceTimeBy(1_200)
+        compose.waitForIdle()
+        assertFalse("ordinary buffering must not bring startup loading back", loadingShown())
+        val previousEpoch = runtime.videoPresentation.value.epoch
+        val reinstall = scope.async {
+            runtime.playRecording(requireNotNull(currentRecordingPlaybackSelection(server.observation.value, DvrEntryId(7))),
+                RecordingPlaybackStart.START_OVER)
+        }
+        settle()
+        compose.waitUntil(10_000) { reinstall.isCompleted }
+        assertTrue("the same recording was reinstalled", reinstall.isCompleted)
+        assertTrue(runtime.videoPresentation.value.epoch > previousEpoch)
+        assertTrue("a new install needs its own presentation before hiding loading", loadingShown())
+    }
+
+    @Test fun loadingYieldsToControlsUntilTheyCloseAndThenToFirstFrame() {
+        screen()
+        assertTrue(loadingShown())
+        key(Key.DirectionDown)
+        assertTrue(exists("player-actions"))
+        assertFalse("focused controls must not sit under loading", loadingShown())
+        key(Key.Back)
+        assertFalse(exists("player-actions"))
+        assertTrue("closing controls restores loading until presentation", loadingShown())
+        playingWithoutFrame()
+        presentFirstFrame()
+        settle()
+        assertFalse("the first video frame dismisses loading", loadingShown())
+        key(Key.DirectionDown)
+        assertTrue(exists("player-actions"))
+        compose.runOnIdle {
+            forcedReady = false
+            playerListeners.toList().forEach { it.onPlaybackStateChanged(Player.STATE_BUFFERING) }
+        }
+        compose.mainClock.advanceTimeBy(1_200)
+        compose.waitForIdle()
+        assertTrue("buffering feedback stays visible over open controls after presentation", exists("player-busy-indicator"))
+    }
+
+    @Test fun loadingYieldsToPauseAndBackStillLeavesBeforeTheFirstFrame() {
+        var closed = false
+        screen(onClose = { closed = true })
+        compose.mainClock.advanceTimeBy(800)
+        compose.waitForIdle()
+        assertTrue(loadingShown())
+        key(Key.DirectionCenter)
+        assertFalse(player.playWhenReady)
+        assertFalse("paused startup does not show loading", loadingShown())
+        key(Key.DirectionCenter)
+        compose.mainClock.advanceTimeBy(800)
+        compose.waitForIdle()
+        assertTrue("resuming startup restores loading", loadingShown())
+        key(Key.Back)
+        assertFalse("first Back only hides the Banner", closed)
+        assertFalse(exists("player-banner"))
+        key(Key.Back)
+        assertTrue("the passive overlay does not intercept Back", closed)
+    }
+
+    private fun loadingShown() = texts(context.getString(R.string.recording_loading))
 
     @Test fun rejectedRecordingReasonExpiresWhenTheServerSessionChanges() {
         val session = screen(refusedEntry = DvrEntry.create(
@@ -228,6 +306,9 @@ class RecordingPlayerChromeScreenTest {
     @Test fun backWhileTheRecordingLoadsClosesThePlayerAtOnce() {
         var closed = false
         screen(onClose = { closed = true }, listed = false)
+        compose.mainClock.advanceTimeBy(800)
+        compose.waitForIdle()
+        assertTrue("unresolved admission shows loading even without playback intent", loadingShown())
         assertFalse("no chrome is drawn while the recording loads", exists("player-banner"))
         assertFalse(exists("player-state"))
         assertFalse(exists("player-end-clock"))
@@ -685,13 +766,15 @@ class RecordingPlayerChromeScreenTest {
         publishTracks(Tracks(listOf(audioTrack("a1", "de", true), audioTrack("a2", "en", false))))
         val start = player.trackSelectionParameters
         compose.onRoot().performKeyInput { pressKey(Key.MediaAudioTrack) }
-        compose.mainClock.advanceTimeByFrame()
-        compose.waitForIdle()
+        // Drain focus and key-counter effects before advancing across their timer deadlines.
+        compose.settleFrames(2, frameMillis = 16)
         compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.settleFrames(2, frameMillis = 16)
         compose.mainClock.advanceTimeBy(PLAYBACK_QUICK_LIST_AUTO_CLOSE_MS - 200)
         compose.waitForIdle()
         assertTrue(player.trackSelectionParameters.overrides.isNotEmpty())
         compose.onRoot().performKeyInput { keyDown(Key.Back) }
+        compose.settleFrames(2, frameMillis = 16)
         compose.mainClock.advanceTimeBy(400)
         compose.waitForIdle()
         assertTrue("Back down renews the list across its previous deadline", exists("playback-options-track-list"))
