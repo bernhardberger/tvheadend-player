@@ -1,8 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens.guide
 
-import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.semantics.SemanticsActions
-import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -10,10 +8,7 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performSemanticsAction
-import androidx.compose.ui.test.pressKey
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import at.bernhardberger.tvhplayer.core.guideWindowBounds
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
@@ -62,7 +57,6 @@ class GuideDayNavigationTest {
         }
     }
 
-    @OptIn(ExperimentalTestApi::class)
     @Test
     fun latestWindowEndsTheDaysAndTimesAtTheBounds() {
         composeRule.setContent {
@@ -84,8 +78,6 @@ class GuideDayNavigationTest {
         composeRule.onNodeWithTag("guide-time-day-7").assertIsFocused().assertIsSelected()
         composeRule.onAllNodesWithTag("guide-time-day-8").assertCountEquals(0)
         // The final window starts at 09:00, so the times from Midday on are past the bound.
-        composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
-        composeRule.waitForIdle()
         composeRule.onNodeWithTag("guide-time-preset-12").assertIsNotEnabled()
     }
 }

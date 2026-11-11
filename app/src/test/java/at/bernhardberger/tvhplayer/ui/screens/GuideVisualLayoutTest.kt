@@ -1037,7 +1037,6 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         show(scale = 1.3f)
         key(Key.Enter)
         tagFocused("guide-time-day-0")
-        key(Key.DirectionRight)
         listOf("06", "12", "15", "18", "20", "22").forEach { hour ->
             val clock = compose.onNode(hasText("$hour:00") and hasAnyAncestor(hasTestTag("guide-time-preset-$hour")),
                 useUnmergedTree = true).fetchSemanticsNode()

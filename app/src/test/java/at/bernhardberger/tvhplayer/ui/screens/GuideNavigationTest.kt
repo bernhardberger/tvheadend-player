@@ -1113,16 +1113,12 @@ class GuideNavigationTest : GuideScreenFixture() {
         tagFocused("guide-time-day-0")
         compose.onNodeWithTag("guide-time-day-0").assertIsSelected()
         compose.onNodeWithTag("guide-time-day-1").assertIsNotSelected()
-        // Now carries the current clock; Right opens the shown day's times, entered at the one holding the window.
+        // Now carries the current clock; the times of the shown day follow without taking focus.
         compose.onNodeWithTag("guide-time-now").assert(hasText("20:15"))
-        key(Key.DirectionRight)
-        tagFocused("guide-time-preset-20")
-        compose.onNode(hasText("Today") and isHeading()).assertIsDisplayed()
-        compose.onNodeWithTag("guide-time-preset-20").assertIsSelected()
+        compose.onNodeWithTag("guide-time-presets").assert(hasAnyDescendant(hasText("Today") and isHeading()))
+        compose.onNodeWithTag("guide-time-preset-20").assertIsNotFocused().assertIsSelected()
             .assert(hasText("20:00") and hasText("Prime time"))
         compose.onNodeWithTag("guide-time-preset-22").assertIsEnabled().assertIsNotSelected()
-        key(Key.Back)
-        tagFocused("guide-time-day-0")
         assertDateButtonNow()
         assertEquals(0, playbackRequests)
     }
@@ -1131,24 +1127,24 @@ class GuideNavigationTest : GuideScreenFixture() {
         show()
         key(Key.Enter)
         tagFocused("guide-time-day-0")
+        // At 20:15 every period up to Evening has ended; the rows stay where another day has them.
+        listOf("06", "12", "15", "18").forEach { compose.onNodeWithTag("guide-time-preset-$it").assertIsNotEnabled() }
+        val today = (listOf("06", "12", "15", "18", "20", "22")).map { bounds("guide-time-preset-$it").top }
+        key(Key.DirectionDown)
+        tagFocused("guide-time-day-1")
+        compose.onNodeWithTag("guide-time-presets").assert(hasAnyDescendant(hasText("Tomorrow") and isHeading()))
+        listOf("06", "12", "15", "18", "20", "22").forEach { compose.onNodeWithTag("guide-time-preset-$it").assertIsEnabled() }
+        assertEquals(today, listOf("06", "12", "15", "18", "20", "22").map { bounds("guide-time-preset-$it").top })
+        key(Key.DirectionUp)
+        tagFocused("guide-time-day-0")
         key(Key.DirectionRight)
         tagFocused("guide-time-preset-20")
-        // At 20:15 every period up to Evening has ended; the rows stay in place, disabled.
-        listOf("06", "12", "15", "18").forEach { compose.onNodeWithTag("guide-time-preset-$it").assertIsNotEnabled() }
         key(Key.DirectionUp)
         tagFocused("guide-time-preset-20")
         key(Key.DirectionDown)
         tagFocused("guide-time-preset-22")
         key(Key.DirectionDown)
         tagFocused("guide-time-preset-22")
-        key(Key.Back)
-        tagFocused("guide-time-day-0")
-        key(Key.DirectionDown)
-        tagFocused("guide-time-day-1")
-        key(Key.DirectionRight)
-        tagFocused("guide-time-preset-20")
-        compose.onNode(hasText("Tomorrow") and isHeading()).assertIsDisplayed()
-        listOf("06", "12", "15", "18", "20", "22").forEach { compose.onNodeWithTag("guide-time-preset-$it").assertIsEnabled() }
         assertEquals(0, playbackRequests)
     }
 
@@ -1161,13 +1157,9 @@ class GuideNavigationTest : GuideScreenFixture() {
         // Prime time ends at 22:00 while it has focus; the open panel keeps it and its neighbours.
         assertTrue(SystemClock.setCurrentTimeMillis((hour + 2 * 3600 + 30) * 1000))
         compose.mainClock.advanceTimeBy(6_000)
-        tagFocused("guide-time-preset-20")
-        // Now keeps ticking even though the focused period's availability is frozen.
-        key(Key.Back)
         compose.waitUntil(5_000) {
             compose.onAllNodes(hasTestTag("guide-time-now") and hasText("22:00")).fetchSemanticsNodes().isNotEmpty()
         }
-        key(Key.DirectionRight)
         tagFocused("guide-time-preset-20")
         compose.onNodeWithTag("guide-time-preset-20").assertIsEnabled()
         key(Key.DirectionDown)
@@ -1199,7 +1191,7 @@ class GuideNavigationTest : GuideScreenFixture() {
         assertEquals(0, playbackRequests)
     }
 
-    @Test fun rightOpensADaysTimesAndBackReturnsToTheDay() {
+    @Test fun rightEntersTheFocusedDaysTimesAndLeftOrBackReturnToTheDay() {
         show()
         key(Key.Enter)
         tagFocused("guide-time-day-0")
@@ -1209,41 +1201,55 @@ class GuideNavigationTest : GuideScreenFixture() {
         // The window's 20:15 lies in Prime time; no time is checked on another day.
         tagFocused("guide-time-preset-20")
         compose.onNodeWithTag("guide-time-preset-20").assertIsNotSelected()
-        // Right stays in the times; Left returns to the originating day, like Back.
-        key(Key.DirectionRight)
-        tagFocused("guide-time-preset-20")
-        key(Key.DirectionLeft)
-        tagFocused("guide-time-day-1")
+        // The day whose times have focus reads as selected beside the shown day.
+        compose.onNodeWithTag("guide-time-day-1").assertIsSelected()
+        compose.onNodeWithTag("guide-time-day-0").assertIsSelected()
         key(Key.DirectionRight)
         tagFocused("guide-time-preset-20")
         key(Key.DirectionUp)
         tagFocused("guide-time-preset-18")
+        // A held Left stays in this pane until release, then returns exactly one step.
+        compose.onRoot().performKeyInput { keyDown(Key.DirectionLeft) }
+        compose.waitForIdle()
+        tagFocused("guide-time-preset-18")
+        compose.onRoot().performKeyInput { keyUp(Key.DirectionLeft) }
+        compose.waitForIdle()
+        tagFocused("guide-time-day-1")
+        compose.onNodeWithTag("guide-time-day-1").assertIsNotSelected()
+        key(Key.DirectionRight)
+        tagFocused("guide-time-preset-20")
         key(Key.Back)
         compose.onNodeWithTag("guide-time-panel").assertIsDisplayed()
         tagFocused("guide-time-day-1")
-        compose.onNodeWithTag("guide-time-day-1").assertIsNotSelected()
-        compose.onNodeWithTag("guide-time-day-0").assertIsSelected()
         key(Key.DirectionUp)
         key(Key.DirectionUp)
         tagFocused("guide-time-now")
         // Right on Now goes nowhere.
         key(Key.DirectionRight)
         tagFocused("guide-time-now")
-        key(Key.DirectionLeft)
+        compose.onRoot().performKeyInput { keyDown(Key.DirectionLeft) }
+        compose.waitForIdle()
+        tagFocused("guide-time-now")
+        compose.onRoot().performKeyInput { keyUp(Key.DirectionLeft) }
+        compose.waitForIdle()
         compose.onNodeWithTag("guide-time-panel").assertDoesNotExist()
         dateFocused()
         assertDateButtonNow()
         assertEquals(0, playbackRequests)
     }
 
-    @Test fun rtlMirrorsOpeningALevelReturningToItsDayAndClosingTheRoot() {
+    @Test fun inRightToLeftTheTimesAreEnteredWithLeftAndLeftWithRight() {
         show(direction = LayoutDirection.Rtl)
         key(Key.Enter)
         tagFocused("guide-time-day-0")
+        key(Key.DirectionDown)
+        tagFocused("guide-time-day-1")
+        key(Key.DirectionLeft)
+        tagFocused("guide-time-preset-20")
         key(Key.DirectionLeft)
         tagFocused("guide-time-preset-20")
         key(Key.DirectionRight)
-        tagFocused("guide-time-day-0")
+        tagFocused("guide-time-day-1")
         key(Key.DirectionRight)
         compose.onNodeWithTag("guide-time-panel").assertDoesNotExist()
         dateFocused()
@@ -1339,6 +1345,8 @@ class GuideNavigationTest : GuideScreenFixture() {
         key(Key.DirectionUp)
         key(Key.DirectionUp)
         tagFocused("guide-time-now")
+        // Now shows today's times.
+        compose.onNodeWithTag("guide-time-presets").assert(hasAnyDescendant(hasText("Today") and isHeading()))
         key(Key.Enter)
         compose.onNodeWithTag("guide-time-panel").assertDoesNotExist()
         dateFocused()
@@ -1354,11 +1362,11 @@ class GuideNavigationTest : GuideScreenFixture() {
         repeat(7) { key(Key.DirectionDown) }
         tagFocused("guide-time-day-7")
         compose.onAllNodesWithTag("guide-time-day-8").assertCountEquals(0)
+        listOf("06", "12", "15").forEach { compose.onNodeWithTag("guide-time-preset-$it").assertIsEnabled() }
+        listOf("18", "20", "22").forEach { compose.onNodeWithTag("guide-time-preset-$it").assertIsNotEnabled() }
         // Prime time is past the bound, so Right enters at the last time before it.
         key(Key.DirectionRight)
         tagFocused("guide-time-preset-15")
-        listOf("06", "12", "15").forEach { compose.onNodeWithTag("guide-time-preset-$it").assertIsEnabled() }
-        listOf("18", "20", "22").forEach { compose.onNodeWithTag("guide-time-preset-$it").assertIsNotEnabled() }
         key(Key.DirectionDown)
         tagFocused("guide-time-preset-15")
         key(Key.Enter)
