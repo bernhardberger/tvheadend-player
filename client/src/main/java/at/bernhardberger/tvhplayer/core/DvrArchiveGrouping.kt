@@ -25,7 +25,6 @@ enum class DvrArchiveGrouping {
  */
 class DvrArchiveNaming(
     val channelName: (DvrEntry) -> String?,
-    val channelNumber: (DvrEntry) -> Int?,
     val genreName: (DvrEntry) -> String?,
     val noChannel: String,
     val noGenre: String,
@@ -48,10 +47,10 @@ fun buildDvrArchive(
     val shown = if (isWatched == null) entries else entries.filterNot { !recordingIsRunning(it) && isWatched(it) }
     val tree = when (grouping) {
         DvrArchiveGrouping.FOLDERS -> buildDvrArchive(shown)
-        // Channel number order, as the channel list reads; unnumbered channels after, by name.
+        // Channel folders follow their newest recording, like folders and genres; the catch-all stays last.
         DvrArchiveGrouping.CHANNELS -> virtualGroups(
             shown, naming.channelName, naming.noChannel,
-            compareBy<DvrArchiveFolder> { naming.channelNumber(it.recordings.first()) ?: Int.MAX_VALUE }
+            compareByDescending<DvrArchiveFolder> { it.newestRecordingStart ?: Long.MIN_VALUE }
                 .thenBy { it.name.lowercase() },
             channelLogo = true,
         )
@@ -81,7 +80,7 @@ data class DvrArchiveView(
 
 /** How the recordings, and the group rows, of every level are ordered. */
 enum class DvrArchiveSort {
-    /** Recordings by start; groups as the grouping orders them (folders and genres by newest, channels by number). */
+    /** Recordings by start and groups by their newest recording; catch-all groups stay last. */
     NEWEST,
     /** By title, or by group name; locale-aware and case-insensitive. */
     NAME,

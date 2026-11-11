@@ -77,14 +77,14 @@ class DvrLibraryPolicyTest {
         assertTrue(buildDvrArchive(entries, DvrArchiveGrouping.FOLDERS, naming()).folders.all { it.genreCategory == null })
     }
 
-    @Test fun channelsGroupingMakesOneFolderPerChannelInNumberOrderNoChannelLast() {
+    @Test fun channelsGroupingMakesOneFolderPerChannelNewestFirstNoChannelLast() {
         val oldNews = onChannel(1, 100, "News", folder = listOf("Series"), channelId = 2)
         val newNews = onChannel(2, 300, "News", channelId = 2)
         val film = onChannel(3, 200, "Film", channelId = 9)
         val orphan = onChannel(4, 400, null)
         val root = buildDvrArchive(
             listOf(oldNews, orphan, film, newNews), DvrArchiveGrouping.CHANNELS,
-            naming(numbers = mapOf("News" to 2, "Film" to 9)),
+            naming(),
         )
 
         assertEquals(listOf("News", "Film", "No channel"), root.folders.map { it.name })
@@ -102,6 +102,8 @@ class DvrLibraryPolicyTest {
             listOf(oldNews, newNews, orphan, duplicate, collision, slash), DvrArchiveGrouping.CHANNELS, naming(),
         )
         assertEquals(4, distinct.folders.size)
+        assertEquals(listOf("News/Local", "No channel", "News", "No channel"), distinct.folders.map { it.name })
+        assertEquals(listOf(orphan), distinct.folders.last().recordings)
         assertEquals(4, distinct.folders.map { it.path }.distinct().size)
         distinct.folders.forEach { folder ->
             assertEquals(folder, distinct.folderAt(folder.path))
@@ -167,7 +169,7 @@ class DvrLibraryPolicyTest {
         assertEquals(ProgrammeCategory.NEWS, root.folders.single { it.name == "News" }.genreCategory)
         assertNull(root.folders.single { it.name == "No genre" }.genreCategory)
         val sameLabels = buildDvrArchive(listOf(sport, plain, news), DvrArchiveGrouping.GENRES,
-            DvrArchiveNaming({ it.channelName }, { null }, { "No genre/News" }, "No channel", "No genre/News"))
+            DvrArchiveNaming({ it.channelName }, { "No genre/News" }, "No channel", "No genre/News"))
         assertEquals(root.folders.map { it.path }, sameLabels.folders.map { it.path })
         sameLabels.folders.forEach { assertEquals(it, sameLabels.folderAt(it.path)) }
     }
@@ -220,7 +222,7 @@ class DvrLibraryPolicyTest {
         val orphan = sized(6, 900, "Aardvark", 5, channel = null)
         val root = buildDvrArchive(
             listOf(bravo, alpha, alphaNewer, untitled, other, orphan), DvrArchiveGrouping.CHANNELS,
-            naming(numbers = mapOf("Zeta" to 1)), DvrArchiveSort.NAME,
+            naming(), DvrArchiveSort.NAME,
         )
 
         assertEquals(listOf("alpha channel", "Zeta", "No channel"), root.folders.map { it.name })
@@ -280,9 +282,8 @@ class DvrLibraryPolicyTest {
             title = title, channelName = channel, channelId = channel?.let { ChannelId(if (it == "Zeta") 1 else 2) }, folder = folder,
             files = size?.let { listOf(DvrRecordingFile.create(sizeBytes = it)) })
 
-    private fun naming(numbers: Map<String, Int> = emptyMap()) = DvrArchiveNaming(
+    private fun naming() = DvrArchiveNaming(
         channelName = { it.channelName },
-        channelNumber = { numbers[it.channelName] },
         genreName = { it.title },
         noChannel = "No channel",
         noGenre = "No genre",

@@ -24,7 +24,7 @@ class RecordingsDepthNavigationTest {
                 channelId = name?.let { at.bernhardberger.tvheadend.sdk.core.ChannelId(index.toLong() + 1) }, channelName = name)
         }
         val naming = at.bernhardberger.tvhplayer.core.DvrArchiveNaming(
-            { it.channelName }, { null }, { null }, "No channel", "No genre",
+            { it.channelName }, { null }, "No channel", "No genre",
         )
         val root = buildDvrArchive(entries, at.bernhardberger.tvhplayer.core.DvrArchiveGrouping.CHANNELS, naming)
         assertEquals(entries.size - 1, root.folders.size)

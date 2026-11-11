@@ -1469,7 +1469,6 @@ private fun rememberArchiveNaming(channelsById: Map<ChannelId, Channel>): DvrArc
     return remember(channelsById, resources, noChannelLabel, noGenreLabel) {
         DvrArchiveNaming(
             channelName = { entry -> entry.channelId?.let(channelsById::get)?.name ?: entry.channelName },
-            channelNumber = { entry -> entry.channelId?.let(channelsById::get)?.number?.toInt() },
             genreName = { entry ->
                 programmeCategory(entry.contentGenre)?.let { resources.getString(programmeCategoryLabelRes(it)) }
             },
