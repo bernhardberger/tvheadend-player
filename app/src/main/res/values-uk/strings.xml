@@ -737,7 +737,9 @@
     <string name="error_305_title">Поки не можна відтворити</string>
     <string name="error_305_reason">Цей запис можна буде відтворити після його завершення.</string>
     <string name="error_306_title">Не вдалося відтворити запис</string>
+    <string name="error_307_title">Не вдалося відтворити запис</string>
     <string name="error_306_reason">Цей пристрій не зміг відтворити запис.</string>
+    <string name="error_307_reason">Не вдалося прочитати файл запису.</string>
     <string name="channel_schedule">Розклад</string>
     <string name="channel_schedule_pane">Розклад, %1$s</string>
     <string name="channel_schedule_loading">Завантаження розкладу</string>

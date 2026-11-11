@@ -698,7 +698,9 @@
     <string name="error_305_title">Noch nicht abspielbar</string>
     <string name="error_305_reason">Diese Aufnahme kann abgespielt werden, sobald sie fertig ist.</string>
     <string name="error_306_title">Aufnahme kann nicht abgespielt werden</string>
+    <string name="error_307_title">Aufnahme kann nicht abgespielt werden</string>
     <string name="error_306_reason">Dieses Gerät konnte die Aufnahme nicht abspielen.</string>
+    <string name="error_307_reason">Die Aufnahmedatei konnte nicht gelesen werden.</string>
     <string name="channel_schedule">Programm</string>
     <string name="channel_schedule_pane">Programm, %1$s</string>
     <string name="channel_schedule_loading">Programm wird geladen</string>

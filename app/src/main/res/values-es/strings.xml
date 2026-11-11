@@ -721,7 +721,9 @@
     <string name="error_305_title">Aún no se puede reproducir</string>
     <string name="error_305_reason">Esta grabación se podrá reproducir cuando termine.</string>
     <string name="error_306_title">No se puede reproducir esta grabación</string>
+    <string name="error_307_title">No se puede reproducir esta grabación</string>
     <string name="error_306_reason">Este dispositivo no pudo reproducir la grabación.</string>
+    <string name="error_307_reason">No se pudo leer el archivo de la grabación.</string>
     <string name="channel_schedule">Programación</string>
     <string name="channel_schedule_pane">Programación, %1$s</string>
     <string name="channel_schedule_loading">Cargando programación</string>

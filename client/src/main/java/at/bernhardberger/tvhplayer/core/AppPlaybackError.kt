@@ -1,14 +1,23 @@
 @file:androidx.media3.common.util.UnstableApi
+// The display-only carrier belongs with the playback error presentation policy below.
+@file:Suppress("MatchingDeclarationName")
 
 package at.bernhardberger.tvhplayer.core
 
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
+import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackFailureCategory
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssueCategory
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
+
+/** Display-only SDK failure; never include [detail] in diagnostics or logging. */
+@OptIn(ExperimentalTvheadendApi::class)
+class RecordingFailureDetail(val category: RecordingPlaybackFailureCategory, val detail: String) {
+    override fun toString(): String = "RecordingFailureDetail(category=$category)"
+}
 
 /**
  * A live failure without an issue is the server stopping the stream. The SDK's issues are open
@@ -51,6 +60,10 @@ fun AppPlaybackState.deviceFaultDetail(): String? {
     return failed.playerErrorNumber?.let { "$name ($it)" } ?: name
 }
 
+/** Display-only recording detail, falling back to the player's code when the SDK has none. */
+fun AppPlaybackState.recordingFailureDetail(recordingFailure: RecordingFailureDetail?): String? =
+    recordingFailure?.detail?.removePrefix("ERROR_CODE_") ?: deviceFaultDetail()
+
 /**
  * The recording player's terminal condition, or null when there is nothing to report: the recording
  * plays, or it is still loading. [entry] is the recording in the current observation, null when it
@@ -63,6 +76,7 @@ fun recordingErrorCondition(
     entry: DvrEntry?,
     admission: RecordingPlaybackAdmission?,
     failure: AppPlaybackState.Failed?,
+    recordingFailure: RecordingFailureDetail? = null,
 ): AppErrorCondition? = when {
     // The SDK defers an active recording whose single file is not MPEG-TS until it is finished.
     admission == RecordingPlaybackAdmission.GrowingDeferred ->
@@ -86,6 +100,8 @@ fun recordingErrorCondition(
         // A completed entry is always admitted, so it only arrives here when it changed or was replaced.
         else -> AppErrorCondition.RECORDING_UNAVAILABLE
     }
+    failure?.deviceFault == true && recordingFailure?.category == RecordingPlaybackFailureCategory.MALFORMED_MEDIA ->
+        AppErrorCondition.RECORDING_FILE_UNREADABLE
     failure?.deviceFault == true -> AppErrorCondition.RECORDING_PLAYBACK_FAILED
     // Failed(OTHER) included: any other playback failure of a playable or unresolved recording is an interruption.
     failure != null -> AppErrorCondition.RECORDING_INTERRUPTED
@@ -101,4 +117,5 @@ fun recordingAppError(
     entry: DvrEntry?,
     admission: RecordingPlaybackAdmission?,
     failure: AppPlaybackState.Failed?,
-): AppError? = recordingErrorCondition(entry, admission, failure)?.toAppError(closable = true)
+    recordingFailure: RecordingFailureDetail? = null,
+): AppError? = recordingErrorCondition(entry, admission, failure, recordingFailure)?.toAppError(closable = true)

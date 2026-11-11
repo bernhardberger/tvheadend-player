@@ -9,6 +9,8 @@ import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackRecoveryReason
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
+import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackFailureCategory
+import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.data.ConnectionState
@@ -306,6 +308,7 @@ class PlaybackStatusPresentationTest {
         }
     }
 
+    @OptIn(ExperimentalTvheadendApi::class)
     @Test
     fun recordingAlert_isTheCatalogConditionWithAtMostTwoButtonsAndNoRetryWithNothingToRetry() {
         val completed = DvrEntry.create(DvrEntryId(1), state = DvrEntryState.COMPLETED)
@@ -331,6 +334,22 @@ class PlaybackStatusPresentationTest {
             (alert(deviceFailed) as LivePlayerAlert.Error).error.actions,
         )
         assertEquals(AppErrorCondition.RECORDING_PLAYBACK_FAILED, (alert(deviceFailed) as LivePlayerAlert.Error).error.condition)
+        for (category in listOf(null) + RecordingPlaybackFailureCategory.entries) {
+            for (deviceFault in listOf(false, true)) {
+                val error = (recordingPlayerAlert(
+                    ConnectionState.Connected, false, readFailed.copy(deviceFault = deviceFault), completed, null,
+                    PlaybackRetryCommand.RESUME_RECORDING,
+                    category?.let { RecordingFailureDetail(it, "ERROR_CODE_PARSING_CONTAINER_MALFORMED: Top bit not zero") },
+                ) as LivePlayerAlert.Error).error
+                val expected = when {
+                    !deviceFault -> 301
+                    category == RecordingPlaybackFailureCategory.MALFORMED_MEDIA -> 307
+                    else -> 306
+                }
+                assertEquals("$category deviceFault=$deviceFault", expected, error.condition.number)
+                if (expected == 307) assertEquals(listOf(AppErrorAction.CLOSE), error.actions)
+            }
+        }
         // Nothing to retry, such as a failure that is not a read failure: Retry would do nothing, so only Close.
         assertEquals(
             LivePlayerAlert.Error(

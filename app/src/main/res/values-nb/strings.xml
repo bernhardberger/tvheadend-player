@@ -706,7 +706,9 @@
     <string name="error_305_title">Kan ikke spille av ennå</string>
     <string name="error_305_reason">Dette opptaket kan spilles av når det er ferdig.</string>
     <string name="error_306_title">Kan ikke spille av dette opptaket</string>
+    <string name="error_307_title">Kan ikke spille av dette opptaket</string>
     <string name="error_306_reason">Denne enheten kunne ikke spille av opptaket.</string>
+    <string name="error_307_reason">Opptaksfilen kunne ikke leses.</string>
     <string name="channel_schedule">Programoversikt</string>
     <string name="channel_schedule_pane">Programoversikt, %1$s</string>
     <string name="channel_schedule_loading">Laster inn programoversikt</string>

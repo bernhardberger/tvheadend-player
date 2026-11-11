@@ -706,7 +706,9 @@
     <string name="error_305_title">Henüz oynatılamıyor</string>
     <string name="error_305_reason">Bu kayıt tamamlandığında oynatılabilir.</string>
     <string name="error_306_title">Bu kayıt oynatılamıyor</string>
+    <string name="error_307_title">Bu kayıt oynatılamıyor</string>
     <string name="error_306_reason">Bu cihaz kaydı oynatamadı.</string>
+    <string name="error_307_reason">Kayıt dosyası okunamadı.</string>
     <string name="channel_schedule">Program</string>
     <string name="channel_schedule_pane">Program, %1$s</string>
     <string name="channel_schedule_loading">Program yükleniyor</string>

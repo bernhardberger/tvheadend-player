@@ -28,13 +28,18 @@ import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackRecoveryReason
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
+import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackFailureCategory
+import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.AppErrorCondition
 import at.bernhardberger.tvhplayer.core.LivePlayerAlert
 import at.bernhardberger.tvhplayer.core.PlaybackRetryCommand
+import at.bernhardberger.tvhplayer.core.RecordingFailureDetail
 import at.bernhardberger.tvhplayer.core.deviceFaultDetail
 import at.bernhardberger.tvhplayer.core.livePlayerAlert
+import at.bernhardberger.tvhplayer.core.recordingFailureDetail
 import at.bernhardberger.tvhplayer.core.recordingPlayerAlert
+import at.bernhardberger.tvhplayer.core.toAppError
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.data.ConnectionState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackDiagnostics
@@ -343,6 +348,7 @@ class PlayerErrorSurfacesTest {
         compose.onNodeWithTag("tv-recovery-primary").assertIsFocused()
     }
 
+    @OptIn(ExperimentalTvheadendApi::class)
     @Test
     fun recordingPlayerFailureShowsThePlayersOwnErrorOutsideTheLiveRegion() {
         val failed = AppPlaybackState.Failed(
@@ -352,6 +358,7 @@ class PlayerErrorSurfacesTest {
             deviceFault = true,
         )
         var alert by mutableStateOf(recordingAlert(failed))
+        var sdkFailure by mutableStateOf<RecordingFailureDetail?>(null)
         show {
             LivePlayerAlertOverlay(
                 visible = true,
@@ -359,7 +366,7 @@ class PlayerErrorSurfacesTest {
                 onRetry = {},
                 onConnectionSettings = {},
                 onClose = {},
-                deviceFaultDetail = failed.deviceFaultDetail(),
+                deviceFaultDetail = failed.recordingFailureDetail(sdkFailure),
             )
         }
 
@@ -369,6 +376,24 @@ class PlayerErrorSurfacesTest {
             .assert(!hasAnyAncestor(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion)))
         compose.onNodeWithTag("tv-recovery-primary").assert(hasText("Retry")).assertIsFocused()
         compose.onNodeWithTag("tv-recovery-secondary").assert(hasText("Close"))
+
+        // SDK notification can arrive after the player's failure; it updates the existing alert.
+        val detail = "PARSING_CONTAINER_MALFORMED: Top bit not zero"
+        compose.runOnIdle {
+            sdkFailure = RecordingFailureDetail(RecordingPlaybackFailureCategory.MALFORMED_MEDIA, "ERROR_CODE_$detail")
+        }
+        compose.onNodeWithTag("tv-recovery-footnote").assert(hasText(detail))
+        compose.runOnIdle {
+            alert = LivePlayerAlert.Error(
+                AppErrorCondition.RECORDING_FILE_UNREADABLE.toAppError(),
+                PlaybackRetryCommand.NONE,
+            )
+        }
+        compose.onNodeWithTag("tv-recovery-footnote")
+            .assert(hasText(detail))
+            .assert(!hasAnyAncestor(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion)))
+        compose.onNodeWithTag("tv-recovery-primary").assert(hasText("Close")).assertIsFocused()
+        compose.onNodeWithTag("tv-recovery-secondary").assertDoesNotExist()
 
         // A lost connection replaces the alert: the player's error goes with it.
         compose.runOnIdle {

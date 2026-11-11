@@ -66,6 +66,10 @@ enum class AppErrorCondition(val number: Int, val kind: AppErrorKind) {
 
     /** This device's player failed on a recording the server still offers. */
     RECORDING_PLAYBACK_FAILED(306, AppErrorKind.RECORDING),
+
+    /** The SDK could not parse the recording file. */
+    @Suppress("MagicNumber") // Stable catalog number, like the neighboring recording conditions.
+    RECORDING_FILE_UNREADABLE(307, AppErrorKind.RECORDING),
 }
 
 /** Buttons of a full-screen alert, in display order; the first is focused. */
@@ -117,6 +121,7 @@ fun AppErrorCondition.actions(
         AppErrorCondition.RECORDING_PLAYBACK_FAILED -> listOf(AppErrorAction.RETRY, AppErrorAction.CLOSE)
         AppErrorCondition.RECORDING_NOT_STARTED,
         AppErrorCondition.RECORDING_FILE_MISSING,
+        AppErrorCondition.RECORDING_FILE_UNREADABLE,
         AppErrorCondition.RECORDING_UNAVAILABLE,
         AppErrorCondition.RECORDING_DEFERRED -> listOf(AppErrorAction.CLOSE)
     }

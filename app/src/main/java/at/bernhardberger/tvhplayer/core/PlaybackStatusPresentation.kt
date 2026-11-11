@@ -116,6 +116,7 @@ fun recordingPlayerAlert(
     entry: DvrEntry?,
     admission: RecordingPlaybackAdmission?,
     retry: PlaybackRetryCommand,
+    recordingFailure: RecordingFailureDetail? = null,
 ): LivePlayerAlert? {
     if (playbackState is AppPlaybackState.Recovering) return LivePlayerAlert.Recovering(playbackState.retryDelayMillis)
     // A read that failed because the connection went is the connection's, not the server stopping the recording.
@@ -124,7 +125,7 @@ fun recordingPlayerAlert(
     val error = if (connectionFailed || connectionLost) {
         connection.playerConnectionError()
     } else {
-        recordingAppError(entry, admission, playbackState as? AppPlaybackState.Failed)
+        recordingAppError(entry, admission, playbackState as? AppPlaybackState.Failed, recordingFailure)
     } ?: return null
     val actions = if (retry == PlaybackRetryCommand.NONE) error.actions - AppErrorAction.RETRY else error.actions
     val startsAt = entry?.start.takeIf { error.condition == AppErrorCondition.RECORDING_NOT_STARTED }

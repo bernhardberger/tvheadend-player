@@ -947,7 +947,9 @@
     <string name="error_305_title">Can’t play yet</string>
     <string name="error_305_reason">This recording can be played once it’s finished.</string>
     <string name="error_306_title">Can’t play this recording</string>
+    <string name="error_307_title">Can’t play this recording</string>
     <string name="error_306_reason">This device couldn’t play the recording.</string>
+    <string name="error_307_reason">The recording file couldn’t be read.</string>
     <string name="channel_schedule">Schedule</string>
     <string name="channel_schedule_pane">Schedule, %1$s</string>
     <string name="channel_schedule_loading">Loading schedule</string>

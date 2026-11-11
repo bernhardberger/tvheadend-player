@@ -722,7 +722,9 @@
     <string name="error_305_title">Lecture pas encore possible</string>
     <string name="error_305_reason">Cet enregistrement pourra être lu une fois terminé.</string>
     <string name="error_306_title">Impossible de lire cet enregistrement</string>
+    <string name="error_307_title">Impossible de lire cet enregistrement</string>
     <string name="error_306_reason">Cet appareil n’a pas pu lire l’enregistrement.</string>
+    <string name="error_307_reason">Le fichier de l’enregistrement n’a pas pu être lu.</string>
     <string name="channel_schedule">Programmation</string>
     <string name="channel_schedule_pane">Programmation, %1$s</string>
     <string name="channel_schedule_loading">Chargement de la programmation</string>

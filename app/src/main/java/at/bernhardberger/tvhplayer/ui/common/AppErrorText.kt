@@ -85,6 +85,7 @@ internal fun AppErrorCondition.titleRes(): Int = when (this) {
     AppErrorCondition.RECORDING_UNAVAILABLE -> R.string.error_304_title
     AppErrorCondition.RECORDING_DEFERRED -> R.string.error_305_title
     AppErrorCondition.RECORDING_PLAYBACK_FAILED -> R.string.error_306_title
+    AppErrorCondition.RECORDING_FILE_UNREADABLE -> R.string.error_307_title
 }
 
 /**
@@ -120,6 +121,7 @@ private fun AppErrorCondition.reasonRes(): Int = when (this) {
     AppErrorCondition.RECORDING_UNAVAILABLE -> R.string.error_304_reason
     AppErrorCondition.RECORDING_DEFERRED -> R.string.error_305_reason
     AppErrorCondition.RECORDING_PLAYBACK_FAILED -> R.string.error_306_reason
+    AppErrorCondition.RECORDING_FILE_UNREADABLE -> R.string.error_307_reason
 }
 
 /** Hints are shared: conditions with the same advice point at one string. */
@@ -152,6 +154,7 @@ internal fun AppErrorCondition.hintRes(): Int? = when (this) {
     AppErrorCondition.RECORDING_UNAVAILABLE -> R.string.error_hint_other_recording
     AppErrorCondition.RECORDING_DEFERRED -> null
     AppErrorCondition.RECORDING_PLAYBACK_FAILED -> R.string.error_hint_try_in_a_moment
+    AppErrorCondition.RECORDING_FILE_UNREADABLE -> R.string.error_hint_check_recording
 }
 
 @StringRes

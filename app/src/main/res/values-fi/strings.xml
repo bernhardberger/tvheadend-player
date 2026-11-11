@@ -706,7 +706,9 @@
     <string name="error_305_title">Ei vielä toistettavissa</string>
     <string name="error_305_reason">Tätä tallennetta voi toistaa, kun tallennus on valmis.</string>
     <string name="error_306_title">Tätä tallennetta ei voi toistaa</string>
+    <string name="error_307_title">Tätä tallennetta ei voi toistaa</string>
     <string name="error_306_reason">Tämä laite ei voinut toistaa tallennetta.</string>
+    <string name="error_307_reason">Tallenteen tiedostoa ei voitu lukea.</string>
     <string name="channel_schedule">Ohjelmatiedot</string>
     <string name="channel_schedule_pane">Ohjelmatiedot, %1$s</string>
     <string name="channel_schedule_loading">Ladataan ohjelmatietoja</string>

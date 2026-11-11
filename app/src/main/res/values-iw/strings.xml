@@ -721,7 +721,9 @@
     <string name="error_305_title">הניגון עדיין לא זמין</string>
     <string name="error_305_reason">ניתן להפעיל את ההקלטה רק לאחר שתסתיים.</string>
     <string name="error_306_title">לא ניתן להפעיל את ההקלטה</string>
+    <string name="error_307_title">לא ניתן להפעיל את ההקלטה</string>
     <string name="error_306_reason">המכשיר לא הצליח לנגן את ההקלטה.</string>
+    <string name="error_307_reason">לא ניתן היה לקרוא את קובץ ההקלטה.</string>
     <string name="channel_schedule">לוח שידורים</string>
     <string name="channel_schedule_pane">לוח שידורים, %1$s</string>
     <string name="channel_schedule_loading">טעינת לוח השידורים</string>

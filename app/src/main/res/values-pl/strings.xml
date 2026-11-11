@@ -736,7 +736,9 @@
     <string name="error_305_title">Nie można jeszcze odtworzyć</string>
     <string name="error_305_reason">To nagranie można odtworzyć po jego zakończeniu.</string>
     <string name="error_306_title">Nie można odtworzyć tego nagrania</string>
+    <string name="error_307_title">Nie można odtworzyć tego nagrania</string>
     <string name="error_306_reason">To urządzenie nie mogło odtworzyć nagrania.</string>
+    <string name="error_307_reason">Nie udało się odczytać pliku nagrania.</string>
     <string name="channel_schedule">Harmonogram</string>
     <string name="channel_schedule_pane">Harmonogram, %1$s</string>
     <string name="channel_schedule_loading">Wczytywanie harmonogramu</string>

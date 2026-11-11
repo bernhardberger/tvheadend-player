@@ -722,7 +722,9 @@
     <string name="error_305_title">Još nije moguće reproducirati</string>
     <string name="error_305_reason">Ova se snimka može reproducirati nakon završetka snimanja.</string>
     <string name="error_306_title">Ovu snimku nije moguće reproducirati</string>
+    <string name="error_307_title">Ovu snimku nije moguće reproducirati</string>
     <string name="error_306_reason">Ovaj uređaj nije mogao reproducirati snimku.</string>
+    <string name="error_307_reason">Datoteku snimke nije bilo moguće pročitati.</string>
     <string name="channel_schedule">Raspored</string>
     <string name="channel_schedule_pane">Raspored, %1$s</string>
     <string name="channel_schedule_loading">Učitavanje rasporeda</string>

@@ -706,7 +706,9 @@
     <string name="error_305_title">Kan ikke afspille endnu</string>
     <string name="error_305_reason">Denne optagelse kan afspilles, når den er færdig.</string>
     <string name="error_306_title">Kan ikke afspille denne optagelse</string>
+    <string name="error_307_title">Kan ikke afspille denne optagelse</string>
     <string name="error_306_reason">Denne enhed kunne ikke afspille optagelsen.</string>
+    <string name="error_307_reason">Optagelsens fil kunne ikke læses.</string>
     <string name="channel_schedule">Programoversigt</string>
     <string name="channel_schedule_pane">Programoversigt, %1$s</string>
     <string name="channel_schedule_loading">Indlæser programoversigt</string>

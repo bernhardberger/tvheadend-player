@@ -661,7 +661,9 @@
     <string name="error_305_title">暂时无法播放</string>
     <string name="error_305_reason">此录制完成后即可播放。</string>
     <string name="error_306_title">无法播放此录制内容</string>
+    <string name="error_307_title">无法播放此录制内容</string>
     <string name="error_306_reason">此设备无法播放该录制内容。</string>
+    <string name="error_307_reason">无法读取录制文件。</string>
     <string name="channel_schedule">节目表</string>
     <string name="channel_schedule_pane">节目表，%1$s</string>
     <string name="channel_schedule_loading">正在加载节目表</string>

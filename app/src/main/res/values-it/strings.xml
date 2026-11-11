@@ -721,7 +721,9 @@
     <string name="error_305_title">Riproduzione non ancora disponibile</string>
     <string name="error_305_reason">Questa registrazione sarà riproducibile al termine.</string>
     <string name="error_306_title">Impossibile riprodurre la registrazione</string>
+    <string name="error_307_title">Impossibile riprodurre la registrazione</string>
     <string name="error_306_reason">Questo dispositivo non ha potuto riprodurre la registrazione.</string>
+    <string name="error_307_reason">Non è stato possibile leggere il file della registrazione.</string>
     <string name="channel_schedule">Programmazione</string>
     <string name="channel_schedule_pane">Programmazione, %1$s</string>
     <string name="channel_schedule_loading">Caricamento della programmazione</string>
