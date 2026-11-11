@@ -182,9 +182,6 @@ class DvrLibraryPolicyTest {
 
         assertEquals(listOf(new, old, undated), root.recordings)
         assertTrue(root.folders.isEmpty())
-        // The running ones stay in the list, so the root has no Recording now row of its own.
-        assertFalse(root.offersRecordingNow)
-        assertTrue(buildDvrArchive(listOf(old), DvrArchiveGrouping.CHANNELS, naming()).offersRecordingNow)
     }
 
     @Test fun dateSectionsOpenOncePerDayThenPerMonthOlder() {
@@ -245,23 +242,45 @@ class DvrLibraryPolicyTest {
         assertEquals(listOf(looseBig, looseSmall), root.recordings)
     }
 
-    @Test fun hideWatchedDropsWatchedRecordingsAndTheGroupsTheyEmptyButNeverARunningOne() {
+    @Test fun notWatchedKeepsOnlyNeverPlayedAndDropsTheGroupsItEmptiesButNeverARunningOne() {
         val seen = onChannel(1, 100, "News").withPlays(1)
         val unseen = onChannel(2, 200, "News")
         val allSeen = onChannel(3, 300, "Film").withPlays(2)
+        val started = onChannel(5, 500, "Doc")
         val running = DvrEntry.create(DvrEntryId(4), state = DvrEntryState.RECORDING, start = Instant.fromEpochSeconds(400),
             channelName = "Film", channelId = ChannelId(9), playCount = 1)
-        val entries = listOf(seen, unseen, allSeen, running)
-        val watched = { entry: DvrEntry -> recordingWatchedToEnd(entry, null) }
+        val entries = listOf(seen, unseen, allSeen, started, running)
+        val resume = { entry: DvrEntry -> if (entry == started) kotlin.time.Duration.parse("5m") else null }
+        val watchState = { entry: DvrEntry -> recordingWatchState(entry, resume(entry), 0L) }
 
-        val root = buildDvrArchive(entries, DvrArchiveGrouping.CHANNELS, naming(), isWatched = watched)
+        val root = buildDvrArchive(entries, DvrArchiveGrouping.CHANNELS, naming(), show = DvrArchiveShow.NOT_WATCHED,
+            watchState = watchState)
         assertEquals(listOf("Film", "News"), root.folders.map { it.name })
         assertEquals(listOf(running), root.folders.single { it.name == "Film" }.recordings)
         assertEquals(listOf(unseen), root.folders.single { it.name == "News" }.recordings)
         assertEquals(1, summarizeDvrFolder(root.folders.single { it.name == "News" }).recordingCount)
 
-        val onlyWatched = buildDvrArchive(listOf(seen, allSeen), DvrArchiveGrouping.FOLDERS, naming(), isWatched = watched)
+        val onlyWatched = buildDvrArchive(listOf(seen, allSeen), DvrArchiveGrouping.FOLDERS, naming(),
+            show = DvrArchiveShow.NOT_WATCHED)
         assertTrue(onlyWatched.folders.isEmpty() && onlyWatched.recordings.isEmpty())
+    }
+
+    @Test fun startedKeepsOnlyPartlyWatchedRecordingsAndNeverARunningOne() {
+        val seen = onChannel(1, 100, "News").withPlays(1)
+        val unseen = onChannel(2, 200, "News")
+        val started = onChannel(3, 300, "Film")
+        val running = DvrEntry.create(DvrEntryId(4), state = DvrEntryState.RECORDING, start = Instant.fromEpochSeconds(400),
+            channelName = "Doc", channelId = ChannelId(9))
+        val watchState = { entry: DvrEntry ->
+            recordingWatchState(entry, kotlin.time.Duration.parse("5m").takeIf { entry == started }, 0L)
+        }
+
+        val root = buildDvrArchive(listOf(seen, unseen, started, running), DvrArchiveGrouping.CHANNELS, naming(),
+            show = DvrArchiveShow.STARTED, watchState = watchState)
+
+        assertEquals(listOf("Doc", "Film"), root.folders.map { it.name })
+        assertEquals(listOf(started), root.folders.single { it.name == "Film" }.recordings)
+        assertEquals(listOf(running), root.folders.single { it.name == "Doc" }.recordings)
     }
 
     @Test fun watchedMeansPlayedToTheEndNotPartlyWatchedNorMissed() {

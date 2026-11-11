@@ -1,15 +1,10 @@
 package at.bernhardberger.tvhplayer.ui.screens.recordings
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -21,7 +16,6 @@ import androidx.compose.ui.util.lerp
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -35,14 +29,14 @@ import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.DvrArchiveFolder
 import at.bernhardberger.tvhplayer.core.DvrArchiveGrouping
+import at.bernhardberger.tvhplayer.core.DvrArchiveShow
 import at.bernhardberger.tvhplayer.core.DvrArchiveSort
+import at.bernhardberger.tvhplayer.core.allRecordings
 import at.bernhardberger.tvhplayer.core.DvrDateSection
 import at.bernhardberger.tvhplayer.core.dvrDateSectionStarts
 import at.bernhardberger.tvhplayer.ui.common.formatDayHeader
 import at.bernhardberger.tvhplayer.core.offeredResumePosition
-import at.bernhardberger.tvhplayer.core.runningRecordings
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnGap
-import at.bernhardberger.tvhplayer.ui.TvGridGutter
 import at.bernhardberger.tvhplayer.ui.TvIconButtonSize
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
@@ -50,25 +44,35 @@ import at.bernhardberger.tvhplayer.ui.components.depth.*
 
 internal fun archiveLevelId(path: List<String>): String = "archive:${path.joinToString("/")}"
 
-internal const val RecordingNowLevelId = "recording-now"
-
 internal fun archiveLevelPath(id: String): List<String> =
     if (id.startsWith("archive:")) id.removePrefix("archive:").split('/').filter(String::isNotEmpty)
     else emptyList()
 
-internal fun archiveLevelItems(root: DvrArchiveFolder, levelId: String): List<ArchiveListItem>? =
+/**
+ * The items of an archive level. [root] is the archive the Show filter leaves; a folder only [fullRoot]
+ * still has stays an open, empty level so the folder the viewer is in does not close under them.
+ */
+internal fun archiveLevelItems(
+    root: DvrArchiveFolder,
+    levelId: String,
+    fullRoot: DvrArchiveFolder = root,
+): List<ArchiveListItem>? =
     when {
-        levelId == RecordingNowLevelId -> root.runningRecordings().takeIf { it.isNotEmpty() }
-            ?.map(ArchiveListItem::Recording)
-        levelId.startsWith("archive:") -> root.folderAt(archiveLevelPath(levelId))?.listItems()
+        levelId.startsWith("archive:") -> archiveLevelPath(levelId).let { path ->
+            root.folderAt(path)?.listItems() ?: fullRoot.folderAt(path)?.let { emptyList() }
+        }
         else -> null
     }
 
 /** Preserve every surviving parent viewport and reconcile selection by the depth owner's index policy. */
-internal fun reconcileArchiveStack(stack: DepthStack, root: DvrArchiveFolder): DepthStack {
-    val frames = stack.frames.takeWhile { archiveLevelItems(root, it.levelId) != null }
+internal fun reconcileArchiveStack(
+    stack: DepthStack,
+    root: DvrArchiveFolder,
+    fullRoot: DvrArchiveFolder = root,
+): DepthStack {
+    val frames = stack.frames.takeWhile { archiveLevelItems(root, it.levelId, fullRoot) != null }
         .map { frame ->
-            val items = requireNotNull(archiveLevelItems(root, frame.levelId))
+            val items = requireNotNull(archiveLevelItems(root, frame.levelId, fullRoot))
             DepthStack(listOf(frame)).reconcile(items.map { DepthItem(it.key) }).active
         }
     return stack.copy(
@@ -89,6 +93,8 @@ internal fun ArchiveDepthContent(
     contentFocus: FocusRequester,
     onModeFocus: () -> Unit,
     onDrawerFocus: (() -> Unit)?,
+    /** Up from the first row: the chip row above the list. */
+    onFirstRowUp: () -> Unit,
     onOpenRecording: (DvrEntry) -> Unit,
     piconForEntry: (DvrEntry) -> ChannelIcon?,
     admissionForEntry: (DvrEntry) -> RecordingPlaybackAdmission?,
@@ -97,11 +103,13 @@ internal fun ArchiveDepthContent(
     onOpenFolderMenu: ((DvrArchiveFolder) -> Unit)? = null,
     grouping: DvrArchiveGrouping = DvrArchiveGrouping.FOLDERS,
     sort: DvrArchiveSort = DvrArchiveSort.NEWEST,
-    /** The archive has recordings but Hide watched leaves none to show: the empty state says so. */
-    emptyBecauseWatched: Boolean = false,
-    /** Hide watched is on: the grouping button takes the tonal fill while it filters the list. */
-    hideWatched: Boolean = false,
-    pill: ArchivePillHooks? = null,
+    /** The archive before the Show filter: it names the folders the filter emptied and counts what it hides. */
+    fullRoot: DvrArchiveFolder = root,
+    show: DvrArchiveShow = DvrArchiveShow.ALL,
+    /** A card above the list drives the preview slot instead of the focused row. */
+    previewOverride: (@Composable () -> Unit)? = null,
+    /** Pixels the preview pane rises above the list's top: the header above it belongs to the left column only. */
+    previewRise: () -> Int = { 0 },
     nowSeconds: () -> Long = { System.currentTimeMillis() / 1000L },
 ) {
     val latestOnOpenRecording = rememberUpdatedState(onOpenRecording)
@@ -113,115 +121,62 @@ internal fun ArchiveDepthContent(
     val sections = remember(root, grouping, sort) {
         archiveDateSections(root, grouping, sort, nowSeconds)
     }
-    // The root heading ends before the View options button at the row's end, whatever width its value gives it;
-    // deeper levels have no button. The heading reads the measured width where it lays out.
-    val buttonWidthPx = remember { mutableIntStateOf(0) }
     val levels = rememberArchiveLevels(
-        root, sections, emptyBecauseWatched, pill != null, buttonWidthPx, contentPadding,
+        root, fullRoot, show, sections, contentPadding,
         latestAdmissionForEntry, latestOnOpenFolderMenu, latestPiconForEntry,
         latestOnOpenRecording, latestOnOpenContextMenu,
     )
-    val atRoot = navigation.stack.active.levelId == archiveLevelId(emptyList())
-    var pillFocused by remember { mutableStateOf(false) }
-    Box(Modifier.fillMaxSize()) {
-        DepthNavigation(
-            state = navigation,
-            levels = levels,
-            fallbackLevel = { levels.getValue(archiveLevelId(emptyList())) },
-            columnWidth = TvBrowseColumnWidth,
-            columnGap = TvBrowseColumnGap,
-            contentPadding = contentPadding,
-            isCurrent = isCurrent,
-            initialFocusEnabled = initialFocusEnabled,
-            backEnabled = backEnabled && !pillFocused,
-            activeFocusRequester = contentFocus,
-            onRootBack = onModeFocus,
-            onRootLeft = onDrawerFocus,
-            // At the root the grouping choice is the stop between the list and the tabs;
-            // inside a group it is not there.
-            onFirstRowUp = if (pill != null && atRoot) pill.focus else onModeFocus,
-            pageKeyDirection = at.bernhardberger.tvhplayer.core.ChannelNavigation::pageDirectionForKeyCode,
-            modifier = modifier.testTag("recordings-archive-list"),
-        )
-        if (pill != null && atRoot && isCurrent) {
-            // Right-aligned in the title row, ending where the list column ends (above the row chevrons).
-            Box(
-                Modifier.padding(start = contentPadding.calculateStartPadding(LocalLayoutDirection.current))
-                    .width(TvBrowseColumnWidth).height(recordingsHeadingBandHeight()),
-                contentAlignment = Alignment.CenterEnd,
-            ) {
-                ArchiveGroupingButton(
-                    grouping = grouping,
-                    active = hideWatched,
-                    modifier = Modifier.onSizeChanged { buttonWidthPx.intValue = it.width },
-                    focusRequester = pill.focusRequester,
-                    onOpen = pill.open,
-                    onUp = pill.up,
-                    onDown = { contentFocus.requestFocus() },
-                    onLeft = onDrawerFocus,
-                    onFocusChanged = { pillFocused = it; pill.onFocusChanged(it) },
-                )
-            }
-        }
-    }
+    DepthNavigation(
+        state = navigation,
+        levels = levels,
+        fallbackLevel = { levels.getValue(archiveLevelId(emptyList())) },
+        columnWidth = TvBrowseColumnWidth,
+        columnGap = TvBrowseColumnGap,
+        contentPadding = contentPadding,
+        isCurrent = isCurrent,
+        initialFocusEnabled = initialFocusEnabled,
+        backEnabled = backEnabled,
+        activeFocusRequester = contentFocus,
+        onRootBack = onModeFocus,
+        onRootLeft = onDrawerFocus,
+        onFirstRowUp = onFirstRowUp,
+        pageKeyDirection = at.bernhardberger.tvhplayer.core.ChannelNavigation::pageDirectionForKeyCode,
+        // Below the heading band a row's own pane has, so a card's pane sits where that one does.
+        previewOverride = previewOverride?.let { content ->
+            { Column { ArchiveLevelHeading("") { 0f }; content() } }
+        },
+        previewRise = previewRise,
+        modifier = modifier.testTag("recordings-archive-list"),
+    )
 }
 
 @Composable
 private fun rememberArchiveLevels(
     root: DvrArchiveFolder,
+    fullRoot: DvrArchiveFolder,
+    show: DvrArchiveShow,
     sections: Map<Long, DvrDateSection>,
-    emptyBecauseWatched: Boolean,
-    hasPill: Boolean,
-    buttonWidthPx: State<Int>,
     contentPadding: PaddingValues,
     latestAdmissionForEntry: State<(DvrEntry) -> RecordingPlaybackAdmission?>,
     latestOnOpenFolderMenu: State<((DvrArchiveFolder) -> Unit)?>,
     latestPiconForEntry: State<(DvrEntry) -> ChannelIcon?>,
     latestOnOpenRecording: State<(DvrEntry) -> Unit>,
     latestOnOpenContextMenu: State<((DvrEntry) -> Unit)?>,
-): Map<String, DepthLevel> = remember(root, sections, emptyBecauseWatched, hasPill) {
+): Map<String, DepthLevel> = remember(root, fullRoot, show, sections) {
         val levels = linkedMapOf<String, DepthLevel>()
-        fun addLevel(id: String, heading: @Composable () -> String, items: List<ArchiveListItem>) {
+        fun addLevel(path: List<String>, heading: @Composable () -> String, items: List<ArchiveListItem>) {
+            val id = archiveLevelId(path)
+            // What the Show filter leaves out of this level, at any depth below it.
+            val hidden = (fullRoot.folderAt(path)?.allRecordings()?.size ?: 0) -
+                (root.folderAt(path)?.allRecordings()?.size ?: 0)
             levels[id] = DepthLevel(
                 id = id,
-                heading = { emphasis ->
-                    ArchiveLevelHeading(
-                        heading(),
-                        emphasis,
-                        endReserve = if (hasPill && id == archiveLevelId(emptyList())) {
-                            { buttonWidthPx.value }
-                        } else null,
-                    )
-                },
+                heading = { emphasis -> ArchiveLevelHeading(heading(), emphasis) },
                 emptyContent = {
-                    if (emptyBecauseWatched) Column(verticalArrangement = Arrangement.spacedBy(TvSpacing8)) {
-                        Text(
-                            stringResource(R.string.recordings_archive_all_watched),
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        Text(
-                            stringResource(R.string.recordings_archive_all_watched_hint),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    } else Text(
-                        stringResource(R.string.recordings_archive_empty), style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
+                    ArchiveEmptyLevel(show, atRoot = path.isEmpty(), hidden = hidden)
                 },
                 rows = items.mapIndexed { index, item ->
                     when (item) {
-                        is ArchiveListItem.RecordingNow -> {
-                            addLevel(RecordingNowLevelId, { stringResource(R.string.recordings_recording_now_folder) },
-                                item.entries.map(ArchiveListItem::Recording))
-                            DepthRow(DepthItem(item.key, RecordingNowLevelId)) { rowModifier, activate ->
-                                Column {
-                                    RecordingNowFolderRow(item.entries.size, rowModifier, activate)
-                                    HorizontalDivider(modifier = Modifier.padding(vertical = TvSpacing8))
-                                }
-                            }
-                        }
                         is ArchiveListItem.Folder -> archiveFolderRow(
                             item, latestAdmissionForEntry, latestOnOpenFolderMenu, latestPiconForEntry,
                         )
@@ -242,10 +197,8 @@ private fun rememberArchiveLevels(
                                 onActivate = { latestOnOpenRecording.value(item.entry) },
                                 previewLevelId = previewId,
                             ) { rowModifier, activate ->
-                                // Only the root list carries the cuts; the Recording now level is a plain list.
-                                val section = if (id == archiveLevelId(emptyList())) {
-                                    sections[item.entry.id.value]
-                                } else null
+                                // Only the root list carries the date cuts.
+                                val section = if (path.isEmpty()) sections[item.entry.id.value] else null
                                 Column {
                                     if (section != null) {
                                         ArchiveDateDivider(dateSectionLabel(section), first = index == 0)
@@ -267,12 +220,20 @@ private fun rememberArchiveLevels(
             )
         }
         fun addFolder(folder: DvrArchiveFolder) {
-            addLevel(archiveLevelId(folder.path), {
+            addLevel(folder.path, {
                 if (folder.path.isEmpty()) stringResource(R.string.recordings_archive_all) else folder.name
             }, folder.listItems())
             folder.folders.forEach(::addFolder)
         }
+        // A folder only the unfiltered archive has is empty here: it stays reachable as the open level.
+        fun addEmptied(folder: DvrArchiveFolder) {
+            folder.folders.forEach { child ->
+                if (archiveLevelId(child.path) !in levels) addLevel(child.path, { child.name }, emptyList())
+                addEmptied(child)
+            }
+        }
         addFolder(root)
+        if (fullRoot !== root) addEmptied(fullRoot)
         levels
     }
 
@@ -311,17 +272,6 @@ private fun archiveFolderRow(
     )
 }
 
-/** What the screen decides about the grouping button: where focus goes from it and what opening it does. */
-internal class ArchivePillHooks(
-    val focusRequester: FocusRequester,
-    val open: () -> Unit,
-    /** Focus to the tabs. */
-    val up: () -> Unit,
-    /** Focus to the button, from the list's first row. */
-    val focus: () -> Unit,
-    val onFocusChanged: (Boolean) -> Unit,
-)
-
 @Composable
 private fun dateSectionLabel(section: DvrDateSection): String = when (section) {
     DvrDateSection.Today -> stringResource(R.string.recordings_date_today)
@@ -337,9 +287,8 @@ private fun dateSectionLabel(section: DvrDateSection): String = when (section) {
 }
 
 /**
- * Every Recordings tab's first heading uses this band, so first rows line up across tabs. It holds a
- * header button with a margin, so the Archive's view options button sits in it on the heading's line and
- * the first row's focus growth stays clear of the button.
+ * Every Recordings tab's first heading uses this band, so first rows line up across tabs. It is as tall
+ * as a header icon button with a margin, the height the other tabs' headings already hold.
  */
 @Composable
 internal fun recordingsHeadingBandHeight(): Dp {
@@ -356,14 +305,12 @@ internal const val ArchiveHeadingPreviewScale = 16f / 22f
  * to full size as the column slides into the active slot.
  */
 @Composable
-private fun ArchiveLevelHeading(name: String, emphasis: () -> Float, endReserve: (() -> Int)? = null) {
-    // The measured width of the button at the end of the row (pixels), plus the shared gap.
-    val reserve = endReserve?.let { with(LocalDensity.current) { it().toDp() } + TvGridGutter } ?: 0.dp
+private fun ArchiveLevelHeading(name: String, emphasis: () -> Float) {
     Box(Modifier.fillMaxWidth().height(recordingsHeadingBandHeight()), contentAlignment = Alignment.CenterStart) {
         if (name.isNotEmpty()) Text(
             name, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
             color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(end = reserve).graphicsLayer {
+            modifier = Modifier.graphicsLayer {
                 scaleX = lerp(ArchiveHeadingPreviewScale, 1f, emphasis())
                 scaleY = scaleX
                 transformOrigin = TransformOrigin(0f, 1f)

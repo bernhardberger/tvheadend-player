@@ -385,12 +385,6 @@
     <string name="recordings_title">Enregistrements</string>
     <string name="recordings_archive">Archives</string>
     <string name="recordings_archive_all">Tous les enregistrements</string>
-    <string name="recordings_recording_now_folder">Enregistrement en cours</string>
-    <plurals name="recordings_in_progress_count">
-        <item quantity="one">%1$d enregistrement en cours</item>
-        <item quantity="many">%1$d enregistrements en cours</item>
-        <item quantity="other">%1$d enregistrements en cours</item>
-    </plurals>
     <string name="recordings_schedule">Programmation</string>
     <string name="recordings_problems">Problèmes</string>
     <string name="recordings_archive_empty">Aucun enregistrement lisible dans ce dossier.</string>

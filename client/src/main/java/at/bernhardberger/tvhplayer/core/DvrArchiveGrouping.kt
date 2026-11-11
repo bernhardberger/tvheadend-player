@@ -40,11 +40,13 @@ fun buildDvrArchive(
     grouping: DvrArchiveGrouping,
     naming: DvrArchiveNaming,
     sort: DvrArchiveSort = DvrArchiveSort.NEWEST,
-    isWatched: ((DvrEntry) -> Boolean)? = null,
+    show: DvrArchiveShow = DvrArchiveShow.ALL,
+    watchState: (DvrEntry) -> RecordingWatchState = { recordingWatchState(it, null, 0L) },
 ): DvrArchiveFolder {
-    // Hide watched: a running recording is not finished, so it is never hidden; a group left with
+    // The Show filter: a running recording is not finished, so it is never hidden; a group left with
     // nothing is never built, and the counts and sizes of what remains follow from what is shown.
-    val shown = if (isWatched == null) entries else entries.filterNot { !recordingIsRunning(it) && isWatched(it) }
+    val shown = if (show == DvrArchiveShow.ALL) entries else
+        entries.filter { recordingIsRunning(it) || show.shows(watchState(it)) }
     val tree = when (grouping) {
         DvrArchiveGrouping.FOLDERS -> buildDvrArchive(shown)
         // Channel folders follow their newest recording, like folders and genres; the catch-all stays last.
@@ -60,8 +62,7 @@ fun buildDvrArchive(
                 .thenBy { it.name.lowercase() },
             genreCategory = true,
         )
-        DvrArchiveGrouping.NONE -> DvrArchiveFolder("", emptyList(), emptyList(), shown.newestFirst(),
-            offersRecordingNow = false)
+        DvrArchiveGrouping.NONE -> DvrArchiveFolder("", emptyList(), emptyList(), shown.newestFirst())
     }
     val lastGroup = when (grouping) {
         DvrArchiveGrouping.CHANNELS -> "channel:unassigned"
@@ -75,8 +76,23 @@ fun buildDvrArchive(
 data class DvrArchiveView(
     val grouping: DvrArchiveGrouping = DvrArchiveGrouping.FOLDERS,
     val sort: DvrArchiveSort = DvrArchiveSort.NEWEST,
-    val hideWatched: Boolean = false,
+    val show: DvrArchiveShow = DvrArchiveShow.ALL,
 )
+
+/** Which recordings the archive lists, by how much of each has been watched. */
+enum class DvrArchiveShow {
+    ALL,
+    /** Never played. */
+    NOT_WATCHED,
+    /** Played partway, so there is a place to continue from. */
+    STARTED,
+}
+
+fun DvrArchiveShow.shows(state: RecordingWatchState): Boolean = when (this) {
+    DvrArchiveShow.ALL -> true
+    DvrArchiveShow.NOT_WATCHED -> state is RecordingWatchState.Unwatched
+    DvrArchiveShow.STARTED -> state is RecordingWatchState.PartlyWatched
+}
 
 /** How the recordings, and the group rows, of every level are ordered. */
 enum class DvrArchiveSort {

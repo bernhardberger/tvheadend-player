@@ -581,12 +581,6 @@
     <string name="recordings_title">Recordings</string>
     <string name="recordings_archive">Archive</string>
     <string name="recordings_archive_all">All recordings</string>
-    <string name="recordings_recording_now_folder">Recording now</string>
-    <!-- Recordings screen status line. -->
-    <plurals name="recordings_in_progress_count">
-        <item quantity="one">%1$d recording in progress</item>
-        <item quantity="other">%1$d recordings in progress</item>
-    </plurals>
     <string name="recordings_schedule">Schedule</string>
     <!-- Recordings tab listing failed, missed and broken recordings. Noun. Max 14. -->
     <string name="recordings_problems">Problems</string>
@@ -605,9 +599,23 @@
     <string name="recordings_sort_newest">Newest first</string>
     <string name="recordings_sort_name">Name A–Z</string>
     <string name="recordings_sort_largest">Largest first</string>
-    <string name="recordings_hide_watched">Hide watched</string>
-    <string name="recordings_archive_all_watched">Everything here is watched.</string>
-    <string name="recordings_archive_all_watched_hint">Turn off Hide watched in View options.</string>
+    <!-- The Show chip and its choices: which recordings the Archive lists. The chip value is max 14. -->
+    <string name="recordings_show_title">Show</string>
+    <string name="recordings_show_all">Show all</string>
+    <string name="recordings_show_option_all">All</string>
+    <string name="recordings_show_not_watched">Not watched</string>
+    <string name="recordings_show_started">Started</string>
+    <string name="recordings_show_all_detail">Watched and not watched</string>
+    <string name="recordings_show_not_watched_detail">Never played</string>
+    <string name="recordings_show_started_detail">Continue watching</string>
+    <!-- Empty states when the Show filter hides everything, then the count of hidden recordings. -->
+    <string name="recordings_empty_not_watched_root">Everything here has been played.</string>
+    <string name="recordings_empty_not_watched_folder">Everything in this folder has been played.</string>
+    <string name="recordings_empty_started">Nothing started yet.</string>
+    <plurals name="recordings_hidden_count">
+        <item quantity="one">%1$d recording is hidden.</item>
+        <item quantity="other">%1$d recordings are hidden.</item>
+    </plurals>
     <string name="recordings_group_no_channel">No channel</string>
     <string name="recordings_group_no_genre">No genre</string>
     <string name="recordings_date_today">Today</string>

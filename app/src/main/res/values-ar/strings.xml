@@ -397,15 +397,6 @@
     <string name="recordings_title">التسجيلات</string>
     <string name="recordings_archive">الأرشيف</string>
     <string name="recordings_archive_all">كل التسجيلات</string>
-    <string name="recordings_recording_now_folder">جارٍ التسجيل</string>
-    <plurals name="recordings_in_progress_count">
-        <item quantity="zero">تسجيلات جارية: %1$d</item>
-        <item quantity="one">تسجيلات جارية: %1$d</item>
-        <item quantity="two">تسجيلات جارية: %1$d</item>
-        <item quantity="few">تسجيلات جارية: %1$d</item>
-        <item quantity="many">تسجيلات جارية: %1$d</item>
-        <item quantity="other">تسجيلات جارية: %1$d</item>
-    </plurals>
     <string name="recordings_schedule">جدول التسجيلات</string>
     <string name="recordings_problems">المشكلات</string>
     <string name="recordings_archive_empty">لا توجد تسجيلات قابلة للتشغيل في هذا المجلد.</string>

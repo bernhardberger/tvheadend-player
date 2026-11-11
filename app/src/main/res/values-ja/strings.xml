@@ -377,10 +377,6 @@
     <string name="recordings_title">録画</string>
     <string name="recordings_archive">アーカイブ</string>
     <string name="recordings_archive_all">すべての録画</string>
-    <string name="recordings_recording_now_folder">録画中</string>
-    <plurals name="recordings_in_progress_count">
-        <item quantity="other">%1$d件を録画中</item>
-    </plurals>
     <string name="recordings_schedule">録画予定</string>
     <string name="recordings_problems">問題</string>
     <string name="recordings_archive_empty">このフォルダーに再生可能な録画はありません。</string>

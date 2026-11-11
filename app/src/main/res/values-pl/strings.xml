@@ -389,13 +389,6 @@
     <string name="recordings_title">Nagrania</string>
     <string name="recordings_archive">Archiwum</string>
     <string name="recordings_archive_all">Wszystkie nagrania</string>
-    <string name="recordings_recording_now_folder">Trwa nagrywanie</string>
-    <plurals name="recordings_in_progress_count">
-        <item quantity="one">%1$d nagranie w toku</item>
-        <item quantity="few">%1$d nagrania w toku</item>
-        <item quantity="many">%1$d nagrań w toku</item>
-        <item quantity="other">%1$d nagrania w toku</item>
-    </plurals>
     <string name="recordings_schedule">Harmonogram</string>
     <string name="recordings_problems">Problemy</string>
     <string name="recordings_archive_empty">W tym folderze nie ma nagrań do odtworzenia.</string>

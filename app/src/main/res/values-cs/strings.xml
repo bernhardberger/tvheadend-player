@@ -389,13 +389,6 @@
     <string name="recordings_title">Nahrávky</string>
     <string name="recordings_archive">Archiv</string>
     <string name="recordings_archive_all">Všechny nahrávky</string>
-    <string name="recordings_recording_now_folder">Právě se nahrává</string>
-    <plurals name="recordings_in_progress_count">
-        <item quantity="one">Probíhá %1$d nahrávání</item>
-        <item quantity="few">Probíhají %1$d nahrávání</item>
-        <item quantity="many">Probíhá %1$d nahrávání</item>
-        <item quantity="other">Probíhá %1$d nahrávání</item>
-    </plurals>
     <string name="recordings_schedule">Plán</string>
     <string name="recordings_problems">Problémy</string>
     <string name="recordings_archive_empty">V této složce nejsou přehratelné nahrávky.</string>

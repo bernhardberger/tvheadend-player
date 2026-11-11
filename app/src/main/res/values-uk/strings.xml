@@ -389,13 +389,6 @@
     <string name="recordings_title">Записи</string>
     <string name="recordings_archive">Архів</string>
     <string name="recordings_archive_all">Усі записи</string>
-    <string name="recordings_recording_now_folder">Триває запис</string>
-    <plurals name="recordings_in_progress_count">
-        <item quantity="one">Триває %1$d запис</item>
-        <item quantity="few">Тривають %1$d записи</item>
-        <item quantity="many">Триває %1$d записів</item>
-        <item quantity="other">Триває %1$d запису</item>
-    </plurals>
     <string name="recordings_schedule">Розклад</string>
     <string name="recordings_problems">Проблеми</string>
     <string name="recordings_archive_empty">У цій теці немає записів для відтворення.</string>

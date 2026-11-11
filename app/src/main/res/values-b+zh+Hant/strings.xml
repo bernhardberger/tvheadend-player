@@ -369,8 +369,6 @@
     <string name="recordings_title">錄影</string>
     <string name="recordings_archive">典藏</string>
     <string name="recordings_archive_all">所有錄影</string>
-    <string name="recordings_recording_now_folder">錄影中</string>
-    <plurals name="recordings_in_progress_count"><item quantity="other">%1$d項錄影進行中</item></plurals>
     <string name="recordings_schedule">錄影排程</string>
     <string name="recordings_problems">問題</string>
     <string name="recordings_archive_empty">此資料夾沒有可播放的錄影。</string>

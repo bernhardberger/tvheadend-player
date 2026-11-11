@@ -381,11 +381,6 @@
     <string name="recordings_title">Kayıtlar</string>
     <string name="recordings_archive">Arşiv</string>
     <string name="recordings_archive_all">Tüm kayıtlar</string>
-    <string name="recordings_recording_now_folder">Şimdi kaydediliyor</string>
-    <plurals name="recordings_in_progress_count">
-        <item quantity="one">%1$d kayıt sürüyor</item>
-        <item quantity="other">%1$d kayıt sürüyor</item>
-    </plurals>
     <string name="recordings_schedule">Planlananlar</string>
     <string name="recordings_problems">Sorunlar</string>
     <string name="recordings_archive_empty">Bu klasörde oynatılabilir kayıt yok.</string>

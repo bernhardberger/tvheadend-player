@@ -175,12 +175,6 @@ class FolderContextMenuTest {
         compose.onNodeWithTag("recordings-folder-supporting-Seen", useUnmergedTree = true).assertTextEquals("2 recordings")
     }
 
-    @Test fun theRecordingNowFolderHasNoMenu() {
-        show(seriesFolder())
-        compose.onNodeWithTag("recordings-recording-now-folder").requestFocus().performKeyInput { pressKey(Key.Menu) }
-        compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
-    }
-
     private lateinit var notices: NoticeCenter
 
     private fun openFolderMenu() {

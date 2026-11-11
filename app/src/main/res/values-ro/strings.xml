@@ -385,12 +385,6 @@
     <string name="recordings_title">Înregistrări</string>
     <string name="recordings_archive">Arhivă</string>
     <string name="recordings_archive_all">Toate înregistrările</string>
-    <string name="recordings_recording_now_folder">Se înregistrează</string>
-    <plurals name="recordings_in_progress_count">
-        <item quantity="one">%1$d înregistrare în curs</item>
-        <item quantity="few">%1$d înregistrări în curs</item>
-        <item quantity="other">%1$d de înregistrări în curs</item>
-    </plurals>
     <string name="recordings_schedule">Programări</string>
     <string name="recordings_problems">Probleme</string>
     <string name="recordings_archive_empty">Nu există înregistrări care pot fi redate în acest dosar.</string>

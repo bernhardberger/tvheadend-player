@@ -381,11 +381,6 @@
     <string name="recordings_title">Εγγραφές</string>
     <string name="recordings_archive">Αρχείο</string>
     <string name="recordings_archive_all">Όλες οι εγγραφές</string>
-    <string name="recordings_recording_now_folder">Εγγραφή τώρα</string>
-    <plurals name="recordings_in_progress_count">
-        <item quantity="one">%1$d εγγραφή σε εξέλιξη</item>
-        <item quantity="other">%1$d εγγραφές σε εξέλιξη</item>
-    </plurals>
     <string name="recordings_schedule">Προγραμματισμένες</string>
     <string name="recordings_problems">Προβλήματα</string>
     <string name="recordings_archive_empty">Δεν υπάρχουν εγγραφές για αναπαραγωγή σε αυτόν τον φάκελο.</string>

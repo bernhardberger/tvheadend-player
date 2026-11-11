@@ -381,11 +381,6 @@
     <string name="recordings_title">Felvételek</string>
     <string name="recordings_archive">Archívum</string>
     <string name="recordings_archive_all">Összes felvétel</string>
-    <string name="recordings_recording_now_folder">Felvétel folyamatban</string>
-    <plurals name="recordings_in_progress_count">
-        <item quantity="one">%1$d felvétel folyamatban</item>
-        <item quantity="other">%1$d felvétel folyamatban</item>
-    </plurals>
     <string name="recordings_schedule">Ütemezés</string>
     <string name="recordings_problems">Problémák</string>
     <string name="recordings_archive_empty">Nincs lejátszható felvétel ebben a mappában.</string>

@@ -385,12 +385,6 @@
     <string name="recordings_title">Grabaciones</string>
     <string name="recordings_archive">Archivo</string>
     <string name="recordings_archive_all">Todas las grabaciones</string>
-    <string name="recordings_recording_now_folder">Grabando</string>
-    <plurals name="recordings_in_progress_count">
-        <item quantity="one">%1$d grabación en curso</item>
-        <item quantity="many">%1$d grabaciones en curso</item>
-        <item quantity="other">%1$d grabaciones en curso</item>
-    </plurals>
     <string name="recordings_schedule">Programación</string>
     <string name="recordings_problems">Problemas</string>
     <string name="recordings_archive_empty">No hay grabaciones reproducibles en esta carpeta.</string>

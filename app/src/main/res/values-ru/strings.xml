@@ -389,13 +389,6 @@
     <string name="recordings_title">Записи</string>
     <string name="recordings_archive">Архив</string>
     <string name="recordings_archive_all">Все записи</string>
-    <string name="recordings_recording_now_folder">Идёт запись</string>
-    <plurals name="recordings_in_progress_count">
-        <item quantity="one">%1$d запись выполняется</item>
-        <item quantity="few">%1$d записи выполняются</item>
-        <item quantity="many">%1$d записей выполняется</item>
-        <item quantity="other">%1$d записи выполняется</item>
-    </plurals>
     <string name="recordings_schedule">Расписание</string>
     <string name="recordings_problems">Проблемы</string>
     <string name="recordings_archive_empty">В этой папке нет записей для воспроизведения.</string>

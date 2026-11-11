@@ -377,10 +377,6 @@
     <string name="recordings_title">녹화</string>
     <string name="recordings_archive">보관함</string>
     <string name="recordings_archive_all">모든 녹화</string>
-    <string name="recordings_recording_now_folder">녹화 중</string>
-    <plurals name="recordings_in_progress_count">
-        <item quantity="other">녹화 %1$d개 진행 중</item>
-    </plurals>
     <string name="recordings_schedule">녹화 일정</string>
     <string name="recordings_problems">문제</string>
     <string name="recordings_archive_empty">이 폴더에 재생 가능한 녹화가 없습니다.</string>

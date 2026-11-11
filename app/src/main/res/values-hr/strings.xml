@@ -385,12 +385,6 @@
     <string name="recordings_title">Snimke</string>
     <string name="recordings_archive">Arhiva</string>
     <string name="recordings_archive_all">Sve snimke</string>
-    <string name="recordings_recording_now_folder">Snimanje u tijeku</string>
-    <plurals name="recordings_in_progress_count">
-        <item quantity="one">%1$d snimanje u tijeku</item>
-        <item quantity="few">%1$d snimanja u tijeku</item>
-        <item quantity="other">%1$d snimanja u tijeku</item>
-    </plurals>
     <string name="recordings_schedule">Raspored</string>
     <string name="recordings_problems">Problemi</string>
     <string name="recordings_archive_empty">U ovoj mapi nema snimki za reprodukciju.</string>

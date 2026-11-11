@@ -369,8 +369,6 @@
     <string name="recordings_title">Gravações</string>
     <string name="recordings_archive">Arquivo</string>
     <string name="recordings_archive_all">Todas as gravações</string>
-    <string name="recordings_recording_now_folder">Gravando agora</string>
-    <plurals name="recordings_in_progress_count"><item quantity="one">%1$d gravação em andamento</item><item quantity="many">%1$d gravações em andamento</item><item quantity="other">%1$d gravações em andamento</item></plurals>
     <string name="recordings_schedule">Agendamentos</string>
     <string name="recordings_problems">Problemas</string>
     <string name="recordings_archive_empty">Não há gravações reproduzíveis nesta pasta.</string>

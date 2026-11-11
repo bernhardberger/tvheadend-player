@@ -381,11 +381,6 @@
     <string name="recordings_title">Inspelningar</string>
     <string name="recordings_archive">Arkiv</string>
     <string name="recordings_archive_all">Alla inspelningar</string>
-    <string name="recordings_recording_now_folder">Spelas in nu</string>
-    <plurals name="recordings_in_progress_count">
-        <item quantity="one">%1$d pågående inspelning</item>
-        <item quantity="other">%1$d pågående inspelningar</item>
-    </plurals>
     <string name="recordings_schedule">Schema</string>
     <string name="recordings_problems">Problem</string>
     <string name="recordings_archive_empty">Inga spelbara inspelningar i mappen.</string>

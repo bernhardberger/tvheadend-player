@@ -381,11 +381,6 @@
     <string name="recordings_title">Opptak</string>
     <string name="recordings_archive">Arkiv</string>
     <string name="recordings_archive_all">Alle opptak</string>
-    <string name="recordings_recording_now_folder">Tar opp nå</string>
-    <plurals name="recordings_in_progress_count">
-        <item quantity="one">%1$d pågående opptak</item>
-        <item quantity="other">%1$d pågående opptak</item>
-    </plurals>
     <string name="recordings_schedule">Planlagte</string>
     <string name="recordings_problems">Problemer</string>
     <string name="recordings_archive_empty">Ingen avspillbare opptak i denne mappen.</string>
