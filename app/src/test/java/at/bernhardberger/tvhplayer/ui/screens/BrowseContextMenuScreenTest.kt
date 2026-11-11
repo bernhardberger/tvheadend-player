@@ -1,5 +1,5 @@
 package at.bernhardberger.tvhplayer.ui.screens
-import kotlinx.coroutines.flow.first
+import at.bernhardberger.tvhplayer.testutil.settleFrames
 
 import at.bernhardberger.tvhplayer.testutil.pressKey
 
@@ -825,7 +825,7 @@ class BrowseContextMenuScreenTest {
     }
 
     @Test fun recordKeySchedulesFocusedChannelWithoutOpeningDetailsOrMovingFocus() {
-        show(recordings = false)
+        show(recordings = false, channelRecording = true, recordingState = DvrEntryState.REMOVED)
         compose.onNodeWithTag("channel-row-1").requestFocus()
         compose.pressKey(Key(android.view.KeyEvent.KEYCODE_MEDIA_RECORD))
         compose.runOnIdle { assertEquals(1, scheduleRequests.size) }
@@ -837,6 +837,14 @@ class BrowseContextMenuScreenTest {
     @Test fun recordKeyOnScheduledChannelOpensCancelAndRepeatedPressDoesNotConfirm() {
         show(recordings = false, channelRecording = true, recordingState = DvrEntryState.SCHEDULED)
         compose.onNodeWithTag("channel-row-1").requestFocus()
+        compose.pressKey(Key(android.view.KeyEvent.KEYCODE_MEDIA_RECORD))
+        compose.onNodeWithTag("details-cancel").assertIsFocused()
+        compose.pressKey(Key.DirectionUp)
+        compose.onNodeWithTag("details-about-description").assertIsFocused()
+        compose.pressKey(Key.DirectionCenter)
+        compose.settleFrames(35, frameMillis = 16)
+        compose.onNodeWithTag("player-info-reading").assertIsFocused()
+        compose.onNodeWithTag("details-cancel").assertDoesNotExist()
         compose.pressKey(Key(android.view.KeyEvent.KEYCODE_MEDIA_RECORD))
         compose.onNodeWithTag("details-cancel").assertIsFocused()
         compose.pressKey(Key.DirectionLeft)
@@ -1402,8 +1410,8 @@ class BrowseContextMenuScreenTest {
         }
         val notices = NoticeCenter({ 0L }) { NoticeContext(0, session.observation.value.currentSession?.generationIdentity) }
         screenNotices = notices
-        val settings = at.bernhardberger.tvhplayer.settings.UiSettingsStore(context)
-        kotlinx.coroutines.runBlocking { settings.settings.first() }
+        val settings = at.bernhardberger.tvhplayer.settings.UiSettingsStore(
+            at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore())
         val dependencies = module {
             single<TvheadendSession> { screenSession }; single { notices }
             single { settings }

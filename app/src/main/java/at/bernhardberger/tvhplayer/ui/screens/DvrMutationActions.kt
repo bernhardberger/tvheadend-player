@@ -19,6 +19,7 @@ import at.bernhardberger.tvhplayer.notices.Notice
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
 import at.bernhardberger.tvhplayer.core.recordUnavailableReason
+import at.bernhardberger.tvhplayer.core.recordingWasRemoved
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvhplayer.core.BrowseContextAction
@@ -42,7 +43,7 @@ import kotlinx.coroutines.flow.first
 @OptIn(ExperimentalTvheadendApi::class)
 internal fun programmeRecordKeyAction(event: EpgEvent, observation: SessionObservation, nowSec: Long): BrowseContextAction? {
     val current = observation.event(event.id) ?: return null
-    val recording = observation.dvrEntryForEvent(current)
+    val recording = observation.dvrEntryForEvent(current)?.takeUnless(::recordingWasRemoved)
     val canModify = observation.currentSession != null && observation.dvrState is DvrRepositoryState.Current &&
         (observation.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
     return programmeDetailsActions(current, nowSec, recording,

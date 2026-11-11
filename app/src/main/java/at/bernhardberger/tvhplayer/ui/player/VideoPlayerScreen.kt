@@ -1474,7 +1474,7 @@ fun VideoPlayerScreen(
                 val keyContext = PlayerKeyContext(
                     surface = PlayerSurface.LIVE,
                     controlsVisible = layerState.core.chrome.controlsVisible,
-                    seekbarFocused = false,
+                    seekbarFocused = layerState.core.chrome.controlsVisible && lastChromeControl == "player-seekbar",
                     timeshiftAvailable = effectiveTimeshiftState.available,
                     optionsOpen = layerState.core.optionsPage != null,
                     statsOpen = layerState.core.statsVisible,
@@ -1619,11 +1619,13 @@ fun VideoPlayerScreen(
                         return@onPreviewKeyEvent true
                     }
                     PlayerKeyAction.SCHEDULE_PROGRAMME -> {
+                        if (timelineState.scrubSpeed != 0) timelineState.cancelPendingSeek()
                         layerState.core.beginOpeningKeyCycle(keyCode)
                         recordProgramme()
                         return@onPreviewKeyEvent true
                     }
                     PlayerKeyAction.OPEN_RECORDING_INFO -> {
+                        if (timelineState.scrubSpeed != 0) timelineState.cancelPendingSeek()
                         openInfo(fromKey = true)
                         infoInitialAction = if (infoEvent?.let(observation::dvrEntryForEvent)?.state == DvrEntryState.SCHEDULED)
                             BrowseContextAction.CANCEL else BrowseContextAction.STOP

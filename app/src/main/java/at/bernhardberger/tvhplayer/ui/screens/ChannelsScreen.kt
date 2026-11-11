@@ -56,6 +56,7 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -224,6 +225,7 @@ fun ChannelsScreen(
     val recordInFlight = remember { mutableStateOf<DvrMutationAction?>(null) }
 
     ChannelsScreenContent(
+        detailsMutationInFlight = recordInFlight,
         onRecordKey = { channelId -> recordMutations.recordChannelProgramme(channelId,
             { recordSession.observation.value }, { System.currentTimeMillis() / 1000L }, settingsStore,
             recordNotices, settingsScope, recordInFlight) },
@@ -257,6 +259,7 @@ fun ChannelsScreen(
 @Composable
 internal fun ChannelsScreenContent(
     onRecordKey: (ChannelId) -> BrowseContextAction?,
+    detailsMutationInFlight: MutableState<DvrMutationAction?> = remember { mutableStateOf(null) },
     contentPadding: PaddingValues = PaddingValues(),
     initialFocusEnabled: Boolean = true,
     channelScopeState: ChannelScopeState,
@@ -352,7 +355,6 @@ internal fun ChannelsScreenContent(
     val rowState = rememberLazyListState()
     val rowOffscreenPx = with(density) { CompactZapRowOffscreen.roundToPx() }
     val coroutineScope = rememberCoroutineScope()
-    val detailsMutationInFlight = remember { mutableStateOf<DvrMutationAction?>(null) }
 
     fun cancelRestoration() {
         restorationGeneration++

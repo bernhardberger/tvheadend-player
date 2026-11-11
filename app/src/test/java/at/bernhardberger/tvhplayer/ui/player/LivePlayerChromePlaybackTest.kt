@@ -45,6 +45,7 @@ import at.bernhardberger.tvhplayer.notices.PauseUnavailableReason
 import at.bernhardberger.tvheadend.sdk.playback.StreamIndex
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionConfirmation
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionEvent
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionSeekTarget
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionOperationResult
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionStream
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionStreamType
@@ -104,12 +105,24 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
         key(Key.MediaPlay)
         assertFalse("Play commits instead of leaving the ticker running",
             descriptionOrNull("timeshift-seek-preview").orEmpty().contains(context.getString(R.string.player_scrub_backward, 2)))
-        key(Key.Back)
+    }
+
+    @Test fun liveScrubRequestsTheBufferStartAndRecordCancelsPreview() = timeshiftPlaying(mapPosition = true) { pauses ->
+        key(Key.MediaPause)
+        assertFalse(pauses.last())
+        compose.pressKey(Key.MediaRewind, settleFrames = 2, frameMillis = 16)
+        key(Key.MediaRecord)
+        assertFalse("Record drops the running target", exists("timeshift-seek-preview"))
+        assertFalse("Record did not resume paused playback", pauses.last())
+        val startTarget = sampleTimeshift().bufferStartMs + 1_000L
         repeat(5) { compose.pressKey(Key.MediaRewind, settleFrames = 2, frameMillis = 16) }
         assertTrue(description("timeshift-seek-preview").contains(context.getString(R.string.player_scrub_backward, 32)))
         compose.settleFrames(125, frameMillis = 16)
+        settleFrames()
         assertFalse("reaching the buffer start stops automatic motion",
-            descriptionOrNull("timeshift-seek-preview").orEmpty().contains(context.getString(R.string.player_scrub_backward, 32)))
+            exists("timeshift-seek-preview") && description("timeshift-seek-preview").contains(context.getString(R.string.player_scrub_backward, 32)))
+        val committed = timeshiftConnection.seekTargets.last() as SubscriptionSeekTarget.Absolute
+        assertEquals("the first buffered second is requested", startTarget, committed.position.inWholeMilliseconds)
     }
 
     @Test fun mediaPauseUsesOnlyTheBannerAndScrubLeavesPlaybackUntilBackCancels() = timeshiftPlaying(mapPosition = true) { pauses ->

@@ -16,6 +16,12 @@ class PlaybackKeyPolicyTest {
         }
         for (surface in PlayerSurface.entries) {
             val seekable = live.copy(surface = surface, timeshiftAvailable = true)
+            for (key in listOf(KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT)) {
+                assertEquals(PlayerKeyAction.PASS_THROUGH,
+                    playerKeyAction(seekable.copy(controlsVisible = true, seekbarFocused = true, scrubbing = true), key))
+                assertEquals(PlayerKeyAction.PASS_THROUGH,
+                    playerKeyAction(seekable.copy(infoOpen = true, scrubbing = true), key))
+            }
             assertEquals(PlayerKeyAction.SEEK_BACK,
                 playerKeyAction(seekable.copy(controlsVisible = true, scrubbing = true), KeyEvent.KEYCODE_DPAD_LEFT))
             assertEquals(PlayerKeyAction.SEEK_FORWARD,
@@ -478,11 +484,11 @@ class PlaybackKeyPolicyTest {
             timeshiftAvailable = false,
         )
         assertEquals(
-            PlayerKeyAction.SEEK_BACK,
+            PlayerKeyAction.PASS_THROUGH,
             playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_LEFT),
         )
         assertEquals(
-            PlayerKeyAction.SEEK_FORWARD,
+            PlayerKeyAction.PASS_THROUGH,
             playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_RIGHT),
         )
         assertEquals(

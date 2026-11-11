@@ -198,9 +198,14 @@ internal fun ProgrammeDetailsPage(
     }
     BackHandler(enabled = backEnabled, onBack = ::close)
     LaunchedEffect(reading) {
-        if (!reading && section in listOf(DetailsSection.ABOUT, DetailsSection.FACTS)) {
+        if (!reading) {
             withFrameNanos { }
-            (if (section == DetailsSection.FACTS) factsFocus else aboutFocus).requestFocus()
+            when (section) {
+                DetailsSection.ACTIONS -> restoreAction()
+                DetailsSection.FACTS -> factsFocus.requestFocus()
+                DetailsSection.ABOUT -> aboutFocus.requestFocus()
+                else -> Unit
+            }
         }
     }
     LaunchedEffect(actions, backEnabled) {
@@ -273,8 +278,10 @@ internal fun ProgrammeDetailsPage(
                         val action = actions.firstOrNull { it == BrowseContextAction.STOP || it == BrowseContextAction.CANCEL }
                         if (key.type == KeyEventType.KeyDown && key.nativeKeyEvent.repeatCount == 0 && action != null) {
                             lastAction = action
-                            reading = false
-                            restoreAction()
+                            if (reading) {
+                                section = DetailsSection.ACTIONS
+                                reading = false
+                            } else restoreAction()
                         }
                         true
                     }

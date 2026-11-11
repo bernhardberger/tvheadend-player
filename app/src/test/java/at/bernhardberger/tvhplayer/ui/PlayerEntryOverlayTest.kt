@@ -7,6 +7,7 @@
 package at.bernhardberger.tvhplayer.ui
 
 import at.bernhardberger.tvhplayer.testutil.setContentWithBrowsePreparation
+import at.bernhardberger.tvhplayer.testutil.pressKey
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -165,6 +166,7 @@ class PlayerEntryOverlayTest {
     private lateinit var playerSettings: PlayerSettingsStore
     private var playerVisible = false
     private var unconsumedCenterUps = 0
+    private var unconsumedDvrEvents = 0
     private var beforeSettingsRead: suspend () -> Unit = {}
     private val loadGate = CountDownLatch(1)
 
@@ -175,6 +177,22 @@ class PlayerEntryOverlayTest {
     }
 
     @Test fun watchFromTheContextMenuFadesTheMenuIntoThePlayer() = watchFromOverlay(details = false)
+
+    @Test fun recordingsKeyNavigatesFromBrowseAndConsumesReleaseAndRepeats() {
+        app(programme = true, recordings = true)
+        compose.pressKey(Key(android.view.KeyEvent.KEYCODE_DVR))
+        settle()
+        compose.onNodeWithTag("recording-list-entry-7").assertExists()
+        compose.runOnUiThread {
+            view.dispatchKeyEvent(android.view.KeyEvent(0, 0, android.view.KeyEvent.ACTION_DOWN,
+                android.view.KeyEvent.KEYCODE_DVR, 1))
+            view.dispatchKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_UP,
+                android.view.KeyEvent.KEYCODE_DVR))
+        }
+        settle()
+        compose.onNodeWithTag("recording-list-entry-7").assertExists()
+        assertEquals("the whole DVR key cycle stays inside AppRoot", 0, unconsumedDvrEvents)
+    }
 
     @Test fun watchFromDetailsFadesTheDetailsIntoThePlayer() = watchFromOverlay(details = true)
 
@@ -751,6 +769,7 @@ class PlayerEntryOverlayTest {
                 TVHeadendPlayerTheme {
                     Box(Modifier.onKeyEvent {
                         if (it.key == Key.DirectionCenter && it.type == KeyEventType.KeyUp) unconsumedCenterUps++
+                        if (it.key == Key(android.view.KeyEvent.KEYCODE_DVR)) unconsumedDvrEvents++
                         false
                     }) {
                         AppRoot(

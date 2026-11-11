@@ -215,7 +215,7 @@ fun playerKeyAction(
     if (context.scrubbing && keyCode in listOf(KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
             KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PAUSE,
             KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)) return PlayerKeyAction.COMMIT_SCRUB
-    if (context.scrubbing && !context.confirmationOpen && !context.optionsOpen && !context.drawerOpen) {
+    if (context.scrubbing && !context.seekbarFocused && !context.confirmationOpen && !context.optionsOpen && !context.drawerOpen) {
         if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) return PlayerKeyAction.SEEK_BACK
         if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) return PlayerKeyAction.SEEK_FORWARD
     }
@@ -241,8 +241,8 @@ fun playerKeyAction(
     }
     if (context.seekbarFocused) {
         return when (keyCode) {
-            KeyEvent.KEYCODE_DPAD_LEFT -> PlayerKeyAction.SEEK_BACK
-            KeyEvent.KEYCODE_DPAD_RIGHT -> PlayerKeyAction.SEEK_FORWARD
+            // The focused bar owns its symmetric steps, including scrub takeover.
+            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> PlayerKeyAction.PASS_THROUGH
             KeyEvent.KEYCODE_BACK -> when {
                 context.infoOpen || context.optionsOpen || context.statsOpen ||
                     context.drawerOpen -> PlayerKeyAction.DISMISS_OVERLAY_ONLY

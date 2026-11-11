@@ -1,4 +1,5 @@
 package at.bernhardberger.tvhplayer.core
+import at.bernhardberger.tvhplayer.notices.RecordUnavailableReason
 
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
@@ -29,11 +30,11 @@ class ProgrammeActionPolicyTest {
     fun recordUnavailableReasonsFollowProgrammeAndPermissionEligibility() {
         assertEquals(null, recordUnavailableReason(event, beforeStart, null))
         assertEquals(null, recordUnavailableReason(null, beforeStart, null))
-        assertEquals(at.bernhardberger.tvhplayer.notices.RecordUnavailableReason.NO_PROGRAMME,
+        assertEquals(RecordUnavailableReason.NO_PROGRAMME,
             recordUnavailableReason(null, beforeStart, false))
-        assertEquals(at.bernhardberger.tvhplayer.notices.RecordUnavailableReason.ENDED,
+        assertEquals(RecordUnavailableReason.ENDED,
             recordUnavailableReason(event, event.stop.epochSeconds, false))
-        assertEquals(at.bernhardberger.tvhplayer.notices.RecordUnavailableReason.PERMISSION_DENIED,
+        assertEquals(RecordUnavailableReason.PERMISSION_DENIED,
             recordUnavailableReason(event, beforeStart, false))
         assertEquals(null, recordUnavailableReason(event, beforeStart, true))
     }

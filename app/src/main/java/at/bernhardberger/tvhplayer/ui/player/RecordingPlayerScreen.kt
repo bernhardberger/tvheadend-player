@@ -243,6 +243,7 @@ fun RecordingPlayerScreen(
     // The recording player has no layers of its own; a quick list before any focus returns to pause.
     val layers = rememberPlayerLayerState(RECORDING_CONTROLS_AUTO_HIDE_MS, initialFocusedControl = "player-pause")
     val chrome = layers.chrome
+    var focusedControl by remember { mutableStateOf<String?>(null) }
     val aspectRatio = targetAspect.mode
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, chrome) {
@@ -399,7 +400,7 @@ fun RecordingPlayerScreen(
     fun recordingKeyContext() = PlayerKeyContext(
         surface = PlayerSurface.RECORDING,
         controlsVisible = chrome.controlsVisible,
-        seekbarFocused = false,
+        seekbarFocused = chrome.controlsVisible && focusedControl == "player-seekbar",
         timeshiftAvailable = false,
         scrubbing = timelineState.scrubSpeed != 0,
     )
@@ -749,6 +750,7 @@ fun RecordingPlayerScreen(
                 onInteraction = chrome::onUserInteraction,
                 onCommitSeek = timelineState::commitPendingSeek,
                 onActionFocused = layers::onActionFocused,
+                onControlFocused = { focusedControl = it },
                 onFocusRestored = layers::onFocusRestored,
                 markerNavigation = markerNavigation,
                 onSeekMarker = ::seekMarker,

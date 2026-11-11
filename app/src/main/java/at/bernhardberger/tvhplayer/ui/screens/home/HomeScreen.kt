@@ -123,6 +123,7 @@ internal fun HomeScreen(
     CompositionLocalProvider(LocalTabOwner provides owner) {
         ProvideArtworkSession(frame.second.currentSession, frame.third) {
         HomeScreenContent(frame.first.copy(hiddenSections = loadedSettings.hiddenHomeSections), frame.second, contentPadding, initialFocusEnabled,
+            mutationInFlight = recordInFlight,
             onRecordKey = { channelId -> if (current(channelId)) recordMutations.recordChannelProgramme(channelId,
                 { recordSession.observation.value }, { System.currentTimeMillis() / 1000L }, settingsStore,
                 recordNotices, saveScope, recordInFlight) else null },
@@ -207,6 +208,7 @@ internal fun HomeScreenContent(
     updateHintShown: Boolean = false,
     onWhatsNewOpened: () -> Unit = {},
     onRecordKey: (ChannelId) -> BrowseContextAction?,
+    mutationInFlight: MutableState<DvrMutationAction?> = remember { mutableStateOf(null) },
 ) {
     val nowSec = input.nowSec
     val owner = LocalTabOwner.current
@@ -229,7 +231,6 @@ internal fun HomeScreenContent(
     var recording by remember { mutableStateOf<DvrEntry?>(null) }
     var recordingMenu by remember { mutableStateOf(false) }
     val mutationScope = rememberCoroutineScope()
-    val mutationInFlight = remember { mutableStateOf<DvrMutationAction?>(null) }
     fun recordFocusedProgramme(channelId: ChannelId) {
         when (val action = onRecordKey(channelId)) {
             BrowseContextAction.STOP, BrowseContextAction.CANCEL -> {

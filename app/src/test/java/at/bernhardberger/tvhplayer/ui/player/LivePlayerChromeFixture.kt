@@ -170,6 +170,7 @@ abstract class LivePlayerChromeFixture {
     protected lateinit var view: View
 
     protected lateinit var runtime: AppPlaybackRuntime
+    protected lateinit var timeshiftConnection: ScriptedSubscriptionConnection
 
     protected lateinit var session: FakeTvheadendSession
 
@@ -274,6 +275,7 @@ abstract class LivePlayerChromeFixture {
             scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 3_600L)))
         }
         val manager = createSubscriptionManager(connection, subscriptionDispatcher).apply { startAdmission() }
+        timeshiftConnection = connection
         try {
             screen(opener = manager, onClose = onClose)
             startLiveSubscription(connection, height = 1080L, signal = 53739L, timeshift = true)

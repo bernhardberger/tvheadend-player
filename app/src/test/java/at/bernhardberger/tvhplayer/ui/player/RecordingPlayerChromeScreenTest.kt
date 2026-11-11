@@ -2,6 +2,7 @@
 @file:OptIn(at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class)
 
 package at.bernhardberger.tvhplayer.ui.player
+import androidx.compose.ui.test.requestFocus
 import at.bernhardberger.tvhplayer.testutil.focusedTags
 import at.bernhardberger.tvhplayer.testutil.tagExists
 import at.bernhardberger.tvhplayer.testutil.pressKey
@@ -388,6 +389,16 @@ class RecordingPlayerChromeScreenTest {
         compose.settleFrames(12)
         assertTrue("Left continues from the scrub target and debounces", positionMs < origin)
         assertFalse("automatic preview stops when D-pad takes over", exists("recording-seek-preview"))
+        key(Key.DirectionDown)
+        compose.onNodeWithTag("player-seekbar").requestFocus()
+        compose.pressKey(Key.MediaRewind, settleFrames = 2, frameMillis = 16)
+        val target = compose.onNodeWithTag("player-seekbar").fetchSemanticsNode()
+            .config[SemanticsProperties.ProgressBarRangeInfo].current * 3_600_000L
+        compose.pressKey(Key.DirectionLeft, settleFrames = 2, frameMillis = 16)
+        compose.settleFrames(12)
+        assertEquals("focused seekbar takes over with a symmetric thirty-second step",
+            target.toDouble() - 30_000.0, positionMs.toDouble(), 5.0)
+        key(Key.Back)
         key(Key.Back)
         positionMs = 1_050L
         settle()
