@@ -248,7 +248,10 @@ fun RecordingPlayerScreen(
     DisposableEffect(lifecycleOwner, chrome) {
         val observer = LifecycleEventObserver { _, event ->
             // A Banner never outlives the stop, nor does its timer.
-            if (event == Lifecycle.Event.ON_STOP) chrome.hideBanner()
+            if (event == Lifecycle.Event.ON_STOP) {
+                if (timelineState.scrubSpeed != 0) timelineState.cancelPendingSeek()
+                chrome.hideBanner()
+            }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
@@ -305,8 +308,16 @@ fun RecordingPlayerScreen(
             val delta = scaled / 1_000_000L
             remainder = scaled % 1_000_000L
             previous = frame
-            val target = timelineState.pendingTargetMs ?: break
+            val target = timelineState.pendingTargetMs
+            if (target == null) {
+                timelineState.stopScrub()
+                break
+            }
             val end = player.duration.takeIf { it > 0L && it != C.TIME_UNSET }
+            if (speed > 0 && end == null) {
+                timelineState.cancelPendingSeek()
+                break
+            }
             val next = (target + delta).coerceAtLeast(1_000L).let { if (end != null) it.coerceAtMost(end) else it }
             timelineState.queueSeek(next - target, automatic = true)
             if (!player.isCurrentMediaItemSeekable) {
@@ -596,7 +607,13 @@ fun RecordingPlayerScreen(
                 // A focused Compose target swallows the Back cycle on the TV before the
                 // BackHandler can fire, so Back is decided here. Menu, audio-track and captions
                 // keys reach the options from any layer; a recording's quick list is always there.
-                if (layers.optionsPage == null && foregroundLayer != PlayerForegroundLayer.RECOVERY &&
+                val scrubContext = recordingKeyContext().copy(
+                    optionsOpen = layers.optionsPage != null,
+                    infoOpen = layers.infoOpen,
+                    confirmationOpen = playerModals.isNotEmpty() || markerNavigation.open,
+                )
+                if (playerKeyAction(scrubContext, keyCode) in listOf(PlayerKeyAction.SCRUB_BACK, PlayerKeyAction.SCRUB_FORWARD) &&
+                    foregroundLayer != PlayerForegroundLayer.RECOVERY &&
                     foregroundLayer != PlayerForegroundLayer.TERMINAL_ERROR &&
                     keyCode in listOf(AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD, AndroidKeyEvent.KEYCODE_MEDIA_REWIND)) {
                     val direction = if (keyCode == AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD) 1 else -1

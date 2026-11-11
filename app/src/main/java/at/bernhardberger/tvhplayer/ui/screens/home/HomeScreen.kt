@@ -11,6 +11,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.type
 import at.bernhardberger.tvhplayer.ui.screens.DvrMutationActions
+import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.ui.screens.recordChannelProgramme
 import at.bernhardberger.tvhplayer.ui.components.TabOwner
 import at.bernhardberger.tvhplayer.ui.components.LocalTabOwner
@@ -73,7 +74,7 @@ internal fun HomeScreen(
     val settings by settingsStore.settings.collectAsStateWithLifecycle<UiSettings?>(null)
     val saveScope = rememberCoroutineScope()
     val recordSession: TvheadendSession = koinInject()
-    val recordNotices: at.bernhardberger.tvhplayer.notices.NoticeCenter = koinInject()
+    val recordNotices: NoticeCenter = koinInject()
     val recordMutations = remember(recordSession) { DvrMutationActions(recordSession.dvrRepository) }
     val recordInFlight = remember { mutableStateOf<DvrMutationAction?>(null) }
     var hintNow by remember { mutableStateOf(System.currentTimeMillis()) }

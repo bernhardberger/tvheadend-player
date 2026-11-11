@@ -597,6 +597,7 @@ fun VideoPlayerScreen(
                     screenStarts += 1
                 }
                 Lifecycle.Event.ON_STOP -> {
+                    if (timelineState.scrubSpeed != 0) timelineState.cancelPendingSeek()
                     screenActive = false
                     // Leaving drops a half-typed number: it never tunes on return.
                     channelNumberInput = ""
@@ -1486,6 +1487,9 @@ fun VideoPlayerScreen(
                         listOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR),
                 )
                 val dedicatedAction = playerKeyAction(keyContext, keyCode)
+                if (keyCode == AndroidKeyEvent.KEYCODE_MEDIA_RECORD && dedicatedAction == PlayerKeyAction.CONSUME) {
+                    return@onPreviewKeyEvent true
+                }
                 if (dedicatedAction in listOf(PlayerKeyAction.SCRUB_BACK, PlayerKeyAction.SCRUB_FORWARD) ||
                     (dedicatedAction == PlayerKeyAction.PEEK_BANNER && keyCode in listOf(
                         AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD, AndroidKeyEvent.KEYCODE_MEDIA_REWIND))) {

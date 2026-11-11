@@ -5,6 +5,8 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import at.bernhardberger.tvhplayer.testutil.pressKey
+import at.bernhardberger.tvhplayer.testutil.settleFrames
+import at.bernhardberger.tvhplayer.R
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -67,6 +69,49 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
 class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
+    @Test fun liveScrubTicksAndCommitsAtLiveEdge() = timeshiftPlaying(mapPosition = true) { pauses ->
+        fun descriptionOrNull(tag: String) = if (exists(tag)) description(tag) else null
+        key(Key.MediaPause)
+        assertFalse(pauses.last())
+        key(Key.MediaFastForward)
+        assertTrue("reaching the live edge commits and resumes", pauses.last())
+        assertFalse(descriptionOrNull("timeshift-seek-preview").orEmpty().contains(
+            context.getString(R.string.player_scrub_forward, 2)))
+        key(Key.MediaPause)
+        compose.pressKey(Key.MediaRewind, settleFrames = 2, frameMillis = 16)
+        repeat(2) { compose.pressKey(Key.MediaRewind, settleFrames = 2, frameMillis = 16) }
+        assertTrue(description("timeshift-seek-preview").contains(context.getString(R.string.player_scrub_backward, 8)))
+        val first = compose.onNodeWithTag("player-timeline-fill", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.width
+        compose.settleFrames(40, frameMillis = 16)
+        assertTrue("the automatic target moves backward while playback stays paused",
+            compose.onNodeWithTag("player-timeline-fill", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.width < first)
+        assertFalse(pauses.last())
+        compose.pressKey(Key.DirectionDown, settleFrames = 2, frameMillis = 16)
+        compose.pressKey(Key.MediaRewind, settleFrames = 2, frameMillis = 16)
+        assertTrue(description("player-seekbar").contains(context.getString(R.string.player_scrub_backward, 2)))
+        compose.pressKey(Key.DirectionLeft, settleFrames = 2, frameMillis = 16)
+        assertFalse("Left stops a scrub even with controls open",
+            descriptionOrNull("player-seekbar").orEmpty().contains(context.getString(R.string.player_scrub_backward, 2)))
+        key(Key.Back)
+        key(Key.Back)
+        compose.pressKey(Key.MediaRewind, settleFrames = 2, frameMillis = 16)
+        assertTrue(description("timeshift-seek-preview").contains(context.getString(R.string.player_scrub_backward, 2)))
+        key(Key.DirectionCenter)
+        assertFalse("OK commits instead of leaving the ticker running",
+            descriptionOrNull("timeshift-seek-preview").orEmpty().contains(context.getString(R.string.player_scrub_backward, 2)))
+        compose.pressKey(Key.MediaRewind, settleFrames = 2, frameMillis = 16)
+        assertTrue(description("timeshift-seek-preview").contains(context.getString(R.string.player_scrub_backward, 2)))
+        key(Key.MediaPlay)
+        assertFalse("Play commits instead of leaving the ticker running",
+            descriptionOrNull("timeshift-seek-preview").orEmpty().contains(context.getString(R.string.player_scrub_backward, 2)))
+        key(Key.Back)
+        repeat(5) { compose.pressKey(Key.MediaRewind, settleFrames = 2, frameMillis = 16) }
+        assertTrue(description("timeshift-seek-preview").contains(context.getString(R.string.player_scrub_backward, 32)))
+        compose.settleFrames(125, frameMillis = 16)
+        assertFalse("reaching the buffer start stops automatic motion",
+            descriptionOrNull("timeshift-seek-preview").orEmpty().contains(context.getString(R.string.player_scrub_backward, 32)))
+    }
+
     @Test fun mediaPauseUsesOnlyTheBannerAndScrubLeavesPlaybackUntilBackCancels() = timeshiftPlaying(mapPosition = true) { pauses ->
         key(Key.MediaPlay)
         assertFalse("a hidden Play key toggles like OK", pauses.last())
@@ -78,7 +123,7 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
         key(Key.Back)
         key(Key.MediaRewind)
         settleFrames()
-        assertTrue(description("timeshift-seek-preview").contains("Rewind, 2 times"))
+        assertTrue(description("timeshift-seek-preview").contains(context.getString(R.string.player_scrub_backward, 2)))
         assertFalse("previewing does not resume paused playback", pauses.last())
         key(Key.Back)
         assertFalse(pauses.last())
@@ -444,8 +489,9 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
         assertFalse("audio-only presentation removes tuning", exists("player-busy-indicator"))
     }
 
-    @Test fun aStoppedAndRestartedScreenShowsNoStaleBanner() {
-        screen()
+    @Test fun aStoppedAndRestartedScreenShowsNoStaleBanner() = timeshiftPlaying(mapPosition = true) { pauses ->
+        key(Key.MediaPause)
+        key(Key.MediaRewind)
         assertTrue(exists("player-banner"))
         compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.CREATED }
         settle()
@@ -454,6 +500,8 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
         repeat(8) { settle() }
         assertFalse("no stale Banner on return", exists("player-banner"))
         assertFalse(exists("player-actions"))
+        assertFalse("stopping preserves pause", pauses.last())
+        assertFalse("no pending scrub on return", exists("timeshift-seek-preview"))
     }
 
     @Test fun theLiveChromeShowsNoStreamBadgesAndStartsNoDiagnostics() {

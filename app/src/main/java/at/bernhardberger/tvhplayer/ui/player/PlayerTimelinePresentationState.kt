@@ -348,6 +348,8 @@ internal class LiveTimelinePresentationState(
 
                     val contentTarget = generation.pendingContentTarget ?: break
                     generation.pendingContentTarget = null
+                    val resumeAfterSeek = generation.resumeAfterSeek
+                    generation.resumeAfterSeek = null
                     val result = positionCommand { seekContent(contentTarget) }
                     val completed = result as? TimeshiftContentSeekResult.Completed
                     completed?.selection?.let { resolved ->
@@ -363,8 +365,6 @@ internal class LiveTimelinePresentationState(
                     }
                     val command = completed?.command
                     val accepted = command === TimeshiftCommandResult.ACCEPTED && completed.seek != null
-                    val resumeAfterSeek = generation.resumeAfterSeek
-                    generation.resumeAfterSeek = null
                     generation.seekQueue = completeTimeshiftSeekDispatch(
                         generation.seekQueue,
                         accepted,

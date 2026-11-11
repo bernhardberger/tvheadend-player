@@ -1451,18 +1451,18 @@ fun AppRoot(
     // Logos and programme pictures load with the latest current session; the provider recomposes
     // nothing for guide or recording updates.
     ProvideAppArtwork(tvheadendSession) {
-    Box(Modifier.fillMaxSize().onPreviewKeyEvent { event ->
-        val key = event.nativeKeyEvent
-        if (key.keyCode == android.view.KeyEvent.KEYCODE_DVR) {
-            if (key.action == android.view.KeyEvent.ACTION_DOWN && key.repeatCount == 0 &&
-                currentDestination != RecordingsKey && navigationAllowed) {
-                playbackOrchestrator.browseNavigationSelected(playingChannelId, playingRecordingId)
-                navigateTopLevel(RecordingsKey)
-            }
-            true
-        } else false
-    }.onKeyEvent { it.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_MEDIA_RECORD }) {
     MainStartupComposition(
+        modifier = Modifier.fillMaxSize().onPreviewKeyEvent { event ->
+            val key = event.nativeKeyEvent
+            if (key.keyCode == android.view.KeyEvent.KEYCODE_DVR) {
+                if (key.action == android.view.KeyEvent.ACTION_DOWN && key.repeatCount == 0 &&
+                    currentDestination != RecordingsKey && navigationAllowed) {
+                    playbackOrchestrator.browseNavigationSelected(playingChannelId, playingRecordingId)
+                    navigateTopLevel(RecordingsKey)
+                }
+                true
+            } else false
+        }.onKeyEvent { it.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_MEDIA_RECORD },
         state = MainStartupCompositionState(
             presentation = effectiveStartupPresentation,
             navigationStartDestination = navigationStartDestination,
@@ -1622,7 +1622,6 @@ fun AppRoot(
             )
         },
     )
-    }
     }
 }
 

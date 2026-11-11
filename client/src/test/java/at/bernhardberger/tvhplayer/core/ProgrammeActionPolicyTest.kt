@@ -27,6 +27,8 @@ class ProgrammeActionPolicyTest {
 
     @Test
     fun recordUnavailableReasonsFollowProgrammeAndPermissionEligibility() {
+        assertEquals(null, recordUnavailableReason(event, beforeStart, null))
+        assertEquals(null, recordUnavailableReason(null, beforeStart, null))
         assertEquals(at.bernhardberger.tvhplayer.notices.RecordUnavailableReason.NO_PROGRAMME,
             recordUnavailableReason(null, beforeStart, false))
         assertEquals(at.bernhardberger.tvhplayer.notices.RecordUnavailableReason.ENDED,

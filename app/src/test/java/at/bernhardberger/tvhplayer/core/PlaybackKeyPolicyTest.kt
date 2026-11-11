@@ -16,6 +16,10 @@ class PlaybackKeyPolicyTest {
         }
         for (surface in PlayerSurface.entries) {
             val seekable = live.copy(surface = surface, timeshiftAvailable = true)
+            assertEquals(PlayerKeyAction.SEEK_BACK,
+                playerKeyAction(seekable.copy(controlsVisible = true, scrubbing = true), KeyEvent.KEYCODE_DPAD_LEFT))
+            assertEquals(PlayerKeyAction.SEEK_FORWARD,
+                playerKeyAction(seekable.copy(controlsVisible = true, scrubbing = true), KeyEvent.KEYCODE_DPAD_RIGHT))
             assertEquals(PlayerKeyAction.SCRUB_BACK, playerKeyAction(seekable, KeyEvent.KEYCODE_MEDIA_REWIND))
             assertEquals(PlayerKeyAction.SCRUB_FORWARD, playerKeyAction(seekable, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD))
             for (controls in listOf(false, true)) for (key in listOf(KeyEvent.KEYCODE_DPAD_CENTER,
@@ -43,10 +47,13 @@ class PlaybackKeyPolicyTest {
             playerKeyAction(live.copy(surface = PlayerSurface.RECORDING), KeyEvent.KEYCODE_MEDIA_RECORD))
         assertEquals(PlayerKeyAction.CONSUME,
             playerKeyAction(live.copy(surface = PlayerSurface.RECORDING, optionsOpen = true), KeyEvent.KEYCODE_MEDIA_RECORD))
-        assertEquals(PlayerKeyAction.PASS_THROUGH,
+        assertEquals(PlayerKeyAction.CONSUME,
             playerKeyAction(live.copy(infoOpen = true), KeyEvent.KEYCODE_MEDIA_RECORD))
-        assertEquals(PlayerKeyAction.PASS_THROUGH,
+        assertEquals(PlayerKeyAction.CONSUME,
             playerKeyAction(live.copy(confirmationOpen = true), KeyEvent.KEYCODE_MEDIA_RECORD))
+        for (modal in listOf(live.copy(optionsOpen = true), live.copy(drawerOpen = true))) {
+            assertEquals(PlayerKeyAction.CONSUME, playerKeyAction(modal, KeyEvent.KEYCODE_MEDIA_RECORD))
+        }
     }
 
     @Test

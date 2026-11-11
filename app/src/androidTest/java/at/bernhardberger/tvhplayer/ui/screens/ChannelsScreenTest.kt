@@ -496,6 +496,7 @@ class ChannelsScreenTest {
         }
 
         ChannelsScreenContent(
+            onRecordKey = { null },
             view = ChannelsView(ChannelsLayout.LIST),
             initialFocusEnabled = initialFocusEnabled,
             channelScopeState = scopeState,

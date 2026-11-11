@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.core.BrowseContextAction
+import at.bernhardberger.tvhplayer.notices.NoticeCenter
 
 import at.bernhardberger.tvhplayer.ui.common.rememberCurrentEpochSeconds
 
@@ -218,7 +219,7 @@ fun ChannelsScreen(
     val settingsStore: UiSettingsStore = koinInject()
     val settingsScope = rememberCoroutineScope()
     val recordSession: TvheadendSession = koinInject()
-    val recordNotices: at.bernhardberger.tvhplayer.notices.NoticeCenter = koinInject()
+    val recordNotices: NoticeCenter = koinInject()
     val recordMutations = remember(recordSession) { DvrMutationActions(recordSession.dvrRepository) }
     val recordInFlight = remember { mutableStateOf<DvrMutationAction?>(null) }
 

@@ -8,6 +8,7 @@ import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
+import at.bernhardberger.tvhplayer.core.BrowseContextAction
 import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.ui.screens.DvrMutationAction
 import at.bernhardberger.tvhplayer.ui.screens.DvrMutationActions
@@ -32,7 +33,7 @@ internal fun GuideOverlayHost(
     onCloseDetails: () -> Unit,
     eventFocusRequesters: Map<EventId, FocusRequester>,
     onShowGuide: (ChannelId, EpgEventEntry?) -> Unit,
-    initialAction: at.bernhardberger.tvhplayer.core.BrowseContextAction? = null,
+    initialAction: BrowseContextAction? = null,
 ) {
     detailsEvent?.let { openingEvent ->
         val openingObservation = detailsObservation ?: return@let

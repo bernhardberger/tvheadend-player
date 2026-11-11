@@ -331,10 +331,10 @@ class RecordingPlayerChromeScreenTest {
         assertEquals("scrubbing leaves playback untouched", origin, positionMs)
         assertFalse(player.playWhenReady)
         assertTrue(exists("recording-seek-preview"))
-        assertTrue(description("recording-seek-preview").contains("Fast forward, 2 times"))
+        assertTrue(description("recording-seek-preview").contains(context.getString(R.string.player_scrub_forward, 2)))
         assertFalse(exists("player-actions"))
         key(Key.MediaFastForward)
-        assertTrue(description("recording-seek-preview").contains("Fast forward, 4 times"))
+        assertTrue(description("recording-seek-preview").contains(context.getString(R.string.player_scrub_forward, 4)))
         key(Key.Back)
         assertEquals(origin, positionMs)
         assertFalse(player.playWhenReady)
@@ -365,7 +365,7 @@ class RecordingPlayerChromeScreenTest {
                 AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD, 12))
         }
         compose.settleFrames(1)
-        assertFalse(description("recording-seek-preview").contains("times"))
+        assertFalse(description("recording-seek-preview").contains(context.getString(R.string.player_scrub_forward, 2)))
         compose.runOnUiThread {
             rootView.dispatchKeyEvent(AndroidKeyEvent(AndroidKeyEvent.ACTION_UP, AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD))
         }
@@ -382,7 +382,7 @@ class RecordingPlayerChromeScreenTest {
         key(Key.MediaFastForward)
         key(Key.MediaFastForward)
         key(Key.MediaRewind)
-        assertTrue(description("recording-seek-preview").contains("Rewind, 2 times"))
+        assertTrue(description("recording-seek-preview").contains(context.getString(R.string.player_scrub_backward, 2)))
         val origin = positionMs
         key(Key.DirectionLeft)
         compose.settleFrames(12)
@@ -450,6 +450,10 @@ class RecordingPlayerChromeScreenTest {
 
     @Test fun aStoppedScreenLeavesNoBannerBehind() {
         screen()
+        playing()
+        key(Key.DirectionCenter)
+        val origin = positionMs
+        key(Key.MediaFastForward)
         assertTrue(exists("player-banner"))
         compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.CREATED }
         settle()
@@ -457,6 +461,9 @@ class RecordingPlayerChromeScreenTest {
         compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.RESUMED }
         repeat(8) { settle() }
         assertFalse("no stale Banner on return", exists("player-banner"))
+        assertEquals("stopping discards the scrub target", origin, positionMs)
+        assertFalse("stopping a scrub preserves pause", player.playWhenReady)
+        assertFalse(exists("recording-seek-preview"))
     }
 
     @Test fun centerPausesUnderTheBannerWhichStaysUntilResumed() {

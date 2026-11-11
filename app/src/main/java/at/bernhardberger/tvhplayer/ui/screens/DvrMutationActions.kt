@@ -18,6 +18,7 @@ import at.bernhardberger.tvhplayer.notices.toDvrMutationFeedback
 import at.bernhardberger.tvhplayer.notices.Notice
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
+import at.bernhardberger.tvhplayer.core.recordUnavailableReason
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvhplayer.core.BrowseContextAction
@@ -53,9 +54,14 @@ internal fun programmeRecordKeyAction(event: EpgEvent, observation: SessionObser
 /** Shared by the action row and dedicated Record key, with the screen's existing lifetime/lock. */
 @OptIn(ExperimentalTvheadendApi::class)
 internal fun NoticeCenter.postRecordUnavailable(event: EpgEvent?, observation: SessionObservation, nowSec: Long) {
-    val canModify = observation.currentSession != null && observation.dvrState is DvrRepositoryState.Current &&
-        (observation.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
-    post(Notice.RecordUnavailable(at.bernhardberger.tvhplayer.core.recordUnavailableReason(event, nowSec, canModify)), context())
+    val access = (observation.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite
+    val canModify = when {
+        access == CapabilityAccess.DENIED -> false
+        observation.currentSession != null && observation.dvrState is DvrRepositoryState.Current &&
+            access == CapabilityAccess.ALLOWED -> true
+        else -> null
+    }
+    post(Notice.RecordUnavailable(recordUnavailableReason(event, nowSec, canModify)), context())
 }
 
 /** Schedules the channel's current programme, or returns the details action to focus. */

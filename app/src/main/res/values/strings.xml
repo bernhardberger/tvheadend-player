@@ -1,8 +1,8 @@
 <resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en">
-    <string name="record_unavailable">Can\'t record this program</string>
+    <string name="record_unavailable">Can’t record this program</string>
     <string name="record_unavailable_ended">It has already ended.</string>
-    <string name="record_unavailable_no_programme">There\'s no program information for this channel.</string>
-    <string name="record_unavailable_permission">Your account isn\'t allowed to record.</string>
+    <string name="record_unavailable_no_programme">There’s no program information for this channel.</string>
+    <string name="record_unavailable_permission">Your account isn’t allowed to record.</string>
     <string name="player_scrub_forward">Fast forward, %1$d times</string>
     <string name="player_scrub_backward">Rewind, %1$d times</string>
     <string name="server_connection_failed">Can’t connect to %1$s</string>

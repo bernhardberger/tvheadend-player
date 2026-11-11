@@ -185,6 +185,10 @@ fun playerKeyAction(
     context: PlayerKeyContext,
     keyCode: Int,
 ): PlayerKeyAction {
+    if (keyCode == KeyEvent.KEYCODE_MEDIA_RECORD &&
+        (context.infoOpen || context.confirmationOpen || context.optionsOpen || context.drawerOpen)) {
+        return PlayerKeyAction.CONSUME
+    }
     if (context.surface == PlayerSurface.RECORDING && keyCode == KeyEvent.KEYCODE_MEDIA_RECORD) {
         return PlayerKeyAction.CONSUME
     }
@@ -211,6 +215,10 @@ fun playerKeyAction(
     if (context.scrubbing && keyCode in listOf(KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
             KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PAUSE,
             KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)) return PlayerKeyAction.COMMIT_SCRUB
+    if (context.scrubbing && !context.confirmationOpen && !context.optionsOpen && !context.drawerOpen) {
+        if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) return PlayerKeyAction.SEEK_BACK
+        if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) return PlayerKeyAction.SEEK_FORWARD
+    }
     if (keyCode == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD || keyCode == KeyEvent.KEYCODE_MEDIA_REWIND) {
         return when {
             context.surface == PlayerSurface.LIVE && !context.timeshiftAvailable -> PlayerKeyAction.PEEK_BANNER
