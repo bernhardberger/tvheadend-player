@@ -115,6 +115,8 @@ them before Tvheadend imports it.
 - Switch channels with channel up and down, from the channel list under the
   player controls, or by typing a channel number.
 - Pause and rewind live TV, if your server has a timeshift buffer.
+- The remote's media buttons work in the player: Play/Pause, Rewind and Fast
+  forward at up to 32 times, and Record for the program you're watching.
 - Open the playing channel's schedule next to the picture.
 - Pick audio and subtitle tracks and set your preferred languages.
 
@@ -138,6 +140,9 @@ them before Tvheadend imports it.
 - Play a recording, pick up where you stopped, and skip around with the remote.
 - Mark recordings watched or unwatched, one at a time or a whole folder at once.
 - Record, stop a running recording, and delete recordings.
+- The Record button records the focused program in the guide, on Home, in
+  Channels and on the details page. The Recordings button opens Recordings from
+  anywhere in the app.
 - See how much recording space is left on the server.
 
 What you can do, recording for example, depends on the permissions of your
@@ -180,8 +185,9 @@ behave like the TV's own tuner app:
 - It can open Tvheadend Player when the TV turns on or wakes from standby.
   That stays off until you turn on *Open when the TV turns on*.
 - It takes over remote buttons the manufacturer keeps for its own apps. Out of
-  the box the TV button opens live TV and the Guide button opens the guide. You
-  can pick other buttons, or none, in the companion.
+  the box the TV button opens live TV, the Guide button opens the guide and the
+  Recordings button opens Recordings. You can pick other buttons, or none, in
+  the companion.
 - It can be the TV's home app, so HOME goes to Tvheadend Player. Not every TV
   allows that.
 

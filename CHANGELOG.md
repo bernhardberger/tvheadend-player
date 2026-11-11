@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Play/Pause in the player pauses or plays and shows only the banner, like OK, instead of opening the full controls.
+- Rewind and Fast forward move through live TV's timeshift buffer and through recordings while the picture keeps playing. Each press doubles the speed, from 2 up to 32 times. Holding the button skips like Left and Right. Play or OK continues from there, Back returns to where you were, and the other button turns around. Without a timeshift buffer, live TV says why, as OK does.
+- With the controls hidden, Left skips back 10 seconds and Right forward 30 seconds. The seek bar still moves 30 seconds both ways.
+- The Record button records the program you're watching, or the focused one in the guide, on Home, in Channels and on the details page. If it's already being recorded, the details open at *Stop recording* or *Cancel recording*. If it can't be recorded, a notice says why.
+- The Recordings button opens Recordings from anywhere in the app.
+- The Appliance companion has *Open recordings* under Functions, set to the Recordings button out of the box.
 - The Appliance companion no longer opens Tvheadend Player when the TV turns on unless you turn on *Open when the TV turns on* under Functions, and turning on its accessibility service no longer starts the player. If you never changed that switch, turn it on again after the update.
 - Switching connections shows its progress on its own page and can be canceled; leaving Settings doesn't stop it. If the connection can't be reached or rejects sign-in, the page says why and your previous connection stays in use. After a successful switch, *Go to Home* takes you straight there.
 - With more than one connection, *Channel groups* and *Stream profile* name the connection they apply to.
