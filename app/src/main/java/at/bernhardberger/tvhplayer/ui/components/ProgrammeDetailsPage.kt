@@ -197,8 +197,8 @@ internal fun ProgrammeDetailsPage(
         else if (section == DetailsSection.ACTIONS) onClose() else restoreAction()
     }
     BackHandler(enabled = backEnabled, onBack = ::close)
-    LaunchedEffect(reading) {
-        if (!reading) {
+    LaunchedEffect(reading, backEnabled) {
+        if (!reading && backEnabled) {
             withFrameNanos { }
             when (section) {
                 DetailsSection.ACTIONS -> restoreAction()

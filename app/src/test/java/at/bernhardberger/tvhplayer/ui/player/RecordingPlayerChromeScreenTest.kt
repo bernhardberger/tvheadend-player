@@ -392,6 +392,7 @@ class RecordingPlayerChromeScreenTest {
         key(Key.DirectionDown)
         compose.onNodeWithTag("player-seekbar").requestFocus()
         compose.pressKey(Key.MediaRewind, settleFrames = 2, frameMillis = 16)
+        compose.onNodeWithTag("player-seekbar").assertIsFocused()
         val target = compose.onNodeWithTag("player-seekbar").fetchSemanticsNode()
             .config[SemanticsProperties.ProgressBarRangeInfo].current * 3_600_000L
         compose.pressKey(Key.DirectionLeft, settleFrames = 2, frameMillis = 16)

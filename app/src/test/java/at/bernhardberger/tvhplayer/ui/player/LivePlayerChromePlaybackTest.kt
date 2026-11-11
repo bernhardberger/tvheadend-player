@@ -27,6 +27,14 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.requestFocus
+import at.bernhardberger.tvheadend.sdk.core.EventId
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvheadend.sdk.core.DvrSchedule
+import kotlin.time.Instant
 import at.bernhardberger.tvhplayer.core.PlayerStateCell
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performSemanticsAction
@@ -107,13 +115,9 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
             descriptionOrNull("timeshift-seek-preview").orEmpty().contains(context.getString(R.string.player_scrub_backward, 2)))
     }
 
-    @Test fun liveScrubRequestsTheBufferStartAndRecordCancelsPreview() = timeshiftPlaying(mapPosition = true) { pauses ->
+    @Test fun liveScrubRequestsTheBufferStart() = timeshiftPlaying(mapPosition = true) { pauses ->
         key(Key.MediaPause)
         assertFalse(pauses.last())
-        compose.pressKey(Key.MediaRewind, settleFrames = 2, frameMillis = 16)
-        key(Key.MediaRecord)
-        assertFalse("Record drops the running target", exists("timeshift-seek-preview"))
-        assertFalse("Record did not resume paused playback", pauses.last())
         val startTarget = sampleTimeshift().bufferStartMs + 1_000L
         repeat(5) { compose.pressKey(Key.MediaRewind, settleFrames = 2, frameMillis = 16) }
         assertTrue(description("timeshift-seek-preview").contains(context.getString(R.string.player_scrub_backward, 32)))
@@ -123,6 +127,88 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
             exists("timeshift-seek-preview") && description("timeshift-seek-preview").contains(context.getString(R.string.player_scrub_backward, 32)))
         val committed = timeshiftConnection.seekTargets.last() as SubscriptionSeekTarget.Absolute
         assertEquals("the first buffered second is requested", startTarget, committed.position.inWholeMilliseconds)
+    }
+
+    @Test fun liveScrubRecordCommitsThePreviewProgrammeAndPinsInfo() = recordFromScrub(scheduled = true)
+
+    @Test fun liveScrubRecordSchedulesThePreviewProgramme() = recordFromScrub(scheduled = false)
+
+    private fun recordFromScrub(scheduled: Boolean) = timeshiftPlaying(mapPosition = true) {
+        val now = System.currentTimeMillis() / 1_000L
+        val previewProgramme = EpgEvent.create(EventId(21), ChannelId(1), Instant.fromEpochSeconds(now - 1800),
+            Instant.fromEpochSeconds(now + 5), title = "Preview programme B")
+        val playbackProgramme = EpgEvent.create(EventId(22), ChannelId(1), Instant.fromEpochSeconds(now + 5),
+            Instant.fromEpochSeconds(now + 3600), title = "Playback programme A")
+        session.publish(observation(now, listOf(previewProgramme, playbackProgramme), recordings = if (scheduled) listOf(
+            DvrEntry.create(DvrEntryId(7), eventId = previewProgramme.id, state = DvrEntryState.SCHEDULED)) else emptyList()))
+        runTest(subscriptionDispatcher) {
+            timeshiftConnection.emit(SubscriptionEvent.Timeshift(61_000_000L, 0L, 0L, 61_000_000L,
+                null, Instant.fromEpochSeconds(now + 11)))
+        }
+        compose.settleFrames(20, frameMillis = 16)
+        settleFrames()
+        assertTrue("playback starts in A: ${description("player-info-bar")}", description("player-info-bar").contains(requireNotNull(playbackProgramme.title)))
+        key(Key.MediaPause)
+        repeat(5) { compose.pressKey(Key.MediaRewind, settleFrames = 2, frameMillis = 16) }
+        compose.settleFrames(16, frameMillis = 16)
+        assertTrue("the scrub banner shows B: ${description("player-info-bar")}", description("player-info-bar").contains(requireNotNull(previewProgramme.title)))
+        val requests = timeshiftConnection.seekTargets.size
+        key(Key.MediaRecord)
+        settleFrames()
+        assertTrue("Record commits the scrub", timeshiftConnection.seekTargets.size > requests)
+        val committed = timeshiftConnection.seekTargets.last() as SubscriptionSeekTarget.Absolute
+        assertTrue("Record seeks into B", committed.position.inWholeMilliseconds in 1_000L..55_000L)
+        if (scheduled) {
+            assertEquals(requireNotNull(previewProgramme.title), texts("details-title"))
+            compose.onNodeWithTag("details-cancel").assertIsFocused()
+            key(Key.DirectionCenter)
+            assertTrue("Cancel confirms B, not the playback programme",
+                texts("centred-dialog-content").contains(requireNotNull(previewProgramme.title)))
+            key(Key.Back)
+            key(Key.Back)
+            settleFrames()
+            val currentProgramme = EpgEvent.create(EventId(23), ChannelId(1), Instant.fromEpochSeconds(now - 3600),
+                Instant.fromEpochSeconds(now + 3600), title = "Current programme C")
+            session.publish(observation(now, listOf(currentProgramme)))
+            settleFrames()
+            key(Key.Info)
+            assertEquals("reopening Info does not retain the scrub's pin",
+                requireNotNull(currentProgramme.title), texts("details-title"))
+        } else {
+            assertEquals("Record schedules the preview programme", DvrSchedule.Programme(previewProgramme.id), scheduleRequests.single().schedule)
+            assertFalse(exists("details-title"))
+        }
+    }
+
+    @Test fun focusedLiveSeekbarTakesOverTheScrubWithThirtySecondSteps() = timeshiftPlaying(mapPosition = true) {
+        val now = System.currentTimeMillis() / 1_000L
+        val programme = EpgEvent.create(EventId(21), ChannelId(1), Instant.fromEpochSeconds(now - 60),
+            Instant.fromEpochSeconds(now + 40), title = "Buffered programme")
+        session.publish(observation(now, listOf(programme)))
+        runTest(subscriptionDispatcher) {
+            timeshiftConnection.emit(SubscriptionEvent.Timeshift(61_000_000L, 0L, 0L, 61_000_000L,
+                null, Instant.fromEpochSeconds(now + 1)))
+        }
+        compose.settleFrames(20, frameMillis = 16)
+        settleFrames()
+        key(Key.MediaPause)
+        compose.pressKey(Key.DirectionDown, settleFrames = 2, frameMillis = 16)
+        compose.onNodeWithTag("player-seekbar").requestFocus()
+        compose.onNodeWithTag("player-seekbar").assertIsFocused()
+        compose.pressKey(Key.MediaRewind, settleFrames = 2, frameMillis = 16)
+        compose.onNodeWithTag("player-seekbar").assertIsFocused()
+        val target = compose.onNodeWithTag("player-seekbar").fetchSemanticsNode().config[
+            SemanticsProperties.ProgressBarRangeInfo].current * 100_000L
+        compose.pressKey(Key.DirectionLeft, settleFrames = 2, frameMillis = 16)
+        compose.settleFrames(12, frameMillis = 16)
+        assertFalse("the automatic scrub ends", description("player-seekbar").contains(
+            context.getString(R.string.player_scrub_backward, 2)))
+        compose.settleFrames(14, frameMillis = 16)
+        settleFrames()
+        val stepped = (timeshiftConnection.seekTargets.last() as SubscriptionSeekTarget.Absolute).position.inWholeMilliseconds
+        // The bar animates behind the automatic target; distinguish its 30 s step from the hidden 10 s step.
+        assertEquals("the focused live bar uses a symmetric thirty-second step",
+            (target - 30_000L).toDouble(), stepped.toDouble(), 2_000.0)
     }
 
     @Test fun mediaPauseUsesOnlyTheBannerAndScrubLeavesPlaybackUntilBackCancels() = timeshiftPlaying(mapPosition = true) { pauses ->

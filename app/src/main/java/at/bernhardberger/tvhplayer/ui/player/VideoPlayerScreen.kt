@@ -28,6 +28,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
+import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvhplayer.core.recordingIsRunning
 import at.bernhardberger.tvhplayer.core.programmeArtwork
 import at.bernhardberger.tvhplayer.core.deviceFaultDetail
@@ -438,6 +439,7 @@ fun VideoPlayerScreen(
     val rootFocus = remember { FocusRequester() }
 
     var currentChannelId by remember { mutableStateOf(channelId) }
+    var infoPinnedEventId by remember(currentChannelId) { mutableStateOf<EventId?>(null) }
     var currentChannelName by remember { mutableStateOf(channelName) }
     val confirmedPlayingChannelId = playingLiveChannelId.takeIf {
         it == currentChannelId && playbackState.presented
@@ -779,6 +781,7 @@ fun VideoPlayerScreen(
     PersistConfirmedChannel(confirmedPlayingChannelId, channelScope, observation, lastPlayedChannelStore)
 
     fun openInfo(fromKey: Boolean = false) {
+        infoPinnedEventId = null
         infoInitialAction = null
         infoRailChannelId = null
         infoReturnAction = if (fromKey && !layerState.core.chrome.controlsVisible) null else "player-info"
@@ -798,6 +801,7 @@ fun VideoPlayerScreen(
     }
 
     fun closeInfo() {
+        infoPinnedEventId = null
         layerState.dismissRecordingConfirmation()
         val returnToRail = infoRailChannelId != null
         layerState.closeInfo(returnToRail = returnToRail)
@@ -1121,9 +1125,8 @@ fun VideoPlayerScreen(
     val infoEvent = displayedProgrammeEvent(visibleSeekPreview != null, displayedWindow,
         committedWindow, effectiveTimeshiftState, nowEvent, liveStart)
 
-    fun recordProgramme() {
+    fun recordProgramme(programme: EpgEventEntry?) {
         if (recordKeyInFlight) return
-        val programme = infoEvent
         val opening = observation
         if (programme == null || opening.currentSession == null) {
             notices.postRecordUnavailable(programme, opening, nowSec)
@@ -1619,16 +1622,21 @@ fun VideoPlayerScreen(
                         return@onPreviewKeyEvent true
                     }
                     PlayerKeyAction.SCHEDULE_PROGRAMME -> {
-                        if (timelineState.scrubSpeed != 0) timelineState.cancelPendingSeek()
+                        val programme = infoEvent
+                        if (timelineState.scrubSpeed != 0) commitScrub()
                         layerState.core.beginOpeningKeyCycle(keyCode)
-                        recordProgramme()
+                        recordProgramme(programme)
                         return@onPreviewKeyEvent true
                     }
                     PlayerKeyAction.OPEN_RECORDING_INFO -> {
-                        if (timelineState.scrubSpeed != 0) timelineState.cancelPendingSeek()
-                        openInfo(fromKey = true)
-                        infoInitialAction = if (infoEvent?.let(observation::dvrEntryForEvent)?.state == DvrEntryState.SCHEDULED)
+                        val programme = infoEvent
+                        val wasScrubbing = timelineState.scrubSpeed != 0
+                        val initialAction = if (programme?.let(observation::dvrEntryForEvent)?.state == DvrEntryState.SCHEDULED)
                             BrowseContextAction.CANCEL else BrowseContextAction.STOP
+                        if (wasScrubbing) commitScrub()
+                        openInfo(fromKey = true)
+                        infoPinnedEventId = programme?.id.takeIf { wasScrubbing }
+                        infoInitialAction = initialAction
                         return@onPreviewKeyEvent true
                     }
                     PlayerKeyAction.SCRUB_BACK,
@@ -1938,7 +1946,9 @@ fun VideoPlayerScreen(
         fun PlayerPanels() {
         val detailsChannelId = infoRailChannelId ?: currentChannelId
         val detailsChannel = channels.firstOrNull { it.id == detailsChannelId }
-        val detailsBaseEvent = if (infoRailChannelId == null) infoEvent else channelsVm.nowEvent(detailsChannelId, nowSec)
+        val detailsBaseEvent = if (infoRailChannelId == null) {
+            infoPinnedEventId?.let(observation::event) ?: infoEvent.takeIf { infoPinnedEventId == null }
+        } else channelsVm.nowEvent(detailsChannelId, nowSec)
         if (layerState.scheduleOpen) PlayerChannelSchedule(
             layerState, currentChannelId, currentChannel, observation, { session.observation.value }, nowSec, effectiveTimeshiftState,
             dvrMutationActions, notices, scope, uiSettingsStore, onReconnect,
