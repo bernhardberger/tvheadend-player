@@ -1073,15 +1073,18 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionCenter)
         focused("recording-list-entry-1")
         assertOverlineAboveTitle(1)
+        val size = formatFileSize(2_400_000_000L, ApplicationProvider.getApplicationContext<Application>())
+        compose.onNodeWithTag("recording-list-metadata-1", useUnmergedTree = true)
+            .assert(hasText(" • $size", substring = true))
         val results = mutableListOf<TextLayoutResult>()
         compose.onNode(hasTestTag("recording-list-metadata-1") and
-            hasText(if (german) "Vorzeitig beendet" else "• 20m Stopped early", substring = true), useUnmergedTree = true)
+            hasText(if (german) "Vorzeitig beendet" else "• 20m • $size Stopped early", substring = true), useUnmergedTree = true)
             .assertIsDisplayed()
             .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(results) }
         val hint = results.single()
         val shown = hint.layoutInput.text.text.substring(0, hint.getLineEnd(hint.lineCount - 1, visibleEnd = true))
         assertTrue("'$shown' lines=${hint.lineCount} size=${hint.size} c=${hint.layoutInput.constraints}",
-            shown.endsWith(if (german) "20 Min. Vorzeitig beendet" else "20m Stopped early"))
+            shown.endsWith(if (german) "20 Min. • $size Vorzeitig beendet" else "20m • $size Stopped early"))
         compose.onNodeWithTag("recording-list-stopped-early", useUnmergedTree = true).assertIsDisplayed()
         assertEquals(1, hint.lineCount)
         assertFalse("The stopped-early marker must remain whole", hint.hasVisualOverflow)
@@ -1199,6 +1202,7 @@ class RecordingsVisualLayoutTest {
             recording(1, "Archived", "Documentaries/archived.ts"),
             DvrEntry.create(DvrEntryId(30), title = "Live match", state = DvrEntryState.RECORDING,
                 start = Instant.fromEpochSeconds(now - 600), stop = Instant.fromEpochSeconds(now + 3_000),
+                files = listOf(DvrRecordingFile.create(sizeBytes = 2_400_000_000L)),
                 channelName = "Ridge Earth HD", subtitle = "Second half"),
             DvrEntry.create(DvrEntryId(31), title = "Weak signal", state = DvrEntryState.RECORDING_ERROR,
                 start = Instant.fromEpochSeconds(now - 300), stop = Instant.fromEpochSeconds(now + 3_300),
@@ -1216,6 +1220,9 @@ class RecordingsVisualLayoutTest {
             useUnmergedTree = true).assertIsDisplayed()
         compose.onNode(hasTestTag("recording-list-metadata-30") and hasText("Recording", substring = true),
             useUnmergedTree = true).assertDoesNotExist()
+        val size = formatFileSize(2_400_000_000L, ApplicationProvider.getApplicationContext<Application>())
+        compose.onNodeWithTag("recording-list-metadata-30", useUnmergedTree = true)
+            .assert(!hasText(size, substring = true))
         assertTrailingStateMark(30, "Recording now")
         // Only the 32dp logo (with the focus scale) leads the row.
         assertEquals(32f * 1.05f, bounds("recording-list-leading-30").width, .1f)

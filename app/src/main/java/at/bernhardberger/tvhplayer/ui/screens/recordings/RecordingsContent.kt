@@ -1030,9 +1030,9 @@ private fun RecordingSectionHeader(
 }
 
 /**
- * The row's overline: the programme start and length (a running recording says when it stops), then
- * symbols for an early stop, a failure or a cancellation whose words are read out by accessibility
- * services. Only a failure is drawn in the error colour; the others stay muted.
+ * The row's overline: the programme start, length (a running recording says when it stops) and
+ * finished file size, then symbols for an early stop, a failure or a cancellation whose words are
+ * read out by accessibility services. Only a failure is drawn in the error colour; the others stay muted.
  */
 @Composable
 private fun RecordingOverline(entry: DvrEntry, focused: Boolean) {
@@ -1040,6 +1040,9 @@ private fun RecordingOverline(entry: DvrEntry, focused: Boolean) {
         entry.start?.epochSeconds.recordingDateTime(androidx.compose.ui.platform.LocalConfiguration.current.locales[0])
             .takeIf(String::isNotBlank)?.let(::add)
         recordingLengthLabel(entry)?.let(::add)
+        if (!recordingIsRunning(entry) && entry.state != DvrEntryState.SCHEDULED) {
+            recordingSizeBytes(entry)?.takeIf { it > 0 }?.let { add(formatFileSize(it, LocalContext.current)) }
+        }
     }.joinToString(" • ")
     val marks = buildList {
         if (recordingIsRunning(entry)) return@buildList
