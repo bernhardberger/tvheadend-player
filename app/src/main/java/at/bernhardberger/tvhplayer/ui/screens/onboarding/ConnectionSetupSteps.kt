@@ -65,6 +65,7 @@ import at.bernhardberger.tvheadend.sdk.core.DEFAULT_HTSP_PORT
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.settings.ConnectionFormFeedback
 import at.bernhardberger.tvhplayer.settings.ConnectionFormState
+import at.bernhardberger.tvhplayer.settings.compactServerName
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
 import at.bernhardberger.tvhplayer.ui.TvSpacing12
 import at.bernhardberger.tvhplayer.ui.TvSpacing80
@@ -409,8 +410,9 @@ private fun SignInStep(state: ConnectionSetupState, profileName: String?) {
                 else R.string.onboarding_sign_in_title,
             ),
             body = if (state.mode == SetupMode.PASSWORD) {
-                val account = stringResource(
-                    R.string.server_user_on_host, state.form.username.trim(), state.form.host.trim(),
+                val account = compactServerName(
+                    state.form.host.trim(), state.form.port.trim().toIntOrNull() ?: DEFAULT_HTSP_PORT,
+                    state.form.username.trim(),
                 )
                 stringResource(R.string.server_password_body, account, profileName ?: account)
             } else {

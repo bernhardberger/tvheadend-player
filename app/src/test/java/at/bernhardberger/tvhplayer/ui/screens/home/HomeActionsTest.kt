@@ -197,7 +197,7 @@ class HomeActionsTest {
     }
 
     private fun leaveTouchMode() {
-        compose.runOnIdle {
+        compose.runOnUiThread {
             org.robolectric.util.ReflectionHelpers.callInstanceMethod<Boolean>(
                 compose.activity.window.decorView.parent, "ensureTouchModeLocally",
                 org.robolectric.util.ReflectionHelpers.ClassParameter.from(Boolean::class.javaPrimitiveType, false))
@@ -884,7 +884,7 @@ class HomeActionsTest {
         val vm = at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel(session,
             at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore(at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore()), kotlinx.coroutines.flow.MutableStateFlow<at.bernhardberger.tvheadend.sdk.core.ServerProfileId?>(null))
         val viewModels = androidx.lifecycle.ViewModelStore().apply { put("channels", vm) }
-        compose.runOnIdle {
+        compose.runOnUiThread {
             val previous = requireNotNull(vm.scope.value.observation)
             session.publish(SessionObservation.create(sessionState = SessionState.Disconnected, channelState = previous.channelState))
             session.publish(FakeTvheadendSession(observation()).observation.value)

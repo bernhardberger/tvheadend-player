@@ -75,9 +75,8 @@
     <string name="audio_description_description">有口述影像音軌時優先使用。</string>
     <string name="subtitle_follow_system">依照系統字幕設定</string>
     <string name="player_status_rec">錄影中</string>
-    <string name="setup_connection">設定連線</string>
+    <string name="setup_connection">編輯連線</string>
     <string name="setup_connection_description">伺服器位址、連接埠及帳號</string>
-    <string name="connection_overview_status">狀態</string>
     <string name="connection_overview_server">伺服器</string>
     <string name="connection_overview_connected">已連線</string>
     <string name="connection_overview_connecting">正在連線…</string>
@@ -717,7 +716,6 @@
     <string name="server_in_use">使用中</string>
     <string name="server_no_sign_in">不登入</string>
     <string name="server_password_needed">需要密碼</string>
-    <string name="server_user_on_host">%1$s（%2$s）</string>
     <string name="server_detail_separator">%1$s · %2$s</string>
     <string name="server_host_port">%1$s · 連接埠 %2$d</string>
     <string name="server_use">使用此連線</string>

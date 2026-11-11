@@ -75,9 +75,8 @@
     <string name="audio_description_description">有音频描述音轨时优先使用。</string>
     <string name="subtitle_follow_system">遵循系统字幕设置</string>
     <string name="player_status_rec">录制中</string>
-    <string name="setup_connection">设置连接</string>
+    <string name="setup_connection">编辑连接</string>
     <string name="setup_connection_description">服务器地址、端口和账号</string>
-    <string name="connection_overview_status">状态</string>
     <string name="connection_overview_server">服务器</string>
     <string name="connection_overview_connected">已连接</string>
     <string name="connection_overview_connecting">正在连接…</string>
@@ -717,7 +716,6 @@
     <string name="server_in_use">使用中</string>
     <string name="server_no_sign_in">不登录</string>
     <string name="server_password_needed">需要密码</string>
-    <string name="server_user_on_host">%1$s（%2$s）</string>
     <string name="server_detail_separator">%1$s · %2$s</string>
     <string name="server_host_port">%1$s · 端口 %2$d</string>
     <string name="server_use">使用此连接</string>

@@ -2,12 +2,13 @@ package at.bernhardberger.tvhplayer.ui.screens.settings
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileId
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileSummary
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvheadend.sdk.core.DEFAULT_HTSP_PORT
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
+import at.bernhardberger.tvhplayer.settings.compactServerName
+import at.bernhardberger.tvhplayer.settings.serverProfileDisplayName
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.SetupMode
 import org.koin.compose.koinInject
 
@@ -43,7 +44,7 @@ internal fun AddServer(
             val host = form.host.trim()
             val username = form.username.trim().ifBlank { null }
             SwitchServerDialog(
-                name = username?.let { stringResource(R.string.server_user_on_host, it, host) } ?: host,
+                name = compactServerName(host, form.port.trim().toIntOrNull() ?: DEFAULT_HTSP_PORT, username),
                 username = username,
                 interruption = interruption(),
                 onSwitch = onSwitch,
@@ -72,7 +73,7 @@ internal fun EditServer(
         ProfileSetupEditor(owner, target, activate = mode == SetupMode.PASSWORD, restoreActive = restore,
             onAlreadyExists = showExisting)
     }
-    val name = serverProfileTitle(target)
+    val name = serverProfileDisplayName(target)
     SettingsConnection(
         settingsStore = editor,
         session = session,

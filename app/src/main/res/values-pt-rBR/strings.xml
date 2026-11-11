@@ -75,9 +75,8 @@
     <string name="audio_description_description">Dá preferência a faixas com audiodescrição, quando disponíveis.</string>
     <string name="subtitle_follow_system">Seguir as configurações de legendas do sistema</string>
     <string name="player_status_rec">GRAV</string>
-    <string name="setup_connection">Configurar conexão</string>
+    <string name="setup_connection">Editar conexão</string>
     <string name="setup_connection_description">Endereço do servidor, porta e conta</string>
-    <string name="connection_overview_status">Status</string>
     <string name="connection_overview_server">Servidor</string>
     <string name="connection_overview_connected">Conectado</string>
     <string name="connection_overview_connecting">Conectando…</string>
@@ -720,7 +719,6 @@
     <string name="server_in_use">Em uso</string>
     <string name="server_no_sign_in">Sem login</string>
     <string name="server_password_needed">Senha necessária</string>
-    <string name="server_user_on_host">%1$s em %2$s</string>
     <string name="server_detail_separator">%1$s · %2$s</string>
     <string name="server_host_port">%1$s · porta %2$d</string>
     <string name="server_use">Usar esta conexão</string>

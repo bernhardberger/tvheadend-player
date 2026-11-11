@@ -257,7 +257,7 @@ class PlayerChromeEvidenceTest {
     private fun assertNoLogoNumberVisibility(name: String, content: @Composable () -> Unit) {
         lateinit var view: View
         try {
-            compose.runOnIdle { at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = true }
+            compose.runOnUiThread { at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = true }
             compose.setContent { TVHeadendPlayerTheme {
                 view = LocalView.current
                 Box(Modifier.fillMaxSize().background(TvSurfaceColors.containerLowest).padding(48.dp)) { content() }

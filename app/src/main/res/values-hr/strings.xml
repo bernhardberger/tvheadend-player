@@ -75,9 +75,8 @@
     <string name="audio_description_description">Daje prednost zapisima s audiodeskripcijom kada su dostupni.</string>
     <string name="subtitle_follow_system">Prati sustavne postavke podnaslova</string>
     <string name="player_status_rec">SNIM</string>
-    <string name="setup_connection">Postavi vezu</string>
+    <string name="setup_connection">Uredi vezu</string>
     <string name="setup_connection_description">Adresa poslužitelja, priključak i račun</string>
-    <string name="connection_overview_status">Stanje</string>
     <string name="connection_overview_server">Poslužitelj</string>
     <string name="connection_overview_connected">Povezano</string>
     <string name="connection_overview_connecting">Povezivanje…</string>
@@ -780,7 +779,6 @@
     <string name="server_in_use">U upotrebi</string>
     <string name="server_no_sign_in">Bez prijave</string>
     <string name="server_password_needed">Potrebna je lozinka</string>
-    <string name="server_user_on_host">%1$s na %2$s</string>
     <string name="server_detail_separator">%1$s · %2$s</string>
     <string name="server_host_port">%1$s · priključak %2$d</string>
     <string name="server_use">Koristi ovu vezu</string>

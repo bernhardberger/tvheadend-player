@@ -75,9 +75,8 @@
     <string name="audio_description_description">Előnyben részesíti az audionarrációs hangsávokat, ha elérhetők.</string>
     <string name="subtitle_follow_system">Rendszer feliratbeállításainak követése</string>
     <string name="player_status_rec">FELV</string>
-    <string name="setup_connection">Kapcsolat beállítása</string>
+    <string name="setup_connection">Kapcsolat szerkesztése</string>
     <string name="setup_connection_description">Szervercím, port és fiók</string>
-    <string name="connection_overview_status">Állapot</string>
     <string name="connection_overview_server">Szerver</string>
     <string name="connection_overview_connected">Csatlakoztatva</string>
     <string name="connection_overview_connecting">Csatlakozás…</string>
@@ -763,7 +762,6 @@
     <string name="server_in_use">Használatban</string>
     <string name="server_no_sign_in">Bejelentkezés nélkül</string>
     <string name="server_password_needed">Jelszó szükséges</string>
-    <string name="server_user_on_host">%1$s itt: %2$s</string>
     <string name="server_detail_separator">%1$s · %2$s</string>
     <string name="server_host_port">%1$s · port %2$d</string>
     <string name="server_use">Kapcsolat használata</string>

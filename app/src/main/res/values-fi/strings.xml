@@ -75,9 +75,8 @@
     <string name="audio_description_description">Suosii kuvailutulkattuja ääniraitoja, kun niitä on saatavilla.</string>
     <string name="subtitle_follow_system">Noudata järjestelmän tekstitysasetuksia</string>
     <string name="player_status_rec">REC</string>
-    <string name="setup_connection">Määritä yhteys</string>
+    <string name="setup_connection">Muokkaa yhteyttä</string>
     <string name="setup_connection_description">Palvelimen osoite, portti ja tili</string>
-    <string name="connection_overview_status">Tila</string>
     <string name="connection_overview_server">Palvelin</string>
     <string name="connection_overview_connected">Yhdistetty</string>
     <string name="connection_overview_connecting">Yhdistetään…</string>
@@ -763,7 +762,6 @@
     <string name="server_in_use">Käytössä</string>
     <string name="server_no_sign_in">Ei kirjautumista</string>
     <string name="server_password_needed">Salasana tarvitaan</string>
-    <string name="server_user_on_host">%1$s palvelimella %2$s</string>
     <string name="server_detail_separator">%1$s · %2$s</string>
     <string name="server_host_port">%1$s · portti %2$d</string>
     <string name="server_use">Käytä tätä yhteyttä</string>

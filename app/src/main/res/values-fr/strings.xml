@@ -75,9 +75,8 @@
     <string name="audio_description_description">Privilégie les pistes avec audiodescription si disponibles.</string>
     <string name="subtitle_follow_system">Suivre les réglages système des sous-titres</string>
     <string name="player_status_rec">ENR</string>
-    <string name="setup_connection">Configurer la connexion</string>
+    <string name="setup_connection">Modifier la connexion</string>
     <string name="setup_connection_description">Adresse du serveur, port et compte</string>
-    <string name="connection_overview_status">État</string>
     <string name="connection_overview_server">Serveur</string>
     <string name="connection_overview_connected">Connecté</string>
     <string name="connection_overview_connecting">Connexion…</string>
@@ -780,7 +779,6 @@
     <string name="server_in_use">En cours d’utilisation</string>
     <string name="server_no_sign_in">Sans identification</string>
     <string name="server_password_needed">Mot de passe requis</string>
-    <string name="server_user_on_host">%1$s sur %2$s</string>
     <string name="server_detail_separator">%1$s · %2$s</string>
     <string name="server_host_port">%1$s · port %2$d</string>
     <string name="server_use">Utiliser cette connexion</string>

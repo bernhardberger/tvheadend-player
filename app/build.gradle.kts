@@ -9,12 +9,16 @@ import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.FileSystemOperations
 import org.gradle.api.provider.ListProperty
+import org.gradle.api.provider.ValueSource
+import org.gradle.api.provider.ValueSourceParameters
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
+import org.gradle.process.ExecOperations
+import java.io.ByteArrayOutputStream
 import java.util.Locale
 import javax.inject.Inject
 
@@ -72,6 +76,35 @@ val appLanguages = listOf(
 )
 // Debug builds add Android's pseudo-locales: en-XA for long text, ar-XB for right-to-left.
 val pseudoLocales = listOf("en-XA", "ar-XB")
+
+// ValueSource tracks HEAD across configuration-cache reuse; source archives can build without Git.
+abstract class GitShortCommit : ValueSource<String, GitShortCommit.Parameters> {
+    interface Parameters : ValueSourceParameters {
+        val repositoryDirectory: DirectoryProperty
+    }
+
+    @get:Inject
+    abstract val execOperations: ExecOperations
+
+    override fun obtain(): String = try {
+        val output = ByteArrayOutputStream()
+        val result = execOperations.exec {
+            workingDir(parameters.repositoryDirectory.get().asFile)
+            commandLine("git", "rev-parse", "--short=8", "HEAD")
+            standardOutput = output
+            errorOutput = ByteArrayOutputStream()
+            isIgnoreExitValue = true
+        }
+        if (result.exitValue == 0) output.toString().trim().ifBlank { "unknown" } else "unknown"
+    } catch (_: GradleException) {
+        "unknown"
+    }
+}
+
+val gitShortCommit = providers.of(GitShortCommit::class) {
+    parameters.repositoryDirectory.set(rootProject.layout.projectDirectory)
+}
+
 fun javaStringArray(values: List<String>) = values.joinToString(prefix = "{", postfix = "}") { "\"$it\"" }
 // aapt2 filters by resource qualifier (de, en-rXA, b+zh+Hans), matching folder names literally; a
 // regional entry also keeps its language's folder. Hebrew resources live in values-iw, the legacy
@@ -96,8 +129,8 @@ android {
         applicationId = "at.bernhardberger.tvhplayer"
         minSdk = 28
         targetSdk = 36
-        versionCode = 179
-        versionName = "0.4.14"
+        versionCode = 180
+        versionName = "0.5.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "PROFILE_TRACE", "false")
@@ -114,6 +147,7 @@ android {
 
     buildTypes {
         debug {
+            versionNameSuffix = "-debug+${gitShortCommit.get()}"
             buildConfigField("String", "APPLIANCE_COMPANION_PACKAGE", "\"at.bernhardberger.tvhplayer.appliance.debug\"")
             manifestPlaceholders["applianceCompanionPackage"] = "at.bernhardberger.tvhplayer.appliance.debug"
             applicationIdSuffix = ".debug"
@@ -131,6 +165,7 @@ android {
         }
         create("profile") {
             initWith(getByName("release"))
+            versionNameSuffix = "-profile+${gitShortCommit.get()}"
             buildConfigField("String", "APPLIANCE_COMPANION_PACKAGE", "\"\"")
             manifestPlaceholders["applianceCompanionPackage"] = "at.bernhardberger.tvhplayer.appliance.debug"
             proguardFiles("benchmark-rules.pro")

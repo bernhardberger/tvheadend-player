@@ -75,9 +75,8 @@
     <string name="audio_description_description">利用できる場合は音声解説付きのトラックを優先します。</string>
     <string name="subtitle_follow_system">システムの字幕設定に従う</string>
     <string name="player_status_rec">録画中</string>
-    <string name="setup_connection">接続を設定</string>
+    <string name="setup_connection">接続を編集</string>
     <string name="setup_connection_description">サーバーアドレス、ポート、アカウント</string>
-    <string name="connection_overview_status">状態</string>
     <string name="connection_overview_server">サーバー</string>
     <string name="connection_overview_connected">接続済み</string>
     <string name="connection_overview_connecting">接続中…</string>
@@ -747,7 +746,6 @@
     <string name="server_in_use">使用中</string>
     <string name="server_no_sign_in">ログインなし</string>
     <string name="server_password_needed">パスワードが必要</string>
-    <string name="server_user_on_host">%1$s（%2$s）</string>
     <string name="server_detail_separator">%1$s · %2$s</string>
     <string name="server_host_port">%1$s · ポート %2$d</string>
     <string name="server_use">この接続を使用</string>

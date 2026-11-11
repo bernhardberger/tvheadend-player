@@ -13,7 +13,6 @@
     <ID>ClassNaming:SettingsVisualEvidenceTest.kt:SettingsVisualEvidenceTest</ID>
     <ID>ClassNaming:TimeshiftCommandDeviceAcceptanceTest.kt:TimeshiftCommandDeviceAcceptanceTest</ID>
     <ID>ClassNaming:TranslationLocaleCaptureTest.kt:PseudoLocaleEvidence</ID>
-    <ID>ForbiddenMethodCall:BrowseCohesionEvidenceTest.kt:BrowseCohesionEvidenceTest$sleep(100)</ID>
     <ID>ForbiddenMethodCall:ProgrammeDetailsCaptureTest.kt:ProgrammeDetailsCaptureTest$sleep(100)</ID>
   </CurrentIssues>
 </SmellBaseline>

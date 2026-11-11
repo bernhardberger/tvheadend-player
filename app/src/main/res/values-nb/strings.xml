@@ -75,9 +75,8 @@
     <string name="audio_description_description">Foretrekker lydspor med synstolking når de er tilgjengelige.</string>
     <string name="subtitle_follow_system">Følg systemets innstillinger for undertekster</string>
     <string name="player_status_rec">REC</string>
-    <string name="setup_connection">Sett opp tilkobling</string>
+    <string name="setup_connection">Rediger tilkobling</string>
     <string name="setup_connection_description">Serveradresse, port og konto</string>
-    <string name="connection_overview_status">Status</string>
     <string name="connection_overview_server">Server</string>
     <string name="connection_overview_connected">Tilkoblet</string>
     <string name="connection_overview_connecting">Kobler til…</string>
@@ -763,7 +762,6 @@
     <string name="server_in_use">I bruk</string>
     <string name="server_no_sign_in">Ingen pålogging</string>
     <string name="server_password_needed">Passord kreves</string>
-    <string name="server_user_on_host">%1$s på %2$s</string>
     <string name="server_detail_separator">%1$s · %2$s</string>
     <string name="server_host_port">%1$s · port %2$d</string>
     <string name="server_use">Bruk denne tilkoblingen</string>

@@ -75,9 +75,8 @@
     <string name="audio_description_description">Föredrar ljudspår med syntolkning när de finns.</string>
     <string name="subtitle_follow_system">Följ systemets textningsinställningar</string>
     <string name="player_status_rec">REC</string>
-    <string name="setup_connection">Ställ in anslutning</string>
+    <string name="setup_connection">Redigera anslutning</string>
     <string name="setup_connection_description">Serveradress, port och konto</string>
-    <string name="connection_overview_status">Status</string>
     <string name="connection_overview_server">Server</string>
     <string name="connection_overview_connected">Ansluten</string>
     <string name="connection_overview_connecting">Ansluter…</string>
@@ -763,7 +762,6 @@
     <string name="server_in_use">Används</string>
     <string name="server_no_sign_in">Ingen inloggning</string>
     <string name="server_password_needed">Lösenord krävs</string>
-    <string name="server_user_on_host">%1$s på %2$s</string>
     <string name="server_detail_separator">%1$s · %2$s</string>
     <string name="server_host_port">%1$s · port %2$d</string>
     <string name="server_use">Använd den här anslutningen</string>

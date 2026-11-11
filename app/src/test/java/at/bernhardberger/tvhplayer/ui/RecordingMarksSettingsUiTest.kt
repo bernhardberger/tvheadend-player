@@ -66,15 +66,15 @@ class RecordingMarksSettingsUiTest {
     }
 
     @Test fun channelGroupsDescriptionNamesTheConnectionOnItsOwnFirstLine() {
-        descriptionBounds { settingsChannelTagsLevel(emptyList(), ChannelScopeVisibility(), true, false, {}, {}, "anna on tvheadend.local") }
+        descriptionBounds { settingsChannelTagsLevel(emptyList(), ChannelScopeVisibility(), true, false, {}, {}, "anna@tvheadend.local") }
         compose.onNodeWithTag("settings-description-${SettingsSection.CHANNEL_TAGS.name}").assertTextEquals(
-            "For anna on tvheadend.local\nChoose which groups appear in Channels and the Guide.")
+            "For anna@tvheadend.local\nChoose which groups appear in Channels and the Guide.")
     }
 
     @Test fun streamProfileDescriptionNamesTheConnectionOnItsOwnFirstLine() {
-        descriptionBounds { settingsStreamProfileLevel(SettingsPlayerUiState(), "anna on tvheadend.local") {} }
+        descriptionBounds { settingsStreamProfileLevel(SettingsPlayerUiState(), "anna@tvheadend.local") {} }
         compose.onNodeWithTag("settings-description-$STREAM_PROFILE_LEVEL").assertTextEquals(
-            "For anna on tvheadend.local\nHow Tvheadend prepares the stream for this TV.")
+            "For anna@tvheadend.local\nHow Tvheadend prepares the stream for this TV.")
     }
 
     @Test fun onlySeveralStoredConnectionsNameTheActiveOneOnPerConnectionPages() {
@@ -90,7 +90,7 @@ class RecordingMarksSettingsUiTest {
             names += connectionScopeName(ServerProfileListResult.Available(listOf(anna, cabin), null))
         }
         compose.waitForIdle()
-        assertEquals(listOf(null, null, null, "anna on tvheadend.local", "Cabin", null), names.takeLast(6))
+        assertEquals(listOf(null, null, null, "anna@tvheadend.local", "Cabin", null), names.takeLast(6))
     }
 
     private fun descriptionBounds(levelFactory: @Composable () -> DepthLevel) {

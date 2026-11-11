@@ -75,9 +75,8 @@
     <string name="audio_description_description">Varsa sesli betimlemeli ses parçalarını tercih eder.</string>
     <string name="subtitle_follow_system">Sistemin altyazı ayarlarını izle</string>
     <string name="player_status_rec">REC</string>
-    <string name="setup_connection">Bağlantıyı kur</string>
+    <string name="setup_connection">Bağlantıyı düzenle</string>
     <string name="setup_connection_description">Sunucu adresi, bağlantı noktası ve hesap</string>
-    <string name="connection_overview_status">Durum</string>
     <string name="connection_overview_server">Sunucu</string>
     <string name="connection_overview_connected">Bağlı</string>
     <string name="connection_overview_connecting">Bağlanıyor…</string>
@@ -763,7 +762,6 @@
     <string name="server_in_use">Kullanımda</string>
     <string name="server_no_sign_in">Oturum açma yok</string>
     <string name="server_password_needed">Parola gerekli</string>
-    <string name="server_user_on_host">%1$s · sunucu: %2$s</string>
     <string name="server_detail_separator">%1$s · %2$s</string>
     <string name="server_host_port">%1$s · bağlantı noktası %2$d</string>
     <string name="server_use">Bu bağlantıyı kullan</string>

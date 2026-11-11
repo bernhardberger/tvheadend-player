@@ -796,7 +796,7 @@ class SettingsDepthNavigationTest {
         }
     }
 
-    @Test fun connectionRootRowShowsOnlyTheStatusTitle() {
+    @Test fun connectionRootRowShowsTheStatusTitle() {
         lateinit var status: ConnectionOverviewStatus
         compose.setContent {
             TVHeadendPlayerTheme {
@@ -806,12 +806,11 @@ class SettingsDepthNavigationTest {
                         at.bernhardberger.tvhplayer.data.ConnectionFailureKind.UNREACHABLE,
                         at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition.EXPLICIT_RETRY)))
                 SettingsScreenNavigation(rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.CONNECTION.name),
-                    listOf(settingsRootLevel(connectionStatus = status.title)))
+                    listOf(settingsRootLevel(connectionStatus = status)))
             }
         }
-        val reason = requireNotNull(status.reason) // The overview page shows both lines.
+        assertEquals(ConnectionOverviewState.OFFLINE, status.state)
         compose.onNode(isFocused() and hasText("Connection") and hasText(status.title)).assertExists()
-        compose.onNodeWithText(reason).assertDoesNotExist()
         // No other root row carries a value.
         compose.onNodeWithText("General").assert(hasText("General") and !hasText(status.title))
     }
