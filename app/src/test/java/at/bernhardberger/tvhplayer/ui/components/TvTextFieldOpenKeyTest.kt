@@ -2,6 +2,10 @@ package at.bernhardberger.tvhplayer.ui.components
 
 import android.app.Application
 import android.view.KeyEvent as AndroidKeyEvent
+import android.view.ViewGroup
+import androidx.core.graphics.Insets
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Text
@@ -80,6 +84,41 @@ class TvTextFieldOpenKeyTest {
         compose.onNodeWithTag("text").requestFocus()
         key(AndroidKeyEvent.ACTION_UP, AndroidKeyEvent.KEYCODE_DPAD_CENTER)
         assertEditing("none")
+    }
+
+    /** The keyboard takes Back for its own hide, so the field is never told: it must end the edit itself. */
+    @Test
+    fun aKeyboardThatHidesItselfEndsTheEditOfBothFields() {
+        val editing = mutableStateOf<String?>(null)
+        showFields(editing)
+        for ((tag, id) in listOf("text" to "text-id", "password" to "password-id")) {
+            compose.onNodeWithTag(tag).requestFocus()
+            compose.runOnIdle { editing.value = id }
+            showKeyboard(true)
+            assertEditing(id)
+            showKeyboard(false)
+            assertEditing("none")
+        }
+    }
+
+    @Test
+    fun aFieldOpenedWithoutAKeyboardKeepsEditing() {
+        val editing = mutableStateOf<String?>(null)
+        showFields(editing)
+        compose.runOnIdle { editing.value = "text-id" }
+        compose.waitForIdle()
+        assertEditing("text-id")
+    }
+
+    /** Robolectric has no keyboard: the window reports the insets the keyboard would. */
+    private fun showKeyboard(visible: Boolean) {
+        compose.runOnIdle {
+            val content = compose.activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0)
+            ViewCompat.dispatchApplyWindowInsets(content, WindowInsetsCompat.Builder()
+                .setInsets(WindowInsetsCompat.Type.ime(), Insets.of(0, 0, 0, if (visible) 300 else 0))
+                .setVisible(WindowInsetsCompat.Type.ime(), visible).build())
+        }
+        compose.waitForIdle()
     }
 
     private fun assertOkOpensOnRelease(id: String, code: Int) {

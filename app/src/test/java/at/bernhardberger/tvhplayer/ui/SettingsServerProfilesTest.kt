@@ -15,6 +15,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
+import androidx.core.graphics.Insets
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import at.bernhardberger.tvhplayer.ui.components.SideRail
@@ -856,6 +859,9 @@ class SettingsServerProfilesTest {
         presentation = AppConnectionPresentation(ConnectionUiState.Ready)
         settle()
         capture("17-names-connected-notice", "Edit connection")
+        press(Key.DirectionCenter); press(Key.DirectionDown); press(Key.DirectionCenter)
+        compose.onNodeWithTag(SERVER_NAME_FIELD).assertIsFocused()
+        capture("19-name-screen", "Name field")
     }
 
     @Test fun addAndNameReturnsToTheNamedConnection() {
@@ -895,6 +901,36 @@ class SettingsServerProfilesTest {
         compose.waitForIdle()
         compose.onNodeWithTag(row(2)).assertIsFocused()
         compose.mainClock.advanceTimeBy(1_000)
+    }
+
+    /**
+     * The keyboard's own Back hides it without the app seeing the key. That ends the edit: the next
+     * Down leaves the field for Save, and a Back after it leaves the page instead of the field.
+     */
+    @Test fun nameFieldLeavesEditingWhenTheKeyboardHidesItself() {
+        stored(); settings()
+        press(Key.DirectionCenter); press(Key.DirectionDown); press(Key.DirectionCenter)
+        compose.onNodeWithTag(SERVER_NAME_FIELD).assertIsFocused()
+        press(Key.DirectionCenter)
+        compose.onNode(hasSetTextAction()).assertExists()
+        showKeyboard(true)
+        showKeyboard(false)
+        compose.onNode(hasSetTextAction()).assertDoesNotExist()
+        press(Key.DirectionDown)
+        compose.onNodeWithTag(SERVER_NAME_SAVE).assertIsFocused()
+        press(Key.Back)
+        compose.onNodeWithTag(SERVER_NAME_FIELD).assertDoesNotExist()
+        compose.onNodeWithTag("settings-row-$SERVER_NAME").assertIsFocused()
+    }
+
+    /** Robolectric has no keyboard: the window reports the insets the keyboard would. */
+    private fun showKeyboard(visible: Boolean) {
+        compose.runOnIdle {
+            ViewCompat.dispatchApplyWindowInsets(view, WindowInsetsCompat.Builder()
+                .setInsets(WindowInsetsCompat.Type.ime(), Insets.of(0, 0, 0, if (visible) 300 else 0))
+                .setVisible(WindowInsetsCompat.Type.ime(), visible).build())
+        }
+        settle()
     }
 
     private fun ready() = at.bernhardberger.tvheadend.sdk.core.SessionObservation.create(

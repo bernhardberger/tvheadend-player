@@ -3,10 +3,18 @@ package at.bernhardberger.tvhplayer.ui.components
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.dropWhile
+import kotlinx.coroutines.flow.first
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
@@ -60,6 +68,23 @@ internal class FieldOpenPress {
 private val FieldOpenKeys = setOf(Key.Enter, Key.NumPadEnter, Key.DirectionCenter)
 
 /**
+ * Ends the edit when the soft keyboard goes away by itself. The keyboard takes Back for its own
+ * hide, so the app never sees that key and the field would stay in edit mode, holding Down. Only
+ * a keyboard that was shown during this edit counts; with a hardware keyboard none appears.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun EndEditWhenKeyboardHides(isEditing: Boolean, endEdit: () -> Unit) {
+    val keyboardVisible = rememberUpdatedState(WindowInsets.isImeVisible)
+    val currentEndEdit by rememberUpdatedState(endEdit)
+    LaunchedEffect(isEditing) {
+        if (!isEditing) return@LaunchedEffect
+        snapshotFlow { keyboardVisible.value }.dropWhile { !it }.first { !it }
+        currentEndEdit()
+    }
+}
+
+/**
  * A D-pad friendly text field for Android TV.
  *
  * The soft keyboard is intentionally NOT opened on focus: while navigating the
@@ -97,6 +122,7 @@ fun TvOutlinedTextField(
     val displayedValue = presentationValue.takeIf { !isEditing && value.isEmpty() } ?: value
 
     BackHandler(enabled = isEditing) { setEditingId(null) }
+    EndEditWhenKeyboardHides(isEditing) { setEditingId(null) }
 
     LaunchedEffect(isEditing) {
         if (isEditing) {
