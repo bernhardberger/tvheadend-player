@@ -9,6 +9,46 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PlaybackKeyPolicyTest {
+    @Test fun scrubKeysRequireSeekableLiveAndCommitBeforeAnyControlCanTogglePause() {
+        val live = PlayerKeyContext(PlayerSurface.LIVE, false, false, false)
+        for (key in listOf(KeyEvent.KEYCODE_MEDIA_REWIND, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD)) {
+            assertEquals(PlayerKeyAction.PEEK_BANNER, playerKeyAction(live, key))
+        }
+        for (surface in PlayerSurface.entries) {
+            val seekable = live.copy(surface = surface, timeshiftAvailable = true)
+            assertEquals(PlayerKeyAction.SCRUB_BACK, playerKeyAction(seekable, KeyEvent.KEYCODE_MEDIA_REWIND))
+            assertEquals(PlayerKeyAction.SCRUB_FORWARD, playerKeyAction(seekable, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD))
+            for (controls in listOf(false, true)) for (key in listOf(KeyEvent.KEYCODE_DPAD_CENTER,
+                    KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PAUSE, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)) {
+                assertEquals(PlayerKeyAction.COMMIT_SCRUB,
+                    playerKeyAction(seekable.copy(controlsVisible = controls, scrubbing = true), key))
+            }
+        }
+        for (direction in listOf(-1, 1)) {
+            var speed = 0
+            for (expected in listOf(2, 4, 8, 16, 32, 32)) {
+                speed = nextPlayerScrubSpeed(speed, direction)
+                assertEquals(expected * direction, speed)
+            }
+            assertEquals(-direction * 2, nextPlayerScrubSpeed(speed, -direction))
+        }
+    }
+
+    @Test fun recordKeySchedulesOrOpensTheExistingRecordingButIsInertOnRecordingsAndModals() {
+        val live = PlayerKeyContext(PlayerSurface.LIVE, false, false, false)
+        assertEquals(PlayerKeyAction.SCHEDULE_PROGRAMME, playerKeyAction(live, KeyEvent.KEYCODE_MEDIA_RECORD))
+        assertEquals(PlayerKeyAction.OPEN_RECORDING_INFO,
+            playerKeyAction(live.copy(programmeRecording = true), KeyEvent.KEYCODE_MEDIA_RECORD))
+        assertEquals(PlayerKeyAction.CONSUME,
+            playerKeyAction(live.copy(surface = PlayerSurface.RECORDING), KeyEvent.KEYCODE_MEDIA_RECORD))
+        assertEquals(PlayerKeyAction.CONSUME,
+            playerKeyAction(live.copy(surface = PlayerSurface.RECORDING, optionsOpen = true), KeyEvent.KEYCODE_MEDIA_RECORD))
+        assertEquals(PlayerKeyAction.PASS_THROUGH,
+            playerKeyAction(live.copy(infoOpen = true), KeyEvent.KEYCODE_MEDIA_RECORD))
+        assertEquals(PlayerKeyAction.PASS_THROUGH,
+            playerKeyAction(live.copy(confirmationOpen = true), KeyEvent.KEYCODE_MEDIA_RECORD))
+    }
+
     @Test
     fun mediaPlaybackActsOnlyOnInitialDownIncludingAfterAReleasedCycle() {
         for (keyCode in listOf(KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PAUSE, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)) {
@@ -203,6 +243,9 @@ class PlaybackKeyPolicyTest {
             PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE,
             playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_CENTER),
         )
+        for (key in listOf(KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PAUSE, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)) {
+            assertEquals(PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE, playerKeyAction(ctx, key))
+        }
         assertEquals(
             PlayerKeyAction.REVEAL_CONTROLS,
             playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_UP),

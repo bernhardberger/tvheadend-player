@@ -15,6 +15,19 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.StepReadout
 import at.bernhardberger.tvhplayer.ui.common.formatSpokenDuration
 
+internal fun scrubSpeedLabel(speed: Int): String? = when {
+    speed > 0 -> "▶▶ ×$speed"
+    speed < 0 -> "◀◀ ×${-speed}"
+    else -> null
+}
+
+@Composable
+internal fun scrubSpeedDescription(speed: Int): String? = when {
+    speed > 0 -> stringResource(R.string.player_scrub_forward, speed)
+    speed < 0 -> stringResource(R.string.player_scrub_backward, -speed)
+    else -> null
+}
+
 /**
  * The spoken step: [text] once the step has settled, else what was spoken last (null before the
  * first). The visible label follows every step; this follows the settled one, so a held key is

@@ -31,6 +31,35 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PlayerTimelinePresentationStateTest {
+    @Test fun liveScrubHoldsThePendingTargetAndResumesOnlyAfterAnAcceptedCommit() = runTest {
+        for (accepted in listOf(false, true)) {
+            val fixture = fixture()
+            val owner = LiveTimelinePresentationState(this, { 0L }, { testScheduler.currentTime })
+            val result = CompletableDeferred<TimeshiftContentSeekResult>()
+            var dispatched = false
+            var resumed = false
+            owner.startScrub(-1)
+            owner.queueRelativeSeek(fixture.presentation(), -2_000,
+                "unavailable", "expired", "replaced", "uncertain") {
+                dispatched = true
+                result.await()
+            }
+            advanceTimeBy(1_000)
+            runCurrent()
+            assertTrue(owner.seekPending)
+            assertFalse(dispatched)
+            owner.commitPendingSeek { resumed = true }
+            runCurrent()
+            assertTrue(dispatched)
+            assertFalse(resumed)
+            result.complete(if (accepted) fixture.completed() else TimeshiftContentSeekResult.Expired)
+            runCurrent()
+            assertEquals(accepted, resumed)
+            assertEquals(0, owner.scrubSpeed)
+            owner.dispose()
+        }
+    }
+
     @Test fun liveDisplayBridgesBatchedHistoryForPlayingAndPausedWithoutGrantingSeeks() = runTest {
         for (paused in listOf(false, true)) {
             val fixture = fixture()

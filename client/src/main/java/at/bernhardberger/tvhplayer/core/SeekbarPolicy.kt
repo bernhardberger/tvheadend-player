@@ -122,6 +122,12 @@ fun seekStepMs(repeatCount: Int): Long = when {
     else -> SEEKBAR_STEP_INITIAL_MS
 }
 
+/** Signed hidden-player skips; focused seekbars retain symmetric [seekStepMs] steps. */
+fun playbackSeekStepMs(direction: Int, repeatCount: Int): Long {
+    val step = if (direction < 0 && repeatCount < SEEKBAR_MEDIUM_AFTER_REPEATS) 10_000L else seekStepMs(repeatCount)
+    return if (direction < 0) -step else step
+}
+
 fun seekbarScrub(
     range: SeekbarRange,
     direction: Int,

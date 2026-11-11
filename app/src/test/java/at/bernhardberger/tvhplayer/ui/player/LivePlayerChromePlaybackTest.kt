@@ -4,6 +4,8 @@
 
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.testutil.pressKey
+
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import android.app.Application
@@ -65,6 +67,24 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
 class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
+    @Test fun mediaPauseUsesOnlyTheBannerAndScrubLeavesPlaybackUntilBackCancels() = timeshiftPlaying(mapPosition = true) { pauses ->
+        key(Key.MediaPlay)
+        assertFalse("a hidden Play key toggles like OK", pauses.last())
+        assertTrue(exists("player-banner"))
+        assertFalse(exists("player-actions"))
+        repeat(2) { compose.pressKey(Key.DirectionLeft, settleFrames = 1, frameMillis = 16) }
+        assertTrue("hidden back presses accumulate ten seconds each",
+            compose.onAllNodesWithText("−0:20", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
+        key(Key.Back)
+        key(Key.MediaRewind)
+        settleFrames()
+        assertTrue(description("timeshift-seek-preview").contains("Rewind, 2 times"))
+        assertFalse("previewing does not resume paused playback", pauses.last())
+        key(Key.Back)
+        assertFalse(pauses.last())
+        assertFalse(exists("timeshift-seek-preview"))
+    }
+
     @Test fun playerEntersWithAPassiveBannerAndDownLandsOnTheControls() {
         screen()
         assertTrue("Banner on entry", exists("player-banner"))
@@ -343,6 +363,13 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
         runTest { PlayerSettingsStore(data).setTimeshiftEnabled(false) }
         screen(settingsData = data)
         assertMainSettled("in-memory settings disable pause") { runtime.livePause.value.availability == LivePauseAvailability.OFF }
+        val playing = player.playWhenReady
+        for (mediaKey in listOf(Key.MediaPlay, Key.MediaPause, Key.MediaPlayPause, Key.MediaFastForward, Key.MediaRewind)) {
+            compose.pressKey(mediaKey, settleFrames = 3, frameMillis = 16)
+            assertTrue(exists("player-banner"))
+            assertFalse(exists("player-actions"))
+            assertEquals(playing, player.playWhenReady)
+        }
         key(Key.DirectionDown)
         compose.onNodeWithTag("player-pause").assertIsFocused()
         repeat(3) { key(Key.DirectionCenter) }

@@ -320,6 +320,88 @@ class RecordingPlayerChromeScreenTest {
         assertTrue("one Back leaves; there is no invisible Banner to hide first", closed)
     }
 
+    @Test fun mediaScrubPreviewsWithoutSeekingAndBackCancelsWhileCenterCommitsAndResumes() {
+        screen()
+        playing()
+        key(Key.DirectionCenter)
+        assertFalse(player.playWhenReady)
+        val origin = positionMs
+        key(Key.MediaFastForward)
+        compose.settleFrames(6)
+        assertEquals("scrubbing leaves playback untouched", origin, positionMs)
+        assertFalse(player.playWhenReady)
+        assertTrue(exists("recording-seek-preview"))
+        assertTrue(description("recording-seek-preview").contains("Fast forward, 2 times"))
+        assertFalse(exists("player-actions"))
+        key(Key.MediaFastForward)
+        assertTrue(description("recording-seek-preview").contains("Fast forward, 4 times"))
+        key(Key.Back)
+        assertEquals(origin, positionMs)
+        assertFalse(player.playWhenReady)
+        key(Key.MediaRewind)
+        compose.settleFrames(3, frameMillis = 16)
+        key(Key.DirectionCenter)
+        assertTrue("OK commits behind the original position", positionMs < origin)
+        assertTrue("committing a scrub resumes", player.playWhenReady)
+        for (commit in listOf(Key.MediaPlay, Key.MediaPause, Key.MediaPlayPause)) {
+            key(Key.DirectionCenter)
+            assertFalse(player.playWhenReady)
+            val before = positionMs
+            key(Key.MediaRewind)
+            key(commit)
+            assertTrue(positionMs < before)
+            assertTrue("every media play key commits and resumes", player.playWhenReady)
+        }
+    }
+
+    @Test fun holdingAMediaSeekKeySwitchesToAcceleratingStepsAndReleaseDoesNotStartAnotherScrub() {
+        screen()
+        playing()
+        key(Key.MediaFastForward)
+        val origin = positionMs
+        compose.runOnUiThread {
+            rootView.dispatchKeyEvent(AndroidKeyEvent(AndroidKeyEvent.ACTION_DOWN, AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD))
+            rootView.dispatchKeyEvent(AndroidKeyEvent(0, 0, AndroidKeyEvent.ACTION_DOWN,
+                AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD, 12))
+        }
+        compose.settleFrames(1)
+        assertFalse(description("recording-seek-preview").contains("times"))
+        compose.runOnUiThread {
+            rootView.dispatchKeyEvent(AndroidKeyEvent(AndroidKeyEvent.ACTION_UP, AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD))
+        }
+        compose.settleFrames(6)
+        assertTrue("the held repeat debounces a forward step", positionMs > origin)
+        val committed = positionMs
+        compose.settleFrames(6)
+        assertEquals("release never restarts automatic motion", committed, positionMs)
+    }
+
+    @Test fun scrubReversesAtFirstSpeedStepsWithDpadAndCommitsAtBothEdges() {
+        screen()
+        playing()
+        key(Key.MediaFastForward)
+        key(Key.MediaFastForward)
+        key(Key.MediaRewind)
+        assertTrue(description("recording-seek-preview").contains("Rewind, 2 times"))
+        val origin = positionMs
+        key(Key.DirectionLeft)
+        compose.settleFrames(12)
+        assertTrue("Left continues from the scrub target and debounces", positionMs < origin)
+        assertFalse("automatic preview stops when D-pad takes over", exists("recording-seek-preview"))
+        key(Key.Back)
+        positionMs = 1_050L
+        settle()
+        key(Key.MediaRewind)
+        assertEquals("the beginning commits at the first second", 1_000L, positionMs)
+        assertTrue(player.playWhenReady)
+        key(Key.Back)
+        positionMs = 3_599_950L
+        settle()
+        key(Key.MediaFastForward)
+        assertEquals("the end commits at the end", 3_600_000L, positionMs)
+        assertTrue(player.playWhenReady)
+    }
+
     @Test fun steppingAgainAccumulatesTheOffsetFromWhereSteppingStartedAndNamesTheTarget() {
         screen()
         playing()
@@ -329,44 +411,33 @@ class RecordingPlayerChromeScreenTest {
         assertTrue("the step previews in the Banner", exists("player-banner"))
         assertFalse(exists("player-actions"))
         assertFalse("no focusable seekbar in the Banner", exists("player-seekbar"))
-        assertEquals("30 seconds back, target 0:09:30. Total 1:00:00.",
+        assertEquals("10 seconds back, target 0:09:50. Total 1:00:00.",
             spokenStep("recording-seek-preview"))
         repeat(8) { settle() }
         assertFalse("the entry Banner timed out", exists("player-banner"))
-        for ((step, target) in listOf(Key.MediaRewind to "30 seconds back, target 0:09:30", Key.MediaFastForward to "30 seconds forward, target 0:10:30")) {
-            positionMs = 600_000L
-            settle()
-            compose.onRoot().performKeyInput { pressKey(step) }
-            compose.mainClock.advanceTimeBy(100)
-            compose.waitForIdle()
-            assertTrue("the step previews in the Banner", exists("player-banner"))
-            assertTrue(spokenStep("recording-seek-preview").startsWith(target))
-            repeat(8) { settle() }
-            assertFalse("the Banner hides again", exists("player-banner"))
-        }
         positionMs = 600_000L
         settle()
-        compose.onRoot().performKeyInput { pressKey(Key.MediaFastForward) }
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
         compose.mainClock.advanceTimeBy(100)
         compose.waitForIdle()
         assertTrue(texts("+0:30"))
-        compose.onRoot().performKeyInput { pressKey(Key.MediaFastForward) }
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
         compose.mainClock.advanceTimeBy(100)
         compose.waitForIdle()
         assertTrue("the label reads the offset from the start", texts("+1:00"))
         assertEquals("0:11:00", compose.onNodeWithTag("timeshift-preview-target-position", useUnmergedTree = true)
             .fetchSemanticsNode().config[SemanticsProperties.Text].joinToString { it.text })
         assertTrue(spokenStep("recording-seek-preview").startsWith("1 minute forward, target 0:11:00"))
-        compose.onRoot().performKeyInput { pressKey(Key.MediaRewind) }
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionLeft) }
         compose.mainClock.advanceTimeBy(100)
         compose.waitForIdle()
-        assertTrue("stepping back reduces the offset", texts("+0:30"))
+        assertTrue("stepping back reduces the offset by ten seconds", texts("+0:50"))
         // Finish the previous burst before checking a new burst's announcement window.
         repeat(8) { settle() }
         positionMs = 600_000L
         settle()
         repeat(3) {
-            compose.onRoot().performKeyInput { pressKey(Key.MediaFastForward) }
+            compose.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
             compose.mainClock.advanceTimeBy(100)
             compose.waitForIdle()
             assertEquals("a held key announces nothing while it steps", "", description("recording-seek-preview"))
@@ -396,6 +467,16 @@ class RecordingPlayerChromeScreenTest {
         assertFalse(player.playWhenReady)
         repeat(8) { settle() }
         assertTrue("paused: the Banner stays past its timeout", exists("player-banner"))
+        for (mediaKey in listOf(Key.MediaPlay, Key.MediaPause, Key.MediaPlayPause)) {
+            val before = player.playWhenReady
+            key(mediaKey)
+            assertEquals("a hidden media key toggles like OK", !before, player.playWhenReady)
+            assertTrue(exists("player-banner"))
+            assertFalse(exists("player-actions"))
+        }
+        key(Key.MediaRecord)
+        assertTrue("Record is inert during recording playback", player.playWhenReady)
+        key(Key.MediaPause)
         key(Key.DirectionCenter)
         assertTrue(player.playWhenReady)
         repeat(6) { settle() }

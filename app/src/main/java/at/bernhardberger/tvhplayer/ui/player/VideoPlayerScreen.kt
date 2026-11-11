@@ -99,7 +99,17 @@ import at.bernhardberger.tvhplayer.core.PlayerSurface
 import at.bernhardberger.tvhplayer.core.playerKeyAction
 import at.bernhardberger.tvhplayer.core.playerKeyActionStartsOpeningCycle
 import at.bernhardberger.tvhplayer.core.programmeRecordingTarget
-import at.bernhardberger.tvhplayer.core.seekStepMs
+import at.bernhardberger.tvhplayer.core.BrowseContextAction
+import at.bernhardberger.tvhplayer.core.programmeDetailsActions
+import at.bernhardberger.tvhplayer.core.chooseDvrConfig
+import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
+import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.SessionState
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.type
+import at.bernhardberger.tvhplayer.core.livePauseAccepted
+import at.bernhardberger.tvhplayer.core.playbackSeekStepMs
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
 import at.bernhardberger.tvheadend.sdk.media3.LivePlaybackObservation
 import at.bernhardberger.tvheadend.sdk.media3.LiveTimeshiftState
@@ -417,6 +427,8 @@ fun VideoPlayerScreen(
     // The control last focused in the controls, which closing Info returns to.
     var lastChromeAction by remember { mutableStateOf<String?>(null) }
     var infoReturnAction by remember { mutableStateOf<String?>(null) }
+    var infoInitialAction by remember { mutableStateOf<BrowseContextAction?>(null) }
+    var recordKeyInFlight by remember { mutableStateOf(false) }
     // The control focused when number entry took the keys over the controls; focus returns there.
     var numberEntryReturnAction by remember { mutableStateOf<String?>(null) }
     // The control last focused in the controls, the live timeline included.
@@ -765,6 +777,7 @@ fun VideoPlayerScreen(
     PersistConfirmedChannel(confirmedPlayingChannelId, channelScope, observation, lastPlayedChannelStore)
 
     fun openInfo(fromKey: Boolean = false) {
+        infoInitialAction = null
         infoRailChannelId = null
         infoReturnAction = if (fromKey && !layerState.core.chrome.controlsVisible) null else "player-info"
         layerState.core.restoreInfoFocus = false
@@ -824,11 +837,12 @@ fun VideoPlayerScreen(
     }
 
     @Composable
-    fun timeshiftSeekAction(): (Long) -> Unit {
+    fun timeshiftSeekAction(automatic: Boolean = false): (Long) -> Unit {
         val expiredText = stringResource(R.string.timeshift_target_expired)
         val replacedText = stringResource(R.string.timeshift_target_replaced)
         val uncertainText = stringResource(R.string.timeshift_seek_uncertain)
         return { deltaMs ->
+            if (!automatic) timelineState.stopScrub()
             timelineState.queueRelativeSeek(
                 state = effectiveTimeshiftState,
                 requestedDeltaMs = deltaMs,
@@ -841,6 +855,40 @@ fun VideoPlayerScreen(
         }
     }
     val queueTimeshiftSeek = timeshiftSeekAction()
+    val queueScrubSeek by rememberUpdatedState(timeshiftSeekAction(automatic = true))
+    val latestTimeshift by rememberUpdatedState(effectiveTimeshiftState)
+    fun commitScrub() {
+        timelineState.commitPendingSeek { dispatchPlaybackAction(MediaPlaybackAction.PLAY) }
+    }
+    LaunchedEffect(timelineState, timelineState.scrubSpeed) {
+        val speed = timelineState.scrubSpeed
+        if (speed == 0) return@LaunchedEffect
+        var previous = withFrameNanos { it }
+        var remainder = 0L
+        while (timelineState.scrubSpeed == speed) {
+            val frame = withFrameNanos { it }
+            if (timelineState.scrubSpeed != speed) break
+            val scaled = (frame - previous) * speed + remainder
+            val delta = scaled / 1_000_000L
+            remainder = scaled % 1_000_000L
+            previous = frame
+            val state = latestTimeshift
+            if (!state.available) {
+                timelineState.cancelPendingSeek()
+                break
+            }
+            val target = timelineState.preview?.decision?.targetMs ?: state.positionMs
+            val start = (state.bufferStartMs + 1_000L).coerceAtMost(state.liveEdgeMs)
+            val next = (target + delta).coerceIn(start, state.liveEdgeMs)
+            queueScrubSeek(next - target)
+            if ((speed < 0 && next <= start) || (speed > 0 && next >= state.liveEdgeMs)) {
+                commitScrub()
+                break
+            }
+        }
+    }
+    var scrubKeyHeld by remember { mutableStateOf(false) }
+    var scrubKeyCode by remember { mutableStateOf<Int?>(null) }
 
     /**
      * Runs a key's start now, before this key's recomposition or controls reveal. It
@@ -1057,6 +1105,48 @@ fun VideoPlayerScreen(
             currentChannelId,
             kotlin.time.Instant.fromEpochSeconds(nowSec),
         )
+    }
+    val committedWindow = if (at.bernhardberger.tvhplayer.BuildConfig.PROGRAMME_WINDOW_B) {
+        programmeWindow(effectiveTimeshiftState) { observation.eventAt(currentChannelId, it) }
+    } else null
+    val displayedWindow = if (at.bernhardberger.tvhplayer.BuildConfig.PROGRAMME_WINDOW_B) {
+        visibleSeekPreview?.let { preview ->
+            programmeWindow(effectiveTimeshiftState, preview.target, preview.mappingTimeline) {
+                observation.eventAt(currentChannelId, it)
+            }
+        } ?: committedWindow.takeIf { visibleSeekPreview == null }
+    } else null
+    val infoEvent = displayedProgrammeEvent(visibleSeekPreview != null, displayedWindow,
+        committedWindow, effectiveTimeshiftState, nowEvent, liveStart)
+
+    fun recordProgramme() {
+        if (recordKeyInFlight) return
+        val programme = infoEvent ?: return
+        val opening = observation
+        val capability = opening.currentSession ?: return
+        val recording = opening.dvrEntryForEvent(programme)?.takeUnless(::recordingWasRemoved)
+        val canModify = opening.dvrState is DvrRepositoryState.Current &&
+            (opening.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
+        val actions = programmeDetailsActions(programme, nowSec, recording,
+            recording?.let(opening::recordingPlaybackAdmission), canModify,
+            programme.channelId?.let(opening::channel) != null, liveProgramme = opening.event(programme.id) != null)
+        if (BrowseContextAction.RECORD !in actions) return
+        val mutation = DvrMutationAction.CreateProgramme(programme.programmeRecordingTarget(capability), null)
+        recordKeyInFlight = true
+        scope.launch {
+            try {
+                val preferred = uiSettingsStore.settings.first().recordingProfileId
+                val current = session.observation.value
+                val request = currentDvrMutation(mutation, opening, current) as? DvrMutationAction.CreateProgramme ?: return@launch
+                if (current.dvrEntryForEvent(programme)?.state in listOf(DvrEntryState.SCHEDULED,
+                        DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)) return@launch
+                val configured = request.copy(configId = chooseDvrConfig(current.currentDvrConfigurations(), preferred))
+                val context = notices.context()
+                notices.postDvrFailure(configured, dvrMutationActions.execute(configured), context)
+            } finally {
+                recordKeyInFlight = false
+            }
+        }
     }
     @Composable
     fun currentChannelNumber() = remember(channels, currentChannelId) {
@@ -1383,7 +1473,39 @@ fun VideoPlayerScreen(
                     drawerOpen = showDrawer,
                     confirmationOpen = foregroundLayer == PlayerForegroundLayer.CONFIRMATION,
                     livePause = livePauseAvailability,
+                    scrubbing = timelineState.scrubSpeed != 0,
+                    programmeRecording = infoEvent?.let(observation::dvrEntryForEvent)?.state in
+                        listOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR),
                 )
+                val dedicatedAction = playerKeyAction(keyContext, keyCode)
+                if (dedicatedAction in listOf(PlayerKeyAction.SCRUB_BACK, PlayerKeyAction.SCRUB_FORWARD) ||
+                    (dedicatedAction == PlayerKeyAction.PEEK_BANNER && keyCode in listOf(
+                        AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD, AndroidKeyEvent.KEYCODE_MEDIA_REWIND))) {
+                    val direction = if (keyCode == AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD) 1 else -1
+                    if (dedicatedAction == PlayerKeyAction.PEEK_BANNER) {
+                        if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
+                            if (livePauseUnavailable(livePauseAvailability)) showPauseUnavailable()
+                            layerState.core.chrome.peekBanner()
+                        }
+                    } else if (event.type == KeyEventType.KeyDown) {
+                        if (event.nativeKeyEvent.repeatCount == 0) {
+                            scrubKeyCode = keyCode
+                            scrubKeyHeld = false
+                        } else if (scrubKeyCode == keyCode) {
+                            scrubKeyHeld = true
+                            queueTimeshiftSeek(playbackSeekStepMs(direction, event.nativeKeyEvent.repeatCount))
+                            layerState.core.chrome.peekBanner()
+                        }
+                    } else if (event.type == KeyEventType.KeyUp && scrubKeyCode == keyCode) {
+                        scrubKeyCode = null
+                        if (!scrubKeyHeld && !event.nativeKeyEvent.isCanceled) {
+                            timelineState.startScrub(direction)
+                            queueScrubSeek(direction.toLong())
+                            layerState.core.chrome.peekBanner()
+                        }
+                    }
+                    return@onPreviewKeyEvent true
+                }
                 layerState.core.handleOverlayKey(
                     event = event,
                     keyContext = keyContext,
@@ -1402,6 +1524,19 @@ fun VideoPlayerScreen(
                     repeatCount = event.nativeKeyEvent.repeatCount,
                 )
                 if (mediaAction != MediaPlaybackAction.NONE) {
+                    if (timelineState.scrubSpeed != 0) {
+                        layerState.core.beginOpeningKeyCycle(keyCode)
+                        commitScrub()
+                        return@onPreviewKeyEvent true
+                    }
+                    if (!layerState.core.chrome.controlsVisible) {
+                        layerState.core.beginOpeningKeyCycle(keyCode)
+                        if (livePauseAccepted(effectiveTimeshiftState.available, livePauseAvailability)) {
+                            dispatchPlaybackAction(MediaPlaybackAction.TOGGLE)
+                        } else if (livePauseUnavailable(livePauseAvailability)) showPauseUnavailable()
+                        layerState.core.chrome.peekBanner()
+                        return@onPreviewKeyEvent true
+                    }
                     when (liveMediaKeyAction(effectiveTimeshiftState.available, livePauseAvailability)) {
                         LiveMediaKeyAction.DISPATCH -> {
                             layerState.core.beginOpeningKeyCycle(keyCode)
@@ -1466,6 +1601,25 @@ fun VideoPlayerScreen(
                     layerState.core.beginOpeningKeyCycle(keyCode)
                 }
                 when (keyAction) {
+                    PlayerKeyAction.COMMIT_SCRUB -> {
+                        layerState.core.beginOpeningKeyCycle(keyCode)
+                        commitScrub()
+                        return@onPreviewKeyEvent true
+                    }
+                    PlayerKeyAction.SCHEDULE_PROGRAMME -> {
+                        layerState.core.beginOpeningKeyCycle(keyCode)
+                        recordProgramme()
+                        return@onPreviewKeyEvent true
+                    }
+                    PlayerKeyAction.OPEN_RECORDING_INFO -> {
+                        openInfo(fromKey = true)
+                        infoInitialAction = if (infoEvent?.let(observation::dvrEntryForEvent)?.state == DvrEntryState.SCHEDULED)
+                            BrowseContextAction.CANCEL else BrowseContextAction.STOP
+                        return@onPreviewKeyEvent true
+                    }
+                    PlayerKeyAction.SCRUB_BACK,
+                    PlayerKeyAction.SCRUB_FORWARD,
+                    PlayerKeyAction.CONSUME -> return@onPreviewKeyEvent true
                     PlayerKeyAction.DISMISS_OVERLAY_ONLY -> {
                         when {
                             layerState.core.infoOpen -> {
@@ -1504,13 +1658,13 @@ fun VideoPlayerScreen(
                     // Options keys are decided before the overlays above can claim them.
                     PlayerKeyAction.OPEN_OPTIONS -> Unit
                     PlayerKeyAction.SEEK_BACK -> {
-                        queueTimeshiftSeek(-seekStepMs(event.nativeKeyEvent.repeatCount))
+                        queueTimeshiftSeek(playbackSeekStepMs(-1, event.nativeKeyEvent.repeatCount))
                         // A quick step on the hidden player shows its preview in the Banner.
                         layerState.core.chrome.peekBanner()
                         return@onPreviewKeyEvent true
                     }
                     PlayerKeyAction.SEEK_FORWARD -> {
-                        queueTimeshiftSeek(seekStepMs(event.nativeKeyEvent.repeatCount))
+                        queueTimeshiftSeek(playbackSeekStepMs(1, event.nativeKeyEvent.repeatCount))
                         layerState.core.chrome.peekBanner()
                         return@onPreviewKeyEvent true
                     }
@@ -1556,21 +1710,9 @@ fun VideoPlayerScreen(
     val currentChannel = remember(observation, currentChannelId) {
         observation.channel(currentChannelId)
     }
-    val committedWindow = if (at.bernhardberger.tvhplayer.BuildConfig.PROGRAMME_WINDOW_B) {
-        programmeWindow(effectiveTimeshiftState) { observation.eventAt(currentChannelId, it) }
-    } else null
-    val displayedWindow = if (at.bernhardberger.tvhplayer.BuildConfig.PROGRAMME_WINDOW_B) {
-        visibleSeekPreview?.let { preview ->
-            programmeWindow(effectiveTimeshiftState, preview.target, preview.mappingTimeline) {
-                observation.eventAt(currentChannelId, it)
-            }
-        } ?: committedWindow.takeIf { visibleSeekPreview == null }
-    } else null
     // A slot window (no programme at the position) is an axis only: it has no Next line.
     val infoNextEvent = displayedNextEvent(visibleSeekPreview != null, displayedWindow,
         effectiveTimeshiftState, nextEvent, liveStart, nowEvent) { observation.nextEvent(currentChannelId, it) }
-    val infoEvent = displayedProgrammeEvent(visibleSeekPreview != null, displayedWindow,
-        committedWindow, effectiveTimeshiftState, nowEvent, liveStart)
     @Composable
     fun chromeContent(): PlayerChromeContent {
     val unavailableTitle = stringResource(R.string.no_epg)
@@ -1650,6 +1792,7 @@ fun VideoPlayerScreen(
                 stepSettled = visibleSeekPreview?.dispatched == true,
                 onStepAnnounced = onStepAnnounced,
                 stepId = previewId,
+                scrubSpeed = timelineState.scrubSpeed,
                 liveStart = liveStart,
                 liveAvailable = !channelUnavailable,
                 feedback = timelineState.feedback,
@@ -1794,6 +1937,7 @@ fun VideoPlayerScreen(
                 event = detailsBaseEvent, channel = detailsChannel, observation = observation,
                 currentObservation = { session.observation.value }, nowSec = nowSec,
                 mutations = dvrMutationActions, notices = notices, mutationScope = scope,
+                initialAction = infoInitialAction,
                 settingsStore = uiSettingsStore,
                 onPlay = { id, _ -> channels.firstOrNull { it.id == id }?.let(onPickChannel) },
                 onShowGuide = onShowGuide, onClose = ::closeInfo,

@@ -51,6 +51,7 @@ internal fun ProgrammeDetailsHost(
     settingsStore: UiSettingsStore = koinInject(),
     retainPlayerSnapshot: Boolean = false,
     onContinueWatching: (() -> Unit)? = null,
+    initialAction: BrowseContextAction? = null,
 ) {
     val closeBehindPlayer = rememberCloseBehindPlayer()
     val entryPending = rememberPlayerEntryPending()
@@ -72,7 +73,7 @@ internal fun ProgrammeDetailsHost(
     var selected by remember { mutableStateOf(openingEvent) }
     var stack by remember { mutableStateOf<List<Triple<EpgEvent, EventId, BrowseContextAction?>>>(emptyList()) }
     var returnCard by remember { mutableStateOf<EventId?>(null) }
-    var returnAction by remember { mutableStateOf<BrowseContextAction?>(null) }
+    var returnAction by remember { mutableStateOf(initialAction) }
     var pending by remember { mutableStateOf<DvrMutationAction?>(null) }
     var pendingAction by remember { mutableStateOf<ProgrammeAction?>(null) }
     var pendingEntries by remember { mutableStateOf<DvrEventEntries?>(null) }

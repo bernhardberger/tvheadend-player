@@ -27,6 +27,7 @@ import at.bernhardberger.tvhplayer.core.completeTimeshiftSeekDispatch
 import at.bernhardberger.tvhplayer.core.playerPlaybackProgressing
 import at.bernhardberger.tvhplayer.core.recordingSeekFeedbackSettled
 import at.bernhardberger.tvhplayer.core.recordingStackedSeekTarget
+import at.bernhardberger.tvhplayer.core.nextPlayerScrubSpeed
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
@@ -79,6 +80,7 @@ private class LiveTimelineSourceGeneration(
     var clearWhenAnnounced: SeekStepId? = null
     var seekQueuedAtMs = 0L
     var commitRequested = false
+    var resumeAfterSeek: (() -> Unit)? = null
     var positionSampleEpoch = 0L
     var positionCommandsInFlight = 0
     val seekWake = Channel<Unit>(Channel.CONFLATED)
@@ -103,6 +105,18 @@ internal class LiveTimelinePresentationState(
     private val sourceGenerations = mutableSetOf(sourceGeneration)
     private var disposed = false
 
+    var scrubSpeed by mutableStateOf(0)
+        private set
+
+    fun startScrub(direction: Int) {
+        if (!disposed) scrubSpeed = nextPlayerScrubSpeed(scrubSpeed, direction)
+    }
+
+    fun stopScrub() {
+        scrubSpeed = 0
+        sourceGeneration.seekWake.trySend(Unit)
+    }
+
     var nowEpochSec by mutableLongStateOf(currentEpochMillis() / 1_000L)
         private set
     var playbackProgressing by mutableStateOf(false)
@@ -121,7 +135,7 @@ internal class LiveTimelinePresentationState(
         get() = sourceGeneration.historyStartTimeline
 
     val seekPending: Boolean
-        get() = sourceGeneration.seekQueue.pendingDeltaMs != 0L
+        get() = scrubSpeed != 0 || sourceGeneration.seekQueue.pendingDeltaMs != 0L
 
     fun seekPreviewPhase(controlsVisible: Boolean): PlayerSeekPreviewPhase = when {
         preview == null -> PlayerSeekPreviewPhase.NONE
@@ -301,6 +315,10 @@ internal class LiveTimelinePresentationState(
         generation.seekJob = scope.launch {
             try {
                 while (true) {
+                    if (!generation.commitRequested && scrubSpeed != 0) {
+                        generation.seekWake.receive()
+                        continue
+                    }
                     val debounceRemainingMs = (
                         generation.seekQueuedAtMs + TIMESHIFT_SEEK_DEBOUNCE_MS -
                             monotonicTimeMillis()
@@ -345,11 +363,14 @@ internal class LiveTimelinePresentationState(
                     }
                     val command = completed?.command
                     val accepted = command === TimeshiftCommandResult.ACCEPTED && completed.seek != null
+                    val resumeAfterSeek = generation.resumeAfterSeek
+                    generation.resumeAfterSeek = null
                     generation.seekQueue = completeTimeshiftSeekDispatch(
                         generation.seekQueue,
                         accepted,
                     )
                     if (generation !== sourceGeneration) break
+                    if (accepted) resumeAfterSeek?.invoke()
                     if (generation.preview?.token == dispatchToken || !accepted) {
                         // Rejection discards stacked input too; explain that outcome rather
                         // than silently removing the newer preview. Preserve unrelated feedback.
@@ -419,8 +440,10 @@ internal class LiveTimelinePresentationState(
     }
 
     fun cancelPendingSeek() {
+        stopScrub()
         val generation = sourceGeneration
         generation.commitRequested = false
+        generation.resumeAfterSeek = null
         generation.seekQueue = cancelPendingTimeshiftSeek(generation.seekQueue)
         generation.pendingContentTarget = null
         generation.seekToken++
@@ -443,14 +466,26 @@ internal class LiveTimelinePresentationState(
         if (generation.clearWhenAnnounced === id) clearPreview(generation)
     }
 
-    fun commitPendingSeek() {
+    fun commitPendingSeek() = commitPendingSeek(null)
+
+    fun commitPendingSeek(resumeAfterSeek: (() -> Unit)?) {
+        stopScrub()
         val generation = sourceGeneration
-        if (disposed || generation.seekQueue.pendingDeltaMs == 0L) return
+        if (disposed) return
+        if (generation.seekQueue.pendingDeltaMs == 0L) {
+            if (resumeAfterSeek != null) {
+                cancelPendingSeek()
+                resumeAfterSeek()
+            }
+            return
+        }
+        generation.resumeAfterSeek = resumeAfterSeek
         generation.commitRequested = true
         generation.seekWake.trySend(Unit)
     }
 
     fun invalidateForSourceChange() {
+        stopScrub()
         val previousGeneration = sourceGeneration
         previousGeneration.seekJob?.cancel()
         previousGeneration.seekJob = null
@@ -481,6 +516,7 @@ internal class LiveTimelinePresentationState(
     }
 
     fun dispose() {
+        stopScrub()
         disposed = true
         sourceGenerations.toList().forEach { generation ->
             generation.seekJob?.cancel()
@@ -492,6 +528,7 @@ internal class LiveTimelinePresentationState(
     }
 
     private fun clearPreview(generation: LiveTimelineSourceGeneration) {
+        if (generation === sourceGeneration) stopScrub()
         generation.previewDismissalEpoch++
         generation.seekFeedbackJob?.cancel()
         generation.seekFeedbackJob = null
@@ -561,8 +598,22 @@ internal class RecordingTimelinePresentationState(
         private set
     private val currentEpochMillis = currentEpochMillis
     private var seekJob: Job? = null
+    private var seekFeedbackJob: Job? = null
     private var seekToken = 0
     private var disposed = false
+
+    var scrubSpeed by mutableStateOf(0)
+        private set
+
+    fun startScrub(direction: Int) {
+        if (disposed || !currentCanSeek()) return
+        scrubSpeed = nextPlayerScrubSpeed(scrubSpeed, direction)
+        queueSeek(direction.toLong(), automatic = true)
+    }
+
+    fun stopScrub() {
+        scrubSpeed = 0
+    }
 
     /** The step being collected or dispatched; every queued step is a new one, also unseen by composition. */
     var stepId by mutableStateOf<SeekStepId?>(null)
@@ -601,7 +652,8 @@ internal class RecordingTimelinePresentationState(
         else -> PlayerSeekPreviewPhase.PENDING
     }
 
-    fun queueSeek(deltaMs: Long) {
+    fun queueSeek(deltaMs: Long, automatic: Boolean = false) {
+        if (!automatic) stopScrub()
         if (disposed || !currentCanSeek()) return
         val currentPosition = currentPositionMs().coerceAtLeast(0L)
         if (pendingTargetMs == null) pendingOriginMs = currentPosition
@@ -617,22 +669,17 @@ internal class RecordingTimelinePresentationState(
         val token = seekToken
         stepId = SeekStepId()
         seekJob?.cancel()
+        seekFeedbackJob?.cancel()
+        if (automatic) return
         seekJob = scope.launch {
             delay(RECORDING_SEEK_DEBOUNCE_MS)
             if (token != seekToken) return@launch
             commitPendingSeek()
-            delay(RECORDING_SEEK_FEEDBACK_MIN_MS)
-            while (!feedbackSettled()) {
-                delay(RECORDING_SEEK_FEEDBACK_POLL_MS)
-            }
-            delay(RECORDING_SEEK_FEEDBACK_SETTLED_GRACE_MS)
-            if (token != seekToken) return@launch
-            clearPendingState()
-            seekJob = null
         }
     }
 
     fun commitPendingSeek() {
+        stopScrub()
         if (disposed || pendingDispatched) return
         val target = pendingTargetMs ?: return
         if (!currentCanSeek()) {
@@ -641,12 +688,27 @@ internal class RecordingTimelinePresentationState(
         }
         pendingDispatched = true
         seekAbsolute(target)
+        val token = seekToken
+        seekFeedbackJob?.cancel()
+        seekFeedbackJob = scope.launch {
+            delay(RECORDING_SEEK_FEEDBACK_MIN_MS)
+            while (!feedbackSettled()) {
+                delay(RECORDING_SEEK_FEEDBACK_POLL_MS)
+            }
+            delay(RECORDING_SEEK_FEEDBACK_SETTLED_GRACE_MS)
+            if (token != seekToken) return@launch
+            clearPendingState()
+            seekFeedbackJob = null
+        }
     }
 
     fun cancelPendingSeek() {
+        stopScrub()
         seekToken++
         seekJob?.cancel()
         seekJob = null
+        seekFeedbackJob?.cancel()
+        seekFeedbackJob = null
         clearPendingState()
     }
 
@@ -668,10 +730,13 @@ internal class RecordingTimelinePresentationState(
     }
 
     fun dispose() {
+        stopScrub()
         disposed = true
         seekToken++
         seekJob?.cancel()
         seekJob = null
+        seekFeedbackJob?.cancel()
+        seekFeedbackJob = null
     }
 
     private fun clearPendingState() {

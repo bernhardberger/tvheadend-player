@@ -76,6 +76,7 @@ internal sealed interface PlayerChromeTimeline {
         val onStepAnnounced: () -> Unit = {},
         /** The step's identity, told from the one before even if no composition saw the pending state between. */
         val stepId: Any? = null,
+        val scrubSpeed: Int = 0,
         /**
          * A live start that has had no pause or timeshift command since, such as right after a zap: it
          * plays the live edge, whether its timing is known yet or not.
@@ -113,6 +114,7 @@ internal sealed interface PlayerChromeTimeline {
         val stepSettled: Boolean = false,
         /** The step's identity, as for the live timeline. */
         val stepId: Any? = null,
+        val scrubSpeed: Int = 0,
         /** The recording's marks, drawn on the bar. */
         val marks: List<at.bernhardberger.tvhplayer.core.RecordingMark> = emptyList(),
         /** The marks row's stops; empty while the recording cannot be sought by mark. */

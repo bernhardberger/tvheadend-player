@@ -43,6 +43,7 @@ internal fun TimeshiftSeekPreviewTimeline(
     onAnnounced: () -> Unit = {},
     /** The step's identity: the seek state's preview. */
     stepId: Any? = null,
+    scrubSpeed: Int = 0,
 ) {
     val targetState = projectedTimeshiftState(state, decision.targetMs)
     val range = timeshiftSeekbarRange(targetState)
@@ -71,7 +72,7 @@ internal fun TimeshiftSeekPreviewTimeline(
     val description = liveStepDescription(decision.deltaMs, readout, targetClock != null, behindLiveLabel, bufferStartDescription)
     val unavailableTarget = stringResource(R.string.timeshift_target_expired)
     // The buffer's length ticks; it is read when the step settles and does not announce the step again.
-    val spoken = rememberSettledStep(
+    val spoken = scrubSpeedDescription(scrubSpeed) ?: rememberSettledStep(
         identity = stepId,
         key = "${readout.text}|${readout.target}",
         settled = settled,
@@ -109,7 +110,7 @@ internal fun TimeshiftSeekPreviewTimeline(
         status = barStatus,
         leadingLabelTestTag = "timeshift-preview-buffer-start",
         trailingLabelTestTag = "timeshift-preview-position",
-        previewLabel = readout.text,
+        previewLabel = scrubSpeedLabel(scrubSpeed) ?: readout.text,
         previewTarget = readout.target,
         previewAtLive = readout.atLive,
         previewDirection = stepDirection(decision.deltaMs),

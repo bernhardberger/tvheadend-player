@@ -289,6 +289,10 @@ class SeekbarPolicyTest {
         assertEquals(120_000L, seekStepMs(4))
         assertEquals(120_000L, seekStepMs(11))
         assertEquals(300_000L, seekStepMs(12))
+        for ((repeat, magnitude) in listOf(0 to 10_000L, 3 to 10_000L, 4 to 120_000L, 11 to 120_000L, 12 to 300_000L)) {
+            assertEquals(-magnitude, playbackSeekStepMs(-1, repeat))
+            assertEquals(seekStepMs(repeat), playbackSeekStepMs(1, repeat))
+        }
     }
 
     @Test

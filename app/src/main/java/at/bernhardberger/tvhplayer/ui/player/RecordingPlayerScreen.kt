@@ -32,6 +32,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -71,7 +72,7 @@ import at.bernhardberger.tvhplayer.core.PlayerKeyAction
 import at.bernhardberger.tvhplayer.core.PlayerKeyContext
 import at.bernhardberger.tvhplayer.core.playerKeyAction
 import at.bernhardberger.tvhplayer.core.playerKeyActionStartsOpeningCycle
-import at.bernhardberger.tvhplayer.core.seekStepMs
+import at.bernhardberger.tvhplayer.core.playbackSeekStepMs
 import at.bernhardberger.tvhplayer.core.mediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.playerBackAction
 import at.bernhardberger.tvhplayer.core.playerControlsAutoHideEligible
@@ -93,7 +94,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
-private const val RECORDING_SHORT_SEEK_MS = 30_000L
 private const val RECORDING_LONG_SEEK_MS = 10 * 60_000L
 private const val RECORDING_CONTROLS_AUTO_HIDE_MS = 5_000L
 
@@ -288,6 +288,40 @@ fun RecordingPlayerScreen(
         timelineState.queueSeek(deltaMs)
     }
 
+    fun commitScrub() {
+        timelineState.commitPendingSeek()
+        session.play()
+    }
+
+    LaunchedEffect(timelineState, timelineState.scrubSpeed) {
+        val speed = timelineState.scrubSpeed
+        if (speed == 0) return@LaunchedEffect
+        var previous = withFrameNanos { it }
+        var remainder = 0L
+        while (timelineState.scrubSpeed == speed) {
+            val frame = withFrameNanos { it }
+            if (timelineState.scrubSpeed != speed) break
+            val scaled = (frame - previous) * speed + remainder
+            val delta = scaled / 1_000_000L
+            remainder = scaled % 1_000_000L
+            previous = frame
+            val target = timelineState.pendingTargetMs ?: break
+            val end = player.duration.takeIf { it > 0L && it != C.TIME_UNSET }
+            val next = (target + delta).coerceAtLeast(1_000L).let { if (end != null) it.coerceAtMost(end) else it }
+            timelineState.queueSeek(next - target, automatic = true)
+            if (!player.isCurrentMediaItemSeekable) {
+                timelineState.cancelPendingSeek()
+                break
+            }
+            if ((speed < 0 && next <= 1_000L) || (speed > 0 && end != null && next >= end)) {
+                commitScrub()
+                break
+            }
+        }
+    }
+    var scrubKeyHeld by remember { mutableStateOf(false) }
+    var scrubKeyCode by remember { mutableStateOf<Int?>(null) }
+
     fun applyKeyAction(
         action: PlayerKeyAction,
         keyCode: Int,
@@ -295,6 +329,16 @@ fun RecordingPlayerScreen(
     ): Boolean = when (action) {
         PlayerKeyAction.PASS_THROUGH,
         PlayerKeyAction.OPEN_CHANNELS -> false
+        PlayerKeyAction.CONSUME,
+        PlayerKeyAction.SCHEDULE_PROGRAMME,
+        PlayerKeyAction.OPEN_RECORDING_INFO,
+        PlayerKeyAction.SCRUB_BACK,
+        PlayerKeyAction.SCRUB_FORWARD -> true // Dedicated key cycles are handled before the down-only overlay dispatch.
+        PlayerKeyAction.COMMIT_SCRUB -> {
+            layers.beginOpeningKeyCycle(keyCode)
+            commitScrub()
+            true
+        }
         PlayerKeyAction.REVEAL_CONTROLS -> {
             if (timelineState.seekPending) {
                 timelineState.commitPendingSeek()
@@ -329,13 +373,13 @@ fun RecordingPlayerScreen(
         // The options keys reach the layers before any other key action.
         PlayerKeyAction.OPEN_OPTIONS -> false
         PlayerKeyAction.SEEK_BACK -> {
-            seekBy(-seekStepMs(repeatCount))
+            seekBy(playbackSeekStepMs(-1, repeatCount))
             // A quick step on the hidden player shows its preview in the Banner.
             chrome.peekBanner()
             true
         }
         PlayerKeyAction.SEEK_FORWARD -> {
-            seekBy(seekStepMs(repeatCount))
+            seekBy(playbackSeekStepMs(1, repeatCount))
             chrome.peekBanner()
             true
         }
@@ -346,6 +390,7 @@ fun RecordingPlayerScreen(
         controlsVisible = chrome.controlsVisible,
         seekbarFocused = false,
         timeshiftAvailable = false,
+        scrubbing = timelineState.scrubSpeed != 0,
     )
 
     fun recordingKeyAction(keyCode: Int): PlayerKeyAction = playerKeyAction(recordingKeyContext(), keyCode)
@@ -522,6 +567,7 @@ fun RecordingPlayerScreen(
                             Triple(markerNavigation, markerNavigation.ownerRevision, markerNavigation.restoration)
                             else foregroundLayer to layers.optionsPage)) return@onPreviewKeyEvent true
                 val keyCode = event.nativeKeyEvent.keyCode
+                if (keyCode == AndroidKeyEvent.KEYCODE_MEDIA_RECORD) return@onPreviewKeyEvent true
                 // OK belongs to the focused prompt; everywhere else it keeps pausing.
                 if (foregroundLayer == PlayerForegroundLayer.SKIP_PROMPT && event.key in RecordingSkipActivationKeys) {
                     return@onPreviewKeyEvent false
@@ -550,6 +596,28 @@ fun RecordingPlayerScreen(
                 // A focused Compose target swallows the Back cycle on the TV before the
                 // BackHandler can fire, so Back is decided here. Menu, audio-track and captions
                 // keys reach the options from any layer; a recording's quick list is always there.
+                if (layers.optionsPage == null && foregroundLayer != PlayerForegroundLayer.RECOVERY &&
+                    foregroundLayer != PlayerForegroundLayer.TERMINAL_ERROR &&
+                    keyCode in listOf(AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD, AndroidKeyEvent.KEYCODE_MEDIA_REWIND)) {
+                    val direction = if (keyCode == AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD) 1 else -1
+                    if (event.type == KeyEventType.KeyDown) {
+                        if (event.nativeKeyEvent.repeatCount == 0) {
+                            scrubKeyCode = keyCode
+                            scrubKeyHeld = false
+                        } else if (scrubKeyCode == keyCode) {
+                            scrubKeyHeld = true
+                            seekBy(playbackSeekStepMs(direction, event.nativeKeyEvent.repeatCount))
+                            chrome.peekBanner()
+                        }
+                    } else if (event.type == KeyEventType.KeyUp && scrubKeyCode == keyCode) {
+                        scrubKeyCode = null
+                        if (!scrubKeyHeld && !event.nativeKeyEvent.isCanceled) {
+                            timelineState.startScrub(direction)
+                            chrome.peekBanner()
+                        }
+                    }
+                    return@onPreviewKeyEvent true
+                }
                 layers.handleOverlayKey(
                     event = event,
                     keyContext = recordingKeyContext(),
@@ -568,6 +636,15 @@ fun RecordingPlayerScreen(
                 )
                 if (mediaAction != MediaPlaybackAction.NONE) {
                     layers.beginOpeningKeyCycle(keyCode)
+                    if (timelineState.scrubSpeed != 0) {
+                        commitScrub()
+                        return@onPreviewKeyEvent true
+                    }
+                    if (!chrome.controlsVisible) {
+                        togglePlayPause()
+                        chrome.peekBanner()
+                        return@onPreviewKeyEvent true
+                    }
                     when (mediaAction) {
                         MediaPlaybackAction.PLAY -> session.play()
                         MediaPlaybackAction.PAUSE -> pausePlayback()
@@ -576,19 +653,6 @@ fun RecordingPlayerScreen(
                     }
                     chrome.showControls()
                     return@onPreviewKeyEvent true
-                }
-
-                when (keyCode) {
-                    AndroidKeyEvent.KEYCODE_MEDIA_REWIND -> {
-                        seekBy(-RECORDING_SHORT_SEEK_MS)
-                        chrome.peekBanner()
-                        return@onPreviewKeyEvent true
-                    }
-                    AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
-                        seekBy(RECORDING_SHORT_SEEK_MS)
-                        chrome.peekBanner()
-                        return@onPreviewKeyEvent true
-                    }
                 }
 
                 val keyAction = recordingKeyAction(keyCode)
@@ -635,6 +699,7 @@ fun RecordingPlayerScreen(
                     originMs = timelineState.pendingOriginMs,
                     stepSettled = timelineState.seekDispatched,
                     stepId = timelineState.stepId,
+                    scrubSpeed = timelineState.scrubSpeed,
                     marks = marks,
                     markStops = markStops,
                     markerRevision = markerRevision,

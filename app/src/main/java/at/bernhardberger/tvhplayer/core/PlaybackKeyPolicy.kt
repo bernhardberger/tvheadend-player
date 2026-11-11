@@ -39,6 +39,12 @@ enum class PlayerKeyAction {
     OPEN_OPTIONS,
     SEEK_BACK,
     SEEK_FORWARD,
+    SCRUB_BACK,
+    SCRUB_FORWARD,
+    COMMIT_SCRUB,
+    SCHEDULE_PROGRAMME,
+    OPEN_RECORDING_INFO,
+    CONSUME,
     CLOSE_PLAYER,
     DISMISS_OVERLAY_ONLY,
 }
@@ -56,6 +62,8 @@ data class PlayerKeyContext(
     val confirmationOpen: Boolean = false,
     /** Live Pause state; a still-starting timeshift accepts a pause like an available one. */
     val livePause: LivePauseAvailability = LivePauseAvailability.NONE,
+    val scrubbing: Boolean = false,
+    val programmeRecording: Boolean = false,
 )
 
 /** What a media play/pause key does on the live surface. */
@@ -90,11 +98,17 @@ fun playerKeyActionStartsOpeningCycle(action: PlayerKeyAction): Boolean = when (
     PlayerKeyAction.PEEK_BANNER,
     PlayerKeyAction.OPEN_CHANNELS,
     PlayerKeyAction.OPEN_INFO,
+    PlayerKeyAction.OPEN_RECORDING_INFO,
     PlayerKeyAction.OPEN_OPTIONS -> true
     PlayerKeyAction.PASS_THROUGH,
     PlayerKeyAction.HIDE_CONTROLS,
     PlayerKeyAction.SEEK_BACK,
     PlayerKeyAction.SEEK_FORWARD,
+    PlayerKeyAction.SCRUB_BACK,
+    PlayerKeyAction.SCRUB_FORWARD,
+    PlayerKeyAction.COMMIT_SCRUB,
+    PlayerKeyAction.SCHEDULE_PROGRAMME,
+    PlayerKeyAction.CONSUME,
     PlayerKeyAction.CLOSE_PLAYER,
     PlayerKeyAction.DISMISS_OVERLAY_ONLY -> false
 }
@@ -162,7 +176,7 @@ fun playerStopKeyClosesScreen(keyCode: Int, repeatCount: Int, hasActiveTarget: B
 /**
  * Hidden-control player key contract.
  *
- * Center on seekable media both toggles pause/play and reveals controls; the
+ * Center on seekable media both toggles pause/play and reveals the Banner; the
  * revealing key cycle must be suppressed so the same press cannot activate a
  * newly focused control. Where live Pause is unavailable Center explains why over
  * the Banner; Up/Down still open the controls.
@@ -171,6 +185,9 @@ fun playerKeyAction(
     context: PlayerKeyContext,
     keyCode: Int,
 ): PlayerKeyAction {
+    if (context.surface == PlayerSurface.RECORDING && keyCode == KeyEvent.KEYCODE_MEDIA_RECORD) {
+        return PlayerKeyAction.CONSUME
+    }
     if (playbackOptionsKeyRequest(keyCode) != null) {
         // Options keys replace Info, the drawer or another options page; a modal
         // confirmation keeps them inert.
@@ -182,6 +199,24 @@ fun playerKeyAction(
     }
     if (context.infoOpen && keyCode != KeyEvent.KEYCODE_BACK) {
         return PlayerKeyAction.PASS_THROUGH
+    }
+    if ((context.confirmationOpen || context.optionsOpen || context.drawerOpen) && keyCode in listOf(
+            KeyEvent.KEYCODE_MEDIA_RECORD, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD, KeyEvent.KEYCODE_MEDIA_REWIND)) {
+        return PlayerKeyAction.PASS_THROUGH
+    }
+    if (keyCode == KeyEvent.KEYCODE_MEDIA_RECORD) return when {
+        context.programmeRecording -> PlayerKeyAction.OPEN_RECORDING_INFO
+        else -> PlayerKeyAction.SCHEDULE_PROGRAMME
+    }
+    if (context.scrubbing && keyCode in listOf(KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
+            KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PAUSE,
+            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)) return PlayerKeyAction.COMMIT_SCRUB
+    if (keyCode == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD || keyCode == KeyEvent.KEYCODE_MEDIA_REWIND) {
+        return when {
+            context.surface == PlayerSurface.LIVE && !context.timeshiftAvailable -> PlayerKeyAction.PEEK_BANNER
+            keyCode == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> PlayerKeyAction.SCRUB_FORWARD
+            else -> PlayerKeyAction.SCRUB_BACK
+        }
     }
     if (keyCode == KeyEvent.KEYCODE_INFO) return PlayerKeyAction.OPEN_INFO
     if (
@@ -232,6 +267,9 @@ fun playerKeyAction(
         }
         KeyEvent.KEYCODE_DPAD_CENTER,
         KeyEvent.KEYCODE_ENTER,
+        KeyEvent.KEYCODE_MEDIA_PLAY,
+        KeyEvent.KEYCODE_MEDIA_PAUSE,
+        KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
         KeyEvent.KEYCODE_NUMPAD_ENTER -> when {
             context.surface == PlayerSurface.RECORDING ||
                 livePauseAccepted(context.timeshiftAvailable, context.livePause) ->
@@ -253,6 +291,10 @@ fun playerKeyAction(
         else -> PlayerKeyAction.PASS_THROUGH
     }
 }
+
+/** Signed programme seconds per second. Reversing always starts at the first speed. */
+fun nextPlayerScrubSpeed(current: Int, direction: Int): Int =
+    if (current * direction > 0) (current * 2).coerceIn(-32, 32) else direction * 2
 
 fun channelPickAction(currentChannelId: ChannelId?, pickedChannelId: ChannelId): ChannelPickAction =
     if (currentChannelId == pickedChannelId) {
