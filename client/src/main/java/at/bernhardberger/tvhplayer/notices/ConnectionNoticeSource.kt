@@ -37,6 +37,7 @@ class ConnectionNoticeSource(
         var lossJob: Job? = null
         var lossOwed = false
         var suppressed = false
+        var silentFallback: SessionState? = null
         combine(profileGeneration, observations, switchInProgress) { generation, observation, switching ->
             Triple(generation, observation, switching)
         }
@@ -57,6 +58,10 @@ class ConnectionNoticeSource(
                     lost = false
                     lossOwed = false
                     _lossAnnounced.value = false
+                } else if (suppressed && !lossOwed) {
+                    // lossOwed is retained throughout suppression. A healthy connection's
+                    // fallback may still be Connecting when the switch releases ownership.
+                    silentFallback = observation.sessionState
                 }
                 suppressed = false
                 val context = NoticeContext(generation, observation.currentSession?.generationIdentity)
@@ -70,8 +75,11 @@ class ConnectionNoticeSource(
                     loginRejected = false
                     lossJob?.cancel()
                     lossJob = null
+                    silentFallback = null
                 }
                 val state = observation.sessionState
+                if (state == silentFallback) return@collect
+                silentFallback = null
                 val identity = observation.currentSession?.generationIdentity
                 when {
                     state is SessionState.Ready && identity != null && identity !== retired -> {

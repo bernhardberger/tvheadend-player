@@ -130,6 +130,7 @@ internal fun settingsRow(
                     .semantics { heading(); contentDescription = section })
         }
         ListItem(
+            enabled = enabled,
             // The platform provider applies ListItem's Selected after ToggleableState.
             // Keep both states aligned; selected/unselected row styling is already identical.
             selected = checked ?: (selected == true),

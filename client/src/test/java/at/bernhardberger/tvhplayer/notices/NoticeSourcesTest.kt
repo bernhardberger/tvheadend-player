@@ -79,6 +79,24 @@ class NoticeSourcesTest {
         val source = ConnectionNoticeSource(observation, profile, center, switching)
         backgroundScope.launch { source.run() }
         runCurrent()
+        // A healthy connection owes no loss: its slow fallback must stay silent after a switch.
+        switching.value = true; runCurrent()
+        observation.value = SessionObservation.create(sessionState = SessionState.Connecting); runCurrent()
+        switching.value = false; runCurrent()
+        advanceTimeBy(4_000); runCurrent()
+        assertNull(center.state.value.candidate)
+        assertFalse(source.lossAnnounced.value)
+        observation.value = readyObservation(); runCurrent()
+        assertNull(center.state.value.candidate)
+        // A genuinely later loss is still announced.
+        observation.value = SessionObservation.create(sessionState = SessionState.Connecting); runCurrent()
+        advanceTimeBy(3_000); runCurrent()
+        assertTrue(source.lossAnnounced.value)
+        center.show(center.state.value.candidate!!.id, 1)
+        advanceTimeBy(1); center.prune()
+        observation.value = readyObservation(); runCurrent()
+        center.show(center.state.value.candidate!!.id, 1)
+        advanceTimeBy(1); center.prune()
         observation.value = SessionObservation.create(sessionState = SessionState.Connecting)
         runCurrent(); advanceTimeBy(2_000)
         switching.value = true

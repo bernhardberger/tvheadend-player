@@ -25,15 +25,12 @@ internal suspend fun readBackSwitchRollback(
     profileStore: ServerProfileStore,
     previousId: ServerProfileId?,
     profiles: MutableStateFlow<ServerProfileListResult?>,
-    noticeCenter: () -> NoticeCenter?,
-): ServerProfileReadResult {
-    if (previousId == null || profileStore.setActive(previousId) !is ServerProfileWriteResult.Applied) {
-        postSwitchNotice(noticeCenter, Notice.ServerProfileWriteFailed)
-    }
+): Pair<ServerProfileReadResult, Boolean> {
+    val rollbackFailed = previousId == null || profileStore.setActive(previousId) !is ServerProfileWriteResult.Applied
     profiles.value = profileStore.profiles()
     // A rejected rollback cannot be presented as the old selection. Reconcile with
     // persistence even when that means keeping the successfully tested target.
-    return profileStore.loadActive()
+    return profileStore.loadActive() to rollbackFailed
 }
 
 internal suspend fun awaitSwitchOutcome(session: TvheadendSession, before: SessionObservation): SessionState =

@@ -577,12 +577,24 @@ class SettingsServerProfilesTest {
         settle()
         assertTrue(restoring)
         press(Key.Back)
+        settle()
+        assertTrue(owner.switchInProgress.value)
+        listOf(SERVER_USE, EDIT_CONNECTION, SERVER_NAME, SERVER_REMOVE).forEach {
+            compose.onNodeWithTag("settings-row-$it").assertIsNotEnabled()
+        }
+        press(Key.Back)
+        compose.onNodeWithTag("settings-row-$ADD_SERVER").assertIsNotEnabled()
         compose.runOnIdle { restore.complete(Unit) }
         settle()
         compose.onNodeWithTag("server-switch-page").assertDoesNotExist()
         assertEquals(id(1), activeId)
         assertNull(notices.state.value.candidate)
         assertTrue(!owner.connectionChanges.isLocked)
+        compose.onNodeWithTag("settings-row-$ADD_SERVER").assertIsEnabled()
+        press(Key.DirectionCenter)
+        listOf(SERVER_USE, EDIT_CONNECTION, SERVER_NAME, SERVER_REMOVE).forEach {
+            compose.onNodeWithTag("settings-row-$it").assertIsEnabled()
+        }
     }
 
     @Test fun cancellingBeforeHandoverRestoresTheInUseConnectionsDegradedWarning() {
@@ -1098,6 +1110,23 @@ class SettingsServerProfilesTest {
             capture(name, if (index == 0) "Try again" else "Edit connection")
             press(Key.Back)
         }
+        val trial = kotlinx.coroutines.CompletableDeferred<Unit>()
+        connectionGate = trial
+        unreachableNextConnection = true
+        press(Key.DirectionCenter)
+        val restore = kotlinx.coroutines.CompletableDeferred<Unit>()
+        restorationGate = restore
+        compose.runOnIdle { trial.complete(Unit) }
+        settle()
+        assertTrue(restoring)
+        press(Key.Back)
+        capture("24-switch-cancelled-restoring-actions-disabled", "Use this connection (disabled)")
+        press(Key.Back)
+        capture("25-switch-cancelled-restoring-add-disabled", "kids")
+        compose.runOnIdle { restore.complete(Unit) }
+        settle()
+        restorationGate = null
+        press(Key.DirectionCenter)
         compose.mainClock.autoAdvance = false
         val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
         connectionGate = gate

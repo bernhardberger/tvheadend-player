@@ -46,11 +46,13 @@ internal fun settingsConnectionLevels(
 ): List<DepthLevel> {
     val profile by owner.serverProfile.collectAsStateWithLifecycle()
     val profiles by owner.profiles.collectAsStateWithLifecycle()
+    val switchInProgress by owner.switchInProgress.collectAsStateWithLifecycle()
     val connection = presentation.connection
     // A switch the user started shows in its own dialog; the rows say nothing about it, least of all
     // on the connection still in use, which the attempt disconnects.
     val status = if (switching) null else connectionOverviewStatus(profile, presentation)
     return settingsServerLevels(profiles, status, actions,
+        actionsEnabled = !switchInProgress && !switching,
         showRetry = !switching && presentation.degraded &&
             connection.primaryRecoveryAction() != ConnectionRecoveryAction.SETTINGS,
         connecting = connection == ConnectionUiState.Connecting || connection == ConnectionUiState.Reconnecting ||

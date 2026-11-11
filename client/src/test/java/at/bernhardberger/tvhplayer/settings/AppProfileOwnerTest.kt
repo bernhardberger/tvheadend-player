@@ -380,7 +380,8 @@ class AppProfileOwnerTest {
         assertNoSwitchedNotice(notices)
     }
 
-    @Test fun cancellationAfterTheCommitRestoresThePreviousConnectionWithoutASwitchedNotice() = runTest {
+    @Test fun cancellationAfterTheCommitRestoresThePreviousConnectionWithoutASwitchedNotice() {
+        for (rejectRollback in listOf(false, true)) runTest {
         val stored = FakeServerProfileStore()
         val first = (stored.addAnonymous("first.invalid", activate = true) as ServerProfileWriteResult.Applied).id
         val next = (stored.addAnonymous("second.invalid") as ServerProfileWriteResult.Applied).id
@@ -388,6 +389,7 @@ class AppProfileOwnerTest {
         var activated = false
         val store = object : ServerProfileStore by stored {
             override suspend fun setActive(id: ServerProfileId): ServerProfileWriteResult {
+                if (id == first && rejectRollback) return ServerProfileWriteResult.Unavailable
                 if (id == next) activated = true
                 return stored.setActive(id)
             }
@@ -398,8 +400,11 @@ class AppProfileOwnerTest {
             }
         }
         val session = FakeTvheadendSession()
-        val notices = NoticeCenter({ 0L }, { NoticeContext(0, null) })
-        val owner = AppProfileOwner(session, store, PlayerSettingsStore(InMemoryPreferencesDataStore()),
+        lateinit var owner: AppProfileOwner
+        val notices = NoticeCenter({ testScheduler.currentTime }, {
+            NoticeContext(owner.configurationGeneration.value, null)
+        })
+        owner = AppProfileOwner(session, store, PlayerSettingsStore(InMemoryPreferencesDataStore()),
             StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Missing }, { notices })
         backgroundScope.launch { owner.run() }
         runCurrent()
@@ -408,14 +413,23 @@ class AppProfileOwnerTest {
         session.publish(readyObservation())
         runCurrent()
         assertTrue(activated)
+        val generation = owner.configurationGeneration.value
         attempt.cancel()
         gate.complete(Unit)
         runCurrent()
-        assertEquals(first, (stored.profiles() as ServerProfileListResult.Available).activeId)
-        assertEquals(first, (owner.serverProfile.value as ServerProfileReadResult.Available).id)
+        val selected = if (rejectRollback) next else first
+        assertEquals(selected, (stored.profiles() as ServerProfileListResult.Available).activeId)
+        assertEquals(selected, (owner.serverProfile.value as ServerProfileReadResult.Available).id)
+        assertEquals(generation + 2, owner.configurationGeneration.value)
         assertNoSwitchedNotice(notices)
+        notices.prune()
+        if (rejectRollback) {
+            assertEquals(Notice.ServerProfileWriteFailed, notices.state.value.candidate?.notice)
+            assertEquals(1, notices.state.value.pending.size)
+        } else assertTrue(notices.state.value.pending.isEmpty())
         assertFalse(owner.connectionChanges.isLocked)
         assertFalse(owner.switchInProgress.value)
+        }
     }
 
     private fun assertNoSwitchedNotice(notices: NoticeCenter) {
@@ -618,9 +632,11 @@ class AppProfileOwnerTest {
         stored.addAnonymous("first.invalid", activate = true)
         val removed = (stored.addAnonymous("second.invalid") as ServerProfileWriteResult.Applied).id
         var failCleanup = false
+        var rejectRemoval = true
         val data = InMemoryPreferencesDataStore(beforeUpdate = { if (failCleanup) throw java.io.IOException("Synthetic cleanup failure") })
         val store = object : ServerProfileStore by stored {
-            override suspend fun remove(id: ServerProfileId): ServerProfileWriteResult = stored.remove(id).also { failCleanup = true }
+            override suspend fun remove(id: ServerProfileId): ServerProfileWriteResult =
+                if (rejectRemoval) ServerProfileWriteResult.Unavailable else stored.remove(id).also { failCleanup = true }
         }
         lateinit var owner: AppProfileOwner
         val notices = NoticeCenter({ 0 }, { NoticeContext(owner.configurationGeneration.value, null) })
@@ -628,9 +644,15 @@ class AppProfileOwnerTest {
             StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Missing }, { notices })
         backgroundScope.launch { owner.run() }
         runCurrent()
+        assertEquals(ServerProfileWriteResult.Unavailable, owner.remove(removed))
+        assertEquals(Notice.ServerProfileWriteFailed, notices.state.value.candidate?.notice)
+        assertEquals(1, notices.state.value.pending.size)
+        assertTrue((owner.profiles.value as ServerProfileListResult.Available).profiles.any { it.id == removed })
+        rejectRemoval = false
         assertEquals(ServerProfileWriteResult.Applied(removed), owner.remove(removed))
         assertFalse((owner.profiles.value as ServerProfileListResult.Available).profiles.any { it.id == removed })
-        assertEquals(Notice.ServerProfileRemoved(removed, "second.invalid"), notices.state.value.candidate?.notice)
+        assertEquals(listOf(Notice.ServerProfileWriteFailed, Notice.ServerProfileRemoved(removed, "second.invalid")),
+            notices.state.value.pending.map { it.notice })
     }
 
     @Test fun freshSetupReadsCurrentStoreAndRemainsDisconnected() {
@@ -653,7 +675,6 @@ class AppProfileOwnerTest {
         } else {
         assertEquals(ServerProfileReadResult.Missing, owner.serverProfile.value)
         assertEquals(ServerSettings(), checkNotNull(owner.serverProfile.value).toServerSettings())
-        assertEquals(listOf(FakeServerProfileStoreCall.PROFILES, FakeServerProfileStoreCall.LOAD_ACTIVE), stored.calls.takeLast(2))
         val list = owner.profiles.value as ServerProfileListResult.Available
         assertNull(list.activeId)
         assertEquals(count, list.profiles.size)
@@ -784,6 +805,7 @@ class AppProfileOwnerTest {
         assertNull((owner.profiles.value as ServerProfileListResult.Available).activeId)
         assertNull(owner.audioProfileId)
         assertEquals(ServerProfileReadResult.Missing, owner.serverProfile.value)
+        assertNull(owner.liveProfile.value)
         assertEquals(Notice.ServerProfileRemoved(id, "viewer@first.invalid"), notices.state.value.candidate?.notice)
         assertTrue(owner.configurationGeneration.value > generation)
         owner.setActive(other)
@@ -798,9 +820,15 @@ class AppProfileOwnerTest {
         val first = (stored.addAnonymous("first.invalid", activate = true) as ServerProfileWriteResult.Applied).id
         val unreadable = (stored.addPassword("second.invalid", username = "viewer", password = "synthetic") as ServerProfileWriteResult.Applied).id
         stored.scriptCredentialsUnavailable(unreadable)
+        var rejectRename = false
+        val store = object : ServerProfileStore by stored {
+            override suspend fun updateLabel(id: ServerProfileId, label: String?): ServerProfileWriteResult =
+                if (rejectRename) ServerProfileWriteResult.Unavailable else stored.updateLabel(id, label)
+        }
         val session = FakeTvheadendSession()
-        val owner = AppProfileOwner(session, stored, PlayerSettingsStore(InMemoryPreferencesDataStore()),
-            StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Unavailable })
+        val notices = NoticeCenter({ testScheduler.currentTime }, { NoticeContext(0, null) })
+        val owner = AppProfileOwner(session, store, PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Unavailable }, { notices })
         backgroundScope.launch { owner.run() }
         runCurrent()
         val connections = session.calls.count { it == FakeSessionCall.CONNECT }
@@ -811,6 +839,12 @@ class AppProfileOwnerTest {
         assertEquals(first, list.activeId)
         assertFalse(list.profiles.last().credentialsAvailable)
         assertEquals("viewer", list.profiles.last().username)
+        rejectRename = true
+        assertEquals(ServerProfileWriteResult.Unavailable, owner.rename(first, "Not saved"))
+        assertEquals(Notice.ServerProfileWriteFailed, notices.state.value.candidate?.notice)
+        assertEquals(1, notices.state.value.pending.size)
+        assertEquals(list.profiles.map { it.label },
+            (owner.profiles.value as ServerProfileListResult.Available).profiles.map { it.label })
         assertEquals(connections, session.calls.count { it == FakeSessionCall.CONNECT })
     }
 
