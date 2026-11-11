@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -36,11 +37,14 @@ import at.bernhardberger.tvhplayer.ui.TvSpacing8
 /** The longest value an active header button shows before it ellipsizes. */
 private val RoundIconButtonValueMaxWidth = 160.dp
 
+/** The count circle after an active button's value. */
+private val RoundIconButtonBadgeSize = 20.dp
+
 /**
  * A header icon button on a faint resting disc. With a [value] it grows into a pill naming it,
  * after the [dot] when given: tonal while the value is [active], on the resting tone otherwise.
  * Focus takes the library's focused styling and scale either way. TalkBack reads the [label] with
- * the value.
+ * the value, or [description] when given. A [badge] count follows the value in the error colour.
  */
 @Composable
 fun RoundIconButton(
@@ -53,8 +57,11 @@ fun RoundIconButton(
     value: String? = null,
     dot: Color? = null,
     active: Boolean = value != null,
+    badge: Int? = null,
+    description: String? = null,
 ) {
-    val description = value?.let { stringResource(R.string.header_button_value_description, label, it) } ?: label
+    val spoken = description
+        ?: value?.let { stringResource(R.string.header_button_value_description, label, it) } ?: label
     // One button for both states, so focus stays on it while its value comes and goes.
     Button(
         onClick = onClick,
@@ -74,7 +81,7 @@ fun RoundIconButton(
             .onFocusChanged { st ->
                 if (st.isFocused) onFocused()
             }
-            .semantics { contentDescription = description },
+            .semantics { contentDescription = spoken },
     ) {
         Icon(icon, contentDescription = null, Modifier.size(IconButtonDefaults.MediumIconSize))
         if (value != null) {
@@ -90,6 +97,21 @@ fun RoundIconButton(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.widthIn(max = RoundIconButtonValueMaxWidth),
             )
+            if (badge != null) {
+                Spacer(Modifier.width(TvSpacing8))
+                Box(
+                    Modifier.size(RoundIconButtonBadgeSize).background(MaterialTheme.colorScheme.error, CircleShape)
+                        .testTag("header-button-badge"),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        badge.toString(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onError,
+                        maxLines = 1,
+                    )
+                }
+            }
         }
     }
 }

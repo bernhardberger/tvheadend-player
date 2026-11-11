@@ -208,7 +208,7 @@ class FolderContextMenuTest {
         val state = RecordingsScreenState()
         compose.setContentWithBrowsePreparation {
             TVHeadendPlayerTheme {
-                if (screenShown.value) RecordingsScreenContent(observation = session.observation.collectAsState().value,
+                if (screenShown.value) RecordingsScreenContent(view = at.bernhardberger.tvhplayer.core.DvrArchiveView(at.bernhardberger.tvhplayer.core.DvrArchiveGrouping.FOLDERS), observation = session.observation.collectAsState().value,
                     currentObservation = { session.observation.value }, state = state,
                     dvrMutationActions = actions, notices = notices)
             }

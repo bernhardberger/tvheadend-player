@@ -30,8 +30,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.layout.layout
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -185,10 +183,6 @@ fun DepthNavigation(
     onFirstRowUp: (() -> Unit)? = null,
     activeFocusRequester: FocusRequester? = null,
     pageKeyDirection: ((Int) -> Int?)? = null,
-    /** The preview slot's content in place of the focused row's preview, while something outside the list drives it. */
-    previewOverride: (@Composable () -> Unit)? = null,
-    /** Pixels the preview slot extends above the host's top, for a host whose header takes only the columns' space. */
-    previewRise: () -> Int = { 0 },
 ) {
     val stack = state.stack
     fun resolve(id: String): DepthLevel {
@@ -419,17 +413,9 @@ fun DepthNavigation(
                         // with no extra offset (no overflow, no clipping during the crossfade).
                         // Intentional overlap is only DIFFERENT siblings here; push/pop disposes
                         // via the active-path key and never draws the same level twice.
-                        Box(Modifier.layout { measurable, constraints ->
-                            // The slot rises by [previewRise] and grows by as much, so its bottom stays put.
-                            val rise = previewRise()
-                            val placeable = measurable.measure(
-                                Constraints.fixed(columnWidth.roundToPx(), constraints.maxHeight + rise),
-                            )
-                            layout(placeable.width, constraints.maxHeight) {
-                                placeable.place(previewSlot * stepPixels, -rise)
-                            }
-                        }) {
-                            if (previewOverride != null) previewOverride() else AnimatedContent(
+                        Box(Modifier.offset { IntOffset(previewSlot * stepPixels, 0) }
+                            .width(columnWidth).fillMaxHeight()) {
+                            AnimatedContent(
                                 targetState = previewPath,
                                 contentKey = { it },
                                 transitionSpec = {

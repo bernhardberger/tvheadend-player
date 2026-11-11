@@ -401,12 +401,12 @@ class BrowseCohesionEvidenceTest {
     }
 
     @Test
-    fun recordingsEmptyLibraryKeepsArchiveTabReachable() {
+    fun recordingsEmptyLibraryKeepsTheSchedulePillReachable() {
         showRecordings(1f, empty = true)
         // Library preparation runs off-main; a composed frame alone is not readiness.
-        awaitFocus(hasText("Archive"))
+        awaitFocus(hasTestTag("recordings-pill-schedule"))
         compose.onNodeWithText("No recordings are available.").assertIsDisplayed()
-        capture("recordings-empty", 1f, "Empty recording library; Archive tab", hasText("Archive"))
+        capture("recordings-empty", 1f, "Empty recording library; Schedule pill", hasTestTag("recordings-pill-schedule"))
     }
 
     private fun showChannels(scale: Float) {
@@ -501,7 +501,7 @@ class BrowseCohesionEvidenceTest {
             NoticeContext(0L, session.observation.value.currentSession?.generationIdentity)
         }
         shell(AppDestination.RECORDINGS, scale) { padding, drawerActive ->
-            RecordingsScreenContent(
+            RecordingsScreenContent(view = at.bernhardberger.tvhplayer.core.DvrArchiveView(at.bernhardberger.tvhplayer.core.DvrArchiveGrouping.FOLDERS), 
                 observation = observation,
                 contentPadding = padding,
                 initialFocusEnabled = !drawerActive,

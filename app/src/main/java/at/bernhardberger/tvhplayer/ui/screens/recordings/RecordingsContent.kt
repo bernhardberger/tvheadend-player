@@ -134,6 +134,7 @@ import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.LocalTabOwner
 import at.bernhardberger.tvhplayer.ui.components.tabFocus
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
+import at.bernhardberger.tvhplayer.core.runningRecordings
 import at.bernhardberger.tvhplayer.ui.components.RecordingBadge
 import at.bernhardberger.tvhplayer.ui.components.StatusIconSize
 import at.bernhardberger.tvhplayer.ui.components.ListBottomReserve
@@ -187,12 +188,14 @@ internal fun RecordingModeTabs(
     selected: DvrLibraryMode,
     selectedFocus: FocusRequester,
     modifier: Modifier = Modifier,
+    /** The modes the row offers; the Schedule screen's subnav leaves the Archive out. */
+    modes: List<DvrLibraryMode> = DvrLibraryMode.entries,
     onFocused: (DvrLibraryMode) -> Unit,
     onClick: (DvrLibraryMode) -> Unit,
     onMoveToContent: () -> Unit,
 ) {
     AppTabRow(
-        selectedTabIndex = selected.ordinal,
+        selectedTabIndex = modes.indexOf(selected),
         style = AppTabStyle.Page,
         selectedTabFocus = selectedFocus,
         modifier = modifier.onPreviewKeyEvent { event ->
@@ -201,7 +204,7 @@ internal fun RecordingModeTabs(
                 onMoveToContent().let { true }
         },
     ) {
-        DvrLibraryMode.entries.forEach { mode ->
+        modes.forEach { mode ->
             AppTab(
                 selected = selected == mode,
                 modifier = Modifier.testTag("recordings-mode-${mode.name.lowercase()}"),
@@ -215,7 +218,7 @@ internal fun RecordingModeTabs(
                 onFocus = { onFocused(mode) },
                 onClick = { onClick(mode) },
                 // Nothing focusable follows the tabs in the header row.
-                last = mode == DvrLibraryMode.entries.last(),
+                last = mode == modes.last(),
             )
         }
     }
@@ -249,6 +252,8 @@ internal fun FolderListRow(
         watched == summary.recordingCount -> RecordingWatchState.Watched
         else -> RecordingWatchState.PartlyWatched(watched.toDouble() / summary.recordingCount)
     }
+    // A running recording anywhere below the folder shows its red dot after the name.
+    val hasRunning = remember(folder) { folder.runningRecordings().isNotEmpty() }
     val owner = LocalTabOwner.current
     val contextMenu = at.bernhardberger.tvhplayer.ui.components.rememberBrowseContextMenuTrigger(
         onOpenContextMenu, enabled = { owner?.isCurrent != false })
@@ -261,6 +266,14 @@ internal fun FolderListRow(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(folder.name, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false))
+                if (hasRunning) {
+                    Spacer(Modifier.width(TvSpacing8))
+                    RecordingStatusIndicator(
+                        state = DvrEntryState.RECORDING,
+                        focused = focused,
+                        modifier = Modifier.testTag("recordings-folder-running-$tag"),
+                    )
+                }
                 if (watchState != RecordingWatchState.Unwatched) {
                     Spacer(Modifier.width(TvSpacing8))
                     RecordingWatchMark(watchState, Modifier.testTag("recordings-folder-watched-$tag"))

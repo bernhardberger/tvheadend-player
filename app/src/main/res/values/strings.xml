@@ -598,29 +598,35 @@
     <string name="recordings_grouping_folders">Folders</string>
     <string name="recordings_grouping_channels">Channels</string>
     <string name="recordings_grouping_genres">Genres</string>
-    <string name="recordings_grouping_none">None</string>
+    <string name="recordings_grouping_flat">Flat</string>
     <string name="recordings_grouping_folders_detail">The server\'s folder tree</string>
     <string name="recordings_grouping_channels_detail">A folder per channel</string>
     <string name="recordings_grouping_genres_detail">A folder per genre</string>
-    <string name="recordings_grouping_none_detail">One list with date dividers</string>
+    <string name="recordings_grouping_none_detail">One list, no folders</string>
     <!-- Archive view options: the sort order, the filter and the empty state the filter can cause. -->
     <string name="recordings_sort_title">Sort</string>
     <string name="recordings_sort_newest">Newest first</string>
     <string name="recordings_sort_name">Name A–Z</string>
     <string name="recordings_sort_largest">Largest first</string>
-    <!-- The Show chip and its choices: which recordings the Archive lists. The chip value is max 14. -->
+    <!-- The Show pill and its choices: which recordings the Archive lists. The pill value is max 17. -->
     <string name="recordings_show_title">Show</string>
-    <string name="recordings_show_all">Show all</string>
     <string name="recordings_show_option_all">All</string>
-    <string name="recordings_show_not_watched">Not watched</string>
-    <string name="recordings_show_started">Started</string>
-    <string name="recordings_show_all_detail">Watched and not watched</string>
-    <string name="recordings_show_not_watched_detail">Never played</string>
-    <string name="recordings_show_started_detail">Continue watching</string>
+    <string name="recordings_show_unwatched">Unwatched</string>
+    <string name="recordings_show_partially_watched">Partially watched</string>
+    <string name="recordings_show_watched">Watched</string>
+    <string name="recordings_show_unwatched_detail">Not played to the end</string>
+    <string name="recordings_show_partially_watched_detail">Started but not finished</string>
+    <string name="recordings_show_watched_detail">Played to the end</string>
     <!-- Empty states when the Show filter hides everything, then the count of hidden recordings. -->
     <string name="recordings_empty_not_watched_root">Everything here has been played.</string>
     <string name="recordings_empty_not_watched_folder">Everything in this folder has been played.</string>
     <string name="recordings_empty_started">Nothing started yet.</string>
+    <string name="recordings_empty_watched">Nothing has been watched to the end yet.</string>
+    <!-- The Schedule pill's spoken name while recording problems are listed behind it. -->
+    <plurals name="recordings_schedule_problems_description">
+        <item quantity="one">Schedule, %1$d problem</item>
+        <item quantity="other">Schedule, %1$d problems</item>
+    </plurals>
     <plurals name="recordings_hidden_count">
         <item quantity="one">%1$d recording is hidden.</item>
         <item quantity="other">%1$d recordings are hidden.</item>

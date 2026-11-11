@@ -154,14 +154,14 @@ class BrowseErrorAlertTest {
         awaitFocus("tv-recovery-primary")
     }
 
-    @Test fun recordingsDoNotTakeFocusFromADeliberatelySelectedHeaderTab() {
+    @Test fun recordingsDoNotTakeFocusFromTheSchedulePillWhenAnAlertAppears() {
         connection = ConnectionUiState.Connecting
         show(recordings = true)
+        awaitFocus("recordings-pill-schedule")
         key(Key.DirectionRight)
-        compose.onNode(hasText("Schedule") and isFocused()).assertExists()
         compose.runOnIdle { connection = backoff() }
         compose.waitForIdle()
-        compose.onNode(hasText("Schedule") and isFocused()).assertExists()
+        compose.onNode(hasTestTag("recordings-pill-schedule") and isFocused()).assertExists()
         key(Key.DirectionDown)
         awaitFocus("tv-recovery-primary")
     }
@@ -201,7 +201,7 @@ class BrowseErrorAlertTest {
             useUnmergedTree = true).assertExists()
     }
 
-    @Test fun recordingsKeepFocusOnTheirTabsWhenTheFocusedAlertLeavesAndReturns() {
+    @Test fun recordingsKeepFocusOnTheirPillsWhenTheFocusedAlertLeavesAndReturns() {
         connection = backoff()
         show(recordings = true)
         awaitFocus("tv-recovery-primary")
@@ -209,9 +209,8 @@ class BrowseErrorAlertTest {
         compose.waitForIdle()
         assertEquals(0, compose.onAllNodes(hasTestTag("tv-recovery-overlay")).fetchSemanticsNodes().size)
         compose.mainClock.advanceTimeUntil(timeoutMillis = 1_000) {
-            compose.onAllNodes(hasAnyAncestor(hasTestTag("recordings-mode-tabs")) and isFocused())
-                .fetchSemanticsNodes().isNotEmpty() ||
-                compose.onAllNodes(hasTestTag("recordings-mode-tabs") and isFocused()).fetchSemanticsNodes().isNotEmpty()
+            compose.onAllNodes(hasAnyAncestor(hasTestTag("recordings-pills")) and isFocused())
+                .fetchSemanticsNodes().isNotEmpty()
         }
         compose.runOnIdle { connection = backoff() }
         awaitFocus("tv-recovery-primary")

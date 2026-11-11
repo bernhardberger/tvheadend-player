@@ -56,7 +56,7 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
             whatsNewSeenVersion = preferences[Keys.WHATS_NEW_SEEN_VERSION],
             recordingsView = DvrArchiveView(
                 grouping = DvrArchiveGrouping.entries.firstOrNull { it.name == preferences[Keys.RECORDINGS_GROUPING] }
-                    ?: DvrArchiveGrouping.FOLDERS,
+                    ?: DvrArchiveGrouping.FLAT,
                 sort = DvrArchiveSort.entries.firstOrNull { it.name == preferences[Keys.RECORDINGS_SORT] }
                     ?: DvrArchiveSort.NEWEST,
                 show = DvrArchiveShow.entries.firstOrNull { it.name == preferences[Keys.RECORDINGS_SHOW] }

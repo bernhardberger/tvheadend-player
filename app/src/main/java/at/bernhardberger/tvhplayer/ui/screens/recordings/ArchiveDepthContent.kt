@@ -91,9 +91,8 @@ internal fun ArchiveDepthContent(
     initialFocusEnabled: Boolean,
     backEnabled: Boolean,
     contentFocus: FocusRequester,
-    onModeFocus: () -> Unit,
     onDrawerFocus: (() -> Unit)?,
-    /** Up from the first row: the chip row above the list. */
+    /** Up from the first row: the pill row above the list. */
     onFirstRowUp: () -> Unit,
     onOpenRecording: (DvrEntry) -> Unit,
     piconForEntry: (DvrEntry) -> ChannelIcon?,
@@ -101,15 +100,11 @@ internal fun ArchiveDepthContent(
     modifier: Modifier = Modifier,
     onOpenContextMenu: ((DvrEntry) -> Unit)? = null,
     onOpenFolderMenu: ((DvrArchiveFolder) -> Unit)? = null,
-    grouping: DvrArchiveGrouping = DvrArchiveGrouping.FOLDERS,
+    grouping: DvrArchiveGrouping = DvrArchiveGrouping.FLAT,
     sort: DvrArchiveSort = DvrArchiveSort.NEWEST,
     /** The archive before the Show filter: it names the folders the filter emptied and counts what it hides. */
     fullRoot: DvrArchiveFolder = root,
     show: DvrArchiveShow = DvrArchiveShow.ALL,
-    /** A card above the list drives the preview slot instead of the focused row. */
-    previewOverride: (@Composable () -> Unit)? = null,
-    /** Pixels the preview pane rises above the list's top: the header above it belongs to the left column only. */
-    previewRise: () -> Int = { 0 },
     nowSeconds: () -> Long = { System.currentTimeMillis() / 1000L },
 ) {
     val latestOnOpenRecording = rememberUpdatedState(onOpenRecording)
@@ -137,15 +132,9 @@ internal fun ArchiveDepthContent(
         initialFocusEnabled = initialFocusEnabled,
         backEnabled = backEnabled,
         activeFocusRequester = contentFocus,
-        onRootBack = onModeFocus,
         onRootLeft = onDrawerFocus,
         onFirstRowUp = onFirstRowUp,
         pageKeyDirection = at.bernhardberger.tvhplayer.core.ChannelNavigation::pageDirectionForKeyCode,
-        // Below the heading band a row's own pane has, so a card's pane sits where that one does.
-        previewOverride = previewOverride?.let { content ->
-            { Column { ArchiveLevelHeading("") { 0f }; content() } }
-        },
-        previewRise = previewRise,
         modifier = modifier.testTag("recordings-archive-list"),
     )
 }
@@ -243,7 +232,7 @@ private fun archiveDateSections(
     sort: DvrArchiveSort,
     nowSeconds: () -> Long,
 ): Map<Long, DvrDateSection> {
-    if (grouping != DvrArchiveGrouping.NONE || sort != DvrArchiveSort.NEWEST) return emptyMap()
+    if (grouping != DvrArchiveGrouping.FLAT || sort != DvrArchiveSort.NEWEST) return emptyMap()
     val starts = dvrDateSectionStarts(
         root.recordings, java.time.Instant.ofEpochSecond(nowSeconds()), java.time.ZoneId.systemDefault(),
     )
@@ -301,8 +290,8 @@ internal const val ArchiveHeadingPreviewScale = 16f / 22f
 
 /**
  * Column headings are the second level under the Recordings title: titleLarge like the
- * Schedule day headings. In the preview slot they read at the row title size and grow
- * to full size as the column slides into the active slot.
+ * Schedule day headings. In the preview slot there is none, so the line beside the free-space
+ * text stays quiet; the heading fades in and grows to full size as the column slides into the active slot.
  */
 @Composable
 private fun ArchiveLevelHeading(name: String, emphasis: () -> Float) {
@@ -313,6 +302,7 @@ private fun ArchiveLevelHeading(name: String, emphasis: () -> Float) {
             modifier = Modifier.graphicsLayer {
                 scaleX = lerp(ArchiveHeadingPreviewScale, 1f, emphasis())
                 scaleY = scaleX
+                alpha = emphasis().coerceIn(0f, 1f)
                 transformOrigin = TransformOrigin(0f, 1f)
             }.semantics { heading() }.testTag("archive-level-heading"),
         )

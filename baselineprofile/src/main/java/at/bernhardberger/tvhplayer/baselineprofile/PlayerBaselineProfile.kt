@@ -183,9 +183,8 @@ class PlayerBaselineProfile {
     }
 
     private fun MacrobenchmarkScope.browseArchiveAndPlay() {
-        focusToward(By.res("recordings-mode-tabs").hasDescendant(By.focused(true)), KeyEvent.KEYCODE_DPAD_UP, focused = false)
-        focusToward(By.res("recordings-mode-archive"), KeyEvent.KEYCODE_DPAD_LEFT)
-        key(KeyEvent.KEYCODE_DPAD_DOWN)
+        // The Archive list takes the focus on arrival; the pills sit above it.
+        await(By.res("recordings-pills"), "Recordings pills must draw")
         await(By.res("recordings-archive-list"), "Archive must draw")
         val active = By.res("depth-active")
         await(active, "Archive must finish preparing its active list")

@@ -1570,6 +1570,10 @@ fun AppRoot(
                                     activeChannelId = playingChannelId,
                                     activeRecordingId = playingRecordingId,
                                 )
+                                // The drawer opens the library; the Schedule screen is reached from its pill.
+                                if (destination == AppDestination.RECORDINGS) {
+                                    recordingsScreenState.open(at.bernhardberger.tvhplayer.core.DvrLibraryMode.ARCHIVE)
+                                }
                                 navigateTopLevel(
                                     destination.toTopLevelKey(
                                         settingsSection = backStack.lastSettingsSection(),

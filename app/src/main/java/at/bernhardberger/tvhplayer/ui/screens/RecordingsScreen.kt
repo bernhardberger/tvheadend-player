@@ -45,7 +45,6 @@ import at.bernhardberger.tvhplayer.ui.components.ProgrammeArtwork
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 import at.bernhardberger.tvhplayer.ui.common.programmeEpisodeLine
 import at.bernhardberger.tvhplayer.ui.common.recordingSpaceText
-import androidx.compose.foundation.layout.width
 
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 
@@ -63,16 +62,10 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
-import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingMetadataPane
-import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingNowCards
-import at.bernhardberger.tvhplayer.ui.screens.recordings.ArchiveChipRow
-import at.bernhardberger.tvhplayer.ui.screens.recordings.ArchiveChipPanel
-import at.bernhardberger.tvhplayer.ui.screens.recordings.ArchiveChip
+import at.bernhardberger.tvhplayer.ui.screens.recordings.ArchivePillRow
+import at.bernhardberger.tvhplayer.ui.screens.recordings.ArchivePillPanel
+import at.bernhardberger.tvhplayer.ui.screens.recordings.ArchivePill
 import at.bernhardberger.tvhplayer.core.DvrArchiveShow
-import kotlin.math.roundToInt
-import androidx.compose.ui.layout.layout
-import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.LaunchedEffect
@@ -158,8 +151,6 @@ import at.bernhardberger.tvhplayer.core.recordingWasRemoved
 import at.bernhardberger.tvhplayer.core.watchedCount
 import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.ui.TvSpacing12
-import at.bernhardberger.tvhplayer.ui.TvSpacing16
-import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.core.recordingWatchState
 import at.bernhardberger.tvhplayer.ui.rememberCloseBehindPlayer
 import at.bernhardberger.tvhplayer.ui.components.TopLevelBrowseHeader
@@ -177,7 +168,6 @@ import at.bernhardberger.tvhplayer.ui.components.depth.DepthNavigationState
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthStack
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthFrame
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
-import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
 import at.bernhardberger.tvhplayer.ui.TvBrowseLeadingInset
 import at.bernhardberger.tvhplayer.ui.TvBrowseTrailingInset
 import at.bernhardberger.tvhplayer.ui.screens.recordings.PendingRecordingAction
@@ -192,6 +182,7 @@ import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingsEmptyState
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingsPreparationSkeleton
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingsSkeleton
 import at.bernhardberger.tvhplayer.ui.screens.recordings.recordingsHeaderMinHeight
+import at.bernhardberger.tvhplayer.ui.screens.recordings.recordingsHeadingBandHeight
 import at.bernhardberger.tvhplayer.ui.screens.recordings.recordingsLoading
 import at.bernhardberger.tvhplayer.ui.screens.recordings.recordingsAppError
 import at.bernhardberger.tvhplayer.ui.screens.recordings.listItems
@@ -453,23 +444,20 @@ internal fun RecordingsScreenContent(
     var pendingView by rememberPendingArchiveView(view)
     val chosenView = pendingView ?: view
     val chosenGrouping = chosenView.grouping
-    var openChip by remember { mutableStateOf<ArchiveChip?>(null) }
-    val chipPanelOpen = openChip != null
-    val chipFocus = remember { ArchiveChip.entries.associateWith { FocusRequester() } }
-    val cardsFocus = remember { FocusRequester() }
-    // The stop the next frames move focus to: a chip after its panel closes, or the first Recording now card.
+    var openPill by remember { mutableStateOf<ArchivePill?>(null) }
+    val pillPanelOpen = openPill != null
+    val pillFocus = remember { ArchivePill.entries.associateWith { FocusRequester() } }
+    // The stop the next frames move focus to: a pill after its panel closes or the Schedule screen is left.
     var requestStop by remember { mutableStateOf<FocusRequester?>(null) }
-    // The tabs and the Recording now cards slide away while the viewer is in the lists below the chips.
-    var headerSlid by remember { mutableStateOf(false) }
-    // The height the tabs and cards take above the chips: the preview pane rises by it,
-    // to the top it has once they slid away.
-    var headerRise by remember { mutableIntStateOf(0) }
-    var focusedCardId by remember { mutableStateOf<DvrEntryId?>(null) }
-    // The card the viewer was last on: Up from the chips and the end of a card's menu return to it.
-    var lastCardId by remember { mutableStateOf<DvrEntryId?>(null) }
-    var returnToCards by remember { mutableStateOf(false) }
+    // The header stop of the screen shown: the Schedule screen's subnav, else the first pill the Archive has.
+    fun focusHeader(): Boolean {
+        val stops = if (mode != DvrLibraryMode.ARCHIVE) listOf(modeFocus)
+        else listOf(pillFocus.getValue(ArchivePill.GROUP), pillFocus.getValue(ArchivePill.SCHEDULE))
+        return stops.any { runCatching { it.requestFocus() }.getOrDefault(false) }
+    }
     val naming = rememberArchiveNaming(channelsById)
-    // Not watched and Started read the position behind the check mark, so they need the observation's saved position.
+    // Unwatched, Partially watched and Watched read the position behind the check mark,
+    // so they need the observation's saved position.
     fun archiveFor(presentation: RecordingLibraryPresentation, show: DvrArchiveShow): DvrArchiveFolder =
         if (chosenGrouping == DvrArchiveGrouping.FOLDERS && chosenView.sort == DvrArchiveSort.NEWEST && show == DvrArchiveShow.ALL) presentation.archive
         else buildDvrArchive(presentation.archiveEntries, chosenGrouping, naming, chosenView.sort, show) { entry ->
@@ -529,7 +517,7 @@ internal fun RecordingsScreenContent(
         onReadyFocus = {
             // A new session can replace preparation while the viewer owns a mode tab.
             // The temporary anchor must hand back to that tab, not revive a deep link.
-            if (!requestContentFocus && !contentFocusOwned && !loadingFocusParked) modeFocus.requestFocus()
+            if (!requestContentFocus && !contentFocusOwned && !loadingFocusParked) focusHeader()
             else { requestContentFocus = true; true }
         },
         skeleton = { RecordingsPreparationSkeleton(contentPadding, startPadding) })
@@ -598,7 +586,7 @@ internal fun RecordingsScreenContent(
         if (removalHandoff && initialFocusEnabled &&
             drawerState?.currentValue != androidx.tv.material3.DrawerValue.Open
         ) {
-            if (modeFocus.requestFocus()) {
+            if (focusHeader()) {
                 contentFocusOwned = false
                 requestContentFocus = observedKeys.isNotEmpty()
             }
@@ -620,9 +608,9 @@ internal fun RecordingsScreenContent(
         detailsEntry,
         pendingAction,
         folderMenu,
-        chipPanelOpen,
+        pillPanelOpen,
     ) {
-        if (recordingOverlayOpen(detailsEntry, pendingAction, folderMenu) || chipPanelOpen) return@LaunchedEffect
+        if (recordingOverlayOpen(detailsEntry, pendingAction, folderMenu) || pillPanelOpen) return@LaunchedEffect
         val requestedEntry = screenState.requestedScheduleEntryId.value
         // Preparation retains the last projection while the new snapshot is calculated.
         // Only the projection built from the displayed snapshot can judge this target.
@@ -639,7 +627,7 @@ internal fun RecordingsScreenContent(
             if (unavailableScheduleEntry) selectedKeys.remove(location)
             if (!initialFocusEnabled || (!requestContentFocus && !contentFocusOwned)) return@LaunchedEffect
             if (drawerState?.currentValue == androidx.tv.material3.DrawerValue.Open) return@LaunchedEffect
-            if (modeFocus.requestFocus()) {
+            if (focusHeader()) {
                 requestContentFocus = false
                 contentFocusOwned = false
                 loadingFocusParked = true
@@ -671,16 +659,8 @@ internal fun RecordingsScreenContent(
             }
         }
     }
-    val nowCards = remember(archive) { archive.runningRecordings() }
-    val cardsShown = mode == DvrLibraryMode.ARCHIVE && nowCards.isNotEmpty()
-    // The end of a menu or details opened from a card goes back to the card, else to the list.
-    fun restoreAfterOverlay(): Boolean {
-        val toCards = returnToCards && cardsShown
-        val restored = runCatching { if (toCards) cardsFocus.requestFocus() else contentFocus.requestFocus() }
-            .getOrDefault(false)
-        if (restored) returnToCards = false
-        return restored
-    }
+    // The end of a menu or details goes back to the list.
+    fun restoreAfterOverlay(): Boolean = runCatching { contentFocus.requestFocus() }.getOrDefault(false)
     LaunchedEffect(
         detailsEntry,
         pendingAction,
@@ -688,16 +668,14 @@ internal fun RecordingsScreenContent(
         location,
         focusRecoveryGeneration,
         folderMenu,
-        chipPanelOpen,
+        pillPanelOpen,
     ) {
         if (!pendingDetailsReturn) return@LaunchedEffect
-        if (recordingOverlayOpen(detailsEntry, pendingAction, folderMenu) || chipPanelOpen) return@LaunchedEffect
+        if (recordingOverlayOpen(detailsEntry, pendingAction, folderMenu) || pillPanelOpen) return@LaunchedEffect
         repeat(4) {
             withFrameNanos { }
-            val toCards = returnToCards && cardsShown
             val restored = runCatching {
-                if (itemKeys.isEmpty() && !alertShown && !toCards) modeFocus.requestFocus()
-                else restoreAfterOverlay()
+                if (itemKeys.isEmpty() && !alertShown) focusHeader() else restoreAfterOverlay()
             }.getOrDefault(false)
             if (restored) {
                 pendingDetailsReturn = false
@@ -708,11 +686,23 @@ internal fun RecordingsScreenContent(
     }
 
     val modeMotion = rememberTabContentMotion(mode) { screenState.mode.value }
+    // Back from the Schedule screen returns to the Archive, with focus on the Schedule pill it was opened from.
+    BackHandler(
+        enabled = mode != DvrLibraryMode.ARCHIVE && backEnabled && initialFocusEnabled &&
+            !recordingOverlayOpen(detailsEntry, pendingAction, folderMenu) && !pillPanelOpen,
+    ) {
+        screenState.requestedScheduleEntryId.value = null
+        modeMotion.select(DvrLibraryMode.ARCHIVE, DvrLibraryMode.entries)
+        mode = DvrLibraryMode.ARCHIVE
+        contentFocusOwned = false
+        requestContentFocus = false
+        requestStop = pillFocus.getValue(ArchivePill.SCHEDULE)
+    }
     val detailsLayering = at.bernhardberger.tvhplayer.ui.components.LocalBrowseContentLayering.current
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .semantics { if (detailsEntry != null || folderMenu != null || chipPanelOpen) hideFromAccessibility() }
+            .semantics { if (detailsEntry != null || folderMenu != null || pillPanelOpen) hideFromAccessibility() }
             .graphicsLayer { alpha = 1f - (detailsLayering?.detailsAlpha() ?: if (detailsEntry != null && !showContextMenu && !showResumeChoice) 1f else 0f) }
             .onPreviewKeyEvent { event ->
                 if (event.key == relocatingKey) {
@@ -739,151 +729,85 @@ internal fun RecordingsScreenContent(
             .padding(top = contentPadding.calculateTopPadding()),
     ) {
         val archiveMode = mode == DvrLibraryMode.ARCHIVE
-        val chipsShown = archiveMode && presentation.archiveEntries.isNotEmpty()
-        val slide by animateFloatAsState(if (headerSlid && archiveMode) 1f else 0f, label = "recordings-header-slide")
-        val cardsNowSec = at.bernhardberger.tvhplayer.ui.common.rememberDetailsEpochSeconds(nowSecProvider)
-        fun focusTabs() {
-            if (modeFocus.requestFocus()) {
-                contentFocusOwned = false
-                requestContentFocus = false
-            }
+        fun openSchedule() {
+            screenState.requestedScheduleEntryId.value = null
+            modeMotion.select(DvrLibraryMode.SCHEDULE, DvrLibraryMode.entries)
+            mode = DvrLibraryMode.SCHEDULE
+            // The Schedule screen opens on its first entry; with none, the subnav holds the focus.
+            contentFocusOwned = false
+            requestContentFocus = true
         }
-        // Down from the tabs: the Recording now cards, then the chips, then the list.
-        fun moveDownFromTabs(forMode: DvrLibraryMode) {
-            when {
-                forMode != DvrLibraryMode.ARCHIVE -> requestContentFocus = true
-                nowCards.isNotEmpty() -> requestStop = cardsFocus
-                presentation.archiveEntries.isNotEmpty() -> requestStop = chipFocus.getValue(ArchiveChip.GROUP)
-                else -> requestContentFocus = true
-            }
-        }
-        // A card that finishes while it holds focus takes the focus with it: another card, the chips, or else the list.
-        val currentCards by rememberUpdatedState(nowCards)
-        // Back from the cards or the chips: a folder steps up a level, the root returns to the Archive tab.
-        fun backFromHeader() {
-            if (archiveNavigation.stack.canPop) archiveNavigation.pop() else focusTabs()
-        }
-        val leaveToDrawer = drawerFocus?.let { focus ->
-            {
-                if (focus.requestFocus()) {
-                    contentFocusOwned = false
-                    requestContentFocus = false
-                }
-            }
-        }
-        Column(
-            Modifier
-                .slideAway({ slide }) { headerRise = it }
-                .onFocusChanged { if (it.hasFocus) headerSlid = false }
-                .semantics { if (slide >= 1f) hideFromAccessibility() },
-        ) {
-            TopLevelBrowseHeader(
-                title = stringResource(R.string.recordings_title),
-                modifier = Modifier
-                    .padding(start = startPadding + TvBrowseLeadingInset, end = maxOf(endPadding, TvBrowseTrailingInset))
-                    .heightIn(min = recordingsHeaderMinHeight())
-                    .testTag("recordings-header"),
-                leading = {
-                    RecordingModeTabs(
-                        selected = mode,
-                        selectedFocus = modeFocus,
-                        onFocused = {
-                            modeMotion.select(it, DvrLibraryMode.entries)
-                            if (mode != it) {
-                                screenState.requestedScheduleEntryId.value = null
-                                contentFocusOwned = false
-                                requestContentFocus = false
-                            }
-                            mode = it
-                        },
-                        onClick = {
+        TopLevelBrowseHeader(
+            title = stringResource(R.string.recordings_title),
+            modifier = Modifier
+                .padding(start = startPadding + TvBrowseLeadingInset, end = maxOf(endPadding, TvBrowseTrailingInset))
+                .heightIn(min = recordingsHeaderMinHeight())
+                .testTag("recordings-header"),
+            leading = if (archiveMode) null else ({
+                RecordingModeTabs(
+                    selected = mode,
+                    selectedFocus = modeFocus,
+                    modes = listOf(DvrLibraryMode.SCHEDULE, DvrLibraryMode.PROBLEMS),
+                    onFocused = {
+                        modeMotion.select(it, DvrLibraryMode.entries)
+                        if (mode != it) {
                             screenState.requestedScheduleEntryId.value = null
-                            modeMotion.select(it, DvrLibraryMode.entries)
-                            mode = it
-                            moveDownFromTabs(it)
-                        },
-                        onMoveToContent = { moveDownFromTabs(mode) },
-                        modifier = Modifier
-                            .onPreviewKeyEvent {
-                                // A deliberate header move gives the viewer ownership, not the loading handoff.
-                                screenState.requestedScheduleEntryId.value = null
-                                loadingFocusParked = false
-                                contentFocusOwned = false
-                                false
-                            }
-                            .testTag("recordings-mode-tabs"),
-                    )
-                },
-            )
-            AnimatedVisibility(visible = archiveMode && nowCards.isNotEmpty()) {
-                RecordingNowCards(
-                    entries = nowCards,
-                    channelsById = channelsById,
-                    nowSec = cardsNowSec,
-                    cardFocus = cardsFocus,
-                    focusTarget = lastCardId,
-                    // Only the list's column wide: the preview pane owns the space to its right, from the top down.
-                    modifier = Modifier.width(startPadding + TvBrowseLeadingInset + TvBrowseColumnWidth),
-                    contentPadding = PaddingValues(start = startPadding + TvBrowseLeadingInset, end = TvSpacing16),
-                    onOpen = { openRecording(it) },
-                    onOpenMenu = {
-                        contentFocusOwned = false
-                        returnToCards = true
-                        detailsInitialAction = null
-                        detailsEntry = it
-                        detailsObservation = observation
-                        showContextMenu = true
-                    },
-                    onCardFocus = { entry, focused ->
-                        if (focused) {
-                            focusedCardId = entry.id
-                            lastCardId = entry.id
                             contentFocusOwned = false
                             requestContentFocus = false
-                        } else if (focusedCardId == entry.id) {
-                            focusedCardId = null
-                            if (currentCards.none { it.id == entry.id }) {
-                                when {
-                                    currentCards.isNotEmpty() -> requestStop = cardsFocus
-                                    chipsShown -> requestStop = chipFocus.getValue(ArchiveChip.GROUP)
-                                    else -> requestContentFocus = true
-                                }
-                            }
+                        }
+                        mode = it
+                    },
+                    onClick = {
+                        screenState.requestedScheduleEntryId.value = null
+                        modeMotion.select(it, DvrLibraryMode.entries)
+                        mode = it
+                        requestContentFocus = true
+                    },
+                    onMoveToContent = { requestContentFocus = true },
+                    modifier = Modifier
+                        .onPreviewKeyEvent {
+                            // A deliberate header move gives the viewer ownership, not the loading handoff.
+                            screenState.requestedScheduleEntryId.value = null
+                            loadingFocusParked = false
+                            contentFocusOwned = false
+                            false
+                        }
+                        .testTag("recordings-mode-tabs"),
+                )
+            }),
+            actions = if (!archiveMode) null else ({
+                ArchivePillRow(
+                    view = chosenView,
+                    problems = library.problems.size,
+                    showView = presentation.archiveEntries.isNotEmpty(),
+                    focusRequesters = pillFocus,
+                    navigationFocus = drawerFocus,
+                    canStepBack = archiveNavigation.stack.canPop,
+                    onOpen = { pill ->
+                        if (pill == ArchivePill.SCHEDULE) openSchedule()
+                        else {
+                            contentFocusOwned = false
+                            openPill = pill
                         }
                     },
-                    onUp = ::focusTabs,
-                    onDown = { requestStop = chipFocus.getValue(ArchiveChip.GROUP) },
-                    onLeft = leaveToDrawer,
-                    onBack = ::backFromHeader,
-                )
-            }
-        }
-        AnimatedVisibility(visible = chipsShown) {
-            ArchiveChipRow(
-                view = chosenView,
-                focusRequesters = chipFocus,
-                onOpen = { chip ->
-                    contentFocusOwned = false
-                    openChip = chip
-                },
-                onUp = { if (nowCards.isNotEmpty()) requestStop = cardsFocus else focusTabs() },
-                onDown = { runCatching { contentFocus.requestFocus() } },
-                onLeft = leaveToDrawer,
-                onBack = ::backFromHeader,
-                onFocusChanged = {
-                    if (it) {
+                    onDown = { runCatching { contentFocus.requestFocus() } },
+                    onBack = { archiveNavigation.pop() },
+                    onFocusChanged = {
+                        if (it) {
+                            contentFocusOwned = false
+                            requestContentFocus = false
+                        }
+                    },
+                    modifier = Modifier.onPreviewKeyEvent {
+                        // A deliberate header move gives the viewer ownership, not the loading handoff.
+                        screenState.requestedScheduleEntryId.value = null
+                        loadingFocusParked = false
                         contentFocusOwned = false
-                        requestContentFocus = false
-                    }
-                },
-                modifier = Modifier
-                    .padding(
-                        start = startPadding + TvBrowseLeadingInset,
-                        end = maxOf(endPadding, TvBrowseTrailingInset),
-                        top = TvSpacing8,
-                    ),
-            )
-        }
+                        false
+                    },
+                )
+            }),
+        )
         TabContent(
             motion = modeMotion,
             selectedKey = mode,
@@ -931,7 +855,7 @@ internal fun RecordingsScreenContent(
                     }
                 },
                 actionFocus = if (owner.isCurrent) contentFocus else remember { FocusRequester() },
-                upFocus = modeFocus,
+                upFocus = if (mode == DvrLibraryMode.ARCHIVE) pillFocus.getValue(ArchivePill.SCHEDULE) else modeFocus,
                 modifier = Modifier
                     .padding(start = startPadding, end = endPadding, bottom = contentPadding.calculateBottomPadding())
                     .onFocusChanged {
@@ -954,37 +878,18 @@ internal fun RecordingsScreenContent(
                     ),
                     isCurrent = owner.isCurrent,
                     initialFocusEnabled = owner.isCurrent && initialFocusEnabled &&
-                        detailsEntry == null && folderMenu == null && !chipPanelOpen &&
+                        detailsEntry == null && folderMenu == null && !pillPanelOpen &&
                         (contentFocusOwned || requestContentFocus),
-                    backEnabled = backEnabled && detailsEntry == null && folderMenu == null && !chipPanelOpen &&
+                    backEnabled = backEnabled && detailsEntry == null && folderMenu == null && !pillPanelOpen &&
                         contentFocusOwned,
                     grouping = chosenGrouping,
                     sort = chosenView.sort,
                     fullRoot = frame.fullArchive,
                     show = chosenView.show,
-                    previewRise = { headerRise },
-                    previewOverride = focusedCardId?.takeIf { owner.isCurrent }
-                        ?.let { id -> nowCards.firstOrNull { it.id == id } }?.let { entry ->
-                            {
-                                RecordingMetadataPane(
-                                    entry, entry.channelId?.let(channelsById::get)?.icon,
-                                    observation.recordingPlaybackAdmission(entry),
-                                    Modifier.padding(bottom = contentPadding.calculateBottomPadding()),
-                                )
-                            }
-                        },
                     onFirstRowUp = {
-                        if (owner.isCurrent && runCatching { chipFocus.getValue(ArchiveChip.GROUP).requestFocus() }
-                                .getOrDefault(false)
-                        ) contentFocusOwned = false
+                        if (owner.isCurrent && focusHeader()) contentFocusOwned = false
                     },
                     contentFocus = contentFocus,
-                    onModeFocus = {
-                        if (owner.isCurrent && modeFocus.requestFocus()) {
-                            contentFocusOwned = false
-                            requestContentFocus = false
-                        }
-                    },
                     onDrawerFocus = drawerFocus?.let { focus -> {
                         if (owner.isCurrent && focus.requestFocus()) {
                             contentFocusOwned = false
@@ -999,7 +904,6 @@ internal fun RecordingsScreenContent(
                     onOpenContextMenu = {
                         if (owner.isCurrent) {
                             contentFocusOwned = false
-                            returnToCards = false
                             detailsInitialAction = null
                             detailsEntry = it
                             detailsObservation = observation
@@ -1024,10 +928,7 @@ internal fun RecordingsScreenContent(
                     modifier = Modifier.fillMaxSize().onFocusChanged {
                         if (owner.isCurrent) {
                             contentHasFocus = it.hasFocus
-                            if (it.hasFocus) {
-                                contentFocusOwned = true
-                                headerSlid = true
-                            }
+                            if (it.hasFocus) contentFocusOwned = true
                         }
                     },
                 )
@@ -1125,15 +1026,18 @@ internal fun RecordingsScreenContent(
         }
     }
 
-    // Quiet information at the screen's top end: no focus stop, and it stays put while the tabs slide away.
-    recordingSpaceText(observation.dvrDiskSpaceState)?.let { value ->
+    // Quiet information on the Archive's headline line, at the content's end: no focus stop, and it never moves.
+    recordingSpaceText(observation.dvrDiskSpaceState)?.takeIf { mode == DvrLibraryMode.ARCHIVE }?.let { value ->
         val description = stringResource(R.string.recording_space_line_description, value)
         Box(
             Modifier
                 .align(Alignment.TopEnd)
-                .padding(top = contentPadding.calculateTopPadding(), end = maxOf(endPadding, TvBrowseTrailingInset))
-                .height(recordingsHeaderMinHeight())
-                .semantics { if (detailsEntry != null || folderMenu != null || chipPanelOpen) hideFromAccessibility() },
+                .padding(
+                    top = contentPadding.calculateTopPadding() + recordingsHeaderMinHeight() + TvSpacing12,
+                    end = maxOf(endPadding, TvBrowseTrailingInset),
+                )
+                .height(recordingsHeadingBandHeight())
+                .semantics { if (detailsEntry != null || folderMenu != null || pillPanelOpen) hideFromAccessibility() },
             contentAlignment = Alignment.CenterEnd,
         ) {
             Text(
@@ -1580,9 +1484,9 @@ internal fun RecordingsScreenContent(
     }
     }
     FolderMenu()
-    openChip?.let { chip ->
-        ArchiveChipPanel(
-            chip = chip,
+    openPill?.let { pill ->
+        ArchivePillPanel(
+            pill = pill,
             current = chosenView,
             onChoose = { choice ->
                 if (choice != chosenView) {
@@ -1601,8 +1505,8 @@ internal fun RecordingsScreenContent(
                 }
             },
             onClose = {
-                openChip = null
-                requestStop = chipFocus.getValue(chip)
+                openPill = null
+                requestStop = pillFocus.getValue(pill)
             },
         )
     }
@@ -1635,17 +1539,3 @@ private fun rememberArchiveNaming(channelsById: Map<ChannelId, Channel>): DvrArc
         )
     }
 }
-
-/**
- * Collapses the content upward and fades it as [progress] goes from 0 to 1; it stays composed and focusable.
- * [onHeight] gets the height it takes.
- */
-private fun Modifier.slideAway(progress: () -> Float, onHeight: (Int) -> Unit): Modifier = this
-    .clipToBounds()
-    .layout { measurable, constraints ->
-        val placeable = measurable.measure(constraints)
-        val height = (placeable.height * (1f - progress())).roundToInt()
-        onHeight(height)
-        layout(placeable.width, height) { placeable.placeRelative(0, height - placeable.height) }
-    }
-    .graphicsLayer { alpha = 1f - progress() }

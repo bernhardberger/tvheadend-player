@@ -69,7 +69,7 @@ class ArchiveDepthOwnershipTest {
                             contentPadding = PaddingValues(24.dp),
                             isCurrent = owner.isCurrent, initialFocusEnabled = owner.isCurrent,
                             backEnabled = owner.isCurrent, contentFocus = requester,
-                            onModeFocus = {}, onDrawerFocus = null, onFirstRowUp = {},
+                            onDrawerFocus = null, onFirstRowUp = {},
                             onOpenRecording = { opened += it.id },
                             piconForEntry = { null },
                             admissionForEntry = { null },
