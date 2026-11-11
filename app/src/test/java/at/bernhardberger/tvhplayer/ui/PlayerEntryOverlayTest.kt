@@ -439,7 +439,7 @@ class PlayerEntryOverlayTest {
 
     private fun soundOnlyEntry(from: String) {
         // The rail shows only what still plays, so the slot's entry keeps its tune open.
-        app(programme = true, mode = WarmPlaybackMode.AUDIO_ONLY, syntheticVideo = true, holdLive = from == "rail")
+        app(programme = true, mode = WarmPlaybackMode.AUDIO_ONLY, syntheticVideo = true, holdLive = from == "rail" || from == "browse")
         compose.onNodeWithTag("channel-row-1").performSemanticsAction(SemanticsActions.OnClick)
         compose.waitUntil(10_000) { playerVisible && runtime.activeTarget.value != null }
         settle()
@@ -497,7 +497,7 @@ class PlayerEntryOverlayTest {
     private fun browseLive(mode: WarmPlaybackMode) {
         val layout = if (mode == WarmPlaybackMode.AUDIO_ONLY) ChannelsLayout.IMMERSIVE else ChannelsLayout.LIST
         val entryTag = if (layout == ChannelsLayout.LIST) "channel-row-1" else "channel-card-1"
-        app(programme = true, mode = mode, channelsLayout = layout)
+        app(programme = true, mode = mode, channelsLayout = layout, holdLive = true)
         compose.onNodeWithTag(entryTag).performSemanticsAction(SemanticsActions.OnClick)
         compose.waitUntil(10_000) { playerVisible && runtime.activeTarget.value != null }
         settle()
