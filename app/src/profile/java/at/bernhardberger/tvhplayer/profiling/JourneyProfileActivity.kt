@@ -134,7 +134,7 @@ class JourneyProfileActivity : AppCompatActivity() {
             session.publish(observation)
             val catalog = ViewModelProvider.create(
                 this@JourneyProfileActivity,
-                viewModelFactory { initializer { ChannelsViewModel(session, tags) } },
+                viewModelFactory { initializer { ChannelsViewModel(session, tags, profiles.liveProfile) } },
             )[ChannelsViewModel::class]
             val selection = ChannelSelectionStore()
             val lastPlayed = LastPlayedChannelStore(this@JourneyProfileActivity)

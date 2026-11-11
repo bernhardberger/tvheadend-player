@@ -18,6 +18,7 @@ import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.test.platform.app.InstrumentationRegistry
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
+import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchRequests
 import at.bernhardberger.tvhplayer.core.MainStartupState
 import at.bernhardberger.tvhplayer.di.SdkRuntimeOwner
@@ -72,7 +73,7 @@ class AppRootBackNavigationTest {
                     owner.appProfileOwner.configurationGeneration, get())
             }
             viewModel { AppConnectionViewModel(get(), get(), get()) }
-            viewModel { ChannelsViewModel(get(), get()) }
+            viewModel { ChannelsViewModel(get(), get(), get<AppProfileOwner>().liveProfile) }
         }
         compose.runOnIdle { activity.setContent {} }
         compose.waitForIdle()
