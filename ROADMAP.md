@@ -13,15 +13,21 @@ Where this is going, as of 0.4.1. No dates. What's already shipped is in the
   welcome.
 - **Remote keys.** GUIDE only toggles the channel schedule in the player right
   now. GUIDE and TV should work across the whole app. There'll also be a small
-  screen that shows which key code your remote sends.
+  screen that shows which key code your remote sends. For 0.5, I also want the
+  recording list, play/pause, fast-forward, rewind and record buttons to work in
+  the app; play/pause shouldn't open the full controls.
 - **Polish.** Channels and the player get adjusted to the rules Home set. Focus
   and Back get a pass across all screens, and time and duration formats get tidied
   up.
 - **Speed.** Making it feel fast on budget Google TVs.
-- **Appliance build.** For TVs that should start straight into the app.
+- **Appliance build.** For TVs that should start straight into the app. In 0.5,
+  autoplay should be a deliberate choice, not enabled by default.
 - **Fire TV.** A build and an Amazon Appstore listing.
 - **Commercial-break marks in recordings** ([issue #3](https://github.com/bernhardberger/tvheadend-player/issues/3)).
   Show the breaks that Comskip finds on the timeline and let you jump past them.
+- **Watching running recordings in more formats** ([issue #24](https://github.com/bernhardberger/tvheadend-player/issues/24)).
+  Matroska first, then other formats where possible. Before 1.0, with no release
+  slot assigned yet.
 
 ## I want these before 1.0, if they work out
 
