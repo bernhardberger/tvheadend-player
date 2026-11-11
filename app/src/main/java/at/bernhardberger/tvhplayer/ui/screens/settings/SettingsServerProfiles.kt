@@ -101,7 +101,7 @@ internal fun settingsServerLevels(
             profiles == ServerProfileListResult.Unavailable -> stringResource(R.string.server_list_unavailable)
             else -> null
         })
-    return listOf(connection) + stored.map { settingsServerLevel(it, it.id == list?.activeId, status, actions) }
+    return listOf(connection) + stored.map { settingsServerLevel(it, it.id == list?.activeId, actions) }
 }
 
 @Composable
@@ -159,33 +159,27 @@ private fun ServerRowDetail(detail: String, state: List<String>, problem: Boolea
 
 /**
  * One server's level: its actions first, then what it connects to, as focusable rows without an
- * action. "Use this connection" switches to this one; on the one in use it is inert, carries a
- * check, and [status] says how it is doing.
+ * action. "Use this connection" switches to this one and is absent on the connection already in use.
  */
 @Composable
 internal fun settingsServerLevel(
     profile: ServerProfileSummary,
     active: Boolean,
-    status: ConnectionOverviewStatus,
     actions: ServerProfileActions,
 ): DepthLevel {
     val username = profile.accountName()
     val rows = buildList {
         // An unreadable password can't connect: Enter password is how that server gets used.
-        if (!profile.passwordNeeded()) add(settingsRow(SERVER_USE, stringResource(R.string.server_use),
-            supporting = when {
-                active && status.state != ConnectionOverviewState.CONNECTED -> status.title
-                active -> stringResource(R.string.server_in_use)
-                username == null -> stringResource(R.string.server_use_anonymous)
-                else -> stringResource(R.string.server_use_sign_in, username)
-            },
-            trailingIcon = R.drawable.ic_check.takeIf { active }, onClick = { if (!active) actions.onUse(profile) }))
+        if (!active && !profile.passwordNeeded()) add(settingsRow(SERVER_USE, stringResource(R.string.server_use),
+            supporting = if (username == null) stringResource(R.string.server_use_anonymous)
+                else stringResource(R.string.server_use_sign_in, username),
+            onClick = { actions.onUse(profile) }))
         if (profile.passwordNeeded()) add(settingsRow(SERVER_PASSWORD, stringResource(R.string.server_enter_password),
             supporting = stringResource(R.string.server_password_needed),
-            trailingIcon = R.drawable.ic_arrow_circle_right, onClick = { actions.onEnterPassword(profile) }))
+            onClick = { actions.onEnterPassword(profile) }))
         add(settingsRow(EDIT_CONNECTION, stringResource(R.string.setup_connection),
             supporting = stringResource(R.string.setup_connection_description),
-            trailingIcon = R.drawable.ic_arrow_circle_right, onClick = { actions.onSetUp(profile) }))
+            onClick = { actions.onSetUp(profile) }))
         add(settingsRow(SERVER_NAME, stringResource(R.string.server_name),
             supporting = profile.label ?: stringResource(R.string.server_name_not_set),
             trailingIcon = R.drawable.ic_edit, onClick = { actions.onName(profile) }))

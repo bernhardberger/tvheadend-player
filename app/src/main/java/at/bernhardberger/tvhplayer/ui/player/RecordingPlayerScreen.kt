@@ -186,7 +186,7 @@ fun RecordingPlayerScreen(
     val recordingResolved = entry != null ||
         admission != null ||
         playbackState is AppPlaybackState.Failed
-    val recordingLoading = !recordingResolved && connectionAvailable
+    val recordingResolving = !recordingResolved && connectionAvailable
     val initialConnectionFailure = !recordingResolved && !connectionAvailable
     val player = remember { session.player }
     val playWhenReady by rememberPlaybackIntent(player)
@@ -406,15 +406,6 @@ fun RecordingPlayerScreen(
             stepPreview = bannerStep,
         )
     }
-    // One playback state for the chrome's state cell and, hidden, the chip at its bottom-start place.
-    val bufferingEligible = bufferingStatusEligible(
-        playbackState, playWhenReady, activeTarget, AppPlaybackTarget.Recording(recordingId),
-        playbackAvailable && retainedSelection != null && retainedSelection.currentSession === currentSession,
-        foregroundBlocked = recordingLoading || foregroundContext.recoveryVisible || foregroundContext.terminalErrorVisible,
-    )
-    val bufferingVisible by rememberBusyVisible(
-        AppPlaybackTarget.Recording(recordingId) to retainedSelection, bufferingEligible, PlayerBusyStatus.BUFFERING,
-    )
     val recordedLengthMs = durationMs.takeIf { it != C.TIME_UNSET && it > 0L }
     val chromeState = playerStateCell(paused = !playWhenReady)
     val audioOnly = tracksAudioOnly(rememberPlayerTracks(player))
@@ -427,6 +418,29 @@ fun RecordingPlayerScreen(
         playing = playbackState is AppPlaybackState.Playing,
         audioOnly = audioOnly,
     )
+    val busyTarget = AppPlaybackTarget.Recording(recordingId)
+    val busyKey = Triple(busyTarget, currentSession, videoPresentation.epoch)
+    var recordingPresented by remember(busyKey) { mutableStateOf(false) }
+    LaunchedEffect(busyKey, bannerFramePresented) {
+        if (bannerFramePresented) recordingPresented = true
+    }
+    val loadingBlocked = foregroundLayer != PlayerForegroundLayer.NONE
+    val startingEligible = tuningStatusEligible(
+        playbackState, playWhenReady, activeTarget, busyTarget,
+        playbackAvailable && retainedSelection != null && retainedSelection.currentSession === currentSession,
+        loadingBlocked, recordingPresented || bannerFramePresented,
+    )
+    val recordingLoading by rememberBusyVisible(
+        busyKey, !loadingBlocked && (recordingResolving || startingEligible), PlayerBusyStatus.TUNING,
+    )
+    // Startup owns feedback until a frame; later seeks use the ordinary buffering ring.
+    val bufferingEligible = bufferingStatusEligible(
+        playbackState, playWhenReady, activeTarget, busyTarget,
+        playbackAvailable && retainedSelection != null && retainedSelection.currentSession === currentSession,
+        foregroundBlocked = recordingResolving || startingEligible ||
+            foregroundContext.recoveryVisible || foregroundContext.terminalErrorVisible,
+    )
+    val bufferingVisible by rememberBusyVisible(busyKey, bufferingEligible, PlayerBusyStatus.BUFFERING)
     SideEffect {
         chrome.onBannerFramePresented(bannerFramePresented)
         chrome.holdBanner(!playWhenReady)

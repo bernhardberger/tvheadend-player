@@ -22,7 +22,6 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import at.bernhardberger.tvheadend.sdk.core.ServerProfileAuthenticationMode
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileSummary
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.settings.serverProfileAddress
@@ -32,7 +31,6 @@ import at.bernhardberger.tvhplayer.ui.components.GuidedStepGuidance
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepLayout
 import at.bernhardberger.tvhplayer.ui.components.TvOutlinedTextField
 import at.bernhardberger.tvhplayer.ui.components.arrivalFocus
-import at.bernhardberger.tvhplayer.ui.components.serverAddress
 
 /** The longest name a server profile stores. */
 internal const val SERVER_NAME_MAX_LENGTH = 64
@@ -54,17 +52,13 @@ internal fun SettingsServerName(
     var name by rememberSaveable(profile.id.value) { mutableStateOf(profile.label.orEmpty()) }
     var editingId by rememberSaveable { mutableStateOf<String?>(null) }
     val save = { onSave(name.trim().takeIf { it.isNotEmpty() }) }
-    val username = profile.username?.takeIf { profile.authenticationMode == ServerProfileAuthenticationMode.PASSWORD }
     val fallback = serverProfileAddress(profile)
-    val address = serverAddress(profile.host, profile.port.toString())
     val fieldLabel = stringResource(R.string.server_name_field)
     SettingsSetupFrame {
         GuidedStepLayout(guidance = {
             GuidedStepGuidance(
                 title = stringResource(R.string.server_name_title),
                 body = stringResource(R.string.server_name_body, fallback),
-                meta = if (username == null) address
-                else stringResource(R.string.server_detail_separator, username, address),
             )
         }) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {

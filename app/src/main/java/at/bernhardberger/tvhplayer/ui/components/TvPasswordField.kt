@@ -84,6 +84,7 @@ fun TvPasswordField(
     val revealed = canReveal && passwordVisible
 
     BackHandler(enabled = isEditing) { setEditingId(null) }
+    EndEditWhenKeyboardHides(isEditing) { setEditingId(null) }
 
     LaunchedEffect(isEditing) {
         if (isEditing) {

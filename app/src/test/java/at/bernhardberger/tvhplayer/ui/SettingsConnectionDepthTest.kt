@@ -121,7 +121,6 @@ class SettingsConnectionDepthTest {
         compose.onNodeWithText("Connection").assertIsFocused()
         press(Key.DirectionCenter)
         press(Key.DirectionCenter)
-        press(Key.DirectionDown) // The level opens on the selected "Use this connection", above Edit.
         compose.onNodeWithText("Edit connection").assertIsFocused()
         assertEquals(0, editor.loads)
         press(Key.DirectionRight) // Dedicated leaf actions do not enter on Right.
@@ -214,7 +213,6 @@ class SettingsConnectionDepthTest {
         }
         press(Key.DirectionCenter)
         press(Key.DirectionCenter)
-        press(Key.DirectionDown) // The level opens on the selected "Use this connection", above Edit.
         compose.onNodeWithText("Edit connection").assertIsFocused()
 
         // Leaving while the test runs cancels it, which disconnects the draft and restores the saved connection.
@@ -256,7 +254,6 @@ class SettingsConnectionDepthTest {
             }
         }
         repeat(2) { press(Key.DirectionCenter) }
-        press(Key.DirectionDown) // The level opens on the selected "Use this connection", above Edit.
         press(Key.DirectionCenter)
         press(Key.DirectionUp)
         compose.onNodeWithTag("setup-port").assertIsFocused()
@@ -282,7 +279,6 @@ class SettingsConnectionDepthTest {
             }
         }
         repeat(2) { press(Key.DirectionCenter) }
-        press(Key.DirectionDown) // The level opens on the selected "Use this connection", above Edit.
         press(Key.DirectionCenter)
         connect()
         compose.runOnIdle { session.publish(unavailable()) }
@@ -331,7 +327,6 @@ class SettingsConnectionDepthTest {
         compose.onNodeWithText("Connection").assertIsFocused()
         press(Key.DirectionCenter)
         press(Key.DirectionCenter)
-        press(Key.DirectionDown) // The level opens on the selected "Use this connection", above Edit.
         compose.onNodeWithText("Edit connection").assertIsFocused()
         val parent = navigation.stack.active
         press(Key.DirectionCenter)
