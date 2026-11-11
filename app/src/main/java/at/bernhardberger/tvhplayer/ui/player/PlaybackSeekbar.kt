@@ -71,6 +71,7 @@ fun PlaybackSeekbar(
     onStepAnnounced: () -> Unit = {},
     /** The step's identity: the seek state's preview. */
     stepId: Any? = null,
+    scrubSpeed: Int = 0,
     /** The state cell, the end after the bar (replacing the end label) and live TV's distance behind live. */
     barStatus: PlayerBarStatus? = null,
     /** The clock time the timeshift buffer starts at; the leading label without programme clocks. */
@@ -254,7 +255,7 @@ fun PlaybackSeekbar(
         } ?: state
     }
     // The whole value, metadata included, holds still during a burst; the buffer's length is read when the step settles.
-    val spokenDescription = rememberSteppedSpoken(
+    val spokenDescription = scrubSpeedDescription(scrubSpeed) ?: rememberSteppedSpoken(
         plain = spokenValue(plainDescription),
         stepId = stepId,
         stepKey = readout?.let { "${it.text}|${it.target}" },
@@ -298,7 +299,7 @@ fun PlaybackSeekbar(
             motionKey = motionKey to schedule?.axisKey,
             feedback = windowFeedback,
             feedbackIsError = feedbackIsError,
-            previewLabel = readout?.text,
+            previewLabel = scrubSpeedLabel(scrubSpeed) ?: readout?.text,
             previewAtLive = readout?.atLive == true,
             previewTarget = readout?.target,
             previewDirection = stepDeltaMs?.takeIf { previewing }?.let(::stepDirection),

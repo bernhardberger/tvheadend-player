@@ -54,6 +54,10 @@ class NoticeFormatterTest {
     }
 
     @Test fun unavailablePauseNamesTheSettingOrChannel() {
+        val pause = Notice.PauseUnavailable(PauseUnavailableReason.SETTINGS_OFF)
+        val record = Notice.RecordUnavailable(null)
+        assertEquals(pause.severity, record.severity)
+        assertEquals(formatter.format(pause).icon, formatter.format(record).icon)
         assertEquals("Timeshift is off in Settings.",
             formatter.format(Notice.PauseUnavailable(PauseUnavailableReason.SETTINGS_OFF)).headline)
         assertEquals("Pause isn't available on this channel.",

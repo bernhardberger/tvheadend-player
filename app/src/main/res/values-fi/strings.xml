@@ -1,4 +1,10 @@
 <resources>
+    <string name="record_unavailable">Tätä ohjelmaa ei voi tallentaa</string>
+    <string name="record_unavailable_ended">Se on jo päättynyt.</string>
+    <string name="record_unavailable_no_programme">Tälle kanavalle ei ole ohjelmatietoja.</string>
+    <string name="record_unavailable_permission">Tällä tilillä ei ole oikeutta tallentaa.</string>
+    <string name="player_scrub_forward">Kelaus eteenpäin, %1$d-kertainen nopeus</string>
+    <string name="player_scrub_backward">Kelaus taaksepäin, %1$d-kertainen nopeus</string>
     <string name="recording_ad_break_skipped">Mainoskatko ohitettu</string>
     <string name="player_full_screen">Koko näyttö</string>
     <string name="stop">Pysäytä</string>
@@ -155,9 +161,6 @@
     <string name="onboarding_connecting_title">Yhdistetään palvelimeen %1$s</string>
     <string name="onboarding_connecting_body">Tarkistetaan palvelinta ja kirjaudutaan käyttäjänä %1$s. Peruuta painamalla Back.</string>
     <string name="onboarding_connecting_body_anonymous">Tarkistetaan palvelinta. Peruuta painamalla Back.</string>
-    <string name="onboarding_connecting">Yhdistetään…</string>
-    <string name="onboarding_failure_meta">%1$s • portti %2$s • käyttäjä %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s • portti %2$s</string>
     <string name="onboarding_change_address">Vaihda osoite</string>
     <string name="onboarding_change_address_detail">%1$s • portti %2$s</string>
     <string name="onboarding_change_sign_in">Vaihda tili</string>
@@ -369,6 +372,11 @@
     <string name="connection_retry_description">Tvheadend Player yrittää myös automaattisesti uudelleen</string>
     <string name="connection_notice_restored">Yhteys palautui</string>
     <string name="server_switched">Yhdistetty: %1$s</string>
+    <string name="cancel">Peru</string>
+    <string name="server_go_home">Avaa etusivu</string>
+    <string name="back_to_settings">Takaisin asetuksiin</string>
+    <string name="server_still_in_use">%1$s on edelleen käytössä</string>
+    <string name="server_switch_unreachable_body">%1$s ei vastannut yhteydenottoon. Tarkista, että palvelin on käynnissä ja samassa verkossa.</string>
     <string name="connection_scope_line">Kohteelle %1$s</string>
     <string name="connection_notice_login_rejected">Kirjautuminen hylättiin</string>
     <string name="recording_action_permission">Tällä tilillä ei ole oikeutta hallita tallennuksia.</string>

@@ -197,10 +197,15 @@ internal fun ProgrammeDetailsPage(
         else if (section == DetailsSection.ACTIONS) onClose() else restoreAction()
     }
     BackHandler(enabled = backEnabled, onBack = ::close)
-    LaunchedEffect(reading) {
-        if (!reading && section in listOf(DetailsSection.ABOUT, DetailsSection.FACTS)) {
+    LaunchedEffect(reading, backEnabled) {
+        if (!reading && backEnabled) {
             withFrameNanos { }
-            (if (section == DetailsSection.FACTS) factsFocus else aboutFocus).requestFocus()
+            when (section) {
+                DetailsSection.ACTIONS -> restoreAction()
+                DetailsSection.FACTS -> factsFocus.requestFocus()
+                DetailsSection.ABOUT -> aboutFocus.requestFocus()
+                else -> Unit
+            }
         }
     }
     LaunchedEffect(actions, backEnabled) {
@@ -269,6 +274,19 @@ internal fun ProgrammeDetailsPage(
                 val activation = key.key in listOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter)
                 when {
                     !backEnabled -> true
+                    event != null && key.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_MEDIA_RECORD -> {
+                        val action = actions.firstOrNull {
+                            it == BrowseContextAction.STOP || it == BrowseContextAction.CANCEL
+                        }
+                        if (key.type == KeyEventType.KeyDown && key.nativeKeyEvent.repeatCount == 0 && action != null) {
+                            lastAction = action
+                            if (reading) {
+                                section = DetailsSection.ACTIONS
+                                reading = false
+                            } else restoreAction()
+                        }
+                        true
+                    }
                     activation && openingRelease -> {
                         if (key.type == KeyEventType.KeyDown && key.nativeKeyEvent.repeatCount == 0) {
                             openingRelease = false; false

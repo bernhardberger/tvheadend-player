@@ -170,6 +170,7 @@ abstract class LivePlayerChromeFixture {
     protected lateinit var view: View
 
     protected lateinit var runtime: AppPlaybackRuntime
+    protected lateinit var timeshiftConnection: ScriptedSubscriptionConnection
 
     protected lateinit var session: FakeTvheadendSession
 
@@ -274,6 +275,7 @@ abstract class LivePlayerChromeFixture {
             scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 3_600L)))
         }
         val manager = createSubscriptionManager(connection, subscriptionDispatcher).apply { startAdmission() }
+        timeshiftConnection = connection
         try {
             screen(opener = manager, onClose = onClose)
             startLiveSubscription(connection, height = 1080L, signal = 53739L, timeshift = true)
@@ -517,8 +519,9 @@ abstract class LivePlayerChromeFixture {
             if (returnToSameChannel) {
                 // Media3's ExoPlayer playback thread binds the grant after collection registration.
                 compose.waitUntil(5_000) { idleMainLooper(); runtime.livePause.value.availability == LivePauseAvailability.READY }
-                // A transport command ends the undisturbed-live-start token without relying
-                // on Center's layer-dependent toggle behavior or pausing the old sample.
+                // With controls open Play keeps its explicit intent; hidden media keys toggle
+                // like Center. End the live-start token without pausing the old sample.
+                key(Key.DirectionDown)
                 key(Key.MediaPlay)
                 assertTrue(player.playWhenReady)
                 assertEquals("transport command kept the subscription", 1, connection.subscribeCount)

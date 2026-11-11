@@ -31,6 +31,61 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PlayerTimelinePresentationStateTest {
+    @Test fun liveScrubHoldsThePendingTargetAndResumesOnlyAfterAnAcceptedCommit() = runTest {
+        val overlappingFixture = fixture()
+        val overlappingOwner = LiveTimelinePresentationState(this, { 0L }, { testScheduler.currentTime })
+        val older = CompletableDeferred<TimeshiftContentSeekResult>()
+        val newer = CompletableDeferred<TimeshiftContentSeekResult>()
+        var dispatches = 0
+        var resumedNewer = false
+        val seek: suspend (TimeshiftSeekSelection) -> TimeshiftContentSeekResult = {
+            if (++dispatches == 1) older.await() else newer.await()
+        }
+        overlappingOwner.queueRelativeSeek(overlappingFixture.presentation(), -10_000,
+            "unavailable", "expired", "replaced", "uncertain", seek)
+        advanceTimeBy(500)
+        runCurrent()
+        assertEquals(1, dispatches)
+        overlappingOwner.startScrub(-1)
+        overlappingOwner.queueRelativeSeek(overlappingFixture.presentation(), -2_000,
+            "unavailable", "expired", "replaced", "uncertain", seek)
+        overlappingOwner.commitPendingSeek { resumedNewer = true }
+        older.complete(overlappingFixture.completed())
+        runCurrent()
+        assertFalse("an older accepted dispatch cannot resume the newer scrub", resumedNewer)
+        assertEquals(2, dispatches)
+        newer.complete(overlappingFixture.completed())
+        runCurrent()
+        assertTrue(resumedNewer)
+        overlappingOwner.dispose()
+        for (accepted in listOf(false, true)) {
+            val fixture = fixture()
+            val owner = LiveTimelinePresentationState(this, { 0L }, { testScheduler.currentTime })
+            val result = CompletableDeferred<TimeshiftContentSeekResult>()
+            var dispatched = false
+            var resumed = false
+            owner.startScrub(-1)
+            owner.queueRelativeSeek(fixture.presentation(), -2_000,
+                "unavailable", "expired", "replaced", "uncertain") {
+                dispatched = true
+                result.await()
+            }
+            advanceTimeBy(1_000)
+            runCurrent()
+            assertTrue(owner.seekPending)
+            assertFalse(dispatched)
+            owner.commitPendingSeek { resumed = true }
+            runCurrent()
+            assertTrue(dispatched)
+            assertFalse(resumed)
+            result.complete(if (accepted) fixture.completed() else TimeshiftContentSeekResult.Expired)
+            runCurrent()
+            assertEquals(accepted, resumed)
+            assertEquals(0, owner.scrubSpeed)
+            owner.dispose()
+        }
+    }
+
     @Test fun liveDisplayBridgesBatchedHistoryForPlayingAndPausedWithoutGrantingSeeks() = runTest {
         for (paused in listOf(false, true)) {
             val fixture = fixture()

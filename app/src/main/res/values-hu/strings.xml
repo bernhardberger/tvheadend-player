@@ -1,4 +1,10 @@
 <resources>
+    <string name="record_unavailable">Ez a műsor nem vehető fel</string>
+    <string name="record_unavailable_ended">Már véget ért.</string>
+    <string name="record_unavailable_no_programme">Ehhez a csatornához nem érhető el műsorinformáció.</string>
+    <string name="record_unavailable_permission">Ez a fiók nem készíthet felvételt.</string>
+    <string name="player_scrub_forward">Előretekerés, sebesség %1$d×</string>
+    <string name="player_scrub_backward">Visszatekerés, sebesség %1$d×</string>
     <string name="recording_ad_break_skipped">Reklámszünet átugorva</string>
     <string name="player_full_screen">Teljes képernyő</string>
     <string name="stop">Leállítás</string>
@@ -155,9 +161,6 @@
     <string name="onboarding_connecting_title">Csatlakozás: %1$s</string>
     <string name="onboarding_connecting_body">Szerver ellenőrzése és bejelentkezés ezzel a felhasználóval: %1$s. A megszakításhoz nyomd meg a Back gombot.</string>
     <string name="onboarding_connecting_body_anonymous">Szerver ellenőrzése. A megszakításhoz nyomd meg a Back gombot.</string>
-    <string name="onboarding_connecting">Csatlakozás…</string>
-    <string name="onboarding_failure_meta">%1$s • port: %2$s • felhasználó: %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s • port: %2$s</string>
     <string name="onboarding_change_address">Cím módosítása</string>
     <string name="onboarding_change_address_detail">%1$s • port: %2$s</string>
     <string name="onboarding_change_sign_in">Fiók módosítása</string>
@@ -369,6 +372,11 @@
     <string name="connection_retry_description">A Tvheadend Player magától is újrapróbálkozik</string>
     <string name="connection_notice_restored">A kapcsolat helyreállt</string>
     <string name="server_switched">Csatlakozva: %1$s</string>
+    <string name="cancel">Mégse</string>
+    <string name="server_go_home">Kezdőlap megnyitása</string>
+    <string name="back_to_settings">Vissza a beállításokhoz</string>
+    <string name="server_still_in_use">A(z) %1$s kapcsolat továbbra is használatban van</string>
+    <string name="server_switch_unreachable_body">A(z) %1$s nem válaszolt a csatlakozási kísérletre. Ellenőrizd, hogy a szerver működik-e, és ugyanazon a hálózaton van-e.</string>
     <string name="connection_scope_line">Ehhez: %1$s</string>
     <string name="connection_notice_login_rejected">Bejelentkezés elutasítva</string>
     <string name="recording_action_permission">Ez a fiók nem kezelhet felvételeket.</string>

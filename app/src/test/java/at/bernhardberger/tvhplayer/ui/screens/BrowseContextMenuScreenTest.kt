@@ -1,4 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
+import at.bernhardberger.tvhplayer.testutil.settleFrames
+
+import at.bernhardberger.tvhplayer.testutil.pressKey
 
 import at.bernhardberger.tvhplayer.testutil.setContentWithBrowsePreparation
 import android.app.Application
@@ -71,6 +74,7 @@ class BrowseContextMenuScreenTest {
     private var playerEntry = at.bernhardberger.tvhplayer.ui.PlayerEntryHandoff()
     private val screenContent = androidx.compose.runtime.mutableStateOf<(@androidx.compose.runtime.Composable () -> Unit)?>(null)
     private val scheduleRequests = mutableListOf<DvrScheduleRequest>()
+    private lateinit var screenNotices: NoticeCenter
 
     /** Starts a player request that stays pending, as while the player is still opening. */
     private fun requestPlayer() {
@@ -820,6 +824,48 @@ class BrowseContextMenuScreenTest {
         compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
     }
 
+    @Test fun recordKeySchedulesFocusedChannelWithoutOpeningDetailsOrMovingFocus() {
+        show(recordings = false, channelRecording = true, recordingState = DvrEntryState.REMOVED)
+        compose.onNodeWithTag("channel-row-1").requestFocus()
+        compose.pressKey(Key(android.view.KeyEvent.KEYCODE_MEDIA_RECORD))
+        compose.runOnIdle { assertEquals(1, scheduleRequests.size) }
+        compose.onNodeWithTag("channel-row-1").assertIsFocused()
+        compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
+        compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
+    }
+
+    @Test fun recordKeyOnScheduledChannelOpensCancelAndRepeatedPressDoesNotConfirm() {
+        show(recordings = false, channelRecording = true, recordingState = DvrEntryState.SCHEDULED)
+        compose.onNodeWithTag("channel-row-1").requestFocus()
+        compose.pressKey(Key(android.view.KeyEvent.KEYCODE_MEDIA_RECORD))
+        compose.onNodeWithTag("details-cancel").assertIsFocused()
+        compose.pressKey(Key.DirectionUp)
+        compose.onNodeWithTag("details-about-description").assertIsFocused()
+        compose.pressKey(Key.DirectionCenter)
+        compose.settleFrames(35, frameMillis = 16)
+        compose.onNodeWithTag("player-info-reading").assertIsFocused()
+        compose.onNodeWithTag("details-cancel").assertDoesNotExist()
+        compose.pressKey(Key(android.view.KeyEvent.KEYCODE_MEDIA_RECORD))
+        compose.onNodeWithTag("details-cancel").assertIsFocused()
+        compose.pressKey(Key.DirectionLeft)
+        compose.pressKey(Key(android.view.KeyEvent.KEYCODE_MEDIA_RECORD))
+        compose.onNodeWithTag("details-cancel").assertIsFocused()
+        compose.onNodeWithTag("centred-dialog-card").assertDoesNotExist()
+        compose.runOnIdle { assertTrue(scheduleRequests.isEmpty()) }
+    }
+
+    @Test fun recordKeyOnChannelWithoutProgrammePostsTypedReason() {
+        show(recordings = false, noProgramme = true)
+        compose.onNodeWithTag("channel-row-1").requestFocus()
+        compose.pressKey(Key(android.view.KeyEvent.KEYCODE_MEDIA_RECORD))
+        compose.runOnIdle {
+            assertEquals(at.bernhardberger.tvhplayer.notices.Notice.RecordUnavailable(
+                at.bernhardberger.tvhplayer.notices.RecordUnavailableReason.NO_PROGRAMME),
+                screenNotices.state.value.candidate?.notice)
+        }
+        compose.onNodeWithTag("channel-row-1").assertIsFocused()
+    }
+
     @Test fun directRecordAfterPoppingDetailsKeepsItsActionFocused() {
         show(recordings = false)
         compose.onNodeWithTag("channel-row-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
@@ -1363,9 +1409,12 @@ class BrowseContextMenuScreenTest {
             }
         }
         val notices = NoticeCenter({ 0L }) { NoticeContext(0, session.observation.value.currentSession?.generationIdentity) }
+        screenNotices = notices
+        val settings = at.bernhardberger.tvhplayer.settings.UiSettingsStore(
+            at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore())
         val dependencies = module {
             single<TvheadendSession> { screenSession }; single { notices }
-            single { at.bernhardberger.tvhplayer.settings.UiSettingsStore(context) }
+            single { settings }
         }
         val application = org.koin.dsl.koinApplication { modules(dependencies) }
         images.install(FixtureArt.imageLoader(context, if (imageProbe) mapOf(
@@ -1422,6 +1471,13 @@ class BrowseContextMenuScreenTest {
                             onPlayRecording = { _, intent -> plays++; start = intent; requestPlayer() },
                             onWatchChannel = { channelId, _ -> watchedChannel = channelId },
                          ) else ChannelsScreenContent(
+                             onRecordKey = run {
+                                 val recordScope = androidx.compose.runtime.rememberCoroutineScope()
+                                 val recordInFlight = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<DvrMutationAction?>(null) }
+                                 val handler: (ChannelId) -> at.bernhardberger.tvhplayer.core.BrowseContextAction? = { id -> DvrMutationActions(screenSession.dvrRepository).recordChannelProgramme(id,
+                                     { session.observation.value }, { now.epochSeconds }, settings, notices, recordScope, recordInFlight) }
+                                 handler
+                             },
                              view = ChannelsView(ChannelsLayout.LIST),
                              initialFocusEnabled = !drawerActive,
                             channelScopeState = resolveChannelScopeState(observation.channelState, null),

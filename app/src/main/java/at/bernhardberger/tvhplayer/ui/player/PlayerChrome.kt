@@ -224,6 +224,7 @@ internal fun PlayerChrome(
                             settled = timeline.stepSettled,
                             onAnnounced = timeline.onStepAnnounced,
                             stepId = timeline.stepId,
+                            scrubSpeed = timeline.scrubSpeed,
                         ) else PlayerPresentedLiveTimeline(requireNotNull(liveBar), content.state,
                             feedback = timeline.feedback, feedbackIsError = timeline.feedbackIsError)
                     }

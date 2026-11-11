@@ -276,6 +276,58 @@ class AppProfileOwnerTest {
         assertEquals(1, notices.state.value.pending.size)
     }
 
+    @Test fun aCallerThatShowsTheOutcomeItselfGetsItInsteadOfANotice() = runTest {
+        val stored = FakeServerProfileStore()
+        val first = (stored.addAnonymous("first.invalid", activate = true) as ServerProfileWriteResult.Applied).id
+        val next = (stored.addAnonymous("second.invalid") as ServerProfileWriteResult.Applied).id
+        val fake = FakeTvheadendSession()
+        var restoreGate: CompletableDeferred<Unit>? = null
+        var restoring = false
+        val session = object : TvheadendSession by fake {
+            override suspend fun disconnect() {
+                restoreGate?.let { restoring = true; it.await() }
+                fake.disconnect()
+            }
+        }
+        val notices = NoticeCenter({ 0L }, { NoticeContext(0, null) })
+        val owner = AppProfileOwner(session, stored, PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            StandardTestDispatcher(testScheduler), { ServerProfileEditReadResult.Missing }, { notices })
+        backgroundScope.launch { owner.run() }
+        runCurrent()
+        val outcomes = mutableListOf<Notice>()
+        val cancelled = backgroundScope.launch { owner.switchActive(next, outcomes::add) }
+        runCurrent()
+        val gate = CompletableDeferred<Unit>()
+        restoreGate = gate
+        fake.publish(SessionObservation.create(sessionState = SessionState.Unavailable(SessionFailure.AUTHENTICATION_REJECTED)))
+        runCurrent()
+        assertTrue(restoring)
+        cancelled.cancel()
+        gate.complete(Unit)
+        runCurrent()
+        assertTrue(cancelled.isCompleted)
+        assertTrue(outcomes.isEmpty())
+        assertNull(notices.state.value.candidate)
+        assertEquals(first, (owner.serverProfile.value as ServerProfileReadResult.Available).id)
+        restoreGate = null
+        fake.publish(readyObservation())
+        val rejected = backgroundScope.async { owner.switchActive(next, outcomes::add) }
+        runCurrent()
+        fake.publish(SessionObservation.create(sessionState = SessionState.Unavailable(SessionFailure.AUTHENTICATION_REJECTED)))
+        runCurrent()
+        assertEquals(ServerProfileWriteResult.Unavailable, rejected.await())
+        assertEquals(listOf<Notice>(Notice.ServerSignInRejected("second.invalid")), outcomes)
+        assertEquals(first, (stored.profiles() as ServerProfileListResult.Available).activeId)
+        val switched = backgroundScope.async { owner.switchActive(next, outcomes::add) }
+        runCurrent()
+        fake.publish(readyObservation())
+        runCurrent()
+        assertEquals(ServerProfileWriteResult.Applied(next), switched.await())
+        assertEquals(Notice.ServerSwitched(next, "second.invalid"), outcomes.last())
+        assertEquals(2, outcomes.size)
+        assertEquals(null, notices.state.value.candidate)
+    }
+
     @Test fun rejectedUserSwitchKeepsThePreviousProfileAndRestoresItsConnection() = runTest {
         val stored = FakeServerProfileStore()
         val first = (stored.addAnonymous("first.invalid", activate = true) as ServerProfileWriteResult.Applied).id

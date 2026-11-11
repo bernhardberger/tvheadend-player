@@ -131,6 +131,25 @@ class LivePlayerChromeProgrammeTest : LivePlayerChromeFixture() {
         assertEquals("a new visit resets Details and its action", listOf("details-continue_watching"), focused())
     }
 
+    @Test fun recordKeySchedulesDirectlyAndReopensInfoOnItsConfirmedStopAction() {
+        screen(recordingProfile = DvrConfigId("archive"))
+        session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Confirmed(DvrEntryId(7)))
+        key(Key.MediaRecord)
+        assertFalse(exists("programme-details-page"))
+        assertFalse(exists("two-column-first"))
+        assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
+        assertEquals(DvrConfigId("archive"), scheduleRequests.single().configId)
+        publishInfoRecording(DvrEntryState.RECORDING)
+        key(Key.MediaRecord)
+        assertEquals(listOf("details-stop"), focused())
+        assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
+        key(Key.DirectionCenter)
+        assertTrue(exists("two-column-first"))
+        assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_STOP_ENTRY })
+        key(Key.Back)
+        assertEquals(listOf("details-stop"), focused())
+    }
+
     @Test fun playerInfoRecordsDirectlyThenOffersStopFromObservedState() {
         screen(recordingProfile = DvrConfigId("archive"))
         session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Confirmed(DvrEntryId(7)))
@@ -156,8 +175,8 @@ class LivePlayerChromeProgrammeTest : LivePlayerChromeFixture() {
 
     @Test fun playerInfoConfirmationBackIsSafeAndDoesNotCloseDetails() {
         screen(recordingScheduled = true)
-        key(Key.Info)
-        compose.onNodeWithTag("details-cancel").performSemanticsAction(SemanticsActions.RequestFocus)
+        key(Key.MediaRecord)
+        assertEquals(listOf("details-cancel"), focused())
         key(Key.DirectionCenter)
         compose.onNodeWithTag("two-column-first").assertIsFocused().assertTextEquals("Keep recording")
         compose.onNode(isDialog()).performKeyInput { pressKey(Key.Back) }

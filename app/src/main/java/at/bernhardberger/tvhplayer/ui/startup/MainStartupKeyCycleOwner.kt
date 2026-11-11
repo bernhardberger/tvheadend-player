@@ -150,6 +150,7 @@ class MainStartupKeyCycleOwner {
         KeyEvent.KEYCODE_MEDIA_AUDIO_TRACK,
         KeyEvent.KEYCODE_CAPTIONS,
         KeyEvent.KEYCODE_GUIDE,
+        KeyEvent.KEYCODE_DVR,
         KeyEvent.KEYCODE_TV_NUMBER_ENTRY,
         KeyEvent.KEYCODE_BOOKMARK -> true
         in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9,

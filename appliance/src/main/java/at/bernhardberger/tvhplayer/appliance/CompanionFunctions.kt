@@ -1,7 +1,7 @@
 package at.bernhardberger.tvhplayer.appliance
 
 /** Append new functions: this order is also the display order. */
-enum class CompanionFunction { STARTUP, LIVE_TV, GUIDE }
+enum class CompanionFunction { STARTUP, LIVE_TV, GUIDE, RECORDINGS }
 
 sealed interface ButtonBinding {
     data object Default : ButtonBinding
@@ -13,20 +13,24 @@ fun CompanionFunction.defaultKeys(): Set<Int> = when (this) {
     CompanionFunction.STARTUP -> emptySet()
     CompanionFunction.LIVE_TV -> setOf(170, ApplianceEntryPolicy.TCL_TV_KEY_CODE)
     CompanionFunction.GUIDE -> setOf(172)
+    CompanionFunction.RECORDINGS -> setOf(173)
 }
 
 data class MovedButton(val function: CompanionFunction, val keyCode: Int)
 data class FunctionChange(val functions: CompanionFunctions, val moved: List<MovedButton>)
 
 data class CompanionFunctions(
-    val startup: Boolean = true,
+    /** Off until chosen: enabling the service must not start the player on its own. */
+    val startup: Boolean = false,
     val liveTv: ButtonBinding = ButtonBinding.Default,
     val guide: ButtonBinding = ButtonBinding.Default,
+    val recordings: ButtonBinding = ButtonBinding.Default,
 ) {
     fun binding(function: CompanionFunction): ButtonBinding = when (function) {
         CompanionFunction.STARTUP -> error("Startup has no button")
         CompanionFunction.LIVE_TV -> liveTv
         CompanionFunction.GUIDE -> guide
+        CompanionFunction.RECORDINGS -> recordings
     }
 
     fun keys(function: CompanionFunction): Set<Int> = when (val binding = binding(function)) {
@@ -61,6 +65,7 @@ data class CompanionFunctions(
         CompanionFunction.STARTUP -> error("Startup has no button")
         CompanionFunction.LIVE_TV -> copy(liveTv = binding)
         CompanionFunction.GUIDE -> copy(guide = binding)
+        CompanionFunction.RECORDINGS -> copy(recordings = binding)
     }
 }
 
@@ -94,18 +99,21 @@ private fun CompanionFunctions.plainButtonLabel(function: CompanionFunction): St
 fun CompanionFunctions.buttonLabel(function: CompanionFunction): String {
     val label = plainButtonLabel(function)
     val key = keys(function).singleOrNull() ?: return label
-    val other = if (function == CompanionFunction.LIVE_TV) CompanionFunction.GUIDE else CompanionFunction.LIVE_TV
-    return if (plainButtonLabel(other) == label) buttonNameWithCode(key) else label
+    val duplicate = CompanionFunction.entries.any {
+        it != CompanionFunction.STARTUP && it != function && plainButtonLabel(it) == label
+    }
+    return if (duplicate) buttonNameWithCode(key) else label
 }
 
 fun CompanionFunctions.allSetBody(defaultHome: Boolean): String {
     val ways = buildList {
         if (startup) add("at startup")
         if (defaultHome) add("on HOME")
-        val buttons = listOf(CompanionFunction.LIVE_TV, CompanionFunction.GUIDE)
+        val buttons = listOf(CompanionFunction.LIVE_TV, CompanionFunction.GUIDE, CompanionFunction.RECORDINGS)
             .filter { keys(it).isNotEmpty() }.map { buttonLabel(it) }
         if (buttons.isNotEmpty()) {
-            val label = if (buttons == listOf("TV button", "Guide button")) "the TV and Guide buttons"
+            val label = if (buttons == listOf("TV button", "Guide button", "Recordings button")) "the TV, Guide and Recordings buttons"
+                else if (buttons == listOf("TV button", "Guide button")) "the TV and Guide buttons"
                 else buttons.joinToString(" and ")
             add("with $label")
         }

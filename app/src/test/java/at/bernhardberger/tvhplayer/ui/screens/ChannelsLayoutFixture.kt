@@ -233,6 +233,7 @@ internal class ChannelsLayoutFixture(
     ) {
         var activeTag by remember { mutableStateOf<ChannelTagId?>(null) }
         ChannelsScreenContent(
+            onRecordKey = { null },
             contentPadding = padding,
             initialFocusEnabled = initialFocusEnabled,
             channelScopeState = resolveChannelScopeState(observation.channelState, activeTag, visibility),

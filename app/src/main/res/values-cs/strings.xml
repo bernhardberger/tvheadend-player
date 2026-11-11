@@ -1,4 +1,10 @@
 <resources>
+    <string name="record_unavailable">Tento pořad nelze nahrát</string>
+    <string name="record_unavailable_ended">Už skončil.</string>
+    <string name="record_unavailable_no_programme">Pro tento kanál nejsou dostupné informace o pořadu.</string>
+    <string name="record_unavailable_permission">Tento účet nemůže nahrávat.</string>
+    <string name="player_scrub_forward">Přetáčení vpřed, rychlost %1$d×</string>
+    <string name="player_scrub_backward">Přetáčení vzad, rychlost %1$d×</string>
     <string name="recording_ad_break_skipped">Reklamní přestávka přeskočena</string>
     <string name="player_full_screen">Celá obrazovka</string>
     <string name="stop">Zastavit</string>
@@ -155,9 +161,6 @@
     <string name="onboarding_connecting_title">Připojování k %1$s</string>
     <string name="onboarding_connecting_body">Ověřování serveru a přihlašování jako %1$s. Stisknutím Back akci zrušíš.</string>
     <string name="onboarding_connecting_body_anonymous">Ověřování serveru. Stisknutím Back akci zrušíš.</string>
-    <string name="onboarding_connecting">Připojování…</string>
-    <string name="onboarding_failure_meta">%1$s • port %2$s • uživatel %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s • port %2$s</string>
     <string name="onboarding_change_address">Změnit adresu</string>
     <string name="onboarding_change_address_detail">%1$s • port %2$s</string>
     <string name="onboarding_change_sign_in">Změnit účet</string>
@@ -377,6 +380,11 @@
     <string name="connection_retry_description">Tvheadend Player se také pokouší připojit automaticky</string>
     <string name="connection_notice_restored">Připojení obnoveno</string>
     <string name="server_switched">Připojeno k %1$s</string>
+    <string name="cancel">Zrušit</string>
+    <string name="server_go_home">Přejít na úvod</string>
+    <string name="back_to_settings">Zpět do nastavení</string>
+    <string name="server_still_in_use">Připojení %1$s se stále používá</string>
+    <string name="server_switch_unreachable_body">Připojení %1$s neodpovědělo. Zkontroluj, že server běží a je ve stejné síti.</string>
     <string name="connection_scope_line">Pro %1$s</string>
     <string name="connection_notice_login_rejected">Přihlášení odmítnuto</string>
     <string name="recording_action_permission">Tento účet nemůže spravovat nahrávky.</string>

@@ -78,6 +78,19 @@ class ApplianceEntryAccessibilityServiceTest {
         controller.destroy()
     }
 
+    @Test fun recordingsLaunchesItsDestinationAndConsumesTheWholeCycle() {
+        val controller = Robolectric.buildService(ApplianceEntryAccessibilityService::class.java).create()
+        val service = controller.get()
+        assertTrue(dispatch(service, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DVR))
+        val launch = shadowOf(service).nextStartedActivity
+        assertEquals(ApplianceEntryPolicy.DESTINATION_RECORDINGS,
+            launch.getStringExtra(ApplianceEntryPolicy.EXTRA_APPLIANCE_DESTINATION))
+        assertEquals(ComponentName(BuildConfig.PLAYER_PACKAGE, ApplianceEntryPolicy.ENTRY_ALIAS_CLASS_NAME), launch.component)
+        assertTrue(dispatch(service, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DVR))
+        assertNull(shadowOf(service).nextStartedActivity)
+        controller.destroy()
+    }
+
     @Test fun captureUsesTheServiceFilterPersistsTheMoveAndSwallowsUpWithoutLaunching() {
         val controller = Robolectric.buildService(ApplianceEntryAccessibilityService::class.java).create()
         val service = controller.get()
@@ -165,10 +178,10 @@ class ApplianceEntryAccessibilityServiceTest {
         CompanionServiceState.setConnected(false)
     }
 
-    @Test fun startupOffPreventsConnectAndWakeLaunchAndStandbyNeverLaunches() {
+    @Test fun startupStaysOffUntilChosenAndStandbyNeverLaunches() {
         val controller = Robolectric.buildService(ApplianceEntryAccessibilityService::class.java).create()
         val service = controller.get()
-        FunctionStore(service).setStartup(false)
+        // A fresh setup: turning the service on must not start the player.
         connect(service)
         service.sendBroadcast(Intent(Intent.ACTION_SCREEN_ON))
         shadowOf(Looper.getMainLooper()).idle()

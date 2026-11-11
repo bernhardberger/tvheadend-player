@@ -5,6 +5,7 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import kotlin.math.abs
+import at.bernhardberger.tvhplayer.notices.RecordUnavailableReason
 
 enum class ProgrammeAction {
     WATCH,
@@ -58,3 +59,15 @@ fun nearestProgrammeAt(
     events: List<EpgEventEntry>,
     targetStartSec: Long,
 ): EpgEventEntry? = events.minByOrNull { abs(it.start.epochSeconds - targetStartSec) }
+
+fun recordUnavailableReason(
+    event: EpgEventEntry?,
+    nowSec: Long,
+    canModifyRecordings: Boolean?,
+): RecordUnavailableReason? = when {
+    canModifyRecordings == null -> null
+    event == null -> RecordUnavailableReason.NO_PROGRAMME
+    event.stop.epochSeconds <= nowSec -> RecordUnavailableReason.ENDED
+    !canModifyRecordings -> RecordUnavailableReason.PERMISSION_DENIED
+    else -> null
+}

@@ -1,4 +1,10 @@
 <resources>
+    <string name="record_unavailable">Det går inte att spela in det här programmet</string>
+    <string name="record_unavailable_ended">Det har redan slutat.</string>
+    <string name="record_unavailable_no_programme">Det finns ingen programinformation för den här kanalen.</string>
+    <string name="record_unavailable_permission">Kontot får inte spela in.</string>
+    <string name="player_scrub_forward">Spolar framåt med %1$d gånger normal hastighet</string>
+    <string name="player_scrub_backward">Spolar tillbaka med %1$d gånger normal hastighet</string>
     <string name="recording_ad_break_skipped">Reklampaus överhoppad</string>
     <string name="player_full_screen">Helskärm</string>
     <string name="stop">Stoppa</string>
@@ -155,9 +161,6 @@
     <string name="onboarding_connecting_title">Ansluter till %1$s</string>
     <string name="onboarding_connecting_body">Kontrollerar servern och loggar in som %1$s. Tryck på Back för att avbryta.</string>
     <string name="onboarding_connecting_body_anonymous">Kontrollerar servern. Tryck på Back för att avbryta.</string>
-    <string name="onboarding_connecting">Ansluter…</string>
-    <string name="onboarding_failure_meta">%1$s • port %2$s • användare %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s • port %2$s</string>
     <string name="onboarding_change_address">Ändra adress</string>
     <string name="onboarding_change_address_detail">%1$s • port %2$s</string>
     <string name="onboarding_change_sign_in">Ändra konto</string>
@@ -369,6 +372,11 @@
     <string name="connection_retry_description">Tvheadend Player försöker också igen automatiskt</string>
     <string name="connection_notice_restored">Anslutningen återställd</string>
     <string name="server_switched">Ansluten till %1$s</string>
+    <string name="cancel">Avbryt</string>
+    <string name="server_go_home">Gå till startsidan</string>
+    <string name="back_to_settings">Tillbaka till inställningar</string>
+    <string name="server_still_in_use">%1$s används fortfarande</string>
+    <string name="server_switch_unreachable_body">%1$s svarade inte på anslutningen. Kontrollera att servern körs och finns på samma nätverk.</string>
     <string name="connection_scope_line">För %1$s</string>
     <string name="connection_notice_login_rejected">Inloggningen nekades</string>
     <string name="recording_action_permission">Kontot får inte hantera inspelningar.</string>

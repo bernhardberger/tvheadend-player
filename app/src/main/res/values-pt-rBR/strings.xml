@@ -1,4 +1,10 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="record_unavailable">Não é possível gravar este programa</string>
+    <string name="record_unavailable_ended">Ele já terminou.</string>
+    <string name="record_unavailable_no_programme">Não há informações do programa para este canal.</string>
+    <string name="record_unavailable_permission">Esta conta não pode gravar.</string>
+    <string name="player_scrub_forward">Avanço rápido, a %1$d vezes a velocidade normal</string>
+    <string name="player_scrub_backward">Retrocesso, a %1$d vezes a velocidade normal</string>
     <string name="recording_ad_break_skipped">Intervalo comercial pulado</string>
     <string name="player_full_screen">Tela cheia</string>
     <string name="stop">Parar</string>
@@ -155,9 +161,6 @@
     <string name="onboarding_connecting_title">Conectando a %1$s</string>
     <string name="onboarding_connecting_body">Verificando o servidor e entrando como %1$s. Pressione Back para cancelar.</string>
     <string name="onboarding_connecting_body_anonymous">Verificando o servidor. Pressione Back para cancelar.</string>
-    <string name="onboarding_connecting">Conectando…</string>
-    <string name="onboarding_failure_meta">%1$s • porta %2$s • usuário %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s • porta %2$s</string>
     <string name="onboarding_change_address">Alterar endereço</string>
     <string name="onboarding_change_address_detail">%1$s • porta %2$s</string>
     <string name="onboarding_change_sign_in">Alterar conta</string>
@@ -357,6 +360,11 @@
     <string name="connection_retry_description">O Tvheadend Player também tenta de novo automaticamente</string>
     <string name="connection_notice_restored">Conexão restabelecida</string>
     <string name="server_switched">Conectado a %1$s</string>
+    <string name="cancel">Cancelar</string>
+    <string name="server_go_home">Ir para Início</string>
+    <string name="back_to_settings">Voltar às configurações</string>
+    <string name="server_still_in_use">%1$s continua em uso</string>
+    <string name="server_switch_unreachable_body">%1$s não respondeu à conexão. Verifique se o servidor está funcionando e na mesma rede.</string>
     <string name="connection_scope_line">Para %1$s</string>
     <string name="connection_notice_login_rejected">Login rejeitado</string>
     <string name="recording_action_permission">Esta conta não pode gerenciar gravações.</string>

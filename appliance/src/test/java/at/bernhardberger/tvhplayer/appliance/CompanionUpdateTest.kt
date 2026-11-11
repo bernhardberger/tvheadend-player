@@ -92,6 +92,7 @@ class CompanionUpdateTest {
             shadowOf(context).grantPermissions("${context.packageName}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION")
             val store = UpdateStore(context)
             store.preferences.edit().clear().putBoolean("suppress_connect", marker).commit()
+            FunctionStore(context).setStartup(true)
             shadowOf(context.getSystemService(PowerManager::class.java)).setIsInteractive(interactive)
             val starts = mutableListOf<Intent>()
             val controller = Robolectric.buildService(ApplianceEntryAccessibilityService::class.java).create()

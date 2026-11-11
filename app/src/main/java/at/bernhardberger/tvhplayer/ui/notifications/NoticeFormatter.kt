@@ -13,6 +13,7 @@ import at.bernhardberger.tvhplayer.notices.ConnectionNoticeKind
 import at.bernhardberger.tvhplayer.notices.DvrMutationFeedback
 import at.bernhardberger.tvhplayer.notices.Notice
 import at.bernhardberger.tvhplayer.notices.PauseUnavailableReason
+import at.bernhardberger.tvhplayer.notices.RecordUnavailableReason
 import at.bernhardberger.tvhplayer.playback.BackgroundPlaybackNotice
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import java.time.ZoneId
@@ -38,6 +39,12 @@ private fun dvrFailureReason(failure: DvrMutationFeedback): Int = when (failure)
 /** The only resource/wording boundary for transient feedback. */
 internal class NoticeFormatter(private val context: Context) {
     fun format(notice: Notice, now: Instant = Clock.System.now()): FormattedNotice = when (notice) {
+        is Notice.RecordUnavailable -> FormattedNotice(context.getString(R.string.record_unavailable),
+            notice.reason?.let { context.getString(when (it) {
+                RecordUnavailableReason.ENDED -> R.string.record_unavailable_ended
+                RecordUnavailableReason.NO_PROGRAMME -> R.string.record_unavailable_no_programme
+                RecordUnavailableReason.PERMISSION_DENIED -> R.string.record_unavailable_permission
+            }) })
         is Notice.ServerProfileRemoved ->
             FormattedNotice(context.getString(R.string.server_profile_removed, notice.name))
         Notice.ServerProfileAlreadyExists -> FormattedNotice(context.getString(R.string.server_profile_already_exists))

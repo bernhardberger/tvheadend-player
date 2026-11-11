@@ -168,21 +168,21 @@ class CompanionScreenTest {
         show(failed)
         focused("Tvheadend Player")
         // The message lives in the update row, below the fold; walk to it as the remote would.
-        repeat(9) { press(Key.DirectionDown) }
+        repeat(10) { press(Key.DirectionDown) }
         focused("Couldn't check for updates")
         save("en-font1.0-update-error")
     }
 
     @Test fun automaticUpdatesFocused() {
         show(ready)
-        repeat(8) { press(Key.DirectionDown) }
+        repeat(9) { press(Key.DirectionDown) }
         focused("Automatic updates")
         save("en-font1.0-automatic-updates-focused")
     }
 
     @Test fun updateUpToDate() {
         show(ready)
-        repeat(9) { press(Key.DirectionDown) }
+        repeat(10) { press(Key.DirectionDown) }
         focused("Check for updates")
         save("en-font1.0-update-up-to-date-focused")
         // Focus back up keeps the list scrolled, so the resting update row shows in full.
@@ -208,7 +208,7 @@ class CompanionScreenTest {
         show(toFix.copy(playerVersion = "0.4.2", installAllowed = true))
         focused("Accessibility service")
         for (title in listOf("HOME app", "Open when the TV turns on", "Open live TV", "Open the Guide",
-            "Install unknown apps", "Automatic updates", "Check for updates")) {
+            "Open recordings", "Install unknown apps", "Automatic updates", "Check for updates")) {
             press(Key.DirectionDown)
             focused(title)
         }
@@ -262,7 +262,7 @@ class CompanionScreenTest {
 
     @Test fun anIdleUpdateRowReportsTheClick() {
         show(ready.copy(hasSystemHome = false))
-        repeat(8) { press(Key.DirectionDown) }
+        repeat(9) { press(Key.DirectionDown) }
         focused("Check for updates")
         press(Key.DirectionCenter)
         assertEquals(listOf(CompanionRow.UPDATE), activated)
@@ -361,7 +361,7 @@ class CompanionScreenTest {
     @Test fun functionsAllSetTop() {
         showContent(withButtons())
         focused("Tvheadend Player")
-        compose.onNodeWithText("This TV opens Tvheadend Player at startup, on HOME and with the TV and Guide buttons.")
+        compose.onNodeWithText("This TV opens Tvheadend Player at startup, on HOME and with the TV, Guide and Recordings buttons.")
             .assertExists()
         save("functions-01-all-set-top")
     }

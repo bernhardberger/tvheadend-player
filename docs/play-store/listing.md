@@ -34,7 +34,7 @@ It's an independent app, not an official Tvheadend product, and it has no channe
 • Live TV keeps playing while you browse
 • No ads, no analytics, no account to sign up for
 
-For people who watch through Tvheadend instead of the TV's built-in tuners, the optional Tvheadend Player Appliance app from the GitHub releases makes Tvheadend Player behave like the TV's own tuner app. It starts the app when the TV turns on, catches remote buttons the manufacturer keeps for its own apps, and can replace the home screen.
+For people who watch through Tvheadend instead of the TV's built-in tuners, the optional Tvheadend Player Appliance app from the GitHub releases makes Tvheadend Player behave like the TV's own tuner app. It can start the app when the TV turns on, catches remote buttons the manufacturer keeps for its own apps, and can replace the home screen.
 
 Open source under the GNU GPL v3, with the source code for every release: github.com/bernhardberger/tvheadend-player
 ```

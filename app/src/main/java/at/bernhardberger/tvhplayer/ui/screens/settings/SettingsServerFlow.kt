@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens.settings
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable
@@ -26,6 +27,7 @@ import at.bernhardberger.tvhplayer.ui.screens.onboarding.SetupMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
+import org.koin.core.qualifier.named
 
 private const val ADD = "add"
 private const val EDIT = "edit:"
@@ -46,6 +48,7 @@ internal class ServerSettingsState(
     private val interruption: () -> PlaybackInterruption,
     private val stopPlayback: suspend () -> Unit,
     private val scope: CoroutineScope,
+    private val switchScope: CoroutineScope,
     private val notices: () -> NoticeCenter?,
     setupState: MutableState<String?>,
     switchingState: MutableState<String?>,
@@ -63,34 +66,40 @@ internal class ServerSettingsState(
     private val activeId get() = list?.activeId
     var switchingNow by mutableStateOf(false)
         private set
+    /** The page over Settings for a switch the user started: connecting, then how it ended. */
+    private var switchProgress by mutableStateOf<SwitchProgress?>(null)
     private var switchJob: kotlinx.coroutines.Job? = null
     private var switchRevision = 0L
-    fun cancelSwitch() { switchJob?.cancel() }
+    val cancelSwitch: () -> Unit = {
+        ++switchRevision
+        switchProgress = null
+        switchingNow = false
+        switchJob?.cancel()
+    }
 
     val actions = ServerProfileActions(
         onUse = use@ { profile ->
-            if (profile.id == activeId) cancelSwitch()
-            else if (profile.authenticationMode == ServerProfileAuthenticationMode.PASSWORD &&
+            if (owner.switchInProgress.value || switchingNow) return@use
+            if (profile.authenticationMode == ServerProfileAuthenticationMode.PASSWORD &&
                 !profile.credentialsAvailable)
-                enterPassword(switchJob, switchRevision, scope, { switchRevision }) {
-                    setup = PASSWORD + profile.id.value
-                }
-            else if (switchingNow) use(profile)
+                setup = PASSWORD + profile.id.value
             else if (interruption() == PlaybackInterruption.NONE) use(profile) else switching = profile.id.value
         },
         onEnterPassword = { profile ->
-            enterPassword(switchJob, switchRevision, scope, { switchRevision }) {
+            if (!owner.switchInProgress.value && !switchingNow) {
                 setup = PASSWORD + profile.id.value
             }
         },
-        onSetUp = { if (!switchingNow) setup = EDIT + it.id.value },
-        onName = { if (!switchingNow) setup = NAME + it.id.value },
-        onRemove = { if (!switchingNow) removing = it.id.value },
-        onAdd = { if (!switchingNow) setup = ADD },
+        onSetUp = { if (!owner.switchInProgress.value && !switchingNow) setup = EDIT + it.id.value },
+        onName = { if (!owner.switchInProgress.value && !switchingNow) setup = NAME + it.id.value },
+        onRemove = { if (!owner.switchInProgress.value && !switchingNow) removing = it.id.value },
+        onAdd = { if (!owner.switchInProgress.value && !switchingNow) setup = ADD },
     )
 
     fun closeSetup() {
         setup = null
+        // This Settings instance no longer owns the presentation; the attempt continues in the app scope.
+        switchProgress = null
     }
 
     fun closeDialogs() {
@@ -98,23 +107,39 @@ internal class ServerSettingsState(
         removing = null
     }
 
-    /** Switches at once and returns to the list, where the row of the server now in use keeps focus. */
+    /**
+     * Switches at once, under a page that replaces Settings until the user leaves it; the server's
+     * level stays under it. An outcome belongs to the page only while it is actually showing.
+     */
     private fun use(profile: ServerProfileSummary) {
-        leaveServerLevel(navigation, profile.id)
         switchingNow = true
+        switchProgress = SwitchProgress.Connecting(profile)
         val previous = switchJob
         val revision = ++switchRevision
         previous?.cancel()
-        switchJob = scope.launch(start = kotlinx.coroutines.CoroutineStart.ATOMIC) {
+        switchJob = switchScope.launch(start = kotlinx.coroutines.CoroutineStart.ATOMIC) {
             try {
                 previous?.join()
                 // Waits for a closed setup's restore, which would otherwise reconnect the old server.
-                owner.switchActive(profile.id) { stopPlaying(interruption, stopPlayback) }
+                owner.switchActive(profile.id, { outcome ->
+                    if (revision == switchRevision) {
+                        if (switchProgress != null) switchProgress = SwitchProgress.Finished(profile, outcome) else {
+                            switchProgress = null
+                            notices()?.let { it.post(outcome, it.context()) }
+                        }
+                    }
+                }) { stopPlaying(interruption, stopPlayback) }
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
                 notices()?.let { it.post(Notice.ServerProfileWriteFailed, it.context()) }
-            } finally { if (revision == switchRevision) switchingNow = false }
+            } finally {
+                if (revision == switchRevision) {
+                    switchingNow = false
+                    // Cancelled, or ended with only a notice of its own: nothing more to say here.
+                    if (switchProgress is SwitchProgress.Connecting) switchProgress = null
+                }
+            }
         }
     }
 
@@ -176,98 +201,121 @@ internal class ServerSettingsState(
     }
 
     @Composable
-    fun setupContent(): (@Composable () -> Unit)? {
-        val request = setup ?: return null
-        return if (request == ADD) ({
-            AddServer(owner, interruption, { stopPlaying(interruption, stopPlayback) }, ::showExisting,
-                onSaved = { setup = null; focusActiveRow() },
-                existingProfile = { host, port, username -> showIfStored(host, port, username, editing = null) },
-                onAddName = { setup = activeId?.let { ADDED_NAME + it.value } })
-        }) else {
-            val target = findProfile(request.substringAfter(':'), list)
-            if (target == null) {
-                LaunchedEffect(request) { setup = null }
-                null
-            } else when {
-                request.startsWith(EDIT) -> ({
-                    EditServer(target, SetupMode.EDIT, owner, activeId, interruption,
-                        { stopPlaying(interruption, stopPlayback) }, ::showExisting,
-                        onSaved = { setup = null },
-                        existingProfile = { host, port, username -> showIfStored(host, port, username, target.id) })
-                })
-                request.startsWith(PASSWORD) -> ({
-                    EditServer(target, SetupMode.PASSWORD, owner, activeId, interruption,
-                        { stopPlaying(interruption, stopPlayback) }, ::showExisting,
-                        // Entering the password makes it the server in use, like "Use this server".
-                        onSaved = { setup = null; leaveServerLevel(navigation, target.id) },
-                        existingProfile = { host, port, username -> showIfStored(host, port, username, target.id) })
-                })
-                else -> ({
-                    val added = request.startsWith(ADDED_NAME)
-                    SettingsServerName(
-                        profile = target,
-                        onSave = { label ->
-                            scope.launch { owner.rename(target.id, label) }
-                            setup = null
-                            if (added) focusActiveRow()
-                        },
-                        onBack = {
-                            setup = null
-                            if (added) focusActiveRow()
-                        },
-                    )
-                })
+    fun setupContent(backEnabled: Boolean = true, onGoHome: () -> Unit = {}): (@Composable () -> Unit)? {
+        val progress = switchProgress
+        val request = setup
+        return when {
+            progress != null -> switchPage(progress, backEnabled, onGoHome)
+            request == null -> null
+            request == ADD -> ({
+                AddServer(owner, interruption, { stopPlaying(interruption, stopPlayback) }, ::showExisting,
+                    onSaved = { setup = null; focusActiveRow() },
+                    existingProfile = { host, port, username -> showIfStored(host, port, username, editing = null) },
+                    onAddName = { setup = activeId?.let { ADDED_NAME + it.value } })
+            })
+            else -> {
+                val target = findProfile(request.substringAfter(':'), list)
+                if (target == null) {
+                    LaunchedEffect(request) { setup = null }
+                    null
+                } else when {
+                    request.startsWith(EDIT) -> ({
+                        EditServer(target, SetupMode.EDIT, owner, activeId, interruption,
+                            { stopPlaying(interruption, stopPlayback) }, ::showExisting,
+                            onSaved = { setup = null },
+                            existingProfile = { host, port, username -> showIfStored(host, port, username, target.id) })
+                    })
+                    request.startsWith(PASSWORD) -> ({
+                        EditServer(target, SetupMode.PASSWORD, owner, activeId, interruption,
+                            { stopPlaying(interruption, stopPlayback) }, ::showExisting,
+                            // Entering the password makes it the server in use, like "Use this server".
+                            onSaved = { setup = null; leaveServerLevel(navigation, target.id) },
+                            existingProfile = { host, port, username -> showIfStored(host, port, username, target.id) })
+                    })
+                    else -> ({
+                        val added = request.startsWith(ADDED_NAME)
+                        SettingsServerName(
+                            profile = target,
+                            onSave = { label ->
+                                scope.launch { owner.rename(target.id, label) }
+                                setup = null
+                                if (added) focusActiveRow()
+                            },
+                            onBack = {
+                                setup = null
+                                if (added) focusActiveRow()
+                            },
+                        )
+                    })
+                }
             }
+        }
+    }
+
+    private fun switchPage(
+        progress: SwitchProgress,
+        backEnabled: Boolean,
+        onGoHome: () -> Unit,
+    ): @Composable () -> Unit {
+        val target = findProfile(progress.target.id.value, list) ?: progress.target
+        val inUse = findProfile(activeId?.value, list)?.takeIf { it.id != target.id }
+        val actions = SwitchPageActions(
+            onCancel = cancelSwitch,
+            onHome = {
+                switchProgress = null
+                onGoHome()
+            },
+            onBackToSettings = { switchProgress = null },
+            onTryAgain = { use(target) },
+            onEdit = {
+                switchProgress = null
+                setup = EDIT + target.id.value
+            },
+        )
+        return {
+            // Like every full-screen step: the frame hands the Back key to the dispatcher, so the page decides it.
+            SettingsSetupFrame { SwitchPage(progress, inUse, actions, backEnabled = backEnabled) }
         }
     }
 
     @Composable
     fun dialogContent(): (@Composable () -> Unit)? {
-        findProfile(switching, list)?.let { profile ->
-            val username = profile.username?.takeIf {
-                profile.authenticationMode == ServerProfileAuthenticationMode.PASSWORD
+        val switchTarget = findProfile(switching, list)
+        val removeTarget = findProfile(removing, list)
+        return when {
+            switchTarget != null -> {
+                val username = switchTarget.username?.takeIf {
+                    switchTarget.authenticationMode == ServerProfileAuthenticationMode.PASSWORD
+                }
+                val name = serverProfileDisplayName(switchTarget)
+                ({
+                    SwitchServerDialog(name, username, interruption(),
+                        onSwitch = {
+                            switching = null
+                            use(switchTarget)
+                        },
+                        onKeep = { switching = null })
+                })
             }
-            val name = serverProfileDisplayName(profile)
-            return {
-                SwitchServerDialog(name, username, interruption(),
-                    onSwitch = {
-                        switching = null
-                        use(profile)
-                    },
-                    onKeep = { switching = null })
+            removeTarget != null -> {
+                val name = serverProfileDisplayName(removeTarget)
+                val active = removeTarget.id == activeId
+                ({
+                    RemoveServerDialog(name, active,
+                        onRemove = {
+                            removing = null
+                            remove(removeTarget)
+                        },
+                        onKeep = { removing = null })
+                })
             }
-        }
-        return findProfile(removing, list)?.let { profile ->
-            val name = serverProfileDisplayName(profile)
-            val active = profile.id == activeId
-            {
-                RemoveServerDialog(name, active,
-                    onRemove = {
-                        removing = null
-                        remove(profile)
-                    },
-                    onKeep = { removing = null })
-            }
+            else -> null
         }
     }
 }
 
 private fun findProfile(id: String?, list: ServerProfileListResult.Available?): ServerProfileSummary? =
     id?.let { value -> list?.profiles?.firstOrNull { it.id.value == value } }
-
-private fun enterPassword(
-    previous: kotlinx.coroutines.Job?,
-    revision: Long,
-    scope: CoroutineScope,
-    currentRevision: () -> Long,
-    onReady: () -> Unit,
-) {
-    previous?.cancel()
-    scope.launch {
-        previous?.join()
-        if (revision == currentRevision()) onReady()
-    }
-}
 
 /**
  * Another server's session ends what plays, and warm playback would otherwise retune its
@@ -289,6 +337,7 @@ internal fun rememberServerSettingsState(
     stopPlayback: suspend () -> Unit,
 ): ServerSettingsState {
     val scope = rememberCoroutineScope()
+    val switchScope = koinInject<CoroutineScope>(qualifier = named("application"))
     val notices = koinInjectOrNull()
     val currentInterruption by rememberUpdatedState(interruption)
     val currentStop by rememberUpdatedState(stopPlayback)
@@ -297,10 +346,13 @@ internal fun rememberServerSettingsState(
     val removing = rememberSaveable { mutableStateOf<String?>(null) }
     val pendingFocus = rememberSaveable { mutableStateOf<String?>(null) }
     val pendingEnter = rememberSaveable { mutableStateOf(false) }
-    return remember(navigation, owner, scope) {
-        ServerSettingsState(navigation, owner, { currentInterruption() }, { currentStop() }, scope, { notices },
+    val state = remember(navigation, owner, scope, switchScope) {
+        ServerSettingsState(navigation, owner, { currentInterruption() }, { currentStop() },
+            scope, switchScope, { notices },
             setup, switching, removing, pendingFocus, pendingEnter)
     }
+    DisposableEffect(state) { onDispose { state.closeSetup() } }
+    return state
 }
 
 /** Settings previews and tests that compose Settings without a notice host still work. */

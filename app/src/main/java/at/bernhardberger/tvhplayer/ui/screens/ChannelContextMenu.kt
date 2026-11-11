@@ -38,6 +38,7 @@ internal fun ChannelContextMenu(
     onShowDetails: () -> Unit = {},
     onPlayRecording: ((RecordingPlaybackSelection) -> Unit)? = null,
     returnFocusRequester: FocusRequester? = null,
+    initialAction: BrowseContextAction? = null,
 ) {
     val opening = remember { observation }
     val channel = observation.channel(channelId)
@@ -58,7 +59,7 @@ internal fun ChannelContextMenu(
             mutations = mutations, notices = notices,
             mutationScope = mutationScope, mutationInFlight = mutationInFlight,
             onPlay = onPlay, onPlayRecording = onPlayRecording, onShowGuide = onShowGuide, onClose = onClose,
-            returnFocusRequester = returnFocusRequester)
+            returnFocusRequester = returnFocusRequester, initialAction = initialAction)
     } else {
         // Without a programme the watched channel still returns to its viewer, and to live beside it,
         // while the session it opened with lasts; opened before Ready it keeps plain Watch.

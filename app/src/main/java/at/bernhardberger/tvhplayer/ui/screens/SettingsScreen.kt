@@ -55,6 +55,7 @@ internal fun SettingsScreen(
     contentPadding: PaddingValues = TvFullScreenPadding,
     backEnabled: Boolean = true,
     isCurrent: Boolean = true,
+    onGoHome: () -> Unit = {},
     settingsStore: UiSettingsStore = koinInject(),
     profileOwner: AppProfileOwner = koinInject(),
     playbackInterruption: () -> PlaybackInterruption = rememberPlaybackInterruption(),
@@ -95,11 +96,10 @@ internal fun SettingsScreen(
         onWhatsNewOpened = { scope.launch { settingsStore.markWhatsNewSeen(BuildConfig.VERSION_CODE) } }) +
         listOf(settingsApplianceLevel(companionInstalled))
     SettingsScreenNavigation(navigation, levels, initialFocusEnabled, contentPadding, backEnabled, isCurrent,
-        setup = servers.setupContent(),
+        setup = servers.setupContent(backEnabled && isCurrent && initialFocusEnabled, onGoHome),
         onCloseSetup = servers::closeSetup,
         dialog = servers.dialogContent(),
-        onCloseDialog = servers::closeDialogs,
-        onCancelSwitch = servers::cancelSwitch.takeIf { servers.switchingNow })
+        onCloseDialog = servers::closeDialogs)
 }
 
 /** Connection carries its status; About always names the installed version. */
@@ -152,9 +152,7 @@ internal fun SettingsScreenNavigation(
     /** A question over Settings; it takes focus and Back, and Settings refocuses its row after it. */
     dialog: (@Composable () -> Unit)? = null,
     onCloseDialog: () -> Unit = {},
-    onCancelSwitch: (() -> Unit)? = null,
 ) {
-    val switchBack = at.bernhardberger.tvhplayer.ui.components.rememberBackKeyCycle()
     val rootFocus = LocalBrowseNavigationFocus.current
     val unavailable = stringResource(R.string.settings_unavailable)
     val layoutDirection = LocalLayoutDirection.current
@@ -182,9 +180,7 @@ internal fun SettingsScreenNavigation(
         if (setupOpen && isCurrent) layering?.details?.set(pageKey, opacity)
         onDispose { layering?.details?.remove(pageKey) }
     }
-    Box(Modifier.fillMaxSize().onPreviewKeyEvent { event ->
-        handleSwitchBack(event.nativeKeyEvent, switchBack, onCancelSwitch, covered, isCurrent, backEnabled)
-    }) {
+    Box(Modifier.fillMaxSize()) {
         // Settings keeps its columns and focus under the setup; nothing behind it takes focus or
         // Back, and closing the setup returns focus to the row that opened it.
         DepthNavigation(
@@ -206,7 +202,6 @@ internal fun SettingsScreenNavigation(
             onRootBack = rootFocus?.let { { it.requestFocus() } },
             pageKeyDirection = ChannelNavigation::pageDirectionForKeyCode,
         )
-        SwitchBackHandler(backEnabled, isCurrent, covered, onCancelSwitch)
         if (shownSetup != null) {
             // Registered before the setup's own handler, so its steps go back first.
             BackHandler(backEnabled, onCloseSetup)
@@ -216,35 +211,4 @@ internal fun SettingsScreenNavigation(
         }
         shownDialog?.invoke()
     }
-}
-
-@Composable
-private fun SwitchBackHandler(
-    backEnabled: Boolean,
-    isCurrent: Boolean,
-    covered: Boolean,
-    onCancelSwitch: (() -> Unit)?,
-) {
-    BackHandler(enabled = backEnabled && isCurrent && !covered && onCancelSwitch != null) {
-        onCancelSwitch?.invoke()
-    }
-}
-
-private fun handleSwitchBack(
-    native: android.view.KeyEvent,
-    switchBack: at.bernhardberger.tvhplayer.core.BackKeyCycle,
-    onCancelSwitch: (() -> Unit)?,
-    covered: Boolean,
-    isCurrent: Boolean,
-    backEnabled: Boolean,
-): Boolean {
-    if (onCancelSwitch == null || covered || !isCurrent) {
-        switchBack.reset()
-        return false
-    }
-    return if (!backEnabled || native.keyCode != android.view.KeyEvent.KEYCODE_BACK) {
-        switchBack.reset()
-        false
-    } else switchBack.handle(native.action == android.view.KeyEvent.ACTION_DOWN,
-        native.repeatCount, native.isCanceled) { onCancelSwitch() }
 }

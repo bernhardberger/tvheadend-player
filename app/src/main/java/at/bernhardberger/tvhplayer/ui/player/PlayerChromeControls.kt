@@ -205,7 +205,10 @@ internal fun PlayerChromeControls(
                 else -> null
             }
             if (target != null) androidx.compose.runtime.withFrameNanos { }
-            if (target?.requestFocus() == true) {
+            // The frame wait lets a viewer's first move win: a bar focused meanwhile is not pulled back to Pause.
+            if (target == initialFocus && restoreFocus == null && timelineFocused) {
+                focusInitialized = true
+            } else if (target?.requestFocus() == true) {
                 focusInitialized = true
                 if (restoreFocus != null) onFocusRestored()
             }
@@ -394,6 +397,7 @@ internal fun PlayerChromeControls(
                 stepSettled = live.stepSettled,
                 onStepAnnounced = live.onStepAnnounced,
                 stepId = live.stepId,
+                scrubSpeed = live.scrubSpeed,
                 programmeWindow = programmeWindow,
                 previewing = previewing,
                 collapsed = false,

@@ -1,4 +1,10 @@
 <resources>
+    <string name="record_unavailable">無法錄影此節目</string>
+    <string name="record_unavailable_ended">節目已結束。</string>
+    <string name="record_unavailable_no_programme">此頻道無節目資訊。</string>
+    <string name="record_unavailable_permission">此帳號無權錄影。</string>
+    <string name="player_scrub_forward">快轉，%1$d倍速</string>
+    <string name="player_scrub_backward">倒轉，%1$d倍速</string>
     <string name="recording_ad_break_skipped">已略過廣告時段</string>
     <string name="player_full_screen">全螢幕</string>
     <string name="stop">停止播放</string>
@@ -155,9 +161,6 @@
     <string name="onboarding_connecting_title">正在連線至%1$s</string>
     <string name="onboarding_connecting_body">正在檢查伺服器並以%1$s登入。按Back鍵取消。</string>
     <string name="onboarding_connecting_body_anonymous">正在檢查伺服器。按Back鍵取消。</string>
-    <string name="onboarding_connecting">正在連線…</string>
-    <string name="onboarding_failure_meta">%1$s • 連接埠%2$s • 使用者%3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s • 連接埠%2$s</string>
     <string name="onboarding_change_address">變更位址</string>
     <string name="onboarding_change_address_detail">%1$s • 連接埠%2$s</string>
     <string name="onboarding_change_sign_in">變更帳號</string>
@@ -357,6 +360,11 @@
     <string name="connection_retry_description">Tvheadend Player也會自行重試</string>
     <string name="connection_notice_restored">連線已恢復</string>
     <string name="server_switched">已連線至%1$s</string>
+    <string name="cancel">取消</string>
+    <string name="server_go_home">前往首頁</string>
+    <string name="back_to_settings">返回設定</string>
+    <string name="server_still_in_use">%1$s仍在使用中</string>
+    <string name="server_switch_unreachable_body">%1$s未回應連線要求。請確認伺服器正在執行，且位於同一網路。</string>
     <string name="connection_scope_line">適用於%1$s</string>
     <string name="connection_notice_login_rejected">登入遭拒</string>
     <string name="recording_action_permission">此帳號無法管理錄影。</string>

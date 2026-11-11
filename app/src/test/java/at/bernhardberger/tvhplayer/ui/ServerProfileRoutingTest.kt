@@ -40,6 +40,7 @@ import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.GuidePositionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.testutil.leaveTouchModeBeforeComposing
+import at.bernhardberger.tvhplayer.testutil.pressKey
 import at.bernhardberger.tvhplayer.ui.screens.settings.REMOVE_CONFIRM
 import at.bernhardberger.tvhplayer.ui.screens.settings.SERVER_REMOVE
 import at.bernhardberger.tvhplayer.ui.screens.settings.noServerInUse
@@ -55,7 +56,7 @@ import at.bernhardberger.tvhplayer.viewmodels.SettingsPlayerViewModel
 import at.bernhardberger.tvhplayer.viewmodels.SettingsStorageViewModel
 import at.bernhardberger.tvhplayer.viewmodels.VideoPlayerViewModel
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
@@ -68,6 +69,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.koin.compose.KoinIsolatedContext
 import org.koin.core.module.dsl.viewModel
+import org.koin.core.qualifier.named
 import org.koin.dsl.koinApplication
 import org.koin.dsl.module
 import org.robolectric.RobolectricTestRunner
@@ -84,7 +86,8 @@ import org.robolectric.annotation.Config
 class ServerProfileRoutingTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     private val context = ApplicationProvider.getApplicationContext<Application>()
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val dispatcher = StandardTestDispatcher()
+    private val scope = CoroutineScope(SupervisorJob() + dispatcher)
     // Saved channels, so Home shows its rows and the rail at once.
     private val session = FakeTvheadendSession(SessionObservation.create(
         sessionState = SessionState.Ready(at.bernhardberger.tvheadend.sdk.core.ServerCapabilities.create(
@@ -128,10 +131,12 @@ class ServerProfileRoutingTest {
                 return result
             }
         }
-        owner = AppProfileOwner(connectingSession, gatedStore, settings, Dispatchers.IO,
+        owner = AppProfileOwner(connectingSession, gatedStore, settings, dispatcher,
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
         scope.launch { owner.run() }
-        compose.waitUntil(10_000) { owner.profiles.value != null && owner.serverProfile.value != null }
+        dispatcher.scheduler.runCurrent()
+        org.junit.Assert.assertNotNull(owner.profiles.value)
+        org.junit.Assert.assertNotNull(owner.serverProfile.value)
         player = ExoPlayer.Builder(context).build()
         val coordinator = createTvheadendPlaybackCoordinator(player).also { it.launchIn(scope) }
         val notices = NoticeCenter(android.os.SystemClock::elapsedRealtime) {
@@ -141,6 +146,7 @@ class ServerProfileRoutingTest {
             TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None, PlaybackRuntimePolicy.fromPlayerSettings(),
             noticeCenter = notices)
         val dependencies = module {
+            single<CoroutineScope>(qualifier = named("application")) { scope }
             single<TvheadendSession> { session }
             single { runtime }
             single { owner }
@@ -193,11 +199,11 @@ class ServerProfileRoutingTest {
         connectionGate = CompletableDeferred()
         click("settings-row-${serverProfileRowId(first)}")
         click("settings-row-${at.bernhardberger.tvhplayer.ui.screens.settings.SERVER_USE}")
-        compose.waitUntil(10_000) { trialStarted }
-        compose.onRoot().performKeyInput { pressKey(androidx.compose.ui.input.key.Key.Back) }
-        compose.waitUntil(10_000) { !owner.connectionChanges.isLocked }
+        org.junit.Assert.assertTrue(trialStarted)
+        compose.pressKey(androidx.compose.ui.input.key.Key.Back)
         settle()
-        compose.onNodeWithTag("settings-row-${serverProfileRowId(first)}").assertIsFocused()
+        // Back cancels the attempt and lands on that connection's level, not out of Settings.
+        compose.onNodeWithTag("settings-row-${at.bernhardberger.tvhplayer.ui.screens.settings.SERVER_USE}").assertIsFocused()
         assertNull((owner.profiles.value as ServerProfileListResult.Available).activeId)
         compose.onNodeWithTag("setup-welcome-continue").assertDoesNotExist()
     }
@@ -214,15 +220,15 @@ class ServerProfileRoutingTest {
         // Launch as the appliance does: a pending startup request that would autoplay.
         launchRequests.request()
         app(ServerSettings())
-        compose.waitUntil(10_000) { launchRequests.state.value == ApplianceLaunchState.Idle }
         settle()
+        assertEquals(ApplianceLaunchState.Idle, launchRequests.state.value)
         assertSettingsConnection()
         // HOME, GUIDE or wake later in the same process.
         compose.onNodeWithTag("nav-channels").performSemanticsAction(SemanticsActions.OnClick)
         settle()
         compose.runOnIdle { launchRequests.request() }
-        compose.waitUntil(10_000) { launchRequests.state.value == ApplianceLaunchState.Idle }
         settle()
+        assertEquals(ApplianceLaunchState.Idle, launchRequests.state.value)
         assertSettingsConnection()
     }
 
@@ -234,15 +240,15 @@ class ServerProfileRoutingTest {
         app(ServerSettings(host = "living.example.invalid"))
         compose.onNodeWithTag("setup-welcome-continue").assertDoesNotExist()
         // Home's Dispatchers.Default browse preparation must finish before it exposes the rail.
-        compose.waitUntil(15_000) { compose.onAllNodes(hasTestTag("nav-settings")).fetchSemanticsNodes().isNotEmpty() }
+        compose.mainClock.advanceTimeUntil { compose.onAllNodes(hasTestTag("nav-settings")).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("nav-settings").performSemanticsAction(SemanticsActions.OnClick)
         settle()
         click("settings-row-${SettingsSection.CONNECTION.name}")
         click("settings-row-${serverProfileRowId(id)}")
         click("settings-row-$SERVER_REMOVE")
         click(REMOVE_CONFIRM)
-        compose.waitUntil(10_000) { (owner.profiles.value as? ServerProfileListResult.Available)?.profiles?.isEmpty() == true }
         settle()
+        assertEquals(0, (owner.profiles.value as ServerProfileListResult.Available).profiles.size)
         compose.onNodeWithTag("setup-welcome-continue").assertIsFocused()
         assertEquals(false, owner.profiles.value.noServerInUse())
     }
@@ -255,7 +261,7 @@ class ServerProfileRoutingTest {
         }
         app(ServerSettings(host = "living.example.invalid"))
         // Home's Dispatchers.Default browse preparation must finish before it exposes the rail.
-        compose.waitUntil(15_000) { compose.onAllNodes(hasTestTag("nav-settings")).fetchSemanticsNodes().isNotEmpty() }
+        compose.mainClock.advanceTimeUntil { compose.onAllNodes(hasTestTag("nav-settings")).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("nav-settings").performSemanticsAction(SemanticsActions.OnClick)
         settle()
         click("settings-row-${SettingsSection.CONNECTION.name}")
@@ -263,19 +269,19 @@ class ServerProfileRoutingTest {
         removalGate = CompletableDeferred()
         click("settings-row-$SERVER_REMOVE")
         click(REMOVE_CONFIRM)
-        compose.waitUntil(10_000) { owner.serverProfile.value == at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult.Missing }
         settle()
+        assertEquals(at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult.Missing, owner.serverProfile.value)
         compose.onNodeWithTag("setup-welcome-continue").assertDoesNotExist()
         compose.onNodeWithTag("nav-settings").assertExists()
         compose.runOnIdle { removalGate!!.complete(Unit) }
-        compose.waitUntil(10_000) { (owner.profiles.value as? ServerProfileListResult.Available)?.profiles?.size == 1 }
         settle()
+        assertEquals(1, (owner.profiles.value as ServerProfileListResult.Available).profiles.size)
         compose.onNodeWithTag("setup-welcome-continue").assertDoesNotExist()
         compose.onNodeWithText("No connection in use. Choose one to watch TV again.").assertExists()
     }
 
     private fun click(tag: String) {
-        compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag(tag)).fetchSemanticsNodes().isNotEmpty() }
+        compose.mainClock.advanceTimeUntil { compose.onAllNodes(hasTestTag(tag)).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag(tag).performSemanticsAction(SemanticsActions.RequestFocus)
         compose.onNodeWithTag(tag).performSemanticsAction(SemanticsActions.OnClick)
         settle()
@@ -283,6 +289,7 @@ class ServerProfileRoutingTest {
 
     private fun settle() {
         repeat(10) {
+            dispatcher.scheduler.runCurrent()
             compose.mainClock.advanceTimeBy(100)
             // Dispatchers.Default browse preparation remains real; this idle only drains UI work.
             compose.waitForIdle()

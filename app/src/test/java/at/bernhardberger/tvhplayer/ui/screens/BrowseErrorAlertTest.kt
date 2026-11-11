@@ -262,6 +262,7 @@ class BrowseErrorAlertTest {
                             dvrMutationActions = mutations,
                             notices = notices,
                         ) else ChannelsScreenContent(
+                            onRecordKey = { null },
                             view = ChannelsView(ChannelsLayout.LIST),
                             contentPadding = padding,
                             initialFocusEnabled = !drawerActive,

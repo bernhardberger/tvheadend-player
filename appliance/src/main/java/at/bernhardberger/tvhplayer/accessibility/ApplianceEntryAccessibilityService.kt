@@ -65,8 +65,11 @@ class ApplianceEntryAccessibilityService : AccessibilityService() {
             repeatCount = event.repeatCount,
         )
         if (decision == ApplianceKeyDecision.LAUNCH_AND_CONSUME) launchApp(
-            if (function == CompanionFunction.GUIDE) ApplianceEntryPolicy.DESTINATION_GUIDE
-            else ApplianceEntryPolicy.DESTINATION_LIVE, explicit = true)
+            when (function) {
+                CompanionFunction.GUIDE -> ApplianceEntryPolicy.DESTINATION_GUIDE
+                CompanionFunction.RECORDINGS -> ApplianceEntryPolicy.DESTINATION_RECORDINGS
+                else -> ApplianceEntryPolicy.DESTINATION_LIVE
+            }, explicit = true)
         return decision != ApplianceKeyDecision.PASS_THROUGH
     }
 

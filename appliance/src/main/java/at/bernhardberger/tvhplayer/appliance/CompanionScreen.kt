@@ -88,6 +88,7 @@ private fun CompanionFunction.row(): CompanionRow = when (this) {
     CompanionFunction.STARTUP -> CompanionRow.STARTUP
     CompanionFunction.LIVE_TV -> CompanionRow.LIVE_TV
     CompanionFunction.GUIDE -> CompanionRow.GUIDE
+    CompanionFunction.RECORDINGS -> CompanionRow.RECORDINGS
 }
 
 /** The function whose page a row opens; the startup switch has none. */
@@ -100,6 +101,7 @@ private val CompanionFunction.titleRes: Int
         CompanionFunction.STARTUP -> R.string.function_startup_title
         CompanionFunction.LIVE_TV -> R.string.function_live_tv_title
         CompanionFunction.GUIDE -> R.string.function_guide_title
+        CompanionFunction.RECORDINGS -> R.string.function_recordings_title
     }
 
 @get:StringRes
@@ -108,6 +110,7 @@ private val CompanionFunction.targetRes: Int
         CompanionFunction.STARTUP -> error("Startup has no button")
         CompanionFunction.LIVE_TV -> R.string.function_live_tv_target
         CompanionFunction.GUIDE -> R.string.function_guide_target
+        CompanionFunction.RECORDINGS -> R.string.function_recordings_target
     }
 
 private fun defaultLabel(function: CompanionFunction) = CompanionFunctions().buttonLabel(function)

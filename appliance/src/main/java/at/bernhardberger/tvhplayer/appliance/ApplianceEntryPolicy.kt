@@ -11,6 +11,7 @@ object ApplianceEntryPolicy {
     const val EXTRA_APPLIANCE_DESTINATION = "at.bernhardberger.tvhplayer.extra.APPLIANCE_DESTINATION"
     const val DESTINATION_LIVE = "live"
     const val DESTINATION_GUIDE = "guide"
+    const val DESTINATION_RECORDINGS = "recordings"
     const val ENTRY_ALIAS_CLASS_NAME = "at.bernhardberger.tvhplayer.ui.ApplianceEntryActivity"
     const val TCL_TV_KEY_CODE = 4001
 

@@ -142,6 +142,7 @@ class ChannelsScreenshotTest(private val scenario: String) {
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                         SideRail(currentRoute = AppDestination.CHANNELS, onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                             ChannelsScreenContent(
+                                onRecordKey = { null },
                                 view = ChannelsView(ChannelsLayout.LIST),
                                 contentPadding = padding, initialFocusEnabled = !drawerActive,
                                 channelScopeState = resolveChannelScopeState(ChannelRepositoryState.Current(catalog), activeTag),

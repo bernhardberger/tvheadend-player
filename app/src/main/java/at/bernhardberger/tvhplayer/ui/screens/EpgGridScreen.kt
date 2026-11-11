@@ -1,4 +1,5 @@
 package at.bernhardberger.tvhplayer.ui.screens
+import at.bernhardberger.tvhplayer.core.BrowseContextAction
 
 import at.bernhardberger.tvhplayer.ui.components.backKeyCycleFocus
 import at.bernhardberger.tvhplayer.ui.components.rememberBackKeyCycle
@@ -430,6 +431,8 @@ fun EpgGridScreen(
     var destinationEntryPending by remember { mutableStateOf(playerReturn == null && !browseReturn) }
     var detailsEvent by remember { mutableStateOf<EpgEventEntry?>(null) }
     var showContextMenu by remember { mutableStateOf(false) }
+    var recordInitialAction by remember { mutableStateOf<BrowseContextAction?>(null) }
+    val recordSettings: UiSettingsStore = koinInject()
     var detailsObservation by remember { mutableStateOf<SessionObservation?>(null) }
     var restoreDetailsFocus by remember { mutableStateOf(false) }
     var showTimePanel by remember { mutableStateOf(false) }
@@ -1930,6 +1933,32 @@ fun EpgGridScreen(
                 }
                 .backKeyCycleFocus(backCycle)
                 .onPreviewKeyEvent { event ->
+                    if (event.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_MEDIA_RECORD) {
+                        val initialPress = event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0
+                        val panelOpen = detailsEvent != null || showTimePanel || openPanel != null
+                        if (initialPress && programmeFocusOwned && !panelOpen) {
+                            val current = observationState.value
+                            val programme = selectedTarget?.eventId?.let(current::event)
+                            val action = programme?.let { programmeRecordKeyAction(it, current, nowSecProvider()) }
+                            if (programme != null && action == BrowseContextAction.RECORD) {
+                                current.currentSession?.let { capability ->
+                                    dvrMutationActions.launchMutation(DvrMutationAction.CreateProgramme(
+                                        programme.programmeRecordingTarget(capability), null),
+                                        current, { observationState.value }, nowSecProvider, recordSettings, notices,
+                                        coroutineScope, detailsMutationInFlight)
+                                }
+                            } else if (action == BrowseContextAction.STOP || action == BrowseContextAction.CANCEL) {
+                                recordInitialAction = action
+                                detailsObservation = current
+                                detailsEvent = programme
+                                showContextMenu = false
+                                releaseProgrammeFocus()
+                            } else {
+                                notices.postRecordUnavailable(programme, current, nowSecProvider())
+                            }
+                        }
+                        return@onPreviewKeyEvent true
+                    }
                     if (event.key == Key.Back) {
                         preparationNavigation.clear()
                         return@onPreviewKeyEvent backCycle.handle(event.type == KeyEventType.KeyDown,
@@ -2091,6 +2120,7 @@ fun EpgGridScreen(
                     detailsEvent = event
                     detailsObservation = frameObservation
                     showContextMenu = false
+                    recordInitialAction = null
                 },
                 onOpenProgrammeContextMenu = menu@{ channelIndex, event, frameObservation ->
                     if (realizedTarget != selectedTarget || frontierRequest != null ||
@@ -2102,6 +2132,7 @@ fun EpgGridScreen(
                     detailsEvent = event
                     detailsObservation = frameObservation
                     showContextMenu = true
+                    recordInitialAction = null
                 },
             )
         }
@@ -2113,6 +2144,7 @@ fun EpgGridScreen(
         val settingsStore: UiSettingsStore = koinInject()
         GuideOverlayHost(
             detailsEvent = detailsEvent,
+            initialAction = recordInitialAction,
             detailsObservation = detailsObservation,
             observation = observation,
             currentObservation = { observationState.value },

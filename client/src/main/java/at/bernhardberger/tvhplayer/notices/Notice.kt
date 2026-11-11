@@ -11,11 +11,16 @@ import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import at.bernhardberger.tvhplayer.playback.BackgroundPlaybackNotice
 
 enum class NoticeSeverity { INFO, FAILURE }
+enum class RecordUnavailableReason { ENDED, NO_PROGRAMME, PERMISSION_DENIED }
 enum class ConnectionNoticeKind { LOST, RESTORED, LOGIN_REJECTED }
 enum class PauseUnavailableReason { SETTINGS_OFF, CHANNEL_UNAVAILABLE }
 
 /** User feedback policy, with no resources or presentation dependencies. */
 sealed interface Notice {
+    data class RecordUnavailable(val reason: RecordUnavailableReason?) : Notice {
+        override val key = "record-unavailable"
+        override val severity = NoticeSeverity.INFO
+    }
     data class ServerConnectionFailed(val name: String) : Notice {
         override val key = "server-connection-failed"
         override val severity = NoticeSeverity.FAILURE

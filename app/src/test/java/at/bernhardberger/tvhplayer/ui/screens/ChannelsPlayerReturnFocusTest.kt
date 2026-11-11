@@ -131,6 +131,7 @@ class ChannelsPlayerReturnFocusTest {
             val observation = observation(loaded)
             TVHeadendPlayerTheme {
                 ChannelsScreenContent(
+                    onRecordKey = { null },
                     view = ChannelsView(ChannelsLayout.LIST),
                     initialFocusEnabled = focusEnabled,
                     channelScopeState = resolveChannelScopeState(observation.channelState, activeTag),

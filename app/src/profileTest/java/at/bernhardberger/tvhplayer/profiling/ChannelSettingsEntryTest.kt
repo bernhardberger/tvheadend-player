@@ -21,6 +21,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.tv.material3.Button
 import androidx.tv.material3.Text
+import at.bernhardberger.tvheadend.sdk.core.ServerProfileId
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
@@ -32,6 +33,7 @@ import at.bernhardberger.tvhplayer.ui.SettingsSection
 import at.bernhardberger.tvhplayer.ui.components.depth.rememberDepthNavigationState
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import org.junit.Rule
 import org.junit.Test
@@ -60,7 +62,7 @@ class ChannelSettingsEntryTest {
         val contentFocus = FocusRequester()
         val categoryFocus = FocusRequester()
         compose.activityRule.scenario.onActivity { activity ->
-            val model = ChannelsViewModel(FakeTvheadendSession(), ChannelTagSettingsStore(store))
+            val model = ChannelsViewModel(FakeTvheadendSession(), ChannelTagSettingsStore(store), MutableStateFlow<ServerProfileId?>(null))
             activity.viewModelStore.put("settings-entry-test", model)
             activity.setContent {
                 TVHeadendPlayerTheme {

@@ -135,6 +135,7 @@ class ChannelScopeArtworkTest {
             TVHeadendPlayerTheme {
                 ProvideAppArtwork(session) {
                     ChannelsScreenContent(
+                        onRecordKey = { null },
                         view = ChannelsView(ChannelsLayout.LIST),
                         channelScopeState = resolveChannelScopeState(scopeFrom.channelState, null).copy(observation = scopeFrom),
                         observation = latest,

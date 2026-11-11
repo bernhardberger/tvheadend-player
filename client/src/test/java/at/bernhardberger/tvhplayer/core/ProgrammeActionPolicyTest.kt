@@ -1,4 +1,5 @@
 package at.bernhardberger.tvhplayer.core
+import at.bernhardberger.tvhplayer.notices.RecordUnavailableReason
 
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
@@ -24,6 +25,19 @@ class ProgrammeActionPolicyTest {
         stop = Instant.fromEpochSeconds(1_800_003_600),
     )
     private val beforeStart = 1_799_999_900L
+
+    @Test
+    fun recordUnavailableReasonsFollowProgrammeAndPermissionEligibility() {
+        assertEquals(null, recordUnavailableReason(event, beforeStart, null))
+        assertEquals(null, recordUnavailableReason(null, beforeStart, null))
+        assertEquals(RecordUnavailableReason.NO_PROGRAMME,
+            recordUnavailableReason(null, beforeStart, false))
+        assertEquals(RecordUnavailableReason.ENDED,
+            recordUnavailableReason(event, event.stop.epochSeconds, false))
+        assertEquals(RecordUnavailableReason.PERMISSION_DENIED,
+            recordUnavailableReason(event, beforeStart, false))
+        assertEquals(null, recordUnavailableReason(event, beforeStart, true))
+    }
 
     @Test
     fun airingProgrammeOffersWatchThenRecord() {

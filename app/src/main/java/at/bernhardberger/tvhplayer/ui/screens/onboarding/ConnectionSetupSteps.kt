@@ -1,24 +1,19 @@
 package at.bernhardberger.tvhplayer.ui.screens.onboarding
 
 import androidx.activity.compose.BackHandler
-import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon as FieldIcon
 import androidx.compose.material3.Text as FieldText
@@ -53,11 +48,8 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.Button
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.OutlinedButton
-import androidx.tv.material3.OutlinedButtonDefaults
 import at.bernhardberger.tvhplayer.ui.components.serverAddress
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.android.DiscoveredTvheadendServer
@@ -67,23 +59,22 @@ import at.bernhardberger.tvhplayer.settings.ConnectionFormFeedback
 import at.bernhardberger.tvhplayer.settings.ConnectionFormState
 import at.bernhardberger.tvhplayer.settings.compactServerName
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
-import at.bernhardberger.tvhplayer.ui.TvSpacing12
-import at.bernhardberger.tvhplayer.ui.TvSpacing80
 import at.bernhardberger.tvhplayer.ui.TvTextDisabledAlpha
+import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
 import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
 import at.bernhardberger.tvhplayer.ui.common.AppErrorText
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepAction
+import at.bernhardberger.tvhplayer.ui.components.GuidedStepCenteredLayout
+import at.bernhardberger.tvhplayer.ui.components.GuidedStepPill
+import at.bernhardberger.tvhplayer.ui.components.ServerAvatarHero
+import at.bernhardberger.tvhplayer.ui.components.ServerAvatarStatus
+import at.bernhardberger.tvhplayer.ui.components.serverAvatarLook
 import at.bernhardberger.tvhplayer.ui.components.arrivalFocus
-import at.bernhardberger.tvhplayer.ui.components.GuidedStepBadge
-import at.bernhardberger.tvhplayer.ui.components.GuidedStepChoiceTop
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepGuidance
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepLayout
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepper
 import at.bernhardberger.tvhplayer.ui.components.TvOutlinedTextField
 import at.bernhardberger.tvhplayer.ui.components.TvPasswordField
-
-/** A TV button's height, so the step does not move as "Connecting…" takes the action's place. */
-private val MainActionHeight = 40.dp
 
 private const val HOST_FIELD = "setup-host"
 private const val PORT_FIELD = "setup-port"
@@ -445,6 +436,16 @@ private fun SignInStep(state: ConnectionSetupState, profileName: String?) {
     }
 }
 
+/** The server being tested as it will look in Settings; a port that doesn't parse shows the default's color. */
+private fun ConnectionFormState.avatarLook() = serverAvatarLook(
+    host.trim(), port.trim().toIntOrNull() ?: DEFAULT_HTSP_PORT, null, username.ifBlank { null },
+)
+
+/**
+ * The running test, centred on the server's avatar with its progress ring. Nothing to press, but the
+ * hero holds the focus the action had, so Back, which cancels, stays with the step and accessibility
+ * services read the status.
+ */
 @Composable
 private fun ConnectStep(state: ConnectionSetupState) {
     val form = state.form
@@ -454,12 +455,19 @@ private fun ConnectStep(state: ConnectionSetupState) {
         form.username.isBlank() -> stringResource(R.string.onboarding_connecting_body_anonymous)
         else -> stringResource(R.string.onboarding_connecting_body, form.username)
     }
-    GuidedStepLayout(guidance = {
-        GuidedStepGuidance(title = title, body = body, stepper = { SetupStepper(SetupStage.CONNECT.ordinal) },
-            meta = serverAddress(host, form.port))
-    }) {
-        ConnectingStatus(Modifier.testTag("setup-connecting"))
-    }
+    val requester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { requester.requestFocus() }
+    GuidedStepCenteredLayout(
+        title = title,
+        body = body,
+        stepper = { SetupStepper(SetupStage.CONNECT.ordinal) },
+        hero = {
+            Box(
+                Modifier.testTag("setup-connecting").focusRequester(requester).focusable()
+                    .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
+            ) { ServerAvatarHero(form.avatarLook(), ServerAvatarStatus.CONNECTING) }
+        },
+    )
 }
 
 @Composable
@@ -538,126 +546,67 @@ internal fun MainActionButton(
     )
 }
 
-/**
- * The running test in the main action's place: a spinner and "Connecting…" as plain text, nothing
- * to press. It holds the focus the action had, so Back, which cancels, stays with the step and
- * accessibility services read the status.
- */
-@Composable
-private fun ConnectingStatus(modifier: Modifier) {
-    val requester = remember { FocusRequester() }
-    LaunchedEffect(Unit) { requester.requestFocus() }
-    Row(
-        modifier = modifier
-            .focusRequester(requester)
-            .focusable()
-            .heightIn(min = MainActionHeight)
-            .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
-        horizontalArrangement = Arrangement.spacedBy(TvSpacing12),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        CircularProgressIndicator(
-            modifier = Modifier.size(22.dp),
-            strokeWidth = 3.dp,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        Text(
-            text = stringResource(R.string.onboarding_connecting),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = TvTextSecondaryAlpha),
-        )
-    }
-}
-
 @Composable
 private fun FailureStep(state: ConnectionSetupState, failure: SetupFailure) {
     val context = LocalContext.current
     val text = remember(context) { AppErrorText(context) }
-    val firstAction = arrivalFocus()
     val form = state.form
-    val host = form.host.trim()
-    val port = form.port.trim()
-    val meta = if (form.username.isBlank()) {
-        serverAddress(host, port)
-    } else {
-        stringResource(R.string.server_detail_separator, serverAddress(host, port), form.username)
-    }
     val reason = if (failure.showsHint) text.paragraph(failure.condition) else text.reason(failure.condition)
     val body = if (state.mode.keepsSavedConnection)
         stringResource(R.string.onboarding_edit_failure_body, reason) else reason
-    GuidedStepLayout(
-        guidance = {
-            GuidedStepGuidance(
-                title = text.title(failure.condition),
-                body = body,
-                stepper = { SetupStepper(SetupStage.CONNECT.ordinal, failed = true) },
-                meta = meta,
+    val actions = failure.actionsFor(state.mode)
+    var focused by remember(actions) { mutableStateOf(actions.firstOrNull()) }
+    GuidedStepCenteredLayout(
+        title = text.title(failure.condition),
+        body = body,
+        stepper = { SetupStepper(SetupStage.CONNECT.ordinal, failed = true) },
+        hero = { ServerAvatarHero(form.avatarLook(), ServerAvatarStatus.FAILED) },
+        detail = { SaveFailedText(form.feedback) },
+        actions = {
+            actions.forEachIndexed { index, action ->
+                val pill = Modifier.onFocusChanged { if (it.isFocused) focused = action }
+                    .testTag("setup-action-${action.name.lowercase()}")
+                GuidedStepPill(
+                    text = stringResource(action.title()),
+                    onClick = { state.onAction(action) },
+                    modifier = if (index == 0) arrivalFocus().then(pill) else pill,
+                    primary = index == 0,
+                )
+            }
+        },
+        footer = {
+            // What the focused action would do, under the buttons so they stay put and the line keeps its room.
+            Text(
+                text = focused?.let { actionSubtitle(it, form) }.orEmpty(),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = TvTextTertiaryAlpha),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 16.dp).heightIn(min = 40.dp).widthIn(max = 560.dp)
+                    .semantics { liveRegion = LiveRegionMode.Polite },
             )
         },
-        actionsTop = GuidedStepChoiceTop,
-    ) {
-        failure.actionsFor(state.mode).forEachIndexed { index, action ->
-            SetupActionButton(
-                action = action,
-                form = form,
-                onClick = { state.onAction(action) },
-                modifier = if (index == 0) firstAction else Modifier,
-            )
-        }
-        SaveFailedText(form.feedback)
-    }
+    )
 }
 
+@StringRes
+private fun SetupAction.title(): Int = when (this) {
+    SetupAction.TRY_AGAIN -> R.string.connection_try_again
+    SetupAction.CHANGE_ADDRESS -> R.string.onboarding_change_address
+    SetupAction.CHANGE_SIGN_IN -> R.string.onboarding_change_sign_in
+    SetupAction.CONTINUE_ANYWAY -> R.string.onboarding_continue_anyway
+    SetupAction.SAVE_ANYWAY -> R.string.onboarding_save_anyway
+}
+
+/** What an action would use or do, which its short label leaves out. */
 @Composable
-private fun SetupActionButton(
-    action: SetupAction,
-    form: ConnectionFormState,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val host = form.host.trim()
-    val user = form.username
-    @StringRes val title: Int
-    @DrawableRes val icon: Int
-    val subtitle: String?
-    when (action) {
-        SetupAction.TRY_AGAIN -> {
-            title = R.string.connection_try_again
-            icon = R.drawable.ic_refresh
-            subtitle = null
-        }
-        SetupAction.CHANGE_ADDRESS -> {
-            title = R.string.onboarding_change_address
-            icon = R.drawable.ic_edit
-            subtitle = serverAddress(host, form.port)
-        }
-        SetupAction.CHANGE_SIGN_IN -> {
-            title = R.string.onboarding_change_sign_in
-            icon = R.drawable.ic_person
-            subtitle = if (user.isBlank()) {
-                stringResource(R.string.onboarding_change_sign_in_anonymous)
-            } else {
-                stringResource(R.string.onboarding_change_sign_in_detail, user)
-            }
-        }
-        SetupAction.CONTINUE_ANYWAY -> {
-            title = R.string.onboarding_continue_anyway
-            icon = R.drawable.ic_arrow_forward
-            subtitle = stringResource(R.string.onboarding_continue_anyway_detail)
-        }
-        SetupAction.SAVE_ANYWAY -> {
-            title = R.string.onboarding_save_anyway
-            icon = R.drawable.ic_cloud_off
-            subtitle = stringResource(R.string.onboarding_save_anyway_detail)
-        }
-    }
-    GuidedStepAction(
-        title = stringResource(title),
-        subtitle = subtitle,
-        icon = icon,
-        onClick = onClick,
-        modifier = modifier.testTag("setup-action-${action.name.lowercase()}"),
-    )
+private fun actionSubtitle(action: SetupAction, form: ConnectionFormState): String? = when (action) {
+    SetupAction.TRY_AGAIN -> null
+    SetupAction.CHANGE_ADDRESS -> serverAddress(form.host.trim(), form.port)
+    SetupAction.CHANGE_SIGN_IN ->
+        if (form.username.isBlank()) stringResource(R.string.onboarding_change_sign_in_anonymous)
+        else stringResource(R.string.onboarding_change_sign_in_detail, form.username)
+    SetupAction.CONTINUE_ANYWAY -> stringResource(R.string.onboarding_continue_anyway_detail)
+    SetupAction.SAVE_ANYWAY -> stringResource(R.string.onboarding_save_anyway_detail)
 }
 
 /** The centred result after a passed test; "Start watching" saves and the app takes over. */
@@ -669,49 +618,34 @@ private fun DoneStep(state: ConnectionSetupState) {
     } else {
         stringResource(R.string.onboarding_done_body, form.username)
     }
-    Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(top = TvSpacing80, bottom = 64.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        SetupStepper(SetupStage.entries.size)
-        Spacer(Modifier.height(32.dp))
-        GuidedStepBadge(R.drawable.ic_check)
-        Text(
-            text = stringResource(R.string.onboarding_done_title, form.host.trim()),
-            style = MaterialTheme.typography.headlineLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 20.dp).widthIn(max = 700.dp).semantics { heading() },
-        )
-        Text(
-            text = body,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = TvTextSecondaryAlpha),
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 8.dp).widthIn(max = 560.dp),
-        )
-        // Keep the button's own layout unpadded: Column can otherwise constrain it to zero
-        // after the success copy grows (notably at 1.3x fonts), leaving no focusable target.
-        Spacer(Modifier.height(24.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(TvSpacing12)) {
-            Button(
+    GuidedStepCenteredLayout(
+        title = stringResource(R.string.onboarding_done_title, form.host.trim()),
+        body = body,
+        stepper = { SetupStepper(SetupStage.entries.size) },
+        hero = { ServerAvatarHero(form.avatarLook(), ServerAvatarStatus.CONNECTED) },
+        detail = { SaveFailedText(form.feedback) },
+        actions = {
+            GuidedStepPill(
+                text = stringResource(
+                    if (state.mode == SetupMode.EDIT) {
+                        R.string.onboarding_save_connection
+                    } else {
+                        R.string.onboarding_start_watching
+                    },
+                ),
                 onClick = { state.save() },
                 modifier = arrivalFocus().testTag("setup-start-watching"),
-            ) {
-                Text(stringResource(if (state.mode == SetupMode.EDIT) R.string.onboarding_save_connection else R.string.onboarding_start_watching))
-            }
+                primary = true,
+            )
             if (state.offersName) {
-                OutlinedButton(
+                GuidedStepPill(
+                    text = stringResource(R.string.server_add_name),
                     onClick = { state.save(addName = true) },
                     modifier = Modifier.testTag("setup-add-name"),
-                    colors = OutlinedButtonDefaults.colors(contentColor = MaterialTheme.colorScheme.onSurface),
-                ) {
-                    Text(stringResource(R.string.server_add_name))
-                }
+                )
             }
-        }
-        SaveFailedText(form.feedback)
-    }
+        },
+    )
 }
 
 @Composable

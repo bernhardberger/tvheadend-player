@@ -18,12 +18,114 @@ import at.bernhardberger.tvhplayer.notices.toDvrMutationFeedback
 import at.bernhardberger.tvhplayer.notices.Notice
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
+import at.bernhardberger.tvhplayer.core.recordUnavailableReason
+import at.bernhardberger.tvhplayer.core.recordingWasRemoved
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvhplayer.core.BrowseContextAction
 import at.bernhardberger.tvhplayer.core.ProgrammeRecordingTarget
 import at.bernhardberger.tvhplayer.core.folderActionApplies
 import at.bernhardberger.tvhplayer.core.dvrMutationStateIsCurrent
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvhplayer.core.programmeRecordingTarget
+import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
+import at.bernhardberger.tvhplayer.core.programmeDetailsActions
+import at.bernhardberger.tvhplayer.core.chooseDvrConfig
+import at.bernhardberger.tvhplayer.settings.UiSettingsStore
+import androidx.compose.runtime.MutableState
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
+
+/** The same eligibility as the programme's action row; Record never acts on a retained event. */
+@OptIn(ExperimentalTvheadendApi::class)
+internal fun programmeRecordKeyAction(event: EpgEvent, observation: SessionObservation, nowSec: Long): BrowseContextAction? {
+    val current = observation.event(event.id) ?: return null
+    val recording = observation.dvrEntryForEvent(current)?.takeUnless(::recordingWasRemoved)
+    val canModify = observation.currentSession != null && observation.dvrState is DvrRepositoryState.Current &&
+        (observation.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
+    return programmeDetailsActions(current, nowSec, recording,
+        recording?.let(observation::recordingPlaybackAdmission), canModify,
+        current.channelId?.let(observation::channel) != null, liveProgramme = true)
+        .firstOrNull { it in listOf(BrowseContextAction.RECORD, BrowseContextAction.STOP, BrowseContextAction.CANCEL) }
+}
+
+/** Shared by the action row and dedicated Record key, with the screen's existing lifetime/lock. */
+@OptIn(ExperimentalTvheadendApi::class)
+internal fun NoticeCenter.postRecordUnavailable(event: EpgEvent?, observation: SessionObservation, nowSec: Long) {
+    val access = (observation.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite
+    val canModify = when {
+        access == CapabilityAccess.DENIED -> false
+        observation.currentSession != null && observation.dvrState is DvrRepositoryState.Current &&
+            access == CapabilityAccess.ALLOWED -> true
+        else -> null
+    }
+    post(Notice.RecordUnavailable(recordUnavailableReason(event, nowSec, canModify)), context())
+}
+
+/** Schedules the channel's current programme, or returns the details action to focus. */
+@OptIn(ExperimentalTvheadendApi::class)
+internal fun DvrMutationActions.recordChannelProgramme(
+    channelId: ChannelId,
+    currentObservation: () -> SessionObservation,
+    nowSecProvider: () -> Long,
+    settingsStore: UiSettingsStore,
+    notices: NoticeCenter,
+    scope: CoroutineScope,
+    inFlight: MutableState<DvrMutationAction?>,
+): BrowseContextAction? {
+    val current = currentObservation()
+    val event = current.eventAt(channelId, kotlin.time.Instant.fromEpochSeconds(nowSecProvider()))
+    return when (val action = event?.let { programmeRecordKeyAction(it, current, nowSecProvider()) }) {
+        BrowseContextAction.RECORD -> {
+            current.currentSession?.let { capability ->
+                launchMutation(DvrMutationAction.CreateProgramme(
+                    requireNotNull(event).programmeRecordingTarget(capability), null),
+                    current, currentObservation, nowSecProvider, settingsStore, notices, scope, inFlight)
+            }
+            null
+        }
+        BrowseContextAction.STOP, BrowseContextAction.CANCEL -> action
+        else -> { notices.postRecordUnavailable(event, current, nowSecProvider()); null }
+    }
+}
+
+/** Shared by the action row and dedicated Record key, with the screen's existing lifetime/lock. */
+@OptIn(ExperimentalTvheadendApi::class)
+internal fun DvrMutationActions.launchMutation(
+    mutation: DvrMutationAction,
+    sourceObservation: SessionObservation,
+    currentObservation: () -> SessionObservation,
+    nowSecProvider: () -> Long,
+    settingsStore: UiSettingsStore,
+    notices: NoticeCenter,
+    scope: CoroutineScope,
+    inFlight: MutableState<DvrMutationAction?>,
+) {
+    if (inFlight.value != null) return
+    inFlight.value = mutation
+    scope.launch(Dispatchers.Main) {
+        try {
+            val preferred = if (mutation is DvrMutationAction.CreateProgramme)
+                settingsStore.settings.first().recordingProfileId else null
+            val current = currentObservation()
+            val request = currentDvrMutation(mutation, sourceObservation, current) ?: return@launch
+            if (request is DvrMutationAction.CreateProgramme &&
+                current.event(request.target.eventId)?.let {
+                    programmeRecordKeyAction(it, current, nowSecProvider())
+                } !=
+                BrowseContextAction.RECORD) return@launch
+            val configured = if (request is DvrMutationAction.CreateProgramme)
+                request.copy(configId = chooseDvrConfig(current.currentDvrConfigurations(), preferred)) else request
+            val context = notices.context()
+            notices.postDvrFailure(configured, execute(configured), context)
+        } finally {
+            inFlight.value = null
+        }
+    }
+}
 
 internal sealed interface DvrMutationAction {
     data class CreateProgramme(

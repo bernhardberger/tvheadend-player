@@ -298,8 +298,16 @@ class AppProfileOwner(
         refreshAfterWrite(profileStore.setActive(id))
     }
 
-    /** Tests the target on the shared connection; persistence changes only after sign-in succeeds. */
-    suspend fun switchActive(id: ServerProfileId, beforeConnect: suspend () -> Unit = {}): ServerProfileWriteResult =
+    /**
+     * Tests the target on the shared connection; persistence changes only after sign-in succeeds.
+     * The switch's own outcome (switched, can't connect, sign-in rejected) goes to [onOutcome] when
+     * the caller shows it itself, else to the notice center; a failed write is always a notice.
+     */
+    suspend fun switchActive(
+        id: ServerProfileId,
+        onOutcome: ((Notice) -> Unit)? = null,
+        beforeConnect: suspend () -> Unit = {},
+    ): ServerProfileWriteResult =
         connectionChanges.withLock {
             val list = availableProfiles() ?: return@withLock unavailableSwitch(noticeCenter)
             if (list.activeId == id) return@withLock ServerProfileWriteResult.Applied(id)
@@ -350,11 +358,11 @@ class AppProfileOwner(
                         if (shouldRestoreSwitch(committed, caller, persisted, previousId) {
                                 switchGenerationMatches(configurationGeneration, generation, committed) })
                             withContext(NonCancellable) {
-                                restoreSwitch(persisted, previousId, previous, failureNotice)
+                                restoreSwitch(persisted, previousId, previous, caller, onOutcome, failureNotice)
                         } else if (committed && caller.isActive) {
                             // The retained outcome: no rollback ran. Generic connection notices stay suppressed
                             // until the switch ends, so this is the only one.
-                            postSwitchNotice(noticeCenter, switchedNotice)
+                            reportSwitch(onOutcome, switchedNotice)
                         }
                     } finally {
                         switchIdentity.unlock()
@@ -364,6 +372,10 @@ class AppProfileOwner(
                 endSwitch()
             }
         }
+
+    private fun reportSwitch(onOutcome: ((Notice) -> Unit)?, notice: Notice?) {
+        if (onOutcome != null) notice?.let(onOutcome) else postSwitchNotice(noticeCenter, notice)
+    }
 
     private fun availableProfiles() = profiles.value as? ServerProfileListResult.Available
 
@@ -398,13 +410,16 @@ class AppProfileOwner(
         persisted: Boolean,
         previousId: ServerProfileId?,
         previous: ServerProfileReadResult,
+        caller: CoroutineContext,
+        onOutcome: ((Notice) -> Unit)?,
         failureNotice: Notice?,
     ) {
         val restored = if (persisted) {
             readBackSwitchRollback(profileStore, previousId, mutableProfiles, noticeCenter)
         } else previous
         applyServerProfile(restored)
-        postSwitchNotice(noticeCenter, failureNotice)
+        // Cleanup must finish, but cancellation has no user-facing outcome.
+        if (caller.isActive) reportSwitch(onOutcome, failureNotice)
     }
 
     suspend fun remove(id: ServerProfileId): ServerProfileWriteResult = mutate { removeProfile(id) }

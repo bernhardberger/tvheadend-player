@@ -1,4 +1,10 @@
 <resources>
+    <string name="record_unavailable">Impossibile registrare questo programma</string>
+    <string name="record_unavailable_ended">È già terminato.</string>
+    <string name="record_unavailable_no_programme">Non sono disponibili informazioni sul programma per questo canale.</string>
+    <string name="record_unavailable_permission">Questo account non può registrare.</string>
+    <string name="player_scrub_forward">Avanzamento rapido, a %1$d volte la velocità normale</string>
+    <string name="player_scrub_backward">Riavvolgimento, a %1$d volte la velocità normale</string>
     <string name="recording_ad_break_skipped">Pausa pubblicitaria saltata</string>
     <string name="player_full_screen">Schermo intero</string>
     <string name="stop">Interrompi</string>
@@ -155,9 +161,6 @@
     <string name="onboarding_connecting_title">Connessione a %1$s</string>
     <string name="onboarding_connecting_body">Verifica del server e accesso come %1$s. Premi Back per annullare.</string>
     <string name="onboarding_connecting_body_anonymous">Verifica del server. Premi Back per annullare.</string>
-    <string name="onboarding_connecting">Connessione…</string>
-    <string name="onboarding_failure_meta">%1$s • porta %2$s • utente %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s • porta %2$s</string>
     <string name="onboarding_change_address">Cambia indirizzo</string>
     <string name="onboarding_change_address_detail">%1$s • porta %2$s</string>
     <string name="onboarding_change_sign_in">Cambia account</string>
@@ -373,6 +376,11 @@
     <string name="connection_retry_description">Tvheadend Player riprova anche automaticamente</string>
     <string name="connection_notice_restored">Connessione ripristinata</string>
     <string name="server_switched">Connesso a %1$s</string>
+    <string name="cancel">Annulla</string>
+    <string name="server_go_home">Vai alla Home</string>
+    <string name="back_to_settings">Torna alle impostazioni</string>
+    <string name="server_still_in_use">%1$s è ancora in uso</string>
+    <string name="server_switch_unreachable_body">%1$s non ha risposto alla connessione. Verifica che il server sia in funzione e sulla stessa rete.</string>
     <string name="connection_scope_line">Per %1$s</string>
     <string name="connection_notice_login_rejected">Accesso rifiutato</string>
     <string name="recording_action_permission">Questo account non può gestire le registrazioni.</string>

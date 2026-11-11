@@ -87,7 +87,8 @@ internal fun RecordingBannerTimeline(timeline: PlayerChromeTimeline.Recording, s
         recordingLengthStatus(timeline, range),
     )
     // A growing recording's length is read when the step settles and does not announce the step again.
-    val spoken = rememberSettledStep(timeline.stepId, "$offsetMs|${readout.target}", timeline.stepSettled, description).orEmpty()
+    val spoken = scrubSpeedDescription(timeline.scrubSpeed) ?:
+        rememberSettledStep(timeline.stepId, "$offsetMs|${readout.target}", timeline.stepSettled, description).orEmpty()
     Column(
         Modifier.fillMaxWidth().testTag("recording-seek-preview").clearAndSetSemantics {
             // Spoken once the step is dispatched, with the final value; the label shows every step.
@@ -95,7 +96,8 @@ internal fun RecordingBannerTimeline(timeline: PlayerChromeTimeline.Recording, s
             liveRegion = LiveRegionMode.Polite
         },
     ) {
-        RecordingTimelineBlock(timeline, range, tone = PlayerTimelineTone.PREVIEW, previewLabel = readout.text,
+        RecordingTimelineBlock(timeline, range, tone = PlayerTimelineTone.PREVIEW,
+            previewLabel = scrubSpeedLabel(timeline.scrubSpeed) ?: readout.text,
             previewTarget = readout.target,
             previewDirection = timeline.stepDeltaMs?.let(::stepDirection), previewAtLive = readout.atLive,
             status = recordingBarStatus(timeline, state, range))
@@ -152,6 +154,7 @@ internal fun RecordingControlsTimeline(
         stepDeltaMs = timeline.stepDeltaMs,
         stepSettled = timeline.stepSettled,
         stepId = timeline.stepId,
+        scrubSpeed = timeline.scrubSpeed,
         paused = paused,
         previewing = previewing,
         recordingMarkers = timeline.markers,

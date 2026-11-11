@@ -1,4 +1,10 @@
 <resources>
+    <string name="record_unavailable">Dit programma kan niet worden opgenomen</string>
+    <string name="record_unavailable_ended">Het is al afgelopen.</string>
+    <string name="record_unavailable_no_programme">Er is geen programma-informatie voor deze zender.</string>
+    <string name="record_unavailable_permission">Dit account mag niet opnemen.</string>
+    <string name="player_scrub_forward">Vooruitspoelen, %1$d keer de normale snelheid</string>
+    <string name="player_scrub_backward">Terugspoelen, %1$d keer de normale snelheid</string>
     <string name="recording_ad_break_skipped">Reclameblok overgeslagen</string>
     <string name="player_full_screen">Volledig scherm</string>
     <string name="stop">Stoppen</string>
@@ -155,9 +161,6 @@
     <string name="onboarding_connecting_title">Verbinden met %1$s</string>
     <string name="onboarding_connecting_body">De server controleren en aanmelden als %1$s. Druk op Back om te annuleren.</string>
     <string name="onboarding_connecting_body_anonymous">De server controleren. Druk op Back om te annuleren.</string>
-    <string name="onboarding_connecting">Verbinden…</string>
-    <string name="onboarding_failure_meta">%1$s • poort %2$s • gebruiker %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s • poort %2$s</string>
     <string name="onboarding_change_address">Adres wijzigen</string>
     <string name="onboarding_change_address_detail">%1$s • poort %2$s</string>
     <string name="onboarding_change_sign_in">Account wijzigen</string>
@@ -369,6 +372,11 @@
     <string name="connection_retry_description">Tvheadend Player probeert het ook automatisch opnieuw</string>
     <string name="connection_notice_restored">Verbinding hersteld</string>
     <string name="server_switched">Verbonden met %1$s</string>
+    <string name="cancel">Annuleren</string>
+    <string name="server_go_home">Ga naar startpagina</string>
+    <string name="back_to_settings">Terug naar instellingen</string>
+    <string name="server_still_in_use">%1$s is nog steeds in gebruik</string>
+    <string name="server_switch_unreachable_body">%1$s reageerde niet op de verbinding. Controleer of de server actief is en zich op hetzelfde netwerk bevindt.</string>
     <string name="connection_scope_line">Voor %1$s</string>
     <string name="connection_notice_login_rejected">Aanmelding geweigerd</string>
     <string name="recording_action_permission">Dit account mag geen opnamen beheren.</string>

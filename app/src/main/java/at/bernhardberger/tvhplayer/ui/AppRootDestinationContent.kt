@@ -252,6 +252,7 @@ internal fun SettingsRouteContent(
     contentPadding: PaddingValues,
     backEnabled: Boolean,
     isCurrent: Boolean,
+    onGoHome: () -> Unit,
 ) {
     if (contentAllowed) {
         ContentContainer {
@@ -264,6 +265,7 @@ internal fun SettingsRouteContent(
                 contentPadding = contentPadding,
                 backEnabled = backEnabled,
                 isCurrent = isCurrent,
+                onGoHome = onGoHome,
             )
         }
     }

@@ -1,4 +1,10 @@
 <resources>
+    <string name="record_unavailable">No se puede grabar este programa</string>
+    <string name="record_unavailable_ended">Ya ha terminado.</string>
+    <string name="record_unavailable_no_programme">No hay información del programa para este canal.</string>
+    <string name="record_unavailable_permission">Esta cuenta no puede grabar.</string>
+    <string name="player_scrub_forward">Avance rápido, a %1$d veces la velocidad normal</string>
+    <string name="player_scrub_backward">Rebobinado, a %1$d veces la velocidad normal</string>
     <string name="recording_ad_break_skipped">Pausa publicitaria omitida</string>
     <string name="player_full_screen">Pantalla completa</string>
     <string name="stop">Detener</string>
@@ -155,9 +161,6 @@
     <string name="onboarding_connecting_title">Conectando con %1$s</string>
     <string name="onboarding_connecting_body">Comprobando el servidor e iniciando sesión como %1$s. Pulsa Back para cancelar.</string>
     <string name="onboarding_connecting_body_anonymous">Comprobando el servidor. Pulsa Back para cancelar.</string>
-    <string name="onboarding_connecting">Conectando…</string>
-    <string name="onboarding_failure_meta">%1$s • puerto %2$s • usuario %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s • puerto %2$s</string>
     <string name="onboarding_change_address">Cambiar dirección</string>
     <string name="onboarding_change_address_detail">%1$s • puerto %2$s</string>
     <string name="onboarding_change_sign_in">Cambiar cuenta</string>
@@ -373,6 +376,11 @@
     <string name="connection_retry_description">Tvheadend Player también lo reintenta automáticamente</string>
     <string name="connection_notice_restored">Conexión restablecida</string>
     <string name="server_switched">Conectado a %1$s</string>
+    <string name="cancel">Cancelar</string>
+    <string name="server_go_home">Ir a Inicio</string>
+    <string name="back_to_settings">Volver a Ajustes</string>
+    <string name="server_still_in_use">%1$s sigue en uso</string>
+    <string name="server_switch_unreachable_body">%1$s no respondió a la conexión. Comprueba que el servidor esté funcionando y en la misma red.</string>
     <string name="connection_scope_line">Para %1$s</string>
     <string name="connection_notice_login_rejected">Inicio de sesión rechazado</string>
     <string name="recording_action_permission">Esta cuenta no puede gestionar grabaciones.</string>
