@@ -1,5 +1,5 @@
 @file:androidx.media3.common.util.UnstableApi
-@file:OptIn(at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class)
+@file:OptIn(at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class, at.bernhardberger.tvheadend.sdk.playback.SubscriptionInfrastructureApi::class)
 
 package at.bernhardberger.tvhplayer.ui
 
@@ -98,6 +98,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.time.Duration
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionOpener
+import kotlinx.coroutines.awaitCancellation
 import java.io.IOException
 
 /**
@@ -359,10 +361,12 @@ class StartupOfflineTest {
     }
 
     @Test fun aServerRestartWhileBrowsingRetunesTheWarmChannelOnce() {
-        app(ready(catalog))
+        app(ready(catalog), holdLive = true)
         confirmRow(2, awaitWait = false)
         compose.awaitScheduledWork(profileDispatcher) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(2)) }
         settle()
+        // A player that is not failed shows its banner: the first Back hides it, the second leaves.
+        compose.pressKey(Key.Back)
         compose.pressKey(Key.Back)
         settle()
         compose.waitUntil(10_000) {
@@ -384,10 +388,12 @@ class StartupOfflineTest {
     }
 
     @Test fun reopeningThePlayerAsTheServerReturnsStillRetunesTheWarmChannelOnce() {
-        app(ready(catalog))
+        app(ready(catalog), holdLive = true)
         confirmRow(2, awaitWait = false)
         compose.awaitScheduledWork(profileDispatcher) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(2)) }
         settle()
+        // A player that is not failed shows its banner: the first Back hides it, the second leaves.
+        compose.pressKey(Key.Back)
         compose.pressKey(Key.Back)
         settle()
         compose.waitUntil(10_000) {
@@ -518,8 +524,13 @@ class StartupOfflineTest {
         awaitRows: Boolean = true,
         profile: ServerProfileReadResult = ServerProfileReadResult.anonymous(at.bernhardberger.tvheadend.sdk.core.ServerProfileId.generate(), "offline.invalid", 9982),
         tagData: InMemoryData = InMemoryData(),
+        holdLive: Boolean = false,
     ) {
-        session = FakeTvheadendSession(initial).apply { scriptLivePlaybackSuccess() }
+        session = FakeTvheadendSession(initial).apply {
+            // The fake's stream otherwise fails at once, and a failed player is not a warm channel.
+            if (holdLive) scriptLivePlaybackSuccess(SubscriptionOpener { _, _, _ -> awaitCancellation() })
+            else scriptLivePlaybackSuccess()
+        }
         val data = InMemoryData().also { playerData = it }
         val settings = PlayerSettingsStore(data)
         val profiles = AppProfileOwner(session, FakeServerProfileStore(profile),
