@@ -1,6 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
 import at.bernhardberger.tvhplayer.testutil.pressKey
+import at.bernhardberger.tvhplayer.testutil.awaitScheduledWork
+import at.bernhardberger.tvhplayer.testutil.setContentWithArtworkSampling
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
 import at.bernhardberger.tvhplayer.settings.ChannelsLayout
@@ -103,13 +105,15 @@ import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.TvScreenPadding
 import at.bernhardberger.tvhplayer.ui.components.SideRail
+import at.bernhardberger.tvhplayer.ui.components.LocalBrowsePreparationContext
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import at.bernhardberger.tvhplayer.viewmodels.resolveChannelScopeState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.After
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
@@ -143,6 +147,7 @@ import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 class BrowseCohesionEvidenceTest {
     @get:Rule val images = ImageLoaderRule()
     @get:Rule val compose = createComposeRule()
+    private val preparation = StandardTestDispatcher()
 
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
     fun offlineChannelsAndNoticeKeepContentAndFocus() {
@@ -159,8 +164,11 @@ class BrowseCohesionEvidenceTest {
             epgState = online.epgState)
         var disconnected by mutableStateOf(false)
         var showNotice by mutableStateOf(false)
-        compose.setContent {
-            CompositionLocalProvider(LocalDensity provides Density(2f, 1f)) {
+        compose.setContentWithArtworkSampling {
+            CompositionLocalProvider(
+                LocalBrowsePreparationContext provides preparation,
+                LocalDensity provides Density(2f, 1f),
+            ) {
                 TVHeadendPlayerTheme {
                     view = LocalView.current
                     val displayed = if (disconnected) offline else connected
@@ -236,7 +244,7 @@ class BrowseCohesionEvidenceTest {
             ArtworkId(101) to FixtureArt.art("ridge-light"),
             ArtworkId(102) to FixtureArt.art("harbor-kickoff"),
             ArtworkId(103) to FixtureArt.art("still-tide-watch"),
-        )))
+        )).newBuilder().coroutineContext(Dispatchers.Main.immediate).build())
     }
 
     @After
@@ -427,15 +435,11 @@ class BrowseCohesionEvidenceTest {
         }
     }
 
-    /**
-     * The Channels backdrop takes the programme art's colour, sampled off the main thread where
-     * waiting for idle does not see it; sampled first, the colour is stored when the backdrop asks.
-     */
-    private fun sampleArtColours(observation: SessionObservation) {
+    /** Completes the Channels palette on virtual time before the backdrop asks for it. */
+    private fun sampleArtColours(observation: SessionObservation) = runTest(preparation) {
         val current = checkNotNull(observation.currentSession)
         val arts = listOf(ArtworkId(101), ArtworkId(102)).map { AppArtworkSource(current, it) }
-        val samples = arts.map { runtimeScope.async(Dispatchers.Default) { DetailsArtColors.sample(context(), it) } }
-        compose.waitUntil(10_000) { samples.all { it.isCompleted } }
+        arts.forEach { DetailsArtColors.sample(context(), it, coroutineContext) }
         arts.forEach { assertNotNull("fixture art has a colour", DetailsArtColors.stored(it)) }
     }
 
@@ -513,8 +517,11 @@ class BrowseCohesionEvidenceTest {
         scale: Float,
         content: @Composable (PaddingValues, Boolean) -> Unit,
     ) {
-        compose.setContent {
-            CompositionLocalProvider(LocalDensity provides Density(1f, scale)) {
+        compose.setContentWithArtworkSampling {
+            CompositionLocalProvider(
+                LocalBrowsePreparationContext provides preparation,
+                LocalDensity provides Density(1f, scale),
+            ) {
                 TVHeadendPlayerTheme {
                     view = LocalView.current
                     back = requireNotNull(androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
@@ -624,7 +631,7 @@ class BrowseCohesionEvidenceTest {
     private fun context(): Application = ApplicationProvider.getApplicationContext()
 
     private fun awaitFocus(target: SemanticsMatcher) {
-        compose.waitUntil(10_000) {
+        compose.awaitScheduledWork(preparation) {
             compose.onAllNodes(target and isFocused()).fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNode(target and isFocused()).assertIsFocused().assertIsDisplayed()
@@ -657,21 +664,12 @@ class BrowseCohesionEvidenceTest {
         // The Channels backdrop follows focus after a pause and a fade.
         compose.mainClock.advanceTimeBy(1_500)
         compose.waitForIdle()
-        var bitmap = draw(dialog)
+        val bitmap = draw(dialog)
         assertEquals(960, bitmap.width)
         assertEquals(540, bitmap.height)
-        // Pictures load off the main thread, so a slow run may still be revealing one; redraw until it rests.
-        var settled: Bitmap
-        var attempts = 0
-        while (true) {
-            compose.waitForIdle()
-            settled = draw(dialog)
-            if (bitmap.sameAs(settled) || ++attempts == 20) break
-            bitmap.recycle()
-            bitmap = settled
-            Thread.sleep(100)
-            compose.mainClock.advanceTimeBy(1_500)
-        }
+        // Preparation and image work have been driven explicitly; a second draw must be stable.
+        compose.waitForIdle()
+        val settled = draw(dialog)
         assertTrue("$name captured mid-animation", bitmap.sameAs(settled))
         settled.recycle()
         val directory = File("build/outputs/browse-cohesion/implemented")

@@ -265,7 +265,7 @@ class PlayerTopIdentityTest {
     @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun noLogoInfoArtworkFollowsNumberVisibility() {
         try {
-            compose.runOnIdle { at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = true }
+            compose.runOnUiThread { at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = true }
             chrome(PlayerChromeMode.CONTROLS)
             val number = hasText("1") and hasAnyAncestor(hasTestTag("player-info-artwork-fallback"))
             compose.onNode(number, useUnmergedTree = true).assertExists()
