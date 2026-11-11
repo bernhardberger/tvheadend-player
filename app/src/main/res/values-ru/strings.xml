@@ -155,9 +155,6 @@
     <string name="onboarding_connecting_title">Подключение к %1$s</string>
     <string name="onboarding_connecting_body">Проверка сервера и вход как %1$s. Нажмите Back для отмены.</string>
     <string name="onboarding_connecting_body_anonymous">Проверка сервера. Нажмите Back для отмены.</string>
-    <string name="onboarding_connecting">Подключение…</string>
-    <string name="onboarding_failure_meta">%1$s • порт %2$s • пользователь %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s • порт %2$s</string>
     <string name="onboarding_change_address">Изменить адрес</string>
     <string name="onboarding_change_address_detail">%1$s • порт %2$s</string>
     <string name="onboarding_change_sign_in">Изменить учётную запись</string>
@@ -377,6 +374,11 @@
     <string name="connection_retry_description">Tvheadend Player также повторяет попытки автоматически</string>
     <string name="connection_notice_restored">Соединение восстановлено</string>
     <string name="server_switched">Подключено к %1$s</string>
+    <string name="cancel">Отменить</string>
+    <string name="server_go_home">Перейти в раздел «Главная»</string>
+    <string name="back_to_settings">Назад к настройкам</string>
+    <string name="server_still_in_use">Подключение %1$s по-прежнему используется</string>
+    <string name="server_switch_unreachable_body">Подключение %1$s не ответило. Проверьте, что сервер работает и находится в той же сети.</string>
     <string name="connection_scope_line">Для %1$s</string>
     <string name="connection_notice_login_rejected">Вход отклонён</string>
     <string name="recording_action_permission">Эта учётная запись не может управлять записями.</string>

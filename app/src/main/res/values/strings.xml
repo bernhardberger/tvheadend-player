@@ -3,6 +3,12 @@
     <string name="server_sign_in_rejected">Couldn’t sign in to %1$s. Check the username and password.</string>
     <!-- Shown after a switch to another connection succeeds. %1$s = the connection's name. -->
     <string name="server_switched">Connected to %1$s</string>
+    <!-- Buttons and lines of the page that shows a switch to another connection under way, done or failed. -->
+    <string name="cancel">Cancel</string>
+    <string name="back_to_settings">Back to Settings</string>
+    <string name="server_still_in_use">%1$s is still in use</string>
+    <string name="server_switch_unreachable_body">%1$s didn’t respond. Check that the server is running and on the same network.</string>
+    <string name="server_go_home">Go to Home</string>
     <!-- Leads a Settings page's description when several connections are stored. %1$s = the connection's name -->
     <string name="connection_scope_line">For %1$s</string>
     <string name="server_profile_removed">Removed %1$s</string>
@@ -226,9 +232,6 @@
     <string name="onboarding_connecting_title">Connecting to %1$s</string>
     <string name="onboarding_connecting_body">Checking the server and signing in as %1$s. Press Back to cancel.</string>
     <string name="onboarding_connecting_body_anonymous">Checking the server. Press Back to cancel.</string>
-    <string name="onboarding_connecting">Connecting…</string>
-    <string name="onboarding_failure_meta">%1$s • port %2$s • user %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s • port %2$s</string>
     <string name="onboarding_change_address">Change address</string>
     <string name="onboarding_change_address_detail">%1$s · port %2$s</string>
     <string name="onboarding_change_sign_in">Change account</string>

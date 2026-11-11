@@ -14,6 +14,11 @@ internal const val SWITCH_KEEP = "server-switch-keep"
 internal const val SWITCH_CONFIRM = "server-switch-confirm"
 internal const val REMOVE_KEEP = "server-remove-keep"
 internal const val REMOVE_CONFIRM = "server-remove-confirm"
+internal const val SWITCH_CANCEL = "server-switch-cancel"
+internal const val SWITCH_HOME = "server-switch-home"
+internal const val SWITCH_BACK = "server-switch-back"
+internal const val SWITCH_TRY_AGAIN = "server-switch-try-again"
+internal const val SWITCH_EDIT = "server-switch-edit"
 
 /** What switching servers would stop: nothing, live TV or a recording. */
 internal enum class PlaybackInterruption { NONE, LIVE, RECORDING }

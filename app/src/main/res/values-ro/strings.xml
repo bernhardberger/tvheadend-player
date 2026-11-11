@@ -155,9 +155,6 @@
     <string name="onboarding_connecting_title">Conectare la %1$s</string>
     <string name="onboarding_connecting_body">Se verifică serverul și se efectuează autentificarea ca %1$s. Apasă Back pentru a anula.</string>
     <string name="onboarding_connecting_body_anonymous">Se verifică serverul. Apasă Back pentru a anula.</string>
-    <string name="onboarding_connecting">Conectare…</string>
-    <string name="onboarding_failure_meta">%1$s • port %2$s • utilizator %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s • port %2$s</string>
     <string name="onboarding_change_address">Schimbă adresa</string>
     <string name="onboarding_change_address_detail">%1$s • port %2$s</string>
     <string name="onboarding_change_sign_in">Schimbă contul</string>
@@ -373,6 +370,11 @@
     <string name="connection_retry_description">Tvheadend Player reîncearcă și automat</string>
     <string name="connection_notice_restored">Conexiune restabilită</string>
     <string name="server_switched">Conectat la %1$s</string>
+    <string name="cancel">Anulează</string>
+    <string name="server_go_home">Mergi la Acasă</string>
+    <string name="back_to_settings">Înapoi la setări</string>
+    <string name="server_still_in_use">Conexiunea %1$s este în continuare în uz</string>
+    <string name="server_switch_unreachable_body">%1$s nu a răspuns la cererea de conectare. Verifică dacă serverul funcționează și este în aceeași rețea.</string>
     <string name="connection_scope_line">Pentru %1$s</string>
     <string name="connection_notice_login_rejected">Autentificare respinsă</string>
     <string name="recording_action_permission">Acest cont nu poate gestiona înregistrări.</string>

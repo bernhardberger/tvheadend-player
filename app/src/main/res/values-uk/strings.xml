@@ -155,9 +155,6 @@
     <string name="onboarding_connecting_title">Підключення до %1$s</string>
     <string name="onboarding_connecting_body">Перевірка сервера та вхід як %1$s. Натисніть Back для скасування.</string>
     <string name="onboarding_connecting_body_anonymous">Перевірка сервера. Натисніть Back для скасування.</string>
-    <string name="onboarding_connecting">Підключення…</string>
-    <string name="onboarding_failure_meta">%1$s • порт %2$s • користувач %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s • порт %2$s</string>
     <string name="onboarding_change_address">Змінити адресу</string>
     <string name="onboarding_change_address_detail">%1$s • порт %2$s</string>
     <string name="onboarding_change_sign_in">Змінити обліковий запис</string>
@@ -377,6 +374,11 @@
     <string name="connection_retry_description">Tvheadend Player також повторює спроби автоматично</string>
     <string name="connection_notice_restored">З’єднання відновлено</string>
     <string name="server_switched">Підключено до %1$s</string>
+    <string name="cancel">Скасувати</string>
+    <string name="server_go_home">Перейти до розділу «Головна»</string>
+    <string name="back_to_settings">Назад до налаштувань</string>
+    <string name="server_still_in_use">Підключення %1$s досі використовується</string>
+    <string name="server_switch_unreachable_body">Підключення %1$s не відповіло. Перевірте, чи сервер працює й перебуває в тій самій мережі.</string>
     <string name="connection_scope_line">Для %1$s</string>
     <string name="connection_notice_login_rejected">Вхід відхилено</string>
     <string name="recording_action_permission">Цей обліковий запис не може керувати записами.</string>

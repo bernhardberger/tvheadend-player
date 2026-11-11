@@ -155,9 +155,6 @@
     <string name="onboarding_connecting_title">Bağlanılıyor: %1$s</string>
     <string name="onboarding_connecting_body">Sunucu kontrol ediliyor ve %1$s kullanıcı adıyla oturum açılıyor. İptal etmek için Back tuşuna basın.</string>
     <string name="onboarding_connecting_body_anonymous">Sunucu kontrol ediliyor. İptal etmek için Back tuşuna basın.</string>
-    <string name="onboarding_connecting">Bağlanılıyor…</string>
-    <string name="onboarding_failure_meta">%1$s • bağlantı noktası %2$s • kullanıcı %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s • bağlantı noktası %2$s</string>
     <string name="onboarding_change_address">Adresi değiştir</string>
     <string name="onboarding_change_address_detail">%1$s • bağlantı noktası %2$s</string>
     <string name="onboarding_change_sign_in">Hesabı değiştir</string>
@@ -369,6 +366,11 @@
     <string name="connection_retry_description">Tvheadend Player otomatik olarak da yeniden dener</string>
     <string name="connection_notice_restored">Bağlantı yeniden kuruldu</string>
     <string name="server_switched">%1$s sunucusuna bağlanıldı</string>
+    <string name="cancel">İptal</string>
+    <string name="server_go_home">Ana sayfaya gidin</string>
+    <string name="back_to_settings">Ayarlara dön</string>
+    <string name="server_still_in_use">%1$s bağlantısı hâlâ kullanımda</string>
+    <string name="server_switch_unreachable_body">%1$s bağlantıya yanıt vermedi. Sunucunun çalıştığını ve aynı ağda olduğunu kontrol edin.</string>
     <string name="connection_scope_line">%1$s için</string>
     <string name="connection_notice_login_rejected">Oturum açma reddedildi</string>
     <string name="recording_action_permission">Bu hesabın kayıtları yönetme izni yok.</string>

@@ -19,6 +19,7 @@ import at.bernhardberger.tvhplayer.settings.serverProfileDisplayName
 import at.bernhardberger.tvhplayer.ui.SettingsSection
 import at.bernhardberger.tvhplayer.ui.components.ServerAvatar
 import at.bernhardberger.tvhplayer.ui.components.ServerAvatarRowSize
+import at.bernhardberger.tvhplayer.ui.components.ServerAvatarStatus
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthLevel
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthRow
 import at.bernhardberger.tvhplayer.ui.components.serverAvatarLook
@@ -69,12 +70,11 @@ private fun ServerProfileSummary.passwordNeeded(): Boolean =
 @Composable
 internal fun settingsServerLevels(
     profiles: ServerProfileListResult?,
-    status: ConnectionOverviewStatus,
+    status: ConnectionOverviewStatus?,
     actions: ServerProfileActions,
     showRetry: Boolean = false,
     connecting: Boolean = false,
     onRetry: () -> Unit = {},
-    switching: Boolean = false,
 ): List<DepthLevel> {
     val list = profiles as? ServerProfileListResult.Available
     val stored = list?.profiles.orEmpty()
@@ -88,8 +88,7 @@ internal fun settingsServerLevels(
         ),
         icon = R.drawable.ic_refresh, onClick = { if (!connecting) onRetry() })
     val rows = buildList {
-        stored.forEach { profile -> add(serverProfileRow(profile, profile.id == list?.activeId, status,
-            cancelSwitch = if (switching && profile.id == list?.activeId) ({ actions.onUse(profile) }) else null)) }
+        stored.forEach { profile -> add(serverProfileRow(profile, profile.id == list?.activeId, status)) }
         if (profiles != null) add(add)
         if (showRetry && list?.activeId != null) add(retry)
     }
@@ -108,14 +107,13 @@ internal fun settingsServerLevels(
 private fun serverProfileRow(
     profile: ServerProfileSummary,
     active: Boolean,
-    status: ConnectionOverviewStatus,
-    cancelSwitch: (() -> Unit)? = null,
+    status: ConnectionOverviewStatus?,
 ): DepthRow {
     // The server in use wears the avatar badge while it is connected, else it also says what is
     // wrong or under way with it.
-    val problem = profile.passwordNeeded() || (active && status.state == ConnectionOverviewState.OFFLINE)
+    val problem = profile.passwordNeeded() || (active && status?.state == ConnectionOverviewState.OFFLINE)
     val state = listOfNotNull(
-        status.title.takeIf { active && status.state != ConnectionOverviewState.CONNECTED },
+        status?.title?.takeIf { active && status.state != ConnectionOverviewState.CONNECTED },
         stringResource(R.string.server_password_needed).takeIf { profile.passwordNeeded() },
     )
     // The title is the label, else the account, else the address; the line under it is what the
@@ -130,11 +128,12 @@ private fun serverProfileRow(
     val look = serverAvatarLook(profile)
     val rowId = serverProfileRowId(profile.id)
     return settingsRow(rowId, title, detail, titleMaxLines = 1,
-        child = rowId.takeIf { cancelSwitch == null }, onClick = { cancelSwitch?.invoke() },
+        child = rowId,
         leading = { focused ->
             // Focus inverts the row, so the badge's ring takes the focused surface.
             val surface = MaterialTheme.colorScheme.run { if (focused) inverseSurface else background }
-            ServerAvatar(look, ServerAvatarRowSize, inUse = active, badgeRing = surface)
+            val status = if (active) ServerAvatarStatus.IN_USE else ServerAvatarStatus.NONE
+            ServerAvatar(look, ServerAvatarRowSize, status = status, badgeRing = surface)
         },
         supportingContent = { focused -> ServerRowDetail(detail, state, problem, focused) })
 }

@@ -155,9 +155,6 @@
     <string name="onboarding_connecting_title">Opretter forbindelse til %1$s</string>
     <string name="onboarding_connecting_body">Kontrollerer serveren og logger ind som %1$s. Tryk på Back for at annullere.</string>
     <string name="onboarding_connecting_body_anonymous">Kontrollerer serveren. Tryk på Back for at annullere.</string>
-    <string name="onboarding_connecting">Opretter forbindelse…</string>
-    <string name="onboarding_failure_meta">%1$s • port %2$s • bruger %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s • port %2$s</string>
     <string name="onboarding_change_address">Skift adresse</string>
     <string name="onboarding_change_address_detail">%1$s • port %2$s</string>
     <string name="onboarding_change_sign_in">Skift konto</string>
@@ -369,6 +366,11 @@
     <string name="connection_retry_description">Tvheadend Player prøver også igen automatisk</string>
     <string name="connection_notice_restored">Forbindelsen er genoprettet</string>
     <string name="server_switched">Forbundet til %1$s</string>
+    <string name="cancel">Annuller</string>
+    <string name="server_go_home">Gå til forsiden</string>
+    <string name="back_to_settings">Tilbage til indstillinger</string>
+    <string name="server_still_in_use">%1$s er stadig i brug</string>
+    <string name="server_switch_unreachable_body">%1$s svarede ikke på forbindelsen. Kontrollér, at serveren kører og er på samme netværk.</string>
     <string name="connection_scope_line">Til %1$s</string>
     <string name="connection_notice_login_rejected">Login afvist</string>
     <string name="recording_action_permission">Denne konto må ikke administrere optagelser.</string>

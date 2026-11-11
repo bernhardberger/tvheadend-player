@@ -155,9 +155,6 @@
     <string name="onboarding_connecting_title">התחברות אל %1$s</string>
     <string name="onboarding_connecting_body">בדיקת השרת וכניסה בשם %1$s. לחיצה על Back תבטל את הפעולה.</string>
     <string name="onboarding_connecting_body_anonymous">בדיקת השרת. לחיצה על Back תבטל את הפעולה.</string>
-    <string name="onboarding_connecting">התחברות…</string>
-    <string name="onboarding_failure_meta">%1$s • יציאה %2$s • משתמש %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s • יציאה %2$s</string>
     <string name="onboarding_change_address">שינוי כתובת</string>
     <string name="onboarding_change_address_detail">%1$s • יציאה %2$s</string>
     <string name="onboarding_change_sign_in">שינוי חשבון</string>
@@ -373,6 +370,11 @@
     <string name="connection_retry_description">Tvheadend Player ינסה שוב גם באופן אוטומטי</string>
     <string name="connection_notice_restored">החיבור שוחזר</string>
     <string name="server_switched">מחובר אל %1$s</string>
+    <string name="cancel">ביטול</string>
+    <string name="server_go_home">מעבר למסך הבית</string>
+    <string name="back_to_settings">חזרה להגדרות</string>
+    <string name="server_still_in_use">החיבור %1$s עדיין בשימוש</string>
+    <string name="server_switch_unreachable_body">החיבור %1$s לא הגיב. יש לוודא שהשרת פועל ונמצא באותה רשת.</string>
     <string name="connection_scope_line">עבור %1$s</string>
     <string name="connection_notice_login_rejected">הכניסה נדחתה</string>
     <string name="recording_action_permission">לחשבון זה אין הרשאה לנהל הקלטות.</string>

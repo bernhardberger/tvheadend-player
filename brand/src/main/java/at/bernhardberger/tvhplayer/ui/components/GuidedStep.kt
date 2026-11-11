@@ -3,7 +3,6 @@ package at.bernhardberger.tvhplayer.ui.components
 import at.bernhardberger.tvhplayer.ui.TvGuidedActionFocusedScale
 
 import androidx.annotation.DrawableRes
-import androidx.compose.foundation.background
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Arrangement
@@ -13,13 +12,15 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -30,17 +31,24 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.tv.material3.Button
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.Icon
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.OutlinedButton
+import androidx.tv.material3.OutlinedButtonDefaults
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnGap
@@ -211,18 +219,74 @@ fun GuidedStepAction(
     }
 }
 
-/** The round mark above a centred result, such as the check after a successful setup. */
+/**
+ * A centred step, for a connection test and its result: the optional [stepper], a [hero] mark, the
+ * title as the screen's heading ([titleAlpha] lets a result fade it in), the explanation, an optional
+ * [detail] and the wrapping row of [actions], which are [GuidedStepPill]s.
+ */
 @Composable
-fun GuidedStepBadge(@DrawableRes icon: Int, modifier: Modifier = Modifier) {
-    Box(
-        modifier.size(64.dp).background(MaterialTheme.colorScheme.primary, CircleShape),
-        contentAlignment = Alignment.Center,
+@OptIn(ExperimentalLayoutApi::class)
+fun GuidedStepCenteredLayout(
+    title: String,
+    body: String,
+    hero: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    stepper: (@Composable () -> Unit)? = null,
+    titleAlpha: () -> Float = { 1f },
+    detail: (@Composable () -> Unit)? = null,
+    actions: (@Composable () -> Unit)? = null,
+    footer: (@Composable () -> Unit)? = null,
+) {
+    Column(
+        modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(top = TvSpacing80, bottom = 64.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(
-            painterResource(icon),
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onPrimary,
-            modifier = Modifier.size(40.dp),
+        if (stepper != null) {
+            stepper()
+            Spacer(Modifier.height(24.dp))
+        }
+        hero()
+        Text(
+            text = title,
+            style = MaterialTheme.typography.headlineLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 20.dp).widthIn(max = 700.dp)
+                .graphicsLayer { alpha = titleAlpha() }.semantics {
+                    heading()
+                    liveRegion = LiveRegionMode.Polite
+                },
         )
+        Text(
+            text = body,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = TvTextSecondaryAlpha),
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 8.dp).widthIn(max = 560.dp),
+        )
+        detail?.invoke()
+        if (actions != null) {
+            Spacer(Modifier.height(24.dp))
+            FlowRow(
+                modifier = Modifier.widthIn(max = 800.dp),
+                horizontalArrangement = Arrangement.spacedBy(TvSpacing12, Alignment.CenterHorizontally),
+                verticalArrangement = Arrangement.spacedBy(TvSpacing12),
+            ) { actions() }
+        }
+        footer?.invoke()
+    }
+}
+
+/** An action of a [GuidedStepCenteredLayout]: the [primary] one filled, the rest outlined. */
+@Composable
+fun GuidedStepPill(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, primary: Boolean = false) {
+    if (primary) {
+        Button(onClick = onClick, modifier = modifier.height(40.dp)) { Text(text) }
+    } else {
+        OutlinedButton(
+            onClick = onClick,
+            modifier = modifier.height(40.dp),
+            colors = OutlinedButtonDefaults.colors(contentColor = MaterialTheme.colorScheme.onSurface),
+        ) { Text(text) }
     }
 }

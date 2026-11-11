@@ -155,9 +155,6 @@
     <string name="onboarding_connecting_title">%1$sに接続中</string>
     <string name="onboarding_connecting_body">サーバーを確認し、%1$sとしてログインしています。取り消すにはBackを押してください。</string>
     <string name="onboarding_connecting_body_anonymous">サーバーを確認しています。取り消すにはBackを押してください。</string>
-    <string name="onboarding_connecting">接続中…</string>
-    <string name="onboarding_failure_meta">%1$s • ポート%2$s • ユーザー%3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s • ポート%2$s</string>
     <string name="onboarding_change_address">アドレスを変更</string>
     <string name="onboarding_change_address_detail">%1$s • ポート%2$s</string>
     <string name="onboarding_change_sign_in">アカウントを変更</string>
@@ -365,6 +362,11 @@
     <string name="connection_retry_description">Tvheadend Playerは自動的にも再試行します</string>
     <string name="connection_notice_restored">接続が復旧しました</string>
     <string name="server_switched">%1$sに接続しました</string>
+    <string name="cancel">キャンセル</string>
+    <string name="server_go_home">ホームへ移動</string>
+    <string name="back_to_settings">設定に戻る</string>
+    <string name="server_still_in_use">%1$sは引き続き使用中です</string>
+    <string name="server_switch_unreachable_body">%1$sが接続に応答しませんでした。サーバーが起動していて、同じネットワークに接続されていることを確認してください。</string>
     <string name="connection_scope_line">%1$s用</string>
     <string name="connection_notice_login_rejected">ログインが拒否されました</string>
     <string name="recording_action_permission">このアカウントには録画を管理する権限がありません。</string>

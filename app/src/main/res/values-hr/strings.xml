@@ -155,9 +155,6 @@
     <string name="onboarding_connecting_title">Povezivanje s %1$s</string>
     <string name="onboarding_connecting_body">Provjera poslužitelja i prijava kao %1$s. Pritisni Back za odustajanje.</string>
     <string name="onboarding_connecting_body_anonymous">Provjera poslužitelja. Pritisni Back za odustajanje.</string>
-    <string name="onboarding_connecting">Povezivanje…</string>
-    <string name="onboarding_failure_meta">%1$s • priključak %2$s • korisnik %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s • priključak %2$s</string>
     <string name="onboarding_change_address">Promijeni adresu</string>
     <string name="onboarding_change_address_detail">%1$s • priključak %2$s</string>
     <string name="onboarding_change_sign_in">Promijeni račun</string>
@@ -373,6 +370,11 @@
     <string name="connection_retry_description">Tvheadend Player pokušava ponovno i automatski</string>
     <string name="connection_notice_restored">Veza obnovljena</string>
     <string name="server_switched">Povezano s %1$s</string>
+    <string name="cancel">Odustani</string>
+    <string name="server_go_home">Idi na početnu stranicu</string>
+    <string name="back_to_settings">Natrag na postavke</string>
+    <string name="server_still_in_use">Veza %1$s i dalje je u upotrebi</string>
+    <string name="server_switch_unreachable_body">Veza %1$s nije odgovorila na pokušaj povezivanja. Provjeri radi li poslužitelj i je li na istoj mreži.</string>
     <string name="connection_scope_line">Za %1$s</string>
     <string name="connection_notice_login_rejected">Prijava odbijena</string>
     <string name="recording_action_permission">Ovaj račun ne može upravljati snimkama.</string>

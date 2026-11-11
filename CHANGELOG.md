@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- If a connection cannot be reached or rejects sign-in, switching restores your previous connection and shows a notice. A successful switch says *Connected to* and the connection's name.
+- Switching connections shows its progress on its own page and can be canceled; leaving Settings doesn't stop it. If the connection can't be reached or rejects sign-in, the page says why and your previous connection stays in use. After a successful switch, *Go to Home* takes you straight there.
 - With more than one connection, *Channel groups* and *Stream profile* name the connection they apply to.
 - A missed or failed recording that never wrote a file offers *Remove entry* instead of *Delete recording*.
 - Settings > Connection can keep several connections, including different users on the same server. Choose one to use it, give it a name, or remove it.

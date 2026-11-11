@@ -155,9 +155,6 @@
     <string name="onboarding_connecting_title">جارٍ الاتصال بـ %1$s</string>
     <string name="onboarding_connecting_body">جارٍ التحقق من الخادم وتسجيل الدخول باسم %1$s. للإلغاء، يمكن الضغط على Back.</string>
     <string name="onboarding_connecting_body_anonymous">جارٍ التحقق من الخادم. للإلغاء، يمكن الضغط على Back.</string>
-    <string name="onboarding_connecting">جارٍ الاتصال…</string>
-    <string name="onboarding_failure_meta">%1$s • المنفذ %2$s • المستخدم %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s • المنفذ %2$s</string>
     <string name="onboarding_change_address">تغيير العنوان</string>
     <string name="onboarding_change_address_detail">%1$s • المنفذ %2$s</string>
     <string name="onboarding_change_sign_in">تغيير الحساب</string>
@@ -385,6 +382,11 @@
     <string name="connection_retry_description">سيعيد Tvheadend Player المحاولة تلقائيًا أيضًا</string>
     <string name="connection_notice_restored">استُعيد الاتصال</string>
     <string name="server_switched">تم الاتصال بـ %1$s</string>
+    <string name="cancel">إلغاء</string>
+    <string name="server_go_home">الانتقال إلى الرئيسية</string>
+    <string name="back_to_settings">العودة إلى الإعدادات</string>
+    <string name="server_still_in_use">لا يزال الاتصال %1$s قيد الاستخدام</string>
+    <string name="server_switch_unreachable_body">لم يستجب الاتصال %1$s. يلزم التحقق من تشغيل الخادم ووجوده على الشبكة نفسها.</string>
     <string name="connection_scope_line">لـ %1$s</string>
     <string name="connection_notice_login_rejected">رُفض تسجيل الدخول</string>
     <string name="recording_action_permission">لا يملك هذا الحساب إذن إدارة التسجيلات.</string>

@@ -155,9 +155,6 @@
     <string name="onboarding_connecting_title">正在连接%1$s</string>
     <string name="onboarding_connecting_body">正在检查服务器并以%1$s登录。按Back取消。</string>
     <string name="onboarding_connecting_body_anonymous">正在检查服务器。按Back取消。</string>
-    <string name="onboarding_connecting">正在连接…</string>
-    <string name="onboarding_failure_meta">%1$s • 端口%2$s • 用户%3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s • 端口%2$s</string>
     <string name="onboarding_change_address">更改地址</string>
     <string name="onboarding_change_address_detail">%1$s • 端口%2$s</string>
     <string name="onboarding_change_sign_in">更改账号</string>
@@ -357,6 +354,11 @@
     <string name="connection_retry_description">Tvheadend Player也会自动重试</string>
     <string name="connection_notice_restored">连接已恢复</string>
     <string name="server_switched">已连接到%1$s</string>
+    <string name="cancel">取消</string>
+    <string name="server_go_home">前往首页</string>
+    <string name="back_to_settings">返回设置</string>
+    <string name="server_still_in_use">%1$s仍在使用中</string>
+    <string name="server_switch_unreachable_body">%1$s未响应连接请求。请检查服务器是否正在运行且位于同一网络。</string>
     <string name="connection_scope_line">适用于%1$s</string>
     <string name="connection_notice_login_rejected">登录被拒绝</string>
     <string name="recording_action_permission">此账号无法管理录制。</string>

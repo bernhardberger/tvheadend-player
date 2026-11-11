@@ -155,9 +155,6 @@
     <string name="onboarding_connecting_title">Connexion à %1$s</string>
     <string name="onboarding_connecting_body">Vérification du serveur et connexion avec le compte %1$s. Appuie sur Back pour annuler.</string>
     <string name="onboarding_connecting_body_anonymous">Vérification du serveur. Appuie sur Back pour annuler.</string>
-    <string name="onboarding_connecting">Connexion…</string>
-    <string name="onboarding_failure_meta">%1$s • port %2$s • utilisateur %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s • port %2$s</string>
     <string name="onboarding_change_address">Modifier l’adresse</string>
     <string name="onboarding_change_address_detail">%1$s • port %2$s</string>
     <string name="onboarding_change_sign_in">Changer de compte</string>
@@ -373,6 +370,11 @@
     <string name="connection_retry_description">Tvheadend Player réessaie aussi automatiquement</string>
     <string name="connection_notice_restored">Connexion rétablie</string>
     <string name="server_switched">Connecté à %1$s</string>
+    <string name="cancel">Annuler</string>
+    <string name="server_go_home">Aller à l\'accueil</string>
+    <string name="back_to_settings">Retour aux paramètres</string>
+    <string name="server_still_in_use">%1$s est toujours en cours d’utilisation</string>
+    <string name="server_switch_unreachable_body">%1$s n’a pas répondu à la connexion. Vérifie que le serveur fonctionne et se trouve sur le même réseau.</string>
     <string name="connection_scope_line">Pour %1$s</string>
     <string name="connection_notice_login_rejected">Identification refusée</string>
     <string name="recording_action_permission">Ce compte ne peut pas gérer les enregistrements.</string>

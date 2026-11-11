@@ -155,9 +155,6 @@
     <string name="onboarding_connecting_title">Σύνδεση με %1$s</string>
     <string name="onboarding_connecting_body">Έλεγχος διακομιστή και σύνδεση ως %1$s. Πάτησε Back για ακύρωση.</string>
     <string name="onboarding_connecting_body_anonymous">Έλεγχος διακομιστή. Πάτησε Back για ακύρωση.</string>
-    <string name="onboarding_connecting">Σύνδεση…</string>
-    <string name="onboarding_failure_meta">%1$s • θύρα %2$s • χρήστης %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s • θύρα %2$s</string>
     <string name="onboarding_change_address">Αλλαγή διεύθυνσης</string>
     <string name="onboarding_change_address_detail">%1$s • θύρα %2$s</string>
     <string name="onboarding_change_sign_in">Αλλαγή λογαριασμού</string>
@@ -369,6 +366,11 @@
     <string name="connection_retry_description">Το Tvheadend Player δοκιμάζει ξανά και αυτόματα</string>
     <string name="connection_notice_restored">Η σύνδεση αποκαταστάθηκε</string>
     <string name="server_switched">Συνδέθηκε με %1$s</string>
+    <string name="cancel">Ακύρωση</string>
+    <string name="server_go_home">Μετάβαση στην Αρχική</string>
+    <string name="back_to_settings">Επιστροφή στις ρυθμίσεις</string>
+    <string name="server_still_in_use">Η σύνδεση %1$s παραμένει σε χρήση</string>
+    <string name="server_switch_unreachable_body">%1$s δεν ανταποκρίθηκε στη σύνδεση. Έλεγξε ότι ο διακομιστής λειτουργεί και βρίσκεται στο ίδιο δίκτυο.</string>
     <string name="connection_scope_line">Για %1$s</string>
     <string name="connection_notice_login_rejected">Η σύνδεση χρήστη απορρίφθηκε</string>
     <string name="recording_action_permission">Αυτός ο λογαριασμός δεν μπορεί να διαχειρίζεται εγγραφές.</string>

@@ -1284,6 +1284,7 @@ fun AppRoot(
                             initialFocusEnabled = !drawerActive && currentDestination == destination,
                             contentPadding = contentPadding,
                             backEnabled = !applianceLaunchActive,
+                            onGoHome = { navigateTopLevel(HomeKey) },
                         )
                     }
 

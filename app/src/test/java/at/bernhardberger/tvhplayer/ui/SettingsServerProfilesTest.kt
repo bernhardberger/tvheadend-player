@@ -46,6 +46,8 @@ import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.testutil.leaveTouchModeBeforeComposing
+import at.bernhardberger.tvhplayer.testutil.pressKey
+import at.bernhardberger.tvhplayer.testutil.settleFrames
 import at.bernhardberger.tvhplayer.ui.components.SERVER_AVATAR_IN_USE_TAG
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthNavigationState
 import at.bernhardberger.tvhplayer.ui.components.depth.rememberDepthNavigationState
@@ -119,6 +121,7 @@ class SettingsServerProfilesTest {
 
     private var presentation by mutableStateOf(AppConnectionPresentation(ConnectionUiState.Ready))
     private var isCurrent by mutableStateOf(true)
+    private var settingsComposed by mutableStateOf(true)
     private lateinit var view: View
     private var connectionGate: kotlinx.coroutines.CompletableDeferred<Unit>? = null
     private var trialStarted = false
@@ -126,10 +129,14 @@ class SettingsServerProfilesTest {
     private var unreachableNextConnection = false
     private var persistenceGate: kotlinx.coroutines.CompletableDeferred<Unit>? = null
     private var persistenceStarted = false
+    private var wentHome = 0
+    private var restorationGate: kotlinx.coroutines.CompletableDeferred<Unit>? = null
+    private var restoring = false
 
     private fun settings(rail: Boolean = false, enter: Boolean = true) {
         val connectedSession = object : TvheadendSession by session {
             override suspend fun disconnect() {
+                restorationGate?.let { restoring = true; it.await() }
                 session.disconnect()
                 session.publish(at.bernhardberger.tvheadend.sdk.core.SessionObservation.create(
                     sessionState = at.bernhardberger.tvheadend.sdk.core.SessionState.Disconnected))
@@ -168,6 +175,7 @@ class SettingsServerProfilesTest {
             single<TvheadendSession> { connectedSession }
             single { notices }
             single { owner }
+            single<CoroutineScope>(qualifier = org.koin.core.qualifier.named("application")) { scope }
         }
         compose.leaveTouchModeBeforeComposing()
         compose.setContent {
@@ -180,7 +188,7 @@ class SettingsServerProfilesTest {
                                 Settings(padding, !drawerActive)
                             }
                         }
-                    } else SettingsSetupFrame { Settings() }
+                    } else if (settingsComposed) SettingsSetupFrame { Settings() }
                     at.bernhardberger.tvhplayer.ui.notifications.AppShellNoticeHost(notices, owner, session)
                 }
             }
@@ -206,14 +214,14 @@ class SettingsServerProfilesTest {
             listOf(settingsRootLevel(
                 connectionStatus = connectionRootStatus(profiles, connectionOverviewStatus(presentation, owner)))) + connection,
             initialFocusEnabled = initialFocusEnabled, contentPadding = contentPadding,
-            setup = servers.setupContent(), onCloseSetup = servers::closeSetup, dialog = servers.dialogContent(),
-            isCurrent = isCurrent, onCloseDialog = servers::closeDialogs,
-            onCancelSwitch = servers::cancelSwitch.takeIf { servers.switchingNow })
+            setup = servers.setupContent(isCurrent && initialFocusEnabled) { wentHome++ },
+            onCloseSetup = servers::closeSetup, dialog = servers.dialogContent(),
+            isCurrent = isCurrent, onCloseDialog = servers::closeDialogs)
     }
 
     private val activeId get() = (owner.profiles.value as? ServerProfileListResult.Available)?.activeId
 
-    @Test fun cancellingBeforeTheSwitchCoroutineDispatchesClearsItsBusyState() = kotlinx.coroutines.test.runTest {
+    @Test fun switchBusyStateSurvivesSettingsReentryButExplicitCancelClearsIt() = kotlinx.coroutines.test.runTest {
         val stored = FakeServerProfileStore()
         val first = (stored.addAnonymous("first.invalid", activate = true) as at.bernhardberger.tvheadend.sdk.core.ServerProfileWriteResult.Applied).id
         stored.addAnonymous("second.invalid")
@@ -224,7 +232,7 @@ class SettingsServerProfilesTest {
         val state = ServerSettingsState(
             DepthNavigationState(at.bernhardberger.tvhplayer.ui.components.depth.DepthStack(listOf(
                 at.bernhardberger.tvhplayer.ui.components.depth.DepthFrame(SettingsSection.CONNECTION.name)))),
-            profiles, { PlaybackInterruption.NONE }, {}, backgroundScope, { null },
+            profiles, { PlaybackInterruption.NONE }, {}, backgroundScope, backgroundScope, { null },
             mutableStateOf(null), mutableStateOf(null), mutableStateOf(null), mutableStateOf(null), mutableStateOf(false))
         val target = (profiles.profiles.value as ServerProfileListResult.Available).profiles.last()
         state.actions.onUse(target)
@@ -234,28 +242,229 @@ class SettingsServerProfilesTest {
         assertTrue(!state.switchingNow)
         assertEquals(first, (profiles.profiles.value as ServerProfileListResult.Available).activeId)
         assertTrue(!profiles.connectionChanges.isLocked)
+        state.actions.onUse(target)
+        runCurrent()
+        assertTrue(profiles.switchInProgress.value)
+        state.closeSetup()
+        val setup = mutableStateOf<String?>(null)
+        val confirmation = mutableStateOf<String?>(null)
+        val removal = mutableStateOf<String?>(null)
+        val reentered = ServerSettingsState(
+            DepthNavigationState(at.bernhardberger.tvhplayer.ui.components.depth.DepthStack(listOf(
+                at.bernhardberger.tvhplayer.ui.components.depth.DepthFrame(SettingsSection.CONNECTION.name)))),
+            profiles, { PlaybackInterruption.NONE }, {}, backgroundScope, backgroundScope, { null },
+            setup, confirmation, removal, mutableStateOf(null), mutableStateOf(false))
+        reentered.actions.onEnterPassword(target)
+        reentered.actions.onSetUp(target)
+        reentered.actions.onName(target)
+        reentered.actions.onRemove(target)
+        reentered.actions.onAdd()
+        reentered.actions.onUse(target)
+        assertNull(setup.value)
+        assertNull(confirmation.value)
+        assertNull(removal.value)
+        assertTrue(!reentered.switchingNow)
+        state.cancelSwitch()
+        runCurrent()
+        assertTrue(!profiles.switchInProgress.value)
     }
 
-    @Test fun previousConnectionCancelsAnAttemptAndAnotherConnectionReplacesIt() {
-        stored(); settings()
-        connectionGate = kotlinx.coroutines.CompletableDeferred()
+    private fun startSwitchToNext(gated: Boolean = true) {
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        connectionGate = gate
         press(Key.DirectionDown); press(Key.DirectionCenter); press(Key.DirectionCenter)
         settle()
+        if (!gated) {
+            compose.runOnIdle { gate.complete(Unit) }
+            settle()
+        }
+    }
+
+    /** Back on a finished switch page is "Back to Settings": it returns to the connection's own level. */
+    private fun closeSwitchPage() {
+        press(Key.Back)
+        compose.mainClock.advanceTimeBy(1_000)
+        settle()
+    }
+
+    /** One more Back leaves that level for the list, focused on the connection. */
+    private fun closeSwitchPageToList() {
+        closeSwitchPage()
+        press(Key.Back)
+    }
+
+    private fun assertOnLevelOf(number: Int) {
+        assertEquals(serverProfileRowId(id(number)), navigation.stack.active.levelId)
+    }
+
+    @Test fun anAttemptRunsOnAPageThatBlocksSettingsAndCancelKeepsThePreviousConnection() {
+        stored(); settings()
+        startSwitchToNext()
         assertTrue(trialStarted)
-        press(Key.DirectionUp); press(Key.DirectionCenter)
+        compose.onNodeWithTag(SWITCH_CANCEL).assertIsFocused()
+        compose.onNodeWithText("Connecting to", substring = true).assertExists()
+        // Nothing behind the dialog takes focus, and the attempt carries on.
+        listOf(Key.DirectionDown, Key.DirectionUp, Key.DirectionLeft, Key.DirectionRight).forEach { press(it) }
+        compose.onNodeWithTag(SWITCH_CANCEL).assertIsFocused()
+        assertTrue(owner.connectionChanges.isLocked)
+        press(Key.DirectionCenter)
         settle()
         assertTrue(!owner.connectionChanges.isLocked)
         assertEquals(id(1), activeId)
-        // A fresh attempt can be replaced by a different list choice, not its cancelled target.
+        compose.onNodeWithTag(SWITCH_CANCEL).assertDoesNotExist()
+        // Cancelling is silent and lands on the connection's level, where Use is one press away again.
+        assertNull(notices.state.value.candidate)
+        assertOnLevelOf(2)
+        compose.onNodeWithTag("settings-row-$SERVER_USE").assertIsFocused()
+        // A fresh attempt can follow the cancelled one.
         trialStarted = false
         connectionGate = kotlinx.coroutines.CompletableDeferred()
+        press(Key.DirectionCenter)
+        settle()
+        assertTrue(trialStarted)
+        compose.onNodeWithTag(SWITCH_CANCEL).assertIsFocused()
+    }
+
+    @Test fun theConnectingPageNamesTheTargetAndLeavesNoRowToSayConnecting() {
+        stored(); settings()
+        startSwitchToNext()
+        assertTrue(trialStarted)
+        compose.runOnIdle { presentation = AppConnectionPresentation(ConnectionUiState.Connecting) }
+        settle()
+        compose.onNodeWithText("Connecting to kids@tvheadend.home.arpa").assertExists()
+        compose.onNodeWithTag(row(1)).assertDoesNotExist()
+    }
+
+    @Test fun leavingSettingsDuringAnAttemptDoesNotCancelIt() {
+        stored(); settings()
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        connectionGate = gate
         press(Key.DirectionDown); press(Key.DirectionCenter); press(Key.DirectionCenter)
         settle()
         assertTrue(trialStarted)
+        compose.runOnIdle { settingsComposed = false }
+        settle()
+        assertTrue(owner.connectionChanges.isLocked)
+        compose.runOnIdle { gate.complete(Unit) }
+        settle()
+        assertEquals(id(2), activeId)
+        assertEquals(listOf(Notice.ServerSwitched(id(2), "kids@tvheadend.home.arpa")),
+            notices.state.value.let { listOfNotNull(it.active?.notice) + it.pending }.map { it.notice })
+        compose.runOnIdle { settingsComposed = true }
+        settle()
+        compose.onNodeWithTag(SWITCH_HOME).assertDoesNotExist()
+        assertEquals(1L, notices.state.value.candidate?.id)
+    }
+
+    @Test fun aFailedSwitchAwayFromSettingsPostsItsOutcomeOnceWithoutReplayingTheDialog() {
+        stored(); settings()
+        unreachableNextConnection = true
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        connectionGate = gate
+        press(Key.DirectionDown); press(Key.DirectionCenter); press(Key.DirectionCenter)
+        compose.runOnIdle { isCurrent = false }
+        settle()
+        compose.onNodeWithTag(SWITCH_CANCEL).assertDoesNotExist()
+        compose.runOnIdle { gate.complete(Unit) }
+        settle()
+        assertEquals(id(1), activeId)
+        assertEquals(listOf(Notice.ServerConnectionFailed("kids@tvheadend.home.arpa")),
+            notices.state.value.let { listOfNotNull(it.active?.notice) + it.pending }.map { it.notice })
+        compose.runOnIdle { isCurrent = true }
+        settle()
+        compose.onNodeWithTag(SWITCH_TRY_AGAIN).assertDoesNotExist()
+        assertEquals(1L, notices.state.value.candidate?.id)
+    }
+
+    @Test fun aSuccessfulSwitchSaysSoOnItsPageAndGoToHomeLeavesSettings() {
+        stored(); settings()
+        // No gate: even an outcome before the page's first composition belongs to the requested page.
         press(Key.DirectionDown); press(Key.DirectionCenter); press(Key.DirectionCenter)
         settle()
-        assertEquals(id(3), activeId)
-        compose.onNodeWithTag(row(3)).assertIsFocused()
+        assertEquals(id(2), activeId)
+        compose.onNodeWithTag(SWITCH_HOME).assertIsFocused()
+        compose.onNodeWithTag("server-switch-page").assertExists()
+        compose.onNodeWithTag(SWITCH_BACK).assertExists()
+        // The page is the message: no notice repeats it.
+        assertNull(notices.state.value.candidate)
+        press(Key.DirectionCenter)
+        assertEquals(1, wentHome)
+        compose.onNodeWithTag(SWITCH_HOME).assertDoesNotExist()
+    }
+
+    /** In the app Settings sits beside the SideRail, where the page must still take the Back key. */
+    @Test fun backOnTheSuccessPageReturnsToTheConnectionsLevelAndOnceMoreToTheListInUse() {
+        stored(); settings(rail = true)
+        startSwitchToNext(gated = false)
+        compose.onNodeWithTag(SWITCH_HOME).assertIsFocused()
+        closeSwitchPage()
+        compose.onNodeWithTag(SWITCH_HOME).assertDoesNotExist()
+        assertEquals(0, wentHome)
+        assertOnLevelOf(2)
+        press(Key.Back)
+        assertEquals(SettingsSection.CONNECTION.name, navigation.stack.active.levelId)
+        compose.onNodeWithTag(row(2)).assertIsFocused()
+        assertInUse(row(2))
+    }
+
+    @Test fun backToSettingsOnTheSuccessPageDoesTheSameAsBack() {
+        stored(); settings()
+        startSwitchToNext(gated = false)
+        press(Key.DirectionRight)
+        compose.onNodeWithTag(SWITCH_BACK).assertIsFocused()
+        press(Key.DirectionCenter)
+        compose.onNodeWithTag(SWITCH_HOME).assertDoesNotExist()
+        assertEquals(0, wentHome)
+        assertOnLevelOf(2)
+    }
+
+    /** The buttons arrive with the end of the success animation, and focus lands on them then, not before. */
+    @Test fun theSuccessButtonsAndTheirFocusWaitForTheRevealToFinish() {
+        stored(); settings()
+        press(Key.DirectionDown); press(Key.DirectionCenter)
+        compose.mainClock.autoAdvance = false
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        connectionGate = gate
+        press(Key.DirectionCenter)
+        // The clock is held: step frames so the connecting page is up before the outcome arrives.
+        repeat(3) { scheduler.runCurrent(); compose.mainClock.advanceTimeByFrame() }
+        compose.onNodeWithTag(SWITCH_CANCEL).assertExists()
+        compose.runOnIdle { gate.complete(Unit) }
+        repeat(5) { scheduler.runCurrent(); compose.mainClock.advanceTimeByFrame() }
+        compose.onNodeWithTag("server-switch-page").assertExists()
+        compose.onNodeWithTag(SWITCH_HOME).assertDoesNotExist()
+        compose.onNodeWithTag(SWITCH_CANCEL).assertDoesNotExist()
+        compose.mainClock.advanceTimeBy(350)
+        compose.onNodeWithTag(SWITCH_HOME).assertDoesNotExist()
+        compose.onNodeWithTag("server-switch-reveal").assertIsFocused()
+        compose.pressKey(Key.DirectionRight)
+        compose.onNodeWithTag("server-switch-reveal").assertIsFocused()
+        compose.mainClock.advanceTimeBy(500)
+        compose.onNodeWithTag(SWITCH_HOME).assertIsFocused()
+    }
+
+    /** With animators off (reduced motion) the finished page is there at once, buttons and focus included. */
+    @Test fun withAnimatorsOffTheSuccessPageShowsItsFinalStateAtOnce() {
+        var backEnabled by mutableStateOf(false)
+        var outerBack = 0
+        var pageBack = 0
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                androidx.activity.compose.BackHandler { outerBack++ }
+                SwitchPage(SwitchProgress.Finished(fixtureServer(2, "tvheadend.home.arpa", "kids"), Notice.ServerSwitched(id(2), "kids")), null,
+                    SwitchPageActions({}, {}, { pageBack++ }, {}, {}), motionEnabled = false, backEnabled = backEnabled)
+            }
+        }
+        compose.mainClock.autoAdvance = false
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithTag(SWITCH_HOME).assertIsFocused()
+        compose.runOnIdle { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        assertEquals(1, outerBack)
+        assertEquals(0, pageBack)
+        compose.runOnIdle { backEnabled = true }
+        compose.settleFrames(2, 16)
+        compose.runOnIdle { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        assertEquals(1, pageBack)
     }
 
     @Test fun backDuringPersistenceFromNoneActiveShowsTheCompletedSelectionAndRestoresFocus() {
@@ -269,6 +478,8 @@ class SettingsServerProfilesTest {
         settle()
         assertEquals(id(2), activeId)
         assertTrue(!owner.connectionChanges.isLocked)
+        assertOnLevelOf(2)
+        press(Key.Back)
         compose.onNodeWithTag(row(2)).assertIsFocused()
         assertInUse(row(2))
         // No busy/cancelled latch remains: Back navigates normally again.
@@ -276,74 +487,102 @@ class SettingsServerProfilesTest {
         compose.onNodeWithText("Connection").assertIsFocused()
     }
 
-    @Test fun unreachableSwitchShowsCantConnectAndKeepsThePreviousConnection() {
+    @Test fun aFailedSwitchSaysWhyOnItsPageAndBackReturnsToTheConnectionsLevelOnThePreviousConnection() {
         stored(); settings()
-        press(Key.DirectionDown)
+        press(Key.DirectionDown); press(Key.DirectionCenter)
         listOf(false, true).forEach { rejected ->
-        unreachableNextConnection = !rejected
-        rejectNextConnection = rejected
-        press(Key.DirectionCenter); press(Key.DirectionCenter)
-        settle()
-        assertTrue(!owner.connectionChanges.isLocked)
-        val posted = notices.state.value.run { listOfNotNull(active?.notice) + pending }.map { it.notice }
-        assertTrue(posted.any { if (rejected) it is Notice.ServerSignInRejected else it is Notice.ServerConnectionFailed })
-        assertEquals(id(1), activeId)
-        compose.onNodeWithTag(row(2)).assertIsFocused()
+            val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+            connectionGate = gate
+            unreachableNextConnection = !rejected
+            rejectNextConnection = rejected
+            press(Key.DirectionCenter)
+            compose.runOnIdle { gate.complete(Unit) }
+            settle()
+            assertTrue(!owner.connectionChanges.isLocked)
+            // The likelier fix comes first: a rejected sign-in asks for the account, an unreachable server for another go.
+            compose.onNodeWithTag(if (rejected) SWITCH_EDIT else SWITCH_TRY_AGAIN).assertIsFocused()
+            compose.onNodeWithText(if (rejected) "Sign-in failed" else "Can’t reach the server").assertExists()
+            compose.onNodeWithTag(SWITCH_BACK).assertExists()
+            assertNull(notices.state.value.candidate)
+            assertEquals(id(1), activeId)
+            // The connection that stays in use is named, with its avatar.
+            compose.onNodeWithText(if (rejected) "Couldn’t sign in" else "didn’t respond", substring = true).assertExists()
+            if (!rejected) compose.onNodeWithText("Living room is still in use").assertExists()
+            closeSwitchPage()
+            compose.onNodeWithTag(SWITCH_BACK).assertDoesNotExist()
+            assertOnLevelOf(2)
+            compose.onNodeWithTag("settings-row-$SERVER_USE").assertIsFocused()
+            assertEquals(id(1), activeId)
         }
     }
 
-    @Test fun editingAndRemovingAreIgnoredWhileAnAttemptOwnsTheConnection() {
-        stored(); settings(); connectionGate = kotlinx.coroutines.CompletableDeferred()
+    @Test fun tryAgainOnAFailedPageRerunsTheSameSwitch() {
+        stored(); settings()
+        unreachableNextConnection = true
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        connectionGate = gate
         press(Key.DirectionDown); press(Key.DirectionCenter); press(Key.DirectionCenter)
+        compose.runOnIdle { gate.complete(Unit) }
         settle()
-        assertTrue(trialStarted)
-        press(Key.DirectionDown); press(Key.DirectionCenter)
-        listOf(EDIT_CONNECTION, SERVER_NAME, SERVER_REMOVE).forEach {
-            press(Key.DirectionDown); press(Key.DirectionCenter)
-            compose.onNodeWithTag("settings-row-$it").assertIsFocused()
-            assertTrue(owner.connectionChanges.isLocked)
-        }
-        press(Key.Back)
+        compose.onNodeWithTag(SWITCH_TRY_AGAIN).assertIsFocused()
+        assertEquals(id(1), activeId)
+        press(Key.DirectionCenter)
         settle()
-        assertTrue(!owner.connectionChanges.isLocked)
+        assertEquals(id(2), activeId)
+        compose.onNodeWithTag(SWITCH_HOME).assertIsFocused()
+    }
+
+    @Test fun editConnectionOnAFailedPageOpensTheEditFlowOfThatConnection() {
+        stored(); settings()
+        rejectNextConnection = true
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        connectionGate = gate
+        press(Key.DirectionDown); press(Key.DirectionCenter); press(Key.DirectionCenter)
+        compose.runOnIdle { gate.complete(Unit) }
+        settle()
+        compose.onNodeWithTag(SWITCH_EDIT).assertIsFocused()
+        press(Key.DirectionCenter)
+        compose.onNodeWithTag(SWITCH_EDIT).assertDoesNotExist()
+        compose.onNodeWithTag("setup-host").assertExists()
         assertEquals(id(1), activeId)
     }
 
     @Test fun backCancelsAnAttemptAndKeepsSettingsOnThePreviousConnection() {
         stored(); settings()
-        press(Key.DirectionDown)
+        press(Key.DirectionDown); press(Key.DirectionCenter)
         listOf(false, true).forEach { dispatcher ->
         trialStarted = false
         connectionGate = kotlinx.coroutines.CompletableDeferred()
-        press(Key.DirectionCenter); press(Key.DirectionCenter)
+        press(Key.DirectionCenter)
         settle()
         assertTrue(trialStarted)
         assertEquals(id(1), activeId)
+        compose.onNodeWithTag(SWITCH_CANCEL).assertIsFocused()
         if (dispatcher) compose.runOnIdle { compose.activity.onBackPressedDispatcher.onBackPressed() }
         else press(Key.Back)
         settle()
         assertTrue(!owner.connectionChanges.isLocked)
         assertEquals(id(1), activeId)
-        assertEquals(SettingsSection.CONNECTION.name, navigation.stack.active.levelId)
-        compose.onNodeWithTag(row(2)).assertIsFocused()
+        assertNull(notices.state.value.candidate)
+        assertOnLevelOf(2)
+        compose.onNodeWithTag("settings-row-$SERVER_USE").assertIsFocused()
         }
-    }
-
-    @Test fun passwordNeededSelectionDuringAnAttemptRestoresThenOpensPasswordSetup() {
-        stored()
-        runBlocking { store.addPassword("cabin.invalid", username = "viewer", password = "synthetic") }
-        store.scriptCredentialsUnavailable(id(4))
-        unreadable += id(4)
-        settings()
-        connectionGate = kotlinx.coroutines.CompletableDeferred()
-        press(Key.DirectionDown); press(Key.DirectionCenter); press(Key.DirectionCenter)
+        val trial = kotlinx.coroutines.CompletableDeferred<Unit>()
+        connectionGate = trial
+        unreachableNextConnection = true
+        press(Key.DirectionCenter)
+        val restore = kotlinx.coroutines.CompletableDeferred<Unit>()
+        restorationGate = restore
+        compose.runOnIdle { trial.complete(Unit) }
         settle()
-        assertTrue(trialStarted)
-        press(Key.DirectionDown); press(Key.DirectionDown); press(Key.DirectionCenter); press(Key.DirectionCenter)
+        assertTrue(restoring)
+        press(Key.Back)
+        compose.runOnIdle { restore.complete(Unit) }
         settle()
-        assertTrue(!owner.connectionChanges.isLocked)
+        compose.onNodeWithTag("server-switch-page").assertDoesNotExist()
         assertEquals(id(1), activeId)
-        compose.onNodeWithTag("setup-password").assertIsFocused()
+        assertNull(notices.state.value.candidate)
+        assertTrue(!owner.connectionChanges.isLocked)
     }
 
     @Test fun cancellingBeforeHandoverRestoresTheInUseConnectionsDegradedWarning() {
@@ -406,12 +645,13 @@ class SettingsServerProfilesTest {
         assertEquals(ConnectionUiState.Connecting, connection.uiState.value.connection)
         assertTrue(!connection.uiState.value.degraded)
         compose.onNodeWithText("Try again").assertDoesNotExist()
-        compose.onNodeWithText("Connecting…", substring = true).assertExists()
+        compose.onNodeWithTag(SWITCH_CANCEL).assertExists()
         compose.runOnIdle { gate.complete(Unit) }
         settle()
         assertTrue(!owner.connectionChanges.isLocked)
         assertEquals(ConnectionUiState.Ready, connection.uiState.value.connection)
         assertTrue(!connection.uiState.value.degraded)
+        closeSwitchPageToList()
         compose.onNodeWithTag(row(2)).assertIsFocused()
         // No focus move: the same preview must now expose the restored profile's actions.
         compose.onNodeWithText("Use this connection", useUnmergedTree = true).assertExists()
@@ -437,7 +677,7 @@ class SettingsServerProfilesTest {
         compose.runOnIdle { gate.complete(Unit) }
         settle()
         assertTrue(!owner.connectionChanges.isLocked)
-        compose.waitForIdle()
+        closeSwitchPageToList()
         compose.mainClock.advanceTimeBy(2_000)
         compose.onNodeWithTag(row(2)).assertIsFocused()
         assertEquals(id(1), activeId)
@@ -557,11 +797,14 @@ class SettingsServerProfilesTest {
         // The level of a server not in use starts on "Use this server".
         compose.onNodeWithTag("settings-row-$SERVER_USE").assertIsFocused()
         compose.onNodeWithText("Sign in as kids").assertIsDisplayed()
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        connectionGate = gate
         press(Key.DirectionCenter)
         compose.onNodeWithTag(SWITCH_KEEP).assertDoesNotExist()
+        compose.runOnIdle { gate.complete(Unit) }
         settle()
         assertEquals(id(2), activeId)
-        compose.waitForIdle()
+        closeSwitchPageToList()
         assertEquals(SettingsSection.CONNECTION.name, navigation.stack.active.levelId)
         compose.onNodeWithTag(row(2)).assertIsFocused()
         assertInUse(row(2))
@@ -595,10 +838,13 @@ class SettingsServerProfilesTest {
         press(Key.DirectionCenter)
         press(Key.DirectionRight)
         compose.onNodeWithTag(SWITCH_CONFIRM).assertIsFocused()
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        connectionGate = gate
         press(Key.DirectionCenter)
+        compose.runOnIdle { gate.complete(Unit) }
         settle()
         assertEquals(id(2), activeId)
-        compose.waitForIdle()
+        closeSwitchPageToList()
         compose.onNodeWithTag(row(2)).assertIsFocused()
         // Switching stops what played; nothing retunes it on the new server.
         assertEquals(1, stopsAt.size)
@@ -820,13 +1066,54 @@ class SettingsServerProfilesTest {
         compose.onNodeWithTag(SWITCH_KEEP).assertIsFocused()
         capture("04-switch-confirm-while-playing", "Keep watching")
         press(Key.DirectionRight)
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        connectionGate = gate
         press(Key.DirectionCenter)
+        compose.runOnIdle { gate.complete(Unit) }
         settle()
         assertEquals(id(2), activeId)
+        closeSwitchPageToList()
         presentation = AppConnectionPresentation(ConnectionUiState.Connecting)
         compose.waitForIdle()
         compose.onNodeWithTag(row(2)).assertIsFocused()
         capture("05-switched-connecting", "kids@tvheadend.home.arpa")
+    }
+
+    /** The page of a switch the user started, while it connects, for each way it ends and across the success reveal. */
+    @Test @Category(VisualCapture::class) fun captureSwitchPages() {
+        stored(); settings()
+        startSwitchToNext()
+        compose.onNodeWithTag(SWITCH_CANCEL).assertIsFocused()
+        capture("20-switch-page-connecting", "Cancel")
+        press(Key.DirectionCenter)
+        listOf("21-switch-page-cant-reach", "22-switch-page-sign-in-failed").forEachIndexed { index, name ->
+            val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+            connectionGate = gate
+            unreachableNextConnection = index == 0
+            rejectNextConnection = index == 1
+            press(Key.DirectionCenter)
+            compose.runOnIdle { gate.complete(Unit) }
+            settle()
+            compose.onNodeWithTag(if (index == 0) SWITCH_TRY_AGAIN else SWITCH_EDIT).assertIsFocused()
+            capture(name, if (index == 0) "Try again" else "Edit connection")
+            press(Key.Back)
+        }
+        compose.mainClock.autoAdvance = false
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        connectionGate = gate
+        press(Key.DirectionCenter)
+        repeat(3) { scheduler.runCurrent(); compose.mainClock.advanceTimeByFrame() }
+        compose.runOnIdle { gate.complete(Unit) }
+        // The outcome lands through the owner's coroutines and a frame; the clock is held, so step both.
+        repeat(5) { scheduler.runCurrent(); compose.mainClock.advanceTimeByFrame() }
+        var elapsed = 0
+        listOf(100, 250, 400, 600).forEachIndexed { index, at ->
+            compose.mainClock.advanceTimeBy((at - elapsed).toLong())
+            elapsed = at
+            capture("23-switch-page-connected-${index + 1}-${at}ms",
+                if (at < 600) "hero" else "Go to Home", settleBeforeCapture = false)
+        }
+        compose.onNodeWithTag(SWITCH_HOME).assertIsFocused()
     }
 
     /** A household's real shapes with fictional values: many accounts on one box, custom ports, a long host. */
@@ -853,13 +1140,18 @@ class SettingsServerProfilesTest {
         capture("15-names-list-anonymous-long-host", "tvh-demo.example.org")
         press(Key.DirectionCenter)
         capture("16-names-anonymous-level", "Use this connection")
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        connectionGate = gate
         press(Key.DirectionCenter)
         presentation = AppConnectionPresentation(ConnectionUiState.Connecting)
         settle()
+        compose.runOnIdle { gate.complete(Unit) }
         presentation = AppConnectionPresentation(ConnectionUiState.Ready)
         settle()
-        capture("17-names-connected-notice", "Edit connection")
-        press(Key.DirectionCenter); press(Key.DirectionDown); press(Key.DirectionCenter)
+        capture("17-names-connected-page", "Go to Home")
+        closeSwitchPage()
+        compose.onNodeWithTag("settings-row-$EDIT_CONNECTION").performSemanticsAction(SemanticsActions.RequestFocus)
+        press(Key.DirectionDown); press(Key.DirectionCenter)
         compose.onNodeWithTag(SERVER_NAME_FIELD).assertIsFocused()
         capture("19-name-screen", "Name field")
     }
@@ -948,8 +1240,8 @@ class SettingsServerProfilesTest {
         press(Key.Back)
     }
 
-    private fun capture(name: String, focus: String) {
-        compose.mainClock.advanceTimeBy(1_000)
+    private fun capture(name: String, focus: String, settleBeforeCapture: Boolean = true) {
+        if (settleBeforeCapture) compose.mainClock.advanceTimeBy(1_000)
         compose.runOnIdle {
             val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
             view.draw(Canvas(bitmap))
@@ -962,7 +1254,7 @@ class SettingsServerProfilesTest {
     }
 
     private fun press(key: Key) {
-        compose.onRoot().performKeyInput { pressKey(key) }
+        compose.pressKey(key)
         settle()
     }
 

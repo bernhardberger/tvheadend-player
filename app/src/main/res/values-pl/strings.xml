@@ -155,9 +155,6 @@
     <string name="onboarding_connecting_title">Łączenie z %1$s</string>
     <string name="onboarding_connecting_body">Sprawdzanie serwera i logowanie jako %1$s. Naciśnij Back, aby anulować.</string>
     <string name="onboarding_connecting_body_anonymous">Sprawdzanie serwera. Naciśnij Back, aby anulować.</string>
-    <string name="onboarding_connecting">Łączenie…</string>
-    <string name="onboarding_failure_meta">%1$s • port %2$s • użytkownik %3$s</string>
-    <string name="onboarding_failure_meta_anonymous">%1$s • port %2$s</string>
     <string name="onboarding_change_address">Zmień adres</string>
     <string name="onboarding_change_address_detail">%1$s • port %2$s</string>
     <string name="onboarding_change_sign_in">Zmień konto</string>
@@ -377,6 +374,11 @@
     <string name="connection_retry_description">Tvheadend Player ponawia też próby automatycznie</string>
     <string name="connection_notice_restored">Połączenie przywrócone</string>
     <string name="server_switched">Połączono z %1$s</string>
+    <string name="cancel">Anuluj</string>
+    <string name="server_go_home">Przejdź do sekcji „Start”</string>
+    <string name="back_to_settings">Powrót do ustawień</string>
+    <string name="server_still_in_use">Połączenie %1$s jest nadal w użyciu</string>
+    <string name="server_switch_unreachable_body">Połączenie %1$s nie odpowiedziało. Sprawdź, czy serwer działa i jest w tej samej sieci.</string>
     <string name="connection_scope_line">Dla %1$s</string>
     <string name="connection_notice_login_rejected">Logowanie odrzucone</string>
     <string name="recording_action_permission">To konto nie może zarządzać nagraniami.</string>
