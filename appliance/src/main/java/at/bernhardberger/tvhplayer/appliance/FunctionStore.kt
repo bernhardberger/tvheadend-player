@@ -6,7 +6,7 @@ class FunctionStore(context: Context) {
     private val preferences = context.getSharedPreferences("companion_functions", Context.MODE_PRIVATE)
 
     val functions: CompanionFunctions
-        get() = CompanionFunctions(preferences.getBoolean("startup", true), read("live_tv"), read("guide"))
+        get() = CompanionFunctions(preferences.getBoolean("startup", false), read("live_tv"), read("guide"))
 
     fun setStartup(enabled: Boolean) { preferences.edit().putBoolean("startup", enabled).apply() }
 

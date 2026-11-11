@@ -164,7 +164,7 @@ Download from the
 | APK | Take it when |
 |---|---|
 | `…-play.apk` | You want the app. That's the one most people want. |
-| `…-appliance.apk` | You watch through Tvheadend instead of the TV's built-in tuners. This optional companion makes Tvheadend Player behave like the TV's own tuner app: it starts the app when the TV turns on, catches remote buttons the manufacturer keeps for its own apps, and can replace the home screen. It needs Tvheadend Player installed and updates itself from these releases. See [Appliance companion](#appliance-companion) for setup. |
+| `…-appliance.apk` | You watch through Tvheadend instead of the TV's built-in tuners. This optional companion makes Tvheadend Player behave like the TV's own tuner app: it can start the app when the TV turns on, catches remote buttons the manufacturer keeps for its own apps, and can replace the home screen. It needs Tvheadend Player installed and updates itself from these releases. See [Appliance companion](#appliance-companion) for setup. |
 
 To install an APK outside the Play Store, allow installs from unknown sources
 for the app you open it with, a file manager for example.
@@ -177,7 +177,8 @@ Tvheadend Player Appliance is a separate, optional app for people who watch TV
 through Tvheadend instead of the TV's built-in tuners. It makes Tvheadend Player
 behave like the TV's own tuner app:
 
-- It opens Tvheadend Player when the TV turns on or wakes from standby.
+- It can open Tvheadend Player when the TV turns on or wakes from standby.
+  That stays off until you turn on *Open when the TV turns on*.
 - It takes over remote buttons the manufacturer keeps for its own apps. Out of
   the box the TV button opens live TV and the Guide button opens the guide. You
   can pick other buttons, or none, in the companion.
@@ -211,15 +212,16 @@ progress, so expect rough edges and changes between releases.
 6. Allow the companion to install unknown apps, so it can install its own
    updates.
 7. Optionally, make it the home app.
-8. Under Functions, check that the buttons do what you want. To use a different
-   button, choose it and press the button on the remote. Some buttons, like
-   power, never reach apps.
+8. Under Functions, choose whether Tvheadend Player opens when the TV turns on,
+   and check that the buttons do what you want. To use a different button,
+   choose it and press the button on the remote. Some buttons, like power,
+   never reach apps.
 
 When the companion says All set, you're done.
 
 The accessibility service only opens Tvheadend Player when the TV turns on or
-wakes, and reacts to the buttons set under Functions. It doesn't read what's on
-the screen, and every other button works as before.
+wakes, if you turned that on, and reacts to the buttons set under Functions. It
+doesn't read what's on the screen, and every other button works as before.
 
 ### If the companion says Blocked
 

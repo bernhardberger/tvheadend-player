@@ -29,7 +29,7 @@ class CompanionFunctionsTest {
 
     @Test fun defaultsCustomAndRemovedKeysRouteOnlyToTheirOwner() {
         val defaults = CompanionFunctions()
-        assertTrue(defaults.startup)
+        assertFalse(defaults.startup)
         assertEquals(CompanionFunction.LIVE_TV, defaults.owner(170))
         assertEquals(CompanionFunction.GUIDE, defaults.owner(172))
         assertEquals(CompanionFunction.LIVE_TV, defaults.owner(4001))
@@ -83,8 +83,8 @@ class CompanionFunctionsTest {
 
     @Test fun bodyUsesOnlyTheEnabledWaysAndOnlyMentionsHomeWhenDefault() {
         assertEquals("This TV opens Tvheadend Player at startup, on HOME and with the TV and Guide buttons.",
-            CompanionFunctions().allSetBody(true))
-        assertEquals("This TV opens Tvheadend Player at startup and with the TV and Guide buttons.",
+            CompanionFunctions(startup = true).allSetBody(true))
+        assertEquals("This TV opens Tvheadend Player with the TV and Guide buttons.",
             CompanionFunctions().allSetBody(false))
         val noButtons = CompanionFunctions(false, ButtonBinding.NotSet, ButtonBinding.NotSet)
         assertEquals("Nothing is set to open Tvheadend Player.", noButtons.allSetBody(false))
@@ -99,7 +99,7 @@ class CompanionFunctionsTest {
         assertEquals(ButtonBinding.Custom(170), split.liveTv)
         assertEquals("TV button (170)", split.buttonLabel(CompanionFunction.LIVE_TV))
         assertEquals("TV button (4001)", split.buttonLabel(CompanionFunction.GUIDE))
-        assertEquals("This TV opens Tvheadend Player at startup and with TV button (170) and TV button (4001).",
+        assertEquals("This TV opens Tvheadend Player with TV button (170) and TV button (4001).",
             split.allSetBody(false))
         assertEquals("TV button", buttonName(170))
         assertEquals("TV button (4001)", buttonNameWithCode(4001))

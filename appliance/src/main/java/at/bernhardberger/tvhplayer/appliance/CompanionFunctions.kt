@@ -19,7 +19,8 @@ data class MovedButton(val function: CompanionFunction, val keyCode: Int)
 data class FunctionChange(val functions: CompanionFunctions, val moved: List<MovedButton>)
 
 data class CompanionFunctions(
-    val startup: Boolean = true,
+    /** Off until chosen: enabling the service must not start the player on its own. */
+    val startup: Boolean = false,
     val liveTv: ButtonBinding = ButtonBinding.Default,
     val guide: ButtonBinding = ButtonBinding.Default,
 ) {

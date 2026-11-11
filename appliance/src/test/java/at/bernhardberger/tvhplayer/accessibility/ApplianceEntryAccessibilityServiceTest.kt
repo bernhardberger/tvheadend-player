@@ -165,10 +165,10 @@ class ApplianceEntryAccessibilityServiceTest {
         CompanionServiceState.setConnected(false)
     }
 
-    @Test fun startupOffPreventsConnectAndWakeLaunchAndStandbyNeverLaunches() {
+    @Test fun startupStaysOffUntilChosenAndStandbyNeverLaunches() {
         val controller = Robolectric.buildService(ApplianceEntryAccessibilityService::class.java).create()
         val service = controller.get()
-        FunctionStore(service).setStartup(false)
+        // A fresh setup: turning the service on must not start the player.
         connect(service)
         service.sendBroadcast(Intent(Intent.ACTION_SCREEN_ON))
         shadowOf(Looper.getMainLooper()).idle()

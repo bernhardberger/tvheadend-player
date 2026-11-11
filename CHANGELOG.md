@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The Appliance companion no longer opens Tvheadend Player when the TV turns on unless you turn on *Open when the TV turns on* under Functions, and turning on its accessibility service no longer starts the player. If you never changed that switch, turn it on again after the update.
 - Switching connections shows its progress on its own page and can be canceled; leaving Settings doesn't stop it. If the connection can't be reached or rejects sign-in, the page says why and your previous connection stays in use. After a successful switch, *Go to Home* takes you straight there.
 - With more than one connection, *Channel groups* and *Stream profile* name the connection they apply to.
 - A missed or failed recording that never wrote a file offers *Remove entry* instead of *Delete recording*.

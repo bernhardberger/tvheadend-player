@@ -82,11 +82,11 @@ class CompanionActivityTest {
     @Test fun theStartupRowTogglesTheStoredSwitch() {
         val context = RuntimeEnvironment.getApplication()
         val controller = Robolectric.buildActivity(CompanionActivity::class.java).create().start().resume()
-        assertTrue(FunctionStore(context).functions.startup)
-        onRow(controller.get(), CompanionRow.STARTUP)
         assertFalse(FunctionStore(context).functions.startup)
         onRow(controller.get(), CompanionRow.STARTUP)
         assertTrue(FunctionStore(context).functions.startup)
+        onRow(controller.get(), CompanionRow.STARTUP)
+        assertFalse(FunctionStore(context).functions.startup)
         controller.pause().stop().destroy()
     }
 
