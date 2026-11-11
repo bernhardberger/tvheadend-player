@@ -67,7 +67,7 @@ Roadmap D-items below are distinct from the same-numbered defects in
 | U12 | Partial evidence, exit unverified | Extensive production-composable capture/layout tests exist. They are not by themselves proof of a settled, maintained screenshot-golden suite. |
 | U13, U17, U19 | Implemented | Clock override, locale-aware formatting and shared bullet separators. Width/readability remains in final localized-screen acceptance. |
 | U14 | Partial; a later, larger slice (owner 2026-10-29) | Live-player GUIDE now toggles its channel Schedule panel (`LivePlayerLayerState.handleScheduleKey`). That is not the original all-screen GUIDE/TV/LIST contract. Device quirks need a key-capture diagnostic first, so testers can report raw key codes; that diagnostic comes with the appliance touch-up (owner 2026-11-02). |
-| U22 | Open; 0.5.x (owner 2026-11-11) | Sony A80J remote: recording list, playback transport and record keys; see the UX workstream for the observed gaps and remaining decisions. |
+| U22 | Implemented; physical check on the A80J and G10 open | Play/Pause shows the banner; Rewind and Fast forward scrub at 2 to 32 times; Record records the watched or focused program; the Recordings button opens Recordings, also through the companion. Left skips back 10 s. Real trick play through Tvheadend's timeshift speed stays a later item. |
 | U15 | Implemented | Shared context menus, details family and error catalog integrated into live, recording and browse/startup surfaces. The old 0.4 allocation is obsolete. |
 | U16 | Partial; final consistency pass still pending | Many entry/Back restorations landed, including Guide time/position, recording-player return and folder-row restoration. No complete TV-DB/all-screen acceptance record found. |
 | U18 | Implemented | `96bcb485`: Settings → General hides channel numbers app-wide (`channelTitleText`/`channelTitleNumber`), with `89ed1f6e` for the player placeholder and `cffe602f` for translations. |
@@ -80,7 +80,7 @@ Roadmap D-items below are distinct from the same-numbered defects in
 | E8 | Open | Measurement tools exist; the release process does not yet contain the proposed previous-release number comparison. |
 | E9 | Acceptance unverified | Owner judgment of the optimized final build remains distinct from collected timings. |
 | A1, A2 | Decision / acceptance open; after 0.3.2 (owner 2026-10-29) | Appliance implementation exists; settle the firmware workaround contract and complete current-candidate GUIDE/wake/process-death/repeat/TalkBack checks. |
-| A4 | Open; 0.5.x (owner 2026-11-11) | Appliance autoplay should default off and require a deliberate choice, including when enabling the accessibility service. |
+| A4 | Implemented; physical check and household re-enable open | Appliance autoplay defaults off; turning on the accessibility service no longer starts the player. Autoplay has to be turned back on on the household G08 and Shield after their update. |
 | R1, R5, R6 | Implemented release machinery; recurring candidate gates | Native/source checks, signing, notices/privacy review and signed install/update acceptance must be recorded for the 1.0 candidate, not inferred from earlier releases. |
 | R2 | Implemented | R8 release minification and mappings delivered; recorded Play smoke does not waive Appliance/current-release smoke. |
 | R3 | Open / per-package closure unverified | Revalidate each dependency-hygiene candidate against the current graph before scheduling removal; do not assume every old candidate is still present. |
