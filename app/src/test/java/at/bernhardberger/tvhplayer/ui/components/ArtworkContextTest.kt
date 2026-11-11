@@ -39,6 +39,7 @@ import at.bernhardberger.tvhplayer.core.recordingArtwork
 import at.bernhardberger.tvhplayer.ui.screens.ProgrammeContextMenu
 import at.bernhardberger.tvhplayer.ui.screens.ChannelsImmersiveBackground
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.RemoteArtworkUrl
@@ -51,12 +52,14 @@ import coil3.request.SuccessResult
 import coil3.request.ErrorResult
 import kotlin.time.Instant
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
+import org.junit.After
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -75,6 +78,9 @@ class ArtworkContextTest {
     private val requests = mutableListOf<Any>()
     private var logoCompositions = 0
     private var observationCompositions = 0
+    private val sampleGate = CompletableDeferred<Unit>()
+
+    @After fun releaseSamples() { sampleGate.complete(Unit) }
 
     @Test fun failedPanePictureShowsTheLogoButASuccessfulReplacementHasNoLogoPlate() {
         val failed = ChannelIcon.parse("https://192.0.2.1/programme.png") as ChannelIcon.RemoteUrl
@@ -94,11 +100,14 @@ class ArtworkContextTest {
     }
 
     @Test fun failedImmersivePictureShowsTheSameLogoFallbackAsNoPicture() {
+        // The glow/tint can still be baking when the backdrop's virtual load deadline reveals it.
+        val revealTimeout = BrowseMotionPolicy.backdropLoadTimeoutMs + BrowseMotionPolicy.backdropSettleMs +
+            BrowseMotionPolicy.backdropIntervalMs
         val failed = ChannelIcon.parse("https://192.0.2.1/programme.png") as ChannelIcon.RemoteUrl
         val art = mutableStateOf<ChannelIcon?>(failed)
         val observation = observation(ready, 1)
         val refreshed = mutableStateOf(observation)
-        show(FakeTvheadendSession(observation), failedModel = failed.url) {
+        show(FakeTvheadendSession(observation), failedModel = failed.url, sampleGate = sampleGate) {
             TVHeadendPlayerTheme {
                 ChannelsImmersiveBackground(listOf(requireNotNull(observation.channel(ChannelId(1)))),
                     { ChannelId(1) }, refreshed.value, { 0L }, 0.dp, 0.dp,
@@ -106,13 +115,13 @@ class ArtworkContextTest {
             }
         }
         compose.onNodeWithTag("channels-logo-glow").assertExists()
-        compose.mainClock.advanceTimeUntil {
+        compose.mainClock.advanceTimeUntil(timeoutMillis = revealTimeout) {
             compose.onAllNodesWithTag("channels-immersive-picon").fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithTag("channels-immersive-picon").assertExists()
         compose.runOnIdle { art.value = requireNotNull(ChannelIcon.parse("https://192.0.2.1/replacement.png")) }
         compose.waitForIdle()
-        compose.mainClock.advanceTimeUntil {
+        compose.mainClock.advanceTimeUntil(timeoutMillis = revealTimeout) {
             compose.onAllNodesWithTag("channels-immersive-picon").fetchSemanticsNodes().isEmpty()
         }
         compose.onNodeWithTag("channels-logo-glow").assertDoesNotExist()
@@ -123,7 +132,7 @@ class ArtworkContextTest {
             art.value = failed
         }
         compose.waitForIdle()
-        compose.mainClock.advanceTimeUntil {
+        compose.mainClock.advanceTimeUntil(timeoutMillis = revealTimeout) {
             compose.onAllNodesWithTag("channels-immersive-picon").fetchSemanticsNodes().isNotEmpty()
         }
         assertTrue("Returning to the picture retries its transient failure", requests.count { it == failed.url } > attempts)
@@ -285,6 +294,7 @@ class ArtworkContextTest {
     private fun show(
         session: FakeTvheadendSession,
         failedModel: Any? = null,
+        sampleGate: CompletableDeferred<Unit>? = null,
         content: @Composable () -> Unit = {
             ObservationReader(session)
             Logo()
@@ -293,6 +303,7 @@ class ArtworkContextTest {
         images.install(ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>())
             .components {
                 add(Interceptor { chain ->
+                    if (!chain.request.memoryCachePolicy.writeEnabled) sampleGate?.await()
                     requests += chain.request.data
                     if (chain.request.data == failedModel) {
                         ErrorResult(null, chain.request, IllegalStateException("Fixture missing image"))

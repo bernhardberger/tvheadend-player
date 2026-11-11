@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.Density
 import androidx.test.core.app.ApplicationProvider
 import androidx.tv.material3.MaterialTheme
@@ -119,7 +120,7 @@ class DetailsTintTest {
     }
 
     @Test fun absentArtAndPiconKeepsTheTheme() {
-        showPage(hasArt = false, hasPicon = false)
+        showPage(hasArt = { false }, hasPicon = false)
         assertPixel(20, 20, 0xFF111416.toInt())
     }
 
@@ -128,7 +129,7 @@ class DetailsTintTest {
     private fun absentArtUsesPiconAccent(stored: Boolean) {
         if (stored) runBlocking { store.put("tint-test-2", 0x336699) }
         else releaseSample.complete(Unit)
-        showPage(hasArt = false)
+        showPage(hasArt = { false })
         compose.waitUntil(10_000) { store["tint-test-2"] != null }
         awaitGlow()
         val accent = if (stored) 0x336699 else requireNotNull(store["tint-test-2"])
@@ -182,15 +183,21 @@ class DetailsTintTest {
             .compositeOver(neutral))
     }
 
-    @Test fun failedArtFallsBackToTheStoredPiconAccent() {
+    @Test fun failedArtUsesTheSameLogoFallbackAsAbsentArt() {
         fail = true
         releaseSample.complete(Unit)
         runBlocking { store.put("tint-test-2", 0x336699) }
-        showPage()
-        compose.waitUntil(10_000) { samples.get() > 0 }
-        compose.mainClock.advanceTimeBy(1000)
-        // The scrim over the missing art is the page's own colour.
-        assertNear(20, 20, Color(0xFF000000.toInt() or detailsTintRgb(0x336699)), tolerance = 1)
+        val hasArt = mutableStateOf(true)
+        showPage(hasArt = { hasArt.value })
+        compose.onNodeWithTag("details-logo-glow").assertExists()
+        compose.onNodeWithTag("details-hero-logo").assertExists()
+        compose.onNodeWithTag("details-hero").assertDoesNotExist()
+        val failedGround = pixel(20, 20)
+        compose.runOnIdle { hasArt.value = false }
+        compose.onNodeWithTag("details-logo-glow").assertExists()
+        compose.onNodeWithTag("details-hero-logo").assertExists()
+        compose.onNodeWithTag("details-hero").assertDoesNotExist()
+        assertPixel(20, 20, failedGround)
     }
 
     @Test fun unknownArtStartsNeutralAndCrossfadesToTheSampledTint() {
@@ -257,11 +264,11 @@ class DetailsTintTest {
         assertEquals(1, samples.get())
     }
 
-    private fun showPage(hasArt: Boolean = true, hasPicon: Boolean = true, warm: Boolean = false) {
+    private fun showPage(hasArt: () -> Boolean = { true }, hasPicon: Boolean = true, warm: Boolean = false) {
         val channel = Channel.create(ChannelId(1), name = "Test", icon = picon.takeIf { hasPicon }?.let { ChannelIcon.ImageCache(it) })
-        val event = EpgEvent.create(EventId(1), channel.id, Instant.fromEpochSeconds(0), Instant.fromEpochSeconds(3600),
-            title = "Test programme", image = art.takeIf { hasArt })
         compose.setContent {
+            val event = EpgEvent.create(EventId(1), channel.id, Instant.fromEpochSeconds(0), Instant.fromEpochSeconds(3600),
+                title = "Test programme", image = art.takeIf { hasArt() })
             CompositionLocalProvider(LocalChannelAccents provides accents, LocalWarmPlayback provides warm,
                 LocalDensity provides Density(2f)) {
                 TVHeadendPlayerTheme {
