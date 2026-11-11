@@ -13,7 +13,7 @@ import at.bernhardberger.tvhplayer.playback.BUSY_RING_QUIET_AFTER_SOUND_MILLIS
 import at.bernhardberger.tvhplayer.playback.busyRingQuietInMillis
 import kotlinx.coroutines.delay
 
-internal enum class PlayerBusyStatus(val delayMs: Long) { TUNING(500L), BUFFERING(1_000L) }
+internal enum class PlayerBusyStatus(val delayMs: Long) { TUNING(500L), RECORDING_STARTING(500L), BUFFERING(1_000L) }
 
 internal fun tuningStatusEligible(
     state: AppPlaybackState,

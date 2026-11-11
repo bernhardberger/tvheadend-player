@@ -77,6 +77,9 @@ class CompactBufferingStatusTest {
     @Test fun tuningDelayIsFiveHundredMillisecondsAndEveryExitAndTargetResetsIt() =
         assertContinuousDelay(PlayerBusyStatus.TUNING)
 
+    @Test fun recordingStartingDelayIsFiveHundredMillisecondsAndEveryExitAndTargetResetsIt() =
+        assertContinuousDelay(PlayerBusyStatus.RECORDING_STARTING)
+
     private fun assertContinuousDelay(status: PlayerBusyStatus) {
         var eligible by mutableStateOf(true)
         var target by mutableStateOf(1)

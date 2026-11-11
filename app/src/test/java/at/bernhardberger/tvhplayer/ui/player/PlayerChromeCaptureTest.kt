@@ -97,6 +97,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
@@ -113,7 +114,6 @@ import org.junit.experimental.categories.Category
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import at.bernhardberger.tvhplayer.testutil.CaptureOutput
-import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
 import org.junit.runner.RunWith
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
 import org.robolectric.RobolectricTestRunner
@@ -472,7 +472,9 @@ class PlayerChromeCaptureTest {
                 compose.onNodeWithTag("details-continue_watching").assertIsFocused()
             }
             val loadingMessage = ApplicationProvider.getApplicationContext<Application>().getString(R.string.recording_loading)
-            if (next == Scene.RECORDING_STARTING) compose.onNodeWithText(loadingMessage).assertExists()
+            if (next == Scene.RECORDING_STARTING || next == Scene.RECORDING_STARTING_CONTROLS) {
+                compose.onNodeWithTag("player-busy-indicator").assertContentDescriptionEquals(loadingMessage)
+            }
             if (next == Scene.RECORDING_STARTING_CONTROLS) {
                 compose.onNodeWithTag("player-pause").assertIsFocused()
             }
@@ -710,12 +712,11 @@ class PlayerChromeCaptureTest {
                     marks = chapterMarks(900_000L, 2_700_000L).takeIf { scene == Scene.RECORDING_CONTROLS }.orEmpty(),
                     modifier = Modifier.align(Alignment.BottomCenter),
                 ) }
-                TvRecoveryOverlay(visible = scene == Scene.RECORDING_STARTING,
-                    message = stringResource(R.string.recording_loading), opaque = false)
             }
         }
         PlayerBusyIndicator(when (scene) {
             Scene.BANNER_TUNING -> PlayerBusyStatus.TUNING
+            Scene.RECORDING_STARTING, Scene.RECORDING_STARTING_CONTROLS -> PlayerBusyStatus.RECORDING_STARTING
             Scene.CONTROLS_BUFFERING, Scene.HIDDEN_BUFFERING -> PlayerBusyStatus.BUFFERING
             else -> null
         }, Modifier.align(Alignment.Center))

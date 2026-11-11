@@ -163,26 +163,29 @@ class RecordingPlayerChromeScreenTest {
         compose.onNodeWithTag("tv-recovery-title")
             .assertTextEquals(context.getString(AppErrorCondition.RECORDING_UNAVAILABLE.titleRes()))
         assertFalse("loading must not cover a terminal failure", loadingShown())
+        assertFalse("startup ring must not cover a terminal failure", exists("player-busy-indicator"))
     }
 
     @Test fun loadingStaysUntilTheFirstFrameAndDoesNotReturnForBuffering() {
-        val server = screen()
+        val server = screen(settleEntry = false)
         compose.mainClock.advanceTimeBy(800)
         compose.waitForIdle()
-        assertTrue("loading stays after admission while the player starts", loadingShown())
+        assertTrue("startup uses the loading ring after admission", startingRingShown())
+        assertFalse("resolved startup has no loading text or scrim", loadingShown())
         playingWithoutFrame()
-        assertTrue("READY alone is not a presented frame", loadingShown())
+        assertTrue("READY alone is not a presented frame", startingRingShown())
         publishTracks(Tracks(listOf(audioTrack("a1", "en", true))))
         settle()
         assertFalse(runtime.videoPresentation.value.visible)
-        assertFalse("audio-only presentation dismisses loading without a video frame", loadingShown())
+        assertFalse("audio-only presentation dismisses loading without a video frame", startingRingShown())
         compose.runOnIdle {
             forcedReady = false
             playerListeners.toList().forEach { it.onPlaybackStateChanged(Player.STATE_BUFFERING) }
         }
         compose.mainClock.advanceTimeBy(1_200)
         compose.waitForIdle()
-        assertFalse("ordinary buffering must not bring startup loading back", loadingShown())
+        assertFalse("ordinary buffering must not bring startup loading back", startingRingShown())
+        compose.onNodeWithTag("player-busy-indicator").assertContentDescriptionEquals(context.getString(R.string.player_buffering))
         val previousEpoch = runtime.videoPresentation.value.epoch
         val reinstall = scope.async {
             runtime.playRecording(requireNotNull(currentRecordingPlaybackSelection(server.observation.value, DvrEntryId(7))),
@@ -192,22 +195,25 @@ class RecordingPlayerChromeScreenTest {
         compose.waitUntil(10_000) { reinstall.isCompleted }
         assertTrue("the same recording was reinstalled", reinstall.isCompleted)
         assertTrue(runtime.videoPresentation.value.epoch > previousEpoch)
-        assertTrue("a new install needs its own presentation before hiding loading", loadingShown())
+        assertTrue("a new install needs its own presentation before hiding loading", startingRingShown())
     }
 
-    @Test fun loadingYieldsToControlsUntilTheyCloseAndThenToFirstFrame() {
+    @Test fun loadingRingKeepsControlsUsableUntilFirstFrame() {
         screen()
-        assertTrue(loadingShown())
+        assertTrue(startingRingShown())
+        assertFalse(loadingShown())
         key(Key.DirectionDown)
         assertTrue(exists("player-actions"))
-        assertFalse("focused controls must not sit under loading", loadingShown())
+        compose.onNodeWithTag("player-pause").assertIsFocused()
+        assertTrue("startup ring remains over usable controls", startingRingShown())
+        assertFalse("controls have no loading text or scrim", loadingShown())
         key(Key.Back)
         assertFalse(exists("player-actions"))
-        assertTrue("closing controls restores loading until presentation", loadingShown())
+        assertTrue("startup ring stays until presentation", startingRingShown())
         playingWithoutFrame()
         presentFirstFrame()
         settle()
-        assertFalse("the first video frame dismisses loading", loadingShown())
+        assertFalse("the first video frame dismisses loading", exists("player-busy-indicator"))
         key(Key.DirectionDown)
         assertTrue(exists("player-actions"))
         compose.runOnIdle {
@@ -224,14 +230,14 @@ class RecordingPlayerChromeScreenTest {
         screen(onClose = { closed = true })
         compose.mainClock.advanceTimeBy(800)
         compose.waitForIdle()
-        assertTrue(loadingShown())
+        assertTrue(startingRingShown())
         key(Key.DirectionCenter)
         assertFalse(player.playWhenReady)
-        assertFalse("paused startup does not show loading", loadingShown())
+        assertFalse("paused startup does not show loading", exists("player-busy-indicator"))
         key(Key.DirectionCenter)
         compose.mainClock.advanceTimeBy(800)
         compose.waitForIdle()
-        assertTrue("resuming startup restores loading", loadingShown())
+        assertTrue("resuming startup restores loading", startingRingShown())
         key(Key.Back)
         assertFalse("first Back only hides the Banner", closed)
         assertFalse(exists("player-banner"))
@@ -240,6 +246,9 @@ class RecordingPlayerChromeScreenTest {
     }
 
     private fun loadingShown() = texts(context.getString(R.string.recording_loading))
+
+    private fun startingRingShown() = exists("player-busy-indicator") &&
+        description("player-busy-indicator") == context.getString(R.string.recording_loading)
 
     @Test fun rejectedRecordingReasonExpiresWhenTheServerSessionChanges() {
         val session = screen(refusedEntry = DvrEntry.create(
@@ -306,10 +315,9 @@ class RecordingPlayerChromeScreenTest {
 
     @Test fun backWhileTheRecordingLoadsClosesThePlayerAtOnce() {
         var closed = false
-        screen(onClose = { closed = true }, listed = false)
-        compose.mainClock.advanceTimeBy(800)
-        compose.waitForIdle()
+        screen(onClose = { closed = true }, listed = false, settleEntry = false)
         assertTrue("unresolved admission shows loading even without playback intent", loadingShown())
+        assertFalse("unresolved admission uses the overlay, not the startup ring", exists("player-busy-indicator"))
         assertFalse("no chrome is drawn while the recording loads", exists("player-banner"))
         assertFalse(exists("player-state"))
         assertFalse(exists("player-end-clock"))
@@ -1076,7 +1084,8 @@ class RecordingPlayerChromeScreenTest {
     }
 
     /** [listed] false: the server never lists the recording, so the screen stays in its loading state. */
-    private fun screen(onClose: () -> Unit = {}, listed: Boolean = true, refusedEntry: DvrEntry? = null): FakeTvheadendSession {
+    private fun screen(onClose: () -> Unit = {}, listed: Boolean = true, refusedEntry: DvrEntry? = null,
+        settleEntry: Boolean = true): FakeTvheadendSession {
         val recording = DvrEntryId(7)
         val session = FakeTvheadendSession(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
@@ -1139,6 +1148,7 @@ class RecordingPlayerChromeScreenTest {
             single { LastPlayedChannelStore(context) }
             single { NoticeCenter({ 0L }) { NoticeContext(0, session.observation.value.currentSession?.generationIdentity) } }
         }
+        if (!settleEntry) compose.mainClock.autoAdvance = false
         compose.setContent {
             rootView = LocalView.current
             KoinApplication(application = { modules(noticeModule) }) {
@@ -1162,9 +1172,9 @@ class RecordingPlayerChromeScreenTest {
             }
         }
         if (listed && refusedEntry == null) assertEquals(AppPlaybackTarget.Recording(recording), runtime.activeTarget.value)
-        settle()
+        if (settleEntry) settle()
         compose.mainClock.autoAdvance = false
-        settle()
+        if (settleEntry) settle()
         return session
     }
 
