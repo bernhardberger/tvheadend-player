@@ -63,7 +63,10 @@ class ApplianceLaunchRequests(
             val previous = _state.value
             val pendingGuide = previous is ApplianceLaunchState.Pending &&
                 previous.request.destination != ApplianceEntryDestination.LIVE
-            if (previous != ApplianceLaunchState.Idle && destination == ApplianceEntryDestination.LIVE && !pendingGuide) return
+            if (previous != ApplianceLaunchState.Idle &&
+                destination == ApplianceEntryDestination.LIVE && !pendingGuide) {
+                return
+            }
 
             val pending = ApplianceLaunchState.Pending(
                 ApplianceLaunchRequest(

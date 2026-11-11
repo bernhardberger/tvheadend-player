@@ -96,7 +96,8 @@ internal fun RecordingBannerTimeline(timeline: PlayerChromeTimeline.Recording, s
             liveRegion = LiveRegionMode.Polite
         },
     ) {
-        RecordingTimelineBlock(timeline, range, tone = PlayerTimelineTone.PREVIEW, previewLabel = scrubSpeedLabel(timeline.scrubSpeed) ?: readout.text,
+        RecordingTimelineBlock(timeline, range, tone = PlayerTimelineTone.PREVIEW,
+            previewLabel = scrubSpeedLabel(timeline.scrubSpeed) ?: readout.text,
             previewTarget = readout.target,
             previewDirection = timeline.stepDeltaMs?.let(::stepDirection), previewAtLive = readout.atLive,
             status = recordingBarStatus(timeline, state, range))

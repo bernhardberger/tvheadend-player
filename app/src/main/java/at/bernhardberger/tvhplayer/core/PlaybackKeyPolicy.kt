@@ -185,8 +185,9 @@ fun playerKeyAction(
     context: PlayerKeyContext,
     keyCode: Int,
 ): PlayerKeyAction {
-    if (keyCode == KeyEvent.KEYCODE_MEDIA_RECORD &&
-        (context.infoOpen || context.confirmationOpen || context.optionsOpen || context.drawerOpen)) {
+    val playbackPanelOpen = context.confirmationOpen || context.optionsOpen || context.drawerOpen
+    val recordPanelOpen = context.infoOpen || playbackPanelOpen
+    if (keyCode == KeyEvent.KEYCODE_MEDIA_RECORD && recordPanelOpen) {
         return PlayerKeyAction.CONSUME
     }
     if (context.surface == PlayerSurface.RECORDING && keyCode == KeyEvent.KEYCODE_MEDIA_RECORD) {
@@ -204,7 +205,7 @@ fun playerKeyAction(
     if (context.infoOpen && keyCode != KeyEvent.KEYCODE_BACK) {
         return PlayerKeyAction.PASS_THROUGH
     }
-    if ((context.confirmationOpen || context.optionsOpen || context.drawerOpen) && keyCode in listOf(
+    if (playbackPanelOpen && keyCode in listOf(
             KeyEvent.KEYCODE_MEDIA_RECORD, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD, KeyEvent.KEYCODE_MEDIA_REWIND)) {
         return PlayerKeyAction.PASS_THROUGH
     }
@@ -215,7 +216,7 @@ fun playerKeyAction(
     if (context.scrubbing && keyCode in listOf(KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
             KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PAUSE,
             KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)) return PlayerKeyAction.COMMIT_SCRUB
-    if (context.scrubbing && !context.seekbarFocused && !context.confirmationOpen && !context.optionsOpen && !context.drawerOpen) {
+    if (context.scrubbing && !context.seekbarFocused && !playbackPanelOpen) {
         if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) return PlayerKeyAction.SEEK_BACK
         if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) return PlayerKeyAction.SEEK_FORWARD
     }
@@ -302,7 +303,12 @@ fun playerKeyAction(
 
 /** Signed programme seconds per second. Reversing always starts at the first speed. */
 fun nextPlayerScrubSpeed(current: Int, direction: Int): Int =
-    if (current * direction > 0) (current * 2).coerceIn(-32, 32) else direction * 2
+    if (current * direction > 0) {
+        (current * PLAYER_SCRUB_SPEED_MULTIPLIER).coerceIn(-PLAYER_SCRUB_MAX_SPEED, PLAYER_SCRUB_MAX_SPEED)
+    } else direction * PLAYER_SCRUB_SPEED_MULTIPLIER
+
+private const val PLAYER_SCRUB_SPEED_MULTIPLIER = 2
+private const val PLAYER_SCRUB_MAX_SPEED = 32
 
 fun channelPickAction(currentChannelId: ChannelId?, pickedChannelId: ChannelId): ChannelPickAction =
     if (currentChannelId == pickedChannelId) {

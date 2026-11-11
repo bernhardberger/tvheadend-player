@@ -873,7 +873,7 @@ fun VideoPlayerScreen(
         var remainder = 0L
         while (timelineState.scrubSpeed == speed) {
             val frame = withFrameNanos { it }
-            if (timelineState.scrubSpeed != speed) break
+            if (timelineState.scrubSpeed != speed) return@LaunchedEffect
             val scaled = (frame - previous) * speed + remainder
             val delta = scaled / 1_000_000L
             remainder = scaled % 1_000_000L
@@ -881,15 +881,17 @@ fun VideoPlayerScreen(
             val state = latestTimeshift
             if (!state.available) {
                 timelineState.cancelPendingSeek()
-                break
+                return@LaunchedEffect
             }
             val target = timelineState.preview?.decision?.targetMs ?: state.positionMs
             val start = (state.bufferStartMs + 1_000L).coerceAtMost(state.liveEdgeMs)
             val next = (target + delta).coerceIn(start, state.liveEdgeMs)
             queueScrubSeek(next - target)
-            if ((speed < 0 && next <= start) || (speed > 0 && next >= state.liveEdgeMs)) {
+            val reachedStart = speed < 0 && next <= start
+            val reachedLiveEdge = speed > 0 && next >= state.liveEdgeMs
+            if (reachedStart || reachedLiveEdge) {
                 commitScrub()
-                break
+                return@LaunchedEffect
             }
         }
     }
@@ -1128,11 +1130,11 @@ fun VideoPlayerScreen(
     fun recordProgramme(programme: EpgEventEntry?) {
         if (recordKeyInFlight) return
         val opening = observation
-        if (programme == null || opening.currentSession == null) {
+        val capability = opening.currentSession
+        if (programme == null || capability == null) {
             notices.postRecordUnavailable(programme, opening, nowSec)
             return
         }
-        val capability = opening.currentSession ?: return
         val recording = opening.dvrEntryForEvent(programme)?.takeUnless(::recordingWasRemoved)
         val canModify = opening.dvrState is DvrRepositoryState.Current &&
             (opening.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
@@ -1141,22 +1143,24 @@ fun VideoPlayerScreen(
             programme.channelId?.let(opening::channel) != null, liveProgramme = opening.event(programme.id) != null)
         if (BrowseContextAction.RECORD !in actions) {
             notices.postRecordUnavailable(programme, opening, nowSec)
-            return
-        }
-        val mutation = DvrMutationAction.CreateProgramme(programme.programmeRecordingTarget(capability), null)
-        recordKeyInFlight = true
-        scope.launch {
-            try {
-                val preferred = uiSettingsStore.settings.first().recordingProfileId
-                val current = session.observation.value
-                val request = currentDvrMutation(mutation, opening, current) as? DvrMutationAction.CreateProgramme ?: return@launch
-                if (current.dvrEntryForEvent(programme)?.state in listOf(DvrEntryState.SCHEDULED,
-                        DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)) return@launch
-                val configured = request.copy(configId = chooseDvrConfig(current.currentDvrConfigurations(), preferred))
-                val context = notices.context()
-                notices.postDvrFailure(configured, dvrMutationActions.execute(configured), context)
-            } finally {
-                recordKeyInFlight = false
+        } else {
+            val mutation = DvrMutationAction.CreateProgramme(programme.programmeRecordingTarget(capability), null)
+            recordKeyInFlight = true
+            scope.launch {
+                try {
+                    val preferred = uiSettingsStore.settings.first().recordingProfileId
+                    val current = session.observation.value
+                    val request = currentDvrMutation(mutation, opening, current) as? DvrMutationAction.CreateProgramme
+                        ?: return@launch
+                    if (current.dvrEntryForEvent(programme)?.state in listOf(DvrEntryState.SCHEDULED,
+                            DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)) return@launch
+                    val configured = request.copy(
+                        configId = chooseDvrConfig(current.currentDvrConfigurations(), preferred))
+                    val context = notices.context()
+                    notices.postDvrFailure(configured, dvrMutationActions.execute(configured), context)
+                } finally {
+                    recordKeyInFlight = false
+                }
             }
         }
     }

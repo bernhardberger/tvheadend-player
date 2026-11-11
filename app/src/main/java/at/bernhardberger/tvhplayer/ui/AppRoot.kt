@@ -1455,8 +1455,9 @@ fun AppRoot(
         modifier = Modifier.fillMaxSize().onPreviewKeyEvent { event ->
             val key = event.nativeKeyEvent
             if (key.keyCode == android.view.KeyEvent.KEYCODE_DVR) {
-                if (key.action == android.view.KeyEvent.ACTION_DOWN && key.repeatCount == 0 &&
-                    currentDestination != RecordingsKey && navigationAllowed) {
+                val initialPress = key.action == android.view.KeyEvent.ACTION_DOWN && key.repeatCount == 0
+                val canOpenRecordings = currentDestination != RecordingsKey && navigationAllowed
+                if (initialPress && canOpenRecordings) {
                     playbackOrchestrator.browseNavigationSelected(playingChannelId, playingRecordingId)
                     navigateTopLevel(RecordingsKey)
                 }

@@ -75,7 +75,7 @@
     <ID>CyclomaticComplexMethod:ChannelsImmersiveList.kt:@Composable internal fun ChannelsImmersiveBackground</ID>
     <ID>CyclomaticComplexMethod:ChannelsImmersiveList.kt:@Composable internal fun ChannelsRowCard</ID>
     <ID>CyclomaticComplexMethod:ChannelsImmersiveList.kt:@OptIn(ExperimentalFoundationApi::class) @Composable private fun ChannelsCardRow</ID>
-    <ID>CyclomaticComplexMethod:ChannelsScreen.kt:@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class) @Composable internal fun ChannelsScreenContent</ID>
+    <ID>CyclomaticComplexMethod:ChannelsScreen.kt:@OptIn( androidx.compose.foundation.ExperimentalFoundationApi::class, at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class, ) @Composable internal fun ChannelsScreenContent</ID>
     <ID>CyclomaticComplexMethod:ColdStart.kt:@Composable internal fun rememberColdStart: ColdStart</ID>
     <ID>CyclomaticComplexMethod:CompactZapCard.kt:@Composable internal fun CompactZapCard</ID>
     <ID>CyclomaticComplexMethod:DepthNavigation.kt:@Composable @OptIn(ExperimentalFoundationApi::class) private fun DepthStripPane</ID>
@@ -186,7 +186,7 @@
     <ID>LongMethod:ChannelsImmersiveList.kt:@OptIn(ExperimentalFoundationApi::class) @Composable private fun ChannelsCardRow</ID>
     <ID>LongMethod:ChannelsScreen.kt:@Composable fun BrowseColumn</ID>
     <ID>LongMethod:ChannelsScreen.kt:@Composable fun ChannelBrowseContent</ID>
-    <ID>LongMethod:ChannelsScreen.kt:@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class) @Composable internal fun ChannelsScreenContent</ID>
+    <ID>LongMethod:ChannelsScreen.kt:@OptIn( androidx.compose.foundation.ExperimentalFoundationApi::class, at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class, ) @Composable internal fun ChannelsScreenContent</ID>
     <ID>LongMethod:CompactZapCard.kt:@Composable internal fun CompactZapCard</ID>
     <ID>LongMethod:DepthNavigation.kt:@Composable @OptIn(ExperimentalFoundationApi::class) private fun DepthStripPane</ID>
     <ID>LongMethod:DepthNavigation.kt:@Composable fun DepthNavigation</ID>

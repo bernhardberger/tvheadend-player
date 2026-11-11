@@ -81,7 +81,8 @@ internal fun DvrMutationActions.recordChannelProgramme(
     return when (val action = event?.let { programmeRecordKeyAction(it, current, nowSecProvider()) }) {
         BrowseContextAction.RECORD -> {
             current.currentSession?.let { capability ->
-                launchMutation(DvrMutationAction.CreateProgramme(requireNotNull(event).programmeRecordingTarget(capability), null),
+                launchMutation(DvrMutationAction.CreateProgramme(
+                    requireNotNull(event).programmeRecordingTarget(capability), null),
                     current, currentObservation, nowSecProvider, settingsStore, notices, scope, inFlight)
             }
             null
@@ -112,7 +113,9 @@ internal fun DvrMutationActions.launchMutation(
             val current = currentObservation()
             val request = currentDvrMutation(mutation, sourceObservation, current) ?: return@launch
             if (request is DvrMutationAction.CreateProgramme &&
-                current.event(request.target.eventId)?.let { programmeRecordKeyAction(it, current, nowSecProvider()) } !=
+                current.event(request.target.eventId)?.let {
+                    programmeRecordKeyAction(it, current, nowSecProvider())
+                } !=
                 BrowseContextAction.RECORD) return@launch
             val configured = if (request is DvrMutationAction.CreateProgramme)
                 request.copy(configId = chooseDvrConfig(current.currentDvrConfigurations(), preferred)) else request

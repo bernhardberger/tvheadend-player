@@ -1934,14 +1934,16 @@ fun EpgGridScreen(
                 .backKeyCycleFocus(backCycle)
                 .onPreviewKeyEvent { event ->
                     if (event.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_MEDIA_RECORD) {
-                        if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0 &&
-                            programmeFocusOwned && detailsEvent == null && !showTimePanel && openPanel == null) {
+                        val initialPress = event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0
+                        val panelOpen = detailsEvent != null || showTimePanel || openPanel != null
+                        if (initialPress && programmeFocusOwned && !panelOpen) {
                             val current = observationState.value
                             val programme = selectedTarget?.eventId?.let(current::event)
                             val action = programme?.let { programmeRecordKeyAction(it, current, nowSecProvider()) }
                             if (programme != null && action == BrowseContextAction.RECORD) {
                                 current.currentSession?.let { capability ->
-                                    dvrMutationActions.launchMutation(DvrMutationAction.CreateProgramme(programme.programmeRecordingTarget(capability), null),
+                                    dvrMutationActions.launchMutation(DvrMutationAction.CreateProgramme(
+                                        programme.programmeRecordingTarget(capability), null),
                                         current, { observationState.value }, nowSecProvider, recordSettings, notices,
                                         coroutineScope, detailsMutationInFlight)
                                 }

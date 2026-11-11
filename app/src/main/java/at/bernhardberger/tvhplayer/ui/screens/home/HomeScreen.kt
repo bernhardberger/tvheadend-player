@@ -334,13 +334,17 @@ internal fun HomeScreenContent(
             followInitialFocus = false
             if (key.nativeKeyEvent.keyCode != android.view.KeyEvent.KEYCODE_MEDIA_RECORD) false
             else {
-                if (key.type == KeyEventType.KeyDown && key.nativeKeyEvent.repeatCount == 0 &&
-                    contentFocusEnabled && cardFocused && owner?.isCurrent != false) {
+                val initialPress = key.type == KeyEventType.KeyDown && key.nativeKeyEvent.repeatCount == 0
+                val contentOwnsRecord = contentFocusEnabled && cardFocused && owner?.isCurrent != false
+                if (initialPress && contentOwnsRecord) {
                     val focus = focused
                     val section = sections.firstOrNull { it.kind == focus?.section }
                     val channelId = when (section) {
-                        is HomeSection.CurrentActivity -> (section.items.getOrNull(focus?.position ?: -1)?.playing as? HomePlaying.LiveChannel)?.channelId
-                        is HomeSection.RecentChannels -> if (focus?.item == "all-channels") null else section.items.getOrNull(focus?.position ?: -1)?.channel?.id
+                        is HomeSection.CurrentActivity ->
+                            (section.items.getOrNull(focus?.position ?: -1)?.playing as? HomePlaying.LiveChannel)
+                                ?.channelId
+                        is HomeSection.RecentChannels -> if (focus?.item == "all-channels") null
+                            else section.items.getOrNull(focus?.position ?: -1)?.channel?.id
                         is HomeSection.OnNow -> section.items.getOrNull(focus?.position ?: -1)?.channel?.id
                         else -> null
                     }

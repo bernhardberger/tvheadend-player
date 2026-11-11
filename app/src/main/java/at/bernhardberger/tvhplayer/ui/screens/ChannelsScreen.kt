@@ -255,7 +255,10 @@ fun ChannelsScreen(
     )
 }
 
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class, at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
+@OptIn(
+    androidx.compose.foundation.ExperimentalFoundationApi::class,
+    at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class,
+)
 @Composable
 internal fun ChannelsScreenContent(
     onRecordKey: (ChannelId) -> BrowseContextAction?,
@@ -674,8 +677,10 @@ internal fun ChannelsScreenContent(
             .onPreviewKeyEvent { key ->
                 if (key.nativeKeyEvent.keyCode != android.view.KeyEvent.KEYCODE_MEDIA_RECORD) false
                 else {
-                    if (key.type == KeyEventType.KeyDown && key.nativeKeyEvent.repeatCount == 0 &&
-                        initialFocusEnabled && contentFocusOwned && contextChannelId == null && openPanel == null) {
+                    val initialPress = key.type == KeyEventType.KeyDown && key.nativeKeyEvent.repeatCount == 0
+                    val contentOwnsRecord = initialFocusEnabled && contentFocusOwned
+                    val panelOpen = contextChannelId != null || openPanel != null
+                    if (initialPress && contentOwnsRecord && !panelOpen) {
                         val action = focusedChannelId?.let(onRecordKey)
                         if (action == BrowseContextAction.STOP || action == BrowseContextAction.CANCEL) {
                             recordInitialAction = action

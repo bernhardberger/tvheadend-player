@@ -304,7 +304,7 @@ fun RecordingPlayerScreen(
         var remainder = 0L
         while (timelineState.scrubSpeed == speed) {
             val frame = withFrameNanos { it }
-            if (timelineState.scrubSpeed != speed) break
+            if (timelineState.scrubSpeed != speed) return@LaunchedEffect
             val scaled = (frame - previous) * speed + remainder
             val delta = scaled / 1_000_000L
             remainder = scaled % 1_000_000L
@@ -312,22 +312,24 @@ fun RecordingPlayerScreen(
             val target = timelineState.pendingTargetMs
             if (target == null) {
                 timelineState.stopScrub()
-                break
+                return@LaunchedEffect
             }
             val end = player.duration.takeIf { it > 0L && it != C.TIME_UNSET }
             if (speed > 0 && end == null) {
                 timelineState.cancelPendingSeek()
-                break
+                return@LaunchedEffect
             }
             val next = (target + delta).coerceAtLeast(1_000L).let { if (end != null) it.coerceAtMost(end) else it }
             timelineState.queueSeek(next - target, automatic = true)
             if (!player.isCurrentMediaItemSeekable) {
                 timelineState.cancelPendingSeek()
-                break
+                return@LaunchedEffect
             }
-            if ((speed < 0 && next <= 1_000L) || (speed > 0 && end != null && next >= end)) {
+            val reachedStart = speed < 0 && next <= 1_000L
+            val reachedEnd = speed > 0 && end != null && next >= end
+            if (reachedStart || reachedEnd) {
                 commitScrub()
-                break
+                return@LaunchedEffect
             }
         }
     }
@@ -613,10 +615,13 @@ fun RecordingPlayerScreen(
                     infoOpen = layers.infoOpen,
                     confirmationOpen = playerModals.isNotEmpty() || markerNavigation.open,
                 )
-                if (playerKeyAction(scrubContext, keyCode) in listOf(PlayerKeyAction.SCRUB_BACK, PlayerKeyAction.SCRUB_FORWARD) &&
-                    foregroundLayer != PlayerForegroundLayer.RECOVERY &&
-                    foregroundLayer != PlayerForegroundLayer.TERMINAL_ERROR &&
-                    keyCode in listOf(AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD, AndroidKeyEvent.KEYCODE_MEDIA_REWIND)) {
+                val scrubRequested = playerKeyAction(scrubContext, keyCode) in
+                    listOf(PlayerKeyAction.SCRUB_BACK, PlayerKeyAction.SCRUB_FORWARD)
+                val playbackBlocked = foregroundLayer == PlayerForegroundLayer.RECOVERY ||
+                    foregroundLayer == PlayerForegroundLayer.TERMINAL_ERROR
+                val mediaSeekKey = keyCode in
+                    listOf(AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD, AndroidKeyEvent.KEYCODE_MEDIA_REWIND)
+                if (scrubRequested && !playbackBlocked && mediaSeekKey) {
                     val direction = if (keyCode == AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD) 1 else -1
                     if (event.type == KeyEventType.KeyDown) {
                         if (event.nativeKeyEvent.repeatCount == 0) {
