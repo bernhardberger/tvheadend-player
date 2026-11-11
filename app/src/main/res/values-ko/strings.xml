@@ -1,4 +1,10 @@
 <resources>
+    <string name="record_unavailable">이 프로그램은 녹화할 수 없습니다</string>
+    <string name="record_unavailable_ended">이미 종료되었습니다.</string>
+    <string name="record_unavailable_no_programme">이 채널의 프로그램 정보가 없습니다.</string>
+    <string name="record_unavailable_permission">이 계정에는 녹화할 권한이 없습니다.</string>
+    <string name="player_scrub_forward">빨리 감기, %1$d배속</string>
+    <string name="player_scrub_backward">되감기, %1$d배속</string>
     <string name="recording_ad_break_skipped">광고 구간을 건너뛰었습니다</string>
     <string name="player_full_screen">전체 화면</string>
     <string name="stop">재생 중지</string>

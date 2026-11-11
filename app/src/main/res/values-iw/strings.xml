@@ -1,4 +1,10 @@
 <resources>
+    <string name="record_unavailable">אי אפשר להקליט את התוכנית הזו</string>
+    <string name="record_unavailable_ended">היא כבר הסתיימה.</string>
+    <string name="record_unavailable_no_programme">אין מידע על התוכנית בערוץ הזה.</string>
+    <string name="record_unavailable_permission">לחשבון זה אין הרשאה להקליט.</string>
+    <string name="player_scrub_forward">הרצה קדימה, במהירות פי %1$d</string>
+    <string name="player_scrub_backward">הרצה לאחור, במהירות פי %1$d</string>
     <string name="recording_ad_break_skipped">הפסקת הפרסומות דולגה</string>
     <string name="player_full_screen">מסך מלא</string>
     <string name="stop">עצירת הניגון</string>

@@ -1,4 +1,10 @@
 <resources>
+    <string name="record_unavailable">No se puede grabar este programa</string>
+    <string name="record_unavailable_ended">Ya ha terminado.</string>
+    <string name="record_unavailable_no_programme">No hay información del programa para este canal.</string>
+    <string name="record_unavailable_permission">Esta cuenta no puede grabar.</string>
+    <string name="player_scrub_forward">Avance rápido, a %1$d veces la velocidad normal</string>
+    <string name="player_scrub_backward">Rebobinado, a %1$d veces la velocidad normal</string>
     <string name="recording_ad_break_skipped">Pausa publicitaria omitida</string>
     <string name="player_full_screen">Pantalla completa</string>
     <string name="stop">Detener</string>

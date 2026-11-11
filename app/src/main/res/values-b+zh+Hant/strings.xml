@@ -1,4 +1,10 @@
 <resources>
+    <string name="record_unavailable">無法錄影此節目</string>
+    <string name="record_unavailable_ended">節目已結束。</string>
+    <string name="record_unavailable_no_programme">此頻道無節目資訊。</string>
+    <string name="record_unavailable_permission">此帳號無權錄影。</string>
+    <string name="player_scrub_forward">快轉，%1$d倍速</string>
+    <string name="player_scrub_backward">倒轉，%1$d倍速</string>
     <string name="recording_ad_break_skipped">已略過廣告時段</string>
     <string name="player_full_screen">全螢幕</string>
     <string name="stop">停止播放</string>

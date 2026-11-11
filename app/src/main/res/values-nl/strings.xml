@@ -1,4 +1,10 @@
 <resources>
+    <string name="record_unavailable">Dit programma kan niet worden opgenomen</string>
+    <string name="record_unavailable_ended">Het is al afgelopen.</string>
+    <string name="record_unavailable_no_programme">Er is geen programma-informatie voor deze zender.</string>
+    <string name="record_unavailable_permission">Dit account mag niet opnemen.</string>
+    <string name="player_scrub_forward">Vooruitspoelen, %1$d keer de normale snelheid</string>
+    <string name="player_scrub_backward">Terugspoelen, %1$d keer de normale snelheid</string>
     <string name="recording_ad_break_skipped">Reclameblok overgeslagen</string>
     <string name="player_full_screen">Volledig scherm</string>
     <string name="stop">Stoppen</string>

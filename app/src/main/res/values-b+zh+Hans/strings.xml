@@ -1,4 +1,10 @@
 <resources>
+    <string name="record_unavailable">无法录制此节目</string>
+    <string name="record_unavailable_ended">节目已结束。</string>
+    <string name="record_unavailable_no_programme">此频道暂无节目信息。</string>
+    <string name="record_unavailable_permission">此账号无权录制。</string>
+    <string name="player_scrub_forward">快进，%1$d倍速</string>
+    <string name="player_scrub_backward">快退，%1$d倍速</string>
     <string name="recording_ad_break_skipped">已跳过广告时段</string>
     <string name="player_full_screen">全屏</string>
     <string name="stop">停止播放</string>

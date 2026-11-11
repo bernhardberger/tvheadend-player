@@ -1,4 +1,10 @@
 <resources>
+    <string name="record_unavailable">Kan ikke ta opp dette programmet</string>
+    <string name="record_unavailable_ended">Det er allerede slutt.</string>
+    <string name="record_unavailable_no_programme">Det finnes ingen programinformasjon for denne kanalen.</string>
+    <string name="record_unavailable_permission">Denne kontoen har ikke tillatelse til å ta opp.</string>
+    <string name="player_scrub_forward">Spoler frem med %1$d ganger normal hastighet</string>
+    <string name="player_scrub_backward">Spoler tilbake med %1$d ganger normal hastighet</string>
     <string name="recording_ad_break_skipped">Reklamepause hoppet over</string>
     <string name="player_full_screen">Fullskjerm</string>
     <string name="stop">Stopp</string>

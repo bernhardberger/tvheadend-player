@@ -8,6 +8,8 @@ delegated plan approval. Do not switch to informal “sen”.
 
 ## Review status
 
+0.5 remote key strings (`record_unavailable*`, `player_scrub_*`) drafted against `d7198998` by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer.
+
 Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retaining
 unchanged round-1 text from `daebdd86`. Full resources reviewed by Sonnet 5.5
 (medium); no definite linguistic defects reported. The approved polite register
@@ -45,6 +47,8 @@ is retained. No human reviewer; remains labeled machine-drafted.
 - Register: neutral labels (Kaydet, Sil, Kapat) and polite plural imperatives (seçin, deneyin) in instructions.
 
 ## Open questions
+
+- Check TTS pronunciation of `player_scrub_*` speed multipliers.
 
 - A reviewer may prefer keeping *mux* and *tuner* over *çoklayıcı* and *ayarlayıcı*.
 - *Sürükleyici* (immersive layout) and *Ses geçişi* (audio passthrough) need UI and AV review.

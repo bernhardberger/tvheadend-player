@@ -1,4 +1,10 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="record_unavailable">Não é possível gravar este programa</string>
+    <string name="record_unavailable_ended">Ele já terminou.</string>
+    <string name="record_unavailable_no_programme">Não há informações do programa para este canal.</string>
+    <string name="record_unavailable_permission">Esta conta não pode gravar.</string>
+    <string name="player_scrub_forward">Avanço rápido, a %1$d vezes a velocidade normal</string>
+    <string name="player_scrub_backward">Retrocesso, a %1$d vezes a velocidade normal</string>
     <string name="recording_ad_break_skipped">Intervalo comercial pulado</string>
     <string name="player_full_screen">Tela cheia</string>
     <string name="stop">Parar</string>

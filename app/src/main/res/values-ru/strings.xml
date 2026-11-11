@@ -1,4 +1,10 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="record_unavailable">Нельзя записать эту передачу</string>
+    <string name="record_unavailable_ended">Она уже закончилась.</string>
+    <string name="record_unavailable_no_programme">Нет сведений о передаче для этого канала.</string>
+    <string name="record_unavailable_permission">Эта учётная запись не может записывать.</string>
+    <string name="player_scrub_forward">Перемотка вперёд, скорость %1$d×</string>
+    <string name="player_scrub_backward">Перемотка назад, скорость %1$d×</string>
     <string name="recording_ad_break_skipped">Рекламная пауза пропущена</string>
     <string name="player_full_screen">Полный экран</string>
     <string name="stop">Остановить</string>

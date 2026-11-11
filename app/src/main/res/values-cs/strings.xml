@@ -1,4 +1,10 @@
 <resources>
+    <string name="record_unavailable">Tento pořad nelze nahrát</string>
+    <string name="record_unavailable_ended">Už skončil.</string>
+    <string name="record_unavailable_no_programme">Pro tento kanál nejsou dostupné informace o pořadu.</string>
+    <string name="record_unavailable_permission">Tento účet nemůže nahrávat.</string>
+    <string name="player_scrub_forward">Přetáčení vpřed, rychlost %1$d×</string>
+    <string name="player_scrub_backward">Přetáčení vzad, rychlost %1$d×</string>
     <string name="recording_ad_break_skipped">Reklamní přestávka přeskočena</string>
     <string name="player_full_screen">Celá obrazovka</string>
     <string name="stop">Zastavit</string>

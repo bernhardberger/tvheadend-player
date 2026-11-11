@@ -24,6 +24,8 @@ Neutral, Taiwan-oriented software terminology, no reader pronouns; polite 請 in
 
 ## Review status
 
+0.5 remote key strings (`record_unavailable*`, `player_scrub_*`) drafted against `d7198998` by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer.
+
 Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retaining unchanged round-1 text from `daebdd86`. Full resources reviewed by Sonnet 5.5 (medium); Behind live meaning and service-entry terminology corrected. No human reviewer; remains labeled machine-drafted. A representative Settings capture checks Traditional Chinese rendering, not whole-language visual acceptance.
 
 0.4.0 Home strings drafted against `d2d9a9ab` by GPT-6.1 Sol and reviewed by Sonnet 5.5 (high); still machine-drafted, no human reviewer.
@@ -37,6 +39,8 @@ Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retain
 0.5 connection switch page texts "Back to Settings", "%1$s is still in use" and the unreachable explanation (`back_to_settings`, `server_still_in_use`, `server_switch_unreachable_body`) drafted by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer.
 
 ## Open questions
+
+- Check TTS pronunciation of 倍速 in `player_scrub_*`; `record_unavailable` now uses 錄影 consistently with `record`.
 
 - Needs its own Traditional Chinese terminology review; no universal regional suitability is claimed.
 - Check `recordings_archive` 典藏 vs 保存錄影, and 通道式播放 (`tunneling_setting`).

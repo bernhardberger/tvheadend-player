@@ -1,4 +1,10 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="record_unavailable">Ovu emisiju nije moguće snimiti</string>
+    <string name="record_unavailable_ended">Već je završila.</string>
+    <string name="record_unavailable_no_programme">Nema podataka o emisiji za ovaj kanal.</string>
+    <string name="record_unavailable_permission">Ovaj račun ne može snimati.</string>
+    <string name="player_scrub_forward">Premotavanje unaprijed, brzina %1$d×</string>
+    <string name="player_scrub_backward">Premotavanje unatrag, brzina %1$d×</string>
     <string name="recording_ad_break_skipped">Reklamni blok preskočen</string>
     <string name="player_full_screen">Cijeli zaslon</string>
     <string name="stop">Zaustavi</string>

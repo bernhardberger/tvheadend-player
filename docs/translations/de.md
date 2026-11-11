@@ -24,6 +24,8 @@ Informal **du**, already in use in the app. Action labels are infinitives or nou
 
 ## Review status
 
+0.5 remote key strings (`record_unavailable*`, `player_scrub_*`) drafted against `d7198998` by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer.
+
 Existing German strings predate this workflow; they are kept and only changed for source changes or accepted corrections.
 
 0.4.0 Home strings drafted against `d2d9a9ab` by GPT-6.1 Sol and reviewed by Sonnet 5.5 (high); still machine-drafted, no human reviewer.
@@ -38,4 +40,4 @@ Existing German strings predate this workflow; they are kept and only changed fo
 
 ## Open questions
 
-- None recorded.
+- Check TTS pronunciation of the hyphenated speed multipliers in `player_scrub_*`.

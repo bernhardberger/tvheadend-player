@@ -1,4 +1,10 @@
 <resources>
+    <string name="record_unavailable">لا يمكن تسجيل هذا البرنامج</string>
+    <string name="record_unavailable_ended">لقد انتهى بالفعل.</string>
+    <string name="record_unavailable_no_programme">لا تتوفر معلومات عن البرنامج لهذه القناة.</string>
+    <string name="record_unavailable_permission">لا يملك هذا الحساب إذن التسجيل.</string>
+    <string name="player_scrub_forward">تقديم سريع، السرعة %1$d×</string>
+    <string name="player_scrub_backward">إرجاع، السرعة %1$d×</string>
     <string name="recording_ad_break_skipped">تم تخطي الفاصل الإعلاني</string>
     <string name="player_full_screen">ملء الشاشة</string>
     <string name="stop">إيقاف التشغيل</string>

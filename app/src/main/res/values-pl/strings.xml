@@ -1,4 +1,10 @@
 <resources>
+    <string name="record_unavailable">Nie można nagrać tego programu</string>
+    <string name="record_unavailable_ended">Już się zakończył.</string>
+    <string name="record_unavailable_no_programme">Brak informacji o programie dla tego kanału.</string>
+    <string name="record_unavailable_permission">To konto nie może nagrywać.</string>
+    <string name="player_scrub_forward">Przewijanie do przodu, prędkość %1$d×</string>
+    <string name="player_scrub_backward">Przewijanie do tyłu, prędkość %1$d×</string>
     <string name="recording_ad_break_skipped">Przerwa reklamowa pominięta</string>
     <string name="player_full_screen">Pełny ekran</string>
     <string name="stop">Zatrzymaj</string>

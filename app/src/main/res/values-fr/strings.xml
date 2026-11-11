@@ -1,4 +1,10 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="record_unavailable">Impossible d’enregistrer ce programme</string>
+    <string name="record_unavailable_ended">Il est déjà terminé.</string>
+    <string name="record_unavailable_no_programme">Aucune information sur le programme n’est disponible pour cette chaîne.</string>
+    <string name="record_unavailable_permission">Ce compte ne peut pas enregistrer.</string>
+    <string name="player_scrub_forward">Avance rapide, à %1$d fois la vitesse normale</string>
+    <string name="player_scrub_backward">Rembobinage, à %1$d fois la vitesse normale</string>
     <string name="recording_ad_break_skipped">Pause publicitaire passée</string>
     <string name="player_full_screen">Plein écran</string>
     <string name="stop">Arrêter</string>

@@ -1,4 +1,10 @@
 <resources>
+    <string name="record_unavailable">Ez a műsor nem vehető fel</string>
+    <string name="record_unavailable_ended">Már véget ért.</string>
+    <string name="record_unavailable_no_programme">Ehhez a csatornához nem érhető el műsorinformáció.</string>
+    <string name="record_unavailable_permission">Ez a fiók nem készíthet felvételt.</string>
+    <string name="player_scrub_forward">Előretekerés, sebesség %1$d×</string>
+    <string name="player_scrub_backward">Visszatekerés, sebesség %1$d×</string>
     <string name="recording_ad_break_skipped">Reklámszünet átugorva</string>
     <string name="player_full_screen">Teljes képernyő</string>
     <string name="stop">Leállítás</string>

@@ -1,4 +1,10 @@
 <resources>
+    <string name="record_unavailable">Kan ikke optage dette program</string>
+    <string name="record_unavailable_ended">Det er allerede slut.</string>
+    <string name="record_unavailable_no_programme">Der er ingen programoplysninger for denne kanal.</string>
+    <string name="record_unavailable_permission">Denne konto må ikke optage.</string>
+    <string name="player_scrub_forward">Spoler frem med %1$d gange normal hastighed</string>
+    <string name="player_scrub_backward">Spoler tilbage med %1$d gange normal hastighed</string>
     <string name="recording_ad_break_skipped">Reklamepause sprunget over</string>
     <string name="player_full_screen">Fuld skærm</string>
     <string name="stop">Stop</string>

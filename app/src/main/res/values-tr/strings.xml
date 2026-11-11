@@ -1,4 +1,10 @@
 <resources>
+    <string name="record_unavailable">Bu program kaydedilemiyor</string>
+    <string name="record_unavailable_ended">Program zaten sona erdi.</string>
+    <string name="record_unavailable_no_programme">Bu kanal için program bilgisi yok.</string>
+    <string name="record_unavailable_permission">Bu hesabın kayıt yapma izni yok.</string>
+    <string name="player_scrub_forward">İleri sarma, %1$d kat hız</string>
+    <string name="player_scrub_backward">Geri sarma, %1$d kat hız</string>
     <string name="recording_ad_break_skipped">Reklam arası atlandı</string>
     <string name="player_full_screen">Tam ekran</string>
     <string name="stop">Durdur</string>

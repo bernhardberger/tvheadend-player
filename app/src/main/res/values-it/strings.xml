@@ -1,4 +1,10 @@
 <resources>
+    <string name="record_unavailable">Impossibile registrare questo programma</string>
+    <string name="record_unavailable_ended">È già terminato.</string>
+    <string name="record_unavailable_no_programme">Non sono disponibili informazioni sul programma per questo canale.</string>
+    <string name="record_unavailable_permission">Questo account non può registrare.</string>
+    <string name="player_scrub_forward">Avanzamento rapido, a %1$d volte la velocità normale</string>
+    <string name="player_scrub_backward">Riavvolgimento, a %1$d volte la velocità normale</string>
     <string name="recording_ad_break_skipped">Pausa pubblicitaria saltata</string>
     <string name="player_full_screen">Schermo intero</string>
     <string name="stop">Interrompi</string>

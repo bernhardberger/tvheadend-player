@@ -1,4 +1,10 @@
 <resources>
+    <string name="record_unavailable">Det går inte att spela in det här programmet</string>
+    <string name="record_unavailable_ended">Det har redan slutat.</string>
+    <string name="record_unavailable_no_programme">Det finns ingen programinformation för den här kanalen.</string>
+    <string name="record_unavailable_permission">Kontot får inte spela in.</string>
+    <string name="player_scrub_forward">Spolar framåt med %1$d gånger normal hastighet</string>
+    <string name="player_scrub_backward">Spolar tillbaka med %1$d gånger normal hastighet</string>
     <string name="recording_ad_break_skipped">Reklampaus överhoppad</string>
     <string name="player_full_screen">Helskärm</string>
     <string name="stop">Stoppa</string>

@@ -1,4 +1,10 @@
 <resources>
+    <string name="record_unavailable">Diese Sendung kann nicht aufgenommen werden</string>
+    <string name="record_unavailable_ended">Sie ist bereits zu Ende.</string>
+    <string name="record_unavailable_no_programme">Für diesen Sender sind keine Programmdaten verfügbar.</string>
+    <string name="record_unavailable_permission">Dieses Konto darf keine Aufnahmen machen.</string>
+    <string name="player_scrub_forward">Vorspulen, %1$d-fache Geschwindigkeit</string>
+    <string name="player_scrub_backward">Zurückspulen, %1$d-fache Geschwindigkeit</string>
     <string name="settings_channel_numbers">Kanalnummern</string>
     <string name="settings_channel_numbers_help">Ausschalten, wenn die Fernbedienung keine Zifferntasten hat</string>
     <string name="player_full_screen">Vollbild</string>

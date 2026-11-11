@@ -1,4 +1,10 @@
 <resources>
+    <string name="record_unavailable">Tätä ohjelmaa ei voi tallentaa</string>
+    <string name="record_unavailable_ended">Se on jo päättynyt.</string>
+    <string name="record_unavailable_no_programme">Tälle kanavalle ei ole ohjelmatietoja.</string>
+    <string name="record_unavailable_permission">Tällä tilillä ei ole oikeutta tallentaa.</string>
+    <string name="player_scrub_forward">Kelaus eteenpäin, %1$d-kertainen nopeus</string>
+    <string name="player_scrub_backward">Kelaus taaksepäin, %1$d-kertainen nopeus</string>
     <string name="recording_ad_break_skipped">Mainoskatko ohitettu</string>
     <string name="player_full_screen">Koko näyttö</string>
     <string name="stop">Pysäytä</string>
