@@ -78,9 +78,8 @@
     <string name="audio_description_description">Bevorzugt Tonspuren mit Bildbeschreibung, wenn vorhanden.</string>
     <string name="subtitle_follow_system">Untertiteleinstellungen des Systems verwenden</string>
     <string name="player_status_rec">REC</string>
-    <string name="setup_connection">Verbindung einrichten</string>
+    <string name="setup_connection">Verbindung bearbeiten</string>
     <string name="setup_connection_description">Serveradresse, Port und Konto</string>
-    <string name="connection_overview_status">Status</string>
     <string name="connection_overview_server">Server</string>
     <string name="connection_overview_connected">Verbunden</string>
     <string name="connection_overview_connecting">Verbinden…</string>
@@ -779,7 +778,6 @@
     <string name="server_in_use">In Verwendung</string>
     <string name="server_no_sign_in">Ohne Anmeldung</string>
     <string name="server_password_needed">Passwort erforderlich</string>
-    <string name="server_user_on_host">%1$s auf %2$s</string>
     <string name="server_detail_separator">%1$s · %2$s</string>
     <string name="server_host_port">%1$s · Port %2$d</string>
     <string name="server_use">Diese Verbindung verwenden</string>

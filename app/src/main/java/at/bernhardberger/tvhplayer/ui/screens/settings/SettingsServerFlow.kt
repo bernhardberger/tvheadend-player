@@ -18,6 +18,7 @@ import at.bernhardberger.tvhplayer.notices.Notice
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.existingServerProfile
+import at.bernhardberger.tvhplayer.settings.serverProfileDisplayName
 import at.bernhardberger.tvhplayer.ui.SettingsSection
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthLevel
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthNavigationState
@@ -226,7 +227,7 @@ internal class ServerSettingsState(
             val username = profile.username?.takeIf {
                 profile.authenticationMode == ServerProfileAuthenticationMode.PASSWORD
             }
-            val name = serverProfileTitle(profile)
+            val name = serverProfileDisplayName(profile)
             return {
                 SwitchServerDialog(name, username, interruption(),
                     onSwitch = {
@@ -237,7 +238,7 @@ internal class ServerSettingsState(
             }
         }
         return findProfile(removing, list)?.let { profile ->
-            val name = serverProfileTitle(profile)
+            val name = serverProfileDisplayName(profile)
             val active = profile.id == activeId
             {
                 RemoveServerDialog(name, active,

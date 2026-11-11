@@ -32,6 +32,8 @@ Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retain
 
 0.5 connections strings (`server_*`) drafted against `996a93f9` by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer.
 
+0.5 "Edit connection" (`setup_connection`, formerly "Set up connection") drafted by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer.
+
 ## Open questions
 
 - Confirm *Modo TV* / *Serviço de entrada do modo TV* and `tunneling_setting` *Reprodução em túnel*.

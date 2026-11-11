@@ -75,9 +75,8 @@
     <string name="audio_description_description">Προτιμά ηχητικά κομμάτια με περιγραφή, όταν είναι διαθέσιμα.</string>
     <string name="subtitle_follow_system">Χρήση ρυθμίσεων υποτίτλων συστήματος</string>
     <string name="player_status_rec">ΕΓΓ</string>
-    <string name="setup_connection">Ρύθμιση σύνδεσης</string>
+    <string name="setup_connection">Επεξεργασία σύνδεσης</string>
     <string name="setup_connection_description">Διεύθυνση διακομιστή, θύρα και λογαριασμός</string>
-    <string name="connection_overview_status">Κατάσταση</string>
     <string name="connection_overview_server">Διακομιστής</string>
     <string name="connection_overview_connected">Συνδεδεμένο</string>
     <string name="connection_overview_connecting">Σύνδεση…</string>
@@ -763,7 +762,6 @@
     <string name="server_in_use">Σε χρήση</string>
     <string name="server_no_sign_in">Χωρίς είσοδο χρήστη</string>
     <string name="server_password_needed">Απαιτείται κωδικός πρόσβασης</string>
-    <string name="server_user_on_host">%1$s στο %2$s</string>
     <string name="server_detail_separator">%1$s · %2$s</string>
     <string name="server_host_port">%1$s · θύρα %2$d</string>
     <string name="server_use">Χρήση αυτής της σύνδεσης</string>

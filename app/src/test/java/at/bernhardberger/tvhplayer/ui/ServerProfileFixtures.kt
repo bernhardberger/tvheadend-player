@@ -6,6 +6,8 @@ import at.bernhardberger.tvheadend.sdk.core.ServerProfileId
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileListResult
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileSummary
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthLevel
+import at.bernhardberger.tvhplayer.ui.screens.settings.ConnectionOverviewState
+import at.bernhardberger.tvhplayer.ui.screens.settings.ConnectionOverviewStatus
 import at.bernhardberger.tvhplayer.ui.screens.settings.ServerProfileActions
 import at.bernhardberger.tvhplayer.ui.screens.settings.settingsServerLevels
 
@@ -29,10 +31,13 @@ internal fun fixtureServer(
 
 internal val fixtureActiveServer = fixtureServer(1, "tvheadend.local", username = "fixture")
 
+internal fun fixtureStatus(title: String, state: ConnectionOverviewState = ConnectionOverviewState.OFFLINE) =
+    ConnectionOverviewStatus(title, state)
+
 /** The Connection list with one server in use, and that server's level, as Settings builds them. */
 @Composable
 internal fun fixtureConnectionLevels(
-    status: String,
+    status: ConnectionOverviewStatus,
     profiles: ServerProfileListResult? = ServerProfileListResult.Available(listOf(fixtureActiveServer), fixtureActiveServer.id),
     actions: ServerProfileActions = ServerProfileActions(),
     showRetry: Boolean = false,

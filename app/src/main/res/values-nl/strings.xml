@@ -75,9 +75,8 @@
     <string name="audio_description_description">Geeft waar beschikbaar de voorkeur aan audiodescriptie.</string>
     <string name="subtitle_follow_system">Ondertitelinstellingen van het systeem volgen</string>
     <string name="player_status_rec">REC</string>
-    <string name="setup_connection">Verbinding instellen</string>
+    <string name="setup_connection">Verbinding bewerken</string>
     <string name="setup_connection_description">Serveradres, poort en account</string>
-    <string name="connection_overview_status">Status</string>
     <string name="connection_overview_server">Server</string>
     <string name="connection_overview_connected">Verbonden</string>
     <string name="connection_overview_connecting">Verbinden…</string>
@@ -763,7 +762,6 @@
     <string name="server_in_use">In gebruik</string>
     <string name="server_no_sign_in">Zonder aanmelding</string>
     <string name="server_password_needed">Wachtwoord nodig</string>
-    <string name="server_user_on_host">%1$s op %2$s</string>
     <string name="server_detail_separator">%1$s · %2$s</string>
     <string name="server_host_port">%1$s · poort %2$d</string>
     <string name="server_use">Deze verbinding gebruiken</string>

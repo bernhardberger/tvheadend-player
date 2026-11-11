@@ -75,9 +75,8 @@
     <string name="audio_description_description">화면 해설 트랙이 있으면 우선 사용합니다.</string>
     <string name="subtitle_follow_system">시스템 자막 설정 따르기</string>
     <string name="player_status_rec">녹화 중</string>
-    <string name="setup_connection">연결 설정</string>
+    <string name="setup_connection">연결 편집</string>
     <string name="setup_connection_description">서버 주소, 포트 및 계정</string>
-    <string name="connection_overview_status">상태</string>
     <string name="connection_overview_server">서버</string>
     <string name="connection_overview_connected">연결됨</string>
     <string name="connection_overview_connecting">연결 중…</string>
@@ -747,7 +746,6 @@
     <string name="server_in_use">사용 중</string>
     <string name="server_no_sign_in">로그인 없음</string>
     <string name="server_password_needed">비밀번호 필요</string>
-    <string name="server_user_on_host">%1$s (%2$s)</string>
     <string name="server_detail_separator">%1$s · %2$s</string>
     <string name="server_host_port">%1$s · 포트 %2$d</string>
     <string name="server_use">이 연결 사용</string>

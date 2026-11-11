@@ -50,7 +50,7 @@ class OfflinePatternTest {
                 val navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.CONNECTION.name)
                 // A failure that needs Settings offers no Try again; the server's level sets it up.
                 SettingsScreenNavigation(navigation, listOf(settingsRootLevel()) +
-                    fixtureConnectionLevels("Saved sign-in unavailable", showRetry = false, onRetry = { retries++ },
+                    fixtureConnectionLevels(fixtureStatus("Saved sign-in unavailable"), showRetry = false, onRetry = { retries++ },
                         actions = ServerProfileActions(onSetUp = { setupOpen = true })),
                     setup = if (setupOpen) {
                         {
@@ -70,15 +70,16 @@ class OfflinePatternTest {
         }
         press(Key.DirectionCenter)
         compose.onNodeWithText("Try again").assertDoesNotExist()
-        compose.onNodeWithText("fixture on tvheadend.local").assertIsFocused()
+        compose.onNodeWithText("fixture").assertIsFocused()
         press(Key.DirectionCenter)
-        compose.onNodeWithText("Set up connection").assertIsFocused()
+        press(Key.DirectionDown) // The level opens on the selected "Use this connection", above Edit.
+        compose.onNodeWithText("Edit connection").assertIsFocused()
         press(Key.DirectionCenter)
         compose.onNodeWithText("Server").assertIsFocused()
         assertTrue(setupOpen)
         assertEquals(0, retries)
         press(Key.Back)
-        compose.onNodeWithText("Set up connection").assertIsFocused()
+        compose.onNodeWithText("Edit connection").assertIsFocused()
     }
 
     @Test fun retryStaysFocusedButDoesNotDispatchWhileConnecting() {
@@ -88,13 +89,13 @@ class OfflinePatternTest {
             TVHeadendPlayerTheme {
                 val navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.CONNECTION.name)
                 SettingsScreenNavigation(navigation, listOf(settingsRootLevel()) +
-                    fixtureConnectionLevels("Connection unavailable", showRetry = true, connecting = connecting,
+                    fixtureConnectionLevels(fixtureStatus("Connection unavailable"), showRetry = true, connecting = connecting,
                         onRetry = { retries++ }))
             }
         }
         press(Key.DirectionCenter)
         // The list opens on the server in use; Try again follows Add server.
-        compose.onNodeWithText("fixture on tvheadend.local").assertIsFocused()
+        compose.onNodeWithText("fixture").assertIsFocused()
         repeat(2) { press(Key.DirectionDown) }
         compose.onNodeWithText("Try again").assertIsFocused()
         press(Key.DirectionCenter)
@@ -124,7 +125,8 @@ class OfflinePatternTest {
                             connectionDegraded = degraded, onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                             SettingsScreenNavigation(navigation, listOf(settingsRootLevel()) +
                                 fixtureConnectionLevels(
-                                    if (degraded) "Can’t reach the server • Showing saved channels" else "Connected",
+                                    if (degraded) fixtureStatus("Can’t reach the server • Showing saved channels")
+                                    else fixtureStatus("Connected", ConnectionOverviewState.CONNECTED),
                                     showRetry = degraded, onRetry = { retries++ }),
                                 contentPadding = padding, initialFocusEnabled = !drawerActive)
                         }
@@ -151,7 +153,7 @@ class OfflinePatternTest {
         compose.runOnIdle { degraded = false }
         compose.onNodeWithText("Try again").assertDoesNotExist()
         // The row that takes Try again's place keeps focus.
-        compose.onNodeWithTag("settings-row-$CONNECTION_STATUS").assertIsFocused()
+        compose.onNodeWithTag("settings-row-$ADD_SERVER").assertIsFocused()
         compose.onNodeWithTag("connection-problem-badge", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("nav-settings").assertContentDescriptionEquals("Settings")
         press(Key.Back)

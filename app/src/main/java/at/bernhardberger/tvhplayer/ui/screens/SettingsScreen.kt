@@ -31,6 +31,9 @@ import at.bernhardberger.tvhplayer.ui.common.recordingSpaceText
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseContentLayering
 import at.bernhardberger.tvhplayer.ui.components.browseDetailsViewport
+import androidx.compose.ui.res.painterResource
+import androidx.tv.material3.Icon
+import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvhplayer.ui.components.depth.*
 import at.bernhardberger.tvhplayer.ui.screens.settings.*
@@ -81,7 +84,7 @@ internal fun SettingsScreen(
     val connectionName = connectionScopeName(profileList)
     val levels = settingsGeneralLevels(navigation) + connectionLevels + settingsPlayerLevels(navigation) + listOf(
         settingsRootLevel(recordingLevels.isNotEmpty(),
-            connectionRootStatus(profileList, connectionOverviewStatus(connectionPresentation, profileOwner).title)),
+            connectionRootStatus(profileList, connectionOverviewStatus(connectionPresentation, profileOwner))),
         settingsKeepChannelLevel(navigation),
         settingsWarmPlaybackLevel(navigation),
         settingsStreamProfileLevel(navigation, connectionName = connectionName),
@@ -103,11 +106,15 @@ internal fun SettingsScreen(
 @Composable
 internal fun settingsRootLevel(
     showRecordings: Boolean = false,
-    connectionStatus: String? = null,
+    connectionStatus: ConnectionOverviewStatus? = null,
 ): DepthLevel = settingsLevel(SETTINGS_ROOT, stringResource(R.string.nav_settings), buildList {
     add(settingsRow(SettingsSection.GENERAL.name, stringResource(R.string.settings_general), child = SettingsSection.GENERAL.name, icon = R.drawable.ic_tune))
-    add(settingsRow(SettingsSection.CONNECTION.name, stringResource(R.string.settings_connection_nav), connectionStatus,
-        child = SettingsSection.CONNECTION.name, icon = R.drawable.ic_cloud))
+    add(
+        settingsRow(
+            SettingsSection.CONNECTION.name, stringResource(R.string.settings_connection_nav), connectionStatus?.title,
+            child = SettingsSection.CONNECTION.name, leading = { connectionStatusIcon(connectionStatus?.state) },
+        ),
+    )
     add(settingsRow(SettingsSection.CHANNEL_TAGS.name, stringResource(R.string.settings_channel_tags_nav), child = SettingsSection.CHANNEL_TAGS.name, icon = R.drawable.ic_filter_list))
     add(settingsRow(SettingsSection.PLAYER.name, stringResource(R.string.settings_player), child = SettingsSection.PLAYER.name, icon = R.drawable.ic_play_arrow))
     add(settingsRow(SettingsSection.AUDIO.name, stringResource(R.string.settings_audio_nav), child = SettingsSection.AUDIO.name, icon = R.drawable.ic_subtitles))
@@ -118,6 +125,18 @@ internal fun settingsRootLevel(
         supporting = stringResource(R.string.settings_about_version_summary, BuildConfig.VERSION_NAME),
         child = ABOUT_LEVEL, icon = R.drawable.ic_info))
 })
+
+/** The Connection row's icon says the state; a connected one is announced since its row drops the word. */
+@Composable
+private fun connectionStatusIcon(state: ConnectionOverviewState?) {
+    val connected = stringResource(R.string.connection_overview_connected)
+    val (icon, description) = when (state) {
+        ConnectionOverviewState.CONNECTED -> R.drawable.ic_cloud_done to connected
+        ConnectionOverviewState.CONNECTING -> R.drawable.ic_cloud_sync to null
+        else -> R.drawable.ic_cloud_off_rounded to null
+    }
+    Icon(painterResource(icon), description, Modifier.size(ListItemDefaults.IconSize))
+}
 
 @Composable
 internal fun SettingsScreenNavigation(

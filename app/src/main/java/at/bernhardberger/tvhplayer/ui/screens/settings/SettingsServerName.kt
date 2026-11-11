@@ -25,6 +25,7 @@ import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileAuthenticationMode
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileSummary
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.settings.serverProfileAddress
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepAction
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepGuidance
@@ -54,7 +55,7 @@ internal fun SettingsServerName(
     var editingId by rememberSaveable { mutableStateOf<String?>(null) }
     val save = { onSave(name.trim().takeIf { it.isNotEmpty() }) }
     val username = profile.username?.takeIf { profile.authenticationMode == ServerProfileAuthenticationMode.PASSWORD }
-    val fallback = serverProfileUnnamed(profile)
+    val fallback = serverProfileAddress(profile)
     val address = serverAddress(profile.host, profile.port.toString())
     val fieldLabel = stringResource(R.string.server_name_field)
     SettingsSetupFrame {

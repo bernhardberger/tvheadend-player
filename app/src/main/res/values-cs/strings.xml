@@ -75,9 +75,8 @@
     <string name="audio_description_description">Upřednostňuje stopy s komentářem pro nevidomé, pokud jsou dostupné.</string>
     <string name="subtitle_follow_system">Podle systémového nastavení titulků</string>
     <string name="player_status_rec">NAHR</string>
-    <string name="setup_connection">Nastavit připojení</string>
+    <string name="setup_connection">Upravit připojení</string>
     <string name="setup_connection_description">Adresa serveru, port a účet</string>
-    <string name="connection_overview_status">Stav</string>
     <string name="connection_overview_server">Server</string>
     <string name="connection_overview_connected">Připojeno</string>
     <string name="connection_overview_connecting">Připojování…</string>
@@ -795,7 +794,6 @@
     <string name="server_in_use">Používá se</string>
     <string name="server_no_sign_in">Bez přihlášení</string>
     <string name="server_password_needed">Je potřeba heslo</string>
-    <string name="server_user_on_host">%1$s na %2$s</string>
     <string name="server_detail_separator">%1$s · %2$s</string>
     <string name="server_host_port">%1$s · port %2$d</string>
     <string name="server_use">Použít toto připojení</string>

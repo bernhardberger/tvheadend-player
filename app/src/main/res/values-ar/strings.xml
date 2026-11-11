@@ -75,9 +75,8 @@
     <string name="audio_description_description">تفضيل المسارات ذات الوصف الصوتي عند توفرها.</string>
     <string name="subtitle_follow_system">اتباع إعدادات الترجمة في النظام</string>
     <string name="player_status_rec">جارٍ التسجيل</string>
-    <string name="setup_connection">إعداد الاتصال</string>
+    <string name="setup_connection">تعديل الاتصال</string>
     <string name="setup_connection_description">عنوان الخادم والمنفذ والحساب</string>
-    <string name="connection_overview_status">الحالة</string>
     <string name="connection_overview_server">الخادم</string>
     <string name="connection_overview_connected">متصل</string>
     <string name="connection_overview_connecting">جارٍ الاتصال…</string>
@@ -827,7 +826,6 @@
     <string name="server_in_use">قيد الاستخدام</string>
     <string name="server_no_sign_in">دون تسجيل الدخول</string>
     <string name="server_password_needed">يلزم إدخال كلمة المرور</string>
-    <string name="server_user_on_host">%1$s على %2$s</string>
     <string name="server_detail_separator">%1$s · %2$s</string>
     <string name="server_host_port">%1$s · المنفذ %2$d</string>
     <string name="server_use">استخدام هذا الاتصال</string>

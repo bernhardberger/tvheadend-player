@@ -732,7 +732,7 @@ class AppProfileOwnerTest {
         assertNull((owner.profiles.value as ServerProfileListResult.Available).activeId)
         assertNull(owner.audioProfileId)
         assertEquals(ServerProfileReadResult.Missing, owner.serverProfile.value)
-        assertEquals(Notice.ServerProfileRemoved(id, "viewer on first.invalid"), notices.state.value.candidate?.notice)
+        assertEquals(Notice.ServerProfileRemoved(id, "viewer@first.invalid"), notices.state.value.candidate?.notice)
         assertTrue(owner.configurationGeneration.value > generation)
         owner.setActive(other)
         owner.clearProfile()

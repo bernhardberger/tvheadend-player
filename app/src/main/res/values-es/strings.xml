@@ -75,9 +75,8 @@
     <string name="audio_description_description">Prefiere pistas con audiodescripción cuando están disponibles.</string>
     <string name="subtitle_follow_system">Seguir los ajustes de subtítulos del sistema</string>
     <string name="player_status_rec">GRAB</string>
-    <string name="setup_connection">Configurar conexión</string>
+    <string name="setup_connection">Editar conexión</string>
     <string name="setup_connection_description">Dirección del servidor, puerto y cuenta</string>
-    <string name="connection_overview_status">Estado</string>
     <string name="connection_overview_server">Servidor</string>
     <string name="connection_overview_connected">Conectado</string>
     <string name="connection_overview_connecting">Conectando…</string>
@@ -779,7 +778,6 @@
     <string name="server_in_use">En uso</string>
     <string name="server_no_sign_in">Sin iniciar sesión</string>
     <string name="server_password_needed">Se necesita contraseña</string>
-    <string name="server_user_on_host">%1$s en %2$s</string>
     <string name="server_detail_separator">%1$s · %2$s</string>
     <string name="server_host_port">%1$s · puerto %2$d</string>
     <string name="server_use">Usar esta conexión</string>

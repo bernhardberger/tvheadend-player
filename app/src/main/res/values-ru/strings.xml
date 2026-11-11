@@ -75,9 +75,8 @@
     <string name="audio_description_description">Предпочитать дорожки с тифлокомментарием, если они доступны.</string>
     <string name="subtitle_follow_system">Использовать системные настройки субтитров</string>
     <string name="player_status_rec">ЗАП</string>
-    <string name="setup_connection">Настроить подключение</string>
+    <string name="setup_connection">Редактировать подключение</string>
     <string name="setup_connection_description">Адрес сервера, порт и учётная запись</string>
-    <string name="connection_overview_status">Состояние</string>
     <string name="connection_overview_server">Сервер</string>
     <string name="connection_overview_connected">Подключено</string>
     <string name="connection_overview_connecting">Подключение…</string>
@@ -796,7 +795,6 @@
     <string name="server_in_use">Используется</string>
     <string name="server_no_sign_in">Без входа</string>
     <string name="server_password_needed">Требуется пароль</string>
-    <string name="server_user_on_host">%1$s на %2$s</string>
     <string name="server_detail_separator">%1$s · %2$s</string>
     <string name="server_host_port">%1$s · порт %2$d</string>
     <string name="server_use">Использовать это подключение</string>

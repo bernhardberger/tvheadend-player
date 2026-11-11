@@ -52,7 +52,7 @@ class SettingsConnectionDepthTest {
         isCurrent: Boolean = true,
         onCancelSwitch: (() -> Unit)? = null,
     ) = SettingsScreenNavigation(navigation, listOf(settingsRootLevel()) +
-        fixtureConnectionLevels("Connected", showRetry = degraded,
+        fixtureConnectionLevels(fixtureStatus("Connected", ConnectionOverviewState.CONNECTED), showRetry = degraded,
             actions = ServerProfileActions(onSetUp = { setupOpen = true })),
         initialFocusEnabled = initialFocusEnabled, contentPadding = contentPadding, isCurrent = isCurrent,
         setup = if (setupOpen) { { setup { setupOpen = false } } } else null,
@@ -121,7 +121,8 @@ class SettingsConnectionDepthTest {
         compose.onNodeWithText("Connection").assertIsFocused()
         press(Key.DirectionCenter)
         press(Key.DirectionCenter)
-        compose.onNodeWithText("Set up connection").assertIsFocused()
+        press(Key.DirectionDown) // The level opens on the selected "Use this connection", above Edit.
+        compose.onNodeWithText("Edit connection").assertIsFocused()
         assertEquals(0, editor.loads)
         press(Key.DirectionRight) // Dedicated leaf actions do not enter on Right.
         assertEquals(0, editor.loads)
@@ -161,7 +162,7 @@ class SettingsConnectionDepthTest {
         assertEquals("draft.invalid", form.host)
         assertTrue(setupOpen)
         press(Key.Back)
-        compose.onNodeWithText("Set up connection").assertIsFocused()
+        compose.onNodeWithText("Edit connection").assertIsFocused()
         assertEquals("", form.password)
         assertEquals(0, editor.saves)
         assertEquals(emptyList<FakeSessionCall>(), session.calls)
@@ -206,14 +207,15 @@ class SettingsConnectionDepthTest {
             compose.waitForIdle()
             assertFalse(setupOpen)
             compose.runOnIdle { current = true }
-            compose.onNodeWithText("Set up connection").assertIsFocused()
+            compose.onNodeWithText("Edit connection").assertIsFocused()
             assertFalse(setupOpen)
             assertEquals(0, editor.saves)
             assertEquals(saved, editor.serverSettings.value)
         }
         press(Key.DirectionCenter)
         press(Key.DirectionCenter)
-        compose.onNodeWithText("Set up connection").assertIsFocused()
+        press(Key.DirectionDown) // The level opens on the selected "Use this connection", above Edit.
+        compose.onNodeWithText("Edit connection").assertIsFocused()
 
         // Leaving while the test runs cancels it, which disconnects the draft and restores the saved connection.
         openAndTestDraft()
@@ -253,7 +255,9 @@ class SettingsConnectionDepthTest {
                 }
             }
         }
-        repeat(3) { press(Key.DirectionCenter) }
+        repeat(2) { press(Key.DirectionCenter) }
+        press(Key.DirectionDown) // The level opens on the selected "Use this connection", above Edit.
+        press(Key.DirectionCenter)
         press(Key.DirectionUp)
         compose.onNodeWithTag("setup-port").assertIsFocused()
         press(Key.DirectionLeft) // A step keeps Left, so it cannot drop what was entered.
@@ -261,7 +265,7 @@ class SettingsConnectionDepthTest {
         assertTrue(setupOpen)
         press(Key.Back)
         assertFalse(setupOpen)
-        compose.onNodeWithText("Set up connection").assertIsFocused()
+        compose.onNodeWithText("Edit connection").assertIsFocused()
         compose.onNodeWithTag("nav-settings").assertIsNotFocused()
         assertEquals(3, navigation.stack.frames.size)
         assertEquals("", form.password)
@@ -277,7 +281,9 @@ class SettingsConnectionDepthTest {
                 SettingsWithSetup(navigation, { onSaved -> editor.Screen(form, onSaved) })
             }
         }
-        repeat(3) { press(Key.DirectionCenter) }
+        repeat(2) { press(Key.DirectionCenter) }
+        press(Key.DirectionDown) // The level opens on the selected "Use this connection", above Edit.
+        press(Key.DirectionCenter)
         connect()
         compose.runOnIdle { session.publish(unavailable()) }
         compose.onNodeWithTag("setup-action-try_again").assertIsFocused()
@@ -289,7 +295,7 @@ class SettingsConnectionDepthTest {
         assertEquals(0, editor.saves)
         press(Key.Back)
         press(Key.Back)
-        compose.onNodeWithText("Set up connection").assertIsFocused()
+        compose.onNodeWithText("Edit connection").assertIsFocused()
     }
 
     private fun press(key: Key) = compose.onRoot().performKeyInput { pressKey(key) }
@@ -325,7 +331,8 @@ class SettingsConnectionDepthTest {
         compose.onNodeWithText("Connection").assertIsFocused()
         press(Key.DirectionCenter)
         press(Key.DirectionCenter)
-        compose.onNodeWithText("Set up connection").assertIsFocused()
+        press(Key.DirectionDown) // The level opens on the selected "Use this connection", above Edit.
+        compose.onNodeWithText("Edit connection").assertIsFocused()
         val parent = navigation.stack.active
         press(Key.DirectionCenter)
         connect()
@@ -346,7 +353,7 @@ class SettingsConnectionDepthTest {
         compose.onNodeWithTag("setup-start-watching").assertIsFocused()
         editor.failSave = false
         press(Key.DirectionCenter)
-        compose.onNodeWithText("Set up connection").assertIsFocused()
+        compose.onNodeWithText("Edit connection").assertIsFocused()
         assertFalse(setupOpen)
         assertEquals(2, editor.saves)
         assertEquals(0, restores)

@@ -31,11 +31,10 @@ import kotlinx.coroutines.launch
 
 internal const val EDIT_CONNECTION = "edit-connection"
 internal const val RETRY_CONNECTION = "retry-connection"
-internal const val CONNECTION_STATUS = "connection-status"
 
 /**
- * Settings > Connection: the stored servers, adding one, and the connection's status, with
- * "Try again" while the server in use is unreachable and the fix is not in Settings.
+ * Settings > Connection: the stored servers, adding one, and "Try again" while the server in use is
+ * unreachable and the fix is not in Settings. The status of the server in use shows on its own row.
  */
 @Composable
 internal fun settingsConnectionLevels(
@@ -48,9 +47,11 @@ internal fun settingsConnectionLevels(
     val profile by owner.serverProfile.collectAsStateWithLifecycle()
     val profiles by owner.profiles.collectAsStateWithLifecycle()
     val connection = presentation.connection
-    val status = if (switching) ConnectionOverviewStatus(stringResource(R.string.connection_overview_connecting))
-        else connectionOverviewStatus(profile, presentation)
-    return settingsServerLevels(profiles, status.text, actions, switching = switching,
+    val status = if (switching) {
+        val connecting = stringResource(R.string.connection_overview_connecting)
+        ConnectionOverviewStatus(connecting, ConnectionOverviewState.CONNECTING)
+    } else connectionOverviewStatus(profile, presentation)
+    return settingsServerLevels(profiles, status, actions, switching = switching,
         showRetry = !switching && presentation.degraded &&
             connection.primaryRecoveryAction() != ConnectionRecoveryAction.SETTINGS,
         connecting = connection == ConnectionUiState.Connecting || connection == ConnectionUiState.Reconnecting ||
@@ -58,12 +59,13 @@ internal fun settingsConnectionLevels(
         onRetry = onRetry)
 }
 
-/** The overview's status: a failure's title and reason, or its own state with no reason. */
-internal class ConnectionOverviewStatus(val title: String, val reason: String? = null) {
-    val text: String get() = if (reason == null) title else "$title\n$reason"
-}
+/** What a connection's status icon shows: connected, on its way to connecting, or not connected. */
+internal enum class ConnectionOverviewState { CONNECTED, CONNECTING, OFFLINE }
 
-/** Read through [owner], for the root row that shows only the status title. */
+/** The overview's status: the title of a failure or of its own state, and which icon state it belongs to. */
+internal class ConnectionOverviewStatus(val title: String, val state: ConnectionOverviewState)
+
+/** Read through [owner], for the root row. */
 @Composable
 internal fun connectionOverviewStatus(
     presentation: AppConnectionPresentation,
@@ -82,17 +84,28 @@ internal fun connectionOverviewStatus(
     val context = LocalContext.current
     val text = remember(context) { AppErrorText(context) }
     val failure = connectionOverviewFailure(profile, presentation)
-    if (failure != null) return ConnectionOverviewStatus(text.title(failure), text.reason(failure))
-    return ConnectionOverviewStatus(stringResource(when {
-        profile == null -> R.string.connection_overview_loading
-        profile == ServerProfileReadResult.Missing -> R.string.connection_overview_not_configured
+    if (failure != null) {
+        val state = if (failure == AppErrorCondition.RECONNECTING) {
+            ConnectionOverviewState.CONNECTING
+        } else {
+            ConnectionOverviewState.OFFLINE
+        }
+        return ConnectionOverviewStatus(text.title(failure), state)
+    }
+    val connecting = ConnectionOverviewState.CONNECTING
+    val offline = ConnectionOverviewState.OFFLINE
+    val connected = ConnectionOverviewState.CONNECTED
+    val (title, state) = when {
+        profile == null -> R.string.connection_overview_loading to connecting
+        profile == ServerProfileReadResult.Missing -> R.string.connection_overview_not_configured to offline
         presentation.degraded && presentation.currentChannelReadiness is CurrentChannelReadiness.Browsable ->
-            R.string.connection_offline_saved
-        connection == ConnectionUiState.SyncingChannels -> R.string.connection_overview_synchronizing
-        connection == ConnectionUiState.Ready -> R.string.connection_overview_connected
-        connection == ConnectionUiState.NeedsConfiguration -> R.string.connection_overview_not_configured
-        else -> R.string.connection_overview_connecting
-    }))
+            R.string.connection_offline_saved to offline
+        connection == ConnectionUiState.SyncingChannels -> R.string.connection_overview_synchronizing to connecting
+        connection == ConnectionUiState.Ready -> R.string.connection_overview_connected to connected
+        connection == ConnectionUiState.NeedsConfiguration -> R.string.connection_overview_not_configured to offline
+        else -> R.string.connection_overview_connecting to connecting
+    }
+    return ConnectionOverviewStatus(stringResource(title), state)
 }
 
 /**

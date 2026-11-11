@@ -75,9 +75,8 @@
     <string name="audio_description_description">Надає перевагу доріжкам з аудіоописом, якщо вони доступні.</string>
     <string name="subtitle_follow_system">Використовувати системні налаштування субтитрів</string>
     <string name="player_status_rec">ЗАП</string>
-    <string name="setup_connection">Налаштувати з’єднання</string>
+    <string name="setup_connection">Редагувати підключення</string>
     <string name="setup_connection_description">Адреса сервера, порт і обліковий запис</string>
-    <string name="connection_overview_status">Стан</string>
     <string name="connection_overview_server">Сервер</string>
     <string name="connection_overview_connected">Підключено</string>
     <string name="connection_overview_connecting">Підключення…</string>
@@ -796,7 +795,6 @@
     <string name="server_in_use">Використовується</string>
     <string name="server_no_sign_in">Без входу</string>
     <string name="server_password_needed">Потрібен пароль</string>
-    <string name="server_user_on_host">%1$s на %2$s</string>
     <string name="server_detail_separator">%1$s · %2$s</string>
     <string name="server_host_port">%1$s · порт %2$d</string>
     <string name="server_use">Використовувати це підключення</string>

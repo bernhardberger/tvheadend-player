@@ -43,6 +43,7 @@ import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.testutil.leaveTouchModeBeforeComposing
+import at.bernhardberger.tvhplayer.ui.components.SERVER_AVATAR_IN_USE_TAG
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthNavigationState
 import at.bernhardberger.tvhplayer.ui.components.depth.rememberDepthNavigationState
 import at.bernhardberger.tvhplayer.ui.screens.SETTINGS_ROOT
@@ -200,7 +201,7 @@ class SettingsServerProfilesTest {
         val profiles by owner.profiles.collectAsStateWithLifecycle()
         SettingsScreenNavigation(navigation,
             listOf(settingsRootLevel(
-                connectionStatus = connectionRootStatus(profiles, connectionOverviewStatus(presentation, owner).title))) + connection,
+                connectionStatus = connectionRootStatus(profiles, connectionOverviewStatus(presentation, owner)))) + connection,
             initialFocusEnabled = initialFocusEnabled, contentPadding = contentPadding,
             setup = servers.setupContent(), onCloseSetup = servers::closeSetup, dialog = servers.dialogContent(),
             isCurrent = isCurrent, onCloseDialog = servers::closeDialogs,
@@ -265,7 +266,8 @@ class SettingsServerProfilesTest {
         settle()
         assertEquals(id(2), activeId)
         assertTrue(!owner.connectionChanges.isLocked)
-        compose.onNodeWithTag(row(2)).assertIsFocused().assert(hasText("In use", substring = true))
+        compose.onNodeWithTag(row(2)).assertIsFocused()
+        assertInUse(row(2))
         // No busy/cancelled latch remains: Back navigates normally again.
         press(Key.Back)
         compose.onNodeWithText("Connection").assertIsFocused()
@@ -457,22 +459,26 @@ class SettingsServerProfilesTest {
 
     @Test fun theListOpensOnTheServerInUseInStoredOrder() {
         stored(active = 2)
+        runBlocking { store.addAnonymous("tvh-demo.example.org", 19982, null, activate = false) }
         settings()
         compose.onNodeWithTag(row(2)).assertIsFocused()
         compose.onNodeWithText("No connection in use. Choose one to watch TV again.").assertDoesNotExist()
         // Stored order, and the row in use keeps its place.
-        val tops = listOf(row(1), row(2), row(3), "settings-row-$ADD_SERVER", "settings-row-$CONNECTION_STATUS")
+        val tops = listOf(row(1), row(2), row(3), row(4), "settings-row-$ADD_SERVER")
             .map { compose.onNodeWithTag(it).fetchSemanticsNode().boundsInRoot.top }
         assertEquals(tops.sorted(), tops)
-        compose.onNodeWithTag(row(2)).assert(hasText("In use", substring = true))
-        compose.onNodeWithTag(row(1)).assert(hasText("kids on tvheadend.home.arpa", substring = true).not())
-        compose.onNodeWithTag(row(1)).assert(hasText("anna on tvheadend.home.arpa", substring = true))
+        assertInUse(row(2))
+        // A labeled server's second line is its account on the address; an unlabeled one is titled by
+        // its account over the address, and an anonymous one by its address over "No sign-in".
+        compose.onNodeWithTag(row(1)).assert(hasText("anna@tvheadend.home.arpa", substring = true))
+        compose.onNodeWithTag(row(2)).assert(hasText("kids")).assert(hasText("tvheadend.home.arpa"))
         compose.onNodeWithTag(row(3)).assert(hasText("No sign-in", substring = true))
+        compose.onNodeWithTag(row(4)).assert(hasText("tvh-demo.example.org:19982"))
         // Every row is reachable by D-pad, and Back returns to the root's Connection row.
-        repeat(2) { press(Key.DirectionDown) }
+        repeat(3) { press(Key.DirectionDown) }
         compose.onNodeWithTag("settings-row-$ADD_SERVER").assertIsFocused()
-        press(Key.DirectionDown)
-        compose.onNodeWithTag("settings-row-$CONNECTION_STATUS").assertIsFocused()
+        // The status of the connection in use shows on its own row, not on a row of its own.
+        compose.onNodeWithTag("settings-row-connection-status").assertDoesNotExist()
         press(Key.Back)
         compose.onNodeWithText("Connection").assertIsFocused()
     }
@@ -482,9 +488,65 @@ class SettingsServerProfilesTest {
         settings()
         compose.onNodeWithText("No connection in use. Choose one to watch TV again.").assertIsDisplayed()
         compose.onNodeWithTag(row(1)).assertIsFocused()
-        compose.onNodeWithTag("settings-row-$CONNECTION_STATUS").assert(hasText("No connection in use", substring = true))
         press(Key.DirectionCenter)
         compose.onNodeWithTag("settings-row-$SERVER_USE").assertIsFocused()
+    }
+
+    /** The connection in use says so with the avatar badge and for TalkBack, not with a line of text. */
+    private fun assertInUse(rowTag: String) {
+        compose.onAllNodesWithTag(SERVER_AVATAR_IN_USE_TAG, useUnmergedTree = true).assertCountEquals(1)
+        compose.onNode(hasTestTag(rowTag) and hasAnyDescendant(hasTestTag(SERVER_AVATAR_IN_USE_TAG)), useUnmergedTree = true)
+            .assertExists()
+        compose.onNodeWithTag(rowTag).assert(hasContentDescription("In use")).assert(hasText("In use", substring = true).not())
+    }
+
+    @Test fun theConnectionInUseWearsTheBadgeAndShowsItsProblemInPlaceOfInUse() {
+        stored(active = 1)
+        settings()
+        assertInUse(row(1))
+        val failing = AppConnectionPresentation(ConnectionUiState.Error(
+            at.bernhardberger.tvhplayer.data.ConnectionFailureKind.UNREACHABLE,
+            at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition.EXPLICIT_RETRY))
+        compose.runOnIdle { presentation = failing }
+        compose.waitForIdle()
+        val title = at.bernhardberger.tvhplayer.ui.common.AppErrorText(compose.activity)
+            .title(requireNotNull(connectionOverviewFailure(owner.serverProfile.value, failing)))
+        compose.onNodeWithTag(row(1)).assert(hasText(title, substring = true))
+        compose.onNodeWithTag(row(2)).assert(hasText(title, substring = true).not())
+        compose.runOnIdle { presentation = AppConnectionPresentation(ConnectionUiState.Connecting) }
+        compose.waitForIdle()
+        compose.onNodeWithTag(row(1)).assert(hasText("Connecting…", substring = true))
+        assertInUse(row(1))
+    }
+
+    @Test fun useThisConnectionIsInertOnTheServerInUse() {
+        stored(active = 1)
+        settings()
+        press(Key.DirectionCenter)
+        compose.onNodeWithTag("settings-row-$SERVER_USE").assert(hasText("In use", substring = true))
+        // It stays reachable, but choosing what is already chosen switches nothing and asks nothing.
+        compose.onNodeWithTag("settings-row-$SERVER_USE").performSemanticsAction(SemanticsActions.RequestFocus)
+        press(Key.DirectionCenter)
+        compose.onNodeWithTag(SWITCH_KEEP).assertDoesNotExist()
+        compose.onNodeWithTag("settings-row-$SERVER_USE").assertIsFocused()
+        assertEquals(id(1), activeId)
+        assertEquals(serverProfileRowId(id(1)), navigation.stack.active.levelId)
+        // Not connected, the row says what is wrong in place of "In use".
+        compose.runOnIdle { presentation = AppConnectionPresentation(ConnectionUiState.Connecting) }
+        compose.waitForIdle()
+        compose.onNodeWithTag("settings-row-$SERVER_USE").assert(hasText("Connecting…", substring = true))
+    }
+
+    @Test fun theRootConnectionRowDropsConnectedForItsIconAndKeepsOtherWords() {
+        stored()
+        settings(enter = false)
+        val root = compose.onNodeWithTag("settings-row-${SettingsSection.CONNECTION.name}")
+        root.assert(hasText("Living room", substring = true))
+            .assert(hasText("Connected", substring = true).not())
+            .assert(hasContentDescription("Connected"))
+        compose.runOnIdle { presentation = AppConnectionPresentation(ConnectionUiState.Connecting) }
+        compose.waitForIdle()
+        root.assert(hasText("Connecting…", substring = true)).assert(hasContentDescription("Connected").not())
     }
 
     @Test fun usingAServerWhileNothingPlaysSwitchesAtOnceAndFocusesItsRow() {
@@ -502,7 +564,7 @@ class SettingsServerProfilesTest {
         compose.waitForIdle()
         assertEquals(SettingsSection.CONNECTION.name, navigation.stack.active.levelId)
         compose.onNodeWithTag(row(2)).assertIsFocused()
-        compose.onNodeWithTag(row(2)).assert(hasText("In use", substring = true))
+        assertInUse(row(2))
     }
 
     @Test fun usingAServerWhileLiveTvPlaysAsksAndKeepWatchingComesFirst() {
@@ -513,7 +575,7 @@ class SettingsServerProfilesTest {
         press(Key.DirectionCenter)
         press(Key.DirectionCenter)
         compose.onNodeWithTag(SWITCH_KEEP).assertIsFocused()
-        compose.onNodeWithText("Switch to kids on tvheadend.home.arpa?").assertIsDisplayed()
+        compose.onNodeWithText("Switch to kids@tvheadend.home.arpa?").assertIsDisplayed()
         compose.onNodeWithText("Live TV stops", substring = true).assertIsDisplayed()
         press(Key.DirectionCenter)
         // Keeping returns focus to the row that asked; nothing switched.
@@ -625,6 +687,7 @@ class SettingsServerProfilesTest {
         settings()
         val startup = session.calls.toList()
         press(Key.DirectionCenter)
+        press(Key.DirectionDown) // The level opens on the selected "Use this connection", above Edit.
         press(Key.DirectionCenter)
         type("setup-host", "192.168.1.20")
         compose.onNodeWithTag("setup-continue").performSemanticsAction(SemanticsActions.RequestFocus)
@@ -654,8 +717,6 @@ class SettingsServerProfilesTest {
         stored(active = 1)
         settings()
         press(Key.DirectionCenter)
-        // The level of the server in use has no "Use this server".
-        compose.onNodeWithTag("settings-row-$SERVER_USE").assertDoesNotExist()
         compose.onNodeWithTag("settings-row-$SERVER_REMOVE").performSemanticsAction(SemanticsActions.RequestFocus)
         press(Key.DirectionCenter)
         compose.onNodeWithTag(REMOVE_KEEP).assertIsFocused()
@@ -714,10 +775,31 @@ class SettingsServerProfilesTest {
         frameScene()
         settings(rail = true, enter = false)
         capture("01-settings-root-active-profile", "Connection")
+        val failing = AppConnectionPresentation(ConnectionUiState.Error(
+            at.bernhardberger.tvhplayer.data.ConnectionFailureKind.UNREACHABLE,
+            at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition.EXPLICIT_RETRY), degraded = true)
+        presentation = failing
+        compose.waitForIdle()
+        capture("06-settings-root-not-connected", "Connection")
+        presentation = AppConnectionPresentation(ConnectionUiState.Ready)
+        compose.waitForIdle()
         press(Key.DirectionCenter)
         compose.onNodeWithTag(row(1)).assertIsFocused()
         capture("02-connection-profile-list", "Living room")
         capture("switcher3-08-connection-list-in-use-text", "Living room")
+        press(Key.DirectionCenter)
+        compose.onNodeWithTag("settings-row-$SERVER_USE").assert(hasText("In use", substring = true))
+        capture("10-connection-in-use-level", "Edit connection")
+        press(Key.Back)
+        compose.onNodeWithTag(row(1)).assertIsFocused()
+        press(Key.DirectionDown)
+        capture("07-connection-list-in-use-unfocused", "Kids")
+        presentation = failing
+        compose.waitForIdle()
+        capture("08-connection-list-in-use-cant-connect", "Kids")
+        presentation = AppConnectionPresentation(ConnectionUiState.Ready)
+        compose.waitForIdle()
+        press(Key.DirectionUp)
         repeat(3) { press(Key.DirectionDown) }
         compose.onNodeWithTag(row(4)).assertIsFocused()
         capture("09-password-unreadable-list", "Cabin")
@@ -739,7 +821,39 @@ class SettingsServerProfilesTest {
         presentation = AppConnectionPresentation(ConnectionUiState.Connecting)
         compose.waitForIdle()
         compose.onNodeWithTag(row(2)).assertIsFocused()
-        capture("05-switched-connecting", "kids on tvheadend.home.arpa")
+        capture("05-switched-connecting", "kids@tvheadend.home.arpa")
+    }
+
+    /** A household's real shapes with fictional values: many accounts on one box, custom ports, a long host. */
+    @Test @Category(VisualCapture::class) fun captureDefaultConnectionNames() {
+        runBlocking {
+            store.addPassword("192.0.2.15", 9982, "maria", "fixture-secret", null, activate = true)
+            store.addPassword("198.51.100.2", 9982, "reviewer_5f3a9c21", "fixture-secret", null, activate = false)
+            store.addPassword("192.0.2.15", 9982, "tom", "fixture-secret", null, activate = false)
+            store.addPassword("192.0.2.15", 19982, "lab", "fixture-secret", null, activate = false)
+            store.addPassword("192.0.2.15", 29982, "lab", "fixture-secret", null, activate = false)
+            store.addPassword("tvheadend.home.arpa", 9982, "anna", "fixture-secret", "Living room", activate = false)
+            store.addAnonymous("tvh-demo.example.org", 19982, null, activate = false)
+        }
+        settings(rail = true, enter = false)
+        capture("11-names-settings-root", "Connection")
+        press(Key.DirectionCenter)
+        compose.onNodeWithTag(row(1)).assertIsFocused()
+        capture("12-names-list-in-use-focused", "maria")
+        press(Key.DirectionDown)
+        capture("13-names-list-in-use-resting", "reviewer")
+        repeat(4) { press(Key.DirectionDown) }
+        capture("14-names-list-labeled-focused", "Living room")
+        press(Key.DirectionDown)
+        capture("15-names-list-anonymous-long-host", "tvh-demo.example.org")
+        press(Key.DirectionCenter)
+        capture("16-names-anonymous-level", "Use this connection")
+        press(Key.DirectionCenter)
+        presentation = AppConnectionPresentation(ConnectionUiState.Connecting)
+        settle()
+        presentation = AppConnectionPresentation(ConnectionUiState.Ready)
+        settle()
+        capture("17-names-connected-notice", "Use this connection")
     }
 
     @Test fun addAndNameReturnsToTheNamedConnection() {

@@ -78,17 +78,23 @@ class ProfilePreferencesTest {
         assertEquals(audio.copy(language = "en"), settings.audioChoices.read(remaining.value, ChannelId(1)))
     }
 
-    @Test fun displayNameUsesLabelOrAccountHostAndOnlyNonDefaultPortWithMiddleDot() = runTest {
+    @Test fun displayNameUsesLabelOrCompactAccountAtHostWithTheNonDefaultPortOnly() = runTest {
         val store = FakeServerProfileStore()
         store.addAnonymous("first.invalid")
         store.addAnonymous("second.invalid", port = 9983)
         store.addPassword("first.invalid", username = "viewer", password = "synthetic")
         store.addPassword("second.invalid", port = 9983, username = "viewer", password = "synthetic", label = "  Lounge  ")
         store.addPassword("second.invalid", port = 9983, username = "guest", password = "synthetic")
+        store.addPassword("fd00::1", port = 9983, username = "lab", password = "synthetic")
+        store.addAnonymous("fd00::2")
         val profiles = (store.profiles() as ServerProfileListResult.Available).profiles
-        assertEquals(listOf("first.invalid", "second.invalid · port 9983", "viewer on first.invalid", "Lounge",
-            "guest on second.invalid · port 9983"),
+        assertEquals(listOf("first.invalid", "second.invalid:9983", "viewer@first.invalid", "Lounge",
+            "guest@second.invalid:9983", "lab@[fd00::1]:9983", "[fd00::2]"),
             profiles.map(::serverProfileDisplayName))
+        // The compact form ignores the label, for the second line of a labeled connection.
+        assertEquals("viewer@second.invalid:9983", serverProfileAddress(profiles[3]))
+        assertEquals("viewer@[fd00::9]", compactServerName("[fd00::9]", 9982, "viewer"))
+        assertEquals("host.invalid", compactServerName("host.invalid", 9982, " "))
         assertEquals(profiles[0].id, existingServerProfile(profiles, " first.invalid ", 9982, null))
         assertEquals(profiles[2].id, existingServerProfile(profiles, "first.invalid", 9982, "viewer"))
         assertNull(existingServerProfile(profiles, "first.invalid", 9983, "viewer"))

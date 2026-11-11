@@ -14,9 +14,7 @@
     <string name="server_in_use">In use</string>
     <string name="server_no_sign_in">No sign-in</string>
     <string name="server_password_needed">Password needed</string>
-    <!-- A server without a name: the account and the server address, e.g. "anna on tvheadend.home.arpa". -->
-    <string name="server_user_on_host">%1$s on %2$s</string>
-    <!-- Joins the parts of a supporting line, e.g. "In use · anna on tvheadend.home.arpa". -->
+    <!-- Joins the parts of a supporting line, e.g. "Living room · Connecting…". -->
     <string name="server_detail_separator">%1$s · %2$s</string>
     <!-- A server address with a port other than the default, e.g. "tvheadend.home.arpa · port 9983". -->
     <string name="server_host_port">%1$s · port %2$d</string>
@@ -140,9 +138,8 @@
     <string name="audio_description_description">Prefers narrated tracks when available.</string>
     <string name="subtitle_follow_system">Follow system caption settings</string>
     <string name="player_status_rec">REC</string>
-    <string name="setup_connection">Set up connection</string>
+    <string name="setup_connection">Edit connection</string>
     <string name="setup_connection_description">Server address, port and account</string>
-    <string name="connection_overview_status">Status</string>
     <string name="connection_overview_server">Server</string>
     <string name="connection_overview_connected">Connected</string>
     <string name="connection_overview_connecting">Connecting…</string>

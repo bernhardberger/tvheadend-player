@@ -107,7 +107,7 @@ internal fun settingsRow(
     // Long localized titles wrap to a second line before they ellipsize.
     titleMaxLines: Int = 2,
     /** Drawn instead of [icon], for a row that leads with more than an icon (a server's avatar). */
-    leading: (@Composable BoxScope.() -> Unit)? = null,
+    leading: (@Composable BoxScope.(focused: Boolean) -> Unit)? = null,
     /** Connection rows split their address and status into distinct text styles; told whether the row is focused. */
     supportingContent: (@Composable (focused: Boolean) -> Unit)? = null,
     onClick: () -> Unit = {},
@@ -139,7 +139,7 @@ internal fun settingsRow(
             supportingContent = supportingContent?.let { { it(rowFocused) } } ?: supporting?.let {
                 { Text(it.annotated(), maxLines = 2, overflow = TextOverflow.Ellipsis) }
             },
-            leadingContent = leading ?: icon?.let {
+            leadingContent = leading?.let { { it(rowFocused) } } ?: icon?.let {
                 { Icon(painterResource(it), null, Modifier.size(ListItemDefaults.IconSize)) }
             },
             trailingContent = when {
