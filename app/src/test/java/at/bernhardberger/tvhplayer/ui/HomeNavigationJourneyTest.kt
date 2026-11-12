@@ -366,7 +366,7 @@ class HomeNavigationJourneyTest {
         compose.onNodeWithTag("recording-list-entry-9").assertIsFocused().assertIsDisplayed()
         compose.runOnIdle { fixture.back.onBackPressed() }
         fixture.settle()
-        compose.onNodeWithTag("nav-recordings").assertIsFocused()
+        compose.onNodeWithTag("nav-schedule").assertIsFocused().assertIsSelected()
         compose.runOnIdle { fixture.back.onBackPressed() }
         fixture.settle()
         compose.onNodeWithTag("nav-home").assertIsFocused()
