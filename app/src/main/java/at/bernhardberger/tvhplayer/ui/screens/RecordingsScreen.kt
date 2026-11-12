@@ -49,6 +49,8 @@ import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.calculateEndPadding
@@ -149,6 +151,7 @@ import at.bernhardberger.tvhplayer.core.recordingWasRemoved
 import at.bernhardberger.tvhplayer.core.watchedCount
 import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.ui.TvSpacing12
+import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.core.recordingWatchState
 import at.bernhardberger.tvhplayer.ui.rememberCloseBehindPlayer
 import at.bernhardberger.tvhplayer.ui.components.TopLevelBrowseHeader
@@ -693,6 +696,16 @@ internal fun RecordingsScreenContent(
                     if (event.type == KeyEventType.KeyUp) relocatingKey = null
                     return@onPreviewKeyEvent true
                 }
+                val scheduleListOwnsFocus = mode != DvrLibraryMode.ARCHIVE && contentHasFocus && drawerFocus != null
+                if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionLeft && scheduleListOwnsFocus) {
+                    // Like Archive's root Left: target the current rail item before natural search
+                    // can enter the drawer at Home and its later restoration effect corrects it.
+                    if (drawerFocus?.requestFocus() == true) {
+                        contentFocusOwned = false
+                        requestContentFocus = false
+                    }
+                    return@onPreviewKeyEvent true
+                }
                 if (
                     event.type == KeyEventType.KeyDown &&
                     event.key == Key.DirectionUp &&
@@ -720,31 +733,38 @@ internal fun RecordingsScreenContent(
                 .heightIn(min = recordingsHeaderMinHeight())
                 .testTag("recordings-header"),
             leading = if (archiveMode) ({
-                ArchivePillRow(
-                    view = chosenView,
-                    focusRequesters = pillFocus,
-                    navigationFocus = drawerFocus,
-                    canStepBack = archiveNavigation.stack.canPop,
-                    onOpen = { pill ->
-                        contentFocusOwned = false
-                        openPill = pill
-                    },
-                    onDown = { runCatching { contentFocus.requestFocus() } },
-                    onBack = { archiveNavigation.pop() },
-                    onFocusChanged = {
-                        if (it) {
+                Spacer(Modifier.weight(1f))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(40.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    RecordingStorageIndicator(observation.dvrDiskSpaceState)
+                    ArchivePillRow(
+                        view = chosenView,
+                        focusRequesters = pillFocus,
+                        navigationFocus = drawerFocus,
+                        canStepBack = archiveNavigation.stack.canPop,
+                        onOpen = { pill ->
                             contentFocusOwned = false
-                            requestContentFocus = false
-                        }
-                    },
-                    modifier = Modifier.onPreviewKeyEvent {
-                        // A deliberate header move gives the viewer ownership, not the loading handoff.
-                        screenState.requestedScheduleEntryId.value = null
-                        loadingFocusParked = false
-                        contentFocusOwned = false
-                        false
-                    },
-                )
+                            openPill = pill
+                        },
+                        onDown = { runCatching { contentFocus.requestFocus() } },
+                        onBack = { archiveNavigation.pop() },
+                        onFocusChanged = {
+                            if (it) {
+                                contentFocusOwned = false
+                                requestContentFocus = false
+                            }
+                        },
+                        modifier = Modifier.onPreviewKeyEvent {
+                            // A deliberate header move takes ownership from the loading handoff.
+                            screenState.requestedScheduleEntryId.value = null
+                            loadingFocusParked = false
+                            contentFocusOwned = false
+                            false
+                        },
+                    )
+                }
             }) else ({
                 RecordingModeTabs(
                     selected = mode,
@@ -777,11 +797,6 @@ internal fun RecordingsScreenContent(
                         .testTag("recordings-mode-tabs"),
                 )
             }),
-            // Quiet information at the content's end, level with the pills: no focus stop, and it never moves.
-            actions = if (!archiveMode) null else ({
-                Spacer(Modifier.weight(1f))
-                RecordingStorageIndicator(observation.dvrDiskSpaceState)
-            }),
         )
         TabContent(
             motion = modeMotion,
@@ -810,8 +825,8 @@ internal fun RecordingsScreenContent(
         val channelsById = frame.channelsById
         val scheduleGroups = frame.schedule
         val problemGroups = frame.problems
-        // Every tab's content starts at y80, as the channel list's first row does.
-        Spacer(Modifier.height(TvSpacing12))
+        // Archive gets more air below its pills; Schedule keeps its original header gap.
+        Spacer(Modifier.height(if (mode == DvrLibraryMode.ARCHIVE) TvSpacing12 + TvSpacing8 else TvSpacing12))
 
         if (frame.empty && recordingsLoading(frame.connection, frame.failure)) {
             // In the Archive column's place, running to the bottom edge as its list does.
@@ -843,8 +858,8 @@ internal fun RecordingsScreenContent(
         } else ProvideArtworkSession(currentSession, observation) {
             // A frame shows its pictures with the session of the observation it was built from.
             when (mode) {
-                DvrLibraryMode.ARCHIVE -> ArchiveDepthContent(
-                    root = frame.archive,
+                DvrLibraryMode.ARCHIVE -> key(chosenView) { ArchiveDepthContent(
+                    root = if (owner.isCurrent) archive else frame.archive,
                     nowSeconds = nowSecProvider,
                     navigation = archiveNavigation,
                     contentPadding = PaddingValues(
@@ -859,7 +874,7 @@ internal fun RecordingsScreenContent(
                         contentFocusOwned,
                     grouping = chosenGrouping,
                     sort = chosenView.sort,
-                    fullRoot = frame.fullArchive,
+                    fullRoot = if (owner.isCurrent) fullArchive else frame.fullArchive,
                     show = chosenView.show,
                     onFirstRowUp = {
                         if (owner.isCurrent && focusHeader()) contentFocusOwned = false
@@ -906,7 +921,7 @@ internal fun RecordingsScreenContent(
                             if (it.hasFocus) contentFocusOwned = true
                         }
                     },
-                )
+                ) }
                 DvrLibraryMode.SCHEDULE -> Box(
                     modifier = Modifier
                         // Archive's columns: the list in its first, the focused recording where it shows its preview.
@@ -1438,23 +1453,31 @@ internal fun RecordingsScreenContent(
             current = chosenView,
             onChoose = { choice ->
                 if (choice != chosenView) {
-                    // A new arrangement has other levels: start at the root's first row. Sort and filter keep
-                    // the level when it still exists; the stack reconciles to the root when it does not.
-                    if (choice.grouping != chosenView.grouping) {
-                        archiveNavigation.update(
-                            DepthStack(
-                                listOf(DepthFrame(archiveLevelId(emptyList()))),
-                                visit = archiveNavigation.stack.visit + 1,
-                            ),
-                        )
-                    }
+                    val stack = archiveNavigation.stack
+                    archiveNavigation.update(
+                        if (choice.grouping != chosenView.grouping) {
+                            DepthStack(listOf(DepthFrame(archiveLevelId(emptyList()))), visit = stack.visit + 1)
+                        } else {
+                            stack.copy(frames = stack.frames.dropLast(1) + DepthFrame(stack.active.levelId),
+                                visit = stack.visit + 1)
+                        },
+                    )
+                    archiveScrollPositions.clear()
+                    screenState.archiveScrollOffsets.clear()
+                    focusRecoveryGeneration++
                     pendingView = choice
                     onViewChange(choice)
                 }
             },
             onClose = {
+                // Move focus before disposing the modal, rather than letting disposal choose a list row.
+                if (pillFocus.getValue(pill).requestFocus()) {
+                    contentFocusOwned = false
+                    requestContentFocus = false
+                } else {
+                    requestStop = pillFocus.getValue(pill)
+                }
                 openPill = null
-                requestStop = pillFocus.getValue(pill)
             },
         )
     }

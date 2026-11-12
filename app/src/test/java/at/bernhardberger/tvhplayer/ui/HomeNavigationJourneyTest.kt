@@ -3,6 +3,7 @@
 package at.bernhardberger.tvhplayer.ui
 
 import android.app.Application
+import at.bernhardberger.tvhplayer.testutil.pressKey
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
@@ -364,6 +365,24 @@ class HomeNavigationJourneyTest {
         fixture.key(Key.Enter)
         compose.onNodeWithTag("recordings-schedule-list").assertExists()
         compose.onNodeWithTag("recording-list-entry-9").assertIsFocused().assertIsDisplayed()
+        // Re-enter through the rail, matching the TV journey rather than Home's deep link.
+        fixture.focus("nav-schedule")
+        fixture.key(Key.Enter)
+        fixture.key(Key.DirectionRight)
+        fixture.focus("recording-list-entry-9")
+        compose.mainClock.autoAdvance = false
+        try {
+            compose.onRoot().performKeyInput { pressKey(Key.DirectionLeft) }
+            repeat(8) {
+                compose.onNodeWithTag("nav-home").assertIsNotFocused()
+                compose.mainClock.advanceTimeByFrame()
+                compose.waitForIdle()
+            }
+            compose.onNodeWithTag("nav-schedule").assertIsFocused()
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        fixture.key(Key.DirectionRight)
         compose.runOnIdle { fixture.back.onBackPressed() }
         fixture.settle()
         compose.onNodeWithTag("nav-schedule").assertIsFocused().assertIsSelected()

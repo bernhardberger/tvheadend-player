@@ -1,6 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -594,44 +596,55 @@ internal fun SideRail(
                                     PinnedRailIcon {
                                         Box {
                                             item.icon()
-                                            if (problemCount != null && drawerValue == DrawerValue.Closed) {
-                                                Box(
-                                                    Modifier
-                                                        .align(Alignment.TopEnd)
-                                                        .offset(x = 8.dp, y = (-6).dp)
-                                                        .defaultMinSize(minWidth = 16.dp, minHeight = 16.dp)
-                                                        .background(MaterialTheme.colorScheme.error, CircleShape)
-                                                        .testTag("schedule-problems-badge"),
-                                                    contentAlignment = Alignment.Center,
+                                            if (problemCount != null) {
+                                                androidx.compose.animation.AnimatedVisibility(
+                                                    visible = drawerValue == DrawerValue.Closed,
+                                                    enter = fadeIn(), exit = fadeOut(),
+                                                    modifier = Modifier.align(Alignment.TopEnd),
                                                 ) {
-                                                    Text(
-                                                        text = problemCount.toString(),
-                                                        style = MaterialTheme.typography.labelSmall,
-                                                        color = MaterialTheme.colorScheme.onError,
-                                                    )
+                                                    Box(
+                                                        Modifier
+                                                            .offset(x = 8.dp, y = (-6).dp)
+                                                            .defaultMinSize(minWidth = 16.dp, minHeight = 16.dp)
+                                                            .background(MaterialTheme.colorScheme.error, CircleShape)
+                                                            .testTag("schedule-problems-badge"),
+                                                        contentAlignment = Alignment.Center,
+                                                    ) {
+                                                        Text(
+                                                            text = problemCount.toString(),
+                                                            style = MaterialTheme.typography.labelSmall,
+                                                            color = MaterialTheme.colorScheme.onError,
+                                                        )
+                                                    }
+                                                }
+                                                // The trailing slot slides with the label and growing row.
+                                                // Pin the badge at the final row end, using only the label's fade.
+                                                Box(
+                                                    Modifier.matchParentSize()
+                                                        .wrapContentWidth(Alignment.Start, unbounded = true)
+                                                        .width(NavigationDrawerItemDefaults.ExpandedDrawerItemWidth -
+                                                            ItemContentPadding * 2),
+                                                    contentAlignment = Alignment.CenterEnd,
+                                                ) {
+                                                    androidx.compose.animation.AnimatedVisibility(
+                                                        visible = drawerValue == DrawerValue.Open,
+                                                        enter = fadeIn(), exit = fadeOut(),
+                                                    ) {
+                                                        NavigationDrawerItemDefaults.TrailingBadge(
+                                                            text = problemCount.toString(),
+                                                            containerColor = if (itemFocused) {
+                                                                MaterialTheme.colorScheme.errorContainer
+                                                            } else MaterialTheme.colorScheme.error,
+                                                            contentColor = if (itemFocused) {
+                                                                MaterialTheme.colorScheme.onErrorContainer
+                                                            } else MaterialTheme.colorScheme.onError,
+                                                        )
+                                                    }
                                                 }
                                             }
                                         }
                                     }
                                 },
-                                trailingContent = if (problemCount != null) {
-                                    {
-                                        // As for the connection badge: the deep container reads on the focused item.
-                                        NavigationDrawerItemDefaults.TrailingBadge(
-                                            text = problemCount.toString(),
-                                            containerColor = if (itemFocused) {
-                                                MaterialTheme.colorScheme.errorContainer
-                                            } else {
-                                                MaterialTheme.colorScheme.error
-                                            },
-                                            contentColor = if (itemFocused) {
-                                                MaterialTheme.colorScheme.onErrorContainer
-                                            } else {
-                                                MaterialTheme.colorScheme.onError
-                                            },
-                                        )
-                                    }
-                                } else null,
                                 colors = drawerColors,
                                 modifier = Modifier
                                     .withinDrawerSheet(fullWidth, visibleWidthPx)

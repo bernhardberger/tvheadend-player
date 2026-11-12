@@ -33,10 +33,10 @@ import at.bernhardberger.tvhplayer.ui.common.formatFileSize
 import kotlin.math.roundToInt
 
 private val StorageRingSize = 32.dp
-private val StorageRingStroke = 4.dp
+private val StorageRingStroke = 3.dp
 
 /**
- * How much recording storage is left, at the end of the Archive's header row: free space in the
+ * How much recording storage is left, beside the Archive header's trailing pills: free space in the
  * first line, the total under it and a ring that fills with the share in use. Only a current reading
  * is drawn; anything else says the space is unknown rather than showing old numbers. It is quiet
  * information with no focus stop, spoken as one line.
@@ -97,6 +97,8 @@ private fun StorageRing(indicator: RecordingSpaceIndicator, arc: Color) {
         progress = { indicator.usedFraction },
         modifier = Modifier.size(StorageRingSize).testTag("recordings-space-ring"),
         color = arc,
+        trackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+        gapSize = 0.dp,
         strokeWidth = StorageRingStroke,
         strokeCap = StrokeCap.Round,
     )

@@ -36,7 +36,7 @@ import at.bernhardberger.tvhplayer.ui.components.RoundIconButton
 import at.bernhardberger.tvhplayer.ui.screens.BrowseLevelsPanel
 import at.bernhardberger.tvhplayer.ui.screens.BrowsePanelEntry
 
-/** The pills at the start of the Archive header, in focus order; each opens its panel. */
+/** The pills at the end of the Archive header, in focus order; each opens its panel. */
 internal enum class ArchivePill { GROUP, SORT, SHOW }
 
 internal fun DvrArchiveGrouping.labelRes(): Int = when (this) {
@@ -240,11 +240,16 @@ internal fun ArchivePillPanel(
                     key = "recordings-grouping-option-${option.name.lowercase()}",
                     label = stringResource(option.labelRes()),
                     selected = option == current.grouping,
+                    icon = when (option) {
+                        DvrArchiveGrouping.FLAT -> R.drawable.ic_view_list
+                        DvrArchiveGrouping.FOLDERS -> R.drawable.ic_folder
+                        DvrArchiveGrouping.CHANNELS -> R.drawable.ic_live_tv_outlined
+                        DvrArchiveGrouping.GENRES -> R.drawable.ic_theater_comedy
+                    },
                     onClick = { pick(current.copy(grouping = option)) },
                     supporting = stringResource(option.detailRes()),
                 )
             },
-            radio = true,
         )
         ArchivePill.SORT -> BrowseLevelsPanel(
             stringResource(R.string.recordings_sort_title), "recordings-sort-panel", onClose,
@@ -253,10 +258,10 @@ internal fun ArchivePillPanel(
                     key = "recordings-sort-option-${option.name.lowercase()}",
                     label = stringResource(option.labelRes()),
                     selected = option == current.sort,
+                    icon = option.pillRes().second,
                     onClick = { pick(current.copy(sort = option)) },
                 )
             },
-            radio = true,
         )
         ArchivePill.SHOW -> BrowseLevelsPanel(
             stringResource(R.string.recordings_show_title), "recordings-show-panel", onClose,
@@ -265,11 +270,11 @@ internal fun ArchivePillPanel(
                     key = "recordings-show-option-${option.name.lowercase()}",
                     label = stringResource(option.labelRes()),
                     selected = option == current.show,
+                    icon = option.iconRes(),
                     onClick = { pick(current.copy(show = option)) },
                     supporting = option.detailRes()?.let { stringResource(it) },
                 )
             },
-            radio = true,
         )
     }
 }

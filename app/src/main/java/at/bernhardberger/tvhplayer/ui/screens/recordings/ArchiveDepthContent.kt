@@ -188,7 +188,7 @@ private fun rememberArchiveLevels(
                                 val section = if (path.isEmpty()) sections[item.entry.id.value] else null
                                 Column {
                                     if (section != null) {
-                                        ArchiveDateDivider(dateSectionLabel(section), first = index == 0)
+                        ArchiveDateDivider(dateSectionLabel(section), first = index == 0)
                                     }
                                     RecordingListRow(
                                         entry = item.entry, piconPath = latestPiconForEntry.value(item.entry),

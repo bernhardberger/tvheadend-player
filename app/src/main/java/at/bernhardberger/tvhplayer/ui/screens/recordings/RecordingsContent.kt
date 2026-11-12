@@ -32,6 +32,7 @@ import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -53,6 +54,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -332,20 +334,22 @@ internal fun FolderListRow(
 }
 
 /**
- * The label that opens a day or month in the flat list, then a thin line. It is only drawn:
+ * The shared section label that opens a day or month in the flat list. It is only drawn:
  * the recording row under it is the focus stop, so Down from a day's last row lands on the next day's first.
  */
 @Composable
 internal fun ArchiveDateDivider(label: String, first: Boolean, modifier: Modifier = Modifier) {
-    Row(
-        modifier.fillMaxWidth().padding(top = if (first) 0.dp else TvSpacing12, bottom = TvSpacing4)
-            .semantics { heading() }.testTag("archive-date-divider"),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Spacer(Modifier.width(TvSpacing12))
-        androidx.compose.material3.HorizontalDivider(Modifier.weight(1f))
+    // Keep the first date band's occupied height: changing label typography must not move its row.
+    val firstBandHeight = if (first) {
+        val previousLabelHeight = rememberTextMeasurer().measure(
+            label, style = MaterialTheme.typography.titleSmall, maxLines = 1,
+        ).size.height
+        with(LocalDensity.current) { previousLabelHeight.toDp() } + TvSpacing4
+    } else 0.dp
+    Box(modifier.then(if (first) Modifier.heightIn(min = firstBandHeight) else Modifier)) {
+        at.bernhardberger.tvhplayer.ui.components.ListSectionLabel(
+            label, Modifier.testTag("archive-date-divider"), first = first,
+        )
     }
 }
 
@@ -647,10 +651,7 @@ internal fun RecordingSchedule(
             ) {
                 groups.forEachIndexed { index, section ->
                     item(key = "header-${section.kind}-${section.date}") {
-                        RecordingSectionHeader(
-                            text = scheduleSectionLabel(section),
-                            first = index == 0,
-                        )
+                        RecordingSectionHeader(text = scheduleSectionLabel(section), first = index == 0)
                     }
                     items(section.entries, key = { recordingItemKey(it.id) }) { entry ->
                         val rowKey = "recording:${recordingItemKey(entry.id)}"
@@ -1077,7 +1078,7 @@ internal fun recordingsHeaderMinHeight(): Dp = with(LocalDensity.current) {
 internal fun RecordingsPreparationSkeleton(contentPadding: PaddingValues, startPadding: Dp) {
     Column(Modifier.fillMaxSize().padding(top = contentPadding.calculateTopPadding())) {
         Spacer(Modifier.height(recordingsHeaderMinHeight()))
-        Spacer(Modifier.height(TvSpacing12))
+        Spacer(Modifier.height(TvSpacing12 + TvSpacing8))
         RecordingsSkeleton(Modifier.padding(start = startPadding + TvBrowseLeadingInset))
     }
 }

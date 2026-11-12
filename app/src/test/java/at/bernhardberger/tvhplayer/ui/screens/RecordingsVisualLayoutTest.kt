@@ -128,9 +128,9 @@ class RecordingsVisualLayoutTest {
         show()
         focused("recordings-folder-Documentaries")
         assertEquals(540f, bounds("recordings-archive-list").bottom, .1f)
-        // The pills sit above the list at the content's start, where the headline begins.
+        // The pills end at the common browse-header edge, independently of the headline.
         assertTrue(bounds("recordings-pills").bottom <= bounds("recordings-archive-list").top)
-        assertEquals(headingLeft(), bounds("recordings-pills").left, 1f)
+        assertEquals(bounds("recordings-header").right, bounds("recordings-pills").right, 1f)
         val grown = bounds("recordings-folder-Documentaries")
         compose.onNodeWithTag("depth-preview", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("recording-list-entry-2").assertDoesNotExist()
@@ -183,7 +183,7 @@ class RecordingsVisualLayoutTest {
 
     /** Eight recordings of the README evening's channels, with their logos, focused on the Documentaries folder. */
     private fun presentationLibrary(store: Boolean = false, firstRow: Boolean = false, problems: Boolean = false,
-        portrait: Boolean = false,
+        portrait: Boolean = false, scale: Float = 1f,
         diskSpace: DvrDiskSpaceState = DvrDiskSpaceState.Current(
             DvrDiskSpace(1_240_000_000_000L, 2_760_000_000_000L, 4_000_000_000_000L))) {
         assertTrue(android.os.SystemClock.setCurrentTimeMillis(1_791_144_900_000L))
@@ -245,7 +245,7 @@ class RecordingsVisualLayoutTest {
                 FixtureArt.art(if (portrait && index == 5) "glass-harbor-poster-2x3" else name)) }
         }))
         // A household server's disk, as the Recordings header reports it.
-        show(entries = library, channels = channels, diskSpace = diskSpace)
+        show(scale = scale, entries = library, channels = channels, diskSpace = diskSpace)
         compose.mainClock.advanceTimeBy(1_500)
         if (firstRow) {
             awaitList()
@@ -281,7 +281,7 @@ class RecordingsVisualLayoutTest {
         capture("store-recording", 1f, outputs = "build/outputs/presentation")
     }
 
-    @Test fun storageIndicatorIsQuietInformationOnThePillRowAtTheContentEndAndNeverMoves() {
+    @Test fun storageIndicatorIsQuietInformationLeftOfThePillsAndNeverMoves() {
         show(diskSpace = DvrDiskSpaceState.Current(DvrDiskSpace(412_000_000_000L, 1_588_000_000_000L, 2_000_000_000_000L)))
         compose.onNodeWithTag("recordings-space").assert(SemanticsMatcher.keyNotDefined(SemanticsActions.RequestFocus))
         // A ring beside the two-line figure, spoken as one description.
@@ -289,10 +289,10 @@ class RecordingsVisualLayoutTest {
         compose.onNodeWithTag("recordings-space").assertContentDescriptionContains("79% used", substring = true)
         focused("recordings-folder-Documentaries")
         val resting = bounds("recordings-space")
-        // At the content's end, on the pill row's line.
-        assertEquals(bounds("recordings-header").right, resting.right, .5f)
+        // The indicator sits directly left of the trailing pills, with the agreed separation.
+        assertEquals(bounds("recordings-header").right, bounds("recordings-pills").right, .5f)
         assertEquals(bounds("recordings-pills").center.y, resting.center.y, 2f)
-        assertTrue(bounds("recordings-pills").right <= resting.left)
+        assertEquals(40f, bounds("recordings-pills").left - resting.right, .5f)
         // Neither a folder nor the pills move it.
         key(Key.DirectionRight)
         focused("recordings-folder-Documentaries/Expeditions")
@@ -307,7 +307,8 @@ class RecordingsVisualLayoutTest {
         compose.onNodeWithTag("recordings-space").assertExists()
         compose.onNodeWithTag("recordings-space-ring", useUnmergedTree = true).assertDoesNotExist()
         focused("recordings-folder-Documentaries")
-        assertEquals(bounds("recordings-header").right, bounds("recordings-space").right, .5f)
+        assertEquals(bounds("recordings-header").right, bounds("recordings-pills").right, .5f)
+        assertTrue(bounds("recordings-space").right < bounds("recordings-pills").left)
         capture("header-no-space", 1f)
     }
 
@@ -489,6 +490,66 @@ class RecordingsVisualLayoutTest {
         assertNoCommands()
     }
 
+    @Test fun choosingAnArrangementResetsTheViewportAndDownEntryToTheFirstRow() {
+        startView = DvrArchiveView(grouping = DvrArchiveGrouping.FLAT)
+        show(entries = (1L..30L).map { recording(it, "Recording $it", "recording$it.ts") })
+        upToPills()
+        key(Key.DirectionRight)
+        key(Key.DirectionCenter)
+        key(Key.DirectionDown)
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("recording-list-entry-30").assertIsDisplayed()
+        key(Key.DirectionDown)
+        focused("recording-list-entry-30")
+    }
+
+    @Test fun rightAfterResortingGenresEntersThePreviewNotThePills() {
+        startView = DvrArchiveView(grouping = DvrArchiveGrouping.GENRES)
+        presentationLibrary(firstRow = true)
+        upToPills()
+        key(Key.DirectionRight)
+        key(Key.DirectionCenter)
+        key(Key.DirectionDown)
+        key(Key.DirectionCenter)
+        key(Key.DirectionCenter)
+        key(Key.DirectionUp)
+        key(Key.DirectionCenter)
+        key(Key.DirectionDown)
+        assertTrue(listRowFocused())
+        key(Key.DirectionRight)
+        assertFalse("Right from a row must not enter the pill row", pillFocused())
+        assertTrue("Right enters the folder preview", listRowFocused())
+    }
+
+    @Test fun closingAPillPanelGoesStraightToThePillWithoutFocusingAnyRow() {
+        startView = DvrArchiveView(grouping = DvrArchiveGrouping.FLAT)
+        show(entries = (1L..30L).map { recording(it, "Recording $it", "recording$it.ts") })
+        focused("recording-list-entry-1")
+        upToPills()
+        key(Key.DirectionRight)
+        focused(PILL_SORT)
+        key(Key.DirectionCenter)
+        focused("recordings-sort-option-newest")
+        key(Key.DirectionDown)
+        focused("recordings-sort-option-oldest")
+        // OK picks: from here on no frame may show a list row holding the focus before the pill has it.
+        compose.mainClock.autoAdvance = false
+        try {
+            compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
+            var frames = 0
+            while (!tagFocused(PILL_SORT)) {
+                assertFalse("A list row held the focus on its way back to the pill", listRowFocused())
+                assertTrue("The pill never took the focus", frames++ < 60)
+                compose.mainClock.advanceTimeByFrame()
+                compose.waitForIdle()
+            }
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        compose.waitForIdle()
+        assertNoCommands()
+    }
+
     @Test fun aFlatListSortsTheRunningRecordingInPlaceAndItsDateDividersTakeNoFocus() {
         startView = DvrArchiveView(grouping = DvrArchiveGrouping.FLAT)
         show(entries = (1L..5L).map { recording(it, "Recording $it", "recording$it.ts") } +
@@ -499,6 +560,10 @@ class RecordingsVisualLayoutTest {
         assertTrailingStateMark(6, "Recording now")
         compose.onAllNodesWithTag("archive-date-divider", useUnmergedTree = true).fetchSemanticsNodes().let {
             assertTrue("A day opens with its label", it.isNotEmpty())
+            assertTrue("Date labels remain accessible section headings", it.all { node ->
+                node.config.contains(SemanticsProperties.Heading) &&
+                    node.config.contains(SemanticsProperties.ContentDescription)
+            })
         }
         key(Key.DirectionDown)
         focused("recording-list-entry-1")
@@ -683,6 +748,32 @@ class RecordingsVisualLayoutTest {
         capture("5-flat-name-az-partially-watched", 1f, outputs = PILL_CAPTURES)
     }
 
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun pillFrameFlatDefaults() {
+        startView = DvrArchiveView(DvrArchiveGrouping.FLAT)
+        presentationLibrary(firstRow = true)
+        assertEquals("Flat headline-to-first-row gap stays at HEAD", 30.5f, headlineToFirstRowGap(), .1f)
+        capture("15-flat-default-header", 1f, outputs = PILL_CAPTURES)
+    }
+
+    @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun widestPillsAndStorageFitTheGermanHeaderAtLargeText() {
+        Locale.setDefault(Locale.GERMANY)
+        // These are the widest current pill labels, including locale fallback where untranslated.
+        startView = DvrArchiveView(DvrArchiveGrouping.CHANNELS, DvrArchiveSort.NAME, DvrArchiveShow.UNWATCHED)
+        presentationLibrary(firstRow = true, scale = 1.3f)
+        val header = bounds("recordings-header")
+        val storage = bounds("recordings-space")
+        val pills = bounds("recordings-pills")
+        assertTrue("Storage fits without overlapping the empty leading area", storage.left >= header.left)
+        assertTrue("Storage and pills do not overlap", storage.right < pills.left)
+        assertEquals(header.right, pills.right, .5f)
+        listOf(PILL_GROUP, PILL_SORT, PILL_SHOW).forEach { compose.onNodeWithTag(it).assertIsDisplayed() }
+        capture("16-german-widest-header", 1.3f, outputs = PILL_CAPTURES)
+    }
+
     private fun diskSpacePercentUsed(used: Int) = DvrDiskSpaceState.Current(
         DvrDiskSpace(4_000_000_000_000L * (100 - used) / 100, 4_000_000_000_000L * used / 100, 4_000_000_000_000L))
 
@@ -720,6 +811,7 @@ class RecordingsVisualLayoutTest {
         startView = DvrArchiveView(DvrArchiveGrouping.FLAT)
         presentationLibrary(firstRow = true, diskSpace = DvrDiskSpaceState.Unknown)
         compose.mainClock.advanceTimeBy(1_500)
+        assertEquals("Flat headline-to-first-row gap stays at HEAD", 30.5f, headlineToFirstRowGap(), .1f)
         capture("7-unknown-flat-root", 1f, outputs = PILL_CAPTURES)
         captureCorner("storage-unknown-corner")
     }
@@ -730,7 +822,11 @@ class RecordingsVisualLayoutTest {
         startView = DvrArchiveView(DvrArchiveGrouping.FOLDERS)
         presentationLibrary(firstRow = true)
         compose.mainClock.advanceTimeBy(1_500)
+        assertEquals("Folders headline-to-first-row gap stays at HEAD", 10f, headlineToFirstRowGap(), .1f)
         capture("13-folders-root-heading-spacing", 1f, outputs = PILL_CAPTURES)
+        upToPills()
+        key(Key.DirectionCenter)
+        capture("14-group-panel", 1f, outputs = PILL_CAPTURES)
     }
 
     /** The Schedule screen's two subnav tabs. */
@@ -742,6 +838,10 @@ class RecordingsVisualLayoutTest {
         openScheduleScreen()
         compose.mainClock.advanceTimeBy(1_500)
         capture("8-schedule-screen-with-badge", 1f, outputs = PILL_CAPTURES)
+        key(Key.DirectionLeft)
+        compose.mainClock.advanceTimeBy(1_500)
+        capture("8b-schedule-expanded-badge", 1f, outputs = PILL_CAPTURES)
+        key(Key.DirectionRight)
         key(Key.DirectionUp)
         key(Key.DirectionRight)
         key(Key.DirectionDown)
@@ -1850,6 +1950,11 @@ class RecordingsVisualLayoutTest {
     private fun bounds(tag: String): Rect = compose.tagBounds(tag)
 
     private fun headingLeft() = compose.onAllNodesWithTag("archive-level-heading")[0].fetchSemanticsNode().boundsInRoot.left
+    private fun headlineToFirstRowGap(): Float {
+        val heading = compose.onAllNodesWithTag("archive-level-heading").fetchSemanticsNodes()
+            .minBy { it.boundsInRoot.left }.boundsInRoot
+        return (visibleListRows().first().top - heading.bottom) / 2f
+    }
 
     private fun assertTrailingStateMark(id: Int, description: String) {
         compose.onNodeWithTag("recording-list-state-$id", useUnmergedTree = true)
@@ -2049,13 +2154,15 @@ class RecordingsVisualLayoutTest {
         }
     }
 
-    /** The header's top-right corner at 1:1 (x 1400-1840, y 30-170 of the 1920x1080 frame) for the storage block. */
+    /** The storage block at 1:1, wherever the trailing pills place it. */
     private fun captureCorner(name: String) {
         if (!CaptureOutput.enabled) return
+        val storage = bounds("recordings-space")
         compose.runOnIdle {
             val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
             view.draw(Canvas(bitmap))
-            val crop = Bitmap.createBitmap(bitmap, 1400, 30, 440, 140)
+            val crop = Bitmap.createBitmap(bitmap, storage.left.toInt() - 16, storage.top.toInt() - 16,
+                storage.width.toInt() + 32, storage.height.toInt() + 32)
             File(File(PILL_CAPTURES).apply { mkdirs() }, "$name.png").outputStream().use {
                 assertTrue(crop.compress(Bitmap.CompressFormat.PNG, 100, it))
             }
