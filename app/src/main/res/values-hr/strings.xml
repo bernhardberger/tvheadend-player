@@ -24,7 +24,6 @@
     <string name="recording_profile_default">Zadani profil</string>
     <string name="recording_space_title">Prostor za snimke</string>
     <string name="recording_space_value">%1$s slobodno od %2$s</string>
-    <string name="recording_space_line_description">Prostor za snimke: %1$s</string>
     <string name="recording_confirmation_profile">Profil snimanja: %1$s</string>
     <string name="recording_confirmation_owner">Vlasnik snimke: %1$s</string>
     <string name="context_watch">Gledaj</string>

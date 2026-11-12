@@ -24,7 +24,6 @@
     <string name="recording_profile_default">默认配置</string>
     <string name="recording_space_title">录制空间</string>
     <string name="recording_space_value">可用%1$s，共%2$s</string>
-    <string name="recording_space_line_description">录制空间：%1$s</string>
     <string name="recording_confirmation_profile">录制配置：%1$s</string>
     <string name="recording_confirmation_owner">录制所有者：%1$s</string>
     <string name="context_watch">观看</string>

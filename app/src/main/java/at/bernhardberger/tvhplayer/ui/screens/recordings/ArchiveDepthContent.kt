@@ -37,9 +37,7 @@ import at.bernhardberger.tvhplayer.core.dvrDateSectionStarts
 import at.bernhardberger.tvhplayer.ui.common.formatDayHeader
 import at.bernhardberger.tvhplayer.core.offeredResumePosition
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnGap
-import at.bernhardberger.tvhplayer.ui.TvIconButtonSize
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
-import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.components.depth.*
 
 internal fun archiveLevelId(path: List<String>): String = "archive:${path.joinToString("/")}"
@@ -232,7 +230,9 @@ private fun archiveDateSections(
     sort: DvrArchiveSort,
     nowSeconds: () -> Long,
 ): Map<Long, DvrDateSection> {
-    if (grouping != DvrArchiveGrouping.FLAT || sort != DvrArchiveSort.NEWEST) return emptyMap()
+    // Dates divide a flat list only when the date is what orders it.
+    val byDate = sort == DvrArchiveSort.NEWEST || sort == DvrArchiveSort.OLDEST
+    if (grouping != DvrArchiveGrouping.FLAT || !byDate) return emptyMap()
     val starts = dvrDateSectionStarts(
         root.recordings, java.time.Instant.ofEpochSecond(nowSeconds()), java.time.ZoneId.systemDefault(),
     )
@@ -276,13 +276,12 @@ private fun dateSectionLabel(section: DvrDateSection): String = when (section) {
 }
 
 /**
- * Every Recordings tab's first heading uses this band, so first rows line up across tabs. It is as tall
- * as a header icon button with a margin, the height the other tabs' headings already hold.
+ * Every Recordings tab's first heading uses this band, so first rows line up across tabs.
  */
 @Composable
 internal fun recordingsHeadingBandHeight(): Dp {
     val lineHeight = with(LocalDensity.current) { MaterialTheme.typography.titleLarge.lineHeight.toDp() }
-    return maxOf(32.dp, lineHeight + 4.dp, TvIconButtonSize + TvSpacing8)
+    return maxOf(32.dp, lineHeight + 4.dp)
 }
 
 /** The preview-slot heading reads at the row title size: titleMedium 16sp of titleLarge 22sp. */
@@ -295,7 +294,7 @@ internal const val ArchiveHeadingPreviewScale = 16f / 22f
  */
 @Composable
 private fun ArchiveLevelHeading(name: String, emphasis: () -> Float) {
-    Box(Modifier.fillMaxWidth().height(recordingsHeadingBandHeight()), contentAlignment = Alignment.CenterStart) {
+    Box(Modifier.fillMaxWidth().height(recordingsHeadingBandHeight())) {
         if (name.isNotEmpty()) Text(
             name, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
             color = MaterialTheme.colorScheme.onSurface,

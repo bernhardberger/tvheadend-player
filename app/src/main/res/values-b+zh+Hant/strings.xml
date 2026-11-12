@@ -24,7 +24,6 @@
     <string name="recording_profile_default">預設設定檔</string>
     <string name="recording_space_title">錄影空間</string>
     <string name="recording_space_value">可用%1$s，總計%2$s</string>
-    <string name="recording_space_line_description">錄影空間：%1$s</string>
     <string name="recording_confirmation_profile">錄影設定檔：%1$s</string>
     <string name="recording_confirmation_owner">錄影擁有者：%1$s</string>
     <string name="context_watch">觀看</string>

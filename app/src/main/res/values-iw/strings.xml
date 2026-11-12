@@ -24,7 +24,6 @@
     <string name="recording_profile_default">פרופיל ברירת המחדל</string>
     <string name="recording_space_title">אחסון הקלטות</string>
     <string name="recording_space_value">%1$s פנויים מתוך %2$s</string>
-    <string name="recording_space_line_description">אחסון הקלטות: %1$s</string>
     <string name="recording_confirmation_profile">פרופיל הקלטה: %1$s</string>
     <string name="recording_confirmation_owner">בעל ההקלטה: %1$s</string>
     <string name="context_watch">צפייה</string>

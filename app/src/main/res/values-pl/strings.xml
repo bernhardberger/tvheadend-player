@@ -24,7 +24,6 @@
     <string name="recording_profile_default">Profil domyślny</string>
     <string name="recording_space_title">Miejsce na nagrania</string>
     <string name="recording_space_value">%1$s wolnego z %2$s</string>
-    <string name="recording_space_line_description">Miejsce na nagrania: %1$s</string>
     <string name="recording_confirmation_profile">Profil nagrywania: %1$s</string>
     <string name="recording_confirmation_owner">Właściciel nagrania: %1$s</string>
     <string name="context_watch">Oglądaj</string>

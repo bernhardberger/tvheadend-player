@@ -24,7 +24,6 @@
     <string name="recording_profile_default">Standardprofil</string>
     <string name="recording_space_title">Opptaksplass</string>
     <string name="recording_space_value">%1$s ledig av %2$s</string>
-    <string name="recording_space_line_description">Opptaksplass: %1$s</string>
     <string name="recording_confirmation_profile">Opptaksprofil: %1$s</string>
     <string name="recording_confirmation_owner">Opptakseier: %1$s</string>
     <string name="context_watch">Se</string>

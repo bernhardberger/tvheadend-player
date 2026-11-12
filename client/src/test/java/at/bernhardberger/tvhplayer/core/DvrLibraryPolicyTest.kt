@@ -225,6 +225,28 @@ class DvrLibraryPolicyTest {
 
         assertEquals(listOf("alpha channel", "Zeta", "No channel"), root.folders.map { it.name })
         assertEquals(listOf(alphaNewer, alpha, bravo, untitled), root.folders.single { it.name == "Zeta" }.recordings)
+
+        val descending = buildDvrArchive(
+            listOf(bravo, alpha, alphaNewer, untitled, other, orphan), DvrArchiveGrouping.CHANNELS,
+            naming(), DvrArchiveSort.NAME_DESCENDING,
+        )
+        assertEquals(listOf("Zeta", "alpha channel", "No channel"), descending.folders.map { it.name })
+        assertEquals(listOf(bravo, alphaNewer, alpha, untitled), descending.folders.single { it.name == "Zeta" }.recordings)
+    }
+
+    @Test fun sortByOldestOrdersRecordingsAndGroupsByTheirOldestStartWithUnknownStartLastAtEveryLevel() {
+        val a = sized(1, 300, "a", 1, folder = listOf("Series", "Season"))
+        val b = sized(2, 100, "b", 1, folder = listOf("Series", "Season"))
+        val undated = DvrEntry.create(DvrEntryId(3), state = DvrEntryState.COMPLETED, folder = listOf("Series", "Season"))
+        val film = sized(4, 200, "c", 1, folder = listOf("Film"))
+        val loose = sized(5, 50, "loose", 1, folder = emptyList())
+        val looseNewer = sized(6, 500, "loose newer", 1, folder = emptyList())
+        val root = buildDvrArchive(listOf(a, b, undated, film, loose, looseNewer), DvrArchiveGrouping.FOLDERS,
+            naming(), DvrArchiveSort.OLDEST)
+
+        assertEquals(listOf("Series", "Film"), root.folders.map { it.name })
+        assertEquals(listOf(b, a, undated), root.folderAt(listOf("Series", "Season"))?.recordings)
+        assertEquals(listOf(loose, looseNewer), root.recordings)
     }
 
     @Test fun sortByLargestOrdersBySizeThenNewestWithUnknownSizeLastAtEveryLevel() {
@@ -241,6 +263,12 @@ class DvrLibraryPolicyTest {
         assertEquals(listOf("Film", "Series"), root.folders.map { it.name })
         assertEquals(listOf(big, tie, small, unknown), root.folderAt(listOf("Series", "Season"))?.recordings)
         assertEquals(listOf(looseBig, looseSmall), root.recordings)
+
+        val smallest = buildDvrArchive(listOf(small, big, tie, unknown, huge, looseSmall, looseBig), DvrArchiveGrouping.FOLDERS,
+            naming(), DvrArchiveSort.SMALLEST)
+        assertEquals(listOf("Series", "Film"), smallest.folders.map { it.name })
+        assertEquals(listOf(tie, small, big, unknown), smallest.folderAt(listOf("Series", "Season"))?.recordings)
+        assertEquals(listOf(looseSmall, looseBig), smallest.recordings)
     }
 
     @Test fun eachShowValueKeepsItsRecordingsDropsTheGroupsItEmptiesAndNeverHidesARunningOne() {

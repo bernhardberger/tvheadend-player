@@ -24,7 +24,6 @@
     <string name="recording_profile_default">Oletusprofiili</string>
     <string name="recording_space_title">Tallennustila</string>
     <string name="recording_space_value">%1$s vapaana, yhteensä %2$s</string>
-    <string name="recording_space_line_description">Tallennustila: %1$s</string>
     <string name="recording_confirmation_profile">Tallennusprofiili: %1$s</string>
     <string name="recording_confirmation_owner">Tallenteen omistaja: %1$s</string>
     <string name="context_watch">Katso</string>

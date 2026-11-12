@@ -24,7 +24,6 @@
     <string name="recording_profile_default">Standardprofil</string>
     <string name="recording_space_title">Inspelningsutrymme</string>
     <string name="recording_space_value">%1$s ledigt av %2$s</string>
-    <string name="recording_space_line_description">Inspelningsutrymme: %1$s</string>
     <string name="recording_confirmation_profile">Inspelningsprofil: %1$s</string>
     <string name="recording_confirmation_owner">Inspelningens ägare: %1$s</string>
     <string name="context_watch">Titta</string>

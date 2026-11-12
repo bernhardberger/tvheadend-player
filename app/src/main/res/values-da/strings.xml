@@ -24,7 +24,6 @@
     <string name="recording_profile_default">Standardprofil</string>
     <string name="recording_space_title">Optagelsesplads</string>
     <string name="recording_space_value">%1$s ledig af %2$s</string>
-    <string name="recording_space_line_description">Optagelsesplads: %1$s</string>
     <string name="recording_confirmation_profile">Optagelsesprofil: %1$s</string>
     <string name="recording_confirmation_owner">Optagelsens ejer: %1$s</string>
     <string name="context_watch">Se</string>

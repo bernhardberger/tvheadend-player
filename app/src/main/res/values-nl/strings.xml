@@ -24,7 +24,6 @@
     <string name="recording_profile_default">Standaardprofiel</string>
     <string name="recording_space_title">Opnameruimte</string>
     <string name="recording_space_value">%1$s vrij van %2$s</string>
-    <string name="recording_space_line_description">Opnameruimte: %1$s</string>
     <string name="recording_confirmation_profile">Opnameprofiel: %1$s</string>
     <string name="recording_confirmation_owner">Eigenaar van de opname: %1$s</string>
     <string name="context_watch">Kijken</string>

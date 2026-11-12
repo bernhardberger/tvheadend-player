@@ -24,7 +24,6 @@
     <string name="recording_profile_default">Perfil padrão</string>
     <string name="recording_space_title">Espaço para gravações</string>
     <string name="recording_space_value">%1$s livres de %2$s</string>
-    <string name="recording_space_line_description">Espaço para gravações: %1$s</string>
     <string name="recording_confirmation_profile">Perfil de gravação: %1$s</string>
     <string name="recording_confirmation_owner">Responsável pela gravação: %1$s</string>
     <string name="context_watch">Assistir</string>

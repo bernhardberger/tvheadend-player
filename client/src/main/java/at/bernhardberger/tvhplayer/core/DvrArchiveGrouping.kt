@@ -101,10 +101,16 @@ fun DvrArchiveShow.shows(state: RecordingWatchState): Boolean = when (this) {
 enum class DvrArchiveSort {
     /** Recordings by start and groups by their newest recording; catch-all groups stay last. */
     NEWEST,
-    /** By title, or by group name; locale-aware and case-insensitive. */
+    /** Recordings by start and groups by their oldest recording, oldest first. */
+    OLDEST,
+    /** By title, or by group name, A to Z; locale-aware and case-insensitive. */
     NAME,
-    /** By file size, or by the total size of a group. */
+    /** By title, or by group name, Z to A. */
+    NAME_DESCENDING,
+    /** By file size, or by the total size of a group, largest first. */
     LARGEST,
+    /** By file size, or by the total size of a group, smallest first. */
+    SMALLEST,
 }
 
 /**
@@ -125,33 +131,53 @@ private fun DvrArchiveFolder.arranged(sort: DvrArchiveSort, lastGroup: String?):
     return sorted()
 }
 
+/** Titles in collator order, a missing or blank title after every named one in both directions. */
+private class TitleOrder(private val collator: Collator, private val descending: Boolean) : Comparator<DvrEntry> {
+    override fun compare(a: DvrEntry, b: DvrEntry): Int {
+        val left = a.title?.takeIf(String::isNotBlank)
+        val right = b.title?.takeIf(String::isNotBlank)
+        return when {
+            left == null && right == null -> 0
+            left == null -> 1
+            right == null -> -1
+            descending -> collator.compare(right, left)
+            else -> collator.compare(left, right)
+        }
+    }
+}
+
 private fun archiveRecordingOrder(
     sort: DvrArchiveSort,
     collator: Collator,
     newest: Comparator<DvrEntry>,
-): Comparator<DvrEntry> = when (sort) {
-    DvrArchiveSort.NEWEST -> newest
-    DvrArchiveSort.NAME -> Comparator<DvrEntry> { a, b ->
-        val left = a.title?.takeIf(String::isNotBlank)
-        val right = b.title?.takeIf(String::isNotBlank)
-        when {
-            left == null && right == null -> 0
-            left == null -> 1
-            right == null -> -1
-            else -> collator.compare(left, right)
-        }
-    }.then(newest)
-    DvrArchiveSort.LARGEST -> compareByDescending<DvrEntry> { recordingSizeBytes(it) ?: -1L }.then(newest)
+): Comparator<DvrEntry> {
+    return when (sort) {
+        DvrArchiveSort.NEWEST -> newest
+        // Without a known start, title or size a recording comes last in both directions.
+        DvrArchiveSort.OLDEST -> compareBy<DvrEntry> { it.start?.epochSeconds ?: Long.MAX_VALUE }
+        DvrArchiveSort.NAME -> TitleOrder(collator, descending = false).then(newest)
+        DvrArchiveSort.NAME_DESCENDING -> TitleOrder(collator, descending = true).then(newest)
+        DvrArchiveSort.LARGEST -> compareByDescending<DvrEntry> { recordingSizeBytes(it) ?: -1L }.then(newest)
+        DvrArchiveSort.SMALLEST -> compareBy<DvrEntry> { recordingSizeBytes(it) ?: Long.MAX_VALUE }.then(newest)
+    }
 }
 
-private fun archiveGroupOrder(sort: DvrArchiveSort, collator: Collator): Comparator<DvrArchiveFolder> =
-    when (sort) {
-        DvrArchiveSort.NEWEST -> compareByDescending { it.newestRecordingStart ?: Long.MIN_VALUE }
-        DvrArchiveSort.NAME -> Comparator<DvrArchiveFolder> { a, b -> collator.compare(a.name, b.name) }
-            .thenByDescending { it.newestRecordingStart ?: Long.MIN_VALUE }
+private fun archiveGroupOrder(sort: DvrArchiveSort, collator: Collator): Comparator<DvrArchiveFolder> {
+    val newestFirst = compareByDescending<DvrArchiveFolder> { it.newestRecordingStart ?: Long.MIN_VALUE }
+    return when (sort) {
+        DvrArchiveSort.NEWEST -> newestFirst
+        DvrArchiveSort.OLDEST ->
+            compareBy<DvrArchiveFolder> { summarizeDvrFolder(it).oldestStart ?: Long.MAX_VALUE }.then(newestFirst)
+        DvrArchiveSort.NAME ->
+            Comparator<DvrArchiveFolder> { a, b -> collator.compare(a.name, b.name) }.then(newestFirst)
+        DvrArchiveSort.NAME_DESCENDING ->
+            Comparator<DvrArchiveFolder> { a, b -> collator.compare(b.name, a.name) }.then(newestFirst)
         DvrArchiveSort.LARGEST -> compareByDescending<DvrArchiveFolder> { summarizeDvrFolder(it).totalSizeBytes }
-            .thenByDescending { it.newestRecordingStart ?: Long.MIN_VALUE }
+            .then(newestFirst)
+        DvrArchiveSort.SMALLEST -> compareBy<DvrArchiveFolder> { summarizeDvrFolder(it).totalSizeBytes }
+            .then(newestFirst)
     }
+}
 
 private fun List<DvrEntry>.newestFirst() = sortedByDescending { it.start?.epochSeconds ?: Long.MIN_VALUE }
 

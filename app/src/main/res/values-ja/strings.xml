@@ -24,7 +24,6 @@
     <string name="recording_profile_default">デフォルトのプロファイル</string>
     <string name="recording_space_title">録画用ストレージ</string>
     <string name="recording_space_value">%2$s中%1$s空き</string>
-    <string name="recording_space_line_description">録画用ストレージ：%1$s</string>
     <string name="recording_confirmation_profile">録画プロファイル：%1$s</string>
     <string name="recording_confirmation_owner">録画の所有者：%1$s</string>
     <string name="context_watch">視聴</string>

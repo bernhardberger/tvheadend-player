@@ -24,7 +24,6 @@
     <string name="recording_profile_default">Výchozí profil</string>
     <string name="recording_space_title">Místo pro nahrávky</string>
     <string name="recording_space_value">%1$s volných z %2$s</string>
-    <string name="recording_space_line_description">Místo pro nahrávky: %1$s</string>
     <string name="recording_confirmation_profile">Profil nahrávání: %1$s</string>
     <string name="recording_confirmation_owner">Vlastník nahrávky: %1$s</string>
     <string name="context_watch">Sledovat</string>

@@ -19,6 +19,12 @@ val TvRecordingFocusedColor = Color(0xFFBA1A1A)
 val TvRecordingContainerColor = Color(0xFFD93025)
 val TvOnRecordingContainerColor = Color.White
 
+/**
+ * The warning amber, the same pastel tone as colorScheme.error (T80 family) so the two read as one scale:
+ * warning before error. The theme has no light scheme. Not the tertiary orange, which means something else.
+ */
+val TvWarningColor = Color(0xFFFFDF9E)
+
 // Static neutral tones from the cyan Material palette. TV Material does not yet
 // expose the surface-container roles; use these for panels instead of tinting
 // surface by elevation. Opacity over video is applied separately by the caller.

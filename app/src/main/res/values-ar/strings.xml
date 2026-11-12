@@ -24,7 +24,6 @@
     <string name="recording_profile_default">الملف الافتراضي</string>
     <string name="recording_space_title">مساحة تخزين التسجيلات</string>
     <string name="recording_space_value">%1$s متاحة من %2$s</string>
-    <string name="recording_space_line_description">مساحة تخزين التسجيلات: %1$s</string>
     <string name="recording_confirmation_profile">ملف التسجيل: %1$s</string>
     <string name="recording_confirmation_owner">مالك التسجيل: %1$s</string>
     <string name="context_watch">مشاهدة</string>

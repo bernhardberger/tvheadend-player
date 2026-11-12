@@ -24,7 +24,6 @@
     <string name="recording_profile_default">Типовий профіль</string>
     <string name="recording_space_title">Місце для записів</string>
     <string name="recording_space_value">Вільно %1$s із %2$s</string>
-    <string name="recording_space_line_description">Місце для записів: %1$s</string>
     <string name="recording_confirmation_profile">Профіль запису: %1$s</string>
     <string name="recording_confirmation_owner">Власник запису: %1$s</string>
     <string name="context_watch">Дивитися</string>

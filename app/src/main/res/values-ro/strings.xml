@@ -24,7 +24,6 @@
     <string name="recording_profile_default">Profil implicit</string>
     <string name="recording_space_title">Spațiu pentru înregistrări</string>
     <string name="recording_space_value">%1$s liber din %2$s</string>
-    <string name="recording_space_line_description">Spațiu pentru înregistrări: %1$s</string>
     <string name="recording_confirmation_profile">Profil de înregistrare: %1$s</string>
     <string name="recording_confirmation_owner">Proprietarul înregistrării: %1$s</string>
     <string name="context_watch">Vizionează</string>

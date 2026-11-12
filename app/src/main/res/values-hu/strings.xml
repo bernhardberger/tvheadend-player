@@ -24,7 +24,6 @@
     <string name="recording_profile_default">Alapértelmezett profil</string>
     <string name="recording_space_title">Felvételek tárhelye</string>
     <string name="recording_space_value">%1$s szabad, összesen %2$s</string>
-    <string name="recording_space_line_description">Felvételek tárhelye: %1$s</string>
     <string name="recording_confirmation_profile">Felvételi profil: %1$s</string>
     <string name="recording_confirmation_owner">Felvétel tulajdonosa: %1$s</string>
     <string name="context_watch">Megnézés</string>

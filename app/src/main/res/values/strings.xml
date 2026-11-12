@@ -84,7 +84,10 @@
     <string name="recording_space_title">Recording space</string>
     <!-- Recording storage line. %1$s = free space, %2$s = total space, both like "120 GB". -->
     <string name="recording_space_value">%1$s free of %2$s</string>
-    <string name="recording_space_line_description">Recording space: %1$s</string>
+    <string name="recording_space_free">%1$s free</string>
+    <string name="recording_space_of_total">of %1$s</string>
+    <string name="recording_space_unknown">Disk space unknown</string>
+    <string name="recording_space_description">%1$s free of %2$s, %3$d%% used</string>
     <string name="recording_confirmation_profile">Recording profile: %1$s</string>
     <string name="recording_confirmation_owner">Recording owner: %1$s</string>
     <!-- Menu action on a channel or program: start watching it now. Imperative verb. Max 14. -->
@@ -606,14 +609,23 @@
     <!-- Archive view options: the sort order, the filter and the empty state the filter can cause. -->
     <string name="recordings_sort_title">Sort</string>
     <string name="recordings_sort_newest">Newest first</string>
+    <string name="recordings_sort_oldest">Oldest first</string>
     <string name="recordings_sort_name">Name A–Z</string>
+    <string name="recordings_sort_name_descending">Name Z–A</string>
     <string name="recordings_sort_largest">Largest first</string>
+    <string name="recordings_sort_smallest">Smallest first</string>
+    <!-- The one word on the Sort pill; its arrow gives the direction. -->
+    <string name="recordings_sort_field_date">Date</string>
+    <string name="recordings_sort_field_name">Name</string>
+    <string name="recordings_sort_field_size">Size</string>
     <!-- The Show pill and its choices: which recordings the Archive lists. The pill value is max 17. -->
     <string name="recordings_show_title">Show</string>
     <string name="recordings_show_option_all">All</string>
     <string name="recordings_show_unwatched">Unwatched</string>
     <string name="recordings_show_partially_watched">Partially watched</string>
     <string name="recordings_show_watched">Watched</string>
+    <!-- The one word on the Show pill for Partially watched. -->
+    <string name="recordings_show_partial">Partial</string>
     <string name="recordings_show_unwatched_detail">Not played to the end</string>
     <string name="recordings_show_partially_watched_detail">Started but not finished</string>
     <string name="recordings_show_watched_detail">Played to the end</string>
@@ -622,7 +634,7 @@
     <string name="recordings_empty_not_watched_folder">Everything in this folder has been played.</string>
     <string name="recordings_empty_started">Nothing started yet.</string>
     <string name="recordings_empty_watched">Nothing has been watched to the end yet.</string>
-    <!-- The Schedule pill's spoken name while recording problems are listed behind it. -->
+    <!-- The Schedule drawer item's spoken name while recording problems are listed behind it. -->
     <plurals name="recordings_schedule_problems_description">
         <item quantity="one">Schedule, %1$d problem</item>
         <item quantity="other">Schedule, %1$d problems</item>

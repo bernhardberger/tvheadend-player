@@ -154,14 +154,14 @@ class BrowseErrorAlertTest {
         awaitFocus("tv-recovery-primary")
     }
 
-    @Test fun recordingsDoNotTakeFocusFromTheSchedulePillWhenAnAlertAppears() {
+    @Test fun recordingsDoNotTakeFocusFromThePillsWhenAnAlertAppears() {
         connection = ConnectionUiState.Connecting
         show(recordings = true)
-        awaitFocus("recordings-pill-schedule")
+        awaitFocus("recordings-pill-group")
         key(Key.DirectionRight)
         compose.runOnIdle { connection = backoff() }
         compose.waitForIdle()
-        compose.onNode(hasTestTag("recordings-pill-schedule") and isFocused()).assertExists()
+        compose.onNode(hasTestTag("recordings-pill-sort") and isFocused()).assertExists()
         key(Key.DirectionDown)
         awaitFocus("tv-recovery-primary")
     }

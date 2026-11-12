@@ -401,12 +401,12 @@ class BrowseCohesionEvidenceTest {
     }
 
     @Test
-    fun recordingsEmptyLibraryKeepsTheSchedulePillReachable() {
+    fun recordingsEmptyLibraryKeepsThePillsReachable() {
         showRecordings(1f, empty = true)
         // Library preparation runs off-main; a composed frame alone is not readiness.
-        awaitFocus(hasTestTag("recordings-pill-schedule"))
+        awaitFocus(hasTestTag("recordings-pill-group"))
         compose.onNodeWithText("No recordings are available.").assertIsDisplayed()
-        capture("recordings-empty", 1f, "Empty recording library; Schedule pill", hasTestTag("recordings-pill-schedule"))
+        capture("recordings-empty", 1f, "Empty recording library; Group pill", hasTestTag("recordings-pill-group"))
     }
 
     private fun showChannels(scale: Float) {

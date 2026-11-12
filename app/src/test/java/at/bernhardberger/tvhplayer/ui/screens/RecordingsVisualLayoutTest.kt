@@ -50,6 +50,7 @@ import at.bernhardberger.tvhplayer.core.DvrArchiveGrouping
 import at.bernhardberger.tvhplayer.core.DvrArchiveView
 import at.bernhardberger.tvhplayer.core.DvrArchiveSort
 import at.bernhardberger.tvhplayer.core.DvrArchiveShow
+import at.bernhardberger.tvhplayer.core.partitionDvrLibrary
 import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.common.formatFileSize
@@ -93,7 +94,8 @@ class RecordingsVisualLayoutTest {
     private lateinit var oldZone: TimeZone
     private var playbackRequests = 0
     private var navigationRequests = 0
-    private val screenState = RecordingsScreenState()
+    private var screenState = RecordingsScreenState()
+    private val railRoute = mutableStateOf(AppDestination.RECORDINGS)
     // The app keeps this state while the player route replaces the Recordings entry.
     private val screenShown = mutableStateOf(true)
     private val endPaddingState = mutableStateOf<Dp?>(null)
@@ -126,9 +128,9 @@ class RecordingsVisualLayoutTest {
         show()
         focused("recordings-folder-Documentaries")
         assertEquals(540f, bounds("recordings-archive-list").bottom, .1f)
-        // The pills sit above the list at the content's end; the rows keep the screen's start.
+        // The pills sit above the list at the content's start, where the headline begins.
         assertTrue(bounds("recordings-pills").bottom <= bounds("recordings-archive-list").top)
-        assertEquals(bounds("recordings-header").right, bounds("recordings-pills").right, .5f)
+        assertEquals(headingLeft(), bounds("recordings-pills").left, 1f)
         val grown = bounds("recordings-folder-Documentaries")
         compose.onNodeWithTag("depth-preview", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("recording-list-entry-2").assertDoesNotExist()
@@ -180,7 +182,9 @@ class RecordingsVisualLayoutTest {
     }
 
     /** Eight recordings of the README evening's channels, with their logos, focused on the Documentaries folder. */
-    private fun presentationLibrary(store: Boolean = false, firstRow: Boolean = false, problems: Boolean = false) {
+    private fun presentationLibrary(store: Boolean = false, firstRow: Boolean = false, problems: Boolean = false,
+        diskSpace: DvrDiskSpaceState = DvrDiskSpaceState.Current(
+            DvrDiskSpace(1_240_000_000_000L, 2_760_000_000_000L, 4_000_000_000_000L))) {
         assertTrue(android.os.SystemClock.setCurrentTimeMillis(1_791_144_900_000L))
         nowSeconds = { 1_791_144_900L }
         val evening = 1_791_057_600L
@@ -222,7 +226,7 @@ class RecordingsVisualLayoutTest {
             recording(9, "Harbor Kickoff", 2, "Sport", evening + 86400 - 1800, 135, "harbor-kickoff",
                 "Match coverage from a floodlit stadium as Harbor FC meet Amber Town.", state = DvrEntryState.RECORDING),
         ) + if (problems) {
-            // Two failed recordings: the Schedule pill's badge counts them.
+            // Two failed recordings: the rail's Schedule badge counts them.
             listOf(
                 recording(10, "Glass Harbor", 6, null, evening - 5 * 86400, 120, null,
                     "A quiet drama about night-shift workers in a harbor glass workshop.", state = DvrEntryState.COMPLETED_ERROR),
@@ -239,8 +243,7 @@ class RecordingsVisualLayoutTest {
             art.forEachIndexed { index, name -> put(ArtworkId(101 + index), FixtureArt.art(name)) }
         }))
         // A household server's disk, as the Recordings header reports it.
-        show(entries = library, channels = channels, diskSpace = DvrDiskSpaceState.Current(
-            DvrDiskSpace(1_240_000_000_000L, 2_760_000_000_000L, 4_000_000_000_000L)))
+        show(entries = library, channels = channels, diskSpace = diskSpace)
         compose.mainClock.advanceTimeBy(1_500)
         if (firstRow) {
             awaitList()
@@ -265,20 +268,18 @@ class RecordingsVisualLayoutTest {
         capture("store-recording", 1f, outputs = "build/outputs/presentation")
     }
 
-    @Test fun recordingSpaceLineIsQuietInformationOnTheHeadlineLineAtTheContentEndAndNeverMoves() {
-        val context = ApplicationProvider.getApplicationContext<Application>()
+    @Test fun storageIndicatorIsQuietInformationOnThePillRowAtTheContentEndAndNeverMoves() {
         show(diskSpace = DvrDiskSpaceState.Current(DvrDiskSpace(412_000_000_000L, 1_588_000_000_000L, 2_000_000_000_000L)))
-        val expected = "${formatFileSize(412_000_000_000L, context)} free of ${formatFileSize(2_000_000_000_000L, context)}"
-        compose.onNodeWithTag("recordings-space").assertTextEquals(expected)
         compose.onNodeWithTag("recordings-space").assert(SemanticsMatcher.keyNotDefined(SemanticsActions.RequestFocus))
+        // A ring beside the two-line figure, spoken as one description.
+        compose.onNodeWithTag("recordings-space-ring", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("recordings-space").assertContentDescriptionContains("79% used", substring = true)
         focused("recordings-folder-Documentaries")
         val resting = bounds("recordings-space")
-        // At the content's end, below the pills, on the level heading's line.
+        // At the content's end, on the pill row's line.
         assertEquals(bounds("recordings-header").right, resting.right, .5f)
-        assertTrue(resting.top >= bounds("recordings-pills").bottom)
-        // The first heading is the current level's; a previewed folder brings a second one in the pane.
-        val heading = compose.onAllNodesWithTag("archive-level-heading")[0].fetchSemanticsNode().boundsInRoot
-        assertEquals(heading.center.y, resting.center.y, 2f)
+        assertEquals(bounds("recordings-pills").center.y, resting.center.y, 2f)
+        assertTrue(bounds("recordings-pills").right <= resting.left)
         // Neither a folder nor the pills move it.
         key(Key.DirectionRight)
         focused("recordings-folder-Documentaries/Expeditions")
@@ -288,10 +289,12 @@ class RecordingsVisualLayoutTest {
         assertNoCommands()
     }
 
-    @Test fun recordingSpaceLineIsAbsentWithoutAFigure() {
+    @Test fun storageIndicatorSaysUnknownWithoutARingOrOldNumbers() {
         show(diskSpace = DvrDiskSpaceState.Synchronizing(null))
-        compose.onNodeWithTag("recordings-space").assertDoesNotExist()
+        compose.onNodeWithTag("recordings-space").assertExists()
+        compose.onNodeWithTag("recordings-space-ring", useUnmergedTree = true).assertDoesNotExist()
         focused("recordings-folder-Documentaries")
+        assertEquals(bounds("recordings-header").right, bounds("recordings-space").right, .5f)
         capture("header-no-space", 1f)
     }
 
@@ -398,8 +401,6 @@ class RecordingsVisualLayoutTest {
         focused(PILL_SORT)
         assertTrue(bounds(PILL_GROUP).right <= bounds(PILL_SORT).left)
         assertTrue(bounds(PILL_SORT).right <= bounds(PILL_SHOW).left)
-        // The pills end at the content's end, level with the header.
-        assertEquals(bounds("recordings-header").right, bounds("recordings-pills").right, .5f)
         key(Key.DirectionLeft)
         key(Key.DirectionDown)
         focused("recordings-folder-Documentaries")
@@ -410,7 +411,6 @@ class RecordingsVisualLayoutTest {
         focused(PILL_GROUP)
         compose.onNodeWithTag(PILL_SORT).assertExists()
         compose.onNodeWithTag(PILL_SHOW).assertExists()
-        compose.onNodeWithTag(PILL_SCHEDULE).assertExists()
         key(Key.Back)
         compose.runOnIdle { assertTrue(screenState.archivePath.isEmpty()) }
         key(Key.DirectionLeft)
@@ -447,7 +447,10 @@ class RecordingsVisualLayoutTest {
         focused(PILL_SORT)
         key(Key.DirectionCenter)
         focused("recordings-sort-option-newest")
-        key(Key.DirectionDown)
+        // All six orders are listed, each with its direction.
+        DvrArchiveSort.entries.forEach { compose.onNodeWithTag("recordings-sort-option-${it.name.lowercase()}").assertExists() }
+        repeat(2) { key(Key.DirectionDown) }
+        focused("recordings-sort-option-name")
         key(Key.DirectionCenter)
         compose.runOnIdle { assertEquals(DvrArchiveSort.NAME, viewChanges.last().sort) }
         gone("recordings-sort-panel")
@@ -467,11 +470,9 @@ class RecordingsVisualLayoutTest {
         gone("recordings-show-panel")
         focused(PILL_SHOW)
         compose.onNodeWithTag(PILL_SHOW).assertTextContains("Unwatched")
-        // Schedule is the last pill; nothing past it.
+        // Show is the last pill; nothing past it.
         key(Key.DirectionRight)
-        focused(PILL_SCHEDULE)
-        key(Key.DirectionRight)
-        focused(PILL_SCHEDULE)
+        focused(PILL_SHOW)
         assertNoCommands()
     }
 
@@ -514,7 +515,7 @@ class RecordingsVisualLayoutTest {
         focused(PILL_SORT)
         key(Key.DirectionCenter)
         focused("recordings-sort-option-newest")
-        key(Key.DirectionDown)
+        repeat(2) { key(Key.DirectionDown) }
         focused("recordings-sort-option-name")
         key(Key.DirectionCenter)
         compose.runOnIdle { assertEquals(DvrArchiveSort.NAME, viewChanges.last().sort) }
@@ -618,7 +619,8 @@ class RecordingsVisualLayoutTest {
         startView = DvrArchiveView()
         presentationLibrary(firstRow = true)
         compose.mainClock.advanceTimeBy(1_500)
-        capture("P-1-defaults", 1f, outputs = PILL_CAPTURES)
+        capture("1-defaults-70-percent", 1f, outputs = PILL_CAPTURES)
+        captureCorner("storage-normal-70-percent-corner")
     }
 
     /** P-2: the Sort pill focused, its neighbours clear of it. */
@@ -631,17 +633,17 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionRight)
         focused(PILL_SORT)
         compose.mainClock.advanceTimeBy(1_500)
-        capture("P-2-sort-pill-focused", 1f, outputs = PILL_CAPTURES)
+        capture("2-sort-pill-focused", 1f, outputs = PILL_CAPTURES)
     }
 
-    /** P-3: Folders, Newest first, Unwatched, with problems on the Schedule pill and a running folder. */
+    /** P-3: Folders, Newest first, Unwatched, with problems on the rail's Schedule item and a running folder. */
     @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
     fun pillFrame3ActivePillsAndABadge() {
         startView = DvrArchiveView(DvrArchiveGrouping.FOLDERS, DvrArchiveSort.NEWEST, DvrArchiveShow.UNWATCHED)
-        presentationLibrary(firstRow = true, problems = true)
+        presentationLibrary(firstRow = true, problems = true, diskSpace = diskSpacePercentUsed(92))
         compose.mainClock.advanceTimeBy(1_500)
-        capture("P-3-active-pills-and-badge", 1f, outputs = PILL_CAPTURES)
+        capture("3-non-default-92-percent-running-folder", 1f, outputs = PILL_CAPTURES)
     }
 
     /** P-4: the Show panel open at its current value. */
@@ -655,7 +657,7 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionCenter)
         focused("recordings-show-option-unwatched")
         compose.mainClock.advanceTimeBy(1_500)
-        capture("P-4-show-panel", 1f, outputs = PILL_CAPTURES)
+        capture("4-show-panel", 1f, outputs = PILL_CAPTURES)
     }
 
     /** P-5: Flat, Name A-Z, Partially watched: no date dividers. */
@@ -665,7 +667,57 @@ class RecordingsVisualLayoutTest {
         startView = DvrArchiveView(DvrArchiveGrouping.FLAT, DvrArchiveSort.NAME, DvrArchiveShow.PARTIALLY_WATCHED)
         presentationLibrary(firstRow = true, problems = true)
         compose.mainClock.advanceTimeBy(1_500)
-        capture("P-5-flat-name-partially-watched", 1f, outputs = PILL_CAPTURES)
+        capture("5-flat-name-az-partially-watched", 1f, outputs = PILL_CAPTURES)
+    }
+
+    private fun diskSpacePercentUsed(used: Int) = DvrDiskSpaceState.Current(
+        DvrDiskSpace(4_000_000_000_000L * (100 - used) / 100, 4_000_000_000_000L * used / 100, 4_000_000_000_000L))
+
+    /** The storage block's critical and unknown states, the Sort panel, and the two heading spacings. */
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun storageAndSortPanelFrames() {
+        startView = DvrArchiveView(DvrArchiveGrouping.FOLDERS, DvrArchiveSort.OLDEST, DvrArchiveShow.ALL)
+        presentationLibrary(firstRow = true, diskSpace = diskSpacePercentUsed(97))
+        compose.mainClock.advanceTimeBy(1_500)
+        capture("6-warning-97-percent-120gb-free-folders-root", 1f, outputs = PILL_CAPTURES)
+        captureCorner("storage-warning-120gb-corner")
+        upToPills()
+        key(Key.DirectionRight)
+        key(Key.DirectionCenter)
+        focused("recordings-sort-option-oldest")
+        compose.mainClock.advanceTimeBy(1_500)
+        capture("12-sort-panel", 1f, outputs = PILL_CAPTURES)
+    }
+
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun storageErrorFrame() {
+        startView = DvrArchiveView(DvrArchiveGrouping.FOLDERS)
+        presentationLibrary(firstRow = true, diskSpace = DvrDiskSpaceState.Current(
+            DvrDiskSpace(80_000_000_000L, 3_920_000_000_000L, 4_000_000_000_000L)))
+        compose.mainClock.advanceTimeBy(1_500)
+        capture("6b-error-80gb-free-folders-root", 1f, outputs = PILL_CAPTURES)
+        captureCorner("storage-error-80gb-corner")
+    }
+
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun storageUnknownFrame() {
+        startView = DvrArchiveView(DvrArchiveGrouping.FLAT)
+        presentationLibrary(firstRow = true, diskSpace = DvrDiskSpaceState.Unknown)
+        compose.mainClock.advanceTimeBy(1_500)
+        capture("7-unknown-flat-root", 1f, outputs = PILL_CAPTURES)
+        captureCorner("storage-unknown-corner")
+    }
+
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun foldersRootHeadingSpacingFrame() {
+        startView = DvrArchiveView(DvrArchiveGrouping.FOLDERS)
+        presentationLibrary(firstRow = true)
+        compose.mainClock.advanceTimeBy(1_500)
+        capture("13-folders-root-heading-spacing", 1f, outputs = PILL_CAPTURES)
     }
 
     /** The Schedule screen's two subnav tabs. */
@@ -676,44 +728,39 @@ class RecordingsVisualLayoutTest {
         presentationLibrary(firstRow = true, problems = true)
         openScheduleScreen()
         compose.mainClock.advanceTimeBy(1_500)
-        capture("S-1-schedule", 1f, outputs = PILL_CAPTURES)
+        capture("8-schedule-screen-with-badge", 1f, outputs = PILL_CAPTURES)
         key(Key.DirectionUp)
         key(Key.DirectionRight)
         key(Key.DirectionDown)
         compose.mainClock.advanceTimeBy(1_500)
-        capture("S-2-problems", 1f, outputs = PILL_CAPTURES)
+        capture("9-problems-tab-with-badge", 1f, outputs = PILL_CAPTURES)
     }
 
-    /** The Schedule screen of a library without problems: the pill carried no badge, the Problems tab is empty. */
+    /** The Schedule screen of a library without problems: the rail item carried no badge, the Problems tab is empty. */
     @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
     fun scheduleScreenWithoutProblemsFrame() {
         startView = DvrArchiveView()
         presentationLibrary(firstRow = true, problems = false)
-        compose.onNodeWithTag("header-button-badge", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("schedule-problems-badge", useUnmergedTree = true).assertDoesNotExist()
         openScheduleScreen()
         compose.mainClock.advanceTimeBy(1_500)
-        capture("S-1-schedule-no-problems", 1f, outputs = PILL_CAPTURES)
+        capture("10-schedule-screen-no-badge", 1f, outputs = PILL_CAPTURES)
         key(Key.DirectionUp)
         key(Key.DirectionRight)
         compose.mainClock.advanceTimeBy(1_500)
-        capture("S-2-problems-empty", 1f, outputs = PILL_CAPTURES)
+        capture("11-problems-tab-empty", 1f, outputs = PILL_CAPTURES)
     }
 
-    @Test fun theSchedulePillOpensTheScheduleScreenAndBackReturnsToThePill() {
+    @Test fun theScheduleScreenOpensOnItsFirstEntryWithItsOwnSubnavAndTheRailCarriesTheProblemCount() {
         show(diskSpace = DvrDiskSpaceState.Current(DvrDiskSpace(412_000_000_000L, 1_588_000_000_000L, 2_000_000_000_000L)))
         focused("recordings-folder-Documentaries")
         capture("header-archive", 1f)
-        upToPills()
-        focused(PILL_GROUP)
-        capture("header-pill-focused", 1f)
-        // One problem in the library: the Schedule pill carries its count.
-        compose.onNodeWithTag("header-button-badge", useUnmergedTree = true).onChild().assertTextEquals("1")
-        downToList()
-        focused("recordings-folder-Documentaries")
+        // The library has no page tabs; its Schedule item is on the rail and carries the one problem.
+        compose.onNodeWithTag("recordings-mode-tabs").assertDoesNotExist()
+        compose.onNodeWithTag("schedule-problems-badge", useUnmergedTree = true).onChild().assertTextEquals("1")
         openScheduleScreen()
-        // The Schedule screen has its own subnav; the pills and the free-space line stay with the Archive.
-        compose.onNodeWithTag("recordings-pills").assertDoesNotExist()
+        // The Schedule screen has its own subnav; the pills and the storage figure stay with the library.
         compose.onNodeWithTag("recordings-space").assertDoesNotExist()
         compose.onNodeWithText("Archive").assertDoesNotExist()
         // It opens on the first entry, not the subnav; Up from that entry reaches the active tab.
@@ -730,14 +777,6 @@ class RecordingsVisualLayoutTest {
         compose.onNodeWithText("Problems").assertIsFocused()
         key(Key.DirectionRight)
         compose.onNodeWithText("Problems").assertIsFocused()
-        // Back from the subnav, and from a row of it, returns to the Schedule pill.
-        key(Key.Back)
-        focused(PILL_SCHEDULE)
-        compose.onNodeWithTag("recordings-pills").assertIsDisplayed()
-        key(Key.DirectionCenter)
-        focused("recording-list-entry-20")
-        key(Key.Back)
-        focused(PILL_SCHEDULE)
         assertNoCommands()
     }
 
@@ -1204,46 +1243,13 @@ class RecordingsVisualLayoutTest {
         assertNoCommands()
     }
 
-    @Test fun channelPagingAndInterruptedModeSwitchCannotReactivateArchive() {
-        show(entries = (1L..30L).map { recording(it, "Recording $it", "recording$it.ts") } +
-            recording(40, "Scheduled", null, DvrEntryState.SCHEDULED))
-        focused("recording-list-entry-1")
-        key(Key(android.view.KeyEvent.KEYCODE_CHANNEL_DOWN))
-        val pagedId = compose.runOnIdle { screenState.archiveNavigation.stack.active.focusedItemId }
-        assertNotEquals("recording:1", pagedId)
-        compose.mainClock.autoAdvance = false
-        try {
-            compose.onRoot().performKeyInput { pressKey(Key(android.view.KeyEvent.KEYCODE_CHANNEL_DOWN)) }
-            compose.mainClock.advanceTimeBy(64)
-            compose.onNodeWithTag(PILL_SCHEDULE).requestFocus()
-            compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
-            compose.mainClock.advanceTimeBy(256)
-            compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
-            compose.mainClock.advanceTimeBy(256)
-            val saved = compose.runOnIdle { screenState.archiveNavigation.stack.active }
-            compose.mainClock.advanceTimeBy(1_200)
-            compose.runOnIdle { assertEquals(saved, screenState.archiveNavigation.stack.active) }
-        } finally {
-            compose.mainClock.autoAdvance = true
-        }
-        focused("recording-list-entry-40")
-        assertNoCommands()
-    }
-
-    @Test fun emptyLibraryKeepsTheSchedulePillReachableWithoutCommands() {
+    @Test fun emptyLibraryKeepsThePillsReachableWithoutCommands() {
         show(empty = true)
-        compose.mainClock.advanceTimeUntil(10_000) { tagFocused(PILL_SCHEDULE) }
+        compose.mainClock.advanceTimeUntil(10_000) { tagFocused(PILL_GROUP) }
         compose.onNodeWithText("No recordings are available.").assertIsDisplayed()
-        // Nothing to group, sort or filter: only the Schedule pill is left.
-        compose.onNodeWithTag(PILL_GROUP).assertDoesNotExist()
         capture("empty-archive", 1f)
-        key(Key.DirectionCenter)
-        compose.mainClock.advanceTimeUntil { tabFocused() }
-        compose.waitForIdle()
-        compose.onNodeWithText("Schedule").assertIsFocused()
         key(Key.DirectionDown)
-        compose.onNodeWithText("Schedule").assertIsFocused()
-        capture("empty-schedule", 1f)
+        focused(PILL_GROUP)
         assertNoCommands()
     }
 
@@ -1252,7 +1258,7 @@ class RecordingsVisualLayoutTest {
         connectionState.value = ConnectionUiState.SyncingChannels
         show(empty = true, diskSpace = space)
         // The loading handoff still parks focus on the pills; the skeleton takes none.
-        compose.mainClock.advanceTimeUntil(10_000) { tagFocused(PILL_SCHEDULE) }
+        compose.mainClock.advanceTimeUntil(10_000) { tagFocused(PILL_GROUP) }
         compose.onNodeWithTag("recordings-skeleton").assertIsDisplayed()
             .assert(SemanticsMatcher.keyNotDefined(SemanticsActions.RequestFocus))
         compose.onNodeWithText("Loading recordings…").assertDoesNotExist()
@@ -1263,15 +1269,15 @@ class RecordingsVisualLayoutTest {
         val skeleton = bounds("recordings-skeleton")
         capture("loading-skeleton", 1f)
         key(Key.DirectionDown)
-        focused(PILL_SCHEDULE)
+        focused(PILL_GROUP)
 
         compose.runOnIdle { connectionState.value = ConnectionUiState.Ready }
         publish(listOf(recording(1, LONG_TITLE, "Documentaries/northern.ts"), recording(5, "Harbor Lights Live", "concert.ts")))
         compose.onNodeWithTag("recordings-archive-list", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("recordings-skeleton").assertDoesNotExist()
         assertEquals(header, bounds("recordings-header"))
-        // The pills fill in toward the start of the screen as recordings arrive; their end stays put.
-        assertEquals(pills.right, bounds("recordings-pills").right, .1f)
+        // The pills stand where they did before the recordings arrived.
+        assertEquals(pills, bounds("recordings-pills"))
         assertEquals(spaceLine, bounds("recordings-space"))
         // The skeleton stood in the Archive column's place; the list fills in below the headline as recordings arrive.
         assertTrue(bounds("recordings-archive-list").top >= skeleton.top)
@@ -1287,7 +1293,7 @@ class RecordingsVisualLayoutTest {
     private fun preparationSkeletonStaysInPlace(scale: Float) {
         connectionState.value = ConnectionUiState.SyncingChannels
         show(scale = scale, empty = true)
-        compose.mainClock.advanceTimeUntil(10_000) { tagFocused(PILL_SCHEDULE) }
+        compose.mainClock.advanceTimeUntil(10_000) { tagFocused(PILL_GROUP) }
         val syncing = bounds("recordings-skeleton")
         compose.runOnIdle { screenShown.value = false }
         compose.waitForIdle()
@@ -1317,19 +1323,13 @@ class RecordingsVisualLayoutTest {
         assertNoCommands()
     }
 
-    @Test fun nestedUpReturnsToThePillsAndTheScheduleScreenRetainsTheArchiveLocation() {
+    @Test fun nestedUpReturnsToThePillsAndDownKeepsTheArchiveLocation() {
         show()
         focused("recordings-folder-Documentaries")
         key(Key.DirectionRight)
         focused("recordings-folder-Documentaries/Expeditions")
         upToPills()
         focused(PILL_GROUP)
-        downToList()
-        focused("recordings-folder-Documentaries/Expeditions")
-        compose.runOnIdle { assertEquals(listOf("Documentaries"), screenState.archivePath) }
-        openScheduleScreen()
-        key(Key.Back)
-        focused(PILL_SCHEDULE)
         downToList()
         focused("recordings-folder-Documentaries/Expeditions")
         compose.runOnIdle { assertEquals(listOf("Documentaries"), screenState.archivePath) }
@@ -1405,7 +1405,7 @@ class RecordingsVisualLayoutTest {
         publish(emptyList())
         compose.onNodeWithTag("nav-recordings").assertIsFocused()
         key(Key.DirectionRight)
-        compose.mainClock.advanceTimeUntil(10_000) { tagFocused(PILL_SCHEDULE) }
+        compose.mainClock.advanceTimeUntil(10_000) { tagFocused(PILL_GROUP) }
         compose.onNodeWithText("No recordings are available.").assertIsDisplayed()
         compose.onNodeWithTag("depth-row-depth-unavailable").assertDoesNotExist()
         assertNoCommands()
@@ -1686,6 +1686,7 @@ class RecordingsVisualLayoutTest {
             dvrDiskSpaceState = diskSpace,
             recordingProgressCapability = RecordingProgressCapability.SUPPORTED,
         )
+        val problemCount = partitionDvrLibrary(recordings).problems.size
         session = FakeTvheadendSession(observation)
         val currentObservation = session.observation.value
         if (snapshotLoaded) assertNotNull("Exercise live capability/session guards, not cached-only rows", currentObservation.currentSession)
@@ -1704,8 +1705,9 @@ class RecordingsVisualLayoutTest {
                     backDispatcher = requireNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                         SideRail(
-                            rootRoute = AppDestination.HOME, availableDestinations = setOf(AppDestination.HOME, AppDestination.CHANNELS, AppDestination.GUIDE, AppDestination.RECORDINGS, AppDestination.SETTINGS),
-                            currentRoute = AppDestination.RECORDINGS,
+                            rootRoute = AppDestination.HOME, availableDestinations = setOf(AppDestination.HOME, AppDestination.CHANNELS, AppDestination.GUIDE, AppDestination.RECORDINGS, AppDestination.SCHEDULE, AppDestination.SETTINGS),
+                            scheduleProblems = problemCount,
+                            currentRoute = railRoute.value,
                             onRootBack = { navigationRequests++ },
                             onNavigate = { navigationRequests++ },
                         ) { padding, drawer ->
@@ -1786,15 +1788,19 @@ class RecordingsVisualLayoutTest {
         assertTrue(pillFocused())
     }
 
-    /** The Schedule pill opens the Schedule screen on its first entry, or on the subnav when it has none. */
+    /**
+     * The rail's Schedule item opens the Schedule screen: its own state, so the library stays on the Archive.
+     * It opens on its first entry, or on the subnav when it has none.
+     */
     private fun openScheduleScreen() {
-        upToPills()
-        repeat(3) { if (!tagFocused(PILL_SCHEDULE)) key(Key.DirectionRight) }
-        focused(PILL_SCHEDULE)
-        key(Key.DirectionCenter)
+        compose.runOnIdle { screenShown.value = false }
+        compose.waitForIdle()
+        screenState = RecordingsScreenState(at.bernhardberger.tvhplayer.core.DvrLibraryMode.SCHEDULE)
+        railRoute.value = AppDestination.SCHEDULE
+        compose.runOnIdle { screenShown.value = true }
         compose.mainClock.advanceTimeUntil { tabFocused() || listRowFocused() }
         compose.waitForIdle()
-        compose.onNodeWithTag(PILL_SCHEDULE).assertDoesNotExist()
+        compose.onNodeWithTag("recordings-pills").assertDoesNotExist()
     }
 
     /** As [openScheduleScreen], then Up from the first entry to the Schedule/Problems subnav. */
@@ -1829,6 +1835,8 @@ class RecordingsVisualLayoutTest {
     }
 
     private fun bounds(tag: String): Rect = compose.tagBounds(tag)
+
+    private fun headingLeft() = compose.onAllNodesWithTag("archive-level-heading")[0].fetchSemanticsNode().boundsInRoot.left
 
     private fun assertTrailingStateMark(id: Int, description: String) {
         compose.onNodeWithTag("recording-list-state-$id", useUnmergedTree = true)
@@ -2028,6 +2036,21 @@ class RecordingsVisualLayoutTest {
         }
     }
 
+    /** The header's top-right corner at 1:1 (x 1400-1840, y 30-170 of the 1920x1080 frame) for the storage block. */
+    private fun captureCorner(name: String) {
+        if (!CaptureOutput.enabled) return
+        compose.runOnIdle {
+            val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+            view.draw(Canvas(bitmap))
+            val crop = Bitmap.createBitmap(bitmap, 1400, 30, 440, 140)
+            File(File(PILL_CAPTURES).apply { mkdirs() }, "$name.png").outputStream().use {
+                assertTrue(crop.compress(Bitmap.CompressFormat.PNG, 100, it))
+            }
+            crop.recycle()
+            bitmap.recycle()
+        }
+    }
+
     private fun capture(name: String, scale: Float, focusEvidence: String? = null,
         outputs: String = "build/outputs/browse-cohesion/archive-depth") {
         if (!CaptureOutput.enabled) return
@@ -2056,11 +2079,10 @@ class RecordingsVisualLayoutTest {
     }
 
     private companion object {
-        const val PILL_CAPTURES = "build/outputs/recordings-pill-captures"
+        const val PILL_CAPTURES = "build/outputs/recordings-round15-captures"
         const val PILL_GROUP = "recordings-pill-group"
         const val PILL_SORT = "recordings-pill-sort"
         const val PILL_SHOW = "recordings-pill-show"
-        const val PILL_SCHEDULE = "recordings-pill-schedule"
-        const val LONG_TITLE = "Ridge Light: The Remarkable Journey of the Northern Lights Across the Arctic"
+            const val LONG_TITLE = "Ridge Light: The Remarkable Journey of the Northern Lights Across the Arctic"
     }
 }

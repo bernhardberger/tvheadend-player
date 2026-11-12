@@ -24,7 +24,6 @@
     <string name="recording_profile_default">Профиль по умолчанию</string>
     <string name="recording_space_title">Место для записей</string>
     <string name="recording_space_value">Свободно %1$s из %2$s</string>
-    <string name="recording_space_line_description">Место для записей: %1$s</string>
     <string name="recording_confirmation_profile">Профиль записи: %1$s</string>
     <string name="recording_confirmation_owner">Владелец записи: %1$s</string>
     <string name="context_watch">Смотреть</string>

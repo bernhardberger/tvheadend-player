@@ -30,18 +30,14 @@ import at.bernhardberger.tvhplayer.core.DvrArchiveGrouping
 import at.bernhardberger.tvhplayer.core.DvrArchiveShow
 import at.bernhardberger.tvhplayer.core.DvrArchiveSort
 import at.bernhardberger.tvhplayer.core.DvrArchiveView
-import at.bernhardberger.tvhplayer.ui.TvGridGutter
 import at.bernhardberger.tvhplayer.ui.TvSpacing16
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.components.RoundIconButton
 import at.bernhardberger.tvhplayer.ui.screens.BrowseLevelsPanel
 import at.bernhardberger.tvhplayer.ui.screens.BrowsePanelEntry
 
-/**
- * The pills at the end of the Archive header, in focus order.
- * Group, Sort and Show open a panel; Schedule opens its screen.
- */
-internal enum class ArchivePill { GROUP, SORT, SHOW, SCHEDULE }
+/** The pills at the start of the Archive header, in focus order; each opens its panel. */
+internal enum class ArchivePill { GROUP, SORT, SHOW }
 
 internal fun DvrArchiveGrouping.labelRes(): Int = when (this) {
     DvrArchiveGrouping.FLAT -> R.string.recordings_grouping_flat
@@ -57,10 +53,24 @@ private fun DvrArchiveGrouping.detailRes(): Int = when (this) {
     DvrArchiveGrouping.GENRES -> R.string.recordings_grouping_genres_detail
 }
 
+/** The full name of a sort, as the panel lists it and the pill is spoken. */
 private fun DvrArchiveSort.labelRes(): Int = when (this) {
     DvrArchiveSort.NEWEST -> R.string.recordings_sort_newest
+    DvrArchiveSort.OLDEST -> R.string.recordings_sort_oldest
     DvrArchiveSort.NAME -> R.string.recordings_sort_name
+    DvrArchiveSort.NAME_DESCENDING -> R.string.recordings_sort_name_descending
     DvrArchiveSort.LARGEST -> R.string.recordings_sort_largest
+    DvrArchiveSort.SMALLEST -> R.string.recordings_sort_smallest
+}
+
+/** The one word the pill shows, with [Pair.second] the arrow giving the direction: down for newest, Z to A, largest. */
+private fun DvrArchiveSort.pillRes(): Pair<Int, Int> = when (this) {
+    DvrArchiveSort.NEWEST -> R.string.recordings_sort_field_date to R.drawable.ic_arrow_downward
+    DvrArchiveSort.OLDEST -> R.string.recordings_sort_field_date to R.drawable.ic_arrow_upward
+    DvrArchiveSort.NAME -> R.string.recordings_sort_field_name to R.drawable.ic_arrow_upward
+    DvrArchiveSort.NAME_DESCENDING -> R.string.recordings_sort_field_name to R.drawable.ic_arrow_downward
+    DvrArchiveSort.LARGEST -> R.string.recordings_sort_field_size to R.drawable.ic_arrow_downward
+    DvrArchiveSort.SMALLEST -> R.string.recordings_sort_field_size to R.drawable.ic_arrow_upward
 }
 
 private fun DvrArchiveShow.labelRes(): Int = when (this) {
@@ -68,6 +78,20 @@ private fun DvrArchiveShow.labelRes(): Int = when (this) {
     DvrArchiveShow.UNWATCHED -> R.string.recordings_show_unwatched
     DvrArchiveShow.PARTIALLY_WATCHED -> R.string.recordings_show_partially_watched
     DvrArchiveShow.WATCHED -> R.string.recordings_show_watched
+}
+
+/** The one word the pill shows. */
+private fun DvrArchiveShow.pillLabelRes(): Int = when (this) {
+    DvrArchiveShow.PARTIALLY_WATCHED -> R.string.recordings_show_partial
+    else -> labelRes()
+}
+
+/** The mark a row of that kind carries, so the pill and the rows speak the same symbols. */
+private fun DvrArchiveShow.iconRes(): Int = when (this) {
+    DvrArchiveShow.ALL -> R.drawable.ic_visibility
+    DvrArchiveShow.UNWATCHED -> R.drawable.ic_radio_button_unchecked
+    DvrArchiveShow.PARTIALLY_WATCHED -> R.drawable.ic_clock_loader_40_outlined
+    DvrArchiveShow.WATCHED -> R.drawable.ic_check_circle_outlined
 }
 
 /** The plain-language line under a Show choice; All needs none. */
@@ -79,17 +103,15 @@ private fun DvrArchiveShow.detailRes(): Int? = when (this) {
 }
 
 /**
- * Group, Sort and Show, each naming its current value and filled while it is not the default, then Schedule
- * after a wider gap, in the Channels header's buttons. Like that header, Up stays, Down goes to the list
- * ([onDown]), Left from the first pill leaves for the navigation rail ([navigationFocus]) and Right stops at
- * Schedule. Schedule carries a count badge while [problems] has entries. Back steps a folder up
- * ([onBack]); from the root it is left to the screen.
+ * Group, Sort and Show from the content's start edge, each naming its current value and filled while
+ * it is not the default, in the Channels header's buttons. They keep their place whatever the values
+ * say. Like that header, Up stays, Down goes to the list ([onDown]), Left from Group leaves for the
+ * navigation rail ([navigationFocus]) and Right stops at Show. Back steps a folder up ([onBack]); from
+ * the root it is left to the screen.
  */
 @Composable
 internal fun ArchivePillRow(
     view: DvrArchiveView,
-    problems: Int,
-    showView: Boolean,
     focusRequesters: Map<ArchivePill, FocusRequester>,
     navigationFocus: FocusRequester?,
     canStepBack: Boolean,
@@ -102,7 +124,14 @@ internal fun ArchivePillRow(
     var hasFocus by remember { mutableStateOf(false) }
     BackHandler(enabled = hasFocus && canStepBack, onBack = onBack)
     val rail = navigationFocus ?: FocusRequester.Default
-    val firstPill = if (showView) ArchivePill.GROUP else ArchivePill.SCHEDULE
+    val default = DvrArchiveView()
+    fun pillModifier(pill: ArchivePill) = Modifier
+        .focusProperties {
+            up = FocusRequester.Cancel
+            if (pill == ArchivePill.GROUP) left = rail
+            if (pill == ArchivePill.SHOW) right = FocusRequester.Cancel
+        }
+        .testTag("recordings-pill-${pill.name.lowercase()}")
     Row(
         modifier
             .onFocusChanged {
@@ -113,43 +142,6 @@ internal fun ArchivePillRow(
                 event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown && onDown().let { true }
             }
             .testTag("recordings-pills"),
-        horizontalArrangement = Arrangement.spacedBy(TvGridGutter * 2),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        fun pillModifier(pill: ArchivePill) = Modifier
-            .focusProperties {
-                up = FocusRequester.Cancel
-                if (pill == firstPill) left = rail
-                if (pill == ArchivePill.SCHEDULE) right = FocusRequester.Cancel
-            }
-            .testTag("recordings-pill-${pill.name.lowercase()}")
-        if (showView) ArchiveViewPills(view, focusRequesters, onOpen, ::pillModifier)
-        val schedule = stringResource(R.string.recordings_schedule)
-        RoundIconButton(
-            icon = painterResource(R.drawable.ic_event),
-            label = schedule,
-            value = schedule,
-            active = false,
-            badge = problems.takeIf { it > 0 },
-            description = if (problems > 0) {
-                pluralStringResource(R.plurals.recordings_schedule_problems_description, problems, problems)
-            } else null,
-            onClick = { onOpen(ArchivePill.SCHEDULE) },
-            focusRequester = focusRequesters.getValue(ArchivePill.SCHEDULE),
-            onFocused = {},
-            modifier = pillModifier(ArchivePill.SCHEDULE),
-        )
-    }
-}
-
-@Composable
-private fun ArchiveViewPills(
-    view: DvrArchiveView,
-    focusRequesters: Map<ArchivePill, FocusRequester>,
-    onOpen: (ArchivePill) -> Unit,
-    pillModifier: (ArchivePill) -> Modifier,
-) {
-    Row(
         horizontalArrangement = Arrangement.spacedBy(TvSpacing16),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -157,27 +149,36 @@ private fun ArchiveViewPills(
             icon = painterResource(R.drawable.ic_account_tree),
             label = stringResource(R.string.recordings_grouping_group_by),
             value = stringResource(view.grouping.labelRes()),
-            active = view.grouping != DvrArchiveView().grouping,
+            active = view.grouping != default.grouping,
             onClick = { onOpen(ArchivePill.GROUP) },
             focusRequester = focusRequesters.getValue(ArchivePill.GROUP),
             onFocused = {},
             modifier = pillModifier(ArchivePill.GROUP),
         )
+        val sort = stringResource(R.string.recordings_sort_title)
+        val (sortField, sortArrow) = view.sort.pillRes()
         RoundIconButton(
-            icon = painterResource(R.drawable.ic_swap_vert),
-            label = stringResource(R.string.recordings_sort_title),
-            value = stringResource(view.sort.labelRes()),
-            active = view.sort != DvrArchiveView().sort,
+            icon = painterResource(sortArrow),
+            label = sort,
+            value = stringResource(sortField),
+            description = stringResource(
+                R.string.header_button_value_description, sort, stringResource(view.sort.labelRes()),
+            ),
+            active = view.sort != default.sort,
             onClick = { onOpen(ArchivePill.SORT) },
             focusRequester = focusRequesters.getValue(ArchivePill.SORT),
             onFocused = {},
             modifier = pillModifier(ArchivePill.SORT),
         )
+        val show = stringResource(R.string.recordings_show_title)
         RoundIconButton(
-            icon = painterResource(R.drawable.ic_visibility),
-            label = stringResource(R.string.recordings_show_title),
-            value = stringResource(view.show.labelRes()),
-            active = view.show != DvrArchiveView().show,
+            icon = painterResource(view.show.iconRes()),
+            label = show,
+            value = stringResource(view.show.pillLabelRes()),
+            description = stringResource(
+                R.string.header_button_value_description, show, stringResource(view.show.labelRes()),
+            ),
+            active = view.show != default.show,
             onClick = { onOpen(ArchivePill.SHOW) },
             focusRequester = focusRequesters.getValue(ArchivePill.SHOW),
             onFocused = {},
@@ -270,6 +271,5 @@ internal fun ArchivePillPanel(
             },
             radio = true,
         )
-        ArchivePill.SCHEDULE -> Unit
     }
 }

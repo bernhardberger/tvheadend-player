@@ -24,7 +24,6 @@
     <string name="recording_profile_default">Varsayılan profil</string>
     <string name="recording_space_title">Kayıt alanı</string>
     <string name="recording_space_value">%2$s alanın %1$s kadarı boş</string>
-    <string name="recording_space_line_description">Kayıt alanı: %1$s</string>
     <string name="recording_confirmation_profile">Kayıt profili: %1$s</string>
     <string name="recording_confirmation_owner">Kayıt sahibi: %1$s</string>
     <string name="context_watch">İzle</string>

@@ -24,7 +24,6 @@
     <string name="recording_profile_default">Προεπιλεγμένο προφίλ</string>
     <string name="recording_space_title">Χώρος εγγραφών</string>
     <string name="recording_space_value">%1$s ελεύθερα από %2$s</string>
-    <string name="recording_space_line_description">Χώρος εγγραφών: %1$s</string>
     <string name="recording_confirmation_profile">Προφίλ εγγραφής: %1$s</string>
     <string name="recording_confirmation_owner">Κάτοχος εγγραφής: %1$s</string>
     <string name="context_watch">Προβολή</string>
