@@ -63,14 +63,14 @@ private fun DvrArchiveSort.labelRes(): Int = when (this) {
     DvrArchiveSort.SMALLEST -> R.string.recordings_sort_smallest
 }
 
-/** The one word the pill shows, with [Pair.second] the arrow giving the direction: down for newest, Z to A, largest. */
+/** The one word the pill shows and the glyph of this sort order, which the panel entry shows too. */
 private fun DvrArchiveSort.pillRes(): Pair<Int, Int> = when (this) {
-    DvrArchiveSort.NEWEST -> R.string.recordings_sort_field_date to R.drawable.ic_arrow_downward
-    DvrArchiveSort.OLDEST -> R.string.recordings_sort_field_date to R.drawable.ic_arrow_upward
-    DvrArchiveSort.NAME -> R.string.recordings_sort_field_name to R.drawable.ic_arrow_upward
-    DvrArchiveSort.NAME_DESCENDING -> R.string.recordings_sort_field_name to R.drawable.ic_arrow_downward
-    DvrArchiveSort.LARGEST -> R.string.recordings_sort_field_size to R.drawable.ic_arrow_downward
-    DvrArchiveSort.SMALLEST -> R.string.recordings_sort_field_size to R.drawable.ic_arrow_upward
+    DvrArchiveSort.NEWEST -> R.string.recordings_sort_field_date to R.drawable.ic_sort_newest_first
+    DvrArchiveSort.OLDEST -> R.string.recordings_sort_field_date to R.drawable.ic_sort_oldest_first
+    DvrArchiveSort.NAME -> R.string.recordings_sort_field_name to R.drawable.ic_sort_name_a_z
+    DvrArchiveSort.NAME_DESCENDING -> R.string.recordings_sort_field_name to R.drawable.ic_sort_name_z_a
+    DvrArchiveSort.LARGEST -> R.string.recordings_sort_field_size to R.drawable.ic_sort_largest_first
+    DvrArchiveSort.SMALLEST -> R.string.recordings_sort_field_size to R.drawable.ic_sort_smallest_first
 }
 
 private fun DvrArchiveShow.labelRes(): Int = when (this) {
