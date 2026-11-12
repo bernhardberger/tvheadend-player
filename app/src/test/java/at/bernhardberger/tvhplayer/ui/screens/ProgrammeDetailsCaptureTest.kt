@@ -28,6 +28,7 @@ import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
+import at.bernhardberger.tvhplayer.testutil.setContentWithArtworkSampling
 import at.bernhardberger.tvhplayer.ui.player.*
 import org.junit.Assert.assertEquals
 import androidx.compose.ui.unit.Density
@@ -99,6 +100,10 @@ class ProgrammeDetailsCaptureTest {
     }
 
     @Test fun guideArtLongDescription() = capture("guide-art-long", guide = true)
+    @Test @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
+    fun portraitArtwork() = capture("portrait-artwork", guide = true, portrait = true)
+    @Test @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
+    fun portraitArtworkFramed() = capture("portrait-artwork-framed", guide = true, portrait = true, player = true)
     @Test fun guideScheduled() = capture("guide-scheduled", guide = true, scheduled = true)
     @Test fun guideWithoutArt() = capture("guide-no-art", guide = true, art = false)
     @Test fun recordingResume() = capture("recording-resume", guide = false)
@@ -317,24 +322,29 @@ class ProgrammeDetailsCaptureTest {
         bitmap.recycle()
     }
 
-    private fun capture(name: String, guide: Boolean, scheduled: Boolean = false, art: Boolean = true, failed: Boolean = false, player: Boolean = false) {
+    private fun capture(name: String, guide: Boolean, scheduled: Boolean = false, art: Boolean = true, failed: Boolean = false, player: Boolean = false, portrait: Boolean = false) {
+        val channel = if (portrait) Channel.create(ChannelId(1), name = "Amber Stage", number = 6,
+            icon = ChannelIcon.ImageCache(ArtworkId(1))) else this.channel
+        if (portrait) images.install(FixtureArt.imageLoader(ApplicationProvider.getApplicationContext(), mapOf(
+            ArtworkId(1) to FixtureArt.picon("amber-stage"), ArtworkId(2) to FixtureArt.art("glass-harbor-poster-2x3"))))
         val event = EpgEvent.create(EventId(1), channel.id, start, start + 7200.seconds,
-            title = "Ridge Light", subtitle = "Beyond the Arctic Circle", description = description,
+            title = if (portrait) "Glass Harbor" else "Ridge Light", subtitle = if (portrait) null else "Beyond the Arctic Circle",
+            description = if (portrait) "A quiet drama about night-shift workers in a harbour glass workshop." else description,
             image = if (art) ArtworkId(2) else null)
         val entry = DvrEntry.create(DvrEntryId(1), eventId = event.id, channelId = channel.id,
             title = event.title, subtitle = event.subtitle, description = description, channelName = channel.name,
             start = event.start, stop = event.stop, image = event.image, playPosition = 3723.seconds,
             subscriptionError = if (failed) DvrSubscriptionError.NO_DISK_SPACE else null,
             state = if (scheduled) DvrEntryState.SCHEDULED else if (failed) DvrEntryState.COMPLETED_ERROR else DvrEntryState.COMPLETED)
-        compose.setContent {
+        compose.setContentWithArtworkSampling {
             CompositionLocalProvider(LocalDensity provides Density(2f, 1f)) {
                 TVHeadendPlayerTheme {
                     view = LocalView.current
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                        if (player) PlayerDetailsSurface {
+                        if (player) ProvideArtworkSession(session) { PlayerDetailsSurface {
                             ProgrammeDetailsPage(event, null, channel, start.epochSeconds + 600,
                                 listOf(at.bernhardberger.tvhplayer.core.BrowseContextAction.CONTINUE_WATCHING), {}, {})
-                        }
+                        } }
                         else if (guide) ProvideArtworkSession(session) { ProgrammeDetailsPage(event, entry.takeIf { scheduled }, channel,
                             start.epochSeconds + if (scheduled) -60 else 600,
                             programmeDetailsActions(event, start.epochSeconds + if (scheduled) -60 else 600,

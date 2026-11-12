@@ -1781,7 +1781,8 @@ def main() -> int:
                 "elif test -f files/tvhplayer_test_provisioning.json; then printf pending; "
                 "else printf missing; fi",
             )
-            deadline = time.monotonic() + 10
+            # A cold start of the unminified debug app takes about 12 s on the G10.
+            deadline = time.monotonic() + 30
             while time.monotonic() < deadline and status == "pending":
                 time.sleep(0.2)
                 result = run(status_command, capture=True, check=False, announce=False)

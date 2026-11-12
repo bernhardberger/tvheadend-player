@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.components
 
+import at.bernhardberger.tvhplayer.images.ProgrammeArtworkMode
+
 import at.bernhardberger.tvhplayer.ui.TvCompactProgressStripHeight
 
 import androidx.compose.animation.AnimatedContent
@@ -59,6 +61,7 @@ import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.request.transformations
+import at.bernhardberger.tvhplayer.images.ProgrammeArtworkTransformation
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 
 /** Width of a compact zap card in a row; grids let the card fill its column instead. */
@@ -106,12 +109,17 @@ internal fun CompactZapCard(
     val showArtwork = artwork != null && !artworkFailed
     val context = LocalPlatformContext.current
     val textTop = ((imageHeight - textBlockHeight) / imageHeight).coerceIn(0f, 1f)
+    val artworkFallback = TvSurfaceColors.containerLow.toArgb()
     // A channel-led card's scrim is drawn into its picture once rather than over it every frame.
-    val artworkModel = remember(artwork, currentSession, channelLed, textTop) {
+    val artworkModel = remember(artwork, currentSession, channelLed, textTop, imageHeight, artworkFallback) {
         val source = if (artwork != null && currentSession != null) programmeArtworkModel(artwork, currentSession)
             else null
-        if (source == null || !channelLed) source
-        else ImageRequest.Builder(context).data(source).transformations(compactZapTextScrim(textTop)).build()
+        val crop = ProgrammeArtworkTransformation(mode = ProgrammeArtworkMode.TITLE_CARD,
+            ratio = (CompactZapCardWidth / imageHeight).toDouble(), fallback = artworkFallback)
+        if (source == null) null
+        else ImageRequest.Builder(context).data(source).transformations(
+            if (channelLed) listOf(crop, compactZapTextScrim(textTop)) else listOf(crop),
+        ).build()
     }
     // A channel-led card keeps its logo over the picture, with a halo of its own so it reads
     // without the whole picture darkening.

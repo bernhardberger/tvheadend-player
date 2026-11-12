@@ -97,6 +97,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
@@ -113,7 +114,6 @@ import org.junit.experimental.categories.Category
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import at.bernhardberger.tvhplayer.testutil.CaptureOutput
-import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
 import org.junit.runner.RunWith
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
 import org.robolectric.RobolectricTestRunner
@@ -194,6 +194,9 @@ class PlayerChromeCaptureTest {
     @Test fun presentation() = presentation("player", railOpen = false)
 
     @Category(VisualCapture::class)
+    @Test fun portraitArtwork() = presentation("player-portrait-artwork", railOpen = false, portrait = true)
+
+    @Category(VisualCapture::class)
     @Test fun presentationWithoutChannelNumbers() {
         try {
             at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = false
@@ -212,7 +215,7 @@ class PlayerChromeCaptureTest {
     @Test @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi")
     fun storePlayer() = presentation("store-player", railOpen = false, concert = true)
 
-    private fun presentation(name: String, railOpen: Boolean, concert: Boolean = false) {
+    private fun presentation(name: String, railOpen: Boolean, concert: Boolean = false, portrait: Boolean = false) {
         val hour = Instant.parse("2026-10-04T20:00:00Z").epochSeconds
         val now = hour + 15 * 60
         val names = listOf("Ridge Earth", "Harbor Sport", "Northline News", "Kite Kids", "Ion Frame", "Amber Stage", "Harbor Lights")
@@ -220,7 +223,8 @@ class PlayerChromeCaptureTest {
         // Title, art and minutes from 20:00, as in the Guide's README scene.
         val onAir = listOf(Triple("Ridge Light", "ridge-light", 0 to 60), Triple("Harbor Kickoff", "harbor-kickoff", -30 to 105),
             Triple("Northline Tonight", "northline-tonight", 0 to 45), Triple("Paper Kite Tales", "paper-kite-tales", 5 to 50),
-            Triple("Ion Wake", "ion-wake", -40 to 25), Triple("The Kettle Hour", "kettle-hour", -60 to 30),
+            Triple("Ion Wake", "ion-wake", -40 to 25),
+            if (portrait) Triple("Glass Harbor", "glass-harbor-poster-2x3", -60 to 30) else Triple("The Kettle Hour", "kettle-hour", -60 to 30),
             Triple("Harbor Lights Live", "harbor-lights-live", -60 to 120))
         val lineUp = names.mapIndexed { index, name ->
             Channel.create(ChannelId(index + 1L), name = name, number = index + 1L, icon = ChannelIcon.ImageCache(ArtworkId(201 + index)))
@@ -231,15 +235,15 @@ class PlayerChromeCaptureTest {
                 subtitle = "Winter on the ridge".takeIf { index == 0 }, genre = "Documentary".takeIf { index == 0 },
                 summary = "Seasonal mountain light, forests and weather moving over a ridge.".takeIf { index == 0 })
         }
-        val playingIndex = if (concert) 6 else 0
-        val next = if (concert) null else EpgEvent.create(EventId(510), ChannelId(1), Instant.fromEpochSeconds(hour + 3600),
+        val playingIndex = if (portrait) 5 else if (concert) 6 else 0
+        val next = if (concert || portrait) null else EpgEvent.create(EventId(510), ChannelId(1), Instant.fromEpochSeconds(hour + 3600),
             Instant.fromEpochSeconds(hour + 7200), title = "Tide Watch")
         val app = ApplicationProvider.getApplicationContext<Application>()
         images.install(FixtureArt.imageLoader(app, buildMap {
             picons.forEachIndexed { index, name -> put(ArtworkId(201 + index), FixtureArt.picon(name)) }
             onAir.forEachIndexed { index, (_, art, _) -> put(ArtworkId(301 + index), FixtureArt.art(art)) }
         }))
-        val still = FixtureArt.art(if (concert) "still-harbor-lights-live" else "still-ridge-light")
+        val still = FixtureArt.art(if (portrait) "still-glass-harbor" else if (concert) "still-harbor-lights-live" else "still-ridge-light")
         val programme = events[playingIndex]
         lateinit var view: View
         var shown by mutableStateOf(false)
@@ -472,7 +476,9 @@ class PlayerChromeCaptureTest {
                 compose.onNodeWithTag("details-continue_watching").assertIsFocused()
             }
             val loadingMessage = ApplicationProvider.getApplicationContext<Application>().getString(R.string.recording_loading)
-            if (next == Scene.RECORDING_STARTING) compose.onNodeWithText(loadingMessage).assertExists()
+            if (next == Scene.RECORDING_STARTING || next == Scene.RECORDING_STARTING_CONTROLS) {
+                compose.onNodeWithTag("player-busy-indicator").assertContentDescriptionEquals(loadingMessage)
+            }
             if (next == Scene.RECORDING_STARTING_CONTROLS) {
                 compose.onNodeWithTag("player-pause").assertIsFocused()
             }
@@ -710,12 +716,11 @@ class PlayerChromeCaptureTest {
                     marks = chapterMarks(900_000L, 2_700_000L).takeIf { scene == Scene.RECORDING_CONTROLS }.orEmpty(),
                     modifier = Modifier.align(Alignment.BottomCenter),
                 ) }
-                TvRecoveryOverlay(visible = scene == Scene.RECORDING_STARTING,
-                    message = stringResource(R.string.recording_loading), opaque = false)
             }
         }
         PlayerBusyIndicator(when (scene) {
             Scene.BANNER_TUNING -> PlayerBusyStatus.TUNING
+            Scene.RECORDING_STARTING, Scene.RECORDING_STARTING_CONTROLS -> PlayerBusyStatus.RECORDING_STARTING
             Scene.CONTROLS_BUFFERING, Scene.HIDDEN_BUFFERING -> PlayerBusyStatus.BUFFERING
             else -> null
         }, Modifier.align(Alignment.Center))

@@ -58,6 +58,15 @@ class ChannelScheduleCaptureTest {
 
     @Test fun englishStates() = capture("en", listOf("live", "behind-live", "future", "tomorrow-gap", "end", "failed", "loading", "loading-more", "empty", "offline", "no-art"))
 
+    @Test fun portraitArtwork() {
+        images.install(FixtureArt.imageLoader(ApplicationProvider.getApplicationContext<Application>(), mapOf(
+            ArtworkId(3) to FixtureArt.picon("amber-stage"),
+            ArtworkId(4) to FixtureArt.art("kettle-hour"),
+            ArtworkId(5) to FixtureArt.art("glass-harbor-poster-2x3"),
+        )))
+        capture("en", listOf("portrait-artwork"))
+    }
+
     /**
      * The README scene: Ridge Earth's schedule beside the playing picture at 20:15 on 2026-10-04, UTC, with Ridge
      * Light 20:00-21:00 and then Tide Watch, as on the other README screens. One full day repeats for a week.
@@ -220,6 +229,7 @@ class ChannelScheduleCaptureTest {
                                 },
                                 onOpen = {}, onClose = {}, onRetry = {},
                                 initialEvent = when (scene) {
+                                    "portrait-artwork" -> events.first { it.title == "Glass Harbor" }
                                     "future" -> events.first { it.start.epochSeconds >= at(18, 0, 0) }
                                     "tomorrow-gap" -> events.first { it.start.epochSeconds == at(16, 6, 0) }
                                     "end" -> events.last()

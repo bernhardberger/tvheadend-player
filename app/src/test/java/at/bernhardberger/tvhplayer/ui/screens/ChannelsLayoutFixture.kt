@@ -136,8 +136,9 @@ internal class ChannelsLayoutFixture(
         playingLive: ChannelId? = null,
         channelCount: Int = LINE_UP.size,
         tagNotice: Boolean = false,
+        portrait: Boolean = false,
     ) {
-        val observation = observation(tags, manyTags, emptyGroup, recordingNow, scheduledNext, guidePending, firstTitle, presentation, channelCount)
+        val observation = observation(tags, manyTags, emptyGroup, recordingNow, scheduledNext, guidePending, firstTitle, presentation, channelCount, portrait)
         shownObservation = observation
         // All channels is opt-in under Settings: hiding it shows the tags only.
         val visibility = if (allChannels) ChannelScopeVisibility() else ChannelScopeVisibility(
@@ -255,11 +256,13 @@ internal class ChannelsLayoutFixture(
     }
 
     /** The fictional fixture pack: picons by channel id, programme art from 101. A channel in [withoutPicon] fails like a missing server image. */
-    fun fixtureArt(withoutPicon: Set<Int> = emptySet()): ImageLoader = FixtureArt.imageLoader(context, buildMap {
+    fun fixtureArt(withoutPicon: Set<Int> = emptySet(), portrait: Boolean = false): ImageLoader = FixtureArt.imageLoader(context, buildMap {
         PICONS.forEachIndexed { index, name ->
             if (index + 1 !in withoutPicon) put(ArtworkId(index + 1), FixtureArt.picon(name))
         }
-        ART.forEachIndexed { index, name -> put(ArtworkId(101 + index), FixtureArt.art(name)) }
+        ART.forEachIndexed { index, name ->
+            put(ArtworkId(101 + index), FixtureArt.art(if (portrait && index == 5) "glass-harbor-poster-2x3" else name))
+        }
     })
 
     fun key(key: Key) {
@@ -276,7 +279,7 @@ internal class ChannelsLayoutFixture(
     private fun observation(
         tags: Boolean, manyTags: Boolean, emptyGroup: Boolean, recordingNow: Int?, scheduledNext: Int?,
         guidePending: Boolean, firstTitle: String?, presentation: Boolean,
-        channelCount: Int,
+        channelCount: Int, portrait: Boolean,
     ): SessionObservation {
         // Longer wall scenes repeat the fictional networks as additional channel numbers,
         // reusing their picons; the extra channels deliberately have no programme data.
@@ -305,7 +308,8 @@ internal class ChannelsLayoutFixture(
         val now = System.currentTimeMillis() / 1000
         val events = channels.mapIndexedNotNull { index, channel ->
             // The README scene gives picon-only Lantern Hour a programme too, so no visible card is empty.
-            val title = firstTitle.takeIf { index == 0 } ?: (if (presentation && index == 1) "Harbor Kickoff" else null)
+            val title = "Glass Harbor".takeIf { portrait && index == 5 }
+                ?: firstTitle.takeIf { index == 0 } ?: (if (presentation && index == 1) "Harbor Kickoff" else null)
                 ?: (if (presentation && index == 7) "Stories by Lamplight" else null)
                 ?: LINE_UP.getOrNull(index)?.second ?: return@mapIndexedNotNull null
             // The presentation lineup shares the Guide's 20:15 evening, including the running match.
@@ -325,16 +329,17 @@ internal class ChannelsLayoutFixture(
                     episode = EpgEpisode(null, null, 2, 5, 3, 10, null, null, "S2 E3").takeIf { index == 0 },
                     copyrightYear = 2024L.takeIf { index == 0 },
                     rating = EpgRating(12, "XMLTV:FSK:12", null, null, null, null).takeIf { index == 0 },
-                    summary = SYNOPSES.getOrElse(index) { "Short stories read aloud, one each evening." },
+                    summary = if (portrait && index == 5) "A quiet drama about night-shift workers in a harbour glass workshop."
+                        else SYNOPSES.getOrElse(index) { "Short stories read aloud, one each evening." },
                     // The Kettle Hour deliberately has no art: the immersive picon fallback.
-                    image = ArtworkId(101 + index).takeIf { index != 5 && index < ART.size },
+                    image = ArtworkId(101 + index).takeIf { (index != 5 || portrait) && index < ART.size },
                     nextEventId = EventId(channel.id.value * 100 + 1),
                 ),
                 EpgEvent.create(
                     id = EventId(channel.id.value * 100 + 1), channelId = channel.id,
                     start = Instant.fromEpochSeconds(switch),
                     stop = Instant.fromEpochSeconds(switch + 60 * 60),
-                    title = NEXT_TITLES.getOrElse(index) { "Night Readings" },
+                    title = if (portrait && index == 5) "The Kettle Hour" else NEXT_TITLES.getOrElse(index) { "Night Readings" },
                 ),
             )
         }.flatten()

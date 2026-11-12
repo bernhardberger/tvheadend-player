@@ -183,6 +183,7 @@ class RecordingsVisualLayoutTest {
 
     /** Eight recordings of the README evening's channels, with their logos, focused on the Documentaries folder. */
     private fun presentationLibrary(store: Boolean = false, firstRow: Boolean = false, problems: Boolean = false,
+        portrait: Boolean = false,
         diskSpace: DvrDiskSpaceState = DvrDiskSpaceState.Current(
             DvrDiskSpace(1_240_000_000_000L, 2_760_000_000_000L, 4_000_000_000_000L))) {
         assertTrue(android.os.SystemClock.setCurrentTimeMillis(1_791_144_900_000L))
@@ -240,7 +241,8 @@ class RecordingsVisualLayoutTest {
             "glass-harbor", "harbor-lights-live", "paper-kite-tales", "harbor-kickoff")
         images.install(FixtureArt.imageLoader(ApplicationProvider.getApplicationContext<Application>(), buildMap {
             picons.forEachIndexed { index, name -> put(ArtworkId(index + 1), FixtureArt.picon(name)) }
-            art.forEachIndexed { index, name -> put(ArtworkId(101 + index), FixtureArt.art(name)) }
+            art.forEachIndexed { index, name -> put(ArtworkId(101 + index),
+                FixtureArt.art(if (portrait && index == 5) "glass-harbor-poster-2x3" else name)) }
         }))
         // A household server's disk, as the Recordings header reports it.
         show(entries = library, channels = channels, diskSpace = diskSpace)
@@ -253,6 +255,17 @@ class RecordingsVisualLayoutTest {
             key(Key.DirectionDown)
             focused("recordings-folder-Documentaries")
         }
+    }
+
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    @Category(VisualCapture::class)
+    fun portraitArtwork() {
+        presentationLibrary(portrait = true)
+        key(Key.DirectionDown)
+        focused("recording-list-entry-6")
+        compose.waitForIdle()
+        capture("recordings-portrait-artwork", 1f, outputs = "build/outputs/presentation")
     }
 
     /** Store archive: a complete, partly watched drama, distinct from tonight's live scenes. */

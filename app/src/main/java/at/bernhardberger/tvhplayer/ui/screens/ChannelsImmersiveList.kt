@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.images.ProgrammeArtworkMode
+
 import at.bernhardberger.tvhplayer.ui.components.programmeMinutesLeft
 import at.bernhardberger.tvhplayer.ui.TvCardProgressStripHeight
 import at.bernhardberger.tvhplayer.ui.TvLogoPlateColor
@@ -157,6 +159,7 @@ import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.request.transformations
+import at.bernhardberger.tvhplayer.ui.components.rememberProgrammeImageRequest
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.core.programmeArtwork
 import at.bernhardberger.tvhplayer.core.programmeArtworkModel
@@ -166,6 +169,7 @@ import at.bernhardberger.tvhplayer.ui.components.channelAccentGround
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.ArtworkLogoPlate
 import at.bernhardberger.tvhplayer.ui.components.AiringCardWidth
+import at.bernhardberger.tvhplayer.ui.components.ArtworkLogoPlateWidth
 
 /**
  * The row's cards: four and their gaps span the content from the keyline to the header's end
@@ -523,6 +527,11 @@ internal fun ChannelsRowCard(
         if (art == null || session == null) null else programmeArtworkModel(art, session)
     }
     val artLoad = rememberPictureLoad(artModel)
+    val plateShare = if (channel.icon != null) {
+        ((ImmersiveCardEmbedInset + ArtworkLogoPlateWidth * (width / AiringCardWidth)) / width).toDouble()
+    } else 0.0
+    val artRequest = rememberProgrammeImageRequest(artModel, mode = ProgrammeArtworkMode.BOX,
+        startPlateShare = plateShare, keepWideTitleCrop = true)
     val showsArt = artModel != null && artLoad.loaded
     StandardProgrammeCard(
         width = width,
@@ -567,7 +576,7 @@ internal fun ChannelsRowCard(
                     }
                 }
             }
-            if (artModel != null && !artLoad.failed) AsyncImage(artModel, contentDescription = null,
+            if (artModel != null && !artLoad.failed) AsyncImage(artRequest, contentDescription = null,
                 contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().testTag("$tag-art"),
                 onSuccess = artLoad::onSuccess, onError = { artLoad.onError() })
             // The picture carries the channel's logo in its embed corner, like the airing cards.

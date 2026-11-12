@@ -48,6 +48,8 @@ import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
 import at.bernhardberger.tvhplayer.ui.TvOverlayFooterGradientRunout
 import at.bernhardberger.tvhplayer.ui.TvSpacing4
 import coil3.compose.AsyncImage
+import at.bernhardberger.tvhplayer.images.ProgrammeArtworkMode
+import at.bernhardberger.tvhplayer.ui.components.rememberProgrammeImageRequest
 import kotlinx.coroutines.launch
 
 /**
@@ -332,12 +334,16 @@ private fun ProgrammeArtworkTile(
     val id = artwork
     val currentSession = LocalArtworkContext.current.currentSession
     var failed by remember(id, currentSession) { mutableStateOf(false) }
+    val request = rememberProgrammeImageRequest(
+        if (id != null && currentSession != null) programmeArtworkModel(id, currentSession) else null,
+        ProgrammeArtworkMode.BOX, ratio = (ArtworkTileWidth / ArtworkTileHeight).toDouble(),
+    )
     Box(modifier.size(ArtworkTileWidth, ArtworkTileHeight).clip(ArtworkTileShape)
         .focusProperties { canFocus = false }.testTag("player-info-artwork-tile")) {
         // Under the picture too, so loading shows the same channel ground as a missing picture.
         if (withoutChannel) RecordingArtworkFallback() else ChannelArtworkFallback(picon, channelId, channelNumber)
         if (id != null && currentSession != null && !failed) {
-            AsyncImage(programmeArtworkModel(id, currentSession), null,
+            AsyncImage(request, null,
                 Modifier.fillMaxSize().testTag("player-info-artwork"), contentScale = ContentScale.Crop, onError = { failed = true })
         }
     }

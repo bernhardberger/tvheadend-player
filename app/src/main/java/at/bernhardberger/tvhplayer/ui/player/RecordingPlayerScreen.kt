@@ -483,23 +483,27 @@ fun RecordingPlayerScreen(
     LaunchedEffect(busyKey, bannerFramePresented) {
         if (bannerFramePresented) recordingPresented = true
     }
-    val loadingBlocked = foregroundLayer != PlayerForegroundLayer.NONE
+    val busyBlocked = foregroundContext.recoveryVisible || foregroundContext.terminalErrorVisible
     val startingEligible = tuningStatusEligible(
         playbackState, playWhenReady, activeTarget, busyTarget,
         playbackAvailable && retainedSelection != null && retainedSelection.currentSession === currentSession,
-        loadingBlocked, recordingPresented || bannerFramePresented,
+        busyBlocked, recordingPresented || bannerFramePresented,
     )
-    val recordingLoading by rememberBusyVisible(
-        busyKey, !loadingBlocked && (recordingResolving || startingEligible), PlayerBusyStatus.TUNING,
+    val startingVisible by rememberBusyVisible(
+        busyKey, !recordingResolving && startingEligible, PlayerBusyStatus.RECORDING_STARTING,
     )
     // Startup owns feedback until a frame; later seeks use the ordinary buffering ring.
     val bufferingEligible = bufferingStatusEligible(
         playbackState, playWhenReady, activeTarget, busyTarget,
         playbackAvailable && retainedSelection != null && retainedSelection.currentSession === currentSession,
-        foregroundBlocked = recordingResolving || startingEligible ||
-            foregroundContext.recoveryVisible || foregroundContext.terminalErrorVisible,
+        foregroundBlocked = recordingResolving || startingEligible || busyBlocked,
     )
     val bufferingVisible by rememberBusyVisible(busyKey, bufferingEligible, PlayerBusyStatus.BUFFERING)
+    val busyStatus = when {
+        startingVisible -> PlayerBusyStatus.RECORDING_STARTING
+        bufferingVisible -> PlayerBusyStatus.BUFFERING
+        else -> null
+    }
     SideEffect {
         chrome.onBannerFramePresented(bannerFramePresented)
         chrome.holdBanner(!playWhenReady)
@@ -797,8 +801,8 @@ fun RecordingPlayerScreen(
             }
 
         }
-        if (!recordingLoading && !foregroundContext.recoveryVisible && !foregroundContext.terminalErrorVisible) {
-            PlayerBusyIndicator(PlayerBusyStatus.BUFFERING.takeIf { bufferingVisible }, Modifier.align(Alignment.Center))
+        if (!busyBlocked) {
+            PlayerBusyIndicator(busyStatus, Modifier.align(Alignment.Center))
         }
         PlayerHiddenStatusChip(
             state = hiddenChipState(
@@ -810,7 +814,7 @@ fun RecordingPlayerScreen(
             modifier = Modifier.align(Alignment.BottomStart).padding(playerHiddenChipPadding()),
         )
         TvRecoveryOverlay(
-            visible = recordingLoading,
+            visible = recordingResolving && !busyBlocked,
             message = stringResource(R.string.recording_loading),
             opaque = false,
         )

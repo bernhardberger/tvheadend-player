@@ -75,13 +75,14 @@ internal fun settingsServerLevels(
     showRetry: Boolean = false,
     connecting: Boolean = false,
     onRetry: () -> Unit = {},
+    actionsEnabled: Boolean = true,
 ): List<DepthLevel> {
     val list = profiles as? ServerProfileListResult.Available
     val stored = list?.profiles.orEmpty()
     val noneInUse = profiles.noServerInUse()
     val add = settingsRow(ADD_SERVER, stringResource(R.string.server_add),
         supporting = stringResource(R.string.server_add_description), icon = R.drawable.ic_add,
-        onClick = actions.onAdd)
+        enabled = actionsEnabled, onClick = actions.onAdd)
     val retry = settingsRow(RETRY_CONNECTION, stringResource(R.string.connection_try_again),
         supporting = stringResource(
             if (connecting) R.string.connection_overview_connecting else R.string.connection_retry_description,
@@ -100,7 +101,7 @@ internal fun settingsServerLevels(
             profiles == ServerProfileListResult.Unavailable -> stringResource(R.string.server_list_unavailable)
             else -> null
         })
-    return listOf(connection) + stored.map { settingsServerLevel(it, it.id == list?.activeId, actions) }
+    return listOf(connection) + stored.map { settingsServerLevel(it, it.id == list?.activeId, actions, actionsEnabled) }
 }
 
 @Composable
@@ -165,6 +166,7 @@ internal fun settingsServerLevel(
     profile: ServerProfileSummary,
     active: Boolean,
     actions: ServerProfileActions,
+    actionsEnabled: Boolean = true,
 ): DepthLevel {
     val username = profile.accountName()
     val rows = buildList {
@@ -172,19 +174,20 @@ internal fun settingsServerLevel(
         if (!active && !profile.passwordNeeded()) add(settingsRow(SERVER_USE, stringResource(R.string.server_use),
             supporting = if (username == null) stringResource(R.string.server_use_anonymous)
                 else stringResource(R.string.server_use_sign_in, username),
-            onClick = { actions.onUse(profile) }))
+            enabled = actionsEnabled, onClick = { actions.onUse(profile) }))
         if (profile.passwordNeeded()) add(settingsRow(SERVER_PASSWORD, stringResource(R.string.server_enter_password),
             supporting = stringResource(R.string.server_password_needed),
-            onClick = { actions.onEnterPassword(profile) }))
+            enabled = actionsEnabled, onClick = { actions.onEnterPassword(profile) }))
         add(settingsRow(EDIT_CONNECTION, stringResource(R.string.setup_connection),
             supporting = stringResource(R.string.setup_connection_description),
-            onClick = { actions.onSetUp(profile) }))
+            enabled = actionsEnabled, onClick = { actions.onSetUp(profile) }))
         add(settingsRow(SERVER_NAME, stringResource(R.string.server_name),
             supporting = profile.label ?: stringResource(R.string.server_name_not_set),
-            trailingIcon = R.drawable.ic_edit, onClick = { actions.onName(profile) }))
+            trailingIcon = R.drawable.ic_edit, enabled = actionsEnabled, onClick = { actions.onName(profile) }))
         add(settingsRow(SERVER_REMOVE, stringResource(R.string.server_remove),
             supporting = stringResource(R.string.server_remove_description),
-            trailingIcon = R.drawable.ic_delete_outlined, onClick = { actions.onRemove(profile) }))
+            trailingIcon = R.drawable.ic_delete_outlined, enabled = actionsEnabled,
+            onClick = { actions.onRemove(profile) }))
         add(settingsRow(SERVER_ADDRESS, stringResource(R.string.connection_overview_server),
             serverAddress(profile)))
         add(settingsRow(SERVER_ACCOUNT, stringResource(R.string.server_account),

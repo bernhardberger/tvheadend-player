@@ -23,6 +23,7 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.programmeArtworkModel
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import coil3.compose.AsyncImage
+import at.bernhardberger.tvhplayer.ui.components.rememberProgrammeImageRequest
 
 /**
  * The rail's preview of the focused card, in the immersive list's order: facts, title and
@@ -41,6 +42,10 @@ fun QuickZapPreview(
 ) {
     val artwork = image
     val currentSession = LocalArtworkContext.current.currentSession
+    val request = rememberProgrammeImageRequest(
+        if (artwork != null && currentSession != null) programmeArtworkModel(artwork, currentSession) else null,
+        ratio = (PlayerChromeTokens.channelCardWidth / PlayerChromeTokens.channelCardHeight).toDouble(),
+    )
     var artworkFailed by remember(artwork, currentSession) { mutableStateOf(false) }
     val secondary = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextSecondaryAlpha)
     val tertiary = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextTertiaryAlpha)
@@ -70,7 +75,7 @@ fun QuickZapPreview(
             }
         }
         if (artwork != null && currentSession != null && !artworkFailed) AsyncImage(
-            programmeArtworkModel(artwork, currentSession), null,
+            request, null,
             modifier = Modifier.size(PlayerChromeTokens.channelCardWidth, PlayerChromeTokens.channelCardHeight)
                 .clip(PreviewArtworkShape),
             contentScale = ContentScale.Crop,

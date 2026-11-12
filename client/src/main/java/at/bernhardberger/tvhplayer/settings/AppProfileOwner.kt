@@ -287,6 +287,8 @@ class AppProfileOwner(
         return mutate {
             val result = profileStore.updateLabel(id, normalizedLabel)
             mutableProfiles.value = profileStore.profiles()
+            if (result !is ServerProfileWriteResult.Applied)
+                postSwitchNotice(noticeCenter, Notice.ServerProfileWriteFailed)
             result
         }
     }
@@ -358,12 +360,12 @@ class AppProfileOwner(
                         if (shouldRestoreSwitch(committed, caller, persisted, previousId) {
                                 switchGenerationMatches(configurationGeneration, generation, committed) })
                             withContext(NonCancellable) {
-                                restoreSwitch(persisted, previousId, previous, caller, onOutcome, failureNotice)
-                        } else if (committed && caller.isActive) {
+                                restoreSwitch(persisted, previousId, previous,
+                                    caller, onOutcome, failureNotice, committed)
+                        } else if (committed && caller.isActive)
                             // The retained outcome: no rollback ran. Generic connection notices stay suppressed
                             // until the switch ends, so this is the only one.
                             reportSwitch(onOutcome, switchedNotice)
-                        }
                     } finally {
                         switchIdentity.unlock()
                     }
@@ -407,18 +409,16 @@ class AppProfileOwner(
     }
 
     private suspend fun restoreSwitch(
-        persisted: Boolean,
-        previousId: ServerProfileId?,
-        previous: ServerProfileReadResult,
-        caller: CoroutineContext,
-        onOutcome: ((Notice) -> Unit)?,
-        failureNotice: Notice?,
+        persisted: Boolean, previousId: ServerProfileId?, previous: ServerProfileReadResult,
+        caller: CoroutineContext, onOutcome: ((Notice) -> Unit)?, failureNotice: Notice?, committed: Boolean,
     ) {
-        val restored = if (persisted) {
-            readBackSwitchRollback(profileStore, previousId, mutableProfiles, noticeCenter)
-        } else previous
+        val (restored, rollbackFailed) = if (persisted) {
+            readBackSwitchRollback(profileStore, previousId, mutableProfiles)
+        } else previous to false
         applyServerProfile(restored)
-        // Cleanup must finish, but cancellation has no user-facing outcome.
+        if (committed) mutableConfigurationGeneration.value += 1
+        if (rollbackFailed) postSwitchNotice(noticeCenter, Notice.ServerProfileWriteFailed)
+        // A cancelled attempt has no switch outcome; rollback write failures still need feedback.
         if (caller.isActive) reportSwitch(onOutcome, failureNotice)
     }
 
@@ -446,6 +446,7 @@ class AppProfileOwner(
             audioProfileId = null
             playerSettings.useProfile(null)
             mutableServerProfile.value = ServerProfileReadResult.Missing
+            mutableLiveProfile.value = null
         }
         val listResult = profileStore.profiles()
         val list = listResult as? ServerProfileListResult.Available
@@ -453,6 +454,7 @@ class AppProfileOwner(
         if (summary == null) {
             mutableProfiles.value = listResult
             if (active) applyServerProfile(profileStore.loadActive())
+            postSwitchNotice(noticeCenter, Notice.ServerProfileWriteFailed)
             return if (list == null) ServerProfileWriteResult.Unavailable else ServerProfileWriteResult.NotFound
         }
         session.cache.clear(summary)
@@ -468,8 +470,9 @@ class AppProfileOwner(
                     center.post(Notice.ServerProfileRemoved(id, serverProfileDisplayName(summary)), center.context())
                 }
             }
-        } else if (active) {
-            applyServerProfile(profileStore.loadActive())
+        } else {
+            if (active) applyServerProfile(profileStore.loadActive())
+            postSwitchNotice(noticeCenter, Notice.ServerProfileWriteFailed)
         }
         return result
     }

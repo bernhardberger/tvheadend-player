@@ -41,7 +41,11 @@ internal fun PlayerBusyIndicator(
         label = "busyRingAlpha",
     )
     val description = status?.let {
-        stringResource(if (it == PlayerBusyStatus.TUNING) R.string.player_tuning else R.string.player_buffering)
+        stringResource(when (it) {
+            PlayerBusyStatus.TUNING -> R.string.player_tuning
+            PlayerBusyStatus.RECORDING_STARTING -> R.string.recording_loading
+            PlayerBusyStatus.BUFFERING -> R.string.player_buffering
+        })
     }
     AnimatedVisibility(
         visible = status != null,
