@@ -47,19 +47,20 @@ class RecordingOpenPolicyTest {
     }
     @Test fun growingRecordingsUseExistingPrimaryPlaybackWithoutPrompt() {
         for (state in listOf(DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)) {
-            assertEquals("$state", RecordingOpenAction.START_OVER, open(entry(state, files = listOf(file()))))
-            assertEquals("$state", RecordingOpenAction.RESUME, open(entry(state, 590, files = listOf(file()))))
-            assertEquals("$state", RecordingOpenAction.RESUME, open(entry(state, 590, files = listOf(file("/rec/A.TS")))))
+            for (path in listOf("/rec/a.ts", "/rec/A.TS", "/rec/a.mkv", "/rec/A.MKV")) {
+                assertEquals("$state $path", RecordingOpenAction.START_OVER, open(entry(state, files = listOf(file(path)))))
+                assertEquals("$state $path", RecordingOpenAction.RESUME, open(entry(state, 590, files = listOf(file(path)))))
+            }
         }
     }
-    @Test fun growingRecordingWithoutOneTransportStreamFileOpensDetails() {
+    @Test fun growingRecordingWithoutOnePlayableGrowingFileOpensDetails() {
         mapOf(
             "no files" to null,
             "empty files" to emptyList(),
             "two files" to listOf(file(), file("/rec/b.ts")),
             "blank path" to listOf(file(" ")),
             "no path" to listOf(DvrRecordingFile.create(fileId = 1)),
-            "not a transport stream" to listOf(file("/rec/a.mkv")),
+            "deferred container" to listOf(file("/rec/a.mp4")),
         ).forEach { (case, files) ->
             for (state in listOf(DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)) {
                 assertEquals("$state $case", RecordingOpenAction.DETAILS, open(entry(state, 590, files = files)))

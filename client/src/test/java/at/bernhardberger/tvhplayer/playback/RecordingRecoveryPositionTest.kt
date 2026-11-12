@@ -137,7 +137,7 @@ class RecordingRecoveryPositionTest {
     }
 
     @OptIn(TvheadendTestingApi::class)
-    @Test fun refusedGrowingMatroskaRetainsItsDeferredReasonOnlyForItsSelection() = exercise(growing = true) {
+    @Test fun refusedGrowingContainerRetainsItsDeferredReasonOnlyForItsSelection() = exercise(growing = true) {
         val initial = session.observation.value
         val missing = selection(FIRST)
         for (noSession in listOf(false, true)) {
@@ -159,7 +159,7 @@ class RecordingRecoveryPositionTest {
         }
         session.publish(initial)
         session.publish(recordings(listOf(FIRST), null, DvrEntryState.RECORDING, true,
-            files = listOf(TvheadendTestResultFactory.recordingFile(serverPath = "/rec/programme.mkv"))))
+            files = listOf(TvheadendTestResultFactory.recordingFile(serverPath = "/rec/programme.mp4"))))
         val entry = requireNotNull(session.observation.value.dvrEntry(FIRST))
         val requested = selection(FIRST)
         val install = scope.async { runtime.playRecording(requested, RecordingPlaybackStart.START_OVER) }

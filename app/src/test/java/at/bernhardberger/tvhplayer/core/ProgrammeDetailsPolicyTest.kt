@@ -191,11 +191,13 @@ class ProgrammeDetailsPolicyTest {
             assertFalse("$it", facts(partial, it).any { fact -> fact.kind == DetailsFactKind.LEFT })
         }
         assertFalse(recordingDetailsFacts(partial, null, nowSec = 300).any { it.kind == DetailsFactKind.LEFT })
-        assertFalse(facts(recording(DvrEntryState.RECORDING, 20, listOf(file("/rec/a.mkv"))))
+        assertFalse(facts(recording(DvrEntryState.RECORDING, 20, listOf(file("/rec/a.mp4", start = event.start))))
             .any { it.kind == DetailsFactKind.LEFT })
         // A running recording's length is what its files hold so far; without file times it is unknown.
-        assertEquals(DetailsFact(DetailsFactKind.LEFT, 180),
-            facts(recording(DvrEntryState.RECORDING, 20, listOf(file(start = event.start)))).last())
+        for (path in listOf("/rec/a.ts", "/rec/a.mkv")) {
+            assertEquals(path, DetailsFact(DetailsFactKind.LEFT, 180),
+                facts(recording(DvrEntryState.RECORDING, 20, listOf(file(path, start = event.start)))).last())
+        }
         assertFalse(facts(recording(DvrEntryState.RECORDING, 20, listOf(file())))
             .any { it.kind == DetailsFactKind.LENGTH || it.kind == DetailsFactKind.LEFT })
     }

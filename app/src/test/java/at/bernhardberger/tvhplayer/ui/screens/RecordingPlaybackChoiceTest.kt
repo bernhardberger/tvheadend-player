@@ -108,7 +108,7 @@ class RecordingPlaybackChoiceTest {
     @Test fun deferredChoiceExplainsWhyAndOnlyOffersWatchLive() {
         var watched = 0
         val starts = mutableListOf<RecordingPlaybackStart>()
-        show(754L, watch = { watched++ }, play = { starts += it }, serverPath = "test.mkv")
+        show(754L, watch = { watched++ }, play = { starts += it }, serverPath = "test.mp4")
         val reason = ApplicationProvider.getApplicationContext<Application>().getString(R.string.error_305_reason)
         compose.onNodeWithText(reason).assertIsDisplayed()
         compose.onNodeWithTag("recording-resume").assertDoesNotExist()
