@@ -89,13 +89,17 @@ internal fun rememberProgrammeImageRequest(
     mode: ProgrammeArtworkMode = ProgrammeArtworkMode.CROP,
     avoidPlate: Boolean = false,
     ratio: Double = 16.0 / 9,
+    startPlateShare: Double = 0.0,
+    keepWideTitleCrop: Boolean = false,
 ): ImageRequest? {
     val context = LocalPlatformContext.current
     val fallback = TvSurfaceColors.containerLow.toArgb()
     val plateAtEnd = LocalLayoutDirection.current == LayoutDirection.Rtl
-    return remember(source, context, mode, avoidPlate, ratio, fallback, plateAtEnd) {
+    return remember(source, context, mode, avoidPlate, ratio, fallback, plateAtEnd,
+        startPlateShare, keepWideTitleCrop) {
         source?.let { ImageRequest.Builder(context).data(it)
-            .transformations(ProgrammeArtworkTransformation(mode, ratio, avoidPlate, plateAtEnd, fallback)).build() }
+            .transformations(ProgrammeArtworkTransformation(mode, ratio, avoidPlate, plateAtEnd, fallback,
+                startPlateShare, keepWideTitleCrop)).build() }
     }
 }
 
@@ -130,13 +134,15 @@ internal fun ProgrammeArtwork(
     }
 }
 
+internal val ArtworkLogoPlateWidth = 56.dp
+
 /**
  * A channel's logo embedded in a programme picture's bottom-start corner, on a dark plate. Sized
  * for an airing card's picture; a smaller picture passes its [scale], so the plate keeps its share.
  */
 @Composable
 internal fun ArtworkLogoPlate(channelIcon: ChannelIcon?, modifier: Modifier = Modifier, scale: Float = 1f) {
-    PiconBox(channelIcon, modifier.size(56.dp * scale, 32.dp * scale)
+    PiconBox(channelIcon, modifier.size(ArtworkLogoPlateWidth * scale, 32.dp * scale)
         .background(TvLogoPlateColor, MaterialTheme.shapes.extraSmall)
         .padding(horizontal = 4.dp * scale, vertical = 3.dp * scale))
 }

@@ -12,6 +12,7 @@ internal data class ArtworkCrop(val x: Double, val y: Double, val width: Double,
 // title_first.py: tuned on 65 covers. Keep these thresholds and candidate/merge rules unchanged.
 private const val EDGE_T = 34
 private const val GROW = .42
+private const val GROW_SPLIT = .6
 private const val GAP_ROWS = 3
 private const val MAX_BAND_SHARE = .38
 private const val MAX_CANDIDATES = 4
@@ -105,8 +106,7 @@ private fun titleCandidates(d: DoubleArray): List<TitleBand> {
     repeat(MAX_CANDIDATES) {
         val peak = d.indices.maxBy { if (masked[it]) -1.0 else d[it] }
         if (masked[peak] || d[peak] <= 0) return out
-        val threshold = GROW * d[peak]
-        fun end(step: Int): Int {
+        fun end(step: Int, threshold: Double): Int {
             var y = peak; var gap = 0; var last = peak
             while (y + step in d.indices && !masked[y + step]) {
                 y += step
@@ -118,7 +118,10 @@ private fun titleCandidates(d: DoubleArray): List<TitleBand> {
             }
             return last
         }
-        val top = end(-1); val bottom = end(1) + 1
+        var top = end(-1, GROW * d[peak]); var bottom = end(1, GROW * d[peak]) + 1
+        if ((bottom - top).toDouble() / height > MAX_BAND_SHARE) {
+            top = end(-1, GROW_SPLIT * d[peak]); bottom = end(1, GROW_SPLIT * d[peak]) + 1
+        }
         val context = (maxOf(0, top - CONTEXT_ROWS) until maxOf(0, top - 1)).map { d[it] } +
             (minOf(height, bottom + 1) until minOf(height, bottom + CONTEXT_ROWS)).map { d[it] }
         val inside = (top until bottom).map { d[it] }.average()
@@ -247,10 +250,14 @@ internal fun needsArtworkTreatment(width: Int, height: Int, ratio: Double): Bool
     return aspect < ratio * .98 && abs(aspect / (16.0 / 9) - 1) > .02
 }
 internal fun usesCoverBox(width: Int, height: Int): Boolean = width.toDouble() / height <= COVER_BOX_MAX_ASPECT
-internal fun coverWindow(width: Int, height: Int, outputWidth: Int, outputHeight: Int): ArtworkWindow {
+internal fun coverWindow(width: Int, height: Int, outputWidth: Int, outputHeight: Int,
+    startClearance: Int = 0, plateAtEnd: Boolean = false): ArtworkWindow {
     var coverWidth = (outputHeight * width.toDouble() / height).roundToInt().coerceIn(1, outputWidth)
     coverWidth += (outputWidth - coverWidth) % 2
-    return ArtworkWindow((outputWidth - coverWidth) / 2, 0, coverWidth, outputHeight)
+    // The smallest shift clearing start also leaves the most possible room for an end mark.
+    // If both cannot fit, start takes priority; the cover must still stay inside the card.
+    val start = maxOf((outputWidth - coverWidth) / 2, startClearance).coerceAtMost(outputWidth - coverWidth)
+    return ArtworkWindow(if (plateAtEnd) outputWidth - coverWidth - start else start, 0, coverWidth, outputHeight)
 }
 
 /** Round-4 attention.py: squared first-difference energy, edge/plate penalties and centre-top bias.

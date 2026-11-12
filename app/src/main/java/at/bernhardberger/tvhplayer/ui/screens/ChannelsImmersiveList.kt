@@ -169,6 +169,7 @@ import at.bernhardberger.tvhplayer.ui.components.channelAccentGround
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.ArtworkLogoPlate
 import at.bernhardberger.tvhplayer.ui.components.AiringCardWidth
+import at.bernhardberger.tvhplayer.ui.components.ArtworkLogoPlateWidth
 
 /**
  * The row's cards: four and their gaps span the content from the keyline to the header's end
@@ -526,7 +527,11 @@ internal fun ChannelsRowCard(
         if (art == null || session == null) null else programmeArtworkModel(art, session)
     }
     val artLoad = rememberPictureLoad(artModel)
-    val artRequest = rememberProgrammeImageRequest(artModel, mode = ProgrammeArtworkMode.TITLE_CARD)
+    val plateShare = if (channel.icon != null) {
+        ((ImmersiveCardEmbedInset + ArtworkLogoPlateWidth * (width / AiringCardWidth)) / width).toDouble()
+    } else 0.0
+    val artRequest = rememberProgrammeImageRequest(artModel, mode = ProgrammeArtworkMode.BOX,
+        startPlateShare = plateShare, keepWideTitleCrop = true)
     val showsArt = artModel != null && artLoad.loaded
     StandardProgrammeCard(
         width = width,

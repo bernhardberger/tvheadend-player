@@ -23,8 +23,11 @@ internal class ProgrammeArtworkTransformation(
     private val avoidPlate: Boolean = false,
     private val plateAtEnd: Boolean = false,
     private val fallback: Int = 0,
+    private val startPlateShare: Double = 0.0,
+    private val keepWideTitleCrop: Boolean = false,
 ) : Transformation() {
-    override val cacheKey = "programmeArtwork-v4($mode;$ratio;$avoidPlate;$plateAtEnd;$fallback)"
+    override val cacheKey = "programmeArtwork-v5($mode;$ratio;$avoidPlate;$plateAtEnd;$fallback;" +
+        "$startPlateShare;$keepWideTitleCrop)"
 
     override suspend fun transform(input: Bitmap, size: Size): Bitmap {
         if (!needsArtworkTreatment(input.width, input.height, ratio)) return input
@@ -42,7 +45,9 @@ internal class ProgrammeArtworkTransformation(
         val output = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(output)
         val paint = Paint(Paint.FILTER_BITMAP_FLAG)
-        if (mode == ProgrammeArtworkMode.TITLE_CARD) {
+        val wideTitleCrop = mode == ProgrammeArtworkMode.BOX && keepWideTitleCrop &&
+            !usesCoverBox(input.width, input.height)
+        if (mode == ProgrammeArtworkMode.TITLE_CARD || wideTitleCrop) {
             drawTitleCard(input, output, pixels, sampleWidth, sampleHeight)
         } else if (backdrop != null) {
             canvas.drawBitmap(input, sourceRect(backdrop, input, sampleWidth, sampleHeight),
@@ -50,7 +55,8 @@ internal class ProgrammeArtworkTransformation(
         } else if (mode == ProgrammeArtworkMode.BOX && usesCoverBox(input.width, input.height)) {
             output.setPixels(artworkFill(pixels, sampleWidth, sampleHeight, width, height, fallback),
                 0, width, 0, 0, width, height)
-            val cover = coverWindow(input.width, input.height, width, height)
+            val cover = coverWindow(input.width, input.height, width, height,
+                kotlin.math.ceil(width * startPlateShare).toInt(), plateAtEnd)
             canvas.drawBitmap(input, null, Rect(cover.x, cover.y, cover.x + cover.width, cover.y + cover.height), paint)
         } else {
             val window = attentionWindow(pixels, sampleWidth, sampleHeight, ratio, avoidPlate, plateAtEnd)

@@ -77,6 +77,12 @@ class BackdropTransformationTest {
         for (mode in ProgrammeArtworkMode.entries) {
             assertSame(landscape, ProgrammeArtworkTransformation(mode).transform(landscape, Size(160, 90)))
         }
+        val wide = Bitmap.createBitmap(140, 100, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.WHITE) }
+        for (x in 0 until wide.width) wide.setPixel(x, 0, Color.RED)
+        val before = ProgrammeArtworkTransformation(ProgrammeArtworkMode.TITLE_CARD).transform(wide, Size(160, 90))
+        val after = ProgrammeArtworkTransformation(ProgrammeArtworkMode.BOX, keepWideTitleCrop = true,
+            startPlateShare = .3).transform(wide, Size(160, 90))
+        assertTrue("non-box images keep the existing title crop", before.sameAs(after))
     }
 
     @Test
@@ -106,7 +112,8 @@ class BackdropTransformationTest {
             ProgrammeArtworkTransformation(ProgrammeArtworkMode.TITLE_CARD),
             ProgrammeArtworkTransformation(ProgrammeArtworkMode.BACKDROP),
             ProgrammeArtworkTransformation(ratio = 4.0 / 3), ProgrammeArtworkTransformation(avoidPlate = true),
-            ProgrammeArtworkTransformation(plateAtEnd = true), ProgrammeArtworkTransformation(fallback = Color.DKGRAY))) {
+            ProgrammeArtworkTransformation(plateAtEnd = true), ProgrammeArtworkTransformation(fallback = Color.DKGRAY),
+            ProgrammeArtworkTransformation(startPlateShare = .3), ProgrammeArtworkTransformation(keepWideTitleCrop = true))) {
             assertNotEquals(crop, variant.cacheKey)
         }
     }

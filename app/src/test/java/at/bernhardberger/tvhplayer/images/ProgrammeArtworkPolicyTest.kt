@@ -28,6 +28,14 @@ class ProgrammeArtworkPolicyTest {
         assertTrue((118 - crop.y) / crop.height < .55)
     }
 
+    @Test fun denseTitleIsNotLostInTheTexturedBodyAboveIt() {
+        // The lower-density body touches the logo and makes the initial band exceed 38% of the cover.
+        val crop = titleCardWindow(titlePixels(96..105, textureRows = 45..95), 96, 144, 16.0 / 9)
+        assertTrue("the title stays inside the picture", crop.y <= 96)
+        assertTrue("the title clears the card's text instead of using the upper-scene fallback",
+            (106 - crop.y) / crop.height < .55)
+    }
+
     @Test fun bottomTitleCanExtendIntoBottomCornerFill() {
         val pixels = titlePixels(132..140)
         val crop = titleCardWindow(pixels, 96, 144, 16.0 / 9)
@@ -55,6 +63,20 @@ class ProgrammeArtworkPolicyTest {
         assertEquals(9, crop.height)
     }
 
+    @Test fun coverClearsTheStartPlateWithTheSmallestShift() {
+        val centered = coverWindow(3, 4, 356, 200)
+        assertEquals(centered, coverWindow(3, 4, 356, 200, startClearance = centered.x))
+        val plateEnd = centered.x + 4
+        val shifted = coverWindow(3, 4, 356, 200, startClearance = plateEnd)
+        assertEquals(plateEnd, shifted.x)
+        assertEquals(centered.width, shifted.width)
+        val rtl = coverWindow(3, 4, 356, 200, startClearance = plateEnd, plateAtEnd = true)
+        assertEquals(shifted.x, 356 - rtl.x - rtl.width)
+        val clamped = coverWindow(3, 4, 160, 90, startClearance = 100)
+        assertEquals(92, clamped.x)
+        assertEquals("an impossible start clearance must not push the cover outside", 160, clamped.x + clamped.width)
+    }
+
     @Test fun flatBackdropIsAbsentButTextureRemains() {
         assertFalse(backdropHasScene(IntArray(96 * 54) { 0xff202020.toInt() }, 96, 54))
         assertTrue(backdropHasScene(IntArray(96 * 54) {
@@ -67,8 +89,9 @@ class ProgrammeArtworkPolicyTest {
         assertTrue(crop.y >= 39 + 144 * .03 || crop.y + crop.height <= 30 - 144 * .03)
     }
 
-    private fun titlePixels(rows: IntRange): IntArray = IntArray(96 * 144) {
-        if (it / 96 in rows && it % 96 in 12..83 && it % 2 == 0) 0xffffffff.toInt() else 0xff202020.toInt()
+    private fun titlePixels(rows: IntRange, textureRows: IntRange = IntRange.EMPTY): IntArray = IntArray(96 * 144) {
+        if (it % 2 == 0 && ((it / 96 in rows && it % 96 in 12..83) ||
+                (it / 96 in textureRows && it % 96 in 12..47))) 0xffffffff.toInt() else 0xff202020.toInt()
     }
 
     @Test fun uprightAndSquareCoversKeepTheirFullHeightCentered() {

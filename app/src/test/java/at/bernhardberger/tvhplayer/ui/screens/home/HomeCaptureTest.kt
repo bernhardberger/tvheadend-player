@@ -147,6 +147,12 @@ class HomeCaptureTest {
         show(Kind.WARM, portraitArtwork = true)
         compose.onNodeWithTag("home-activity-1").requestFocus()
         capture("portrait-artwork", "home-activity-1")
+        compose.onNodeWithTag("home-activity-0").requestFocus()
+        key(Key.DirectionDown)
+        key(Key.DirectionDown)
+        settle("home-onnow-0")
+        repeat(5) { key(Key.DirectionRight) }
+        capture("portrait-onnow-artwork", "home-onnow-5")
     }
 
     @Category(VisualCapture::class)
@@ -981,7 +987,8 @@ class HomeCaptureTest {
                     else -> synopses[index]
                 },
                 image = ArtworkId(101 + index).takeIf { !noArtwork && (index != 5 || portrait) && index < 7 },
-                contentGenre = genreCodes[index]?.let { ContentGenre.fromContentType((it.code shl 4).toLong()) },
+                contentGenre = (if (portrait && index == 5) ContentCategory.MOVIE_DRAMA else genreCodes[index])
+                    ?.let { ContentGenre.fromContentType((it.code shl 4).toLong()) },
                 nextEventId = EventId(channel.id.value * 100 + 1),
             )
         } + if (longOnNow) channels.drop(titles.size).map { channel ->
