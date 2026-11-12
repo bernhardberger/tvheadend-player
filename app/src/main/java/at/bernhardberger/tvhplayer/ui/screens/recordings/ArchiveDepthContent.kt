@@ -290,8 +290,8 @@ internal const val ArchiveHeadingPreviewScale = 16f / 22f
 
 /**
  * Column headings are the second level under the Recordings title: titleLarge like the
- * Schedule day headings. In the preview slot there is none, so the line beside the free-space
- * text stays quiet; the heading fades in and grows to full size as the column slides into the active slot.
+ * Schedule day headings. In the preview slot they read at the row title size and grow
+ * to full size as the column slides into the active slot.
  */
 @Composable
 private fun ArchiveLevelHeading(name: String, emphasis: () -> Float) {
@@ -302,7 +302,6 @@ private fun ArchiveLevelHeading(name: String, emphasis: () -> Float) {
             modifier = Modifier.graphicsLayer {
                 scaleX = lerp(ArchiveHeadingPreviewScale, 1f, emphasis())
                 scaleY = scaleX
-                alpha = emphasis().coerceIn(0f, 1f)
                 transformOrigin = TransformOrigin(0f, 1f)
             }.semantics { heading() }.testTag("archive-level-heading"),
         )
