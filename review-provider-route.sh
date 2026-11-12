@@ -116,6 +116,7 @@ import math
 import sys
 
 # Max 5x policy: one fifth of the former Pro percentage reserves (20% / 5%).
+# The 5h reserve applies only on plans that report a 5h window.
 FIVE_HOUR_MINIMUM = 4.0
 WEEKLY_MINIMUM = 1.0
 
@@ -154,11 +155,12 @@ def remaining(window_name, window):
         raise SystemExit(2)
     return float(value)
 
-five_hour = remaining("5h", windows.get("5h"))
 weekly = remaining("7d", windows.get("7d"))
-if five_hour <= FIVE_HOUR_MINIMUM:
-    print("Claude 5h quota is below the UX eligibility minimum")
-    raise SystemExit(1)
+if "5h" in windows:
+    five_hour = remaining("5h", windows["5h"])
+    if five_hour <= FIVE_HOUR_MINIMUM:
+        print("Claude 5h quota is below the UX eligibility minimum")
+        raise SystemExit(1)
 if weekly <= WEEKLY_MINIMUM:
     print("Claude 7d quota is below the UX eligibility minimum")
     raise SystemExit(1)
