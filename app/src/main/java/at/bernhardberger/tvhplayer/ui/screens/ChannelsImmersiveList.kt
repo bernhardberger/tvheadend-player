@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.images.ProgrammeArtworkMode
+
 import at.bernhardberger.tvhplayer.ui.components.programmeMinutesLeft
 import at.bernhardberger.tvhplayer.ui.TvCardProgressStripHeight
 import at.bernhardberger.tvhplayer.ui.TvLogoPlateColor
@@ -157,6 +159,7 @@ import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.request.transformations
+import at.bernhardberger.tvhplayer.ui.components.rememberProgrammeImageRequest
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.core.programmeArtwork
 import at.bernhardberger.tvhplayer.core.programmeArtworkModel
@@ -523,6 +526,7 @@ internal fun ChannelsRowCard(
         if (art == null || session == null) null else programmeArtworkModel(art, session)
     }
     val artLoad = rememberPictureLoad(artModel)
+    val artRequest = rememberProgrammeImageRequest(artModel, mode = ProgrammeArtworkMode.TITLE_CARD)
     val showsArt = artModel != null && artLoad.loaded
     StandardProgrammeCard(
         width = width,
@@ -567,7 +571,7 @@ internal fun ChannelsRowCard(
                     }
                 }
             }
-            if (artModel != null && !artLoad.failed) AsyncImage(artModel, contentDescription = null,
+            if (artModel != null && !artLoad.failed) AsyncImage(artRequest, contentDescription = null,
                 contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().testTag("$tag-art"),
                 onSuccess = artLoad::onSuccess, onError = { artLoad.onError() })
             // The picture carries the channel's logo in its embed corner, like the airing cards.

@@ -143,6 +143,13 @@ class HomeCaptureTest {
     private val context: Application get() = ApplicationProvider.getApplicationContext()
 
     @Category(VisualCapture::class)
+    @Test fun portraitArtwork() = atEvening {
+        show(Kind.WARM, portraitArtwork = true)
+        compose.onNodeWithTag("home-activity-1").requestFocus()
+        capture("portrait-artwork", "home-activity-1")
+    }
+
+    @Category(VisualCapture::class)
     @Test
     fun browse() = atEvening {
         show(Kind.BROWSE)
@@ -793,9 +800,9 @@ class HomeCaptureTest {
         compose.onNodeWithTag("home-view-button").assertIsDisplayed()
     }
 
-    private fun show(kind: Kind, activityItems: Int = 2, longOnNow: Boolean = false, screen: Boolean = false, fontScale: Float = 1f, noArtwork: Boolean = false, infoLineCounts: Boolean = false, updateHint: Boolean = false, headerTag: String? = null) {
+    private fun show(kind: Kind, activityItems: Int = 2, longOnNow: Boolean = false, screen: Boolean = false, fontScale: Float = 1f, noArtwork: Boolean = false, infoLineCounts: Boolean = false, updateHint: Boolean = false, headerTag: String? = null, portraitArtwork: Boolean = false) {
         isDebugInspectorInfoEnabled = true
-        val base = scene(kind, activityItems, longOnNow, noArtwork, infoLineCounts)
+        val base = scene(kind, activityItems, longOnNow, noArtwork, infoLineCounts, portraitArtwork)
         val scene = if (kind in setOf(Kind.LOADING, Kind.EMPTY, Kind.OFFLINE)) base.copy(
             input = base.input.copy(channels = if (kind == Kind.EMPTY) base.input.channels else emptyList(),
                 currentEvents = emptyMap(), upcomingEvents = emptyList(), recentChannelIds = emptyList(), dvrEntries = emptyList(), playing = null),
@@ -806,7 +813,7 @@ class HomeCaptureTest {
             ) else SessionObservation.create(), playing = null,
         ) else base
         val sections = homeSections(scene.input)
-        installFixtures()
+        installFixtures(portraitArtwork)
         val playing = scene.playing
         val nowPlaying = playing?.let {
             railNowPlaying(
@@ -898,7 +905,7 @@ class HomeCaptureTest {
         compose.waitForIdle()
     }
 
-    private fun installFixtures() {
+    private fun installFixtures(portrait: Boolean = false) {
         images.install(
             FixtureArt.imageLoader(
                 context,
@@ -907,18 +914,19 @@ class HomeCaptureTest {
                         if (index + 1 != 14) put(ArtworkId(index + 1), FixtureArt.picon(name))
                     }
                     ChannelsLayoutFixture.ART.forEachIndexed { index, name ->
-                        put(ArtworkId(101 + index), FixtureArt.art(name))
+                        put(ArtworkId(101 + index), FixtureArt.art(if (portrait && index == 5) "glass-harbor-poster-2x3" else name))
                     }
                     listOf("glass-harbor", "lantern-road", "river-court", "field-desk", "little-orbit")
                         .forEachIndexed { index, name ->
-                            put(ArtworkId(201 + index), FixtureArt.art(name))
+                            put(ArtworkId(201 + index), FixtureArt.art(if (portrait && index == 0) "glass-harbor-poster-2x3" else name))
                         }
                 },
             ),
         )
     }
 
-    private fun scene(kind: Kind, activityItems: Int, longOnNow: Boolean, noArtwork: Boolean, infoLineCounts: Boolean = false): Scene {
+    private fun scene(kind: Kind, activityItems: Int, longOnNow: Boolean, noArtwork: Boolean, infoLineCounts: Boolean = false,
+        portrait: Boolean = false): Scene {
         val now = 1_791_144_900L
         val channels = ChannelsLayoutFixture.LINE_UP.mapIndexed { index, (name, _) ->
             Channel.create(
@@ -960,18 +968,19 @@ class HomeCaptureTest {
                 channelId = channel.id,
                 start = Instant.fromEpochSeconds(now - (if (index == 0) 15 else 10 + index * 7) * 60),
                 stop = Instant.fromEpochSeconds(switch),
-                title = titles[index],
+                title = if (portrait && index == 5) "Glass Harbor" else titles[index],
                 subtitle = "Winter on the ridge".takeIf { index == 0 },
                 genre = "Documentary".takeIf { index == 0 },
                 episode = EpgEpisode(null, null, 2, 5, 3, 10, null, null, "S2 E3").takeIf { index == 0 },
                 copyrightYear = 2024L.takeIf { index == 0 },
                 rating = EpgRating(12, "XMLTV:FSK:12", null, null, null, null).takeIf { index == 0 },
                 summary = when {
+                    portrait && index == 5 -> "A quiet drama about night-shift workers in a harbour glass workshop."
                     infoLineCounts && index == 0 -> "Mountain light."
                     infoLineCounts && index == 1 -> "Match coverage.\nHarbor FC meet Amber Town.\nA floodlit stadium."
                     else -> synopses[index]
                 },
-                image = ArtworkId(101 + index).takeIf { !noArtwork && index != 5 && index < 7 },
+                image = ArtworkId(101 + index).takeIf { !noArtwork && (index != 5 || portrait) && index < 7 },
                 contentGenre = genreCodes[index]?.let { ContentGenre.fromContentType((it.code shl 4).toLong()) },
                 nextEventId = EventId(channel.id.value * 100 + 1),
             )
@@ -992,7 +1001,7 @@ class HomeCaptureTest {
                 channelId = channel.id,
                 start = Instant.fromEpochSeconds(switch),
                 stop = Instant.fromEpochSeconds(switch + 3600),
-                title = nextTitles[index],
+                title = if (portrait && index == 5) "The Kettle Hour" else nextTitles[index],
             )
         }
         val observation = SessionObservation.create(
@@ -1026,7 +1035,7 @@ class HomeCaptureTest {
                     },
                 ),
             ),
-            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = dvrEntries(kind, activityItems, now))),
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = dvrEntries(kind, activityItems, now, portrait))),
         )
         val firstRun = kind == Kind.FIRST_RUN
         val warm = kind == Kind.WARM
@@ -1040,7 +1049,7 @@ class HomeCaptureTest {
             currentEvents = currentEvents.mapNotNull { event -> event.channelId?.let { it to event } }.toMap(),
             upcomingEvents = upcomingEvents,
             recentChannelIds = if (firstRun) emptyList() else recentIds.map { ChannelId(it.toLong()) },
-            dvrEntries = dvrEntries(kind, activityItems, now),
+            dvrEntries = dvrEntries(kind, activityItems, now, portrait),
             admission = { entry ->
                 (resumeMinutes + runningResume)[entry.id]
                     ?.let {
@@ -1071,12 +1080,13 @@ class HomeCaptureTest {
         DvrEntryId(203) to 40L,
     )
 
-    private fun dvrEntries(kind: Kind, activityItems: Int, now: Long): List<DvrEntry> {
+    private fun dvrEntries(kind: Kind, activityItems: Int, now: Long, portrait: Boolean = false): List<DvrEntry> {
         val warm = kind == Kind.WARM
         val firstRun = kind == Kind.FIRST_RUN
         return buildList {
             if (warm && activityItems >= 2) {
-                add(running(1, 2, 200, "Harbor Kickoff", 102, now, startMin = 20, stopMin = 40))
+                add(if (portrait) running(1, 6, 600, "Glass Harbor", 106, now, startMin = 45, stopMin = 50)
+                    else running(1, 2, 200, "Harbor Kickoff", 102, now, startMin = 20, stopMin = 40))
             }
             if (warm && activityItems >= 3) {
                 add(running(3, 7, 700, "Harbor Lights Live", 106, now, startMin = 25, stopMin = 30))
@@ -1086,7 +1096,7 @@ class HomeCaptureTest {
                     DvrEntry.create(
                         DvrEntryId(201),
                         channelId = ChannelId(6),
-                        channelName = "Harbor Lights Live",
+                        channelName = if (portrait) "Amber Stage" else "Harbor Lights Live",
                         state = DvrEntryState.COMPLETED,
                         title = "Glass Harbor",
                         start = Instant.fromEpochSeconds(now - 26 * 3600),

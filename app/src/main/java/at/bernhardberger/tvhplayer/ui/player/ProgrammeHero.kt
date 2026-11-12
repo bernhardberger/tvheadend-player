@@ -27,6 +27,8 @@ import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers
 import at.bernhardberger.tvhplayer.ui.components.rememberChannelAccent
 import coil3.compose.SubcomposeAsyncImage
+import at.bernhardberger.tvhplayer.images.ProgrammeArtworkMode
+import at.bernhardberger.tvhplayer.ui.components.rememberProgrammeImageRequest
 
 /** Cache selectors use the current session; remote pictures use the channel-logo loading path. */
 @Composable
@@ -68,9 +70,13 @@ fun ProgrammeHero(
             }
         }
         if (artwork != null && currentSession != null) {
-            SubcomposeAsyncImage(programmeArtworkModel(artwork, currentSession), null,
+            val request = rememberProgrammeImageRequest(
+                programmeArtworkModel(artwork, currentSession), ProgrammeArtworkMode.BOX,
+                ratio = (PlayerChromeTokens.heroWidth / PlayerChromeTokens.heroHeight).toDouble())
+            SubcomposeAsyncImage(request, null,
                 modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop,
-                loading = { fallback() }, error = { fallback() })
+                loading = { fallback() },
+                error = { fallback() })
         } else fallback()
     }
 }

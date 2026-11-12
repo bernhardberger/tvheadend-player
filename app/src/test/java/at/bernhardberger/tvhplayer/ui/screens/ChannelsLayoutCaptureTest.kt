@@ -72,6 +72,22 @@ class ChannelsLayoutCaptureTest {
 
     @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun portraitArtwork() = atEvening {
+        fixture.show(ChannelsView(ChannelsLayout.LIST), fixture.fixtureArt(portrait = true), presentation = true,
+            portrait = true, playerReturn = PlayerReturnFocus(ChannelId(6), ChannelId(6)))
+        capture("channels-list-portrait-artwork", row(6), outputs = "build/outputs/presentation")
+    }
+
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun portraitArtworkImmersive() = atEvening {
+        fixture.show(ChannelsView(), fixture.fixtureArt(portrait = true), presentation = true,
+            portrait = true, playerReturn = PlayerReturnFocus(ChannelId(6), ChannelId(6)))
+        capture("channels-immersive-portrait-artwork", card(6), outputs = "build/outputs/presentation")
+    }
+
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
     fun presentationListWithoutChannelNumbers() = atEvening {
         try {
             at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = false

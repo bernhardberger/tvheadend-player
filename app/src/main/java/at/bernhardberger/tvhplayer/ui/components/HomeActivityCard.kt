@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.components
 
+import at.bernhardberger.tvhplayer.images.ProgrammeArtworkMode
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -89,6 +91,7 @@ internal fun HomeActivityCard(
     val icon = channel?.icon
     val model = remember(session, image) { image?.let { programmeArtworkModel(it, session) } }
     val load = rememberPictureLoad(model)
+    val request = rememberProgrammeImageRequest(model, mode = ProgrammeArtworkMode.TITLE_CARD)
     val pictured = model != null && !load.failed
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -131,7 +134,7 @@ internal fun HomeActivityCard(
             }
             if (pictured) {
                 AsyncImage(
-                    model,
+                    request,
                     null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),

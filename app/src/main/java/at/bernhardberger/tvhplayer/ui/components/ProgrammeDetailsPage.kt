@@ -49,6 +49,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import at.bernhardberger.tvhplayer.images.ProgrammeArtworkMode
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -89,6 +90,7 @@ import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.request.transformations
+import at.bernhardberger.tvhplayer.images.ProgrammeArtworkTransformation
 import coil3.request.allowHardware
 import at.bernhardberger.tvhplayer.ui.common.formatFirstAired
 import at.bernhardberger.tvhplayer.ui.common.formatFileSize
@@ -789,18 +791,21 @@ private const val DetailsHeroWidthFraction = 758f / 960f
  */
 @Composable
 private fun DetailsBackdrop(art: ChannelIcon, background: State<Color>, blur: () -> Float, reading: () -> Float,
-    textAreas: List<DetailsBackdropTextArea>, scrolledTextTop: Float, readingTextTop: Float, onError: () -> Unit) {
+    textAreas: List<DetailsBackdropTextArea>, scrolledTextTop: Float, readingTextTop: Float,
+    onError: () -> Unit) {
     val session = LocalArtworkContext.current.currentSession ?: return
     val context = LocalPlatformContext.current
     val source = remember(session, art) { programmeArtworkModel(art, session) }
     val sharp = remember(source, context) {
-        ImageRequest.Builder(context).data(source).allowHardware(false).build()
+        ImageRequest.Builder(context).data(source).allowHardware(false)
+            .transformations(ProgrammeArtworkTransformation(mode = ProgrammeArtworkMode.BACKDROP)).build()
     }
     val blurred = remember(source, context) {
         ImageRequest.Builder(context).data(source)
             .allowHardware(false)
             .size(DetailsBackdropDecodeSize.first, DetailsBackdropDecodeSize.second)
-            .transformations(BackdropTransformation(DetailsBackdropWidth, DetailsBackdropBlurRadius))
+            .transformations(ProgrammeArtworkTransformation(mode = ProgrammeArtworkMode.BACKDROP),
+                BackdropTransformation(DetailsBackdropWidth, DetailsBackdropBlurRadius))
             .build()
     }
     var blurredLoaded by remember(blurred) { mutableStateOf(false) }
@@ -913,7 +918,8 @@ internal fun DetailsHero(
     val context = LocalPlatformContext.current
     val request = remember(session, image, context, height != null) {
         ImageRequest.Builder(context).data(programmeArtworkModel(image, session))
-            .transformations(if (height != null) GuideScrimTransformation else CinematicScrimTransformation).build()
+            .transformations(ProgrammeArtworkTransformation(mode = ProgrammeArtworkMode.BACKDROP),
+                if (height != null) GuideScrimTransformation else CinematicScrimTransformation).build()
     }
     AsyncImage(request, null,
         contentScale = ContentScale.Crop,

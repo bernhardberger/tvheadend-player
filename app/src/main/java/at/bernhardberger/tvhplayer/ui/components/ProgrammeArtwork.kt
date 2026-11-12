@@ -13,6 +13,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -29,6 +32,11 @@ import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
 import coil3.decode.DataSource
+import coil3.compose.LocalPlatformContext
+import coil3.request.ImageRequest
+import coil3.request.transformations
+import at.bernhardberger.tvhplayer.images.ProgrammeArtworkMode
+import at.bernhardberger.tvhplayer.images.ProgrammeArtworkTransformation
 import kotlinx.coroutines.delay
 
 /**
@@ -74,6 +82,23 @@ internal fun rememberPictureLoad(model: Any?): PictureLoad {
     return load
 }
 
+/** One request policy for programme pictures only; picons keep their own decode path. */
+@Composable
+internal fun rememberProgrammeImageRequest(
+    source: Any?,
+    mode: ProgrammeArtworkMode = ProgrammeArtworkMode.CROP,
+    avoidPlate: Boolean = false,
+    ratio: Double = 16.0 / 9,
+): ImageRequest? {
+    val context = LocalPlatformContext.current
+    val fallback = TvSurfaceColors.containerLow.toArgb()
+    val plateAtEnd = LocalLayoutDirection.current == LayoutDirection.Rtl
+    return remember(source, context, mode, avoidPlate, ratio, fallback, plateAtEnd) {
+        source?.let { ImageRequest.Builder(context).data(it)
+            .transformations(ProgrammeArtworkTransformation(mode, ratio, avoidPlate, plateAtEnd, fallback)).build() }
+    }
+}
+
 /** Non-focusable artwork shared by airing cards and browse menus. */
 @Composable
 internal fun ProgrammeArtwork(
@@ -87,12 +112,13 @@ internal fun ProgrammeArtwork(
         if (image != null && session != null) programmeArtworkModel(image, session) else null
     }
     val load = rememberPictureLoad(model)
+    val request = rememberProgrammeImageRequest(model, avoidPlate = channelIcon != null)
     Box(modifier.clip(MaterialTheme.shapes.small).background(TvSurfaceColors.containerLowest)) {
         if (model == null || load.failed || (channelIcon != null && load.needsFallback)) {
             PiconBox(channelIcon, Modifier.align(Alignment.Center).size(100.dp, 45.dp))
         }
         if (model != null && !load.failed) {
-            AsyncImage(model, null,
+            AsyncImage(request, null,
                 contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(),
                 onSuccess = load::onSuccess, onError = { load.onError() })
             if (load.loaded && channelIcon != null) ArtworkLogoPlate(channelIcon,

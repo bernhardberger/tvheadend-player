@@ -51,6 +51,7 @@ import at.bernhardberger.tvhplayer.ui.player.playerMinutesLeft
 import at.bernhardberger.tvhplayer.ui.player.programmeFactsSegments
 import at.bernhardberger.tvhplayer.core.programmeArtworkModel
 import coil3.compose.AsyncImage
+import at.bernhardberger.tvhplayer.images.ProgrammeArtworkMode
 
 /**
  * The pane beside a list is the kit's four-column card, 268 by 151, and the headline below keeps
@@ -101,6 +102,7 @@ internal fun ProgrammePanePicture(
         if (art != null && session != null) programmeArtworkModel(art, session) else null
     }
     val load = rememberPictureLoad(model)
+    val request = rememberProgrammeImageRequest(model, ProgrammeArtworkMode.BOX)
     Box(modifier.clip(MaterialTheme.shapes.small).background(TvSurfaceColors.containerLowest)) {
         if (model == null || load.needsFallback) {
             // The logo cards' ambient colour; with no text on it, it keeps its strength to the bottom.
@@ -112,7 +114,7 @@ internal fun ProgrammePanePicture(
                     else TvSurfaceColors.containerLowest)
         }
         if (model != null && !load.failed) {
-            AsyncImage(model, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(),
+            AsyncImage(request, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(),
                 onSuccess = load::onSuccess, onError = { load.onError() })
         }
     }
