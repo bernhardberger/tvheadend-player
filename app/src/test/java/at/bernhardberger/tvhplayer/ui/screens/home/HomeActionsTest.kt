@@ -20,6 +20,7 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
+import org.junit.After
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -35,6 +36,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
 import at.bernhardberger.tvhplayer.testutil.awaitScheduledWork
 import at.bernhardberger.tvhplayer.testutil.pressKey
+import at.bernhardberger.tvhplayer.testutil.settleFrames
+import at.bernhardberger.tvhplayer.ui.LocalWarmPlayback
+import androidx.compose.ui.graphics.GraphicsLayerScope
+import androidx.compose.ui.platform.InspectableValue
+import androidx.compose.ui.platform.isDebugInspectorInfoEnabled
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
@@ -1090,6 +1096,49 @@ class HomeActionsTest {
         compose.onNodeWithTag("home-onnow-0").assertIsFocused()
     }
 
+    @Test fun warmProgrammeDetailsHideHome() = detailsHideHome(programme = true)
+
+    @Test fun warmRecordingDetailsHideHome() = detailsHideHome(programme = false)
+
+    @After fun resetInspector() { isDebugInspectorInfoEnabled = false }
+
+    private fun detailsHideHome(programme: Boolean) {
+        isDebugInspectorInfoEnabled = true
+        val event = EpgEvent.create(EventId(1), channel.id, Instant.fromEpochSeconds(now - 60),
+            Instant.fromEpochSeconds(now + 600), title = "Now").takeIf { programme }
+        recordingHome(false, { fail("must not tune") }, { fail("must not play") }, event = event,
+            warm = true, layering = BrowseContentLayering())
+        val card = if (programme) "home-onnow-0" else "home-shelf-0"
+        compose.settleFrames(3)
+        compose.onNodeWithTag(card).assertIsFocused()
+        assertFalse("Home draws before opening details", drawingHidden(card))
+        compose.pressKey(Key.Menu, settleFrames = 3)
+        compose.onNodeWithTag("browse-context-menu").assertIsDisplayed()
+        assertFalse("The context menu itself remains drawn", drawingHidden("browse-context-menu"))
+        compose.pressKey(Key.DirectionDown)
+        if (!programme) compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionCenter, settleFrames = 3)
+        compose.onNodeWithTag("programme-details-page").assertIsDisplayed()
+        assertTrue("Home content must not draw behind warm details", drawingHidden(card))
+        assertFalse("Details must remain outside Home's faded content", drawingHidden("details-title"))
+        compose.runOnIdle { back.onBackPressed() }
+        compose.settleFrames(3)
+        compose.onNodeWithTag(card).assertIsFocused()
+        assertFalse("Back restores Home's drawing", drawingHidden(card))
+    }
+
+    /** Inspect the real ancestor drawing layers: displayed semantics alone ignore opacity. */
+    @Suppress("UNCHECKED_CAST")
+    private fun drawingHidden(tag: String): Boolean = compose.runOnIdle {
+        generateSequence(compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().layoutInfo) { it.parentInfo }
+            .flatMap { it.getModifierInfo().asSequence() }
+            .mapNotNull { it.modifier as? InspectableValue }
+            .flatMap { it.inspectableElements }
+            .filter { it.name == "block" }
+            .map { it.value as GraphicsLayerScope.() -> Unit }
+            .any { GraphicsLayerScope().apply(it).alpha <= 0f }
+    }
+
     @Test fun currentLiveOkUsesExistingLiveEntryPath() {
         val tuned = mutableListOf<ChannelId>()
         val observation = SessionObservation.create(channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(channel))))
@@ -1151,7 +1200,8 @@ class HomeActionsTest {
 
     @OptIn(TvheadendTestingApi::class, at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
     private fun recordingHome(running: Boolean, onWatch: (ChannelId) -> Unit, onPlay: (RecordingPlaybackStart) -> Unit, playing: Boolean = false, outsideScope: Boolean = false,
-        onWatchRecording: ((ChannelId) -> Unit)? = null, scheduled: Boolean = false, event: EpgEvent? = null, alsoFinished: Boolean = false) {
+        onWatchRecording: ((ChannelId) -> Unit)? = null, scheduled: Boolean = false, event: EpgEvent? = null, alsoFinished: Boolean = false,
+        warm: Boolean = false, layering: BrowseContentLayering? = null) {
         val entry = DvrEntry.create(DvrEntryId(1), channelId = channel.id, title = "Test recording",
             state = if (scheduled) DvrEntryState.SCHEDULED else if (running) DvrEntryState.RECORDING else DvrEntryState.COMPLETED,
             start = Instant.fromEpochSeconds(if (scheduled) now + 600 else now - 1800), stop = Instant.fromEpochSeconds(if (running || scheduled) now + 1800 else now),
@@ -1187,9 +1237,11 @@ class HomeActionsTest {
             back = androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current!!.onBackPressedDispatcher
             androidx.compose.runtime.DisposableEffect(application) { onDispose { application.close() } }
             TVHeadendPlayerTheme {
+            CompositionLocalProvider(LocalWarmPlayback provides warm, LocalBrowseContentLayering provides layering) {
             homeScreen(input, observation,
                 onPlay = { id, _ -> onWatch(id) }, onPlayRecording = { _, start -> onPlay(start) },
                 onWatchRecordingChannel = { id, _ -> (onWatchRecording ?: onWatch)(id) })
+            }
         } } }
     }
 
