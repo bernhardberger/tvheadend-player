@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.*
-import androidx.compose.ui.platform.LocalConfiguration
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvhplayer.core.*
@@ -13,7 +12,6 @@ import at.bernhardberger.tvhplayer.notices.*
 import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
-import at.bernhardberger.tvhplayer.ui.common.formatRecordingSchedule
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsPage
 import at.bernhardberger.tvhplayer.ui.components.LocalWatchingTarget
 import at.bernhardberger.tvhplayer.ui.components.LocalRecordingPlaybackSelection
@@ -162,11 +160,8 @@ internal fun RecordingDetailsHost(
             }
             val visibility = remember(mutation) { MutableTransitionState(false).apply { targetState = true } }
             RecordingConfirmationDialog(
-                visibility = visibility, action = action, title = opened.title.orEmpty(),
-                removeEntry = deleteRemovesEntryOnly(opened),
-                channelName = channel?.name ?: opened.channelName.orEmpty(),
-                dateAndTime = formatRecordingSchedule(opened.start?.epochSeconds,
-                    dateOnly = action == PendingRecordingAction.DELETE, locale = LocalConfiguration.current.locales[0]),
+                visibility = visibility, action = action, entry = opened, channel = channel,
+                nowSec = displayNowSec, currentSession = capability, observation = displayObservation,
                 backEnabled = backEnabled,
                 onDismiss = { pending = null },
                 onConfirm = {

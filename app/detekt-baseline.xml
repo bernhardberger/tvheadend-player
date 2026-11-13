@@ -63,7 +63,7 @@
     <ID>CyclomaticComplexMethod:BrowseContextMenu.kt:@Composable internal fun BrowseContextMenu</ID>
     <ID>CyclomaticComplexMethod:BrowseContextMenu.kt:@Composable internal fun rememberBrowseContextMenuTrigger: BrowseContextMenuTrigger</ID>
     <ID>CyclomaticComplexMethod:BrowseContextMenu.kt:internal fun BrowseContextAction.label: Int</ID>
-    <ID>CyclomaticComplexMethod:CentredDialog.kt:@Composable internal fun CentredDialog</ID>
+    <ID>CyclomaticComplexMethod:CentredDialogShell.kt:@Composable internal fun CentredDialogShell</ID>
     <ID>CyclomaticComplexMethod:ChannelAccents.kt:ChannelAccents$suspend fun fillIn</ID>
     <ID>CyclomaticComplexMethod:ChannelDrawer.kt:@OptIn(ExperimentalFoundationApi::class) @Composable fun ChannelDrawer</ID>
     <ID>CyclomaticComplexMethod:ChannelNumberOverlay.kt:@Composable private fun ChannelNumberEntryRow</ID>
@@ -174,7 +174,6 @@
     <ID>LongMethod:AppRoot.kt:@Composable internal fun MainStartupComposition</ID>
     <ID>LongMethod:ArchiveDepthContent.kt:fun addLevel</ID>
     <ID>LongMethod:BrowsePanels.kt:@OptIn(ExperimentalFoundationApi::class) @Composable internal fun BrowsePanelList</ID>
-    <ID>LongMethod:CentredDialog.kt:@Composable internal fun CentredDialog</ID>
     <ID>LongMethod:ChannelDrawer.kt:@OptIn(ExperimentalFoundationApi::class) @Composable fun ChannelDrawer</ID>
     <ID>LongMethod:ChannelNumberOverlay.kt:@Composable private fun ChannelNumberEntryRow</ID>
     <ID>LongMethod:ChannelRow.kt:@Composable fun ChannelRow</ID>
@@ -421,11 +420,6 @@
     <ID>MaxLineLength:BrowseContextMenu.kt:color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)</ID>
     <ID>MaxLineLength:BrowseContextMenu.kt:color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)</ID>
     <ID>MaxLineLength:BrowsePanels.kt:val activation = event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter</ID>
-    <ID>MaxLineLength:CentredDialog.kt:Text</ID>
-    <ID>MaxLineLength:CentredDialog.kt:color = MaterialTheme.colorScheme.onSurface</ID>
-    <ID>MaxLineLength:CentredDialog.kt:if</ID>
-    <ID>MaxLineLength:CentredDialog.kt:val activation = event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter</ID>
-    <ID>MaxLineLength:CentredDialog.kt:visibility: MutableTransitionState&lt;Boolean&gt; = remember { MutableTransitionState(false).apply { targetState = true } }</ID>
     <ID>MaxLineLength:ChannelAccent.kt:if</ID>
     <ID>MaxLineLength:ChannelAccents.kt:ChannelAccents$.</ID>
     <ID>MaxLineLength:ChannelAccents.kt:return@withContext if (failure == null || failure == TvheadendFailure.FILE_UNAVAILABLE) NEUTRAL_ACCENT_RGB else null</ID>
@@ -1224,9 +1218,6 @@
     <ID>WildcardImport:BrowseContextMenu.kt:import androidx.compose.runtime.*</ID>
     <ID>WildcardImport:BrowseContextMenu.kt:import androidx.compose.ui.focus.*</ID>
     <ID>WildcardImport:BrowseContextMenu.kt:import androidx.compose.ui.input.key.*</ID>
-    <ID>WildcardImport:CentredDialog.kt:import androidx.compose.foundation.layout.*</ID>
-    <ID>WildcardImport:CentredDialog.kt:import androidx.compose.runtime.*</ID>
-    <ID>WildcardImport:CentredDialog.kt:import androidx.compose.ui.input.key.*</ID>
     <ID>WildcardImport:ChannelContextMenu.kt:import androidx.compose.runtime.*</ID>
     <ID>WildcardImport:ChannelContextMenu.kt:import at.bernhardberger.tvheadend.sdk.core.*</ID>
     <ID>WildcardImport:ChannelSchedule.kt:import androidx.compose.foundation.layout.*</ID>

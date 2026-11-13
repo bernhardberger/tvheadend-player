@@ -14,7 +14,9 @@ import at.bernhardberger.tvhplayer.testutil.settleFrames
 import android.app.Application
 import android.view.KeyEvent as AndroidKeyEvent
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -118,6 +120,9 @@ import at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy
 import at.bernhardberger.tvhplayer.playback.PlaybackTrace
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
+import org.koin.compose.KoinIsolatedContext
+import org.koin.dsl.koinApplication
+import org.koin.dsl.module
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
@@ -898,6 +903,9 @@ abstract class LivePlayerChromeFixture {
         if (!settleOnEntry) compose.mainClock.autoAdvance = false
         compose.setContent {
             if (screenVisible.value) {
+                val application = remember { koinApplication { modules(module { single { profiles } }) } }
+                DisposableEffect(application) { onDispose { application.close() } }
+                KoinIsolatedContext(application) {
                 CompositionLocalProvider(
                     LocalLifecycleOwner provides owner,
                     LocalDensity provides Density(LocalDensity.current.density, fontScale),
@@ -911,6 +919,7 @@ abstract class LivePlayerChromeFixture {
                             startupTarget = if (startupEnabled()) ApplianceLaunchTarget(ApplianceLaunchRequest(startupRequestId()), ChannelId(1), "Name 1") else null,
                             onStartupOutcome = { _, outcome -> onStartupOutcome(outcome); acceptStartupOutcome() })
                     } }
+                }
                 }
             }
         }

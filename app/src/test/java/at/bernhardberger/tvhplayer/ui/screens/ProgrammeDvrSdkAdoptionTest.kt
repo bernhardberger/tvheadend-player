@@ -48,7 +48,7 @@ class ProgrammeDvrSdkAdoptionTest {
     @Test fun guideMenuStopsRecordingRatherThanCompletedEntry() = stop(details = false)
     @Test fun differentProfilesNameSelectedProfile() = stop(details = true, otherProfile = "two")
     @Test fun sameProfileNamesSelectedOwner() = stop(details = true, otherProfile = "one")
-    @Test fun singleActiveKeepsExistingConfirmationText() = stop(details = true, unchangedText = true)
+    @Test fun singleActiveOmitsTarget() = stop(details = true, unchangedText = true)
 
     @Test fun recordRestoresFocusBeforeFailureAndGuardsReopenedMenu() = deferredMutation(null, reopen = true)
     @Test fun confirmedStopRestoresFocusBeforeFailure() = deferredMutation(DvrEntryState.RECORDING)
@@ -126,7 +126,7 @@ class ProgrammeDvrSdkAdoptionTest {
                     showContextMenu = !details, onShowDetails = {},
                     mutations = actions, notices = notices, mutationScope = scope, mutationInFlight = inFlight,
                     onPlay = { _, _ -> }, onPlayRecording = {}, onClose = { opened = false },
-                    returnFocusRequester = origin, settingsStore = UiSettingsStore(InMemoryPreferencesDataStore()))
+                    returnFocusRequester = origin, settingsStore = UiSettingsStore(InMemoryPreferencesDataStore()), signedInUsername = null)
             }
         }
         val actionText = when (state) {
@@ -159,7 +159,9 @@ class ProgrammeDvrSdkAdoptionTest {
         assertFalse(cancelled)
     }
 
-    private fun stop(details: Boolean, otherProfile: String? = null, unchangedText: Boolean = false) {
+    @Test fun sameProfileOmitsSignedInOwner() = stop(details = false, otherProfile = "one", signedInUsername = "Fixture owner")
+
+    private fun stop(details: Boolean, otherProfile: String? = null, unchangedText: Boolean = false, signedInUsername: String? = null) {
         val selected = DvrEntry.create(DvrEntryId(2), eventId = event.id, state = DvrEntryState.RECORDING,
             configId = DvrConfigId("one"), owner = "Fixture owner", creator = "Fixture creator")
         val other = DvrEntry.create(DvrEntryId(1), eventId = event.id,
@@ -190,17 +192,23 @@ class ProgrammeDvrSdkAdoptionTest {
                     mutations = actions, notices = notices, onPlay = { _, _ -> }, onPlayRecording = {},
                     mutationScope = androidx.compose.runtime.rememberCoroutineScope(),
                     mutationInFlight = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(null) },
-                    onClose = {}, settingsStore = UiSettingsStore(context))
+                    onClose = {}, settingsStore = UiSettingsStore(context), signedInUsername = signedInUsername)
             }
         }
         compose.onNodeWithText("Stop recording").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         if (otherProfile == "one") {
-            compose.onNodeWithText("Recording owner: Fixture owner", substring = true).assertIsDisplayed()
-            compose.onNodeWithText("Fixture creator", substring = true).assertDoesNotExist()
+            val owner = compose.onNodeWithContentDescription("Recording owner: Fixture owner", substring = true)
+            compose.onNodeWithContentDescription("Ridge Light", substring = true).assertIsDisplayed()
+            if (signedInUsername == "Fixture owner") owner.assertDoesNotExist() else owner.assertIsDisplayed()
+            compose.onNodeWithContentDescription("Fixture creator", substring = true).assertDoesNotExist()
         } else if (otherProfile != null) {
-            compose.onNodeWithText("Recording profile: One", substring = true).assertIsDisplayed()
+            compose.onNodeWithContentDescription("Recording profile: One", substring = true).assertIsDisplayed()
         }
-        if (unchangedText) compose.onNodeWithText(context.getString(R.string.stop_recording_confirm_message, "Ridge Light")).assertIsDisplayed()
+        if (unchangedText) {
+            compose.onNodeWithContentDescription("Ridge Light", substring = true).assertIsDisplayed()
+            compose.onNodeWithContentDescription("Recording owner:", substring = true).assertDoesNotExist()
+            compose.onNodeWithContentDescription("Recording profile:", substring = true).assertDoesNotExist()
+        }
         compose.onNodeWithText("Keep recording").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
         compose.onNodeWithText("Stop recording", ignoreCase = false).requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.runOnIdle { assertEquals(selected.id, stopped) }
@@ -237,7 +245,7 @@ class ProgrammeDvrSdkAdoptionTest {
                     notices = NoticeCenter({ 0L }) { NoticeContext(0, opening.currentSession?.generationIdentity) },
                     mutationScope = rememberCoroutineScope(), mutationInFlight = remember { mutableStateOf(null) },
                     onPlay = { _, _ -> }, onPlayRecording = { played = it }, onClose = {},
-                    settingsStore = UiSettingsStore(context))
+                    settingsStore = UiSettingsStore(context), signedInUsername = null)
             }
         }
         compose.onNodeWithText("Play recording").assertIsDisplayed()
@@ -267,7 +275,7 @@ class ProgrammeDvrSdkAdoptionTest {
                     notices = NoticeCenter({ 0L }) { NoticeContext(0, opening.currentSession?.generationIdentity) },
                     mutationScope = rememberCoroutineScope(), mutationInFlight = remember { mutableStateOf(null) },
                     onPlay = { _, _ -> }, onPlayRecording = {}, onClose = {},
-                    settingsStore = UiSettingsStore(InMemoryPreferencesDataStore()))
+                    settingsStore = UiSettingsStore(InMemoryPreferencesDataStore()), signedInUsername = null)
             }
         }
         compose.onNodeWithText("Record").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }

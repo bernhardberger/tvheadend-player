@@ -8,6 +8,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.key.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvhplayer.core.*
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
@@ -22,6 +23,9 @@ import at.bernhardberger.tvhplayer.ui.screens.guide.ConfirmProgrammeActionDialog
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
+import at.bernhardberger.tvhplayer.settings.AppProfileOwner
+import at.bernhardberger.tvhplayer.ui.screens.settings.activeProfile
+import at.bernhardberger.tvhplayer.ui.screens.settings.accountName
 import at.bernhardberger.tvhplayer.ui.rememberCloseBehindPlayer
 import at.bernhardberger.tvhplayer.ui.rememberPlayerEntryPending
 import at.bernhardberger.tvhplayer.ui.LocalPlayerEntryHandoff
@@ -51,6 +55,8 @@ internal fun ProgrammeDetailsHost(
     retainPlayerSnapshot: Boolean = false,
     onContinueWatching: (() -> Unit)? = null,
     initialAction: BrowseContextAction? = null,
+    signedInUsername: String? = koinInject<AppProfileOwner>().profiles.collectAsStateWithLifecycle()
+        .value.activeProfile()?.accountName(),
 ) {
     val closeBehindPlayer = rememberCloseBehindPlayer()
     val entryPending = rememberPlayerEntryPending()
@@ -347,13 +353,14 @@ internal fun ProgrammeDetailsHost(
     }
     pendingAction?.takeIf { currentMutation != null }?.let { action ->
         val programme = mutationEvent ?: event
-        ConfirmProgrammeActionDialog(action, programme.title.orEmpty(),
+        ConfirmProgrammeActionDialog(action, programme,
+            channel = programme.channelId?.let(observation::channel),
+            nowSec = nowSec, currentSession = capability, observation = observation,
             entries = pendingEntries,
+            signedInUsername = signedInUsername,
             configurations = observation.currentDvrConfigurations(),
             visibility = confirmationVisibility,
             onPreviewKeyEvent = keyHandler,
-            channelName = programme.channelId?.let(observation::channel)?.name.orEmpty(),
-            dateAndTime = formatRecordingSchedule(programme.start.epochSeconds),
             onDismiss = {
                 pendingAction = null
                 pending = null

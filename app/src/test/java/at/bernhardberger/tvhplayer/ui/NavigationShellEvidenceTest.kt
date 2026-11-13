@@ -1187,11 +1187,12 @@ class NavigationShellEvidenceTest {
                             onStopNowPlaying = { stopped++; nowPlaying = null },
                             nowSecProvider = { clock },
                         ) { padding, drawerActive ->
-                            if (switchDialog) at.bernhardberger.tvhplayer.ui.components.CentredDialog(
-                                title = "Change connection", message = "Stop watching?",
-                                firstLabel = "Keep watching", secondLabel = "Change connection",
-                                onFirst = { switchDialog = false }, onSecond = { switchDialog = false },
-                                onDismiss = { switchDialog = false },
+                            if (switchDialog) at.bernhardberger.tvhplayer.ui.screens.settings.SwitchServerDialog(
+                                name = "Bedroom",
+                                look = at.bernhardberger.tvhplayer.ui.components.ServerAvatarLook(1, "B"),
+                                detail = "Fixture connection",
+                                interruption = at.bernhardberger.tvhplayer.ui.screens.settings.PlaybackInterruption.LIVE,
+                                onKeep = { switchDialog = false }, onSwitch = { switchDialog = false },
                             )
                             SettingsScreenNavigation(
                                 navigation,

@@ -14,16 +14,18 @@ import at.bernhardberger.tvhplayer.images.DetailsArtColors
 /**
  * Only the details backdrop changes colour; the content retains the normal theme. The colour
  * animates in once sampled; a caller that waits for [onSettled] instead gets it without animation.
- * Before a session only a logo's stored colour is known.
+ * Before a session only a logo's stored colour is known. [tintRgb] turns the seed into the colour,
+ * null for none.
  */
 @Composable
 internal fun rememberDetailsTint(
     art: ChannelIcon?,
     picon: ChannelIcon?,
     onSettled: (() -> Unit)? = null,
+    tintRgb: (Int) -> Int? = ::detailsTintRgb,
+    neutral: Color = MaterialTheme.colorScheme.background,
 ): State<Color> {
     val currentOnSettled by rememberUpdatedState(onSettled)
-    val neutral = MaterialTheme.colorScheme.background
     val context = LocalContext.current
     val samplingContext = LocalArtworkSamplingContext.current
     val accents = LocalChannelAccents.current
@@ -51,7 +53,7 @@ internal fun rememberDetailsTint(
             }
             currentOnSettled?.invoke()
         }
-        val color = seed?.let { Color(0xFF000000.toInt() or detailsTintRgb(it)) } ?: neutral
+        val color = seed?.let(tintRgb)?.let { Color(0xFF000000.toInt() or it) } ?: neutral
         if (onSettled != null) rememberUpdatedState(color)
         else animateColorAsState(color, tween(320), label = "detailsTint")
     }

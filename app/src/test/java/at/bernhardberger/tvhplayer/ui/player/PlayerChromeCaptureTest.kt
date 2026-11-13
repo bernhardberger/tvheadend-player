@@ -665,7 +665,9 @@ class PlayerChromeCaptureTest {
                     }
                 } }
                 if (scene == Scene.PROGRAMME_CONFIRM_STOP) ConfirmProgrammeActionDialog(
-                    action = ProgrammeAction.STOP_RECORDING, programmeTitle = shown.title.orEmpty(), onDismiss = {}, onConfirm = {},
+                    action = ProgrammeAction.STOP_RECORDING, event = shown, channel = channel, nowSec = NOW,
+                    currentSession = session, observation = null,
+                    onDismiss = {}, onConfirm = {},
                 )
             }
             // Back while paused hides the Banner: the paused chip stays alone at the state cell's place.

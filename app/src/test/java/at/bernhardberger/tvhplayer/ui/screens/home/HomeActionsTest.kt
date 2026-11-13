@@ -1,4 +1,10 @@
 package at.bernhardberger.tvhplayer.ui.screens.home
+import at.bernhardberger.tvhplayer.settings.AppProfileOwner
+import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
+import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
+import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
+import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore
+import kotlinx.coroutines.test.StandardTestDispatcher
 
 import android.app.Application
 import androidx.compose.foundation.layout.PaddingValues
@@ -1162,8 +1168,8 @@ class HomeActionsTest {
             onWatchRecording = if (outsideScope) { { tuned += it } } else null)
         compose.onNodeWithTag("home-activity-0").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.mainClock.advanceTimeBy(500)
-        compose.onNodeWithTag("recording-resume").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
-        compose.onNodeWithTag("recording-start-over").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
+        compose.onNodeWithTag("recording-resume").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.onNodeWithTag("recording-start-over").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
         compose.onNodeWithTag("recording-watch-live").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.runOnIdle { assertEquals(listOf(channel.id), tuned) }
     }
@@ -1224,6 +1230,9 @@ class HomeActionsTest {
         val notices = NoticeCenter({ 0L }) { NoticeContext(0, observation.currentSession?.generationIdentity) }
         val dependencies = module {
             single<TvheadendSession> { session }; single { notices }
+            single { AppProfileOwner(session, FakeServerProfileStore(),
+                PlayerSettingsStore(InMemoryPreferencesDataStore()), StandardTestDispatcher(),
+                readProfileForEditing = { ServerProfileEditReadResult.Missing }) }
             if (event != null) single {
                 at.bernhardberger.tvhplayer.settings.UiSettingsStore(at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore())
             }

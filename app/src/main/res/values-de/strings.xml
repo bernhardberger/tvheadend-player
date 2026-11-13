@@ -324,9 +324,10 @@
     <string name="cancel_recording">Aufnahme abbrechen</string>
     <string name="stop_recording">Aufnahme beenden</string>
     <string name="cancel_recording_confirm_title">Diese Aufnahme absagen?</string>
-    <string name="cancel_recording_confirm_message">%1$s auf %2$s, %3$s, wird nicht aufgenommen.</string>
     <string name="stop_recording_confirm_title">Diese Aufnahme beenden?</string>
-    <string name="stop_recording_confirm_message">Die Aufnahme von %1$s wird jetzt beendet. Das bisher Aufgenommene bleibt erhalten.</string>
+    <string name="stop_recording_confirm_body">Der bisher aufgenommene Teil von %1$s bleibt erhalten. Der letzte Teil von %2$s wird nicht aufgenommen.</string>
+    <string name="stop_recording_confirm_body_open">Der bisher aufgenommene Teil von %1$s bleibt erhalten und die Aufnahme endet jetzt.</string>
+    <string name="cancel_recording_confirm_body">Sie wird aus dem Zeitplan entfernt und nicht aufgenommen.</string>
     <string name="recording_status">Aufnahme: %1$s</string>
     <string name="recording_state_scheduled">Geplant</string>
     <string name="recording_state_recording">Wird aufgenommen</string>
@@ -426,24 +427,18 @@
     <string name="recordings_reconnecting">Verbindung wird wiederhergestellt. Gespeicherte Aufnahmedaten können veraltet sein…</string>
     <string name="delete_recording">Aufnahme löschen</string>
     <string name="delete_recording_confirm_title">Diese Aufnahme löschen?</string>
-    <string name="delete_recording_confirm_message">%1$s (%2$s, %3$s) wird vom Server gelöscht.</string>
+    <string name="delete_recording_confirm_body">Die Aufnahme wird vom Server gelöscht.</string>
     <string name="remove_entry">Eintrag entfernen</string>
     <string name="remove_entry_confirm_title">Diesen Eintrag entfernen?</string>
-    <string name="remove_entry_confirm_message">%1$s (%2$s, %3$s) wird aus der Liste des Servers entfernt.</string>
-    <string name="delete_folder_all_confirm_title">Alle Aufnahmen in %1$s löschen?</string>
-    <string name="delete_folder_watched_confirm_title">Gesehene Aufnahmen in %1$s löschen?</string>
-    <plurals name="delete_folder_confirm_message">
-        <item quantity="one">%1$d Aufnahme (%2$s) wird vom Server gelöscht.</item>
-        <item quantity="other">%1$d Aufnahmen (%2$s) werden vom Server gelöscht.</item>
-    </plurals>
-    <plurals name="delete_folder_confirm_message_no_size">
-        <item quantity="one">%1$d Aufnahme wird vom Server gelöscht.</item>
-        <item quantity="other">%1$d Aufnahmen werden vom Server gelöscht.</item>
-    </plurals>
+    <string name="remove_entry_confirm_body">Er wird aus der Liste des Servers entfernt.</string>
+    <string name="delete_folder_all_confirm_question">Alle Aufnahmen in diesem Ordner löschen?</string>
+    <string name="delete_folder_watched_confirm_question">Alle gesehenen Aufnahmen in diesem Ordner löschen?</string>
+    <string name="delete_folder_confirm_body">Sie werden vom Server gelöscht.</string>
     <string name="delete_folder_running_kept">Laufende Aufnahmen bleiben erhalten.</string>
     <string name="recording_loading">Aufnahme wird geladen…</string>
     <string name="recording_resume_from">Fortsetzen ab %1$s</string>
     <string name="recording_ends_at">Endet um %1$s</string>
+    <string name="recording_recorded_of">%1$s von %2$s aufgenommen</string>
     <string name="recording_length_recorded">%1$s aufgenommen</string>
     <string name="recording_from_series_rule">Teil einer Serienaufnahme</string>
     <string name="recording_from_timer_rule">Teil eines wiederkehrenden Timers</string>
@@ -562,6 +557,7 @@
     <!-- Trial: program details -->
     <string name="details_read_more">Mehr Infos</string>
     <string name="details_important_information">Details</string>
+    <string name="details_cast_and_crew">Besetzung &amp; Team</string>
     <string name="details_available_until">Verfügbar bis %1$s</string>
     <string name="details_size">Größe</string>
     <string name="details_recording_profile">Aufnahmeprofil</string>
@@ -792,16 +788,16 @@
     <string name="server_remove_description">Diese Verbindung von diesem Fernseher löschen</string>
     <string name="server_account">Konto</string>
     <string name="server_enter_password">Passwort eingeben</string>
-    <string name="server_switch_title">Zu %1$s wechseln?</string>
-    <string name="server_switch_live">Live-TV wird beendet. Die App meldet sich als %1$s an und lädt die Sender und das TV-Programm dieses Servers.</string>
-    <string name="server_switch_live_anonymous">Live-TV wird beendet. Die App verbindet sich ohne Anmeldung und lädt die Sender und das TV-Programm dieses Servers.</string>
-    <string name="server_switch_recording">Die Wiedergabe der Aufnahme wird beendet. Die App meldet sich als %1$s an und lädt die Sender und das TV-Programm dieses Servers.</string>
-    <string name="server_switch_recording_anonymous">Die Wiedergabe der Aufnahme wird beendet. Die App verbindet sich ohne Anmeldung und lädt die Sender und das TV-Programm dieses Servers.</string>
+    <string name="server_switch_question">Zu diesem Server wechseln?</string>
+    <string name="server_switch_live_body">Live-TV wird beendet und die App lädt die Sender und das TV-Programm dieses Servers.</string>
+    <string name="server_switch_recording_body">Die Wiedergabe wird beendet und die App lädt die Sender und das TV-Programm dieses Servers.</string>
+    <string name="server_confirmation_account_detail">%1$s · %2$s:%3$d</string>
+    <string name="server_confirmation_anonymous_detail">Ohne Anmeldung · %1$s:%2$d</string>
     <string name="server_keep_watching">Weiter ansehen</string>
     <string name="server_switch">Wechseln</string>
-    <string name="server_remove_title">%1$s entfernen?</string>
-    <string name="server_remove_body">Zuletzt gesehene Sender, Audioauswahl und gespeicherte Bilder für %1$s werden von diesem Fernseher gelöscht. Aufnahmen bleiben auf dem Server.</string>
-    <string name="server_remove_body_active">Live-TV wird beendet und keine Verbindung wird verwendet, bis du eine auswählst. Zuletzt gesehene Sender, Audioauswahl und gespeicherte Bilder für %1$s werden von diesem Fernseher gelöscht. Aufnahmen bleiben auf dem Server.</string>
+    <string name="server_remove_question">Diese Verbindung entfernen?</string>
+    <string name="server_remove_body">Die zuletzt gesehenen Sender, die Audioauswahl und die gespeicherten Bilder dieser Verbindung werden von diesem Fernseher gelöscht. Aufnahmen bleiben auf dem Server.</string>
+    <string name="server_remove_body_active">Die Wiedergabe wird beendet und es wird keine Verbindung verwendet, bis du eine auswählst. Die zuletzt gesehenen Sender, die Audioauswahl und die gespeicherten Bilder dieser Verbindung werden von diesem Fernseher gelöscht. Aufnahmen bleiben auf dem Server.</string>
     <string name="server_add_name">Namen hinzufügen</string>
     <string name="server_name_title">Diese Verbindung benennen</string>
     <string name="server_name_body">In den Einstellungen wird der Name statt der Adresse angezeigt. Lass das Feld leer, um %1$s anzuzeigen.</string>
