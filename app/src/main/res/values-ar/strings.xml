@@ -615,6 +615,7 @@
     <string name="player_rail_watching">قيد المشاهدة</string>
     <string name="details_read_more">معلومات إضافية</string>
     <string name="details_important_information">التفاصيل</string>
+    <string name="details_cast_and_crew">طاقم التمثيل وفريق العمل</string>
     <string name="details_available_until">متاح حتى %1$s</string>
     <string name="details_size">الحجم</string>
     <string name="details_recording_profile">ملف التسجيل</string>

@@ -588,6 +588,7 @@
     <string name="player_rail_watching">Viendo</string>
     <string name="details_read_more">Más información</string>
     <string name="details_important_information">Detalles</string>
+    <string name="details_cast_and_crew">Reparto y equipo</string>
     <string name="details_available_until">Disponible hasta %1$s</string>
     <string name="details_size">Tamaño</string>
     <string name="details_recording_profile">Perfil de grabación</string>

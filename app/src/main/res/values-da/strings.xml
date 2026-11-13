@@ -579,6 +579,7 @@
     <string name="player_rail_watching">Ser</string>
     <string name="details_read_more">Mere info</string>
     <string name="details_important_information">Detaljer</string>
+    <string name="details_cast_and_crew">Medvirkende og hold</string>
     <string name="details_available_until">Tilgængelig indtil %1$s</string>
     <string name="details_size">Størrelse</string>
     <string name="details_recording_profile">Optagelsesprofil</string>

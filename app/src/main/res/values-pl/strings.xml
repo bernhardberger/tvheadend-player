@@ -597,6 +597,7 @@
     <string name="player_rail_watching">Oglądasz</string>
     <string name="details_read_more">Więcej informacji</string>
     <string name="details_important_information">Szczegóły</string>
+    <string name="details_cast_and_crew">Obsada i ekipa</string>
     <string name="details_available_until">Dostępne do %1$s</string>
     <string name="details_size">Rozmiar</string>
     <string name="details_recording_profile">Profil nagrywania</string>

@@ -1,6 +1,7 @@
 name: Feature request
 description: Something you'd like Tvheadend Player to do.
 labels: ["enhancement"]
+type: Feature
 body:
   - type: textarea
     id: wish

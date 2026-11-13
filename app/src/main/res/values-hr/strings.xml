@@ -588,6 +588,7 @@
     <string name="player_rail_watching">Gledaš</string>
     <string name="details_read_more">Više informacija</string>
     <string name="details_important_information">Pojedinosti</string>
+    <string name="details_cast_and_crew">Glumci i ekipa</string>
     <string name="details_available_until">Dostupno do %1$s</string>
     <string name="details_size">Veličina</string>
     <string name="details_recording_profile">Profil snimanja</string>
