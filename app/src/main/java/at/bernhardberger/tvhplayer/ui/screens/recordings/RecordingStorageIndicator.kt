@@ -31,7 +31,7 @@ import at.bernhardberger.tvhplayer.ui.common.formatFileSize
 import kotlin.math.roundToInt
 
 private val StorageRingSize = 20.dp
-private val StorageRingStroke = 3.dp
+private val StorageRingStroke = 2.dp
 
 /**
  * How much recording storage is left, quiet at the end of the Recordings tab line: a small ring that
