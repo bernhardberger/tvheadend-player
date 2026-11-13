@@ -205,6 +205,11 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import org.koin.compose.koinInject
+import androidx.compose.ui.platform.LocalConfiguration
+import at.bernhardberger.tvhplayer.core.automaticRecordingList
+import at.bernhardberger.tvhplayer.ui.screens.recordings.SCHEDULE_NEW_TIMER
+import at.bernhardberger.tvhplayer.ui.screens.recordings.scheduleManagementKeys
+import java.text.Collator
 
 private fun recordingOverlayOpen(
     detailsEntry: DvrEntry?,
@@ -227,7 +232,9 @@ class RecordingsScreenState(initialMode: DvrLibraryMode = DvrLibraryMode.ARCHIVE
     val mode = mutableStateOf(initialMode)
     internal val requestedScheduleEntryId = mutableStateOf<DvrEntryId?>(null)
     val archiveNavigation = DepthNavigationState(DepthStack(listOf(DepthFrame("archive:"))))
-    val scheduleNavigation = DepthNavigationState(DepthStack(listOf(DepthFrame(SCHEDULE_ROOT_LEVEL))))
+    val scheduleNavigation = DepthNavigationState(DepthStack(listOf(
+        DepthFrame(SCHEDULE_ROOT_LEVEL, firstVisibleItemId = SCHEDULE_NEW_TIMER),
+    )))
     val archivePath: List<String> get() = archiveLevelPath(archiveNavigation.stack.active.levelId)
 
     /** Home can enter Schedule at an entry; ordinary tab/rail entry keeps its saved position. */
@@ -347,6 +354,16 @@ internal fun RecordingsScreenContent(
     val startPadding = contentPadding.calculateStartPadding(layoutDirection)
     val endPadding = contentPadding.calculateEndPadding(layoutDirection)
     val currentSession = observation.currentSession
+    val locale = LocalConfiguration.current.locales[0]
+    val automaticRecordings = remember(observation.dvrSnapshotForDisplay, locale) {
+        val collator = Collator.getInstance(locale)
+        automaticRecordingList(observation, Comparator { first, second -> collator.compare(first, second) })
+    }
+    val canModifyRecordings = (observation.sessionState as? SessionState.Ready)
+        ?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
+    val scheduleManagement = if (automaticRecordings.available) {
+        scheduleManagementKeys(canModifyRecordings, automaticRecordings.items.isNotEmpty())
+    } else emptyList()
     val latestObservationProvider by rememberUpdatedState(currentObservation)
     val preparationAuthority = currentSession ?: observation.dvrSnapshotForDisplay
     var retainedPreparation by remember(preparationAuthority) {
@@ -408,6 +425,7 @@ internal fun RecordingsScreenContent(
     var pendingDetailsReturn by remember { mutableStateOf(false) }
     var folderMenu by remember { mutableStateOf<FolderMenuTarget?>(null) }
     var folderDelete by remember { mutableStateOf<FolderDeleteTarget?>(null) }
+    var newTimerSession by remember { mutableStateOf<CurrentSessionObservation?>(null) }
 
     fun closeFolderMenu() {
         if (folderMenu == null) return
@@ -565,13 +583,14 @@ internal fun RecordingsScreenContent(
                 observedArchive, reconciledArchiveStack.active.levelId, observedFullArchive, observedRecordingNow,
             ),
         ).map { it.key }
-        DvrLibraryMode.SCHEDULE -> observedLibrary.schedule.map { "recording:${recordingItemKey(it.id)}" }
+        DvrLibraryMode.SCHEDULE -> scheduleManagement +
+            observedLibrary.schedule.map { "recording:${recordingItemKey(it.id)}" }
         DvrLibraryMode.PROBLEMS -> observedLibrary.problems.map { "recording:${recordingItemKey(it.id)}" }
     }
     val removalHandoff = contentFocusOwned && retainedEntries != observedEntries &&
         ((when (mode) {
             DvrLibraryMode.ARCHIVE -> archiveNavigation.stack.active.focusedItemId
-            DvrLibraryMode.SCHEDULE -> scheduleNavigation.stack.active.focusedItemId
+            DvrLibraryMode.SCHEDULE -> scheduleNavigation.stack.frames.first().focusedItemId
             DvrLibraryMode.PROBLEMS -> selectedKeys[location]
         })?.let { it !in observedKeys } == true ||
             (mode == DvrLibraryMode.ARCHIVE && reconciledArchiveStack.active.levelId != archiveLevel))
@@ -599,7 +618,7 @@ internal fun RecordingsScreenContent(
     val problemGroups = presentation.problems
     val itemKeys = when (mode) {
         DvrLibraryMode.ARCHIVE -> archiveItems.map { it.key }
-        DvrLibraryMode.SCHEDULE -> scheduleGroups.flatMap { it.entries }
+        DvrLibraryMode.SCHEDULE -> scheduleManagement + scheduleGroups.flatMap { it.entries }
             .map { "recording:${recordingItemKey(it.id)}" }
         DvrLibraryMode.PROBLEMS -> DvrProblemBucket.entries
             .flatMap { problemGroups[it].orEmpty() }
@@ -638,8 +657,10 @@ internal fun RecordingsScreenContent(
         pendingAction,
         folderMenu,
         optionsOpen,
+        newTimerSession,
     ) {
-        if (recordingOverlayOpen(detailsEntry, pendingAction, folderMenu) || optionsOpen) return@LaunchedEffect
+        if (recordingOverlayOpen(detailsEntry, pendingAction, folderMenu) || optionsOpen ||
+            newTimerSession != null) return@LaunchedEffect
         val requestedEntry = screenState.requestedScheduleEntryId.value
         // Preparation retains the last projection while the new snapshot is calculated.
         // Only the projection built from the displayed snapshot can judge this target.
@@ -649,7 +670,7 @@ internal fun RecordingsScreenContent(
         if (snapshotReady && requestedEntry != null) {
             if (mode == DvrLibraryMode.SCHEDULE) {
                 val key = "recording:${recordingItemKey(requestedEntry)}".takeUnless { unavailableScheduleEntry }
-                    ?: itemKeys.firstOrNull()
+                    ?: itemKeys.firstOrNull { it.startsWith("recording:") } ?: itemKeys.firstOrNull()
                 scheduleNavigation.update(DepthStack(listOf(DepthFrame(
                     SCHEDULE_ROOT_LEVEL, focusedItemId = key,
                     firstVisibleItemId = key,
@@ -706,9 +727,11 @@ internal fun RecordingsScreenContent(
         focusRecoveryGeneration,
         folderMenu,
         optionsOpen,
+        newTimerSession,
     ) {
         if (!pendingDetailsReturn) return@LaunchedEffect
-        if (recordingOverlayOpen(detailsEntry, pendingAction, folderMenu) || optionsOpen) return@LaunchedEffect
+        if (recordingOverlayOpen(detailsEntry, pendingAction, folderMenu) || optionsOpen ||
+            newTimerSession != null) return@LaunchedEffect
         repeat(4) {
             withFrameNanos { }
             val restored = runCatching {
@@ -727,7 +750,11 @@ internal fun RecordingsScreenContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .semantics { if (detailsEntry != null || folderMenu != null || optionsOpen) hideFromAccessibility() }
+            .semantics {
+                if (detailsEntry != null || folderMenu != null || optionsOpen) hideFromAccessibility()
+                if (newTimerSession != null) hideFromAccessibility()
+            }
+            .then(if (newTimerSession != null) Modifier.focusProperties { canFocus = false } else Modifier)
             .graphicsLayer { alpha = 1f - (detailsLayering?.detailsAlpha() ?: if (detailsEntry != null && !showContextMenu && !showResumeChoice) 1f else 0f) }
             .onPreviewKeyEvent { event ->
                 if (event.key == relocatingKey) {
@@ -828,13 +855,15 @@ internal fun RecordingsScreenContent(
         val channelsById = frame.channelsById
         val scheduleGroups = frame.schedule
         val problemGroups = frame.problems
+        val scheduleReady = mode == DvrLibraryMode.SCHEDULE && automaticRecordings.available &&
+            recordingsAppError(true, frame.connection, frame.failure) == null
         // Every tab's content starts at y80, as the channel list's first row does.
         Spacer(Modifier.height(TvSpacing12))
 
         if (frame.empty && recordingsLoading(frame.connection, frame.failure)) {
             // In the Archive column's place, running to the bottom edge as its list does.
             RecordingsSkeleton(Modifier.padding(start = startPadding + TvBrowseLeadingInset))
-        } else if (frame.empty) {
+        } else if (frame.empty && !scheduleReady) {
             RecordingsEmptyState(
                 connectionUiState = frame.connection,
                 connectionFailure = frame.failure,
@@ -973,6 +1002,20 @@ internal fun RecordingsScreenContent(
                 ) {
                     ScheduleDepthContent(
                         groups = scheduleGroups,
+                        automatic = automaticRecordings,
+                        canModify = canModifyRecordings,
+                        onNewTimer = {
+                            val latest = latestObservationProvider()
+                            val ready = latest.sessionState as? SessionState.Ready
+                            if (owner.isCurrent && latest.currentSession == currentSession) {
+                                if (ready?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED &&
+                                    latest.dvrState is DvrRepositoryState.Current
+                                ) {
+                                    contentFocusOwned = false
+                                    newTimerSession = latest.currentSession
+                                }
+                            }
+                        },
                         navigation = scheduleNavigation,
                         contentPadding = PaddingValues(
                             start = startPadding + TvBrowseLeadingInset,
@@ -980,8 +1023,10 @@ internal fun RecordingsScreenContent(
                         ),
                         isCurrent = owner.isCurrent,
                         initialFocusEnabled = owner.isCurrent && initialFocusEnabled &&
-                            detailsEntry == null && (contentFocusOwned || requestContentFocus),
-                        backEnabled = backEnabled && detailsEntry == null && contentFocusOwned,
+                            detailsEntry == null && newTimerSession == null &&
+                            (contentFocusOwned || requestContentFocus),
+                        backEnabled = backEnabled && detailsEntry == null && newTimerSession == null &&
+                            contentFocusOwned,
                         contentFocus = contentFocus,
                         onFirstRowUp = {
                             if (owner.isCurrent && focusHeader()) contentFocusOwned = false
@@ -1431,6 +1476,17 @@ internal fun RecordingsScreenContent(
             editorSession, dvrMutationActions, notices,
             now = { kotlin.time.Instant.fromEpochSeconds(latestRuleNow()) },
             onClose = { ruleEditorEntry = null })
+    }
+    newTimerSession?.let { openingSession ->
+        val editorSession: TvheadendSession = koinInject()
+        TimerRecordingEditorHost(
+            openingSession, editorSession.observation, dvrMutationActions, notices,
+            now = { kotlin.time.Instant.fromEpochSeconds(nowSecProvider()) },
+            onClose = {
+                newTimerSession = null
+                pendingDetailsReturn = true
+            },
+        )
     }
 
     val action = pendingAction

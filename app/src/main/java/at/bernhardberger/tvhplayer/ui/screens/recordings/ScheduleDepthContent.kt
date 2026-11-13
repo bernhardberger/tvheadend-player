@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
@@ -21,6 +22,7 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
+import at.bernhardberger.tvhplayer.core.AutomaticRecordingList
 import at.bernhardberger.tvhplayer.core.DvrScheduleSection
 import at.bernhardberger.tvhplayer.core.offeredResumePosition
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnGap
@@ -38,6 +40,9 @@ internal const val SCHEDULE_ROOT_LEVEL = "schedule:"
 @Composable
 internal fun ScheduleDepthContent(
     groups: List<DvrScheduleSection>,
+    automatic: AutomaticRecordingList,
+    canModify: Boolean,
+    onNewTimer: () -> Unit,
     navigation: DepthNavigationState,
     contentPadding: PaddingValues,
     isCurrent: Boolean,
@@ -58,7 +63,9 @@ internal fun ScheduleDepthContent(
         val paneWidth = (maxWidth - contentPadding.calculateStartPadding(layoutDirection) -
             TvBrowseColumnWidth - TvBrowseColumnGap).coerceIn(0.dp, TvBrowseColumnWidth)
         val levels = rememberScheduleLevels(
-            groups, contentPadding, paneWidth, onOpenRecording, onOpenContextMenu,
+            groups, automatic, canModify, onNewTimer,
+            navigation.stack.frames.first().focusedItemId == null,
+            contentPadding, paneWidth, onOpenRecording, onOpenContextMenu,
             piconForEntry, admissionForEntry, ruleForEntry,
         )
         DepthNavigation(
@@ -83,6 +90,10 @@ internal fun ScheduleDepthContent(
 @Composable
 private fun rememberScheduleLevels(
     groups: List<DvrScheduleSection>,
+    automatic: AutomaticRecordingList,
+    canModify: Boolean,
+    onNewTimer: () -> Unit,
+    initial: Boolean,
     contentPadding: PaddingValues,
     paneWidth: Dp,
     onOpenRecording: (DvrEntry) -> Unit,
@@ -92,13 +103,15 @@ private fun rememberScheduleLevels(
     ruleForEntry: (DvrEntry) -> RecordingRule?,
 ): Map<String, DepthLevel> {
     val latestOpen = rememberUpdatedState(onOpenRecording)
+    val latestNewTimer = rememberUpdatedState(onNewTimer)
     val latestMenu = rememberUpdatedState(onOpenContextMenu)
     val latestPicon = rememberUpdatedState(piconForEntry)
     val latestAdmission = rememberUpdatedState(admissionForEntry)
     val latestRule = rememberUpdatedState(ruleForEntry)
-    return remember(groups, contentPadding, paneWidth) {
+    return remember(groups, automatic, canModify, initial, contentPadding, paneWidth) {
         val levels = linkedMapOf<String, DepthLevel>()
-        val rows = groups.flatMapIndexed { sectionIndex, section ->
+        val rows = scheduleManagementRows(canModify, automatic, groups.isEmpty(), latestNewTimer) +
+            groups.flatMapIndexed { sectionIndex, section ->
             section.entries.mapIndexed { entryIndex, entry ->
                 val key = "recording:${recordingItemKey(entry.id)}"
                 val previewId = "$SCHEDULE_ROOT_LEVEL$key"
@@ -114,6 +127,10 @@ private fun rememberScheduleLevels(
                 ) { rowModifier, activate ->
                     Column {
                         if (entryIndex == 0) {
+                            if (!canModify && automatic.items.isEmpty() && sectionIndex == 0) {
+                                ArchiveLevelHeading(
+                                    stringResource(R.string.schedule_upcoming), { 1f }, null)
+                            }
                             RecordingSectionHeader(scheduleSectionLabel(section), first = sectionIndex == 0)
                             if (sectionIndex != 0) Spacer(Modifier.height(4.dp))
                         }
@@ -136,8 +153,11 @@ private fun rememberScheduleLevels(
             id = SCHEDULE_ROOT_LEVEL,
             rows = rows,
             heading = {},
+            initialItemId = groups.firstOrNull()?.entries?.firstOrNull()?.takeIf { initial }
+                ?.let { "recording:${recordingItemKey(it.id)}" },
             emptyContent = { ModeEmptyState(R.string.recordings_schedule_empty) },
         )
+        levels[SCHEDULE_AUTOMATIC_LEVEL] = scheduleAutomaticLevel(automatic)
         levels
     }
 }

@@ -28,6 +28,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.key.Key
@@ -86,6 +87,9 @@ import at.bernhardberger.tvhplayer.ui.components.LocalBrowsePreparationContext
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
+import org.koin.compose.KoinIsolatedContext
+import org.koin.dsl.koinApplication
+import org.koin.dsl.module
 
 /** Offline production screen and shell, with real D-pad focus and no server/player. */
 @RunWith(RobolectricTestRunner::class)
@@ -944,7 +948,7 @@ class RecordingsVisualLayoutTest {
         assertEquals(storage, bounds("recordings-space"))
         key(Key.DirectionDown)
         focused("recording-list-entry-20")
-        key(Key.DirectionUp)
+        repeat(3) { key(Key.DirectionUp) }
         focused("recordings-mode-schedule")
         key(Key.DirectionRight)
         focused("recordings-mode-problems")
@@ -1225,6 +1229,27 @@ class RecordingsVisualLayoutTest {
 
     @Test fun scheduleAndProblemsKeepNativeRowsAndTruthfulStatus() {
         scheduleAndProblemsKeepNativeRowsAndTruthfulStatus(endPadding = null)
+        openScheduleScreen()
+        focused("recording-list-entry-20")
+        compose.onNodeWithTag("schedule-new-timer").assertIsDisplayed()
+        compose.onNodeWithTag("schedule-upcoming-heading", useUnmergedTree = true).assertIsDisplayed()
+        key(Key.DirectionUp)
+        focused("schedule-automatic-recordings")
+        key(Key.DirectionUp)
+        focused("schedule-new-timer")
+        key(Key.DirectionUp)
+        compose.onNodeWithText("Schedule").assertIsFocused()
+        key(Key.DirectionDown)
+        focused("schedule-new-timer")
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("timer-recording-main").assertIsDisplayed()
+        focused("timer-recording-channel-time")
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("timer-recording-date").assertIsDisplayed()
+        key(Key.Back)
+        key(Key.Back)
+        focused("schedule-new-timer")
+        assertNoCommands()
     }
 
     @Test fun largerCallerEndPaddingIsPreservedWithoutDoublingFocusReserve() {
@@ -1239,10 +1264,10 @@ class RecordingsVisualLayoutTest {
         if (endPadding != null) assertEquals(860f, bounds("recordings-header").right, .1f)
         openScheduleSubnav()
         compose.onNodeWithText("Schedule").assertIsFocused()
-        key(Key.DirectionDown)
+        repeat(3) { key(Key.DirectionDown) }
         focused("recording-list-entry-20")
         assertOverlineAboveTitle(20)
-        assertArchiveColumns(20, archiveRow, "Tomorrow's documentary")
+        assertArchiveColumns(20, archiveRow, "Tomorrow's documentary", paneTopTag = "schedule-new-timer")
         if (endPadding != null) assertTrue(bounds("recording-metadata-pane").right <= 860f)
         // A scheduled row carries its clock at the end, as channel rows do; the overline keeps only times.
         assertTrailingStateMark(20, "Scheduled")
@@ -1250,7 +1275,7 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionRight)
         focused("recording-list-entry-20")
         capture("schedule", 1f)
-        key(Key.DirectionUp)
+        repeat(3) { key(Key.DirectionUp) }
         key(Key.DirectionRight)
         compose.onNodeWithText("Problems").assertIsFocused()
         key(Key.DirectionDown)
@@ -1290,9 +1315,9 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionUp)
         openScheduleSubnav()
         compose.onNodeWithText("Schedule").assertIsFocused()
-        key(Key.DirectionDown)
+        repeat(3) { key(Key.DirectionDown) }
         focused("recording-list-entry-40")
-        assertDenseListGeometry()
+        assertDenseListGeometry(expectedRows = 3)
         // The focused entry's pane takes the column of the Archive's recording preview.
         assertEquals(archivePane.width, bounds("recording-metadata-pane").width, .1f)
         assertEquals(archivePane.left, bounds("recording-metadata-pane").left, .1f)
@@ -1302,7 +1327,7 @@ class RecordingsVisualLayoutTest {
         assertPaneTitle("Scheduled expedition 2")
         assertMiddleFocus(41)
         key(Key.DirectionUp)
-        key(Key.DirectionUp)
+        repeat(3) { key(Key.DirectionUp) }
         key(Key.DirectionRight)
         compose.onNodeWithText("Problems").assertIsFocused()
         key(Key.DirectionDown)
@@ -1370,7 +1395,7 @@ class RecordingsVisualLayoutTest {
         compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-metadata")) and hasText("until", substring = true),
             useUnmergedTree = true).assertDoesNotExist()
         key(Key.DirectionUp)
-        key(Key.DirectionUp)
+        repeat(3) { key(Key.DirectionUp) }
         key(Key.DirectionRight)
         compose.onNodeWithText("Problems").assertIsFocused()
         key(Key.DirectionDown)
@@ -1402,7 +1427,7 @@ class RecordingsVisualLayoutTest {
         assertOverlineAboveTitle(40)
         assertPaneLinesWhole("recording-metadata-title", "recording-metadata-metadata", "recording-metadata-rule")
         capture("schedule-pane-de-font1.3", 1.3f)
-        key(Key.DirectionUp)
+        repeat(3) { key(Key.DirectionUp) }
         key(Key.DirectionRight)
         key(Key.DirectionDown)
         focused("recording-list-entry-60")
@@ -1416,7 +1441,13 @@ class RecordingsVisualLayoutTest {
     @Test fun emptyScheduleAndProblemsKeepTheirMessageWithoutAPane() {
         show(entries = listOf(recording(1, "Kept match", "Sport/kept.ts")))
         focused("recordings-folder-Sport")
-        openScheduleSubnav()
+        openScheduleScreen()
+        compose.onNodeWithTag("schedule-new-timer").assertIsDisplayed().assertIsFocused()
+        key(Key.DirectionDown)
+        focused("schedule-automatic-recordings")
+        key(Key.DirectionUp)
+        focused("schedule-new-timer")
+        key(Key.DirectionUp)
         compose.onNodeWithText("Schedule").assertIsFocused()
         compose.onNodeWithText("Nothing is recording or scheduled.").assertIsDisplayed()
         compose.onNodeWithTag("recording-metadata-pane", useUnmergedTree = true).assertDoesNotExist()
@@ -1426,6 +1457,68 @@ class RecordingsVisualLayoutTest {
         compose.onNodeWithTag("recording-metadata-pane", useUnmergedTree = true).assertDoesNotExist()
         capture("empty-problems", 1f)
         assertNoCommands()
+    }
+
+    @Test fun readOnlyScheduleHasNoAddingRowsAndOnlyShowsAnExistingAutomaticRecordingsLevel() {
+        screenState.open(at.bernhardberger.tvhplayer.core.DvrLibraryMode.SCHEDULE)
+        val entry = recording(20, "Tomorrow's documentary", null, DvrEntryState.SCHEDULED)
+        show(entries = listOf(entry), canModify = false)
+        focused("recording-list-entry-20")
+        compose.onNodeWithTag("schedule-new-timer").assertDoesNotExist()
+        compose.onNodeWithTag("schedule-automatic-recordings").assertDoesNotExist()
+        publish(listOf(entry), autorecRules = listOf(AutorecRule.create(AutorecRuleId("series"),
+            title = "^Ridge Light$", seriesLinkUri = "series:ridge-light")))
+        compose.onNodeWithTag("schedule-automatic-recordings").assertExists()
+        key(Key.DirectionUp)
+        focused("schedule-automatic-recordings")
+        assertNoCommands()
+    }
+
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun scheduleEntryRowsPhase2Captures() {
+        val outputs = "build/outputs/slice-7b"
+        presentationLibrary(firstRow = true, scheduled = true)
+        val entries = requireNotNull(session.observation.value.dvrSnapshotForDisplay).entries
+        val automaticRules = listOf(
+            AutorecRule.create(AutorecRuleId("ridge"), title = "^Ridge Light$"),
+            AutorecRule.create(AutorecRuleId("tide"), title = "^Tide Watch$"),
+            AutorecRule.create(AutorecRuleId("glass"), title = "^Glass Harbor$"),
+            AutorecRule.create(AutorecRuleId("night"), title = "^Northline Tonight$", enabled = false),
+        )
+        publish(entries, autorecRules = automaticRules)
+        openScheduleScreen()
+        focused("recording-list-entry-9")
+        capture("Bx1-schedule-opens", 1f, "Fixture pack artwork and channel picons.", outputs)
+        repeat(2) { key(Key.DirectionUp) }
+        focused("schedule-new-timer")
+        capture("Bx2-new-timer-focused", 1f, "Right column is intentionally blank.", outputs)
+        val ridge = entries.first { it.id == DvrEntryId(1) }
+        publish(entries + (40L..51L).map {
+            val start = nowSeconds() + 10_000 + (it - 40) * 86_400
+            DvrEntry.create(DvrEntryId(it), title = ridge.title, state = DvrEntryState.SCHEDULED,
+                start = Instant.fromEpochSeconds(start), stop = Instant.fromEpochSeconds(start + 3_600),
+                channelId = ridge.channelId, channelName = ridge.channelName,
+                image = ridge.image, description = ridge.description)
+        }, autorecRules = automaticRules)
+        repeat(9) { key(Key.DirectionDown) }
+        compose.onNodeWithTag("schedule-upcoming-heading", useUnmergedTree = true).assertIsNotDisplayed()
+        capture("Bx5-schedule-scrolled", 1f, "Upcoming and management rows scrolled away.", outputs)
+        publish(listOf(DvrEntry.create(
+            DvrEntryId(12), title = ridge.title, state = DvrEntryState.SCHEDULED, enabled = false,
+            start = Instant.fromEpochSeconds(nowSeconds() + 3_600),
+            stop = Instant.fromEpochSeconds(nowSeconds() + 7_200),
+            channelId = ridge.channelId, channelName = ridge.channelName,
+            image = ridge.image, description = ridge.description, autorecRuleId = AutorecRuleId("series"),
+        )), autorecRules = listOf(AutorecRule.create(
+            AutorecRuleId("series"), title = "^Ridge Light$", seriesLinkUri = "series:ridge-light")))
+        openScheduleScreen()
+        focused("recording-list-entry-12")
+        capture("14b-skipped-entry", 1f, "Ridge Light art and Ridge Earth picon from the fixture pack.", outputs)
+        publish(emptyList())
+        openScheduleScreen()
+        focused("schedule-new-timer")
+        capture("Bx6-empty-schedule", 1f, "Empty Schedule, New timer focused.", outputs)
     }
 
     @Test fun stoppedEarlyOverlineFitsOneLine() {
@@ -1584,7 +1677,7 @@ class RecordingsVisualLayoutTest {
         awaitList()
         openScheduleSubnav()
         compose.onNodeWithText("Schedule").assertIsFocused()
-        key(Key.DirectionDown)
+        repeat(3) { key(Key.DirectionDown) }
         focused("recording-list-entry-30")
         assertOverlineAboveTitle(30)
         // The overline gives the start and the stop; the state is the dot at the row's end.
@@ -2057,7 +2150,8 @@ class RecordingsVisualLayoutTest {
 
     private fun show(scale: Float = 1f, empty: Boolean = false, entries: List<DvrEntry>? = null, endPadding: Dp? = null,
         diskSpace: DvrDiskSpaceState = DvrDiskSpaceState.Unknown, channels: List<Channel> = emptyList(),
-        snapshotLoaded: Boolean = true, autorecRules: List<at.bernhardberger.tvheadend.sdk.core.AutorecRule> = emptyList()) {
+        snapshotLoaded: Boolean = true, autorecRules: List<at.bernhardberger.tvheadend.sdk.core.AutorecRule> = emptyList(),
+        canModify: Boolean = true) {
         endPaddingState.value = endPadding
         val recordings = entries ?: if (empty) emptyList() else listOf(
             recording(1, LONG_TITLE, "Documentaries/northern.ts"),
@@ -2070,7 +2164,8 @@ class RecordingsVisualLayoutTest {
         )
         val observation = SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(
-                streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED,
+                streaming = CapabilityAccess.ALLOWED,
+                dvrWrite = if (canModify) CapabilityAccess.ALLOWED else CapabilityAccess.DENIED,
             )),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(channels, emptyList())),
             epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
@@ -2086,7 +2181,9 @@ class RecordingsVisualLayoutTest {
         val notices = NoticeCenter(android.os.SystemClock::elapsedRealtime) {
             NoticeContext(0L, session.observation.value.currentSession?.generationIdentity)
         }
+        val dependencies = module { single<TvheadendSession> { session }; single { notices } }
         compose.setContent {
+            KoinIsolatedContext(remember { koinApplication { modules(dependencies) } }) {
             val liveObservation by session.observation.collectAsState()
             CompositionLocalProvider(
                 LocalDensity provides Density(LocalDensity.current.density, scale),
@@ -2126,6 +2223,7 @@ class RecordingsVisualLayoutTest {
                         }
                     }
                 }
+            }
             }
         }
         compose.waitForIdle()
@@ -2216,7 +2314,7 @@ class RecordingsVisualLayoutTest {
         compose.waitForIdle()
         screenState = RecordingsScreenState(at.bernhardberger.tvhplayer.core.DvrLibraryMode.SCHEDULE)
         compose.runOnIdle { screenShown.value = true }
-        compose.mainClock.advanceTimeUntil { tabFocused() || listRowFocused() }
+        compose.mainClock.advanceTimeUntil { tabFocused() || listRowFocused() || tagFocused("schedule-new-timer") }
         compose.waitForIdle()
         gone(OPTIONS)
     }
@@ -2224,7 +2322,7 @@ class RecordingsVisualLayoutTest {
     /** As [openScheduleScreen], then Up from the first entry to the tabs. */
     private fun openScheduleSubnav() {
         openScheduleScreen()
-        if (!tabFocused()) key(Key.DirectionUp)
+        repeat(3) { if (!tabFocused()) key(Key.DirectionUp) }
         assertTrue(tabFocused())
     }
 
@@ -2300,13 +2398,13 @@ class RecordingsVisualLayoutTest {
     }
 
     /** The row in Archive's first column, the pane where Archive shows its preview, level with the first row. */
-    private fun assertArchiveColumns(id: Long, archiveRow: Rect, paneTitle: String) {
+    private fun assertArchiveColumns(id: Long, archiveRow: Rect, paneTitle: String, paneTopTag: String? = null) {
         val row = bounds("recording-list-entry-$id")
         assertEquals(archiveRow.left, row.left, .5f)
         assertEquals(archiveRow.width, row.width, .5f)
         val pane = bounds("recording-metadata-pane")
         assertEquals(row.left + 340f + 92f, pane.left, .5f)
-        assertEquals(row.top, pane.top, .5f)
+        assertEquals(paneTopTag?.let { bounds(it).top } ?: row.top, pane.top, .5f)
         assertPaneTitle(paneTitle)
     }
 
@@ -2382,9 +2480,9 @@ class RecordingsVisualLayoutTest {
             !tag.contains("-logo-") && !tag.contains("-watched-") && !tag.contains("-supporting-")
     }).fetchSemanticsNodes().map { it.boundsInRoot }.sortedBy { it.top }
 
-    private fun assertDenseListGeometry() {
+    private fun assertDenseListGeometry(expectedRows: Int = 6) {
         val rows = visibleListRows().filter { it.height > 63.5f }
-        assertEquals(6, rows.size)
+        assertEquals(expectedRows, rows.size)
         rows.forEachIndexed { index, row ->
             assertEquals(rows.first().top + index * 68f, row.top, .5f)
             assertEquals(64f, row.height, .5f)

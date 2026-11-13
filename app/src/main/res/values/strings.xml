@@ -9,6 +9,20 @@
     <string name="automatic_recording_new_title_help">Programs with exactly this title</string>
     <string name="automatic_recording_new_timer">Repeating timer</string>
     <string name="automatic_recording_new_timer_help">A channel at set times on chosen days</string>
+    <string name="schedule_upcoming">Upcoming</string>
+    <string name="schedule_new_timer">New timer</string>
+    <string name="schedule_new_timer_help">A channel at set times, once or repeating</string>
+    <string name="schedule_automatic_empty_help">Series, titles, keywords and repeating timers</string>
+    <string name="schedule_automatic_empty">No automatic recordings yet.</string>
+    <string name="schedule_automatic_counts">%1$s • %2$s</string>
+    <plurals name="schedule_automatic_on">
+        <item quantity="one">%d on</item>
+        <item quantity="other">%d on</item>
+    </plurals>
+    <plurals name="schedule_automatic_off">
+        <item quantity="one">%d off</item>
+        <item quantity="other">%d off</item>
+    </plurals>
     <string name="context_record_series">Record series</string>
     <string name="context_record_title">Record all with this title</string>
     <string name="context_edit_series">Edit series recording</string>
