@@ -552,6 +552,7 @@
     <string name="player_rail_watching">正在观看</string>
     <string name="details_read_more">更多信息</string>
     <string name="details_important_information">详情</string>
+    <string name="details_cast_and_crew">演职人员</string>
     <string name="details_available_until">可用至%1$s</string>
     <string name="details_size">大小</string>
     <string name="details_recording_profile">录制配置</string>
