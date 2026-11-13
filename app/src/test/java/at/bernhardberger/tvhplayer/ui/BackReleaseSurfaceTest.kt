@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.ui
 import android.app.Application
 import android.view.KeyEvent as NativeKey
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.LaunchedEffect
@@ -15,15 +16,18 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.ui.components.CentredDialog
+import at.bernhardberger.tvhplayer.ui.components.CentredDialogShell
 import at.bernhardberger.tvhplayer.ui.components.depth.*
 import at.bernhardberger.tvhplayer.ui.screens.BrowseSidePanel
 import at.bernhardberger.tvhplayer.testutil.holdBack
+import at.bernhardberger.tvhplayer.testutil.pressKey
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -87,6 +91,32 @@ class BackReleaseSurfaceTest {
         assertEquals(1, backs)
         key(false)
         assertEquals(2, backs)
+    }
+
+    @Test fun centeredDialogShellOnlyAllowsVerticalNavigationWhenEnabled() {
+        var verticalKeys by mutableStateOf(false)
+        compose.setContent { TVHeadendPlayerTheme {
+            CentredDialogShell("Choices", onDismiss = {}, verticalKeys = verticalKeys) {
+                val firstFocus = remember { FocusRequester() }
+                LaunchedEffect(Unit) { firstFocus.requestFocus() }
+                Column {
+                    Button({}, Modifier.focusRequester(firstFocus)) { Text("First") }
+                    Button({}) { Text("Second") }
+                }
+            }
+        } }
+        compose.onNodeWithText("First").assertIsFocused()
+        compose.pressKey(Key.DirectionDown)
+        compose.onNodeWithText("First").assertIsFocused()
+        compose.runOnIdle { verticalKeys = true }
+        compose.pressKey(Key.DirectionDown)
+        compose.onNodeWithText("Second").assertIsFocused()
+        compose.runOnIdle { verticalKeys = false }
+        compose.pressKey(Key.DirectionUp)
+        compose.onNodeWithText("Second").assertIsFocused()
+        compose.runOnIdle { verticalKeys = true }
+        compose.pressKey(Key.DirectionUp)
+        compose.onNodeWithText("First").assertIsFocused()
     }
 
     @Test @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)

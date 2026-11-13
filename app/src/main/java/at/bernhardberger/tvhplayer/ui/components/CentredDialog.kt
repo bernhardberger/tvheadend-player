@@ -1,34 +1,19 @@
 package at.bernhardberger.tvhplayer.ui.components
 
-import at.bernhardberger.tvhplayer.ui.TvScrimModalAlpha
-
-import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.togetherWith
-import androidx.compose.animation.EnterExitState
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.MutableTransitionState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.dialog
 import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
@@ -42,9 +27,6 @@ import androidx.tv.material3.OutlinedButton
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
 import at.bernhardberger.tvhplayer.ui.TvTextColors
-import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
-import at.bernhardberger.tvhplayer.ui.player.PlayerMotionFrame
-import at.bernhardberger.tvhplayer.ui.player.RegisterPlayerModal
 
 /** Safe choice first, in the same horizontal pill row as the resume prompt. */
 @Composable
@@ -64,7 +46,6 @@ internal fun CentredDialog(
     thirdTag: String = "two-column-third",
     onThird: () -> Unit = {},
     secondaryText: String? = null,
-    alternativeContent: (@Composable () -> Unit)? = null,
     onBack: (() -> Unit)? = null,
     visibility: MutableTransitionState<Boolean> = remember { MutableTransitionState(false).apply { targetState = true } },
 ) {
@@ -75,10 +56,10 @@ internal fun CentredDialog(
     CentredDialog(title, message, onDismiss = {
         when (chosen) { 0 -> onFirst(); 1 -> onSecond(); else -> onDismiss() }
     }, backEnabled = backEnabled, visibility = visibility, secondaryText = secondaryText,
-        alternativeContent = alternativeContent, onBack = onBack,
+        onBack = onBack,
         modifier = Modifier.onPreviewKeyEvent(onPreviewKeyEvent)) {
-        LaunchedEffect(alternativeContent == null) {
-            if (alternativeContent == null) { withFrameNanos { }; firstFocus.requestFocus() }
+        LaunchedEffect(Unit) {
+            withFrameNanos { }; firstFocus.requestFocus()
         }
         Button(onClick = { chosen = 0; visibility.targetState = false },
             modifier = Modifier.height(40.dp).focusRequester(firstFocus).focusProperties {
@@ -105,113 +86,52 @@ internal fun CentredDialog(
     backEnabled: Boolean = true,
     secondaryText: String? = null,
     eyebrow: (@Composable () -> Unit)? = null,
-    alternativeContent: (@Composable () -> Unit)? = null,
     onBack: (() -> Unit)? = null,
     visibility: MutableTransitionState<Boolean> = remember { MutableTransitionState(false).apply { targetState = true } },
     actions: @Composable RowScope.() -> Unit,
 ) {
-    RegisterPlayerModal(backEnabled)
-    var openingReleasePending by remember { mutableStateOf(true) }
-    val latestDismiss by rememberUpdatedState(onDismiss)
-    LaunchedEffect(visibility.isIdle, visibility.currentState, visibility.targetState) {
-        if (visibility.isIdle && !visibility.currentState && !visibility.targetState) latestDismiss()
-    }
-    val back = onBack ?: { visibility.targetState = false }
-    BackHandler(enabled = backEnabled) { back() }
-    // Expand over the rail without registering opaque details: the shell stays visible below
-    // this single scrim, and focus never crosses an Android window boundary on dismissal.
-    AnimatedVisibility(visibleState = visibility, modifier = modifier.browseDetailsViewport(),
-        enter = fadeIn(tween(PlayerMotion.PanelMs, easing = PlayerMotion.Standard)),
-        exit = fadeOut(tween(PlayerMotion.PanelMs, easing = PlayerMotion.Standard))) {
-        val layering = LocalBrowseContentLayering.current
-        val key = remember { Any() }
-        val scrim = transition.animateFloat(
-            transitionSpec = { tween(PlayerMotion.PanelMs, easing = PlayerMotion.Standard) },
-            label = "modal-rail-scrim",
-        ) { if (it == EnterExitState.Visible) TvScrimModalAlpha else 0f }
-        DisposableEffect(layering, scrim) {
-            layering?.modalScrims?.set(key, scrim)
-            onDispose { layering?.modalScrims?.remove(key) }
-        }
-        val backCycle = rememberBackKeyCycle(backEnabled && visibility.targetState)
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = TvScrimModalAlpha))
-            .backKeyCycleFocus(backCycle)
-            .testTag("centred-dialog-scrim")
-            .semantics { dialog(); paneTitle = title }
-            .onPreviewKeyEvent { event ->
-                if (!visibility.targetState) {
-                    backCycle.reset()
-                    return@onPreviewKeyEvent true
-                }
-                if (!backEnabled) backCycle.reset()
-                if (backEnabled && event.key == Key.Back) {
-                    return@onPreviewKeyEvent backCycle.handle(event.type == KeyEventType.KeyDown,
-                        event.nativeKeyEvent.repeatCount, event.nativeKeyEvent.isCanceled) { back() }
-                }
-                val activation = event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter
-                if (activation && openingReleasePending) {
-                    if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
-                        openingReleasePending = false
-                    } else {
-                        if (event.type == KeyEventType.KeyUp) openingReleasePending = false
-                        return@onPreviewKeyEvent true
-                    }
-                }
-                alternativeContent == null && (event.key == Key.DirectionUp || event.key == Key.DirectionDown)
-            }, contentAlignment = Alignment.Center) {
-            // Keep one dimmed backdrop while a decision drills into its options. Fade through
-            // rather than drawing the card and side panel visibly on top of each other.
-            AnimatedContent(targetState = alternativeContent, contentKey = { it != null },
-                transitionSpec = {
-                    (fadeIn(tween(PlayerMotion.MediumMs, delayMillis = PlayerMotion.FastMs)) togetherWith
-                        fadeOut(tween(PlayerMotion.FastMs))).using(null)
-                }, label = "dialog-options") { alternative ->
-            PlayerMotionFrame(leaving = (alternative != null) != (alternativeContent != null)) {
-            if (alternative != null) alternative() else {
-            Layout(modifier = Modifier.clip(RoundedCornerShape(16.dp)).background(TvSurfaceColors.container)
-                .testTag("centred-dialog-card").padding(24.dp),
-                content = {
-                Column(Modifier.fillMaxWidth().testTag("centred-dialog-content")) {
-                    Column(Modifier.fillMaxWidth().testTag("centred-dialog-text"),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            eyebrow?.let {
-                                it()
-                                Spacer(Modifier.height(4.dp))
-                            }
-                            Text(title, Modifier.semantics { heading() }, style = MaterialTheme.typography.headlineMedium,
-                                color = MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            if (!secondaryText.isNullOrBlank()) Text(secondaryText, style = MaterialTheme.typography.titleMedium,
-                                color = TvTextColors.primary,
-                                maxLines = 2, overflow = TextOverflow.Ellipsis)
+    CentredDialogShell(paneTitle = title, onDismiss = onDismiss, modifier = modifier,
+        backEnabled = backEnabled, onBack = onBack, visibility = visibility) {
+        Layout(modifier = Modifier.clip(RoundedCornerShape(16.dp)).background(TvSurfaceColors.container)
+            .testTag("centred-dialog-card").padding(24.dp),
+            content = {
+            Column(Modifier.fillMaxWidth().testTag("centred-dialog-content")) {
+                Column(Modifier.fillMaxWidth().testTag("centred-dialog-text"),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        eyebrow?.let {
+                            it()
+                            Spacer(Modifier.height(4.dp))
                         }
-                        if (text.isNotBlank()) Text(text, style = MaterialTheme.typography.bodyLarge,
-                            color = TvTextColors.secondary)
+                        Text(title, Modifier.semantics { heading() }, style = MaterialTheme.typography.headlineMedium,
+                            color = MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        if (!secondaryText.isNullOrBlank()) Text(secondaryText, style = MaterialTheme.typography.titleMedium,
+                            color = TvTextColors.primary,
+                            maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
-                }
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp), content = actions)
-            }) { measurables, constraints ->
-                // Only actions determine the width; copy is measured afterwards so it wraps.
-                // The FlowRow's maximum intrinsic width is its natural, unwrapped row.
-                val padding = 48.dp.roundToPx()
-                val width = constraints.constrainWidth(
-                    measurables[1].maxIntrinsicWidth(Constraints.Infinity).coerceIn(
-                        528.dp.roundToPx() - padding,
-                        (960.dp - TvGridHorizontalMargin * 2).roundToPx() - padding,
-                    ),
-                )
-                val childConstraints = constraints.copy(minWidth = width, maxWidth = width, minHeight = 0)
-                val actionsPlaceable = measurables[1].measure(childConstraints)
-                val textPlaceable = measurables[0].measure(childConstraints)
-                val gap = 24.dp.roundToPx()
-                layout(width, constraints.constrainHeight(textPlaceable.height + gap + actionsPlaceable.height)) {
-                    textPlaceable.placeRelative(0, 0)
-                    actionsPlaceable.placeRelative(0, textPlaceable.height + gap)
+                    if (text.isNotBlank()) Text(text, style = MaterialTheme.typography.bodyLarge,
+                        color = TvTextColors.secondary)
                 }
             }
-            }
-            }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp), content = actions)
+        }) { measurables, constraints ->
+            // Only actions determine the width; copy is measured afterwards so it wraps.
+            // The FlowRow's maximum intrinsic width is its natural, unwrapped row.
+            val padding = 48.dp.roundToPx()
+            val width = constraints.constrainWidth(
+                measurables[1].maxIntrinsicWidth(Constraints.Infinity).coerceIn(
+                    528.dp.roundToPx() - padding,
+                    (960.dp - TvGridHorizontalMargin * 2).roundToPx() - padding,
+                ),
+            )
+            val childConstraints = constraints.copy(minWidth = width, maxWidth = width, minHeight = 0)
+            val actionsPlaceable = measurables[1].measure(childConstraints)
+            val textPlaceable = measurables[0].measure(childConstraints)
+            val gap = 24.dp.roundToPx()
+            layout(width, constraints.constrainHeight(textPlaceable.height + gap + actionsPlaceable.height)) {
+                textPlaceable.placeRelative(0, 0)
+                actionsPlaceable.placeRelative(0, textPlaceable.height + gap)
             }
         }
     }
