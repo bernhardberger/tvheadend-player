@@ -10,6 +10,7 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import at.bernhardberger.tvhplayer.core.DvrDateSection
+import at.bernhardberger.tvhplayer.ui.components.RecordingRule
 import at.bernhardberger.tvhplayer.core.offeredResumePosition
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthItem
@@ -31,13 +32,17 @@ internal fun recordingPreviewLevel(
     contentPadding: PaddingValues,
     latestPiconForEntry: State<(DvrEntry) -> ChannelIcon?>,
     latestAdmissionForEntry: State<(DvrEntry) -> RecordingPlaybackAdmission?>,
+    kind: RecordingRowKind = RecordingRowKind.ARCHIVE,
+    latestRuleForEntry: State<(DvrEntry) -> RecordingRule?>? = null,
+    paneModifier: Modifier = Modifier,
 ) = DepthLevel(
     id = id,
     rows = emptyList(),
     heading = { ArchiveLevelHeading("", it, valuesLine = null) },
     passiveContent = {
         RecordingMetadataPane(entry, latestPiconForEntry.value(entry), latestAdmissionForEntry.value(entry),
-            Modifier.padding(bottom = contentPadding.calculateBottomPadding()))
+            paneModifier.padding(bottom = contentPadding.calculateBottomPadding()), kind = kind,
+            recordingRule = latestRuleForEntry?.value?.invoke(entry))
     },
 )
 

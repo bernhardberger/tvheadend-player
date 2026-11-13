@@ -186,7 +186,8 @@ import at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsPage
 import at.bernhardberger.tvhplayer.core.recordingDetailsActions
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingModeTabs
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingProblems
-import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingSchedule
+import at.bernhardberger.tvhplayer.ui.screens.recordings.ScheduleDepthContent
+import at.bernhardberger.tvhplayer.ui.screens.recordings.SCHEDULE_ROOT_LEVEL
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingsEmptyState
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingsPreparationSkeleton
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingsSkeleton
@@ -226,6 +227,7 @@ class RecordingsScreenState(initialMode: DvrLibraryMode = DvrLibraryMode.ARCHIVE
     val mode = mutableStateOf(initialMode)
     internal val requestedScheduleEntryId = mutableStateOf<DvrEntryId?>(null)
     val archiveNavigation = DepthNavigationState(DepthStack(listOf(DepthFrame("archive:"))))
+    val scheduleNavigation = DepthNavigationState(DepthStack(listOf(DepthFrame(SCHEDULE_ROOT_LEVEL))))
     val archivePath: List<String> get() = archiveLevelPath(archiveNavigation.stack.active.levelId)
 
     /** Home can enter Schedule at an entry; ordinary tab/rail entry keeps its saved position. */
@@ -367,6 +369,7 @@ internal fun RecordingsScreenContent(
     val archiveScrollPositions = screenState.archiveScrollPositions
     var mode by screenState.mode
     val archiveNavigation = screenState.archiveNavigation
+    val scheduleNavigation = screenState.scheduleNavigation
     val archiveLevel = archiveNavigation.stack.active.levelId
     val drawerFocus = LocalBrowseNavigationFocus.current
     val drawerState = at.bernhardberger.tvhplayer.ui.components.LocalBrowseDrawerState.current
@@ -566,8 +569,11 @@ internal fun RecordingsScreenContent(
         DvrLibraryMode.PROBLEMS -> observedLibrary.problems.map { "recording:${recordingItemKey(it.id)}" }
     }
     val removalHandoff = contentFocusOwned && retainedEntries != observedEntries &&
-        ((if (mode == DvrLibraryMode.ARCHIVE) archiveNavigation.stack.active.focusedItemId
-            else selectedKeys[location])?.let { it !in observedKeys } == true ||
+        ((when (mode) {
+            DvrLibraryMode.ARCHIVE -> archiveNavigation.stack.active.focusedItemId
+            DvrLibraryMode.SCHEDULE -> scheduleNavigation.stack.active.focusedItemId
+            DvrLibraryMode.PROBLEMS -> selectedKeys[location]
+        })?.let { it !in observedKeys } == true ||
             (mode == DvrLibraryMode.ARCHIVE && reconciledArchiveStack.active.levelId != archiveLevel))
     val entries = if (removalHandoff) retainedEntries else observedEntries
     val presentation = if (removalHandoff) retained.value else prepared.value
@@ -641,6 +647,15 @@ internal fun RecordingsScreenContent(
         val unavailableScheduleEntry = snapshotReady && mode == DvrLibraryMode.SCHEDULE && requestedEntry != null &&
             observedLibrary.schedule.none { it.id == requestedEntry && it.state == DvrEntryState.SCHEDULED }
         if (snapshotReady && requestedEntry != null) {
+            if (mode == DvrLibraryMode.SCHEDULE) {
+                val key = "recording:${recordingItemKey(requestedEntry)}".takeUnless { unavailableScheduleEntry }
+                    ?: itemKeys.firstOrNull()
+                scheduleNavigation.update(DepthStack(listOf(DepthFrame(
+                    SCHEDULE_ROOT_LEVEL, focusedItemId = key,
+                    firstVisibleItemId = key,
+                    firstVisibleIndex = itemKeys.indexOf(key).coerceAtLeast(0),
+                )), visit = scheduleNavigation.stack.visit + 1))
+            }
             screenState.requestedScheduleEntryId.value = null
             if (mode == DvrLibraryMode.SCHEDULE && initialFocusEnabled && (loadingFocusParked || contentFocusOwned)) {
                 requestContentFocus = true
@@ -658,8 +673,7 @@ internal fun RecordingsScreenContent(
             return@LaunchedEffect
         }
         if (requestedEntry != null && !snapshotReady) return@LaunchedEffect
-        if (mode != DvrLibraryMode.ARCHIVE && (unavailableScheduleEntry ||
-                (itemKeys.isNotEmpty() && selectedKeys[location] !in itemKeys))) {
+        if (mode == DvrLibraryMode.PROBLEMS && itemKeys.isNotEmpty() && selectedKeys[location] !in itemKeys) {
             if (itemKeys.isEmpty()) selectedKeys.remove(location) else selectedKeys[location] = itemKeys.first()
             archiveScrollPositions[location] = 0
             screenState.archiveScrollOffsets[location] = 0
@@ -720,8 +734,8 @@ internal fun RecordingsScreenContent(
                     if (event.type == KeyEventType.KeyUp) relocatingKey = null
                     return@onPreviewKeyEvent true
                 }
-                val scheduleListOwnsFocus = mode != DvrLibraryMode.ARCHIVE && contentHasFocus && drawerFocus != null
-                if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionLeft && scheduleListOwnsFocus) {
+                val problemsListOwnsFocus = mode == DvrLibraryMode.PROBLEMS && contentHasFocus && drawerFocus != null
+                if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionLeft && problemsListOwnsFocus) {
                     // Like Archive's root Left: target the current rail item before natural search
                     // can enter the drawer at Home and its later restoration effect corrects it.
                     if (drawerFocus?.requestFocus() == true) {
@@ -730,12 +744,12 @@ internal fun RecordingsScreenContent(
                     }
                     return@onPreviewKeyEvent true
                 }
+                val firstProblemRow = mode == DvrLibraryMode.PROBLEMS && contentHasFocus &&
+                    selectedKeys[location] == itemKeys.firstOrNull()
                 if (
                     event.type == KeyEventType.KeyDown &&
                     event.key == Key.DirectionUp &&
-                    mode != DvrLibraryMode.ARCHIVE &&
-                    contentHasFocus &&
-                    selectedKeys[location] == itemKeys.firstOrNull()
+                    firstProblemRow
                 ) {
                     relocatingKey = event.key
                     if (modeFocus.requestFocus()) {
@@ -800,12 +814,7 @@ internal fun RecordingsScreenContent(
                     mode, location, entries.isEmpty(), connectionUiState, connectionFailure,
                     observation, channelsById, archive, fullArchive,
                     scheduleGroups, problemGroups, selectedKeys[location],
-                    archiveScrollPositions[location] ?: if (mode == DvrLibraryMode.SCHEDULE) {
-                        // Include section headers so a deep-linked row is composed before focus entry.
-                        scheduleGroups.flatMap { section ->
-                            listOf<String?>(null) + section.entries.map { "recording:${recordingItemKey(it.id)}" }
-                        }.indexOf(selectedKeys[location]).coerceAtLeast(0)
-                    } else 0,
+                    archiveScrollPositions[location] ?: 0,
                     screenState.archiveScrollOffsets[location] ?: 0,
                     focusRecoveryGeneration,
                 )
@@ -954,7 +963,7 @@ internal fun RecordingsScreenContent(
                 DvrLibraryMode.SCHEDULE -> Box(
                     modifier = Modifier
                         // Archive's columns: the list in its first, the focused recording where it shows its preview.
-                        .padding(start = startPadding + TvBrowseLeadingInset, end = endPadding)
+                        .padding(end = endPadding)
                         .fillMaxSize()
                         .onFocusChanged {
                             if (!owner.isCurrent) return@onFocusChanged
@@ -962,40 +971,46 @@ internal fun RecordingsScreenContent(
                             if (it.hasFocus) contentFocusOwned = true
                         },
                 ) {
-                    key(location, frame.recoveryGeneration) {
-                        val generation = frame.recoveryGeneration
-                        RecordingSchedule(
-                            groups = scheduleGroups,
-                            selectedKey = frame.selectedKey,
-                            selectedFocus = contentFocus,
-                            onFocused = { if (owner.isCurrent) selectedKeys[location] = it },
-                            onOpen = {
-                                if (!owner.isCurrent) return@RecordingSchedule
-                                openRecording(it)
-                            },
-                            onOpenContextMenu = {
-                                if (owner.isCurrent) {
-                                    contentFocusOwned = false
-                                    detailsInitialAction = null
-                                    detailsEntry = it
-                                    detailsObservation = observation
-                                    showContextMenu = true
-                                }
-                            },
-                            piconForEntry = { entry ->
-                                entry.channelId?.let(channelsById::get)?.icon
-                            },
-                            admissionForEntry = { observation.recordingPlaybackAdmission(it) },
-                            ruleForEntry = { recordingRule(observation.recordingRuleKind(it)) },
-                            paneBottom = contentPadding.calculateBottomPadding(),
-                            initialScrollIndex = frame.scrollIndex,
-                            onScrollChanged = {
-                                if (owner.isCurrent && generation == focusRecoveryGeneration) {
-                                    archiveScrollPositions[location] = it
-                                }
-                            },
-                        )
-                    }
+                    ScheduleDepthContent(
+                        groups = scheduleGroups,
+                        navigation = scheduleNavigation,
+                        contentPadding = PaddingValues(
+                            start = startPadding + TvBrowseLeadingInset,
+                            bottom = contentPadding.calculateBottomPadding(),
+                        ),
+                        isCurrent = owner.isCurrent,
+                        initialFocusEnabled = owner.isCurrent && initialFocusEnabled &&
+                            detailsEntry == null && (contentFocusOwned || requestContentFocus),
+                        backEnabled = backEnabled && detailsEntry == null && contentFocusOwned,
+                        contentFocus = contentFocus,
+                        onFirstRowUp = {
+                            if (owner.isCurrent && focusHeader()) contentFocusOwned = false
+                        },
+                        onDrawerFocus = drawerFocus?.let { focus -> {
+                            if (owner.isCurrent && focus.requestFocus()) {
+                                contentFocusOwned = false
+                                requestContentFocus = false
+                            }
+                        } },
+                        onOpenRecording = {
+                            if (!owner.isCurrent) return@ScheduleDepthContent
+                            openRecording(it)
+                        },
+                        onOpenContextMenu = {
+                            if (owner.isCurrent) {
+                                contentFocusOwned = false
+                                detailsInitialAction = null
+                                detailsEntry = it
+                                detailsObservation = observation
+                                showContextMenu = true
+                            }
+                        },
+                        piconForEntry = { entry ->
+                            entry.channelId?.let(channelsById::get)?.icon
+                        },
+                        admissionForEntry = { observation.recordingPlaybackAdmission(it) },
+                        ruleForEntry = { recordingRule(observation.recordingRuleKind(it)) },
+                    )
                 }
                 DvrLibraryMode.PROBLEMS -> Box(
                     modifier = Modifier

@@ -61,6 +61,7 @@ import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.common.formatFileSize
 import at.bernhardberger.tvhplayer.ui.common.formatRecordedDuration
 import at.bernhardberger.tvhplayer.ui.common.formatRecordingDate
+import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import java.io.File
 import java.util.Locale
@@ -1334,16 +1335,25 @@ class RecordingsVisualLayoutTest {
     }
 
     @Test fun schedulePaneGivesThePaddedStopAndRuleAndProblemsPaneWhatWentWrong() {
-        show(entries = paneEntries(long = false), autorecRules = listOf(
+        show(entries = paneEntries(long = false, skipped = true), autorecRules = listOf(
             at.bernhardberger.tvheadend.sdk.core.AutorecRule.create(
                 AutorecRuleId("series"), seriesLinkUri = "series:ridge-light")))
         focused("recordings-folder-Sport")
         openScheduleScreen()
         focused("recording-list-entry-40")
+        val skipped = view.resources.getString(R.string.autorec_editor_skipped)
+        val overline = compose.onNodeWithTag("recording-list-metadata-40", useUnmergedTree = true)
+            .fetchSemanticsNode().config[SemanticsProperties.Text].joinToString { it.text }
+        assertTrue("Skipped leads the scheduled row's first line", overline.startsWith("$skipped • "))
+        compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-eyebrow")) and hasText(skipped),
+            useUnmergedTree = true).assertIsDisplayed()
+        compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-rule")) and
+            hasText("$skipped • ", substring = true), useUnmergedTree = true).assertIsDisplayed()
         // The padded stop in the Schedule row's own words, and the series rule that set it up.
         compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-metadata")) and hasText("• until", substring = true),
             useUnmergedTree = true).assertIsDisplayed()
-        compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-rule")) and hasText("Part of a series recording"),
+        compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-rule")) and
+            hasText("Part of a series recording", substring = true),
             useUnmergedTree = true).assertIsDisplayed()
         // Nothing is recorded yet, so the planned length is not given as recorded.
         compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-metadata")) and hasText("recorded", substring = true),
@@ -2330,7 +2340,7 @@ class RecordingsVisualLayoutTest {
         }
     }
 
-    private fun paneEntries(long: Boolean): List<DvrEntry> {
+    private fun paneEntries(long: Boolean, skipped: Boolean = false): List<DvrEntry> {
         val start = 1_791_086_400L
         val title = if (long) "Die außergewöhnliche Reise der Polarlichter: Eine Winterexpedition durch die Arktis"
             else "Coastal Final"
@@ -2338,6 +2348,7 @@ class RecordingsVisualLayoutTest {
         return listOf(
             recording(1, "Kept match", "Sport/kept.ts"),
             DvrEntry.create(DvrEntryId(40), title = title, state = DvrEntryState.SCHEDULED,
+                enabled = !skipped,
                 start = Instant.fromEpochSeconds(start), stop = Instant.fromEpochSeconds(start + 90 * 60),
                 startExtraMinutes = 2.minutes, stopExtraMinutes = 15.minutes,
                 autorecRuleId = AutorecRuleId("series"), channelName = channel,
