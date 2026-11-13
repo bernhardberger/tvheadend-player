@@ -251,6 +251,9 @@
     <string name="playback_options_next_category">Επόμενη κατηγορία επιλογών</string>
     <string name="player_live_tv_surface">Αναπαραγωγή ζωντανής TV</string>
     <string name="player_recording_surface">Αναπαραγωγή εγγραφών</string>
+    <string name="player_raster_spoken">%1$s γραμμές</string>
+    <string name="player_audio_spoken">Ήχος %1$s</string>
+    <string name="player_ad_short">AD</string>
     <string name="stats_on">Ενεργό</string>
     <string name="stats_off">Ανενεργό</string>
     <string name="display_mode">Λειτουργία προβολής</string>

@@ -251,6 +251,9 @@
     <string name="playback_options_next_category">Следующая категория параметров</string>
     <string name="player_live_tv_surface">Проигрыватель прямого эфира</string>
     <string name="player_recording_surface">Проигрыватель записей</string>
+    <string name="player_raster_spoken">Строк: %1$s</string>
+    <string name="player_audio_spoken">Звук %1$s</string>
+    <string name="player_ad_short">AD</string>
     <string name="stats_on">Вкл.</string>
     <string name="stats_off">Выкл.</string>
     <string name="display_mode">Режим изображения</string>

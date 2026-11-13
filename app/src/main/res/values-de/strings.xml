@@ -809,4 +809,7 @@
     <string name="server_none_in_use">Keine Verbindung in Verwendung</string>
     <string name="server_list_unavailable">Die gespeicherten Verbindungen können auf diesem Fernseher gerade nicht gelesen werden.</string>
     <string name="server_none_in_use_description">Keine Verbindung in Verwendung. Wähle eine aus, um wieder fernzusehen.</string>
+    <string name="player_raster_spoken">%1$s Zeilen</string>
+    <string name="player_audio_spoken">Audio %1$s</string>
+    <string name="player_ad_short">AD</string>
 </resources>

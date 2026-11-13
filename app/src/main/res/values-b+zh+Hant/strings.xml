@@ -251,6 +251,9 @@
     <string name="playback_options_next_category">下一組選項</string>
     <string name="player_live_tv_surface">電視直播播放器</string>
     <string name="player_recording_surface">錄影播放器</string>
+    <string name="player_raster_spoken">%1$s 線</string>
+    <string name="player_audio_spoken">音訊 %1$s</string>
+    <string name="player_ad_short">AD</string>
     <string name="stats_on">開啟</string>
     <string name="stats_off">關閉</string>
     <string name="display_mode">顯示模式</string>

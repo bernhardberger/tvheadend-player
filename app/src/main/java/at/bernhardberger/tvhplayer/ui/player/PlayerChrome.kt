@@ -152,6 +152,7 @@ internal fun PlayerChrome(
                     modifier = Modifier.testTag("player-info-bar"),
                     contentAlpha = contentAlpha,
                     lastLineEndReserve = lastLineEndReserve,
+                    badges = content.badges,
                 ) { faded ->
                     ProgrammeArtworkTile(content.artwork, content.picon, content.channelId,
                         content.info.channelNumber, faded, content.withoutChannel)

@@ -251,6 +251,9 @@
     <string name="playback_options_next_category">Categoria de opções seguinte</string>
     <string name="player_live_tv_surface">Leitor de TV em direto</string>
     <string name="player_recording_surface">Leitor de gravações</string>
+    <string name="player_raster_spoken">%1$s linhas</string>
+    <string name="player_audio_spoken">Áudio %1$s</string>
+    <string name="player_ad_short">AD</string>
     <string name="stats_on">Ativo</string>
     <string name="stats_off">Inativo</string>
     <string name="display_mode">Modo de visualização</string>

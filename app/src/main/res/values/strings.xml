@@ -346,6 +346,9 @@
     <string name="playback_options_next_category">Next options category</string>
     <string name="player_live_tv_surface">Live TV player</string>
     <string name="player_recording_surface">Recording player</string>
+    <string name="player_raster_spoken">%1$s lines</string>
+    <string name="player_audio_spoken">Audio %1$s</string>
+    <string name="player_ad_short">AD</string>
     <string name="stats_on">On</string>
     <string name="stats_off">Off</string>
     <string name="display_mode">Display mode</string>

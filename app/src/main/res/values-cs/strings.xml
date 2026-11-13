@@ -251,6 +251,9 @@
     <string name="playback_options_next_category">Další kategorie možností</string>
     <string name="player_live_tv_surface">Přehrávač živé TV</string>
     <string name="player_recording_surface">Přehrávač nahrávek</string>
+    <string name="player_raster_spoken">Počet řádků: %1$s</string>
+    <string name="player_audio_spoken">Zvuk %1$s</string>
+    <string name="player_ad_short">AD</string>
     <string name="stats_on">Zapnuto</string>
     <string name="stats_off">Vypnuto</string>
     <string name="display_mode">Režim zobrazení</string>

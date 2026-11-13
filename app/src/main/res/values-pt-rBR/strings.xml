@@ -251,6 +251,9 @@
     <string name="playback_options_next_category">Próxima categoria de opções</string>
     <string name="player_live_tv_surface">Player de TV ao vivo</string>
     <string name="player_recording_surface">Player de gravações</string>
+    <string name="player_raster_spoken">%1$s linhas</string>
+    <string name="player_audio_spoken">Áudio %1$s</string>
+    <string name="player_ad_short">AD</string>
     <string name="stats_on">Ativado</string>
     <string name="stats_off">Desativado</string>
     <string name="display_mode">Modo de exibição</string>

@@ -251,6 +251,9 @@
     <string name="playback_options_next_category">فئة الخيارات التالية</string>
     <string name="player_live_tv_surface">مشغّل التلفزيون المباشر</string>
     <string name="player_recording_surface">مشغّل التسجيلات</string>
+    <string name="player_raster_spoken">عدد خطوط المسح: %1$s</string>
+    <string name="player_audio_spoken">الصوت %1$s</string>
+    <string name="player_ad_short">AD</string>
     <string name="stats_on">تشغيل</string>
     <string name="stats_off">إيقاف</string>
     <string name="display_mode">وضع العرض</string>

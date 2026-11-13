@@ -12,7 +12,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
@@ -22,8 +21,11 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.core.GlanceBadge
 import at.bernhardberger.tvhplayer.ui.components.ScheduledIndicator
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
+
+private val InfoBarFactsBadgeGap = 12.dp
 
 /**
  * Presentation strings follow the displayed programme/seek target. Callers pass no next for
@@ -62,6 +64,7 @@ fun PlayerInfoBar(
     modifier: Modifier = Modifier,
     contentAlpha: () -> Float = { 1f },
     lastLineEndReserve: Dp = 0.dp,
+    badges: List<GlanceBadge> = emptyList(),
     identity: @Composable (Modifier) -> Unit,
 ) {
     val recorded = data.recordedDate != null
@@ -77,6 +80,7 @@ fun PlayerInfoBar(
         if (data.recordedDate == null) stringResource(R.string.player_now_spoken, data.title, data.spokenTimeRange)
         else stringResource(R.string.player_recorded_spoken, data.title, data.recordedDate, data.spokenTimeRange),
         remaining, next, scheduled,
+        badges.takeIf { it.isNotEmpty() }?.map { glanceBadgeSpoken(it) }?.joinToString(". "),
     ).joinToString(". ")
     val secondary = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextTertiaryAlpha)
     val faded = Modifier.graphicsLayer { alpha = contentAlpha() }
@@ -91,18 +95,12 @@ fun PlayerInfoBar(
         facts.isNotEmpty() -> "facts"
         else -> "title"
     }
-    val factsLine: @Composable (TextStyle) -> Unit = { style ->
-        if (facts.isNotEmpty()) Text(facts, style = style, maxLines = 1, overflow = TextOverflow.Ellipsis, color = secondary,
-            modifier = faded.then(if (reserveOn == "facts") reserved else Modifier)
-                .testTag("player-info-programme").clearAndSetSemantics {})
-        else Text("", style = style, maxLines = 1, modifier = Modifier.clearAndSetSemantics {})
-    }
     // The bar speaks for itself.
     Row(modifier.height(IntrinsicSize.Min).semantics(mergeDescendants = true) { contentDescription = description },
         horizontalArrangement = Arrangement.spacedBy(TvGridGutter), verticalAlignment = Alignment.Top) {
         identity(faded)
         Column(Modifier.weight(1f).fillMaxHeight()) {
-            factsLine(MaterialTheme.typography.labelLarge)
+            PlayerInfoFacts(facts, badges, faded.then(if (reserveOn == "facts") reserved else Modifier))
             Spacer(Modifier.height(4.dp))
             Text(data.title, style = MaterialTheme.typography.headlineMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurface, modifier = faded.then(if (reserveOn == "title") reserved else Modifier)
@@ -124,6 +122,19 @@ fun PlayerInfoBar(
                     color = secondary,
                     modifier = reserved.testTag("player-info-last-text").clearAndSetSemantics {})
             } else Text("", style = MaterialTheme.typography.labelLarge, maxLines = 1, modifier = Modifier.clearAndSetSemantics {})
+        }
+    }
+}
+
+@Composable
+private fun PlayerInfoFacts(facts: String, badges: List<GlanceBadge>, modifier: Modifier = Modifier) {
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(facts, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextTertiaryAlpha),
+            modifier = Modifier.weight(1f, fill = false).testTag("player-info-programme").clearAndSetSemantics {})
+        if (badges.isNotEmpty()) {
+            if (facts.isNotEmpty()) Spacer(Modifier.width(InfoBarFactsBadgeGap))
+            PlayerGlanceBadges(badges)
         }
     }
 }
