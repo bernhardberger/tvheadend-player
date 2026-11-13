@@ -273,9 +273,10 @@ This supersedes the round-3 points above where they conflict. Reference frames:
   - eyebrow: logo · number · channel | genre, plus one status chip for the
     broadcast state ("On now", red-dot "Recording scheduled");
   - title (dominant), one quiet episode line, then the description (summary, then a
-    description that differs) in a 584dp panel: up to four lines, of which the third and
-    fourth come only from room free above the action row, so the buttons never move for
-    it; a cut text ends in "… More" and OK opens the reading box;
+    description that differs) at 584dp wide: fitting text is plain, without padding,
+    an arrow or a focus stop; only cut text uses the reading panel with "… More" and
+    OK opens the reading box. Up to four lines use room above the action row plus
+    up to 16dp of peek slack, so the buttons may move down by up to 16dp;
   - facts row, value over label (Starts · Length · Left; recordings Recorded ·
     Length · Left), labels left-aligned;
   - the viewer's own progress is only the bar under the facts row;

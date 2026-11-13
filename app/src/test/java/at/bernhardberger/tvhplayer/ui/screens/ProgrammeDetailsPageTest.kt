@@ -240,9 +240,52 @@ class ProgrammeDetailsPageTest {
         compose.onNodeWithTag("details-watch").assertIsFocused().assertIsDisplayed()
         val actions = compose.onNodeWithTag("details-actions").getUnclippedBoundsInRoot()
         Assert.assertTrue("$actions", actions.bottom.value <= 540f - 48f)
-        compose.onNodeWithTag("details-about-description").assertIsDisplayed()
+        compose.onNodeWithTag("details-synopsis", useUnmergedTree = true).assertIsDisplayed()
     }
-    @Test fun shortAboutAlwaysFocusesAndOpensSharedReader() = aboutOpensSharedReader(longText = false)
+    @Test fun fittingAboutRestoresActionsWhenFocusedOrReadingPanelDisappears() {
+        val source = androidx.compose.runtime.mutableStateOf(event.description!!.repeat(12))
+        val tallHeader = androidx.compose.runtime.mutableStateOf(false)
+        show(aboutSource = source, aboutHeaderTall = tallHeader, fontScale = 1.3f)
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
+        compose.onNodeWithTag("details-about-description").assertIsFocused()
+        compose.runOnIdle { source.value = "The expedition returns home." }
+        compose.onNodeWithTag("details-about-description").assertDoesNotExist()
+        compose.onNodeWithTag("details-watch").assertIsFocused()
+        compose.runOnIdle { tallHeader.value = true }
+        compose.onNodeWithTag("details-about-description").assertDoesNotExist()
+        compose.runOnIdle {
+            source.value = (1..4).joinToString("\n") { "Expedition day $it" }
+            tallHeader.value = true
+        }
+        compose.onNodeWithTag("details-watch").assertIsFocused()
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionUp); pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("player-info-reading").assertIsFocused()
+        compose.mainClock.advanceTimeBy(432)
+        compose.mainClock.autoAdvance = false
+        compose.runOnIdle { tallHeader.value = false }
+        compose.mainClock.advanceTimeByFrame()
+        compose.waitForIdle()
+        compose.onNodeWithTag("player-info-reading").assertIsFocused()
+        compose.runOnIdle { back.onBackPressed() }
+        repeat(27) { compose.mainClock.advanceTimeByFrame(); compose.waitForIdle() }
+        compose.mainClock.autoAdvance = true
+        compose.onNodeWithTag("player-info-reading").assertDoesNotExist()
+        compose.onNodeWithTag("details-about-description").assertDoesNotExist()
+        compose.onNodeWithTag("details-watch").assertIsFocused()
+        compose.runOnIdle { source.value = event.description!!.repeat(12) }
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionUp); pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("player-info-reading").assertIsFocused()
+        compose.runOnIdle { source.value = "The expedition returns home." }
+        compose.onNodeWithTag("player-info-reading").assertDoesNotExist()
+        compose.onNodeWithTag("details-about-description").assertDoesNotExist()
+        compose.onNodeWithTag("details-watch").assertIsFocused()
+        compose.runOnIdle { source.value = event.description!!.repeat(12) }
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
+        compose.onNodeWithTag("details-about-description").assertIsFocused()
+        compose.runOnIdle { source.value = "" }
+        compose.onNodeWithTag("details-about-description").assertDoesNotExist()
+        compose.onNodeWithTag("details-watch").assertIsFocused()
+    }
     @Test fun factsWithoutDescriptionAppearInHeaderWithoutAnEmptyReader() {
         show(factsOnly = true)
         compose.onNodeWithTag("details-metadata").assertTextEquals("120m • Documentary")
@@ -327,7 +370,7 @@ class ProgrammeDetailsPageTest {
 
     @Test fun upFocusesPanelAboveActionsAndBackReturnsToTheActions() {
         var closed = 0
-        show(onClose = { closed++ }, noAirings = true)
+        show(onClose = { closed++ }, noAirings = true, longText = true)
         compose.onNodeWithTag("details-watch").performKeyInput { pressKey(Key.DirectionUp) }
         compose.onNodeWithTag("details-about-description").assertIsFocused()
         val about = compose.onNodeWithTag("details-about")
@@ -345,10 +388,10 @@ class ProgrammeDetailsPageTest {
         Assert.assertEquals(1, closed)
     }
 
-    @Test fun longAboutOpensSharedReaderScrollsToEndAndRestoresAbout() = aboutOpensSharedReader(longText = true)
+    @Test fun longAboutOpensSharedReaderScrollsToEndAndRestoresAbout() = aboutOpensSharedReader()
 
-    private fun aboutOpensSharedReader(longText: Boolean) {
-        show(longText = longText)
+    private fun aboutOpensSharedReader() {
+        show(longText = true)
         compose.onNodeWithTag("details-watch").performKeyInput { pressKey(Key.DirectionUp) }
         compose.onNodeWithTag("details-about-description").assertIsFocused()
         compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
@@ -356,28 +399,26 @@ class ProgrammeDetailsPageTest {
         compose.onNode(hasText(event.title!!) and hasAnyAncestor(hasTestTag("details-reading-heading")), useUnmergedTree = true).assertExists()
         compose.onNode(hasText("More info") and hasAnyAncestor(hasTestTag("details-reading-heading")), useUnmergedTree = true).assertDoesNotExist()
         val text = compose.onNodeWithTag("details-reading-text", useUnmergedTree = true)
-        if (longText) {
-            val viewport = compose.onNode(
-                SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange) and
-                    hasAnyAncestor(hasTestTag("player-info-reading")), useUnmergedTree = true)
-            fun readingScrollValue() = viewport.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
-            val viewportHeight = viewport.fetchSemanticsNode().boundsInRoot.height
-            val before = readingScrollValue()
+        val viewport = compose.onNode(
+            SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange) and
+                hasAnyAncestor(hasTestTag("player-info-reading")), useUnmergedTree = true)
+        fun readingScrollValue() = viewport.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
+        val viewportHeight = viewport.fetchSemanticsNode().boundsInRoot.height
+        val before = readingScrollValue()
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        Assert.assertEquals("one Down scrolls half the viewport", viewportHeight / 2f,
+            readingScrollValue() - before, 1f)
+        var previous = Float.NaN
+        var steps = 0
+        while (readingScrollValue() != previous && steps < 100) {
+            previous = readingScrollValue()
             compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
-            Assert.assertEquals("one Down scrolls half the viewport", viewportHeight / 2f,
-                readingScrollValue() - before, 1f)
-            var previous = Float.NaN
-            var steps = 0
-            while (readingScrollValue() != previous && steps < 100) {
-                previous = readingScrollValue()
-                compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
-                steps++
-            }
-            Assert.assertTrue(text.getUnclippedBoundsInRoot().bottom.value <= 540f - 48f + 1f)
-            val endTop = text.getUnclippedBoundsInRoot().top.value
-            compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
-            Assert.assertTrue(text.getUnclippedBoundsInRoot().top.value > endTop)
+            steps++
         }
+        Assert.assertTrue(text.getUnclippedBoundsInRoot().bottom.value <= 540f - 48f + 1f)
+        val endTop = text.getUnclippedBoundsInRoot().top.value
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
+        Assert.assertTrue(text.getUnclippedBoundsInRoot().top.value > endTop)
         compose.runOnIdle { back.onBackPressed() }
         compose.onNodeWithTag("details-about-description").assertIsFocused().assertIsDisplayed()
         compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
@@ -443,7 +484,7 @@ class ProgrammeDetailsPageTest {
 
 
     @Test fun panelAndActionsShareTheTopWithoutScrolling() {
-        show(summaryOnly = true)
+        show(longText = true)
         val top = pageScrollValue()
         compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
         compose.onNodeWithTag("details-about-description").assertIsFocused()
@@ -583,7 +624,7 @@ class ProgrammeDetailsPageTest {
         compose.onNodeWithTag("details-read-more").assertDoesNotExist()
         val first = compose.onNodeWithTag("details-card-2").assertIsFocused().assertIsDisplayed()
         compose.onNodeWithText("Other airings of Ridge Light").assertIsDisplayed()
-        compose.onNodeWithTag("details-about-description").assertIsNotFocused()
+        compose.onNodeWithTag("details-about-description").assertDoesNotExist()
         // Cards lead with when; the page's own title is never repeated, a different one is the episode line.
         first.assertContentDescriptionEquals("Tomorrow 20:00, 101 Ridge Earth HD")
         compose.onNodeWithTag("details-card-4").assertContentDescriptionEquals("Fri, Sep 18 20:00, Into the Polar Night, 101 Ridge Earth HD")
@@ -922,25 +963,43 @@ class ProgrammeDetailsPageTest {
     @Test fun fittingSynopsisHasNoMoreHint() = synopsisMoreHint(summaryOnly = true)
 
     @Test fun fourLineDescriptionShowsInFull() = fittingAboutLines(4)
+    @Test fun threeLineDescriptionShowsInFull() = fittingAboutLines(3)
     @Test fun aboutShowsSummaryAndDifferentDescriptionInFull() = fittingAboutLines(4, summaryAndDescription = true)
 
     private fun fittingAboutLines(lines: Int, summaryAndDescription: Boolean = false) {
         show(aboutLines = lines, summaryAndDescription = summaryAndDescription)
-        val expected = (1..lines).joinToString("\n") { "Expedition day $it" }
+        val expected = (1..lines).joinToString("\n") { "Expedition day $it: " + "north ".repeat(11).trimEnd() }
         val synopsis = compose.onNodeWithTag("details-synopsis", useUnmergedTree = true)
         synopsis.assertTextEquals(expected)
         val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
         synopsis.performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { it(layouts) }
         Assert.assertEquals(lines, layouts.single().lineCount)
         Assert.assertFalse(layouts.single().hasVisualOverflow)
+        compose.onNodeWithTag("details-about-description").assertDoesNotExist()
+        compose.onNodeWithTag("details-about-arrow", useUnmergedTree = true).assertDoesNotExist()
+        synopsis.assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Focused))
+            .assert(SemanticsMatcher.keyNotDefined(androidx.compose.ui.semantics.SemanticsActions.OnClick))
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Role))
+        Assert.assertEquals(compose.onNodeWithTag("details-information").getUnclippedBoundsInRoot().left.value,
+            synopsis.getUnclippedBoundsInRoot().left.value, .5f)
+        Assert.assertEquals(compose.onNodeWithTag("details-about").getUnclippedBoundsInRoot(),
+            synopsis.getUnclippedBoundsInRoot())
         assertBottomAnchored()
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionUp); pressKey(Key.DirectionCenter) }
-        compose.onNodeWithTag("player-info-reading").assertIsFocused()
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
+        compose.onNodeWithTag("details-watch").assertIsFocused()
+        compose.onNodeWithTag("player-info-reading").assertDoesNotExist()
     }
 
     private fun synopsisMoreHint(summaryOnly: Boolean) {
         show(aboutLines = 6.takeUnless { summaryOnly }, longSynopsis = !summaryOnly, summaryOnly = summaryOnly)
         if (summaryOnly) {
+            compose.onNodeWithTag("details-about-description").assertDoesNotExist()
+            compose.onNodeWithTag("details-about-arrow", useUnmergedTree = true).assertDoesNotExist()
+            compose.onNodeWithTag("details-synopsis", useUnmergedTree = true)
+                .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Focused))
+                .assert(SemanticsMatcher.keyNotDefined(androidx.compose.ui.semantics.SemanticsActions.OnClick))
+            compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
+            compose.onNodeWithTag("details-watch").assertIsFocused()
             val text = compose.onNodeWithTag("details-synopsis", useUnmergedTree = true).fetchSemanticsNode().config[SemanticsProperties.Text].single()
             Assert.assertEquals(event.summary, text.text)
             Assert.assertTrue(text.spanStyles.isEmpty())
@@ -982,10 +1041,12 @@ class ProgrammeDetailsPageTest {
     }
 
 
-    // The first screen's block keeps one bottom anchor (540 - 96 peek - 32 gap) and grows upward; the
-    // next section's heading and the top of its cards peek below it.
-    private fun assertBottomAnchored(peek: Boolean = true) {
-        Assert.assertEquals(412f, compose.onNodeWithTag("details-actions").getUnclippedBoundsInRoot().bottom.value, 1f)
+    // The first screen grows upward from one anchor (540 - 96 peek - 32 gap), with at most 16dp
+    // of extra height for the description; the next section still peeks below it.
+    private fun assertBottomAnchored(peek: Boolean = true, allowSlack: Boolean = false) {
+        val bottom = compose.onNodeWithTag("details-actions").getUnclippedBoundsInRoot().bottom.value
+        if (allowSlack) Assert.assertTrue("actions overshoot ${bottom - 412f}dp", bottom in 412f..428f)
+        else Assert.assertEquals(412f, bottom, 1f)
         Assert.assertTrue(compose.onNodeWithTag("details-information").getUnclippedBoundsInRoot().top.value >= 48f - .5f)
         compose.onNodeWithTag("details-next-hint", useUnmergedTree = true).assertDoesNotExist()
         if (!peek) return
@@ -996,13 +1057,21 @@ class ProgrammeDetailsPageTest {
     @Test fun shortProgrammeBlockSitsAtTheBottomAnchorWithTheAiringsPeeking() {
         show(heroVariant = 0); assertBottomAnchored()
     }
-    @Test fun longProgrammeBlockGrowsUpwardFromTheSameAnchor() {
+    @Test fun longProgrammeBlockUsesPeekSlackForFourLines() {
         show(longMeta = true)
         val metadata = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
         compose.onNodeWithTag("details-metadata").performSemanticsAction(
             androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { it(metadata) }
         Assert.assertEquals(2, metadata.single().lineCount)
-        assertBottomAnchored()
+        val synopsis = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+        compose.onNodeWithTag("details-synopsis", useUnmergedTree = true).performSemanticsAction(
+            androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { it(synopsis) }
+        Assert.assertEquals(4, synopsis.single().lineCount)
+        val bottom = compose.onNodeWithTag("details-actions").getUnclippedBoundsInRoot().bottom.value
+        Assert.assertTrue("four lines spend only the peek slack: ${bottom - 412f}dp", bottom > 412f && bottom <= 412f + 16f)
+        Assert.assertEquals(48f, compose.onNodeWithTag("details-information").getUnclippedBoundsInRoot().top.value, .5f)
+        compose.onNodeWithTag("details-next-hint", useUnmergedTree = true).assertDoesNotExist()
+        Assert.assertTrue(compose.onNodeWithTag("details-card-2").getUnclippedBoundsInRoot().top.value < 540f)
     }
 
     @Test fun recordingThatStoppedEarlySaysSoUnderItsTimeline() = recordingStoppedEarlyMessage(stoppedEarly = true)
@@ -1033,9 +1102,14 @@ class ProgrammeDetailsPageTest {
 
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
     fun germanTwoLineSubtitleKeepsTheAiringsPeek() {
-        show(longSubtitle = true)
+        show(longSubtitle = true, longText = true)
         assertTwoLineSubtitle()
-        assertBottomAnchored(peek = false)
+        assertBottomAnchored(peek = false, allowSlack = true)
+        val synopsis = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+        compose.onNodeWithTag("details-synopsis", useUnmergedTree = true).performSemanticsAction(
+            androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { it(synopsis) }
+        val layout = synopsis.single()
+        Assert.assertEquals(3, layout.lineCount)
         Assert.assertTrue(compose.onNodeWithText("Weitere Ausstrahlungen von", substring = true)
             .getBoundsInRoot().bottom.value <= 492f)
         Assert.assertTrue(compose.onNodeWithTag("details-card-2").getUnclippedBoundsInRoot().top.value <= 508f)
@@ -1253,15 +1327,19 @@ class ProgrammeDetailsPageTest {
         recordingFacts: Boolean = false, cast: Boolean = false, stoppedEarly: Boolean = false, aboutLines: Int? = null,
         summaryAndDescription: Boolean = false, creditsOnly: Boolean = false, actorCount: Int? = null, readerCredits: Boolean = false,
         creditsPresent: androidx.compose.runtime.State<Boolean>? = null,
+        aboutSource: androidx.compose.runtime.State<String>? = null,
+        aboutHeaderTall: androidx.compose.runtime.State<Boolean>? = null,
         warmMode: androidx.compose.runtime.State<at.bernhardberger.tvhplayer.settings.WarmPlaybackMode>? = null,
         samplingContext: CoroutineContext = Dispatchers.Default) {
         val subtitle = if (longSubtitle && recordingFacts) "An extraordinary journey through the snowy mountains of the north, along the coast and across the wide valleys in the changing light of a long winter."
             else if (longSubtitle) "Eine außergewöhnliche Reise durch die verschneiten Berge des Nordens, entlang der Küste und über die weiten Täler im wechselnden Licht des langen Winters." else event.subtitle
         val shown = when {
             aboutLines != null -> EpgEvent.create(event.id, channel.id, start, event.stop, title = event.title,
-                subtitle = event.subtitle, image = event.image, summary = "Expedition day 1".takeIf { summaryAndDescription },
+                subtitle = event.subtitle, image = event.image,
+                summary = ("Expedition day 1: " + "north ".repeat(11).trimEnd()).takeIf { summaryAndDescription },
                 description = ((if (summaryAndDescription) 2 else 1)..aboutLines).joinToString("\n") {
-                    if (longSynopsis) "An extraordinary expedition " + "unforgettable".repeat(30) else "Expedition day $it" })
+                    if (longSynopsis) "An extraordinary expedition " + "unforgettable".repeat(30)
+                    else "Expedition day $it: " + "north ".repeat(11).trimEnd() })
             recordingFacts || cast -> EpgEvent.create(event.id, channel.id, start, event.stop, title = event.title,
                 subtitle = subtitle, image = event.image, summary = event.summary, description = event.description,
                 genre = event.genre.takeUnless { creditsOnly },
@@ -1274,7 +1352,8 @@ class ProgrammeDetailsPageTest {
                     else listOf(EpgCredit("Rowan Frost", EpgCreditRole.GUEST), EpgCredit("Avery Lake", EpgCreditRole.PRESENTER))) +
                     listOf(EpgCredit("Morgan Pine", EpgCreditRole.DIRECTOR), EpgCredit("Alex Winter", EpgCreditRole.WRITER)))
             longSubtitle && !longMeta -> EpgEvent.create(event.id, channel.id, start, event.stop, title = event.title,
-                subtitle = subtitle, genre = event.genre, image = event.image, summary = event.summary, description = event.description)
+                subtitle = subtitle, genre = event.genre, image = event.image, summary = event.summary,
+                description = if (longText) event.description!!.repeat(12) else event.description)
             longMeta -> EpgEvent.create(event.id, channel.id, start, event.stop,
                 title = "Ridge Light: Across the Frozen North and the Polar Sea", subtitle = if (longSubtitle) subtitle else event.subtitle,
                 genre = "Documentary and natural history about northern landscapes", episode = event.episode,
@@ -1343,7 +1422,12 @@ class ProgrammeDetailsPageTest {
                             androidx.tv.material3.Text("Rail")
                         }
                         val details: @androidx.compose.runtime.Composable () -> Unit = {
-                        ProvideArtworkSession(session) { ProgrammeDetailsPage(shown.takeUnless { recording }, entry.takeIf { recording || future }, channel, now,
+                        val current = if (aboutSource != null) EpgEvent.create(event.id, channel.id, start, event.stop,
+                            title = if (aboutHeaderTall?.value == true) "Ridge Light: Across the Frozen North and the Polar Sea" else event.title,
+                            subtitle = if (aboutHeaderTall?.value == true) event.subtitle!!.repeat(12) else event.subtitle,
+                            genre = if (aboutHeaderTall?.value == true) "Documentary and natural history about northern landscapes" else event.genre,
+                            image = event.image, description = aboutSource.value) else shown
+                        ProvideArtworkSession(session) { ProgrammeDetailsPage(current.takeUnless { recording }, entry.takeIf { recording || future }, channel, now,
                             if (recording) recordingDetailsActions(entry, admitted(entry), true, true, nowSec = now)
                             else programmeDetailsActions(shown, now, entry.takeIf { future }, admitted(entry.takeIf { future }), true, true),
                               {}, onClose, related = if (recording || noAirings) emptyList() else if (runningCard)
