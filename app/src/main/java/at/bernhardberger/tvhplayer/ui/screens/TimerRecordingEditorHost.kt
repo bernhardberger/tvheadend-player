@@ -7,9 +7,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
+import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrConfigurationsState
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
+import at.bernhardberger.tvheadend.sdk.core.DvrMutationKind
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.TimerecRule
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
@@ -19,6 +21,8 @@ import at.bernhardberger.tvhplayer.core.toDraft
 import at.bernhardberger.tvhplayer.core.toScheduleRequest
 import at.bernhardberger.tvhplayer.core.toUpdateRequest
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
+import at.bernhardberger.tvhplayer.notices.Notice
+import at.bernhardberger.tvhplayer.notices.toDvrMutationFeedback
 import java.time.ZoneId
 import kotlin.time.Instant
 import kotlinx.coroutines.flow.StateFlow
@@ -55,9 +59,23 @@ internal fun TimerRecordingEditorHost(
         }
         TimerRecordingEditorState(
             initial, scope,
-            saveDraft = { draft, submittedAt ->
-                val channelName = observations.value.channelCatalogForDisplay?.channels
-                    ?.firstOrNull { it.id == draft.channelId }?.name.orEmpty()
+            saveDraft = save@{ draft, submittedAt ->
+                val channel = (observations.value.channelState as? ChannelRepositoryState.Current)?.catalog?.channels
+                    ?.firstOrNull { it.id == draft.channelId }
+                    ?.takeUnless { draft.name.isBlank() && it.name.isNullOrBlank() }
+                if (channel == null) {
+                    val result = DvrMutationResult.Failed(TvheadendFailure.NOT_READY, false)
+                    val kind = if (rule != null) DvrMutationKind.UPDATE else DvrMutationKind.SCHEDULE
+                    notices.post(
+                        if (rule != null || draft.repeating) {
+                            Notice.DvrRuleActionFailed(kind, result.toDvrMutationFeedback())
+                        }
+                        else Notice.DvrActionFailed(kind, result.toDvrMutationFeedback()),
+                        context,
+                    )
+                    return@save result
+                }
+                val channelName = channel.name.orEmpty()
                 execute(when {
                     rule != null -> DvrMutationAction.UpdateTimerec(currentSession, rule,
                         requireNotNull(draft.toUpdateRequest(initial, channelName)))

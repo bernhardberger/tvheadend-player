@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
 import at.bernhardberger.tvhplayer.core.TimerDraft
+import at.bernhardberger.tvhplayer.core.RecordingSubmitUnavailable
 import at.bernhardberger.tvhplayer.core.cannotSubmit
 import at.bernhardberger.tvhplayer.core.changedFields
 import at.bernhardberger.tvhplayer.core.timerHourChoices
@@ -42,9 +43,10 @@ internal class TimerRecordingEditorState(
     var selectedHour by mutableStateOf(initial.start.hour)
         private set
     private var mutation: Job? = null
+    private var lastRefusal by mutableStateOf<RecordingSubmitUnavailable?>(null)
     val changed get() = draft != baseline
     val changedFields get() = draft.changedFields(baseline)
-    val mainProblem get() = draft.cannotSubmit(zone, now(), baseline.takeIf { editing })
+    val mainProblem get() = lastRefusal ?: draft.cannotSubmit(zone, now(), baseline.takeIf { editing })
     val today: LocalDate get() = java.time.Instant.ofEpochSecond(now().epochSeconds).atZone(zone).toLocalDate()
     val ending get() = navigation.page.level in setOf(
         AutomaticRecordingEditorLevel.END_HOUR, AutomaticRecordingEditorLevel.END_MINUTE,
@@ -56,6 +58,7 @@ internal class TimerRecordingEditorState(
     fun updateDraft(restoreFocusTo: String? = null, update: (TimerDraft) -> TimerDraft) {
         if (!navigation.canNavigate()) return
         draft = update(draft)
+        lastRefusal = null
         if (restoreFocusTo != null) navigation.restoreFocus(restoreFocusTo)
     }
 
@@ -99,7 +102,10 @@ internal class TimerRecordingEditorState(
     fun submit() {
         if (!navigation.canNavigate()) return
         val submittedAt = now()
-        if (draft.cannotSubmit(zone, submittedAt, baseline.takeIf { editing }) != null) {
+        val problem = draft.cannotSubmit(zone, submittedAt, baseline.takeIf { editing })
+        if (problem != null) {
+            lastRefusal = problem
+            navigation.confirmation = null
             navigation.firstLevel("main")
             return
         }

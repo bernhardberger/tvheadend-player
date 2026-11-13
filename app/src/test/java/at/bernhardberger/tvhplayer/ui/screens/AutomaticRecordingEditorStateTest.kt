@@ -34,13 +34,19 @@ class AutomaticRecordingEditorStateTest {
             .copy(channelId = automaticRecordingChannels.first().id)
         val state = fixture.timer(draft)
         assertNull(state.mainProblem)
+        state.updateDraft { it.copy(name = "Viewer name") }
+        state.back()
+        assertEquals(AutomaticRecordingEditorConfirmation.LEAVE, state.navigation.confirmation)
         fixture.timerNow = draft.resolveOccurrenceOn(draft.date, automaticRecordingZone).stop
         state.submit()
         runCurrent()
         assertTrue(fixture.timerSubmissions.isEmpty())
+        assertNull(state.navigation.confirmation)
+        assertEquals(AutomaticRecordingEditorLevel.FIRST, state.navigation.page.level)
         assertEquals(RecordingSubmitUnavailable.TIME_PASSED, state.mainProblem)
         assertEquals("main", state.navigation.focusedRow)
         state.updateDraft { it.copy(date = it.date.plusDays(1), name = "Viewer name") }
+        assertNull(state.mainProblem)
         val submitted = state.draft
         fixture.timerResult = DvrMutationResult.Failed(TvheadendFailure.SERVER_REJECTED, false)
         state.submit()
@@ -50,10 +56,31 @@ class AutomaticRecordingEditorStateTest {
         assertFalse(state.closed)
         assertEquals("main", state.navigation.focusedRow)
         fixture.timerResult = DvrMutationResult.Confirmed(Unit)
+        val gate = CompletableDeferred<Unit>()
+        fixture.timerSaveGate = gate
         state.submit()
+        runCurrent()
+        state.submit()
+        runCurrent()
+        assertEquals(2, fixture.timerSubmissions.size)
+        assertTrue(state.busy)
+        gate.complete(Unit)
         runCurrent()
         assertTrue(state.closed)
         assertEquals(1, fixture.closes)
+        val existing = fixture.timer(submitted.copy(existingTimer = true, days = setOf(DayOfWeek.MONDAY)))
+        existing.updateDraft { it.copy(name = "Unsaved timer") }
+        val beforeDelete = existing.draft
+        existing.navigation.open(AutomaticRecordingEditorLevel.MORE, "delete")
+        existing.navigation.confirmation = AutomaticRecordingEditorConfirmation.DELETE
+        fixture.deletionResult = DvrMutationResult.Failed(TvheadendFailure.SERVER_REJECTED, false)
+        existing.confirmDestructiveAction()
+        runCurrent()
+        assertFalse(existing.closed)
+        assertEquals(beforeDelete, existing.draft)
+        assertNull(existing.navigation.confirmation)
+        assertEquals(AutomaticRecordingEditorLevel.MORE, existing.navigation.page.level)
+        assertEquals("delete", existing.navigation.focusedRow)
     }
 
     @Test fun levelsRestoreTheirOpeningRowAndChoicesApplyOnlyWhenConfirmed() = runTest {

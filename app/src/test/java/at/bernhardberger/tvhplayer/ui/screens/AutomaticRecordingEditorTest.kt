@@ -20,6 +20,9 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrPriority
 import at.bernhardberger.tvheadend.sdk.core.RecordingRuleChannel
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.runtime.key
+import at.bernhardberger.tvhplayer.core.resolveOccurrenceOn
 import at.bernhardberger.tvhplayer.testutil.pressKey
 import at.bernhardberger.tvhplayer.core.AutomaticRecordingKind
 import at.bernhardberger.tvhplayer.core.RecordingStartWindow
@@ -154,6 +157,74 @@ class AutomaticRecordingEditorTest {
         compose.runOnIdle {
             assertTrue(state.draft.days.isEmpty())
             assertTrue(fixture.timerSubmissions.isEmpty())
+            state.updateDraft { it.copy(channelId = ChannelId(101)) }
+        }
+        compose.pressKey(Key.Back)
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
+        compose.pressKey(Key.Back)
+        compose.onNodeWithTag("timer-recording-hour-${state.draft.start.hour}").assertIsFocused()
+        compose.pressKey(Key.Back)
+        compose.onNodeWithTag("timer-recording-start").assertIsFocused()
+        compose.pressKey(Key.Back)
+        compose.pressKey(Key.DirectionUp)
+        compose.onNodeWithTag("timer-recording-main").assertIsFocused()
+        compose.runOnIdle {
+            fixture.timerNow = state.draft.resolveOccurrenceOn(state.draft.date, state.zone).stop
+        }
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("timer-recording-main").assertIsNotEnabled()
+        compose.onNodeWithText(org.robolectric.RuntimeEnvironment.getApplication().getString(
+            at.bernhardberger.tvhplayer.R.string.timer_editor_time_passed,
+        )).assertExists()
+    }
+
+    @Test fun timerHostRefusesMissingChannelWithoutLosingTheDraft() {
+        val sessions = List(2) { automaticRecordingFakeSession(emptyList()) }
+        val notices = List(2) { NoticeCenter({ compose.mainClock.currentTime }, { NoticeContext(1, null) }) }
+        var repeating by mutableStateOf(false)
+        var closes = 0
+        compose.setContent {
+            key(repeating) {
+                val index = if (repeating) 1 else 0
+                val session = sessions[index]
+                val current = remember { session.captureCurrentSession() }
+                TVHeadendPlayerTheme {
+                    TimerRecordingEditorHost(
+                        current, session.observation, remember { DvrMutationActions(session.dvrRepository) },
+                        notices[index], now = { automaticRecordingNow }, onClose = { closes++ },
+                        startingRepeating = repeating,
+                    )
+                }
+            }
+        }
+        for (index in sessions.indices) {
+            compose.onNodeWithTag("timer-recording-channel-time").assertIsFocused()
+            compose.pressKey(Key.DirectionCenter)
+            compose.pressKey(Key.DirectionCenter)
+            compose.pressKey(Key.DirectionCenter)
+            compose.pressKey(Key.Back)
+            compose.pressKey(Key.DirectionUp)
+            compose.onNodeWithTag("timer-recording-main").assertIsFocused()
+            compose.runOnIdle {
+                sessions[index].publish(automaticRecordingObservation(emptyList(), emptyList()))
+            }
+            compose.pressKey(Key.DirectionCenter)
+            compose.onNodeWithTag("timer-recording-main").assertIsFocused()
+            compose.runOnIdle {
+                assertEquals(0, closes)
+                assertEquals(1, notices[index].state.value.pending.size)
+                assertTrue(sessions[index].calls.none {
+                    it == FakeSessionCall.DVR_SCHEDULE_ENTRY || it == FakeSessionCall.DVR_CREATE_TIMEREC_RULE
+                })
+            }
+            compose.pressKey(Key.DirectionDown)
+            compose.pressKey(Key.DirectionCenter)
+            compose.pressKey(Key.DirectionCenter)
+            compose.onNodeWithTag("timer-recording-channel-101").assertIsFocused()
+            if (index == 0) compose.runOnIdle { repeating = true }
         }
     }
 

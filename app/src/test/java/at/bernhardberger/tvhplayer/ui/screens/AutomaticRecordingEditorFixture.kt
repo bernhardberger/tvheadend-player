@@ -35,6 +35,7 @@ import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.core.TimerecRuleId
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
+import kotlinx.coroutines.CompletableDeferred
 
 internal val automaticRecordingNow = Instant.parse("2026-11-12T12:00:00Z")
 internal val automaticRecordingZone = ZoneId.of("Europe/Berlin")
@@ -97,17 +98,21 @@ internal val timerRecordingSavedEntries = listOf(0, 3, 4, 5).mapIndexed { index,
         title = "Late news", channelId = ChannelId(103), start = start, stop = start + 60.minutes,
     )
 }
-internal fun automaticRecordingFakeSession(entries: List<DvrEntry> = automaticRecordingSavedEntries) = FakeTvheadendSession(
-    SessionObservation.create(
+internal fun automaticRecordingFakeSession(entries: List<DvrEntry> = automaticRecordingSavedEntries) =
+    FakeTvheadendSession(automaticRecordingObservation(entries))
+
+internal fun automaticRecordingObservation(
+    entries: List<DvrEntry> = automaticRecordingSavedEntries,
+    channels: List<Channel> = automaticRecordingChannels,
+) = SessionObservation.create(
         sessionState = SessionState.Ready(ServerCapabilities.create(
             streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED,
         )),
-        channelState = ChannelRepositoryState.Current(ChannelCatalog.create(channels = automaticRecordingChannels)),
+        channelState = ChannelRepositoryState.Current(ChannelCatalog.create(channels = channels)),
         epgState = EpgRepositoryState.Current(EpgSnapshot.create(
             events = automaticRecordingEvents + automaticRecordingKeywordEvents,
         )),
         dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = entries)),
-    ),
 )
 internal val automaticRecordingSession = automaticRecordingFakeSession().captureCurrentSession()
 
@@ -121,10 +126,15 @@ internal class AutomaticRecordingEditorFixture(
     var deletionResult: DvrMutationResult<*> = DvrMutationResult.Confirmed(Unit)
     val timerSubmissions = mutableListOf<TimerDraft>()
     var timerResult: DvrMutationResult<*> = DvrMutationResult.Confirmed(Unit)
+    var timerSaveGate: CompletableDeferred<Unit>? = null
     var timerNow = automaticRecordingNow
 
     fun timer(draft: TimerDraft = newTimerDraft(timerNow, automaticRecordingZone)) = TimerRecordingEditorState(
-        draft, scope, saveDraft = { submitted, _ -> timerSubmissions += submitted; timerResult },
+        draft, scope, saveDraft = { submitted, _ ->
+            timerSubmissions += submitted
+            timerSaveGate?.await()
+            timerResult
+        },
         now = { timerNow }, zone = automaticRecordingZone, onClose = { closes++ },
         deleteTimer = { deletions++; deletionResult },
     )
