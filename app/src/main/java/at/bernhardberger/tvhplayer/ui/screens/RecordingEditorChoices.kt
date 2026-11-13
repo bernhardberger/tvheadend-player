@@ -9,7 +9,10 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.unit.dp
+import androidx.tv.material3.Checkbox
 import androidx.tv.material3.RadioButton
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
@@ -23,6 +26,9 @@ import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepAction
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import java.time.LocalTime
+import java.time.DayOfWeek
+import java.time.format.TextStyle
+import java.util.Locale
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
@@ -153,9 +159,30 @@ internal fun RecordingEditorHour(
     hour: Int,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     GuidedStepAction(
         formatClock(LocalTime.of(hour, 0)), onClick,
         modifier.then(editorRowModifier(navigation, "hour-$hour")), trailingIcon = R.drawable.ic_keyboard_arrow_right,
+        enabled = enabled && navigation.canNavigate(),
+    )
+}
+
+@Composable
+internal fun RecordingEditorDay(
+    navigation: RecordingEditorNavigation,
+    day: DayOfWeek,
+    checked: Boolean,
+    onClick: () -> Unit,
+) {
+    GuidedStepAction(
+        day.getDisplayName(TextStyle.FULL, Locale.getDefault()),
+        { if (navigation.canNavigate()) onClick() },
+        editorRowModifier(navigation, "day-${day.value}").semantics {
+            role = Role.Checkbox; toggleableState = ToggleableState(checked)
+        },
+        trailingContent = {
+            Checkbox(checked, onCheckedChange = null, modifier = Modifier.clearAndSetSemantics {})
+        },
     )
 }

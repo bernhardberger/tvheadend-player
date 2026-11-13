@@ -21,6 +21,8 @@ import at.bernhardberger.tvheadend.sdk.core.DvrConfiguration
 import at.bernhardberger.tvheadend.sdk.core.RecordingRuleChannel
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import at.bernhardberger.tvhplayer.core.AutorecDraft
+import at.bernhardberger.tvhplayer.core.TimerDraft
+import at.bernhardberger.tvhplayer.core.newTimerDraft
 import at.bernhardberger.tvhplayer.core.AutomaticRecordingKind
 import at.bernhardberger.tvhplayer.core.newAutorecDraft
 import at.bernhardberger.tvhplayer.core.RecordingPattern
@@ -42,6 +44,8 @@ import at.bernhardberger.tvhplayer.ui.common.AppClock
 import at.bernhardberger.tvhplayer.settings.ClockFormat
 import java.io.File
 import java.time.DayOfWeek
+import java.time.LocalDate
+import java.time.LocalTime
 import java.util.TimeZone
 import kotlinx.coroutines.Dispatchers
 import org.junit.Rule
@@ -74,6 +78,7 @@ class AutomaticRecordingEditorCaptureTest {
     private lateinit var fixture: AutomaticRecordingEditorFixture
     private lateinit var view: View
     private var shown by mutableStateOf<AutomaticRecordingEditorState?>(null)
+    private var shownTimer by mutableStateOf<TimerRecordingEditorState?>(null)
     private val initial = automaticRecordingSeries.copy(
         channel = RecordingRuleChannel.SpecificChannel(automaticRecordingChannels.first().id),
     )
@@ -101,6 +106,10 @@ class AutomaticRecordingEditorCaptureTest {
                             DvrConfiguration(DvrConfigId("archive"), "Archive", ""),
                          ), automaticRecordingEvents + automaticRecordingKeywordEvents,
                              scheduledEpisodeCount = if (state.editing) automaticRecordingSavedEntries.size else 0)
+                    }
+                    shownTimer?.let { state ->
+                        TimerRecordingEditor(state, automaticRecordingChannels,
+                            scheduledEntries = timerRecordingSavedEntries)
                     }
                 }
             }
@@ -176,6 +185,42 @@ class AutomaticRecordingEditorCaptureTest {
         capture("11d-delete-confirm", "slice-3-job-b")
     }
 
+    @Test fun timerEditorReferenceFrames() {
+        val initialTimer = newTimerDraft(automaticRecordingNow, automaticRecordingZone).copy(
+            channelId = automaticRecordingChannels[2].id, date = LocalDate.of(2026, 11, 13),
+            start = LocalTime.of(23, 30), end = LocalTime.of(0, 30),
+        )
+        compose.runOnIdle { shownTimer = fixture.timer(initialTimer) }
+        capture("10a-record-by-time-first-level", "slice-4")
+        compose.runOnIdle {
+            requireNotNull(shownTimer).navigation.open(AutomaticRecordingEditorLevel.CHANNEL_TIME, "end")
+        }
+        capture("10b-record-by-time-channel-and-time", "slice-4")
+        compose.runOnIdle { requireNotNull(shownTimer).openClock(true) }
+        capture("10c-ends-at-hour", "slice-4")
+        compose.runOnIdle { requireNotNull(shownTimer).openMinutes(0) }
+        capture("10d-ends-at-minutes", "slice-4")
+        compose.runOnIdle {
+            requireNotNull(shownTimer).navigation.returnTo(AutomaticRecordingEditorLevel.CHANNEL_TIME)
+            requireNotNull(shownTimer).navigation.open(AutomaticRecordingEditorLevel.REPEAT, "done")
+        }
+        capture("10e-repeat-days", "slice-4")
+        val repeating = initialTimer.copy(days = DayOfWeek.entries.take(5).toSet(), name = "Late news")
+        compose.runOnIdle { shownTimer = fixture.timer(repeating) }
+        capture("10f-record-by-time-repeating", "slice-4")
+        compose.runOnIdle {
+            shownTimer = fixture.timer(newTimerDraft(automaticRecordingNow, automaticRecordingZone,
+                startingRepeating = true))
+        }
+        capture("10g-new-repeating-timer-from-kind", "slice-4")
+        compose.runOnIdle {
+            shownTimer = fixture.timer(repeating.copy(existingTimer = true))
+            requireNotNull(shownTimer).updateDraft { it.copy(enabled = false) }
+            requireNotNull(shownTimer).navigation.focusedRow = "enabled"
+        }
+        capture("12b-edit-timer-off-in-draft", "slice-4")
+    }
+
     private fun show(
         draft: AutorecDraft = initial,
         editing: Boolean = false,
@@ -200,12 +245,14 @@ class AutomaticRecordingEditorCaptureTest {
     }
 
     private fun capture(name: String, directory: String = "slice-3-job-a") {
-        val focus = when (shown?.navigation?.confirmation) {
+        val navigation = shownTimer?.navigation ?: requireNotNull(shown).navigation
+        val focus = when (navigation.confirmation) {
             AutomaticRecordingEditorConfirmation.LEAVE -> "keep-editing"
             AutomaticRecordingEditorConfirmation.DELETE -> "keep"
-            null -> requireNotNull(shown).navigation.focusedRow
+            null -> navigation.focusedRow
         }
-        compose.onNodeWithTag("automatic-recording-$focus").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+        compose.onNodeWithTag("${navigation.tagPrefix}-$focus")
+            .performSemanticsAction(SemanticsActions.RequestFocus) { it() }
         compose.settleFrames(1, PlayerMotion.PanelMs.toLong())
         compose.runOnIdle {
             val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
@@ -214,7 +261,8 @@ class AutomaticRecordingEditorCaptureTest {
             CaptureOutput.writePng(file, bitmap)
             CaptureOutput.writeText(File(file.parentFile, "$name.txt")) {
                 "Canvas ${view.width}x${view.height}; en-US; font scale 1.0; Europe/Berlin; 24-hour; focus $focus; " +
-                    "production AutomaticRecordingEditor; fictional fixture art; no device or server."
+                    "production ${if (shownTimer == null) "AutomaticRecordingEditor" else "TimerRecordingEditor"}; " +
+                    "fictional fixture art; no device or server."
             }
             bitmap.recycle()
         }

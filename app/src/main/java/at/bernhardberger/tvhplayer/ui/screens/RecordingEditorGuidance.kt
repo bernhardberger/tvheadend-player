@@ -2,9 +2,12 @@ package at.bernhardberger.tvhplayer.ui.screens
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
+import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.core.RecordingDraftField
 
 @Composable
 internal fun RecordingEditorHeading(text: String, modifier: Modifier = Modifier) {
@@ -16,3 +19,10 @@ internal fun RecordingEditorSecondary(text: String, modifier: Modifier = Modifie
     Text(text, modifier, style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = TvTextSecondaryAlpha))
 }
+
+@Composable
+internal fun recordingEditorMoreSummary(changed: Set<RecordingDraftField>, editing: Boolean): String =
+    if (changed.isEmpty()) stringResource(if (editing)
+        R.string.autorec_editor_unchanged_options else R.string.autorec_editor_defaults)
+    else stringResource(R.string.autorec_editor_changed_options, changed.size,
+        changed.map { automaticRecordingFieldLabel(it) }.joinToString(", "))

@@ -126,12 +126,3 @@ internal fun automaticRecordingBroadcastLabel(value: BroadcastType): String = st
 @Composable
 internal fun automaticRecordingMaximumLabel(value: Long): String =
     if (value == 0L) stringResource(R.string.autorec_editor_no_limit) else value.toString()
-
-@Composable
-internal fun automaticRecordingMoreSummary(state: AutomaticRecordingEditorState): String {
-    val changed = state.changedFields.intersect(automaticRecordingMoreFields)
-    return if (changed.isEmpty()) stringResource(if (state.editing)
-        R.string.autorec_editor_unchanged_options else R.string.autorec_editor_defaults)
-    else stringResource(R.string.autorec_editor_changed_options, changed.size,
-        changed.map { automaticRecordingFieldLabel(it) }.joinToString(", "))
-}

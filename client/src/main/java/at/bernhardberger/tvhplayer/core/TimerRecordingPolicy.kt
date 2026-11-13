@@ -19,13 +19,35 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
+private const val HOURS_PER_DAY = 24
+private const val LAST_GRID_MINUTE = 55
+private const val TIMER_MINUTE_STEP = 5
+
 fun newTimerDraft(
-    date: LocalDate,
-    start: LocalTime,
-    end: LocalTime,
+    now: Instant,
+    serverZone: ZoneId,
     configurations: List<DvrConfiguration> = emptyList(),
     preferred: DvrConfigId? = null,
-): TimerDraft = TimerDraft(date, start, end, configId = chooseDvrConfig(configurations, preferred))
+    startingRepeating: Boolean = false,
+): TimerDraft {
+    val local = java.time.Instant.ofEpochSecond(now.epochSeconds, now.nanosecondsOfSecond.toLong())
+        .atZone(serverZone).toLocalDateTime()
+    val minute = local.truncatedTo(ChronoUnit.MINUTES)
+    val rounded = minute.plusMinutes(if (local == minute && minute.minute % TIMER_MINUTE_STEP == 0) 0
+        else (TIMER_MINUTE_STEP - minute.minute % TIMER_MINUTE_STEP).toLong()).atZone(serverZone)
+    return TimerDraft(
+        rounded.toLocalDate(), rounded.toLocalTime(), rounded.toLocalTime().plusHours(1),
+        configId = chooseDvrConfig(configurations, preferred),
+        days = if (startingRepeating) DayOfWeek.entries.toSet() else emptySet(),
+    )
+}
+
+fun TimerDraft.timerHourChoices(ending: Boolean): List<Int> =
+    (0 until HOURS_PER_DAY).map { if (ending) (start.hour + it) % HOURS_PER_DAY else it }
+
+fun TimerDraft.timerMinuteChoices(hour: Int, ending: Boolean): List<LocalTime> =
+    (0..LAST_GRID_MINUTE step TIMER_MINUTE_STEP).map { LocalTime.of(hour, it) }
+        .filter { !ending || hour != start.hour || it > start }
 
 /**
  * Date is only editor context; existing timerecs cannot become one-off recordings.
@@ -64,9 +86,20 @@ fun TimerDraft.changedFields(baseline: TimerDraft): Set<RecordingDraftField> = b
     }
 }
 
-fun TimerDraft.cannotSubmit(serverZone: ZoneId, baseline: TimerDraft? = null): RecordingSubmitUnavailable? =
-    commonCannotSubmit(baseline) ?: if (!repeating && resolveOccurrenceOn(date, serverZone).let { it.stop <= it.start })
-        RecordingSubmitUnavailable.EMPTY_SPAN else null
+fun TimerDraft.cannotSubmit(
+    serverZone: ZoneId,
+    now: Instant,
+    baseline: TimerDraft? = null,
+): RecordingSubmitUnavailable? {
+    val common = commonCannotSubmit(baseline)
+    if (common != null || repeating) return common
+    val occurrence = resolveOccurrenceOn(date, serverZone)
+    return when {
+        occurrence.stop <= occurrence.start -> RecordingSubmitUnavailable.EMPTY_SPAN
+        occurrence.stop <= now -> RecordingSubmitUnavailable.TIME_PASSED
+        else -> null
+    }
+}
 
 private fun TimerDraft.commonCannotSubmit(baseline: TimerDraft? = null): RecordingSubmitUnavailable? = when {
     channelId == null -> RecordingSubmitUnavailable.CHANNEL_REQUIRED
@@ -83,8 +116,8 @@ private fun TimerDraft.commonCannotSubmit(baseline: TimerDraft? = null): Recordi
  * An earlier end wraps to the following date. ZonedDateTime.of semantics shift a gap
  * forward and take the earlier offset in an overlap.
  */
-fun TimerDraft.toScheduleRequest(channelName: String, serverZone: ZoneId): DvrScheduleRequest {
-    require(!repeating && cannotSubmit(serverZone) == null)
+fun TimerDraft.toScheduleRequest(channelName: String, serverZone: ZoneId, now: Instant): DvrScheduleRequest {
+    require(!repeating && cannotSubmit(serverZone, now) == null)
     val occurrence = resolveOccurrenceOn(date, serverZone)
     return DvrScheduleRequest(
         schedule = DvrSchedule.ExplicitTime(
@@ -106,7 +139,7 @@ fun TimerDraft.toScheduleRequest(channelName: String, serverZone: ZoneId): DvrSc
  * Repeating gaps keep the date using the nominal clock length, not an emulation of libc's DST retry
  * (dvr_timerec.c:35-52,122-125). Stored equal times stay zero length; one-off resolution is unchanged.
  */
-internal fun TimerDraft.resolveOccurrenceOn(date: LocalDate, serverZone: ZoneId): TimerOccurrence {
+fun TimerDraft.resolveOccurrenceOn(date: LocalDate, serverZone: ZoneId): TimerOccurrence {
     val nextDay = if (repeating) end < start else end <= start
     val endDate = if (nextDay) date.plusDays(1) else date
     val from = Instant.fromEpochSeconds(date.atTime(start).atZone(serverZone).toEpochSecond())

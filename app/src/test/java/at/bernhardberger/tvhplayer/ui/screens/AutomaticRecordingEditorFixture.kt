@@ -6,6 +6,8 @@ import at.bernhardberger.tvhplayer.core.AutorecEpisodeState
 import at.bernhardberger.tvhplayer.core.AutorecPreviewRow
 import at.bernhardberger.tvhplayer.core.AutorecPreviewState
 import at.bernhardberger.tvhplayer.core.RecordingPattern
+import at.bernhardberger.tvhplayer.core.TimerDraft
+import at.bernhardberger.tvhplayer.core.newTimerDraft
 import java.time.ZoneId
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
@@ -31,6 +33,7 @@ import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
 import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
+import at.bernhardberger.tvheadend.sdk.core.TimerecRuleId
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 
 internal val automaticRecordingNow = Instant.parse("2026-11-12T12:00:00Z")
@@ -87,6 +90,13 @@ internal val automaticRecordingSavedEntries = automaticRecordingEpisodes.take(5)
         duplicate = index == 1 || index == 3, enabled = index != 2,
     )
 }
+internal val timerRecordingSavedEntries = listOf(0, 3, 4, 5).mapIndexed { index, dayOffset ->
+    val start = Instant.parse("2026-11-13T22:30:00Z") + dayOffset.days
+    DvrEntry.create(
+        DvrEntryId(index.toLong() + 101), timerecRuleId = TimerecRuleId("timer"),
+        title = "Late news", channelId = ChannelId(103), start = start, stop = start + 60.minutes,
+    )
+}
 internal val automaticRecordingSession = FakeTvheadendSession(
     SessionObservation.create(
         sessionState = SessionState.Ready(ServerCapabilities.create(
@@ -108,6 +118,15 @@ internal class AutomaticRecordingEditorFixture(
     var closes = 0
     var deletions = 0
     var deletionResult: DvrMutationResult<*> = DvrMutationResult.Confirmed(Unit)
+    val timerSubmissions = mutableListOf<TimerDraft>()
+    var timerResult: DvrMutationResult<*> = DvrMutationResult.Confirmed(Unit)
+    var timerNow = automaticRecordingNow
+
+    fun timer(draft: TimerDraft = newTimerDraft(timerNow, automaticRecordingZone)) = TimerRecordingEditorState(
+        draft, scope, saveDraft = { submitted, _ -> timerSubmissions += submitted; timerResult },
+        now = { timerNow }, zone = automaticRecordingZone, onClose = { closes++ },
+        deleteTimer = { deletions++; deletionResult },
+    )
 
     fun state(
         draft: AutorecDraft = automaticRecordingSeries,

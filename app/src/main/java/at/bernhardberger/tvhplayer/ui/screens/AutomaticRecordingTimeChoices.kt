@@ -98,22 +98,13 @@ private fun AutomaticRecordingDays(state: AutomaticRecordingEditorState) {
     )
     for (day in DayOfWeek.entries) {
         val checked = day in state.draft.days && state.draft.days.size != DayOfWeek.entries.size
-        GuidedStepAction(
-            day.getDisplayName(TextStyle.FULL, Locale.getDefault()),
-            {
+        RecordingEditorDay(state.navigation, day, checked) {
                 state.updateDraft {
                     val days = it.days.takeUnless { days -> days.size == DayOfWeek.entries.size }.orEmpty()
                     val changed = if (day in days) days - day else days + day
                     it.copy(days = changed.takeUnless { days -> days.isEmpty() || days.size == 7 } ?: unrestricted)
                 }
-            },
-            editorRowModifier(state.navigation, "day-${day.value}").semantics {
-                role = Role.Checkbox; toggleableState = ToggleableState(checked)
-            },
-            trailingContent = {
-                Checkbox(checked, onCheckedChange = null, modifier = Modifier.clearAndSetSemantics {})
-            },
-        )
+        }
     }
 }
 

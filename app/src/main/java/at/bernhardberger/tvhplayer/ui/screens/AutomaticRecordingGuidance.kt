@@ -107,7 +107,8 @@ private fun AutomaticRecordingFocusedEpisode(
 private fun AutomaticRecordingFocusedChoice(state: AutomaticRecordingEditorState) {
     when (state.navigation.page.level) {
         AutomaticRecordingEditorLevel.FIRST -> AutomaticRecordingMainGuidance(state)
-        AutomaticRecordingEditorLevel.MORE -> RecordingEditorSecondary(automaticRecordingMoreSummary(state))
+        AutomaticRecordingEditorLevel.MORE -> RecordingEditorSecondary(
+            recordingEditorMoreSummary(state.changedFields.intersect(automaticRecordingMoreFields), state.editing))
         AutomaticRecordingEditorLevel.DUPLICATE -> {
             val focused = (listOf(DuplicateDetection.DVR_PROFILE) + offeredDuplicateDetection)
                 .firstOrNull { "choice-$it" == state.navigation.focusedRow } ?: state.draft.duplicateDetection
@@ -124,7 +125,8 @@ private fun AutomaticRecordingFocusedChoice(state: AutomaticRecordingEditorState
 
 @Composable
 private fun AutomaticRecordingMainGuidance(state: AutomaticRecordingEditorState) {
-    if (state.navigation.focusedRow == "more") RecordingEditorSecondary(automaticRecordingMoreSummary(state))
+    if (state.navigation.focusedRow == "more") RecordingEditorSecondary(
+        recordingEditorMoreSummary(state.changedFields.intersect(automaticRecordingMoreFields), state.editing))
     if (state.navigation.focusedRow == "main") {
         val reason = when (state.mainProblem) {
             RecordingSubmitUnavailable.UNCHANGED -> stringResource(R.string.autorec_editor_unchanged)

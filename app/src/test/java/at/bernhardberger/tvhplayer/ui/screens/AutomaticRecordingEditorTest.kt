@@ -2,6 +2,9 @@ package at.bernhardberger.tvhplayer.ui.screens
 
 import android.app.Application
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.assertIsFocused
@@ -22,6 +25,7 @@ import at.bernhardberger.tvhplayer.core.RecordingStartWindow
 import at.bernhardberger.tvhplayer.core.newAutorecDraft
 import at.bernhardberger.tvhplayer.core.readRecordingPattern
 import at.bernhardberger.tvhplayer.core.toUpdateRequest
+import at.bernhardberger.tvhplayer.core.newTimerDraft
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
@@ -39,6 +43,46 @@ import java.time.LocalTime
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
 class AutomaticRecordingEditorTest {
     @get:Rule val compose = createComposeRule()
+
+    @Test fun timerRepeatKeepsExistingTypeAndHidesDate() {
+        lateinit var fixture: AutomaticRecordingEditorFixture
+        lateinit var state: TimerRecordingEditorState
+        var replacement by mutableStateOf<TimerRecordingEditorState?>(null)
+        compose.setContent {
+            val scope = rememberCoroutineScope()
+            fixture = remember { AutomaticRecordingEditorFixture(scope) }
+            val initial = remember { fixture.timer(newTimerDraft(automaticRecordingNow, automaticRecordingZone).copy(
+                channelId = ChannelId(101), days = setOf(DayOfWeek.MONDAY), existingTimer = true,
+            )) }
+            state = replacement ?: initial
+            TVHeadendPlayerTheme { TimerRecordingEditor(state, automaticRecordingChannels) }
+        }
+        compose.onNodeWithTag("timer-recording-channel-time").assertIsFocused()
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("timer-recording-date").assertDoesNotExist()
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("timer-recording-done").assertIsFocused()
+        compose.onNodeWithTag("timer-recording-never").assertDoesNotExist()
+        compose.pressKey(Key.DirectionDown)
+        compose.onNodeWithTag("timer-recording-day-1").assertIsOn()
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("timer-recording-day-1").assertIsOff()
+        compose.pressKey(Key.DirectionUp)
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("timer-recording-repeat").assertIsFocused()
+        compose.onNodeWithTag("timer-recording-date").assertDoesNotExist()
+        compose.pressKey(Key.Back)
+        compose.onNodeWithTag("timer-recording-main").assertIsNotEnabled()
+        compose.runOnIdle {
+            assertTrue(state.draft.repeating)
+            assertTrue(state.draft.days.isEmpty())
+            assertTrue(fixture.timerSubmissions.isEmpty())
+            replacement = fixture.timer()
+        }
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("timer-recording-date").assertExists()
+    }
 
     @Test fun wordsEntryPreservesRawExpressionAndReturnsWithoutSubmitting() {
         lateinit var fixture: AutomaticRecordingEditorFixture

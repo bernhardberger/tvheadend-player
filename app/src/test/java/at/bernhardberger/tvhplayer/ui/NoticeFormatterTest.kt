@@ -45,8 +45,12 @@ class NoticeFormatterTest {
             assertEquals("None in the guide yet", formatAutomaticRecordingPreviewSummary(
                 context, kind, AutorecPreviewState.Matches(emptyList(), 0, false)))
         }
-        for (kind in listOf(AutomaticRecordingKind.SERIES, AutomaticRecordingKind.TITLE, AutomaticRecordingKind.KEYWORD)) {
-            val singular = if (kind == AutomaticRecordingKind.SERIES) "episode" else "program"
+        for (kind in AutomaticRecordingKind.entries) {
+            val singular = when (kind) {
+                AutomaticRecordingKind.SERIES -> "episode"
+                AutomaticRecordingKind.TIMER -> "recording"
+                else -> "program"
+            }
             for (count in listOf(0, 1, 5)) {
                 val scheduled = if (count == 0) "" else
                     "Its $count scheduled $singular${if (count == 1) "" else "s"} will be removed. "

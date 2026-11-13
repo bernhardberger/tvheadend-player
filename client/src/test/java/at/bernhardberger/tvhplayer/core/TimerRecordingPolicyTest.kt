@@ -19,7 +19,7 @@ import org.junit.Test
 class TimerRecordingPolicyTest {
     @Test fun `timer occurrences use weekdays next day end and DST calendar arithmetic`() {
         val zone = ZoneId.of("Europe/Berlin")
-        val draft = newTimerDraft(LocalDate.of(2026, 3, 29), LocalTime.of(1, 30), LocalTime.of(3, 30))
+        val draft = TimerDraft(LocalDate.of(2026, 3, 29), LocalTime.of(1, 30), LocalTime.of(3, 30))
         val now = Instant.parse("2026-03-28T00:00:00Z")
         val oneOff = draft.nextOccurrences(now, zone, 3)
         assertEquals(1, oneOff.size)
@@ -27,21 +27,28 @@ class TimerRecordingPolicyTest {
         val repeated = draft.copy(days = setOf(DayOfWeek.SUNDAY)).nextOccurrences(now, zone, 2)
         assertEquals(2, repeated.size)
         assertEquals(120.minutes, repeated.last().stop - repeated.last().start)
-        val midnight = draft.copy(start = LocalTime.of(23, 0), end = LocalTime.of(1, 0))
-            .nextOccurrences(now, zone, 1).single()
+        val midnightDraft = draft.copy(start = LocalTime.of(23, 0), end = LocalTime.of(1, 0))
+        val midnight = midnightDraft.nextOccurrences(now, zone, 1).single()
         assertEquals(120.minutes, midnight.stop - midnight.start)
         assertTrue(draft.nextOccurrences(Instant.parse("2026-03-30T00:00:00Z"), zone, 1).isEmpty())
         val equal = draft.copy(existingTimer = true, days = setOf(DayOfWeek.SUNDAY), end = draft.start)
         assertTrue(equal.nextOccurrences(now, zone, 2).isEmpty())
+        val hours = midnightDraft.timerHourChoices(ending = true)
+        assertEquals(24, hours.distinct().size)
+        assertEquals(listOf(23, 0, 1), hours.take(3))
+        assertTrue(midnightDraft.timerMinuteChoices(23, ending = true).all { it > midnightDraft.start })
+        assertTrue(midnightDraft.copy(start = LocalTime.of(23, 55)).timerMinuteChoices(23, ending = true).isEmpty())
     }
 
     @Test fun `one off crosses midnight and inherits profile defaults`() {
-        val draft = newTimerDraft(
+        val draft = TimerDraft(
             LocalDate.of(2026, 11, 12),
             LocalTime.of(23, 0),
             LocalTime.of(1, 0),
         ).copy(channelId = ChannelId(1), paddingBefore = 5.minutes)
-        val request = draft.toScheduleRequest("Channel", ZoneId.of("UTC"))
+        val zone = ZoneId.of("UTC")
+        val now = Instant.parse("2026-11-12T23:30:00Z")
+        val request = draft.toScheduleRequest("Channel", zone, now)
         val schedule = request.schedule as DvrSchedule.ExplicitTime
         assertEquals(120.minutes, schedule.stop - schedule.start)
         assertEquals("Channel", request.title)
@@ -49,10 +56,21 @@ class TimerRecordingPolicyTest {
         assertEquals(5.minutes, request.startExtraMinutes)
         assertNull(request.removal)
         assertNull(request.priority)
+        assertNull(draft.cannotSubmit(zone, now))
+        assertEquals(RecordingSubmitUnavailable.TIME_PASSED, draft.cannotSubmit(zone, schedule.stop))
+        assertEquals(RecordingSubmitUnavailable.TIME_PASSED, draft.cannotSubmit(zone, schedule.stop + 1.minutes))
+        val rounded = newTimerDraft(Instant.parse("2026-11-12T23:58:00Z"), zone)
+        assertEquals(LocalDate.of(2026, 11, 13), rounded.date)
+        assertEquals(LocalTime.MIDNIGHT, rounded.start)
+        assertEquals(LocalTime.of(1, 0), rounded.end)
+        assertNull(rounded.channelId)
+        val repeating = newTimerDraft(Instant.parse("2026-11-12T12:00:00.001Z"), zone, startingRepeating = true)
+        assertEquals(LocalTime.of(12, 5), repeating.start)
+        assertEquals(DayOfWeek.entries.toSet(), repeating.days)
     }
 
     @Test fun `repeating ignores date and padding`() {
-        val draft = newTimerDraft(
+        val draft = TimerDraft(
             LocalDate.of(2026, 11, 12),
             LocalTime.of(23, 0),
             LocalTime.of(1, 0),
@@ -73,12 +91,13 @@ class TimerRecordingPolicyTest {
     }
 
     @Test fun `timer names escape strftime only for repeating titles`() {
-        val draft = newTimerDraft(
+        val draft = TimerDraft(
             LocalDate.of(2026, 11, 12),
             LocalTime.NOON,
             LocalTime.of(13, 0),
         ).copy(channelId = ChannelId(1), name = "100% sport")
-        assertEquals("100% sport", draft.toScheduleRequest("Channel", ZoneId.of("UTC")).title)
+        assertEquals("100% sport",
+            draft.toScheduleRequest("Channel", ZoneId.of("UTC"), Instant.parse("2026-11-12T00:00:00Z")).title)
         val request = draft.copy(days = setOf(DayOfWeek.MONDAY)).toCreateRequest("Channel")
         assertEquals("100% sport", request.name)
         assertEquals("100%% sport", request.title)
@@ -125,36 +144,38 @@ class TimerRecordingPolicyTest {
         assertEquals(setOf(RecordingDraftField.ENABLED), changed.changedFields(baseline))
         assertEquals(TimerecRuleUpdate(enabled = false), changed.toUpdateRequest(baseline, "Channel"))
         assertEquals(RecordingSubmitUnavailable.REPEAT_REQUIRED,
-            baseline.copy(days = emptySet()).cannotSubmit(ZoneId.of("UTC"), baseline))
+            baseline.copy(days = emptySet()).cannotSubmit(
+                ZoneId.of("UTC"), Instant.parse("2026-11-12T00:00:00Z"), baseline))
         assertEquals(RecordingSubmitUnavailable.CHANNEL_REQUIRED,
-            newTimerDraft(baseline.date, LocalTime.NOON, LocalTime.of(13, 0)).cannotSubmit(ZoneId.of("UTC")))
+            TimerDraft(baseline.date, LocalTime.NOON, LocalTime.of(13, 0))
+                .cannotSubmit(ZoneId.of("UTC"), Instant.parse("2026-11-12T00:00:00Z")))
     }
 
     @Test fun `empty spans block new times but preserve equal stored times and DST gap shifts forward`() {
         val zone = ZoneId.of("Europe/Berlin")
-        val equal = newTimerDraft(LocalDate.of(2026, 3, 29), LocalTime.NOON, LocalTime.NOON)
+        val beforeGap = Instant.parse("2026-03-28T00:00:00Z")
+        val equal = TimerDraft(LocalDate.of(2026, 3, 29), LocalTime.NOON, LocalTime.NOON)
             .copy(channelId = ChannelId(1))
-        assertEquals(RecordingSubmitUnavailable.EMPTY_SPAN, equal.cannotSubmit(zone))
+        assertEquals(RecordingSubmitUnavailable.EMPTY_SPAN, equal.cannotSubmit(zone, beforeGap))
         val stored = equal.copy(existingTimer = true, days = setOf(DayOfWeek.MONDAY))
-        assertEquals(RecordingSubmitUnavailable.UNCHANGED, stored.cannotSubmit(zone, stored))
-        assertNull(stored.copy(name = "Changed").cannotSubmit(zone, stored))
+        assertEquals(RecordingSubmitUnavailable.UNCHANGED, stored.cannotSubmit(zone, beforeGap, stored))
+        assertNull(stored.copy(name = "Changed").cannotSubmit(zone, beforeGap, stored))
         val gap = equal.copy(start = LocalTime.of(2, 30), end = LocalTime.of(4, 0))
-            .toScheduleRequest("Channel", zone).schedule as DvrSchedule.ExplicitTime
+            .toScheduleRequest("Channel", zone, beforeGap).schedule as DvrSchedule.ExplicitTime
         assertEquals(30.minutes, gap.stop - gap.start)
         val reversed = equal.copy(start = LocalTime.of(2, 30), end = LocalTime.of(3, 0))
-        assertEquals(RecordingSubmitUnavailable.EMPTY_SPAN, reversed.cannotSubmit(zone))
-        val beforeGap = Instant.parse("2026-03-28T00:00:00Z")
+        assertEquals(RecordingSubmitUnavailable.EMPTY_SPAN, reversed.cannotSubmit(zone, beforeGap))
         assertTrue(reversed.nextOccurrences(beforeGap, zone, 1).isEmpty())
         val repeating = reversed.copy(days = setOf(DayOfWeek.SUNDAY))
             .nextOccurrences(beforeGap, zone, 1).single()
         assertEquals(Instant.parse("2026-03-29T01:30:00Z"), repeating.start)
         assertEquals(30.minutes, repeating.stop - repeating.start)
         val overlap = reversed.copy(date = LocalDate.of(2026, 10, 25))
-        assertNull(overlap.cannotSubmit(zone))
+        assertNull(overlap.cannotSubmit(zone, beforeGap))
         val occurrence = overlap.nextOccurrences(Instant.parse("2026-10-24T00:00:00Z"),
             zone, 1).single()
         assertEquals(90.minutes, occurrence.stop - occurrence.start)
         assertEquals(occurrence.start,
-            (overlap.toScheduleRequest("Channel", zone).schedule as DvrSchedule.ExplicitTime).start)
+            (overlap.toScheduleRequest("Channel", zone, beforeGap).schedule as DvrSchedule.ExplicitTime).start)
     }
 }

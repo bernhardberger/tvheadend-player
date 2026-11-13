@@ -107,7 +107,9 @@ private fun AutomaticRecordingFirstLevel(state: AutomaticRecordingEditorState, c
         trailingContent = { AutomaticRecordingChanged(state, setOf(RecordingDraftField.KEEP_UNTIL)) },
     )
     GuidedStepAction(
-        title = stringResource(R.string.autorec_editor_more), subtitle = automaticRecordingMoreSummary(state),
+        title = stringResource(R.string.autorec_editor_more),
+        subtitle = recordingEditorMoreSummary(
+            state.changedFields.intersect(automaticRecordingMoreFields), state.editing),
         onClick = { state.navigation.open(AutomaticRecordingEditorLevel.MORE, "duplicate") },
         modifier = editorRowModifier(state.navigation, "more"), trailingIcon = R.drawable.ic_keyboard_arrow_right,
         trailingContent = { AutomaticRecordingChanged(state, automaticRecordingMoreFields) },

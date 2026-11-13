@@ -114,7 +114,9 @@ val autorecMatchAffectingFields: Set<RecordingDraftField> = setOf(
     RecordingDraftField.BROADCAST_TYPE, RecordingDraftField.ENABLED,
 )
 
-enum class RecordingSubmitUnavailable { WORDS_REQUIRED, CHANNEL_REQUIRED, UNCHANGED, REPEAT_REQUIRED, EMPTY_SPAN }
+enum class RecordingSubmitUnavailable {
+    WORDS_REQUIRED, CHANNEL_REQUIRED, UNCHANGED, REPEAT_REQUIRED, EMPTY_SPAN, TIME_PASSED,
+}
 
 val offeredDuplicateDetection: List<DuplicateDetection> = listOf(
     DuplicateDetection.ALL, DuplicateDetection.DIFFERENT_EPISODE_NUMBER,

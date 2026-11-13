@@ -33,8 +33,11 @@ internal fun formatAutomaticRecordingDeleteBody(
     changed: Boolean,
 ): String {
     val scheduled = if (scheduledCount == 0) "" else context.resources.getQuantityString(
-        if (kind == AutomaticRecordingKind.SERIES) R.plurals.autorec_editor_delete_episodes
-            else R.plurals.autorec_editor_delete_programs,
+        when (kind) {
+            AutomaticRecordingKind.SERIES -> R.plurals.autorec_editor_delete_episodes
+            AutomaticRecordingKind.TIMER -> R.plurals.timer_editor_delete_scheduled
+            else -> R.plurals.autorec_editor_delete_programs
+        },
         scheduledCount, scheduledCount,
     ) + " "
     return scheduled + context.getString(R.string.autorec_editor_delete_finished) +

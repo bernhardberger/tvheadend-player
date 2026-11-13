@@ -3,6 +3,8 @@ package at.bernhardberger.tvhplayer.ui.screens
 import at.bernhardberger.tvhplayer.core.AutorecEpisodeState
 import at.bernhardberger.tvhplayer.core.AutorecPreviewState
 import at.bernhardberger.tvhplayer.core.RecordingSubmitUnavailable
+import at.bernhardberger.tvhplayer.core.newTimerDraft
+import at.bernhardberger.tvhplayer.core.resolveOccurrenceOn
 import java.time.DayOfWeek
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -26,6 +28,34 @@ import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AutomaticRecordingEditorStateTest {
+    @Test fun timerSubmitRechecksTimeAndKeepsItsDraftAfterFailure() = runTest {
+        val fixture = AutomaticRecordingEditorFixture(this)
+        val draft = newTimerDraft(automaticRecordingNow, automaticRecordingZone)
+            .copy(channelId = automaticRecordingChannels.first().id)
+        val state = fixture.timer(draft)
+        assertNull(state.mainProblem)
+        fixture.timerNow = draft.resolveOccurrenceOn(draft.date, automaticRecordingZone).stop
+        state.submit()
+        runCurrent()
+        assertTrue(fixture.timerSubmissions.isEmpty())
+        assertEquals(RecordingSubmitUnavailable.TIME_PASSED, state.mainProblem)
+        assertEquals("main", state.navigation.focusedRow)
+        state.updateDraft { it.copy(date = it.date.plusDays(1), name = "Viewer name") }
+        val submitted = state.draft
+        fixture.timerResult = DvrMutationResult.Failed(TvheadendFailure.SERVER_REJECTED, false)
+        state.submit()
+        runCurrent()
+        assertEquals(submitted, fixture.timerSubmissions.single())
+        assertEquals(submitted, state.draft)
+        assertFalse(state.closed)
+        assertEquals("main", state.navigation.focusedRow)
+        fixture.timerResult = DvrMutationResult.Confirmed(Unit)
+        state.submit()
+        runCurrent()
+        assertTrue(state.closed)
+        assertEquals(1, fixture.closes)
+    }
+
     @Test fun levelsRestoreTheirOpeningRowAndChoicesApplyOnlyWhenConfirmed() = runTest {
         val state = AutomaticRecordingEditorFixture(this).state()
         state.navigation.focusedRow = "channel-time"
