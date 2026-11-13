@@ -1271,7 +1271,7 @@ fun VideoPlayerScreen(
     }
     StartupOutcome()
     val busyBlocked = channelUnavailable || statusPresentation == PlaybackStatusPresentation.FULL_RECOVERY
-    val trackGlance = trackGlance(rememberPlayerTracks(player))
+    val trackGlance = rememberTrackGlance(player, rememberPlayerTracks(player), confirmedPlayingChannelId != null)
     @Composable
     fun rememberBusyStatus(): PlayerBusyStatus? {
     // The Banner stays while tuning and hides after the first frame of this tune; only a
@@ -1751,7 +1751,7 @@ fun VideoPlayerScreen(
             unavailableTitle = unavailableTitle,
         ),
         recordingNow = currentChannelId in recordingChannelIds,
-        badges = trackGlance.badges.takeIf { confirmedPlayingChannelId != null }.orEmpty(),
+        badges = trackGlance.badges,
         picon = currentChannel?.icon,
         // The info bar's artwork tile.
         artwork = controlsEvent?.let(::programmeArtwork),

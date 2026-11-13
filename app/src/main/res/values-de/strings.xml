@@ -818,6 +818,5 @@
     <string name="server_none_in_use_description">Keine Verbindung in Verwendung. Wähle eine aus, um wieder fernzusehen.</string>
     <string name="player_raster_spoken">%1$s Zeilen</string>
     <string name="player_audio_spoken">Audio %1$s</string>
-    <string name="player_ad">Audiodeskription</string>
     <string name="player_ad_short">AD</string>
 </resources>

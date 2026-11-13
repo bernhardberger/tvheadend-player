@@ -26,6 +26,8 @@ import at.bernhardberger.tvhplayer.core.GlanceBadge
 import at.bernhardberger.tvhplayer.ui.components.ScheduledIndicator
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 
+private val InfoBarFactsBadgeGap = 16.dp
+
 /**
  * Presentation strings follow the displayed programme/seek target. Callers pass no next for
  * recordings; a recording's [metadata] is its whole eyebrow (`Recorded 14 Nov • Ends 23:45`).
@@ -98,9 +100,10 @@ fun PlayerInfoBar(
         Row(faded.then(if (reserveOn == "facts") reserved else Modifier).fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically) {
             Text(facts, style = style, maxLines = 1, overflow = TextOverflow.Ellipsis, color = secondary,
-                modifier = Modifier.weight(1f).testTag("player-info-programme").clearAndSetSemantics {})
+                modifier = Modifier.weight(1f).testTag("player-info-programme")
+                    .clearAndSetSemantics {})
             if (badges.isNotEmpty()) {
-                Spacer(Modifier.width(IdentityTextGap))
+                Spacer(Modifier.width(InfoBarFactsBadgeGap))
                 PlayerGlanceBadges(badges, Modifier.wrapContentWidth(unbounded = true))
             }
         }

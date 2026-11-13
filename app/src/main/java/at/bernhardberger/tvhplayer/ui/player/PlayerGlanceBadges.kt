@@ -18,7 +18,7 @@ import at.bernhardberger.tvhplayer.ui.components.StatusBadgeTone
 internal fun glanceBadgeSpoken(badge: GlanceBadge): String = when (badge.kind) {
     GlanceBadgeKind.RASTER -> stringResource(R.string.player_raster_spoken, badge.value)
     GlanceBadgeKind.AUDIO -> stringResource(R.string.player_audio_spoken, badge.value)
-    GlanceBadgeKind.AD -> stringResource(R.string.player_ad)
+    GlanceBadgeKind.AD -> stringResource(R.string.audio_description)
 }
 
 @Composable

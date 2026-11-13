@@ -963,7 +963,8 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
 - The programme block groups its title and subtitle closely: 4dp from the
   metadata row to the title, 2dp from title to subtitle, and 8dp before Next.
   The metadata row ends with passive compact neutral StatusBadges for resolution and declared scan type,
-  the selected audio format and layout, and AD for audio description, in that order. Its text
+  the decoded audio format and layout, and AD for the selected audio-description track, in that order.
+  Resolution, scan and audio format follow the decoded stream, including mid-stream changes. Its text
   ellipsizes before the badges; the badges keep their width and the title's end keyline even
   without EPG. They are centred on the eyebrow without changing any line's height, and leave
   the behind-live distance its reserved room when it shares this line. The info bar announces

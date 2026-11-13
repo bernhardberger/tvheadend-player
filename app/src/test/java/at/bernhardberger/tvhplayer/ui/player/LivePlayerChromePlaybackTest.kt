@@ -604,7 +604,7 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
         assertFalse("no pending scrub on return", exists("timeshift-seek-preview"))
     }
 
-    @Test fun theLiveChromeShowsNoStreamBadgesAndStartsNoDiagnostics() {
+    @Test fun confirmedLiveBadgesFollowDecodedFormatsWithoutStartingDiagnostics() {
         val connection = ScriptedSubscriptionConnection().apply {
             scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, null)))
         }
@@ -614,11 +614,29 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
             val tracks = Tracks(listOf(
                 Tracks.Group(TrackGroup(Format.Builder().setSampleMimeType(MimeTypes.VIDEO_H264)
                     .setWidth(1920).setHeight(1080).build()), false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(true)),
-                Tracks.Group(TrackGroup(Format.Builder().setSampleMimeType(MimeTypes.AUDIO_E_AC3)
-                    .setChannelCount(6).build()), false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(true)),
+                Tracks.Group(TrackGroup(
+                    Format.Builder().setSampleMimeType(MimeTypes.AUDIO_E_AC3).setChannelCount(2).build(),
+                    Format.Builder().setSampleMimeType(MimeTypes.AUDIO_E_AC3).setChannelCount(6)
+                        .setRoleFlags(C.ROLE_FLAG_DESCRIBES_VIDEO).build()),
+                    false, intArrayOf(C.FORMAT_HANDLED, C.FORMAT_HANDLED), booleanArrayOf(true, false)),
             ))
             forcedTracks = tracks
             compose.runOnIdle { playerListeners.toList().forEach { it.onTracksChanged(tracks) } }
+            fun formats(height: Int, channels: Int) {
+                compose.runOnIdle {
+                    val video = Format.Builder().setSampleMimeType(MimeTypes.VIDEO_H264).setHeight(height).build()
+                    val audio = Format.Builder().setSampleMimeType(MimeTypes.AUDIO_E_AC3).setChannelCount(channels).build()
+                    forcedVideoFormat = video
+                    forcedAudioFormat = audio
+                    val event = androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime(
+                        0, player.currentTimeline, 0, null, 0, player.currentTimeline, 0, null, 0, 0)
+                    formatListeners.toList().forEach {
+                        it.onVideoInputFormatChanged(event, video, null)
+                        it.onAudioInputFormatChanged(event, audio, null)
+                    }
+                }
+                settleFrames()
+            }
             // Media3's real ExoPlayer playback thread registers the media period's collection.
             val registered = scope.async(start = CoroutineStart.UNDISPATCHED) { connection.awaitCollectionRegistered() }
             compose.waitUntil(5_000) { idleMainLooper(); registered.isCompleted }
@@ -635,14 +653,38 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
             val diagnostics = runtime.diagnostics.value
             assertTrue("Stats is closed: no format or frontend diagnostics",
                 diagnostics.video == null && diagnostics.audio == null && diagnostics.live == null)
+            // Enter the installed channel before READY, with formats reported while the UI was away.
+            compose.runOnIdle { screenVisible.value = false }
+            settleFrames()
+            compose.runOnIdle {
+                forcedVideoFormat = Format.Builder().setSampleMimeType(MimeTypes.VIDEO_H264).setHeight(1080).build()
+                forcedAudioFormat = Format.Builder().setSampleMimeType(MimeTypes.AUDIO_E_AC3).setChannelCount(2).build()
+                screenVisible.value = true
+            }
+            settleFrames()
+            assertFalse("warm-entry facts wait for channel confirmation", exists("player-stream-badges"))
             playerReady()
             assertMainSettled("the driven player reports Playing") { runtime.state.value is AppPlaybackState.Playing }
             settle()
             assertTrue(exists("player-banner"))
-            val badges = badgeDescription("player-banner")
-            for (absent in listOf("lines", "Video", "Audio", "Signal-to-noise")) {
-                assertFalse("Banner '$badges' shows no badge ('$absent')", badges.contains(absent))
-            }
+            assertTrue("warm adoption uses the existing decoded raster without another callback",
+                description("player-info-bar").contains("1080 lines"))
+            assertFalse("UNKNOWN scan is not inferred", description("player-info-bar").contains("1080i"))
+            assertTrue("warm adoption uses the existing decoded audio without another callback",
+                description("player-info-bar").contains("Audio DD+ 2.0"))
+            assertFalse("an unselected AD track is not the playing track",
+                description("player-info-bar").contains(context.getString(R.string.audio_description)))
+            formats(720, 6)
+            assertTrue("unchanged Tracks must not freeze the raster", description("player-info-bar").contains("720 lines"))
+            assertFalse(description("player-info-bar").contains("1080"))
+            assertTrue("the decoded layout can change in-band", description("player-info-bar").contains("Audio DD+ 5.1"))
+            val selectedAd = Tracks(listOf(tracks.groups[0], Tracks.Group(tracks.groups[1].mediaTrackGroup,
+                false, intArrayOf(C.FORMAT_HANDLED, C.FORMAT_HANDLED), booleanArrayOf(false, true))))
+            publishTracks(selectedAd)
+            assertTrue("only the selected audio role supplies AD",
+                description("player-info-bar").contains(context.getString(R.string.audio_description)))
+            assertTrue("passive badges do not start diagnostics",
+                runtime.diagnostics.value.let { it.video == null && it.audio == null && it.live == null })
 
             // Without live Pause, Center posts a notice; Down opens the controls.
             key(Key.DirectionCenter)
@@ -650,10 +692,19 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
             assertTrue(exists("player-banner"))
             key(Key.DirectionDown)
             assertTrue(exists("player-actions"))
-            val controls = identityDescription() + " | " + badgeDescription("player-footer")
-            for (absent in listOf("lines", "Video", "Audio")) {
-                assertFalse("controls '$controls' show no badge ('$absent')", controls.contains(absent))
+            assertTrue(description("player-info-bar").contains("720 lines"))
+            assertTrue(description("player-info-bar").contains("Audio DD+ 5.1"))
+            compose.runOnIdle {
+                val event = androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime(
+                    0, player.currentTimeline, 0, null, 0, player.currentTimeline, 0, null, 0, 0)
+                formatListeners.toList().forEach {
+                    it.onMediaItemTransition(event, player.currentMediaItem, Player.MEDIA_ITEM_TRANSITION_REASON_AUTO)
+                }
             }
+            settleFrames()
+            assertFalse("a new media item clears the previous raster", description("player-info-bar").contains("lines"))
+            assertFalse("a new media item clears the previous audio format", description("player-info-bar").contains("Audio DD+"))
+            formats(720, 6)
 
             // Programme Info never starts full diagnostics. Stats for nerds still owns them.
             key(Key.Info)

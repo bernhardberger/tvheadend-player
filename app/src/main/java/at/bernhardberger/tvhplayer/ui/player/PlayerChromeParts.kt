@@ -18,7 +18,10 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,6 +35,11 @@ import androidx.compose.ui.unit.dp
 import androidx.media3.common.C
 import androidx.media3.common.Tracks
 import androidx.media3.common.Format
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.DecoderReuseEvaluation
+import androidx.media3.exoplayer.analytics.AnalyticsListener
 import at.bernhardberger.tvheadend.sdk.media3.VideoScanType
 import at.bernhardberger.tvheadend.sdk.media3.videoScanType
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
@@ -91,18 +99,43 @@ internal fun liveInfoBarData(
 internal fun tracksAudioOnly(tracks: Tracks): Boolean =
     tracks.groups.any { it.type == C.TRACK_TYPE_AUDIO } && tracks.groups.none { it.type == C.TRACK_TYPE_VIDEO }
 
-/** Both chrome facts and the audio-only presentation come from the screen's one track snapshot. */
+/** Track roles use the screen's snapshot; codec, raster and scan follow the decoded input. */
 internal data class TrackGlance(val audioOnly: Boolean, val badges: List<GlanceBadge>)
 
 @OptIn(ExperimentalTvheadendApi::class)
-internal fun trackGlance(tracks: Tracks): TrackGlance {
-    val video = selectedFormat(tracks, C.TRACK_TYPE_VIDEO)
-    val audio = selectedFormat(tracks, C.TRACK_TYPE_AUDIO)
-    return TrackGlance(tracksAudioOnly(tracks), glanceBadges(
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+@Composable
+internal fun rememberTrackGlance(player: Player, tracks: Tracks, available: Boolean): TrackGlance {
+    val exoPlayer = player as? ExoPlayer
+    var video by remember(player) { mutableStateOf(exoPlayer?.videoFormat) }
+    var audio by remember(player) { mutableStateOf(exoPlayer?.audioFormat) }
+    DisposableEffect(player) {
+        val listener = object : AnalyticsListener {
+            override fun onVideoInputFormatChanged(
+                eventTime: AnalyticsListener.EventTime, format: Format, decoderReuseEvaluation: DecoderReuseEvaluation?,
+            ) {
+                video = format
+            }
+            override fun onAudioInputFormatChanged(
+                eventTime: AnalyticsListener.EventTime, format: Format, decoderReuseEvaluation: DecoderReuseEvaluation?,
+            ) {
+                audio = format
+            }
+            override fun onMediaItemTransition(eventTime: AnalyticsListener.EventTime, mediaItem: MediaItem?, reason: Int) {
+                video = null
+                audio = null
+            }
+        }
+        exoPlayer?.addAnalyticsListener(listener)
+        onDispose { exoPlayer?.removeAnalyticsListener(listener) }
+    }
+    return TrackGlance(tracksAudioOnly(tracks), if (!available) emptyList() else glanceBadges(
         videoHeight = video?.height,
         audioMimeType = audio?.sampleMimeType,
         audioChannelCount = audio?.channelCount,
-        audioDescription = audio?.let { (it.roleFlags and C.ROLE_FLAG_DESCRIBES_VIDEO) != 0 } == true,
+        audioDescription = selectedFormat(tracks, C.TRACK_TYPE_AUDIO)?.let {
+            (it.roleFlags and C.ROLE_FLAG_DESCRIBES_VIDEO) != 0
+        } == true,
         scan = when (video?.videoScanType()) {
             VideoScanType.PROGRESSIVE -> VideoScan.PROGRESSIVE
             VideoScanType.INTERLACED -> VideoScan.INTERLACED

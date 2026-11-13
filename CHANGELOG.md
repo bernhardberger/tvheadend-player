@@ -4,7 +4,7 @@
 
 ### Playback
 
-- The player shows the stream resolution and scan type, audio format and layout, and an AD badge for audio description.
+- The player shows resolution and scan type, audio format and layout as the stream is decoded, including mid-stream changes, and an AD badge for audio description.
 - A recording that's still running can be played when it's made with Tvheadend's built-in Matroska profile, not only as MPEG-TS. Right at the end of what's recorded so far, the player buffers every few seconds for about the first minute and then follows a few seconds behind. Running MP4 recordings and recordings from the libav Matroska profile can't be played (#24).
 - A recording file the player can't read says *The recording file couldn't be read* and shows the player's error underneath, instead of *Recording interrupted* with a retry that fails the same way.
 - Matroska recordings start with subtitles off until you choose a subtitle track.
