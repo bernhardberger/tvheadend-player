@@ -380,7 +380,8 @@ internal fun TimelineChannelRow(
                 val innerInset = if (!isFocusTarget) 0.dp else {
                     ((if (isRtl) focusEndInset else focusStartInset) - GuideFocusReserve).coerceAtLeast(0.dp)
                 }
-                val contentInset = (if (isRtl) end - (maxWidth - innerInset) else innerInset - start).coerceAtLeast(0.dp)
+                val contentInset =
+                    (if (isRtl) end - (maxWidth - innerInset) else innerInset - start).coerceAtLeast(0.dp)
                 if (!shouldComposeTimelineCell(
                         // Shell clipping is logical-leading; the time axis is physical.
                         startPx = with(density) {
@@ -609,7 +610,10 @@ internal fun TimelineProgrammeCell(
         // rows do: the title ellipsizes first and the time line keeps its width. Cancelled and invalid
         // ones carry none, which keeps the grid quiet.
         val headline: @Composable () -> Unit = {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = contentAlpha.padding(start = contentStartInset)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = contentAlpha.padding(start = contentStartInset),
+            ) {
                 Text(
                     // Always render a label so no focusable cell is visually blank.
                     text = event.title.orEmpty(),
