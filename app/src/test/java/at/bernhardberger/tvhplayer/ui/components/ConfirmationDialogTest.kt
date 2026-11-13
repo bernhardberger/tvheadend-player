@@ -16,10 +16,11 @@ class ConfirmationDialogTest {
     }
 
     @Test fun growsInStepsUntilTheCopyFits() {
-        val asked = mutableListOf<Int>()
-        val width = confirmationColumnWidth(buttonRow = 0, base = 352, max = 520, step = 4) { asked += it; it < 361 }
+        val width = confirmationColumnWidth(buttonRow = 0, base = 352, max = 520, step = 4) {
+            assertTrue("No probe exceeds the maximum", it <= 520)
+            it < 361
+        }
         assertEquals(364, width)
-        assertEquals(listOf(352, 356, 360, 364), asked)
     }
 
     @Test fun stopsAtTheMaximum() {

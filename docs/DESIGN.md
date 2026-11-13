@@ -1324,8 +1324,9 @@ timeshift window is listed; this display estimate is not a seek grant.
   and is read as one description. Only the panel is tinted, from the picture,
   else the channel logo, else not at all. The card is 400 dp wide and widens in
   4 dp steps up to 568 dp only to avoid a single word on the last line, a name
-  over two lines, or a wrapped channel line. A recording belonging to another
-  account names its owner in the panel; your own does not.
+  over two lines, or a wrapped channel line. The panel adds a recording-profile
+  or owner row only when the same broadcast has other active recordings; the
+  owner row is left out when the recording belongs to the signed-in account.
 - **Playback choice** (resume, watch from beginning, watch live): a 400 dp card
   with the picture on top, the channel line, the title, and for a running
   recording its status line and bar; full-width stacked buttons, the first

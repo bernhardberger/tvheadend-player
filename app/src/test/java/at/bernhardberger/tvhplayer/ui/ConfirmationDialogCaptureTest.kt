@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -48,7 +49,8 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ProgrammeAction
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.testutil.settleFrames
-import at.bernhardberger.tvhplayer.ui.common.formatHoursMinutes
+import at.bernhardberger.tvhplayer.testutil.pressKey
+import at.bernhardberger.tvhplayer.ui.common.formatNarrowDuration
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import at.bernhardberger.tvhplayer.ui.components.ConfirmationChoice
@@ -58,6 +60,7 @@ import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 import at.bernhardberger.tvhplayer.ui.components.ServerAvatarLook
 import at.bernhardberger.tvhplayer.ui.screens.recordings.PendingRecordingAction
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingConfirmationDialog
+import at.bernhardberger.tvhplayer.ui.screens.recordings.recordingConfirmationAirTime
 import at.bernhardberger.tvhplayer.ui.screens.guide.ConfirmProgrammeActionDialog
 import at.bernhardberger.tvhplayer.ui.screens.settings.PlaybackInterruption
 import at.bernhardberger.tvhplayer.ui.screens.settings.SwitchServerDialog
@@ -114,7 +117,7 @@ class ConfirmationDialogCaptureTest {
 
     @Test fun delete() = recording("delete", PendingRecordingAction.DELETE,
         entry("Paper Kite Tales", "2026-10-03T08:00:00Z", "2026-10-03T08:30:00Z", art = "paper-kite-tales"),
-        channel(4, "Kite Kids", "kite-kids"))
+        channel(4, "Kite Kids", "kite-kids"), actionFocused = true)
 
     @Test fun removeEntry() = recording("remove-entry", PendingRecordingAction.DELETE,
         entry("River Court", "2026-10-01T18:00:00Z", "2026-10-01T19:45:00Z", art = "river-court",
@@ -132,10 +135,12 @@ class ConfirmationDialogCaptureTest {
         ConfirmationDialog(
             question = stringResource(R.string.stop_recording_confirm_title),
             subject = programme("Harbor Kickoff", "harbor-kickoff", 2, "Harbor Sport", "harbor-sport",
-                "Today 20:15–22:05", progress = 1f,
+                recordingConfirmationAirTime(Instant.parse("2026-10-03T20:15:00Z").epochSeconds,
+                    Instant.parse("2026-10-03T22:05:00Z").epochSeconds,
+                    Instant.parse("2026-10-03T22:20:00Z").epochSeconds), progress = 1f,
                 target = stringResource(R.string.recording_confirmation_profile, "Sports HD (high bitrate)")),
             sentence = stringResource(R.string.stop_recording_confirm_body_open,
-                formatHoursMinutes(7_500L, LocalContext.current.resources)),
+                formatNarrowDuration(7_500L, LocalContext.current.resources)),
             safe = keep(R.string.keep_recording), action = choice(R.string.stop_recording, R.drawable.ic_stop),
             onDismiss = {}, onConfirm = {},
         )
@@ -227,12 +232,12 @@ class ConfirmationDialogCaptureTest {
     }
 
     private fun recording(scene: String, action: PendingRecordingAction, entry: DvrEntry, channel: Channel,
-        now: String = "2026-10-05T12:00:00Z") = component(scene) {
+        now: String = "2026-10-05T12:00:00Z", actionFocused: Boolean = false) = component(scene, actionFocused = actionFocused) {
         RecordingConfirmationDialog(action, entry, channel, Instant.parse(now).epochSeconds, session, observation,
             backEnabled = true, onDismiss = {}, onConfirm = {})
     }
 
-    private fun component(scene: String, safeTag: String = SAFE, content: @Composable () -> Unit) {
+    private fun component(scene: String, safeTag: String = SAFE, actionFocused: Boolean = false, content: @Composable () -> Unit) {
         val still = FixtureArt.art("still-ridge-light")
         lateinit var view: View
         compose.mainClock.autoAdvance = false
@@ -254,6 +259,11 @@ class ConfirmationDialogCaptureTest {
         compose.runOnIdle { view.draw(Canvas(bitmap)) }
         val directory = File("build/outputs/centre-dialog-captures").apply { mkdirs() }
         File(directory, "confirm-$scene.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        if (actionFocused) {
+            compose.pressKey(Key.DirectionRight)
+            compose.runOnIdle { view.draw(Canvas(bitmap)) }
+            File(directory, "confirm-$scene-action-focused.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        }
         bitmap.recycle()
     }
 

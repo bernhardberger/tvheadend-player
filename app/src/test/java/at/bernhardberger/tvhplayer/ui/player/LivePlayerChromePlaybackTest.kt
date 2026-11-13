@@ -20,6 +20,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isFocusable
 import androidx.compose.ui.test.assertIsFocused
@@ -162,8 +163,8 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
             assertEquals(requireNotNull(previewProgramme.title), texts("details-title"))
             compose.onNodeWithTag("details-cancel").assertIsFocused()
             key(Key.DirectionCenter)
-            assertTrue("Cancel confirms B, not the playback programme",
-                texts("centred-dialog-content").contains(requireNotNull(previewProgramme.title)))
+            compose.onNode(hasContentDescription(requireNotNull(previewProgramme.title), substring = true)).assertExists()
+            compose.onNode(hasContentDescription(requireNotNull(playbackProgramme.title), substring = true)).assertDoesNotExist()
             key(Key.Back)
             key(Key.Back)
             settleFrames()

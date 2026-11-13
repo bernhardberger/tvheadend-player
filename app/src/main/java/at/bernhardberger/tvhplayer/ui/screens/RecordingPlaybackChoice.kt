@@ -63,7 +63,9 @@ internal fun RecordingPlaybackChoice(
         formatDurationMinutes(positionMs / 60_000L, resources, spoken = true))
     val title = entry.title.orEmpty()
     CentredDialogShell(paneTitle = title, onDismiss = onClose, backEnabled = backEnabled, verticalKeys = true) {
-        LaunchedEffect(firstFocus) { withFrameNanos { }; firstFocus.requestFocus() }
+        LaunchedEffect(firstFocus, order) {
+            if (firstFocus in order) { withFrameNanos { }; firstFocus.requestFocus() }
+        }
         ProvideArtworkSession(observation.currentSession, observation) {
             PlaybackChoiceCard(
                 art = recordingArtwork(entry),

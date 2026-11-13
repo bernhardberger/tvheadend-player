@@ -41,7 +41,7 @@
     <string name="server_enter_password">Enter password</string>
     <string name="server_switch_question">Switch to this server?</string>
     <string name="server_switch_live_body">Live TV stops, and the app loads that server\'s channels and guide.</string>
-    <string name="server_switch_recording_body">The recording stops, and the app loads that server\'s channels and guide.</string>
+    <string name="server_switch_recording_body">Playback stops, and the app loads that server\'s channels and guide.</string>
     <string name="server_confirmation_account_detail">%1$s · %2$s:%3$d</string>
     <string name="server_confirmation_anonymous_detail">No sign-in · %1$s:%2$d</string>
     <string name="server_keep_watching">Keep watching</string>
@@ -516,9 +516,9 @@
     <string name="stop_recording">Stop recording</string>
     <string name="cancel_recording_confirm_title">Cancel this recording?</string>
     <string name="stop_recording_confirm_title">Stop this recording?</string>
-    <!-- Sentence under the stopped recording's panel when it has a listed end still ahead. %1$s = duration recorded so far, %2$s = duration left until the listed end; each from one hour as hours and minutes ("1:05"), otherwise spelled-out minutes ("45 minutes"). -->
+    <!-- Sentence under the stopped recording's panel when it has a listed end still ahead. %1$s = duration recorded so far, %2$s = duration left until the listed end; narrow units with zero units omitted ("1h 5m", "45m", "30s"), joined with no-break spaces. -->
     <string name="stop_recording_confirm_body">The %1$s recorded so far is kept. The last %2$s won\'t be recorded.</string>
-    <!-- Sentence under the stopped recording's panel when it is past its listed end or has none. %1$s = duration recorded so far: from one hour as hours and minutes ("2:05"), otherwise spelled-out minutes ("45 minutes"). -->
+    <!-- Sentence under the stopped recording's panel when it is past its listed end or has none. %1$s = duration recorded so far: narrow units with zero units omitted ("2h 5m", "45m", "30s"), joined with no-break spaces. -->
     <string name="stop_recording_confirm_body_open">The %1$s recorded so far is kept, and recording ends now.</string>
     <!-- Sentence under the panel of a scheduled recording about to be canceled. -->
     <string name="cancel_recording_confirm_body">It\'s taken off the schedule and won\'t be recorded.</string>

@@ -27,7 +27,8 @@ import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
 import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore
 import kotlinx.coroutines.test.StandardTestDispatcher
-import org.koin.compose.KoinApplication
+import org.koin.compose.KoinIsolatedContext
+import org.koin.dsl.koinApplication
 import org.koin.dsl.module
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.screens.DvrMutationActions
@@ -278,11 +279,13 @@ class PlayerProgrammeDetailsTest {
         val notices = NoticeCenter({ 0L }) { NoticeContext(0, null) }
         val settings = UiSettingsStore(ApplicationProvider.getApplicationContext<Application>())
         compose.setContent {
-            KoinApplication(application = { modules(module {
+            val application = remember { koinApplication { modules(module {
                 single { AppProfileOwner(FakeTvheadendSession(observation), FakeServerProfileStore(),
                     PlayerSettingsStore(InMemoryPreferencesDataStore()), StandardTestDispatcher(),
                     readProfileForEditing = { ServerProfileEditReadResult.Missing }) }
-            }) }) {
+            }) } }
+            DisposableEffect(application) { onDispose { application.close() } }
+            KoinIsolatedContext(application) {
             var opened by remember { mutableStateOf(false) }
             var restore by remember { mutableStateOf<String?>("player-info") }
             val scope = rememberCoroutineScope()

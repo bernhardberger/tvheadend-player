@@ -49,7 +49,6 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.isUsableAccent
 import at.bernhardberger.tvhplayer.core.normalizeAccentRgb
 import at.bernhardberger.tvhplayer.ui.TvCardProgressStripHeight
-import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.TvTextColors
 
@@ -297,13 +296,13 @@ private fun ProgrammeLead(subject: ConfirmationSubject.Programme) {
             }
             subject.progress?.let {
                 ProgressStrip(it, Modifier.align(Alignment.BottomStart).fillMaxWidth(),
-                    height = TvCardProgressStripHeight, color = TvRecordingColor)
+                    height = TvCardProgressStripHeight, color = recordingMarkColor(focused = false))
             }
         }
     } else {
         // A picture leaves the logo to the channel line, so the slot keeps no corner plate.
         ProgrammeArtwork(subject.image, subject.channelIcon.takeIf { subject.image == null }, subject.progress,
-            slot, progressColor = TvRecordingColor)
+            slot, progressColor = recordingMarkColor(focused = false))
     }
 }
 

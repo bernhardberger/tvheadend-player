@@ -11,9 +11,12 @@ import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.testutil.FixtureArt
+import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.formatRecordedDuration
+import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -32,11 +35,18 @@ import kotlin.time.Instant
 @OptIn(TvheadendTestingApi::class, ExperimentalTvheadendApi::class)
 class RecordingPlaybackChoiceTest {
     @get:Rule val compose = createComposeRule()
+    @get:Rule val images = ImageLoaderRule()
 
-    @Test fun activeChoiceStartsAtResumeAndNavigatesInOrder() {
+    @Test fun activeChoiceWithoutTitleFitsAndNavigatesInOrder() {
         var watched = 0
         val starts = mutableListOf<RecordingPlaybackStart>()
-        show(754L, watch = { watched++ }, play = { starts += it })
+        images.install(FixtureArt.imageLoader(ApplicationProvider.getApplicationContext<Application>(),
+            mapOf(ArtworkId(2) to FixtureArt.art("still-ridge-light")))
+            .newBuilder().coroutineContext(Dispatchers.Main.immediate).build())
+        show(754L, watch = { watched++ }, play = { starts += it }, title = null,
+            channelName = "Ridge Earth: mountains, wildlife and journeys around the world",
+            image = ArtworkId(2), subtitle = "Winter on the ridge: the long climb to the summit hut before the first snow",
+            episode = EpgEpisode(null, null, 1, null, 3, null, null, null, null))
         compose.onNodeWithTag("recording-resume").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionLeft); pressKey(Key.DirectionRight); pressKey(Key.DirectionUp) }
         compose.onNodeWithTag("recording-watch-live").assertTextEquals("Watch live")
@@ -45,6 +55,9 @@ class RecordingPlaybackChoiceTest {
         val card = compose.onNodeWithTag("centred-dialog-card").getUnclippedBoundsInRoot()
         val buttons = listOf("recording-resume", "recording-start-over", "recording-watch-live")
             .map { compose.onNodeWithTag(it).getUnclippedBoundsInRoot() }
+        assertTrue("The card stays within its height cap", (card.bottom - card.top).value <= 476f)
+        assertTrue("The last choice stays inside the card", buttons.last().bottom < card.bottom)
+        compose.onAllNodes(isHeading()).assertCountEquals(0)
         buttons.forEach { bounds ->
             assertEquals("Every choice spans the same column", buttons.first().left, bounds.left)
             assertEquals("Every choice spans the same column", buttons.first().right, bounds.right)
@@ -156,11 +169,13 @@ class RecordingPlaybackChoiceTest {
         play: (RecordingPlaybackStart) -> Unit = {},
         visible: androidx.compose.runtime.MutableState<Boolean> = mutableStateOf(true), close: () -> Unit = {},
         serverPath: String = "test.ts", progress: RecordingProgressCapability = RecordingProgressCapability.SUPPORTED,
-        left: Long = 1800, startExtra: Duration = Duration.ZERO) {
+        left: Long = 1800, startExtra: Duration = Duration.ZERO, title: String? = "Test recording",
+        channelName: String = "Test channel", image: ArtworkId? = null, subtitle: String? = null, episode: EpgEpisode? = null) {
         val now = NOW
-        val channel = Channel.create(ChannelId(1), name = "Test channel")
+        val channel = Channel.create(ChannelId(1), name = channelName)
         val start = Instant.fromEpochSeconds(now - 3600 + left)
-        val entry = DvrEntry.create(DvrEntryId(1), title = "Test recording", state = DvrEntryState.RECORDING,
+        val entry = DvrEntry.create(DvrEntryId(1), title = title, state = DvrEntryState.RECORDING,
+            image = image, subtitle = subtitle, episode = episode,
             channelId = channel.id, start = start, stop = Instant.fromEpochSeconds(now + left),
             startExtraMinutes = startExtra, playPosition = position?.seconds,
             files = listOf(TvheadendTestResultFactory.recordingFile(serverPath = serverPath,
@@ -168,6 +183,7 @@ class RecordingPlaybackChoiceTest {
         val observation = SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(channels = listOf(channel))),
+            epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = listOf(entry))),
             recordingProgressCapability = progress)
         compose.setContent {

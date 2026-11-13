@@ -17,7 +17,7 @@ import at.bernhardberger.tvhplayer.core.recordingElapsedProgress
 import at.bernhardberger.tvhplayer.core.recordingIsRunning
 import at.bernhardberger.tvhplayer.core.recordingLengthSeconds
 import at.bernhardberger.tvhplayer.core.recordingPaddedStart
-import at.bernhardberger.tvhplayer.ui.common.formatHoursMinutes
+import at.bernhardberger.tvhplayer.ui.common.formatNarrowDuration
 import at.bernhardberger.tvhplayer.ui.common.formatRecordedDuration
 import at.bernhardberger.tvhplayer.ui.common.formatRecordingSchedule
 import at.bernhardberger.tvhplayer.ui.common.formatSpokenDuration
@@ -144,13 +144,13 @@ internal fun stopConfirmationSentence(
 }
 
 /**
- * Whole minutes: drawn as hours and minutes ("1:05") from one hour, otherwise and when [spoken]
- * spelled out ("45 minutes", "1 hour, 5 minutes"); under a minute in seconds.
+ * Recorded minutes round down, remaining minutes round up. Drawn lengths use narrow units;
+ * spoken lengths stay fully spelled out. Recorded lengths under a minute retain seconds.
  */
 private fun sentenceDuration(seconds: Long, roundUp: Boolean, resources: android.content.res.Resources, spoken: Boolean): String {
     val minutes = if (roundUp) (seconds + 59L) / 60L else seconds / 60L
     return when {
-        minutes >= 60L && !spoken -> formatHoursMinutes(minutes * 60L, resources)
+        !spoken -> formatNarrowDuration(if (minutes > 0L) minutes * 60L else seconds, resources)
         minutes > 0L -> formatSpokenDuration(minutes * 60L, resources)
         else -> formatRecordedDuration(seconds, resources, spoken = true)
     }

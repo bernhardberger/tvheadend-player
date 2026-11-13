@@ -171,16 +171,19 @@ fun formatSpokenDuration(totalSeconds: Long, resources: android.content.res.Reso
     ).formatMeasures(*measures.toTypedArray())
 }
 
-/** Whole minutes as hours and minutes in the configured app locale's numeric form ("1:05" in English). */
-fun formatHoursMinutes(totalSeconds: Long, resources: android.content.res.Resources): String {
-    val minutes = totalSeconds.coerceAtLeast(0L) / 60L
-    return android.icu.text.MeasureFormat.getInstance(
+/** Narrow hours/minutes, or seconds under a minute; zero units are omitted and the duration stays together. */
+fun formatNarrowDuration(totalSeconds: Long, resources: android.content.res.Resources): String {
+    val seconds = totalSeconds.coerceAtLeast(0L)
+    val measures = if (seconds < 60L) listOf(android.icu.util.Measure(seconds, android.icu.util.MeasureUnit.SECOND))
+    else listOf(
+        seconds / 3_600L to android.icu.util.MeasureUnit.HOUR,
+        seconds % 3_600L / 60L to android.icu.util.MeasureUnit.MINUTE,
+    ).filter { (amount, _) -> amount > 0L }.map { (amount, unit) -> android.icu.util.Measure(amount, unit) }
+    val format = android.icu.text.MeasureFormat.getInstance(
         resources.configuration.locales[0],
-        android.icu.text.MeasureFormat.FormatWidth.NUMERIC,
-    ).formatMeasures(
-        android.icu.util.Measure(minutes / 60L, android.icu.util.MeasureUnit.HOUR),
-        android.icu.util.Measure(minutes % 60L, android.icu.util.MeasureUnit.MINUTE),
+        android.icu.text.MeasureFormat.FormatWidth.NARROW,
     )
+    return measures.joinToString("\u00a0") { format.format(it).replace(whitespace, "\u00a0") }
 }
 
 /** Whole-hour jump amounts, with the unit written out in the configured app locale. */

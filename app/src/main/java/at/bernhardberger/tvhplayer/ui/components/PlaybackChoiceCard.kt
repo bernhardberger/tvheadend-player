@@ -31,6 +31,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.constrainHeight
@@ -44,7 +45,6 @@ import at.bernhardberger.tvhplayer.core.fitPlaybackCard
 import at.bernhardberger.tvhplayer.core.playbackCardTint
 import at.bernhardberger.tvhplayer.core.programmeArtworkModel
 import at.bernhardberger.tvhplayer.images.usesCoverBox
-import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.TvTextColors
 import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
@@ -159,14 +159,15 @@ private fun rememberPlaybackCardFit(
             fun height(text: String?, style: TextStyle, max: Int) =
                 if (text.isNullOrBlank() || max == 0) 0f else measure(text, style, max).size.height.toDp().value
             val logo = if (hasPicon && picture != PlaybackPicture.Logo) InlineLogoSpace.roundToPx() else 0
-            val ownRow = !poster && airTime != null && measurer.measure(channelLine(channel, airTime), type.labelMedium,
+            val ownRow = !poster && airTime != null && measurer.measure(channelLine(channel, airTime), type.labelLarge,
                 maxLines = 1, softWrap = false).size.width > column - logo
             val channelRows = if (ownRow) ChannelRow * 2 + 4f else ChannelRow
-            val waitingHeight = waiting?.let { 16f + height(it, type.bodyLarge, Int.MAX_VALUE) } ?: 0f
+            val waitingHeight = waiting?.let { 16f + height(it, type.bodyLarge.balanced(), Int.MAX_VALUE) } ?: 0f
             val statusHeight = status?.let { (if (poster) 16f else 12f) + maxOf(8f, height(it, type.bodyMedium, 1)) + 12f + 4f } ?: 0f
             val stack = 24f + buttonCount * 40f + (buttonCount - 1).coerceAtLeast(0) * 12f + 24f
             val heading = { t: Int, e: Int ->
-                val text = 8f + height(title, type.headlineMedium, t) + (if (e > 0) 4f + height(episode, type.bodyLarge, e) else 0f)
+                val text = (if (title.isNotBlank()) 8f + height(title, type.headlineMedium, t) else 0f) +
+                    (if (e > 0) (if (title.isBlank()) 8f else 4f) + height(episode, type.bodyLarge, e) else 0f)
                 when (picture) {
                     PlaybackPicture.Band -> -16f + channelRows + text
                     PlaybackPicture.Logo -> LogoHeadingTop.value + channelRows + text
@@ -187,18 +188,28 @@ private fun rememberPlaybackCardFit(
 private fun channelLine(channel: String, airTime: String?) = listOfNotNull(channel.takeIf(String::isNotBlank), airTime)
     .joinToString(" · ")
 
+private fun TextStyle.balanced() = copy(lineBreak = lineBreak.copy(strategy = LineBreak.Strategy.Balanced))
+
 @Composable
 private fun PictureBand(painter: Painter, height: Dp, surface: Color) {
     Box(Modifier.fillMaxWidth().height(height)) {
         Image(painter, null, Modifier.fillMaxSize(), BandAlignment, ContentScale.Crop)
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.4f to Color.Transparent, 1f to surface)))
+        Box(Modifier.fillMaxSize().drawBehind {
+            drawRect(Brush.verticalGradient(0.4f to Color.Transparent,
+                (1f - 16.dp.toPx() / size.height) to surface, 1f to surface))
+        })
     }
 }
 
 @Composable
 private fun ChannelLine(picon: ChannelIcon?, channel: String, airTime: String?, airTimeOwnRow: Boolean, piconModifier: Modifier) {
     val rowModifier = Modifier.fillMaxWidth().heightIn(min = ChannelRow.dp)
-    ProgrammeEyebrow(picon, channelLine(channel, airTime.takeUnless { airTimeOwnRow }), rowModifier, piconModifier)
+    Row(rowModifier, Arrangement.spacedBy(8.dp), Alignment.CenterVertically) {
+        picon?.let { InlineLogo(it, piconModifier) }
+        Text(channelLine(channel, airTime.takeUnless { airTimeOwnRow }), Modifier.weight(1f, fill = false),
+            style = MaterialTheme.typography.labelLarge, color = TvTextColors.secondary,
+            maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
     if (airTime != null && airTimeOwnRow) {
         Spacer(Modifier.height(4.dp))
         AirTime(airTime)
@@ -208,17 +219,20 @@ private fun ChannelLine(picon: ChannelIcon?, channel: String, airTime: String?, 
 @Composable
 private fun AirTime(airTime: String) {
     Box(Modifier.heightIn(min = ChannelRow.dp), contentAlignment = Alignment.CenterStart) {
-        Text(airTime, style = MaterialTheme.typography.labelMedium, color = TvTextColors.tertiary,
+        Text(airTime, style = MaterialTheme.typography.labelLarge, color = TvTextColors.secondary,
             maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
 @Composable
 private fun PlaybackTitle(title: String, fit: PlaybackCardFit, episode: String) {
-    Text(title, Modifier.semantics { heading() }, style = MaterialTheme.typography.headlineMedium,
-        color = MaterialTheme.colorScheme.onSurface, maxLines = fit.titleLines, overflow = TextOverflow.Ellipsis)
+    if (title.isNotBlank()) {
+        Spacer(Modifier.height(8.dp))
+        Text(title, Modifier.semantics { heading() }, style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.onSurface, maxLines = fit.titleLines, overflow = TextOverflow.Ellipsis)
+    }
     if (fit.episodeLines > 0 && episode.isNotBlank()) {
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(if (title.isBlank()) 8.dp else 4.dp))
         Text(episode, style = MaterialTheme.typography.bodyLarge, color = TvTextColors.secondary,
             maxLines = fit.episodeLines, overflow = TextOverflow.Ellipsis)
     }
@@ -231,7 +245,6 @@ private fun PlaybackHeadingBody(
 ) {
     Column(modifier) {
         ChannelLine(picon, channel, airTime, airTimeOwnRow, piconModifier)
-        Spacer(Modifier.height(8.dp))
         PlaybackTitle(title, fit, episode)
     }
 }
@@ -256,7 +269,6 @@ private fun PosterHeading(
         Spacer(Modifier.width(16.dp))
         Column(Modifier.width(PosterColumnWidth)) {
             ChannelLine(picon, channel, null, false, piconModifier)
-            Spacer(Modifier.height(8.dp))
             PlaybackTitle(title, fit, episode)
             if (airTime != null) {
                 Spacer(Modifier.height(4.dp))
@@ -275,17 +287,17 @@ private fun PlaybackCardLower(
             Spacer(Modifier.height(statusTop))
             Row(Modifier.semantics(mergeDescendants = true) { contentDescription = recording.spokenStatus },
                 verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(8.dp).background(TvRecordingColor, CircleShape))
+                Box(Modifier.size(8.dp).background(recordingMarkColor(focused = false), CircleShape))
                 Spacer(Modifier.width(8.dp))
                 Text(recording.status, style = MaterialTheme.typography.bodyMedium, color = TvTextColors.secondary,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Spacer(Modifier.height(12.dp))
-            ProgressStrip(recording.progress, Modifier.fillMaxWidth().clearAndSetSemantics { }, color = TvRecordingColor)
+            ProgressStrip(recording.progress, Modifier.fillMaxWidth().clearAndSetSemantics { }, color = recordingMarkColor(focused = false))
         }
         if (waiting != null) {
             Spacer(Modifier.height(16.dp))
-            Text(waiting, style = MaterialTheme.typography.bodyLarge, color = TvTextColors.secondary)
+            Text(waiting, style = MaterialTheme.typography.bodyLarge.balanced(), color = TvTextColors.secondary)
         }
         Spacer(Modifier.height(24.dp))
         Column(verticalArrangement = Arrangement.spacedBy(12.dp), content = buttons)

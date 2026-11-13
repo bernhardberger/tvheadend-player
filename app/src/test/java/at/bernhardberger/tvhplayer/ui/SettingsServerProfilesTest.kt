@@ -840,7 +840,7 @@ class SettingsServerProfilesTest {
         assertTrue(stopsAt.isEmpty())
         compose.runOnIdle { interruption = PlaybackInterruption.RECORDING }
         press(Key.DirectionCenter)
-        compose.onNodeWithText("The recording stops", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Playback stops", substring = true).assertIsDisplayed()
         press(Key.Back)
         compose.onNodeWithTag(SWITCH_KEEP).assertDoesNotExist()
         compose.onNodeWithTag("settings-row-$SERVER_USE").assertIsFocused()

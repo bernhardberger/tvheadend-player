@@ -397,8 +397,13 @@ class RecordingConfirmationStateTest {
         val longer = running(start + 110.minutes, files = true)
         val drawn = stopConfirmationSentence(longer, now + 300L, resources, spoken = false)
         val spoken = stopConfirmationSentence(longer, now + 300L, resources, spoken = true)
-        assertTrue(drawn, "1:05" in drawn && "45 minutes" in drawn && "hour" !in drawn)
+        assertTrue(drawn, "1h\u00a05m" in drawn && "45m" in drawn && "hour" !in drawn)
         assertTrue(spoken, "1 hour" in spoken && "45 minutes" in spoken && "1:05" !in spoken)
+        val longRemainder = stopConfirmationSentence(StopConfirmationTimes(3_959L, 3_901L), resources, spoken = false)
+        assertTrue(longRemainder, "1h\u00a05m" in longRemainder && "1h\u00a06m" in longRemainder)
+        val boundary = stopConfirmationSentence(StopConfirmationTimes(119L, 30L), resources, spoken = false)
+        assertTrue(boundary, "The 1m recorded" in boundary && "last 1m" in boundary)
+        assertTrue(stopConfirmationSentence(StopConfirmationTimes(30L, null), resources, spoken = false).contains("30s"))
     }
 
     private fun observation(
