@@ -5,14 +5,28 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.View
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
+import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.Text
 import androidx.test.core.app.ApplicationProvider
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.semantics.SemanticsActions
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
@@ -27,6 +41,11 @@ import at.bernhardberger.tvhplayer.core.AutomaticRecordingKind
 import at.bernhardberger.tvhplayer.core.newAutorecDraft
 import at.bernhardberger.tvhplayer.core.RecordingPattern
 import at.bernhardberger.tvheadend.sdk.core.DvrRemoval
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvhplayer.core.BrowseContextAction
+import at.bernhardberger.tvhplayer.core.programmeDetailsActions
+import at.bernhardberger.tvhplayer.core.recordingDetailsActions
+import at.bernhardberger.tvhplayer.core.recordingContextActions
 import at.bernhardberger.tvhplayer.core.AutorecPreviewState
 import at.bernhardberger.tvhplayer.core.previewMatches
 import at.bernhardberger.tvheadend.sdk.core.AutorecRuleId
@@ -40,6 +59,16 @@ import at.bernhardberger.tvhplayer.testutil.settleFrames
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
+import at.bernhardberger.tvhplayer.ui.components.BrowseContextMenu
+import at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsPage
+import at.bernhardberger.tvhplayer.ui.components.ProgrammeArtwork
+import at.bernhardberger.tvhplayer.ui.components.GuidedStepAction
+import at.bernhardberger.tvhplayer.ui.components.RecordingRule
+import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
+import at.bernhardberger.tvhplayer.core.programmeArtwork
+import at.bernhardberger.tvhplayer.ui.common.programmeEpisodeLine
+import at.bernhardberger.tvhplayer.ui.common.formatClock
+import at.bernhardberger.tvhplayer.ui.common.formatRecordingDate
 import at.bernhardberger.tvhplayer.ui.common.AppClock
 import at.bernhardberger.tvhplayer.settings.ClockFormat
 import java.io.File
@@ -79,6 +108,7 @@ class AutomaticRecordingEditorCaptureTest {
     private lateinit var view: View
     private var shown by mutableStateOf<AutomaticRecordingEditorState?>(null)
     private var shownTimer by mutableStateOf<TimerRecordingEditorState?>(null)
+    private var entryScene by mutableStateOf<(@Composable () -> Unit)?>(null)
     private val initial = automaticRecordingSeries.copy(
         channel = RecordingRuleChannel.SpecificChannel(automaticRecordingChannels.first().id),
     )
@@ -111,7 +141,98 @@ class AutomaticRecordingEditorCaptureTest {
                         TimerRecordingEditor(state, automaticRecordingChannels,
                             scheduledEntries = timerRecordingSavedEntries)
                     }
+                    entryScene?.invoke()
                 }
+            }
+        }
+    }
+
+    @Test fun entryPointsAndRunningRuleReferenceFrames() {
+        val directory = "slice-5"
+        for ((event, action, name) in listOf(
+            Triple(automaticRecordingEvents.first(), BrowseContextAction.RECORD_SERIES,
+                "03a-details-record-series"),
+            Triple(automaticRecordingKeywordEvents.first(), BrowseContextAction.RECORD_TITLE,
+                "03b-details-record-all-title"),
+        )) {
+            compose.runOnIdle {
+                entryScene = {
+                    ProgrammeDetailsPage(
+                        event, null, automaticRecordingChannels.first { it.id == event.channelId },
+                        event.start.epochSeconds + 60,
+                        programmeDetailsActions(event, event.start.epochSeconds + 60, recording = null,
+                            recordingAdmission = null, canModifyRecordings = true, canWatchChannel = true),
+                        onAction = {}, onClose = {}, initialAction = action,
+                    )
+                }
+            }
+            capture(name, directory, "details-${action.name.lowercase()}")
+        }
+        for (enabled in listOf(true, false)) {
+            val entry = automaticRecordingEntry(enabled)
+            compose.runOnIdle {
+                entryScene = {
+                    BrowseContextMenu(
+                        title = entry.title.orEmpty(), channel = automaticRecordingChannels.first().name.orEmpty(),
+                        episode = programmeEpisodeLine(entry.episode, entry.subtitle,
+                            ApplicationProvider.getApplicationContext<Application>().resources),
+                        time = formatRecordingDate(requireNotNull(entry.start).epochSeconds, dateOnly = true,
+                            nowSec = automaticRecordingNow.epochSeconds) + " · " +
+                            formatClock(requireNotNull(entry.start).epochSeconds),
+                        summary = automaticRecordingEvents.first().description.orEmpty(),
+                        recordingState = entry.state, recordingRule = RecordingRule.SERIES,
+                        recordingKind = AutomaticRecordingKind.SERIES, recordingEnabled = enabled,
+                        actions = recordingContextActions(entry, admission = null,
+                            canModifyRecordings = true, ruleAvailable = true),
+                        onAction = {}, onClose = {},
+                        artwork = {
+                            ProgrammeArtwork(programmeArtwork(automaticRecordingEvents.first()),
+                                automaticRecordingChannels.first().icon, progress = null)
+                        },
+                    )
+                }
+            }
+            capture(if (enabled) "14a-rule-entry-menu" else "14c-skipped-entry-menu", directory,
+                "browse-context-action-${if (enabled) "skip" else "unskip"}")
+        }
+        val running = automaticRecordingEntry(state = DvrEntryState.RECORDING)
+        compose.runOnIdle {
+            entryScene = {
+                ProgrammeDetailsPage(null, running, automaticRecordingChannels.first(),
+                    requireNotNull(running.start).epochSeconds + 600,
+                    recordingDetailsActions(running, admission = null, canModifyRecordings = true,
+                        canWatchChannel = true, nowSec = requireNotNull(running.start).epochSeconds + 600,
+                        ruleAvailable = true),
+                    onAction = {}, onClose = {},
+                    recordingKind = AutomaticRecordingKind.SERIES)
+            }
+        }
+        compose.onNodeWithTag("details-stop").assertIsFocused()
+        capture("running-rule-recording-details", directory, "details-stop")
+        compose.runOnIdle { entryScene = { RunningMarkSheet() } }
+        capture("running-marks-16dp-rest-and-focus", directory, "running-mark-focused")
+    }
+
+    @Composable
+    private fun RunningMarkSheet() {
+        Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(40.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("One-off / Automatic recording", style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onBackground)
+            for (id in listOf("rest", "focused")) {
+                var focused by remember { mutableStateOf(false) }
+                GuidedStepAction(
+                    title = if (id == "rest") "At rest" else "Focused",
+                    modifier = Modifier.testTag("running-mark-$id").onFocusChanged { focused = it.isFocused },
+                    leadingIcon = {
+                        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            RecordingStatusIndicator(DvrEntryState.RECORDING, focused = focused)
+                            RecordingStatusIndicator(DvrEntryState.RECORDING, rule = RecordingRule.SERIES,
+                                focused = focused)
+                        }
+                    },
+                    onClick = {},
+                )
             }
         }
     }
@@ -244,14 +365,14 @@ class AutomaticRecordingEditorCaptureTest {
         requireNotNull(shown).navigation.open(level, row)
     }
 
-    private fun capture(name: String, directory: String = "slice-3-job-a") {
-        val navigation = shownTimer?.navigation ?: requireNotNull(shown).navigation
-        val focus = when (navigation.confirmation) {
+    private fun capture(name: String, directory: String = "slice-3-job-a", focusTag: String? = null) {
+        val navigation = shownTimer?.navigation ?: shown?.navigation
+        val focus = focusTag ?: when (navigation?.confirmation) {
             AutomaticRecordingEditorConfirmation.LEAVE -> "keep-editing"
             AutomaticRecordingEditorConfirmation.DELETE -> "keep"
-            null -> navigation.focusedRow
+            null -> requireNotNull(navigation).focusedRow
         }
-        compose.onNodeWithTag("${navigation.tagPrefix}-$focus")
+        compose.onNodeWithTag(focusTag ?: "${requireNotNull(navigation).tagPrefix}-$focus")
             .performSemanticsAction(SemanticsActions.RequestFocus) { it() }
         compose.settleFrames(1, PlayerMotion.PanelMs.toLong())
         compose.runOnIdle {
@@ -261,7 +382,8 @@ class AutomaticRecordingEditorCaptureTest {
             CaptureOutput.writePng(file, bitmap)
             CaptureOutput.writeText(File(file.parentFile, "$name.txt")) {
                 "Canvas ${view.width}x${view.height}; en-US; font scale 1.0; Europe/Berlin; 24-hour; focus $focus; " +
-                    "production ${if (shownTimer == null) "AutomaticRecordingEditor" else "TimerRecordingEditor"}; " +
+                    "production ${if (entryScene != null) "details/menu/status components" else if (shownTimer == null)
+                        "AutomaticRecordingEditor" else "TimerRecordingEditor"}; " +
                     "fictional fixture art; no device or server."
             }
             bitmap.recycle()

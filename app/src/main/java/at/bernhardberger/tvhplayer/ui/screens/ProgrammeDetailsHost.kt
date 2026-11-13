@@ -74,6 +74,7 @@ internal fun ProgrammeDetailsHost(
     var stack by remember { mutableStateOf<List<Triple<EpgEvent, EventId, BrowseContextAction?>>>(emptyList()) }
     var returnCard by remember { mutableStateOf<EventId?>(null) }
     var returnAction by remember { mutableStateOf(initialAction) }
+    var editingRule by remember { mutableStateOf<DvrEntry?>(null) }
     var pending by remember { mutableStateOf<DvrMutationAction?>(null) }
     var pendingAction by remember { mutableStateOf<ProgrammeAction?>(null) }
     var pendingEntries by remember { mutableStateOf<DvrEventEntries?>(null) }
@@ -112,12 +113,14 @@ internal fun ProgrammeDetailsHost(
     fun isPlaying(event: EpgEvent) = capability != null && programmeWatched(event, nowSec)
     val actions = programmeDetailsActions(event, nowSec, recording,
         recording?.let(displayObservation::recordingPlaybackAdmission), canModify,
-        channel != null, liveProgramme = live != null, playing = isPlaying(event), behindLive = isBehindLive(event))
+        channel != null, liveProgramme = live != null, playing = isPlaying(event), behindLive = isBehindLive(event),
+        ruleAvailable = recording?.let(displayObservation::recordingRuleAvailable) == true)
         .filter { it !in listOf(BrowseContextAction.PLAY, BrowseContextAction.START_OVER) || onPlayRecording != null && capability != null }
     val visibility = remember { MutableTransitionState(false).apply { targetState = true } }
     val closing = !visibility.targetState
     at.bernhardberger.tvhplayer.ui.player.RegisterPlayerModal(
-        backEnabled = !closing && automaticRecording == null, identity = selected.id to showContextMenu)
+        backEnabled = !closing && automaticRecording == null && editingRule == null,
+        identity = selected.id to showContextMenu)
     val closeAnimated = { visibility.targetState = false }
     BackHandler(enabled = closing) { }
     LaunchedEffect(visibility.isIdle, visibility.currentState, closing) {
@@ -174,7 +177,8 @@ internal fun ProgrammeDetailsHost(
             return@action
         }
         if (inFlight != null && action in listOf(BrowseContextAction.RECORD,
-                BrowseContextAction.STOP, BrowseContextAction.CANCEL)) return@action
+                BrowseContextAction.STOP, BrowseContextAction.CANCEL, BrowseContextAction.SKIP,
+                BrowseContextAction.UNSKIP, BrowseContextAction.EDIT_RULE)) return@action
         val current = currentObservation()
         if (action == BrowseContextAction.WATCH || action == BrowseContextAction.SHOW_GUIDE) {
             // Live playback shares the player's wait for the session, and the guide is browsing:
@@ -205,6 +209,16 @@ internal fun ProgrammeDetailsHost(
         val actionRecording = current.dvrEntryForEvent(actionEvent)
         val actionCanModify = current.dvrState is DvrRepositoryState.Current &&
             (current.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
+        if (action in listOf(BrowseContextAction.SKIP, BrowseContextAction.UNSKIP, BrowseContextAction.EDIT_RULE)) {
+            val available = actionRecording?.let(current::recordingRuleAvailable) == true
+            if (actionRecording != null && action in recordingRuleActions(actionRecording, actionCanModify, available)) {
+                returnAction = action
+                if (action == BrowseContextAction.EDIT_RULE) editingRule = actionRecording
+                else executeDirect(DvrMutationAction.SetEntryEnabled(
+                    capability, actionRecording, action == BrowseContextAction.UNSKIP))
+            }
+            return@action
+        }
         if (action in listOf(BrowseContextAction.RECORD_SERIES, BrowseContextAction.RECORD_TITLE)) {
             val allowed = programmeDetailsActions(actionEvent, nowSecProvider(), actionRecording,
                 actionRecording?.let(current::recordingPlaybackAdmission), actionCanModify,
@@ -315,9 +329,11 @@ internal fun ProgrammeDetailsHost(
             val pageActions = programmeDetailsActions(pageEvent, nowSec, pageRecording,
                 pageRecording?.let(displayObservation::recordingPlaybackAdmission), canModify,
                 pageChannel != null, liveProgramme = pageLive != null, playing = isPlaying(pageEvent),
-                behindLive = isBehindLive(pageEvent))
+                behindLive = isBehindLive(pageEvent),
+                ruleAvailable = pageRecording?.let(displayObservation::recordingRuleAvailable) == true)
                 .filter { it !in listOf(BrowseContextAction.PLAY, BrowseContextAction.START_OVER) || onPlayRecording != null && capability != null }
-            val covered = menuAiring != null || pendingAction != null || automaticRecording != null
+            val covered = menuAiring != null || pendingAction != null ||
+                automaticRecording != null || editingRule != null
             // The page shows its pictures with the session it was opened with.
             PlayerMotionFrame(leaving = page.id != selected.id || covered) { ProvideArtworkSession(capability, displayObservation) {
             ProgrammeDetailsPage(pageEvent, pageRecording, pageChannel, nowSec,
@@ -335,6 +351,7 @@ internal fun ProgrammeDetailsHost(
                  modifier = Modifier.onPreviewKeyEvent(keyHandler),
                  visibilityAlpha = pageAlpha,
                 initialAction = returnAction,
+                recordingKind = pageRecording?.let(displayObservation::recordingRuleKind),
                 backEnabled = !closing && page.id == selected.id && menu == showContextMenu && !covered,
                 onActionFocused = { returnAction = it },
                 related = airings,
@@ -396,5 +413,9 @@ internal fun ProgrammeDetailsHost(
                 else AutomaticRecordingKind.SERIES,
             programme = programme,
         )
+    }
+    editingRule?.takeIf { capability != null }?.let { entry ->
+        RecordingRuleEditorHost(entry, requireNotNull(capability), displayObservation, session, mutations, notices,
+            now = { kotlin.time.Instant.fromEpochSeconds(nowSecProvider()) }, onClose = { editingRule = null })
     }
 }

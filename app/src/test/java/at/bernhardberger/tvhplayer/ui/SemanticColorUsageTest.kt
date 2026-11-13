@@ -19,7 +19,7 @@ class SemanticColorUsageTest {
         )
         assertContains(
             "ui/components/ProgrammeDetailsPage.kt",
-            "DetailsStatus.RECORDING -> RecordingBadge(DvrEntryState.RECORDING)",
+            "DetailsStatus.RECORDING -> RecordingBadge(DvrEntryState.RECORDING,",
         )
         assertContains("ui/components/StatusBadge.kt", "StatusBadgeTone.RECORDING -> TvRecordingContainerColor")
 

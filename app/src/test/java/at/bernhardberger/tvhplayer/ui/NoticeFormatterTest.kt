@@ -16,6 +16,8 @@ import at.bernhardberger.tvhplayer.notices.PauseUnavailableReason
 import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeIcon
 import at.bernhardberger.tvhplayer.ui.notifications.NoticeFormatter
 import at.bernhardberger.tvhplayer.core.AutomaticRecordingKind
+import at.bernhardberger.tvhplayer.core.BrowseContextAction
+import at.bernhardberger.tvhplayer.ui.components.label
 import at.bernhardberger.tvhplayer.core.AutorecPreviewState
 import at.bernhardberger.tvhplayer.ui.screens.formatAutomaticRecordingPreviewSummary
 import at.bernhardberger.tvhplayer.ui.screens.formatAutomaticRecordingDeleteBody
@@ -64,6 +66,9 @@ class NoticeFormatterTest {
                 AutomaticRecordingKind.TIMER -> "recording"
                 else -> "program"
             }
+            assertEquals("Skip this $singular", context.getString(BrowseContextAction.SKIP.label(false, kind)))
+            assertEquals(if (kind == AutomaticRecordingKind.TIMER) "Record this time" else "Record this $singular",
+                context.getString(BrowseContextAction.UNSKIP.label(false, kind)))
             for (count in listOf(0, 1, 5)) {
                 val scheduled = if (count == 0) "" else
                     "Its $count scheduled $singular${if (count == 1) "" else "s"} will be removed. "

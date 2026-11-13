@@ -1,6 +1,8 @@
 package at.bernhardberger.tvhplayer.core
 
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.AutorecRuleId
+import at.bernhardberger.tvheadend.sdk.core.TimerecRuleId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
@@ -29,8 +31,12 @@ class BrowseContextActionsTest {
         files: List<DvrRecordingFile>? = null,
         dataSize: Long? = null,
         playCount: Long? = 0,
+        autorec: AutorecRuleId? = null,
+        timer: TimerecRuleId? = null,
+        enabled: Boolean? = null,
     ) = DvrEntry.create(DvrEntryId(1), state = state, playPosition = position.seconds, files = files,
-        dataSizeBytes = dataSize, playCount = playCount)
+        dataSizeBytes = dataSize, playCount = playCount, autorecRuleId = autorec, timerecRuleId = timer,
+        enabled = enabled)
 
     @Test fun channelsWithoutProgrammeOrPermissionDoNotOfferRecording() {
         assertEquals(listOf(WATCH, SHOW_GUIDE), channelContextActions(null, 100, null, null, true))
@@ -131,6 +137,21 @@ class BrowseContextActionsTest {
         assertEquals(listOf(WATCH, START_OVER, DETAILS, STOP), actions(recording(DvrEntryState.RECORDING, 20, listOf(file()))))
         assertEquals(listOf(WATCH, DETAILS, STOP), actions(recording(DvrEntryState.RECORDING, files = listOf(file()))))
         assertEquals(listOf(DETAILS, CANCEL), actions(recording(DvrEntryState.SCHEDULED)))
+        listOf(false, true).forEach { timer ->
+            fun owned(state: DvrEntryState, enabled: Boolean = true) = recording(state,
+                autorec = AutorecRuleId("series").takeUnless { timer },
+                timer = TimerecRuleId("timer").takeIf { timer }, enabled = enabled)
+            assertEquals(listOf("DETAILS", "SKIP", "EDIT_RULE"),
+                actions(owned(DvrEntryState.SCHEDULED), ruleAvailable = true).map { it.name })
+            assertEquals(listOf("DETAILS", "UNSKIP", "EDIT_RULE"),
+                actions(owned(DvrEntryState.SCHEDULED, false), ruleAvailable = true).map { it.name })
+            assertEquals(listOf("DETAILS", "SKIP"),
+                actions(owned(DvrEntryState.SCHEDULED)).map { it.name })
+            assertEquals(listOf("DETAILS", "STOP", "EDIT_RULE"),
+                actions(owned(DvrEntryState.RECORDING), ruleAvailable = true).map { it.name })
+            assertEquals(listOf(DETAILS), actions(owned(DvrEntryState.SCHEDULED), canModify = false,
+                ruleAvailable = true))
+        }
     }
 
     @Test fun watchChannelFollowsPlaybackOnlyForRunningRecordingsWithATunePath() {
@@ -292,6 +313,7 @@ class BrowseContextActionsTest {
         canModify: Boolean = true,
         capability: RecordingProgressCapability = RecordingProgressCapability.SUPPORTED,
         playing: Boolean = false,
+        ruleAvailable: Boolean = false,
     ) = recordingContextActions(entry, SessionObservation.create(recordingProgressCapability = capability)
-        .recordingPlaybackAdmission(entry), canModify, playing)
+        .recordingPlaybackAdmission(entry), canModify, playing, ruleAvailable = ruleAvailable)
 }

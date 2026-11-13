@@ -41,10 +41,13 @@ internal fun HomeRecordingActions(
     val session: TvheadendSession = koinInject()
     val notices: NoticeCenter = koinInject()
     val scope = rememberCoroutineScope()
+    val latestNowSec by rememberUpdatedState(nowSec)
     val mutations = remember(session) { DvrMutationActions(session.dvrRepository) }
+    var editingRule by remember { mutableStateOf(false) }
     val capability = opening.currentSession?.takeIf { it === observation.currentSession }
-    val opened = if (capability != null && observation.dvrState is DvrRepositoryState.Current)
+    val observed = if (capability != null && observation.dvrState is DvrRepositoryState.Current)
         observation.dvrEntry(entry.id)?.takeUnless(::recordingWasRemoved) else entry
+    val opened = observed ?: entry.takeIf { editingRule && capability != null }
     LaunchedEffect(capability, opened) {
         if (opening.currentSession != null && capability == null || opened == null) onClose()
     }
@@ -101,15 +104,18 @@ internal fun HomeRecordingActions(
                 opened.stop?.epochSeconds, androidx.compose.ui.platform.LocalConfiguration.current.locales[0]),
             summary = opened.summary?.takeIf(String::isNotBlank) ?: opened.description.orEmpty(),
             recordingState = opened.state,
-            recordingRule = opened.rule,
+            recordingRule = recordingRule(observation.recordingRuleKind(opened)),
+            recordingKind = observation.recordingRuleKind(opened),
+            recordingEnabled = opened.enabled,
             resumePositionMs = offeredResumePosition(admission)?.inWholeMilliseconds,
             playbackIndicator = watchingIndicator(opened.id),
             actions = recordingContextActions(opened, admission, canModify, canWatchChannel = watchLive != null,
+                ruleAvailable = observation.recordingRuleAvailable(opened),
                 playing = capability != null && at.bernhardberger.tvhplayer.ui.warmRecordingId(
                     LocalWatchingTarget.current, LocalRecordingPlaybackSelection.current, observation.currentSession) == opened.id),
-            modifier = Modifier.onPreviewKeyEvent { pending() || mutationBusy },
+            modifier = Modifier.onPreviewKeyEvent { pending() || mutationBusy || editingRule },
             onClose = onClose,
-            backEnabled = pendingMutation == null && !mutationBusy,
+            backEnabled = pendingMutation == null && !mutationBusy && !editingRule,
             onAction = handle@{ action ->
                 if (owner?.isCurrent == false) return@handle
                 when (action) {
@@ -117,6 +123,34 @@ internal fun HomeRecordingActions(
                     BrowseContextAction.WATCH, BrowseContextAction.RESUME -> play(RecordingPlaybackStart.RESUME)
                     BrowseContextAction.PLAY, BrowseContextAction.START_OVER -> play(RecordingPlaybackStart.START_OVER)
                     BrowseContextAction.WATCH_LIVE -> watchLive?.invoke()
+                    BrowseContextAction.EDIT_RULE -> {
+                        val current = session.observation.value
+                        val owner = capability?.takeIf { current.currentSession === it }
+                        val writable = (current.sessionState as? SessionState.Ready)
+                            ?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
+                        if (owner != null && writable &&
+                            current.recordingRuleAvailable(opened)) editingRule = true
+                    }
+                    BrowseContextAction.SKIP, BrowseContextAction.UNSKIP -> {
+                        mutationBusy = true
+                        scope.launch {
+                            val current = session.observation.value
+                            val owner = capability?.takeIf { current.currentSession === it }
+                            val latest = current.dvrEntry(opened.id)
+                            val writable = (current.sessionState as? SessionState.Ready)
+                                ?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
+                            if (owner != null && latest != null && action in recordingRuleActions(
+                                    latest, writable, current.recordingRuleAvailable(latest))) {
+                                val mutation = DvrMutationAction.SetEntryEnabled(
+                                    owner, latest, action == BrowseContextAction.UNSKIP)
+                                if (mutation.recordingStateIsCurrent(current)) {
+                                    val context = notices.context()
+                                    notices.postDvrFailure(mutation, mutations.execute(mutation), context)
+                                }
+                            }
+                            mutationBusy = false
+                        }
+                    }
                     BrowseContextAction.STOP -> capability?.let { pendingMutation = DvrMutationAction.Stop(it, opened.id) }
                     BrowseContextAction.CANCEL -> capability?.let { pendingMutation = DvrMutationAction.Cancel(it, opened.id) }
                     BrowseContextAction.DELETE, BrowseContextAction.REMOVE_ENTRY -> capability?.let {
@@ -187,5 +221,9 @@ internal fun HomeRecordingActions(
                     }
                 }
             })
+    }
+    if (editingRule && capability != null) {
+        RecordingRuleEditorHost(opened, capability, observation, session, mutations, notices,
+            now = { kotlin.time.Instant.fromEpochSeconds(latestNowSec) }, onClose = { editingRule = false })
     }
 }

@@ -32,6 +32,7 @@ fun programmeDetailsActions(
     liveProgramme: Boolean = true,
     playing: Boolean = false,
     behindLive: Boolean = false,
+    ruleAvailable: Boolean = false,
 ): List<BrowseContextAction> = buildList {
     if (playing) {
         add(BrowseContextAction.CONTINUE_WATCHING)
@@ -43,6 +44,7 @@ fun programmeDetailsActions(
         recordingAdmission = recordingAdmission).mapNotNull {
         programmeDetailsAction(it, event, nowSec, recording, liveProgramme)
     })
+    addAll(recordingRuleActions(recording, canModifyRecordings, ruleAvailable))
     if (canWatchChannel) add(BrowseContextAction.SHOW_GUIDE)
 }
 
@@ -53,7 +55,7 @@ private fun programmeDetailsAction(action: ProgrammeAction, event: EpgEvent, now
     ProgrammeAction.RECORD_SERIES -> BrowseContextAction.RECORD_SERIES.takeIf { liveProgramme }
     ProgrammeAction.RECORD_TITLE -> BrowseContextAction.RECORD_TITLE.takeIf { liveProgramme }
     ProgrammeAction.STOP_RECORDING -> BrowseContextAction.STOP
-    ProgrammeAction.CANCEL_RECORDING -> BrowseContextAction.CANCEL
+    ProgrammeAction.CANCEL_RECORDING -> BrowseContextAction.CANCEL.takeUnless { recording?.isRuleRecording == true }
     ProgrammeAction.WATCH_FROM_START -> if (recording == null) null else
         if (nowSec < event.stop.epochSeconds) BrowseContextAction.START_OVER else BrowseContextAction.PLAY
 }
@@ -65,9 +67,10 @@ fun recordingDetailsActions(
     canWatchChannel: Boolean,
     playing: Boolean = false,
     nowSec: Long,
+    ruleAvailable: Boolean = false,
 ): List<BrowseContextAction> = buildList {
     if (!playing && recording.state == DvrEntryState.SCHEDULED && canWatchChannel) add(BrowseContextAction.WATCH)
-    addAll(recordingContextActions(recording, admission, canModifyRecordings, playing)
+    addAll(recordingContextActions(recording, admission, canModifyRecordings, playing, ruleAvailable = ruleAvailable)
         .filter { it != BrowseContextAction.DETAILS })
     if (canWatchChannel && recording.state in listOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING,
             DvrEntryState.RECORDING_ERROR) && recording.stop?.epochSeconds?.let { it > nowSec } == true) {

@@ -1,6 +1,23 @@
 <resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en">
     <string name="context_record_series">Record series</string>
     <string name="context_record_title">Record all with this title</string>
+    <string name="context_edit_series">Edit series recording</string>
+    <string name="context_edit_title">Edit title recording</string>
+    <string name="context_edit_keyword">Edit keyword recording</string>
+    <string name="context_edit_timer">Edit repeating timer</string>
+    <string name="context_skip_episode">Skip this episode</string>
+    <string name="context_unskip_episode">Record this episode</string>
+    <string name="context_skip_program">Skip this program</string>
+    <string name="context_unskip_program">Record this program</string>
+    <!-- Accessibility: recording state, then where it came from. -->
+    <string name="recording_state_and_origin">%1$s, %2$s</string>
+    <string name="context_skip_timer">Skip this recording</string>
+    <string name="context_unskip_timer">Record this time</string>
+    <string name="context_skip_series_support">The series recording stays on</string>
+    <string name="context_skip_automatic_support">The automatic recording stays on</string>
+    <string name="context_skip_timer_support">The repeating timer stays on</string>
+    <string name="context_unskip_support">Undoes the skip</string>
+    <string name="recording_from_automatic">Part of an automatic recording</string>
     <string name="timer_editor_title">Record by time</string>
     <string name="timer_editor_new">New timer</string>
     <string name="timer_editor_edit">Edit repeating timer</string>
