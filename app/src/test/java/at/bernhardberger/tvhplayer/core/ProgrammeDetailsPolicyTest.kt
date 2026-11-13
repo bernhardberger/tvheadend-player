@@ -218,7 +218,8 @@ class ProgrammeDetailsPolicyTest {
         assertFalse(facts(recording(DvrEntryState.COMPLETED_ERROR, 20, listOf(file()))).any { it.kind == DetailsFactKind.LEFT })
         assertFalse(facts(recording(DvrEntryState.MISSED, 20, listOf(file()))).any { it.kind == DetailsFactKind.LEFT })
         assertFalse(facts(recording(DvrEntryState.COMPLETED_ERROR, 20)).any { it.kind == DetailsFactKind.LEFT })
-        assertEquals(listOf(RESUME, START_OVER, MARK_WATCHED, DELETE), actions(recording(DvrEntryState.COMPLETED_ERROR, 20, listOf(file()))))
+        assertEquals(listOf(RESUME, START_OVER, MARK_WATCHED, KEEP_UNTIL, DELETE),
+            actions(recording(DvrEntryState.COMPLETED_ERROR, 20, listOf(file()))))
         assertEquals(listOf(PLAY, DELETE), actions(recording(DvrEntryState.MISSED, 20, listOf(file()))))
         assertEquals(listOf(REMOVE_ENTRY), actions(recording(DvrEntryState.MISSED, 20)))
     }

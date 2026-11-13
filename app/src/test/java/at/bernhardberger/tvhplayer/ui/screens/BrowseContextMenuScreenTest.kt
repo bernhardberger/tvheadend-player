@@ -44,6 +44,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performKeyPress
@@ -145,6 +146,7 @@ class BrowseContextMenuScreenTest {
     private var playerEntry = at.bernhardberger.tvhplayer.ui.PlayerEntryHandoff()
     private val screenContent = androidx.compose.runtime.mutableStateOf<(@androidx.compose.runtime.Composable () -> Unit)?>(null)
     private val scheduleRequests = mutableListOf<DvrScheduleRequest>()
+    private val removalUpdates = mutableListOf<at.bernhardberger.tvheadend.sdk.core.DvrEntryUpdate>()
     private lateinit var screenNotices: NoticeCenter
 
     /** Starts a player request that stays pending, as while the player is still opening. */
@@ -632,6 +634,113 @@ class BrowseContextMenuScreenTest {
         exercise("recording-list-entry-1", "Resume", "recordings")
         assertEquals(1, plays)
         assertEquals(RecordingPlaybackStart.RESUME, start)
+    }
+
+    @Test fun recordingKeepUntilUpdatesOnceAndReturnsToItsCard() {
+        val session = openRecordingKeepUntil()
+        compose.onNodeWithTag("keep-until-option-one_week").requestFocus()
+        compose.pressKey(Key.DirectionCenter)
+        compose.settleFrames(3)
+        assertEquals(listOf(at.bernhardberger.tvheadend.sdk.core.DvrRemoval.Days(8)),
+            removalUpdates.map { it.removal })
+        assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_UPDATE_ENTRY })
+        compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
+        compose.onNodeWithTag("recording-list-entry-1").assertIsFocused()
+        val stale = openRecordingKeepUntil()
+        publishKeepUntilEntry(stale, filesPresent = false)
+        compose.onNodeWithTag("keep-until-option-one_week").requestFocus()
+        compose.pressKey(Key.DirectionCenter)
+        assertEquals(0, stale.calls.count { it == FakeSessionCall.DVR_UPDATE_ENTRY })
+        compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
+    }
+
+    @Test fun recordingKeepUntilBackRestoresItsActionAndSelectedChoiceSendsNothing() {
+        val session = openRecordingKeepUntil()
+        compose.runOnIdle { back.onBackPressed() }
+        compose.onNodeWithTag("browse-context-action-keep_until").assertIsFocused()
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("keep-until-option-forever").assertIsFocused()
+        compose.pressKey(Key.DirectionCenter)
+        compose.settleFrames(3)
+        assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_UPDATE_ENTRY })
+        compose.onNodeWithTag("recording-list-entry-1").assertIsFocused()
+    }
+
+    @Test fun recordingKeepUntilFailureKeepsChoiceFocusedAndPostsOneNotice() {
+        val session = openRecordingKeepUntil()
+        session.dvrRepository.scriptUpdateEntry(DvrMutationResult.Failed(
+            at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure.ACCESS_DENIED, mayHaveApplied = false))
+        compose.onNodeWithTag("keep-until-option-one_week").requestFocus()
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("keep-until-option-one_week").assertIsFocused()
+        assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_UPDATE_ENTRY })
+        assertEquals(1, screenNotices.state.value.pending.count {
+            it.notice is at.bernhardberger.tvhplayer.notices.Notice.DvrActionFailed
+        })
+    }
+
+    @Test fun recordingDetailsKeepUntilOpensDirectlyAndBackRestoresTheAction() {
+        val session = show(recordings = true, growingFile = true,
+            removal = at.bernhardberger.tvheadend.sdk.core.DvrRemoval.Forever)
+        compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
+        compose.onNodeWithTag("browse-context-action-details").requestFocus()
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("details-keep_until").requestFocus()
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("recording-keep-until").assertExists()
+        compose.runOnIdle { back.onBackPressed() }
+        compose.onNodeWithTag("details-keep_until").assertIsFocused()
+        compose.pressKey(Key.DirectionCenter)
+        session.dvrRepository.scriptUpdateEntry(DvrMutationResult.Confirmed(Unit))
+        compose.onNodeWithTag("keep-until-option-one_week").requestFocus()
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("recording-keep-until").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Expires", substring = true).assertDoesNotExist()
+        publishKeepUntilEntry(session, removal = at.bernhardberger.tvheadend.sdk.core.DvrRemoval.Days(8))
+        compose.onNodeWithContentDescription("Expires", substring = true).assertExists()
+    }
+
+    private fun publishKeepUntilEntry(
+        session: FakeTvheadendSession,
+        filesPresent: Boolean = true,
+        removal: at.bernhardberger.tvheadend.sdk.core.DvrRemoval? = null,
+    ) = compose.runOnIdle {
+        val previous = session.observation.value
+        val old = requireNotNull(previous.dvrEntry(DvrEntryId(1)))
+        val entry = DvrEntry.create(old.id, title = old.title, channelId = old.channelId,
+            start = old.start, stop = old.stop, state = old.state, removal = removal,
+            files = old.files.takeIf { filesPresent })
+        session.publish(SessionObservation.create(previous.sessionState, previous.channelState, previous.epgState,
+            DvrRepositoryState.Current(DvrSnapshot.create(listOf(entry))),
+            recordingProgressCapability = previous.recordingProgressCapability))
+    }
+
+    @Test
+    @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
+    fun recordingKeepUntilWiringCaptures() {
+        show(recordings = true, growingFile = true,
+            removal = at.bernhardberger.tvheadend.sdk.core.DvrRemoval.Forever)
+        compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
+        compose.onNodeWithTag("browse-context-action-keep_until").requestFocus()
+        capture("keep-until-menu-en-font1.0")
+        compose.pressKey(Key.DirectionCenter)
+        capture("keep-until-menu-level-en-font1.0")
+        compose.runOnIdle { back.onBackPressed() }
+        compose.onNodeWithTag("browse-context-action-details").requestFocus()
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("details-keep_until").requestFocus()
+        capture("keep-until-details-action-en-font1.0")
+    }
+
+    private fun openRecordingKeepUntil(): FakeTvheadendSession {
+        val session = show(recordings = true, growingFile = true,
+            removal = at.bernhardberger.tvheadend.sdk.core.DvrRemoval.Forever)
+        session.dvrRepository.scriptUpdateEntry(DvrMutationResult.Confirmed(Unit))
+        compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
+        compose.onNodeWithTag("browse-context-action-keep_until").requestFocus()
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("keep-until-option-forever").assertIsFocused()
+        return session
     }
 
     @Test fun recordingMenuResumeHasQuietPositionLine() {
@@ -1547,7 +1656,8 @@ class BrowseContextMenuScreenTest {
         offline: Boolean = false, guideDetails: Boolean = false, entryHandoff: Boolean = false,
         rootArtwork: FakeTvheadendSession? = null, watching: Boolean = false,
         behindLive: Boolean = false, growingFile: Boolean = false, awaitContent: Boolean = true,
-        ruleMade: Boolean = false, recordingEnabled: Boolean = true): FakeTvheadendSession {
+        ruleMade: Boolean = false, recordingEnabled: Boolean = true,
+        removal: at.bernhardberger.tvheadend.sdk.core.DvrRemoval? = null): FakeTvheadendSession {
         val firstLeg = screenContent.value == null
         if (!firstLeg) {
             compose.runOnIdle { screenContent.value = null }
@@ -1563,6 +1673,7 @@ class BrowseContextMenuScreenTest {
         guideProgramme = null
         artworkRequests.clear()
         scheduleRequests.clear()
+        removalUpdates.clear()
         playerEntry = at.bernhardberger.tvhplayer.ui.PlayerEntryHandoff()
         val context = ApplicationProvider.getApplicationContext<Application>()
         val now = fixedNow?.let(Instant::fromEpochSeconds) ?: Instant.parse("2026-09-15T19:00:00Z")
@@ -1586,6 +1697,7 @@ class BrowseContextMenuScreenTest {
         val entry = DvrEntry.create(DvrEntryId(1), channelId = channel.id, eventId = event.id,
             autorecRuleId = if (ruleMade) at.bernhardberger.tvheadend.sdk.core.AutorecRuleId("series") else null,
             enabled = recordingEnabled,
+            removal = removal,
             title = if (recordingState == DvrEntryState.COMPLETED) "Ridge Light: The remarkable journey along the mountain ridge in winter" else "Ridge Light",
             folder = emptyList(),
             summary = summary, description = description, subtitle = episodeSubtitle,
@@ -1615,6 +1727,11 @@ class BrowseContextMenuScreenTest {
         ))
         val screenSession = object : TvheadendSession by session {
             override val dvrRepository = object : DvrRepository by session.dvrRepository {
+                override suspend fun updateEntry(currentSession: CurrentSessionObservation, entryId: DvrEntryId,
+                    update: at.bernhardberger.tvheadend.sdk.core.DvrEntryUpdate): DvrMutationResult<Unit> {
+                    removalUpdates += update
+                    return session.dvrRepository.updateEntry(currentSession, entryId, update)
+                }
                 override suspend fun scheduleEntry(currentSession: CurrentSessionObservation, request: DvrScheduleRequest): DvrMutationResult<DvrEntryId> {
                     scheduleRequests += request
                     return session.dvrRepository.scheduleEntry(currentSession, request)

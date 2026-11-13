@@ -72,6 +72,7 @@ internal fun TwoColumnDialog(
     onPreviewKeyEvent: (KeyEvent) -> Boolean = { false },
     leading: (@Composable ColumnScope.() -> Unit)? = null,
     itemCardLayout: Boolean = false,
+    dismissLevel: Boolean = false,
     actions: @Composable ColumnScope.() -> Unit,
 ) {
     var openingReleasePending by remember { mutableStateOf(true) }
@@ -81,7 +82,7 @@ internal fun TwoColumnDialog(
     RegisterPlayerModal(backEnabled)
     BackHandler(enabled = backEnabled) {
         if (!closing) {
-            if (parentMotion != null) onDismiss() else visibility.targetState = false
+            if (dismissLevel || parentMotion != null) onDismiss() else visibility.targetState = false
         }
     }
     LaunchedEffect(closing, visibility.isIdle, visibility.currentState) {

@@ -117,6 +117,23 @@ class BrowseContextActionsTest {
         assertEquals(listOf(RESUME, START_OVER, DETAILS, MARK_WATCHED, DELETE), actions(recording(DvrEntryState.COMPLETED, 20)))
     }
 
+    @Test fun keepUntilRequiresFinishedFileAndWritePermissionBeforeDelete() {
+        listOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR,
+            DvrEntryState.COMPLETED, DvrEntryState.COMPLETED_ERROR, DvrEntryState.MISSED,
+            DvrEntryState.INVALID).forEach { state ->
+            listOf(false, true).forEach { hasFile ->
+                listOf(false, true).forEach { writable ->
+                    val entry = recording(state, files = if (hasFile) listOf(file()) else emptyList())
+                    val names = actions(entry, canModify = writable).map { it.name }
+                    val expected = writable && hasFile &&
+                        state in listOf(DvrEntryState.COMPLETED, DvrEntryState.COMPLETED_ERROR)
+                    assertEquals("$state file=$hasFile writable=$writable", expected, "KEEP_UNTIL" in names)
+                    if (expected) assertEquals(names.indexOf("DELETE") - 1, names.indexOf("KEEP_UNTIL"))
+                }
+            }
+        }
+    }
+
     @Test fun completedWatchedRecordingsOfferOnlyMarkUnwatchedAfterDetails() {
         assertEquals(listOf(PLAY, DETAILS, MARK_UNWATCHED, DELETE),
             actions(recording(DvrEntryState.COMPLETED, playCount = 2)))
@@ -183,7 +200,9 @@ class BrowseContextActionsTest {
             assertEquals("$it", listOf(DETAILS, REMOVE_ENTRY), actions(recording(it, 20, files = emptyList())))
         }
         listOf(DvrEntryState.MISSED, DvrEntryState.COMPLETED_ERROR).forEach {
-            assertEquals("$it", listOf(DETAILS, DELETE), actions(recording(it, 20, listOf(file()), dataSize = 0)))
+            val expected = if (it == DvrEntryState.COMPLETED_ERROR) listOf(DETAILS, KEEP_UNTIL, DELETE)
+                else listOf(DETAILS, DELETE)
+            assertEquals("$it", expected, actions(recording(it, 20, listOf(file()), dataSize = 0)))
         }
         listOf(DvrEntryState.INVALID).forEach {
             assertEquals("$it", listOf(DETAILS, DELETE), actions(recording(it, 20, listOf(file()))))
@@ -208,9 +227,12 @@ class BrowseContextActionsTest {
 
     @Test fun failedRecordingWithAFilePlaysLikeACompletedOne() {
         val failed = DvrEntryState.COMPLETED_ERROR
-        assertEquals(listOf(PLAY, DETAILS, MARK_WATCHED, DELETE), actions(recording(failed, files = listOf(file()))))
-        assertEquals(listOf(RESUME, START_OVER, DETAILS, MARK_WATCHED, DELETE), actions(recording(failed, 20, listOf(file()))))
-        assertEquals(listOf(RESUME, START_OVER, DETAILS, MARK_WATCHED, DELETE), actions(recording(failed, 20, listOf(file()), dataSize = 1)))
+        assertEquals(listOf(PLAY, DETAILS, MARK_WATCHED, KEEP_UNTIL, DELETE),
+            actions(recording(failed, files = listOf(file()))))
+        assertEquals(listOf(RESUME, START_OVER, DETAILS, MARK_WATCHED, KEEP_UNTIL, DELETE),
+            actions(recording(failed, 20, listOf(file()))))
+        assertEquals(listOf(RESUME, START_OVER, DETAILS, MARK_WATCHED, KEEP_UNTIL, DELETE),
+            actions(recording(failed, 20, listOf(file()), dataSize = 1)))
     }
 
     @Test fun missedRecordingWithAFileOnlyOffersPlay() {

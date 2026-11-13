@@ -68,23 +68,34 @@ internal fun RecordingKeepUntilLevel(
     recordingEnabled: Boolean? = null,
     artwork: @Composable () -> Unit,
 ) {
+    TwoColumnDialog(
+        stringResource(R.string.recording_keep_until_heading), "", onBack,
+        modifier.testTag("recording-keep-until"), itemCardLayout = true, dismissLevel = true,
+        onPreviewKeyEvent = { event ->
+            event.key == Key.Menu || busy && event.key in listOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter)
+        },
+        leading = { BrowseContextRecordingCard(title, channel, episode, time, summary,
+            recordingState, recordingRule, recordingEnabled, artwork) },
+    ) {
+        RecordingKeepUntilChoices(options, nowSec, busy, onChoose)
+    }
+}
+
+@Composable
+internal fun RecordingKeepUntilChoices(
+    options: List<RecordingKeepUntilOption>,
+    nowSec: Long,
+    busy: Boolean,
+    onChoose: (RecordingKeepUntilOption) -> Unit,
+) {
     val requesters = remember { RecordingKeepUntilChoice.entries.associateWith { FocusRequester() } }
     val initial = options.firstOrNull { it.selected }?.choice ?: options.firstOrNull()?.choice
     var chosen by remember { mutableStateOf<RecordingKeepUntilChoice?>(null) }
     val locale = LocalConfiguration.current.locales[0]
-    LaunchedEffect(initial) {
+    LaunchedEffect(Unit) {
         withFrameNanos { }
         initial?.let { requesters.getValue(it).requestFocus() }
     }
-    TwoColumnDialog(
-        stringResource(R.string.recording_keep_until_heading), "", onBack,
-        modifier.testTag("recording-keep-until"), itemCardLayout = true,
-        onPreviewKeyEvent = { event ->
-            event.key == Key.Menu || busy && event.key in listOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter)
-        },
-        leading = { KeepUntilRecordingCard(title, channel, episode, time, summary,
-            recordingState, recordingRule, recordingEnabled, artwork) },
-    ) {
         Text(stringResource(R.string.recording_keep_until_heading), Modifier.semantics { heading() },
             style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
         Column(Modifier.verticalScroll(rememberScrollState()).padding(vertical = 4.dp),
@@ -112,7 +123,6 @@ internal fun RecordingKeepUntilLevel(
                 }
             }
         }
-    }
 }
 
 @Composable
@@ -126,7 +136,7 @@ private fun KeepUntilSelectionMark(selected: Boolean, busy: Boolean) {
 }
 
 @Composable
-private fun KeepUntilRecordingCard(
+internal fun BrowseContextRecordingCard(
     title: String, channel: String, episode: String, time: String, summary: String,
     state: DvrEntryState?, rule: RecordingRule?, enabled: Boolean?, artwork: @Composable () -> Unit,
 ) {
@@ -142,6 +152,11 @@ private fun KeepUntilRecordingCard(
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
             RecordingBadge(state, Modifier.testTag("browse-context-recording"), rule = rule, skipped = enabled == false)
+            if (rule != null && state in listOf(
+                    DvrEntryState.SCHEDULED, DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)) {
+                Text(stringResource(rule.label), style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             if (description.isNotBlank()) Text(description, style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                 maxLines = 3, overflow = TextOverflow.Ellipsis)

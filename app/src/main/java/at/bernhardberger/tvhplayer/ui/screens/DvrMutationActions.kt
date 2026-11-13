@@ -69,6 +69,39 @@ import kotlinx.coroutines.launch
 
 internal val AutorecEpisodeWaitTimeout = 10.seconds
 
+@OptIn(ExperimentalTvheadendApi::class)
+internal fun SessionObservation.keepUntilEntry(
+    id: DvrEntryId,
+    openingSession: CurrentSessionObservation?,
+): DvrEntry? {
+    if (openingSession == null || currentSession !== openingSession) return null
+    val writable = (sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
+    return dvrEntry(id)?.takeIf { at.bernhardberger.tvhplayer.core.recordingKeepUntilAvailable(it, writable) }
+}
+
+/** True closes the level, including obsolete targets and choices already published by the server. */
+internal suspend fun DvrMutationActions.chooseRecordingRemoval(
+    id: DvrEntryId,
+    openingSession: CurrentSessionObservation?,
+    observation: SessionObservation,
+    option: at.bernhardberger.tvhplayer.core.RecordingKeepUntilOption,
+    notices: NoticeCenter,
+): Boolean {
+    val entry = observation.keepUntilEntry(id, openingSession) ?: return true
+    val removal = option.removal
+    return when {
+        removal == null -> false
+        entry.removal == removal -> true
+        else -> {
+            val mutation = DvrMutationAction.SetEntryRemoval(requireNotNull(openingSession), entry, removal)
+            val context = notices.context()
+            val result = execute(mutation)
+            notices.postDvrFailure(mutation, result, context)
+            result !is DvrMutationResult.Failed
+        }
+    }
+}
+
 /** Failed retains SDK mayHaveApplied: an ambiguous rule failure never means "nothing was created". */
 internal sealed interface AutorecSaveOutcome {
     data class RuleFailed(val result: DvrMutationResult.Failed) : AutorecSaveOutcome

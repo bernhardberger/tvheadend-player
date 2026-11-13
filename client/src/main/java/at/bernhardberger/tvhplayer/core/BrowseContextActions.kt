@@ -12,7 +12,7 @@ enum class BrowseContextAction {
     CONTINUE_WATCHING, WATCH_LIVE,
     EDIT_RULE, SKIP, UNSKIP,
     WATCH, DETAILS, RECORD, RECORD_SERIES, RECORD_TITLE, STOP, CANCEL, SHOW_GUIDE,
-    RESUME, START_OVER, PLAY, MARK_WATCHED, MARK_UNWATCHED, DELETE, REMOVE_ENTRY,
+    RESUME, START_OVER, PLAY, MARK_WATCHED, MARK_UNWATCHED, KEEP_UNTIL, DELETE, REMOVE_ENTRY,
     MARK_ALL_WATCHED, MARK_ALL_UNWATCHED, DELETE_WATCHED, DELETE_ALL,
 }
 
@@ -95,6 +95,7 @@ fun recordingContextActions(
     add(BrowseContextAction.DETAILS)
     val ruleActions = recordingRuleActions(entry, canModifyRecordings, ruleAvailable)
     recordingWatchStateAction(entry, admission, canModifyRecordings)?.let(::add)
+    if (recordingKeepUntilAvailable(entry, canModifyRecordings)) add(BrowseContextAction.KEEP_UNTIL)
     if (canModifyRecordings) when (entry.state) {
         DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR -> add(BrowseContextAction.STOP)
         DvrEntryState.SCHEDULED -> if (entry.isRuleRecording) {
@@ -107,6 +108,10 @@ fun recordingContextActions(
     }
     if (BrowseContextAction.EDIT_RULE in ruleActions) add(BrowseContextAction.EDIT_RULE)
 }
+
+fun recordingKeepUntilAvailable(entry: DvrEntry, canModifyRecordings: Boolean): Boolean =
+    canModifyRecordings && !entry.files.isNullOrEmpty() &&
+        entry.state in listOf(DvrEntryState.COMPLETED, DvrEntryState.COMPLETED_ERROR)
 
 val DvrEntry.isRuleRecording: Boolean get() = autorecRuleId != null || timerecRuleId != null
 

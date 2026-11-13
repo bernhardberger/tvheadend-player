@@ -1,11 +1,24 @@
 package at.bernhardberger.tvhplayer.ui.common
 
 import android.content.res.Resources
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrRemoval
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.RecordingExpiryTimeLeft
 import at.bernhardberger.tvhplayer.core.RecordingExpiryUnit
 import at.bernhardberger.tvhplayer.core.recordingExpiryTimeLeft
+import at.bernhardberger.tvhplayer.core.recordingRemovalTime
 import java.util.Locale
+
+fun formatRecordingKeepUntil(entry: DvrEntry, nowSec: Long, resources: Resources, locale: Locale): String? =
+    when (entry.removal) {
+        DvrRemoval.Forever -> resources.getString(R.string.recording_keep_until_forever)
+        DvrRemoval.UntilSpaceNeeded -> resources.getString(R.string.recording_keep_until_space_needed)
+        else -> recordingRemovalTime(entry, nowSec)?.let {
+            resources.getString(R.string.recording_expires_in,
+                formatRecordingDate(it, dateOnly = true, locale = locale, nowSec = nowSec))
+        }
+    }
 
 /** Shared compact text and plural wording for the card badge, list segment and spoken expiry. */
 fun formatRecordingExpiry(left: RecordingExpiryTimeLeft, resources: Resources, compact: Boolean = false): String {

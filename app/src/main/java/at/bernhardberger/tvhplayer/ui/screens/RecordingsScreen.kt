@@ -1040,6 +1040,8 @@ internal fun RecordingsScreenContent(
             if (!returned) openRecording(opened, returnIfPlaying = false, beforePlay = leaveBehindPlayer)
         }
         val visibility = remember { MutableTransitionState(false).apply { targetState = true } }
+        var keepingUntil by remember { mutableStateOf(false) }
+        var keepUntilBusy by remember { mutableStateOf(false) }
         val closing = !visibility.targetState
         BackHandler(enabled = backEnabled && closing) { }
         LaunchedEffect(visibility.isIdle, visibility.currentState, closing) {
@@ -1073,7 +1075,7 @@ internal fun RecordingsScreenContent(
             leaving = pendingAction != null || ruleEditorEntry != null) {
         BrowseContextMenu(
             backEnabled = backEnabled && !closing && menu == showContextMenu &&
-                pendingAction == null && ruleEditorEntry == null && !ruleMutationBusy,
+                pendingAction == null && ruleEditorEntry == null && !ruleMutationBusy && !keepUntilBusy,
             title = opened.title.orEmpty(),
             channel = opened.channelId?.let(channelsById::get)?.let {
                 at.bernhardberger.tvhplayer.ui.components.channelTitleText(it.number, it.name.orEmpty())
@@ -1087,6 +1089,25 @@ internal fun RecordingsScreenContent(
             recordingKind = observation.recordingRuleKind(opened),
             recordingEnabled = opened.enabled,
             resumePositionMs = at.bernhardberger.tvhplayer.core.offeredResumePosition(openedAdmission)?.inWholeMilliseconds,
+            keepUntilOptions = if (keepingUntil) at.bernhardberger.tvhplayer.core.recordingKeepUntilOptions(
+                opened, nowSec, java.time.ZoneId.systemDefault()) else null,
+            keepUntilBusy = keepUntilBusy,
+            keepUntilSupport = at.bernhardberger.tvhplayer.ui.common.formatRecordingKeepUntil(opened, nowSec,
+                androidx.compose.ui.platform.LocalContext.current.resources,
+                androidx.compose.ui.platform.LocalConfiguration.current.locales[0]),
+            nowSec = nowSec,
+            onKeepUntilBack = { keepingUntil = false },
+            onKeepUntilChoose = { option ->
+                if (!keepUntilBusy) {
+                    keepUntilBusy = true
+                    scope.launch {
+                        try {
+                            if (dvrMutationActions.chooseRecordingRemoval(opened.id, selectedCapability,
+                                    latestObservationProvider(), option, notices)) visibility.targetState = false
+                        } finally { keepUntilBusy = false }
+                    }
+                }
+            },
             playbackIndicator = watchingIndicator(opened.id),
             actions = recordingContextActions(opened, canModifyRecordings = selectedCapability != null &&
                 (observation.sessionState as? at.bernhardberger.tvheadend.sdk.core.SessionState.Ready)
@@ -1101,6 +1122,12 @@ internal fun RecordingsScreenContent(
                         observation.currentSession)),
             onClose = { visibility.targetState = false },
             onAction = ruleDispatch@{ action ->
+                if (action == BrowseContextAction.KEEP_UNTIL) {
+                    if (latestObservationProvider().keepUntilEntry(opened.id, selectedCapability) != null)
+                        keepingUntil = true
+                    else visibility.targetState = false
+                    return@ruleDispatch
+                }
                 if (action in listOf(BrowseContextAction.EDIT_RULE, BrowseContextAction.SKIP,
                         BrowseContextAction.UNSKIP)) {
                     ruleAction(action)

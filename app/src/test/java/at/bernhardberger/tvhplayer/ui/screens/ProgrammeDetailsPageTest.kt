@@ -1152,7 +1152,11 @@ class ProgrammeDetailsPageTest {
         show(recording = true, recordingFacts = true, longSubtitle = true,
             creditsPresent = creditsPresent, factsPresent = factsPresent)
         compose.onNodeWithTag("details-resume").assertIsFocused()
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionRight); pressKey(Key.DirectionRight); pressKey(Key.DirectionRight) }
+        compose.onRoot().performKeyInput {
+            pressKey(Key.DirectionRight); pressKey(Key.DirectionRight); pressKey(Key.DirectionRight)
+        }
+        compose.onNodeWithTag("details-keep_until").assertIsFocused()
+        compose.pressKey(Key.DirectionRight)
         compose.onNodeWithTag("details-delete").assertIsFocused()
         compose.onNodeWithContentDescription("Expires Tue, Sep 22 21:00").assertExists()
         assertBottomAnchored(peek = false)
