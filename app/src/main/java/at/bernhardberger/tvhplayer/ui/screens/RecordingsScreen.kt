@@ -1210,12 +1210,11 @@ internal fun RecordingsScreenContent(
         RecordingConfirmationDialog(
             visibility = confirmationVisibility,
             action = action,
-            removeEntry = deleteRemovesEntryOnly(target),
-            title = target.title.orEmpty(),
-            channelName = target.channelId?.let(channelsById::get)?.name ?: target.channelName.orEmpty(),
-            dateAndTime = at.bernhardberger.tvhplayer.ui.common.formatRecordingSchedule(target.start?.epochSeconds,
-                dateOnly = action == PendingRecordingAction.DELETE,
-                locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]),
+            entry = target,
+            channel = target.channelId?.let(channelsById::get),
+            nowSec = at.bernhardberger.tvhplayer.ui.common.rememberDetailsEpochSeconds(nowSecProvider),
+            currentSession = selectedCapability,
+            observation = observation,
             backEnabled = backEnabled,
             onDismiss = {
                 pendingAction = null

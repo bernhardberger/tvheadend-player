@@ -422,10 +422,8 @@
     <string name="recordings_reconnecting">Återansluter. Sparad inspelningsinformation kan vara inaktuell…</string>
     <string name="delete_recording">Radera inspelning</string>
     <string name="delete_recording_confirm_title">Radera inspelningen?</string>
-    <string name="delete_recording_confirm_message">%1$s (%2$s, %3$s) raderas från servern.</string>
     <string name="remove_entry">Ta bort post</string>
     <string name="remove_entry_confirm_title">Ta bort den här posten?</string>
-    <string name="remove_entry_confirm_message">%1$s (%2$s, %3$s) tas bort från serverns lista.</string>
     <string name="delete_folder_all_confirm_title">Radera alla inspelningar i %1$s?</string>
     <string name="delete_folder_watched_confirm_title">Radera sedda inspelningar i %1$s?</string>
     <plurals name="delete_folder_confirm_message">

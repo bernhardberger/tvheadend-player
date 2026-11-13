@@ -422,10 +422,8 @@
     <string name="recordings_reconnecting">Opnieuw verbinden. Opgeslagen opnamegegevens kunnen verouderd zijn…</string>
     <string name="delete_recording">Opname verwijderen</string>
     <string name="delete_recording_confirm_title">Deze opname verwijderen?</string>
-    <string name="delete_recording_confirm_message">%1$s (%2$s, %3$s) wordt van de server verwijderd.</string>
     <string name="remove_entry">Vermelding verwijderen</string>
     <string name="remove_entry_confirm_title">Deze vermelding verwijderen?</string>
-    <string name="remove_entry_confirm_message">%1$s (%2$s, %3$s) wordt uit de lijst van de server verwijderd.</string>
     <string name="delete_folder_all_confirm_title">Alle opnamen in %1$s verwijderen?</string>
     <string name="delete_folder_watched_confirm_title">Bekeken opnamen in %1$s verwijderen?</string>
     <plurals name="delete_folder_confirm_message">

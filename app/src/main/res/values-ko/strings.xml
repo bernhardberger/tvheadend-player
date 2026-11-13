@@ -415,10 +415,8 @@
     <string name="recordings_reconnecting">다시 연결 중입니다. 저장된 녹화 정보가 오래된 정보일 수 있습니다…</string>
     <string name="delete_recording">녹화 삭제</string>
     <string name="delete_recording_confirm_title">이 녹화를 삭제할까요?</string>
-    <string name="delete_recording_confirm_message">%1$s(%2$s, %3$s) 항목이 서버에서 삭제됩니다.</string>
     <string name="remove_entry">항목 제거</string>
     <string name="remove_entry_confirm_title">이 항목을 제거할까요?</string>
-    <string name="remove_entry_confirm_message">%1$s(%2$s, %3$s) 항목이 서버 목록에서 제거됩니다.</string>
     <string name="delete_folder_all_confirm_title">%1$s의 모든 녹화를 삭제할까요?</string>
     <string name="delete_folder_watched_confirm_title">%1$s에서 시청 완료한 녹화를 삭제할까요?</string>
     <plurals name="delete_folder_confirm_message">

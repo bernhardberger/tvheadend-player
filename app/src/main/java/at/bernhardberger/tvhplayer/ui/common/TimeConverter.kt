@@ -171,6 +171,18 @@ fun formatSpokenDuration(totalSeconds: Long, resources: android.content.res.Reso
     ).formatMeasures(*measures.toTypedArray())
 }
 
+/** Whole minutes as hours and minutes in the configured app locale's numeric form ("1:05" in English). */
+fun formatHoursMinutes(totalSeconds: Long, resources: android.content.res.Resources): String {
+    val minutes = totalSeconds.coerceAtLeast(0L) / 60L
+    return android.icu.text.MeasureFormat.getInstance(
+        resources.configuration.locales[0],
+        android.icu.text.MeasureFormat.FormatWidth.NUMERIC,
+    ).formatMeasures(
+        android.icu.util.Measure(minutes / 60L, android.icu.util.MeasureUnit.HOUR),
+        android.icu.util.Measure(minutes % 60L, android.icu.util.MeasureUnit.MINUTE),
+    )
+}
+
 /** Whole-hour jump amounts, with the unit written out in the configured app locale. */
 fun formatWholeHours(hours: Long, resources: android.content.res.Resources): String =
     android.icu.text.MeasureFormat.getInstance(

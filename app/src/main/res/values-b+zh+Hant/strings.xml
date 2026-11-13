@@ -401,10 +401,8 @@
     <string name="recordings_reconnecting">正在重新連線。已儲存的錄影資訊可能已過期…</string>
     <string name="delete_recording">刪除錄影</string>
     <string name="delete_recording_confirm_title">刪除此錄影？</string>
-    <string name="delete_recording_confirm_message">將從伺服器刪除%1$s（%2$s，%3$s）。</string>
     <string name="remove_entry">移除項目</string>
     <string name="remove_entry_confirm_title">移除此項目？</string>
-    <string name="remove_entry_confirm_message">%1$s（%2$s，%3$s）將從伺服器清單中移除。</string>
     <string name="delete_folder_all_confirm_title">刪除%1$s中的所有錄影？</string>
     <string name="delete_folder_watched_confirm_title">刪除%1$s中已看的錄影？</string>
     <plurals name="delete_folder_confirm_message"><item quantity="other">將從伺服器刪除%1$d項錄影（%2$s）。</item></plurals>

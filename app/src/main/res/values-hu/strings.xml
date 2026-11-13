@@ -422,10 +422,8 @@
     <string name="recordings_reconnecting">Újracsatlakozás. A mentett felvételi adatok elavultak lehetnek…</string>
     <string name="delete_recording">Felvétel törlése</string>
     <string name="delete_recording_confirm_title">Törlöd ezt a felvételt?</string>
-    <string name="delete_recording_confirm_message">A felvétel törlődik a szerverről: %1$s (%2$s, %3$s).</string>
     <string name="remove_entry">Bejegyzés eltávolítása</string>
     <string name="remove_entry_confirm_title">Eltávolítod ezt a bejegyzést?</string>
-    <string name="remove_entry_confirm_message">A bejegyzés eltávolításra kerül a szerver listájáról: %1$s (%2$s, %3$s).</string>
     <string name="delete_folder_all_confirm_title">Törlöd az összes felvételt innen: %1$s?</string>
     <string name="delete_folder_watched_confirm_title">Törlöd a megnézett felvételeket innen: %1$s?</string>
     <plurals name="delete_folder_confirm_message">

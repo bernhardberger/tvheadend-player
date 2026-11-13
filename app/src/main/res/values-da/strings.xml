@@ -422,10 +422,8 @@
     <string name="recordings_reconnecting">Genopretter forbindelse. Gemte optagelsesoplysninger kan være forældede…</string>
     <string name="delete_recording">Slet optagelse</string>
     <string name="delete_recording_confirm_title">Slet denne optagelse?</string>
-    <string name="delete_recording_confirm_message">%1$s (%2$s, %3$s) bliver slettet fra serveren.</string>
     <string name="remove_entry">Fjern post</string>
     <string name="remove_entry_confirm_title">Fjern denne post?</string>
-    <string name="remove_entry_confirm_message">%1$s (%2$s, %3$s) fjernes fra serverens liste.</string>
     <string name="delete_folder_all_confirm_title">Slet alle optagelser i %1$s?</string>
     <string name="delete_folder_watched_confirm_title">Slet sete optagelser i %1$s?</string>
     <plurals name="delete_folder_confirm_message">

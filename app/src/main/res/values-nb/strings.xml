@@ -422,10 +422,8 @@
     <string name="recordings_reconnecting">Kobler til på nytt. Lagret opptaksinformasjon kan være utdatert…</string>
     <string name="delete_recording">Slett opptak</string>
     <string name="delete_recording_confirm_title">Slette dette opptaket?</string>
-    <string name="delete_recording_confirm_message">%1$s (%2$s, %3$s) blir slettet fra serveren.</string>
     <string name="remove_entry">Fjern oppføring</string>
     <string name="remove_entry_confirm_title">Fjerne denne oppføringen?</string>
-    <string name="remove_entry_confirm_message">%1$s (%2$s, %3$s) fjernes fra serverens liste.</string>
     <string name="delete_folder_all_confirm_title">Slette alle opptak i %1$s?</string>
     <string name="delete_folder_watched_confirm_title">Slette sette opptak i %1$s?</string>
     <plurals name="delete_folder_confirm_message">

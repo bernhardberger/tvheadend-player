@@ -436,10 +436,8 @@
     <string name="recordings_reconnecting">Obnovování připojení. Uložené informace o nahrávkách mohou být zastaralé…</string>
     <string name="delete_recording">Smazat nahrávku</string>
     <string name="delete_recording_confirm_title">Smazat tuto nahrávku?</string>
-    <string name="delete_recording_confirm_message">%1$s (%2$s, %3$s) bude smazáno ze serveru.</string>
     <string name="remove_entry">Odebrat položku</string>
     <string name="remove_entry_confirm_title">Odebrat tuto položku?</string>
-    <string name="remove_entry_confirm_message">%1$s (%2$s, %3$s) bude odebráno ze seznamu serveru.</string>
     <string name="delete_folder_all_confirm_title">Smazat všechny nahrávky ve složce %1$s?</string>
     <string name="delete_folder_watched_confirm_title">Smazat zhlédnuté nahrávky ve složce %1$s?</string>
     <plurals name="delete_folder_confirm_message">

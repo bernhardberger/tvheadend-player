@@ -422,10 +422,8 @@
     <string name="recordings_reconnecting">Επανασύνδεση. Οι αποθηκευμένες πληροφορίες εγγραφών μπορεί να μην είναι ενημερωμένες…</string>
     <string name="delete_recording">Διαγραφή εγγραφής</string>
     <string name="delete_recording_confirm_title">Διαγραφή αυτής της εγγραφής;</string>
-    <string name="delete_recording_confirm_message">Η εγγραφή %1$s (%2$s, %3$s) θα διαγραφεί από τον διακομιστή.</string>
     <string name="remove_entry">Αφαίρεση καταχώρισης</string>
     <string name="remove_entry_confirm_title">Αφαίρεση αυτής της καταχώρισης;</string>
-    <string name="remove_entry_confirm_message">Η καταχώριση %1$s (%2$s, %3$s) θα αφαιρεθεί από τη λίστα του διακομιστή.</string>
     <string name="delete_folder_all_confirm_title">Διαγραφή όλων των εγγραφών στο %1$s;</string>
     <string name="delete_folder_watched_confirm_title">Διαγραφή των προβλημένων εγγραφών στο %1$s;</string>
     <plurals name="delete_folder_confirm_message">

@@ -422,10 +422,8 @@
     <string name="recordings_reconnecting">Yeniden bağlanılıyor. Saklanan kayıt bilgileri güncel olmayabilir…</string>
     <string name="delete_recording">Kaydı sil</string>
     <string name="delete_recording_confirm_title">Bu kayıt silinsin mi?</string>
-    <string name="delete_recording_confirm_message">%1$s (%2$s, %3$s) sunucudan silinecek.</string>
     <string name="remove_entry">Girdiyi kaldır</string>
     <string name="remove_entry_confirm_title">Bu girdi kaldırılsın mı?</string>
-    <string name="remove_entry_confirm_message">%1$s (%2$s, %3$s) sunucunun listesinden kaldırılacak.</string>
     <string name="delete_folder_all_confirm_title">%1$s içindeki tüm kayıtlar silinsin mi?</string>
     <string name="delete_folder_watched_confirm_title">%1$s içindeki izlenen kayıtlar silinsin mi?</string>
     <plurals name="delete_folder_confirm_message">

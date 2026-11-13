@@ -20,6 +20,9 @@ import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performScrollToIndex
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvhplayer.core.GuideWindowBounds
 import at.bernhardberger.tvhplayer.core.ProgrammeCategory
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
@@ -258,7 +261,10 @@ class PlaybackPanelCaptureTest {
                 if (guide) {
                     ConfirmProgrammeActionDialog(ProgrammeAction.STOP_RECORDING, PROGRAMME_TITLE, {}, {})
                 } else {
-                    RecordingConfirmationDialog(PendingRecordingAction.DELETE, PROGRAMME_TITLE, true, {}, {})
+                    RecordingConfirmationDialog(PendingRecordingAction.DELETE,
+                        DvrEntry.create(DvrEntryId(1), title = PROGRAMME_TITLE, state = DvrEntryState.COMPLETED, folder = emptyList()),
+                        channel = null, nowSec = 0L, currentSession = null, observation = null,
+                        backEnabled = true, onDismiss = {}, onConfirm = {})
                 }
             }
         }

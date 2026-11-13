@@ -433,10 +433,8 @@
     <string name="recordings_reconnecting">Verbindung wird wiederhergestellt. Gespeicherte Aufnahmedaten können veraltet sein…</string>
     <string name="delete_recording">Aufnahme löschen</string>
     <string name="delete_recording_confirm_title">Diese Aufnahme löschen?</string>
-    <string name="delete_recording_confirm_message">%1$s (%2$s, %3$s) wird vom Server gelöscht.</string>
     <string name="remove_entry">Eintrag entfernen</string>
     <string name="remove_entry_confirm_title">Diesen Eintrag entfernen?</string>
-    <string name="remove_entry_confirm_message">%1$s (%2$s, %3$s) wird aus der Liste des Servers entfernt.</string>
     <string name="delete_folder_all_confirm_title">Alle Aufnahmen in %1$s löschen?</string>
     <string name="delete_folder_watched_confirm_title">Gesehene Aufnahmen in %1$s löschen?</string>
     <plurals name="delete_folder_confirm_message">

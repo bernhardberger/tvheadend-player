@@ -436,10 +436,8 @@
     <string name="recordings_reconnecting">Ponowne łączenie. Zapisane informacje o nagraniach mogą być nieaktualne…</string>
     <string name="delete_recording">Usuń nagranie</string>
     <string name="delete_recording_confirm_title">Usunąć to nagranie?</string>
-    <string name="delete_recording_confirm_message">Nagranie %1$s (%2$s, %3$s) zostanie usunięte z serwera.</string>
     <string name="remove_entry">Usuń wpis</string>
     <string name="remove_entry_confirm_title">Usunąć ten wpis?</string>
-    <string name="remove_entry_confirm_message">Wpis %1$s (%2$s, %3$s) zostanie usunięty z listy serwera.</string>
     <string name="delete_folder_all_confirm_title">Usunąć wszystkie nagrania w %1$s?</string>
     <string name="delete_folder_watched_confirm_title">Usunąć obejrzane nagrania w %1$s?</string>
     <plurals name="delete_folder_confirm_message">

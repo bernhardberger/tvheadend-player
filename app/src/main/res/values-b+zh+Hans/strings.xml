@@ -401,10 +401,8 @@
     <string name="recordings_reconnecting">正在重新连接。已保存的录制信息可能已过时…</string>
     <string name="delete_recording">删除录制内容</string>
     <string name="delete_recording_confirm_title">删除此录制内容？</string>
-    <string name="delete_recording_confirm_message">将从服务器删除%1$s（%2$s，%3$s）。</string>
     <string name="remove_entry">移除条目</string>
     <string name="remove_entry_confirm_title">移除此条目？</string>
-    <string name="remove_entry_confirm_message">%1$s（%2$s，%3$s）将从服务器列表中移除。</string>
     <string name="delete_folder_all_confirm_title">删除%1$s中的所有录制内容？</string>
     <string name="delete_folder_watched_confirm_title">删除%1$s中已看的录制内容？</string>
     <plurals name="delete_folder_confirm_message"><item quantity="other">将从服务器删除%1$d项录制内容（%2$s）。</item></plurals>

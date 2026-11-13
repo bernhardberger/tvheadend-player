@@ -429,10 +429,8 @@
     <string name="recordings_reconnecting">Ponovno povezivanje. Spremljeni podaci o snimkama mogu biti zastarjeli…</string>
     <string name="delete_recording">Izbriši snimku</string>
     <string name="delete_recording_confirm_title">Izbrisati ovu snimku?</string>
-    <string name="delete_recording_confirm_message">Snimka %1$s (%2$s, %3$s) bit će izbrisana s poslužitelja.</string>
     <string name="remove_entry">Ukloni stavku</string>
     <string name="remove_entry_confirm_title">Ukloniti ovu stavku?</string>
-    <string name="remove_entry_confirm_message">Stavka %1$s (%2$s, %3$s) bit će uklonjena s popisa poslužitelja.</string>
     <string name="delete_folder_all_confirm_title">Izbrisati sve snimke u %1$s?</string>
     <string name="delete_folder_watched_confirm_title">Izbrisati pogledane snimke u %1$s?</string>
     <plurals name="delete_folder_confirm_message">

@@ -429,10 +429,8 @@
     <string name="recordings_reconnecting">מתבצע חיבור מחדש; ייתכן שמידע ההקלטות השמור אינו מעודכן…</string>
     <string name="delete_recording">מחיקת הקלטה</string>
     <string name="delete_recording_confirm_title">למחוק את ההקלטה הזו?</string>
-    <string name="delete_recording_confirm_message">%1$s (%2$s, %3$s) תימחק מהשרת.</string>
     <string name="remove_entry">הסרת הרשומה</string>
     <string name="remove_entry_confirm_title">להסיר את הרשומה הזו?</string>
-    <string name="remove_entry_confirm_message">%1$s (%2$s, %3$s) תוסר מרשימת השרת.</string>
     <string name="delete_folder_all_confirm_title">למחוק את כל ההקלטות של %1$s?</string>
     <string name="delete_folder_watched_confirm_title">למחוק הקלטות שנצפו מתוך %1$s?</string>
     <plurals name="delete_folder_confirm_message">

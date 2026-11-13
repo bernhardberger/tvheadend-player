@@ -429,10 +429,8 @@
     <string name="recordings_reconnecting">Reconectare. Informațiile salvate despre înregistrări pot fi învechite…</string>
     <string name="delete_recording">Șterge înregistrarea</string>
     <string name="delete_recording_confirm_title">Ștergi această înregistrare?</string>
-    <string name="delete_recording_confirm_message">%1$s (%2$s, %3$s) va fi ștearsă de pe server.</string>
     <string name="remove_entry">Elimină intrarea</string>
     <string name="remove_entry_confirm_title">Elimini această intrare?</string>
-    <string name="remove_entry_confirm_message">%1$s (%2$s, %3$s) va fi eliminată din lista serverului.</string>
     <string name="delete_folder_all_confirm_title">Ștergi toate înregistrările din %1$s?</string>
     <string name="delete_folder_watched_confirm_title">Ștergi înregistrările vizionate din %1$s?</string>
     <plurals name="delete_folder_confirm_message">

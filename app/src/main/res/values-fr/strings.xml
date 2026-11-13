@@ -429,10 +429,8 @@
     <string name="recordings_reconnecting">Reconnexion. Les informations enregistrées peuvent être obsolètes…</string>
     <string name="delete_recording">Supprimer l’enregistrement</string>
     <string name="delete_recording_confirm_title">Supprimer cet enregistrement ?</string>
-    <string name="delete_recording_confirm_message">%1$s (%2$s, %3$s) sera supprimé du serveur.</string>
     <string name="remove_entry">Retirer l’entrée</string>
     <string name="remove_entry_confirm_title">Retirer cette entrée ?</string>
-    <string name="remove_entry_confirm_message">%1$s (%2$s, %3$s) sera retiré de la liste du serveur.</string>
     <string name="delete_folder_all_confirm_title">Supprimer tous les enregistrements de %1$s ?</string>
     <string name="delete_folder_watched_confirm_title">Supprimer les enregistrements vus de %1$s ?</string>
     <plurals name="delete_folder_confirm_message">

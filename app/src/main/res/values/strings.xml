@@ -520,6 +520,12 @@
     <string name="stop_recording_confirm_title">Stop this recording?</string>
     <!-- Dialog body before stopping a running recording. %1$s = program title. Escape apostrophes as \'. -->
     <string name="stop_recording_confirm_message">%1$s stops recording now. What\'s recorded so far is kept.</string>
+    <!-- Sentence under the stopped recording's panel when it has a listed end still ahead. %1$s = duration recorded so far, %2$s = duration left until the listed end; each from one hour as hours and minutes ("1:05"), otherwise spelled-out minutes ("45 minutes"). -->
+    <string name="stop_recording_confirm_body">The %1$s recorded so far is kept. The last %2$s won\'t be recorded.</string>
+    <!-- Sentence under the stopped recording's panel when it is past its listed end or has none. %1$s = duration recorded so far: from one hour as hours and minutes ("2:05"), otherwise spelled-out minutes ("45 minutes"). -->
+    <string name="stop_recording_confirm_body_open">The %1$s recorded so far is kept, and recording ends now.</string>
+    <!-- Sentence under the panel of a scheduled recording about to be canceled. -->
+    <string name="cancel_recording_confirm_body">It\'s taken off the schedule and won\'t be recorded.</string>
     <string name="recording_status">Recording: %1$s</string>
     <string name="recording_state_scheduled">Scheduled</string>
     <string name="recording_state_recording">Recording now</string>
@@ -626,13 +632,13 @@
     <string name="recordings_reconnecting">Reconnecting. Saved recording information may be out of date…</string>
     <string name="delete_recording">Delete recording</string>
     <string name="delete_recording_confirm_title">Delete this recording?</string>
-    <!-- Dialog body before deleting one recording. %1$s = title, %2$s = date, %3$s = file size. -->
-    <string name="delete_recording_confirm_message">%1$s (%2$s, %3$s) will be deleted from the server.</string>
+    <!-- Sentence under the panel of the recording about to be deleted. -->
+    <string name="delete_recording_confirm_body">The recording is deleted from the server.</string>
     <!-- Delete for a missed, invalid or failed entry that has no file: only its row in the server's list goes. -->
     <string name="remove_entry">Remove entry</string>
     <string name="remove_entry_confirm_title">Remove this entry?</string>
-    <!-- Dialog body before removing one entry without a file. %1$s = title, %2$s = date, %3$s = file size. -->
-    <string name="remove_entry_confirm_message">%1$s (%2$s, %3$s) will be removed from the server\'s list.</string>
+    <!-- Sentence under the panel of an entry without a file about to be removed. -->
+    <string name="remove_entry_confirm_body">It\'s removed from the server\'s list.</string>
     <string name="delete_folder_all_confirm_title">Delete all recordings in %1$s?</string>
     <string name="delete_folder_watched_confirm_title">Delete watched recordings in %1$s?</string>
     <!-- Confirmation dialog body before deleting a folder's recordings. %1$d = count, %2$s = total file size such as "4.2 GB". -->

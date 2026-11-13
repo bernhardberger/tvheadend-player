@@ -436,10 +436,8 @@
     <string name="recordings_reconnecting">Повторне підключення. Збережені відомості про записи можуть бути застарілими…</string>
     <string name="delete_recording">Видалити запис</string>
     <string name="delete_recording_confirm_title">Видалити цей запис?</string>
-    <string name="delete_recording_confirm_message">Запис %1$s (%2$s, %3$s) буде видалено із сервера.</string>
     <string name="remove_entry">Прибрати елемент</string>
     <string name="remove_entry_confirm_title">Прибрати цей елемент?</string>
-    <string name="remove_entry_confirm_message">Елемент %1$s (%2$s, %3$s) буде прибрано зі списку сервера.</string>
     <string name="delete_folder_all_confirm_title">Видалити всі записи в %1$s?</string>
     <string name="delete_folder_watched_confirm_title">Видалити переглянуті записи в %1$s?</string>
     <plurals name="delete_folder_confirm_message">

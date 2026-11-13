@@ -429,10 +429,8 @@
     <string name="recordings_reconnecting">Reconectando. La información guardada de las grabaciones puede estar desactualizada…</string>
     <string name="delete_recording">Eliminar grabación</string>
     <string name="delete_recording_confirm_title">¿Eliminar esta grabación?</string>
-    <string name="delete_recording_confirm_message">%1$s (%2$s, %3$s) se eliminará del servidor.</string>
     <string name="remove_entry">Quitar entrada</string>
     <string name="remove_entry_confirm_title">¿Quitar esta entrada?</string>
-    <string name="remove_entry_confirm_message">%1$s (%2$s, %3$s) se quitará de la lista del servidor.</string>
     <string name="delete_folder_all_confirm_title">¿Eliminar todas las grabaciones de %1$s?</string>
     <string name="delete_folder_watched_confirm_title">¿Eliminar las grabaciones vistas de %1$s?</string>
     <plurals name="delete_folder_confirm_message">
