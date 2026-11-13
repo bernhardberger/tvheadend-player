@@ -314,9 +314,7 @@
     <string name="cancel_recording">Anuluj nagrywanie</string>
     <string name="stop_recording">Zatrzymaj nagrywanie</string>
     <string name="cancel_recording_confirm_title">Anulować to nagrywanie?</string>
-    <string name="cancel_recording_confirm_message">%1$s na %2$s, %3$s, nie zostanie nagrany.</string>
     <string name="stop_recording_confirm_title">Zatrzymać to nagrywanie?</string>
-    <string name="stop_recording_confirm_message">Nagrywanie programu %1$s zakończy się teraz. Dotychczasowe nagranie zostanie zachowane.</string>
     <string name="recording_status">Nagrywanie: %1$s</string>
     <string name="recording_state_scheduled">Zaplanowane</string>
     <string name="recording_state_recording">Trwa nagrywanie</string>
@@ -438,20 +436,6 @@
     <string name="delete_recording_confirm_title">Usunąć to nagranie?</string>
     <string name="remove_entry">Usuń wpis</string>
     <string name="remove_entry_confirm_title">Usunąć ten wpis?</string>
-    <string name="delete_folder_all_confirm_title">Usunąć wszystkie nagrania w %1$s?</string>
-    <string name="delete_folder_watched_confirm_title">Usunąć obejrzane nagrania w %1$s?</string>
-    <plurals name="delete_folder_confirm_message">
-        <item quantity="one">%1$d nagranie (%2$s) zostanie usunięte z serwera.</item>
-        <item quantity="few">%1$d nagrania (%2$s) zostaną usunięte z serwera.</item>
-        <item quantity="many">%1$d nagrań (%2$s) zostanie usuniętych z serwera.</item>
-        <item quantity="other">%1$d nagrania (%2$s) zostanie usunięte z serwera.</item>
-    </plurals>
-    <plurals name="delete_folder_confirm_message_no_size">
-        <item quantity="one">%1$d nagranie zostanie usunięte z serwera.</item>
-        <item quantity="few">%1$d nagrania zostaną usunięte z serwera.</item>
-        <item quantity="many">%1$d nagrań zostanie usuniętych z serwera.</item>
-        <item quantity="other">%1$d nagrania zostanie usunięte z serwera.</item>
-    </plurals>
     <string name="delete_folder_running_kept">Trwające nagrania zostaną zachowane.</string>
     <string name="recording_loading">Wczytywanie nagrania…</string>
     <string name="recording_resume_from">Wznów od %1$s</string>
@@ -813,16 +797,8 @@
     <string name="server_remove_description">Usuń to połączenie z tego telewizora</string>
     <string name="server_account">Konto</string>
     <string name="server_enter_password">Wpisz hasło</string>
-    <string name="server_switch_title">Przełączyć na %1$s?</string>
-    <string name="server_switch_live">Telewizja na żywo zostanie zatrzymana. Aplikacja zaloguje się jako %1$s i wczyta kanały oraz program TV z tego serwera.</string>
-    <string name="server_switch_live_anonymous">Telewizja na żywo zostanie zatrzymana. Aplikacja połączy się bez logowania i wczyta kanały oraz program TV z tego serwera.</string>
-    <string name="server_switch_recording">Odtwarzanie nagrania zostanie zatrzymane. Aplikacja zaloguje się jako %1$s i wczyta kanały oraz program TV z tego serwera.</string>
-    <string name="server_switch_recording_anonymous">Odtwarzanie nagrania zostanie zatrzymane. Aplikacja połączy się bez logowania i wczyta kanały oraz program TV z tego serwera.</string>
     <string name="server_keep_watching">Oglądaj dalej</string>
     <string name="server_switch">Przełącz</string>
-    <string name="server_remove_title">Usunąć %1$s?</string>
-    <string name="server_remove_body">Ostatnie kanały, wybory dźwięku i zapisane obrazy dla %1$s zostaną usunięte z tego telewizora. Nagrania pozostaną na serwerze.</string>
-    <string name="server_remove_body_active">Telewizja na żywo zostanie zatrzymana i żadne połączenie nie będzie używane, dopóki go nie wybierzesz. Ostatnie kanały, wybory dźwięku i zapisane obrazy dla %1$s zostaną usunięte z tego telewizora. Nagrania pozostaną na serwerze.</string>
     <string name="server_add_name">Dodaj nazwę</string>
     <string name="server_name_title">Nazwij to połączenie</string>
     <string name="server_name_body">W ustawieniach zamiast adresu pojawi się nazwa. Pozostaw puste pole, aby wyświetlać %1$s.</string>

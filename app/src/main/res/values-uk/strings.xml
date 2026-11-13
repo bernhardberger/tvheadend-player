@@ -314,9 +314,7 @@
     <string name="cancel_recording">Скасувати запис</string>
     <string name="stop_recording">Зупинити запис</string>
     <string name="cancel_recording_confirm_title">Скасувати цей запис?</string>
-    <string name="cancel_recording_confirm_message">Передачу %1$s на каналі %2$s, %3$s, не буде записано.</string>
     <string name="stop_recording_confirm_title">Зупинити цей запис?</string>
-    <string name="stop_recording_confirm_message">Запис передачі %1$s зупиниться зараз. Уже записану частину буде збережено.</string>
     <string name="recording_status">Запис: %1$s</string>
     <string name="recording_state_scheduled">Заплановано</string>
     <string name="recording_state_recording">Триває запис</string>
@@ -438,20 +436,6 @@
     <string name="delete_recording_confirm_title">Видалити цей запис?</string>
     <string name="remove_entry">Прибрати елемент</string>
     <string name="remove_entry_confirm_title">Прибрати цей елемент?</string>
-    <string name="delete_folder_all_confirm_title">Видалити всі записи в %1$s?</string>
-    <string name="delete_folder_watched_confirm_title">Видалити переглянуті записи в %1$s?</string>
-    <plurals name="delete_folder_confirm_message">
-        <item quantity="one">%1$d запис (%2$s) буде видалено із сервера.</item>
-        <item quantity="few">%1$d записи (%2$s) буде видалено із сервера.</item>
-        <item quantity="many">%1$d записів (%2$s) буде видалено із сервера.</item>
-        <item quantity="other">%1$d запису (%2$s) буде видалено із сервера.</item>
-    </plurals>
-    <plurals name="delete_folder_confirm_message_no_size">
-        <item quantity="one">%1$d запис буде видалено із сервера.</item>
-        <item quantity="few">%1$d записи буде видалено із сервера.</item>
-        <item quantity="many">%1$d записів буде видалено із сервера.</item>
-        <item quantity="other">%1$d запису буде видалено із сервера.</item>
-    </plurals>
     <string name="delete_folder_running_kept">Поточні записи буде збережено.</string>
     <string name="recording_loading">Завантаження запису…</string>
     <string name="recording_resume_from">Продовжити з %1$s</string>
@@ -814,16 +798,8 @@
     <string name="server_remove_description">Видалити це підключення з цього телевізора</string>
     <string name="server_account">Обліковий запис</string>
     <string name="server_enter_password">Ввести пароль</string>
-    <string name="server_switch_title">Перемкнутися на %1$s?</string>
-    <string name="server_switch_live">Перегляд прямого ефіру зупиниться. Застосунок виконає вхід як %1$s і завантажить канали та телепрограму цього сервера.</string>
-    <string name="server_switch_live_anonymous">Перегляд прямого ефіру зупиниться. Застосунок підключиться без входу й завантажить канали та телепрограму цього сервера.</string>
-    <string name="server_switch_recording">Відтворення запису зупиниться. Застосунок виконає вхід як %1$s і завантажить канали та телепрограму цього сервера.</string>
-    <string name="server_switch_recording_anonymous">Відтворення запису зупиниться. Застосунок підключиться без входу й завантажить канали та телепрограму цього сервера.</string>
     <string name="server_keep_watching">Продовжити перегляд</string>
     <string name="server_switch">Перемкнутися</string>
-    <string name="server_remove_title">Видалити підключення %1$s?</string>
-    <string name="server_remove_body">Нещодавні канали, вибрані звукові доріжки та збережені зображення для %1$s буде видалено з цього телевізора. Записи залишаться на сервері.</string>
-    <string name="server_remove_body_active">Перегляд прямого ефіру зупиниться, і жодне підключення не використовуватиметься, доки ви не виберете його. Нещодавні канали, вибрані звукові доріжки та збережені зображення для %1$s буде видалено з цього телевізора. Записи залишаться на сервері.</string>
     <string name="server_add_name">Додати назву</string>
     <string name="server_name_title">Назвати це підключення</string>
     <string name="server_name_body">У налаштуваннях замість адреси відображатиметься назва. Залиште поле порожнім, щоб показувати %1$s.</string>

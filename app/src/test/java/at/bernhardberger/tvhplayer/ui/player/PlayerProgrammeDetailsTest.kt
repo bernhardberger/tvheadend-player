@@ -20,6 +20,15 @@ import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
+import at.bernhardberger.tvhplayer.settings.AppProfileOwner
+import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
+import at.bernhardberger.tvhplayer.ui.screens.ProgrammeDetailsHost
+import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
+import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
+import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore
+import kotlinx.coroutines.test.StandardTestDispatcher
+import org.koin.compose.KoinApplication
+import org.koin.dsl.module
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.screens.DvrMutationActions
 import kotlin.time.Instant
@@ -269,6 +278,11 @@ class PlayerProgrammeDetailsTest {
         val notices = NoticeCenter({ 0L }) { NoticeContext(0, null) }
         val settings = UiSettingsStore(ApplicationProvider.getApplicationContext<Application>())
         compose.setContent {
+            KoinApplication(application = { modules(module {
+                single { AppProfileOwner(FakeTvheadendSession(observation), FakeServerProfileStore(),
+                    PlayerSettingsStore(InMemoryPreferencesDataStore()), StandardTestDispatcher(),
+                    readProfileForEditing = { ServerProfileEditReadResult.Missing }) }
+            }) }) {
             var opened by remember { mutableStateOf(false) }
             var restore by remember { mutableStateOf<String?>("player-info") }
             val scope = rememberCoroutineScope()
@@ -310,7 +324,7 @@ class PlayerProgrammeDetailsTest {
                     if (recording) RecordingPlayerDetails(entry, observation, observation, { observation },
                         2_000, mutations, notices, scope,
                         onPlayRecording = { _, _ -> error("Unexpected playback command") }, onClose = close)
-                    else if (browse) at.bernhardberger.tvhplayer.ui.screens.ProgrammeDetailsHost(
+                    else if (browse) ProgrammeDetailsHost(
                         watched, observation, observation, { observation }, { nowSec },
                         showContextMenu = false, onShowDetails = {}, mutations = mutations, notices = notices,
                         mutationScope = scope, mutationInFlight = remember { mutableStateOf(null) },
@@ -326,6 +340,7 @@ class PlayerProgrammeDetailsTest {
                 }
             }
             }
+        }
         }
         settle()
     }

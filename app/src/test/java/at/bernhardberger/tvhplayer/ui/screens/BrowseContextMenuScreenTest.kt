@@ -1,4 +1,10 @@
 package at.bernhardberger.tvhplayer.ui.screens
+import at.bernhardberger.tvhplayer.settings.AppProfileOwner
+import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
+import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
+import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
+import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore
+import kotlinx.coroutines.test.StandardTestDispatcher
 import at.bernhardberger.tvhplayer.testutil.settleFrames
 
 import at.bernhardberger.tvhplayer.testutil.pressKey
@@ -1415,6 +1421,9 @@ class BrowseContextMenuScreenTest {
         val dependencies = module {
             single<TvheadendSession> { screenSession }; single { notices }
             single { settings }
+            single { AppProfileOwner(screenSession, FakeServerProfileStore(),
+                PlayerSettingsStore(InMemoryPreferencesDataStore()), StandardTestDispatcher(),
+                readProfileForEditing = { ServerProfileEditReadResult.Missing }) }
         }
         val application = org.koin.dsl.koinApplication { modules(dependencies) }
         images.install(FixtureArt.imageLoader(context, if (imageProbe) mapOf(

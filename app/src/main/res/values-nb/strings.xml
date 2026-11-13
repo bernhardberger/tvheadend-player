@@ -314,9 +314,7 @@
     <string name="cancel_recording">Avlys opptak</string>
     <string name="stop_recording">Stopp opptak</string>
     <string name="cancel_recording_confirm_title">Avlyse dette opptaket?</string>
-    <string name="cancel_recording_confirm_message">%1$s på %2$s, %3$s, blir ikke tatt opp.</string>
     <string name="stop_recording_confirm_title">Stoppe dette opptaket?</string>
-    <string name="stop_recording_confirm_message">Opptaket av %1$s stopper nå. Det som allerede er tatt opp, beholdes.</string>
     <string name="recording_status">Opptak: %1$s</string>
     <string name="recording_state_scheduled">Planlagt</string>
     <string name="recording_state_recording">Tar opp nå</string>
@@ -424,16 +422,6 @@
     <string name="delete_recording_confirm_title">Slette dette opptaket?</string>
     <string name="remove_entry">Fjern oppføring</string>
     <string name="remove_entry_confirm_title">Fjerne denne oppføringen?</string>
-    <string name="delete_folder_all_confirm_title">Slette alle opptak i %1$s?</string>
-    <string name="delete_folder_watched_confirm_title">Slette sette opptak i %1$s?</string>
-    <plurals name="delete_folder_confirm_message">
-        <item quantity="one">%1$d opptak (%2$s) blir slettet fra serveren.</item>
-        <item quantity="other">%1$d opptak (%2$s) blir slettet fra serveren.</item>
-    </plurals>
-    <plurals name="delete_folder_confirm_message_no_size">
-        <item quantity="one">%1$d opptak blir slettet fra serveren.</item>
-        <item quantity="other">%1$d opptak blir slettet fra serveren.</item>
-    </plurals>
     <string name="delete_folder_running_kept">Pågående opptak beholdes.</string>
     <string name="recording_loading">Laster inn opptak…</string>
     <string name="recording_resume_from">Fortsett fra %1$s</string>
@@ -781,16 +769,8 @@
     <string name="server_remove_description">Slett denne tilkoblingen fra denne TV-en</string>
     <string name="server_account">Konto</string>
     <string name="server_enter_password">Skriv inn passord</string>
-    <string name="server_switch_title">Bytte til %1$s?</string>
-    <string name="server_switch_live">Direktesendt TV stopper. Appen logger på som %1$s og laster inn serverens kanaler og TV-guide.</string>
-    <string name="server_switch_live_anonymous">Direktesendt TV stopper. Appen kobler til uten pålogging og laster inn serverens kanaler og TV-guide.</string>
-    <string name="server_switch_recording">Avspillingen av opptaket stopper. Appen logger på som %1$s og laster inn serverens kanaler og TV-guide.</string>
-    <string name="server_switch_recording_anonymous">Avspillingen av opptaket stopper. Appen kobler til uten pålogging og laster inn serverens kanaler og TV-guide.</string>
     <string name="server_keep_watching">Fortsett å se</string>
     <string name="server_switch">Bytt</string>
-    <string name="server_remove_title">Fjerne %1$s?</string>
-    <string name="server_remove_body">Siste kanaler, lydvalg og lagrede bilder for %1$s slettes fra denne TV-en. Opptakene blir værende på serveren.</string>
-    <string name="server_remove_body_active">Direktesendt TV stopper, og ingen tilkobling er i bruk før du velger en. Siste kanaler, lydvalg og lagrede bilder for %1$s slettes fra denne TV-en. Opptakene blir værende på serveren.</string>
     <string name="server_add_name">Legg til et navn</string>
     <string name="server_name_title">Gi denne tilkoblingen et navn</string>
     <string name="server_name_body">Innstillinger viser navnet i stedet for adressen. La feltet stå tomt for å vise %1$s.</string>

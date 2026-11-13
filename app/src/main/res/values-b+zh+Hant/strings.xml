@@ -314,9 +314,7 @@
     <string name="cancel_recording">取消錄影</string>
     <string name="stop_recording">停止錄影</string>
     <string name="cancel_recording_confirm_title">取消此錄影預約？</string>
-    <string name="cancel_recording_confirm_message">不會錄製%2$s頻道於%3$s播出的%1$s。</string>
     <string name="stop_recording_confirm_title">停止此次錄影？</string>
-    <string name="stop_recording_confirm_message">立即停止錄製%1$s。已錄製的內容會保留。</string>
     <string name="recording_status">錄影：%1$s</string>
     <string name="recording_state_scheduled">已預約</string>
     <string name="recording_state_recording">錄影中</string>
@@ -403,10 +401,6 @@
     <string name="delete_recording_confirm_title">刪除此錄影？</string>
     <string name="remove_entry">移除項目</string>
     <string name="remove_entry_confirm_title">移除此項目？</string>
-    <string name="delete_folder_all_confirm_title">刪除%1$s中的所有錄影？</string>
-    <string name="delete_folder_watched_confirm_title">刪除%1$s中已看的錄影？</string>
-    <plurals name="delete_folder_confirm_message"><item quantity="other">將從伺服器刪除%1$d項錄影（%2$s）。</item></plurals>
-    <plurals name="delete_folder_confirm_message_no_size"><item quantity="other">將從伺服器刪除%1$d項錄影。</item></plurals>
     <string name="delete_folder_running_kept">仍在錄製的內容會保留。</string>
     <string name="recording_loading">正在載入錄影…</string>
     <string name="recording_resume_from">從%1$s繼續播放</string>
@@ -735,16 +729,8 @@
     <string name="server_remove_description">從這台電視刪除此連線</string>
     <string name="server_account">帳號</string>
     <string name="server_enter_password">輸入密碼</string>
-    <string name="server_switch_title">切換至%1$s？</string>
-    <string name="server_switch_live">電視直播將停止播放。應用程式將以%1$s身分登入，並載入該伺服器的頻道和節目表。</string>
-    <string name="server_switch_live_anonymous">電視直播將停止播放。應用程式將不登入，直接連線並載入該伺服器的頻道和節目表。</string>
-    <string name="server_switch_recording">錄影將停止播放。應用程式將以%1$s身分登入，並載入該伺服器的頻道和節目表。</string>
-    <string name="server_switch_recording_anonymous">錄影將停止播放。應用程式將不登入，直接連線並載入該伺服器的頻道和節目表。</string>
     <string name="server_keep_watching">繼續觀看</string>
     <string name="server_switch">切換</string>
-    <string name="server_remove_title">移除%1$s？</string>
-    <string name="server_remove_body">這台電視上%1$s的最近觀看頻道、音訊選擇和已儲存圖片將被刪除。錄影會保留在伺服器上。</string>
-    <string name="server_remove_body_active">電視直播將停止播放，選取連線前不會使用任何連線。這台電視上%1$s的最近觀看頻道、音訊選擇和已儲存圖片將被刪除。錄影會保留在伺服器上。</string>
     <string name="server_add_name">新增名稱</string>
     <string name="server_name_title">為此連線命名</string>
     <string name="server_name_body">設定中會顯示名稱而非位址。留空則顯示%1$s。</string>

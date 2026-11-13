@@ -314,9 +314,7 @@
     <string name="cancel_recording">Otkaži snimanje</string>
     <string name="stop_recording">Zaustavi snimanje</string>
     <string name="cancel_recording_confirm_title">Otkazati ovo snimanje?</string>
-    <string name="cancel_recording_confirm_message">Emisija %1$s na kanalu %2$s, %3$s, neće biti snimljena.</string>
     <string name="stop_recording_confirm_title">Zaustaviti ovo snimanje?</string>
-    <string name="stop_recording_confirm_message">Snimanje emisije %1$s sada se zaustavlja. Dosad snimljeni dio ostaje sačuvan.</string>
     <string name="recording_status">Snimanje: %1$s</string>
     <string name="recording_state_scheduled">Zakazano</string>
     <string name="recording_state_recording">Snimanje u tijeku</string>
@@ -431,18 +429,6 @@
     <string name="delete_recording_confirm_title">Izbrisati ovu snimku?</string>
     <string name="remove_entry">Ukloni stavku</string>
     <string name="remove_entry_confirm_title">Ukloniti ovu stavku?</string>
-    <string name="delete_folder_all_confirm_title">Izbrisati sve snimke u %1$s?</string>
-    <string name="delete_folder_watched_confirm_title">Izbrisati pogledane snimke u %1$s?</string>
-    <plurals name="delete_folder_confirm_message">
-        <item quantity="one">%1$d snimka (%2$s) bit će izbrisana s poslužitelja.</item>
-        <item quantity="few">%1$d snimke (%2$s) bit će izbrisane s poslužitelja.</item>
-        <item quantity="other">%1$d snimki (%2$s) bit će izbrisano s poslužitelja.</item>
-    </plurals>
-    <plurals name="delete_folder_confirm_message_no_size">
-        <item quantity="one">%1$d snimka bit će izbrisana s poslužitelja.</item>
-        <item quantity="few">%1$d snimke bit će izbrisane s poslužitelja.</item>
-        <item quantity="other">%1$d snimki bit će izbrisano s poslužitelja.</item>
-    </plurals>
     <string name="delete_folder_running_kept">Snimke koje su još u tijeku ostaju sačuvane.</string>
     <string name="recording_loading">Učitavanje snimke…</string>
     <string name="recording_resume_from">Nastavi od %1$s</string>
@@ -798,16 +784,8 @@
     <string name="server_remove_description">Izbriši ovu vezu s ovog TV-a</string>
     <string name="server_account">Račun</string>
     <string name="server_enter_password">Unesi lozinku</string>
-    <string name="server_switch_title">Prebaci se na %1$s?</string>
-    <string name="server_switch_live">TV uživo se zaustavlja. Aplikacija se prijavljuje kao %1$s i učitava kanale i TV vodič tog poslužitelja.</string>
-    <string name="server_switch_live_anonymous">TV uživo se zaustavlja. Aplikacija se povezuje bez prijave i učitava kanale i TV vodič tog poslužitelja.</string>
-    <string name="server_switch_recording">Reprodukcija snimke se zaustavlja. Aplikacija se prijavljuje kao %1$s i učitava kanale i TV vodič tog poslužitelja.</string>
-    <string name="server_switch_recording_anonymous">Reprodukcija snimke se zaustavlja. Aplikacija se povezuje bez prijave i učitava kanale i TV vodič tog poslužitelja.</string>
     <string name="server_keep_watching">Nastavi gledati</string>
     <string name="server_switch">Prebaci</string>
-    <string name="server_remove_title">Ukloniti %1$s?</string>
-    <string name="server_remove_body">Nedavni kanali, odabiri zvuka i spremljene slike za %1$s brišu se s ovog TV-a. Snimke ostaju na poslužitelju.</string>
-    <string name="server_remove_body_active">TV uživo se zaustavlja i nijedna veza nije u upotrebi dok ne odabereš jednu. Nedavni kanali, odabiri zvuka i spremljene slike za %1$s brišu se s ovog TV-a. Snimke ostaju na poslužitelju.</string>
     <string name="server_add_name">Dodaj naziv</string>
     <string name="server_name_title">Imenuj ovu vezu</string>
     <string name="server_name_body">U postavkama se prikazuje naziv umjesto adrese. Ostavi polje prazno za prikaz %1$s.</string>

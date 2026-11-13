@@ -39,16 +39,16 @@
     <string name="server_remove_description">Delete this connection from this TV</string>
     <string name="server_account">Account</string>
     <string name="server_enter_password">Enter password</string>
-    <string name="server_switch_title">Switch to %1$s?</string>
-    <string name="server_switch_live">Live TV stops. The app signs in as %1$s and loads that server’s channels and guide.</string>
-    <string name="server_switch_live_anonymous">Live TV stops. The app connects without sign-in and loads that server’s channels and guide.</string>
-    <string name="server_switch_recording">The recording stops. The app signs in as %1$s and loads that server’s channels and guide.</string>
-    <string name="server_switch_recording_anonymous">The recording stops. The app connects without sign-in and loads that server’s channels and guide.</string>
+    <string name="server_switch_question">Switch to this server?</string>
+    <string name="server_switch_live_body">Live TV stops, and the app loads that server\'s channels and guide.</string>
+    <string name="server_switch_recording_body">The recording stops, and the app loads that server\'s channels and guide.</string>
+    <string name="server_confirmation_account_detail">%1$s · %2$s:%3$d</string>
+    <string name="server_confirmation_anonymous_detail">No sign-in · %1$s:%2$d</string>
     <string name="server_keep_watching">Keep watching</string>
     <string name="server_switch">Switch</string>
-    <string name="server_remove_title">Remove %1$s?</string>
-    <string name="server_remove_body">Recent channels, audio choices and saved pictures for %1$s are deleted from this TV. Recordings stay on the server.</string>
-    <string name="server_remove_body_active">Live TV stops and no connection is in use until you choose one. Recent channels, audio choices and saved pictures for %1$s are deleted from this TV. Recordings stay on the server.</string>
+    <string name="server_remove_question">Remove this connection?</string>
+    <string name="server_remove_body">Its recent channels, audio choices and saved pictures are deleted from this TV. Recordings stay on the server.</string>
+    <string name="server_remove_body_active">Playback stops, and no connection is in use until you choose one. Its recent channels, audio choices and saved pictures are deleted from this TV. Recordings stay on the server.</string>
     <string name="server_add_name">Add a name</string>
     <string name="server_name_title">Name this connection</string>
     <string name="server_name_body">Settings shows the name instead of the address. Leave it empty to show %1$s.</string>
@@ -516,10 +516,8 @@
     <string name="stop_recording">Stop recording</string>
     <string name="cancel_recording_confirm_title">Cancel this recording?</string>
     <!-- Dialog body before canceling a scheduled recording. %1$s = program title, %2$s = channel name, %3$s = date and time. -->
-    <string name="cancel_recording_confirm_message">%1$s on %2$s, %3$s, won\'t be recorded.</string>
     <string name="stop_recording_confirm_title">Stop this recording?</string>
     <!-- Dialog body before stopping a running recording. %1$s = program title. Escape apostrophes as \'. -->
-    <string name="stop_recording_confirm_message">%1$s stops recording now. What\'s recorded so far is kept.</string>
     <!-- Sentence under the stopped recording's panel when it has a listed end still ahead. %1$s = duration recorded so far, %2$s = duration left until the listed end; each from one hour as hours and minutes ("1:05"), otherwise spelled-out minutes ("45 minutes"). -->
     <string name="stop_recording_confirm_body">The %1$s recorded so far is kept. The last %2$s won\'t be recorded.</string>
     <!-- Sentence under the stopped recording's panel when it is past its listed end or has none. %1$s = duration recorded so far: from one hour as hours and minutes ("2:05"), otherwise spelled-out minutes ("45 minutes"). -->
@@ -639,17 +637,9 @@
     <string name="remove_entry_confirm_title">Remove this entry?</string>
     <!-- Sentence under the panel of an entry without a file about to be removed. -->
     <string name="remove_entry_confirm_body">It\'s removed from the server\'s list.</string>
-    <string name="delete_folder_all_confirm_title">Delete all recordings in %1$s?</string>
-    <string name="delete_folder_watched_confirm_title">Delete watched recordings in %1$s?</string>
-    <!-- Confirmation dialog body before deleting a folder's recordings. %1$d = count, %2$s = total file size such as "4.2 GB". -->
-    <plurals name="delete_folder_confirm_message">
-        <item quantity="one">%1$d recording (%2$s) will be deleted from the server.</item>
-        <item quantity="other">%1$d recordings (%2$s) will be deleted from the server.</item>
-    </plurals>
-    <plurals name="delete_folder_confirm_message_no_size">
-        <item quantity="one">%1$d recording will be deleted from the server.</item>
-        <item quantity="other">%1$d recordings will be deleted from the server.</item>
-    </plurals>
+    <string name="delete_folder_all_confirm_question">Delete all the recordings in this folder?</string>
+    <string name="delete_folder_watched_confirm_question">Delete all watched recordings in this folder?</string>
+    <string name="delete_folder_confirm_body">They\'re deleted from the server.</string>
     <string name="delete_folder_running_kept">Recordings still running are kept.</string>
     <string name="recording_loading">Loading recording…</string>
     <string name="recording_resume_from">Resume from %1$s</string>

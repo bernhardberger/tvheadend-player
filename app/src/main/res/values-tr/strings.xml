@@ -314,9 +314,7 @@
     <string name="cancel_recording">Kaydı iptal et</string>
     <string name="stop_recording">Kaydı durdur</string>
     <string name="cancel_recording_confirm_title">Bu kayıt iptal edilsin mi?</string>
-    <string name="cancel_recording_confirm_message">%2$s kanalındaki %1$s (%3$s) kaydedilmeyecek.</string>
     <string name="stop_recording_confirm_title">Bu kayıt durdurulsun mu?</string>
-    <string name="stop_recording_confirm_message">%1$s kaydı şimdi duracak. Şimdiye kadar kaydedilen bölüm saklanacak.</string>
     <string name="recording_status">Kayıt: %1$s</string>
     <string name="recording_state_scheduled">Planlandı</string>
     <string name="recording_state_recording">Şimdi kaydediliyor</string>
@@ -424,16 +422,6 @@
     <string name="delete_recording_confirm_title">Bu kayıt silinsin mi?</string>
     <string name="remove_entry">Girdiyi kaldır</string>
     <string name="remove_entry_confirm_title">Bu girdi kaldırılsın mı?</string>
-    <string name="delete_folder_all_confirm_title">%1$s içindeki tüm kayıtlar silinsin mi?</string>
-    <string name="delete_folder_watched_confirm_title">%1$s içindeki izlenen kayıtlar silinsin mi?</string>
-    <plurals name="delete_folder_confirm_message">
-        <item quantity="one">%1$d kayıt (%2$s) sunucudan silinecek.</item>
-        <item quantity="other">%1$d kayıt (%2$s) sunucudan silinecek.</item>
-    </plurals>
-    <plurals name="delete_folder_confirm_message_no_size">
-        <item quantity="one">%1$d kayıt sunucudan silinecek.</item>
-        <item quantity="other">%1$d kayıt sunucudan silinecek.</item>
-    </plurals>
     <string name="delete_folder_running_kept">Süren kayıtlar saklanacak.</string>
     <string name="recording_loading">Kayıt yükleniyor…</string>
     <string name="recording_resume_from">%1$s konumundan devam et</string>
@@ -781,16 +769,8 @@
     <string name="server_remove_description">Bu bağlantıyı bu TV’den sil</string>
     <string name="server_account">Hesap</string>
     <string name="server_enter_password">Parolayı girin</string>
-    <string name="server_switch_title">Bağlantı değiştirilsin mi: %1$s?</string>
-    <string name="server_switch_live">Canlı TV durur. Uygulama %1$s olarak oturum açar ve o sunucunun kanallarını ve rehberini yükler.</string>
-    <string name="server_switch_live_anonymous">Canlı TV durur. Uygulama oturum açmadan bağlanır ve o sunucunun kanallarını ve rehberini yükler.</string>
-    <string name="server_switch_recording">Kaydın oynatılması durur. Uygulama %1$s olarak oturum açar ve o sunucunun kanallarını ve rehberini yükler.</string>
-    <string name="server_switch_recording_anonymous">Kaydın oynatılması durur. Uygulama oturum açmadan bağlanır ve o sunucunun kanallarını ve rehberini yükler.</string>
     <string name="server_keep_watching">İzlemeye devam et</string>
     <string name="server_switch">Değiştir</string>
-    <string name="server_remove_title">Kaldırılsın mı: %1$s?</string>
-    <string name="server_remove_body">%1$s için son kanallar, ses seçimleri ve kayıtlı resimler bu TV’den silinir. Kayıtlar sunucuda kalır.</string>
-    <string name="server_remove_body_active">Canlı TV durur ve siz bir bağlantı seçene kadar hiçbir bağlantı kullanımda olmaz. %1$s için son kanallar, ses seçimleri ve kayıtlı resimler bu TV’den silinir. Kayıtlar sunucuda kalır.</string>
     <string name="server_add_name">Ad ekle</string>
     <string name="server_name_title">Bu bağlantıya ad verin</string>
     <string name="server_name_body">Ayarlarda adres yerine ad gösterilir. %1$s gösterilsin istiyorsanız alanı boş bırakın.</string>

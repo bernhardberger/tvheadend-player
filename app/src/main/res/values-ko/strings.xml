@@ -314,9 +314,7 @@
     <string name="cancel_recording">녹화 예약 취소</string>
     <string name="stop_recording">녹화 중지</string>
     <string name="cancel_recording_confirm_title">이 녹화 예약을 취소할까요?</string>
-    <string name="cancel_recording_confirm_message">%2$s에서 %3$s에 방송되는 %1$s 프로그램은 녹화되지 않습니다.</string>
     <string name="stop_recording_confirm_title">이 녹화를 중지할까요?</string>
-    <string name="stop_recording_confirm_message">%1$s 녹화가 지금 중지됩니다. 지금까지 녹화된 내용은 보관됩니다.</string>
     <string name="recording_status">녹화: %1$s</string>
     <string name="recording_state_scheduled">예약됨</string>
     <string name="recording_state_recording">녹화 중</string>
@@ -417,14 +415,6 @@
     <string name="delete_recording_confirm_title">이 녹화를 삭제할까요?</string>
     <string name="remove_entry">항목 제거</string>
     <string name="remove_entry_confirm_title">이 항목을 제거할까요?</string>
-    <string name="delete_folder_all_confirm_title">%1$s의 모든 녹화를 삭제할까요?</string>
-    <string name="delete_folder_watched_confirm_title">%1$s에서 시청 완료한 녹화를 삭제할까요?</string>
-    <plurals name="delete_folder_confirm_message">
-        <item quantity="other">녹화 %1$d개(%2$s)가 서버에서 삭제됩니다.</item>
-    </plurals>
-    <plurals name="delete_folder_confirm_message_no_size">
-        <item quantity="other">녹화 %1$d개가 서버에서 삭제됩니다.</item>
-    </plurals>
     <string name="delete_folder_running_kept">진행 중인 녹화는 보관됩니다.</string>
     <string name="recording_loading">녹화 불러오는 중…</string>
     <string name="recording_resume_from">%1$s부터 이어서 재생</string>
@@ -765,16 +755,8 @@
     <string name="server_remove_description">이 TV에서 이 연결 삭제</string>
     <string name="server_account">계정</string>
     <string name="server_enter_password">비밀번호 입력</string>
-    <string name="server_switch_title">%1$s 연결로 전환할까요?</string>
-    <string name="server_switch_live">실시간 TV 재생이 중지됩니다. 앱이 %1$s 계정으로 로그인하고 해당 서버의 채널과 편성표를 불러옵니다.</string>
-    <string name="server_switch_live_anonymous">실시간 TV 재생이 중지됩니다. 앱이 로그인 없이 연결하고 해당 서버의 채널과 편성표를 불러옵니다.</string>
-    <string name="server_switch_recording">녹화 재생이 중지됩니다. 앱이 %1$s 계정으로 로그인하고 해당 서버의 채널과 편성표를 불러옵니다.</string>
-    <string name="server_switch_recording_anonymous">녹화 재생이 중지됩니다. 앱이 로그인 없이 연결하고 해당 서버의 채널과 편성표를 불러옵니다.</string>
     <string name="server_keep_watching">계속 시청</string>
     <string name="server_switch">전환</string>
-    <string name="server_remove_title">%1$s 연결을 삭제할까요?</string>
-    <string name="server_remove_body">%1$s 연결의 최근 채널, 오디오 선택 사항 및 저장된 이미지가 이 TV에서 삭제됩니다. 녹화는 서버에 남아 있습니다.</string>
-    <string name="server_remove_body_active">실시간 TV 재생이 중지되며 연결을 선택할 때까지 사용 중인 연결이 없게 됩니다. %1$s 연결의 최근 채널, 오디오 선택 사항 및 저장된 이미지가 이 TV에서 삭제됩니다. 녹화는 서버에 남아 있습니다.</string>
     <string name="server_add_name">이름 추가</string>
     <string name="server_name_title">이 연결의 이름 지정</string>
     <string name="server_name_body">설정에 주소 대신 이름이 표시됩니다. 비워 두면 다음이 표시됩니다: %1$s</string>

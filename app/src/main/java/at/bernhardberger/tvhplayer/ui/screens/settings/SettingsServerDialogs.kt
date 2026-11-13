@@ -7,7 +7,10 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
-import at.bernhardberger.tvhplayer.ui.components.CentredDialog
+import at.bernhardberger.tvhplayer.ui.components.ConfirmationChoice
+import at.bernhardberger.tvhplayer.ui.components.ConfirmationDialog
+import at.bernhardberger.tvhplayer.ui.components.ConfirmationSubject
+import at.bernhardberger.tvhplayer.ui.components.ServerAvatarLook
 import org.koin.compose.koinInject
 
 internal const val SWITCH_KEEP = "server-switch-keep"
@@ -45,29 +48,21 @@ internal fun rememberPlaybackStop(runtime: AppPlaybackRuntime = koinInject()): s
 @Composable
 internal fun SwitchServerDialog(
     name: String,
-    username: String?,
+    look: ServerAvatarLook,
+    detail: String,
     interruption: PlaybackInterruption,
     onSwitch: () -> Unit,
     onKeep: () -> Unit,
 ) {
     val recording = interruption == PlaybackInterruption.RECORDING
-    CentredDialog(
-        title = stringResource(R.string.server_switch_title, name),
-        message = when {
-            username == null -> stringResource(
-                if (recording) R.string.server_switch_recording_anonymous else R.string.server_switch_live_anonymous,
-            )
-            else -> stringResource(
-                if (recording) R.string.server_switch_recording else R.string.server_switch_live, username,
-            )
-        },
-        firstLabel = stringResource(R.string.server_keep_watching),
-        secondLabel = stringResource(R.string.server_switch),
-        onFirst = onKeep,
-        onSecond = onSwitch,
+    ConfirmationDialog(
+        question = stringResource(R.string.server_switch_question),
+        subject = ConfirmationSubject.Server(look, name, detail),
+        sentence = stringResource(if (recording) R.string.server_switch_recording_body else R.string.server_switch_live_body),
+        safe = ConfirmationChoice(stringResource(R.string.server_keep_watching), R.drawable.ic_check, SWITCH_KEEP),
+        action = ConfirmationChoice(stringResource(R.string.server_switch), R.drawable.ic_swap_horiz, SWITCH_CONFIRM),
+        onConfirm = onSwitch,
         onDismiss = onKeep,
-        firstTag = SWITCH_KEEP,
-        secondTag = SWITCH_CONFIRM,
     )
 }
 
@@ -75,19 +70,24 @@ internal fun SwitchServerDialog(
 @Composable
 internal fun RemoveServerDialog(
     name: String,
+    look: ServerAvatarLook,
+    detail: String,
     active: Boolean,
     onRemove: () -> Unit,
     onKeep: () -> Unit,
 ) {
-    CentredDialog(
-        title = stringResource(R.string.server_remove_title, name),
-        message = stringResource(if (active) R.string.server_remove_body_active else R.string.server_remove_body, name),
-        firstLabel = stringResource(R.string.keep),
-        secondLabel = stringResource(R.string.server_remove),
-        onFirst = onKeep,
-        onSecond = onRemove,
+    ConfirmationDialog(
+        question = stringResource(R.string.server_remove_question),
+        subject = ConfirmationSubject.Server(look, name, detail),
+        sentence = stringResource(if (active) R.string.server_remove_body_active else R.string.server_remove_body),
+        safe = ConfirmationChoice(stringResource(R.string.keep), R.drawable.ic_check, REMOVE_KEEP),
+        action = ConfirmationChoice(stringResource(R.string.server_remove), R.drawable.ic_delete_outlined, REMOVE_CONFIRM),
+        onConfirm = onRemove,
         onDismiss = onKeep,
-        firstTag = REMOVE_KEEP,
-        secondTag = REMOVE_CONFIRM,
     )
 }
+
+@Composable
+internal fun serverConfirmationDetail(host: String, port: Int, username: String?): String =
+    if (username.isNullOrBlank()) stringResource(R.string.server_confirmation_anonymous_detail, host, port)
+    else stringResource(R.string.server_confirmation_account_detail, username, host, port)

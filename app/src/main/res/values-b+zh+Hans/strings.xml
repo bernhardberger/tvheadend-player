@@ -314,9 +314,7 @@
     <string name="cancel_recording">取消录制</string>
     <string name="stop_recording">停止录制</string>
     <string name="cancel_recording_confirm_title">取消此录制预约？</string>
-    <string name="cancel_recording_confirm_message">不会录制%2$s频道于%3$s播出的%1$s。</string>
     <string name="stop_recording_confirm_title">停止此次录制？</string>
-    <string name="stop_recording_confirm_message">立即停止录制%1$s。已录制的内容会保留。</string>
     <string name="recording_status">录制：%1$s</string>
     <string name="recording_state_scheduled">已预约</string>
     <string name="recording_state_recording">正在录制</string>
@@ -403,10 +401,6 @@
     <string name="delete_recording_confirm_title">删除此录制内容？</string>
     <string name="remove_entry">移除条目</string>
     <string name="remove_entry_confirm_title">移除此条目？</string>
-    <string name="delete_folder_all_confirm_title">删除%1$s中的所有录制内容？</string>
-    <string name="delete_folder_watched_confirm_title">删除%1$s中已看的录制内容？</string>
-    <plurals name="delete_folder_confirm_message"><item quantity="other">将从服务器删除%1$d项录制内容（%2$s）。</item></plurals>
-    <plurals name="delete_folder_confirm_message_no_size"><item quantity="other">将从服务器删除%1$d项录制内容。</item></plurals>
     <string name="delete_folder_running_kept">仍在录制的内容会保留。</string>
     <string name="recording_loading">正在加载录制内容…</string>
     <string name="recording_resume_from">从%1$s继续播放</string>
@@ -735,16 +729,8 @@
     <string name="server_remove_description">从此电视删除此连接</string>
     <string name="server_account">账号</string>
     <string name="server_enter_password">输入密码</string>
-    <string name="server_switch_title">切换到%1$s？</string>
-    <string name="server_switch_live">电视直播将停止播放。应用将以%1$s身份登录，并加载该服务器的频道和节目指南。</string>
-    <string name="server_switch_live_anonymous">电视直播将停止播放。应用将不登录，直接连接并加载该服务器的频道和节目指南。</string>
-    <string name="server_switch_recording">录制内容将停止播放。应用将以%1$s身份登录，并加载该服务器的频道和节目指南。</string>
-    <string name="server_switch_recording_anonymous">录制内容将停止播放。应用将不登录，直接连接并加载该服务器的频道和节目指南。</string>
     <string name="server_keep_watching">继续观看</string>
     <string name="server_switch">切换</string>
-    <string name="server_remove_title">删除%1$s？</string>
-    <string name="server_remove_body">此电视上%1$s的最近观看频道、音频选择和已保存图片将被删除。录制内容将保留在服务器上。</string>
-    <string name="server_remove_body_active">电视直播将停止播放，在选择连接之前不会使用任何连接。此电视上%1$s的最近观看频道、音频选择和已保存图片将被删除。录制内容将保留在服务器上。</string>
     <string name="server_add_name">添加名称</string>
     <string name="server_name_title">为此连接命名</string>
     <string name="server_name_body">设置中将显示名称而非地址。留空则显示%1$s。</string>

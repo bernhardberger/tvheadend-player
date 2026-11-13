@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -31,6 +32,9 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvheadend.sdk.core.DvrConfigId
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent
+import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.core.DvrRecordingFile
 import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
@@ -41,7 +45,9 @@ import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.core.ProgrammeAction
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
+import at.bernhardberger.tvhplayer.testutil.settleFrames
 import at.bernhardberger.tvhplayer.ui.common.formatHoursMinutes
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.testutil.VisualCapture
@@ -52,6 +58,13 @@ import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 import at.bernhardberger.tvhplayer.ui.components.ServerAvatarLook
 import at.bernhardberger.tvhplayer.ui.screens.recordings.PendingRecordingAction
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingConfirmationDialog
+import at.bernhardberger.tvhplayer.ui.screens.guide.ConfirmProgrammeActionDialog
+import at.bernhardberger.tvhplayer.ui.screens.settings.PlaybackInterruption
+import at.bernhardberger.tvhplayer.ui.screens.settings.SwitchServerDialog
+import at.bernhardberger.tvhplayer.ui.screens.settings.RemoveServerDialog
+import at.bernhardberger.tvhplayer.ui.screens.settings.SWITCH_KEEP
+import at.bernhardberger.tvhplayer.ui.screens.settings.REMOVE_KEEP
+import at.bernhardberger.tvhplayer.ui.screens.settings.serverConfirmationDetail
 import java.io.File
 import java.util.TimeZone
 import kotlin.time.Instant
@@ -67,7 +80,7 @@ import org.robolectric.annotation.GraphicsMode
 
 /**
  * Confirmation card evidence, one scene per centre-dialog round 8 H3 mockup: recording confirmations
- * through [RecordingConfirmationDialog], target-row, folder and server scenes through the component.
+ * through [RecordingConfirmationDialog], Guide and server callers, and folder card resources.
  * 960×540 dp, English, font scale 1.0, safe button focused, fictional fixture art.
  * Writes to build/outputs/centre-dialog-captures (ignored).
  */
@@ -134,15 +147,22 @@ class ConfirmationDialogCaptureTest {
         channel(5, "Ion Frame", "ion-frame"), now = "2026-10-03T19:00:00Z")
 
     /** Another user's scheduled recording, with the owner row. */
-    @Test fun cancelOwner() = component("cancel-owner") {
-        ConfirmationDialog(
-            question = stringResource(R.string.cancel_recording_confirm_title),
-            subject = programme("Lantern Road", "lantern-road", 5, "Ion Frame", "ion-frame", "Today 21:30–22:00",
-                target = stringResource(R.string.recording_confirmation_owner, "anna.berger")),
-            sentence = stringResource(R.string.cancel_recording_confirm_body),
-            safe = keep(R.string.keep_recording), action = choice(R.string.cancel_recording, R.drawable.ic_close),
-            onDismiss = {}, onConfirm = {},
-        )
+    @OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
+    @Test fun cancelOwner() {
+        val channel = channel(5, "Ion Frame", "ion-frame")
+        val event = EpgEvent.create(EventId(1), channel.id, Instant.parse("2026-10-03T21:30:00Z"),
+            Instant.parse("2026-10-03T22:00:00Z"), title = "Lantern Road", image = ArtworkId(ART.getValue("lantern-road")))
+        val entries = SessionObservation.create(dvrState = DvrRepositoryState.Current(DvrSnapshot.create(listOf(
+            DvrEntry.create(DvrEntryId(1), eventId = event.id, state = DvrEntryState.SCHEDULED,
+                configId = DvrConfigId("one"), owner = "Fixture owner", creator = null),
+            DvrEntry.create(DvrEntryId(2), eventId = event.id, state = DvrEntryState.SCHEDULED,
+                configId = DvrConfigId("one"), owner = "Other fixture owner", creator = null),
+        )))).dvrEntriesForEvent(event)
+        component("cancel-owner", safeTag = "two-column-first") {
+            ConfirmProgrammeActionDialog(ProgrammeAction.CANCEL_RECORDING, event, channel,
+                Instant.parse("2026-10-03T19:00:00Z").epochSeconds, session, observation,
+                onDismiss = {}, onConfirm = {}, entries = entries)
+        }
     }
 
     /** No picture: the slot shows the logo; the glow follows the logo. */
@@ -167,43 +187,44 @@ class ConfirmationDialogCaptureTest {
 
     @Test fun folder() = component("folder") {
         ConfirmationDialog(
-            question = "Delete all the recordings in this folder?",
-            subject = ConfirmationSubject.Folder("Documentaries", "3 recordings · 6.6 GB"),
-            sentence = "They're deleted from the server. Recordings still running are kept.",
-            safe = keep(R.string.keep), action = ConfirmationChoice("Delete all", R.drawable.ic_delete_outlined, ACTION),
+            question = stringResource(R.string.delete_folder_all_confirm_question),
+            subject = ConfirmationSubject.Folder("Documentaries", stringResource(R.string.server_detail_separator,
+                pluralStringResource(R.plurals.recordings_folder_recording_count, 3, 3), "6.6 GB")),
+            sentence = stringResource(R.string.delete_folder_confirm_body) + " " + stringResource(R.string.delete_folder_running_kept),
+            safe = keep(R.string.keep), action = choice(R.string.context_delete_all, R.drawable.ic_delete_outlined),
             onDismiss = {}, onConfirm = {},
         )
     }
 
     @Test fun folderWatched() = component("folder-watched") {
         ConfirmationDialog(
-            question = "Delete all watched recordings in this folder?",
-            subject = ConfirmationSubject.Folder("Documentaries", "3 recordings"),
-            sentence = "They're deleted from the server.",
-            safe = keep(R.string.keep), action = ConfirmationChoice("Delete all", R.drawable.ic_delete_outlined, ACTION),
+            question = stringResource(R.string.delete_folder_watched_confirm_question),
+            subject = ConfirmationSubject.Folder("Documentaries", pluralStringResource(R.plurals.recordings_folder_recording_count, 3, 3)),
+            sentence = stringResource(R.string.delete_folder_confirm_body),
+            safe = keep(R.string.keep), action = choice(R.string.context_delete_watched, R.drawable.ic_delete_outlined),
             onDismiss = {}, onConfirm = {},
         )
     }
 
-    @Test fun serverSwitch() = server("server-switch", "Switch to this server?", ServerAvatarLook(1, "B"), "Bedroom",
-        "anna · 192.168.1.30:9982", "The recording stops, and the app loads that server's channels and guide.",
-        "Keep watching", ConfirmationChoice("Switch", R.drawable.ic_arrow_forward, ACTION))
+    @Test fun serverSwitch() = component("server-switch", SWITCH_KEEP) {
+        SwitchServerDialog("Bedroom", ServerAvatarLook(1, "B"), serverConfirmationDetail("bedroom.invalid", 9982, "Fixture account"),
+            PlaybackInterruption.RECORDING, onSwitch = {}, onKeep = {})
+    }
 
-    @Test fun serverSwitchAnon() = server("server-switch-anon", "Switch to this server?", ServerAvatarLook(4, null),
-        "Guest server", "No sign-in · 192.168.1.40:9982",
-        "Live TV stops, and the app loads that server's channels and guide.",
-        "Keep watching", ConfirmationChoice("Switch", R.drawable.ic_arrow_forward, ACTION))
+    @Test fun serverSwitchAnon() = component("server-switch-anon", SWITCH_KEEP) {
+        SwitchServerDialog("Guest server", ServerAvatarLook(4, null), serverConfirmationDetail("guest.invalid", 9982, null),
+            PlaybackInterruption.LIVE, onSwitch = {}, onKeep = {})
+    }
 
-    @Test fun serverRemove() = server("server-remove", "Remove this connection?", ServerAvatarLook(2, "L"), "Living room",
-        "anna · 192.168.1.20:9982",
-        "Its recent channels, audio choices and saved pictures are deleted from this TV. Recordings stay on the server.",
-        "Keep", ConfirmationChoice("Remove connection", R.drawable.ic_delete_outlined, ACTION))
+    @Test fun serverRemove() = component("server-remove", REMOVE_KEEP) {
+        RemoveServerDialog("Living room", ServerAvatarLook(2, "L"), serverConfirmationDetail("living-room.invalid", 9982, "Fixture account"),
+            active = false, onRemove = {}, onKeep = {})
+    }
 
-    @Test fun serverRemoveActive() = server("server-remove-active", "Remove this connection?", ServerAvatarLook(2, "L"),
-        "Living room", "anna · 192.168.1.20:9982",
-        "Live TV stops, and no connection is in use until you choose one. Its recent channels, audio choices and " +
-            "saved pictures are deleted from this TV. Recordings stay on the server.",
-        "Keep", ConfirmationChoice("Remove connection", R.drawable.ic_delete_outlined, ACTION))
+    @Test fun serverRemoveActive() = component("server-remove-active", REMOVE_KEEP) {
+        RemoveServerDialog("Living room", ServerAvatarLook(2, "L"), serverConfirmationDetail("living-room.invalid", 9982, "Fixture account"),
+            active = true, onRemove = {}, onKeep = {})
+    }
 
     private fun recording(scene: String, action: PendingRecordingAction, entry: DvrEntry, channel: Channel,
         now: String = "2026-10-05T12:00:00Z") = component(scene) {
@@ -211,14 +232,7 @@ class ConfirmationDialogCaptureTest {
             backEnabled = true, onDismiss = {}, onConfirm = {})
     }
 
-    private fun server(scene: String, question: String, look: ServerAvatarLook, name: String, detail: String,
-        sentence: String, safe: String, action: ConfirmationChoice) = component(scene) {
-        ConfirmationDialog(question = question, subject = ConfirmationSubject.Server(look, name, detail),
-            sentence = sentence, safe = ConfirmationChoice(safe, R.drawable.ic_check, SAFE), action = action,
-            onDismiss = {}, onConfirm = {})
-    }
-
-    private fun component(scene: String, content: @Composable () -> Unit) {
+    private fun component(scene: String, safeTag: String = SAFE, content: @Composable () -> Unit) {
         val still = FixtureArt.art("still-ridge-light")
         lateinit var view: View
         compose.mainClock.autoAdvance = false
@@ -234,11 +248,8 @@ class ConfirmationDialogCaptureTest {
             }
         }
         compose.waitForIdle()
-        repeat(15) {
-            compose.mainClock.advanceTimeBy(100)
-            compose.waitForIdle()
-        }
-        compose.onNodeWithTag(SAFE).assertIsFocused()
+        compose.settleFrames(15)
+        compose.onNodeWithTag(safeTag).assertIsFocused()
         val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
         compose.runOnIdle { view.draw(Canvas(bitmap)) }
         val directory = File("build/outputs/centre-dialog-captures").apply { mkdirs() }

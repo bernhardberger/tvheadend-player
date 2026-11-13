@@ -314,9 +314,7 @@
     <string name="cancel_recording">Cancelar gravação</string>
     <string name="stop_recording">Parar gravação</string>
     <string name="cancel_recording_confirm_title">Cancelar esta gravação?</string>
-    <string name="cancel_recording_confirm_message">%1$s no canal %2$s, %3$s, não será gravado.</string>
     <string name="stop_recording_confirm_title">Parar esta gravação?</string>
-    <string name="stop_recording_confirm_message">A gravação de %1$s será parada agora. O que já foi gravado será mantido.</string>
     <string name="recording_status">Gravação: %1$s</string>
     <string name="recording_state_scheduled">Agendada</string>
     <string name="recording_state_recording">Gravando agora</string>
@@ -403,10 +401,6 @@
     <string name="delete_recording_confirm_title">Excluir esta gravação?</string>
     <string name="remove_entry">Remover item</string>
     <string name="remove_entry_confirm_title">Remover este item?</string>
-    <string name="delete_folder_all_confirm_title">Excluir todas as gravações de %1$s?</string>
-    <string name="delete_folder_watched_confirm_title">Excluir as gravações assistidas de %1$s?</string>
-    <plurals name="delete_folder_confirm_message"><item quantity="one">%1$d gravação (%2$s) será excluída do servidor.</item><item quantity="many">%1$d gravações (%2$s) serão excluídas do servidor.</item><item quantity="other">%1$d gravações (%2$s) serão excluídas do servidor.</item></plurals>
-    <plurals name="delete_folder_confirm_message_no_size"><item quantity="one">%1$d gravação será excluída do servidor.</item><item quantity="many">%1$d gravações serão excluídas do servidor.</item><item quantity="other">%1$d gravações serão excluídas do servidor.</item></plurals>
     <string name="delete_folder_running_kept">As gravações em andamento serão mantidas.</string>
     <string name="recording_loading">Carregando gravação…</string>
     <string name="recording_resume_from">Continuar de %1$s</string>
@@ -738,16 +732,8 @@
     <string name="server_remove_description">Excluir esta conexão desta TV</string>
     <string name="server_account">Conta</string>
     <string name="server_enter_password">Digite a senha</string>
-    <string name="server_switch_title">Mudar para %1$s?</string>
-    <string name="server_switch_live">A TV ao vivo vai parar. O app vai entrar como %1$s e carregar os canais e o guia desse servidor.</string>
-    <string name="server_switch_live_anonymous">A TV ao vivo vai parar. O app vai conectar sem login e carregar os canais e o guia desse servidor.</string>
-    <string name="server_switch_recording">A reprodução da gravação vai parar. O app vai entrar como %1$s e carregar os canais e o guia desse servidor.</string>
-    <string name="server_switch_recording_anonymous">A reprodução da gravação vai parar. O app vai conectar sem login e carregar os canais e o guia desse servidor.</string>
     <string name="server_keep_watching">Continuar assistindo</string>
     <string name="server_switch">Mudar</string>
-    <string name="server_remove_title">Remover %1$s?</string>
-    <string name="server_remove_body">Os canais recentes, as opções de áudio e as imagens salvas de %1$s serão excluídos desta TV. As gravações ficam no servidor.</string>
-    <string name="server_remove_body_active">A TV ao vivo vai parar e nenhuma conexão ficará em uso até você escolher uma. Os canais recentes, as opções de áudio e as imagens salvas de %1$s serão excluídos desta TV. As gravações ficam no servidor.</string>
     <string name="server_add_name">Adicionar um nome</string>
     <string name="server_name_title">Dê um nome a esta conexão</string>
     <string name="server_name_body">As Configurações mostram o nome em vez do endereço. Deixe em branco para mostrar %1$s.</string>

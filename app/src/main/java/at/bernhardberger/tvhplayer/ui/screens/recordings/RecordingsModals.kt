@@ -84,17 +84,17 @@ private fun recordingConfirmationSubject(entry: DvrEntry, channel: Channel?, now
         channelIcon = channel?.icon,
         channelNumber = channel?.number,
         channelName = channel?.name ?: entry.channelName.orEmpty(),
-        airTime = recordingConfirmationAirTime(entry, nowSec),
+        airTime = recordingConfirmationAirTime(entry.start?.epochSeconds, entry.stop?.epochSeconds, nowSec),
         progress = if (recordingIsRunning(entry)) recordingElapsedProgress(entry, nowSec)
             ?: if (entry.start?.epochSeconds?.let { nowSec < it } == true) 0f else 1f else null,
     )
 
 /** "Today 20:15–22:05", "Tomorrow …", or the date with the times. */
 @Composable
-private fun recordingConfirmationAirTime(entry: DvrEntry, nowSec: Long): String {
+internal fun recordingConfirmationAirTime(start: Long?, stop: Long?, nowSec: Long): String {
     val locale = LocalConfiguration.current.locales[0]
-    val start = entry.start?.epochSeconds ?: return ""
-    val stop = entry.stop?.epochSeconds ?: return formatRecordingSchedule(start, locale = locale, nowSec = nowSec)
+    if (start == null) return ""
+    if (stop == null) return formatRecordingSchedule(start, locale = locale, nowSec = nowSec)
     val zone = ZoneId.systemDefault()
     val today = Instant.ofEpochSecond(nowSec).atZone(zone).toLocalDate()
     return when (ChronoUnit.DAYS.between(today, Instant.ofEpochSecond(start).atZone(zone).toLocalDate())) {
@@ -131,7 +131,12 @@ internal fun stopConfirmationTimes(entry: DvrEntry, nowSec: Long): StopConfirmat
 internal fun stopConfirmationSentence(
     entry: DvrEntry, nowSec: Long, resources: android.content.res.Resources, spoken: Boolean,
 ): String {
-    val times = stopConfirmationTimes(entry, nowSec)
+    return stopConfirmationSentence(stopConfirmationTimes(entry, nowSec), resources, spoken)
+}
+
+internal fun stopConfirmationSentence(
+    times: StopConfirmationTimes, resources: android.content.res.Resources, spoken: Boolean,
+): String {
     val recorded = sentenceDuration(times.recordedSec, roundUp = false, resources, spoken)
     return times.remainingSec?.let {
         resources.getString(R.string.stop_recording_confirm_body, recorded, sentenceDuration(it, roundUp = true, resources, spoken))

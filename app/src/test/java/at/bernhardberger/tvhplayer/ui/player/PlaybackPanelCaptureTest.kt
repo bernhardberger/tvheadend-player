@@ -23,6 +23,9 @@ import androidx.compose.ui.test.performScrollToIndex
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent
+import at.bernhardberger.tvheadend.sdk.core.EventId
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.core.GuideWindowBounds
 import at.bernhardberger.tvhplayer.core.ProgrammeCategory
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
@@ -36,6 +39,7 @@ import at.bernhardberger.tvhplayer.ui.screens.BrowseSidePanel
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideFilterPanel
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideTimePanel
 import java.time.Instant
+import kotlin.time.Instant as KotlinInstant
 import java.time.ZoneId
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -259,7 +263,11 @@ class PlaybackPanelCaptureTest {
             TVHeadendPlayerTheme {
                 view = LocalView.current
                 if (guide) {
-                    ConfirmProgrammeActionDialog(ProgrammeAction.STOP_RECORDING, PROGRAMME_TITLE, {}, {})
+                    ConfirmProgrammeActionDialog(ProgrammeAction.STOP_RECORDING,
+                        EpgEvent.create(EventId(1), ChannelId(1), KotlinInstant.fromEpochSeconds(0),
+                            KotlinInstant.fromEpochSeconds(3_600), title = PROGRAMME_TITLE),
+                        channel = null, nowSec = 1_800L, currentSession = null, observation = null,
+                        onDismiss = {}, onConfirm = {})
                 } else {
                     RecordingConfirmationDialog(PendingRecordingAction.DELETE,
                         DvrEntry.create(DvrEntryId(1), title = PROGRAMME_TITLE, state = DvrEntryState.COMPLETED, folder = emptyList()),

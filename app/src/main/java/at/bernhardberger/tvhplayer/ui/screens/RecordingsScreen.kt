@@ -8,7 +8,9 @@ import at.bernhardberger.tvhplayer.ui.components.progressColor
 
 import androidx.compose.ui.platform.LocalContext
 import at.bernhardberger.tvhplayer.ui.TvTextColors
-import at.bernhardberger.tvhplayer.ui.components.CentredDialog
+import at.bernhardberger.tvhplayer.ui.components.ConfirmationChoice
+import at.bernhardberger.tvhplayer.ui.components.ConfirmationDialog
+import at.bernhardberger.tvhplayer.ui.components.ConfirmationSubject
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.background
@@ -1300,25 +1302,26 @@ internal fun RecordingsScreenContent(
         folderDelete?.let { delete ->
             val count = delete.recordingIds.size
             val size = delete.sizeBytes.takeIf { it > 0 }?.let { formatFileSize(it, context) }
+            val countLabel = pluralStringResource(R.plurals.recordings_folder_recording_count, count, count)
+            val detail = size?.let { stringResource(R.string.server_detail_separator, countLabel, it) } ?: countLabel
             val message = buildString {
-                append(if (size != null) pluralStringResource(R.plurals.delete_folder_confirm_message, count, count, size)
-                    else pluralStringResource(R.plurals.delete_folder_confirm_message_no_size, count, count))
+                append(stringResource(R.string.delete_folder_confirm_body))
                 if (delete.keepsRunning) append(' ').append(stringResource(R.string.delete_folder_running_kept))
             }
-            CentredDialog(
-                title = stringResource(if (delete.action == BrowseContextAction.DELETE_ALL)
-                    R.string.delete_folder_all_confirm_title else R.string.delete_folder_watched_confirm_title, delete.name),
-                message = message,
-                firstLabel = stringResource(R.string.keep),
-                secondLabel = stringResource(delete.action.label(watchChannel = false)),
-                onFirst = ::closeFolderMenu,
-                onSecond = {
+            ConfirmationDialog(
+                question = stringResource(if (delete.action == BrowseContextAction.DELETE_ALL)
+                    R.string.delete_folder_all_confirm_question else R.string.delete_folder_watched_confirm_question),
+                subject = ConfirmationSubject.Folder(delete.name, detail),
+                sentence = message,
+                safe = ConfirmationChoice(stringResource(R.string.keep), R.drawable.ic_check, "folder-delete-back"),
+                action = ConfirmationChoice(stringResource(delete.action.label(watchChannel = false)),
+                    R.drawable.ic_delete_outlined, "folder-delete-confirm"),
+                onConfirm = {
                     closeFolderMenu()
                     runFolderAction(delete.action, session, delete.recordingIds)
                 },
                 onDismiss = ::closeFolderMenu,
                 backEnabled = backEnabled,
-                firstTag = "folder-delete-back", secondTag = "folder-delete-confirm",
             )
         }
     }

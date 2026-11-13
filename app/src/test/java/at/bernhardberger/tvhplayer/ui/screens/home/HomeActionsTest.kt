@@ -1,4 +1,10 @@
 package at.bernhardberger.tvhplayer.ui.screens.home
+import at.bernhardberger.tvhplayer.settings.AppProfileOwner
+import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
+import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
+import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
+import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore
+import kotlinx.coroutines.test.StandardTestDispatcher
 
 import android.app.Application
 import androidx.compose.foundation.layout.PaddingValues
@@ -1224,6 +1230,9 @@ class HomeActionsTest {
         val notices = NoticeCenter({ 0L }) { NoticeContext(0, observation.currentSession?.generationIdentity) }
         val dependencies = module {
             single<TvheadendSession> { session }; single { notices }
+            single { AppProfileOwner(session, FakeServerProfileStore(),
+                PlayerSettingsStore(InMemoryPreferencesDataStore()), StandardTestDispatcher(),
+                readProfileForEditing = { ServerProfileEditReadResult.Missing }) }
             if (event != null) single {
                 at.bernhardberger.tvhplayer.settings.UiSettingsStore(at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore())
             }
