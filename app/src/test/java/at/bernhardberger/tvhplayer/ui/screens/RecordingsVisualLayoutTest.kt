@@ -40,6 +40,7 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
@@ -296,7 +297,8 @@ class RecordingsVisualLayoutTest {
         capture("store-recording", 1f, outputs = "build/outputs/presentation")
     }
 
-        @Test fun storageIndicatorIsQuietInformationAtTheEndOfTheTabLineAndNeverMoves() {
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
+    fun storageIndicatorIsQuietInformationAtTheEndOfTheTabLineAndNeverMoves() {
         show(diskSpace = DvrDiskSpaceState.Current(DvrDiskSpace(412_000_000_000L, 1_588_000_000_000L, 2_000_000_000_000L)))
         compose.onNodeWithTag("recordings-space").assert(SemanticsMatcher.keyNotDefined(SemanticsActions.RequestFocus))
         // A ring beside the one-line figure, spoken as one description.
@@ -321,6 +323,34 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionRight)
         focused("recordings-mode-schedule")
         assertEquals(resting, bounds("recordings-space"))
+        // Sample the opaque centres of the drawn strokes, not antialiased edge pixels.
+        // At normal usage both strokes are long enough to identify their dominant colours.
+        fun ringColours(): List<androidx.compose.ui.graphics.Color> {
+            val pixels = compose.onNodeWithTag("recordings-space-ring", useUnmergedTree = true)
+                .captureToImage().toPixelMap()
+            val background = pixels[pixels.width / 2, pixels.height / 2]
+            return (0 until pixels.height).flatMap { y -> (0 until pixels.width).map { x -> pixels[x, y] } }
+                .filter { it != background }.groupingBy { it }.eachCount()
+                .entries.sortedByDescending { it.value }.map { it.key }
+        }
+        var trackLuminance = 0f
+        val contrasts = listOf(70, 95, 99).map { used ->
+            compose.runOnIdle {
+                session.publish(session.observation.value.let {
+                    SessionObservation.create(it.sessionState, it.channelState, it.epgState, it.dvrState,
+                        recordingProgressCapability = it.recordingProgressCapability,
+                        dvrDiskSpaceState = diskSpacePercentUsed(used))
+                })
+            }
+            compose.waitForIdle()
+            val colours = ringColours()
+            if (used == 70) trackLuminance = colours.take(2).minOf { it.luminance() }
+            val contrast = (colours.first().luminance() + .05f) / (trackLuminance + .05f)
+            "$used% used" to contrast
+        }
+        println("Storage ring drawn arc/track contrast: $contrasts")
+        assertTrue("Every storage level needs arc/track contrast >= 3:1: $contrasts",
+            contrasts.all { it.second >= 3f })
         assertNoCommands()
     }
 

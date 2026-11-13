@@ -31,7 +31,7 @@ import at.bernhardberger.tvhplayer.ui.common.formatFileSize
 import kotlin.math.roundToInt
 
 private val StorageRingSize = 20.dp
-private val StorageRingStroke = 2.5.dp
+private val StorageRingStroke = 3.dp
 
 /**
  * How much recording storage is left, quiet at the end of the Recordings tab line: a small ring that
@@ -69,7 +69,7 @@ internal fun RecordingStorageIndicator(state: DvrDiskSpaceState, modifier: Modif
         horizontalArrangement = Arrangement.spacedBy(TvSpacing12),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        StorageRing(indicator, emphasis ?: TvTextColors.secondary)
+        StorageRing(indicator, emphasis ?: MaterialTheme.colorScheme.onSurface)
         Text(
             text = stringResource(R.string.recording_space_value, free, total),
             style = MaterialTheme.typography.bodySmall,
@@ -86,7 +86,7 @@ private fun StorageRing(indicator: RecordingSpaceIndicator, arc: Color) {
         progress = { indicator.usedFraction },
         modifier = Modifier.size(StorageRingSize).testTag("recordings-space-ring"),
         color = arc,
-        trackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+        trackColor = MaterialTheme.colorScheme.surfaceVariant,
         gapSize = 0.dp,
         strokeWidth = StorageRingStroke,
         strokeCap = StrokeCap.Round,
