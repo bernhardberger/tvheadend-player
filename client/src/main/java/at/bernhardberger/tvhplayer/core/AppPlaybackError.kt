@@ -100,7 +100,8 @@ fun recordingErrorCondition(
         // A completed entry is always admitted, so it only arrives here when it changed or was replaced.
         else -> AppErrorCondition.RECORDING_UNAVAILABLE
     }
-    failure?.deviceFault == true && recordingFailure?.category == RecordingPlaybackFailureCategory.MALFORMED_MEDIA ->
+    // The SDK can identify malformed media even when Media3 reports an IO error, not a device fault.
+    failure != null && recordingFailure?.category == RecordingPlaybackFailureCategory.MALFORMED_MEDIA ->
         AppErrorCondition.RECORDING_FILE_UNREADABLE
     failure?.deviceFault == true -> AppErrorCondition.RECORDING_PLAYBACK_FAILED
     // Failed(OTHER) included: any other playback failure of a playable or unresolved recording is an interruption.

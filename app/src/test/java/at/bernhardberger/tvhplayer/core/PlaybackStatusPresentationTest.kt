@@ -342,9 +342,9 @@ class PlaybackStatusPresentationTest {
                     category?.let { RecordingFailureDetail(it, "ERROR_CODE_PARSING_CONTAINER_MALFORMED: Top bit not zero") },
                 ) as LivePlayerAlert.Error).error
                 val expected = when {
-                    !deviceFault -> 301
                     category == RecordingPlaybackFailureCategory.MALFORMED_MEDIA -> 307
-                    else -> 306
+                    deviceFault -> 306
+                    else -> 301
                 }
                 assertEquals("$category deviceFault=$deviceFault", expected, error.condition.number)
                 if (expected == 307) assertEquals(listOf(AppErrorAction.CLOSE), error.actions)

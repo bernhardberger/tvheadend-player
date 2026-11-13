@@ -351,12 +351,12 @@ class PlayerErrorSurfacesTest {
     @OptIn(ExperimentalTvheadendApi::class)
     @Test
     fun recordingPlayerFailureShowsThePlayersOwnErrorOutsideTheLiveRegion() {
-        val failed = AppPlaybackState.Failed(
+        var failed by mutableStateOf(AppPlaybackState.Failed(
             AppPlaybackFailureReason.RECORDING_READ_FAILED,
             playerErrorCode = "ERROR_CODE_DECODER_INIT_FAILED",
             playerErrorNumber = 4001,
             deviceFault = true,
-        )
+        ))
         var alert by mutableStateOf(recordingAlert(failed))
         var sdkFailure by mutableStateOf<RecordingFailureDetail?>(null)
         show {
@@ -378,17 +378,21 @@ class PlayerErrorSurfacesTest {
         compose.onNodeWithTag("tv-recovery-secondary").assert(hasText("Close"))
 
         // SDK notification can arrive after the player's failure; it updates the existing alert.
-        val detail = "PARSING_CONTAINER_MALFORMED: Top bit not zero"
+        val detail = "IO_UNSPECIFIED: Top bit not zero"
         compose.runOnIdle {
+            failed = failed.copy(
+                deviceFault = false,
+                playerErrorCode = "ERROR_CODE_IO_UNSPECIFIED",
+                playerErrorNumber = 2000,
+            )
             sdkFailure = RecordingFailureDetail(RecordingPlaybackFailureCategory.MALFORMED_MEDIA, "ERROR_CODE_$detail")
-        }
-        compose.onNodeWithTag("tv-recovery-footnote").assert(hasText(detail))
-        compose.runOnIdle {
-            alert = LivePlayerAlert.Error(
-                AppErrorCondition.RECORDING_FILE_UNREADABLE.toAppError(),
-                PlaybackRetryCommand.NONE,
+            alert = recordingPlayerAlert(
+                ConnectionState.Connected, false, failed,
+                DvrEntry.create(DvrEntryId(1), state = DvrEntryState.COMPLETED), null,
+                PlaybackRetryCommand.RESUME_RECORDING, sdkFailure,
             )
         }
+        compose.onNodeWithTag("tv-recovery-title").assert(hasText(string(R.string.error_307_title)))
         compose.onNodeWithTag("tv-recovery-footnote")
             .assert(hasText(detail))
             .assert(!hasAnyAncestor(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion)))
