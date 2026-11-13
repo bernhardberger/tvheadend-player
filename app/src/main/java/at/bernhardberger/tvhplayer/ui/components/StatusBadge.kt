@@ -90,16 +90,20 @@ fun RecordingBadge(
     label: Boolean = true,
     compact: Boolean = false,
     rule: RecordingRule? = null,
+    skipped: Boolean = false,
 ) {
     when (state) {
         DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR -> {
-            val description = stringResource(
+            val stateDescription = stringResource(
                 if (state == DvrEntryState.RECORDING) R.string.player_recording else R.string.recording_state_recording_errors
             )
+            val description = if (rule == null) stateDescription else stringResource(
+                R.string.recording_state_and_origin, stateDescription, stringResource(rule.label))
             // One announcement for the pair; a caller's tag wins over the default one.
             Row(modifier.testTag("recording-badge").clearAndSetSemantics { contentDescription = description },
                 horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                StatusBadge(stringResource(R.string.player_status_rec), StatusBadgeTone.RECORDING, compact = compact)
+                StatusBadge(stringResource(R.string.player_status_rec), StatusBadgeTone.RECORDING, compact = compact,
+                    icon = R.drawable.ic_fiber_smart_record.takeIf { rule != null })
                 if (state == DvrEntryState.RECORDING_ERROR) {
                     StatusBadge(stringResource(R.string.recording_badge_errors), StatusBadgeTone.ERROR,
                         icon = R.drawable.ic_error_outlined, compact = compact)
@@ -107,10 +111,13 @@ fun RecordingBadge(
             }
         }
         DvrEntryState.SCHEDULED -> {
-            StatusBadge(stringResource(R.string.recording_state_scheduled).takeIf { label }, StatusBadgeTone.NEUTRAL,
+            val text = stringResource(
+                if (skipped) R.string.autorec_editor_skipped else R.string.recording_state_scheduled)
+            StatusBadge(text.takeIf { label }, StatusBadgeTone.NEUTRAL,
                 modifier.testTag("recording-badge-scheduled"),
                 icon = if (rule != null) R.drawable.ic_schedule_rule else R.drawable.ic_schedule,
-                contentDescription = stringResource(rule?.label ?: R.string.details_status_scheduled))
+                contentDescription = if (skipped) text else stringResource(
+                    rule?.label ?: R.string.details_status_scheduled))
         }
         DvrEntryState.COMPLETED_ERROR ->
             StatusBadge(stringResource(R.string.recording_state_failed), StatusBadgeTone.ERROR,

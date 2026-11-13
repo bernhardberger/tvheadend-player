@@ -76,6 +76,7 @@ class AutomaticRecordingEditorStateTest {
         fixture.deletionResult = DvrMutationResult.Failed(TvheadendFailure.SERVER_REJECTED, false)
         existing.confirmDestructiveAction()
         runCurrent()
+        assertEquals(1, fixture.deletions)
         assertFalse(existing.closed)
         assertEquals(beforeDelete, existing.draft)
         assertNull(existing.navigation.confirmation)

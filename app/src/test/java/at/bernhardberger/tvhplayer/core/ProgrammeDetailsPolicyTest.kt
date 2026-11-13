@@ -46,8 +46,10 @@ class ProgrammeDetailsPolicyTest {
     }
 
     private val event = EpgEvent.create(EventId(1), ChannelId(1), Instant.fromEpochSeconds(100), Instant.fromEpochSeconds(200))
-    private fun recording(state: DvrEntryState, position: Long = 0, files: List<DvrRecordingFile>? = null) = DvrEntry.create(
-        DvrEntryId(1), state = state, start = event.start, stop = event.stop, playPosition = position.seconds, files = files)
+    private fun recording(state: DvrEntryState, position: Long = 0, files: List<DvrRecordingFile>? = null,
+        autorec: AutorecRuleId? = null) = DvrEntry.create(
+        DvrEntryId(1), state = state, start = event.start, stop = event.stop, playPosition = position.seconds,
+        files = files, autorecRuleId = autorec)
 
     private fun file(path: String = "/rec/a.ts", start: Instant? = null, stop: Instant? = null) =
         TvheadendTestResultFactory.recordingFile(fileId = 1, serverPath = path, start = start, stop = stop)
@@ -142,6 +144,11 @@ class ProgrammeDetailsPolicyTest {
     }
 
     @Test fun recordingActionsFollowLifecycleAndPlaybackAuthority() {
+        for (state in listOf(DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)) {
+            val owned = recording(state, autorec = AutorecRuleId("series"))
+            assertEquals(listOf(STOP, EDIT_RULE, SHOW_GUIDE),
+                recordingDetailsActions(owned, null, true, true, nowSec = 150, ruleAvailable = true))
+        }
         assertEquals(listOf(PLAY, MARK_WATCHED, DELETE), actions(recording(DvrEntryState.COMPLETED)))
         assertEquals(listOf(RESUME, START_OVER, MARK_WATCHED, DELETE), actions(recording(DvrEntryState.COMPLETED, 20)))
         assertEquals(listOf(WATCH, STOP), actions(recording(DvrEntryState.RECORDING, files = listOf(file()))))

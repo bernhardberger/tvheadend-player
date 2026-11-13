@@ -56,6 +56,62 @@ import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 class AutomaticRecordingEditorTest {
     @get:Rule val compose = createComposeRule()
 
+    @Test fun ruleMenuSkipAndUnskipWaitForPublishedMetadata() {
+        val entry = automaticRecordingEntry()
+        val session = automaticRecordingFakeSession(listOf(entry))
+        val notices = NoticeCenter({ compose.mainClock.currentTime }, { NoticeContext(1, null) })
+        session.dvrRepository.scriptUpdateEntry(DvrMutationResult.Confirmed(Unit))
+        val dependencies = org.koin.dsl.module {
+            single<at.bernhardberger.tvheadend.sdk.core.TvheadendSession> { session }
+            single { notices }
+        }
+        compose.setContent {
+            val observation by session.observation.collectAsState()
+            org.koin.compose.KoinIsolatedContext(remember { org.koin.dsl.koinApplication { modules(dependencies) } }) {
+                TVHeadendPlayerTheme {
+                    at.bernhardberger.tvhplayer.ui.screens.home.HomeRecordingActions(
+                        entry, observation, contextMenu = true, nowSec = automaticRecordingNow.epochSeconds,
+                        onPlay = { _, _ -> }, onWatchChannel = { _, _ -> }, onShowGuide = { _, _ -> },
+                        onReturnToRecording = { _, _ -> false }, onClose = {},
+                    )
+                }
+            }
+        }
+        compose.onNodeWithTag("browse-context-action-details").assertIsFocused()
+        compose.pressKey(Key.DirectionDown)
+        compose.onNodeWithTag("browse-context-action-skip").assertIsFocused()
+        compose.pressKey(Key.DirectionCenter)
+        assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_UPDATE_ENTRY })
+        compose.onNodeWithTag("browse-context-action-skip").assertExists()
+        compose.runOnIdle {
+            session.publish(automaticRecordingObservation(entries = listOf(automaticRecordingEntry(enabled = false))))
+            session.dvrRepository.scriptUpdateEntry(DvrMutationResult.Confirmed(Unit))
+        }
+        compose.onNodeWithTag("browse-context-action-unskip").assertIsFocused()
+        compose.onNodeWithTag("browse-context-action-cancel").assertDoesNotExist()
+        compose.pressKey(Key.DirectionCenter)
+        assertEquals(2, session.calls.count { it == FakeSessionCall.DVR_UPDATE_ENTRY })
+        compose.runOnIdle {
+            session.publish(automaticRecordingObservation(entries = listOf(automaticRecordingEntry())))
+        }
+        compose.onNodeWithTag("browse-context-action-skip").assertIsFocused()
+        assertTrue(notices.state.value.pending.isEmpty())
+        val rule = at.bernhardberger.tvheadend.sdk.core.AutorecRule.create(
+            requireNotNull(entry.autorecRuleId), title = "^Ridge Light$",
+            seriesLinkUri = automaticRecordingSeries.seriesLinkUri)
+        compose.runOnIdle {
+            session.publish(automaticRecordingObservation(entries = listOf(entry), autorecRules = listOf(rule)))
+        }
+        compose.pressKey(Key.DirectionDown)
+        compose.onNodeWithTag("browse-context-action-edit_rule").assertIsFocused()
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("automatic-recording-matches").assertIsFocused()
+        compose.runOnIdle {
+            session.publish(automaticRecordingObservation(entries = emptyList(), autorecRules = listOf(rule)))
+        }
+        compose.onNodeWithTag("automatic-recording-matches").assertExists()
+    }
+
     @OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
     @Test fun programmeDetailsOpensRestoresAndCreatesThroughTheEditorHost() {
         val session = automaticRecordingFakeSession(emptyList())

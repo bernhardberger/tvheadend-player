@@ -118,9 +118,9 @@ Meaning of colour:
     while recording a red `● REC` plus an `error` "Errors" badge. "On now"
     and "Available until" are neutral badges. The Guide headline badges what
     its cells mark: also a neutral "Recorded" with the library mark.
-    "Scheduled" carries stacked clocks wherever a rule scheduled it. Where a recording
-    came from shows only while it is scheduled: running is the red dot,
-    whatever scheduled it (decided 2026-11-09, following Kodi and TiVo).
+    "Scheduled" carries stacked clocks wherever a rule scheduled it. Running uses a
+    red dot with a half ring for a rule, otherwise the plain dot. The origin stays
+    visible because a running rule-made recording now offers "Edit …".
   - In Recordings overlines a failure, missed recordings included, is an
     `error` "!" symbol; cancelled and stopped early are muted symbols. Problems
     lists missed recordings under "Failed"; only invalid entries are "Canceled"

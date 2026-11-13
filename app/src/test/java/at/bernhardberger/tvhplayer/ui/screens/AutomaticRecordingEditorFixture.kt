@@ -26,6 +26,8 @@ import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvheadend.sdk.core.AutorecRule
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
 import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
@@ -91,6 +93,16 @@ internal val automaticRecordingSavedEntries = automaticRecordingEpisodes.take(5)
         duplicate = index == 1 || index == 3, enabled = index != 2,
     )
 }
+internal fun automaticRecordingEntry(
+    enabled: Boolean = true, state: DvrEntryState = DvrEntryState.SCHEDULED,
+): DvrEntry {
+    val row = automaticRecordingEpisodes.first()
+    return DvrEntry.create(
+        DvrEntryId(1), eventId = row.eventId, autorecRuleId = AutorecRuleId("automatic-recording"),
+        title = row.title, subtitle = row.subtitle, channelId = row.channelId, start = row.start, stop = row.stop,
+        enabled = enabled, state = state,
+    )
+}
 internal val timerRecordingSavedEntries = listOf(0, 3, 4, 5).mapIndexed { index, dayOffset ->
     val start = Instant.parse("2026-11-13T22:30:00Z") + dayOffset.days
     DvrEntry.create(
@@ -104,6 +116,7 @@ internal fun automaticRecordingFakeSession(entries: List<DvrEntry> = automaticRe
 internal fun automaticRecordingObservation(
     entries: List<DvrEntry> = automaticRecordingSavedEntries,
     channels: List<Channel> = automaticRecordingChannels,
+    autorecRules: List<AutorecRule> = emptyList(),
 ) = SessionObservation.create(
         sessionState = SessionState.Ready(ServerCapabilities.create(
             streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED,
@@ -112,7 +125,7 @@ internal fun automaticRecordingObservation(
         epgState = EpgRepositoryState.Current(EpgSnapshot.create(
             events = automaticRecordingEvents + automaticRecordingKeywordEvents,
         )),
-        dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = entries)),
+        dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = entries, autorecRules = autorecRules)),
 )
 internal val automaticRecordingSession = automaticRecordingFakeSession().captureCurrentSession()
 

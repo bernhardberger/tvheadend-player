@@ -39,6 +39,11 @@ import androidx.compose.ui.graphics.graphicsLayer
 
 import at.bernhardberger.tvhplayer.core.BrowseContextAction
 import at.bernhardberger.tvhplayer.core.recordingContextActions
+import at.bernhardberger.tvhplayer.core.recordingRuleActions
+import at.bernhardberger.tvhplayer.core.recordingRuleAvailable
+import at.bernhardberger.tvhplayer.core.recordingRuleKind
+import at.bernhardberger.tvhplayer.core.isRuleRecording
+import at.bernhardberger.tvhplayer.ui.components.recordingRule
 import at.bernhardberger.tvhplayer.core.deleteRemovesEntryOnly
 import at.bernhardberger.tvhplayer.ui.components.BrowseContextMenu
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeArtwork
@@ -896,15 +901,20 @@ internal fun RecordingsScreenContent(
 
     @Composable
     fun RecordingDetails() {
+    var ruleEditorEntry by remember { mutableStateOf<DvrEntry?>(null) }
+    var ruleMutationBusy by remember { mutableStateOf(false) }
+    val latestRuleNow by rememberUpdatedState(nowSecProvider)
     // Refresh metadata only within the opening session. Never substitute a colliding ID
     // from a later session, including while a captured confirmation is pending.
     val selectedCapability = detailsObservation?.currentSession
         ?.takeIf { observation.currentSession === it }
-    val opened = detailsEntry?.let { entry ->
+    val observed = detailsEntry?.let { entry ->
         if (selectedCapability != null && observation.dvrState is DvrRepositoryState.Current) {
             observation.dvrEntry(entry.id)?.takeUnless(::recordingWasRemoved)
         } else entry
     }
+    val opened = observed ?: ruleEditorEntry.takeIf { selectedCapability != null }
+    LaunchedEffect(selectedCapability) { if (selectedCapability == null) ruleEditorEntry = null }
     // The SDK admits the opened entry with the observation it was read from; without its session nothing plays.
     val openedAdmission = opened?.let { entry ->
         selectedCapability?.let {
@@ -928,6 +938,32 @@ internal fun RecordingsScreenContent(
                 is DvrProgressResult.Failed -> {
                     val feedback = result.toDvrMutationFeedback()
                     notices.post(Notice.DvrActionFailed(DvrMutationKind.UPDATE, feedback), noticeContext)
+                }
+            }
+        }
+    }
+    fun ruleAction(action: BrowseContextAction) {
+        val capability = selectedCapability ?: return
+        val current = latestObservationProvider()
+        val target = opened?.id?.let(current::dvrEntry)
+        val ready = !ruleMutationBusy && ruleEditorEntry == null && current.currentSession === capability
+        val writable = (current.sessionState as? SessionState.Ready)
+            ?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
+        if (!ready || !writable || target == null) return
+        if (action == BrowseContextAction.EDIT_RULE) {
+            if (current.recordingRuleAvailable(target)) ruleEditorEntry = target
+        } else if (action in recordingRuleActions(target, true, current.recordingRuleAvailable(target))) {
+            ruleMutationBusy = true
+            scope.launch {
+                try {
+                    val mutation = DvrMutationAction.SetEntryEnabled(capability, target,
+                        action == BrowseContextAction.UNSKIP)
+                    if (!mutation.recordingStateIsCurrent(latestObservationProvider())) return@launch
+                    val context = notices.context()
+                    val result = dvrMutationActions.execute(mutation)
+                    notices.postDvrFailure(mutation, result, context)
+                } finally {
+                    ruleMutationBusy = false
                 }
             }
         }
@@ -1027,9 +1063,11 @@ internal fun RecordingsScreenContent(
             enter = EnterTransition.None, exit = ExitTransition.None) {
         androidx.compose.runtime.CompositionLocalProvider(
             at.bernhardberger.tvhplayer.ui.player.LocalPlayerPanelMotion provides this) {
-        at.bernhardberger.tvhplayer.ui.player.PlayerMotionFrame(leaving = pendingAction != null) {
+        at.bernhardberger.tvhplayer.ui.player.PlayerMotionFrame(
+            leaving = pendingAction != null || ruleEditorEntry != null) {
         BrowseContextMenu(
-            backEnabled = backEnabled && !closing && menu == showContextMenu && pendingAction == null,
+            backEnabled = backEnabled && !closing && menu == showContextMenu &&
+                pendingAction == null && ruleEditorEntry == null && !ruleMutationBusy,
             title = opened.title.orEmpty(),
             channel = opened.channelId?.let(channelsById::get)?.let {
                 at.bernhardberger.tvhplayer.ui.components.channelTitleText(it.number, it.name.orEmpty())
@@ -1039,13 +1077,16 @@ internal fun RecordingsScreenContent(
                 androidx.compose.ui.platform.LocalConfiguration.current.locales[0]),
             summary = opened.summary?.takeIf(String::isNotBlank) ?: opened.description.orEmpty(),
             recordingState = opened.state,
-            recordingRule = opened.rule,
+            recordingRule = recordingRule(observation.recordingRuleKind(opened)),
+            recordingKind = observation.recordingRuleKind(opened),
+            recordingEnabled = opened.enabled,
             resumePositionMs = at.bernhardberger.tvhplayer.core.offeredResumePosition(openedAdmission)?.inWholeMilliseconds,
             playbackIndicator = watchingIndicator(opened.id),
             actions = recordingContextActions(opened, canModifyRecordings = selectedCapability != null &&
                 (observation.sessionState as? at.bernhardberger.tvheadend.sdk.core.SessionState.Ready)
                     ?.capabilities?.dvrWrite == at.bernhardberger.tvheadend.sdk.core.CapabilityAccess.ALLOWED,
                 admission = openedAdmission,
+                ruleAvailable = observation.recordingRuleAvailable(opened),
                 canWatchChannel = selectedCapability != null && onWatchChannel != null && opened.channelId?.let(channelsById::get) != null,
                 playing = selectedCapability != null && opened.id ==
                     at.bernhardberger.tvhplayer.ui.warmRecordingId(
@@ -1053,7 +1094,12 @@ internal fun RecordingsScreenContent(
                         at.bernhardberger.tvhplayer.ui.components.LocalRecordingPlaybackSelection.current,
                         observation.currentSession)),
             onClose = { visibility.targetState = false },
-            onAction = { action ->
+            onAction = ruleDispatch@{ action ->
+                if (action in listOf(BrowseContextAction.EDIT_RULE, BrowseContextAction.SKIP,
+                        BrowseContextAction.UNSKIP)) {
+                    ruleAction(action)
+                    return@ruleDispatch
+                }
                 val playing = selectedCapability?.takeIf { action in listOf(BrowseContextAction.WATCH,
                     BrowseContextAction.PLAY, BrowseContextAction.RESUME, BrowseContextAction.START_OVER,
                     BrowseContextAction.CONTINUE_WATCHING, BrowseContextAction.WATCH_LIVE) }
@@ -1147,7 +1193,9 @@ internal fun RecordingsScreenContent(
             initialAction = when (detailsInitialAction) {
                 RecordingDetailsAction.CANCEL,
                 RecordingDetailsAction.STOP -> when (opened.state) {
-                    DvrEntryState.SCHEDULED -> BrowseContextAction.CANCEL
+                    DvrEntryState.SCHEDULED -> if (opened.isRuleRecording)
+                        if (opened.enabled == false) BrowseContextAction.UNSKIP else BrowseContextAction.SKIP
+                        else BrowseContextAction.CANCEL
                     DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR -> BrowseContextAction.STOP
                     else -> null
                 }
@@ -1182,6 +1230,14 @@ internal fun RecordingsScreenContent(
         }
         }
         }
+    }
+
+    if (ruleEditorEntry != null && selectedCapability != null) {
+        val editorSession: TvheadendSession = koinInject()
+        RecordingRuleEditorHost(requireNotNull(ruleEditorEntry), selectedCapability, observation,
+            editorSession, dvrMutationActions, notices,
+            now = { kotlin.time.Instant.fromEpochSeconds(latestRuleNow()) },
+            onClose = { ruleEditorEntry = null })
     }
 
     val action = pendingAction
