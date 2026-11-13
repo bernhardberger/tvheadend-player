@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -139,7 +140,8 @@ import at.bernhardberger.tvhplayer.ui.tvGenreColors
 import at.bernhardberger.tvhplayer.core.TimelineEpgEventIndex
 import at.bernhardberger.tvhplayer.ui.components.rememberTabContentMotion
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
-import at.bernhardberger.tvhplayer.ui.screens.guide.GuideChannelWidth
+import at.bernhardberger.tvhplayer.ui.screens.guide.LocalGuideChannelWidth
+import at.bernhardberger.tvhplayer.ui.screens.guide.guideChannelWidth
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeader
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideHeaderMinHeight
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideHeaderRulerClearance
@@ -297,8 +299,12 @@ fun EpgGridScreen(
     ProfileCompositionLifetime("guide")
     val startPadding = contentPadding.calculateStartPadding(layoutDirection)
     val endPadding = contentPadding.calculateEndPadding(layoutDirection)
+    // Event callbacks must validate the scope that produced their rows, not a newer
+    // collector value that can arrive before this composition is replaced.
+    val channelScopeState = channelViewModel.scope.collectAsStateWithLifecycle().value
+    val channelScope = channelScopeState.scope
     fun timelineWidthPixels(): Float {
-    val timelineWidth = (maxWidth - startPadding - TvBrowseLeadingInset - GuideChannelWidth - GuideChannelGap)
+    val timelineWidth = (maxWidth - startPadding - TvBrowseLeadingInset - guideChannelWidth(channelScope.visibleChannels) - GuideChannelGap)
         .coerceAtLeast(1.dp)
     return with(density) { timelineWidth.toPx() }
     }
@@ -338,10 +344,6 @@ fun EpgGridScreen(
     val dvrMutationActions = remember(session.dvrRepository) {
         DvrMutationActions(session.dvrRepository)
     }
-    // Event callbacks must validate the scope that produced their rows, not a newer
-    // collector value that can arrive before this composition is replaced.
-    val channelScopeState = channelViewModel.scope.collectAsStateWithLifecycle().value
-    val channelScope = channelScopeState.scope
     val scopeMotion = rememberTabContentMotion(channelScope.activeTagId) {
         channelViewModel.scope.value.scope.activeTagId
     }
@@ -1816,6 +1818,7 @@ fun EpgGridScreen(
     }
 
     val detailsLayering = at.bernhardberger.tvhplayer.ui.components.LocalBrowseContentLayering.current
+    CompositionLocalProvider(LocalGuideChannelWidth provides guideChannelWidth(channelScope.visibleChannels)) {
     Box(Modifier.fillMaxSize().testTag("epg-screen")) content@{
         // Settings writes belong to the screen, not the temporarily gated prepared content.
         val settingsScope = rememberCoroutineScope()
@@ -2209,6 +2212,7 @@ fun EpgGridScreen(
         }
         GuideOverlays(settingsScope)
 
+    }
     }
     }
 }

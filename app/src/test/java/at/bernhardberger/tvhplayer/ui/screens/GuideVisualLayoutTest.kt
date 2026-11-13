@@ -93,6 +93,7 @@ import at.bernhardberger.tvhplayer.ui.screens.guide.TimelineTimeRuler
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeadlineSettleMs
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeadlineRulerGap
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideHeadlineHeight
+import at.bernhardberger.tvhplayer.ui.screens.guide.guideChannelWidth
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideFocusWindowStart
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideTimePositionPx
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideVisibleWindowSec
@@ -155,7 +156,24 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
     @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
     fun storeGuide() = presentationScene(store = true)
 
-    private fun presentationScene(store: Boolean) {
+    /** Numbers off and a logo on every channel: the column is the logo, and the timeline starts 8dp after it. */
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
+    @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
+    fun logoColumnWithoutNumbers() {
+        try {
+            at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = false
+            presentationScene(store = false, capture = "guide-no-numbers-logo-column")
+            val header = bounds("epg-channel-header-1")
+            val px = context().resources.displayMetrics.density
+            assertEquals(72f * px, header.width, .1f)
+            assertEquals(48f * px, bounds("epg-channel-picon-1").width, .1f)
+            assertEquals(header.right + 8f * px, bounds("epg-time-ruler").left, .1f)
+        } finally {
+            at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = true
+        }
+    }
+
+    private fun presentationScene(store: Boolean, capture: String? = null) {
         val names = listOf("Ridge Earth", "Harbor Sport", "Northline News", "Kite Kids", "Ion Frame", "Amber Stage", "Harbor Lights")
         val picons = listOf("ridge-earth", "harbor-sport", "northline-news", "kite-kids", "ion-frame", "amber-stage", "harbor-lights")
         val art = listOf("ridge-light", "harbor-kickoff", "northline-tonight", "field-desk", "paper-kite-tales", "little-orbit",
@@ -223,7 +241,8 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         }
         compose.mainClock.advanceTimeBy(1_500)
         compose.waitForIdle()
-        capture(if (store) "store-guide" else "guide", 1f, LayoutDirection.Ltr, outputs = "build/outputs/presentation").recycle()
+        if (capture != null) capture(capture, 1f, LayoutDirection.Ltr).recycle()
+        else capture(if (store) "store-guide" else "guide", 1f, LayoutDirection.Ltr, outputs = "build/outputs/presentation").recycle()
     }
 
     @Test fun normalGeometryAndContinuousNowAboveNativeFocus() {
@@ -587,6 +606,10 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
             compose.onNodeWithTag("epg-channel-picon-1", useUnmergedTree = true).assertExists()
             compose.onNodeWithText("Northline News", useUnmergedTree = true).assertExists()
             compose.onNodeWithText("89", useUnmergedTree = true).assertExists()
+            // A channel shown by name keeps the full column; logos alone narrow it to the logo and its padding.
+            assertEquals(104.dp, guideChannelWidth(channels))
+            assertEquals(72.dp, guideChannelWidth(channels.take(1)))
+            assertEquals(104.dp, guideChannelWidth(channels.take(1), numbersShown = true))
             compose.onNodeWithTag("epg-channel-header-1").assertContentDescriptionEquals("Ridge Earth")
             compose.onNodeWithTag("epg-channel-header-2").assertContentDescriptionEquals("Northline News")
             compose.onNodeWithTag("epg-channel-header-3").assertContentDescriptionEquals("89")

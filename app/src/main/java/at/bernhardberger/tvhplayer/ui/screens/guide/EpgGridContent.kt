@@ -199,7 +199,7 @@ internal fun TimelineTimeRuler(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // The channel column needs no heading: the space only aligns the ruler with the track.
-        Spacer(Modifier.width(GuideChannelWidth + GuideChannelGap))
+        Spacer(Modifier.width(LocalGuideChannelWidth.current + GuideChannelGap))
         BoxWithConstraints(
             modifier = Modifier
                 .weight(1f)
@@ -359,7 +359,7 @@ internal fun TimelineChannelRow(
         ) {
             val density = LocalDensity.current
             val visibleTrackWidthPx = visibleRowWidthPx?.minus(
-                with(density) { GuideChannelWidth.roundToPx() + GuideChannelGap.roundToPx() },
+                with(density) { LocalGuideChannelWidth.current.roundToPx() + GuideChannelGap.roundToPx() },
             )
             val isRtl = layoutDirection == LayoutDirection.Rtl
             events.forEach { event ->
@@ -469,7 +469,7 @@ internal fun TimelineChannelHeader(
     val titleNumber = channelTitleNumber(number, channel.name.orEmpty())
     Surface(
         modifier = Modifier
-            .width(GuideChannelWidth)
+            .width(LocalGuideChannelWidth.current)
             .fillMaxHeight()
             .semantics(mergeDescendants = true) {
                 contentDescription = channelTitleText(number, channel.name.orEmpty())
@@ -880,7 +880,7 @@ internal fun GuideSkeletonGrid(
                     Row(Modifier.fillMaxWidth().height(rowHeight)) {
                         Box(
                             Modifier
-                                .width(GuideChannelWidth)
+                                .width(LocalGuideChannelWidth.current)
                                 .fillMaxHeight()
                                 .background(TvSurfaceColors.container.copy(alpha = TvPanelDenseAlpha), MaterialTheme.shapes.small),
                         )
