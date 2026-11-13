@@ -386,7 +386,6 @@
     <string name="recording_action_connection">Sunucuya bağlı değil.</string>
     <string name="recording_already_scheduled">Bu program zaten kaydediliyor veya kayıt için planlandı.</string>
     <string name="recordings_title">Kayıtlar</string>
-    <string name="recordings_archive">Arşiv</string>
     <string name="recordings_archive_all">Tüm kayıtlar</string>
     <string name="recordings_schedule">Planlananlar</string>
     <string name="recordings_problems">Sorunlar</string>

@@ -214,7 +214,7 @@ class RecordingConfirmationStateTest {
             compose.onNodeWithTag("recording-confirmation-back").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
             compose.onNodeWithTag("recording-confirmation-confirm").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
         }
-        val returnTarget = if (emptyRoot) hasTestTag("recordings-pill-group") else hasText(if (source == "menu") "Before" else "Next") and hasClickAction()
+        val returnTarget = if (emptyRoot) hasTestTag("recordings-mode-archive") else hasText(if (source == "menu") "Before" else "Next") and hasClickAction()
         compose.mainClock.advanceTimeUntil(timeoutMillis = 1_000) {
             state.archivePath == (if (emptyRoot) emptyList<String>() else listOf("Series")) &&
                 compose.onAllNodes(returnTarget and isFocused()).fetchSemanticsNodes().isNotEmpty()
@@ -223,7 +223,7 @@ class RecordingConfirmationStateTest {
         compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
         if (emptyRoot) {
             compose.runOnIdle { assertEquals(emptyList<String>(), state.archivePath) }
-            compose.onNodeWithTag("recordings-pill-group").assertIsFocused()
+            compose.onNodeWithTag("recordings-mode-archive").assertIsFocused()
         } else {
             compose.runOnIdle { assertEquals(listOf("Series"), state.archivePath) }
             compose.onNode(hasText(if (source == "menu") "Before" else "Next") and hasClickAction()).assertIsFocused()

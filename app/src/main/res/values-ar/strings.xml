@@ -402,7 +402,6 @@
     <string name="recording_action_connection">غير متصل بالخادم.</string>
     <string name="recording_already_scheduled">هذا البرنامج قيد التسجيل أو مجدول بالفعل.</string>
     <string name="recordings_title">التسجيلات</string>
-    <string name="recordings_archive">الأرشيف</string>
     <string name="recordings_archive_all">كل التسجيلات</string>
     <string name="recordings_schedule">جدول التسجيلات</string>
     <string name="recordings_problems">المشكلات</string>

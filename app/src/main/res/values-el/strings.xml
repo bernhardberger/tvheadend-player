@@ -386,7 +386,6 @@
     <string name="recording_action_connection">Δεν υπάρχει σύνδεση με τον διακομιστή.</string>
     <string name="recording_already_scheduled">Αυτή η εκπομπή εγγράφεται ή έχει προγραμματιστεί για εγγραφή.</string>
     <string name="recordings_title">Εγγραφές</string>
-    <string name="recordings_archive">Αρχείο</string>
     <string name="recordings_archive_all">Όλες οι εγγραφές</string>
     <string name="recordings_schedule">Προγραμματισμένες</string>
     <string name="recordings_problems">Προβλήματα</string>

@@ -386,7 +386,6 @@
     <string name="recording_action_connection">Ikke koblet til serveren.</string>
     <string name="recording_already_scheduled">Dette programmet tas opp eller er planlagt for opptak.</string>
     <string name="recordings_title">Opptak</string>
-    <string name="recordings_archive">Arkiv</string>
     <string name="recordings_archive_all">Alle opptak</string>
     <string name="recordings_schedule">Planlagte</string>
     <string name="recordings_problems">Problemer</string>

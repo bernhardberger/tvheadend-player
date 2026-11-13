@@ -390,7 +390,6 @@
     <string name="recording_action_connection">Pas de connexion au serveur.</string>
     <string name="recording_already_scheduled">Ce programme est en cours d’enregistrement ou programmé.</string>
     <string name="recordings_title">Enregistrements</string>
-    <string name="recordings_archive">Archives</string>
     <string name="recordings_archive_all">Tous les enregistrements</string>
     <string name="recordings_schedule">Programmation</string>
     <string name="recordings_problems">Problèmes</string>

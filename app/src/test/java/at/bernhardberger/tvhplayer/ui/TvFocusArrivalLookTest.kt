@@ -218,7 +218,7 @@ class TvFocusArrivalLookTest {
         }
         compose.awaitBrowsePreparation()
         compose.settleFrames(1, frameMillis = 1000)
-        assertLightFill(compose.onNodeWithTag("recordings-pill-group"), "Group pill")
+        assertLightFill(compose.onNodeWithTag("recordings-mode-archive"), "Browse tab")
     }
 
     @Test fun selectedAudioRowLooksFocusedWhenItsPageOpensBelowTheViewport() {

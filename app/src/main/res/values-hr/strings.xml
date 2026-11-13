@@ -390,7 +390,6 @@
     <string name="recording_action_connection">Nema veze s poslužiteljem.</string>
     <string name="recording_already_scheduled">Ova se emisija snima ili je snimanje zakazano.</string>
     <string name="recordings_title">Snimke</string>
-    <string name="recordings_archive">Arhiva</string>
     <string name="recordings_archive_all">Sve snimke</string>
     <string name="recordings_schedule">Raspored</string>
     <string name="recordings_problems">Problemi</string>

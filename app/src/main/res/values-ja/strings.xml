@@ -382,7 +382,6 @@
     <string name="recording_action_connection">サーバーに接続していません。</string>
     <string name="recording_already_scheduled">この番組は録画中または予約済みです。</string>
     <string name="recordings_title">録画</string>
-    <string name="recordings_archive">アーカイブ</string>
     <string name="recordings_archive_all">すべての録画</string>
     <string name="recordings_schedule">録画予定</string>
     <string name="recordings_problems">問題</string>

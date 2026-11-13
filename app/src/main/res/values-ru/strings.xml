@@ -394,7 +394,6 @@
     <string name="recording_action_connection">Нет подключения к серверу.</string>
     <string name="recording_already_scheduled">Эта передача записывается или запланирована для записи.</string>
     <string name="recordings_title">Записи</string>
-    <string name="recordings_archive">Архив</string>
     <string name="recordings_archive_all">Все записи</string>
     <string name="recordings_schedule">Расписание</string>
     <string name="recordings_problems">Проблемы</string>

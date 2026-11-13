@@ -390,7 +390,6 @@
     <string name="recording_action_connection">Nu există conexiune la server.</string>
     <string name="recording_already_scheduled">Această emisiune se înregistrează sau este programată pentru înregistrare.</string>
     <string name="recordings_title">Înregistrări</string>
-    <string name="recordings_archive">Arhivă</string>
     <string name="recordings_archive_all">Toate înregistrările</string>
     <string name="recordings_schedule">Programări</string>
     <string name="recordings_problems">Probleme</string>

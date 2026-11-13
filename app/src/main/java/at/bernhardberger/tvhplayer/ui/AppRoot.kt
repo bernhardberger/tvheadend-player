@@ -59,7 +59,6 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchRequests
-import at.bernhardberger.tvhplayer.core.partitionDvrLibrary
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchState
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget
 import at.bernhardberger.tvhplayer.core.WarmReturnOpportunity
@@ -590,10 +589,6 @@ fun AppRoot(
         backStack.navigateTopLevel(destination)
     }
     val recordingsScreenState = remember { RecordingsScreenState() }
-    // The Schedule destination keeps its own state, so the library never leaves the Archive.
-    val scheduleScreenState = remember {
-        RecordingsScreenState(initialMode = at.bernhardberger.tvhplayer.core.DvrLibraryMode.SCHEDULE)
-    }
     val focusManager = LocalFocusManager.current
 
     val appVm: AppConnectionViewModel = koinViewModel()
@@ -625,9 +620,6 @@ fun AppRoot(
     val activeRecordingId = (activeTarget as? AppPlaybackTarget.Recording)?.recordingId
     val recordingSelection by playbackRuntime.recordingSelection.collectAsStateWithLifecycle()
     val playbackObservation by tvheadendSession.observation.collectAsStateWithLifecycle()
-    val scheduleProblems = remember(playbackObservation.dvrSnapshotForDisplay) {
-        partitionDvrLibrary(playbackObservation.dvrSnapshotForDisplay?.entries.orEmpty()).problems.size
-    }
     val warmRecordingId = warmRecordingId(browsePlaying, recordingSelection, playbackObservation.currentSession)
     val playingNow = { playingIds(playbackRuntime.activeTarget.value, playbackRuntime.state.value) }
     // Created once here: the surface and both player screens read this one value.
@@ -1081,55 +1073,6 @@ fun AppRoot(
                 .then(if (coldStartVisible) Modifier.clearAndSetSemantics {} else Modifier)) {
                 // The full-screen shell only ever shows players: its edges are player transitions.
                 val playerTransition = shellBackStack.lastOrNull().let { it is LivePlayerKey || it is RecordingPlayerKey }
-                // Recordings and Schedule are one screen over two states: the library, and the Schedule/Problems pages.
-                @Composable
-                fun RecordingsRoute(routeKey: AppNavKey, screenState: RecordingsScreenState) {
-                    RecordingsRouteContent(
-                        onShowGuide = { channelId, programme ->
-                            guideChannelRequest = PlayerReturnFocus(channelId, channelId,
-                                programme?.id, programme?.start?.epochSeconds)
-                            navigateTopLevel(GuideKey)
-                        },
-                        playingRecordingId = warmRecordingId,
-                        onReturnToRecording = returnToWarmRecording,
-                        view = uiSettings.recordingsView,
-                        onViewChange = { settingsScope.launch { uiSettingsStore.setRecordingsView(it) } },
-                        onWatchChannel = requestLivePlayer,
-                        contentAllowed = contentAllowed,
-                        contentPadding = contentPadding,
-                        initialFocusEnabled = !drawerActive && currentDestination == routeKey,
-                        backEnabled = !applianceLaunchActive,
-                        connectionUiState = connectionUiState,
-                        connectionFailure = browseConnectionFailure,
-                        onRetry = retryBrowseConnection,
-                        onOpenConnectionSettings = {
-                            navigateTopLevel(SettingsKey(SettingsSection.CONNECTION))
-                        },
-                        onPlayRecording = { playbackSelection, intent ->
-                            val recordingId = playbackSelection.recordingId
-                            playerEntry.request(playbackSelectionScope) {
-                                browseSteps.withdrawPending()
-                                browseSteps.joinStart()
-                                browseStop?.join()
-                                val target = playbackOrchestrator.requestRecordingPlayer(
-                                    activeChannelId = playingNow().first,
-                                    activeRecordingId = playingNow().second,
-                                    requestedRecordingId = recordingId,
-                                    startPlayback = {
-                                        playbackRuntime.playRecording(
-                                            playbackSelection,
-                                            intent,
-                                        )
-                                    },
-                                ) ?: return@request
-                                backStack.pushTransient(
-                                    recordingPlayerKey(target.recordingId, intent),
-                                )
-                            }
-                        },
-                        state = screenState,
-                    )
-                }
                 NavDisplay(
                     backStack = shellBackStack,
                     sceneStrategies = listOf(
@@ -1173,15 +1116,7 @@ fun AppRoot(
                             },
                             onPlay = requestLivePlayer,
                             onReturnToRecording = returnToWarmRecording,
-                            onRecordings = { mode, entryId ->
-                                if (mode == at.bernhardberger.tvhplayer.core.DvrLibraryMode.ARCHIVE) {
-                                    recordingsScreenState.open(mode, entryId)
-                                    navigateTopLevel(RecordingsKey)
-                                } else {
-                                    scheduleScreenState.open(mode, entryId)
-                                    navigateTopLevel(ScheduleKey)
-                                }
-                            },
+                            onRecordings = { mode, entryId -> recordingsScreenState.open(mode, entryId); navigateTopLevel(RecordingsKey) },
                             onGenre = { category -> guideGenreRequest = category; navigateTopLevel(GuideKey) },
                             onShowGuide = { channelId, programme ->
                                 guideChannelRequest = PlayerReturnFocus(channelId, channelId, programme?.id, programme?.start?.epochSeconds)
@@ -1296,11 +1231,53 @@ fun AppRoot(
 
                     entry<RecordingsKey>(
                         metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.RECORDINGS),
-                    ) { RecordingsRoute(RecordingsKey, recordingsScreenState) }
-
-                    entry<ScheduleKey>(
-                        metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.SCHEDULE),
-                    ) { RecordingsRoute(ScheduleKey, scheduleScreenState) }
+                    ) {
+                        RecordingsRouteContent(
+                            onShowGuide = { channelId, programme ->
+                                guideChannelRequest = PlayerReturnFocus(channelId, channelId,
+                                    programme?.id, programme?.start?.epochSeconds)
+                                navigateTopLevel(GuideKey)
+                            },
+                            playingRecordingId = warmRecordingId,
+                            onReturnToRecording = returnToWarmRecording,
+                            view = uiSettings.recordingsView,
+                            onViewChange = { settingsScope.launch { uiSettingsStore.setRecordingsView(it) } },
+                            onWatchChannel = requestLivePlayer,
+                            contentAllowed = contentAllowed,
+                            contentPadding = contentPadding,
+                            initialFocusEnabled = !drawerActive && currentDestination == RecordingsKey,
+                            backEnabled = !applianceLaunchActive,
+                            connectionUiState = connectionUiState,
+                            connectionFailure = browseConnectionFailure,
+                            onRetry = retryBrowseConnection,
+                            onOpenConnectionSettings = {
+                                navigateTopLevel(SettingsKey(SettingsSection.CONNECTION))
+                            },
+                            onPlayRecording = { playbackSelection, intent ->
+                                val recordingId = playbackSelection.recordingId
+                                playerEntry.request(playbackSelectionScope) {
+                                    browseSteps.withdrawPending()
+                                    browseSteps.joinStart()
+                                    browseStop?.join()
+                                    val target = playbackOrchestrator.requestRecordingPlayer(
+                                        activeChannelId = playingNow().first,
+                                        activeRecordingId = playingNow().second,
+                                        requestedRecordingId = recordingId,
+                                        startPlayback = {
+                                            playbackRuntime.playRecording(
+                                                playbackSelection,
+                                                intent,
+                                            )
+                                        },
+                                    ) ?: return@request
+                                    backStack.pushTransient(
+                                        recordingPlayerKey(target.recordingId, intent),
+                                    )
+                                }
+                            },
+                            state = recordingsScreenState,
+                        )
+                    }
 
                     entry<SettingsKey>(
                         metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.SETTINGS),
@@ -1577,10 +1554,8 @@ fun AppRoot(
                             add(AppDestination.CHANNELS)
                             add(AppDestination.GUIDE)
                             add(AppDestination.RECORDINGS)
-                            add(AppDestination.SCHEDULE)
                             add(AppDestination.SETTINGS)
                         },
-                        scheduleProblems = scheduleProblems,
                         rootBackPriority = applianceLaunchActive,
                         onRootBack = handleRootBack,
                         onBackHandlerChanged = { browseBackHandler.value = it },
@@ -1595,6 +1570,10 @@ fun AppRoot(
                                     activeChannelId = playingChannelId,
                                     activeRecordingId = playingRecordingId,
                                 )
+                                // The drawer opens the library; the Schedule screen is reached from its pill.
+                                if (destination == AppDestination.RECORDINGS) {
+                                    recordingsScreenState.open(at.bernhardberger.tvhplayer.core.DvrLibraryMode.ARCHIVE)
+                                }
                                 navigateTopLevel(
                                     destination.toTopLevelKey(
                                         settingsSection = backStack.lastSettingsSection(),
@@ -1669,7 +1648,6 @@ private fun AppDestination.toTopLevelKey(
     AppDestination.CHANNELS -> ChannelsKey
     AppDestination.GUIDE -> GuideKey
     AppDestination.RECORDINGS -> RecordingsKey
-    AppDestination.SCHEDULE -> ScheduleKey
     AppDestination.SETTINGS -> SettingsKey(settingsSection ?: SettingsSection.GENERAL)
     AppDestination.LIVE_PLAYER,
     AppDestination.RECORDING_PLAYER -> error("Transient destination is not top-level")

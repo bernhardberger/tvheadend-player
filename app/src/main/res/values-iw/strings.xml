@@ -390,7 +390,6 @@
     <string name="recording_action_connection">אין חיבור לשרת.</string>
     <string name="recording_already_scheduled">התוכנית כבר מוקלטת או מתוזמנת להקלטה.</string>
     <string name="recordings_title">הקלטות</string>
-    <string name="recordings_archive">ארכיון</string>
     <string name="recordings_archive_all">כל ההקלטות</string>
     <string name="recordings_schedule">לוח הקלטות</string>
     <string name="recordings_problems">בעיות</string>

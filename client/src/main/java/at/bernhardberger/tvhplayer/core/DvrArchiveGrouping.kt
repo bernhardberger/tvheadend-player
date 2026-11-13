@@ -72,11 +72,15 @@ fun buildDvrArchive(
     return if (sort == DvrArchiveSort.NEWEST) tree else tree.arranged(sort, lastGroup)
 }
 
-/** The viewer's choices for Recordings > Archive: how it is grouped, ordered and filtered. */
+/**
+ * The viewer's choices for Recordings > Browse: how it is grouped, ordered and filtered, and whether
+ * the Folders root opens with the Recording now folder.
+ */
 data class DvrArchiveView(
     val grouping: DvrArchiveGrouping = DvrArchiveGrouping.FLAT,
     val sort: DvrArchiveSort = DvrArchiveSort.NEWEST,
     val show: DvrArchiveShow = DvrArchiveShow.ALL,
+    val recordingNowFolder: Boolean = true,
 )
 
 /** Which recordings the archive lists, by how much of each has been watched. */

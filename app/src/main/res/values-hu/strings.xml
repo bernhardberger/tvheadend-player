@@ -386,7 +386,6 @@
     <string name="recording_action_connection">Nincs kapcsolat a szerverrel.</string>
     <string name="recording_already_scheduled">A műsor felvétele folyamatban van vagy ütemezve lett.</string>
     <string name="recordings_title">Felvételek</string>
-    <string name="recordings_archive">Archívum</string>
     <string name="recordings_archive_all">Összes felvétel</string>
     <string name="recordings_schedule">Ütemezés</string>
     <string name="recordings_problems">Problémák</string>

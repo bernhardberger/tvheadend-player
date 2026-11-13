@@ -374,7 +374,6 @@
     <string name="recording_action_connection">Sem conexão com o servidor.</string>
     <string name="recording_already_scheduled">Este programa está sendo gravado ou já está agendado.</string>
     <string name="recordings_title">Gravações</string>
-    <string name="recordings_archive">Arquivo</string>
     <string name="recordings_archive_all">Todas as gravações</string>
     <string name="recordings_schedule">Agendamentos</string>
     <string name="recordings_problems">Problemas</string>

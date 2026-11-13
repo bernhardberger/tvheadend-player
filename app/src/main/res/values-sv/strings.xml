@@ -386,7 +386,6 @@
     <string name="recording_action_connection">Inte ansluten till servern.</string>
     <string name="recording_already_scheduled">Programmet spelas in eller är schemalagt.</string>
     <string name="recordings_title">Inspelningar</string>
-    <string name="recordings_archive">Arkiv</string>
     <string name="recordings_archive_all">Alla inspelningar</string>
     <string name="recordings_schedule">Schema</string>
     <string name="recordings_problems">Problem</string>

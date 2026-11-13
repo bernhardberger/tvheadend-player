@@ -394,7 +394,6 @@
     <string name="recording_action_connection">Brak połączenia z serwerem.</string>
     <string name="recording_already_scheduled">Ten program jest nagrywany lub ma zaplanowane nagrywanie.</string>
     <string name="recordings_title">Nagrania</string>
-    <string name="recordings_archive">Archiwum</string>
     <string name="recordings_archive_all">Wszystkie nagrania</string>
     <string name="recordings_schedule">Harmonogram</string>
     <string name="recordings_problems">Problemy</string>

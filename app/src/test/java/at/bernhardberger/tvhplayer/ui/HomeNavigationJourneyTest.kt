@@ -365,11 +365,7 @@ class HomeNavigationJourneyTest {
         fixture.key(Key.Enter)
         compose.onNodeWithTag("recordings-schedule-list").assertExists()
         compose.onNodeWithTag("recording-list-entry-9").assertIsFocused().assertIsDisplayed()
-        // Re-enter through the rail, matching the TV journey rather than Home's deep link.
-        fixture.focus("nav-schedule")
-        fixture.key(Key.Enter)
-        fixture.key(Key.DirectionRight)
-        fixture.focus("recording-list-entry-9")
+        // The Schedule tab lives in Recordings: Left enters the rail on Recordings, never on Home first.
         compose.mainClock.autoAdvance = false
         try {
             compose.onRoot().performKeyInput { pressKey(Key.DirectionLeft) }
@@ -378,14 +374,15 @@ class HomeNavigationJourneyTest {
                 compose.mainClock.advanceTimeByFrame()
                 compose.waitForIdle()
             }
-            compose.onNodeWithTag("nav-schedule").assertIsFocused()
+            compose.onNodeWithTag("nav-recordings").assertIsFocused()
         } finally {
             compose.mainClock.autoAdvance = true
         }
         fixture.key(Key.DirectionRight)
+        compose.onNodeWithTag("recording-list-entry-9").assertIsFocused()
         compose.runOnIdle { fixture.back.onBackPressed() }
         fixture.settle()
-        compose.onNodeWithTag("nav-schedule").assertIsFocused().assertIsSelected()
+        compose.onNodeWithTag("nav-recordings").assertIsFocused().assertIsSelected()
         compose.runOnIdle { fixture.back.onBackPressed() }
         fixture.settle()
         compose.onNodeWithTag("nav-home").assertIsFocused()

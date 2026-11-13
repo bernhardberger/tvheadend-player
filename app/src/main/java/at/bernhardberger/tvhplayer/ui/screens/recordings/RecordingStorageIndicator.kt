@@ -1,7 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens.recordings
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
@@ -16,7 +15,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
@@ -32,14 +30,14 @@ import at.bernhardberger.tvhplayer.ui.TvWarningColor
 import at.bernhardberger.tvhplayer.ui.common.formatFileSize
 import kotlin.math.roundToInt
 
-private val StorageRingSize = 32.dp
-private val StorageRingStroke = 3.dp
+private val StorageRingSize = 20.dp
+private val StorageRingStroke = 2.5.dp
 
 /**
- * How much recording storage is left, beside the Archive header's trailing pills: free space in the
- * first line, the total under it and a ring that fills with the share in use. Only a current reading
- * is drawn; anything else says the space is unknown rather than showing old numbers. It is quiet
- * information with no focus stop, spoken as one line.
+ * How much recording storage is left, quiet at the end of the Recordings tab line: a small ring that
+ * fills with the share in use, then one muted line with the free space and the total. Only the ring
+ * turns amber or red as space runs low. Only a current reading is drawn; anything else says the space
+ * is unknown rather than showing old numbers. It has no focus stop and is spoken as one line.
  */
 @Composable
 internal fun RecordingStorageIndicator(state: DvrDiskSpaceState, modifier: Modifier = Modifier) {
@@ -48,7 +46,7 @@ internal fun RecordingStorageIndicator(state: DvrDiskSpaceState, modifier: Modif
         val unknown = stringResource(R.string.recording_space_unknown)
         Text(
             text = unknown,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodySmall,
             color = TvTextColors.secondary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -71,23 +69,14 @@ internal fun RecordingStorageIndicator(state: DvrDiskSpaceState, modifier: Modif
         horizontalArrangement = Arrangement.spacedBy(TvSpacing12),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(horizontalAlignment = Alignment.End) {
-            Text(
-                text = stringResource(R.string.recording_space_free, free),
-                style = MaterialTheme.typography.titleSmall,
-                color = emphasis ?: TvTextColors.primary,
-                textAlign = TextAlign.End,
-                maxLines = 1,
-            )
-            Text(
-                text = stringResource(R.string.recording_space_of_total, total),
-                style = MaterialTheme.typography.bodySmall,
-                color = TvTextColors.secondary,
-                textAlign = TextAlign.End,
-                maxLines = 1,
-            )
-        }
         StorageRing(indicator, emphasis ?: TvTextColors.secondary)
+        Text(
+            text = stringResource(R.string.recording_space_value, free, total),
+            style = MaterialTheme.typography.bodySmall,
+            color = TvTextColors.secondary,
+            maxLines = 1,
+            modifier = Modifier.testTag("recordings-space-text"),
+        )
     }
 }
 

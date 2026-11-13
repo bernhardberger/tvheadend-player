@@ -48,6 +48,7 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
         val RECORDINGS_GROUPING = stringPreferencesKey("recordingsGrouping")
         val RECORDINGS_SORT = stringPreferencesKey("recordingsSort")
         val RECORDINGS_SHOW = stringPreferencesKey("recordingsShow")
+        val RECORDINGS_RECORDING_NOW = booleanPreferencesKey("recordingsRecordingNowFolder")
         fun homeSection(kind: HomeSectionKind) = booleanPreferencesKey("homeSection${kind.name}")
     }
 
@@ -61,6 +62,7 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
                     ?: DvrArchiveSort.NEWEST,
                 show = DvrArchiveShow.entries.firstOrNull { it.name == preferences[Keys.RECORDINGS_SHOW] }
                     ?: DvrArchiveShow.ALL,
+                recordingNowFolder = preferences[Keys.RECORDINGS_RECORDING_NOW] ?: true,
             ),
             autoStartPlayback = resolvePlaybackAutoStart(preferences[Keys.AUTO_START_PLAYBACK]),
             clockFormat = resolveClockFormat(preferences[Keys.CLOCK_FORMAT]),
@@ -102,6 +104,7 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
             it[Keys.RECORDINGS_GROUPING] = view.grouping.name
             it[Keys.RECORDINGS_SORT] = view.sort.name
             it[Keys.RECORDINGS_SHOW] = view.show.name
+            it[Keys.RECORDINGS_RECORDING_NOW] = view.recordingNowFolder
         }
     }
 

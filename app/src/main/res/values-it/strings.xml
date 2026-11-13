@@ -390,7 +390,6 @@
     <string name="recording_action_connection">Non connesso al server.</string>
     <string name="recording_already_scheduled">Questo programma è in registrazione o è già programmato per la registrazione.</string>
     <string name="recordings_title">Registrazioni</string>
-    <string name="recordings_archive">Archivio</string>
     <string name="recordings_archive_all">Tutte le registrazioni</string>
     <string name="recordings_schedule">Programmazione</string>
     <string name="recordings_problems">Problemi</string>

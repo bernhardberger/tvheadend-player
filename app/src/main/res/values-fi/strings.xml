@@ -386,7 +386,6 @@
     <string name="recording_action_connection">Ei yhteyttä palvelimeen.</string>
     <string name="recording_already_scheduled">Tätä ohjelmaa tallennetaan jo tai sen tallennus on ajastettu.</string>
     <string name="recordings_title">Tallenteet</string>
-    <string name="recordings_archive">Arkisto</string>
     <string name="recordings_archive_all">Kaikki tallenteet</string>
     <string name="recordings_schedule">Ajastukset</string>
     <string name="recordings_problems">Ongelmat</string>

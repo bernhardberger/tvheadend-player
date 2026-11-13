@@ -374,7 +374,6 @@
     <string name="recording_action_connection">尚未連線至伺服器。</string>
     <string name="recording_already_scheduled">此節目正在錄影或已預約錄影。</string>
     <string name="recordings_title">錄影</string>
-    <string name="recordings_archive">典藏</string>
     <string name="recordings_archive_all">所有錄影</string>
     <string name="recordings_schedule">錄影排程</string>
     <string name="recordings_problems">問題</string>

@@ -394,7 +394,6 @@
     <string name="recording_action_connection">Není připojení k serveru.</string>
     <string name="recording_already_scheduled">Tento pořad se nahrává nebo je nahrávání naplánováno.</string>
     <string name="recordings_title">Nahrávky</string>
-    <string name="recordings_archive">Archiv</string>
     <string name="recordings_archive_all">Všechny nahrávky</string>
     <string name="recordings_schedule">Plán</string>
     <string name="recordings_problems">Problémy</string>

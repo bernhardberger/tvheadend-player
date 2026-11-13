@@ -62,6 +62,22 @@ class DvrLibraryPolicyTest {
         assertTrue(completed.runningRecordings().isEmpty())
     }
 
+    @Test fun recordingNowFolderListsRunningRecordingsOnlyAtTheFoldersRootWhileSwitchedOn() {
+        val path = listOf("Sport")
+        val running = entry(1, DvrEntryState.RECORDING, 100, path)
+        val root = buildDvrArchive(listOf(running, entry(2, DvrEntryState.COMPLETED, 50, path)))
+        val folders = DvrArchiveView(grouping = DvrArchiveGrouping.FOLDERS)
+
+        assertTrue(DvrArchiveView().recordingNowFolder)
+        assertEquals(listOf(running), root.recordingNowEntries(folders))
+        assertTrue(root.recordingNowEntries(folders.copy(recordingNowFolder = false)).isEmpty())
+        assertTrue(root.folderAt(path)!!.recordingNowEntries(folders).isEmpty())
+        DvrArchiveGrouping.entries.filter { it != DvrArchiveGrouping.FOLDERS }.forEach {
+            assertTrue("$it", root.recordingNowEntries(folders.copy(grouping = it)).isEmpty())
+        }
+        assertTrue(buildDvrArchive(listOf(entry(3, DvrEntryState.COMPLETED, 10, path))).recordingNowEntries(folders).isEmpty())
+    }
+
     @Test fun runningListIsFlatAscendingWithUnknownStartsLast() {
         val late = entry(1, DvrEntryState.RECORDING, 300, listOf("A", "B"))
         val early = entry(2, DvrEntryState.RECORDING_ERROR, 100, emptyList())

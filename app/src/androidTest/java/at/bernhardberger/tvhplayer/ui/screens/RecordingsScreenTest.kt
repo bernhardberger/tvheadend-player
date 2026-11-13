@@ -78,7 +78,9 @@ import org.junit.Test
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
-private const val GROUP_PILL = "recordings-pill-group"
+/** Without a list there is no headline or options button; focus parks on the Browse tab. */
+private const val BROWSE_TAB = "recordings-mode-archive"
+private const val OPTIONS_BUTTON = "recordings-view-options"
 
 @OptIn(ExperimentalTestApi::class, TvheadendTestingApi::class)
 class RecordingsScreenTest {
@@ -164,12 +166,12 @@ class RecordingsScreenTest {
 
         composeRule.onNodeWithText("Retry").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionUp) }
-        composeRule.onNodeWithTag(GROUP_PILL).assertIsFocused()
+        composeRule.onNodeWithTag(BROWSE_TAB).assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionDown) }
         composeRule.onNodeWithText("Retry").assertIsFocused()
         composeRule.runOnIdle { assertEquals(0, retries) }
         composeRule.onNodeWithText("Retry").performKeyInput { pressKey(Key.DirectionUp) }
-        composeRule.onNodeWithTag(GROUP_PILL).assertIsFocused()
+        composeRule.onNodeWithTag(BROWSE_TAB).assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionDown) }
         composeRule.onNodeWithText("Retry").assertIsFocused()
         composeRule.runOnIdle { assertEquals(0, retries) }
@@ -213,19 +215,19 @@ class RecordingsScreenTest {
             TVHeadendPlayerTheme { TestRecordingsScreen(connectionUiState = connection) }
         }
 
-        composeRule.onNodeWithTag(GROUP_PILL).assertIsFocused()
+        composeRule.onNodeWithTag(BROWSE_TAB).assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionDown) }
-        composeRule.onNodeWithTag(GROUP_PILL).assertIsFocused()
+        composeRule.onNodeWithTag(BROWSE_TAB).assertIsFocused()
         composeRule.onAllNodesWithText("Retry").assertCountEquals(0)
         composeRule.runOnIdle { connection = ConnectionUiState.Ready }
-        composeRule.onNodeWithTag(GROUP_PILL).assertIsFocused()
+        composeRule.onNodeWithTag(BROWSE_TAB).assertIsFocused()
         composeRule.runOnIdle {
             connection = ConnectionUiState.Error(
                 ConnectionFailureKind.UNREACHABLE,
                 SessionRecoveryDisposition.EXPLICIT_RETRY,
             )
         }
-        composeRule.onNodeWithTag(GROUP_PILL).assertIsFocused()
+        composeRule.onNodeWithTag(BROWSE_TAB).assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionDown) }
         composeRule.onNodeWithText("Retry").assertIsFocused()
     }
@@ -242,14 +244,14 @@ class RecordingsScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithTag(GROUP_PILL).assertIsFocused()
+        composeRule.onNodeWithTag(BROWSE_TAB).assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionDown) }
-        composeRule.onNodeWithTag(GROUP_PILL).assertIsFocused()
+        composeRule.onNodeWithTag(BROWSE_TAB).assertIsFocused()
         composeRule.onAllNodesWithText("Retry").assertCountEquals(0)
     }
 
     @Test
-    fun pillsStartTheHeaderRow() {
+    fun tabsStartTheHeaderRow() {
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 TestRecordingsScreen(
@@ -260,12 +262,12 @@ class RecordingsScreenTest {
 
         val header = composeRule.onNodeWithTag("recordings-header")
             .fetchSemanticsNode().boundsInRoot
-        val pills = composeRule.onNodeWithTag("recordings-pills")
+        val tabs = composeRule.onNodeWithTag("recordings-mode-tabs")
             .fetchSemanticsNode().boundsInRoot
 
-        assertTrue(pills.left >= header.left)
-        assertTrue(pills.right < header.right)
-        assertEquals(header.center.y, pills.center.y, 0.5f)
+        assertTrue(tabs.left >= header.left)
+        assertTrue(tabs.right < header.right)
+        assertEquals(header.center.y, tabs.center.y, 0.5f)
     }
 
     @Test
@@ -470,12 +472,12 @@ class RecordingsScreenTest {
                 keyDown(Key.DirectionUp); keyUp(Key.DirectionUp)
             }
             composeRule.mainClock.advanceTimeByFrame()
-            assertPillFocused()
+            assertOptionsFocused()
             composeRule.runOnIdle {
                 entries.value += recording(id = 2, title = "Second", path = "Series/second.ts")
             }
             repeat(12) { composeRule.mainClock.advanceTimeByFrame() }
-            assertPillFocused()
+            assertOptionsFocused()
             composeRule.runOnIdle { assertFalse(drawerActive) }
         } finally {
             composeRule.mainClock.autoAdvance = true
@@ -513,7 +515,7 @@ class RecordingsScreenTest {
         }
         composeRule.waitForIdle()
         composeRule.runOnIdle { assertEquals("Removal must retain the current focus region", drawerOwnsFocus, drawerActive) }
-        if (!drawerOwnsFocus) composeRule.onNodeWithTag(GROUP_PILL).assertIsFocused()
+        if (!drawerOwnsFocus) composeRule.onNodeWithTag(BROWSE_TAB).assertIsFocused()
     }
 
     @Test
@@ -669,7 +671,7 @@ class RecordingsScreenTest {
     }
 
     @Test
-    fun movingUpFromFirstEnteredFolderRowReturnsToThePillsWithoutChangingDepth() {
+    fun movingUpFromFirstEnteredFolderRowReturnsToTheOptionsButtonWithoutChangingDepth() {
         val entries = listOf(
             recording(id = 7, title = "Evening News", path = "News/evening-news.ts")
         )
@@ -685,7 +687,7 @@ class RecordingsScreenTest {
             .assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionUp) }
 
-        assertPillFocused()
+        assertOptionsFocused()
         composeRule.onNodeWithTag("recordings-archive-list").assertIsDisplayed()
     }
 
@@ -1104,7 +1106,7 @@ class RecordingsScreenTest {
     }
 
     @Test
-    fun pageDownThenUpDoesNotReclaimFocusFromThePills() {
+    fun pageDownThenUpDoesNotReclaimFocusFromTheOptionsButton() {
         val entries = (1..50).map { id ->
             recording(id, "Recording $id", path = "recording-$id.ts", start = id.toLong())
         }
@@ -1119,7 +1121,7 @@ class RecordingsScreenTest {
         }
         composeRule.mainClock.autoAdvance = true
         composeRule.waitForIdle()
-        assertPillFocused()
+        assertOptionsFocused()
     }
 
     @Test
@@ -1399,7 +1401,7 @@ class RecordingsScreenTest {
         }
         composeRule.onAllNodesWithTag("programme-details-page").assertCountEquals(0)
         composeRule.onAllNodesWithTag("details-delete").assertCountEquals(0)
-        composeRule.onNodeWithTag(GROUP_PILL).assertIsFocused()
+        composeRule.onNodeWithTag(BROWSE_TAB).assertIsFocused()
     }
 
     @Test
@@ -1762,10 +1764,8 @@ class RecordingsScreenTest {
         composeRule.onNodeWithTag(tag).assertIsFocused()
     }
 
-    private fun assertPillFocused() {
-        composeRule.onAllNodes(SemanticsMatcher("A pill") {
-            it.config.getOrElse(SemanticsProperties.TestTag) { "" }.startsWith("recordings-pill-")
-        } and isFocused()).assertCountEquals(1)
+    private fun assertOptionsFocused() {
+        composeRule.onNodeWithTag(OPTIONS_BUTTON).assertIsFocused()
     }
 
     private fun SemanticsNodeInteraction.pressCenter() =

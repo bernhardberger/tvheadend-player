@@ -62,9 +62,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
-import at.bernhardberger.tvhplayer.ui.screens.recordings.ArchivePillRow
-import at.bernhardberger.tvhplayer.ui.screens.recordings.ArchivePillPanel
-import at.bernhardberger.tvhplayer.ui.screens.recordings.ArchivePill
+import at.bernhardberger.tvhplayer.ui.screens.recordings.ArchiveViewOptionsButton
+import at.bernhardberger.tvhplayer.ui.screens.recordings.ArchiveViewOptionsPanel
+import at.bernhardberger.tvhplayer.core.recordingNowEntries
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingStorageIndicator
 import at.bernhardberger.tvhplayer.core.DvrArchiveShow
 import androidx.compose.runtime.DisposableEffect
@@ -444,15 +444,14 @@ internal fun RecordingsScreenContent(
     var pendingView by rememberPendingArchiveView(view)
     val chosenView = pendingView ?: view
     val chosenGrouping = chosenView.grouping
-    var openPill by remember { mutableStateOf<ArchivePill?>(null) }
-    val pillPanelOpen = openPill != null
-    val pillFocus = remember { ArchivePill.entries.associateWith { FocusRequester() } }
-    // The stop the next frames move focus to: a pill after its panel closes.
+    var optionsOpen by remember { mutableStateOf(false) }
+    val optionsFocus = remember { FocusRequester() }
+    // The stop the next frames move focus to: the View options button after its panel closes.
     var requestStop by remember { mutableStateOf<FocusRequester?>(null) }
-    // The header stop of the screen shown: the Schedule screen's subnav, else the Archive's first pill.
+    // The stop above the list: Browse's View options button, else (or without a list) the selected tab.
     fun focusHeader(): Boolean {
-        val stop = if (mode != DvrLibraryMode.ARCHIVE) modeFocus else pillFocus.getValue(ArchivePill.GROUP)
-        return runCatching { stop.requestFocus() }.getOrDefault(false)
+        fun request(stop: FocusRequester) = runCatching { stop.requestFocus() }.getOrDefault(false)
+        return (mode == DvrLibraryMode.ARCHIVE && request(optionsFocus)) || request(modeFocus)
     }
     val naming = rememberArchiveNaming(channelsById)
     // Unwatched, Partially watched and Watched read the position behind the check mark,
@@ -534,12 +533,17 @@ internal fun RecordingsScreenContent(
     ) {
         if (chosenView.show == DvrArchiveShow.ALL) observedFullArchive else archiveFor(prepared.value, chosenView.show)
     }
-    val reconciledArchiveStack = remember(observedArchive, observedFullArchive, archiveNavigation.stack) {
-        reconcileArchiveStack(archiveNavigation.stack, observedArchive, observedFullArchive)
+    val observedRecordingNow = remember(observedArchive, chosenView) { observedArchive.recordingNowEntries(chosenView) }
+    val reconciledArchiveStack = remember(
+        observedArchive, observedFullArchive, observedRecordingNow, archiveNavigation.stack,
+    ) {
+        reconcileArchiveStack(archiveNavigation.stack, observedArchive, observedFullArchive, observedRecordingNow)
     }
     val observedKeys = when (mode) {
         DvrLibraryMode.ARCHIVE -> requireNotNull(
-            archiveLevelItems(observedArchive, reconciledArchiveStack.active.levelId, observedFullArchive),
+            archiveLevelItems(
+                observedArchive, reconciledArchiveStack.active.levelId, observedFullArchive, observedRecordingNow,
+            ),
         ).map { it.key }
         DvrLibraryMode.SCHEDULE -> observedLibrary.schedule.map { "recording:${recordingItemKey(it.id)}" }
         DvrLibraryMode.PROBLEMS -> observedLibrary.problems.map { "recording:${recordingItemKey(it.id)}" }
@@ -564,8 +568,9 @@ internal fun RecordingsScreenContent(
             else -> archiveFor(presentation, chosenView.show)
         }
     }
-    val archiveItems = remember(archive, archiveLevel, fullArchive) {
-        archiveLevelItems(archive, archiveLevel, fullArchive) ?: archive.listItems()
+    val recordingNow = remember(archive, chosenView) { archive.recordingNowEntries(chosenView) }
+    val archiveItems = remember(archive, archiveLevel, fullArchive, recordingNow) {
+        archiveLevelItems(archive, archiveLevel, fullArchive, recordingNow) ?: archive.listItems(recordingNow)
     }
     val scheduleGroups = presentation.schedule
     val problemGroups = presentation.problems
@@ -591,7 +596,9 @@ internal fun RecordingsScreenContent(
             }
         }
         retainedPreparation = prepared
-        archiveNavigation.update(reconcileArchiveStack(archiveNavigation.stack, observedArchive, observedFullArchive))
+        archiveNavigation.update(
+            reconcileArchiveStack(archiveNavigation.stack, observedArchive, observedFullArchive, observedRecordingNow),
+        )
     }
 
     LaunchedEffect(
@@ -607,9 +614,9 @@ internal fun RecordingsScreenContent(
         detailsEntry,
         pendingAction,
         folderMenu,
-        pillPanelOpen,
+        optionsOpen,
     ) {
-        if (recordingOverlayOpen(detailsEntry, pendingAction, folderMenu) || pillPanelOpen) return@LaunchedEffect
+        if (recordingOverlayOpen(detailsEntry, pendingAction, folderMenu) || optionsOpen) return@LaunchedEffect
         val requestedEntry = screenState.requestedScheduleEntryId.value
         // Preparation retains the last projection while the new snapshot is calculated.
         // Only the projection built from the displayed snapshot can judge this target.
@@ -667,10 +674,10 @@ internal fun RecordingsScreenContent(
         location,
         focusRecoveryGeneration,
         folderMenu,
-        pillPanelOpen,
+        optionsOpen,
     ) {
         if (!pendingDetailsReturn) return@LaunchedEffect
-        if (recordingOverlayOpen(detailsEntry, pendingAction, folderMenu) || pillPanelOpen) return@LaunchedEffect
+        if (recordingOverlayOpen(detailsEntry, pendingAction, folderMenu) || optionsOpen) return@LaunchedEffect
         repeat(4) {
             withFrameNanos { }
             val restored = runCatching {
@@ -689,7 +696,7 @@ internal fun RecordingsScreenContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .semantics { if (detailsEntry != null || folderMenu != null || pillPanelOpen) hideFromAccessibility() }
+            .semantics { if (detailsEntry != null || folderMenu != null || optionsOpen) hideFromAccessibility() }
             .graphicsLayer { alpha = 1f - (detailsLayering?.detailsAlpha() ?: if (detailsEntry != null && !showContextMenu && !showResumeChoice) 1f else 0f) }
             .onPreviewKeyEvent { event ->
                 if (event.key == relocatingKey) {
@@ -725,51 +732,17 @@ internal fun RecordingsScreenContent(
             // Lists run to the bottom edge and fade there; other content keeps the safe area.
             .padding(top = contentPadding.calculateTopPadding()),
     ) {
-        val archiveMode = mode == DvrLibraryMode.ARCHIVE
         TopLevelBrowseHeader(
-            title = stringResource(if (archiveMode) R.string.recordings_title else R.string.recordings_schedule),
+            title = stringResource(R.string.recordings_title),
             modifier = Modifier
                 .padding(start = startPadding + TvBrowseLeadingInset, end = maxOf(endPadding, TvBrowseTrailingInset))
                 .heightIn(min = recordingsHeaderMinHeight())
                 .testTag("recordings-header"),
-            leading = if (archiveMode) ({
-                Spacer(Modifier.weight(1f))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(40.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    RecordingStorageIndicator(observation.dvrDiskSpaceState)
-                    ArchivePillRow(
-                        view = chosenView,
-                        focusRequesters = pillFocus,
-                        navigationFocus = drawerFocus,
-                        canStepBack = archiveNavigation.stack.canPop,
-                        onOpen = { pill ->
-                            contentFocusOwned = false
-                            openPill = pill
-                        },
-                        onDown = { runCatching { contentFocus.requestFocus() } },
-                        onBack = { archiveNavigation.pop() },
-                        onFocusChanged = {
-                            if (it) {
-                                contentFocusOwned = false
-                                requestContentFocus = false
-                            }
-                        },
-                        modifier = Modifier.onPreviewKeyEvent {
-                            // A deliberate header move takes ownership from the loading handoff.
-                            screenState.requestedScheduleEntryId.value = null
-                            loadingFocusParked = false
-                            contentFocusOwned = false
-                            false
-                        },
-                    )
-                }
-            }) else ({
+            leading = {
                 RecordingModeTabs(
                     selected = mode,
                     selectedFocus = modeFocus,
-                    modes = listOf(DvrLibraryMode.SCHEDULE, DvrLibraryMode.PROBLEMS),
+                    problemCount = problemGroups.values.sumOf { it.size },
                     onFocused = {
                         modeMotion.select(it, DvrLibraryMode.entries)
                         if (mode != it) {
@@ -796,7 +769,10 @@ internal fun RecordingsScreenContent(
                         }
                         .testTag("recordings-mode-tabs"),
                 )
-            }),
+                Spacer(Modifier.weight(1f))
+                // Quiet information at the tab line's end on every tab: no focus stop.
+                RecordingStorageIndicator(observation.dvrDiskSpaceState)
+            },
         )
         TabContent(
             motion = modeMotion,
@@ -825,8 +801,8 @@ internal fun RecordingsScreenContent(
         val channelsById = frame.channelsById
         val scheduleGroups = frame.schedule
         val problemGroups = frame.problems
-        // Archive gets more air below its pills; Schedule keeps its original header gap.
-        Spacer(Modifier.height(if (mode == DvrLibraryMode.ARCHIVE) TvSpacing12 + TvSpacing8 else TvSpacing12))
+        // Every tab's content starts at y80, as the channel list's first row does.
+        Spacer(Modifier.height(TvSpacing12))
 
         if (frame.empty && recordingsLoading(frame.connection, frame.failure)) {
             // In the Archive column's place, running to the bottom edge as its list does.
@@ -845,7 +821,7 @@ internal fun RecordingsScreenContent(
                     }
                 },
                 actionFocus = if (owner.isCurrent) contentFocus else remember { FocusRequester() },
-                upFocus = if (mode == DvrLibraryMode.ARCHIVE) pillFocus.getValue(ArchivePill.GROUP) else modeFocus,
+                upFocus = modeFocus,
                 modifier = Modifier
                     .padding(start = startPadding, end = endPadding, bottom = contentPadding.calculateBottomPadding())
                     .onFocusChanged {
@@ -858,8 +834,11 @@ internal fun RecordingsScreenContent(
         } else ProvideArtworkSession(currentSession, observation) {
             // A frame shows its pictures with the session of the observation it was built from.
             when (mode) {
-                DvrLibraryMode.ARCHIVE -> key(chosenView) { ArchiveDepthContent(
+                DvrLibraryMode.ARCHIVE -> Box(Modifier.fillMaxSize()) { key(chosenView) { ArchiveDepthContent(
                     root = if (owner.isCurrent) archive else frame.archive,
+                    recordingNow = if (owner.isCurrent) recordingNow else {
+                        remember(frame.archive, chosenView) { frame.archive.recordingNowEntries(chosenView) }
+                    },
                     nowSeconds = nowSecProvider,
                     navigation = archiveNavigation,
                     contentPadding = PaddingValues(
@@ -868,9 +847,9 @@ internal fun RecordingsScreenContent(
                     ),
                     isCurrent = owner.isCurrent,
                     initialFocusEnabled = owner.isCurrent && initialFocusEnabled &&
-                        detailsEntry == null && folderMenu == null && !pillPanelOpen &&
+                        detailsEntry == null && folderMenu == null && !optionsOpen &&
                         (contentFocusOwned || requestContentFocus),
-                    backEnabled = backEnabled && detailsEntry == null && folderMenu == null && !pillPanelOpen &&
+                    backEnabled = backEnabled && detailsEntry == null && folderMenu == null && !optionsOpen &&
                         contentFocusOwned,
                     grouping = chosenGrouping,
                     sort = chosenView.sort,
@@ -922,6 +901,31 @@ internal fun RecordingsScreenContent(
                         }
                     },
                 ) }
+                    ArchiveViewOptionsButton(
+                        view = chosenView,
+                        focusRequester = if (owner.isCurrent) optionsFocus else remember { FocusRequester() },
+                        upFocus = modeFocus,
+                        navigationFocus = drawerFocus,
+                        canStepBack = archiveNavigation.stack.canPop,
+                        onOpen = {
+                            if (owner.isCurrent) {
+                                contentFocusOwned = false
+                                optionsOpen = true
+                            }
+                        },
+                        onDown = { runCatching { contentFocus.requestFocus() } },
+                        onBack = { archiveNavigation.pop() },
+                        onFocusChanged = {
+                            if (it && owner.isCurrent) {
+                                screenState.requestedScheduleEntryId.value = null
+                                loadingFocusParked = false
+                                contentFocusOwned = false
+                                requestContentFocus = false
+                            }
+                        },
+                        modifier = Modifier.padding(start = startPadding + TvBrowseLeadingInset),
+                    )
+                }
                 DvrLibraryMode.SCHEDULE -> Box(
                     modifier = Modifier
                         // Archive's columns: the list in its first, the focused recording where it shows its preview.
@@ -1447,9 +1451,8 @@ internal fun RecordingsScreenContent(
     }
     }
     FolderMenu()
-    openPill?.let { pill ->
-        ArchivePillPanel(
-            pill = pill,
+    if (optionsOpen) {
+        ArchiveViewOptionsPanel(
             current = chosenView,
             onChoose = { choice ->
                 if (choice != chosenView) {
@@ -1471,13 +1474,13 @@ internal fun RecordingsScreenContent(
             },
             onClose = {
                 // Move focus before disposing the modal, rather than letting disposal choose a list row.
-                if (pillFocus.getValue(pill).requestFocus()) {
+                if (runCatching { optionsFocus.requestFocus() }.getOrDefault(false)) {
                     contentFocusOwned = false
                     requestContentFocus = false
                 } else {
-                    requestStop = pillFocus.getValue(pill)
+                    requestStop = optionsFocus
                 }
-                openPill = null
+                optionsOpen = false
             },
         )
     }

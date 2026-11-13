@@ -374,7 +374,6 @@
     <string name="recording_action_connection">未连接服务器。</string>
     <string name="recording_already_scheduled">此节目正在录制或已预约录制。</string>
     <string name="recordings_title">录制</string>
-    <string name="recordings_archive">存档</string>
     <string name="recordings_archive_all">所有录制</string>
     <string name="recordings_schedule">录制计划</string>
     <string name="recordings_problems">问题</string>

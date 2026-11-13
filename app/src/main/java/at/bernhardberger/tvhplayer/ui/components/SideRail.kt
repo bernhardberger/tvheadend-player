@@ -1,8 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -20,7 +18,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeight
@@ -73,7 +70,6 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -263,8 +259,6 @@ internal fun SideRail(
     ),
     rootBackPriority: Boolean = false,
     connectionDegraded: Boolean = false,
-    /** Recordings with a problem; the Schedule item shows the count while it is above zero. */
-    scheduleProblems: Int = 0,
     onBackHandlerChanged: ((() -> Unit) -> Unit) = {},
     /** What plays behind browse; the controls below it act on that target. */
     nowPlaying: RailNowPlaying? = null,
@@ -287,12 +281,6 @@ internal fun SideRail(
     val channelsLabel = stringResource(R.string.nav_channels)
     val epgLabel = stringResource(R.string.nav_epg)
     val recordingsLabel = stringResource(R.string.nav_recordings)
-    val scheduleLabel = stringResource(R.string.recordings_schedule)
-    val scheduleDescription = if (scheduleProblems > 0) {
-        pluralStringResource(R.plurals.recordings_schedule_problems_description, scheduleProblems, scheduleProblems)
-    } else {
-        scheduleLabel
-    }
     val settingsLabel = stringResource(R.string.nav_settings)
     val settingsDescription = when {
         connectionDegraded -> stringResource(R.string.connection_problem_label)
@@ -303,7 +291,6 @@ internal fun SideRail(
         channelsLabel,
         epgLabel,
         recordingsLabel,
-        scheduleLabel,
         availableDestinations,
     ) {
         buildList {
@@ -338,15 +325,6 @@ internal fun SideRail(
                 add(RailItem(AppDestination.RECORDINGS, recordingsLabel) {
                     Icon(
                         painter = painterResource(R.drawable.ic_video_library),
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp),
-                    )
-                })
-            }
-            if (AppDestination.SCHEDULE in availableDestinations) {
-                add(RailItem(AppDestination.SCHEDULE, scheduleLabel) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_schedule),
                         contentDescription = null,
                         modifier = Modifier.size(24.dp),
                     )
@@ -585,66 +563,10 @@ internal fun SideRail(
 
                     mainItems.forEach { item ->
                         key(item.route) {
-                            val problemCount = scheduleProblems.takeIf {
-                                it > 0 && item.route == AppDestination.SCHEDULE
-                            }
-                            var itemFocused by remember { mutableStateOf(false) }
                             NavigationDrawerItem(
                                 selected = selectedRoute == item.route,
                                 onClick = { requestRoute(item.route) },
-                                leadingContent = {
-                                    PinnedRailIcon {
-                                        Box {
-                                            item.icon()
-                                            if (problemCount != null) {
-                                                androidx.compose.animation.AnimatedVisibility(
-                                                    visible = drawerValue == DrawerValue.Closed,
-                                                    enter = fadeIn(), exit = fadeOut(),
-                                                    modifier = Modifier.align(Alignment.TopEnd),
-                                                ) {
-                                                    Box(
-                                                        Modifier
-                                                            .offset(x = 8.dp, y = (-6).dp)
-                                                            .defaultMinSize(minWidth = 16.dp, minHeight = 16.dp)
-                                                            .background(MaterialTheme.colorScheme.error, CircleShape)
-                                                            .testTag("schedule-problems-badge"),
-                                                        contentAlignment = Alignment.Center,
-                                                    ) {
-                                                        Text(
-                                                            text = problemCount.toString(),
-                                                            style = MaterialTheme.typography.labelSmall,
-                                                            color = MaterialTheme.colorScheme.onError,
-                                                        )
-                                                    }
-                                                }
-                                                // The trailing slot slides with the label and growing row.
-                                                // Pin the badge at the final row end, using only the label's fade.
-                                                Box(
-                                                    Modifier.matchParentSize()
-                                                        .wrapContentWidth(Alignment.Start, unbounded = true)
-                                                        .width(NavigationDrawerItemDefaults.ExpandedDrawerItemWidth -
-                                                            ItemContentPadding * 2),
-                                                    contentAlignment = Alignment.CenterEnd,
-                                                ) {
-                                                    androidx.compose.animation.AnimatedVisibility(
-                                                        visible = drawerValue == DrawerValue.Open,
-                                                        enter = fadeIn(), exit = fadeOut(),
-                                                    ) {
-                                                        NavigationDrawerItemDefaults.TrailingBadge(
-                                                            text = problemCount.toString(),
-                                                            containerColor = if (itemFocused) {
-                                                                MaterialTheme.colorScheme.errorContainer
-                                                            } else MaterialTheme.colorScheme.error,
-                                                            contentColor = if (itemFocused) {
-                                                                MaterialTheme.colorScheme.onErrorContainer
-                                                            } else MaterialTheme.colorScheme.onError,
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                },
+                                leadingContent = { PinnedRailIcon(item.icon) },
                                 colors = drawerColors,
                                 modifier = Modifier
                                     .withinDrawerSheet(fullWidth, visibleWidthPx)
@@ -655,16 +577,9 @@ internal fun SideRail(
                                         }
                                     }
                                     .focusRequester(itemFocus.getValue(item.route))
-                                    .semantics {
-                                        contentDescription = if (item.route == AppDestination.SCHEDULE) {
-                                            scheduleDescription
-                                        } else {
-                                            item.label
-                                        }
-                                    }
+                                    .semantics { contentDescription = item.label }
                                     .testTag(item.route.testTag)
                                     .onFocusChanged { focusState ->
-                                        itemFocused = focusState.isFocused
                                         if (BuildConfig.PROFILE_TRACE && focusState.isFocused) {
                                             profileTrace("P48:sidebarFocus:${item.route.name}") { }
                                         }
@@ -1080,7 +995,6 @@ private val AppDestination.testTag: String
         AppDestination.CHANNELS -> "nav-channels"
         AppDestination.GUIDE -> "nav-epg"
         AppDestination.RECORDINGS -> "nav-recordings"
-        AppDestination.SCHEDULE -> "nav-schedule"
         AppDestination.SETTINGS -> "nav-settings"
         AppDestination.LIVE_PLAYER -> "nav-player"
         AppDestination.RECORDING_PLAYER -> "nav-recording-player"

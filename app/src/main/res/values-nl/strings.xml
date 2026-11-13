@@ -386,7 +386,6 @@
     <string name="recording_action_connection">Niet verbonden met de server.</string>
     <string name="recording_already_scheduled">Dit programma wordt opgenomen of staat gepland.</string>
     <string name="recordings_title">Opnamen</string>
-    <string name="recordings_archive">Archief</string>
     <string name="recordings_archive_all">Alle opnamen</string>
     <string name="recordings_schedule">Planning</string>
     <string name="recordings_problems">Problemen</string>

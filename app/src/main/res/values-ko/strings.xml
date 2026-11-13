@@ -382,7 +382,6 @@
     <string name="recording_action_connection">서버에 연결되지 않았습니다.</string>
     <string name="recording_already_scheduled">이 프로그램은 녹화 중이거나 예약되어 있습니다.</string>
     <string name="recordings_title">녹화</string>
-    <string name="recordings_archive">보관함</string>
     <string name="recordings_archive_all">모든 녹화</string>
     <string name="recordings_schedule">녹화 일정</string>
     <string name="recordings_problems">문제</string>
