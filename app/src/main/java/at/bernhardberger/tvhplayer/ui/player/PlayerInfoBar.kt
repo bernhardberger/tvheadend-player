@@ -12,7 +12,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
@@ -96,24 +95,12 @@ fun PlayerInfoBar(
         facts.isNotEmpty() -> "facts"
         else -> "title"
     }
-    val factsLine: @Composable (TextStyle) -> Unit = { style ->
-        Row(faded.then(if (reserveOn == "facts") reserved else Modifier).fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically) {
-            Text(facts, style = style, maxLines = 1, overflow = TextOverflow.Ellipsis, color = secondary,
-                modifier = Modifier.weight(1f).testTag("player-info-programme")
-                    .clearAndSetSemantics {})
-            if (badges.isNotEmpty()) {
-                Spacer(Modifier.width(InfoBarFactsBadgeGap))
-                PlayerGlanceBadges(badges, Modifier.wrapContentWidth(unbounded = true))
-            }
-        }
-    }
     // The bar speaks for itself.
     Row(modifier.height(IntrinsicSize.Min).semantics(mergeDescendants = true) { contentDescription = description },
         horizontalArrangement = Arrangement.spacedBy(TvGridGutter), verticalAlignment = Alignment.Top) {
         identity(faded)
         Column(Modifier.weight(1f).fillMaxHeight()) {
-            factsLine(MaterialTheme.typography.labelLarge)
+            PlayerInfoFacts(facts, badges, faded.then(if (reserveOn == "facts") reserved else Modifier))
             Spacer(Modifier.height(4.dp))
             Text(data.title, style = MaterialTheme.typography.headlineMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurface, modifier = faded.then(if (reserveOn == "title") reserved else Modifier)
@@ -135,6 +122,19 @@ fun PlayerInfoBar(
                     color = secondary,
                     modifier = reserved.testTag("player-info-last-text").clearAndSetSemantics {})
             } else Text("", style = MaterialTheme.typography.labelLarge, maxLines = 1, modifier = Modifier.clearAndSetSemantics {})
+        }
+    }
+}
+
+@Composable
+private fun PlayerInfoFacts(facts: String, badges: List<GlanceBadge>, modifier: Modifier = Modifier) {
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(facts, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextTertiaryAlpha),
+            modifier = Modifier.weight(1f).testTag("player-info-programme").clearAndSetSemantics {})
+        if (badges.isNotEmpty()) {
+            Spacer(Modifier.width(InfoBarFactsBadgeGap))
+            PlayerGlanceBadges(badges, Modifier.wrapContentWidth(unbounded = true))
         }
     }
 }

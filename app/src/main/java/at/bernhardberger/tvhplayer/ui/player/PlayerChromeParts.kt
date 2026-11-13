@@ -121,7 +121,9 @@ internal fun rememberTrackGlance(player: Player, tracks: Tracks, available: Bool
             ) {
                 audio = format
             }
-            override fun onMediaItemTransition(eventTime: AnalyticsListener.EventTime, mediaItem: MediaItem?, reason: Int) {
+            override fun onMediaItemTransition(
+                eventTime: AnalyticsListener.EventTime, mediaItem: MediaItem?, reason: Int,
+            ) {
                 video = null
                 audio = null
             }
