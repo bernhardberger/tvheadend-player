@@ -38,20 +38,24 @@ fun programmeDetailsActions(
         // Continue watching returns to where the viewer is; behind live, live is its own choice.
         if (behindLive) add(BrowseContextAction.WATCH_LIVE)
     } else if (canWatchChannel) add(BrowseContextAction.WATCH)
-    programmeActions(event, nowSec, recording,
+    addAll(programmeActions(event, nowSec, recording,
         canModifyRecordings = canModifyRecordings,
-        recordingAdmission = recordingAdmission).forEach {
-        when (it) {
-            ProgrammeAction.WATCH -> Unit
-            ProgrammeAction.RECORD -> if (liveProgramme) add(BrowseContextAction.RECORD)
-            ProgrammeAction.STOP_RECORDING -> add(BrowseContextAction.STOP)
-            ProgrammeAction.CANCEL_RECORDING -> add(BrowseContextAction.CANCEL)
-            ProgrammeAction.WATCH_FROM_START -> if (recording != null) {
-                add(if (nowSec < event.stop.epochSeconds) BrowseContextAction.START_OVER else BrowseContextAction.PLAY)
-            }
-        }
-    }
+        recordingAdmission = recordingAdmission).mapNotNull {
+        programmeDetailsAction(it, event, nowSec, recording, liveProgramme)
+    })
     if (canWatchChannel) add(BrowseContextAction.SHOW_GUIDE)
+}
+
+private fun programmeDetailsAction(action: ProgrammeAction, event: EpgEvent, nowSec: Long,
+    recording: DvrEntry?, liveProgramme: Boolean): BrowseContextAction? = when (action) {
+    ProgrammeAction.WATCH -> null
+    ProgrammeAction.RECORD -> BrowseContextAction.RECORD.takeIf { liveProgramme }
+    ProgrammeAction.RECORD_SERIES -> BrowseContextAction.RECORD_SERIES.takeIf { liveProgramme }
+    ProgrammeAction.RECORD_TITLE -> BrowseContextAction.RECORD_TITLE.takeIf { liveProgramme }
+    ProgrammeAction.STOP_RECORDING -> BrowseContextAction.STOP
+    ProgrammeAction.CANCEL_RECORDING -> BrowseContextAction.CANCEL
+    ProgrammeAction.WATCH_FROM_START -> if (recording == null) null else
+        if (nowSec < event.stop.epochSeconds) BrowseContextAction.START_OVER else BrowseContextAction.PLAY
 }
 
 fun recordingDetailsActions(

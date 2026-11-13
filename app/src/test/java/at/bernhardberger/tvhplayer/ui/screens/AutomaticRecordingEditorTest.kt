@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsOff
@@ -38,11 +39,67 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.time.DayOfWeek
 import java.time.LocalTime
+import at.bernhardberger.tvheadend.sdk.core.AutorecRuleCreate
+import at.bernhardberger.tvheadend.sdk.core.AutorecRuleId
+import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
+import at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall
+import at.bernhardberger.tvhplayer.notices.NoticeCenter
+import at.bernhardberger.tvhplayer.notices.NoticeContext
+import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
+import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
 class AutomaticRecordingEditorTest {
     @get:Rule val compose = createComposeRule()
+
+    @OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
+    @Test fun programmeDetailsOpensRestoresAndCreatesThroughTheEditorHost() {
+        val session = automaticRecordingFakeSession(emptyList())
+        val repository = session.dvrRepository
+        val requests = mutableListOf<AutorecRuleCreate>()
+        repository.scriptCreateAutorecRule(DvrMutationResult.Confirmed(AutorecRuleId("created")))
+        val mutations = DvrMutationActions(
+            repository::scheduleEntry, repository::stopEntry, repository::cancelEntry,
+            repository::deleteEntry, repository::updateWatchState,
+            createAutorecRule = { current, request ->
+                requests += request
+                repository.createAutorecRule(current, request)
+            },
+        )
+        val notices = NoticeCenter({ compose.mainClock.currentTime }, { NoticeContext(1, null) })
+        val settings = UiSettingsStore(InMemoryPreferencesDataStore())
+        compose.setContent {
+            val observation by session.observation.collectAsState()
+            val scope = rememberCoroutineScope()
+            TVHeadendPlayerTheme {
+                ProgrammeDetailsHost(
+                    automaticRecordingEvents.first(), session.observation.value, observation,
+                    { session.observation.value }, { automaticRecordingNow.epochSeconds },
+                    showContextMenu = false, onShowDetails = {}, mutations, notices, scope,
+                    remember { mutableStateOf(null) }, onPlay = { _, _ -> }, onPlayRecording = null,
+                    onClose = {}, settingsStore = settings, session = session,
+                )
+            }
+        }
+        compose.onNodeWithTag("details-watch").assertIsFocused()
+        compose.pressKey(Key.DirectionRight)
+        compose.pressKey(Key.DirectionRight)
+        compose.onNodeWithTag("details-record_series").assertIsFocused()
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("automatic-recording-main").assertIsFocused()
+        assertTrue(requests.isEmpty())
+        compose.pressKey(Key.Back)
+        compose.onNodeWithTag("details-record_series").assertIsFocused()
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("automatic-recording-main").assertIsFocused()
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("details-record_series").assertIsFocused()
+        assertEquals(1, requests.size)
+        assertEquals(automaticRecordingEvents.first().seriesLinkUri, requests.single().seriesLinkUri)
+        assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_CREATE_AUTOREC_RULE })
+        assertTrue(notices.state.value.pending.isEmpty())
+    }
 
     @Test fun timerRepeatKeepsExistingTypeAndHidesDate() {
         lateinit var fixture: AutomaticRecordingEditorFixture

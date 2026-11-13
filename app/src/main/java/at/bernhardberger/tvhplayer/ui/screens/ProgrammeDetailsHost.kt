@@ -51,6 +51,7 @@ internal fun ProgrammeDetailsHost(
     retainPlayerSnapshot: Boolean = false,
     onContinueWatching: (() -> Unit)? = null,
     initialAction: BrowseContextAction? = null,
+    session: TvheadendSession = koinInject(),
 ) {
     val closeBehindPlayer = rememberCloseBehindPlayer()
     val entryPending = rememberPlayerEntryPending()
@@ -84,6 +85,9 @@ internal fun ProgrammeDetailsHost(
     var menuAiring by remember { mutableStateOf<EpgEvent?>(null) }
     var menuConsumed by remember { mutableStateOf(false) }
     var mutationEvent by remember { mutableStateOf<EpgEvent?>(null) }
+    var automaticRecording by remember {
+        mutableStateOf<Pair<CurrentSessionObservation, EpgEvent>?>(null)
+    }
     // Opened before Ready, the session that arrives later becomes its own, so recording actions appear.
     val sessionObservation = remember(openingObservation, displayObservation.currentSession) {
         if (openingObservation.currentSession != null) openingObservation else displayObservation
@@ -113,7 +117,7 @@ internal fun ProgrammeDetailsHost(
     val visibility = remember { MutableTransitionState(false).apply { targetState = true } }
     val closing = !visibility.targetState
     at.bernhardberger.tvhplayer.ui.player.RegisterPlayerModal(
-        backEnabled = !closing, identity = selected.id to showContextMenu)
+        backEnabled = !closing && automaticRecording == null, identity = selected.id to showContextMenu)
     val closeAnimated = { visibility.targetState = false }
     BackHandler(enabled = closing) { }
     LaunchedEffect(visibility.isIdle, visibility.currentState, closing) {
@@ -201,6 +205,17 @@ internal fun ProgrammeDetailsHost(
         val actionRecording = current.dvrEntryForEvent(actionEvent)
         val actionCanModify = current.dvrState is DvrRepositoryState.Current &&
             (current.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
+        if (action in listOf(BrowseContextAction.RECORD_SERIES, BrowseContextAction.RECORD_TITLE)) {
+            val allowed = programmeDetailsActions(actionEvent, nowSecProvider(), actionRecording,
+                actionRecording?.let(current::recordingPlaybackAdmission), actionCanModify,
+                actionEvent.channelId?.let(current::channel) != null,
+                liveProgramme = current.event(programme.id) != null)
+            if (action in allowed && inFlight == null) {
+                returnAction = action
+                automaticRecording = capability to actionEvent
+            }
+            return@action
+        }
         if (action in listOf(BrowseContextAction.PLAY, BrowseContextAction.START_OVER) && actionRecording != null) {
             // Every page and menu stays up until the player has replaced browse.
             closeBehindPlayer(close)
@@ -302,7 +317,7 @@ internal fun ProgrammeDetailsHost(
                 pageChannel != null, liveProgramme = pageLive != null, playing = isPlaying(pageEvent),
                 behindLive = isBehindLive(pageEvent))
                 .filter { it !in listOf(BrowseContextAction.PLAY, BrowseContextAction.START_OVER) || onPlayRecording != null && capability != null }
-            val covered = menuAiring != null || pendingAction != null
+            val covered = menuAiring != null || pendingAction != null || automaticRecording != null
             // The page shows its pictures with the session it was opened with.
             PlayerMotionFrame(leaving = page.id != selected.id || covered) { ProvideArtworkSession(capability, displayObservation) {
             ProgrammeDetailsPage(pageEvent, pageRecording, pageChannel, nowSec,
@@ -369,5 +384,17 @@ internal fun ProgrammeDetailsHost(
         )
     }
     }
+    }
+    automaticRecording?.let { (currentSession, programme) ->
+        val zone = remember { java.time.ZoneId.systemDefault() }
+        AutomaticRecordingEditorHost(
+            currentSession, session.observation,
+            remember(session) { AutorecPreviewLoader(session.epgRepository) },
+            mutations, notices, now = { kotlin.time.Instant.fromEpochSeconds(nowSecProvider()) },
+            serverZone = zone, onClose = { automaticRecording = null },
+            kind = if (programme.seriesLinkUri.isNullOrBlank()) AutomaticRecordingKind.TITLE
+                else AutomaticRecordingKind.SERIES,
+            programme = programme,
+        )
     }
 }

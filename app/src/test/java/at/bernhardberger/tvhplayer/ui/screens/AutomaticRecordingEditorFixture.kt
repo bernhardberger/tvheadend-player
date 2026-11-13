@@ -97,7 +97,7 @@ internal val timerRecordingSavedEntries = listOf(0, 3, 4, 5).mapIndexed { index,
         title = "Late news", channelId = ChannelId(103), start = start, stop = start + 60.minutes,
     )
 }
-internal val automaticRecordingSession = FakeTvheadendSession(
+internal fun automaticRecordingFakeSession(entries: List<DvrEntry> = automaticRecordingSavedEntries) = FakeTvheadendSession(
     SessionObservation.create(
         sessionState = SessionState.Ready(ServerCapabilities.create(
             streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED,
@@ -106,9 +106,10 @@ internal val automaticRecordingSession = FakeTvheadendSession(
         epgState = EpgRepositoryState.Current(EpgSnapshot.create(
             events = automaticRecordingEvents + automaticRecordingKeywordEvents,
         )),
-        dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = automaticRecordingSavedEntries)),
+        dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = entries)),
     ),
-).captureCurrentSession()
+)
+internal val automaticRecordingSession = automaticRecordingFakeSession().captureCurrentSession()
 
 internal class AutomaticRecordingEditorFixture(
     private val scope: CoroutineScope,

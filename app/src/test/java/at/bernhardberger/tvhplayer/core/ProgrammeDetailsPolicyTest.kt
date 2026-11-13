@@ -62,15 +62,17 @@ class ProgrammeDetailsPolicyTest {
         recordingDetailsFacts(entry, admission(entry, capability), nowSec = 300)
 
     @Test fun programmeActionsPreservePermissionAndTime() {
-        assertEquals(listOf(WATCH, RECORD, SHOW_GUIDE), programmeDetailsActions(event, 150, null, null, true, true))
-        assertEquals(listOf(WATCH, RECORD, SHOW_GUIDE), programmeDetailsActions(event, 50, null, null, true, true))
+        assertEquals(listOf(WATCH, RECORD, BrowseContextAction.RECORD_TITLE, SHOW_GUIDE),
+            programmeDetailsActions(event, 150, null, null, true, true))
+        assertEquals(listOf(WATCH, RECORD, BrowseContextAction.RECORD_TITLE, SHOW_GUIDE),
+            programmeDetailsActions(event, 50, null, null, true, true))
         assertEquals(listOf(WATCH, SHOW_GUIDE), programmeDetailsActions(event, 150, null, null, false, true))
         assertEquals(listOf(WATCH, SHOW_GUIDE), programmeDetailsActions(event, 200, null, null, true, true))
         assertEquals(emptyList<BrowseContextAction>(), programmeDetailsActions(event, 150, null, null, false, false))
         assertFalse(programmeDetailsActions(event, 150, null, null, true, true, liveProgramme = false).contains(RECORD))
         for (state in listOf(DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)) {
             val entry = recording(state, files = listOf(file()))
-            assertEquals(listOf(WATCH, START_OVER, STOP, SHOW_GUIDE),
+            assertEquals(listOf(WATCH, START_OVER, STOP, BrowseContextAction.RECORD_TITLE, SHOW_GUIDE),
                 programmeDetailsActions(event, 150, entry, admission(entry), true, true))
             assertEquals(listOf(CONTINUE_WATCHING, WATCH_LIVE, START_OVER, SHOW_GUIDE),
                 programmeDetailsActions(event, 150, entry, admission(entry), false, true, playing = true, behindLive = true))
@@ -79,19 +81,19 @@ class ProgrammeDetailsPolicyTest {
     }
 
     @Test fun livePlayerReplacesWatchWithContinueAndKeepsGuardedRecordingAndGuide() {
-        assertEquals(listOf(CONTINUE_WATCHING, RECORD, SHOW_GUIDE),
+        assertEquals(listOf(CONTINUE_WATCHING, RECORD, BrowseContextAction.RECORD_TITLE, SHOW_GUIDE),
             programmeDetailsActions(event, 150, null, null, true, true, playing = true))
         assertEquals(listOf(CONTINUE_WATCHING, SHOW_GUIDE),
             programmeDetailsActions(event, 150, null, null, false, true, playing = true))
-        assertEquals(listOf(CONTINUE_WATCHING, CANCEL, SHOW_GUIDE),
+        assertEquals(listOf(CONTINUE_WATCHING, CANCEL, BrowseContextAction.RECORD_TITLE, SHOW_GUIDE),
             programmeDetailsActions(event, 150, recording(DvrEntryState.SCHEDULED), null,
                 true, true, playing = true))
     }
 
     @Test fun behindLiveOffersLiveBesideContinueWatchingOnlyForThePlayingProgramme() {
-        assertEquals(listOf(CONTINUE_WATCHING, WATCH_LIVE, RECORD, SHOW_GUIDE),
+        assertEquals(listOf(CONTINUE_WATCHING, WATCH_LIVE, RECORD, BrowseContextAction.RECORD_TITLE, SHOW_GUIDE),
             programmeDetailsActions(event, 150, null, null, true, true, playing = true, behindLive = true))
-        assertEquals(listOf(WATCH, RECORD, SHOW_GUIDE),
+        assertEquals(listOf(WATCH, RECORD, BrowseContextAction.RECORD_TITLE, SHOW_GUIDE),
             programmeDetailsActions(event, 150, null, null, true, true, behindLive = true))
     }
 

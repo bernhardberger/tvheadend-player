@@ -8,7 +8,7 @@ import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 
 enum class BrowseContextAction {
     CONTINUE_WATCHING, WATCH_LIVE,
-    WATCH, DETAILS, RECORD, STOP, CANCEL, SHOW_GUIDE,
+    WATCH, DETAILS, RECORD, RECORD_SERIES, RECORD_TITLE, STOP, CANCEL, SHOW_GUIDE,
     RESUME, START_OVER, PLAY, MARK_WATCHED, MARK_UNWATCHED, DELETE, REMOVE_ENTRY,
     MARK_ALL_WATCHED, MARK_ALL_UNWATCHED, DELETE_WATCHED, DELETE_ALL,
 }
@@ -44,7 +44,8 @@ fun channelContextActions(
                 ProgrammeAction.RECORD -> BrowseContextAction.RECORD
                 ProgrammeAction.STOP_RECORDING -> BrowseContextAction.STOP
                 ProgrammeAction.CANCEL_RECORDING -> BrowseContextAction.CANCEL
-                ProgrammeAction.WATCH, ProgrammeAction.WATCH_FROM_START -> null
+                ProgrammeAction.WATCH, ProgrammeAction.WATCH_FROM_START,
+                ProgrammeAction.RECORD_SERIES, ProgrammeAction.RECORD_TITLE -> null
             }
         }
     }

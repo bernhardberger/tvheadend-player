@@ -145,6 +145,8 @@ internal fun BrowseContextAction.label(watchChannel: Boolean): Int = when (this)
     BrowseContextAction.WATCH -> if (watchChannel) R.string.context_watch_channel else R.string.context_watch
     BrowseContextAction.DETAILS -> R.string.context_details
     BrowseContextAction.RECORD -> R.string.context_record
+    BrowseContextAction.RECORD_SERIES -> R.string.context_record_series
+    BrowseContextAction.RECORD_TITLE -> R.string.context_record_title
     BrowseContextAction.STOP -> R.string.stop_recording
     BrowseContextAction.CANCEL -> R.string.cancel_recording
     BrowseContextAction.SHOW_GUIDE -> R.string.context_show_guide
@@ -166,6 +168,7 @@ internal fun BrowseContextAction.label(watchChannel: Boolean): Int = when (this)
 internal fun BrowseContextAction.icon(): Int = when (this) {
     BrowseContextAction.DETAILS -> R.drawable.ic_info
     BrowseContextAction.RECORD -> R.drawable.ic_fiber_manual_record
+    BrowseContextAction.RECORD_SERIES, BrowseContextAction.RECORD_TITLE -> R.drawable.ic_fiber_smart_record
     BrowseContextAction.STOP, BrowseContextAction.CANCEL -> R.drawable.ic_stop
     BrowseContextAction.DELETE, BrowseContextAction.REMOVE_ENTRY, BrowseContextAction.DELETE_WATCHED ->
         R.drawable.ic_delete_outlined

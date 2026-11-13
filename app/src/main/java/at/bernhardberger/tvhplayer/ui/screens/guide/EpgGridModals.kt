@@ -65,6 +65,8 @@ internal fun programmeActionLabel(action: ProgrammeAction): String = stringResou
     when (action) {
         ProgrammeAction.WATCH -> R.string.watch
         ProgrammeAction.RECORD -> R.string.record
+        ProgrammeAction.RECORD_SERIES -> R.string.context_record_series
+        ProgrammeAction.RECORD_TITLE -> R.string.context_record_title
         ProgrammeAction.CANCEL_RECORDING -> R.string.cancel_recording
         ProgrammeAction.STOP_RECORDING -> R.string.stop_recording
         ProgrammeAction.WATCH_FROM_START -> R.string.watch_from_start

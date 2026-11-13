@@ -1,4 +1,6 @@
 <resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en">
+    <string name="context_record_series">Record series</string>
+    <string name="context_record_title">Record all with this title</string>
     <string name="timer_editor_title">Record by time</string>
     <string name="timer_editor_new">New timer</string>
     <string name="timer_editor_edit">Edit repeating timer</string>

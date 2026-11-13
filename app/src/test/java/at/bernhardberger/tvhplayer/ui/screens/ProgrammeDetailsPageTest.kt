@@ -687,6 +687,8 @@ class ProgrammeDetailsPageTest {
         show(fontScale = 1.3f)
         compose.onNodeWithTag("details-watch").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
         compose.onNodeWithTag("details-record").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
+        compose.onNodeWithTag("details-record_title").assertIsFocused().assertIsDisplayed()
+            .performKeyInput { pressKey(Key.DirectionRight) }
         compose.onNodeWithTag("details-show_guide").assertIsFocused().assertIsDisplayed()
             .performKeyInput { pressKey(Key.DirectionDown) }
         var steps = 0
