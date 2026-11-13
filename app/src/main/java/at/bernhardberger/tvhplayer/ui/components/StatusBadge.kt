@@ -29,7 +29,7 @@ import at.bernhardberger.tvhplayer.ui.TvRecordingContainerColor
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 
 /** The fill of a [StatusBadge]: neutral facts, recording now, or a failure. */
-enum class StatusBadgeTone { NEUTRAL, RECORDING, ERROR }
+enum class StatusBadgeTone { NEUTRAL, RECORDING, ERROR, CHANGED }
 
 private val StatusBadgeHeight = 20.dp
 private val StatusBadgeShape = RoundedCornerShape(4.dp)
@@ -55,6 +55,8 @@ fun StatusBadge(
         StatusBadgeTone.RECORDING -> TvRecordingContainerColor to TvOnRecordingContainerColor
         // Material's badge role: the pink error fill under its dark text.
         StatusBadgeTone.ERROR -> MaterialTheme.colorScheme.error to MaterialTheme.colorScheme.onError
+        StatusBadgeTone.CHANGED ->
+            MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer
     }
     Row(
         modifier.background(container, StatusBadgeShape)

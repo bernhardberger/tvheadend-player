@@ -15,6 +15,10 @@ import at.bernhardberger.tvhplayer.notices.Notice
 import at.bernhardberger.tvhplayer.notices.PauseUnavailableReason
 import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeIcon
 import at.bernhardberger.tvhplayer.ui.notifications.NoticeFormatter
+import at.bernhardberger.tvhplayer.core.AutomaticRecordingKind
+import at.bernhardberger.tvhplayer.core.AutorecPreviewState
+import at.bernhardberger.tvhplayer.ui.screens.formatAutomaticRecordingPreviewSummary
+import at.bernhardberger.tvhplayer.ui.screens.automaticRecordingMatches
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
@@ -25,6 +29,23 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en")
 class NoticeFormatterTest {
+    @Test fun automaticRecordingPreviewSummariesUseKindPluralsAllAndEmpty() {
+        val context = ApplicationProvider.getApplicationContext<Application>()
+        val all = automaticRecordingMatches
+        assertEquals("In the guide: 6 episodes, all to be recorded",
+            formatAutomaticRecordingPreviewSummary(context, AutomaticRecordingKind.SERIES, all))
+        assertEquals("In the guide: 5 episodes, 2 to be recorded",
+            formatAutomaticRecordingPreviewSummary(context, AutomaticRecordingKind.SERIES,
+                all.copy(rows = all.rows.take(5), willRecordCount = 2)))
+        for (kind in listOf(AutomaticRecordingKind.TITLE, AutomaticRecordingKind.KEYWORD)) {
+            assertEquals("In the guide: 1 program, all to be recorded",
+                formatAutomaticRecordingPreviewSummary(context, kind,
+                    all.copy(rows = all.rows.take(1), willRecordCount = 1)))
+            assertEquals("None in the guide yet", formatAutomaticRecordingPreviewSummary(
+                context, kind, AutorecPreviewState.Matches(emptyList(), 0, false)))
+        }
+    }
+
     @Test fun failedServerSwitchDistinguishesConnectionAndSignIn() {
         assertEquals("Can’t connect to Cabin", formatter.format(Notice.ServerConnectionFailed("Cabin")).headline)
         assertEquals("Couldn’t sign in to Cabin. Check the username and password.",

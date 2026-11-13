@@ -178,10 +178,12 @@ fun GuidedStepAction(
     leadingIcon: (@Composable () -> Unit)? = null,
     /** A status word, badge or switch after the explanation, before [trailingIcon]. */
     trailingContent: (@Composable () -> Unit)? = null,
+    enabled: Boolean = true,
 ) {
     val colors = MaterialTheme.colorScheme
     Surface(
         onClick = onClick,
+        enabled = enabled,
         modifier = modifier.width(TvBrowseColumnWidth).semantics { role = Role.Button },
         shape = ClickableSurfaceDefaults.shape(GuidedStepActionShape),
         colors = ClickableSurfaceDefaults.colors(
