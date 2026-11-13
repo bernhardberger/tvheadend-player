@@ -2,23 +2,93 @@
 
 ## Unreleased
 
+### Playback
+
+- A recording that's still running can be played when it's made with Tvheadend's built-in Matroska profile, not only as MPEG-TS. Right at the end of what's recorded so far, the player buffers every few seconds for about the first minute and then follows a few seconds behind. Running MP4 recordings and recordings from the libav Matroska profile can't be played (#24).
+- A recording file the player can't read says *The recording file couldn't be read* and shows the player's error underneath, instead of *Recording interrupted* with a retry that fails the same way.
+- Matroska recordings start with subtitles off until you choose a subtitle track.
+- Starting a recording shows the loading ring until the first picture instead of several seconds of black screen (#30).
+
+### Recordings
+
+- Stop, cancel, delete and remove ask on a card that shows the recording: its picture or channel logo, name, channel and air time, and a sentence that says what happens. The other confirmations in the Guide, for folders and for connections use the same card.
+- The choice between *Play recording* and *Watch live* shows the recording's picture and says when each choice would end. For a recording that's still running, that end time counts the part still to come; before, it counted only what was recorded so far.
+- A missed or failed recording that never wrote a file offers *Remove entry* instead of *Delete recording*.
+- A removed recording no longer hides another recording of the same program, and retention cleanup no longer repeats the “Recording deleted” notice.
+
+### Remote buttons
+
 - Play/Pause in the player pauses or plays and shows only the banner, like OK, instead of opening the full controls.
 - Rewind and Fast forward move through live TV's timeshift buffer and through recordings while the picture keeps playing. Each press doubles the speed, from 2 up to 32 times. Holding the button skips like Left and Right. Play or OK continues from there, Back returns to where you were, and the other button turns around. Without a timeshift buffer, live TV says why, as OK does.
 - With the controls hidden, Left skips back 10 seconds and Right forward 30 seconds. The seek bar still moves 30 seconds both ways.
 - The Record button records the program you're watching, or the focused one in the guide, on Home, in Channels and on the details page. If it's already being recorded, the details open at *Stop recording* or *Cancel recording*. If it can't be recorded, a notice says why.
 - The Recordings button opens Recordings from anywhere in the app.
-- The Appliance companion has *Open recordings* under Functions, set to the Recordings button out of the box.
-- The Appliance companion no longer opens Tvheadend Player when the TV turns on unless you turn on *Open when the TV turns on* under Functions, and turning on its accessibility service no longer starts the player. If you never changed that switch, turn it on again after the update.
+
+### Connections
+
+- Settings > Connection can keep several connections, including different users on the same server. Choose one to use it, give it a name, or remove it.
 - Switching connections shows its progress on its own page and can be canceled; leaving Settings doesn't stop it. If the connection can't be reached or rejects sign-in, the page says why and your previous connection stays in use. After a successful switch, *Go to Home* takes you straight there.
 - With more than one connection, *Channel groups* and *Stream profile* name the connection they apply to.
-- A missed or failed recording that never wrote a file offers *Remove entry* instead of *Delete recording*.
-- Settings > Connection can keep several connections, including different users on the same server. Choose one to use it, give it a name, or remove it.
-- A removed recording no longer hides another recording of the same program, and retention cleanup no longer repeats the “Recording deleted” notice.
 - Recent channels, the *Continue watching* order, channel tags, channel aspect settings, the selected stream profile and audio choices start fresh after this update; they are now kept per connection.
 
 ### Recordings
 
 - Recordings > Archive can group by folders, channels, genres or none.
+
+### Guide
+
+- With channel numbers turned off and a logo on every channel in the list, the channel column shrinks to the logo and the timeline gets the freed width.
+- A program that runs past the right edge of the screen is cut by the screen instead of ending there with a rounded corner and an ellipsis.
+
+### Program details
+
+- The description gets up to four lines instead of two, without a box around it when it fits. A longer one ends in *… More*, and OK opens the full text (#18).
+- Cast and crew have their own section, one column per role and one name per line, nothing abbreviated. *Cast & crew* and *Details* show everything on the page and scroll when they're taller than the screen (#18).
+- Opening details from Home while something keeps playing in the background no longer shows Home's text through the details page.
+
+### Pictures
+
+- Upright covers, like the ones Sky's guide data sends, aren't cut down to a strip of their middle anymore. Channel cards and the large picture slots show the whole cover on a background made from its colors, cards with text over the picture show the cover's title area, and backgrounds show the scene without the title (#25).
+
+### Appliance companion
+
+- The Appliance companion has *Open recordings* under Functions, set to the Recordings button out of the box.
+- The Appliance companion no longer opens Tvheadend Player when the TV turns on unless you turn on *Open when the TV turns on* under Functions, and turning on its accessibility service no longer starts the player. If you never changed that switch, turn it on again after the update.
+
+## 0.4.15
+
+### Playback
+
+- Recordings from channels that list an audio description track but never
+  send it, like Channel 4 HD and ITV HD on Freeview, play again. Before, they
+  failed with *FAILED_RUNTIME_CHECK (1004)*, finished or still running. The
+  empty track is left out (#26).
+- Switching to another channel or recording right after one failed starts it
+  instead of showing the old error.
+
+### Home
+
+- The *Right now* card says *Back to live TV* or *Back to recording* instead
+  of showing a grey *Recording* badge, and its icon shows whether playback is
+  playing or paused (#27).
+- After playback fails, the card doesn't offer to go back to it, and Back on
+  Home doesn't reopen the error. Opening that channel or recording again
+  starts it anew instead of showing the error screen (#27, #29).
+- *Continue watching* marks recordings that are still running with the red
+  dot.
+
+### Guide
+
+- A program that's being recorded offers *Watch from beginning* right after
+  *Watch* in its menu and details, when the recording can be played while it
+  runs (#28).
+- A direction pressed while the Guide is still loading isn't lost anymore. The
+  last press is applied once it's ready.
+
+### Pictures
+
+- Program and recording pictures show up when Tvheadend's image cache is off
+  and the guide links them over http, like pictures from an XMLTV guide (#22).
 
 ## 0.4.14
 
