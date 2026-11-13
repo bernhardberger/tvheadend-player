@@ -451,11 +451,6 @@ internal fun RecordingsScreenContent(
     val chosenView = pendingView ?: view
     val chosenGrouping = chosenView.grouping
     var optionsOpen by remember { mutableStateOf(false) }
-    // Inside a folder the tabs are the stop above the list, so Back there steps a level up as the list does.
-    var tabsFocused by remember { mutableStateOf(false) }
-    BackHandler(
-        enabled = backEnabled && tabsFocused && mode == DvrLibraryMode.ARCHIVE && archiveNavigation.stack.canPop,
-    ) { archiveNavigation.pop() }
     val optionsFocus = remember { FocusRequester() }
     // The stop the next frames move focus to: the View options button after its panel closes.
     var requestStop by remember { mutableStateOf<FocusRequester?>(null) }
@@ -549,12 +544,12 @@ internal fun RecordingsScreenContent(
     val reconciledArchiveStack = remember(
         observedArchive, observedFullArchive, observedRecordingNow, archiveNavigation.stack,
     ) {
-        reconcileArchiveStack(archiveNavigation.stack, observedArchive, observedFullArchive, observedRecordingNow)
+        reconcileArchiveStack(archiveNavigation.stack, observedArchive, observedRecordingNow)
     }
     val observedKeys = when (mode) {
         DvrLibraryMode.ARCHIVE -> requireNotNull(
             archiveLevelItems(
-                observedArchive, reconciledArchiveStack.active.levelId, observedFullArchive, observedRecordingNow,
+                observedArchive, reconciledArchiveStack.active.levelId, observedRecordingNow,
             ),
         ).map { it.key }
         DvrLibraryMode.SCHEDULE -> observedLibrary.schedule.map { "recording:${recordingItemKey(it.id)}" }
@@ -582,7 +577,7 @@ internal fun RecordingsScreenContent(
     }
     val recordingNow = remember(archive, chosenView) { archive.recordingNowEntries(chosenView) }
     val archiveItems = remember(archive, archiveLevel, fullArchive, recordingNow) {
-        archiveLevelItems(archive, archiveLevel, fullArchive, recordingNow) ?: archive.listItems(recordingNow)
+        archiveLevelItems(archive, archiveLevel, recordingNow) ?: archive.listItems(recordingNow)
     }
     val scheduleGroups = presentation.schedule
     val problemGroups = presentation.problems
@@ -596,7 +591,7 @@ internal fun RecordingsScreenContent(
     }
     val alertShown = recordingsAppError(entries.isEmpty(), connectionUiState, connectionFailure) != null
 
-    LaunchedEffect(observedEntries) {
+    LaunchedEffect(observedEntries, observedArchive, observedRecordingNow) {
         // Transfer locally before removing the actual focused node. Keeping only the
         // old key would recreate the node and leave the same focus vacancy.
         if (removalHandoff && initialFocusEnabled &&
@@ -609,7 +604,7 @@ internal fun RecordingsScreenContent(
         }
         retainedPreparation = prepared
         archiveNavigation.update(
-            reconcileArchiveStack(archiveNavigation.stack, observedArchive, observedFullArchive, observedRecordingNow),
+            reconcileArchiveStack(archiveNavigation.stack, observedArchive, observedRecordingNow),
         )
     }
 
@@ -772,7 +767,6 @@ internal fun RecordingsScreenContent(
                     },
                     onMoveToContent = { requestContentFocus = true },
                     modifier = Modifier
-                        .onFocusChanged { tabsFocused = it.hasFocus }
                         .onPreviewKeyEvent {
                             // A deliberate header move gives the viewer ownership, not the loading handoff.
                             screenState.requestedScheduleEntryId.value = null

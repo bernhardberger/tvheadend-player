@@ -63,21 +63,19 @@ internal fun archiveLevelPath(id: String): List<String> =
     else emptyList()
 
 /**
- * The items of an archive level. [root] is the archive the Show filter leaves; a folder only [fullRoot]
- * still has stays an open, empty level so the folder the viewer is in does not close under them.
+ * The items of an archive level after the Show filter. Only the root may be empty.
  * [recordingNow] are the Recording now folder's recordings; without any the folder and its level are gone.
  */
 internal fun archiveLevelItems(
     root: DvrArchiveFolder,
     levelId: String,
-    fullRoot: DvrArchiveFolder = root,
     recordingNow: List<DvrEntry> = emptyList(),
 ): List<ArchiveListItem>? =
     when {
         levelId == RECORDING_NOW_LEVEL_ID -> recordingNow.takeIf { it.isNotEmpty() }?.map(ArchiveListItem::Recording)
         levelId.startsWith("archive:") -> archiveLevelPath(levelId).let { path ->
             root.folderAt(path)?.listItems(if (path.isEmpty()) recordingNow else emptyList())
-                ?: fullRoot.folderAt(path)?.let { emptyList() }
+                ?.takeIf { path.isEmpty() || it.isNotEmpty() }
         }
         else -> null
     }
@@ -86,12 +84,11 @@ internal fun archiveLevelItems(
 internal fun reconcileArchiveStack(
     stack: DepthStack,
     root: DvrArchiveFolder,
-    fullRoot: DvrArchiveFolder = root,
     recordingNow: List<DvrEntry> = emptyList(),
 ): DepthStack {
-    val frames = stack.frames.takeWhile { archiveLevelItems(root, it.levelId, fullRoot, recordingNow) != null }
+    val frames = stack.frames.takeWhile { archiveLevelItems(root, it.levelId, recordingNow) != null }
         .map { frame ->
-            val items = requireNotNull(archiveLevelItems(root, frame.levelId, fullRoot, recordingNow))
+            val items = requireNotNull(archiveLevelItems(root, frame.levelId, recordingNow))
             DepthStack(listOf(frame)).reconcile(items.map { DepthItem(it.key) }).active
         }
     return stack.copy(
@@ -121,7 +118,7 @@ internal fun ArchiveDepthContent(
     onOpenFolderMenu: ((DvrArchiveFolder) -> Unit)? = null,
     grouping: DvrArchiveGrouping = DvrArchiveGrouping.FLAT,
     sort: DvrArchiveSort = DvrArchiveSort.NEWEST,
-    /** The archive before the Show filter: it names the folders the filter emptied and counts what it hides. */
+    /** The archive before the Show filter, for the root empty state's hidden count. */
     fullRoot: DvrArchiveFolder = root,
     show: DvrArchiveShow = DvrArchiveShow.ALL,
     /** The running recordings the Recording now folder lists at the top of the root; none hides it. */
@@ -203,9 +200,7 @@ private fun rememberArchiveLevels(
                         if (id == rootId) latestRootHeadingEnd.value?.invoke()
                     }
                 },
-                emptyContent = {
-                    ArchiveEmptyLevel(show, atRoot = path.isEmpty(), hidden = hidden)
-                },
+                emptyContent = if (id == rootId) ({ ArchiveEmptyLevel(show, hidden = hidden) }) else null,
                 rows = items.mapIndexed { index, item ->
                     when (item) {
                         is ArchiveListItem.RecordingNow -> recordingNowRow(item)
@@ -234,20 +229,12 @@ private fun rememberArchiveLevels(
             addLevel(folder.path, { folder.name }, folder.listItems())
             folder.folders.forEach(::addFolder)
         }
-        // A folder only the unfiltered archive has is empty here: it stays reachable as the open level.
-        fun addEmptied(folder: DvrArchiveFolder) {
-            folder.folders.forEach { child ->
-                if (archiveLevelId(child.path) !in levels) addLevel(child.path, { child.name }, emptyList())
-                addEmptied(child)
-            }
-        }
         addLevel(root.path, { stringResource(grouping.rootHeadingRes()) }, root.listItems(recordingNow))
         root.folders.forEach(::addFolder)
         if (recordingNow.isNotEmpty()) {
             addLevel(emptyList(), { stringResource(R.string.recordings_recording_now) },
                 recordingNow.map(ArchiveListItem::Recording), id = RECORDING_NOW_LEVEL_ID)
         }
-        if (fullRoot !== root) addEmptied(fullRoot)
         levels
     }
 

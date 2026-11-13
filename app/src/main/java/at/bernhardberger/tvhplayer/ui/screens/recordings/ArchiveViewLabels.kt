@@ -95,7 +95,7 @@ internal fun DvrArchiveView.nonDefaultValues(): List<String> {
  * filter hides here ([hidden] recordings at any depth below).
  */
 @Composable
-internal fun ArchiveEmptyLevel(show: DvrArchiveShow, atRoot: Boolean, hidden: Int) {
+internal fun ArchiveEmptyLevel(show: DvrArchiveShow, hidden: Int) {
     if (show == DvrArchiveShow.ALL || hidden <= 0) {
         Text(
             stringResource(R.string.recordings_archive_empty),
@@ -107,7 +107,7 @@ internal fun ArchiveEmptyLevel(show: DvrArchiveShow, atRoot: Boolean, hidden: In
     val title = when (show) {
         DvrArchiveShow.PARTIALLY_WATCHED -> R.string.recordings_empty_started
         DvrArchiveShow.WATCHED -> R.string.recordings_empty_watched
-        else -> if (atRoot) R.string.recordings_empty_not_watched_root else R.string.recordings_empty_not_watched_folder
+        else -> R.string.recordings_empty_not_watched_root
     }
     Column(verticalArrangement = Arrangement.spacedBy(TvSpacing8)) {
         Text(
