@@ -255,7 +255,7 @@ class PlayerChromeCaptureTest {
                     Box(Modifier.fillMaxSize()) {
                         Image(still.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                         // Composed after the first frame, as the capture scenes are; the resting rail scrolls inside layout otherwise.
-                        if (shown) Controls(
+                        val player: @Composable () -> Unit = { if (shown) Controls(
                             timeshift = AppTimeshiftState(available = true, bufferStartMs = -600_000, positionMs = 0,
                                 liveEdgeMs = 0, timingKnown = true),
                             behind = false, paused = false,
@@ -273,6 +273,7 @@ class PlayerChromeCaptureTest {
                                 65f / 180f, 75f / 180f, 75f / 180f, true)
                             else ProgrammeWindow(programme, Instant.fromEpochSeconds(now), 0.25f, 5f / 60f, 0.25f, 0.25f, true),
                             programme = programme, peek = !railOpen,
+                            browser = if (railOpen) remember { PlayerChannelBrowserState() } else null,
                             tray = if (railOpen) {
                                 { ProvideArtworkSession(session) { QuickZapTrayPreview(lineUp[0], programme, next, now,
                                     Modifier.padding(horizontal = TvGridHorizontalMargin)) } }
@@ -280,7 +281,16 @@ class PlayerChromeCaptureTest {
                             tracks = PlayerTrackButtons(audio = "English"),
                             nowSec = now, peekChannels = lineUp, peekEvent = { id -> events.firstOrNull { it.channelId == id } },
                             recordingChannels = setOf(ChannelId(2)),
-                        )
+                        ) }
+                        if (railOpen) PlayerPage<Unit>(
+                            details = null, railExpanded = true,
+                            nowPlaying = { ProvideArtworkSession(session) {
+                                NowPlayingStrip(lineUp[0].id, lineUp[0].number?.toString(), lineUp[0].name.orEmpty(),
+                                    lineUp[0].icon, programme, now,
+                                    playbackIndicator = ChannelPlaybackIndicator.PLAYING)
+                            } },
+                            player = { player() }, programme = {},
+                        ) else player()
                     }
                 }
             }
@@ -886,9 +896,9 @@ class PlayerChromeCaptureTest {
                             PlayerChannelBrowser(peekRows, peekChannels, peekChannels.drop(1), peekChannels[0].id, emptySet(),
                                 peekEvent ?: railEvent, nowSec, false, {}, {}, { _, _, _ -> }, {})
                         }
-                        else if (browser != null) ProvideArtworkSession(session) { PlayerChannelBrowser(browser, channels, if (emptyRecent) emptyList() else channels.drop(1),
-                            channels[0].id, emptySet(), { if (it == channels[0].id) programme else if (it == channels[1].id) trayProgramme else null },
-                            NOW, true, {}, {}, { _, _, _ -> }, {}) }
+                        else if (browser != null) ProvideArtworkSession(session) { PlayerChannelBrowser(browser, peekChannels, if (emptyRecent) emptyList() else peekChannels.drop(1),
+                            peekChannels[0].id, recordingChannels, peekEvent ?: railEvent,
+                            nowSec, true, { railFocus = it }, {}, { _, _, _ -> }, {}) }
                         else if (tray != null) ProvideArtworkSession(session) { ChannelDrawer(
                             channels = peekChannels, selectedId = ChannelId(1), playingChannelId = ChannelId(1),
                             recordingChannelIds = recordingChannels, nowEvent = peekEvent ?: railEvent,
