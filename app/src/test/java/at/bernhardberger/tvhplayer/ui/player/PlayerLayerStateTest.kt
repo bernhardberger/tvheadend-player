@@ -95,9 +95,6 @@ class PlayerLayerStateTest {
         assertNull(state.optionsPage)
         assertEquals("player-pause", state.restoreControl)
 
-        state.updateStatsVisibility(true)
-        assertTrue(state.applyBackAction(PlayerBackAction.HIDE_STATS))
-        assertFalse(state.statsVisible)
         assertTrue(state.applyBackAction(PlayerBackAction.HIDE_CONTROLS))
         assertFalse(state.chrome.controlsVisible)
 

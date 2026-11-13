@@ -341,6 +341,7 @@ class LivePlayerServerWaitTest {
         val notices = NoticeCenter(android.os.SystemClock::elapsedRealtime) {
             NoticeContext(profiles.configurationGeneration.value, session.observation.value.currentSession?.generationIdentity)
         }
+        val statsStore = at.bernhardberger.tvhplayer.di.PlayerStatsStore()
         compose.setContent {
             CompositionLocalProvider(LocalLifecycleOwner provides owner) {
                 TVHeadendPlayerTheme { ProvideAppArtwork(session) {
@@ -349,7 +350,7 @@ class LivePlayerServerWaitTest {
                             VideoPlayerScreen(video, ChannelSelectionStore(), LastPlayedChannelStore(context), TargetAspect(AspectRatioMode.FIT) {},
                                 channels, session, ChannelId(1), "Name 1", {},
                                 { closes++ }, runtime, notices = notices, uiSettingsStore = UiSettingsStore(data),
-                                connectionUiState = connection.value)
+                                connectionUiState = connection.value, statsStore = statsStore)
                         }
                     }
                 } }

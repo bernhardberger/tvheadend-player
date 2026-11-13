@@ -610,7 +610,8 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
         }
         val manager = createSubscriptionManager(connection, subscriptionDispatcher).apply { startAdmission() }
         try {
-            screen(opener = manager)
+            var closes = 0
+            screen(opener = manager, onClose = { closes++; screenVisible.value = false })
             val tracks = Tracks(listOf(
                 Tracks.Group(TrackGroup(Format.Builder().setSampleMimeType(MimeTypes.VIDEO_H264)
                     .setWidth(1920).setHeight(1080).build()), false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(true)),
@@ -672,8 +673,11 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
             assertTrue(exists("player-actions"))
             key(Key.Back)
             assertTrue(exists("playback-stats-overlay"))
+            assertTrue("Stats keep sampling with the chrome hidden", runtime.diagnostics.value.live != null)
             key(Key.Back)
-            assertSubscriptionSettled("closing Stats clears live diagnostics") { runtime.diagnostics.value.live == null }
+            assertEquals(1, closes)
+            assertTrue("leaving the player keeps the process switch on", statsStore.visible.value)
+            assertSubscriptionSettled("closing the player clears live diagnostics") { runtime.diagnostics.value.live == null }
             assertFalse(exists("playback-stats-overlay"))
         } finally {
             runTest(subscriptionDispatcher) { manager.closeAndJoin() }

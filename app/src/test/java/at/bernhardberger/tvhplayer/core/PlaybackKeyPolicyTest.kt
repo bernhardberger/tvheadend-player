@@ -337,7 +337,6 @@ class PlaybackKeyPolicyTest {
             hidden.copy(controlsVisible = true, seekbarFocused = true),
             // Info, Stats, the drawer and another options page are replaced, not kept.
             hidden.copy(infoOpen = true),
-            hidden.copy(statsOpen = true),
             hidden.copy(drawerOpen = true),
             hidden.copy(controlsVisible = true, optionsOpen = true),
         )
@@ -537,12 +536,12 @@ class PlaybackKeyPolicyTest {
         assertFalse(playerParentConsumesRecoveryKey(KeyEvent.KEYCODE_MEDIA_STOP))
         for (surface in PlayerSurface.entries) {
             for (controlsVisible in listOf(false, true)) {
-                for (overlay in 0..5) {
+                for (overlay in 0..4) {
                     val ctx = PlayerKeyContext(
                         surface, controlsVisible = controlsVisible, seekbarFocused = false,
                         timeshiftAvailable = true,
-                        optionsOpen = overlay == 1, infoOpen = overlay == 2, statsOpen = overlay == 3,
-                        drawerOpen = overlay == 4, confirmationOpen = overlay == 5,
+                        optionsOpen = overlay == 1, infoOpen = overlay == 2,
+                        drawerOpen = overlay == 3, confirmationOpen = overlay == 4,
                     )
                     assertEquals(PlayerKeyAction.PASS_THROUGH, playerKeyAction(ctx, KeyEvent.KEYCODE_MEDIA_STOP))
                 }

@@ -1113,12 +1113,15 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   the Audio/Subtitles quick list (restores the earlier selection and closes),
   options detail (returns to the options root), options root, numeric entry
   (clears it), channel drawer, recovery, terminal error, controls, pending seek
-  preview, dispatched seek preview, Stats. With no layer, Back hides the Banner
+  preview, dispatched seek preview. With no layer, Back hides the Banner
   when it is visible and otherwise closes the player to warm browse. A pending
   step cancels; a dispatched one only dismisses its feedback and claims no
   undo. Recovery and terminal-error Back close the player at once. Short Back is
   not Stop. Holding Back stops playback while watching, including the passive
-  Banner, paused label, controls, Stats, seek feedback, recovery and errors.
+  Banner, paused label, controls, seek feedback, recovery and errors. Stats is a
+  passive, non-focusable overlay below every player layer; it never changes Back
+  or remote-key handling. Its switch is shared by live and recording players for
+  the app process, off after a cold start, and is not saved in settings.
   With Info, schedule, options, number entry, the channel drawer, recording
   markers or any dialog open, a hold acts as one short Back on release.
 - Controls auto-hide only when they are visible, playback is playing and ready,

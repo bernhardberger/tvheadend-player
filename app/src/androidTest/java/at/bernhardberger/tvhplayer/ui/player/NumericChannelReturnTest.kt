@@ -94,11 +94,12 @@ class NumericChannelReturnTest(private val tagged: Boolean, private val completi
         catalog.scope.first { it.scope.visibleChannels.size == if (tagged) 2 else 3 }
         val selection = ChannelSelectionStore().apply { setSelected(ChannelId(1)) }
         val visible = mutableStateOf(true)
+        val statsStore = at.bernhardberger.tvhplayer.di.PlayerStatsStore()
         try {
             composeRule.setContent {
                 if (visible.value) TVHeadendPlayerTheme {
                     VideoPlayerScreen(video, selection, LastPlayedChannelStore(context), TargetAspect(AspectRatioMode.FIT) {},
-                        catalog, session, ChannelId(1), "Offline 1", {}, {}, runtime)
+                        catalog, session, ChannelId(1), "Offline 1", {}, {}, runtime, statsStore = statsStore)
                 }
             }
             composeRule.waitUntil(10_000) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1)) }

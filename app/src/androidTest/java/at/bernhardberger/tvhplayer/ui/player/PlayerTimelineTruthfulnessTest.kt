@@ -811,7 +811,6 @@ class PlayerTimelineTruthfulnessTest {
         terminalErrorVisible = false,
         seekPreviewPhase = phase,
         controlsVisible = false,
-        statsEnabled = false,
     )
 
     private fun dispatchBack() {

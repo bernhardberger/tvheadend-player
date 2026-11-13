@@ -720,7 +720,7 @@ class PlayerMotionTest {
         var context by mutableStateOf(PlayerForegroundContext(
             confirmationVisible = false, infoVisible = false, optionsPage = null, numberEntryVisible = false,
             channelDrawerVisible = false, recoveryVisible = false, terminalErrorVisible = false,
-            seekPreviewPhase = PlayerSeekPreviewPhase.NONE, controlsVisible = false, statsEnabled = false,
+            seekPreviewPhase = PlayerSeekPreviewPhase.NONE, controlsVisible = false,
         ))
         var bannerVisible by mutableStateOf(false)
         var mode = PlayerChromeMode.HIDDEN

@@ -699,6 +699,7 @@ class GuideRealisticSceneTest {
         }
         val noticeModule = module {
             single { notices }
+            single { at.bernhardberger.tvhplayer.di.PlayerStatsStore() }
             single { uiSettings }
             single { profiles }
             single<TvheadendSession> { session }

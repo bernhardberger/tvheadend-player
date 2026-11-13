@@ -369,8 +369,10 @@ fun VideoPlayerScreen(
     connectionUiState: at.bernhardberger.tvhplayer.core.ConnectionUiState? = null,
     guideEntryRequestId: Long? = null,
     consumeGuideEntry: () -> Boolean = { false },
+    statsStore: at.bernhardberger.tvhplayer.di.PlayerStatsStore = koinInject(),
 ) {
     val scope = rememberCoroutineScope()
+    val statsVisible by statsStore.visible.collectAsStateWithLifecycle()
     val layerState = rememberLivePlayerLayerState()
     val playerClose = rememberPlayerClose(onClose)
     // First, before any playback effect: a user stop since the last intent closes the screen.
@@ -1480,7 +1482,6 @@ fun VideoPlayerScreen(
                         remoteKeys.lastChromeControl == "player-seekbar",
                     timeshiftAvailable = effectiveTimeshiftState.available,
                     optionsOpen = layerState.core.optionsPage != null,
-                    statsOpen = layerState.core.statsVisible,
                     infoOpen = layerState.core.infoOpen,
                     drawerOpen = showDrawer,
                     confirmationOpen = foregroundLayer == PlayerForegroundLayer.CONFIRMATION,
@@ -1758,6 +1759,18 @@ fun VideoPlayerScreen(
     )
     }
     Box(modifier = rootModifier) { ProvideArtworkSession(currentSession, observation) {
+        // Passive diagnostics sit below all chrome and foreground panels.
+        LivePlayerDiagnostics(
+            viewModel = videoPlayerViewModel,
+            enabled = statsVisible,
+            visible = statsVisible,
+            aspectRatio = targetAspect.mode,
+            timeshiftState = effectiveTimeshiftState,
+            playbackRuntime = playbackRuntime,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 36.dp, end = 48.dp),
+        )
         // A quick step's preview plays inside the Banner; the pending or dispatched seek is its own layer.
         val bannerSeekPreview = visibleSeekPreview?.takeIf {
             foregroundLayer == PlayerForegroundLayer.PENDING_SEEK_PREVIEW ||
@@ -1969,18 +1982,6 @@ fun VideoPlayerScreen(
             )
         }
 
-        LivePlayerDiagnostics(
-            viewModel = videoPlayerViewModel,
-            enabled = layerState.core.statsVisible,
-            visible = foregroundLayer == PlayerForegroundLayer.STATS,
-            aspectRatio = aspectRatio,
-            timeshiftState = effectiveTimeshiftState,
-            playbackRuntime = playbackRuntime,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 36.dp, end = 48.dp),
-        )
-
         PlayerPanelVisibility(
             value = layerState.core.optionsPage?.let { it to layerState.core.optionsQuickList },
             // A quick list applies its focused row when it leaves; that must not wait.
@@ -1996,7 +1997,7 @@ fun VideoPlayerScreen(
                     playbackState is AppPlaybackState.Starting ||
                         playbackState is AppPlaybackState.Recovering,
                 aspectRatio = aspectRatio,
-                statsVisible = layerState.core.statsVisible,
+                statsVisible = statsVisible,
                 onPageChange = layerState.core::showOptionsPage,
                 quickList = layerState.core.quickList.takeIf { layerState.core.optionsQuickList },
                 onQuickListClose = layerState.core::closeQuickList,
@@ -2008,7 +2009,7 @@ fun VideoPlayerScreen(
                 },
                 onQuickAudioSelection = { epoch, override -> playbackRuntime.selectQuickListAudio(epoch, override) },
                 onAspectRatioChange = targetAspect.select,
-                onStatsVisibleChange = layerState.core::updateStatsVisibility,
+                onStatsVisibleChange = statsStore::setVisible,
             )
         }
 

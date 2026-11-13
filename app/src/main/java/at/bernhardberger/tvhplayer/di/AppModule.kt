@@ -55,6 +55,7 @@ import org.koin.dsl.module
 import org.koin.dsl.onClose
 
 val appModule = module {
+    single { PlayerStatsStore() }
     single<CoroutineDispatcher>(qualifier = named("io")) { Dispatchers.IO }
     single { PlayerSettingsStore(androidContext()) }
     single { ChannelTagSettingsStore(androidContext()) }

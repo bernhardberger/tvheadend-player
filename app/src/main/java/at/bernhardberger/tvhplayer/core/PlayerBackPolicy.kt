@@ -23,7 +23,6 @@ enum class PlayerForegroundLayer {
     CONTROLS,
     /** A recording's Skip prompt over the hidden chrome. */
     SKIP_PROMPT,
-    STATS,
     NONE,
 }
 
@@ -32,7 +31,6 @@ fun playerBackHoldAllowed(layer: PlayerForegroundLayer): Boolean = when (layer) 
     PlayerForegroundLayer.NONE,
     PlayerForegroundLayer.CONTROLS,
     PlayerForegroundLayer.SKIP_PROMPT,
-    PlayerForegroundLayer.STATS,
     PlayerForegroundLayer.PENDING_SEEK_PREVIEW,
     PlayerForegroundLayer.DISPATCHED_SEEK_PREVIEW,
     PlayerForegroundLayer.RECOVERY,
@@ -63,7 +61,6 @@ enum class PlayerBackAction {
     CANCEL_PENDING_SEEK,
     DISMISS_SEEK_FEEDBACK,
     HIDE_CONTROLS,
-    HIDE_STATS,
     DISMISS_SKIP_PROMPT,
 }
 
@@ -77,7 +74,6 @@ data class PlayerForegroundContext(
     val terminalErrorVisible: Boolean,
     val seekPreviewPhase: PlayerSeekPreviewPhase,
     val controlsVisible: Boolean,
-    val statsEnabled: Boolean,
     /** [optionsPage] is shown as the short list of its remote key. */
     val optionsQuickList: Boolean = false,
     val scheduleVisible: Boolean = false,
@@ -104,7 +100,6 @@ fun playerForegroundLayer(context: PlayerForegroundContext): PlayerForegroundLay
     context.seekPreviewPhase == PlayerSeekPreviewPhase.DISPATCHED ->
         PlayerForegroundLayer.DISPATCHED_SEEK_PREVIEW
     context.skipPromptOffered -> PlayerForegroundLayer.SKIP_PROMPT
-    context.statsEnabled -> PlayerForegroundLayer.STATS
     else -> PlayerForegroundLayer.NONE
 }
 
@@ -120,7 +115,6 @@ fun playerRootFocusRequired(foregroundLayer: PlayerForegroundLayer): Boolean =
         PlayerForegroundLayer.NUMBER_ENTRY,
         PlayerForegroundLayer.PENDING_SEEK_PREVIEW,
         PlayerForegroundLayer.DISPATCHED_SEEK_PREVIEW,
-        PlayerForegroundLayer.STATS,
         PlayerForegroundLayer.NONE -> true
         PlayerForegroundLayer.CONFIRMATION,
         PlayerForegroundLayer.INFO,
@@ -162,7 +156,6 @@ fun playerBackAction(
         PlayerSeekPreviewPhase.NONE -> PlayerBackAction.HIDE_CONTROLS
     }
     PlayerForegroundLayer.SKIP_PROMPT -> PlayerBackAction.DISMISS_SKIP_PROMPT
-    PlayerForegroundLayer.STATS -> PlayerBackAction.HIDE_STATS
 }
 
 /** What Back does on the layer in front of [context]; [bannerVisible] is the Banner as drawn. */

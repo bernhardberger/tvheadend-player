@@ -111,6 +111,7 @@ fun RecordingPlayerScreen(
     onClose: () -> Unit,
     onOpenConnectionSettings: () -> Unit = {},
     onShowGuide: (at.bernhardberger.tvheadend.sdk.core.ChannelId, at.bernhardberger.tvheadend.sdk.core.EpgEvent?) -> Unit = { _, _ -> },
+    statsStore: at.bernhardberger.tvhplayer.di.PlayerStatsStore = koinInject(),
 ) {
     val playerClose = rememberPlayerClose(onClose)
     // First, before the route restore: a user stop since the last intent closes the screen.
@@ -259,7 +260,7 @@ fun RecordingPlayerScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val statsVisible = layers.statsVisible
+    val statsVisible by statsStore.visible.collectAsStateWithLifecycle()
     DisposableEffect(statsVisible) {
         session.setDiagnosticsEnabled(statsVisible)
         onDispose {
@@ -444,7 +445,6 @@ fun RecordingPlayerScreen(
                         playbackState is AppPlaybackState.Failed)),
             seekPreviewPhase = timelineState.seekPreviewPhase(chrome.controlsVisible),
             controlsVisible = chrome.controlsVisible && playbackAvailable,
-            statsEnabled = layers.statsVisible,
             skipPromptOffered = recordingSkipPromptShown(
                 offered = skipPrompt != null && playbackAvailable,
                 playing = isPlaying,
@@ -697,6 +697,19 @@ fun RecordingPlayerScreen(
             .playerRootSemantics(stringResource(R.string.player_recording_surface))
             .focusable(),
     ) {
+        // Passive diagnostics remain below every foreground layer, including recovery.
+        PlaybackStatsVisibility(
+            visible = statsVisible,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 36.dp, end = 48.dp),
+        ) {
+            PlaybackStatsOverlay(
+                diagnostics = diagnostics,
+                aspectRatio = aspectRatio,
+                frameRate = session.frameRate,
+            )
+        }
         if (playbackAvailable) {
             val entry = requireNotNull(entry)
             val channel = entry.channelId?.let { targetObservation?.channel(it) }
@@ -786,21 +799,6 @@ fun RecordingPlayerScreen(
                     .padding(end = TvGridHorizontalMargin, bottom = TvGridVerticalMargin),
             )
 
-            PlaybackStatsVisibility(
-                // Stats stay up under the Skip prompt, which Back dismisses first.
-                visible = foregroundLayer == PlayerForegroundLayer.STATS ||
-                    foregroundLayer == PlayerForegroundLayer.SKIP_PROMPT && layers.statsVisible,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 36.dp, end = 48.dp),
-            ) {
-                PlaybackStatsOverlay(
-                    diagnostics = diagnostics,
-                    aspectRatio = aspectRatio,
-                    frameRate = session.frameRate,
-                )
-            }
-
         }
         if (!busyBlocked) {
             PlayerBusyIndicator(busyStatus, Modifier.align(Alignment.Center))
@@ -859,7 +857,7 @@ fun RecordingPlayerScreen(
                 onQuickAudioSelection = { epoch, override -> session.selectQuickListAudio(epoch, override) },
                 recording = true,
                 onAspectRatioChange = targetAspect.select,
-                onStatsVisibleChange = layers::updateStatsVisibility,
+                onStatsVisibleChange = statsStore::setVisible,
             )
         }
     }

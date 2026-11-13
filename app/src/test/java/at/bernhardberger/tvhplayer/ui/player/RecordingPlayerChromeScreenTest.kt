@@ -136,6 +136,8 @@ class RecordingPlayerChromeScreenTest {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private lateinit var player: ExoPlayer
     private lateinit var runtime: AppPlaybackRuntime
+    private val statsStore = at.bernhardberger.tvhplayer.di.PlayerStatsStore()
+    private var playerVisible by androidx.compose.runtime.mutableStateOf(true)
     private val owner = object : LifecycleOwner {
         override val lifecycle = LifecycleRegistry.createUnsafe(this)
     }
@@ -729,7 +731,7 @@ class RecordingPlayerChromeScreenTest {
         assertEquals("closing the options returns focus to their gear", listOf("player-settings"), focused())
     }
 
-    @Test fun twoBacksBeforeACompositionHideTheStatsThenClose() {
+    @Test fun statsStayShownUnderOptionsAndBackClosesWithoutDisablingThem() {
         var closed = false
         screen(onClose = { closed = true })
         playing()
@@ -738,21 +740,24 @@ class RecordingPlayerChromeScreenTest {
         settle()
         key(Key.DirectionCenter)
         key(Key.DirectionCenter)
+        assertTrue("Stats switch is on", statsStore.visible.value)
+        assertTrue("Stats remain shown under their options page", exists("playback-stats-overlay"))
         key(Key.Back)
         key(Key.Back)
         key(Key.Back)
         assertFalse("only the stats remain", exists("player-settings") || exists("player-banner"))
-        assertTrue("the stats are shown", texts("Stats for nerds"))
+        assertTrue("the stats are shown", exists("playback-stats-overlay"))
         assertFalse(closed)
-        // Both Backs arrive before the screen recomposes.
-        compose.runOnUiThread {
-            repeat(2) {
-                rootView.dispatchKeyEvent(AndroidKeyEvent(AndroidKeyEvent.ACTION_DOWN, AndroidKeyEvent.KEYCODE_BACK))
-                rootView.dispatchKeyEvent(AndroidKeyEvent(AndroidKeyEvent.ACTION_UP, AndroidKeyEvent.KEYCODE_BACK))
-            }
-        }
+        key(Key.Back)
+        assertTrue("Back closes without first dismissing Stats", closed)
+        assertTrue(statsStore.visible.value)
+
+        compose.runOnIdle { playerVisible = false }
         settle()
-        assertTrue("the first Back hides the stats, the second closes", closed)
+        assertFalse(exists("playback-stats-overlay"))
+        compose.runOnIdle { playerVisible = true }
+        settle()
+        assertTrue("Stats survive a new player-screen layer state", exists("playback-stats-overlay"))
     }
 
     @Test fun leftClosesTheOptionsRootLikeBack() {
@@ -1157,7 +1162,7 @@ class RecordingPlayerChromeScreenTest {
             CompositionLocalProvider(LocalLifecycleOwner provides owner,
                 LocalWatchingTarget provides target, LocalRecordingPlaybackSelection provides selection) {
                 TVHeadendPlayerTheme {
-                    RecordingPlayerScreen(
+                    if (playerVisible) RecordingPlayerScreen(
                         recordingId = recording,
                         playbackStart = RecordingPlaybackStart.START_OVER,
                         tvheadendSession = session,
@@ -1166,6 +1171,7 @@ class RecordingPlayerChromeScreenTest {
                         connectionState = ConnectionState.Connected,
                         onReconnect = {},
                         onClose = onClose,
+                        statsStore = statsStore,
                     )
                 }
             }

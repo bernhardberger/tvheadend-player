@@ -204,6 +204,7 @@ abstract class LivePlayerChromeFixture {
     protected var forcedAudioFormat: Format? = null
 
     protected val screenVisible = mutableStateOf(true)
+    protected val statsStore = at.bernhardberger.tvhplayer.di.PlayerStatsStore()
 
     // The preferencesDataStore delegate is a sandbox singleton, not a per-Application fixture.
     // Snapshot the real store rather than replacing production persistence or leaving channel 2
@@ -903,7 +904,10 @@ abstract class LivePlayerChromeFixture {
         if (!settleOnEntry) compose.mainClock.autoAdvance = false
         compose.setContent {
             if (screenVisible.value) {
-                val application = remember { koinApplication { modules(module { single { profiles } }) } }
+                val application = remember { koinApplication { modules(module {
+                    single { profiles }
+                    single { statsStore }
+                }) } }
                 DisposableEffect(application) { onDispose { application.close() } }
                 KoinIsolatedContext(application) {
                 CompositionLocalProvider(

@@ -9,7 +9,7 @@ import org.junit.Test
 class PlayerBackPolicyTest {
     @Test fun onlyWatchingLayersAllowHoldToStop() {
         val watching = setOf(PlayerForegroundLayer.NONE, PlayerForegroundLayer.CONTROLS,
-            PlayerForegroundLayer.SKIP_PROMPT, PlayerForegroundLayer.STATS, PlayerForegroundLayer.PENDING_SEEK_PREVIEW,
+            PlayerForegroundLayer.SKIP_PROMPT, PlayerForegroundLayer.PENDING_SEEK_PREVIEW,
             PlayerForegroundLayer.DISPATCHED_SEEK_PREVIEW, PlayerForegroundLayer.RECOVERY,
             PlayerForegroundLayer.TERMINAL_ERROR)
         PlayerForegroundLayer.entries.forEach { layer ->
@@ -34,7 +34,6 @@ class PlayerBackPolicyTest {
             PlayerForegroundLayer.NUMBER_ENTRY,
             PlayerForegroundLayer.PENDING_SEEK_PREVIEW,
             PlayerForegroundLayer.DISPATCHED_SEEK_PREVIEW,
-            PlayerForegroundLayer.STATS,
             PlayerForegroundLayer.NONE,
         ).forEach { layer ->
             assertTrue(layer.name, playerRootFocusRequired(layer))
@@ -69,12 +68,10 @@ class PlayerBackPolicyTest {
             terminalErrorVisible = false,
             seekPreviewPhase = PlayerSeekPreviewPhase.NONE,
             controlsVisible = false,
-            statsEnabled = false,
         )
         for (before in listOf(
             watching.copy(controlsVisible = true),
             watching,
-            watching.copy(statsEnabled = true),
             watching.copy(channelDrawerVisible = true, controlsVisible = true),
             watching.copy(recoveryVisible = true, controlsVisible = true),
         )) {
@@ -100,7 +97,6 @@ class PlayerBackPolicyTest {
             terminalErrorVisible = true,
             seekPreviewPhase = PlayerSeekPreviewPhase.PENDING,
             controlsVisible = true,
-            statsEnabled = true,
         )
 
         val expected = listOf(
@@ -113,7 +109,6 @@ class PlayerBackPolicyTest {
             PlayerForegroundLayer.TERMINAL_ERROR,
             PlayerForegroundLayer.CONTROLS,
             PlayerForegroundLayer.CONTROLS,
-            PlayerForegroundLayer.STATS,
             PlayerForegroundLayer.NONE,
         )
         val contexts = listOf(
@@ -176,18 +171,6 @@ class PlayerBackPolicyTest {
                 seekPreviewPhase = PlayerSeekPreviewPhase.NONE,
                 controlsVisible = false,
             ),
-            allVisible.copy(
-                confirmationVisible = false,
-                infoVisible = false,
-                optionsPage = null,
-                numberEntryVisible = false,
-                channelDrawerVisible = false,
-                recoveryVisible = false,
-                terminalErrorVisible = false,
-                seekPreviewPhase = PlayerSeekPreviewPhase.NONE,
-                controlsVisible = false,
-                statsEnabled = false,
-            ),
         )
 
         assertEquals(expected, contexts.map(::playerForegroundLayer))
@@ -213,7 +196,6 @@ class PlayerBackPolicyTest {
             optionsPage = PlaybackOptionsPage.SUBTITLES,
             optionsQuickList = true,
             controlsVisible = true,
-            statsEnabled = true,
         )
         assertEquals(PlayerForegroundLayer.OPTIONS_QUICK_LIST, playerForegroundLayer(quick))
         assertEquals(PlayerForegroundLayer.INFO, playerForegroundLayer(quick.copy(infoVisible = true)))
@@ -223,27 +205,6 @@ class PlayerBackPolicyTest {
             PlayerForegroundLayer.OPTIONS_DETAIL,
             playerForegroundLayer(quick.copy(optionsQuickList = false)),
         )
-    }
-
-    @Test
-    fun everyHigherLayerSuppressesRenderedStats() {
-        val stats = baseContext().copy(statsEnabled = true)
-        assertEquals(PlayerForegroundLayer.STATS, playerForegroundLayer(stats))
-
-        listOf(
-            stats.copy(confirmationVisible = true),
-            stats.copy(infoVisible = true),
-            stats.copy(optionsPage = PlaybackOptionsPage.ROOT),
-            stats.copy(numberEntryVisible = true),
-            stats.copy(channelDrawerVisible = true),
-            stats.copy(recoveryVisible = true),
-            stats.copy(terminalErrorVisible = true),
-            stats.copy(seekPreviewPhase = PlayerSeekPreviewPhase.PENDING),
-            stats.copy(seekPreviewPhase = PlayerSeekPreviewPhase.DISPATCHED),
-            stats.copy(controlsVisible = true),
-        ).forEach { context ->
-            assertNotEquals(context.toString(), PlayerForegroundLayer.STATS, playerForegroundLayer(context))
-        }
     }
 
     @Test
@@ -269,14 +230,12 @@ class PlayerBackPolicyTest {
         assertEquals(PlayerBackAction.DISMISS_SEEK_FEEDBACK, actions[PlayerForegroundLayer.DISPATCHED_SEEK_PREVIEW])
         assertEquals(PlayerBackAction.HIDE_CONTROLS, actions[PlayerForegroundLayer.CONTROLS])
         assertEquals(PlayerBackAction.DISMISS_SKIP_PROMPT, actions[PlayerForegroundLayer.SKIP_PROMPT])
-        assertEquals(PlayerBackAction.HIDE_STATS, actions[PlayerForegroundLayer.STATS])
     }
 
     @Test
-    fun theSkipPromptIsAboveStatsAndBelowEveryOtherLayer() {
+    fun theSkipPromptIsBelowEveryOtherLayer() {
         val prompt = baseContext().copy(skipPromptOffered = true)
         assertEquals(PlayerForegroundLayer.SKIP_PROMPT, playerForegroundLayer(prompt))
-        assertEquals(PlayerForegroundLayer.SKIP_PROMPT, playerForegroundLayer(prompt.copy(statsEnabled = true)))
         listOf(
             prompt.copy(infoVisible = true),
             prompt.copy(optionsPage = PlaybackOptionsPage.ROOT),
@@ -323,8 +282,6 @@ class PlayerBackPolicyTest {
             playerBackAction(PlayerSurface.LIVE, PlayerForegroundLayer.CONTROLS, bannerVisible = true))
         assertEquals(PlayerBackAction.CANCEL_PENDING_SEEK,
             playerBackAction(PlayerSurface.LIVE, PlayerForegroundLayer.PENDING_SEEK_PREVIEW, bannerVisible = true))
-        assertEquals(PlayerBackAction.HIDE_STATS,
-            playerBackAction(PlayerSurface.LIVE, PlayerForegroundLayer.STATS, bannerVisible = true))
     }
 
     @Test
@@ -359,6 +316,5 @@ class PlayerBackPolicyTest {
         terminalErrorVisible = false,
         seekPreviewPhase = PlayerSeekPreviewPhase.NONE,
         controlsVisible = false,
-        statsEnabled = false,
     )
 }
