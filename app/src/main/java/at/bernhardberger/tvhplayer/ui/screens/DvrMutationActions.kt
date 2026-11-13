@@ -37,6 +37,7 @@ import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvhplayer.core.BrowseContextAction
 import at.bernhardberger.tvhplayer.core.ProgrammeRecordingTarget
+import at.bernhardberger.tvhplayer.core.RecordingKeepUntilChoice
 import at.bernhardberger.tvhplayer.core.folderActionApplies
 import at.bernhardberger.tvhplayer.core.dvrMutationStateIsCurrent
 import at.bernhardberger.tvhplayer.core.dvrMutationTargetIsCurrent
@@ -90,8 +91,12 @@ internal suspend fun DvrMutationActions.chooseRecordingRemoval(
 ): Boolean {
     val entry = observation.keepUntilEntry(id, openingSession) ?: return true
     val removal = option.removal
-    val retention = option.retention.takeIf { entry.retention is DvrRetention.Days }
+    val retention = DvrRetention.UntilFilesRemoved.takeIf {
+        option.choice == RecordingKeepUntilChoice.FOREVER &&
+            entry.retention is DvrRetention.Days
+    }
     return when {
+        option.choice == RecordingKeepUntilChoice.CURRENT -> true
         removal == null -> false
         entry.removal == removal && (retention == null || entry.retention == retention) -> true
         else -> {

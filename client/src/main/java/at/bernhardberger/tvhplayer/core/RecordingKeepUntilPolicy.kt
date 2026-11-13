@@ -19,7 +19,6 @@ data class RecordingKeepUntilOption(
     val removal: DvrRemoval?,
     val expirySec: Long?,
     val selected: Boolean,
-    val retention: DvrRetention? = null,
 )
 
 /** Dates reflect the server's whole-day expiry, not the requested calendar target. */
@@ -42,14 +41,13 @@ fun recordingKeepUntilOptions(recording: DvrEntry, nowSec: Long, zone: ZoneId): 
         val expiry = if (choice == RecordingKeepUntilChoice.CURRENT) recordingRemovalTime(recording, nowSec)
         else (removal as? DvrRemoval.Days)?.let { days -> stop?.plus(days.days * 1.days.inWholeSeconds) }
             ?.takeIf { it > nowSec }
-        val retention = DvrRetention.UntilFilesRemoved.takeIf {
-            choice == RecordingKeepUntilChoice.FOREVER && recording.retention is DvrRetention.Days
-        }
-        RecordingKeepUntilOption(choice, removal, expiry, selected = false, retention = retention)
+        RecordingKeepUntilOption(choice, removal, expiry, selected = false)
     }
-    val selected = recording.removal?.let { current ->
+    val selected = recording.removal?.takeUnless {
+        it == DvrRemoval.Forever && recording.retention is DvrRetention.Days
+    }?.let { current ->
         options.filterNot { it.choice == RecordingKeepUntilChoice.CURRENT }
-            .firstOrNull { it.removal == current && it.retention == null }?.choice
+            .firstOrNull { it.removal == current }?.choice
     } ?: RecordingKeepUntilChoice.CURRENT
     return options.filter {
         it.choice != RecordingKeepUntilChoice.CURRENT || selected == RecordingKeepUntilChoice.CURRENT

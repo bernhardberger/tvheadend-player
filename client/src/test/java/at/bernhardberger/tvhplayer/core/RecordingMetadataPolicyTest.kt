@@ -53,10 +53,6 @@ class RecordingMetadataPolicyTest {
         assertEquals(RecordingKeepUntilChoice.CURRENT, retained.single { it.selected }.choice)
         assertEquals(now + 3 * 86400L, retained.single { it.selected }.expirySec)
         assertFalse(retained.single { it.choice == RecordingKeepUntilChoice.FOREVER }.selected)
-        assertEquals(DvrRetention.UntilFilesRemoved,
-            retained.single { it.choice == RecordingKeepUntilChoice.FOREVER }.retention)
-        assertTrue(retained.filter { it.choice != RecordingKeepUntilChoice.FOREVER }.all { it.retention == null })
-        assertTrue(options(DvrRemoval.Forever).all { it.retention == null })
     }
 
     @Test fun keepUntilPeriodsCountFromNowAndRoundUpTheServerDayCount() {
