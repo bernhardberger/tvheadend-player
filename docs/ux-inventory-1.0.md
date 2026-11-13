@@ -272,7 +272,11 @@ This supersedes the round-3 points above where they conflict. Reference frames:
   playback the page draws no art (see "Warm playback and browse backgrounds"):
   - eyebrow: logo · number · channel | genre, plus one status chip for the
     broadcast state ("On now", red-dot "Recording scheduled");
-  - title (dominant), one quiet episode line, two-line synopsis;
+  - title (dominant), one quiet episode line, then the description (summary, then a
+    description that differs) at 584dp wide: fitting text is plain, without padding,
+    an arrow or a focus stop; only cut text uses the reading panel with "… More" and
+    OK opens the reading box. Up to four lines use room above the action row plus
+    up to 16dp of peek slack, so the buttons may move down by up to 16dp;
   - facts row, value over label (Starts · Length · Left; recordings Recorded ·
     Length · Left), labels left-aligned;
   - the viewer's own progress is only the bar under the facts row;
@@ -281,9 +285,17 @@ This supersedes the round-3 points above where they conflict. Reference frames:
     labels: on now Watch · Record · Show in Guide; later Watch channel · Cancel
     recording (or Record) · Show in Guide; recording Resume · Start over;
   - below: the next programs on the channel as tv-material standard cards
-    (kit focus border; channel logo on the placeholder without art); scrolling
-    down keeps a compact identity line and shows the full description and
-    secondary facts (genre, episode, audio, subtitles, picture).
+    (kit focus border; channel logo on the placeholder without art); then
+    "Cast & crew" when the guide sends credits, and "Details" with the
+    secondary facts (genre, episode, audio, subtitles, picture). Cast & crew
+    is one focus stop on the four-column grid: a column per role, one name per
+    line, nothing abbreviated; a role with twelve or more names continues in
+    the next column (at least six per column, at most three columns) and a role
+    that no longer fits starts a new band. Both sections are read in place:
+    Up/Down scroll half the visible viewport before leaving at its edge, and
+    the bottom fades only while more content remains below, focused or not.
+    OK does nothing on these sections; only a cut description opens the reading
+    box, which also moves half its height per Up/Down press.
 - **Center dialogs** use the kit Two Column dialog for both decisions: resume
   (Resume · Start over; Back closes) and cancel recording (Keep recording
   focused · Cancel recording).
