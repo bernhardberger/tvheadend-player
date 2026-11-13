@@ -154,14 +154,14 @@ class BrowseErrorAlertTest {
         awaitFocus("tv-recovery-primary")
     }
 
-    @Test fun recordingsDoNotTakeFocusFromADeliberatelySelectedHeaderTab() {
+    @Test fun recordingsDoNotTakeFocusFromTheTabsWhenAnAlertAppears() {
         connection = ConnectionUiState.Connecting
         show(recordings = true)
+        awaitFocus("recordings-mode-archive")
         key(Key.DirectionRight)
-        compose.onNode(hasText("Schedule") and isFocused()).assertExists()
         compose.runOnIdle { connection = backoff() }
         compose.waitForIdle()
-        compose.onNode(hasText("Schedule") and isFocused()).assertExists()
+        compose.onNode(hasTestTag("recordings-mode-schedule") and isFocused()).assertExists()
         key(Key.DirectionDown)
         awaitFocus("tv-recovery-primary")
     }
@@ -210,8 +210,7 @@ class BrowseErrorAlertTest {
         assertEquals(0, compose.onAllNodes(hasTestTag("tv-recovery-overlay")).fetchSemanticsNodes().size)
         compose.mainClock.advanceTimeUntil(timeoutMillis = 1_000) {
             compose.onAllNodes(hasAnyAncestor(hasTestTag("recordings-mode-tabs")) and isFocused())
-                .fetchSemanticsNodes().isNotEmpty() ||
-                compose.onAllNodes(hasTestTag("recordings-mode-tabs") and isFocused()).fetchSemanticsNodes().isNotEmpty()
+                .fetchSemanticsNodes().isNotEmpty()
         }
         compose.runOnIdle { connection = backoff() }
         awaitFocus("tv-recovery-primary")

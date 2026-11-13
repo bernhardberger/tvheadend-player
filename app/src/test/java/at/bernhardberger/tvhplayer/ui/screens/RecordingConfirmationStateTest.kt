@@ -101,7 +101,7 @@ class RecordingConfirmationStateTest {
         val notices = NoticeCenter({ 0L }) { NoticeContext(0, session.observation.value.currentSession?.generationIdentity) }
         compose.setContentWithBrowsePreparation {
             TVHeadendPlayerTheme {
-                RecordingsScreenContent(observation = session.observation.collectAsState().value,
+                RecordingsScreenContent(view = at.bernhardberger.tvhplayer.core.DvrArchiveView(at.bernhardberger.tvhplayer.core.DvrArchiveGrouping.FOLDERS), observation = session.observation.collectAsState().value,
                     currentObservation = { session.observation.value }, state = state,
                     dvrMutationActions = actions, notices = notices)
             }
@@ -146,7 +146,7 @@ class RecordingConfirmationStateTest {
         val notices = NoticeCenter({ 0L }) { NoticeContext(0, session.observation.value.currentSession?.generationIdentity) }
         compose.setContentWithBrowsePreparation {
             TVHeadendPlayerTheme {
-                RecordingsScreenContent(observation = session.observation.collectAsState().value,
+                RecordingsScreenContent(view = at.bernhardberger.tvhplayer.core.DvrArchiveView(at.bernhardberger.tvhplayer.core.DvrArchiveGrouping.FOLDERS), observation = session.observation.collectAsState().value,
                     currentObservation = { session.observation.value }, state = state,
                     dvrMutationActions = actions, notices = notices)
             }
@@ -171,7 +171,7 @@ class RecordingConfirmationStateTest {
     @Test fun lastInFolderDeleteFromDetailsReturnsToNextParentItem() = lastInFolder("details")
     @Test fun lastInFolderDeleteFromMenuReturnsToPreviousParentItem() = lastInFolder("menu")
     @Test fun lastInFolderRemovalFromBrowseReturnsToParentItemAndBackWorks() = lastInFolder("browse")
-    @Test fun lastInFolderDeleteAtEmptyRootFocusesMode() = lastInFolder("details", emptyRoot = true)
+    @Test fun lastInFolderDeleteAtEmptyRootFocusesThePill() = lastInFolder("details", emptyRoot = true)
 
     private fun lastInFolder(source: String, emptyRoot: Boolean = false) {
         val entry = DvrEntry.create(DvrEntryId(1), title = "Recording", state = DvrEntryState.COMPLETED,
@@ -199,7 +199,7 @@ class RecordingConfirmationStateTest {
         compose.setContentWithBrowsePreparation {
             TVHeadendPlayerTheme {
                 back = requireNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
-                RecordingsScreenContent(observation = session.observation.collectAsState().value,
+                RecordingsScreenContent(view = at.bernhardberger.tvhplayer.core.DvrArchiveView(at.bernhardberger.tvhplayer.core.DvrArchiveGrouping.FOLDERS), observation = session.observation.collectAsState().value,
                     currentObservation = { session.observation.value }, state = state,
                     dvrMutationActions = actions, notices = notices)
             }
@@ -221,7 +221,7 @@ class RecordingConfirmationStateTest {
             compose.onNodeWithTag("recording-confirmation-back").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
             compose.onNodeWithTag("recording-confirmation-confirm").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
         }
-        val returnTarget = hasText(if (emptyRoot) "Archive" else if (source == "menu") "Before" else "Next") and hasClickAction()
+        val returnTarget = if (emptyRoot) hasTestTag("recordings-mode-archive") else hasText(if (source == "menu") "Before" else "Next") and hasClickAction()
         compose.mainClock.advanceTimeUntil(timeoutMillis = 1_000) {
             state.archivePath == (if (emptyRoot) emptyList<String>() else listOf("Series")) &&
                 compose.onAllNodes(returnTarget and isFocused()).fetchSemanticsNodes().isNotEmpty()
@@ -230,7 +230,7 @@ class RecordingConfirmationStateTest {
         compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
         if (emptyRoot) {
             compose.runOnIdle { assertEquals(emptyList<String>(), state.archivePath) }
-            compose.onNode(hasText("Archive") and hasClickAction()).assertIsFocused()
+            compose.onNodeWithTag("recordings-mode-archive").assertIsFocused()
         } else {
             compose.runOnIdle { assertEquals(listOf("Series"), state.archivePath) }
             compose.onNode(hasText(if (source == "menu") "Before" else "Next") and hasClickAction()).assertIsFocused()
@@ -258,7 +258,7 @@ class RecordingConfirmationStateTest {
         compose.setContentWithBrowsePreparation {
             TVHeadendPlayerTheme {
                 backDispatcher = requireNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
-                RecordingsScreenContent(
+                RecordingsScreenContent(view = at.bernhardberger.tvhplayer.core.DvrArchiveView(at.bernhardberger.tvhplayer.core.DvrArchiveGrouping.FOLDERS), 
                     observation = session.observation.collectAsState().value,
                     currentObservation = { session.observation.value },
                     state = state, dvrMutationActions = actions, notices = notices,
@@ -299,7 +299,7 @@ class RecordingConfirmationStateTest {
         }
         compose.setContentWithBrowsePreparation {
             TVHeadendPlayerTheme {
-                RecordingsScreenContent(
+                RecordingsScreenContent(view = at.bernhardberger.tvhplayer.core.DvrArchiveView(at.bernhardberger.tvhplayer.core.DvrArchiveGrouping.FOLDERS), 
                     observation = session.observation.collectAsState().value,
                     currentObservation = { session.observation.value },
                     state = state, dvrMutationActions = actions,
@@ -356,7 +356,7 @@ class RecordingConfirmationStateTest {
         }
         compose.setContentWithBrowsePreparation {
             TVHeadendPlayerTheme {
-                RecordingsScreenContent(
+                RecordingsScreenContent(view = at.bernhardberger.tvhplayer.core.DvrArchiveView(at.bernhardberger.tvhplayer.core.DvrArchiveGrouping.FOLDERS), 
                     observation = session.observation.collectAsState().value,
                     currentObservation = { session.observation.value },
                     state = state, dvrMutationActions = actions,

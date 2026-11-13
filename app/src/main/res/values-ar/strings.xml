@@ -24,7 +24,6 @@
     <string name="recording_profile_default">الملف الافتراضي</string>
     <string name="recording_space_title">مساحة تخزين التسجيلات</string>
     <string name="recording_space_value">%1$s متاحة من %2$s</string>
-    <string name="recording_space_line_description">مساحة تخزين التسجيلات: %1$s</string>
     <string name="recording_confirmation_profile">ملف التسجيل: %1$s</string>
     <string name="recording_confirmation_owner">مالك التسجيل: %1$s</string>
     <string name="context_watch">مشاهدة</string>
@@ -404,17 +403,7 @@
     <string name="recording_action_connection">غير متصل بالخادم.</string>
     <string name="recording_already_scheduled">هذا البرنامج قيد التسجيل أو مجدول بالفعل.</string>
     <string name="recordings_title">التسجيلات</string>
-    <string name="recordings_archive">الأرشيف</string>
     <string name="recordings_archive_all">كل التسجيلات</string>
-    <string name="recordings_recording_now_folder">جارٍ التسجيل</string>
-    <plurals name="recordings_in_progress_count">
-        <item quantity="zero">تسجيلات جارية: %1$d</item>
-        <item quantity="one">تسجيلات جارية: %1$d</item>
-        <item quantity="two">تسجيلات جارية: %1$d</item>
-        <item quantity="few">تسجيلات جارية: %1$d</item>
-        <item quantity="many">تسجيلات جارية: %1$d</item>
-        <item quantity="other">تسجيلات جارية: %1$d</item>
-    </plurals>
     <string name="recordings_schedule">جدول التسجيلات</string>
     <string name="recordings_problems">المشكلات</string>
     <string name="recordings_archive_empty">لا توجد تسجيلات قابلة للتشغيل في هذا المجلد.</string>

@@ -24,7 +24,6 @@
     <string name="recording_profile_default">預設設定檔</string>
     <string name="recording_space_title">錄影空間</string>
     <string name="recording_space_value">可用%1$s，總計%2$s</string>
-    <string name="recording_space_line_description">錄影空間：%1$s</string>
     <string name="recording_confirmation_profile">錄影設定檔：%1$s</string>
     <string name="recording_confirmation_owner">錄影擁有者：%1$s</string>
     <string name="context_watch">觀看</string>
@@ -376,10 +375,7 @@
     <string name="recording_action_connection">尚未連線至伺服器。</string>
     <string name="recording_already_scheduled">此節目正在錄影或已預約錄影。</string>
     <string name="recordings_title">錄影</string>
-    <string name="recordings_archive">典藏</string>
     <string name="recordings_archive_all">所有錄影</string>
-    <string name="recordings_recording_now_folder">錄影中</string>
-    <plurals name="recordings_in_progress_count"><item quantity="other">%1$d項錄影進行中</item></plurals>
     <string name="recordings_schedule">錄影排程</string>
     <string name="recordings_problems">問題</string>
     <string name="recordings_archive_empty">此資料夾沒有可播放的錄影。</string>

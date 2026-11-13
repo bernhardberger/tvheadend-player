@@ -150,7 +150,7 @@ internal fun GuideTimePanel(
     BrowseSidePanel(
         title = stringResource(R.string.guide_time_title),
         panelTag = "guide-time-panel",
-        // Back in the times returns to their day; only Back on the days closes the panel.
+        // Back or Left returns to the day from the times, and closes from the days.
         onClose = { if (inTimes) backToDay() else onClose() },
         width = GuideTimePanelWidth,
     ) {
@@ -165,7 +165,8 @@ internal fun GuideTimePanel(
                         if (event.isFirstDown() && !nowFocused) enterTimes()
                         true
                     }
-                    towardDays -> true
+                    // Let the panel handle the complete press once, on release.
+                    towardDays -> false
                     else -> false
                 }
             }) {
@@ -177,10 +178,7 @@ internal fun GuideTimePanel(
                 .onFocusChanged { inTimes = it.hasFocus }
                 .onPreviewKeyEvent { event ->
                     when (event.key) {
-                        towardDays -> {
-                            if (event.isFirstDown()) backToDay()
-                            true
-                        }
+                        towardDays -> false
                         towardTimes -> true
                         else -> false
                     }

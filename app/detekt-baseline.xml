@@ -875,7 +875,6 @@
     <ID>MaxLineLength:RecordingSkipButton.kt:topLeft = Offset(inset, inset)</ID>
     <ID>MaxLineLength:RecordingsContent.kt:/** A completed recording is the normal case and carries no mark; running and scheduled ones carry theirs at the row's end. */</ID>
     <ID>MaxLineLength:RecordingsContent.kt:ProgrammeStatusLine</ID>
-    <ID>MaxLineLength:RecordingsContent.kt:Text(stringResource(R.string.recordings_recording_now_folder), maxLines = 1, overflow = TextOverflow.Ellipsis)</ID>
     <ID>MaxLineLength:RecordingsContent.kt:append(" • ").append(pluralStringResource(R.plurals.recordings_folder_watched_count, watched, watched))</ID>
     <ID>MaxLineLength:RecordingsContent.kt:append(resources.getString(R.string.recording_length_recorded, formatRecordedDuration(it, resources)))</ID>
     <ID>MaxLineLength:RecordingsContent.kt:at.bernhardberger.tvhplayer.ui.common.formatRecordedDuration(it, androidx.compose.ui.platform.LocalResources.current)</ID>
@@ -1099,7 +1098,6 @@
     <ID>TooManyFunctions:WatchingProgress.kt:at.bernhardberger.tvhplayer.ui.components.WatchingProgress.kt</ID>
     <ID>TopLevelPropertyNaming:AppRoot.kt:/** * Autoplay handoff: the full-screen startup screen fades into the first video frames over the * M3 long2 duration with M3 standard easing, after the first picture's [PlayerMotion.PictureHoldMs]. */ internal const val StartupRevealMs = 500</ID>
     <ID>TopLevelPropertyNaming:ArchiveDepthContent.kt:/** The preview-slot heading reads at the row title size: titleMedium 16sp of titleLarge 22sp. */ internal const val ArchiveHeadingPreviewScale = 16f / 22f</ID>
-    <ID>TopLevelPropertyNaming:ArchiveDepthContent.kt:internal const val RecordingNowLevelId = "recording-now"</ID>
     <ID>TopLevelPropertyNaming:BrowseContentLayering.kt:/** * The gradient's darkness at the screen edge. The closed rail's icons only need to read over the * backdrop; the open drawer's labels lie over the content, so it darkens like the kit's modal drawer. */ private const val ClosedRailEdgeAlpha = 0.6f</ID>
     <ID>TopLevelPropertyNaming:BrowseContentLayering.kt:/** The kit's modal drawer scrim, `colorScheme.scrim` at 50%: content under the drawer stays legible. */ private const val ForegroundUnderDrawerAlpha = 0.5f</ID>
     <ID>TopLevelPropertyNaming:BrowseContentLayering.kt:private const val OpenDrawerEdgeAlpha = 0.95f</ID>

@@ -24,7 +24,6 @@
     <string name="recording_profile_default">Zadani profil</string>
     <string name="recording_space_title">Prostor za snimke</string>
     <string name="recording_space_value">%1$s slobodno od %2$s</string>
-    <string name="recording_space_line_description">Prostor za snimke: %1$s</string>
     <string name="recording_confirmation_profile">Profil snimanja: %1$s</string>
     <string name="recording_confirmation_owner">Vlasnik snimke: %1$s</string>
     <string name="context_watch">Gledaj</string>
@@ -392,14 +391,7 @@
     <string name="recording_action_connection">Nema veze s poslužiteljem.</string>
     <string name="recording_already_scheduled">Ova se emisija snima ili je snimanje zakazano.</string>
     <string name="recordings_title">Snimke</string>
-    <string name="recordings_archive">Arhiva</string>
     <string name="recordings_archive_all">Sve snimke</string>
-    <string name="recordings_recording_now_folder">Snimanje u tijeku</string>
-    <plurals name="recordings_in_progress_count">
-        <item quantity="one">%1$d snimanje u tijeku</item>
-        <item quantity="few">%1$d snimanja u tijeku</item>
-        <item quantity="other">%1$d snimanja u tijeku</item>
-    </plurals>
     <string name="recordings_schedule">Raspored</string>
     <string name="recordings_problems">Problemi</string>
     <string name="recordings_archive_empty">U ovoj mapi nema snimki za reprodukciju.</string>

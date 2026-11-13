@@ -293,8 +293,10 @@ fun DepthNavigation(
     }
     val displayed = if (moving) unionStrip(held, desired) else desired
 
+    // A control in a level's heading (Recordings' options button) takes its own keys, not the list's.
+    var headingFocused by remember { mutableStateOf(false) }
     Box(modifier.backKeyCycleFocus(backCycle).onPreviewKeyEvent { event ->
-        if (!isCurrent) {
+        if (!isCurrent || headingFocused) {
             backCycle.reset()
             return@onPreviewKeyEvent false
         }
@@ -378,6 +380,7 @@ fun DepthNavigation(
                             stepPixels = stepPixels,
                             xOffset = columnOffset,
                             emphasis = { (1f - abs(columnOffset + stripOffset.value) / stepPixels).coerceIn(0f, 1f) },
+                            onHeadingFocus = { headingFocused = it },
                             columnWidth = columnWidth,
                             contentPadding = contentPadding,
                             previewAlpha = previewAlpha,
@@ -496,6 +499,7 @@ private fun DepthStripPane(
     xOffset: Int,
     emphasis: () -> Float,
     columnWidth: Dp,
+    onHeadingFocus: (Boolean) -> Unit = {},
     contentPadding: PaddingValues,
     previewAlpha: Float,
     parentAlpha: Float,
@@ -674,7 +678,7 @@ private fun DepthStripPane(
                     },
                 ),
         ) {
-            column.level.heading(emphasis)
+            Box(Modifier.onFocusChanged { onHeadingFocus(it.hasFocus) }) { column.level.heading(emphasis) }
             if (column.level.passiveContent != null) {
                 column.level.passiveContent.invoke()
                 return@Column

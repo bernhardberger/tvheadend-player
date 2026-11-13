@@ -36,6 +36,10 @@ Modifications applied by this project:
     replaced Material icon AutoMirrored behavior;
   - renamed each file to the project's `ic_{symbol}` resource name.
 
+The six `ic_sort_*` sort-order icons are this project's own drawings on the
+same 960 grid. Their arrows and the letters A and Z are adapted from Material
+Symbols glyphs; the bars and the calendar are drawn by the project.
+
 Everything below is the unmodified Apache License 2.0 text shipped with the
 source repository.
 

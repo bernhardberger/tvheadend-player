@@ -24,7 +24,6 @@
     <string name="recording_profile_default">Alapértelmezett profil</string>
     <string name="recording_space_title">Felvételek tárhelye</string>
     <string name="recording_space_value">%1$s szabad, összesen %2$s</string>
-    <string name="recording_space_line_description">Felvételek tárhelye: %1$s</string>
     <string name="recording_confirmation_profile">Felvételi profil: %1$s</string>
     <string name="recording_confirmation_owner">Felvétel tulajdonosa: %1$s</string>
     <string name="context_watch">Megnézés</string>
@@ -388,13 +387,7 @@
     <string name="recording_action_connection">Nincs kapcsolat a szerverrel.</string>
     <string name="recording_already_scheduled">A műsor felvétele folyamatban van vagy ütemezve lett.</string>
     <string name="recordings_title">Felvételek</string>
-    <string name="recordings_archive">Archívum</string>
     <string name="recordings_archive_all">Összes felvétel</string>
-    <string name="recordings_recording_now_folder">Felvétel folyamatban</string>
-    <plurals name="recordings_in_progress_count">
-        <item quantity="one">%1$d felvétel folyamatban</item>
-        <item quantity="other">%1$d felvétel folyamatban</item>
-    </plurals>
     <string name="recordings_schedule">Ütemezés</string>
     <string name="recordings_problems">Problémák</string>
     <string name="recordings_archive_empty">Nincs lejátszható felvétel ebben a mappában.</string>

@@ -24,7 +24,6 @@
     <string name="recording_profile_default">默认配置</string>
     <string name="recording_space_title">录制空间</string>
     <string name="recording_space_value">可用%1$s，共%2$s</string>
-    <string name="recording_space_line_description">录制空间：%1$s</string>
     <string name="recording_confirmation_profile">录制配置：%1$s</string>
     <string name="recording_confirmation_owner">录制所有者：%1$s</string>
     <string name="context_watch">观看</string>
@@ -376,10 +375,7 @@
     <string name="recording_action_connection">未连接服务器。</string>
     <string name="recording_already_scheduled">此节目正在录制或已预约录制。</string>
     <string name="recordings_title">录制</string>
-    <string name="recordings_archive">存档</string>
     <string name="recordings_archive_all">所有录制</string>
-    <string name="recordings_recording_now_folder">正在录制</string>
-    <plurals name="recordings_in_progress_count"><item quantity="other">%1$d项正在录制</item></plurals>
     <string name="recordings_schedule">录制计划</string>
     <string name="recordings_problems">问题</string>
     <string name="recordings_archive_empty">此文件夹中没有可播放的录制内容。</string>

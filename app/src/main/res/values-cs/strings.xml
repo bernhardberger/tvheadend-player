@@ -24,7 +24,6 @@
     <string name="recording_profile_default">Výchozí profil</string>
     <string name="recording_space_title">Místo pro nahrávky</string>
     <string name="recording_space_value">%1$s volných z %2$s</string>
-    <string name="recording_space_line_description">Místo pro nahrávky: %1$s</string>
     <string name="recording_confirmation_profile">Profil nahrávání: %1$s</string>
     <string name="recording_confirmation_owner">Vlastník nahrávky: %1$s</string>
     <string name="context_watch">Sledovat</string>
@@ -396,15 +395,7 @@
     <string name="recording_action_connection">Není připojení k serveru.</string>
     <string name="recording_already_scheduled">Tento pořad se nahrává nebo je nahrávání naplánováno.</string>
     <string name="recordings_title">Nahrávky</string>
-    <string name="recordings_archive">Archiv</string>
     <string name="recordings_archive_all">Všechny nahrávky</string>
-    <string name="recordings_recording_now_folder">Právě se nahrává</string>
-    <plurals name="recordings_in_progress_count">
-        <item quantity="one">Probíhá %1$d nahrávání</item>
-        <item quantity="few">Probíhají %1$d nahrávání</item>
-        <item quantity="many">Probíhá %1$d nahrávání</item>
-        <item quantity="other">Probíhá %1$d nahrávání</item>
-    </plurals>
     <string name="recordings_schedule">Plán</string>
     <string name="recordings_problems">Problémy</string>
     <string name="recordings_archive_empty">V této složce nejsou přehratelné nahrávky.</string>

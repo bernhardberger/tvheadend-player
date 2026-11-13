@@ -24,7 +24,6 @@
     <string name="recording_profile_default">Perfil predefinido</string>
     <string name="recording_space_title">Espaço para gravações</string>
     <string name="recording_space_value">%1$s livres de %2$s</string>
-    <string name="recording_space_line_description">Espaço para gravações: %1$s</string>
     <string name="recording_confirmation_profile">Perfil de gravação: %1$s</string>
     <string name="recording_confirmation_owner">Proprietário da gravação: %1$s</string>
     <string name="context_watch">Ver</string>
@@ -376,10 +375,7 @@
     <string name="recording_action_connection">Sem ligação ao servidor.</string>
     <string name="recording_already_scheduled">Este programa está a ser gravado ou já está agendado.</string>
     <string name="recordings_title">Gravações</string>
-    <string name="recordings_archive">Arquivo</string>
     <string name="recordings_archive_all">Todas as gravações</string>
-    <string name="recordings_recording_now_folder">A gravar</string>
-    <plurals name="recordings_in_progress_count"><item quantity="one">%1$d gravação em curso</item><item quantity="many">%1$d gravações em curso</item><item quantity="other">%1$d gravações em curso</item></plurals>
     <string name="recordings_schedule">Agendamentos</string>
     <string name="recordings_problems">Problemas</string>
     <string name="recordings_archive_empty">Não há gravações reproduzíveis nesta pasta.</string>

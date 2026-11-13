@@ -24,7 +24,6 @@
     <string name="recording_profile_default">Profil par défaut</string>
     <string name="recording_space_title">Espace d’enregistrement</string>
     <string name="recording_space_value">%1$s libres sur %2$s</string>
-    <string name="recording_space_line_description">Espace d’enregistrement : %1$s</string>
     <string name="recording_confirmation_profile">Profil d’enregistrement : %1$s</string>
     <string name="recording_confirmation_owner">Propriétaire de l’enregistrement : %1$s</string>
     <string name="context_watch">Regarder</string>
@@ -392,14 +391,7 @@
     <string name="recording_action_connection">Pas de connexion au serveur.</string>
     <string name="recording_already_scheduled">Ce programme est en cours d’enregistrement ou programmé.</string>
     <string name="recordings_title">Enregistrements</string>
-    <string name="recordings_archive">Archives</string>
     <string name="recordings_archive_all">Tous les enregistrements</string>
-    <string name="recordings_recording_now_folder">Enregistrement en cours</string>
-    <plurals name="recordings_in_progress_count">
-        <item quantity="one">%1$d enregistrement en cours</item>
-        <item quantity="many">%1$d enregistrements en cours</item>
-        <item quantity="other">%1$d enregistrements en cours</item>
-    </plurals>
     <string name="recordings_schedule">Programmation</string>
     <string name="recordings_problems">Problèmes</string>
     <string name="recordings_archive_empty">Aucun enregistrement lisible dans ce dossier.</string>

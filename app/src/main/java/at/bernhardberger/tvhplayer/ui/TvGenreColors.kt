@@ -8,7 +8,10 @@ import at.bernhardberger.tvhplayer.core.ProgrammeCategory
  * programme (12% of the base over containerHigh), focused or not. Programmes without a genre code
  * stay plain.
  */
-class TvGenreColors(val base: Color, val tint: Color)
+class TvGenreColors(val base: Color, val tint: Color) {
+    /** Half the sRGB value preserves hue/saturation and clears 3:1 on the native light focus card. */
+    val focusedBase: Color get() = Color(base.red * 0.5f, base.green * 0.5f, base.blue * 0.5f, base.alpha)
+}
 
 private val GenreFilmDrama = TvGenreColors(Color(0xFFC8B7FF), Color(0xFF3B3B45))
 private val GenreNews = TvGenreColors(Color(0xFF7699FB), Color(0xFF313745))

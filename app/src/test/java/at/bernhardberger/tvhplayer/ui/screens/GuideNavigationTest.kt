@@ -1100,6 +1100,9 @@ class GuideNavigationTest : GuideScreenFixture() {
         key(Key.DirectionRight)
         tagFocused("channels-view-button")
         key(Key.Enter)
+        compose.onNodeWithTag("guide-view-panel").assertIsDisplayed()
+        tagFocused("guide-view-rows")
+        key(Key.DirectionRight)
         tagFocused("guide-view-rows-regular")
         key(Key.DirectionDown)
         tagFocused("guide-view-rows-dense")
@@ -1108,6 +1111,12 @@ class GuideNavigationTest : GuideScreenFixture() {
         assertTrue("Dense rows are shorter than regular rows", bounds("epg-channel-row-1").height < regularHeight)
         compose.onAllNodesWithTag("guide-cell-time", useUnmergedTree = true).assertCountEquals(0)
         assertEquals(GuideRows.DENSE, runBlocking { uiSettings.settings.first() }.guideView.rows)
+        compose.onNodeWithTag("guide-view-panel").assertIsDisplayed()
+        key(Key.Back)
+        tagFocused("guide-view-rows")
+        key(Key.Back)
+        compose.onNodeWithTag("guide-view-panel").assertDoesNotExist()
+        tagFocused("channels-view-button")
         assertNoPlayback()
     }
 
@@ -1204,9 +1213,6 @@ class GuideNavigationTest : GuideScreenFixture() {
         show()
         key(Key.Enter)
         tagFocused("guide-time-day-0")
-        // Left on the days and Right on Now go nowhere.
-        key(Key.DirectionLeft)
-        tagFocused("guide-time-day-0")
         key(Key.DirectionDown)
         tagFocused("guide-time-day-1")
         key(Key.DirectionRight)
@@ -1220,7 +1226,12 @@ class GuideNavigationTest : GuideScreenFixture() {
         tagFocused("guide-time-preset-20")
         key(Key.DirectionUp)
         tagFocused("guide-time-preset-18")
-        key(Key.DirectionLeft)
+        // A held Left stays in this pane until release, then returns exactly one step.
+        compose.onRoot().performKeyInput { keyDown(Key.DirectionLeft) }
+        compose.waitForIdle()
+        tagFocused("guide-time-preset-18")
+        compose.onRoot().performKeyInput { keyUp(Key.DirectionLeft) }
+        compose.waitForIdle()
         tagFocused("guide-time-day-1")
         compose.onNodeWithTag("guide-time-day-1").assertIsNotSelected()
         key(Key.DirectionRight)
@@ -1231,9 +1242,14 @@ class GuideNavigationTest : GuideScreenFixture() {
         key(Key.DirectionUp)
         key(Key.DirectionUp)
         tagFocused("guide-time-now")
+        // Right on Now goes nowhere.
         key(Key.DirectionRight)
         tagFocused("guide-time-now")
-        key(Key.Back)
+        compose.onRoot().performKeyInput { keyDown(Key.DirectionLeft) }
+        compose.waitForIdle()
+        tagFocused("guide-time-now")
+        compose.onRoot().performKeyInput { keyUp(Key.DirectionLeft) }
+        compose.waitForIdle()
         compose.onNodeWithTag("guide-time-panel").assertDoesNotExist()
         dateFocused()
         assertDateButtonNow()
@@ -1244,8 +1260,6 @@ class GuideNavigationTest : GuideScreenFixture() {
         show(direction = LayoutDirection.Rtl)
         key(Key.Enter)
         tagFocused("guide-time-day-0")
-        key(Key.DirectionRight)
-        tagFocused("guide-time-day-0")
         key(Key.DirectionDown)
         tagFocused("guide-time-day-1")
         key(Key.DirectionLeft)
@@ -1254,7 +1268,10 @@ class GuideNavigationTest : GuideScreenFixture() {
         tagFocused("guide-time-preset-20")
         key(Key.DirectionRight)
         tagFocused("guide-time-day-1")
-        assertEquals(0, playbackRequests)
+        key(Key.DirectionRight)
+        compose.onNodeWithTag("guide-time-panel").assertDoesNotExist()
+        dateFocused()
+        assertNoPlayback()
     }
 
     @Test fun aTimeJumpsToItsStartClosesThePanelAndKeepsTheChannel() {
@@ -1396,7 +1413,7 @@ class GuideNavigationTest : GuideScreenFixture() {
             key(Key.DirectionRight)
             tagFocused("channels-view-button")
             key(Key.Enter)
-            tagFocused("guide-view-rows-dense")
+            tagFocused("guide-view-rows")
             key(Key.DirectionDown)
             tagFocused("guide-view-headline")
             key(Key.Enter)

@@ -1,6 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.components
 
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -25,6 +27,7 @@ import androidx.tv.material3.TabRowScope
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.ui.TvSpacing16
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
+import at.bernhardberger.tvhplayer.ui.TvSpacing12
 
 internal enum class AppTabStyle { Page, Section }
 
@@ -84,6 +87,7 @@ internal class AppTabScope internal constructor(
         first: Boolean = false,
         last: Boolean = false,
         focusTarget: Boolean = selected,
+        trailing: (@Composable () -> Unit)? = null,
     ) {
         with(row) {
             Tab(
@@ -105,8 +109,13 @@ internal class AppTabScope internal constructor(
                     style = MaterialTheme.typography.titleSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(horizontal = TvSpacing16, vertical = TvSpacing8).then(labelModifier),
+                    modifier = Modifier.padding(start = TvSpacing16, end = if (trailing == null) TvSpacing16 else TvSpacing8,
+                        top = TvSpacing8, bottom = TvSpacing8).then(labelModifier),
                 )
+                if (trailing != null) {
+                    trailing()
+                    Spacer(Modifier.width(TvSpacing12))
+                }
             }
         }
     }

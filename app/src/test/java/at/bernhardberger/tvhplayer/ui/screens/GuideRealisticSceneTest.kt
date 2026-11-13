@@ -440,11 +440,14 @@ class GuideRealisticSceneTest {
     @Test fun u5RegularRowsAddTheStartTime() {
         showAt("2026-09-15T19:40:00")
         openViewOptions()
+        compose.pressKey(Key.DirectionRight)
         compose.pressKey(Key.DirectionUp)
         tagFocused("guide-view-rows-regular")
         compose.pressKey(Key.Enter)
         compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("epg-channel-row-1")).fetchSemanticsNodes().any {
             it.boundsInRoot.height > 50f } }
+        compose.pressKey(Key.Back)
+        tagFocused("guide-view-rows")
         compose.pressKey(Key.Back)
         tagFocused("channels-view-button")
         compose.pressKey(Key.DirectionDown)
@@ -879,7 +882,7 @@ class GuideRealisticSceneTest {
         repeat(3) { compose.pressKey(Key.DirectionRight) }
         tagFocused("channels-view-button")
         compose.pressKey(Key.Enter)
-        tagFocused("guide-view-rows-dense")
+        tagFocused("guide-view-rows")
     }
 
     /** Filter button, Sport; the panel closes onto the Filter button. */

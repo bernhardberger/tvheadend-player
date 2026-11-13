@@ -33,6 +33,7 @@ import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -54,12 +55,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -76,6 +72,14 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.tv.material3.NavigationDrawerItemDefaults
+import at.bernhardberger.tvhplayer.ui.components.recordingMarkColor
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
@@ -133,7 +137,6 @@ import at.bernhardberger.tvhplayer.core.recordingListMetadata
 import at.bernhardberger.tvhplayer.core.recordingListPageTargetIndex
 import at.bernhardberger.tvhplayer.core.summarizeDvrFolder
 import at.bernhardberger.tvhplayer.core.watchedCount
-import at.bernhardberger.tvhplayer.core.runningRecordings
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnGap
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
 import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
@@ -148,6 +151,7 @@ import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.LocalTabOwner
 import at.bernhardberger.tvhplayer.ui.components.tabFocus
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
+import at.bernhardberger.tvhplayer.core.runningRecordings
 import at.bernhardberger.tvhplayer.ui.components.RecordingBadge
 import at.bernhardberger.tvhplayer.ui.components.StatusIconSize
 import at.bernhardberger.tvhplayer.ui.components.ListBottomReserve
@@ -155,7 +159,6 @@ import at.bernhardberger.tvhplayer.ui.components.SkeletonLine
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthListTopReserve
 import at.bernhardberger.tvhplayer.ui.components.listEdgeFades
 import at.bernhardberger.tvhplayer.ui.components.rememberListEdgeBringIntoView
-import at.bernhardberger.tvhplayer.ui.components.recordingMarkColor
 import at.bernhardberger.tvhplayer.ui.common.formatDayHeader
 import at.bernhardberger.tvhplayer.ui.common.formatFileSize
 import at.bernhardberger.tvhplayer.ui.common.rememberDetailsEpochSeconds
@@ -181,6 +184,7 @@ import kotlinx.coroutines.launch
 internal sealed interface ArchiveListItem {
     val key: String
 
+    /** The Recording now folder at the top of the Folders root; each running recording also stays in its own folder. */
     data class RecordingNow(val entries: List<DvrEntry>) : ArchiveListItem {
         override val key = "meta:recording-now"
     }
@@ -196,10 +200,9 @@ internal sealed interface ArchiveListItem {
 
 internal fun recordingItemKey(id: DvrEntryId): Long = id.value
 
-internal fun DvrArchiveFolder.listItems(): List<ArchiveListItem> = buildList {
-    if (path.isEmpty()) {
-        runningRecordings().takeIf { it.isNotEmpty() }?.let { add(ArchiveListItem.RecordingNow(it)) }
-    }
+/** A level's rows; [recordingNow] are the running recordings of the Recording now folder that opens a Folders root. */
+internal fun DvrArchiveFolder.listItems(recordingNow: List<DvrEntry> = emptyList()): List<ArchiveListItem> = buildList {
+    if (recordingNow.isNotEmpty()) add(ArchiveListItem.RecordingNow(recordingNow))
     addAll(folders.map(ArchiveListItem::Folder))
     addAll(recordings.map(ArchiveListItem::Recording))
 }
@@ -209,12 +212,16 @@ internal fun RecordingModeTabs(
     selected: DvrLibraryMode,
     selectedFocus: FocusRequester,
     modifier: Modifier = Modifier,
+    /** The modes the row offers; the Schedule screen's subnav leaves the Archive out. */
+    modes: List<DvrLibraryMode> = DvrLibraryMode.entries,
     onFocused: (DvrLibraryMode) -> Unit,
     onClick: (DvrLibraryMode) -> Unit,
     onMoveToContent: () -> Unit,
+    /** Recordings with a problem; the Problems tab carries the count while it is above zero. */
+    problemCount: Int = 0,
 ) {
     AppTabRow(
-        selectedTabIndex = selected.ordinal,
+        selectedTabIndex = modes.indexOf(selected),
         style = AppTabStyle.Page,
         selectedTabFocus = selectedFocus,
         modifier = modifier.onPreviewKeyEvent { event ->
@@ -223,13 +230,13 @@ internal fun RecordingModeTabs(
                 onMoveToContent().let { true }
         },
     ) {
-        DvrLibraryMode.entries.forEach { mode ->
+        modes.forEach { mode ->
             AppTab(
                 selected = selected == mode,
                 modifier = Modifier.testTag("recordings-mode-${mode.name.lowercase()}"),
                 label = stringResource(
                     when (mode) {
-                        DvrLibraryMode.ARCHIVE -> R.string.recordings_archive
+                        DvrLibraryMode.ARCHIVE -> R.string.recordings_browse
                         DvrLibraryMode.SCHEDULE -> R.string.recordings_schedule
                         DvrLibraryMode.PROBLEMS -> R.string.recordings_problems
                     }
@@ -237,10 +244,79 @@ internal fun RecordingModeTabs(
                 onFocus = { onFocused(mode) },
                 onClick = { onClick(mode) },
                 // Nothing focusable follows the tabs in the header row.
-                last = mode == DvrLibraryMode.entries.last(),
+                last = mode == modes.last(),
+                trailing = if (mode == DvrLibraryMode.PROBLEMS && problemCount > 0) {
+                    {
+                        Box(Modifier.testTag("recordings-problems-badge")) {
+                            NavigationDrawerItemDefaults.TrailingBadge(
+                                text = problemCount.toString(),
+                                containerColor = MaterialTheme.colorScheme.error,
+                                contentColor = MaterialTheme.colorScheme.onError,
+                            )
+                        }
+                    }
+                } else null,
             )
         }
     }
+}
+
+private val FolderRecordingDotRadius = 5.dp
+private val FolderRecordingDotGap = 1.5.dp
+
+/**
+ * The red dot of a folder holding a running recording: the channel rows' 10 dp recording dot on the
+ * icon's top-right corner, cut out of the icon by a thin gap.
+ */
+private fun Modifier.folderRecordingDot(focused: () -> Boolean): Modifier {
+    val center = { size: Size -> Offset(size.width * 0.915f, size.height * 0.25f) }
+    return drawWithContent {
+        drawContent()
+        drawCircle(recordingMarkColor(focused()), radius = FolderRecordingDotRadius.toPx(), center = center(size))
+    }
+        .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
+        .drawWithContent {
+            drawContent()
+            drawCircle(Color.Black, radius = (FolderRecordingDotRadius + FolderRecordingDotGap).toPx(),
+                center = center(size), blendMode = BlendMode.Clear)
+        }
+}
+
+/** The Recording now folder: how many recordings are running, with the recording dot on its folder icon. */
+@Composable
+internal fun RecordingNowFolderRow(
+    recordingCount: Int,
+    modifier: Modifier,
+    onClick: () -> Unit,
+) {
+    val owner = LocalTabOwner.current
+    var focused by remember { mutableStateOf(false) }
+    ListItem(
+        selected = false,
+        onClick = { if (owner?.isCurrent != false) onClick() },
+        headlineContent = {
+            Text(stringResource(R.string.recordings_recording_now), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        },
+        supportingContent = {
+            Text(pluralStringResource(R.plurals.recordings_in_progress_count, recordingCount, recordingCount),
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
+        },
+        leadingContent = {
+            Icon(
+                painterResource(R.drawable.ic_folder),
+                contentDescription = null,
+                modifier = Modifier.size(32.dp).folderRecordingDot { focused },
+            )
+        },
+        trailingContent = {
+            Icon(painterResource(R.drawable.ic_keyboard_arrow_right), contentDescription = null)
+        },
+        modifier = modifier
+            .tabFocus()
+            .fillMaxWidth()
+            .onFocusChanged { focused = it.isFocused }
+            .testTag("recordings-recording-now-folder"),
+    )
 }
 
 /**
@@ -255,7 +331,13 @@ internal fun FolderListRow(
     onClick: () -> Unit,
     resumePosition: (DvrEntry) -> Duration? = { null },
     onOpenContextMenu: (() -> Unit)? = null,
+    /** A channel folder shows the channel's logo where other folders show the folder icon. */
+    picon: ChannelIcon? = null,
+    /** Optional genre colors; other folders keep the native icon tint in both states. */
+    iconTint: Color? = null,
+    focusedIconTint: Color? = null,
 ) {
+    var focused by remember { mutableStateOf(false) }
     val summary = remember(folder) { summarizeDvrFolder(folder) }
     val latestResumePosition by rememberUpdatedState(resumePosition)
     // Resume positions arrive with the entries, so a new folder is the only reason to count again.
@@ -265,6 +347,8 @@ internal fun FolderListRow(
         watched == summary.recordingCount -> RecordingWatchState.Watched
         else -> RecordingWatchState.PartlyWatched(watched.toDouble() / summary.recordingCount)
     }
+    // A running recording anywhere below the folder puts the red dot on the folder's icon or logo.
+    val hasRunning = remember(folder) { folder.runningRecordings().isNotEmpty() }
     val owner = LocalTabOwner.current
     val contextMenu = at.bernhardberger.tvhplayer.ui.components.rememberBrowseContextMenuTrigger(
         onOpenContextMenu, enabled = { owner?.isCurrent != false })
@@ -307,12 +391,26 @@ internal fun FolderListRow(
             )
         },
         leadingContent = {
-            Icon(
-                painter = painterResource(R.drawable.ic_folder),
-                contentDescription = null,
-                tint = androidx.tv.material3.LocalContentColor.current,
-                modifier = Modifier.size(32.dp),
-            )
+            // The dot sits on a box of its own so the logo keeps its tag.
+            val dot = if (hasRunning) Modifier.folderRecordingDot { focused }.testTag("recordings-folder-running-$tag")
+                else Modifier
+            Box(dot) {
+                if (folder.channelId != null) {
+                    PiconBox(
+                        piconPath = picon,
+                        placeholderTint = androidx.tv.material3.LocalContentColor.current,
+                        ground = if (focused) MaterialTheme.colorScheme.inverseSurface else MaterialTheme.colorScheme.background,
+                        prefetchGround = if (focused) MaterialTheme.colorScheme.background else MaterialTheme.colorScheme.inverseSurface,
+                        modifier = Modifier.size(32.dp).testTag("recordings-folder-logo-$tag"),
+                    )
+                } else Icon(
+                    painter = painterResource(R.drawable.ic_folder),
+                    contentDescription = null,
+                    tint = (if (focused) focusedIconTint else iconTint)
+                        ?: androidx.tv.material3.LocalContentColor.current,
+                    modifier = Modifier.size(32.dp),
+                )
+            }
         },
         trailingContent = {
             Icon(painterResource(R.drawable.ic_keyboard_arrow_right), contentDescription = null)
@@ -321,61 +419,29 @@ internal fun FolderListRow(
             .tabFocus()
             .fillMaxWidth()
             .testTag("recordings-folder-$tag")
-            .then(contextMenu.modifier),
+            .then(contextMenu.modifier)
+            .onFocusChanged { focused = it.isFocused },
     )
 }
 
-private val RecordingNowDotRadius = 5.dp
-private val RecordingNowDotGap = 1.5.dp
-
+/**
+ * The shared section label that opens a day or month in the flat list. It is only drawn:
+ * the recording row under it is the focus stop, so Down from a day's last row lands on the next day's first.
+ */
 @Composable
-internal fun RecordingNowFolderRow(
-    recordingCount: Int,
-    modifier: Modifier,
-    onClick: () -> Unit,
-) {
-    val owner = LocalTabOwner.current
-    var focused by remember { mutableStateOf(false) }
-    ListItem(
-        selected = false,
-        onClick = { if (owner?.isCurrent != false) onClick() },
-        headlineContent = {
-            Text(stringResource(R.string.recordings_recording_now_folder), maxLines = 1, overflow = TextOverflow.Ellipsis)
-        },
-        supportingContent = {
-            Text(pluralStringResource(R.plurals.recordings_in_progress_count, recordingCount, recordingCount),
-                maxLines = 1, overflow = TextOverflow.Ellipsis)
-        },
-        leadingContent = {
-            // The red dot sits on the folder's top-right corner, cut out of the folder by a thin gap. It
-            // is the channel rows' 10dp recording dot.
-            val dotCenter = { size: Size -> Offset(size.width * 0.915f, size.height * 0.25f) }
-            Icon(
-                painterResource(R.drawable.ic_folder),
-                contentDescription = null,
-                tint = androidx.tv.material3.LocalContentColor.current,
-                modifier = Modifier
-                    .size(32.dp)
-                    .drawWithContent {
-                        drawContent()
-                        drawCircle(recordingMarkColor(focused), radius = RecordingNowDotRadius.toPx(), center = dotCenter(size))
-                    }
-                    .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
-                    .drawWithContent {
-                        drawContent()
-                        drawCircle(Color.Black, radius = (RecordingNowDotRadius + RecordingNowDotGap).toPx(), center = dotCenter(size), blendMode = BlendMode.Clear)
-                    },
-            )
-        },
-        trailingContent = {
-            Icon(painterResource(R.drawable.ic_keyboard_arrow_right), contentDescription = null)
-        },
-        modifier = modifier
-            .tabFocus()
-            .fillMaxWidth()
-            .onFocusChanged { focused = it.isFocused }
-            .testTag("recordings-recording-now-folder"),
-    )
+internal fun ArchiveDateDivider(label: String, first: Boolean, modifier: Modifier = Modifier) {
+    // Keep the first date band's occupied height: changing label typography must not move its row.
+    val firstBandHeight = if (first) {
+        val previousLabelHeight = rememberTextMeasurer().measure(
+            label, style = MaterialTheme.typography.titleSmall, maxLines = 1,
+        ).size.height
+        with(LocalDensity.current) { previousLabelHeight.toDp() } + TvSpacing4
+    } else 0.dp
+    Box(modifier.then(if (first) Modifier.heightIn(min = firstBandHeight) else Modifier)) {
+        at.bernhardberger.tvhplayer.ui.components.ListSectionLabel(
+            label, Modifier.testTag("archive-date-divider"), first = first,
+        )
+    }
 }
 
 /**
@@ -687,10 +753,7 @@ internal fun RecordingSchedule(
             ) {
                 groups.forEachIndexed { index, section ->
                     item(key = "header-${section.kind}-${section.date}") {
-                        RecordingSectionHeader(
-                            text = scheduleSectionLabel(section),
-                            first = index == 0,
-                        )
+                        RecordingSectionHeader(text = scheduleSectionLabel(section), first = index == 0)
                     }
                     items(section.entries, key = { recordingItemKey(it.id) }) { entry ->
                         val rowKey = "recording:${recordingItemKey(entry.id)}"
@@ -1015,9 +1078,9 @@ private fun RecordingSectionHeader(
 }
 
 /**
- * The row's overline: the programme start and length (a running recording says when it stops), then
- * symbols for an early stop, a failure or a cancellation whose words are read out by accessibility
- * services. Only a failure is drawn in the error colour; the others stay muted.
+ * The row's overline: the programme start, length (a running recording says when it stops) and
+ * finished file size, then symbols for an early stop, a failure or a cancellation whose words are
+ * read out by accessibility services. Only a failure is drawn in the error colour; the others stay muted.
  */
 @Composable
 private fun RecordingOverline(entry: DvrEntry, focused: Boolean) {
@@ -1029,6 +1092,9 @@ private fun RecordingOverline(entry: DvrEntry, focused: Boolean) {
         entry.start?.epochSeconds.recordingDateTime(androidx.compose.ui.platform.LocalConfiguration.current.locales[0])
             .takeIf(String::isNotBlank)?.let(::add)
         recordingLengthLabel(entry)?.let(::add)
+        if (!recordingIsRunning(entry) && entry.state != DvrEntryState.SCHEDULED) {
+            recordingSizeBytes(entry)?.takeIf { it > 0 }?.let { add(formatFileSize(it, LocalContext.current)) }
+        }
     }.joinToString(" • ")
     val marks = buildList {
         if (recordingIsRunning(entry)) return@buildList

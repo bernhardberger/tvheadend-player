@@ -31,6 +31,10 @@
 - With more than one connection, *Channel groups* and *Stream profile* name the connection they apply to.
 - Recent channels, the *Continue watching* order, channel tags, channel aspect settings, the selected stream profile and audio choices start fresh after this update; they are now kept per connection.
 
+### Recordings
+
+- Recordings > Archive can group by folders, channels, genres or none.
+
 ### Guide
 
 - With channel numbers turned off and a logo on every channel in the list, the channel column shrinks to the logo and the timeline gets the freed width.

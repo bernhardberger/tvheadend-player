@@ -196,7 +196,7 @@ class TvFocusArrivalLookTest {
         assertLooksAsWhenRefocused(paged, Key.DirectionDown, Key.DirectionUp)
     }
 
-    @Test fun recordingTabLooksFocusedWhenAnEmptyLibraryIsPrepared() {
+    @Test fun recordingPillLooksFocusedWhenAnEmptyLibraryIsPrepared() {
         leaveTouchModeBeforeComposing()
         val session = FakeTvheadendSession(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
@@ -218,7 +218,7 @@ class TvFocusArrivalLookTest {
         }
         compose.awaitBrowsePreparation()
         compose.settleFrames(1, frameMillis = 1000)
-        assertLooksAsWhenRefocused("recordings-mode-archive", Key.DirectionRight, Key.DirectionLeft)
+        assertLightFill(compose.onNodeWithTag("recordings-mode-archive"), "Browse tab")
     }
 
     @Test fun selectedAudioRowLooksFocusedWhenItsPageOpensBelowTheViewport() {

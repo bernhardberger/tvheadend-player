@@ -38,6 +38,8 @@ import at.bernhardberger.tvhplayer.ui.screens.BrowsePanelList
 import at.bernhardberger.tvhplayer.ui.screens.BrowseSidePanel
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideFilterPanel
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideTimePanel
+import at.bernhardberger.tvhplayer.ui.screens.guide.GuideViewOptionsPanel
+import at.bernhardberger.tvhplayer.settings.GuideView
 import java.time.Instant
 import kotlin.time.Instant as KotlinInstant
 import java.time.ZoneId
@@ -176,19 +178,18 @@ class PlaybackPanelCaptureTest {
     }
 
     @OptIn(ExperimentalTestApi::class)
-    @Test fun guideTimeTwoLists() {
+    @Test fun guideTimeRootAndLevel() {
         val now = Instant.parse("2026-11-03T12:00:00Z").epochSecond
         panelScene {
             GuideTimePanel(now, now + 7200, GuideWindowBounds(now - 21600, now + 7 * 86400), ZoneId.of("UTC"), { now }, {}, {}, {})
         }
         compose.onNodeWithTag("guide-time-day-0").assertIsFocused()
+        val rootList = compose.onAllNodes(SemanticsMatcher.keyIsDefined(ListBottomFadeVisible)).fetchSemanticsNodes()
+        assertEquals(1, rootList.size)
+        assertTrue("Day list scrolls", rootList.first().config[ListBottomFadeVisible])
         compose.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
         compose.waitForIdle()
         compose.onNodeWithTag("guide-time-preset-12").assertIsFocused()
-        val lists = compose.onAllNodes(SemanticsMatcher.keyIsDefined(ListBottomFadeVisible)).fetchSemanticsNodes()
-        assertEquals(2, lists.size)
-        assertTrue("Both panes have width", lists.all { it.boundsInRoot.width > 300f })
-        assertTrue("Day list scrolls", lists.first().config[ListBottomFadeVisible])
         compose.onRoot().performKeyInput { repeat(4) { pressKey(Key.DirectionDown) } }
         compose.waitForIdle()
         compose.onNodeWithTag("guide-time-preset-22").assertIsFocused()
@@ -212,6 +213,32 @@ class PlaybackPanelCaptureTest {
         }
         compose.onNodeWithTag("playback-options-track-automatic").assertIsFocused()
         assertTrue(compose.onNodeWithTag("playback-options-track-list").fetchSemanticsNode().config[ListBottomFadeVisible])
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test fun playerRootAndAudioLevel() {
+        panelScene {
+            var page by remember { mutableStateOf(PlaybackOptionsPage.ROOT) }
+            PlaybackOptionsSheet(page,
+                PlaybackOptionsTrackListTest.player(PlaybackOptionsTrackListTest.orfTracks()),
+                false, AspectRatioMode.FIT, false, { page = it }, {}, {}, audioAutomatic = true, onAutomaticAudio = {})
+        }
+        compose.onNodeWithTag("playback-options-audio").assertIsFocused()
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
+        compose.waitForIdle()
+        compose.onNodeWithTag("playback-options-track-automatic").assertIsFocused()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test fun guideViewRootAndRowsLevel() {
+        panelScene {
+            var options by remember { mutableStateOf(GuideView()) }
+            GuideViewOptionsPanel(options, { options = it }, {})
+        }
+        compose.onNodeWithTag("guide-view-rows").assertIsFocused()
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
+        compose.waitForIdle()
+        compose.onNodeWithTag("guide-view-rows-dense").assertIsFocused()
     }
 
     /** Match the browse shell, early-morning bounds and 12-hour clock of the integrated report. */

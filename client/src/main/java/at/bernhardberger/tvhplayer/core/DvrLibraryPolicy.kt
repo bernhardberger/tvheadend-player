@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.core
 
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrConfigId
 import at.bernhardberger.tvheadend.sdk.core.DvrConfiguration
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
@@ -44,6 +45,10 @@ data class DvrArchiveFolder(
     val path: List<String>,
     val folders: List<DvrArchiveFolder>,
     val recordings: List<DvrEntry>,
+    /** A channel group's channel, for its logo; null for every other folder. */
+    val channelId: ChannelId? = null,
+    /** A named genre group's category; never inferred from its display name. */
+    val genreCategory: ProgrammeCategory? = null,
 ) {
     val newestRecordingStart: Long?
         get() = (recordings.mapNotNull { it.start?.epochSeconds } +
@@ -52,7 +57,7 @@ data class DvrArchiveFolder(
 
     fun folderAt(targetPath: List<String>): DvrArchiveFolder? {
         if (targetPath.isEmpty()) return this
-        val child = folders.firstOrNull { it.name == targetPath.first() } ?: return null
+        val child = folders.firstOrNull { it.path.lastOrNull() == targetPath.first() } ?: return null
         return child.folderAt(targetPath.drop(1))
     }
 }
@@ -91,11 +96,27 @@ fun DvrArchiveFolder.allRecordings(): List<DvrEntry> = descendantRecordings()
  * since there is still something to see.
  */
 fun DvrArchiveFolder.watchedCount(resumePosition: (DvrEntry) -> Duration?): Int =
-    descendantRecordings().count { recordingWatchState(it, resumePosition(it), nowSec = 0L) == RecordingWatchState.Watched }
+    descendantRecordings().count { recordingWatchedToEnd(it, resumePosition(it)) }
+
+/** Watched to the end by the rule behind the check mark; a saved position means partly watched. */
+fun recordingWatchedToEnd(entry: DvrEntry, resumePosition: Duration?): Boolean =
+    recordingWatchState(entry, resumePosition, nowSec = 0L) == RecordingWatchState.Watched
 
 fun DvrArchiveFolder.runningRecordings(): List<DvrEntry> =
     descendantRecordings().filter(::recordingIsRunning)
         .sortedBy { it.start?.epochSeconds ?: Long.MAX_VALUE }
+
+/**
+ * What the Recording now folder at the top of the Folders root lists: the running recordings below
+ * [this] root, oldest start first. Other groupings, deeper folders and a view that turned the folder
+ * off have none, and without a running recording there is no folder.
+ */
+fun DvrArchiveFolder.recordingNowEntries(view: DvrArchiveView): List<DvrEntry> =
+    if (view.grouping == DvrArchiveGrouping.FOLDERS && view.recordingNowFolder && path.isEmpty()) {
+        runningRecordings()
+    } else {
+        emptyList()
+    }
 
 fun chooseDvrConfig(configs: List<DvrConfiguration>, preferredId: DvrConfigId? = null): DvrConfigId? =
     (configs.firstOrNull { it.id == preferredId } ?: configs.firstOrNull { it.name.isBlank() } ?: configs.firstOrNull())?.id

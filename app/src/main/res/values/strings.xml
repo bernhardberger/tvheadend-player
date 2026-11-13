@@ -320,7 +320,8 @@
     <string name="recording_space_title">Recording space</string>
     <!-- Recording storage line. %1$s = free space, %2$s = total space, both like "120 GB". -->
     <string name="recording_space_value">%1$s free of %2$s</string>
-    <string name="recording_space_line_description">Recording space: %1$s</string>
+    <string name="recording_space_unknown">Disk space unknown</string>
+    <string name="recording_space_description">%1$s free of %2$s, %3$d%% used</string>
     <string name="recording_confirmation_profile">Recording profile: %1$s</string>
     <string name="recording_confirmation_owner">Recording owner: %1$s</string>
     <!-- Menu action on a channel or program: start watching it now. Imperative verb. Max 14. -->
@@ -833,17 +834,53 @@
     <string name="recording_action_connection">Not connected to the server.</string>
     <string name="recording_already_scheduled">This program is recording or scheduled.</string>
     <string name="recordings_title">Recordings</string>
-    <string name="recordings_archive">Archive</string>
+    <!-- Recordings tab listing the recorded library. Verb used as a noun. Max 14. -->
+    <string name="recordings_browse">Browse</string>
     <string name="recordings_archive_all">All recordings</string>
-    <string name="recordings_recording_now_folder">Recording now</string>
-    <!-- Recordings screen status line. -->
-    <plurals name="recordings_in_progress_count">
-        <item quantity="one">%1$d recording in progress</item>
-        <item quantity="other">%1$d recordings in progress</item>
-    </plurals>
     <string name="recordings_schedule">Schedule</string>
     <!-- Recordings tab listing failed, missed and broken recordings. Noun. Max 14. -->
     <string name="recordings_problems">Problems</string>
+    <!-- Browse grouping: the View options choice and its four options; the Browse root is headed by the grouping name. -->
+    <string name="recordings_grouping_group_by">Group by</string>
+    <string name="recordings_grouping_folders">Folders</string>
+    <string name="recordings_grouping_channels">Channels</string>
+    <string name="recordings_grouping_genres">Genres</string>
+    <string name="recordings_grouping_flat">Flat</string>
+    <string name="recordings_grouping_folders_detail">The server\'s folder tree</string>
+    <string name="recordings_grouping_channels_detail">A folder per channel</string>
+    <string name="recordings_grouping_genres_detail">A folder per genre</string>
+    <string name="recordings_grouping_none_detail">One list, no folders</string>
+    <!-- Archive view options: the sort order, the filter and the empty state the filter can cause. -->
+    <string name="recordings_sort_title">Sort</string>
+    <string name="recordings_sort_newest">Newest first</string>
+    <string name="recordings_sort_oldest">Oldest first</string>
+    <string name="recordings_sort_name">Name A–Z</string>
+    <string name="recordings_sort_name_descending">Name Z–A</string>
+    <string name="recordings_sort_largest">Largest first</string>
+    <string name="recordings_sort_smallest">Smallest first</string>
+    <!-- The Show choice and its options: which recordings Browse lists. -->
+    <string name="recordings_show_title">Show</string>
+    <string name="recordings_show_option_all">All</string>
+    <string name="recordings_show_unwatched">Unwatched</string>
+    <string name="recordings_show_partially_watched">Partially watched</string>
+    <string name="recordings_show_watched">Watched</string>
+    <string name="recordings_show_unwatched_detail">Not played to the end</string>
+    <string name="recordings_show_partially_watched_detail">Started but not finished</string>
+    <string name="recordings_show_watched_detail">Played to the end</string>
+    <!-- Empty states when the Show filter hides everything, then the count of hidden recordings. -->
+    <string name="recordings_empty_not_watched_root">Everything here has been played.</string>
+    <string name="recordings_empty_not_watched_folder">Everything in this folder has been played.</string>
+    <string name="recordings_empty_started">Nothing started yet.</string>
+    <string name="recordings_empty_watched">Nothing has been watched to the end yet.</string>
+    <plurals name="recordings_hidden_count">
+        <item quantity="one">%1$d recording is hidden.</item>
+        <item quantity="other">%1$d recordings are hidden.</item>
+    </plurals>
+    <string name="recordings_group_no_channel">No channel</string>
+    <string name="recordings_group_no_genre">No genre</string>
+    <string name="recordings_date_today">Today</string>
+    <string name="recordings_date_yesterday">Yesterday</string>
+    <string name="recordings_date_unknown">Unknown date</string>
     <string name="recordings_archive_empty">No playable recordings in this folder.</string>
     <string name="recordings_schedule_empty">Nothing is recording or scheduled.</string>
     <string name="recordings_problems_empty">No recording problems.</string>
@@ -860,6 +897,13 @@
     <string name="recording_watched">Watched</string>
     <string name="recording_partly_watched">Partly watched</string>
     <string name="recordings_recording_now">Recording now</string>
+    <!-- View options switch: whether the Folders root opens with a Recording now folder of every running recording. -->
+    <string name="recordings_recording_now_folder">Recording now folder</string>
+    <!-- Line under the Recording now folder. -->
+    <plurals name="recordings_in_progress_count">
+        <item quantity="one">%1$d recording in progress</item>
+        <item quantity="other">%1$d recordings in progress</item>
+    </plurals>
     <string name="recordings_schedule_end_duration">until %1$s • %2$s</string>
     <string name="recordings_failed">Failed</string>
     <string name="recordings_cancelled">Canceled</string>

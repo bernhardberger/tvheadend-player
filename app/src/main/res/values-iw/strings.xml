@@ -24,7 +24,6 @@
     <string name="recording_profile_default">פרופיל ברירת המחדל</string>
     <string name="recording_space_title">אחסון הקלטות</string>
     <string name="recording_space_value">%1$s פנויים מתוך %2$s</string>
-    <string name="recording_space_line_description">אחסון הקלטות: %1$s</string>
     <string name="recording_confirmation_profile">פרופיל הקלטה: %1$s</string>
     <string name="recording_confirmation_owner">בעל ההקלטה: %1$s</string>
     <string name="context_watch">צפייה</string>
@@ -392,14 +391,7 @@
     <string name="recording_action_connection">אין חיבור לשרת.</string>
     <string name="recording_already_scheduled">התוכנית כבר מוקלטת או מתוזמנת להקלטה.</string>
     <string name="recordings_title">הקלטות</string>
-    <string name="recordings_archive">ארכיון</string>
     <string name="recordings_archive_all">כל ההקלטות</string>
-    <string name="recordings_recording_now_folder">הקלטה פעילה</string>
-    <plurals name="recordings_in_progress_count">
-        <item quantity="one">%1$d הקלטה פעילה</item>
-        <item quantity="two">%1$d הקלטות פעילות</item>
-        <item quantity="other">%1$d הקלטות פעילות</item>
-    </plurals>
     <string name="recordings_schedule">לוח הקלטות</string>
     <string name="recordings_problems">בעיות</string>
     <string name="recordings_archive_empty">אין הקלטות שניתן להפעיל בתיקייה זו.</string>

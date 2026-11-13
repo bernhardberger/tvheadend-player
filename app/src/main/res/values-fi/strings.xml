@@ -24,7 +24,6 @@
     <string name="recording_profile_default">Oletusprofiili</string>
     <string name="recording_space_title">Tallennustila</string>
     <string name="recording_space_value">%1$s vapaana, yhteensä %2$s</string>
-    <string name="recording_space_line_description">Tallennustila: %1$s</string>
     <string name="recording_confirmation_profile">Tallennusprofiili: %1$s</string>
     <string name="recording_confirmation_owner">Tallenteen omistaja: %1$s</string>
     <string name="context_watch">Katso</string>
@@ -388,13 +387,7 @@
     <string name="recording_action_connection">Ei yhteyttä palvelimeen.</string>
     <string name="recording_already_scheduled">Tätä ohjelmaa tallennetaan jo tai sen tallennus on ajastettu.</string>
     <string name="recordings_title">Tallenteet</string>
-    <string name="recordings_archive">Arkisto</string>
     <string name="recordings_archive_all">Kaikki tallenteet</string>
-    <string name="recordings_recording_now_folder">Tallennetaan nyt</string>
-    <plurals name="recordings_in_progress_count">
-        <item quantity="one">%1$d tallennus käynnissä</item>
-        <item quantity="other">%1$d tallennusta käynnissä</item>
-    </plurals>
     <string name="recordings_schedule">Ajastukset</string>
     <string name="recordings_problems">Ongelmat</string>
     <string name="recordings_archive_empty">Tässä kansiossa ei ole toistettavia tallenteita.</string>

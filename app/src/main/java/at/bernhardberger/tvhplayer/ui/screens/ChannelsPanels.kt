@@ -33,15 +33,13 @@ internal fun ChannelsTagsPanel(
             ))
         }
     }
-    BrowseSidePanel(stringResource(R.string.browse_tags), "channels-tags-panel", onClose) {
-        BrowsePanelList(entries, radio = false)
-    }
+    BrowseLevelsPanel(stringResource(R.string.browse_tags), "channels-tags-panel", onClose, entries)
 }
 
 /**
- * View options: the layouts, then the current layout's program art and channel names switches
- * where it has them. Each
- * change applies at once; Back closes the panel.
+ * View options: the layout opens a level of its three choices, then the current layout's program
+ * art and channel names switches sit on the root where it has them. Each change applies at once;
+ * Back steps out of the level, then closes the panel.
  */
 @Composable
 internal fun ChannelsViewOptionsPanel(
@@ -49,17 +47,27 @@ internal fun ChannelsViewOptionsPanel(
     onViewChange: (ChannelsView) -> Unit,
     onClose: () -> Unit,
 ) {
+    val layoutTitle = stringResource(R.string.channels_view_layout)
     val entries = buildList {
-        add(BrowsePanelEntry.Section(stringResource(R.string.channels_view_layout)))
-        ChannelsLayout.entries.forEach { layout ->
-            add(BrowsePanelEntry.Choice(
-                key = "channels-view-layout-${layout.name.lowercase()}",
-                label = stringResource(layout.label()),
-                selected = layout == view.layout,
-                onClick = { onViewChange(view.copy(layout = layout)) },
-                icon = layout.icon(),
-            ))
-        }
+        add(BrowsePanelEntry.Choice(
+            key = "channels-view-layout",
+            label = layoutTitle,
+            selected = false,
+            onClick = {},
+            level = BrowsePanelLevel(
+                title = layoutTitle,
+                currentValue = stringResource(view.layout.label()),
+                entries = ChannelsLayout.entries.map { layout ->
+                    BrowsePanelEntry.Choice(
+                        key = "channels-view-layout-${layout.name.lowercase()}",
+                        label = stringResource(layout.label()),
+                        selected = layout == view.layout,
+                        onClick = { onViewChange(view.copy(layout = layout)) },
+                        icon = layout.icon(),
+                    )
+                },
+            ),
+        ))
         view.layout.optionsTitle()?.let { title ->
             add(BrowsePanelEntry.Divider)
             add(BrowsePanelEntry.Section(stringResource(title)))
@@ -79,9 +87,7 @@ internal fun ChannelsViewOptionsPanel(
             ))
         }
     }
-    BrowseSidePanel(stringResource(R.string.channels_view_options), "channels-view-panel", onClose) {
-        BrowsePanelList(entries, radio = true)
-    }
+    BrowseLevelsPanel(stringResource(R.string.channels_view_options), "channels-view-panel", onClose, entries)
 }
 
 private fun ChannelsLayout.label(): Int = when (this) {

@@ -24,7 +24,6 @@
     <string name="recording_profile_default">Profilo predefinito</string>
     <string name="recording_space_title">Spazio per le registrazioni</string>
     <string name="recording_space_value">%1$s liberi su %2$s</string>
-    <string name="recording_space_line_description">Spazio per le registrazioni: %1$s</string>
     <string name="recording_confirmation_profile">Profilo di registrazione: %1$s</string>
     <string name="recording_confirmation_owner">Proprietario della registrazione: %1$s</string>
     <string name="context_watch">Guarda</string>
@@ -392,14 +391,7 @@
     <string name="recording_action_connection">Non connesso al server.</string>
     <string name="recording_already_scheduled">Questo programma è in registrazione o è già programmato per la registrazione.</string>
     <string name="recordings_title">Registrazioni</string>
-    <string name="recordings_archive">Archivio</string>
     <string name="recordings_archive_all">Tutte le registrazioni</string>
-    <string name="recordings_recording_now_folder">Registrazione in corso</string>
-    <plurals name="recordings_in_progress_count">
-        <item quantity="one">%1$d registrazione in corso</item>
-        <item quantity="many">%1$d registrazioni in corso</item>
-        <item quantity="other">%1$d registrazioni in corso</item>
-    </plurals>
     <string name="recordings_schedule">Programmazione</string>
     <string name="recordings_problems">Problemi</string>
     <string name="recordings_archive_empty">Nessuna registrazione riproducibile in questa cartella.</string>

@@ -354,15 +354,21 @@ class SettingsDepthNavigationTest {
         val downCount = when (tag) {
             "stats" -> 0
             "channels-view-program-art" -> 1
-            "channels-view-channel-names", "guide-view-headline" -> 2
-            else -> 3
+            "guide-view-headline" -> 1
+            else -> 2
         }
         if (tag.startsWith("channels")) {
+            press(Key.DirectionRight)
             assertAccessibleChoice("channels-view-layout-grid", selected = true)
             assertAccessibleChoice("channels-view-layout-list", selected = false)
+            press(Key.DirectionLeft)
+            compose.onNodeWithTag("channels-view-layout").assertIsFocused()
         } else if (tag.startsWith("guide")) {
+            press(Key.DirectionRight)
             assertAccessibleChoice("guide-view-rows-regular", selected = true)
             assertAccessibleChoice("guide-view-rows-dense", selected = false)
+            press(Key.DirectionLeft)
+            compose.onNodeWithTag("guide-view-rows").assertIsFocused()
         }
         repeat(downCount) { press(Key.DirectionDown) }
     }

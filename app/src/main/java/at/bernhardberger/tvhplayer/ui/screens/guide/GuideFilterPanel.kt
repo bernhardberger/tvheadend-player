@@ -6,8 +6,7 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ProgrammeCategory
 import at.bernhardberger.tvhplayer.ui.common.programmeCategoryLabel
 import at.bernhardberger.tvhplayer.ui.screens.BrowsePanelEntry
-import at.bernhardberger.tvhplayer.ui.screens.BrowsePanelList
-import at.bernhardberger.tvhplayer.ui.screens.BrowseSidePanel
+import at.bernhardberger.tvhplayer.ui.screens.BrowseLevelsPanel
 import at.bernhardberger.tvhplayer.ui.tvGenreColors
 
 /**
@@ -30,7 +29,5 @@ internal fun GuideFilterPanel(
             dot = if (genreColors) tvGenreColors(category)?.base else null,
         )
     }
-    BrowseSidePanel(stringResource(R.string.guide_filter_title), "guide-genre-panel", onClose) {
-        BrowsePanelList(entries, radio = false)
-    }
+    BrowseLevelsPanel(stringResource(R.string.guide_filter_title), "guide-genre-panel", onClose, entries)
 }

@@ -215,6 +215,8 @@ internal fun RecordingsRouteContent(
     state: RecordingsScreenState,
     playingRecordingId: at.bernhardberger.tvheadend.sdk.core.DvrEntryId? = null,
     onReturnToRecording: (at.bernhardberger.tvheadend.sdk.core.DvrEntryId, () -> Unit) -> Boolean = { _, _ -> false },
+    view: at.bernhardberger.tvhplayer.core.DvrArchiveView = at.bernhardberger.tvhplayer.core.DvrArchiveView(),
+    onViewChange: (at.bernhardberger.tvhplayer.core.DvrArchiveView) -> Unit = {},
 ) {
     if (contentAllowed) {
         ContentContainer(modifier = Modifier.profileLayout("recordings")) {
@@ -232,6 +234,8 @@ internal fun RecordingsRouteContent(
                 state = state,
                 playingRecordingId = playingRecordingId,
                 onReturnToRecording = onReturnToRecording,
+                view = view,
+                onViewChange = onViewChange,
             )
         }
     }

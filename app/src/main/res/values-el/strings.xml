@@ -24,7 +24,6 @@
     <string name="recording_profile_default">Προεπιλεγμένο προφίλ</string>
     <string name="recording_space_title">Χώρος εγγραφών</string>
     <string name="recording_space_value">%1$s ελεύθερα από %2$s</string>
-    <string name="recording_space_line_description">Χώρος εγγραφών: %1$s</string>
     <string name="recording_confirmation_profile">Προφίλ εγγραφής: %1$s</string>
     <string name="recording_confirmation_owner">Κάτοχος εγγραφής: %1$s</string>
     <string name="context_watch">Προβολή</string>
@@ -388,13 +387,7 @@
     <string name="recording_action_connection">Δεν υπάρχει σύνδεση με τον διακομιστή.</string>
     <string name="recording_already_scheduled">Αυτή η εκπομπή εγγράφεται ή έχει προγραμματιστεί για εγγραφή.</string>
     <string name="recordings_title">Εγγραφές</string>
-    <string name="recordings_archive">Αρχείο</string>
     <string name="recordings_archive_all">Όλες οι εγγραφές</string>
-    <string name="recordings_recording_now_folder">Εγγραφή τώρα</string>
-    <plurals name="recordings_in_progress_count">
-        <item quantity="one">%1$d εγγραφή σε εξέλιξη</item>
-        <item quantity="other">%1$d εγγραφές σε εξέλιξη</item>
-    </plurals>
     <string name="recordings_schedule">Προγραμματισμένες</string>
     <string name="recordings_problems">Προβλήματα</string>
     <string name="recordings_archive_empty">Δεν υπάρχουν εγγραφές για αναπαραγωγή σε αυτόν τον φάκελο.</string>

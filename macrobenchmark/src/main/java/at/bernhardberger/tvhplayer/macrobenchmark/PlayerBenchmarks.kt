@@ -106,11 +106,12 @@ class PlayerBenchmarks {
 
     @Test fun recordingsTabs() = interaction("P44:measure:recordings", setup = {
         navigate("nav-recordings", "recordings-header")
-        await(By.res("recordings-mode-tabs").hasDescendant(By.focused(true)), "Start on a recordings tab")
+        await(By.res("recordings-pills"), "Recordings pills must draw")
     }) {
+        key(KeyEvent.KEYCODE_DPAD_UP)
         keys(KeyEvent.KEYCODE_DPAD_RIGHT, 2)
         keys(KeyEvent.KEYCODE_DPAD_LEFT, 2)
-        await(By.res("recordings-mode-tabs"), "Recordings tabs must remain visible")
+        await(By.res("recordings-pills"), "Recordings pills must remain visible")
     }
 
     @Test fun recordingsScroll() = interaction("P44:measure:recordings", setup = {

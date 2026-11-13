@@ -24,7 +24,6 @@
     <string name="recording_profile_default">Профиль по умолчанию</string>
     <string name="recording_space_title">Место для записей</string>
     <string name="recording_space_value">Свободно %1$s из %2$s</string>
-    <string name="recording_space_line_description">Место для записей: %1$s</string>
     <string name="recording_confirmation_profile">Профиль записи: %1$s</string>
     <string name="recording_confirmation_owner">Владелец записи: %1$s</string>
     <string name="context_watch">Смотреть</string>
@@ -396,15 +395,7 @@
     <string name="recording_action_connection">Нет подключения к серверу.</string>
     <string name="recording_already_scheduled">Эта передача записывается или запланирована для записи.</string>
     <string name="recordings_title">Записи</string>
-    <string name="recordings_archive">Архив</string>
     <string name="recordings_archive_all">Все записи</string>
-    <string name="recordings_recording_now_folder">Идёт запись</string>
-    <plurals name="recordings_in_progress_count">
-        <item quantity="one">%1$d запись выполняется</item>
-        <item quantity="few">%1$d записи выполняются</item>
-        <item quantity="many">%1$d записей выполняется</item>
-        <item quantity="other">%1$d записи выполняется</item>
-    </plurals>
     <string name="recordings_schedule">Расписание</string>
     <string name="recordings_problems">Проблемы</string>
     <string name="recordings_archive_empty">В этой папке нет записей для воспроизведения.</string>

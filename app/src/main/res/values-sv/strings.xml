@@ -24,7 +24,6 @@
     <string name="recording_profile_default">Standardprofil</string>
     <string name="recording_space_title">Inspelningsutrymme</string>
     <string name="recording_space_value">%1$s ledigt av %2$s</string>
-    <string name="recording_space_line_description">Inspelningsutrymme: %1$s</string>
     <string name="recording_confirmation_profile">Inspelningsprofil: %1$s</string>
     <string name="recording_confirmation_owner">Inspelningens ägare: %1$s</string>
     <string name="context_watch">Titta</string>
@@ -388,13 +387,7 @@
     <string name="recording_action_connection">Inte ansluten till servern.</string>
     <string name="recording_already_scheduled">Programmet spelas in eller är schemalagt.</string>
     <string name="recordings_title">Inspelningar</string>
-    <string name="recordings_archive">Arkiv</string>
     <string name="recordings_archive_all">Alla inspelningar</string>
-    <string name="recordings_recording_now_folder">Spelas in nu</string>
-    <plurals name="recordings_in_progress_count">
-        <item quantity="one">%1$d pågående inspelning</item>
-        <item quantity="other">%1$d pågående inspelningar</item>
-    </plurals>
     <string name="recordings_schedule">Schema</string>
     <string name="recordings_problems">Problem</string>
     <string name="recordings_archive_empty">Inga spelbara inspelningar i mappen.</string>

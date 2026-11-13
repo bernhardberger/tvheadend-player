@@ -24,7 +24,6 @@
     <string name="recording_profile_default">Standaardprofiel</string>
     <string name="recording_space_title">Opnameruimte</string>
     <string name="recording_space_value">%1$s vrij van %2$s</string>
-    <string name="recording_space_line_description">Opnameruimte: %1$s</string>
     <string name="recording_confirmation_profile">Opnameprofiel: %1$s</string>
     <string name="recording_confirmation_owner">Eigenaar van de opname: %1$s</string>
     <string name="context_watch">Kijken</string>
@@ -388,13 +387,7 @@
     <string name="recording_action_connection">Niet verbonden met de server.</string>
     <string name="recording_already_scheduled">Dit programma wordt opgenomen of staat gepland.</string>
     <string name="recordings_title">Opnamen</string>
-    <string name="recordings_archive">Archief</string>
     <string name="recordings_archive_all">Alle opnamen</string>
-    <string name="recordings_recording_now_folder">Wordt opgenomen</string>
-    <plurals name="recordings_in_progress_count">
-        <item quantity="one">%1$d opname bezig</item>
-        <item quantity="other">%1$d opnamen bezig</item>
-    </plurals>
     <string name="recordings_schedule">Planning</string>
     <string name="recordings_problems">Problemen</string>
     <string name="recordings_archive_empty">Geen afspeelbare opnamen in deze map.</string>

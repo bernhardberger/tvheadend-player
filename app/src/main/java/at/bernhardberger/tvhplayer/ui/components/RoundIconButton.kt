@@ -40,7 +40,7 @@ private val RoundIconButtonValueMaxWidth = 160.dp
  * A header icon button on a faint resting disc. With a [value] it grows into a pill naming it,
  * after the [dot] when given: tonal while the value is [active], on the resting tone otherwise.
  * Focus takes the library's focused styling and scale either way. TalkBack reads the [label] with
- * the value.
+ * the value, or [description] when given.
  */
 @Composable
 fun RoundIconButton(
@@ -53,8 +53,10 @@ fun RoundIconButton(
     value: String? = null,
     dot: Color? = null,
     active: Boolean = value != null,
+    description: String? = null,
 ) {
-    val description = value?.let { stringResource(R.string.header_button_value_description, label, it) } ?: label
+    val spoken = description
+        ?: value?.let { stringResource(R.string.header_button_value_description, label, it) } ?: label
     // One button for both states, so focus stays on it while its value comes and goes.
     Button(
         onClick = onClick,
@@ -74,7 +76,7 @@ fun RoundIconButton(
             .onFocusChanged { st ->
                 if (st.isFocused) onFocused()
             }
-            .semantics { contentDescription = description },
+            .semantics { contentDescription = spoken },
     ) {
         Icon(icon, contentDescription = null, Modifier.size(IconButtonDefaults.MediumIconSize))
         if (value != null) {

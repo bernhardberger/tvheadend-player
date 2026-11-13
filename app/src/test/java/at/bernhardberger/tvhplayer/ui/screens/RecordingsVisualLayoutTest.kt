@@ -2,15 +2,16 @@ package at.bernhardberger.tvhplayer.ui.screens
 
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
-import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import at.bernhardberger.tvhplayer.testutil.tagBounds
+import at.bernhardberger.tvhplayer.testutil.labelToFocusedFillGap
 import at.bernhardberger.tvhplayer.testutil.pressKey
 import at.bernhardberger.tvhplayer.testutil.settleFrames
-import org.junit.experimental.categories.Category
 
 import android.app.Application
 import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
+import at.bernhardberger.tvhplayer.ui.TvCardFocusedScale
+import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -25,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
@@ -37,6 +39,9 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
@@ -46,6 +51,11 @@ import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
+import at.bernhardberger.tvhplayer.core.DvrArchiveGrouping
+import at.bernhardberger.tvhplayer.core.DvrArchiveView
+import at.bernhardberger.tvhplayer.core.DvrArchiveSort
+import at.bernhardberger.tvhplayer.core.DvrArchiveShow
+import at.bernhardberger.tvhplayer.core.partitionDvrLibrary
 import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.common.formatFileSize
@@ -63,6 +73,8 @@ import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.junit.experimental.categories.Category
+import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -88,11 +100,15 @@ class RecordingsVisualLayoutTest {
     private lateinit var oldZone: TimeZone
     private var playbackRequests = 0
     private var navigationRequests = 0
-    private val screenState = RecordingsScreenState()
+    private var screenState = RecordingsScreenState()
+    private val railRoute = mutableStateOf(AppDestination.RECORDINGS)
     // The app keeps this state while the player route replaces the Recordings entry.
     private val screenShown = mutableStateOf(true)
     private val endPaddingState = mutableStateOf<Dp?>(null)
     private val connectionState = mutableStateOf<ConnectionUiState>(ConnectionUiState.Ready)
+    private var startView by mutableStateOf(DvrArchiveView(grouping = DvrArchiveGrouping.FOLDERS))
+    private var nowSeconds: () -> Long = { System.currentTimeMillis() / 1000L }
+    private val viewChanges = mutableListOf<DvrArchiveView>()
     private val preparationContext = mutableStateOf<CoroutineContext>(EmptyCoroutineContext)
 
     @Before fun prepare() {
@@ -173,15 +189,11 @@ class RecordingsVisualLayoutTest {
     @Test fun rootAlignmentAndImmediateChildPreviewPromotesOnlyOnEntry() {
         show()
         focused("recordings-folder-Documentaries")
-        assertEquals(130f, bounds("recordings-header").left, .1f)
-        assertEquals(28f, bounds("recordings-header").top, .1f)
-        assertEquals(902f, bounds("recordings-header").right, .1f)
         assertEquals(540f, bounds("recordings-archive-list").bottom, .1f)
-        // The tabs are the header row's leading content, centred in it, with the list area below.
-        assertEquals(130f, bounds("recordings-mode-tabs").left, .1f)
-        assertEquals(bounds("recordings-header").center.y, bounds("recordings-mode-tabs").center.y, .5f)
-        assertEquals("content starts at y80, as the channel list does", 80f, bounds("recordings-archive-list").top, .1f)
         val grown = bounds("recordings-folder-Documentaries")
+        // The options button ends where the rows do and stays clear of the focused first row.
+        assertEquals(grown.right, bounds(OPTIONS).right, 1f)
+        assertTrue(bounds(OPTIONS).bottom <= grown.top - grown.height * .025f)
         compose.onNodeWithTag("depth-preview", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("recording-list-entry-2").assertDoesNotExist()
         compose.onNodeWithTag("recordings-folder-Documentaries/Expeditions").assertDoesNotExist()
@@ -232,13 +244,19 @@ class RecordingsVisualLayoutTest {
     }
 
     /** Eight recordings of the README evening's channels, with their logos, focused on the Documentaries folder. */
-    private fun presentationLibrary(store: Boolean = false, portrait: Boolean = false) {
+    private fun presentationLibrary(store: Boolean = false, firstRow: Boolean = false, problems: Boolean = false,
+        portrait: Boolean = false, scale: Float = 1f, scheduled: Boolean = false,
+        diskSpace: DvrDiskSpaceState = DvrDiskSpaceState.Current(
+            DvrDiskSpace(1_240_000_000_000L, 2_760_000_000_000L, 4_000_000_000_000L))) {
         assertTrue(android.os.SystemClock.setCurrentTimeMillis(1_791_144_900_000L))
+        nowSeconds = { 1_791_144_900L }
         val evening = 1_791_057_600L
         // The channels as Channels and the player number them; each logo is the channel's fixture picon.
         val picons = listOf("ridge-earth", "harbor-sport", "northline-news", "kite-kids", "ion-frame", "amber-stage", "harbor-lights")
         val channels = listOf("Ridge Earth", "Harbor Sport", "Northline News", "Kite Kids", "Ion Frame", "Amber Stage", "Harbor Lights")
             .mapIndexed { index, name -> Channel.create(ChannelId(index + 1L), name = name, number = index + 1L, icon = ChannelIcon.ImageCache(ArtworkId(index + 1))) }
+        val genres = mapOf(1L to 0x90L, 2L to 0x90L, 3L to 0x90L, 4L to 0x40L, 5L to 0x40L, 6L to 0x10L, 7L to 0x60L,
+            8L to 0x50L, 9L to 0x40L, 10L to 0x10L, 11L to 0x40L, 12L to 0x90L, 13L to 0x60L)
         fun recording(id: Long, title: String, channel: Int, folder: String?, start: Long, minutes: Long,
             art: String?, synopsis: String, position: Long? = null, plays: Long? = null,
             state: DvrEntryState = DvrEntryState.COMPLETED) = DvrEntry.create(
@@ -248,7 +266,8 @@ class RecordingsVisualLayoutTest {
                 stop = Instant.fromEpochSeconds(start + minutes * 60), sizeBytes = minutes * 40_000_000L)),
             channelId = ChannelId(channel.toLong()), channelName = channels[channel - 1].name,
             image = art?.let { ArtworkId(100 + id.toInt()) }, description = synopsis,
-            subtitle = "Winter on the ridge".takeIf { id == 1L }, playPosition = position?.seconds, playCount = plays)
+            subtitle = "Winter on the ridge".takeIf { id == 1L }, playPosition = position?.seconds, playCount = plays,
+            contentGenre = ContentGenre.fromContentType(genres.getValue(id)))
         val library = listOf(
             recording(1, "Ridge Light", 1, "Documentaries", evening, 60, "ridge-light",
                 "Seasonal mountain light, forests and weather moving over a ridge.", position = 1223),
@@ -269,7 +288,27 @@ class RecordingsVisualLayoutTest {
             // Tonight's match, recording now as in the Guide.
             recording(9, "Harbor Kickoff", 2, "Sport", evening + 86400 - 1800, 135, "harbor-kickoff",
                 "Match coverage from a floodlit stadium as Harbor FC meet Amber Town.", state = DvrEntryState.RECORDING),
-        )
+        ) + if (problems) {
+            // Two failed recordings: the Problems tab's badge counts them.
+            listOf(
+                recording(10, "Glass Harbor", 6, null, evening - 5 * 86400, 120, null,
+                    "A quiet drama about night-shift workers in a harbor glass workshop.", state = DvrEntryState.COMPLETED_ERROR),
+                recording(11, "River Court", 2, null, evening - 6 * 86400, 105, null,
+                    "Indoor basketball, River Court against North Quay.", state = DvrEntryState.COMPLETED_ERROR),
+            )
+        } else {
+            emptyList()
+        } + if (scheduled) {
+            // Two timers for the coming evenings, for the Schedule tab.
+            listOf(
+                recording(12, "Ridge Light", 1, "Documentaries", evening + 2 * 86400, 60, null,
+                    "Seasonal mountain light, forests and weather moving over a ridge.", state = DvrEntryState.SCHEDULED),
+                recording(13, "Harbor Lights Live", 7, null, evening + 3 * 86400, 90, null,
+                    "A small-hall concert with a quartet.", state = DvrEntryState.SCHEDULED),
+            )
+        } else {
+            emptyList()
+        }
         val art = listOf("ridge-light", "still-tide-watch", "still-coastal-miles", "harbor-kickoff", "river-court",
             "glass-harbor", "harbor-lights-live", "paper-kite-tales", "harbor-kickoff")
         images.install(FixtureArt.imageLoader(ApplicationProvider.getApplicationContext<Application>(), buildMap {
@@ -278,15 +317,18 @@ class RecordingsVisualLayoutTest {
                 FixtureArt.art(if (portrait && index == 5) "glass-harbor-poster-2x3" else name)) }
         }))
         // A household server's disk, as the Recordings header reports it.
-        show(entries = library, channels = channels, diskSpace = DvrDiskSpaceState.Current(
-            DvrDiskSpace(1_240_000_000_000L, 2_760_000_000_000L, 4_000_000_000_000L)))
+        show(scale = scale, entries = library, channels = channels, diskSpace = diskSpace)
         compose.mainClock.advanceTimeBy(1_500)
-        // The running match's Recording now folder comes first, then Sport, which holds it, then Documentaries.
-        focused("recordings-recording-now-folder")
-        key(Key.DirectionDown)
-        focused("recordings-folder-Sport")
-        key(Key.DirectionDown)
-        focused("recordings-folder-Documentaries")
+        if (firstRow) {
+            awaitList()
+        } else {
+            // The running match fills the Recording now folder that leads the list, and dots its Sport folder.
+            focused("recordings-recording-now-folder")
+            key(Key.DirectionDown)
+            focused("recordings-folder-Sport")
+            key(Key.DirectionDown)
+            focused("recordings-folder-Documentaries")
+        }
     }
 
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
@@ -313,39 +355,69 @@ class RecordingsVisualLayoutTest {
         capture("store-recording", 1f, outputs = "build/outputs/presentation")
     }
 
-    /** Store library: the running match is visible without opening the virtual folder. */
-    @Test @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi",
-        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
-    @Category(VisualCapture::class)
-    fun storeRecordingNow() {
-        presentationLibrary(store = true)
-        repeat(2) { key(Key.DirectionUp) }
-        focused("recordings-recording-now-folder")
-        compose.mainClock.advanceTimeBy(1_500)
-        compose.waitForIdle()
-        capture("store-recording-now", 1f, outputs = "build/outputs/presentation")
-    }
-
-    @Test fun recordingSpaceLineIsQuietInformationInTheHeader() {
-        val context = ApplicationProvider.getApplicationContext<Application>()
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
+    fun storageIndicatorIsQuietInformationAtTheEndOfTheTabLineAndNeverMoves() {
         show(diskSpace = DvrDiskSpaceState.Current(DvrDiskSpace(412_000_000_000L, 1_588_000_000_000L, 2_000_000_000_000L)))
-        val expected = "${formatFileSize(412_000_000_000L, context)} free of ${formatFileSize(2_000_000_000_000L, context)}"
-        compose.onNodeWithTag("recordings-space").assertTextEquals(expected)
         compose.onNodeWithTag("recordings-space").assert(SemanticsMatcher.keyNotDefined(SemanticsActions.RequestFocus))
-        // It ends the tabs' row, level with them and clear of them.
-        assertEquals(bounds("recordings-mode-tabs").center.y, bounds("recordings-space").center.y, .5f)
-        assertTrue(bounds("recordings-space").left >= bounds("recordings-mode-tabs").right)
-        assertEquals(902f, bounds("recordings-space").right, .5f)
-        assertEquals(130f, bounds("recordings-header").left, .1f)
-        assertEquals(902f, bounds("recordings-header").right, .1f)
+        // A ring beside the one-line figure, spoken as one description.
+        compose.onNodeWithTag("recordings-space-ring", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("recordings-space").assertContentDescriptionContains("79% used", substring = true)
         focused("recordings-folder-Documentaries")
+        val resting = bounds("recordings-space")
+        // It ends the tab line at the header's edge, centred on the tabs.
+        assertEquals(bounds("recordings-header").right, resting.right, .5f)
+        assertEquals(bounds("recordings-mode-tabs").center.y, resting.center.y, 2f)
+        assertTrue(bounds("recordings-mode-tabs").right < resting.left)
+        // Neither the options button, a folder nor another tab moves it.
+        upToOptions()
+        assertEquals(resting, bounds("recordings-space"))
+        key(Key.DirectionDown)
+        focused("recordings-folder-Documentaries")
+        key(Key.DirectionRight)
+        focused("recordings-folder-Documentaries/Expeditions")
+        assertEquals(resting, bounds("recordings-space"))
+        key(Key.DirectionUp)
+        focused("recordings-mode-archive")
+        key(Key.DirectionRight)
+        focused("recordings-mode-schedule")
+        assertEquals(resting, bounds("recordings-space"))
+        // Sample the opaque centres of the drawn strokes, not antialiased edge pixels.
+        // At normal usage both strokes are long enough to identify their dominant colours.
+        fun ringColours(): List<androidx.compose.ui.graphics.Color> {
+            val pixels = compose.onNodeWithTag("recordings-space-ring", useUnmergedTree = true)
+                .captureToImage().toPixelMap()
+            val background = pixels[pixels.width / 2, pixels.height / 2]
+            return (0 until pixels.height).flatMap { y -> (0 until pixels.width).map { x -> pixels[x, y] } }
+                .filter { it != background }.groupingBy { it }.eachCount()
+                .entries.sortedByDescending { it.value }.map { it.key }
+        }
+        var trackLuminance = 0f
+        val contrasts = listOf(70, 95, 99).map { used ->
+            compose.runOnIdle {
+                session.publish(session.observation.value.let {
+                    SessionObservation.create(it.sessionState, it.channelState, it.epgState, it.dvrState,
+                        recordingProgressCapability = it.recordingProgressCapability,
+                        dvrDiskSpaceState = diskSpacePercentUsed(used))
+                })
+            }
+            compose.waitForIdle()
+            val colours = ringColours()
+            if (used == 70) trackLuminance = colours.take(2).minOf { it.luminance() }
+            val contrast = (colours.first().luminance() + .05f) / (trackLuminance + .05f)
+            "$used% used" to contrast
+        }
+        println("Storage ring drawn arc/track contrast: $contrasts")
+        assertTrue("Every storage level needs arc/track contrast >= 3:1: $contrasts",
+            contrasts.all { it.second >= 3f })
         assertNoCommands()
     }
 
-    @Test fun recordingSpaceLineIsAbsentWithoutAFigure() {
+    @Test fun storageIndicatorSaysUnknownWithoutARingOrOldNumbers() {
         show(diskSpace = DvrDiskSpaceState.Synchronizing(null))
-        compose.onNodeWithTag("recordings-space").assertDoesNotExist()
+        compose.onNodeWithTag("recordings-space").assertExists()
+        compose.onNodeWithTag("recordings-space-ring", useUnmergedTree = true).assertDoesNotExist()
         focused("recordings-folder-Documentaries")
+        assertEquals(bounds("recordings-header").right, bounds("recordings-space").right, .5f)
         capture("header-no-space", 1f)
     }
 
@@ -439,58 +511,606 @@ class RecordingsVisualLayoutTest {
         compose.runOnIdle { assertNull(screenState.requestedScheduleEntryId.value) }
     }
 
-    @Test fun recordingSpaceLineGivesWayToTheTabs() {
-        show(diskSpace = DvrDiskSpaceState.Current(DvrDiskSpace(412_000_000_000L, 1_588_000_000_000L, 2_000_000_000_000L)))
+    @Test fun upFromTheFirstRowReachesTheOptionsButtonThenTheTabsAndDownFromATabReturnsToTheRow() {
+        show()
         focused("recordings-folder-Documentaries")
-        val tabs = bounds("recordings-mode-tabs")
-        val full = bounds("recordings-space").width
-        assertTrue("the fixture's text must be wider than the hiding threshold ($full)", full > 120f)
-        // The header row runs from x130 to the trailing inset; its actions start 12dp after the tabs.
-        fun leaveForSpace(width: Float) = compose.runOnIdle {
-            endPaddingState.value = (960f - tabs.right - 12f - width).dp
-        }
-        leaveForSpace((full + 96f) / 2f)
-        compose.waitForIdle()
-        assertTrue("narrower than its text, it ellipsizes", textLayout("recordings-space").hasVisualOverflow)
-        assertTrue(bounds("recordings-space").left >= tabs.right)
-        assertEquals("the tabs keep their width", tabs, bounds("recordings-mode-tabs"))
-        leaveForSpace(80f)
-        compose.waitForIdle()
-        compose.onNodeWithTag("recordings-space").assertDoesNotExist()
-        assertEquals("the tabs keep their width", tabs, bounds("recordings-mode-tabs"))
-        listOf("Archive", "Schedule", "Problems").forEach {
-            val label = mutableListOf<TextLayoutResult>()
-            compose.onNodeWithText(it, useUnmergedTree = true)
-                .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { layout -> layout(label) }
-            assertTrue("$it is not shortened", !label.single().hasVisualOverflow)
-        }
-        focused("recordings-folder-Documentaries")
-    }
-
-    @Test fun upFromEachTabsFirstItemReachesThatTabAndDownReturnsToTheList() {
-        show(diskSpace = DvrDiskSpaceState.Current(DvrDiskSpace(412_000_000_000L, 1_588_000_000_000L, 2_000_000_000_000L)))
-        focused("recordings-folder-Documentaries")
-        capture("header-archive", 1f)
+        key(Key.DirectionDown)
+        focused("recordings-folder-News")
         key(Key.DirectionUp)
-        compose.onNodeWithText("Archive").assertIsFocused()
-        capture("header-archive-tab-focused", 1f)
+        key(Key.DirectionUp)
+        focused(OPTIONS)
+        // Right from the button stays; Up reaches the selected tab, and Down from a tab skips the button.
+        key(Key.DirectionRight)
+        focused(OPTIONS)
+        key(Key.DirectionUp)
+        focused("recordings-mode-archive")
+        key(Key.DirectionUp)
+        focused("recordings-mode-archive")
         key(Key.DirectionDown)
         focused("recordings-folder-Documentaries")
-        key(Key.DirectionUp)
-        listOf("Schedule" to 20, "Problems" to 21).forEach { (tab, first) ->
-            key(Key.DirectionRight)
-            compose.onNodeWithText(tab).assertIsFocused()
-            key(Key.DirectionDown)
-            focused("recording-list-entry-$first")
-            capture("header-${tab.lowercase().replace(' ', '-')}", 1f)
-            // The active tab, not the one above the item.
-            key(Key.DirectionUp)
-            compose.onNodeWithText(tab).assertIsFocused()
-        }
-        // The disk-space text takes no focus: the row ends at Problems.
+        // The button belongs to the root: inside a folder Up goes straight to the tab, Down returns to the row.
         key(Key.DirectionRight)
-        compose.onNodeWithText("Problems").assertIsFocused()
+        focused("recordings-folder-Documentaries/Expeditions")
+        gone(OPTIONS)
+        key(Key.DirectionUp)
+        focused("recordings-mode-archive")
+        key(Key.DirectionDown)
+        focused("recordings-folder-Documentaries/Expeditions")
+        compose.runOnIdle { assertEquals(listOf("Documentaries"), screenState.archivePath) }
+        key(Key.Back)
+        compose.runOnIdle { assertTrue(screenState.archivePath.isEmpty()) }
+        focused("recordings-folder-Documentaries")
+        upToOptions()
+        key(Key.DirectionLeft)
+        compose.onNodeWithTag("nav-recordings").assertIsFocused()
+        capture("drawer-expanded", 1f)
         assertNoCommands()
+    }
+
+    @Test fun theOptionsPanelOpensGroupSortAndShowAtTheirValuesChoicesApplyAtOnceAndFocusReturnsToTheButton() {
+        show()
+        focused("recordings-folder-Documentaries")
+        upToOptions()
+        // The root names each choice with its current value; Folders adds the Recording now switch.
+        key(Key.DirectionCenter)
+        focused("recordings-view-group")
+        compose.onNodeWithTag("recordings-view-group").assertTextContains("Folders")
+        compose.onNodeWithTag("recordings-view-recording-now").assertExists()
+        key(Key.DirectionCenter)
+        focused("recordings-grouping-option-folders")
+        key(Key.Back)
+        focused("recordings-view-group")
+        key(Key.Back)
+        gone("recordings-view-panel")
+        focused(OPTIONS)
+        compose.runOnIdle { assertTrue(viewChanges.isEmpty()) }
+
+        openOptionsLevel("group")
+        focused("recordings-grouping-option-folders")
+        key(Key.DirectionDown)
+        focused("recordings-grouping-option-channels")
+        key(Key.DirectionCenter)
+        // OK applies at once and the level stays on the row just pressed.
+        compose.runOnIdle { assertEquals(listOf(DvrArchiveView(grouping = DvrArchiveGrouping.CHANNELS)), viewChanges) }
+        focused("recordings-grouping-option-channels")
+        key(Key.Back)
+        focused("recordings-view-group")
+        compose.onNodeWithTag("recordings-view-group").assertTextContains("Channels")
+        compose.onNodeWithTag("recordings-view-recording-now").assertDoesNotExist()
+        key(Key.DirectionDown)
+        key(Key.DirectionCenter)
+        focused("recordings-sort-option-newest")
+        // All six orders are listed, each with its direction.
+        DvrArchiveSort.entries.forEach { compose.onNodeWithTag("recordings-sort-option-${it.name.lowercase()}").assertExists() }
+        repeat(2) { key(Key.DirectionDown) }
+        focused("recordings-sort-option-name")
+        key(Key.DirectionCenter)
+        compose.runOnIdle { assertEquals(DvrArchiveSort.NAME, viewChanges.last().sort) }
+        key(Key.Back)
+        key(Key.DirectionDown)
+        focused("recordings-view-show")
+        key(Key.DirectionCenter)
+        focused("recordings-show-option-all")
+        DvrArchiveShow.entries.forEach { compose.onNodeWithTag("recordings-show-option-${it.name.lowercase()}").assertExists() }
+        key(Key.DirectionDown)
+        focused("recordings-show-option-unwatched")
+        key(Key.DirectionCenter)
+        compose.runOnIdle {
+            assertEquals(DvrArchiveView(DvrArchiveGrouping.CHANNELS, DvrArchiveSort.NAME, DvrArchiveShow.UNWATCHED), viewChanges.last())
+        }
+        key(Key.Back)
+        key(Key.Back)
+        gone("recordings-view-panel")
+        focused(OPTIONS)
+        // The button speaks the values that differ from the defaults; the headline names the grouping.
+        compose.onNodeWithTag(OPTIONS).assertContentDescriptionEquals("View options, Name A–Z, Unwatched")
+        assertEquals("Channels", activeHeading().text)
+        requireNotNull(valuesLine()).assertTextEquals("Name A–Z · Unwatched")
+        assertNoCommands()
+    }
+
+    @Test fun choosingAnArrangementResetsTheViewportAndDownEntryToTheFirstRow() {
+        startView = DvrArchiveView(grouping = DvrArchiveGrouping.FLAT)
+        show(entries = (1L..30L).map { recording(it, "Recording $it", "recording$it.ts") })
+        upToOptions()
+        openOptionsLevel("sort")
+        key(Key.DirectionDown)
+        key(Key.DirectionCenter)
+        closeOptions()
+        compose.onNodeWithTag("recording-list-entry-30").assertIsDisplayed()
+        key(Key.DirectionDown)
+        focused("recording-list-entry-30")
+    }
+
+    @Test fun rightAfterResortingGenresEntersThePreviewNotTheButton() {
+        startView = DvrArchiveView(grouping = DvrArchiveGrouping.GENRES)
+        presentationLibrary(firstRow = true)
+        upToOptions()
+        openOptionsLevel("sort")
+        key(Key.DirectionDown)
+        key(Key.DirectionCenter)
+        closeOptions()
+        key(Key.DirectionDown)
+        assertTrue(listRowFocused())
+        key(Key.DirectionRight)
+        assertFalse("Right from a row must not reach the options button", tagFocused(OPTIONS))
+        assertTrue("Right enters the folder preview", listRowFocused())
+    }
+
+    @Test fun closingTheOptionsPanelGoesStraightToTheButtonWithoutFocusingAnyRow() {
+        startView = DvrArchiveView(grouping = DvrArchiveGrouping.FLAT)
+        show(entries = (1L..30L).map { recording(it, "Recording $it", "recording$it.ts") })
+        focused("recording-list-entry-1")
+        upToOptions()
+        openOptionsLevel("sort")
+        focused("recordings-sort-option-newest")
+        key(Key.DirectionDown)
+        key(Key.DirectionCenter)
+        key(Key.Back)
+        focused("recordings-view-sort")
+        // Back closes: from here on no frame may show a list row holding the focus before the button has it.
+        compose.mainClock.autoAdvance = false
+        try {
+            compose.runOnIdle { backDispatcher.onBackPressed() }
+            var frames = 0
+            while (!tagFocused(OPTIONS)) {
+                assertFalse("A list row held the focus on its way back to the button", listRowFocused())
+                assertTrue("The button never took the focus", frames++ < 60)
+                compose.mainClock.advanceTimeByFrame()
+                compose.waitForIdle()
+            }
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        compose.waitForIdle()
+        assertNoCommands()
+    }
+
+    @Test fun aFlatListSortsTheRunningRecordingInPlaceAndItsDateDividersTakeNoFocus() {
+        startView = DvrArchiveView(grouping = DvrArchiveGrouping.FLAT)
+        show(entries = (1L..5L).map { recording(it, "Recording $it", "recording$it.ts") } +
+            recording(6, "Running now", "running.ts", DvrEntryState.RECORDING, startEpochSeconds = 1_791_100_000))
+        // The running recording is the newest row of the list, with its dot: no card, no virtual row.
+        compose.onNodeWithTag("recordings-now-cards").assertDoesNotExist()
+        focused("recording-list-entry-6")
+        assertTrailingStateMark(6, "Recording now")
+        compose.onAllNodesWithTag("archive-date-divider", useUnmergedTree = true).fetchSemanticsNodes().let {
+            assertTrue("A day opens with its label", it.isNotEmpty())
+            assertTrue("Date labels remain accessible section headings", it.all { node ->
+                node.config.contains(SemanticsProperties.Heading) &&
+                    node.config.contains(SemanticsProperties.ContentDescription)
+            })
+        }
+        key(Key.DirectionDown)
+        focused("recording-list-entry-1")
+        key(Key.DirectionUp)
+        focused("recording-list-entry-6")
+        // The first row's Up stop is the options button, as at every level; Down returns to the first recording.
+        key(Key.DirectionUp)
+        focused(OPTIONS)
+        key(Key.DirectionDown)
+        focused("recording-list-entry-6")
+        assertNoCommands()
+    }
+
+    /**
+     * A focused row grows towards the label above it. Every date label keeps the first one's air
+     * above a focused row, so the label never touches the row it introduces.
+     */
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun aFocusedRowKeepsTheFirstDateLabelsAirUnderEveryLabel() {
+        startView = DvrArchiveView()
+        presentationLibrary(firstRow = true)
+        compose.mainClock.advanceTimeBy(600)
+        fun labels() = compose.onAllNodesWithTag("archive-date-divider", useUnmergedTree = true).fetchSemanticsNodes()
+            .map { it.boundsInRoot }.filter { it.width > 0f && it.top > 0f }.sortedBy { it.top }
+        fun focusedRow() = compose.onAllNodes(SemanticsMatcher("List row") {
+            it.config.getOrNull(SemanticsProperties.TestTag).orEmpty().startsWith("recording-list-entry-")
+        } and isFocused()).fetchSemanticsNodes().single().boundsInRoot
+        fun labelAbove(row: Rect) = labels().lastOrNull { it.bottom <= row.top + 1f && row.top - it.bottom < 48f }
+        val first = labels().first()
+        assertEquals(first, labelAbove(focusedRow()))
+        val firstGap = compose.labelToFocusedFillGap(view, first)
+        capture("flat-first-label-focused-row", 1f, "label ink to focused fill=$firstGap px", outputs = LABEL_CAPTURES)
+        repeat(8) { if (labelAbove(focusedRow()).let { it == null || it == labels().first() }) key(Key.DirectionDown) }
+        compose.mainClock.advanceTimeBy(600)
+        val later = requireNotNull(labelAbove(focusedRow())) { "No later date label above a focused row" }
+        val laterGap = compose.labelToFocusedFillGap(view, later)
+        capture("flat-later-label-focused-row", 1f, "label ink to focused fill=$laterGap px", outputs = LABEL_CAPTURES)
+        assertTrue("A later date label sits $laterGap px above a focused row, the first $firstGap px",
+            laterGap >= firstGap)
+    }
+
+    @Test fun sortAndShowApplyAtOnceTheListFollowsAndOnlyShowFillsTheButton() {
+        startView = DvrArchiveView(grouping = DvrArchiveGrouping.FLAT)
+        show(entries = listOf(
+            recording(1, "Bravo", "b.ts"), recording(2, "Alpha", "a.ts", playCount = 1), recording(3, "Charlie", "c.ts"),
+            recording(4, "Zulu", "Zulu/z.ts"),
+        ))
+        focused("recording-list-entry-1")
+        compose.onAllNodesWithTag("archive-date-divider", useUnmergedTree = true).fetchSemanticsNodes().let {
+            assertTrue("Newest first keeps the date dividers", it.isNotEmpty())
+        }
+        assertEquals(null, valuesLine())
+        val resting = optionsFill()
+        openOptionsLevel("sort")
+        repeat(2) { key(Key.DirectionDown) }
+        focused("recordings-sort-option-name")
+        key(Key.DirectionCenter)
+        compose.runOnIdle { assertEquals(DvrArchiveSort.NAME, viewChanges.last().sort) }
+        closeOptions()
+        // A sort alone leaves the button quiet and shows on the values line.
+        key(Key.DirectionDown)
+        assertEquals(resting, optionsFill())
+        requireNotNull(valuesLine()).assertTextEquals("Name A–Z")
+        openOptionsLevel("show")
+        focused("recordings-show-option-all")
+        key(Key.DirectionDown)
+        focused("recordings-show-option-unwatched")
+        key(Key.DirectionCenter)
+        compose.runOnIdle {
+            assertEquals(DvrArchiveView(DvrArchiveGrouping.FLAT, DvrArchiveSort.NAME, DvrArchiveShow.UNWATCHED), viewChanges.last())
+        }
+        // Name order without date dividers; the played Alpha is out, the partly watched Bravo is not played to the end.
+        compose.onNodeWithTag("recording-list-entry-2").assertDoesNotExist()
+        assertTrue(bounds("recording-list-entry-1").top < bounds("recording-list-entry-3").top)
+        assertTrue(bounds("recording-list-entry-3").top < bounds("recording-list-entry-4").top)
+        assertTrue(compose.onAllNodesWithTag("archive-date-divider", useUnmergedTree = true).fetchSemanticsNodes().isEmpty())
+        // Partially watched is narrower: only what was begun and not finished.
+        key(Key.DirectionDown)
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("recording-list-entry-1").assertExists()
+        compose.onNodeWithTag("recording-list-entry-3").assertDoesNotExist()
+        // Watched is the opposite of Unwatched.
+        key(Key.DirectionDown)
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("recording-list-entry-2").assertExists()
+        compose.onNodeWithTag("recording-list-entry-1").assertDoesNotExist()
+        // The choices apply together: grouping to folders keeps the sort and the filter.
+        key(Key.Back)
+        repeat(2) { key(Key.DirectionUp) }
+        focused("recordings-view-group")
+        key(Key.DirectionCenter)
+        focused("recordings-grouping-option-flat")
+        key(Key.DirectionDown)
+        key(Key.DirectionCenter)
+        compose.runOnIdle {
+            assertEquals(DvrArchiveView(DvrArchiveGrouping.FOLDERS, DvrArchiveSort.NAME, DvrArchiveShow.WATCHED), viewChanges.last())
+        }
+        closeOptions()
+        // A narrowing Show fills the button.
+        key(Key.DirectionDown)
+        assertNotEquals(resting, optionsFill())
+        assertNoCommands()
+    }
+
+    @Test fun anArchiveEmptiedByTheShowFilterSaysSoAndTheButtonCanLiftIt() {
+        startView = DvrArchiveView(show = DvrArchiveShow.UNWATCHED)
+        show(entries = listOf(recording(2, "Alpha", "a.ts", playCount = 1), recording(3, "Bravo", "b.ts", playCount = 2)))
+        compose.mainClock.advanceTimeUntil { tagFocused(OPTIONS) }
+        compose.waitForIdle()
+        compose.onNodeWithText("Everything here has been played.").assertIsDisplayed()
+        compose.onNodeWithText("2 recordings are hidden.").assertIsDisplayed()
+        openOptionsLevel("show")
+        focused("recordings-show-option-unwatched")
+        key(Key.DirectionUp)
+        key(Key.DirectionCenter)
+        closeOptions()
+        compose.onNodeWithText("Everything here has been played.").assertDoesNotExist()
+        compose.onNodeWithTag("recording-list-entry-2").assertExists()
+    }
+
+    @Test fun aFolderTheFilterEmptiesStaysOpenWithTheMessageAndLeavesItsParentWhenBackSteps() {
+        startView = DvrArchiveView(grouping = DvrArchiveGrouping.FOLDERS, show = DvrArchiveShow.UNWATCHED)
+        show(entries = listOf(
+            recording(2, "Alpha", "Series/a.ts"), recording(3, "Bravo", "Series/b.ts"),
+            recording(4, "Charlie", "Other/c.ts"),
+        ))
+        awaitList()
+        if (!tagFocused("recordings-folder-Series")) key(Key.DirectionDown)
+        focused("recordings-folder-Series")
+        key(Key.DirectionRight)
+        focused("recording-list-entry-2")
+        // Both get played elsewhere while the folder is open under Unwatched.
+        publish(listOf(
+            recording(2, "Alpha", "Series/a.ts", playCount = 1), recording(3, "Bravo", "Series/b.ts", playCount = 2),
+            recording(4, "Charlie", "Other/c.ts"),
+        ))
+        // No step back: the folder stays open and says why it is empty.
+        compose.runOnIdle { assertEquals(listOf("Series"), screenState.archivePath) }
+        compose.onNodeWithText("Everything in this folder has been played.").assertIsDisplayed()
+        compose.onNodeWithText("2 recordings are hidden.").assertIsDisplayed()
+        // Focus waits on the tab above, and Back there steps up a level, where the emptied folder has gone.
+        focused(BROWSE_TAB)
+        key(Key.Back)
+        compose.runOnIdle { assertEquals(emptyList<String>(), screenState.archivePath) }
+        compose.onNodeWithTag("recordings-folder-Series").assertDoesNotExist()
+        compose.onNodeWithTag("recordings-folder-Other").assertExists()
+        assertNoCommands()
+    }
+
+    /**
+     * At the defaults both columns' first rows are level and the button stays clear of the focused
+     * first row; the values line hangs from the headline and never moves the preview column.
+     */
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun theBrowseHeadlineNamesTheGroupingAndItsColumnsShareTheFirstRow() {
+        show()
+        focused("recordings-folder-Documentaries")
+        val active = activeHeading()
+        assertEquals("Folders", active.text)
+        val defaultRow = firstListRow()
+        assertButtonClearOf(defaultRow)
+        assertEquals(null, valuesLine())
+        compose.onNodeWithTag(OPTIONS).assertContentDescriptionEquals("View options")
+        // With the list unfocused both columns start with a folder row: their icons are level.
+        upToOptions()
+        val listIcon = firstIconInk(firstListRow().left, active.bounds.bottom)
+        val previewIcon = firstIconInk(bounds("depth-preview").left, active.bounds.bottom)
+        assertEquals("Both columns start their rows level", listIcon, previewIcon, 1f)
+        // Below the root at the defaults: no button, no line, the same headline and rows.
+        downToList()
+        key(Key.DirectionRight)
+        focused("recordings-folder-Documentaries/Expeditions")
+        gone(OPTIONS)
+        assertEquals(null, valuesLine())
+        assertEquals(active.baseline, activeHeading().baseline, 1f)
+        assertEquals(defaultRow.top, firstListRow().top, 1f)
+        key(Key.Back)
+        focused("recordings-folder-Documentaries")
+
+        // A non-default sort and filter add the quiet line under the headline; the preview column stays put.
+        openOptionsLevel("sort")
+        repeat(2) { key(Key.DirectionDown) }
+        key(Key.DirectionCenter)
+        key(Key.Back)
+        key(Key.DirectionDown)
+        key(Key.DirectionCenter)
+        key(Key.DirectionDown)
+        key(Key.DirectionCenter)
+        closeOptions()
+        val withValues = activeHeading()
+        assertEquals(active.baseline, withValues.baseline, 1f)
+        val values = requireNotNull(valuesLine())
+            .assertTextEquals("Name A–Z · Unwatched").fetchSemanticsNode().boundsInRoot
+        assertEquals("The values line never pushes the preview down", previewIcon,
+            firstIconInk(bounds("depth-preview").left, active.bounds.bottom), 1f)
+        val above = values.top - withValues.baseline
+        val below = firstListRow().top - values.bottom
+        assertTrue("The values line hangs from the headline ($above above, $below below)", above >= 0f && below > 2 * above)
+        assertTrue("The values line stops short of the button", values.right <= bounds(OPTIONS).left)
+        downToList()
+        assertButtonClearOf(firstListRow())
+        val rootRowWithValues = firstListRow()
+
+        // Below the root there is no button and the line reads as at the root, at the same geometry.
+        key(Key.DirectionRight)
+        focused("recordings-folder-Documentaries/Expeditions")
+        gone(OPTIONS)
+        val inFolder = activeHeading()
+        assertEquals(active.baseline, inFolder.baseline, 1f)
+        requireNotNull(valuesLine()).assertTextEquals("Name A–Z · Unwatched")
+        assertEquals(rootRowWithValues.top, firstListRow().top, 1f)
+
+        // With Show back at All the non-default sort alone still names itself below the root.
+        key(Key.Back)
+        focused("recordings-folder-Documentaries")
+        openOptionsLevel("show")
+        key(Key.DirectionUp)
+        key(Key.DirectionCenter)
+        closeOptions()
+        requireNotNull(valuesLine()).assertTextEquals("Name A–Z")
+        downToList()
+        key(Key.DirectionRight)
+        focused("recordings-folder-Documentaries/Expeditions")
+        requireNotNull(valuesLine()).assertTextEquals("Name A–Z")
+        assertEquals(active.baseline, activeHeading().baseline, 1f)
+        assertEquals(rootRowWithValues.top, firstListRow().top, 1f)
+        assertNoCommands()
+    }
+
+    @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun theLongestHeaderValuesStayClearOfTheButtonAndTheTabsOfTheStorageInGermanAtLargeText() {
+        Locale.setDefault(Locale.GERMANY)
+        startView = DvrArchiveView(DvrArchiveGrouping.CHANNELS, DvrArchiveSort.LARGEST, DvrArchiveShow.PARTIALLY_WATCHED)
+        presentationLibrary(firstRow = true, scale = 1.3f)
+        val storage = bounds("recordings-space")
+        assertTrue("Storage and tabs do not overlap", bounds("recordings-mode-tabs").right < storage.left)
+        assertEquals(bounds("recordings-header").right, storage.right, .5f)
+        val values = requireNotNull(valuesLine()).fetchSemanticsNode().boundsInRoot
+        assertTrue("The values line ends before the button", values.right <= bounds(OPTIONS).left)
+        assertButtonClearOf(firstListRow())
+    }
+
+    @Test fun theTabsOpenScheduleAndProblemsBesideTheStorageWithTheProblemCountOnTheTab() {
+        val space = DvrDiskSpaceState.Current(DvrDiskSpace(412_000_000_000L, 1_588_000_000_000L, 2_000_000_000_000L))
+        show(diskSpace = space)
+        focused("recordings-folder-Documentaries")
+        val storage = bounds("recordings-space")
+        // Schedule is a tab here, not a rail item; the Problems tab counts the one problem.
+        compose.onNodeWithTag("nav-schedule").assertDoesNotExist()
+        compose.onNode(hasText("1") and hasAnyAncestor(hasTestTag("recordings-problems-badge")), useUnmergedTree = true)
+            .assertIsDisplayed()
+        upToOptions()
+        key(Key.DirectionUp)
+        focused("recordings-mode-archive")
+        key(Key.DirectionRight)
+        focused("recordings-mode-schedule")
+        gone(OPTIONS)
+        assertEquals(storage, bounds("recordings-space"))
+        key(Key.DirectionDown)
+        focused("recording-list-entry-20")
+        key(Key.DirectionUp)
+        focused("recordings-mode-schedule")
+        key(Key.DirectionRight)
+        focused("recordings-mode-problems")
+        assertEquals(storage, bounds("recordings-space"))
+        key(Key.DirectionDown)
+        focused("recording-list-entry-21")
+        key(Key.DirectionUp)
+        focused("recordings-mode-problems")
+        // Problems is the last tab; Left walks back to Browse, whose Down returns to the row it left.
+        key(Key.DirectionRight)
+        focused("recordings-mode-problems")
+        repeat(2) { key(Key.DirectionLeft) }
+        focused("recordings-mode-archive")
+        key(Key.DirectionDown)
+        focused("recordings-folder-Documentaries")
+        assertNoCommands()
+    }
+
+    private fun diskSpacePercentUsed(used: Int) = DvrDiskSpaceState.Current(
+        DvrDiskSpace(4_000_000_000_000L * (100 - used) / 100, 4_000_000_000_000L * used / 100, 4_000_000_000_000L))
+
+    /** The final header frames for the owner's review; each frame's .txt lists the measured header bounds. */
+    private fun headerFrame(name: String, view: DvrArchiveView, problems: Boolean = false,
+        diskSpace: DvrDiskSpaceState = diskSpacePercentUsed(70), steps: () -> Unit = {}) {
+        startView = view
+        presentationLibrary(firstRow = true, problems = problems, scheduled = true, diskSpace = diskSpace)
+        steps()
+        compose.mainClock.advanceTimeBy(1_500)
+        compose.waitForIdle()
+        capture(name, 1f, headerReport(), outputs = HEADER_CAPTURES)
+    }
+
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun headerFrameFoldersDefault() = headerFrame("folders-default", DvrArchiveView(DvrArchiveGrouping.FOLDERS))
+
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun headerFrameFoldersSortAndFilter() = headerFrame("folders-sort-and-filter",
+        DvrArchiveView(DvrArchiveGrouping.FOLDERS, DvrArchiveSort.NAME, DvrArchiveShow.UNWATCHED))
+
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun headerFrameFoldersRecordingNowOff() = headerFrame("folders-recording-now-off",
+        DvrArchiveView(DvrArchiveGrouping.FOLDERS, recordingNowFolder = false))
+
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun headerFrameFoldersEntered() = headerFrame("folders-entered", DvrArchiveView(DvrArchiveGrouping.FOLDERS)) {
+        key(Key.DirectionDown)
+        focused("recordings-folder-Sport")
+        key(Key.DirectionRight)
+        awaitList()
+    }
+
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun headerFrameFoldersEnteredFilter() = headerFrame("folders-entered-filter",
+        DvrArchiveView(DvrArchiveGrouping.FOLDERS, DvrArchiveSort.NAME, DvrArchiveShow.UNWATCHED)) {
+        // Name A–Z puts Sport after the other folders.
+        repeat(6) { if (!tagFocused("recordings-folder-Sport")) key(Key.DirectionDown) }
+        focused("recordings-folder-Sport")
+        key(Key.DirectionRight)
+        awaitList()
+    }
+
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun headerFrameFlatDefault() = headerFrame("flat-default", DvrArchiveView())
+
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun headerFrameFlatSortOnly() = headerFrame("flat-sort-only", DvrArchiveView(sort = DvrArchiveSort.OLDEST))
+
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun headerFrameChannelsFilterOnly() = headerFrame("channels-filter-only",
+        DvrArchiveView(DvrArchiveGrouping.CHANNELS, show = DvrArchiveShow.UNWATCHED))
+
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun headerFrameOptionsButtonFocused() = headerFrame("options-button-focused",
+        DvrArchiveView(DvrArchiveGrouping.FOLDERS, DvrArchiveSort.NAME, DvrArchiveShow.UNWATCHED)) { upToOptions() }
+
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun headerFrameOptionsPanelRoot() = headerFrame("options-panel-root",
+        DvrArchiveView(DvrArchiveGrouping.FOLDERS, DvrArchiveSort.NAME, DvrArchiveShow.UNWATCHED)) {
+        upToOptions()
+        key(Key.DirectionCenter)
+        focused("recordings-view-group")
+    }
+
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun headerFrameScheduleTab() = headerFrame("schedule-tab", DvrArchiveView(DvrArchiveGrouping.FOLDERS), problems = true) {
+        upToOptions()
+        key(Key.DirectionUp)
+        key(Key.DirectionRight)
+        focused("recordings-mode-schedule")
+        downToList()
+    }
+
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun headerFrameProblemsTab() = headerFrame("problems-tab", DvrArchiveView(DvrArchiveGrouping.FOLDERS), problems = true) {
+        upToOptions()
+        key(Key.DirectionUp)
+        repeat(2) { key(Key.DirectionRight) }
+        focused("recordings-mode-problems")
+        downToList()
+    }
+
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun headerFrameStorageWarning() = headerFrame("storage-warning", DvrArchiveView(DvrArchiveGrouping.FOLDERS),
+        diskSpace = diskSpacePercentUsed(97))
+
+    /**
+     * The options button belongs to Browse's root column: entering a folder carries it off with
+     * that column, stepping back brings it home, and it never stands over the level sliding in.
+     */
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun theOptionsButtonTravelsWithTheRootColumnThroughTheDepthSlide() {
+        startView = DvrArchiveView(DvrArchiveGrouping.FOLDERS)
+        presentationLibrary(firstRow = true)
+        key(Key.DirectionDown)
+        focused("recordings-folder-Sport")
+        compose.mainClock.advanceTimeBy(1_500)
+        val button = bounds(OPTIONS)
+        // The root column's own unscaled content under the button: its leading row's end, with the chevron.
+        val row = bounds("recordings-recording-now-folder").let { Rect(it.right - 160f, it.top, it.right, it.bottom) }
+        val buttonTemplate = compose.runOnIdle { luminance(button) }
+        val rowTemplate = compose.runOnIdle { luminance(row) }
+        // Frame by frame, wherever the root column's row is still legible (it fades and leaves the
+        // screen), the button stands at the same shift, whole: nothing of the deeper level is drawn over it.
+        fun step(press: Key, captures: Map<Long, String> = emptyMap()) {
+            var tracked = 0
+            compose.mainClock.autoAdvance = false
+            try {
+                compose.onRoot().performKeyInput { pressKey(press) }
+                (1..12).map { it * 80L }.forEach { at ->
+                    compose.mainClock.advanceTimeBy(80)
+                    compose.waitForIdle()
+                    val (rowShift, rowMatch) = compose.runOnIdle { trackHorizontally(rowTemplate, row) }
+                    val (buttonShift, buttonMatch) = compose.runOnIdle { trackHorizontally(buttonTemplate, button) }
+                    captures[at]?.let { capture(it, 1f, "root column shift=$rowShift px; button shift=$buttonShift px",
+                        outputs = HEADER_CAPTURES) }
+                    if (rowMatch < 0.85f) return@forEach
+                    assertEquals("At $at ms the button left the root column", rowShift, buttonShift, 1f)
+                    assertTrue("At $at ms the button is not whole (match $buttonMatch)", buttonMatch > 0.9f)
+                    if (rowShift != 0f) tracked++
+                }
+            } finally {
+                compose.mainClock.autoAdvance = true
+            }
+            assertTrue("The slide was not seen in motion ($tracked frames)", tracked >= 3)
+        }
+        step(Key.DirectionRight, mapOf(160L to "transition-enter-1", 240L to "transition-enter-2",
+            320L to "transition-enter-3"))
+        awaitList()
+        compose.mainClock.advanceTimeBy(1_500)
+        step(Key.DirectionLeft)
+        compose.mainClock.advanceTimeBy(1_500)
+        focused("recordings-folder-Sport")
+        assertEquals(button, bounds(OPTIONS))
     }
 
     /**
@@ -613,11 +1233,10 @@ class RecordingsVisualLayoutTest {
     private fun scheduleAndProblemsKeepNativeRowsAndTruthfulStatus(endPadding: Dp?) {
         show(endPadding = endPadding)
         focused("recordings-folder-Documentaries")
+        compose.mainClock.advanceTimeBy(600)
         val archiveRow = bounds("recordings-folder-Documentaries")
         if (endPadding != null) assertEquals(860f, bounds("recordings-header").right, .1f)
-        key(Key.DirectionUp)
-        compose.onNodeWithText("Archive").assertIsFocused()
-        key(Key.DirectionRight)
+        openScheduleSubnav()
         compose.onNodeWithText("Schedule").assertIsFocused()
         key(Key.DirectionDown)
         focused("recording-list-entry-20")
@@ -660,8 +1279,6 @@ class RecordingsVisualLayoutTest {
                 startEpochSeconds = 1_791_000_000) }
         show(entries = entries)
         focused("recordings-folder-Documentaries")
-        // Every tab's first heading shares the Archive heading band, so first rows line up.
-        val firstRowTop = bounds("recordings-folder-Documentaries").top
         key(Key.DirectionCenter)
         focused("recording-list-entry-1")
         val archivePane = bounds("recording-metadata-pane")
@@ -670,15 +1287,14 @@ class RecordingsVisualLayoutTest {
         // Archive spacing is unchanged: record its existing overlap, but still require complete focus growth.
         assertMiddleFocus(2, checkNeighbourClearance = false)
         key(Key.DirectionUp)
-        key(Key.DirectionUp)
-        compose.onNodeWithText("Archive").assertIsFocused()
-        key(Key.DirectionRight)
+        openScheduleSubnav()
         compose.onNodeWithText("Schedule").assertIsFocused()
         key(Key.DirectionDown)
         focused("recording-list-entry-40")
-        assertDenseListGeometry(firstRowTop)
-        // The focused entry's pane takes the place and size of the Archive's recording preview.
-        assertEquals(archivePane, bounds("recording-metadata-pane"))
+        assertDenseListGeometry()
+        // The focused entry's pane takes the column of the Archive's recording preview.
+        assertEquals(archivePane.width, bounds("recording-metadata-pane").width, .1f)
+        assertEquals(archivePane.left, bounds("recording-metadata-pane").left, .1f)
         assertPaneTitle("Scheduled expedition 1")
         key(Key.DirectionDown)
         focused("recording-list-entry-41")
@@ -690,8 +1306,9 @@ class RecordingsVisualLayoutTest {
         compose.onNodeWithText("Problems").assertIsFocused()
         key(Key.DirectionDown)
         focused("recording-list-entry-60")
-        assertDenseListGeometry(firstRowTop)
-        assertEquals(archivePane, bounds("recording-metadata-pane"))
+        assertDenseListGeometry()
+        assertEquals(archivePane.width, bounds("recording-metadata-pane").width, .1f)
+        assertEquals(archivePane.left, bounds("recording-metadata-pane").left, .1f)
         assertPaneTitle("Unfinished expedition 1")
         key(Key.DirectionDown)
         focused("recording-list-entry-61")
@@ -721,9 +1338,7 @@ class RecordingsVisualLayoutTest {
             at.bernhardberger.tvheadend.sdk.core.AutorecRule.create(
                 AutorecRuleId("series"), seriesLinkUri = "series:ridge-light")))
         focused("recordings-folder-Sport")
-        key(Key.DirectionUp)
-        key(Key.DirectionRight)
-        key(Key.DirectionDown)
+        openScheduleScreen()
         focused("recording-list-entry-40")
         // The padded stop in the Schedule row's own words, and the series rule that set it up.
         compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-metadata")) and hasText("• until", substring = true),
@@ -772,9 +1387,7 @@ class RecordingsVisualLayoutTest {
         Locale.setDefault(Locale.GERMANY)
         show(scale = 1.3f, entries = paneEntries(long = true))
         focused("recordings-folder-Sport")
-        key(Key.DirectionUp)
-        key(Key.DirectionRight)
-        key(Key.DirectionDown)
+        openScheduleScreen()
         focused("recording-list-entry-40")
         assertOverlineAboveTitle(40)
         assertPaneLinesWhole("recording-metadata-title", "recording-metadata-metadata", "recording-metadata-rule")
@@ -793,8 +1406,7 @@ class RecordingsVisualLayoutTest {
     @Test fun emptyScheduleAndProblemsKeepTheirMessageWithoutAPane() {
         show(entries = listOf(recording(1, "Kept match", "Sport/kept.ts")))
         focused("recordings-folder-Sport")
-        key(Key.DirectionUp)
-        key(Key.DirectionRight)
+        openScheduleSubnav()
         compose.onNodeWithText("Schedule").assertIsFocused()
         compose.onNodeWithText("Nothing is recording or scheduled.").assertIsDisplayed()
         compose.onNodeWithTag("recording-metadata-pane", useUnmergedTree = true).assertDoesNotExist()
@@ -825,15 +1437,18 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionCenter)
         focused("recording-list-entry-1")
         assertOverlineAboveTitle(1)
+        val size = formatFileSize(2_400_000_000L, ApplicationProvider.getApplicationContext<Application>())
+        compose.onNodeWithTag("recording-list-metadata-1", useUnmergedTree = true)
+            .assert(hasText(" • $size", substring = true))
         val results = mutableListOf<TextLayoutResult>()
         compose.onNode(hasTestTag("recording-list-metadata-1") and
-            hasText(if (german) "Vorzeitig beendet" else "• 20m Stopped early", substring = true), useUnmergedTree = true)
+            hasText(if (german) "Vorzeitig beendet" else "• 20m • $size Stopped early", substring = true), useUnmergedTree = true)
             .assertIsDisplayed()
             .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(results) }
         val hint = results.single()
         val shown = hint.layoutInput.text.text.substring(0, hint.getLineEnd(hint.lineCount - 1, visibleEnd = true))
         assertTrue("'$shown' lines=${hint.lineCount} size=${hint.size} c=${hint.layoutInput.constraints}",
-            shown.endsWith(if (german) "20 Min. Vorzeitig beendet" else "20m Stopped early"))
+            shown.endsWith(if (german) "20 Min. • $size Vorzeitig beendet" else "20m • $size Stopped early"))
         compose.onNodeWithTag("recording-list-stopped-early", useUnmergedTree = true).assertIsDisplayed()
         assertEquals(1, hint.lineCount)
         assertFalse("The stopped-early marker must remain whole", hint.hasVisualOverflow)
@@ -867,8 +1482,7 @@ class RecordingsVisualLayoutTest {
             recording(30, "Missed match", null, DvrEntryState.MISSED),
             recording(31, "Broken match", null, DvrEntryState.COMPLETED_ERROR)))
         focused("recordings-folder-Sport")
-        key(Key.DirectionUp)
-        key(Key.DirectionRight)
+        openScheduleSubnav()
         key(Key.DirectionRight)
         compose.onNodeWithText("Problems").assertIsFocused()
         key(Key.DirectionDown)
@@ -951,14 +1565,14 @@ class RecordingsVisualLayoutTest {
             recording(1, "Archived", "Documentaries/archived.ts"),
             DvrEntry.create(DvrEntryId(30), title = "Live match", state = DvrEntryState.RECORDING,
                 start = Instant.fromEpochSeconds(now - 600), stop = Instant.fromEpochSeconds(now + 3_000),
+                files = listOf(DvrRecordingFile.create(sizeBytes = 2_400_000_000L)),
                 channelName = "Ridge Earth HD", subtitle = "Second half"),
             DvrEntry.create(DvrEntryId(31), title = "Weak signal", state = DvrEntryState.RECORDING_ERROR,
                 start = Instant.fromEpochSeconds(now - 300), stop = Instant.fromEpochSeconds(now + 3_300),
                 channelName = "Ridge Earth HD"),
         ))
-        focused("recordings-recording-now-folder")
-        key(Key.DirectionUp)
-        key(Key.DirectionRight)
+        awaitList()
+        openScheduleSubnav()
         compose.onNodeWithText("Schedule").assertIsFocused()
         key(Key.DirectionDown)
         focused("recording-list-entry-30")
@@ -968,6 +1582,9 @@ class RecordingsVisualLayoutTest {
             useUnmergedTree = true).assertIsDisplayed()
         compose.onNode(hasTestTag("recording-list-metadata-30") and hasText("Recording", substring = true),
             useUnmergedTree = true).assertDoesNotExist()
+        val size = formatFileSize(2_400_000_000L, ApplicationProvider.getApplicationContext<Application>())
+        compose.onNodeWithTag("recording-list-metadata-30", useUnmergedTree = true)
+            .assert(!hasText(size, substring = true))
         assertTrailingStateMark(30, "Recording now")
         // Only the 32dp logo (with the focus scale) leads the row.
         assertEquals(32f * 1.05f, bounds("recording-list-leading-30").width, .1f)
@@ -981,42 +1598,13 @@ class RecordingsVisualLayoutTest {
         assertNoCommands()
     }
 
-    @Test fun channelPagingAndInterruptedModeSwitchCannotReactivateArchive() {
-        show(entries = (1L..30L).map { recording(it, "Recording $it", "recording$it.ts") } +
-            recording(40, "Scheduled", null, DvrEntryState.SCHEDULED))
-        focused("recording-list-entry-1")
-        key(Key(android.view.KeyEvent.KEYCODE_CHANNEL_DOWN))
-        val pagedId = compose.runOnIdle { screenState.archiveNavigation.stack.active.focusedItemId }
-        assertNotEquals("recording:1", pagedId)
-        compose.mainClock.autoAdvance = false
-        try {
-            compose.onRoot().performKeyInput { pressKey(Key(android.view.KeyEvent.KEYCODE_CHANNEL_DOWN)) }
-            compose.mainClock.advanceTimeBy(64)
-            compose.onNodeWithText("Archive").requestFocus()
-            compose.onRoot().performKeyInput { pressKey(Key.DirectionRight); pressKey(Key.DirectionDown) }
-            compose.mainClock.advanceTimeBy(256)
-            val saved = compose.runOnIdle { screenState.archiveNavigation.stack.active }
-            compose.mainClock.advanceTimeBy(1_200)
-            compose.runOnIdle { assertEquals(saved, screenState.archiveNavigation.stack.active) }
-        } finally {
-            compose.mainClock.autoAdvance = true
-        }
-        focused("recording-list-entry-40")
-        assertNoCommands()
-    }
-
-    @Test fun emptyLibraryKeepsModeTabsReachableWithoutCommands() {
+    @Test fun emptyLibraryParksFocusOnTheBrowseTabWithoutCommands() {
         show(empty = true)
-        compose.mainClock.advanceTimeUntil(10_000) {
-            compose.onAllNodes(hasText("Archive") and isFocused()).fetchSemanticsNodes().isNotEmpty()
-        }
+        compose.mainClock.advanceTimeUntil(10_000) { tagFocused(BROWSE_TAB) }
         compose.onNodeWithText("No recordings are available.").assertIsDisplayed()
         capture("empty-archive", 1f)
-        key(Key.DirectionRight)
-        compose.onNodeWithText("Schedule").assertIsFocused()
         key(Key.DirectionDown)
-        compose.onNodeWithText("Schedule").assertIsFocused()
-        capture("empty-schedule", 1f)
+        focused(BROWSE_TAB)
         assertNoCommands()
     }
 
@@ -1024,31 +1612,30 @@ class RecordingsVisualLayoutTest {
         val space = DvrDiskSpaceState.Current(DvrDiskSpace(412_000_000_000L, 1_588_000_000_000L, 2_000_000_000_000L))
         connectionState.value = ConnectionUiState.SyncingChannels
         show(empty = true, diskSpace = space)
-        // The loading handoff still parks focus on the tabs; the skeleton takes none.
-        compose.mainClock.advanceTimeUntil(10_000) {
-            compose.onAllNodes(hasText("Archive") and isFocused()).fetchSemanticsNodes().isNotEmpty()
-        }
+        // The loading handoff parks focus on the Browse tab: without a list there is no headline or button; the skeleton takes none.
+        compose.mainClock.advanceTimeUntil(10_000) { tagFocused(BROWSE_TAB) }
         compose.onNodeWithTag("recordings-skeleton").assertIsDisplayed()
             .assert(SemanticsMatcher.keyNotDefined(SemanticsActions.RequestFocus))
         compose.onNodeWithText("Loading recordings…").assertDoesNotExist()
         compose.onNodeWithContentDescription("Loading recordings…").assertIsDisplayed()
         val header = bounds("recordings-header")
-        val tabs = bounds("recordings-mode-tabs")
+        val tab = bounds(BROWSE_TAB)
         val spaceLine = bounds("recordings-space")
         val skeleton = bounds("recordings-skeleton")
         capture("loading-skeleton", 1f)
         key(Key.DirectionDown)
-        compose.onNodeWithText("Archive").assertIsFocused()
+        focused(BROWSE_TAB)
 
         compose.runOnIdle { connectionState.value = ConnectionUiState.Ready }
         publish(listOf(recording(1, LONG_TITLE, "Documentaries/northern.ts"), recording(5, "Harbor Lights Live", "concert.ts")))
         compose.onNodeWithTag("recordings-archive-list", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("recordings-skeleton").assertDoesNotExist()
         assertEquals(header, bounds("recordings-header"))
-        assertEquals(tabs, bounds("recordings-mode-tabs"))
+        // The tab stands where it did before the recordings arrived.
+        assertEquals(tab, bounds(BROWSE_TAB))
         assertEquals(spaceLine, bounds("recordings-space"))
-        // The skeleton stood in the Archive column's place, under the root's blank heading.
-        assertEquals(bounds("recordings-archive-list").top, skeleton.top, .1f)
+        // The skeleton stood in the Archive column's place; the list fills in below the headline as recordings arrive.
+        assertTrue(bounds("recordings-archive-list").top >= skeleton.top)
         assertEquals(bounds("recordings-folder-Documentaries").left, skeleton.left, .1f)
         assertEquals(540f, skeleton.bottom, .1f)
         assertNoCommands()
@@ -1061,9 +1648,7 @@ class RecordingsVisualLayoutTest {
     private fun preparationSkeletonStaysInPlace(scale: Float) {
         connectionState.value = ConnectionUiState.SyncingChannels
         show(scale = scale, empty = true)
-        compose.mainClock.advanceTimeUntil(10_000) {
-            compose.onAllNodes(hasText("Archive") and isFocused()).fetchSemanticsNodes().isNotEmpty()
-        }
+        compose.mainClock.advanceTimeUntil(10_000) { tagFocused(BROWSE_TAB) }
         val syncing = bounds("recordings-skeleton")
         compose.runOnIdle { screenShown.value = false }
         compose.waitForIdle()
@@ -1090,32 +1675,6 @@ class RecordingsVisualLayoutTest {
             compose.onAllNodesWithTag("browse-preparing", useUnmergedTree = true).fetchSemanticsNodes().isEmpty()
         }
         assertEquals(syncing, bounds("recordings-skeleton"))
-        assertNoCommands()
-    }
-
-    @Test fun nestedUpReturnsToTabsAndModeChangesRetainArchiveLocation() {
-        show()
-        focused("recordings-folder-Documentaries")
-        key(Key.DirectionRight)
-        focused("recordings-folder-Documentaries/Expeditions")
-        key(Key.DirectionUp)
-        compose.onNodeWithText("Archive").assertIsFocused()
-        key(Key.DirectionRight)
-        compose.onNodeWithText("Schedule").assertIsFocused()
-        key(Key.DirectionLeft)
-        compose.onNodeWithText("Archive").assertIsFocused()
-        key(Key.DirectionDown)
-        focused("recordings-folder-Documentaries/Expeditions")
-        compose.runOnIdle { assertEquals(listOf("Documentaries"), screenState.archivePath) }
-        key(Key.Back)
-        focused("recordings-folder-Documentaries")
-        key(Key.Back)
-        compose.onNodeWithText("Archive").assertIsFocused()
-        key(Key.DirectionDown)
-        focused("recordings-folder-Documentaries")
-        key(Key.DirectionLeft)
-        compose.onNodeWithTag("nav-recordings").assertIsFocused()
-        capture("drawer-expanded", 1f)
         assertNoCommands()
     }
 
@@ -1170,11 +1729,11 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionRight)
         focused("recording-list-entry-2")
         key(Key.DirectionUp)
-        compose.onNodeWithText("Archive").assertIsFocused()
+        focused(BROWSE_TAB)
         publish(listOf(recording(1, "Remaining", "Documentaries/remaining.ts")))
         compose.runOnIdle { assertEquals(listOf("Documentaries"), screenState.archivePath) }
-        compose.onNodeWithText("Archive").assertIsFocused()
-        key(Key.DirectionDown)
+        focused(BROWSE_TAB)
+        downToList()
         focused("recording-list-entry-1")
         key(Key.Back)
         focused("recordings-folder-Documentaries")
@@ -1183,9 +1742,7 @@ class RecordingsVisualLayoutTest {
         publish(emptyList())
         compose.onNodeWithTag("nav-recordings").assertIsFocused()
         key(Key.DirectionRight)
-        compose.waitUntil(10_000) {
-            compose.onAllNodes(hasText("Archive") and isFocused()).fetchSemanticsNodes().isNotEmpty()
-        }
+        compose.mainClock.advanceTimeUntil(10_000) { tagFocused(BROWSE_TAB) }
         compose.onNodeWithText("No recordings are available.").assertIsDisplayed()
         compose.onNodeWithTag("depth-row-depth-unavailable").assertDoesNotExist()
         assertNoCommands()
@@ -1206,8 +1763,7 @@ class RecordingsVisualLayoutTest {
         compose.onNodeWithTag("details-delete").assertDoesNotExist()
         compose.onNodeWithTag("details-remove_entry").assertDoesNotExist()
         focused("recording-list-entry-3")
-        repeat(2) { key(Key.DirectionUp) }
-        key(Key.DirectionRight)
+        openScheduleSubnav()
         key(Key.DirectionRight)
         compose.onNodeWithText("Problems").assertIsFocused()
         compose.onNodeWithText("Failed").assertDoesNotExist()
@@ -1313,82 +1869,72 @@ class RecordingsVisualLayoutTest {
         assertNoCommands()
     }
 
-    @OptIn(TvheadendTestingApi::class)
-    @Test fun recordingNowIsFirstEntersFlatListAndBackRestoresItsRow() {
+    @Test fun aRunningRecordingLeadsTheFoldersRootInRecordingNowAndDotsItsFolderIcon() {
         show(entries = listOf(
-            DvrEntry.create(DvrEntryId(10), title = "Later", state = DvrEntryState.RECORDING,
-                folder = listOf("Series", "Season"), start = Instant.fromEpochSeconds(200),
-                stop = Instant.fromEpochSeconds(500),
-                files = listOf(TvheadendTestResultFactory.recordingFile(serverPath = "Series/Season/later.ts"))),
-            recording(11, "Earlier", "Recording now/earlier.ts", DvrEntryState.RECORDING_ERROR, startEpochSeconds = 100),
+            recording(10, "Growing", "Series/Season/growing.ts", DvrEntryState.RECORDING),
+            recording(12, "Kept", "kept.ts"),
         ))
+        awaitList()
+        compose.onNodeWithTag("recordings-now-cards").assertDoesNotExist()
+        // The Recording now folder leads the root and opens on the running recording.
         focused("recordings-recording-now-folder")
-        compose.onNodeWithText("2 recordings in progress").assertIsDisplayed()
-        key(Key.DirectionUp)
-        compose.onNodeWithText("Archive").assertIsFocused()
-        key(Key.DirectionDown)
-        focused("recordings-recording-now-folder")
-        capture("recording-now-root", 1f)
-        key(Key.DirectionCenter)
-        focused("recording-list-entry-11")
-        compose.onNodeWithTag("archive-level-heading").assertTextEquals("Recording now")
-        compose.onNodeWithTag("recordings-folder-Series").assertDoesNotExist()
-        capture("recording-now-flat", 1f)
-        key(Key.DirectionDown)
-        focused("recording-list-entry-10")
-        key(Key.Menu)
-        compose.onNodeWithText("Details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.onNodeWithTag("programme-details-page").assertIsDisplayed()
-        key(Key.Back)
-        focused("recording-list-entry-10")
-        key(Key.Back)
-        focused("recordings-recording-now-folder")
-        key(Key.DirectionDown)
-        focused("recordings-folder-Series")
-        key(Key.DirectionDown)
-        focused("recordings-folder-Recording now")
-        key(Key.DirectionCenter)
-        focused("recording-list-entry-11")
-        key(Key.Back)
-        focused("recordings-folder-Recording now")
-        assertNoCommands()
-        key(Key.DirectionUp)
-        key(Key.DirectionUp)
-        focused("recordings-recording-now-folder")
-        key(Key.DirectionRight)
-        // Recording now opens again on the recording it was left on.
-        focused("recording-list-entry-10")
-        key(Key.DirectionUp)
-        focused("recording-list-entry-11")
-        key(Key.DirectionDown)
-        focused("recording-list-entry-10")
-        key(Key.DirectionCenter)
-        compose.runOnIdle { assertEquals(1, playbackRequests) }
-    }
-
-    @Test fun finishingLastRecordingInsideMetaFolderReturnsFocusToSurvivingRootFolder() {
-        val running = recording(10, "Growing", "Series/Season/growing.ts", DvrEntryState.RECORDING)
-        show(entries = listOf(running))
-        focused("recordings-recording-now-folder")
-        compose.onNodeWithText("1 recording in progress").assertIsDisplayed()
+        assertTrue(bounds("recordings-recording-now-folder").top < bounds("recordings-folder-Series").top)
         key(Key.DirectionRight)
         focused("recording-list-entry-10")
-
-        publish(listOf(recording(10, "Finished", "Series/Season/growing.ts")))
-
+        compose.runOnIdle { assertEquals(listOf("recording-now"), screenState.archiveNavigation.stack.frames.drop(1).map { it.levelId }) }
+        key(Key.DirectionLeft)
+        focused("recordings-recording-now-folder")
+        // The running recording also stays in its own folder, whose icon carries the dot.
+        key(Key.DirectionDown)
         focused("recordings-folder-Series")
-        compose.onNodeWithTag("recordings-recording-now-folder").assertDoesNotExist()
-        compose.runOnIdle { assertEquals(listOf("archive:"), screenState.archiveNavigation.stack.path) }
+        assertFolderDotOnIcon("Series")
         key(Key.DirectionRight)
         focused("recordings-folder-Series/Season")
+        assertFolderDotOnIcon("Series/Season")
         key(Key.DirectionRight)
         focused("recording-list-entry-10")
+        assertTrailingStateMark(10, "Recording now")
+        key(Key.DirectionLeft)
+        key(Key.DirectionLeft)
+        focused("recordings-folder-Series")
+        // Once it finishes the folder and the dot go.
+        publish(listOf(recording(10, "Finished", "Series/Season/growing.ts"), recording(12, "Kept", "kept.ts")))
+        compose.onNodeWithTag("recordings-folder-running-Series", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("recordings-recording-now-folder").assertDoesNotExist()
         assertNoCommands()
     }
 
-    @Test fun finishingLastRecordingWithContextMenuOpenReturnsToSurvivingRootFolder() {
+    @Test fun theRecordingNowSwitchHidesTheFolderButKeepsTheFolderDot() {
+        show(entries = listOf(
+            recording(10, "Growing", "Series/Season/growing.ts", DvrEntryState.RECORDING),
+            recording(12, "Kept", "kept.ts"),
+        ))
+        focused("recordings-recording-now-folder")
+        upToOptions()
+        key(Key.DirectionCenter)
+        focused("recordings-view-group")
+        repeat(3) { key(Key.DirectionDown) }
+        focused("recordings-view-recording-now")
+        compose.onNodeWithTag("recordings-view-recording-now").assertIsOn()
+        key(Key.DirectionCenter)
+        compose.runOnIdle { assertEquals(DvrArchiveView(DvrArchiveGrouping.FOLDERS, recordingNowFolder = false), viewChanges.last()) }
+        compose.onNodeWithTag("recordings-view-recording-now").assertIsOff()
+        key(Key.Back)
+        gone("recordings-view-panel")
+        focused(OPTIONS)
+        compose.onNodeWithTag("recordings-recording-now-folder").assertDoesNotExist()
+        key(Key.DirectionDown)
+        focused("recordings-folder-Series")
+        assertFolderDotOnIcon("Series")
+        assertNoCommands()
+    }
+
+    @Test fun finishingLastRecordingWithContextMenuOpenKeepsTheMenuOnTheSameRecording() {
         show(entries = listOf(recording(10, "Growing", "Series/Season/growing.ts", DvrEntryState.RECORDING)))
         focused("recordings-recording-now-folder")
+        key(Key.DirectionDown)
+        focused("recordings-folder-Series")
+        key(Key.DirectionRight)
         key(Key.DirectionRight)
         focused("recording-list-entry-10")
         key(Key.Menu)
@@ -1401,25 +1947,10 @@ class RecordingsVisualLayoutTest {
         compose.onNodeWithText("Stop recording").assertDoesNotExist()
         compose.onNodeWithText("Delete").assertIsDisplayed()
         compose.onNode(hasAnyAncestor(hasTestTag("browse-context-menu")) and isFocused()).assertExists()
-        compose.onNodeWithText("Finished").assertIsDisplayed()
-        compose.runOnIdle { assertEquals(listOf("archive:"), screenState.archiveNavigation.stack.path) }
+        assertTrue(compose.onAllNodesWithText("Finished").fetchSemanticsNodes().isNotEmpty())
         key(Key.Back)
         compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
-        focused("recordings-folder-Series")
-        compose.onNodeWithTag("recordings-recording-now-folder").assertDoesNotExist()
-        assertNoCommands()
-    }
-
-    @Test fun disappearingMetaFolderAtRootHandsFocusToNextRow() {
-        show(entries = listOf(recording(10, "Growing", "Series/growing.ts", DvrEntryState.RECORDING)))
-        focused("recordings-recording-now-folder")
-
-        publish(listOf(recording(10, "Finished", "Series/growing.ts")))
-
-        focused("recordings-folder-Series")
-        compose.onNodeWithTag("recordings-recording-now-folder").assertDoesNotExist()
-        key(Key.DirectionUp)
-        compose.onNodeWithText("Archive").assertIsFocused()
+        focused("recording-list-entry-10")
         assertNoCommands()
     }
 
@@ -1557,7 +2088,7 @@ class RecordingsVisualLayoutTest {
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                         SideRail(
                             rootRoute = AppDestination.HOME, availableDestinations = setOf(AppDestination.HOME, AppDestination.CHANNELS, AppDestination.GUIDE, AppDestination.RECORDINGS, AppDestination.SETTINGS),
-                            currentRoute = AppDestination.RECORDINGS,
+                            currentRoute = railRoute.value,
                             onRootBack = { navigationRequests++ },
                             onNavigate = { navigationRequests++ },
                         ) { padding, drawer ->
@@ -1578,6 +2109,9 @@ class RecordingsVisualLayoutTest {
                                 notices = notices,
                                 onRetry = { error("Unexpected retry") },
                                 onPlayRecording = { _, _ -> playbackRequests++ },
+                                view = startView,
+                                onViewChange = { viewChanges += it },
+                                nowSecProvider = nowSeconds,
                             )
                         }
                     }
@@ -1613,14 +2147,109 @@ class RecordingsVisualLayoutTest {
         compose.waitForIdle()
     }
 
+    private fun tabFocused() = compose.onAllNodes(SemanticsMatcher("Mode tab") {
+        it.config.getOrNull(SemanticsProperties.TestTag).orEmpty().let { tag -> tag.startsWith("recordings-mode-") && tag != "recordings-mode-tabs" }
+    } and isFocused()).fetchSemanticsNodes().isNotEmpty()
+
+    private fun tagFocused(tag: String) =
+        compose.onAllNodes(hasTestTag(tag) and isFocused()).fetchSemanticsNodes().isNotEmpty()
+
+    private fun listRowFocused() = compose.onAllNodes(SemanticsMatcher("List row") {
+        val tag = it.config.getOrNull(SemanticsProperties.TestTag).orEmpty()
+        tag.startsWith("recording-list-entry-") || tag.startsWith("recordings-folder-") ||
+            tag == "recordings-recording-now-folder"
+    } and isFocused()).fetchSemanticsNodes().isNotEmpty()
+
+    /** Up from the first list row reaches the options button. */
+    private fun upToOptions() {
+        repeat(5) { if (!tagFocused(OPTIONS)) key(Key.DirectionUp) }
+        focused(OPTIONS)
+    }
+
+    /** From the button or the list, the options panel's [entry] level ("group", "sort", "show"). */
+    private fun openOptionsLevel(entry: String) {
+        upToOptions()
+        key(Key.DirectionCenter)
+        focused("recordings-view-group")
+        repeat(listOf("group", "sort", "show").indexOf(entry)) { key(Key.DirectionDown) }
+        focused("recordings-view-$entry")
+        key(Key.DirectionCenter)
+    }
+
+    /** Back from a level to the panel's root and Back again closes it, focus back on the button. */
+    private fun closeOptions() {
+        key(Key.Back)
+        if (compose.onAllNodesWithTag("recordings-view-panel").fetchSemanticsNodes().isNotEmpty()) key(Key.Back)
+        gone("recordings-view-panel")
+        focused(OPTIONS)
+    }
+
+    /** The options button's fill beside its glyph: quiet or filled. */
+    private fun optionsFill(): Int {
+        val map = compose.onNodeWithTag(OPTIONS).captureToImage().toPixelMap()
+        return map[map.width / 6, map.height / 2].toArgb()
+    }
+
+    /** The running recording's dot sits on the folder's 32 dp icon or logo, not after its title. */
+    private fun assertFolderDotOnIcon(folder: String) {
+        val dot = compose.onNodeWithTag("recordings-folder-running-$folder", useUnmergedTree = true)
+            .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val row = bounds("recordings-folder-$folder")
+        val density = view.resources.displayMetrics.density
+        assertTrue("The dot sits on the 32 dp icon (${dot.width} px)", dot.width in 32f * density - 1f..32f * 1.05f * density + 1f)
+        assertTrue("The dot is at the row's start", dot.left - row.left < 40f * density)
+    }
+
+    /** Reopens the screen on its Schedule tab, as Home's upcoming card does. */
+    private fun openScheduleScreen() {
+        compose.runOnIdle { screenShown.value = false }
+        compose.waitForIdle()
+        screenState = RecordingsScreenState(at.bernhardberger.tvhplayer.core.DvrLibraryMode.SCHEDULE)
+        compose.runOnIdle { screenShown.value = true }
+        compose.mainClock.advanceTimeUntil { tabFocused() || listRowFocused() }
+        compose.waitForIdle()
+        gone(OPTIONS)
+    }
+
+    /** As [openScheduleScreen], then Up from the first entry to the tabs. */
+    private fun openScheduleSubnav() {
+        openScheduleScreen()
+        if (!tabFocused()) key(Key.DirectionUp)
+        assertTrue(tabFocused())
+    }
+
+    private fun downToList() {
+        key(Key.DirectionDown)
+        awaitList()
+    }
+
+    private fun awaitList() {
+        compose.mainClock.advanceTimeUntil { listRowFocused() }
+        compose.waitForIdle()
+    }
+
     private fun focused(tag: String) {
-        compose.waitUntil(10_000) {
+        compose.mainClock.advanceTimeUntil {
             compose.onAllNodes(hasTestTag(tag) and isFocused()).fetchSemanticsNodes().isNotEmpty()
         }
+        compose.waitForIdle()
         compose.onNodeWithTag(tag).assertIsFocused().assertIsDisplayed()
     }
 
+    /** Waits for a panel page to finish leaving: its fade keeps it composed for a moment. */
+    private fun gone(tag: String) {
+        compose.mainClock.advanceTimeUntil { compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isEmpty() }
+        compose.waitForIdle()
+    }
+
     private fun bounds(tag: String): Rect = compose.tagBounds(tag)
+
+    private fun headingLeft() = compose.onAllNodesWithTag("archive-level-heading")[0].fetchSemanticsNode().boundsInRoot.left
+    private fun headlineToFirstRowGap(): Float {
+        val heading = compose.onAllNodesWithTag("archive-level-heading").fetchSemanticsNodes()
+            .minBy { it.boundsInRoot.left }.boundsInRoot
+        return (visibleListRows().first().top - heading.bottom) / 2f
+    }
 
     private fun assertTrailingStateMark(id: Int, description: String) {
         compose.onNodeWithTag("recording-list-state-$id", useUnmergedTree = true)
@@ -1667,7 +2296,7 @@ class RecordingsVisualLayoutTest {
         assertEquals(archiveRow.width, row.width, .5f)
         val pane = bounds("recording-metadata-pane")
         assertEquals(row.left + 340f + 92f, pane.left, .5f)
-        assertEquals(archiveRow.top, pane.top, .5f)
+        assertEquals(row.top, pane.top, .5f)
         assertPaneTitle(paneTitle)
     }
 
@@ -1737,14 +2366,16 @@ class RecordingsVisualLayoutTest {
 
     private fun visibleListRows(): List<Rect> = compose.onAllNodes(SemanticsMatcher("Recording or folder row") {
         val tag = it.config.getOrNull(SemanticsProperties.TestTag).orEmpty()
-        tag.startsWith("recording-list-entry-") || tag.startsWith("recordings-folder-")
+        (tag.startsWith("recording-list-entry-") || tag.startsWith("recordings-folder-") ||
+            tag == "recordings-recording-now-folder") && !tag.substringAfter("recordings-folder-").startsWith("running-") &&
+            !tag.contains("-logo-") && !tag.contains("-watched-") && !tag.contains("-supporting-")
     }).fetchSemanticsNodes().map { it.boundsInRoot }.sortedBy { it.top }
 
-    private fun assertDenseListGeometry(firstRowTop: Float) {
+    private fun assertDenseListGeometry() {
         val rows = visibleListRows().filter { it.height > 63.5f }
         assertEquals(6, rows.size)
         rows.forEachIndexed { index, row ->
-            assertEquals(firstRowTop + index * 68f, row.top, .5f)
+            assertEquals(rows.first().top + index * 68f, row.top, .5f)
             assertEquals(64f, row.height, .5f)
         }
         rows.zipWithNext().forEach { (previous, next) -> assertEquals(4f, next.top - previous.bottom, .5f) }
@@ -1781,6 +2412,85 @@ class RecordingsVisualLayoutTest {
                 bitmap.recycle()
             }
         }
+    }
+
+    private class Heading(val text: String, val bounds: Rect, val baseline: Float)
+
+    /**
+     * The active level's heading with its baseline in the root. The preview column clears its
+     * semantics, so its heading is measured in the captures' ink, not here.
+     */
+    private fun activeHeading(): Heading {
+        val previewLeft = bounds("depth-preview").left
+        return compose.onAllNodesWithTag("archive-level-heading").fetchSemanticsNodes().map { node ->
+            val layouts = mutableListOf<TextLayoutResult>()
+            node.config[SemanticsActions.GetTextLayoutResult].action?.invoke(layouts)
+            val layout = layouts.first()
+            val box = node.boundsInRoot
+            Heading(layout.layoutInput.text.text, box, box.top + layout.firstBaseline * box.height / layout.size.height)
+        }.filter { it.bounds.width > 0f && it.bounds.left >= 0f && it.bounds.left < previewLeft - 1f }
+            .maxBy { it.bounds.left }
+    }
+
+    /** The active level's values line, if it has one; earlier levels keep theirs off-screen. */
+    private fun valuesLine(): SemanticsNodeInteraction? {
+        val previewLeft = bounds("depth-preview").left
+        val nodes = compose.onAllNodesWithTag("archive-values-line", useUnmergedTree = true)
+        val index = nodes.fetchSemanticsNodes().withIndex()
+            .filter { (_, it) -> it.boundsInRoot.width > 0f && it.boundsInRoot.left >= 0f && it.boundsInRoot.left < previewLeft }
+            .maxByOrNull { it.value.boundsInRoot.left }?.index ?: return null
+        return nodes[index]
+    }
+
+    /** The first visible row of the list column; the preview column's rows carry no semantics. */
+    private fun firstListRow(): Rect {
+        val previewLeft = bounds("depth-preview").left
+        return visibleListRows().filter {
+            it.width > 100f && it.bottom > 0f && it.left < previewLeft && it.left > bounds("recordings-header").left - 1f
+        }.minBy { it.top }
+    }
+
+    /** The first line below [fromY] with ink in the 40 dp band where a column starting at [left] draws its row icons. */
+    private fun firstIconInk(left: Float, fromY: Float): Float = compose.runOnIdle {
+        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        view.draw(Canvas(bitmap))
+        fun brightness(x: Int, y: Int) =
+            android.graphics.Color.valueOf(bitmap.getPixel(x, y)).run { maxOf(red(), green(), blue()) }
+        val background = brightness(view.width - 4, view.height - 4)
+        val band = left.toInt() until left.toInt() + (40f * view.resources.displayMetrics.density).toInt()
+        val first = (fromY.toInt() + 1 until view.height).first { y -> band.any { x -> brightness(x, y) > background + .15f } }
+        bitmap.recycle()
+        first.toFloat()
+    }
+
+    /** The button ends where the rows do and keeps clear air above the row grown by its focus. */
+    private fun assertButtonClearOf(row: Rect) {
+        val button = bounds(OPTIONS)
+        assertEquals("The button ends with the rows", row.right, button.right, 1f)
+        val gap = row.top - row.height * .025f - button.bottom
+        assertTrue("The button keeps clear of the focused first row ($gap px)", gap >= 4f * view.resources.displayMetrics.density)
+    }
+
+    /** The header's measured bounds for a frame's evidence file, in pixels. */
+    private fun headerReport(): String {
+        fun r(rect: Rect) = "%.1f,%.1f-%.1f,%.1f".format(rect.left, rect.top, rect.right, rect.bottom)
+        fun tagged(tag: String) = runCatching {
+            compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        }.getOrNull()
+        return buildList {
+            add("tabs=${tagged("recordings-mode-tabs")?.let(::r)}")
+            add("storage=${tagged("recordings-space")?.let(::r)} ring=${tagged("recordings-space-ring")?.let(::r)} " +
+                "text=${tagged("recordings-space-text")?.let(::r)}")
+            add("button=${tagged(OPTIONS)?.let(::r)}")
+            add("values=${runCatching { valuesLine() }.getOrNull()?.fetchSemanticsNode()?.boundsInRoot?.let(::r)}")
+            runCatching { activeHeading() }.getOrNull()?.let { active ->
+                add("headline='${active.text}' ${r(active.bounds)} baseline=${active.baseline}")
+            }
+            runCatching { firstListRow() }.getOrNull()?.let { list ->
+                add("firstListRow=${r(list)}")
+                tagged(OPTIONS)?.let { add("buttonToFocusedRowGap=${list.top - list.height * .025f - it.bottom}") }
+            }
+        }.joinToString("\n")
     }
 
     private fun textLayout(tag: String): TextLayoutResult {
@@ -1820,6 +2530,57 @@ class RecordingsVisualLayoutTest {
         }
     }
 
+    /** Luminance of [area] in the frame as drawn now, row by row. */
+    private fun luminance(area: Rect): FloatArray {
+        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        view.draw(Canvas(bitmap))
+        val left = area.left.toInt()
+        val top = area.top.toInt()
+        val width = area.width.toInt()
+        val height = area.height.toInt()
+        val pixels = IntArray(width * height)
+        bitmap.getPixels(pixels, 0, width, left.coerceAtLeast(0), top, width, height)
+        bitmap.recycle()
+        return FloatArray(pixels.size) { pixels[it].let { c ->
+            0.299f * (c shr 16 and 0xff) + 0.587f * (c shr 8 and 0xff) + 0.114f * (c and 0xff) } }
+    }
+
+    /**
+     * Where [template], drawn at [home], now stands on the same rows at or left of home: the shift and its
+     * normalised correlation, which a fade over the plain background does not change.
+     */
+    private fun trackHorizontally(template: FloatArray, home: Rect): Pair<Float, Float> {
+        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        view.draw(Canvas(bitmap))
+        val width = home.width.toInt()
+        val height = home.height.toInt()
+        val band = IntArray(view.width * height)
+        bitmap.getPixels(band, 0, view.width, 0, home.top.toInt(), view.width, height)
+        bitmap.recycle()
+        val lum = FloatArray(band.size) { band[it].let { c ->
+            0.299f * (c shr 16 and 0xff) + 0.587f * (c shr 8 and 0xff) + 0.114f * (c and 0xff) } }
+        val mean = template.average().toFloat()
+        val t = FloatArray(template.size) { template[it] - mean }
+        val tNorm = kotlin.math.sqrt(t.sumOf { (it * it).toDouble() }).toFloat()
+        var best = 0 to -1f
+        // The root column only ever moves left of its home.
+        for (x in 0..minOf(view.width - width, home.left.toInt())) {
+            var sum = 0f
+            for (y in 0 until height) for (i in 0 until width) sum += lum[y * view.width + x + i]
+            val m = sum / (width * height)
+            var dot = 0f
+            var norm = 0f
+            for (y in 0 until height) for (i in 0 until width) {
+                val v = lum[y * view.width + x + i] - m
+                dot += v * t[y * width + i]
+                norm += v * v
+            }
+            val score = if (norm == 0f) 0f else dot / (kotlin.math.sqrt(norm) * tNorm)
+            if (score > best.second) best = x to score
+        }
+        return (best.first - home.left) to best.second
+    }
+
     private fun capture(name: String, scale: Float, focusEvidence: String? = null,
         outputs: String = "build/outputs/browse-cohesion/archive-depth") {
         if (!CaptureOutput.enabled) return
@@ -1848,6 +2609,10 @@ class RecordingsVisualLayoutTest {
     }
 
     private companion object {
+        const val HEADER_CAPTURES = "build/outputs/recordings-header-final"
+        const val LABEL_CAPTURES = "build/outputs/list-label-spacing"
+        const val OPTIONS = "recordings-view-options"
+        const val BROWSE_TAB = "recordings-mode-archive"
         const val LONG_TITLE = "Ridge Light: The Remarkable Journey of the Northern Lights Across the Arctic"
     }
 }
