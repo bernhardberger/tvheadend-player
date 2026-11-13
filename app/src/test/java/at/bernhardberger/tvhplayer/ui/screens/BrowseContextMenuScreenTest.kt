@@ -860,7 +860,7 @@ class BrowseContextMenuScreenTest {
         compose.onNodeWithTag("centred-dialog-card").assertDoesNotExist()
         compose.runOnIdle { assertTrue(scheduleRequests.isEmpty()) }
         for (enabled in listOf(true, false)) {
-            show(recordings = false, channelRecording = true, recordingState = DvrEntryState.SCHEDULED,
+            val session = show(recordings = false, channelRecording = true, recordingState = DvrEntryState.SCHEDULED,
                 ruleMade = true, recordingEnabled = enabled)
             compose.onNodeWithTag("channel-row-1").requestFocus()
             compose.pressKey(Key(android.view.KeyEvent.KEYCODE_MEDIA_RECORD))
@@ -871,6 +871,7 @@ class BrowseContextMenuScreenTest {
             compose.onNodeWithTag("details-$ownAction").assertIsFocused()
             compose.runOnIdle {
                 assertTrue(scheduleRequests.isEmpty())
+                assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_UPDATE_ENTRY })
                 assertTrue(screenNotices.state.value.pending.none {
                     it.notice is at.bernhardberger.tvhplayer.notices.Notice.RecordUnavailable
                 })

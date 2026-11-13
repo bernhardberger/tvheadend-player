@@ -41,6 +41,7 @@ internal class AutomaticRecordingEditorState(
         deletionAllowed = editing,
     )
     private var loadedPreview by mutableStateOf<AutorecPreviewState>(AutorecPreviewState.Loading)
+    private var lastMatchedRows = emptyList<AutorecPreviewRow>()
     val preview: AutorecPreviewState
         get() = (loadedPreview as? AutorecPreviewState.Matches)?.let { matches ->
             matches.copy(willRecordCount = matches.rows.count { row ->
@@ -149,15 +150,14 @@ internal class AutomaticRecordingEditorState(
         navigation.confirmation = null
         busy = true
         val submittedDraft = draft
-        // Real rule updates may recreate even previously skipped entries enabled.
-        val submittedChoices = if (editing && changedFields.isNotEmpty()) {
-            val skipped = (preview as? AutorecPreviewState.Matches)?.rows.orEmpty()
-                .filter { it.state != AutorecEpisodeState.REMOVED && it.eventId != null && !episodeEnabled(it) }
-                .associate { requireNotNull(it.eventId) to false }
-            enabledChanges.filterValues { it } + skipped
-        } else enabledChanges
+        val updatingRule = editing && changedFields.isNotEmpty()
         saveJob = scope.launch {
             try {
+                // Wait for this locked draft's preview; unavailable results retain explicit and last-known skips.
+                val submittedChoices = if (updatingRule) {
+                    previewJob?.join()
+                    episodeChoicesForRuleUpdate()
+                } else enabledChanges
                 when (saveDraft(submittedDraft, submittedChoices)) {
                     is AutorecSaveOutcome.RuleFailed -> {
                         navigation.firstLevel("main")
@@ -168,6 +168,17 @@ internal class AutomaticRecordingEditorState(
                 busy = false
             }
         }
+    }
+
+    private fun episodeChoicesForRuleUpdate(): Map<EventId, Boolean> {
+        val rows = (preview as? AutorecPreviewState.Matches)?.rows
+        return if (rows != null) rows.filter {
+            it.state != AutorecEpisodeState.REMOVED && it.eventId != null &&
+                (it.eventId in enabledChanges || !episodeEnabled(it))
+        }.associate { requireNotNull(it.eventId) to episodeEnabled(it) }
+        else enabledChanges + lastMatchedRows.filter {
+            it.eventId != null && it.eventId !in enabledChanges && !episodeEnabled(it)
+        }.associate { requireNotNull(it.eventId) to false }
     }
 
     fun dispose() {
@@ -183,7 +194,10 @@ internal class AutomaticRecordingEditorState(
         if (!keepMatches || loadedPreview !is AutorecPreviewState.Matches) loadedPreview = AutorecPreviewState.Loading
         previewJob = scope.launch {
             val result = loadPreview(requestedDraft, baseline.takeIf { editing }, now(), zone)
-            if (revision == previewRevision && !closed) loadedPreview = result
+            if (revision == previewRevision && !closed) {
+                loadedPreview = result
+                if (result is AutorecPreviewState.Matches) lastMatchedRows = result.rows
+            }
         }
     }
 

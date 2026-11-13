@@ -63,6 +63,8 @@ import java.time.ZoneId
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
+import kotlinx.coroutines.CompletableDeferred
+import at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 
 class DvrMutationActionsTest {
@@ -230,6 +232,68 @@ class DvrMutationActionsTest {
         assertEquals(AutorecSaveOutcome.Applied(rule.id), outcome)
         assertTrue(editor.closed)
         editor.dispose()
+
+        for (previewFails in listOf(false, true)) {
+            val explicit = DvrEntry.create(DvrEntryId(20), eventId = EventId(8), autorecRuleId = rule.id,
+                state = DvrEntryState.SCHEDULED, enabled = true)
+            val gatedSession = automaticSession(listOf(rule), listOf(old, explicit))
+            gatedSession.dvrRepository.scriptUpdateAutorecRule(DvrMutationResult.Confirmed(Unit))
+            val appliedChoices = mutableListOf<Pair<DvrEntryId, DvrEntryUpdate>>()
+            val gatedActions = automaticActions(gatedSession) { _, id, update ->
+                appliedChoices += id to update
+                DvrMutationResult.Confirmed(Unit)
+            }
+            val rows = listOf(
+                AutorecPreviewRow(old.eventId, old.id, null, null, null, automaticRecordingNow, null,
+                    AutorecEpisodeState.SKIPPED),
+                AutorecPreviewRow(explicit.eventId, explicit.id, null, null, null, automaticRecordingNow, null,
+                    AutorecEpisodeState.SCHEDULED),
+            )
+            val previewGate = CompletableDeferred<AutorecPreviewState>()
+            var gatedOutcome: AutorecSaveOutcome? = null
+            val gatedEditor = AutomaticRecordingEditorState(baseline, this,
+                loadPreview = { draft, _, _, _ ->
+                    if (draft == baseline) AutorecPreviewState.Matches(rows, 1, false) else previewGate.await()
+                },
+                saveDraft = { draft, choices ->
+                    gatedActions.updateAutorecWithEpisodes(DvrMutationAction.UpdateAutorec(
+                        requireNotNull(gatedSession.observation.value.currentSession), rule,
+                        draft.toUpdateRequest(baseline)), choices, gatedSession.observation, notices, context)
+                        .also { gatedOutcome = it }
+                }, now = { automaticRecordingNow }, zone = automaticRecordingZone,
+                editing = true, deleteRule = { DvrMutationResult.Confirmed(Unit) })
+            try {
+                runCurrent()
+                gatedEditor.toggleEpisode(rows[1])
+                gatedEditor.updateDraft { it.copy(pattern = it.pattern.copy(words = "news updated")) }
+                runCurrent()
+                assertEquals(AutorecPreviewState.Loading, gatedEditor.preview)
+                gatedEditor.submit()
+                runCurrent()
+                assertTrue(gatedEditor.busy)
+                assertEquals(0, gatedSession.calls.count { it == FakeSessionCall.DVR_UPDATE_AUTOREC_RULE })
+                previewGate.complete(if (previewFails) AutorecPreviewState.Failed(TvheadendFailure.TIMEOUT)
+                    else AutorecPreviewState.Matches(listOf(rows[0].copy(state = AutorecEpisodeState.REMOVED),
+                        rows[1]), 1, false))
+                runCurrent()
+                assertEquals(1, gatedSession.calls.count { it == FakeSessionCall.DVR_UPDATE_AUTOREC_RULE })
+                val newSkipped = DvrEntry.create(DvrEntryId(30), eventId = old.eventId, autorecRuleId = rule.id,
+                    state = DvrEntryState.SCHEDULED, enabled = true)
+                val newExplicit = DvrEntry.create(DvrEntryId(31), eventId = explicit.eventId,
+                    autorecRuleId = rule.id, state = DvrEntryState.SCHEDULED, enabled = true)
+                publishAutomaticEntries(gatedSession, listOf(newSkipped, newExplicit), listOf(rule))
+                runCurrent()
+                val expected = listOf(newExplicit.id to DvrEntryUpdate(enabled = false)) +
+                    if (previewFails) listOf(newSkipped.id to DvrEntryUpdate(enabled = false)) else emptyList()
+                assertEquals(expected.toMap(), appliedChoices.toMap())
+                assertEquals(expected.size, appliedChoices.size)
+                assertEquals(AutorecSaveOutcome.Applied(rule.id), gatedOutcome)
+                assertTrue(gatedEditor.closed)
+            } finally {
+                previewGate.complete(AutorecPreviewState.Failed(TvheadendFailure.TIMEOUT))
+                gatedEditor.dispose()
+            }
+        }
     }
 
     private fun automaticSession(
