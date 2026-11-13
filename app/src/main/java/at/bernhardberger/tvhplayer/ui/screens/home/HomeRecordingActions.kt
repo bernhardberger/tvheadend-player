@@ -44,10 +44,11 @@ internal fun HomeRecordingActions(
     val latestNowSec by rememberUpdatedState(nowSec)
     val mutations = remember(session) { DvrMutationActions(session.dvrRepository) }
     var editingRule by remember { mutableStateOf(false) }
+    var detailsRuleEditor by remember { mutableStateOf(false) }
     val capability = opening.currentSession?.takeIf { it === observation.currentSession }
     val observed = if (capability != null && observation.dvrState is DvrRepositoryState.Current)
         observation.dvrEntry(entry.id)?.takeUnless(::recordingWasRemoved) else entry
-    val opened = observed ?: entry.takeIf { editingRule && capability != null }
+    val opened = observed ?: entry.takeIf { (editingRule || detailsRuleEditor) && capability != null }
     LaunchedEffect(capability, opened) {
         if (opening.currentSession != null && capability == null || opened == null) onClose()
     }
@@ -92,7 +93,7 @@ internal fun HomeRecordingActions(
             onContinueWatching = {
                 if (owner?.isCurrent != false) onReturnToRecording(opened.id) { closeBehindPlayer(onClose) }
             },
-            initialAction = initialAction)
+            initialAction = initialAction, onRuleEditorActive = { detailsRuleEditor = it })
     } else if (menu) {
         val canModify = capability != null && (observation.sessionState as? SessionState.Ready)
             ?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
@@ -128,8 +129,9 @@ internal fun HomeRecordingActions(
                         val owner = capability?.takeIf { current.currentSession === it }
                         val writable = (current.sessionState as? SessionState.Ready)
                             ?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
-                        if (owner != null && writable &&
-                            current.recordingRuleAvailable(opened)) editingRule = true
+                        val latest = current.dvrEntry(opened.id)
+                        if (owner != null && latest != null && action in recordingRuleActions(
+                                latest, writable, current.recordingRuleAvailable(latest))) editingRule = true
                     }
                     BrowseContextAction.SKIP, BrowseContextAction.UNSKIP -> {
                         mutationBusy = true

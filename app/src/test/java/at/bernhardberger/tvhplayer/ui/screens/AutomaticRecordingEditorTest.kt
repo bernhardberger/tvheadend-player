@@ -9,6 +9,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -58,6 +60,7 @@ class AutomaticRecordingEditorTest {
 
     @Test fun ruleMenuSkipAndUnskipWaitForPublishedMetadata() {
         val entry = automaticRecordingEntry()
+        var detailsRoute by mutableStateOf(false)
         val session = automaticRecordingFakeSession(listOf(entry))
         val notices = NoticeCenter({ compose.mainClock.currentTime }, { NoticeContext(1, null) })
         session.dvrRepository.scriptUpdateEntry(DvrMutationResult.Confirmed(Unit))
@@ -69,11 +72,13 @@ class AutomaticRecordingEditorTest {
             val observation by session.observation.collectAsState()
             org.koin.compose.KoinIsolatedContext(remember { org.koin.dsl.koinApplication { modules(dependencies) } }) {
                 TVHeadendPlayerTheme {
+                    key(detailsRoute) {
                     at.bernhardberger.tvhplayer.ui.screens.home.HomeRecordingActions(
                         entry, observation, contextMenu = true, nowSec = automaticRecordingNow.epochSeconds,
                         onPlay = { _, _ -> }, onWatchChannel = { _, _ -> }, onShowGuide = { _, _ -> },
                         onReturnToRecording = { _, _ -> false }, onClose = {},
                     )
+                    }
                 }
             }
         }
@@ -106,10 +111,78 @@ class AutomaticRecordingEditorTest {
         compose.onNodeWithTag("browse-context-action-edit_rule").assertIsFocused()
         compose.pressKey(Key.DirectionCenter)
         compose.onNodeWithTag("automatic-recording-matches").assertIsFocused()
+        compose.onNodeWithTag("automatic-recording-enabled")
+            .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.RequestFocus) { it() }
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("automatic-recording-enabled").assertIsOff()
         compose.runOnIdle {
             session.publish(automaticRecordingObservation(entries = emptyList(), autorecRules = listOf(rule)))
         }
-        compose.onNodeWithTag("automatic-recording-matches").assertExists()
+        compose.onNodeWithTag("automatic-recording-enabled").assertIsOff().assertIsFocused()
+        compose.onNodeWithTag("automatic-recording-main").assertIsEnabled()
+        compose.runOnIdle {
+            session.publish(automaticRecordingObservation(entries = listOf(entry), autorecRules = listOf(rule)))
+            detailsRoute = true
+        }
+        compose.onNodeWithTag("browse-context-action-details").assertIsFocused()
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("details-edit_rule")
+            .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.RequestFocus) { it() }
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("automatic-recording-enabled")
+            .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.RequestFocus) { it() }
+        compose.pressKey(Key.DirectionCenter)
+        compose.runOnIdle {
+            session.publish(automaticRecordingObservation(entries = emptyList(), autorecRules = listOf(rule)))
+        }
+        compose.onNodeWithTag("automatic-recording-enabled").assertIsOff().assertIsFocused()
+        compose.onNodeWithTag("automatic-recording-main").assertIsEnabled()
+    }
+
+    @Test fun ruleEditRechecksThePublishedEntryAtActivation() {
+        val entry = automaticRecordingEntry()
+        val rule = at.bernhardberger.tvheadend.sdk.core.AutorecRule.create(
+            requireNotNull(entry.autorecRuleId), title = "^Ridge Light$")
+        val session = automaticRecordingFakeSession(listOf(entry))
+        var detailsRoute by mutableStateOf(false)
+        val notices = NoticeCenter({ compose.mainClock.currentTime }, { NoticeContext(1, null) })
+        val dependencies = org.koin.dsl.module {
+            single<at.bernhardberger.tvheadend.sdk.core.TvheadendSession> { session }
+            single { notices }
+        }
+        session.publish(automaticRecordingObservation(entries = listOf(entry), autorecRules = listOf(rule)))
+        compose.setContent {
+            val observation by session.observation.collectAsState()
+            org.koin.compose.KoinIsolatedContext(remember { org.koin.dsl.koinApplication { modules(dependencies) } }) {
+                TVHeadendPlayerTheme {
+                    key(detailsRoute) {
+                        at.bernhardberger.tvhplayer.ui.screens.home.HomeRecordingActions(
+                            entry, observation, contextMenu = !detailsRoute, nowSec = automaticRecordingNow.epochSeconds,
+                            onPlay = { _, _ -> }, onWatchChannel = { _, _ -> }, onShowGuide = { _, _ -> },
+                            onReturnToRecording = { _, _ -> false }, onClose = {})
+                    }
+                }
+            }
+        }
+        val openedRoutes = mutableListOf<Boolean>()
+        for (details in listOf(false, true)) {
+            compose.runOnIdle {
+                session.publish(automaticRecordingObservation(entries = listOf(entry), autorecRules = listOf(rule)))
+                detailsRoute = details
+            }
+            val tag = if (details) "details-edit_rule" else "browse-context-action-edit_rule"
+            val activate = requireNotNull(compose.onNodeWithTag(tag).fetchSemanticsNode()
+                .config[androidx.compose.ui.semantics.SemanticsActions.OnClick].action)
+            compose.runOnIdle {
+                session.publish(automaticRecordingObservation(
+                    entries = listOf(automaticRecordingEntry(state = at.bernhardberger.tvheadend.sdk.core.DvrEntryState.COMPLETED)),
+                    autorecRules = listOf(rule)))
+                activate()
+            }
+            if (compose.onAllNodes(androidx.compose.ui.test.hasTestTag("automatic-recording-matches"))
+                    .fetchSemanticsNodes().isNotEmpty()) openedRoutes += details
+        }
+        assertEquals(emptyList<Boolean>(), openedRoutes)
     }
 
     @OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)

@@ -54,6 +54,11 @@ import at.bernhardberger.tvhplayer.core.AutomaticRecordingKind
 import at.bernhardberger.tvhplayer.core.AutorecPreviewState
 import at.bernhardberger.tvhplayer.core.RecordingPattern
 import at.bernhardberger.tvhplayer.core.newAutorecDraft
+import at.bernhardberger.tvhplayer.core.toDraft
+import at.bernhardberger.tvhplayer.core.toUpdateRequest
+import at.bernhardberger.tvhplayer.core.AutorecPreviewRow
+import at.bernhardberger.tvhplayer.core.AutorecEpisodeState
+import kotlinx.coroutines.test.runCurrent
 import java.time.ZoneId
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -166,6 +171,7 @@ class DvrMutationActionsTest {
             session.observation, notices, context) is AutorecSaveOutcome.RuleFailed)
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Test fun editingEpisodeChoicesWaitsForRecreatedEntriesAndEnablesAsWellAsDisables() = runTest {
         val rule = AutorecRule.create(AutorecRuleId("own"), title = "news")
         val old = DvrEntry.create(DvrEntryId(10), eventId = EventId(7), autorecRuleId = rule.id,
@@ -194,6 +200,36 @@ class DvrMutationActionsTest {
         assertEquals(mapOf(enabled.id to DvrEntryUpdate(enabled = true),
             disabled.id to DvrEntryUpdate(enabled = false)), requests.toMap())
         assertEquals(2, requests.size)
+
+        requests.clear()
+        publishAutomaticEntries(session, listOf(old), listOf(rule))
+        session.dvrRepository.scriptUpdateAutorecRule(DvrMutationResult.Confirmed(Unit))
+        var outcome: AutorecSaveOutcome? = null
+        val baseline = rule.toDraft()
+        val editor = AutomaticRecordingEditorState(baseline, this,
+            loadPreview = { _, _, _, _ -> AutorecPreviewState.Matches(listOf(AutorecPreviewRow(
+                old.eventId, old.id, null, null, null, automaticRecordingNow, null, AutorecEpisodeState.SKIPPED,
+            )), 0, false) },
+            saveDraft = { draft, choices ->
+                actions.updateAutorecWithEpisodes(DvrMutationAction.UpdateAutorec(
+                    requireNotNull(session.observation.value.currentSession), rule, draft.toUpdateRequest(baseline)),
+                    choices, session.observation, notices, context).also { outcome = it }
+            }, now = { automaticRecordingNow }, zone = automaticRecordingZone,
+            editing = true, deleteRule = { DvrMutationResult.Confirmed(Unit) })
+        runCurrent()
+        assertFalse(editor.changed)
+        editor.updateDraft { it.copy(removal = DvrRemoval.Forever) }
+        runCurrent()
+        editor.submit()
+        runCurrent()
+        val recreated = DvrEntry.create(DvrEntryId(13), eventId = old.eventId, autorecRuleId = rule.id,
+            state = DvrEntryState.SCHEDULED, enabled = true)
+        publishAutomaticEntries(session, listOf(recreated), listOf(rule))
+        runCurrent()
+        assertEquals(listOf(recreated.id to DvrEntryUpdate(enabled = false)), requests)
+        assertEquals(AutorecSaveOutcome.Applied(rule.id), outcome)
+        assertTrue(editor.closed)
+        editor.dispose()
     }
 
     private fun automaticSession(

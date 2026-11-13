@@ -642,8 +642,26 @@ class RecordingsVisualLayoutTest {
         assertNoCommands()
     }
 
+    @Test fun ruleMenuRejectsAnEntryThatCompletedBeforeActivation() {
+        val entry = paneEntries(long = false).single { it.id == DvrEntryId(40) }
+        val rule = at.bernhardberger.tvheadend.sdk.core.AutorecRule.create(
+            requireNotNull(entry.autorecRuleId), title = "^Ridge Light$")
+        screenState.open(at.bernhardberger.tvhplayer.core.DvrLibraryMode.SCHEDULE)
+        show(entries = listOf(entry), autorecRules = listOf(rule))
+        focused("recording-list-entry-40")
+        key(Key.Menu)
+        val activate = requireNotNull(compose.onNodeWithTag("browse-context-action-edit_rule").fetchSemanticsNode()
+            .config[SemanticsActions.OnClick].action)
+        publish(listOf(DvrEntry.create(entry.id, title = entry.title, state = DvrEntryState.COMPLETED,
+            autorecRuleId = rule.id)), autorecRules = listOf(rule), afterPublish = { activate() })
+        compose.onNodeWithTag("automatic-recording-matches").assertDoesNotExist()
+        assertNoCommands()
+    }
+
     @Test fun schedulePaneGivesThePaddedStopAndRuleAndProblemsPaneWhatWentWrong() {
-        show(entries = paneEntries(long = false))
+        show(entries = paneEntries(long = false), autorecRules = listOf(
+            at.bernhardberger.tvheadend.sdk.core.AutorecRule.create(
+                AutorecRuleId("series"), seriesLinkUri = "series:ridge-light")))
         focused("recordings-folder-Sport")
         key(Key.DirectionUp)
         key(Key.DirectionRight)
@@ -658,6 +676,10 @@ class RecordingsVisualLayoutTest {
         compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-metadata")) and hasText("recorded", substring = true),
             useUnmergedTree = true).assertDoesNotExist()
         capture("schedule-pane", 1f)
+        publish(paneEntries(long = false), autorecRules = listOf(
+            at.bernhardberger.tvheadend.sdk.core.AutorecRule.create(AutorecRuleId("series"), title = "^Ridge Light$")))
+        compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-rule")) and
+            hasText("Part of an automatic recording"), useUnmergedTree = true).assertIsDisplayed()
         key(Key.DirectionDown)
         focused("recording-list-entry-41")
         compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-rule")) and hasText("Part of a repeating timer"),
@@ -1419,20 +1441,24 @@ class RecordingsVisualLayoutTest {
             useUnmergedTree = true).assertIsDisplayed()
     }
 
-    private fun publish(entries: List<DvrEntry>, awaitPreparation: Boolean = true) {
+    private fun publish(entries: List<DvrEntry>, awaitPreparation: Boolean = true,
+        autorecRules: List<at.bernhardberger.tvheadend.sdk.core.AutorecRule> = emptyList(),
+        afterPublish: () -> Unit = {}) {
         compose.runOnIdle {
             session.publish(session.observation.value.let {
                 SessionObservation.create(it.sessionState, it.channelState, it.epgState,
-                    DvrRepositoryState.Current(DvrSnapshot.create(entries)),
+                    DvrRepositoryState.Current(DvrSnapshot.create(entries, autorecRules = autorecRules)),
                     recordingProgressCapability = it.recordingProgressCapability,
                     dvrDiskSpaceState = it.dvrDiskSpaceState)
             })
+            afterPublish()
         }
         if (awaitPreparation) compose.waitForIdle()
     }
 
     private fun show(scale: Float = 1f, empty: Boolean = false, entries: List<DvrEntry>? = null, endPadding: Dp? = null,
-        diskSpace: DvrDiskSpaceState = DvrDiskSpaceState.Unknown, channels: List<Channel> = emptyList(), snapshotLoaded: Boolean = true) {
+        diskSpace: DvrDiskSpaceState = DvrDiskSpaceState.Unknown, channels: List<Channel> = emptyList(),
+        snapshotLoaded: Boolean = true, autorecRules: List<at.bernhardberger.tvheadend.sdk.core.AutorecRule> = emptyList()) {
         endPaddingState.value = endPadding
         val recordings = entries ?: if (empty) emptyList() else listOf(
             recording(1, LONG_TITLE, "Documentaries/northern.ts"),
@@ -1449,7 +1475,8 @@ class RecordingsVisualLayoutTest {
             )),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(channels, emptyList())),
             epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
-            dvrState = if (snapshotLoaded) DvrRepositoryState.Current(DvrSnapshot.create(recordings)) else SessionObservation.create().dvrState,
+            dvrState = if (snapshotLoaded) DvrRepositoryState.Current(DvrSnapshot.create(recordings,
+                autorecRules = autorecRules)) else SessionObservation.create().dvrState,
             dvrDiskSpaceState = diskSpace,
             recordingProgressCapability = RecordingProgressCapability.SUPPORTED,
         )

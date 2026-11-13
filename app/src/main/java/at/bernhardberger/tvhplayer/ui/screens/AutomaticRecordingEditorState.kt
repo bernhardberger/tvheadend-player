@@ -149,7 +149,13 @@ internal class AutomaticRecordingEditorState(
         navigation.confirmation = null
         busy = true
         val submittedDraft = draft
-        val submittedChoices = enabledChanges
+        // Real rule updates may recreate even previously skipped entries enabled.
+        val submittedChoices = if (editing && changedFields.isNotEmpty()) {
+            val skipped = (preview as? AutorecPreviewState.Matches)?.rows.orEmpty()
+                .filter { it.state != AutorecEpisodeState.REMOVED && it.eventId != null && !episodeEnabled(it) }
+                .associate { requireNotNull(it.eventId) to false }
+            enabledChanges.filterValues { it } + skipped
+        } else enabledChanges
         saveJob = scope.launch {
             try {
                 when (saveDraft(submittedDraft, submittedChoices)) {

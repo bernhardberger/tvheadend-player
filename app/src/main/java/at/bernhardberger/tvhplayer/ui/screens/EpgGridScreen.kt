@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens
 import at.bernhardberger.tvhplayer.core.BrowseContextAction
+import at.bernhardberger.tvhplayer.core.programmeRecordingRecordKeyActions
 
 import at.bernhardberger.tvhplayer.ui.components.backKeyCycleFocus
 import at.bernhardberger.tvhplayer.ui.components.rememberBackKeyCycle
@@ -1954,7 +1955,7 @@ fun EpgGridScreen(
                                         current, { observationState.value }, nowSecProvider, recordSettings, notices,
                                         coroutineScope, detailsMutationInFlight)
                                 }
-                            } else if (action == BrowseContextAction.STOP || action == BrowseContextAction.CANCEL) {
+                            } else if (action in programmeRecordingRecordKeyActions) {
                                 recordInitialAction = action
                                 detailsObservation = current
                                 detailsEvent = programme

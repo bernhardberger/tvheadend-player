@@ -321,7 +321,7 @@ internal fun ProgrammeDetailsPage(
                     !backEnabled -> true
                     event != null && key.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_MEDIA_RECORD -> {
                         val action = actions.firstOrNull {
-                            it == BrowseContextAction.STOP || it == BrowseContextAction.CANCEL
+                            it in programmeRecordingRecordKeyActions
                         }
                         if (key.type == KeyEventType.KeyDown && key.nativeKeyEvent.repeatCount == 0 && action != null) {
                             lastAction = action

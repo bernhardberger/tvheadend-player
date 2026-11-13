@@ -854,6 +854,23 @@ class BrowseContextMenuScreenTest {
         compose.onNodeWithTag("details-cancel").assertIsFocused()
         compose.onNodeWithTag("centred-dialog-card").assertDoesNotExist()
         compose.runOnIdle { assertTrue(scheduleRequests.isEmpty()) }
+        for (enabled in listOf(true, false)) {
+            show(recordings = false, channelRecording = true, recordingState = DvrEntryState.SCHEDULED,
+                ruleMade = true, recordingEnabled = enabled)
+            compose.onNodeWithTag("channel-row-1").requestFocus()
+            compose.pressKey(Key(android.view.KeyEvent.KEYCODE_MEDIA_RECORD))
+            val ownAction = if (enabled) "skip" else "unskip"
+            compose.onNodeWithTag("details-$ownAction").assertIsFocused()
+            compose.pressKey(Key.DirectionLeft)
+            compose.pressKey(Key(android.view.KeyEvent.KEYCODE_MEDIA_RECORD))
+            compose.onNodeWithTag("details-$ownAction").assertIsFocused()
+            compose.runOnIdle {
+                assertTrue(scheduleRequests.isEmpty())
+                assertTrue(screenNotices.state.value.pending.none {
+                    it.notice is at.bernhardberger.tvhplayer.notices.Notice.RecordUnavailable
+                })
+            }
+        }
     }
 
     @Test fun recordKeyOnChannelWithoutProgrammePostsTypedReason() {
@@ -1339,7 +1356,8 @@ class BrowseContextMenuScreenTest {
         fixedNow: Long? = null, profiles: Boolean = false, scopeTabs: Boolean = false,
         offline: Boolean = false, guideDetails: Boolean = false, entryHandoff: Boolean = false,
         rootArtwork: FakeTvheadendSession? = null, watching: Boolean = false,
-        behindLive: Boolean = false, growingFile: Boolean = false, awaitContent: Boolean = true): FakeTvheadendSession {
+        behindLive: Boolean = false, growingFile: Boolean = false, awaitContent: Boolean = true,
+        ruleMade: Boolean = false, recordingEnabled: Boolean = true): FakeTvheadendSession {
         val firstLeg = screenContent.value == null
         if (!firstLeg) {
             compose.runOnIdle { screenContent.value = null }
@@ -1376,6 +1394,8 @@ class BrowseContextMenuScreenTest {
             summary = "Seasonal mountain light, forests and weather moving over a ridge.",
             description = "Seasonal mountain light, forests and weather moving over a ridge, from the first snow to the thaw. ".repeat(3))
         val entry = DvrEntry.create(DvrEntryId(1), channelId = channel.id, eventId = event.id,
+            autorecRuleId = if (ruleMade) at.bernhardberger.tvheadend.sdk.core.AutorecRuleId("series") else null,
+            enabled = recordingEnabled,
             title = if (recordingState == DvrEntryState.COMPLETED) "Ridge Light: The remarkable journey along the mountain ridge in winter" else "Ridge Light",
             folder = emptyList(),
             summary = summary, description = description, subtitle = episodeSubtitle,

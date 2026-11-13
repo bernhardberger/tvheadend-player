@@ -840,6 +840,7 @@ internal fun RecordingsScreenContent(
                                 entry.channelId?.let(channelsById::get)?.icon
                             },
                             admissionForEntry = { observation.recordingPlaybackAdmission(it) },
+                            ruleForEntry = { recordingRule(observation.recordingRuleKind(it)) },
                             paneBottom = contentPadding.calculateBottomPadding(),
                             initialScrollIndex = frame.scrollIndex,
                             onScrollChanged = {
@@ -902,6 +903,7 @@ internal fun RecordingsScreenContent(
     @Composable
     fun RecordingDetails() {
     var ruleEditorEntry by remember { mutableStateOf<DvrEntry?>(null) }
+    var detailsRuleEditor by remember { mutableStateOf(false) }
     var ruleMutationBusy by remember { mutableStateOf(false) }
     val latestRuleNow by rememberUpdatedState(nowSecProvider)
     // Refresh metadata only within the opening session. Never substitute a colliding ID
@@ -913,7 +915,8 @@ internal fun RecordingsScreenContent(
             observation.dvrEntry(entry.id)?.takeUnless(::recordingWasRemoved)
         } else entry
     }
-    val opened = observed ?: ruleEditorEntry.takeIf { selectedCapability != null }
+    val opened = observed ?: (ruleEditorEntry ?: detailsEntry.takeIf { detailsRuleEditor })
+        .takeIf { selectedCapability != null }
     LaunchedEffect(selectedCapability) { if (selectedCapability == null) ruleEditorEntry = null }
     // The SDK admits the opened entry with the observation it was read from; without its session nothing plays.
     val openedAdmission = opened?.let { entry ->
@@ -951,7 +954,8 @@ internal fun RecordingsScreenContent(
             ?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
         if (!ready || !writable || target == null) return
         if (action == BrowseContextAction.EDIT_RULE) {
-            if (current.recordingRuleAvailable(target)) ruleEditorEntry = target
+            if (action in recordingRuleActions(target, writable, current.recordingRuleAvailable(target)))
+                ruleEditorEntry = target
         } else if (action in recordingRuleActions(target, true, current.recordingRuleAvailable(target))) {
             ruleMutationBusy = true
             scope.launch {
@@ -1181,6 +1185,7 @@ internal fun RecordingsScreenContent(
         val alpha = remember(detailAlpha, menuAlpha) { derivedStateOf { detailAlpha.value * menuAlpha.value } }
         // Details show their pictures with the session they were opened with.
         RecordingDetailsHost(
+            onRuleEditorActive = { detailsRuleEditor = it },
             onShowGuide = onShowGuide,
             recording = opened,
             openingObservation = requireNotNull(detailsObservation),

@@ -236,7 +236,8 @@ internal fun HomeScreenContent(
     val mutationScope = rememberCoroutineScope()
     fun recordFocusedProgramme(channelId: ChannelId) {
         when (val action = onRecordKey(channelId)) {
-            BrowseContextAction.STOP, BrowseContextAction.CANCEL -> {
+            BrowseContextAction.STOP, BrowseContextAction.CANCEL,
+            BrowseContextAction.SKIP, BrowseContextAction.UNSKIP -> {
                 recordInitialAction = action
                 channelDetails = true
                 channelMenu = channelId

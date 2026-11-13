@@ -145,15 +145,16 @@ import kotlinx.coroutines.test.StandardTestDispatcher
     instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class GuideNavigationTest : GuideScreenFixture() {
-    @Test fun recordKeyOnScheduledProgrammeOpensCancelWithoutConfirming() {
+    @Test fun recordKeyOnScheduledProgrammeOpensItsOwnActionWithoutConfirming() {
         show(recordings = listOf(DvrEntry.create(DvrEntryId(1), eventId = EventId(110),
-            channelId = ChannelId(1), state = DvrEntryState.SCHEDULED)))
+            channelId = ChannelId(1), state = DvrEntryState.SCHEDULED, enabled = false,
+            autorecRuleId = at.bernhardberger.tvheadend.sdk.core.AutorecRuleId("series"))))
         key(Key.DirectionDown)
         focused(title(1, 0))
         key(Key(android.view.KeyEvent.KEYCODE_MEDIA_RECORD))
-        compose.onNodeWithTag("details-cancel").assertIsFocused()
+        compose.onNodeWithTag("details-unskip").assertIsFocused()
         key(Key(android.view.KeyEvent.KEYCODE_MEDIA_RECORD))
-        compose.onNodeWithTag("details-cancel").assertIsFocused()
+        compose.onNodeWithTag("details-unskip").assertIsFocused()
         compose.onNodeWithTag("two-column-first").assertDoesNotExist()
         assertNoPlayback()
     }

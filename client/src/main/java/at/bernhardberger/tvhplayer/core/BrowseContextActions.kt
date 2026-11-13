@@ -16,6 +16,11 @@ enum class BrowseContextAction {
     MARK_ALL_WATCHED, MARK_ALL_UNWATCHED, DELETE_WATCHED, DELETE_ALL,
 }
 
+/** Actions a programme's existing recording entry answers the Record key with. */
+val programmeRecordingRecordKeyActions: Set<BrowseContextAction> = setOf(
+    BrowseContextAction.STOP, BrowseContextAction.CANCEL, BrowseContextAction.SKIP, BrowseContextAction.UNSKIP,
+)
+
 /**
  * One order for every channel and programme menu, so a held OK always lands on Watch.
  * [recordingAdmission] is the SDK's admission of [recording]: an ended programme it admits plays
