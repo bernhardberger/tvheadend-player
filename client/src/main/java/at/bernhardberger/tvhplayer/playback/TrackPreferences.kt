@@ -29,6 +29,8 @@ fun trackPreferences(
         AudioFormatPreference.PREFER_STEREO -> arrayOf(MimeTypes.AUDIO_AAC, MimeTypes.AUDIO_MPEG_L2, MimeTypes.AUDIO_MPEG)
     })
     .setPreferredAudioRoleFlags(if (settings.audioDescription) C.ROLE_FLAG_DESCRIBES_VIDEO else 0)
+    // Tvheadend's Matroska files mark every track default; subtitles follow the viewer's choice instead.
+    .setIgnoredTextSelectionFlags(C.SELECTION_FLAG_DEFAULT)
     .apply {
         val language = settings.subtitleLanguage
         if (language == null) {

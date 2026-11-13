@@ -124,6 +124,14 @@ class TrackPreferencesTest {
         assertEquals("default-mp2", select(listOf(main, dolby), PlayerSettings(audioFormat = AudioFormatPreference.PREFER_DOLBY)))
     }
 
+    @Test fun containerDefaultFlagAloneDoesNotTurnSubtitlesOn() {
+        // Tvheadend's Matroska muxer leaves FlagDefault unset, which marks every track default.
+        val text = Format.Builder().setId("dvb").setLanguage("de").setSampleMimeType(MimeTypes.APPLICATION_MEDIA3_CUES)
+            .setSelectionFlags(C.SELECTION_FLAG_DEFAULT).build()
+        assertEquals(null, selectWithParameters(listOf(text), trackPreferences(defaults, PlayerSettings()), trackType = C.TRACK_TYPE_TEXT))
+        assertEquals("dvb", selectWithParameters(listOf(text), trackPreferences(defaults, PlayerSettings(subtitleLanguage = "de")), trackType = C.TRACK_TYPE_TEXT))
+    }
+
     @Test fun nativeExplicitOverrideIsNotFilteredByRendererSupport() {
         // The app filters concrete choices and restores against supported tracks. Media3 trusts overrides.
         val supported = format("supported", "de", MimeTypes.AUDIO_MPEG_L2)
