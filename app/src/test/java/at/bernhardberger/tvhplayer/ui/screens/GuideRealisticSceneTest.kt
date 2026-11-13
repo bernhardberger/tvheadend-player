@@ -257,7 +257,7 @@ class GuideRealisticSceneTest {
         capture("guide-fixture-headers-font1.3")
     }
 
-    @Test fun sevenHourOvernightEventKeepsFocusInTheVisibleFragment() {
+    @Test fun sevenHourOvernightEventKeepsItsTitleOnTheTrackClearOfTheFade() {
         // At 02:00 the window opens at 00:30, after Harbor Sport Plus's last programme ended at 00:00.
         showAt("2026-09-15T02:00:00")
         moveToChannel(12)
@@ -266,6 +266,10 @@ class GuideRealisticSceneTest {
         val window = checkNotNull(position.position.value).windowStartSec
         assertTrue("The requested overnight fragment starts off-screen", event.start.epochSeconds < window)
         assertTrue(event.stop.epochSeconds > window)
+        val text = compose.onNode(hasText(event.title.orEmpty()) and hasAnyAncestor(isFocused()), useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot
+        val ruler = compose.onNodeWithTag("epg-time-ruler").fetchSemanticsNode().boundsInRoot
+        assertTrue("The title starts past the 48dp fade: $text", text.left >= ruler.left + 48f)
         capture("guide-fixture-coastal-seven-hour")
     }
 
@@ -773,8 +777,9 @@ class GuideRealisticSceneTest {
         val focus = compose.onNode(isFocused())
         focus.assertIsDisplayed().assertIsFocused()
         val bounds = focus.getUnclippedBoundsInRoot()
-        assertTrue("Focus must be fully on the canvas: $bounds", bounds.left.value >= 0f && bounds.top.value >= 0f &&
-            bounds.right.value <= 960f && bounds.bottom.value <= 540f)
+        // A programme running past the window keeps its size, so only its height must fit.
+        assertTrue("Focus must be on the canvas: $bounds", bounds.right.value > 0f && bounds.top.value >= 0f &&
+            bounds.left.value < 960f && bounds.bottom.value <= 540f)
         assertEquals(0, playbackRequests)
         assertEquals(0, navigationRequests)
         assertFalse(FakeSessionCall.BIND_LIVE_PLAYBACK in session.calls)

@@ -99,12 +99,12 @@ internal fun guideFocusWindowStart(
     val leftReserve = readable.first - windowStartSec
     val rightLimit = readable.last + 1 - windowStartSec
     // A programme longer than the readable viewport cannot fit in one time window.
-    // Its visible fragment is clipped to that viewport, never stretched or overlapped.
+    // It keeps its size and the edges cut it; the window stays where it shows part of it.
     if (eventEndSec - eventStartSec > rightLimit - leftReserve &&
         eventStartSec < windowStartSec + rightLimit && eventEndSec > windowStartSec + leftReserve
     ) return windowStartSec
     // The programme on air keeps a window that shows now with half an hour of it readable, so
-    // now stays where Now put it; its cell is clipped as a long one is.
+    // now stays where Now put it; the edges cut its cell as they cut a long one.
     if (nowSec != null && nowSec in eventStartSec until eventEndSec &&
         nowSec in windowStartSec + leftReserve until windowStartSec + rightLimit &&
         minOf(eventEndSec, windowStartSec + rightLimit) - maxOf(eventStartSec, windowStartSec + leftReserve) >=
@@ -135,19 +135,19 @@ internal fun Modifier.guideNowLine(
 }
 
 /**
- * A row's track ends where its inner fade reaches zero, so a focused cell cannot paint past the fade
- * into the channel gap at full strength. The outer edge has no fade and is not clipped.
+ * A row's track ends at its inner edge, so a cell that began before the window is cut square there
+ * instead of painting into the channel gap. The outer edge is not clipped: the screen cuts it.
  */
-internal fun Modifier.guideFadedEdgeClip(innerContinues: Boolean, isRtl: Boolean): Modifier =
-    if (!innerContinues) this else drawWithContent {
-        // Physical sides, like the fades: the inner edge is left in LTR and right in RTL.
-        clipRect(
-            left = if (isRtl) -size.width else 0f,
-            top = -size.height,
-            right = if (isRtl) size.width else size.width * 2,
-            bottom = size.height * 2,
-        ) { this@drawWithContent.drawContent() }
-    }
+internal fun Modifier.guideInnerEdgeClip(isRtl: Boolean): Modifier = drawWithContent {
+    // Physical sides, like the fades: the inner edge is left in LTR and right in RTL. The far
+    // bounds only need to clear a cell that overflows the window by one window.
+    clipRect(
+        left = if (isRtl) -size.width * 2 else 0f,
+        top = -size.height,
+        right = if (isRtl) size.width else size.width * 3,
+        bottom = size.height * 2,
+    ) { this@drawWithContent.drawContent() }
+}
 
 /**
  * Local alpha masks: no scrim is added to headings, scopes, controls or live video. Only the edge

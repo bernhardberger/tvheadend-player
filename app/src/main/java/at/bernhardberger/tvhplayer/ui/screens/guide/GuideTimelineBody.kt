@@ -87,7 +87,6 @@ internal data class GuideTabBody(
     val rows: GuideRows,
     val genre: ProgrammeCategory,
     val genreColors: Boolean,
-    val clipSelectedToViewport: () -> Boolean = { false },
 )
 
 /**
@@ -263,7 +262,6 @@ internal fun GuideTimelineBody(
                         orderedChannelIds, channelNumbers, channel.id,
                     ),
                     selectedEventId = selected?.takeIf { it.channelIndex == channelIndex }?.eventId,
-                    clipSelectedToViewport = rememberTabReader(frame.clipSelectedToViewport)(),
                     eventFocusRequesters = eventFocusRequesters,
                     windowStartSec = renderedWindowStartSec,
                     windowEndSec = windowEndSec,
@@ -297,8 +295,6 @@ internal fun GuideTimelineBody(
                     ),
                     focusStartInset = focusInsets.first,
                     focusEndInset = focusInsets.second,
-                    earlierContent = frame.earlierContent,
-                    laterContent = frame.laterContent,
                     rows = rows,
                     genre = genre,
                     genreColors = genreColors,

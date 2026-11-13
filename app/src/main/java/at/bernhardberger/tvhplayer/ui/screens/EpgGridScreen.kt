@@ -2031,11 +2031,6 @@ fun EpgGridScreen(
                         },
                         { channelId -> coverageByChannel[channelId] },
                         earlierContent, laterContent, view.rows, genre, view.genreColors,
-                        clipSelectedToViewport = {
-                            selectedTarget?.let { target ->
-                                focusRows.getOrNull(target.channelIndex)?.events?.firstOrNull { it.id == target.eventId }
-                            }?.let(::keepAnchoredWindowFor) == true
-                        },
                     )
                 },
                 modifier = Modifier.weight(1f).fillMaxWidth(),

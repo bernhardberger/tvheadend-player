@@ -647,7 +647,7 @@ class GuideNavigationTest : GuideScreenFixture() {
         assertEquals(window, checkNotNull(position.position.value).windowStartSec)
     }
 
-    @Test fun verticalMoveClipsShortOffAirProgrammeAtTheRightEdge() {
+    @Test fun verticalMoveKeepsShortOffAirProgrammeAtItsSizeAcrossTheRightEdge() {
         show(events = listOf(
             EpgEvent.create(EventId(110), ChannelId(1), Instant.fromEpochSeconds(hour),
                 Instant.fromEpochSeconds(hour + 3600), title = "Current programme"),
@@ -665,8 +665,11 @@ class GuideNavigationTest : GuideScreenFixture() {
         focused("Crossing right edge")
         assertEquals(window, checkNotNull(position.position.value).windowStartSec)
         assertReadableFocus()
-        val focus = compose.onNode(hasText("Crossing right edge") and isFocused()).fetchSemanticsNode().boundsInRoot
-        assertEquals(bounds("epg-time-ruler").right - 8f, focus.right, 1f)
+        // 20:30 to 22:40 in a window that ends at 22:00: the screen cuts it, not a closed corner.
+        val focus = compose.onNode(hasText("Crossing right edge") and isFocused()).getUnclippedBoundsInRoot()
+        val ruler = bounds("epg-time-ruler")
+        assertEquals(ruler.width * 130 / 180, (focus.right - focus.left).value, 1f)
+        assertTrue("The cell runs past the screen edge: $focus", focus.right.value > ruler.right)
     }
 
     @Test fun verticalMoveSkipsLeftSliverForAShortFullyVisibleNeighbour() {

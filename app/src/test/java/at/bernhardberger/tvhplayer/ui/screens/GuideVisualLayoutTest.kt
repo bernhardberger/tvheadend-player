@@ -953,7 +953,7 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
     fun enlargedRtlHistoryEdgeKeepsNativeFocusInsidePhysicalSafeArea() = terminalRtlHistory(scale = 1.3f, hours = 2, name = "guide-history-rtl-large")
 
     @Test @Config(qualifiers = "ar-ldrtl-w960dp-h540dp-land-mdpi")
-    fun boundedHistoryLeftKeepsFullCellWhileVerticalMovesClipItsLeadingEdge() {
+    fun boundedHistoryKeepsTheFullCellOnHorizontalAndVerticalMoves() {
         Locale.setDefault(Locale.forLanguageTag("ar"))
         val firstHour = hour - 6 * 3600
         position.save(GuidePosition(ChannelId(1), EventId(111), firstHour + 3600, firstHour, 0))
@@ -973,19 +973,12 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         focused(title(2, 0))
         val vertical = compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot
         assertEquals("Down must not shift the bounded window", firstHour, checkNotNull(position.position.value).windowStartSec)
-        assertEquals("The vertical target clears the readable-start reserve", ruler.left + 8f, vertical.left, 1f)
-        assertEquals(horizontal.right, vertical.right, 1f)
-        assertEquals(horizontal.width - 8f, vertical.width, 1f)
+        assertEquals("The vertical target keeps the complete cell too", horizontal.left, vertical.left, 1f)
+        assertEquals(horizontal.width, vertical.width, 1f)
 
         key(Key.DirectionUp)
         focused(title(1, 0))
-        assertEquals(vertical.left, compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot.left, 1f)
-        key(Key.DirectionRight)
-        focused(title(1, 1))
-        key(Key.DirectionLeft)
-        focused(title(1, 0))
-        assertEquals("Left drops vertical clipping again", horizontal,
-            compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot)
+        assertEquals(horizontal, compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot)
         assertEquals(firstHour, checkNotNull(position.position.value).windowStartSec)
         assertNoPlayback()
     }
@@ -1016,19 +1009,20 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         assertNoPlayback()
     }
 
-    @Test fun oversizedProgrammeKeepsNativeFocusInsideTheUnfadedViewport() {
+    @Test fun oversizedProgrammeRunsItsFocusRingOffTheScreenEdge() {
         show(longProgramme = true)
         key(Key.DirectionDown)
         focused(title(1, 0))
         assertReadableFocus()
         val bitmap = capture("guide-long-programme", 1f, LayoutDirection.Ltr)
         val ruler = bounds("epg-time-ruler")
-        val y = compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot.center.y.toInt()
-        val nativeFocusPixels = (ruler.left.toInt() until ruler.right.toInt()).filter {
-            android.graphics.Color.red(bitmap.getPixel(it, y)) > 180
+        val focus = compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot
+        // The ring's top line, inside the cell's 2dp stroke.
+        val nativeFocusPixels = (ruler.left.toInt() until bitmap.width).filter {
+            android.graphics.Color.red(bitmap.getPixel(it, focus.top.toInt() + 1)) > 180
         }
-        assertTrue("Native scaled leading edge stays clear of the fade", nativeFocusPixels.first() >= ruler.left + 48)
-        assertTrue("Native scaled trailing edge stays inside the 8dp reserve", nativeFocusPixels.last() < ruler.right - 8)
+        assertTrue("The ring's leading edge stays clear of the fade", nativeFocusPixels.first() >= ruler.left + 48)
+        assertEquals("The screen cuts the ring; it does not close in a corner", bitmap.width - 1, nativeFocusPixels.last())
         bitmap.recycle()
     }
 

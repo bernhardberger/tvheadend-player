@@ -832,7 +832,13 @@ activation, DVR eligibility, confirmations and current-session guards remain.
   trailing/bottom edges and is simply cut there; only the edge beside the channel
   column (left in LTR, right in RTL) and the top edge under the ruler fade, over a
   local 48dp and only when more content exists there. Headers, controls and scopes remain clear.
-  Settled focused cells remain inside the unfaded area; real data/history bounds
+  A programme that runs past the window keeps its real size, focused or not: the
+  screen edge cuts its cell and title rather than the cell ending in a corner and
+  an ellipsis there, and at the channel column the row's track cuts it square
+  (under the fade when there is one). Only on that inner side does the title stay
+  on the track and ellipsize, a focused cell's clear of the fade
+  (`ui/screens/guide/EpgGridContent.kt` `contentStartInset`).
+  Settled focused cells that fit remain inside the unfaded area; real data/history bounds
   must not imply unavailable overflow. Preserve physical Left earlier/Right later.
 - At a terminal physical edge, reserve 8dp breathing room
   rather than letting focus touch the screen edge. This is blank spatial padding,

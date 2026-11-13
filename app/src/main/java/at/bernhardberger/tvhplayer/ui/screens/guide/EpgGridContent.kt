@@ -33,10 +33,10 @@ import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -318,13 +318,10 @@ internal fun TimelineChannelRow(
     visibleRowWidthPx: Int? = null,
     focusStartInset: Dp = 0.dp,
     focusEndInset: Dp = 0.dp,
-    earlierContent: Boolean = false,
-    laterContent: Boolean = false,
     rows: GuideRows = GuideRows.REGULAR,
     genre: ProgrammeCategory = ProgrammeCategory.ALL,
     genreColors: Boolean = true,
     coverage: EpgCoverage? = null,
-    clipSelectedToViewport: Boolean = false,
 ) {
     val nowSec = nowSecProvider()
     // One state for the row's cells outside the chosen genre.
@@ -352,28 +349,19 @@ internal fun TimelineChannelRow(
         )
         Spacer(Modifier.width(GuideChannelGap))
         // No track behind the cells: they sit on the page, one 4dp gutter apart, like the channel
-        // tiles. Clipped at the faded inner edge, so a cell never paints past its fade into the channel gap.
+        // tiles. Clipped at the inner edge, so a cell never paints into the channel gap.
         val layoutDirection = LocalLayoutDirection.current
         BoxWithConstraints(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .guideFadedEdgeClip(
-                    guideInnerContinuation(earlierContent, laterContent, layoutDirection == LayoutDirection.Rtl),
-                    layoutDirection == LayoutDirection.Rtl,
-                ),
+                .guideInnerEdgeClip(layoutDirection == LayoutDirection.Rtl),
         ) {
             val density = LocalDensity.current
             val visibleTrackWidthPx = visibleRowWidthPx?.minus(
                 with(density) { GuideChannelWidth.roundToPx() + GuideChannelGap.roundToPx() },
             )
-            // The window keeps the programme on air even where it runs past an edge.
-            val onAirId by remember(events, nowSecProvider) {
-                derivedStateOf {
-                    val now = nowSecProvider()
-                    events.firstOrNull { now >= it.start.epochSeconds && now < it.stop.epochSeconds }?.id
-                }
-            }
+            val isRtl = layoutDirection == LayoutDirection.Rtl
             events.forEach { event ->
                 val span = timelineEventSpan(
                     eventStartSec = event.start.epochSeconds,
@@ -382,22 +370,21 @@ internal fun TimelineChannelRow(
                     windowEndSec = windowEndSec,
                 ) ?: return@forEach
                 val isFocusTarget = selectedEventId == event.id
-                val fullStart = maxWidth * span.startFraction
-                val fullEnd = maxWidth * span.endFraction
-                val readableWidth = (maxWidth - focusStartInset - focusEndInset).coerceAtLeast(0.dp)
-                // A changed inset can hide the old fragment before the focus effect repositions
-                // its window. Keep a nonzero cell during that handoff instead of clipping it away.
-                val clipFocus = isFocusTarget && fullEnd > focusStartInset && fullStart < maxWidth - focusEndInset &&
-                    (clipSelectedToViewport || fullEnd - fullStart > readableWidth || event.id == onAirId)
-                // Vertical navigation keeps the time window, even for a short off-air programme
-                // crossing an edge. Its focused fragment stays clear of both reserves.
-                val start = if (clipFocus) maxOf(fullStart, focusStartInset) else fullStart
-                val end = if (clipFocus) minOf(fullEnd, maxWidth - focusEndInset) else fullEnd
-                val width = (end - start).coerceAtLeast(0.dp)
+                // The cell keeps its real size past both edges: the screen cuts it at the outer one
+                // and the track at the channel column, so neither end closes in a corner there.
+                val start = maxWidth * span.startFraction
+                val end = maxWidth * span.endFraction
+                val width = end - start
+                // Only its content stays on the track beside the channel column, and a focused
+                // cell's clear of that side's fade.
+                val innerInset = if (!isFocusTarget) 0.dp else {
+                    ((if (isRtl) focusEndInset else focusStartInset) - GuideFocusReserve).coerceAtLeast(0.dp)
+                }
+                val contentInset = (if (isRtl) end - (maxWidth - innerInset) else innerInset - start).coerceAtLeast(0.dp)
                 if (!shouldComposeTimelineCell(
                         // Shell clipping is logical-leading; the time axis is physical.
                         startPx = with(density) {
-                            (if (layoutDirection == LayoutDirection.Rtl) maxWidth - end else start).roundToPx()
+                            (if (isRtl) maxWidth - end else start).roundToPx()
                         },
                         widthPx = with(density) { width.roundToPx() },
                         visibleWidthPx = visibleTrackWidthPx,
@@ -430,9 +417,12 @@ internal fun TimelineChannelRow(
                         genre = genre,
                         genreColors = genreColors,
                         outsideGenre = outsideGenre,
+                        contentStartInset = contentInset,
                         modifier = Modifier
                             .align(AbsoluteAlignment.TopLeft)
                             .absoluteOffset(x = start)
+                            // Unbounded: a cell may be wider than the track that cuts it.
+                            .wrapContentWidth(AbsoluteAlignment.Left, unbounded = true)
                             .width(width)
                             .fillMaxHeight()
                             .profileViewportItem { "guideCell:$channelIndex:${event.id.value}" },
@@ -567,6 +557,8 @@ internal fun TimelineProgrammeCell(
     genreColors: Boolean = true,
     /** The state a cell outside the chosen [genre] reads, such as "Not Sport". */
     outsideGenre: String? = null,
+    /** How far the cell runs under the channel column's edge; its content starts past that. */
+    contentStartInset: Dp = 0.dp,
 ) {
     val contextMenu = at.bernhardberger.tvhplayer.ui.components.rememberBrowseContextMenuTrigger(onOpenContextMenu)
     val stateText = when {
@@ -617,7 +609,7 @@ internal fun TimelineProgrammeCell(
         // rows do: the title ellipsizes first and the time line keeps its width. Cancelled and invalid
         // ones carry none, which keeps the grid quiet.
         val headline: @Composable () -> Unit = {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = contentAlpha) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = contentAlpha.padding(start = contentStartInset)) {
                 Text(
                     // Always render a label so no focusable cell is visually blank.
                     text = event.title.orEmpty(),
@@ -647,7 +639,7 @@ internal fun TimelineProgrammeCell(
         }
         // Dense rows leave the start time to the ruler and the headline; the description still reads it.
         val supporting: (@Composable () -> Unit)? = if (rows == GuideRows.DENSE) null else {
-            { ProgrammeStartText(start = startTime, modifier = contentAlpha) }
+            { ProgrammeStartText(start = startTime, modifier = contentAlpha.padding(start = contentStartInset)) }
         }
         val cellModifier = Modifier
             .tabFocus()
