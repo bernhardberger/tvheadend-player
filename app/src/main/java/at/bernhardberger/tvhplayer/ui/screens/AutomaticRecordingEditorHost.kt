@@ -77,8 +77,8 @@ internal fun AutomaticRecordingEditorHost(
         )
     }
     RecordingEditorOverlay(state) {
-        AutomaticRecordingEditor(state, observation.channelCatalogForDisplay?.channels.orEmpty(),
-            configurations, observation.epgSnapshotForDisplay?.events.orEmpty(),
+        AutomaticRecordingEditor(state, channels = observation.channelCatalogForDisplay?.channels.orEmpty(),
+            configurations = configurations, events = observation.epgSnapshotForDisplay?.events.orEmpty(),
             scheduledEpisodeCount = observation.dvrSnapshotForDisplay?.entries.orEmpty().count {
                 rule != null && it.autorecRuleId == rule.id && it.state == DvrEntryState.SCHEDULED
             })

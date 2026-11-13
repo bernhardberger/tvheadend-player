@@ -14,6 +14,7 @@ import java.time.LocalDate
 import java.time.DayOfWeek
 import java.time.format.TextStyle
 import java.util.Locale
+import at.bernhardberger.tvhplayer.core.TimerDraft
 import kotlin.time.Instant
 
 internal val timerMoreFields = setOf(
@@ -33,16 +34,16 @@ internal fun timerMainLabel(state: TimerRecordingEditorState): String = stringRe
 })
 
 @Composable
-internal fun timerChannelLabel(state: TimerRecordingEditorState, channels: List<Channel>): String =
-    channels.firstOrNull { it.id == state.draft.channelId }?.name ?: stringResource(
-        if (state.draft.channelId == null) R.string.timer_editor_channel_not_chosen
+internal fun timerChannelLabel(draft: TimerDraft, channels: List<Channel>): String =
+    channels.firstOrNull { it.id == draft.channelId }?.name ?: stringResource(
+        if (draft.channelId == null) R.string.timer_editor_channel_not_chosen
         else R.string.autorec_editor_channel_unavailable,
     )
 
 @Composable
-internal fun timerNameLabel(state: TimerRecordingEditorState, channels: List<Channel>): String =
-    state.draft.name.ifBlank {
-        channels.firstOrNull { it.id == state.draft.channelId }?.name
+internal fun timerNameLabel(draft: TimerDraft, channels: List<Channel>): String =
+    draft.name.ifBlank {
+        channels.firstOrNull { it.id == draft.channelId }?.name
             ?: stringResource(R.string.timer_editor_name_default)
     }
 

@@ -133,14 +133,14 @@ class AutomaticRecordingEditorCaptureTest {
             TVHeadendPlayerTheme {
                 ProvideArtworkSession(automaticRecordingSession) {
                     shown?.let { state ->
-                        AutomaticRecordingEditor(state, automaticRecordingChannels, listOf(
+                        AutomaticRecordingEditor(state, channels = automaticRecordingChannels, configurations = listOf(
                             DvrConfiguration(DvrConfigId("default"), "Default", ""),
                             DvrConfiguration(DvrConfigId("archive"), "Archive", ""),
-                         ), automaticRecordingEvents + automaticRecordingKeywordEvents,
+                         ), events = automaticRecordingEvents + automaticRecordingKeywordEvents,
                              scheduledEpisodeCount = if (state.editing) automaticRecordingSavedEntries.size else 0)
                     }
                     shownTimer?.let { state ->
-                        TimerRecordingEditor(state, automaticRecordingChannels,
+                        TimerRecordingEditor(state, channels = automaticRecordingChannels,
                             scheduledEntries = timerRecordingSavedEntries)
                     }
                     entryScene?.invoke()

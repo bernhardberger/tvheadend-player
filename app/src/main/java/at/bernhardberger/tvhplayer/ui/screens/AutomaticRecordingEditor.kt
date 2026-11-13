@@ -31,10 +31,10 @@ import androidx.compose.material3.CircularProgressIndicator
 @Composable
 internal fun AutomaticRecordingEditor(
     state: AutomaticRecordingEditorState,
+    modifier: Modifier = Modifier,
     channels: List<Channel> = emptyList(),
     configurations: List<DvrConfiguration> = emptyList(),
     events: List<EpgEvent> = emptyList(),
-    modifier: Modifier = Modifier,
     scheduledEpisodeCount: Int = 0,
 ) {
     DisposableEffect(state) { onDispose(state::dispose) }

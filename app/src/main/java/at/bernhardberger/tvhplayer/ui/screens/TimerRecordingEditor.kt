@@ -32,9 +32,9 @@ import at.bernhardberger.tvhplayer.ui.components.StatusBadgeTone
 @Composable
 internal fun TimerRecordingEditor(
     state: TimerRecordingEditorState,
+    modifier: Modifier = Modifier,
     channels: List<Channel> = emptyList(),
     configurations: List<DvrConfiguration> = emptyList(),
-    modifier: Modifier = Modifier,
     scheduledEntries: List<DvrEntry> = emptyList(),
 ) {
     DisposableEffect(state) { onDispose(state::dispose) }
@@ -66,9 +66,10 @@ internal fun TimerRecordingEditor(
     )
     if (state.navigation.confirmation == AutomaticRecordingEditorConfirmation.DELETE) ConfirmationDialog(
         question = stringResource(R.string.timer_editor_delete),
-        subject = ConfirmationSubject.Rule(R.drawable.ic_schedule, timerNameLabel(state, channels),
-            listOf(timerChannelLabel(state, channels), formatTimerRecordingDays(LocalContext.current, state.draft.days),
-                "${formatClock(state.draft.start)} – ${formatClock(state.draft.end)}").joinToString(" • ")),
+        subject = ConfirmationSubject.Rule(R.drawable.ic_schedule, timerNameLabel(state.baseline, channels),
+            listOf(timerChannelLabel(state.baseline, channels),
+                formatTimerRecordingDays(LocalContext.current, state.baseline.days),
+                "${formatClock(state.baseline.start)} – ${formatClock(state.baseline.end)}").joinToString(" • ")),
         sentence = formatAutomaticRecordingDeleteBody(
             LocalContext.current, AutomaticRecordingKind.TIMER, scheduledEntries.size, state.changed,
         ),
@@ -90,11 +91,11 @@ private fun TimerRecordingFirstLevel(state: TimerRecordingEditorState, channels:
         }) else null,
     )
     TimerRecordingField(state, "channel-time", stringResource(R.string.autorec_editor_channel_time),
-        "${timerChannelLabel(state, channels)} · ${timerSpanLabel(state)}", timerChannelTimeFields) {
+        "${timerChannelLabel(state.draft, channels)} · ${timerSpanLabel(state)}", timerChannelTimeFields) {
         state.navigation.open(AutomaticRecordingEditorLevel.CHANNEL_TIME, "channel")
     }
     TimerRecordingField(state, "name", stringResource(R.string.timer_editor_name),
-        timerNameLabel(state, channels), setOf(RecordingDraftField.NAME)) {
+        timerNameLabel(state.draft, channels), setOf(RecordingDraftField.NAME)) {
         state.navigation.open(AutomaticRecordingEditorLevel.NAME, "name-input")
     }
     TimerRecordingField(state, "keep", stringResource(R.string.autorec_editor_keep),

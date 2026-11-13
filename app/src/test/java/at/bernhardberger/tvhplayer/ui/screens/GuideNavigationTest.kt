@@ -157,6 +157,7 @@ class GuideNavigationTest : GuideScreenFixture() {
         compose.onNodeWithTag("details-unskip").assertIsFocused()
         compose.onNodeWithTag("two-column-first").assertDoesNotExist()
         assertNoPlayback()
+        compose.runOnIdle { assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_UPDATE_ENTRY }) }
     }
 
     @Test fun retainedEntryWaitsForRowsWhenNewCoverageArrivesBeforePreparation() {

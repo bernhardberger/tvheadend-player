@@ -228,7 +228,7 @@ private fun confirmationPanelNeedsMoreWidth(
     }
 }
 
-private fun confirmationSubjectName(subject: ConfirmationSubject): String = when (subject) {
+internal fun confirmationSubjectName(subject: ConfirmationSubject): String = when (subject) {
     is ConfirmationSubject.Programme -> subject.name
     is ConfirmationSubject.Folder -> subject.name
     is ConfirmationSubject.Rule -> subject.name

@@ -2,17 +2,18 @@ package at.bernhardberger.tvhplayer.ui.screens
 
 import android.view.KeyEvent
 import androidx.activity.compose.BackHandler
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -24,9 +25,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -34,16 +32,20 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.ui.components.CentredDialogShell
-import at.bernhardberger.tvhplayer.ui.components.PlaybackChoiceButton
-import at.bernhardberger.tvhplayer.ui.components.PlaybackCardWidth
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.TvTextColors
+import at.bernhardberger.tvhplayer.ui.components.CardPadding
+import at.bernhardberger.tvhplayer.ui.components.CentredDialogShell
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepLayout
+import at.bernhardberger.tvhplayer.ui.components.PlaybackCardWidth
+import at.bernhardberger.tvhplayer.ui.components.PlaybackChoiceButton
 import at.bernhardberger.tvhplayer.ui.components.backKeyCycleFocus
 import at.bernhardberger.tvhplayer.ui.components.rememberBackKeyCycle
 
@@ -118,7 +120,7 @@ internal fun RecordingEditorLeaveDialog(
     onBack: () -> Unit,
     onSubmit: () -> Unit,
     onDiscard: () -> Unit,
-    mainIcon: Int,
+    @DrawableRes mainIcon: Int,
 ) {
     val keep = remember { FocusRequester() }
     val main = remember { FocusRequester() }
@@ -127,7 +129,7 @@ internal fun RecordingEditorLeaveDialog(
     val question = stringResource(R.string.autorec_editor_leave_title)
     CentredDialogShell(paneTitle = question, onDismiss = onBack, verticalKeys = true) {
         Column(Modifier.width(PlaybackCardWidth).clip(RoundedCornerShape(16.dp))
-            .background(TvSurfaceColors.container).testTag("centred-dialog-card").padding(24.dp)
+            .background(TvSurfaceColors.container).testTag("centred-dialog-card").padding(CardPadding)
             .onPreviewKeyEvent { it.nativeKeyEvent.keyCode in listOf(
                 KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
             ) }) {

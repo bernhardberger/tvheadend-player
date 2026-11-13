@@ -113,12 +113,7 @@ private fun ProgrammeLead(subject: ConfirmationSubject.Programme) {
 
 @Composable
 private fun PanelText(subject: ConfirmationSubject, styles: ConfirmationStyles) {
-    val name = when (subject) {
-        is ConfirmationSubject.Programme -> subject.name
-        is ConfirmationSubject.Folder -> subject.name
-        is ConfirmationSubject.Rule -> subject.name
-        is ConfirmationSubject.Server -> subject.name
-    }
+    val name = confirmationSubjectName(subject)
     Text(name, style = styles.name, color = MaterialTheme.colorScheme.onSurface, maxLines = 2,
         overflow = TextOverflow.Ellipsis)
     when (subject) {

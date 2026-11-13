@@ -92,7 +92,8 @@ internal fun TimerRecordingEditorHost(
         )
     }
     RecordingEditorOverlay(state) {
-        TimerRecordingEditor(state, observation.channelCatalogForDisplay?.channels.orEmpty(), configurations,
+        TimerRecordingEditor(state, channels = observation.channelCatalogForDisplay?.channels.orEmpty(),
+            configurations = configurations,
             scheduledEntries = observation.dvrSnapshotForDisplay?.entries.orEmpty().filter {
                 rule != null && it.timerecRuleId == rule.id && it.state == DvrEntryState.SCHEDULED
             }.sortedBy { it.start })

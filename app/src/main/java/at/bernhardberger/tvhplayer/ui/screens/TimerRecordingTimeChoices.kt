@@ -28,7 +28,7 @@ internal fun TimerRecordingChannelTime(state: TimerRecordingEditorState, channel
     GuidedStepAction(stringResource(R.string.autorec_editor_channel),
         { state.navigation.open(AutomaticRecordingEditorLevel.CHANNEL,
             "channel-${state.draft.channelId?.value ?: channels.firstOrNull()?.id?.value}") },
-        editorRowModifier(state.navigation, "channel"), subtitle = timerChannelLabel(state, channels),
+        editorRowModifier(state.navigation, "channel"), subtitle = timerChannelLabel(state.draft, channels),
         trailingIcon = R.drawable.ic_keyboard_arrow_right)
     GuidedStepAction(stringResource(R.string.timer_editor_repeat),
         { state.navigation.open(AutomaticRecordingEditorLevel.REPEAT, "done") },
