@@ -16,6 +16,25 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class)
 class PlaybackDiagnosticsRuntimeTest {
+    @Test fun anOutgoingOwnerCannotDisableAnIncomingOwnersDiagnostics() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            forcedVideoFormat = Format.Builder().setSampleMimeType(MimeTypes.VIDEO_H264)
+                .setWidth(1920).setHeight(1080).build()
+            live(timeshift = false)
+            val outgoing = Any()
+            val incoming = Any()
+            runtime.setDiagnosticsClaim(outgoing, true)
+            runtime.setDiagnosticsClaim(incoming, true)
+            runtime.setDiagnosticsClaim(incoming, true)
+            runtime.setDiagnosticsClaim(outgoing, false)
+            playerReady()
+            assertEquals("the incoming player still owns sampling", 1920, runtime.diagnostics.value.video?.width)
+            runtime.setDiagnosticsClaim(outgoing, false)
+            assertEquals("withdrawing an absent owner does not affect another", 1920, runtime.diagnostics.value.video?.width)
+            runtime.setDiagnosticsClaim(incoming, false)
+            assertNull(runtime.diagnostics.value.video)
+        }
+
     @Test fun playerCallbacksRespectDiagnosticsOptInAndOptOut() =
         exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
             forcedVideoFormat = Format.Builder()
@@ -31,11 +50,11 @@ class PlaybackDiagnosticsRuntimeTest {
             assertNull(runtime.diagnostics.value.live)
             assertEquals(runtime.state.value, runtime.diagnostics.value.state)
 
-            runtime.setDiagnosticsEnabled(true)
+            runtime.setDiagnosticsClaim(this, true)
             playerReady()
             assertEquals(1920, runtime.diagnostics.value.video?.width)
 
-            runtime.setDiagnosticsEnabled(false)
+            runtime.setDiagnosticsClaim(this, false)
             playerReady()
             assertNull(runtime.diagnostics.value.video)
             assertNull(runtime.diagnostics.value.live)

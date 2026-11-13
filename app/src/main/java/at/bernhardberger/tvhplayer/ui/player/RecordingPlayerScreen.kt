@@ -261,12 +261,7 @@ fun RecordingPlayerScreen(
     }
 
     val statsVisible by statsStore.visible.collectAsStateWithLifecycle()
-    DisposableEffect(statsVisible) {
-        session.setDiagnosticsEnabled(statsVisible)
-        onDispose {
-            if (statsVisible) session.setDiagnosticsEnabled(false)
-        }
-    }
+    PlayerDiagnosticsEffect(session, statsVisible)
 
     fun stopAndClose() {
         scope.launch {

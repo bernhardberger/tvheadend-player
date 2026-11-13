@@ -45,7 +45,7 @@ import org.robolectric.annotation.Config
 @Config(sdk = [34], application = Application::class)
 class StallWatchdogRuntimeTest {
     @Test fun liveStuckBufferingRetunesOnceThroughAStoppedPlayer() = exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
-        runtime.setDiagnosticsEnabled(true)
+        runtime.setDiagnosticsClaim(this, true)
         live()
         val subscribes = connection.subscribeCount
         val stoppedBeforeRetune = stoppedBefore { connection.subscribeCount > subscribes }
@@ -64,7 +64,7 @@ class StallWatchdogRuntimeTest {
     }
 
     @Test fun beforeAnyStallALiveZapKeepsTheDecoders() = exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
-        runtime.setDiagnosticsEnabled(true)
+        runtime.setDiagnosticsClaim(this, true)
         live()
         val subscribes = connection.subscribeCount
         val stopped = stoppedBefore { connection.subscribeCount > subscribes }
@@ -76,7 +76,7 @@ class StallWatchdogRuntimeTest {
     }
 
     @Test fun afterOneLiveStallRecoveryEveryLiveZapStopsTheOldTargetFirst() = exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
-        runtime.setDiagnosticsEnabled(true)
+        runtime.setDiagnosticsClaim(this, true)
         live()
         val subscribes = connection.subscribeCount
         stuckBuffering()
@@ -156,7 +156,7 @@ class StallWatchdogRuntimeTest {
     }
 
     @Test fun aNewerViewingIntentWinsOverAQueuedRecovery() = exercise(PlaybackRuntimePolicy.fromPlayerSettings(trace)) {
-        runtime.setDiagnosticsEnabled(true)
+        runtime.setDiagnosticsClaim(this, true)
         recordingReadsNeverAnswer()
         val install = scope.async {
             runtime.playRecording(requireNotNull(currentRecordingPlaybackSelection(session.observation.value, RECORDING)),
@@ -213,7 +213,7 @@ class StallWatchdogRuntimeTest {
     }
 
     @Test fun aStuckRecordingResumesWhereItStoodThroughAStoppedPlayer() = exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
-        runtime.setDiagnosticsEnabled(true)
+        runtime.setDiagnosticsClaim(this, true)
         recordingReadsNeverAnswer()
         val install = scope.async {
             runtime.playRecording(requireNotNull(currentRecordingPlaybackSelection(session.observation.value, RECORDING)),
@@ -429,7 +429,7 @@ class StallWatchdogRuntimeTest {
     }
 
     @Test fun aFrameBeforeTheQueuedPictureRecoveryRunsSupersedesIt() = exercise(PlaybackRuntimePolicy.fromPlayerSettings(trace)) {
-        runtime.setDiagnosticsEnabled(true)
+        runtime.setDiagnosticsClaim(this, true)
         live()
         val subscribes = connection.subscribeCount
         val counters = DecoderCounters().also { forcedVideoDecoderCounters = it }
@@ -559,7 +559,7 @@ class StallWatchdogRuntimeTest {
     /** A stall is reported and queued, then [supersede] happens before the serialized recovery runs. */
     private fun supersededBeforeDispatch(supersede: BackgroundPlaybackRuntimeTest.Fixture.() -> Unit) =
         exercise(PlaybackRuntimePolicy.fromPlayerSettings(trace)) {
-            runtime.setDiagnosticsEnabled(true)
+            runtime.setDiagnosticsClaim(this, true)
             recordingReadsNeverAnswer()
             val install = scope.async {
                 runtime.playRecording(requireNotNull(currentRecordingPlaybackSelection(session.observation.value, RECORDING)),
@@ -608,7 +608,7 @@ class StallWatchdogRuntimeTest {
     /** [pause] arrives while the stuck recording's recovery has retired it and binds its replacement. */
     private fun pauseDuringRecordingRecovery(pause: BackgroundPlaybackRuntimeTest.Fixture.() -> Unit) =
         exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
-            runtime.setDiagnosticsEnabled(true)
+            runtime.setDiagnosticsClaim(this, true)
             recordingReadsNeverAnswer()
             val install = scope.async {
                 runtime.playRecording(requireNotNull(currentRecordingPlaybackSelection(session.observation.value, RECORDING)),
@@ -638,7 +638,7 @@ class StallWatchdogRuntimeTest {
 
     /** One live stall recovery turns on a fresh decoder per zap; the recovered channel 1 plays on. */
     private suspend fun BackgroundPlaybackRuntimeTest.Fixture.latchFreshDecoderPerZap() {
-        runtime.setDiagnosticsEnabled(true)
+        runtime.setDiagnosticsClaim(this, true)
         live()
         val subscribes = connection.subscribeCount
         stuckBuffering()

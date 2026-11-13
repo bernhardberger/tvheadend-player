@@ -471,17 +471,23 @@ class RecordingPlayerChromeScreenTest {
     }
 
     @Test fun aStoppedScreenLeavesNoBannerBehind() {
+        statsStore.setVisible(true)
         screen()
         playing()
+        assertEquals(3_600_000L, runtime.diagnostics.value.durationMs)
         key(Key.DirectionCenter)
         val origin = positionMs
         key(Key.MediaFastForward)
         assertTrue(exists("player-banner"))
         compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.CREATED }
         settle()
+        assertEquals("a stopped recording screen withdraws diagnostics", null, runtime.diagnostics.value.durationMs)
+        assertTrue(statsStore.visible.value)
         assertFalse("the Banner does not outlive the stop", exists("player-banner"))
         compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.RESUMED }
         repeat(8) { settle() }
+        assertEquals("a started recording screen samples again", 3_600_000L, runtime.diagnostics.value.durationMs)
+        assertTrue(statsStore.visible.value)
         assertFalse("no stale Banner on return", exists("player-banner"))
         assertEquals("stopping discards the scrub target", origin, positionMs)
         assertFalse("stopping a scrub preserves pause", player.playWhenReady)
@@ -741,7 +747,15 @@ class RecordingPlayerChromeScreenTest {
         key(Key.DirectionCenter)
         key(Key.DirectionCenter)
         assertTrue("Stats switch is on", statsStore.visible.value)
+        assertEquals("the recording session samples while Stats are on", 3_600_000L, runtime.diagnostics.value.durationMs)
         assertTrue("Stats remain shown under their options page", exists("playback-stats-overlay"))
+        compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.CREATED }
+        settle()
+        assertEquals("Stats alone do not keep a stopped recording sampling", null, runtime.diagnostics.value.durationMs)
+        assertTrue(statsStore.visible.value)
+        compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.RESUMED }
+        settle()
+        assertEquals(3_600_000L, runtime.diagnostics.value.durationMs)
         key(Key.Back)
         key(Key.Back)
         key(Key.Back)
@@ -754,9 +768,11 @@ class RecordingPlayerChromeScreenTest {
 
         compose.runOnIdle { playerVisible = false }
         settle()
+        assertEquals("the closed recording screen withdraws diagnostics", null, runtime.diagnostics.value.durationMs)
         assertFalse(exists("playback-stats-overlay"))
         compose.runOnIdle { playerVisible = true }
         settle()
+        assertEquals("the new recording screen samples again", 3_600_000L, runtime.diagnostics.value.durationMs)
         assertTrue("Stats survive a new player-screen layer state", exists("playback-stats-overlay"))
     }
 

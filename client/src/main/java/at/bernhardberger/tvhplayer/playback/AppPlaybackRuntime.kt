@@ -1984,8 +1984,9 @@ class AppPlaybackRuntime(
     fun seekRecordingMarker(positionMs: Long, expectedRevision: Long, programMarks: List<at.bernhardberger.tvhplayer.core.RecordingMark> = emptyList()) {
         recordingMarkers.seekRecordingMarker(positionMs, expectedRevision, programMarks)
     }
-    fun setDiagnosticsEnabled(enabled: Boolean) {
-        presentation.setDiagnosticsEnabled(enabled)
+    /** Each showing diagnostics consumer withdraws only its own identity-keyed claim. */
+    fun setDiagnosticsClaim(owner: Any, enabled: Boolean) {
+        presentation.setDiagnosticsClaim(owner, enabled)
     }
     fun setFrameRateSwitching(switching: FrameRateSwitching) {
         audioTracks.setFrameRateSwitching(switching)

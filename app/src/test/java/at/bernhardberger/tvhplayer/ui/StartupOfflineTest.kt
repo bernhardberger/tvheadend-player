@@ -546,6 +546,7 @@ class StartupOfflineTest {
             NoticeContext(profiles.configurationGeneration.value, session.observation.value.currentSession?.generationIdentity)
         }
         val dependencies = module {
+            includes(at.bernhardberger.tvhplayer.testutil.playerStatsTestModule())
             single<CoroutineScope>(qualifier = org.koin.core.qualifier.named("application")) { scope }
             single<TvheadendSession> { session }
             single { runtime }

@@ -590,14 +590,23 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
     }
 
     @Test fun aStoppedAndRestartedScreenShowsNoStaleBanner() = timeshiftPlaying(mapPosition = true) { pauses ->
+        forcedVideoFormat = Format.Builder().setSampleMimeType(MimeTypes.VIDEO_H264)
+            .setWidth(1920).setHeight(1080).build()
+        compose.runOnIdle { statsStore.setVisible(true) }
+        settle()
+        assertEquals(1920, runtime.diagnostics.value.video?.width)
         key(Key.MediaPause)
         key(Key.MediaRewind)
         assertTrue(exists("player-banner"))
         compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.CREATED }
         settle()
+        assertEquals("a stopped live screen withdraws diagnostics", null, runtime.diagnostics.value.video)
+        assertTrue(statsStore.visible.value)
         assertFalse("the Banner does not outlive the stop", exists("player-banner"))
         compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.RESUMED }
         repeat(8) { settle() }
+        assertEquals("a started live screen samples again", 1920, runtime.diagnostics.value.video?.width)
+        assertTrue(statsStore.visible.value)
         assertFalse("no stale Banner on return", exists("player-banner"))
         assertFalse(exists("player-actions"))
         assertFalse("stopping preserves pause", pauses.last())

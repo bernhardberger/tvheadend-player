@@ -18,21 +18,6 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class LivePlayerLayerStateTest {
-    @Test fun backIgnoresStatsAndLeavesThemOn() = runTest {
-        val state = LivePlayerLayerState(this, 5_000L)
-        val stats = at.bernhardberger.tvhplayer.di.PlayerStatsStore()
-        stats.setVisible(true)
-        for (surface in PlayerSurface.entries) {
-            assertEquals(at.bernhardberger.tvhplayer.core.PlayerBackAction.CLOSE_PLAYER,
-                at.bernhardberger.tvhplayer.core.playerBackAction(surface, state.foregroundContext(), bannerVisible = false))
-            val back = at.bernhardberger.tvhplayer.core.playerBackAction(surface, state.foregroundContext(), bannerVisible = true)
-            assertEquals(at.bernhardberger.tvhplayer.core.PlayerBackAction.HIDE_BANNER, back)
-            state.core.applyBackAction(back)
-            assertTrue(stats.visible.value)
-        }
-        state.dispose()
-    }
-
     @Test fun companionScheduleTogglePreparesOnlyOnOpenAndPreservesTheReturnTarget() = runTest {
         val state = LivePlayerLayerState(this, 5_000L)
         state.showControls()

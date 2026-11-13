@@ -54,7 +54,8 @@ internal class PlaybackPresentationPublisher(
     val state = _state.asStateFlow()
     private val _diagnostics = MutableStateFlow(AppPlaybackDiagnostics())
     private val _videoPresentation = MutableStateFlow(AppVideoPresentation())
-    private var diagnosticsEnabled = false
+    // Accessed only under targetCommands' access lock, like diagnostic publication.
+    private val diagnosticsOwners = java.util.Collections.newSetFromMap(java.util.IdentityHashMap<Any, Boolean>())
     private var targetFrameListener: Player.Listener? = null
     private var targetSoundListener: AnalyticsListener? = null
 
@@ -139,10 +140,11 @@ internal class PlaybackPresentationPublisher(
         }
     } else null
 
-    fun setDiagnosticsEnabled(enabled: Boolean) {
-        if (!targetCommands.isOpen()) return
-        diagnosticsEnabled = enabled
-        publishDiagnostics()
+    fun setDiagnosticsClaim(owner: Any, enabled: Boolean) {
+        targetCommands.runIfOpen {
+            if (enabled) diagnosticsOwners.add(owner) else diagnosticsOwners.remove(owner)
+            publishDiagnosticsUnderAccessLock()
+        }
     }
 
     /** Runs [seek] and, for a paused seek with seek diagnostics on, logs one bounded line about it. */
@@ -566,7 +568,7 @@ internal class PlaybackPresentationPublisher(
      */
     fun publishDiagnosticsUnderAccessLock() {
         // Player-state, target-install and error callbacks also enter here directly.
-        if (!diagnosticsEnabled) {
+        if (diagnosticsOwners.isEmpty()) {
             _diagnostics.value = AppPlaybackDiagnostics(source = source(), state = _state.value)
             return
         }

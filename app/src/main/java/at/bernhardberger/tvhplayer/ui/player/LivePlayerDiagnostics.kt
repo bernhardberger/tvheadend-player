@@ -1,7 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -19,13 +18,7 @@ internal fun LivePlayerDiagnostics(
     modifier: Modifier,
 ) {
     val diagnostics by viewModel.diagnostics.collectAsStateWithLifecycle()
-    // Only Stats for nerds needs full diagnostics.
-    DisposableEffect(enabled) {
-        viewModel.setDiagnosticsEnabled(enabled)
-        onDispose {
-            if (enabled) viewModel.setDiagnosticsEnabled(false)
-        }
-    }
+    PlayerDiagnosticsEffect(playbackRuntime, enabled)
     PlaybackStatsVisibility(visible = visible, modifier = modifier) {
         PlaybackStatsOverlay(
             diagnostics = diagnostics,
