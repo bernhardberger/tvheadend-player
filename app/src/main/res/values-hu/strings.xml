@@ -574,6 +574,7 @@
     <string name="player_rail_watching">Ezt nézed</string>
     <string name="details_read_more">További információ</string>
     <string name="details_important_information">Részletek</string>
+    <string name="details_cast_and_crew">Szereplők és stáb</string>
     <string name="details_available_until">Eddig érhető el: %1$s</string>
     <string name="details_size">Méret</string>
     <string name="details_recording_profile">Felvételi profil</string>

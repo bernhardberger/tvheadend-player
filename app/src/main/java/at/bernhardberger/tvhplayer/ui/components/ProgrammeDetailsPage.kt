@@ -484,8 +484,8 @@ internal fun ProgrammeDetailsPage(
                         onFocused = { lastCard = it }, onTextHeight = { airingsText.intValue = it },
                         onClick = { if (backEnabled) onRelated(it) },
                         onOpenContextMenu = onRelatedContextMenu?.let { open -> { if (backEnabled) open(it) } },
-                         bottomSpace = if (credits.isNotEmpty() || importantFacts.isNotEmpty()) DetailsSectionGap else DetailsSafeEdge)
-                      if (credits.isNotEmpty()) DetailsFactSection(stringResource(R.string.details_cast_and_crew),
+                        bottomSpace = if (credits.isNotEmpty() || importantFacts.isNotEmpty()) DetailsSectionGap else DetailsSafeEdge)
+                    if (credits.isNotEmpty()) DetailsFactSection(stringResource(R.string.details_cast_and_crew),
                           creditsScroll, rowSpec, viewport, creditsHeadingHeight, { creditsEmphasis.value },
                           if (importantFacts.isNotEmpty()) DetailsSectionGap else DetailsSafeEdge,
                           Modifier.onPlaced { creditsTop = it.positionInParent().y.roundToInt() }
@@ -501,7 +501,7 @@ internal fun ProgrammeDetailsPage(
                                   down = if (importantFacts.isNotEmpty()) factsFocus else FocusRequester.Cancel
                                   left = FocusRequester.Cancel; right = FocusRequester.Cancel
                               }.semantics(mergeDescendants = true) {}.focusable().testTag("details-credits-panel")) { DetailsCredits(credits) }
-                      if (importantFacts.isNotEmpty()) DetailsFactSection(stringResource(R.string.details_important_information),
+                    if (importantFacts.isNotEmpty()) DetailsFactSection(stringResource(R.string.details_important_information),
                           factsScroll, rowSpec, viewport, factsHeadingHeight, { factsEmphasis.value }, DetailsSafeEdge, Modifier
                           .onPlaced { factsTop = it.positionInParent().y.roundToInt() }
                          .scrollSection(pageSpec, DetailsSection.FACTS)
@@ -519,10 +519,10 @@ internal fun ProgrammeDetailsPage(
                              down = FocusRequester.Cancel
                              left = FocusRequester.Cancel; right = FocusRequester.Cancel
                           }.semantics(mergeDescendants = true) {}.focusable().testTag("details-facts-panel")) { DetailsAboutFacts(importantFacts) }
-                      else if (ids.isEmpty() && credits.isEmpty()) Spacer(Modifier.height(DetailsSafeEdge))
-                     // Room after the last section, so that it reaches the same keyline as the others.
-                     if (ids.isNotEmpty() || credits.isNotEmpty() || importantFacts.isNotEmpty())
-                         Spacer(Modifier.height(with(density) { (viewport - headingKeyline).coerceAtLeast(0).toDp() }))
+                    else if (ids.isEmpty() && credits.isEmpty()) Spacer(Modifier.height(DetailsSafeEdge))
+                    // Room after the last section, so that it reaches the same keyline as the others.
+                    if (ids.isNotEmpty() || credits.isNotEmpty() || importantFacts.isNotEmpty())
+                        Spacer(Modifier.height(with(density) { (viewport - headingKeyline).coerceAtLeast(0).toDp() }))
                 }
               }
             }

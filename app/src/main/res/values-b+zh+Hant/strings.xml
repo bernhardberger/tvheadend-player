@@ -553,6 +553,7 @@
     <string name="player_rail_watching">觀看中</string>
     <string name="details_read_more">更多資訊</string>
     <string name="details_important_information">詳細資料</string>
+    <string name="details_cast_and_crew">演職人員</string>
     <string name="details_available_until">可用至%1$s</string>
     <string name="details_size">大小</string>
     <string name="details_recording_profile">錄影設定檔</string>

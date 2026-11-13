@@ -4,6 +4,7 @@
     <string name="appliance_setup">TV-Start einrichten</string>
     <string name="close">Schliessen</string>
     <string name="details_size">Grösse</string>
+    <string name="details_cast_and_crew">Besetzung &amp; Team</string>
     <string name="action_close">Schliessen</string>
     <string name="appliance_companion">TV-Start-Begleitapp</string>
     <string name="appliance_companion_not_installed">Nicht installiert</string>

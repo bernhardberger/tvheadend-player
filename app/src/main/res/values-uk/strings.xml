@@ -588,6 +588,7 @@
     <string name="player_rail_watching">Перегляд</string>
     <string name="details_read_more">Докладніше</string>
     <string name="details_important_information">Відомості</string>
+    <string name="details_cast_and_crew">Актори та знімальна група</string>
     <string name="details_available_until">Доступно до %1$s</string>
     <string name="details_size">Розмір</string>
     <string name="details_recording_profile">Профіль запису</string>
