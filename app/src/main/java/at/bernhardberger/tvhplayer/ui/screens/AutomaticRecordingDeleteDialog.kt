@@ -16,17 +16,17 @@ internal fun AutomaticRecordingDeleteDialog(
     state: AutomaticRecordingEditorState, scheduledCount: Int, channels: List<Channel>,
 ) {
     ConfirmationDialog(
-        question = stringResource(when (state.draft.kind) {
+        question = stringResource(when (state.baseline.kind) {
             AutomaticRecordingKind.SERIES -> R.string.autorec_editor_delete_series
             AutomaticRecordingKind.TITLE -> R.string.autorec_editor_delete_title
             else -> R.string.autorec_editor_delete_keyword
         }),
-        subject = ConfirmationSubject.Rule(R.drawable.ic_fiber_smart_record, state.draft.pattern.words,
-            listOf(stringResource(when (state.draft.kind) {
+        subject = ConfirmationSubject.Rule(R.drawable.ic_fiber_smart_record, state.baseline.pattern.words,
+            listOf(stringResource(when (state.baseline.kind) {
                 AutomaticRecordingKind.SERIES -> R.string.automatic_recording_kind_series
                 AutomaticRecordingKind.TITLE -> R.string.automatic_recording_kind_title
                 else -> R.string.automatic_recording_kind_keyword
-            }), automaticRecordingChannelLabel(state.draft, channels)).joinToString(" • ")),
+            }), automaticRecordingChannelLabel(state.baseline, channels)).joinToString(" • ")),
         sentence = formatAutomaticRecordingDeleteBody(
             LocalContext.current, state.draft.kind, scheduledCount, state.changed,
         ),

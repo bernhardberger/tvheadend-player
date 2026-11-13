@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.ui.screens
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -28,7 +29,6 @@ import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import java.time.LocalTime
 import java.time.DayOfWeek
 import java.time.format.TextStyle
-import java.util.Locale
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
@@ -176,7 +176,7 @@ internal fun RecordingEditorDay(
     onClick: () -> Unit,
 ) {
     GuidedStepAction(
-        day.getDisplayName(TextStyle.FULL, Locale.getDefault()),
+        day.getDisplayName(TextStyle.FULL, LocalConfiguration.current.locales[0]),
         { if (navigation.canNavigate()) onClick() },
         editorRowModifier(navigation, "day-${day.value}").semantics {
             role = Role.Checkbox; toggleableState = ToggleableState(checked)

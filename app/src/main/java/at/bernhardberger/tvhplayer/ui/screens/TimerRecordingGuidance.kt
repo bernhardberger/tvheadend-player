@@ -27,7 +27,8 @@ internal fun TimerRecordingGuidance(
     scheduledEntries: List<DvrEntry>,
 ) {
     GuidedStepGuidance(
-        title = if (state.editing) timerNameLabel(state, channels) else stringResource(R.string.timer_editor_title),
+        title = if (state.editing) timerNameLabel(state.draft, channels)
+            else stringResource(R.string.timer_editor_title),
         body = timerGuidanceBody(state, channels),
         lead = {
             Text(stringResource(if (state.editing) R.string.timer_editor_edit else R.string.timer_editor_new),
@@ -43,7 +44,7 @@ internal fun TimerRecordingGuidance(
                 RecordingEditorHeading(if (state.navigation.page.level == AutomaticRecordingEditorLevel.FIRST)
                     timerUnavailableLabel(state) ?: timerSpanLabel(state) else timerSpanLabel(state))
                 if (state.draft.name.isNotBlank() || channels.any { it.id == state.draft.channelId }) {
-                    Text(timerNameLabel(state, channels), style = MaterialTheme.typography.bodyMedium,
+                    Text(timerNameLabel(state.draft, channels), style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface)
                 }
                 if (state.draft.repeating) TimerRecordingUpcoming(state) else TimerRecordingOneOff(state)
@@ -64,7 +65,7 @@ private fun timerGuidanceBody(state: TimerRecordingEditorState, channels: List<C
         AutomaticRecordingEditorLevel.START_MINUTE, AutomaticRecordingEditorLevel.END_MINUTE ->
             stringResource(R.string.timer_editor_minute_help)
         else -> if (state.draft.channelId == null) stringResource(R.string.timer_editor_no_channel_description)
-            else stringResource(R.string.timer_editor_description, timerChannelLabel(state, channels),
+            else stringResource(R.string.timer_editor_description, timerChannelLabel(state.draft, channels),
                 formatClock(state.draft.start), formatClock(state.draft.end))
     }
 
