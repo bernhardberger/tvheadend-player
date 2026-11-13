@@ -178,18 +178,19 @@ class PlaybackPanelCaptureTest {
     }
 
     @OptIn(ExperimentalTestApi::class)
-    @Test fun guideTimeRootAndLevel() {
+    @Test fun guideTimeTwoLists() {
         val now = Instant.parse("2026-11-03T12:00:00Z").epochSecond
         panelScene {
             GuideTimePanel(now, now + 7200, GuideWindowBounds(now - 21600, now + 7 * 86400), ZoneId.of("UTC"), { now }, {}, {}, {})
         }
         compose.onNodeWithTag("guide-time-day-0").assertIsFocused()
-        val rootList = compose.onAllNodes(SemanticsMatcher.keyIsDefined(ListBottomFadeVisible)).fetchSemanticsNodes()
-        assertEquals(1, rootList.size)
-        assertTrue("Day list scrolls", rootList.first().config[ListBottomFadeVisible])
         compose.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
         compose.waitForIdle()
         compose.onNodeWithTag("guide-time-preset-12").assertIsFocused()
+        val lists = compose.onAllNodes(SemanticsMatcher.keyIsDefined(ListBottomFadeVisible)).fetchSemanticsNodes()
+        assertEquals(2, lists.size)
+        assertTrue("Both panes have width", lists.all { it.boundsInRoot.width > 300f })
+        assertTrue("Day list scrolls", lists.first().config[ListBottomFadeVisible])
         compose.onRoot().performKeyInput { repeat(4) { pressKey(Key.DirectionDown) } }
         compose.waitForIdle()
         compose.onNodeWithTag("guide-time-preset-22").assertIsFocused()
