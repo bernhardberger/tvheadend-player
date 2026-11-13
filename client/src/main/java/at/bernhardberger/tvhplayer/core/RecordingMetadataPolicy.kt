@@ -3,9 +3,13 @@ package at.bernhardberger.tvhplayer.core
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.DvrRemoval
+import at.bernhardberger.tvheadend.sdk.core.DvrRetention
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionStreamType
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
 /** A finished recording under this share of its planned length shows as stopped early... */
@@ -118,11 +122,39 @@ fun recordingStoppedEarly(recording: DvrEntry): RecordingShortfall? {
     }
 }
 
-/** File removal, not DVR log retention. Unknown and server-managed policies have no date. */
+/** File expiry, including finite log retention that deletes files despite Forever removal. */
 fun recordingRemovalTime(recording: DvrEntry, nowSec: Long): Long? {
-    val days = (recording.removal as? DvrRemoval.Days)?.days ?: return null
+    val days = when (val removal = recording.removal) {
+        is DvrRemoval.Days -> removal.days
+        DvrRemoval.Forever -> (recording.retention as? DvrRetention.Days)?.days
+        else -> null
+    } ?: return null
     val stop = recording.stop?.epochSeconds ?: return null
     return (stop + days * 86400L).takeIf { it > nowSec }
+}
+
+enum class RecordingExpiryUnit { MINUTES, HOURS, DAYS }
+
+data class RecordingExpiryTimeLeft(val amount: Int, val unit: RecordingExpiryUnit)
+
+/** A future file expiry suitable for recording markers. */
+fun recordingExpiryTime(recording: DvrEntry, nowSec: Long): Long? {
+    if (recording.state == DvrEntryState.SCHEDULED || recording.files.isNullOrEmpty()) return null
+    return recordingRemovalTime(recording, nowSec)
+}
+
+/** The compact warning window, rounded down without ever saying zero minutes. */
+fun recordingExpiryTimeLeft(removalSec: Long?, nowSec: Long): RecordingExpiryTimeLeft? {
+    val seconds = removalSec?.minus(nowSec)?.takeIf { it in 1..7.days.inWholeSeconds } ?: return null
+    return when {
+        seconds < 1.hours.inWholeSeconds ->
+            RecordingExpiryTimeLeft(
+                (seconds / 1.minutes.inWholeSeconds).toInt().coerceAtLeast(1), RecordingExpiryUnit.MINUTES,
+            )
+        seconds < 1.days.inWholeSeconds ->
+            RecordingExpiryTimeLeft((seconds / 1.hours.inWholeSeconds).toInt(), RecordingExpiryUnit.HOURS)
+        else -> RecordingExpiryTimeLeft((seconds / 1.days.inWholeSeconds).toInt(), RecordingExpiryUnit.DAYS)
+    }
 }
 
 fun recordingSizeBytes(recording: DvrEntry): Long? = recording.dataSizeBytes?.takeIf { it >= 0 }

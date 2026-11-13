@@ -26,6 +26,7 @@ import at.bernhardberger.tvheadend.sdk.core.TimerecRuleUpdate
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryUpdate
 import at.bernhardberger.tvheadend.sdk.core.DvrRemoval
+import at.bernhardberger.tvheadend.sdk.core.DvrRetention
 import at.bernhardberger.tvheadend.sdk.core.RecordingRuleChannel
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
@@ -40,6 +41,7 @@ import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvhplayer.core.BrowseContextAction
 import at.bernhardberger.tvhplayer.core.ProgrammeRecordingTarget
+import at.bernhardberger.tvhplayer.core.RecordingKeepUntilChoice
 import at.bernhardberger.tvhplayer.core.folderActionApplies
 import at.bernhardberger.tvhplayer.core.dvrMutationStateIsCurrent
 import at.bernhardberger.tvhplayer.core.dvrMutationTargetIsCurrent
@@ -72,6 +74,44 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 internal val AutorecEpisodeWaitTimeout = 10.seconds
+
+@OptIn(ExperimentalTvheadendApi::class)
+internal fun SessionObservation.keepUntilEntry(
+    id: DvrEntryId,
+    openingSession: CurrentSessionObservation?,
+): DvrEntry? {
+    if (openingSession == null || currentSession !== openingSession) return null
+    val writable = (sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
+    return dvrEntry(id)?.takeIf { at.bernhardberger.tvhplayer.core.recordingKeepUntilAvailable(it, writable) }
+}
+
+/** True closes the level, including obsolete targets and choices already published by the server. */
+internal suspend fun DvrMutationActions.chooseRecordingRemoval(
+    id: DvrEntryId,
+    openingSession: CurrentSessionObservation?,
+    observation: SessionObservation,
+    option: at.bernhardberger.tvhplayer.core.RecordingKeepUntilOption,
+    notices: NoticeCenter,
+): Boolean {
+    val entry = observation.keepUntilEntry(id, openingSession) ?: return true
+    val removal = option.removal
+    val retention = DvrRetention.UntilFilesRemoved.takeIf {
+        option.choice == RecordingKeepUntilChoice.FOREVER &&
+            entry.retention is DvrRetention.Days
+    }
+    return when {
+        option.choice == RecordingKeepUntilChoice.CURRENT -> true
+        removal == null -> false
+        entry.removal == removal && (retention == null || entry.retention == retention) -> true
+        else -> {
+            val mutation = DvrMutationAction.SetEntryRemoval(requireNotNull(openingSession), entry, removal, retention)
+            val context = notices.context()
+            val result = execute(mutation)
+            notices.postDvrFailure(mutation, result, context)
+            result !is DvrMutationResult.Failed
+        }
+    }
+}
 
 /** Failed retains SDK mayHaveApplied: an ambiguous rule failure never means "nothing was created". */
 internal sealed interface AutorecSaveOutcome {
@@ -240,6 +280,7 @@ internal sealed interface DvrMutationAction {
         val currentSession: CurrentSessionObservation,
         val target: DvrEntry,
         val removal: DvrRemoval,
+        val retention: DvrRetention? = null,
     ) : DvrMutationAction {
         init { require(removal != DvrRemoval.ServerDefault) }
     }
@@ -526,7 +567,8 @@ internal class DvrMutationActions(
                 action.currentSession, action.target.id, DvrEntryUpdate(enabled = action.enabled),
             )
             is DvrMutationAction.SetEntryRemoval -> updateEntry(
-                action.currentSession, action.target.id, DvrEntryUpdate(removal = action.removal),
+                action.currentSession, action.target.id,
+                DvrEntryUpdate(removal = action.removal, retention = action.retention),
             )
             is DvrMutationAction.CreateProgramme -> scheduleEntry(
                 action.target.currentSession,

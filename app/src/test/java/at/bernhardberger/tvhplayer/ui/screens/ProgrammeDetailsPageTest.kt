@@ -1140,15 +1140,25 @@ class ProgrammeDetailsPageTest {
         Assert.assertTrue(compose.onNodeWithTag("details-card-2").getUnclippedBoundsInRoot().top.value <= 508f)
     }
 
+    @Test @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
+    fun recordingExpiryCapture() {
+        show(recording = true, recordingFacts = true, longSubtitle = true)
+        capture("details-expiry-en-font1.0", settle = false)
+    }
+
     @Test fun recordingDeleteChipAndFactsKeepTheAnchorWithoutAirings() {
         val creditsPresent = androidx.compose.runtime.mutableStateOf(true)
         val factsPresent = androidx.compose.runtime.mutableStateOf(true)
         show(recording = true, recordingFacts = true, longSubtitle = true,
             creditsPresent = creditsPresent, factsPresent = factsPresent)
         compose.onNodeWithTag("details-resume").assertIsFocused()
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionRight); pressKey(Key.DirectionRight); pressKey(Key.DirectionRight) }
+        compose.onRoot().performKeyInput {
+            pressKey(Key.DirectionRight); pressKey(Key.DirectionRight); pressKey(Key.DirectionRight)
+        }
+        compose.onNodeWithTag("details-keep_until").assertIsFocused()
+        compose.pressKey(Key.DirectionRight)
         compose.onNodeWithTag("details-delete").assertIsFocused()
-        compose.onNodeWithContentDescription("Available until Tue, Sep 22").assertExists()
+        compose.onNodeWithContentDescription("Expires Tue, Sep 22 21:00").assertExists()
         assertBottomAnchored(peek = false)
         assertTwoLineSubtitle()
         compose.onNodeWithTag("details-airings").assertDoesNotExist()

@@ -115,6 +115,12 @@ import at.bernhardberger.tvhplayer.core.recordingElapsedProgress
 import at.bernhardberger.tvhplayer.core.recordingFocusTargetKey
 import at.bernhardberger.tvhplayer.core.RecordingWatchState
 import at.bernhardberger.tvhplayer.core.recordingIsRunning
+import at.bernhardberger.tvhplayer.core.recordingExpiryTimeLeft
+import at.bernhardberger.tvhplayer.core.recordingExpiryTime
+import at.bernhardberger.tvhplayer.ui.common.formatRecordingExpiry
+import at.bernhardberger.tvhplayer.ui.common.formatRecordingExpiryDate
+import at.bernhardberger.tvhplayer.ui.components.StatusBadge
+import at.bernhardberger.tvhplayer.ui.components.StatusBadgeTone
 import at.bernhardberger.tvhplayer.core.recordingWatchState
 import at.bernhardberger.tvhplayer.core.recordingLengthSeconds
 import at.bernhardberger.tvhplayer.core.offeredResumePosition
@@ -403,6 +409,8 @@ internal fun RecordingMetadataPane(
     val locale = LocalConfiguration.current.locales[0]
     // The minute clock moves a running recording's length and the end of watching it from now.
     val nowSec = rememberDetailsEpochSeconds()
+    val expiry = recordingExpiryTime(entry, nowSec)
+        ?.let { formatRecordingExpiryDate(it, nowSec, resources, locale) }
     val watchState = recordingWatchState(entry, offeredResumePosition(admission), nowSec)
     val timeLeft = remember(entry, admission) { recordingTimeLeft(entry, admission) }
     val facts = remember(entry, resources, locale) {
@@ -471,9 +479,13 @@ internal fun RecordingMetadataPane(
             titleStyle = MaterialTheme.typography.titleLarge,
             synopsisStyle = MaterialTheme.typography.bodyMedium,
             // Under its time, how it ended and how watching it would go, each with its row's mark.
-            status = if (failure == null && !stoppedEarly && !watched && timeLeft == null && rule == null &&
-                partialSize == null) null else { statusModifier ->
+            status = if (listOf(failure, timeLeft, rule, partialSize, expiry).all { it == null } &&
+                !stoppedEarly && !watched) null else { statusModifier ->
                 Column(statusModifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    expiry?.let {
+                        StatusBadge(it, StatusBadgeTone.NEUTRAL, icon = R.drawable.ic_hourglass_bottom,
+                            modifier = Modifier.testTag("recording-metadata-expiry"))
+                    }
                     rule?.let { (text, icon) ->
                         ProgrammeStatusLine(text, icon, "recording-metadata-rule", maxLines = 2)
                     }
@@ -1009,6 +1021,10 @@ private fun RecordingSectionHeader(
  */
 @Composable
 private fun RecordingOverline(entry: DvrEntry, focused: Boolean) {
+    val nowSec = rememberDetailsEpochSeconds()
+    val expiry = recordingExpiryTimeLeft(recordingExpiryTime(entry, nowSec), nowSec)
+        ?.let { formatRecordingExpiry(it, LocalContext.current.resources) }
+    val expiryMark = stringResource(R.string.recording_expires)
     val leading = buildList {
         entry.start?.epochSeconds.recordingDateTime(androidx.compose.ui.platform.LocalConfiguration.current.locales[0])
             .takeIf(String::isNotBlank)?.let(::add)
@@ -1027,6 +1043,12 @@ private fun RecordingOverline(entry: DvrEntry, focused: Boolean) {
             marks.forEach { (mark, label) ->
                 if (length > 0) append(' ')
                 appendInlineContent(mark.name, label)
+            }
+            expiry?.let {
+                if (length > 0) append(" • ")
+                appendInlineContent(RecordingOverlineMark.EXPIRY.name, expiryMark)
+                append(' ')
+                append(it)
             }
         },
         inlineContent = remember(failedTint) {
@@ -1051,6 +1073,7 @@ private enum class RecordingOverlineMark(@DrawableRes val icon: Int, val tag: St
     STOPPED_EARLY(R.drawable.ic_warning_outlined, "recording-list-stopped-early"),
     FAILED(R.drawable.ic_error_outlined, "recording-list-state-failed"),
     CANCELLED(R.drawable.ic_cancel_outlined, "recording-list-state-cancelled"),
+    EXPIRY(R.drawable.ic_hourglass_bottom, "recording-list-expiry"),
 }
 
 /** A completed recording is the normal case and carries no mark; running and scheduled ones carry theirs at the row's end. */

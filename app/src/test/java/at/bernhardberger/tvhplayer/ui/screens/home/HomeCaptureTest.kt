@@ -53,6 +53,8 @@ import at.bernhardberger.tvheadend.sdk.core.ContentGenre
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvheadend.sdk.core.DvrRecordingFile
+import at.bernhardberger.tvheadend.sdk.core.DvrRemoval
 import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
 import at.bernhardberger.tvheadend.sdk.core.EpgCoverage
@@ -81,6 +83,8 @@ import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.testutil.VisualCapture
+import at.bernhardberger.tvhplayer.testutil.pressKey
+import at.bernhardberger.tvhplayer.testutil.settleFrames
 import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.LocalWarmPlayback
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
@@ -780,7 +784,46 @@ class HomeCaptureTest {
         capture("22-continue-running-and-finished", "home-shelf-0")
     }
 
-    private enum class Kind { BROWSE, WARM, FIRST_RUN, LOADING, EMPTY, OFFLINE }
+    @Test fun expiryCardsDescribeMinuteHourAndDayForms() = atEvening {
+        show(Kind.EXPIRING)
+        compose.settleFrames(3)
+        val shelf = hasAnyAncestor(hasTestTag("home-section-CONTINUE_WATCHING"))
+        listOf("Expires in 45 minutes", "Expires in 5 hours", "Expires in 4 days").forEach { expiry ->
+            val card = compose.onNode(shelf and hasContentDescription(expiry, substring = true))
+            val descriptions = card.fetchSemanticsNode().config[
+                androidx.compose.ui.semantics.SemanticsProperties.ContentDescription]
+            assertEquals(1, descriptions.sumOf { it.split(expiry).size - 1 })
+        }
+    }
+
+    @Test fun cardsWithoutFiniteExpiryHaveNoExpiryDescription() = atEvening {
+        show(Kind.BROWSE)
+        compose.onAllNodes(hasContentDescription("Expires", substring = true)).assertCountEquals(0)
+    }
+
+    @Test @Category(VisualCapture::class) fun expiringSoonCaptures() = atEvening {
+        show(Kind.EXPIRING)
+        compose.settleFrames(3)
+        fun save(name: String) {
+            val bitmap = draw()
+            CaptureOutput.writePng(File(out, "$name.png"), bitmap)
+            bitmap.recycle()
+        }
+        save("home-continue-expiry-en-font1.0")
+        compose.pressKey(Key.DirectionDown)
+        compose.settleFrames(3)
+        compose.onNode(
+            hasTestTag("home-shelf-0") and
+                hasAnyAncestor(hasTestTag("home-section-EXPIRING_SOON")) and isFocused(),
+        ).assertExists()
+        save("home-expiring-soon-en-font1.0")
+        CaptureOutput.writeText(File(out, "home-expiry.txt")) {
+            "Production HomeContent; 1920x1080; en-US; UTC; fontScale=1.0; fictional fixture art; " +
+                "Continue watching then Expiring soon focused; static offline composition only."
+        }
+    }
+
+    private enum class Kind { BROWSE, WARM, FIRST_RUN, LOADING, EMPTY, OFFLINE, EXPIRING }
 
     private data class Scene(
         val observation: SessionObservation,
@@ -1070,6 +1113,9 @@ class HomeCaptureTest {
                 HomePlaying.LiveChannel(it.id)
             }.takeIf { warm },
             nowSec = now,
+            hiddenSections = if (kind == Kind.EXPIRING) HomeSectionKind.entries.toSet() - setOf(
+                HomeSectionKind.CONTINUE_WATCHING, HomeSectionKind.EXPIRING_SOON, HomeSectionKind.RECENTLY_RECORDED,
+            ) else emptySet(),
         )
         return Scene(
             observation = observation,
@@ -1088,6 +1134,24 @@ class HomeCaptureTest {
     )
 
     private fun dvrEntries(kind: Kind, activityItems: Int, now: Long, portrait: Boolean = false): List<DvrEntry> {
+        if (kind == Kind.EXPIRING) {
+            val titles = listOf("Glass Harbor", "Lantern Road", "River Court")
+            val channels = listOf(6L, 5L, 2L)
+            return listOf(45 * 60L, 5 * 3600L, 4 * 86400L).mapIndexed { index, left ->
+                val stop = now + left - 30 * 86400L
+                DvrEntry.create(
+                    DvrEntryId(201L + index),
+                    channelId = ChannelId(channels[index]),
+                    title = titles[index],
+                    state = DvrEntryState.COMPLETED,
+                    start = Instant.fromEpochSeconds(stop - 2 * 3600),
+                    stop = Instant.fromEpochSeconds(stop),
+                    image = ArtworkId(201 + index),
+                    files = listOf(DvrRecordingFile.create(sizeBytes = 2_400_000_000)),
+                    removal = DvrRemoval.Days(30),
+                )
+            }
+        }
         val warm = kind == Kind.WARM
         val firstRun = kind == Kind.FIRST_RUN
         return buildList {

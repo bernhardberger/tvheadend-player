@@ -93,6 +93,7 @@ import coil3.request.transformations
 import at.bernhardberger.tvhplayer.images.ProgrammeArtworkTransformation
 import coil3.request.allowHardware
 import at.bernhardberger.tvhplayer.ui.common.formatFirstAired
+import at.bernhardberger.tvhplayer.ui.common.formatRecordingExpiryDate
 import at.bernhardberger.tvhplayer.ui.common.formatFileSize
 import at.bernhardberger.tvhplayer.ui.common.formatMetadataNumber
 import java.util.Locale
@@ -1272,10 +1273,13 @@ private fun DetailsInformation(
     Column(Modifier.fillMaxWidth().testTag("details-information")) {
         ProgrammeEyebrow(channel?.icon, channelTitleText(channel?.number, channel?.name.orEmpty()),
             Modifier.widthIn(max = 470.dp).onGloballyPositioned { textArea("eyebrow", it.boundsInRoot(), false) }) {
-            val removal = recording?.takeIf { event == null }?.let { recordingRemovalTime(it, nowSec) }
+            val removal = recording?.takeIf { event == null }?.let { recordingExpiryTime(it, nowSec) }
             if (removal != null) {
-                DetailsStatusBadge(null, stringResource(R.string.details_available_until,
-                    formatRecordingDate(removal, dateOnly = true, locale = LocalConfiguration.current.locales[0], nowSec = nowSec)))
+                StatusBadge(
+                    formatRecordingExpiryDate(
+                        removal, nowSec, LocalContext.current.resources, LocalConfiguration.current.locales[0]),
+                    StatusBadgeTone.NEUTRAL, icon = R.drawable.ic_hourglass_bottom,
+                )
             } else detailsStatus(event, recording, nowSec)?.let {
                 DetailsStatusBadge(it, rule = recordingRule(recordingKind) ?: recording?.rule,
                     skipped = recording?.enabled == false)

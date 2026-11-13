@@ -286,6 +286,9 @@ internal fun HomeScreenContent(
             is HomeSection.RecentlyRecorded -> if (key.item == "all-recordings") {
                 if (!menu) onRecordings(DvrLibraryMode.ARCHIVE, null)
             } else section.items.getOrNull(key.position)?.let { openRecording(it.entry, menu) }
+            is HomeSection.ExpiringSoon -> if (key.item == "all-recordings") {
+                if (!menu) onRecordings(DvrLibraryMode.ARCHIVE, null)
+            } else section.items.getOrNull(key.position)?.let { openRecording(it.entry, menu) }
             is HomeSection.Upcoming -> if (!menu) {
                 if (key.item == "all-scheduled") onRecordings(DvrLibraryMode.SCHEDULE, null)
                 else section.items.getOrNull(key.position)?.entry?.let { onRecordings(DvrLibraryMode.SCHEDULE, it.id) }

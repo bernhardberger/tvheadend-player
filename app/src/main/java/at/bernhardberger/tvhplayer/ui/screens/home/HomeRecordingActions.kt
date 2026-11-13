@@ -77,6 +77,7 @@ internal fun HomeRecordingActions(
     var initialAction by remember { mutableStateOf<BrowseContextAction?>(null) }
     var pendingMutation by remember { mutableStateOf<DvrMutationAction?>(null) }
     var mutationBusy by remember { mutableStateOf(false) }
+    var keepingUntil by remember { mutableStateOf(false) }
     val pendingCurrent = pendingMutation?.recordingStateIsCurrent(observation) == true
     LaunchedEffect(capability, pendingCurrent) {
         if (pendingMutation != null && (capability == null || !pendingCurrent)) { pendingMutation = null; onClose() }
@@ -109,6 +110,25 @@ internal fun HomeRecordingActions(
             recordingKind = observation.recordingRuleKind(opened),
             recordingEnabled = opened.enabled,
             resumePositionMs = offeredResumePosition(admission)?.inWholeMilliseconds,
+            keepUntilOptions = if (keepingUntil) recordingKeepUntilOptions(opened, nowSec,
+                java.time.ZoneId.systemDefault()) else null,
+            keepUntilBusy = mutationBusy,
+            keepUntilSupport = at.bernhardberger.tvhplayer.ui.common.formatRecordingKeepUntil(opened, nowSec,
+                androidx.compose.ui.platform.LocalContext.current.resources,
+                androidx.compose.ui.platform.LocalConfiguration.current.locales[0]),
+            nowSec = nowSec,
+            onKeepUntilBack = { keepingUntil = false },
+            onKeepUntilChoose = { option ->
+                if (!mutationBusy && owner?.isCurrent != false) {
+                    mutationBusy = true
+                    scope.launch {
+                        try {
+                            if (mutations.chooseRecordingRemoval(opened.id, capability,
+                                    session.observation.value, option, notices)) onClose()
+                        } finally { mutationBusy = false }
+                    }
+                }
+            },
             playbackIndicator = watchingIndicator(opened.id),
             actions = recordingContextActions(opened, admission, canModify, canWatchChannel = watchLive != null,
                 ruleAvailable = observation.recordingRuleAvailable(opened),
@@ -120,6 +140,11 @@ internal fun HomeRecordingActions(
             onAction = handle@{ action ->
                 if (owner?.isCurrent == false) return@handle
                 when (action) {
+                    BrowseContextAction.KEEP_UNTIL -> {
+                        if (session.observation.value.keepUntilEntry(opened.id, capability) != null)
+                            keepingUntil = true
+                        else onClose()
+                    }
                     BrowseContextAction.CONTINUE_WATCHING -> onReturnToRecording(opened.id) { closeBehindPlayer(onClose) }
                     BrowseContextAction.WATCH, BrowseContextAction.RESUME -> play(RecordingPlaybackStart.RESUME)
                     BrowseContextAction.PLAY, BrowseContextAction.START_OVER -> play(RecordingPlaybackStart.START_OVER)

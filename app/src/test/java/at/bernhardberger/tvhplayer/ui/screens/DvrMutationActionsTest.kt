@@ -38,10 +38,13 @@ import at.bernhardberger.tvheadend.sdk.core.TimerecRule
 import at.bernhardberger.tvheadend.sdk.core.TimerecRuleId
 import at.bernhardberger.tvheadend.sdk.core.TimerecRuleCreate
 import at.bernhardberger.tvheadend.sdk.core.TimerecRuleUpdate
+import at.bernhardberger.tvheadend.sdk.core.TvheadendTestResultFactory
+import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryUpdate
 import at.bernhardberger.tvheadend.sdk.core.DvrRemoval
+import at.bernhardberger.tvheadend.sdk.core.DvrRetention
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import kotlin.time.Instant
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
@@ -52,8 +55,10 @@ import at.bernhardberger.tvheadend.sdk.core.DvrMutationKind
 import at.bernhardberger.tvheadend.sdk.core.EpgSearchResult
 import at.bernhardberger.tvhplayer.core.AutomaticRecordingKind
 import at.bernhardberger.tvhplayer.core.AutorecPreviewState
+import at.bernhardberger.tvhplayer.core.RecordingKeepUntilChoice
 import at.bernhardberger.tvhplayer.core.RecordingPattern
 import at.bernhardberger.tvhplayer.core.newAutorecDraft
+import at.bernhardberger.tvhplayer.core.recordingKeepUntilOptions
 import at.bernhardberger.tvhplayer.core.toDraft
 import at.bernhardberger.tvhplayer.core.toUpdateRequest
 import at.bernhardberger.tvhplayer.core.AutorecPreviewRow
@@ -443,6 +448,7 @@ class DvrMutationActionsTest {
             notices.state.value.candidate?.notice)
     }
 
+    @OptIn(TvheadendTestingApi::class, ExperimentalCoroutinesApi::class)
     @Test fun ruleTimeSkipAndKeepActionsDispatchCapturedRequests() = runTest {
         val session = currentSession()
         val auto = AutorecRule.create(AutorecRuleId("auto"), title = "news")
@@ -484,6 +490,30 @@ class DvrMutationActionsTest {
         assertEquals(listOf(createdAuto, updatedAuto, auto.id, createdTimer, updatedTimer, timer.id,
             time, DvrEntryUpdate(enabled = false), DvrEntryUpdate(enabled = true),
             DvrEntryUpdate(removal = DvrRemoval.Forever)), received)
+        val publishedUpdates = mutableListOf<Pair<DvrRemoval, DvrEntryUpdate>>()
+        val removals = listOf(DvrRemoval.Days(8), DvrRemoval.Forever)
+        for (removal in removals) {
+            val opening = DvrEntry.create(entry.id, state = DvrEntryState.COMPLETED, removal = removal,
+                stop = Instant.fromEpochSeconds(100), files = listOf(
+                    TvheadendTestResultFactory.recordingFile(serverPath = "test.ts")))
+            val source = automaticSession(entries = listOf(opening))
+            val captured = requireNotNull(source.observation.value.currentSession)
+            val forever = recordingKeepUntilOptions(opening, 200, ZoneId.of("UTC"))
+                .single { it.choice == RecordingKeepUntilChoice.FOREVER }
+            publishAutomaticEntries(source, listOf(DvrEntry.create(opening.id, state = opening.state,
+                stop = opening.stop, files = opening.files, removal = removal,
+                retention = DvrRetention.Days(3))))
+            val keep = automaticActions(source) { _, id, update ->
+                assertEquals(opening.id, id)
+                publishedUpdates += removal to update
+                DvrMutationResult.Confirmed(Unit)
+            }
+            val notices = NoticeCenter({ testScheduler.currentTime }) { NoticeContext(0, null) }
+            assertTrue(keep.chooseRecordingRemoval(opening.id, captured, source.observation.value, forever, notices))
+        }
+        assertEquals(removals.map { Triple(it, DvrRemoval.Forever,
+            DvrRetention.UntilFilesRemoved) },
+            publishedUpdates.map { Triple(it.first, it.second.removal, it.second.retention) })
     }
 
     @Test

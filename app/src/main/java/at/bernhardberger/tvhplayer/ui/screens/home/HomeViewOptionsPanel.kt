@@ -35,6 +35,7 @@ private fun HomeSectionKind.homeLabel() = when (this) {
     HomeSectionKind.ON_NOW -> R.string.home_on_now
     HomeSectionKind.GENRES -> R.string.home_browse_by_genre
     HomeSectionKind.CONTINUE_WATCHING -> R.string.home_continue_watching
+    HomeSectionKind.EXPIRING_SOON -> R.string.home_expiring_soon
     HomeSectionKind.RECENTLY_RECORDED -> R.string.home_recently_recorded
     HomeSectionKind.UPCOMING -> R.string.home_upcoming_recordings
 }

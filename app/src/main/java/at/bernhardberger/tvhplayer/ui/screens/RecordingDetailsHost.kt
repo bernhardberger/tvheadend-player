@@ -2,6 +2,9 @@ package at.bernhardberger.tvhplayer.ui.screens
 
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.*
@@ -15,6 +18,11 @@ import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsPage
 import at.bernhardberger.tvhplayer.ui.components.LocalWatchingTarget
 import at.bernhardberger.tvhplayer.ui.components.LocalRecordingPlaybackSelection
+import at.bernhardberger.tvhplayer.ui.components.RecordingKeepUntilLevel
+import at.bernhardberger.tvhplayer.ui.components.ProgrammeArtwork
+import at.bernhardberger.tvhplayer.ui.components.channelTitleText
+import at.bernhardberger.tvhplayer.ui.components.recordingRule
+import at.bernhardberger.tvhplayer.ui.common.programmeEpisodeLine
 import at.bernhardberger.tvhplayer.ui.warmRecordingId
 import at.bernhardberger.tvhplayer.ui.LocalPlayerEntryHandoff
 import at.bernhardberger.tvhplayer.ui.rememberPlayerEntryPending
@@ -73,6 +81,7 @@ internal fun RecordingDetailsHost(
     var focusedAction by remember { mutableStateOf(initialAction) }
     var confirmationKey by remember { mutableStateOf<Key?>(null) }
     var mutationBusy by remember { mutableStateOf(false) }
+    var keepingUntil by remember { mutableStateOf(false) }
     val latestNowSec by rememberUpdatedState(nowSec)
     LaunchedEffect(capability) {
         if (capability == null) { editingRule = false; reportEditorActive(false) }
@@ -80,7 +89,8 @@ internal fun RecordingDetailsHost(
     val latestObservation by rememberUpdatedState(currentObservation)
     val pendingCurrent = pending?.recordingStateIsCurrent(observation) == true
     at.bernhardberger.tvhplayer.ui.player.RegisterPlayerModal(
-        backEnabled = backEnabled && pending == null && !departing && !editingRule, identity = opened.id)
+        backEnabled = backEnabled && pending == null && !departing && !editingRule && !keepingUntil,
+        identity = opened.id)
     LaunchedEffect(capability, pendingCurrent) {
         if (pending != null && (capability == null || !pendingCurrent)) {
             pending = null
@@ -109,7 +119,7 @@ internal fun RecordingDetailsHost(
                     channel != null, playing = playing, nowSec = displayNowSec,
                     ruleAvailable = displayObservation.recordingRuleAvailable(opened)),
                 initialAction = focusedAction,
-                backEnabled = backEnabled && pending == null && !editingRule && !mutationBusy,
+                backEnabled = backEnabled && pending == null && !editingRule && !mutationBusy && !keepingUntil,
                 visibilityAlpha = visibilityAlpha,
                 onClose = onClose,
                 onAction = handle@{ action ->
@@ -117,6 +127,12 @@ internal fun RecordingDetailsHost(
                     val current = currentObservation()
                     val session = capability?.takeIf { current.currentSession === it }
                     when (action) {
+                        BrowseContextAction.KEEP_UNTIL -> {
+                            if (current.keepUntilEntry(opened.id, session) != null) {
+                                focusedAction = action
+                                keepingUntil = true
+                            } else onClose()
+                        }
                         BrowseContextAction.EDIT_RULE -> {
                             val entry = current.dvrEntry(opened.id)
                             val writable = (current.sessionState as? SessionState.Ready)
@@ -194,6 +210,41 @@ internal fun RecordingDetailsHost(
                     }
                 },
             )
+        }
+        if (keepingUntil && capability != null) {
+            val resources = LocalContext.current.resources
+            val locale = LocalConfiguration.current.locales[0]
+            ProvideArtworkSession(capability, displayObservation) {
+                RecordingKeepUntilLevel(
+                    title = opened.title.orEmpty(),
+                    channel = channel?.let { channelTitleText(it.number, it.name.orEmpty()) }
+                        ?: opened.channelName.orEmpty(),
+                    episode = programmeEpisodeLine(opened.episode, opened.subtitle, resources),
+                    time = recordingTimeRange(opened.start?.epochSeconds, opened.stop?.epochSeconds, locale),
+                    summary = opened.summary?.takeIf(String::isNotBlank) ?: opened.description.orEmpty(),
+                    recordingState = opened.state,
+                    recordingRule = recordingRule(displayObservation.recordingRuleKind(opened)),
+                    recordingEnabled = opened.enabled,
+                    options = recordingKeepUntilOptions(opened, displayNowSec, java.time.ZoneId.systemDefault()),
+                    nowSec = displayNowSec,
+                    busy = mutationBusy,
+                    onBack = { keepingUntil = false },
+                    onChoose = { option ->
+                        if (!mutationBusy) {
+                            mutationBusy = true
+                            mutationScope.launch {
+                                try {
+                                    if (mutations.chooseRecordingRemoval(opened.id, capability,
+                                            latestObservation(), option, notices)) keepingUntil = false
+                                } finally { mutationBusy = false }
+                            }
+                        }
+                    },
+                    artwork = {
+                        ProgrammeArtwork(recordingArtwork(opened), channel?.icon, null, Modifier.fillMaxSize())
+                    },
+                )
+            }
         }
         val mutation = pending
         if (mutation != null && capability != null && pendingCurrent) {

@@ -568,7 +568,6 @@
     <string name="details_read_more">추가 정보</string>
     <string name="details_important_information">상세 정보</string>
     <string name="details_cast_and_crew">출연진 및 제작진</string>
-    <string name="details_available_until">%1$s까지 이용 가능</string>
     <string name="details_size">크기</string>
     <string name="details_recording_profile">녹화 프로필</string>
     <string name="details_picture">영상</string>
