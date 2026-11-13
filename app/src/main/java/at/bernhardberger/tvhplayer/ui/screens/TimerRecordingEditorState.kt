@@ -26,6 +26,7 @@ internal class TimerRecordingEditorState(
     val zone: ZoneId,
     private val onClose: () -> Unit = {},
     private val deleteTimer: (suspend () -> DvrMutationResult<*>)? = null,
+    private val onSaved: () -> Unit = onClose,
 ) {
     val baseline = initial
     var draft by mutableStateOf(initial)
@@ -141,7 +142,7 @@ internal class TimerRecordingEditorState(
                 when (action()) {
                     is DvrMutationResult.Failed -> if (deletingTimer) navigation.restoreFocus()
                         else navigation.firstLevel("main")
-                    else -> close()
+                    else -> close(saved = !deletingTimer)
                 }
             } finally {
                 busy = false
@@ -150,8 +151,8 @@ internal class TimerRecordingEditorState(
         }
     }
 
-    private fun close() {
+    private fun close(saved: Boolean = false) {
         closed = true
-        onClose()
+        if (saved) onSaved() else onClose()
     }
 }

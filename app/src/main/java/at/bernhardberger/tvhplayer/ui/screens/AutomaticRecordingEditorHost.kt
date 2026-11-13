@@ -42,6 +42,7 @@ internal fun AutomaticRecordingEditorHost(
     kind: AutomaticRecordingKind? = null,
     programme: EpgEvent? = null,
     rule: AutorecRule? = null,
+    onSaved: () -> Unit = onClose,
 ) {
     require((kind == null) != (rule == null))
     val observation by observations.collectAsState()
@@ -49,6 +50,7 @@ internal fun AutomaticRecordingEditorHost(
         ?.configurations.orEmpty()
     val scope = rememberCoroutineScope()
     val close by rememberUpdatedState(onClose)
+    val saved by rememberUpdatedState(onSaved)
     val state = remember(kind, programme?.id, rule?.id) {
         val initial = rule?.toDraft() ?: newAutorecDraft(requireNotNull(kind), configurations, programme = programme)
         val context = notices.context()
@@ -74,6 +76,7 @@ internal fun AutomaticRecordingEditorHost(
                 notices.postDvrFailure(action, result, context)
                 result
             },
+            onSaved = { saved() },
         )
     }
     RecordingEditorOverlay(state) {

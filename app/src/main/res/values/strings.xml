@@ -1,4 +1,14 @@
 <resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en">
+    <string name="automatic_recording_new_overline">Automatic recordings</string>
+    <string name="automatic_recording_new_title">New automatic recording</string>
+    <string name="automatic_recording_new_choose">Choose how it finds the programs to record.</string>
+    <string name="automatic_recording_new_series_help">To record a series, open one of its programs in the Guide and choose Record series.</string>
+    <string name="automatic_recording_new_keyword">Keyword</string>
+    <string name="automatic_recording_new_keyword_help">Programs that mention your words</string>
+    <string name="automatic_recording_new_title_kind">Title</string>
+    <string name="automatic_recording_new_title_help">Programs with exactly this title</string>
+    <string name="automatic_recording_new_timer">Repeating timer</string>
+    <string name="automatic_recording_new_timer_help">A channel at set times on chosen days</string>
     <string name="context_record_series">Record series</string>
     <string name="context_record_title">Record all with this title</string>
     <string name="context_edit_series">Edit series recording</string>

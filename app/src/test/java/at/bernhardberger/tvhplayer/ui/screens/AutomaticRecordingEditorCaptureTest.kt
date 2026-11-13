@@ -376,6 +376,24 @@ class AutomaticRecordingEditorCaptureTest {
         capture("12b-edit-timer-off-in-draft", "slice-4")
     }
 
+    @Test fun newAutomaticRecordingKindReferenceFrames() {
+        val session = automaticRecordingFakeSession()
+        val current = requireNotNull(session.observation.value.currentSession)
+        val notices = at.bernhardberger.tvhplayer.notices.NoticeCenter(
+            { compose.mainClock.currentTime }, { at.bernhardberger.tvhplayer.notices.NoticeContext(1, null) })
+        compose.runOnIdle {
+            entryScene = {
+                NewAutomaticRecordingHost(
+                    current, session.observation, remember { AutorecPreviewLoader(session.epgRepository) },
+                    remember { DvrMutationActions(session.dvrRepository) }, notices,
+                    { automaticRecordingNow }, automaticRecordingZone, onClose = {},
+                )
+            }
+        }
+        capture("new-kind-keyword-focused", "slice-7a", "automatic-recording-new-keyword")
+        capture("new-kind-cancel-focused", "slice-7a", "automatic-recording-new-cancel")
+    }
+
     private fun show(
         draft: AutorecDraft = initial,
         editing: Boolean = false,
@@ -418,7 +436,7 @@ class AutomaticRecordingEditorCaptureTest {
             CaptureOutput.writePng(file, bitmap)
             CaptureOutput.writeText(File(file.parentFile, "$name.txt")) {
                 "Canvas ${view.width}x${view.height}; en-US; font scale 1.0; Europe/Berlin; 24-hour; focus $focus; " +
-                    "production ${if (entryScene != null) "details/menu/status components" else if (shownTimer == null)
+                    "production ${if (entryScene != null) "entry-point components" else if (shownTimer == null)
                         "AutomaticRecordingEditor" else "TimerRecordingEditor"}; " +
                     "fictional fixture art; no device or server."
             }

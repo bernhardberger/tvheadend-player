@@ -167,6 +167,7 @@ class AutomaticRecordingEditorStateTest {
         assertTrue(state.closed)
         assertEquals(1, fixture.closes)
         val unchanged = fixture.state(editing = true)
+        assertEquals(1, fixture.saves)
         assertEquals(RecordingSubmitUnavailable.UNCHANGED, unchanged.mainProblem)
         assertEquals("matches", unchanged.navigation.page.focusedRow)
         unchanged.submit()

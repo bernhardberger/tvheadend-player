@@ -30,6 +30,7 @@ internal class AutomaticRecordingEditorState(
     prefilled: Boolean = false,
     private val onClose: () -> Unit = {},
     private val deleteRule: (suspend () -> DvrMutationResult<*>)? = null,
+    private val onSaved: () -> Unit = onClose,
 ) {
     val baseline = initial
     var draft by mutableStateOf(initial)
@@ -162,7 +163,7 @@ internal class AutomaticRecordingEditorState(
                     is AutorecSaveOutcome.RuleFailed -> {
                         navigation.firstLevel("main")
                     }
-                    is AutorecSaveOutcome.Applied, is AutorecSaveOutcome.PartiallyApplied -> close()
+                    is AutorecSaveOutcome.Applied, is AutorecSaveOutcome.PartiallyApplied -> close(saved = true)
                 }
             } finally {
                 busy = false
@@ -207,11 +208,11 @@ internal class AutomaticRecordingEditorState(
         }
     }
 
-    private fun close() {
+    private fun close(saved: Boolean = false) {
         closed = true
         previewRevision++
         previewJob?.cancel()
-        onClose()
+        if (saved) onSaved() else onClose()
     }
 }
 

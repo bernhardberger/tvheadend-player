@@ -412,6 +412,35 @@ class DvrMutationActionsTest {
         notices.postDvrFailure(edits.last(), failed, context)
         assertEquals(Notice.DvrActionFailed(DvrMutationKind.UPDATE, DvrMutationFeedback.TIMEOUT),
             notices.state.value.candidate?.notice)
+        val received = mutableListOf<Any>()
+        val toggles = DvrMutationActions(
+            scheduleEntry = { _, _ -> error("Not scheduling") },
+            stopEntry = { _, _ -> error("Not stopping") },
+            cancelEntry = { _, _ -> error("Not cancelling") },
+            deleteEntry = { _, _ -> error("Not deleting") },
+            updateWatchStateCommand = { _, _, _ -> error("Not progress") },
+            updateAutorecRule = { _, _, update -> received += update; DvrMutationResult.Confirmed(Unit) },
+            updateTimerecRule = { _, _, update -> received += update; DvrMutationResult.Confirmed(Unit) },
+        )
+        val live = FakeTvheadendSession(initial)
+        val liveSession = requireNotNull(live.observation.value.currentSession)
+        val items = at.bernhardberger.tvhplayer.core.automaticRecordingList(live.observation.value).items
+        for (item in items) {
+            assertTrue(toggles.setRuleEnabled(item, false, liveSession, live.observation.value,
+                notices, context) is DvrMutationResult.Confirmed)
+        }
+        assertEquals(setOf(AutorecRuleUpdate(enabled = false), TimerecRuleUpdate(enabled = false)), received.toSet())
+        assertEquals(2, received.size)
+        val removed = SessionObservation.create(sessionState = initial.sessionState,
+            channelState = initial.channelState, epgState = initial.epgState,
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create()))
+        for (item in items) assertEquals(DvrMutationResult.Failed(TvheadendFailure.NOT_READY, false),
+            toggles.setRuleEnabled(item, false, liveSession, removed, notices, context))
+        for (item in items) assertEquals(DvrMutationResult.Failed(TvheadendFailure.NOT_READY, false),
+            toggles.setRuleEnabled(item, true, liveSession, removed, notices, context))
+        assertEquals(2, received.size)
+        assertEquals(Notice.DvrRuleActionFailed(DvrMutationKind.UPDATE, DvrMutationFeedback.CONNECTION_UNAVAILABLE),
+            notices.state.value.candidate?.notice)
     }
 
     @Test fun ruleTimeSkipAndKeepActionsDispatchCapturedRequests() = runTest {

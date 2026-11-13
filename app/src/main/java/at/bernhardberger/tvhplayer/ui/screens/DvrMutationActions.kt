@@ -1,5 +1,9 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.core.AutomaticRecordingListItem
+import at.bernhardberger.tvhplayer.core.toDraft
+import at.bernhardberger.tvhplayer.core.toUpdateRequest
+
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.DvrConfigId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
@@ -412,6 +416,42 @@ internal class DvrMutationActions(
         }
         return applyEpisodeChoices(action.currentSession, action.target.id, enabledChanges, oldIds,
             observations, notices, context, created = false)
+    }
+
+    suspend fun setRuleEnabled(
+        item: AutomaticRecordingListItem,
+        enabled: Boolean,
+        currentSession: CurrentSessionObservation,
+        observation: SessionObservation,
+        notices: NoticeCenter,
+        context: NoticeContext,
+    ): DvrMutationResult<*> {
+        val current = when (item) {
+            is AutomaticRecordingListItem.Automatic ->
+                dvrMutationTargetIsCurrent(currentSession, item.rule, observation)
+            is AutomaticRecordingListItem.Timer -> dvrMutationTargetIsCurrent(currentSession, item.rule, observation)
+        }
+        if (!current) {
+            val result = DvrMutationResult.Failed(TvheadendFailure.NOT_READY, false)
+            notices.post(Notice.DvrRuleActionFailed(DvrMutationKind.UPDATE, result.toDvrMutationFeedback()), context)
+            return result
+        }
+        val action = when (item) {
+            is AutomaticRecordingListItem.Automatic -> {
+                val baseline = item.rule.toDraft()
+                DvrMutationAction.UpdateAutorec(currentSession, item.rule,
+                    baseline.copy(enabled = enabled).toUpdateRequest(baseline))
+            }
+            is AutomaticRecordingListItem.Timer -> {
+                // Date is editor context only and is not sent for an existing repeating timer.
+                val baseline = item.rule.toDraft(java.time.LocalDate.MIN)
+                val update = baseline.copy(enabled = enabled).toUpdateRequest(baseline, baseline.name)
+                update?.let { DvrMutationAction.UpdateTimerec(currentSession, item.rule, it) }
+            }
+        }
+        val result = action?.let { execute(it) } ?: DvrMutationResult.Confirmed(Unit)
+        if (action != null) notices.postDvrFailure(action, result, context)
+        return result
     }
 
     private suspend fun applyEpisodeChoices(

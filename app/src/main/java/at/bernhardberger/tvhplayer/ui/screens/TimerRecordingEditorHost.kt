@@ -38,6 +38,7 @@ internal fun TimerRecordingEditorHost(
     onClose: () -> Unit,
     rule: TimerecRule? = null,
     startingRepeating: Boolean = false,
+    onSaved: () -> Unit = onClose,
 ) {
     val zone = remember { ZoneId.systemDefault() }
     val observation by observations.collectAsState()
@@ -45,6 +46,7 @@ internal fun TimerRecordingEditorHost(
         ?.configurations.orEmpty()
     val scope = rememberCoroutineScope()
     val close by rememberUpdatedState(onClose)
+    val saved by rememberUpdatedState(onSaved)
     val state = remember(rule?.id, startingRepeating) {
         val date = java.time.Instant.ofEpochSecond(now().epochSeconds).atZone(zone).toLocalDate()
         val initial = rule?.toDraft(date) ?: newTimerDraft(
@@ -89,6 +91,7 @@ internal fun TimerRecordingEditorHost(
             },
             now, zone, onClose = { close() },
             deleteTimer = { execute(DvrMutationAction.DeleteTimerec(currentSession, requireNotNull(rule))) },
+            onSaved = { saved() },
         )
     }
     RecordingEditorOverlay(state) {

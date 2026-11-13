@@ -60,7 +60,7 @@ fun TimerecRule.toDraft(date: LocalDate): TimerDraft = TimerDraft(
     end = stopMinutesSinceMidnight ?: LocalTime.MIDNIGHT,
     channelId = channelId,
     days = daysOfWeekMask ?: DayOfWeek.entries.toSet(),
-    name = name?.takeUnless(String::isBlank) ?: title.orEmpty(),
+    name = recordingName(),
     // A finite log retention also deletes files marked Forever (dvr_db.c:582-586).
     removal = retention.let {
         if (removal == DvrRemoval.Forever && it is DvrRetention.Days) DvrRemoval.Days(it.days) else removal
@@ -174,11 +174,12 @@ fun TimerDraft.toCreateRequest(channelName: String): TimerecRuleCreate {
 }
 
 fun TimerDraft.toUpdateRequest(baseline: TimerDraft, channelName: String): TimerecRuleUpdate? {
-    require(existingTimer && baseline.existingTimer && days.isNotEmpty())
+    require(existingTimer && baseline.existingTimer)
     val changed = changedFields(baseline)
     if (changed.isEmpty()) return null
     fun has(field: RecordingDraftField) = field in changed
-    require(channelId != null)
+    require(!has(RecordingDraftField.DAYS) || days.isNotEmpty())
+    require(!has(RecordingDraftField.CHANNEL) || channelId != null)
     require(!has(RecordingDraftField.PROFILE) || configId != null) { "Choose a recording profile" }
     val title = name.ifBlank { channelName }
     return TimerecRuleUpdate(

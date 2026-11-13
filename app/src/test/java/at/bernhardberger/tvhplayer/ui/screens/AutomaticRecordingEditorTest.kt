@@ -64,6 +64,64 @@ import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 class AutomaticRecordingEditorTest {
     @get:Rule val compose = createComposeRule()
 
+    @Test fun newRecordingFlowRestoresItsKindAndClosesOnceAfterCreating() {
+        val session = automaticRecordingFakeSession()
+        val current = requireNotNull(session.observation.value.currentSession)
+        val notices = NoticeCenter({ compose.mainClock.currentTime }, { NoticeContext(1, null) })
+        var visible by mutableStateOf(true)
+        var closes = 0
+        session.dvrRepository.scriptCreateTimerecRule(
+            DvrMutationResult.Confirmed(at.bernhardberger.tvheadend.sdk.core.TimerecRuleId("new")))
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                if (visible) NewAutomaticRecordingHost(
+                    current, session.observation, remember { AutorecPreviewLoader(session.epgRepository) },
+                    remember { DvrMutationActions(session.dvrRepository) }, notices,
+                    { automaticRecordingNow }, automaticRecordingZone, onClose = { closes++; visible = false },
+                )
+            }
+        }
+        compose.onNodeWithTag("automatic-recording-new-keyword").assertIsFocused()
+        compose.pressKey(Key.DirectionUp)
+        compose.onNodeWithTag("automatic-recording-new-keyword").assertIsFocused()
+        repeat(3) { compose.pressKey(Key.DirectionDown) }
+        compose.onNodeWithTag("automatic-recording-new-cancel").assertIsFocused()
+        compose.pressKey(Key.DirectionDown)
+        compose.onNodeWithTag("automatic-recording-new-cancel").assertIsFocused()
+        repeat(3) { compose.pressKey(Key.DirectionUp) }
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("automatic-recording-matches").assertIsFocused()
+        compose.onNodeWithTag("automatic-recording-done").assertDoesNotExist()
+        compose.pressKey(Key.Back)
+        compose.onNodeWithTag("automatic-recording-new-keyword").assertIsFocused()
+        repeat(2) { compose.pressKey(Key.DirectionDown) }
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("timer-recording-channel-time").assertIsFocused()
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("timer-recording-date").assertDoesNotExist()
+        compose.pressKey(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionCenter)
+        for (day in DayOfWeek.entries) compose.onNodeWithTag("timer-recording-day-${day.value}").assertIsOn()
+        compose.pressKey(Key.Back)
+        compose.pressKey(Key.Back)
+        compose.pressKey(Key.DirectionUp)
+        compose.onNodeWithTag("timer-recording-main").assertIsFocused().assertIsEnabled()
+        compose.pressKey(Key.DirectionCenter)
+        compose.runOnIdle {
+            assertEquals(1, closes)
+            assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_CREATE_TIMEREC_RULE })
+            assertEquals(null, notices.state.value.candidate)
+        }
+        compose.onNodeWithTag("timer-recording-main").assertDoesNotExist()
+        compose.runOnIdle { visible = true }
+        compose.onNodeWithTag("automatic-recording-new-keyword").assertIsFocused()
+        compose.pressKey(Key.Back)
+        compose.runOnIdle { assertEquals(2, closes) }
+        compose.onNodeWithTag("automatic-recording-new-keyword").assertDoesNotExist()
+    }
+
     @Test fun editorConfirmationCardsKeepDraftsAndDispatchTheChosenActionOnce() {
         lateinit var fixture: AutomaticRecordingEditorFixture
         lateinit var automatic: AutomaticRecordingEditorState

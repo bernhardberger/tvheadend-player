@@ -135,6 +135,7 @@ internal class AutomaticRecordingEditorFixture(
     val submissions = mutableListOf<Pair<AutorecDraft, Map<EventId, Boolean>>>()
     var outcome: AutorecSaveOutcome = AutorecSaveOutcome.Applied(AutorecRuleId("series"))
     var closes = 0
+    var saves = 0
     var deletions = 0
     var deletionResult: DvrMutationResult<*> = DvrMutationResult.Confirmed(Unit)
     val timerSubmissions = mutableListOf<TimerDraft>()
@@ -176,5 +177,6 @@ internal class AutomaticRecordingEditorFixture(
             deletions++
             deletionResult
         },
+        onSaved = { saves++; closes++ },
     )
 }
