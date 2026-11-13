@@ -81,6 +81,7 @@ class AutomaticRecordingEditorTest {
                 )
             }
         }
+        // Check the kind level's initial focus and directional bounds.
         compose.onNodeWithTag("automatic-recording-new-keyword").assertIsFocused()
         compose.pressKey(Key.DirectionUp)
         compose.onNodeWithTag("automatic-recording-new-keyword").assertIsFocused()
@@ -89,11 +90,14 @@ class AutomaticRecordingEditorTest {
         compose.pressKey(Key.DirectionDown)
         compose.onNodeWithTag("automatic-recording-new-cancel").assertIsFocused()
         repeat(3) { compose.pressKey(Key.DirectionUp) }
+        // Open Keyword, then leave without saving.
         compose.pressKey(Key.DirectionCenter)
         compose.onNodeWithTag("automatic-recording-matches").assertIsFocused()
         compose.onNodeWithTag("automatic-recording-done").assertDoesNotExist()
         compose.pressKey(Key.Back)
         compose.onNodeWithTag("automatic-recording-new-keyword").assertIsFocused()
+        compose.runOnIdle { assertEquals(0, closes) }
+        // Open the repeating timer, select a channel and inspect its days.
         repeat(2) { compose.pressKey(Key.DirectionDown) }
         compose.pressKey(Key.DirectionCenter)
         compose.onNodeWithTag("timer-recording-channel-time").assertIsFocused()
@@ -106,6 +110,7 @@ class AutomaticRecordingEditorTest {
         for (day in DayOfWeek.entries) compose.onNodeWithTag("timer-recording-day-${day.value}").assertIsOn()
         compose.pressKey(Key.Back)
         compose.pressKey(Key.Back)
+        // Create once, then reopen the kind level and leave it with Back.
         compose.pressKey(Key.DirectionUp)
         compose.onNodeWithTag("timer-recording-main").assertIsFocused().assertIsEnabled()
         compose.pressKey(Key.DirectionCenter)
@@ -196,7 +201,12 @@ class AutomaticRecordingEditorTest {
         compose.runOnIdle { automatic.navigation.confirmation = AutomaticRecordingEditorConfirmation.DELETE }
         compose.pressKey(Key.DirectionRight)
         confirmTwice()
-        compose.runOnIdle { assertEquals(1, fixture.deletions); assertTrue(automatic.closed); timerMode = true }
+        compose.runOnIdle {
+            assertEquals(1, fixture.deletions)
+            assertEquals(0, fixture.saves)
+            assertTrue(automatic.closed)
+            timerMode = true
+        }
         compose.runOnIdle {
             timer.updateDraft { it.copy(name = "Late news") }
             timerOpener = timer.navigation.focusedRow
@@ -606,6 +616,7 @@ class AutomaticRecordingEditorTest {
             state = remember { fixture.state(automaticRecordingSeries.copy(days = setOf(DayOfWeek.SATURDAY))) }
             TVHeadendPlayerTheme { AutomaticRecordingEditor(state, channels = automaticRecordingChannels) }
         }
+        // Open the upcoming episodes without submitting.
         compose.onNodeWithTag("automatic-recording-main").assertIsFocused()
         compose.pressKey(Key.DirectionDown)
         compose.pressKey(Key.DirectionCenter)
@@ -622,10 +633,12 @@ class AutomaticRecordingEditorTest {
         compose.onNodeWithTag("automatic-recording-episode-1").assertIsOff()
         compose.pressKey(Key.DirectionLeft)
         compose.onNodeWithTag("automatic-recording-matches").assertIsFocused()
+        // Return from the changed episode and dismiss the safe leave choice.
         compose.pressKey(Key.Back)
         compose.onNodeWithTag("automatic-recording-keep-editing").assertIsFocused()
         compose.pressKey(Key.Back, settleFrames = 1, frameMillis = PlayerMotion.PanelMs.toLong())
         compose.onNodeWithTag("automatic-recording-matches").assertIsFocused()
+        // Inspect the stored channel and normalize day selections.
         compose.runOnIdle {
             state.updateDraft { it.copy(channel = RecordingRuleChannel.SpecificChannel(ChannelId(999))) }
         }
@@ -662,8 +675,10 @@ class AutomaticRecordingEditorTest {
         compose.pressKey(Key.DirectionLeft)
         compose.pressKey(Key.DirectionLeft)
         compose.onNodeWithTag("automatic-recording-channel-time").assertIsFocused()
+        // Reset More and confirm both time-window controls.
         verifyResetRestoresFirstMoreRow(state)
         verifyMinuteChoiceReturnsToWindow(state)
+        // Discard the draft: leaving closes the editor but must not count as saved.
         compose.pressKey(Key.Back)
         compose.pressKey(Key.DirectionRight)
         compose.onNodeWithTag("automatic-recording-keep-editing").assertIsFocused()
@@ -673,6 +688,7 @@ class AutomaticRecordingEditorTest {
         compose.pressKey(Key.DirectionCenter)
         compose.runOnIdle {
             assertEquals(1, fixture.closes)
+            assertEquals(0, fixture.saves)
             assertTrue(fixture.submissions.isEmpty())
         }
     }

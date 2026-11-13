@@ -57,6 +57,7 @@ import at.bernhardberger.tvhplayer.core.AutomaticRecordingKind
 import at.bernhardberger.tvhplayer.core.AutorecPreviewState
 import at.bernhardberger.tvhplayer.core.RecordingKeepUntilChoice
 import at.bernhardberger.tvhplayer.core.RecordingPattern
+import at.bernhardberger.tvhplayer.core.automaticRecordingList
 import at.bernhardberger.tvhplayer.core.newAutorecDraft
 import at.bernhardberger.tvhplayer.core.recordingKeepUntilOptions
 import at.bernhardberger.tvhplayer.core.toDraft
@@ -418,32 +419,57 @@ class DvrMutationActionsTest {
         assertEquals(Notice.DvrActionFailed(DvrMutationKind.UPDATE, DvrMutationFeedback.TIMEOUT),
             notices.state.value.candidate?.notice)
         val received = mutableListOf<Any>()
+        var toggleResult: DvrMutationResult<Unit> = DvrMutationResult.Confirmed(Unit)
         val toggles = DvrMutationActions(
             scheduleEntry = { _, _ -> error("Not scheduling") },
             stopEntry = { _, _ -> error("Not stopping") },
             cancelEntry = { _, _ -> error("Not cancelling") },
             deleteEntry = { _, _ -> error("Not deleting") },
             updateWatchStateCommand = { _, _, _ -> error("Not progress") },
-            updateAutorecRule = { _, _, update -> received += update; DvrMutationResult.Confirmed(Unit) },
-            updateTimerecRule = { _, _, update -> received += update; DvrMutationResult.Confirmed(Unit) },
+            updateAutorecRule = { _, _, update -> received += update; toggleResult },
+            updateTimerecRule = { _, _, update -> received += update; toggleResult },
         )
         val live = FakeTvheadendSession(initial)
         val liveSession = requireNotNull(live.observation.value.currentSession)
-        val items = at.bernhardberger.tvhplayer.core.automaticRecordingList(live.observation.value).items
+        val items = automaticRecordingList(live.observation.value).items
         for (item in items) {
             assertTrue(toggles.setRuleEnabled(item, false, liveSession, live.observation.value,
                 notices, context) is DvrMutationResult.Confirmed)
         }
         assertEquals(setOf(AutorecRuleUpdate(enabled = false), TimerecRuleUpdate(enabled = false)), received.toSet())
         assertEquals(2, received.size)
+        for (item in items) assertTrue(toggles.setRuleEnabled(item, true, liveSession, live.observation.value,
+            notices, context) is DvrMutationResult.Confirmed)
+        assertEquals(2, received.size)
+        live.publish(SessionObservation.create(sessionState = initial.sessionState,
+            channelState = initial.channelState, epgState = initial.epgState,
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(
+                autorecRules = listOf(AutorecRule.create(auto.id, title = auto.title, enabled = false)),
+                timerecRules = listOf(TimerecRule.create(timer.id, enabled = false)),
+            ))))
+        assertSame(liveSession, live.observation.value.currentSession)
+        val disabledItems = automaticRecordingList(live.observation.value).items
+        for (item in disabledItems) assertTrue(toggles.setRuleEnabled(item, true, liveSession, live.observation.value,
+            notices, context) is DvrMutationResult.Confirmed)
+        assertEquals(setOf(AutorecRuleUpdate(enabled = true), TimerecRuleUpdate(enabled = true)),
+            received.drop(2).toSet())
+        assertEquals(4, received.size)
+        toggleResult = DvrMutationResult.Failed(TvheadendFailure.ACCESS_DENIED, false)
+        for (item in disabledItems) assertEquals(toggleResult,
+            toggles.setRuleEnabled(item, true, liveSession, live.observation.value, notices, context))
+        assertEquals(6, received.size)
+        assertEquals(Notice.DvrRuleActionFailed(DvrMutationKind.UPDATE, DvrMutationFeedback.PERMISSION_DENIED),
+            notices.state.value.candidate?.notice)
         val removed = SessionObservation.create(sessionState = initial.sessionState,
             channelState = initial.channelState, epgState = initial.epgState,
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create()))
-        for (item in items) assertEquals(DvrMutationResult.Failed(TvheadendFailure.NOT_READY, false),
-            toggles.setRuleEnabled(item, false, liveSession, removed, notices, context))
-        for (item in items) assertEquals(DvrMutationResult.Failed(TvheadendFailure.NOT_READY, false),
-            toggles.setRuleEnabled(item, true, liveSession, removed, notices, context))
-        assertEquals(2, received.size)
+        live.publish(removed)
+        assertSame(liveSession, live.observation.value.currentSession)
+        for (item in disabledItems) assertEquals(DvrMutationResult.Failed(TvheadendFailure.NOT_READY, false),
+            toggles.setRuleEnabled(item, false, liveSession, live.observation.value, notices, context))
+        for (item in disabledItems) assertEquals(DvrMutationResult.Failed(TvheadendFailure.NOT_READY, false),
+            toggles.setRuleEnabled(item, true, liveSession, live.observation.value, notices, context))
+        assertEquals(6, received.size)
         assertEquals(Notice.DvrRuleActionFailed(DvrMutationKind.UPDATE, DvrMutationFeedback.CONNECTION_UNAVAILABLE),
             notices.state.value.candidate?.notice)
     }
