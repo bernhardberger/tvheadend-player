@@ -123,8 +123,8 @@ val offeredDuplicateDetection: List<DuplicateDetection> = listOf(
 )
 
 /**
- * New nullable duplicate detection follows the recording profile (DVR_AUTOREC_RECORD_DVR_PROFILE,
- * dvr_autorec.c:466); an edit retains the server's stored value, including non-offered policies.
+ * Send DVR_PROFILE explicitly: htsp_server.c:610-611 replaces an omitted create value with ALL.
+ * An edit retains the server's stored value, including non-offered policies.
  * Null removal/priority/padding on a new draft omit the field, leaving the profile in charge.
  */
 data class AutorecDraft(
@@ -139,7 +139,7 @@ data class AutorecDraft(
     val enabled: Boolean = true,
     val name: String = "",
     val removal: DvrRemoval? = null,
-    val duplicateDetection: DuplicateDetection? = null,
+    val duplicateDetection: DuplicateDetection = DuplicateDetection.DVR_PROFILE,
     val priority: DvrPriority? = null,
     val paddingBefore: Duration? = null,
     val paddingAfter: Duration? = null,
@@ -206,7 +206,7 @@ fun AutorecRule.toDraft(): AutorecDraft = AutorecDraft(
     enabled = enabled ?: true,
     name = name.orEmpty(),
     removal = removal,
-    duplicateDetection = duplicateDetection,
+    duplicateDetection = duplicateDetection ?: DuplicateDetection.DVR_PROFILE,
     priority = priority,
     paddingBefore = startExtraMinutes,
     paddingAfter = stopExtraMinutes,
@@ -273,9 +273,6 @@ fun AutorecDraft.toUpdateRequest(baseline: AutorecDraft): AutorecRuleUpdate? {
     val changed = changedFields(baseline)
     if (changed.isEmpty()) return null
     fun has(field: RecordingDraftField) = field in changed
-    require(!has(RecordingDraftField.DUPLICATE_DETECTION) || duplicateDetection != null) {
-        "Unset duplicate detection is new-rule only"
-    }
     require(!has(RecordingDraftField.PROFILE) || configId != null) { "Choose a recording profile" }
     val (start, end) = startWindow.bounds()
     return AutorecRuleUpdate(

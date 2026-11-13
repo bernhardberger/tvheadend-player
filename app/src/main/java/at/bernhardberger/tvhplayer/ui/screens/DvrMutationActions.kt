@@ -422,9 +422,10 @@ internal class DvrMutationActions(
     ): AutorecSaveOutcome {
         val pending = changes.toMutableMap()
         val failed = mutableSetOf<EventId>()
+        val acceptedIds = mutableSetOf<DvrEntryId>()
         if (pending.isNotEmpty()) withTimeoutOrNull(AutorecEpisodeWaitTimeout) {
             observations.first {
-                applyAvailableEpisodeChoices(session, ruleId, pending, failed, replacedIds, observations)
+                applyAvailableEpisodeChoices(session, ruleId, pending, failed, acceptedIds, replacedIds, observations)
                 pending.isEmpty()
             }
         }
@@ -440,6 +441,7 @@ internal class DvrMutationActions(
         ruleId: AutorecRuleId,
         pending: MutableMap<EventId, Boolean>,
         failed: MutableSet<EventId>,
+        acceptedIds: MutableSet<DvrEntryId>,
         replacedIds: Set<DvrEntryId>,
         observations: StateFlow<SessionObservation>,
     ) {
@@ -453,11 +455,17 @@ internal class DvrMutationActions(
             val entries = (current.dvrState as? DvrRepositoryState.Current)?.snapshot?.entries.orEmpty()
             val entry = entries.singleOrNull { it.autorecRuleId == ruleId && it.eventId == eventId &&
                 it.state == DvrEntryState.SCHEDULED && it.id !in replacedIds } ?: continue
-            if (entry.enabled != enabled) {
-                val result = updateEntry(session, entry.id, DvrEntryUpdate(enabled = enabled))
-                if (result !is DvrMutationResult.Confirmed) failed += eventId
+            if (entry.enabled == enabled) pending.remove(eventId)
+            else if (entry.id !in acceptedIds) {
+                when (updateEntry(session, entry.id, DvrEntryUpdate(enabled = enabled))) {
+                    is DvrMutationResult.AcceptedButUnconfirmed -> acceptedIds += entry.id
+                    is DvrMutationResult.Failed -> {
+                        failed += eventId
+                        pending.remove(eventId)
+                    }
+                    is DvrMutationResult.Confirmed -> pending.remove(eventId)
+                }
             }
-            pending.remove(eventId)
         }
     }
 

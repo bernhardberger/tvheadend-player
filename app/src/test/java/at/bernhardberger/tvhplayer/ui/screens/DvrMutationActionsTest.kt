@@ -56,6 +56,7 @@ import at.bernhardberger.tvhplayer.core.RecordingPattern
 import at.bernhardberger.tvhplayer.core.newAutorecDraft
 import java.time.ZoneId
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 
@@ -90,14 +91,16 @@ class DvrMutationActionsTest {
             captured, session.observation.value, null, now, zone) as AutorecPreviewState.Matches).matchCount)
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Test fun leftOutEpisodesApplyAfterEntriesArriveAndEmptySetDoesNotWait() = runTest {
         val session = automaticSession()
         val ruleId = AutorecRuleId("own")
         session.dvrRepository.scriptCreateAutorecRule(DvrMutationResult.Confirmed(ruleId))
         val requests = mutableListOf<Pair<DvrEntryId, DvrEntryUpdate>>()
+        var confirmed = true
         val actions = automaticActions(session) { _, id, update ->
             requests += id to update
-            DvrMutationResult.Confirmed(Unit)
+            if (confirmed) DvrMutationResult.Confirmed(Unit) else DvrMutationResult.AcceptedButUnconfirmed(Unit)
         }
         val context = NoticeContext(1, null)
         val notices = NoticeCenter({ testScheduler.currentTime }, { context })
@@ -116,6 +119,19 @@ class DvrMutationActionsTest {
         assertEquals(AutorecSaveOutcome.Applied(ruleId),
             actions.createAutorecWithLeftOut(action, emptySet(), session.observation, notices, context))
         assertEquals(before, testScheduler.currentTime)
+        confirmed = false
+        val accepted = async(start = CoroutineStart.UNDISPATCHED) {
+            actions.createAutorecWithLeftOut(action, setOf(EventId(7)), session.observation, notices, context)
+        }
+        assertFalse(accepted.isCompleted)
+        publishAutomaticEntries(session, listOf(DvrEntry.create(entry.id, eventId = entry.eventId,
+            autorecRuleId = ruleId, state = DvrEntryState.SCHEDULED, enabled = true, dataSizeBytes = 1)))
+        testScheduler.runCurrent()
+        assertEquals(2, requests.size)
+        publishAutomaticEntries(session, listOf(DvrEntry.create(entry.id, eventId = entry.eventId,
+            autorecRuleId = ruleId, state = DvrEntryState.SCHEDULED, enabled = false)))
+        assertEquals(AutorecSaveOutcome.Applied(ruleId), accepted.await())
+        assertEquals(2, requests.size)
     }
 
     @Test fun missingOrFailedLeftOutUpdatesReturnPartialAndOneNoticeWithoutRetryingRule() = runTest {
@@ -172,8 +188,8 @@ class DvrMutationActionsTest {
             state = DvrEntryState.SCHEDULED, enabled = true)
         publishAutomaticEntries(session, listOf(enabled, disabled), listOf(rule))
         assertEquals(AutorecSaveOutcome.Applied(rule.id), saving.await())
-        assertEquals(listOf(enabled.id to DvrEntryUpdate(enabled = true),
-            disabled.id to DvrEntryUpdate(enabled = false)), requests)
+        assertEquals(mapOf(enabled.id to DvrEntryUpdate(enabled = true),
+            disabled.id to DvrEntryUpdate(enabled = false)), requests.toMap())
     }
 
     private fun automaticSession(

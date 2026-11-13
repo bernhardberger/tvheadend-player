@@ -9,6 +9,7 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DuplicateDetection
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.DvrRemoval
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.EventId
@@ -17,14 +18,13 @@ import java.time.DayOfWeek
 import java.time.LocalTime
 import java.time.ZoneId
 import kotlin.time.Instant
-import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AutomaticRecordingPolicyTest {
-    @Test fun `preview requests respect kind and bounded series search`() = runTest {
+    @Test fun `preview requests respect kind and bounded series search`() {
         val keyword = newAutorecDraft(AutomaticRecordingKind.KEYWORD)
             .copy(pattern = RecordingPattern("A|B"), fullText = true, mergeText = true)
         assertEquals("""A\|B""", keyword.previewSearchRequest()?.query)
@@ -41,9 +41,10 @@ class AutomaticRecordingPolicyTest {
         assertEquals(true, channelSeries.previewSearchRequest()?.mergeText)
         assertNull(series.copy(pattern = RecordingPattern("")).previewSearchRequest())
         assertNull(keyword.copy(pattern = RecordingPattern(" ")).previewSearchRequest())
+        assertNull(keyword.copy(enabled = false).previewSearchRequest())
     }
 
-    @Test fun `preview filters local weekday inclusive minute windows series and supported broadcast type`() = runTest {
+    @Test fun `preview filters local weekday inclusive minute windows series and supported broadcast type`() {
         val now = Instant.parse("2026-11-12T00:00:00Z")
         fun event(start: Instant = Instant.parse("2026-11-12T23:15:30Z"), isNew: Boolean? = true) =
             EpgEvent.create(EventId(1), ChannelId(3), start, Instant.parse("2026-11-13T00:15:30Z"),
@@ -74,7 +75,7 @@ class AutomaticRecordingPolicyTest {
         }
     }
 
-    @Test fun `preview merges every own upcoming entry and never predicts duplicates`() = runTest {
+    @Test fun `preview merges every own upcoming entry and never predicts duplicates`() {
         val now = Instant.fromEpochSeconds(100)
         val ruleId = AutorecRuleId("own")
         val events = (1..5).map { id ->
@@ -99,6 +100,10 @@ class AutomaticRecordingPolicyTest {
         assertNull(keepOnly.previewSearchRequest(draft))
         assertEquals(result, keepOnly.previewMatches(events, entries, ruleId, now, ZoneId.of("UTC"), draft))
         assertNull(draft.previewSearchRequest(draft))
+        val eventless = DvrEntry.create(DvrEntryId(7), autorecRuleId = ruleId,
+            state = DvrEntryState.SCHEDULED, start = Instant.fromEpochSeconds(207))
+        assertEquals(AutorecEpisodeState.REMOVED, keepOnly.previewMatches(emptyList(), listOf(eventless),
+            ruleId, now, ZoneId.of("UTC"), draft).rows.single().state)
         val fresh = draft.previewMatches(events, entries, null, now, ZoneId.of("UTC"))
         assertEquals(4, fresh.willRecordCount)
         assertTrue(fresh.rows.none { it.state == AutorecEpisodeState.DUPLICATE })
@@ -107,7 +112,7 @@ class AutomaticRecordingPolicyTest {
         assertEquals(4, noWords.previewMatches(emptyList(), entries, ruleId, now, ZoneId.of("UTC"), noWords).matchCount)
     }
 
-    @Test fun `changed existing match criteria preview removed entries and newly scheduled matches`() = runTest {
+    @Test fun `changed existing match criteria preview removed entries and newly scheduled matches`() {
         val now = Instant.parse("2026-11-12T23:00:00Z")
         val start = Instant.parse("2026-11-12T23:15:30Z")
         val stop = Instant.parse("2026-11-13T00:15:30Z")
@@ -135,13 +140,23 @@ class AutomaticRecordingPolicyTest {
             assertEquals(AutorecEpisodeState.REMOVED,
                 changed.previewMatches(emptyList(), listOf(entry), ruleId, now, zone, draft).rows.single().state)
         }
+        for (isNew in listOf(false, null)) {
+            val known = EpgEvent.create(EventId(1), ChannelId(1), start, stop, isNew = isNew)
+            val unknown = DvrEntry.create(DvrEntryId(4), eventId = EventId(4), autorecRuleId = ruleId,
+                state = DvrEntryState.SCHEDULED, start = start, stop = stop, channelId = ChannelId(1))
+            val newOnly = draft.copy(broadcastType = BroadcastType.NEW).previewMatches(
+                listOf(known), listOf(entry, unknown), ruleId, now, zone, draft)
+            assertEquals(mapOf(entry.id to AutorecEpisodeState.REMOVED,
+                unknown.id to AutorecEpisodeState.SCHEDULED), newOnly.rows.associate { it.recordingId to it.state })
+            assertEquals(1, newOnly.willRecordCount)
+        }
         val renamed = draft.copy(pattern = RecordingPattern("Other"))
-        val noEventId = DvrEntry.create(DvrEntryId(3), autorecRuleId = ruleId,
+        val noEventId = DvrEntry.create(DvrEntryId(3), autorecRuleId = ruleId, state = DvrEntryState.SCHEDULED,
             start = start, stop = stop, channelId = ChannelId(1))
         val textResult = renamed.previewMatches(emptyList(), listOf(entry, noEventId), ruleId, now, zone, draft)
         assertEquals(mapOf(DvrEntryId(1) to AutorecEpisodeState.REMOVED,
-            DvrEntryId(3) to AutorecEpisodeState.SCHEDULED), textResult.rows.associate { it.recordingId to it.state })
-        assertEquals(1, textResult.willRecordCount)
+            DvrEntryId(3) to AutorecEpisodeState.REMOVED), textResult.rows.associate { it.recordingId to it.state })
+        assertEquals(0, textResult.willRecordCount)
     }
 
     @Test fun `literal metacharacters round trip for title and keyword`() {
@@ -168,7 +183,9 @@ class AutomaticRecordingPolicyTest {
     @Test fun `new defaults omit profile owned values and stored values are only sent when changed`() {
         val draft = newAutorecDraft(AutomaticRecordingKind.KEYWORD).copy(pattern = RecordingPattern("news"))
         val request = draft.toCreateRequest()
-        assertNull(request.duplicateDetection)
+        assertEquals(DuplicateDetection.DVR_PROFILE, request.duplicateDetection)
+        assertEquals(DuplicateDetection.DVR_PROFILE,
+            newAutorecDraft(AutomaticRecordingKind.KEYWORD).toCreateRequest().duplicateDetection)
         assertNull(request.removal)
         assertNull(request.priority)
         assertNull(request.startExtraMinutes)
@@ -193,6 +210,9 @@ class AutomaticRecordingPolicyTest {
         assertEquals(RecordingSubmitUnavailable.UNCHANGED, baseline.cannotSubmit(baseline))
         assertEquals(RecordingSubmitUnavailable.WORDS_REQUIRED,
             newAutorecDraft(AutomaticRecordingKind.TITLE).cannotSubmit())
+        val recordAll = baseline.copy(duplicateDetection = DuplicateDetection.ALL)
+        assertEquals(AutorecRuleUpdate(duplicateDetection = DuplicateDetection.DVR_PROFILE),
+            baseline.toUpdateRequest(recordAll))
     }
 
     @Test fun `missing stored fields use server defaults without changing the edit`() {
@@ -263,6 +283,14 @@ class AutomaticRecordingPolicyTest {
         assertEquals("""A\|B""", draft.toCreateRequest().title)
         assertEquals("A|B", draft.toCreateRequest().name)
         assertEquals(RecordingRuleChannel.SpecificChannel(ChannelId(2)), draft.toCreateRequest().channel)
+        val entry = DvrEntry.create(DvrEntryId(1), eventId = event.id, autorecRuleId = AutorecRuleId("own"),
+            channelId = event.channelId, start = event.start, stop = event.stop)
+        for (edited in listOf(draft.copy(pattern = RecordingPattern("Other")),
+            draft.copy(fullText = true), draft.copy(mergeText = true))) {
+            assertNull(edited.previewSearchRequest(draft))
+            assertEquals(AutorecEpisodeState.SCHEDULED, edited.previewMatches(emptyList(), listOf(entry),
+                AutorecRuleId("own"), Instant.fromEpochSeconds(0), ZoneId.of("UTC"), draft).rows.single().state)
+        }
     }
 
     @Test fun `raw expression supplies a blank rule name only at creation`() {

@@ -62,7 +62,11 @@ fun TimerDraft.changedFields(baseline: TimerDraft): Set<RecordingDraftField> = b
     }
 }
 
-fun TimerDraft.cannotSubmit(baseline: TimerDraft? = null): RecordingSubmitUnavailable? = when {
+fun TimerDraft.cannotSubmit(serverZone: ZoneId, baseline: TimerDraft? = null): RecordingSubmitUnavailable? =
+    commonCannotSubmit(baseline) ?: if (!repeating && resolveOccurrenceOn(date, serverZone).let { it.stop <= it.start })
+        RecordingSubmitUnavailable.EMPTY_SPAN else null
+
+private fun TimerDraft.commonCannotSubmit(baseline: TimerDraft? = null): RecordingSubmitUnavailable? = when {
     channelId == null -> RecordingSubmitUnavailable.CHANNEL_REQUIRED
     existingTimer && days.isEmpty() -> RecordingSubmitUnavailable.REPEAT_REQUIRED
     baseline != null && changedFields(baseline).isEmpty() -> RecordingSubmitUnavailable.UNCHANGED
@@ -78,15 +82,13 @@ fun TimerDraft.cannotSubmit(baseline: TimerDraft? = null): RecordingSubmitUnavai
  * forward and take the earlier offset in an overlap.
  */
 fun TimerDraft.toScheduleRequest(channelName: String, serverZone: ZoneId): DvrScheduleRequest {
-    require(!repeating && cannotSubmit() == null)
-    val endDate = if (end <= start) date.plusDays(1) else date
-    val from = date.atTime(start).atZone(serverZone).toInstant()
-    val until = endDate.atTime(end).atZone(serverZone).toInstant()
+    require(!repeating && cannotSubmit(serverZone) == null)
+    val occurrence = resolveOccurrenceOn(date, serverZone)
     return DvrScheduleRequest(
         schedule = DvrSchedule.ExplicitTime(
             requireNotNull(channelId),
-            Instant.fromEpochSeconds(from.epochSecond),
-            Instant.fromEpochSeconds(until.epochSecond),
+            occurrence.start,
+            occurrence.stop,
         ),
         title = name.ifBlank { channelName },
         configId = configId,
@@ -98,8 +100,18 @@ fun TimerDraft.toScheduleRequest(channelName: String, serverZone: ZoneId): DvrSc
     )
 }
 
+/** Repeating equal clock times are zero length (dvr_timerec.c:122-125); one-off wrapping stays unchanged. */
+internal fun TimerDraft.resolveOccurrenceOn(date: LocalDate, serverZone: ZoneId): TimerOccurrence {
+    val nextDay = if (repeating) end < start else end <= start
+    val endDate = if (nextDay) date.plusDays(1) else date
+    return TimerOccurrence(
+        Instant.fromEpochSeconds(date.atTime(start).atZone(serverZone).toEpochSecond()),
+        Instant.fromEpochSeconds(endDate.atTime(end).atZone(serverZone).toEpochSecond()),
+    )
+}
+
 fun TimerDraft.toCreateRequest(channelName: String): TimerecRuleCreate {
-    require(repeating && !existingTimer && cannotSubmit() == null)
+    require(repeating && !existingTimer && commonCannotSubmit() == null)
     val title = name.ifBlank { channelName }
     return TimerecRuleCreate(
         title = title.replace("%", "%%"),

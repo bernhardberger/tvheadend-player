@@ -6,12 +6,12 @@ import at.bernhardberger.tvheadend.sdk.core.BroadcastType
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.EpgSearchRequest
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.core.RecordingRuleChannel
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
-import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 import kotlin.time.Instant
@@ -54,7 +54,7 @@ sealed interface AutorecPreviewState {
  * Existing rules need no search unless matching changed; an off draft cannot create replacement entries.
  */
 fun AutorecDraft.previewSearchRequest(baseline: AutorecDraft? = null): EpgSearchRequest? {
-    if (baseline != null && (!enabled || changedFields(baseline).none { it in autorecMatchAffectingFields })) {
+    if (!enabled || (baseline != null && !matchingChanged(changedFields(baseline)))) {
         return null
     }
     val channelId = (channel as? RecordingRuleChannel.SpecificChannel)?.channelId
@@ -87,11 +87,10 @@ fun AutorecDraft.previewMatches(
 ): AutorecPreviewState.Matches {
     require(ruleId == null || baseline != null) { "An existing rule preview requires its baseline draft" }
     val changed = baseline?.let(::changedFields).orEmpty()
-    val rematching = ruleId == null || changed.any { it in autorecMatchAffectingFields }
+    val rematching = ruleId == null || matchingChanged(changed)
     val matches = if (rematching) events.distinctBy { it.id }.filter { matchesPreviewEvent(it, now, zone) }
         else emptyList()
     val matchingIds = matches.map { it.id }.toSet()
-    val textChanged = changed.any { it in textMatchFields }
     val own = entries.filter {
         ruleId != null && it.autorecRuleId == ruleId && it.start?.let { time -> time > now } == true
     }
@@ -105,7 +104,7 @@ fun AutorecDraft.previewMatches(
     val entryRows = own.map { entry ->
         AutorecPreviewRow(entry.eventId, entry.id, entry.title, entry.subtitle, entry.channelId,
             requireNotNull(entry.start), entry.stop,
-            if (rematching && entryWillBeRemoved(entry, matchingIds, textChanged, zone)) AutorecEpisodeState.REMOVED
+            if (entryWillBeRemoved(entry, matchingIds, changed, events, zone)) AutorecEpisodeState.REMOVED
             else entry.previewState())
     }
     val rows = (guideRows.toList() + entryRows).sortedBy { it.start }
@@ -116,10 +115,27 @@ fun AutorecDraft.previewMatches(
 private fun AutorecDraft.entryWillBeRemoved(
     entry: DvrEntry,
     matchingIds: Set<EventId>,
-    textChanged: Boolean,
+    changed: Set<RecordingDraftField>,
+    events: List<EpgEvent>,
     zone: ZoneId,
-): Boolean = !enabled || !matchesChannelAndTime(entry.channelId, requireNotNull(entry.start), zone) ||
-    (textChanged && entry.eventId?.let { it !in matchingIds } == true)
+): Boolean {
+    // Every real update rebuilds scheduled spawns from guide events (dvr_autorec.c:1610-1631).
+    val eventlessSpawn = entry.eventId == null && entry.state == DvrEntryState.SCHEDULED
+    val knownNotNew = broadcastType == BroadcastType.NEW &&
+        events.any { it.id == entry.eventId && it.isNew != true }
+    val criteriaExclude = !enabled || !matchesChannelAndTime(entry.channelId, requireNotNull(entry.start), zone) ||
+        (textMatchingChanged(changed) && entry.eventId?.let { it !in matchingIds } == true)
+    return changed.isNotEmpty() && (eventlessSpawn || knownNotNew || (matchingChanged(changed) && criteriaExclude))
+}
+
+private fun AutorecDraft.matchingChanged(changed: Set<RecordingDraftField>): Boolean =
+    changed.any {
+        it in autorecMatchAffectingFields && (kind != AutomaticRecordingKind.SERIES || it !in textMatchFields)
+    }
+
+// A series link bypasses the server's text checks (dvr_autorec.c:356-358).
+private fun AutorecDraft.textMatchingChanged(changed: Set<RecordingDraftField>): Boolean =
+    kind != AutomaticRecordingKind.SERIES && changed.any { it in textMatchFields }
 
 private fun DvrEntry.previewState(): AutorecEpisodeState = when {
     enabled == false -> AutorecEpisodeState.SKIPPED
@@ -157,18 +173,12 @@ data class TimerOccurrence(val start: Instant, val stop: Instant)
 /** Calendar-day arithmetic in the caller's server-equivalent zone, including DST gaps/overlaps. */
 fun TimerDraft.nextOccurrences(now: Instant, zone: ZoneId, count: Int): List<TimerOccurrence> {
     require(count >= 0)
+    if (start == end) return emptyList()
     val firstDate = java.time.Instant.ofEpochSecond(now.epochSeconds).atZone(zone).toLocalDate()
     val dates = if (repeating) {
         if (days.isEmpty()) emptySequence()
         else generateSequence(firstDate) { it.plusDays(1) }.filter { it.dayOfWeek in days }
     } else sequenceOf(date)
-    return dates.map { occurrenceOn(it, zone) }.filter { it.start > now }.take(count).toList()
-}
-
-private fun TimerDraft.occurrenceOn(date: LocalDate, zone: ZoneId): TimerOccurrence {
-    val stopDate = if (end <= start) date.plusDays(1) else date
-    return TimerOccurrence(
-        Instant.fromEpochSeconds(date.atTime(start).atZone(zone).toEpochSecond()),
-        Instant.fromEpochSeconds(stopDate.atTime(end).atZone(zone).toEpochSecond()),
-    )
+    return dates.map { resolveOccurrenceOn(it, zone) }.filter { it.start > now && it.stop > it.start }
+        .take(count).toList()
 }
