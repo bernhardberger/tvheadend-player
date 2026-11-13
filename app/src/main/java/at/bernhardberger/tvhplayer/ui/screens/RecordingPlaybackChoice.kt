@@ -33,6 +33,7 @@ internal fun RecordingPlaybackChoice(
     val resumeFocus = remember { FocusRequester() }
     val liveFocus = remember { FocusRequester() }
     val startFocus = remember { FocusRequester() }
+    var focusedChoice by remember { mutableStateOf<FocusRequester?>(null) }
     val playable = recordingPlaybackOffered(admission)
     val deferred = admission == RecordingPlaybackAdmission.GrowingDeferred
     val resumePosition = offeredResumePosition(admission)
@@ -45,7 +46,9 @@ internal fun RecordingPlaybackChoice(
     val order = listOfNotNull(resumeFocus.takeIf { resumePosition != null }, startFocus.takeIf { playable },
         liveFocus.takeIf { onWatchLive != null })
     // The stack runs top to bottom and stops at both ends; nothing leaves the card sideways.
-    fun Modifier.stacked(self: FocusRequester) = focusRequester(self).focusProperties {
+    fun Modifier.stacked(self: FocusRequester) = focusRequester(self).onFocusChanged {
+        if (it.isFocused) focusedChoice = self else if (focusedChoice == self) focusedChoice = null
+    }.focusProperties {
         val index = order.indexOf(self)
         up = order.getOrNull(index - 1) ?: FocusRequester.Cancel
         down = order.getOrNull(index + 1) ?: FocusRequester.Cancel
@@ -64,13 +67,15 @@ internal fun RecordingPlaybackChoice(
     val title = entry.title.orEmpty()
     CentredDialogShell(paneTitle = title, onDismiss = onClose, backEnabled = backEnabled, verticalKeys = true) {
         LaunchedEffect(firstFocus, order) {
-            if (firstFocus in order) { withFrameNanos { }; firstFocus.requestFocus() }
+            withFrameNanos { }
+            if (firstFocus in order && focusedChoice !in order) firstFocus.requestFocus()
         }
         ProvideArtworkSession(observation.currentSession, observation) {
             PlaybackChoiceCard(
                 art = recordingArtwork(entry),
                 picon = channel?.icon,
-                channel = (channel?.let { channelTitleText(it.number, it.name.orEmpty()) } ?: entry.channelName).orEmpty(),
+                channel = (channel?.let { channelTitleText(it.number, it.name.orEmpty()) }
+                    ?: entry.channelName).orEmpty(),
                 airTime = recordingAirTime(entry, locale, nowSec),
                 title = title,
                 episode = programmeEpisodeLine(entry.episode, entry.subtitle, resources),
@@ -87,7 +92,9 @@ internal fun RecordingPlaybackChoice(
                         .testTag("recording-resume"),
                 )
                 if (playable) PlaybackChoiceButton(
-                    stringResource(if (resumePosition == null) R.string.recording_choice_play else R.string.context_start_over),
+                    stringResource(
+                        if (resumePosition == null) R.string.recording_choice_play else R.string.context_start_over,
+                    ),
                     if (resumePosition == null) R.drawable.ic_play_arrow else R.drawable.ic_replay,
                     startEnd, filled = resumePosition == null,
                     onClick = { onPlay(RecordingPlaybackStart.START_OVER) },
@@ -105,8 +112,9 @@ internal fun RecordingPlaybackChoice(
 
 private fun recordingAirTime(entry: DvrEntry, locale: java.util.Locale, nowSec: Long): String? {
     val start = entry.start?.epochSeconds ?: return null
-    val stop = entry.stop?.epochSeconds ?: return start.formatDateTime(locale)
-    return formatTimeInterval(start, stop, withDate = true, locale = locale, nowSec = nowSec)
+    return entry.stop?.epochSeconds?.let { stop ->
+        formatTimeInterval(start, stop, withDate = true, locale = locale, nowSec = nowSec)
+    } ?: start.formatDateTime(locale)
 }
 
 /** Only while the server is still recording: how much is on disk of what is planned. */

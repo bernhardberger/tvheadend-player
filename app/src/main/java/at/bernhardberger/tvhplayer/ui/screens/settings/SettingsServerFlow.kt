@@ -302,7 +302,8 @@ internal class ServerSettingsState(
                 val active = removeTarget.id == activeId
                 ({
                     RemoveServerDialog(name, serverAvatarLook(removeTarget),
-                        serverConfirmationDetail(removeTarget.host, removeTarget.port, removeTarget.accountName()), active,
+                        serverConfirmationDetail(removeTarget.host, removeTarget.port, removeTarget.accountName()),
+                        active,
                         onRemove = {
                             removing = null
                             remove(removeTarget)

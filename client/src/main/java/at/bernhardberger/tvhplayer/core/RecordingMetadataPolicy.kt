@@ -58,9 +58,11 @@ fun recordingLengthSeconds(recording: DvrEntry, nowSec: Long): Long? = when {
  */
 fun recordingFinalLengthSeconds(recording: DvrEntry, nowSec: Long): Long? {
     if (!recordingIsRunning(recording)) return null
-    val recorded = recordingLengthSeconds(recording, nowSec) ?: return null
-    val stop = recordingPaddedStop(recording)?.epochSeconds ?: return null
-    return recorded + (stop - nowSec).coerceAtLeast(0L)
+    return recordingLengthSeconds(recording, nowSec)?.let { recorded ->
+        recordingPaddedStop(recording)?.epochSeconds?.let { stop ->
+            recorded + (stop - nowSec).coerceAtLeast(0L)
+        }
+    }
 }
 
 /** From the first file's start to the last file's stop, which is when the recording actually ran. */

@@ -38,10 +38,15 @@ internal fun playbackCardTint(detailsTint: Int): PlaybackCardTint? {
     val (hue, saturation, _) = rgbToHsv(detailsTint)
     if (saturation < MIN_TINT_SATURATION) return null
     return PlaybackCardTint(
-        surface = hsvToRgb(hue, .18f, .135f),
-        halo = hsvToRgb(hue, saturation.coerceIn(.35f, .60f), .62f),
+        surface = hsvToRgb(hue, SURFACE_SATURATION, SURFACE_VALUE),
+        halo = hsvToRgb(hue, saturation.coerceIn(MIN_HALO_SATURATION, MAX_HALO_SATURATION), HALO_VALUE),
         accent = normalizeAccentRgb(detailsTint),
     )
 }
 
 private const val MIN_TINT_SATURATION = .1f
+private const val SURFACE_SATURATION = .18f
+private const val SURFACE_VALUE = .135f
+private const val MIN_HALO_SATURATION = .35f
+private const val MAX_HALO_SATURATION = .60f
+private const val HALO_VALUE = .62f

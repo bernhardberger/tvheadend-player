@@ -58,7 +58,9 @@ internal fun SwitchServerDialog(
     ConfirmationDialog(
         question = stringResource(R.string.server_switch_question),
         subject = ConfirmationSubject.Server(look, name, detail),
-        sentence = stringResource(if (recording) R.string.server_switch_recording_body else R.string.server_switch_live_body),
+        sentence = stringResource(
+            if (recording) R.string.server_switch_recording_body else R.string.server_switch_live_body,
+        ),
         safe = ConfirmationChoice(stringResource(R.string.server_keep_watching), R.drawable.ic_check, SWITCH_KEEP),
         action = ConfirmationChoice(stringResource(R.string.server_switch), R.drawable.ic_swap_horiz, SWITCH_CONFIRM),
         onConfirm = onSwitch,
@@ -81,7 +83,9 @@ internal fun RemoveServerDialog(
         subject = ConfirmationSubject.Server(look, name, detail),
         sentence = stringResource(if (active) R.string.server_remove_body_active else R.string.server_remove_body),
         safe = ConfirmationChoice(stringResource(R.string.keep), R.drawable.ic_check, REMOVE_KEEP),
-        action = ConfirmationChoice(stringResource(R.string.server_remove), R.drawable.ic_delete_outlined, REMOVE_CONFIRM),
+        action = ConfirmationChoice(
+            stringResource(R.string.server_remove), R.drawable.ic_delete_outlined, REMOVE_CONFIRM,
+        ),
         onConfirm = onRemove,
         onDismiss = onKeep,
     )

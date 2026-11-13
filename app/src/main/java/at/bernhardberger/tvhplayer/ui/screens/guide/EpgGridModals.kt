@@ -54,7 +54,9 @@ internal fun ConfirmProgrammeActionDialog(
     ProvideArtworkSession(currentSession, observation) {
         ConfirmationDialog(
             visibility = visibility,
-            question = stringResource(if (stopping) R.string.stop_recording_confirm_title else R.string.cancel_recording_confirm_title),
+            question = stringResource(
+                if (stopping) R.string.stop_recording_confirm_title else R.string.cancel_recording_confirm_title,
+            ),
             subject = ConfirmationSubject.Programme(
                 name = event.title.orEmpty(), image = programmeArtwork(event),
                 channelIcon = channel?.icon, channelNumber = channel?.number, channelName = channel?.name.orEmpty(),

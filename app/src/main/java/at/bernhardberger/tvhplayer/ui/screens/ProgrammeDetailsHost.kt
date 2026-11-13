@@ -55,7 +55,8 @@ internal fun ProgrammeDetailsHost(
     retainPlayerSnapshot: Boolean = false,
     onContinueWatching: (() -> Unit)? = null,
     initialAction: BrowseContextAction? = null,
-    signedInUsername: String? = koinInject<AppProfileOwner>().profiles.collectAsStateWithLifecycle().value.activeProfile()?.accountName(),
+    signedInUsername: String? = koinInject<AppProfileOwner>().profiles.collectAsStateWithLifecycle()
+        .value.activeProfile()?.accountName(),
 ) {
     val closeBehindPlayer = rememberCloseBehindPlayer()
     val entryPending = rememberPlayerEntryPending()

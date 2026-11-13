@@ -1,11 +1,15 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
 import android.app.Application
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.unit.Density
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
@@ -13,6 +17,7 @@ import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
+import at.bernhardberger.tvhplayer.testutil.pressKey
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.formatRecordedDuration
@@ -102,6 +107,19 @@ class RecordingPlaybackChoiceTest {
         compose.runOnIdle { assertEquals(0, watched) }
     }
 
+    @Test fun activeChoiceWithScaledTextStaysWithinTheHeightCap() {
+        images.install(FixtureArt.imageLoader(ApplicationProvider.getApplicationContext<Application>(),
+            mapOf(ArtworkId(2) to FixtureArt.art("still-ridge-light")))
+            .newBuilder().coroutineContext(Dispatchers.Main.immediate).build())
+        show(754L, watch = {}, fontScale = 1.3f, image = ArtworkId(2),
+            title = "A winter journey through the mountain wilderness before the first snow arrives",
+            channelName = "Ridge Earth: mountains, wildlife and journeys around the world")
+        val card = compose.onNodeWithTag("centred-dialog-card").getUnclippedBoundsInRoot()
+        val last = compose.onNodeWithTag("recording-watch-live").getUnclippedBoundsInRoot()
+        assertTrue("Scaled card height ${(card.bottom - card.top).value} exceeds 476", (card.bottom - card.top).value <= 476f)
+        assertTrue("The last choice stays inside the card", last.bottom < card.bottom)
+    }
+
     @Test fun ordinaryChoiceStillFocusesResumeAndDispatchesResume() {
         val starts = mutableListOf<RecordingPlaybackStart>()
         show(754L, play = { starts += it })
@@ -127,17 +145,22 @@ class RecordingPlaybackChoiceTest {
     }
 
     @Test fun runningChoiceThatCannotPlayOnlyOffersWatchLiveWithoutTheFinishedReason() {
-        show(754L, watch = {}, progress = RecordingProgressCapability.UNSUPPORTED)
+        val progress = mutableStateOf(RecordingProgressCapability.UNSUPPORTED)
+        show(754L, watch = {}, progress = progress)
         val reason = ApplicationProvider.getApplicationContext<Application>().getString(R.string.error_305_reason)
         compose.onNodeWithText(reason).assertDoesNotExist()
         compose.onNodeWithTag("recording-resume").assertDoesNotExist()
         compose.onNodeWithTag("recording-start-over").assertDoesNotExist()
         compose.onNodeWithTag("recording-watch-live").assertIsFocused()
+        compose.runOnIdle { progress.value = RecordingProgressCapability.SUPPORTED }
+        compose.onNodeWithTag("recording-resume").assertExists()
+        compose.onNodeWithTag("recording-watch-live").assertIsFocused()
     }
 
     @Test fun eachPlayableChoiceStatesItsOwnEndAndFocusNeverResizesTheCard() {
+        val watchAvailable = mutableStateOf(true)
         // A minute before the stop, with five minutes of pre-padding already on disk: 64 of 65 minutes.
-        show(754L, watch = {}, left = 60, startExtra = 5.minutes)
+        show(754L, watch = {}, left = 60, startExtra = 5.minutes, watchAvailable = watchAvailable)
         val before = compose.onNodeWithTag("centred-dialog-card").getUnclippedBoundsInRoot()
         val app = ApplicationProvider.getApplicationContext<Application>()
         fun endsAt(sec: Long?) = SemanticsMatcher("ends at $sec") {
@@ -156,6 +179,13 @@ class RecordingPlaybackChoiceTest {
         compose.onNodeWithTag("recording-start-over").performKeyInput { pressKey(Key.DirectionDown) }
         compose.onNodeWithTag("recording-watch-live").assertIsFocused()
         assertEquals(before, compose.onNodeWithTag("centred-dialog-card").getUnclippedBoundsInRoot())
+        compose.runOnIdle { watchAvailable.value = false }
+        compose.onNodeWithTag("recording-resume").assertIsFocused()
+        compose.runOnIdle { watchAvailable.value = true }
+        compose.pressKey(Key.DirectionDown)
+        compose.onNodeWithTag("recording-start-over").assertIsFocused()
+        compose.runOnIdle { watchAvailable.value = false }
+        compose.onNodeWithTag("recording-start-over").assertIsFocused()
     }
 
     private fun assertTopToBottom(vararg tags: String) {
@@ -168,9 +198,11 @@ class RecordingPlaybackChoiceTest {
     private fun show(position: Long?, watch: (() -> Unit)? = null,
         play: (RecordingPlaybackStart) -> Unit = {},
         visible: androidx.compose.runtime.MutableState<Boolean> = mutableStateOf(true), close: () -> Unit = {},
-        serverPath: String = "test.ts", progress: RecordingProgressCapability = RecordingProgressCapability.SUPPORTED,
+        serverPath: String = "test.ts",
+        progress: State<RecordingProgressCapability> = mutableStateOf(RecordingProgressCapability.SUPPORTED),
         left: Long = 1800, startExtra: Duration = Duration.ZERO, title: String? = "Test recording",
-        channelName: String = "Test channel", image: ArtworkId? = null, subtitle: String? = null, episode: EpgEpisode? = null) {
+        channelName: String = "Test channel", image: ArtworkId? = null, subtitle: String? = null, episode: EpgEpisode? = null,
+        fontScale: Float = 1f, watchAvailable: State<Boolean> = mutableStateOf(true)) {
         val now = NOW
         val channel = Channel.create(ChannelId(1), name = channelName)
         val start = Instant.fromEpochSeconds(now - 3600 + left)
@@ -180,16 +212,19 @@ class RecordingPlaybackChoiceTest {
             startExtraMinutes = startExtra, playPosition = position?.seconds,
             files = listOf(TvheadendTestResultFactory.recordingFile(serverPath = serverPath,
                 start = start - startExtra, stop = Instant.fromEpochSeconds(now))))
-        val observation = SessionObservation.create(
-            sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
-            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(channels = listOf(channel))),
-            epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
-            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = listOf(entry))),
-            recordingProgressCapability = progress)
         compose.setContent {
-            TVHeadendPlayerTheme {
-                if (visible.value) RecordingPlaybackChoice(entry, observation.recordingPlaybackAdmission(entry),
-                    observation, channel, now, play, close, watch)
+            val observation = SessionObservation.create(
+                sessionState = SessionState.Ready(ServerCapabilities.create(
+                    streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
+                channelState = ChannelRepositoryState.Current(ChannelCatalog.create(channels = listOf(channel))),
+                epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
+                dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = listOf(entry))),
+                recordingProgressCapability = progress.value)
+            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale)) {
+                TVHeadendPlayerTheme {
+                    if (visible.value) RecordingPlaybackChoice(entry, observation.recordingPlaybackAdmission(entry),
+                        observation, channel, now, play, close, watch.takeIf { watchAvailable.value })
+                }
             }
         }
     }

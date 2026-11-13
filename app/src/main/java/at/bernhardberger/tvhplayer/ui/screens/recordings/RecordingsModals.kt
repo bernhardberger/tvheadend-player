@@ -94,13 +94,14 @@ private fun recordingConfirmationSubject(entry: DvrEntry, channel: Channel?, now
 internal fun recordingConfirmationAirTime(start: Long?, stop: Long?, nowSec: Long): String {
     val locale = LocalConfiguration.current.locales[0]
     if (start == null) return ""
-    if (stop == null) return formatRecordingSchedule(start, locale = locale, nowSec = nowSec)
-    val zone = ZoneId.systemDefault()
-    val today = Instant.ofEpochSecond(nowSec).atZone(zone).toLocalDate()
-    return when (ChronoUnit.DAYS.between(today, Instant.ofEpochSecond(start).atZone(zone).toLocalDate())) {
-        0L -> stringResource(R.string.details_today, formatTimeInterval(start, stop, locale = locale))
-        1L -> stringResource(R.string.details_tomorrow, formatTimeInterval(start, stop, locale = locale))
-        else -> formatTimeInterval(start, stop, withDate = true, locale = locale, nowSec = nowSec)
+    return if (stop == null) formatRecordingSchedule(start, locale = locale, nowSec = nowSec) else {
+        val zone = ZoneId.systemDefault()
+        val today = Instant.ofEpochSecond(nowSec).atZone(zone).toLocalDate()
+        when (ChronoUnit.DAYS.between(today, Instant.ofEpochSecond(start).atZone(zone).toLocalDate())) {
+            0L -> stringResource(R.string.details_today, formatTimeInterval(start, stop, locale = locale))
+            1L -> stringResource(R.string.details_tomorrow, formatTimeInterval(start, stop, locale = locale))
+            else -> formatTimeInterval(start, stop, withDate = true, locale = locale, nowSec = nowSec)
+        }
     }
 }
 
@@ -108,7 +109,8 @@ internal fun recordingConfirmationAirTime(start: Long?, stop: Long?, nowSec: Lon
 private fun recordingConfirmationSentence(
     action: PendingRecordingAction, removeEntry: Boolean, entry: DvrEntry, nowSec: Long,
 ): String = when (action) {
-    PendingRecordingAction.STOP -> stopConfirmationSentence(entry, nowSec, LocalContext.current.resources, spoken = false)
+    PendingRecordingAction.STOP ->
+        stopConfirmationSentence(entry, nowSec, LocalContext.current.resources, spoken = false)
     PendingRecordingAction.CANCEL -> stringResource(R.string.cancel_recording_confirm_body)
     PendingRecordingAction.DELETE -> stringResource(
         if (removeEntry) R.string.remove_entry_confirm_body else R.string.delete_recording_confirm_body)
@@ -139,7 +141,8 @@ internal fun stopConfirmationSentence(
 ): String {
     val recorded = sentenceDuration(times.recordedSec, roundUp = false, resources, spoken)
     return times.remainingSec?.let {
-        resources.getString(R.string.stop_recording_confirm_body, recorded, sentenceDuration(it, roundUp = true, resources, spoken))
+        resources.getString(R.string.stop_recording_confirm_body, recorded,
+            sentenceDuration(it, roundUp = true, resources, spoken))
     } ?: resources.getString(R.string.stop_recording_confirm_body_open, recorded)
 }
 
@@ -147,7 +150,9 @@ internal fun stopConfirmationSentence(
  * Recorded minutes round down, remaining minutes round up. Drawn lengths use narrow units;
  * spoken lengths stay fully spelled out. Recorded lengths under a minute retain seconds.
  */
-private fun sentenceDuration(seconds: Long, roundUp: Boolean, resources: android.content.res.Resources, spoken: Boolean): String {
+private fun sentenceDuration(
+    seconds: Long, roundUp: Boolean, resources: android.content.res.Resources, spoken: Boolean,
+): String {
     val minutes = if (roundUp) (seconds + 59L) / 60L else seconds / 60L
     return when {
         !spoken -> formatNarrowDuration(if (minutes > 0L) minutes * 60L else seconds, resources)

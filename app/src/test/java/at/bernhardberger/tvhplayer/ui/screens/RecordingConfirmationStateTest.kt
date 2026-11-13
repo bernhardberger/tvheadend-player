@@ -14,6 +14,7 @@ import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.core.DvrLibraryMode
+import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.notices.*
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.screens.recordings.StopConfirmationTimes
@@ -402,7 +403,7 @@ class RecordingConfirmationStateTest {
         val longRemainder = stopConfirmationSentence(StopConfirmationTimes(3_959L, 3_901L), resources, spoken = false)
         assertTrue(longRemainder, "1h\u00a05m" in longRemainder && "1h\u00a06m" in longRemainder)
         val boundary = stopConfirmationSentence(StopConfirmationTimes(119L, 30L), resources, spoken = false)
-        assertTrue(boundary, "The 1m recorded" in boundary && "last 1m" in boundary)
+        assertEquals(resources.getString(R.string.stop_recording_confirm_body, "1m", "1m"), boundary)
         assertTrue(stopConfirmationSentence(StopConfirmationTimes(30L, null), resources, spoken = false).contains("30s"))
     }
 
