@@ -828,7 +828,7 @@ activation, DVR eligibility, confirmations and current-session guards remain.
   (`ui/screens/guide/GuideHeadline.kt` `guideHeadlineDrop`); hidden, they keep
   their place. A 104dp channel column and an 8dp gap lead into the
   timeline, which extends to the physical edge, with the ruler above the
-  programme rows (`ui/screens/guide/GuideViewport.kt` `guideChannelWidth`, `GuideChannelGap`).
+  programme rows (`ui/screens/guide/GuideChannelColumn.kt` `guideChannelWidth`, `GuideChannelGap`).
   With channel numbers hidden and a logo on every channel in the list, the column
   is 72dp (the logo and its padding) and the timeline takes the rest; a channel
   shown by name keeps it at 104dp. Timeline content continues to the physical
