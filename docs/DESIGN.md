@@ -286,7 +286,9 @@ Paths below are relative to `app/src/main/java/at/bernhardberger/tvhplayer/ui/`.
 | Reading box | `components/ProgrammeDetailsLayout.kt` — `ProgrammeDetailsFullDescription` |
 | Context menu | `components/BrowseContextMenu.kt` |
 | Two-column dialog | `components/TwoColumnDialog.kt` |
-| Centred prompt/confirmation card | `components/CentredDialog.kt` |
+| Modal shell | `components/CentredDialogShell.kt` |
+| Confirmation card | `components/ConfirmationDialog.kt` |
+| Playback choice card | `components/PlaybackChoiceCard.kt` |
 | Guided step (setup flows) | `brand/.../ui/components/GuidedStep.kt` (shared with the appliance companion; `GuidedStepper` stays in `app/.../ui/components/GuidedStepper.kt`) — full-screen guidance and step line left, fields or choices right, both a browse column wide with independent scrolling. The actions column runs the full screen height with no fade: only the screen's edges cut it, and focus scrolling keeps the focused action, with its scale, between the 80 dp top line and 35 dp above the bottom. Settings uses the same full-screen viewport. First run adds a non-focusable signature (mark, name, version) at the foot of the guidance column; the guidance column's content stops 64 dp above the bottom so it never meets it. `GuidedStepAction` is the Wide button's look on a clickable `Surface`, because TV Material 1.1's `WideButton` cannot grow to a wrapped or translated subtitle. An optional `trailingContent` slot holds a status word, badge or switch before the chevron; a switch row sets `Role.Switch` and `toggleableState` and clears the switch's own semantics. Busy actions retain native disabled focus, dim their content and replace the icon with a spinner; they do not use the enabled focused fill. |
 | Details page | `components/ProgrammeDetailsPage.kt` |
 | Channel schedule column | `components/ChannelSchedule.kt`; player sheet and navigation in `player/PlayerChannelSchedule.kt` |
@@ -1307,10 +1309,34 @@ timeshift window is listed; this display estimate is not a seek grant.
   place of Watch, Resume or Play, and never Watch live. An action that
   needs a confirmation closes the menu for good; Keep, Cancel and Back return focus to the originating card. Details
   opened from a menu return to the card on Back, never to the menu.
-- **Prompts and confirmations** (resume or start over; cancel, stop or delete a
-  recording): kit Standard card centred over a 60% black scrim, drawn in the
-  window so the screen beneath stays visible. Text only, buttons in one row.
-  Destructive confirmations focus the safe choice; Back equals it.
+- **Prompts and confirmations:** both cards sit centered over a 60% black scrim,
+  drawn in the window so the screen beneath stays visible. The choice determines
+  the layout: two buttons in a row for a yes/no confirmation, stacked buttons for
+  choosing how to do something. Full-screen pages are reserved for heavy
+  operations with progress, such as the server switch itself.
+- **Confirmations** (stop, cancel, delete or remove a recording; delete a folder's
+  recordings; switch or remove a server connection): a generic question as the
+  headline; a panel naming what is affected (programme with its picture or channel
+  logo, channel number and name, air time; folder with recording count and size;
+  server with account and address); one sentence stating the consequence; then
+  the button row. The safe choice comes first and is focused; Back equals it;
+  Left/Right move between buttons; Up/Down do nothing. The panel is not focusable
+  and is read as one description. Only the panel is tinted, from the picture,
+  else the channel logo, else not at all. The card is 400 dp wide and widens in
+  4 dp steps up to 568 dp only to avoid a single word on the last line, a name
+  over two lines, or a wrapped channel line. A recording belonging to another
+  account names its owner in the panel; your own does not.
+- **Playback choice** (resume, watch from beginning, watch live): a 400 dp card
+  with the picture on top, the channel line, the title, and for a running
+  recording its status line and bar; full-width stacked buttons, the first
+  focused; Up/Down move and stop at both ends; Left/Right do nothing; Back closes.
+  Each button shows when the programme would end if started that way, appended
+  quietly to its centered label; the time is dropped when it does not fit and
+  is always spoken. Focus never resizes the card. When height is short the
+  picture shrinks first, then the episode line, then the title. A portrait poster
+  is shown whole beside the heading; without a picture the channel logo stands
+  in on a fade in the channel's color; without a logo the card is plain.
+- Destructive buttons are plain outlined buttons.
 - **Record** acts immediately, without a confirmation; the recording profile
   comes from Settings → Recordings.
 - Programme and recording details use the same actions whether opened from

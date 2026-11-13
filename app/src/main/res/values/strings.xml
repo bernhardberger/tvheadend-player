@@ -515,9 +515,7 @@
     <string name="cancel_recording">Cancel recording</string>
     <string name="stop_recording">Stop recording</string>
     <string name="cancel_recording_confirm_title">Cancel this recording?</string>
-    <!-- Dialog body before canceling a scheduled recording. %1$s = program title, %2$s = channel name, %3$s = date and time. -->
     <string name="stop_recording_confirm_title">Stop this recording?</string>
-    <!-- Dialog body before stopping a running recording. %1$s = program title. Escape apostrophes as \'. -->
     <!-- Sentence under the stopped recording's panel when it has a listed end still ahead. %1$s = duration recorded so far, %2$s = duration left until the listed end; each from one hour as hours and minutes ("1:05"), otherwise spelled-out minutes ("45 minutes"). -->
     <string name="stop_recording_confirm_body">The %1$s recorded so far is kept. The last %2$s won\'t be recorded.</string>
     <!-- Sentence under the stopped recording's panel when it is past its listed end or has none. %1$s = duration recorded so far: from one hour as hours and minutes ("2:05"), otherwise spelled-out minutes ("45 minutes"). -->

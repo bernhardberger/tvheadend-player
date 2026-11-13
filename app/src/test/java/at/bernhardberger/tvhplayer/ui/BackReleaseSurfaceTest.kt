@@ -22,14 +22,12 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
 import androidx.tv.material3.Text
-import at.bernhardberger.tvhplayer.ui.components.CentredDialog
 import at.bernhardberger.tvhplayer.ui.components.CentredDialogShell
 import at.bernhardberger.tvhplayer.ui.components.depth.*
 import at.bernhardberger.tvhplayer.ui.screens.BrowseSidePanel
 import at.bernhardberger.tvhplayer.testutil.holdBack
 import at.bernhardberger.tvhplayer.testutil.pressKey
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -80,8 +78,11 @@ class BackReleaseSurfaceTest {
     @Test fun centeredDialogWaitsForItsOwnUncanceledRelease() {
         var backs = 0
         compose.setContent { TVHeadendPlayerTheme {
-            CentredDialog("Confirm", "A decision", "Cancel", "Confirm", {}, {}, {},
-                onBack = { backs++ })
+            CentredDialogShell("Confirm", onDismiss = {}, onBack = { backs++ }) {
+                val focus = remember { FocusRequester() }
+                LaunchedEffect(Unit) { focus.requestFocus() }
+                Button({}, Modifier.focusRequester(focus)) { Text("Cancel") }
+            }
         } }
         releaseCycle { assertEquals(0, backs); compose.onNodeWithText("Cancel").assertIsFocused() }
         assertEquals(1, backs)
@@ -117,40 +118,6 @@ class BackReleaseSurfaceTest {
         compose.runOnIdle { verticalKeys = true }
         compose.pressKey(Key.DirectionUp)
         compose.onNodeWithText("First").assertIsFocused()
-    }
-
-    @Test @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
-    fun centeredDialogWidthFollowsActionsNotLongCopy() {
-        compose.setContent { TVHeadendPlayerTheme {
-            CentredDialog(
-                "A long recording title with many words ".repeat(8),
-                "A long explanation of this decision ".repeat(8),
-                "Resume this recording from the previously saved position",
-                "Watch this recording again from the very beginning",
-                {}, {}, {},
-            )
-        } }
-        val card = compose.onNodeWithTag("centred-dialog-card")
-        val content = compose.onNodeWithTag("centred-dialog-content").getUnclippedBoundsInRoot()
-        val bounds = card.getUnclippedBoundsInRoot()
-        val first = compose.onNodeWithTag("two-column-first").getUnclippedBoundsInRoot()
-        val second = compose.onNodeWithTag("two-column-second").getUnclippedBoundsInRoot()
-        val padding = (content.left - bounds.left) + (bounds.right - content.right)
-        assertTrue("Actions can grow the card beyond its minimum", bounds.right - bounds.left > 528.dp)
-        assertEquals("Long copy does not widen the action-driven card",
-            (second.right - first.left + padding).value, (bounds.right - bounds.left).value, 1f)
-    }
-
-    @Test @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
-    fun centeredDialogWrapsActionsAtTheSafeMaximum() {
-        compose.setContent { TVHeadendPlayerTheme {
-            CentredDialog("Confirm", "A decision", "Resume recording ".repeat(20),
-                "Watch recording ".repeat(20), {}, {}, {})
-        } }
-        compose.onNodeWithTag("centred-dialog-card").assertWidthIsEqualTo(960.dp - TvGridHorizontalMargin * 2)
-        assertTrue("Actions wrap when their natural row exceeds the safe maximum",
-            compose.onNodeWithTag("two-column-second").getUnclippedBoundsInRoot().top >
-                compose.onNodeWithTag("two-column-first").getUnclippedBoundsInRoot().top)
     }
 
     @Test fun depthPopAndRootHandoffWaitForTheirOwnUncanceledRelease() {
@@ -226,8 +193,11 @@ class BackReleaseSurfaceTest {
         var enabled by mutableStateOf(true)
         var backs = 0
         compose.setContent { TVHeadendPlayerTheme {
-            CentredDialog("Confirm", "A decision", "Cancel", "Confirm", {}, {}, {},
-                backEnabled = enabled, onBack = { backs++ })
+            CentredDialogShell("Confirm", onDismiss = {}, backEnabled = enabled, onBack = { backs++ }) {
+                val focus = remember { FocusRequester() }
+                LaunchedEffect(Unit) { focus.requestFocus() }
+                Button({}, Modifier.focusRequester(focus)) { Text("Cancel") }
+            }
         } }
         key(true)
         compose.runOnIdle { enabled = false }
