@@ -110,12 +110,14 @@ private fun optionLevel(key: String, title: Int, value: Int, choices: List<Brows
  * The one options button at the end of the Browse headline, centred on its capitals: filled while Show
  * hides recordings, its spoken label naming the Sort and Show values that differ from the defaults.
  * Up goes to the tabs ([upFocus]), Down to the list ([onDown]), Left to the navigation rail
- * ([navigationFocus]) and Right stays. It sits at Browse's root only, so Back is left to the screen.
- * Placed where the headline starts, it is as wide as the list column so its end meets the rows'.
+ * ([navigationFocus]) and Right stays. It sits in Browse's root headline, so Back is left to the screen,
+ * and it can take focus only while that root is the open level ([focusable]).
+ * As wide as the list column, its end meets the rows'.
  */
 @Composable
 internal fun ArchiveViewOptionsButton(
     view: DvrArchiveView,
+    focusable: Boolean,
     focusRequester: FocusRequester,
     upFocus: FocusRequester,
     navigationFocus: FocusRequester?,
@@ -145,6 +147,7 @@ internal fun ArchiveViewOptionsButton(
             onFocused = {},
             modifier = Modifier
                 .focusProperties {
+                    canFocus = focusable
                     up = upFocus
                     left = navigationFocus ?: FocusRequester.Default
                     right = FocusRequester.Cancel

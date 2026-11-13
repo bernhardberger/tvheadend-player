@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.ui.screens
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
 import at.bernhardberger.tvhplayer.testutil.tagBounds
+import at.bernhardberger.tvhplayer.testutil.labelToFocusedFillGap
 import at.bernhardberger.tvhplayer.testutil.pressKey
 
 import android.app.Application
@@ -604,6 +605,35 @@ class RecordingsVisualLayoutTest {
         assertNoCommands()
     }
 
+    /**
+     * A focused row grows towards the label above it. Every date label keeps the first one's air
+     * above a focused row, so the label never touches the row it introduces.
+     */
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun aFocusedRowKeepsTheFirstDateLabelsAirUnderEveryLabel() {
+        startView = DvrArchiveView()
+        presentationLibrary(firstRow = true)
+        compose.mainClock.advanceTimeBy(600)
+        fun labels() = compose.onAllNodesWithTag("archive-date-divider", useUnmergedTree = true).fetchSemanticsNodes()
+            .map { it.boundsInRoot }.filter { it.width > 0f && it.top > 0f }.sortedBy { it.top }
+        fun focusedRow() = compose.onAllNodes(SemanticsMatcher("List row") {
+            it.config.getOrNull(SemanticsProperties.TestTag).orEmpty().startsWith("recording-list-entry-")
+        } and isFocused()).fetchSemanticsNodes().single().boundsInRoot
+        fun labelAbove(row: Rect) = labels().lastOrNull { it.bottom <= row.top + 1f && row.top - it.bottom < 48f }
+        val first = labels().first()
+        assertEquals(first, labelAbove(focusedRow()))
+        val firstGap = compose.labelToFocusedFillGap(view, first)
+        capture("flat-first-label-focused-row", 1f, "label ink to focused fill=$firstGap px", outputs = LABEL_CAPTURES)
+        repeat(8) { if (labelAbove(focusedRow()).let { it == null || it == labels().first() }) key(Key.DirectionDown) }
+        compose.mainClock.advanceTimeBy(600)
+        val later = requireNotNull(labelAbove(focusedRow())) { "No later date label above a focused row" }
+        val laterGap = compose.labelToFocusedFillGap(view, later)
+        capture("flat-later-label-focused-row", 1f, "label ink to focused fill=$laterGap px", outputs = LABEL_CAPTURES)
+        assertTrue("A later date label sits $laterGap px above a focused row, the first $firstGap px",
+            laterGap >= firstGap)
+    }
+
     @Test fun sortAndShowApplyAtOnceTheListFollowsAndOnlyShowFillsTheButton() {
         startView = DvrArchiveView(grouping = DvrArchiveGrouping.FLAT)
         show(entries = listOf(
@@ -732,6 +762,16 @@ class RecordingsVisualLayoutTest {
         val listIcon = firstIconInk(firstListRow().left, active.bounds.bottom)
         val previewIcon = firstIconInk(bounds("depth-preview").left, active.bounds.bottom)
         assertEquals("Both columns start their rows level", listIcon, previewIcon, 1f)
+        // Below the root at the defaults: no button, no line, the same headline and rows.
+        downToList()
+        key(Key.DirectionRight)
+        focused("recordings-folder-Documentaries/Expeditions")
+        gone(OPTIONS)
+        assertEquals(null, valuesLine())
+        assertEquals(active.baseline, activeHeading().baseline, 1f)
+        assertEquals(defaultRow.top, firstListRow().top, 1f)
+        key(Key.Back)
+        focused("recordings-folder-Documentaries")
 
         // A non-default sort and filter add the quiet line under the headline; the preview column stays put.
         openOptionsLevel("sort")
@@ -757,16 +797,16 @@ class RecordingsVisualLayoutTest {
         assertButtonClearOf(firstListRow())
         val rootRowWithValues = firstListRow()
 
-        // Below the root there is no button and the line names only the filter, at the same geometry.
+        // Below the root there is no button and the line reads as at the root, at the same geometry.
         key(Key.DirectionRight)
         focused("recordings-folder-Documentaries/Expeditions")
         gone(OPTIONS)
         val inFolder = activeHeading()
         assertEquals(active.baseline, inFolder.baseline, 1f)
-        requireNotNull(valuesLine()).assertTextEquals("Unwatched")
+        requireNotNull(valuesLine()).assertTextEquals("Name A–Z · Unwatched")
         assertEquals(rootRowWithValues.top, firstListRow().top, 1f)
 
-        // With Show back at All a non-default sort leaves no line below the root.
+        // With Show back at All the non-default sort alone still names itself below the root.
         key(Key.Back)
         focused("recordings-folder-Documentaries")
         openOptionsLevel("show")
@@ -777,10 +817,9 @@ class RecordingsVisualLayoutTest {
         downToList()
         key(Key.DirectionRight)
         focused("recordings-folder-Documentaries/Expeditions")
-        assertEquals(null, valuesLine())
+        requireNotNull(valuesLine()).assertTextEquals("Name A–Z")
         assertEquals(active.baseline, activeHeading().baseline, 1f)
-        assertEquals("Without a line the folder's rows sit where the root's do at the defaults",
-            defaultRow.top, firstListRow().top, 1f)
+        assertEquals(rootRowWithValues.top, firstListRow().top, 1f)
         assertNoCommands()
     }
 
@@ -934,6 +973,57 @@ class RecordingsVisualLayoutTest {
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
     fun headerFrameStorageWarning() = headerFrame("storage-warning", DvrArchiveView(DvrArchiveGrouping.FOLDERS),
         diskSpace = diskSpacePercentUsed(97))
+
+    /**
+     * The options button belongs to Browse's root column: entering a folder carries it off with
+     * that column, stepping back brings it home, and it never stands over the level sliding in.
+     */
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun theOptionsButtonTravelsWithTheRootColumnThroughTheDepthSlide() {
+        startView = DvrArchiveView(DvrArchiveGrouping.FOLDERS)
+        presentationLibrary(firstRow = true)
+        key(Key.DirectionDown)
+        focused("recordings-folder-Sport")
+        compose.mainClock.advanceTimeBy(1_500)
+        val button = bounds(OPTIONS)
+        // The root column's own unscaled content under the button: its leading row's end, with the chevron.
+        val row = bounds("recordings-recording-now-folder").let { Rect(it.right - 160f, it.top, it.right, it.bottom) }
+        val buttonTemplate = compose.runOnIdle { luminance(button) }
+        val rowTemplate = compose.runOnIdle { luminance(row) }
+        // Frame by frame, wherever the root column's row is still legible (it fades and leaves the
+        // screen), the button stands at the same shift, whole: nothing of the deeper level is drawn over it.
+        fun step(press: Key, captures: Map<Long, String> = emptyMap()) {
+            var tracked = 0
+            compose.mainClock.autoAdvance = false
+            try {
+                compose.onRoot().performKeyInput { pressKey(press) }
+                (1..12).map { it * 80L }.forEach { at ->
+                    compose.mainClock.advanceTimeBy(80)
+                    compose.waitForIdle()
+                    val (rowShift, rowMatch) = compose.runOnIdle { trackHorizontally(rowTemplate, row) }
+                    val (buttonShift, buttonMatch) = compose.runOnIdle { trackHorizontally(buttonTemplate, button) }
+                    captures[at]?.let { capture(it, 1f, "root column shift=$rowShift px; button shift=$buttonShift px",
+                        outputs = HEADER_CAPTURES) }
+                    if (rowMatch < 0.85f) return@forEach
+                    assertEquals("At $at ms the button left the root column", rowShift, buttonShift, 1f)
+                    assertTrue("At $at ms the button is not whole (match $buttonMatch)", buttonMatch > 0.9f)
+                    if (rowShift != 0f) tracked++
+                }
+            } finally {
+                compose.mainClock.autoAdvance = true
+            }
+            assertTrue("The slide was not seen in motion ($tracked frames)", tracked >= 3)
+        }
+        step(Key.DirectionRight, mapOf(160L to "transition-enter-1", 240L to "transition-enter-2",
+            320L to "transition-enter-3"))
+        awaitList()
+        compose.mainClock.advanceTimeBy(1_500)
+        step(Key.DirectionLeft)
+        compose.mainClock.advanceTimeBy(1_500)
+        focused("recordings-folder-Sport")
+        assertEquals(button, bounds(OPTIONS))
+    }
 
     /**
      * Inside a folder the parent slides off to the screen edge beside the rail. Once the slide
@@ -2325,6 +2415,57 @@ class RecordingsVisualLayoutTest {
         }
     }
 
+    /** Luminance of [area] in the frame as drawn now, row by row. */
+    private fun luminance(area: Rect): FloatArray {
+        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        view.draw(Canvas(bitmap))
+        val left = area.left.toInt()
+        val top = area.top.toInt()
+        val width = area.width.toInt()
+        val height = area.height.toInt()
+        val pixels = IntArray(width * height)
+        bitmap.getPixels(pixels, 0, width, left.coerceAtLeast(0), top, width, height)
+        bitmap.recycle()
+        return FloatArray(pixels.size) { pixels[it].let { c ->
+            0.299f * (c shr 16 and 0xff) + 0.587f * (c shr 8 and 0xff) + 0.114f * (c and 0xff) } }
+    }
+
+    /**
+     * Where [template], drawn at [home], now stands on the same rows at or left of home: the shift and its
+     * normalised correlation, which a fade over the plain background does not change.
+     */
+    private fun trackHorizontally(template: FloatArray, home: Rect): Pair<Float, Float> {
+        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        view.draw(Canvas(bitmap))
+        val width = home.width.toInt()
+        val height = home.height.toInt()
+        val band = IntArray(view.width * height)
+        bitmap.getPixels(band, 0, view.width, 0, home.top.toInt(), view.width, height)
+        bitmap.recycle()
+        val lum = FloatArray(band.size) { band[it].let { c ->
+            0.299f * (c shr 16 and 0xff) + 0.587f * (c shr 8 and 0xff) + 0.114f * (c and 0xff) } }
+        val mean = template.average().toFloat()
+        val t = FloatArray(template.size) { template[it] - mean }
+        val tNorm = kotlin.math.sqrt(t.sumOf { (it * it).toDouble() }).toFloat()
+        var best = 0 to -1f
+        // The root column only ever moves left of its home.
+        for (x in 0..minOf(view.width - width, home.left.toInt())) {
+            var sum = 0f
+            for (y in 0 until height) for (i in 0 until width) sum += lum[y * view.width + x + i]
+            val m = sum / (width * height)
+            var dot = 0f
+            var norm = 0f
+            for (y in 0 until height) for (i in 0 until width) {
+                val v = lum[y * view.width + x + i] - m
+                dot += v * t[y * width + i]
+                norm += v * v
+            }
+            val score = if (norm == 0f) 0f else dot / (kotlin.math.sqrt(norm) * tNorm)
+            if (score > best.second) best = x to score
+        }
+        return (best.first - home.left) to best.second
+    }
+
     private fun capture(name: String, scale: Float, focusEvidence: String? = null,
         outputs: String = "build/outputs/browse-cohesion/archive-depth") {
         if (!CaptureOutput.enabled) return
@@ -2354,6 +2495,7 @@ class RecordingsVisualLayoutTest {
 
     private companion object {
         const val HEADER_CAPTURES = "build/outputs/recordings-header-final"
+        const val LABEL_CAPTURES = "build/outputs/list-label-spacing"
         const val OPTIONS = "recordings-view-options"
         const val BROWSE_TAB = "recordings-mode-archive"
         const val LONG_TITLE = "Ridge Light: The Remarkable Journey of the Northern Lights Across the Arctic"

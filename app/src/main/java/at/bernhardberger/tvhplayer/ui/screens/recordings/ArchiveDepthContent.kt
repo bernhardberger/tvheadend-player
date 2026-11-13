@@ -127,7 +127,10 @@ internal fun ArchiveDepthContent(
     /** The running recordings the Recording now folder lists at the top of the root; none hides it. */
     recordingNow: List<DvrEntry> = emptyList(),
     nowSeconds: () -> Long = { System.currentTimeMillis() / 1000L },
+    /** Drawn over the root headline's band (the options button), so it slides and fades with the root column. */
+    rootHeadingEnd: (@Composable () -> Unit)? = null,
 ) {
+    val latestRootHeadingEnd = rememberUpdatedState(rootHeadingEnd)
     val latestOnOpenRecording = rememberUpdatedState(onOpenRecording)
     val latestOnOpenContextMenu = rememberUpdatedState(onOpenContextMenu)
     val latestOnOpenFolderMenu = rememberUpdatedState(onOpenFolderMenu)
@@ -137,15 +140,14 @@ internal fun ArchiveDepthContent(
     val sections = remember(root, grouping, sort) {
         archiveDateSections(root, grouping, sort, nowSeconds)
     }
-    // Sort and Show away from their defaults, quietly under the root's headline; below the root only Show.
-    val valuesLine = rememberUpdatedState(ArchiveValuesLine(
-        root = DvrArchiveView(grouping, sort, show).nonDefaultValues().joinToString(" · ").ifEmpty { null },
-        below = DvrArchiveView(grouping, show = show).nonDefaultValues().singleOrNull(),
-    ))
+    // Sort and Show away from their defaults, quietly under the active headline.
+    val valuesLine = rememberUpdatedState(
+        DvrArchiveView(grouping, sort, show).nonDefaultValues().joinToString(" · ").ifEmpty { null },
+    )
     val levels = rememberArchiveLevels(
         root, fullRoot, grouping, show, recordingNow, sections, contentPadding, valuesLine,
         latestAdmissionForEntry, latestOnOpenFolderMenu, latestPiconForEntry,
-        latestOnOpenRecording, latestOnOpenContextMenu,
+        latestOnOpenRecording, latestOnOpenContextMenu, latestRootHeadingEnd,
     )
     DepthNavigation(
         state = navigation,
@@ -165,9 +167,6 @@ internal fun ArchiveDepthContent(
     )
 }
 
-/** The quiet line under a headline: the root's non-default Sort and Show, and below the root Show alone. */
-private data class ArchiveValuesLine(val root: String?, val below: String?)
-
 @Composable
 private fun rememberArchiveLevels(
     root: DvrArchiveFolder,
@@ -177,12 +176,13 @@ private fun rememberArchiveLevels(
     recordingNow: List<DvrEntry>,
     sections: Map<Long, DvrDateSection>,
     contentPadding: PaddingValues,
-    valuesLine: State<ArchiveValuesLine>,
+    valuesLine: State<String?>,
     latestAdmissionForEntry: State<(DvrEntry) -> RecordingPlaybackAdmission?>,
     latestOnOpenFolderMenu: State<((DvrArchiveFolder) -> Unit)?>,
     latestPiconForEntry: State<(DvrEntry) -> ChannelIcon?>,
     latestOnOpenRecording: State<(DvrEntry) -> Unit>,
     latestOnOpenContextMenu: State<((DvrEntry) -> Unit)?>,
+    latestRootHeadingEnd: State<(@Composable () -> Unit)?>,
 ): Map<String, DepthLevel> = remember(root, fullRoot, grouping, show, recordingNow, sections) {
         val levels = linkedMapOf<String, DepthLevel>()
         val rootId = archiveLevelId(emptyList())
@@ -198,8 +198,10 @@ private fun rememberArchiveLevels(
             levels[id] = DepthLevel(
                 id = id,
                 heading = { emphasis ->
-                    val line = valuesLine.value
-                    ArchiveLevelHeading(heading(), emphasis, if (id == rootId) line.root else line.below)
+                    Box {
+                        ArchiveLevelHeading(heading(), emphasis, valuesLine.value)
+                        if (id == rootId) latestRootHeadingEnd.value?.invoke()
+                    }
                 },
                 emptyContent = {
                     ArchiveEmptyLevel(show, atRoot = path.isEmpty(), hidden = hidden)

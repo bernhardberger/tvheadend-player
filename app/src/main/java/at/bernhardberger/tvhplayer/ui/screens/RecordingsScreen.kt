@@ -365,6 +365,9 @@ internal fun RecordingsScreenContent(
     var requestContentFocus by remember { mutableStateOf(true) }
     var contentHasFocus by remember { mutableStateOf(false) }
     var contentFocusOwned by remember { mutableStateOf(false) }
+    // Browse's options button sits in the archive's root headline: focus there is not the list's.
+    var archiveHasFocus by remember { mutableStateOf(false) }
+    var optionsHasFocus by remember { mutableStateOf(false) }
     var loadingFocusParked by remember { mutableStateOf(false) }
     LaunchedEffect(initialFocusEnabled, drawerState?.currentValue, screenState.requestedScheduleEntryId.value) {
         if ((!initialFocusEnabled || drawerState?.currentValue == androidx.tv.material3.DrawerValue.Open) &&
@@ -903,14 +906,15 @@ internal fun RecordingsScreenContent(
                     admissionForEntry = { observation.recordingPlaybackAdmission(it) },
                     modifier = Modifier.fillMaxSize().onFocusChanged {
                         if (owner.isCurrent) {
-                            contentHasFocus = it.hasFocus
-                            if (it.hasFocus) contentFocusOwned = true
+                            archiveHasFocus = it.hasFocus
+                            contentHasFocus = it.hasFocus && !optionsHasFocus
+                            if (contentHasFocus) contentFocusOwned = true
                         }
                     },
-                ) }
-                    // The options belong to Browse's root; inside a folder, channel or genre there is none.
-                    if (!archiveNavigation.stack.canPop) ArchiveViewOptionsButton(
+                    // The options belong to Browse's root and travel with its column; below it they can't take focus.
+                    rootHeadingEnd = { ArchiveViewOptionsButton(
                         view = chosenView,
+                        focusable = owner.isCurrent && !archiveNavigation.stack.canPop,
                         focusRequester = if (owner.isCurrent) optionsFocus else remember { FocusRequester() },
                         upFocus = modeFocus,
                         navigationFocus = drawerFocus,
@@ -920,18 +924,25 @@ internal fun RecordingsScreenContent(
                                 optionsOpen = true
                             }
                         },
-                        onDown = { runCatching { contentFocus.requestFocus() } },
+                        // Leaving the button for the list keeps the archive focused, so its callback stays quiet.
+                        onDown = {
+                            val moved = runCatching { contentFocus.requestFocus() }.getOrDefault(false)
+                            if (moved) contentFocusOwned = true
+                        },
                         onFocusChanged = {
-                            if (it && owner.isCurrent) {
-                                screenState.requestedScheduleEntryId.value = null
-                                loadingFocusParked = false
-                                contentFocusOwned = false
-                                requestContentFocus = false
+                            if (owner.isCurrent) {
+                                optionsHasFocus = it
+                                contentHasFocus = archiveHasFocus && !it
+                                if (it) {
+                                    screenState.requestedScheduleEntryId.value = null
+                                    loadingFocusParked = false
+                                    contentFocusOwned = false
+                                    requestContentFocus = false
+                                }
                             }
                         },
-                        modifier = Modifier.padding(start = startPadding + TvBrowseLeadingInset),
-                    )
-                }
+                    ) },
+                ) } }
                 DvrLibraryMode.SCHEDULE -> Box(
                     modifier = Modifier
                         // Archive's columns: the list in its first, the focused recording where it shows its preview.

@@ -13,7 +13,22 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
-import at.bernhardberger.tvhplayer.ui.screens.settings.settingsRow
+import androidx.compose.ui.input.key.Key
+import androidx.tv.material3.MaterialTheme
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
+import at.bernhardberger.tvhplayer.testutil.VisualCapture
+import at.bernhardberger.tvhplayer.testutil.labelToFocusedFillGap
+import at.bernhardberger.tvhplayer.testutil.pressKey
+import at.bernhardberger.tvhplayer.ui.components.SideRail
+import at.bernhardberger.tvhplayer.ui.components.depth.rememberDepthNavigationState
+import at.bernhardberger.tvhplayer.ui.screens.SETTINGS_ROOT
+import at.bernhardberger.tvhplayer.ui.screens.SettingsScreenNavigation
+import at.bernhardberger.tvhplayer.ui.screens.settingsRootLevel
+import at.bernhardberger.tvhplayer.ui.screens.recordings.ArchiveDateDivider
+import at.bernhardberger.tvhplayer.ui.screens.settings.*
+import at.bernhardberger.tvhplayer.viewmodels.SettingsPlayerUiState
+import java.io.File
+import org.junit.experimental.categories.Category
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -37,6 +52,87 @@ class SettingsSectionSubheaderTest {
     @get:Rule val compose = createComposeRule()
 
     private lateinit var view: View
+
+    /**
+     * A focused row grows towards the label above it. A Settings label keeps the first Recordings
+     * date label's air above a focused row: that label stands in the same list as the reference.
+     */
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
+    fun aFocusedRowKeepsTheFirstDateLabelsAirUnderASettingsLabel() {
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                view = LocalView.current
+                Column(Modifier.padding(16.dp).width(340.dp).background(Color.Black)) {
+                    ArchiveDateDivider("Today", first = true)
+                    settingsRow("reference", "Reference row").content(Modifier, {})
+                    settingsRow("grouped", "Grouped row", section = "Navigation").content(Modifier, {})
+                }
+            }
+        }
+        fun gapAbove(row: String, label: String): Int {
+            compose.onNodeWithTag("settings-row-$row").requestFocus()
+            compose.waitForIdle()
+            val node = compose.onAllNodes(hasText(label, ignoreCase = true), useUnmergedTree = true)
+                .fetchSemanticsNodes().first()
+            return compose.labelToFocusedFillGap(view, node.boundsInRoot)
+        }
+        val reference = gapAbove("reference", "Today")
+        val settings = gapAbove("grouped", "Navigation")
+        assertTrue("A Settings label sits $settings px above a focused row, the first date label $reference px",
+            settings >= reference)
+    }
+
+    /** The Playback page with a focused row under its first label and under a later one, for review. */
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
+    fun settingsLabelsAboveAFocusedRowCaptures() {
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                view = LocalView.current
+                val navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.PLAYER.name)
+                Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                    SideRail(currentRoute = AppDestination.SETTINGS, onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
+                        SettingsScreenNavigation(navigation, listOf(settingsRootLevel(),
+                            settingsPlayerLevel(SettingsPlayerUiState(), {})),
+                            initialFocusEnabled = !drawerActive, contentPadding = padding)
+                    }
+                }
+            }
+        }
+        compose.pressKey(Key.DirectionCenter, settleFrames = 12)
+        fun focusUnder(label: String, name: String) {
+            repeat(16) {
+                val heading = compose.onAllNodes(hasText(label, ignoreCase = true), useUnmergedTree = true)
+                    .fetchSemanticsNodes().firstOrNull()?.boundsInRoot
+                val row = compose.onAllNodes(isFocused()).fetchSemanticsNodes().firstOrNull()?.boundsInRoot
+                if (heading != null && row != null && heading.bottom <= row.top + 1f && row.top - heading.bottom < 48f) {
+                    compose.mainClock.advanceTimeBy(1_000)
+                    val settled = compose.onAllNodes(hasText(label, ignoreCase = true), useUnmergedTree = true)
+                        .fetchSemanticsNodes().first().boundsInRoot
+                    val gap = compose.labelToFocusedFillGap(view, settled)
+                    capture(name, "label ink to focused fill=$gap px; label=$settled")
+                    return
+                }
+                compose.pressKey(Key.DirectionDown, settleFrames = 6)
+            }
+            fail("No focused row under $label")
+        }
+        focusUnder("Recording marks", "settings-first-label-focused-row")
+        // Streaming's row is disabled without a server, outlined instead of filled; Picture's is not.
+        focusUnder("Picture", "settings-later-label-focused-row")
+    }
+
+    private fun capture(name: String, report: String) {
+        lateinit var bitmap: Bitmap
+        compose.runOnUiThread {
+            bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+            view.draw(Canvas(bitmap))
+        }
+        CaptureOutput.writePng(File("build/outputs/list-label-spacing/$name.png"), bitmap)
+        CaptureOutput.writeText(File("build/outputs/list-label-spacing/$name.txt")) {
+            "Production SettingsScreenNavigation + SideRail, Playback page; 960x540dp xhdpi; en; fontScale=1\n$report\n"
+        }
+        bitmap.recycle()
+    }
 
     @Test fun sectionSubheaderIsDistinctFromRowTitlesAndAlignsWithThem() {
         compose.setContent {
@@ -65,14 +161,14 @@ class SettingsSectionSubheaderTest {
         assertTrue("Subheader introduces its group, so it precedes the row",
             subheader.boundsInRoot.bottom <= title.boundsInRoot.top)
 
-        // The kit's symmetric 8dp box, plus the ListItem's own 12dp padding, left the
-        // label almost equidistant between the two groups. It must bind to the one below.
-        val previous = compose.onNodeWithText("Ungrouped row", useUnmergedTree = true)
-            .fetchSemanticsNode().boundsInRoot
+        // The label binds to the group below it: between the rows, no more air under it than over
+        // it, though a focused row needs some (see the focused-row rule above).
+        val previous = compose.onNodeWithTag("settings-row-plain", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val next = compose.onNodeWithTag("settings-row-grouped", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val above = subheader.boundsInRoot.top - previous.bottom
-        val below = title.boundsInRoot.top - subheader.boundsInRoot.bottom
+        val below = next.top - subheader.boundsInRoot.bottom
         assertTrue("Subheader must sit nearer the group it heads: above=$above below=$below",
-            above > below * 1.5f)
+            below > 0f && above >= below)
 
         // It must also recede from the row titles rather than match them, which a colour
         // equal to onSurface would not do. Compare peak ink, not a hex value.

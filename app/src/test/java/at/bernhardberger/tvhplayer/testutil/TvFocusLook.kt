@@ -66,3 +66,29 @@ private fun pixelDifference(a: PixelMap, b: PixelMap): Float {
     }
     return changed.toFloat() / (a.width * a.height)
 }
+
+/**
+ * Pixels of air between a section label's lowest ink and the top of the focused row's light
+ * fill below it, as [view] draws now: the grown edge of a focused row, not its layout bounds.
+ * Scans the label's own columns from its top down.
+ */
+internal fun ComposeContentTestRule.labelToFocusedFillGap(view: View, label: Rect): Int = runOnIdle {
+    val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+    view.draw(Canvas(bitmap))
+    val xs = label.left.toInt().coerceAtLeast(0) until label.right.toInt().coerceAtMost(bitmap.width)
+    fun luminance(x: Int, y: Int) = bitmap.getPixel(x, y).let {
+        0.299f * android.graphics.Color.red(it) + 0.587f * android.graphics.Color.green(it) +
+            0.114f * android.graphics.Color.blue(it)
+    }
+    var lastInk = -1
+    var fill = -1
+    for (y in label.top.toInt().coerceAtLeast(0) until bitmap.height) {
+        val values = xs.map { luminance(it, y) }
+        if (values.count { it > 150f } > values.size * 0.6f) { fill = y; break }
+        // Glyphs light a few columns of a row; the fill's soft top edge lights all of them.
+        if (values.any { it > 90f } && values.count { it > 90f } < values.size * 0.6f) lastInk = y
+    }
+    bitmap.recycle()
+    check(lastInk >= 0 && fill > lastInk) { "No label ink above a focused fill under $label" }
+    fill - lastInk - 1
+}
