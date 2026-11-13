@@ -320,7 +320,7 @@ class LivePlayerChromeProgrammeTest : LivePlayerChromeFixture() {
     @Test fun playerInfoUsesSharedDescriptionReaderAndReturnsToItsPanel() {
         screen()
         val now = System.currentTimeMillis() / 1_000L
-        val description = "A full description with its own ending. ".repeat(24)
+        val description = "A full description with its own ending.\n".repeat(24)
         session.publish(observation(now, listOf(EpgEvent.create(EventId(11), ChannelId(1),
             Instant.fromEpochSeconds(now - 60), Instant.fromEpochSeconds(now + 600), title = "Now showing",
             description = description, summary = "A separate summary", genre = "Drama",

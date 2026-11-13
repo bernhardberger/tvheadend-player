@@ -684,10 +684,11 @@ class BrowseContextMenuScreenTest {
         target.requestFocus()
         compose.mainClock.advanceTimeBy(500)
         val original = if (details) resumeBitmap() else browse
-        // Above the card: details eyebrow, browse heading (picker), or rail glyph (menu).
-        // Probe the heading for the picker: opaque-layer registration alone can hide the rail.
-        val xs = if (details) 96 until 900 else 24 until 112
-        val ys = if (details) 125 until 260 else 100 until 980
+        // A fitting plain synopsis shortens the bottom-anchored block, moving its title down.
+        // Sample its actual ink, not the old fixed eyebrow band; menu probes still use the rail.
+        val titleBounds = if (details) compose.onNodeWithTag("details-title").fetchSemanticsNode().boundsInRoot else null
+        val xs = titleBounds?.let { it.left.toInt() until it.right.toInt() } ?: (24 until 112)
+        val ys = titleBounds?.let { it.top.toInt() until it.bottom.toInt() } ?: (100 until 980)
         val (x, y, brightest) = brightestRedPixel(original, xs, ys)
         assertTrue("Rendered backdrop probe", brightest > 100)
         fun assertFrames(exiting: Boolean = false) {
@@ -840,7 +841,8 @@ class BrowseContextMenuScreenTest {
     }
 
     @Test fun recordKeyOnScheduledChannelOpensCancelAndRepeatedPressDoesNotConfirm() {
-        show(recordings = false, channelRecording = true, recordingState = DvrEntryState.SCHEDULED)
+        show(recordings = false, channelRecording = true, recordingState = DvrEntryState.SCHEDULED,
+            description = "A winter expedition follows the changing light across the ridge.\n".repeat(8))
         compose.onNodeWithTag("channel-row-1").requestFocus()
         compose.pressKey(Key(android.view.KeyEvent.KEYCODE_MEDIA_RECORD))
         compose.onNodeWithTag("details-cancel").assertIsFocused()
@@ -1057,7 +1059,8 @@ class BrowseContextMenuScreenTest {
     }
 
     @Test fun hardwareBackFromAboutOrRowReturnsToTheActionsBeforeClosing() {
-        show(recordings = false)
+        show(recordings = false,
+            description = "A winter expedition follows the changing light across the ridge.\n".repeat(8))
         val row = compose.onNodeWithTag("channel-row-1").requestFocus()
         row.performKeyInput { pressKey(Key.Menu) }
         compose.onNodeWithText("Program details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
