@@ -173,6 +173,7 @@ internal fun ProgrammeDetailsPage(
     val pageScroll = rememberScrollState()
     val factsScroll = rememberScrollState()
     val creditsScroll = rememberScrollState()
+    val sectionScrollTargets = remember { mutableMapOf<DetailsSection, Int>() }
     var section by remember { mutableStateOf(if (returnToCard in ids) DetailsSection.AIRINGS else DetailsSection.ACTIONS) }
     var lastAction by remember { mutableStateOf(initialAction ?: actions.firstOrNull()) }
     var lastCard by remember { mutableStateOf(returnToCard ?: ids.firstOrNull()) }
@@ -216,20 +217,18 @@ internal fun ProgrammeDetailsPage(
     // Only re-measure the cached viewport while the page is absent; restoration reads the rendered branch.
     val closeAboutReader = reading && (!hasAbout || aboutConstraints?.let { !measurePlain(it).hasVisualOverflow } == true)
     LaunchedEffect(reading, backEnabled, credits.isNotEmpty(), importantFacts.isNotEmpty(), closeAboutReader, hasAbout, aboutIsPanel) {
-        if (reading && (section == DetailsSection.CREDITS && credits.isEmpty() ||
-                section == DetailsSection.FACTS && importantFacts.isEmpty() ||
-                section == DetailsSection.ABOUT && closeAboutReader)) reading = false
+        if (closeAboutReader) reading = false
         else if (!reading && backEnabled) {
             withFrameNanos { }
             when (section) {
                 DetailsSection.ACTIONS -> restoreAction()
+                DetailsSection.ABOUT -> if (hasAbout && aboutIsPanel) aboutFocus.requestFocus() else restoreAction()
                 DetailsSection.FACTS -> if (importantFacts.isNotEmpty()) factsFocus.requestFocus() else restoreAction()
                 DetailsSection.CREDITS -> when {
                     credits.isNotEmpty() -> creditsFocus.requestFocus()
                     importantFacts.isNotEmpty() -> { section = DetailsSection.FACTS; factsFocus.requestFocus() }
                     else -> restoreAction()
                 }
-                DetailsSection.ABOUT -> if (hasAbout && aboutIsPanel) aboutFocus.requestFocus() else restoreAction()
                 else -> Unit
             }
         }
@@ -319,24 +318,31 @@ internal fun ProgrammeDetailsPage(
                     }
                     activation && openingRelease -> {
                         if (key.type == KeyEventType.KeyDown && key.nativeKeyEvent.repeatCount == 0) {
-                            openingRelease = false; false
+                            openingRelease = false; factPanel
                         } else {
                             if (key.type == KeyEventType.KeyUp) openingRelease = false
                             true
                         }
                     }
                      reading -> false
-                       factPanel && activation -> {
-                         if (key.type == KeyEventType.KeyUp) reading = true
-                         true
-                     }
-                     // The panel has nothing to focus inside: Down reads on through its facts.
-                       factPanel && key.key == Key.DirectionDown -> {
+                       factPanel && activation -> true
+                     // Read the section in place before moving focus to its neighbour.
+                       factPanel && (key.key == Key.DirectionDown || key.key == Key.DirectionUp) -> {
                            val scroll = if (section == DetailsSection.CREDITS) creditsScroll else factsScroll
-                           if (!scroll.canScrollForward && section == DetailsSection.CREDITS && importantFacts.isNotEmpty()) false
+                           val down = key.key == Key.DirectionDown
+                           if (!down && !scroll.canScrollBackward ||
+                               down && !scroll.canScrollForward && section == DetailsSection.CREDITS && importantFacts.isNotEmpty())
+                               key.nativeKeyEvent.repeatCount > 0
                            else {
-                               if (key.type == KeyEventType.KeyDown) scope.launch {
-                                   scroll.animateScrollTo(scroll.value + with(density) { 60.dp.roundToPx() }, RowChangeMotion)
+                               if (key.type == KeyEventType.KeyDown) {
+                                   val scrollingSection = section
+                                   val target = ((sectionScrollTargets[scrollingSection] ?: scroll.value) +
+                                       scroll.viewportSize / 2 * if (down) 1 else -1).coerceIn(0, scroll.maxValue)
+                                   sectionScrollTargets[scrollingSection] = target
+                                   scope.launch {
+                                       scroll.animateScrollTo(target, RowChangeMotion)
+                                       if (sectionScrollTargets[scrollingSection] == target) sectionScrollTargets.remove(scrollingSection)
+                                   }
                                }
                                true
                           }
@@ -407,11 +413,7 @@ internal fun ProgrammeDetailsPage(
                 },
                 reading = {},
             ) {
-                  if (section == DetailsSection.CREDITS) BoxWithConstraints {
-                      DetailsCredits(credits, ((maxWidth + 32.dp) / 224.dp).toInt().coerceAtLeast(1))
-                  }
-                  else if (section == DetailsSection.FACTS) DetailsAboutFacts(importantFacts)
-                 else if (aboutText.isNotEmpty()) Text(aboutText.joinToString("\n\n"),
+                 if (aboutText.isNotEmpty()) Text(aboutText.joinToString("\n\n"),
                     Modifier.testTag("details-reading-text"), style = MaterialTheme.typography.bodyLarge.copy(fontSize = 20.sp, lineHeight = 30.sp))
             }
             else {
@@ -490,24 +492,24 @@ internal fun ProgrammeDetailsPage(
                               .scrollSection(pageSpec, DetailsSection.CREDITS)
                               .focusRequester(creditsFocus).onFocusChanged {
                                   if (it.isFocused && section != DetailsSection.CREDITS) {
-                                      if (!reading) scope.launch { creditsScroll.scrollTo(0) }
+                                      sectionScrollTargets.remove(DetailsSection.CREDITS)
+                                      scope.launch { creditsScroll.scrollTo(0) }
                                       section = DetailsSection.CREDITS
                                   }
                               }.focusProperties {
                                   canFocus = backEnabled
                                   down = if (importantFacts.isNotEmpty()) factsFocus else FocusRequester.Cancel
                                   left = FocusRequester.Cancel; right = FocusRequester.Cancel
-                              }.semantics(mergeDescendants = true) {
-                                  onClick { if (backEnabled) { section = DetailsSection.CREDITS; reading = true }; true }
-                              }.focusable().testTag("details-credits-panel")) { DetailsCredits(credits, 4) }
+                              }.semantics(mergeDescendants = true) {}.focusable().testTag("details-credits-panel")) { DetailsCredits(credits) }
                       if (importantFacts.isNotEmpty()) DetailsFactSection(stringResource(R.string.details_important_information),
                           factsScroll, rowSpec, viewport, factsHeadingHeight, { factsEmphasis.value }, DetailsSafeEdge, Modifier
                           .onPlaced { factsTop = it.positionInParent().y.roundToInt() }
                          .scrollSection(pageSpec, DetailsSection.FACTS)
                          .focusRequester(factsFocus).onFocusChanged {
                              if (it.isFocused && section != DetailsSection.FACTS) {
+                                 sectionScrollTargets.remove(DetailsSection.FACTS)
                                  // Entered again, the panel reads from its first facts.
-                                 if (!reading) scope.launch { factsScroll.scrollTo(0) }
+                                 scope.launch { factsScroll.scrollTo(0) }
                                  section = DetailsSection.FACTS
                              }
                          }
@@ -516,9 +518,7 @@ internal fun ProgrammeDetailsPage(
                               up = if (credits.isNotEmpty()) creditsFocus else FocusRequester.Default
                              down = FocusRequester.Cancel
                              left = FocusRequester.Cancel; right = FocusRequester.Cancel
-                          }.semantics(mergeDescendants = true) {
-                              onClick { if (backEnabled) { section = DetailsSection.FACTS; reading = true }; true }
-                          }.focusable().testTag("details-facts-panel")) { DetailsAboutFacts(importantFacts) }
+                          }.semantics(mergeDescendants = true) {}.focusable().testTag("details-facts-panel")) { DetailsAboutFacts(importantFacts) }
                       else if (ids.isEmpty() && credits.isEmpty()) Spacer(Modifier.height(DetailsSafeEdge))
                      // Room after the last section, so that it reaches the same keyline as the others.
                      if (ids.isNotEmpty() || credits.isNotEmpty() || importantFacts.isNotEmpty())
@@ -731,7 +731,8 @@ private fun DetailsFactSection(title: String, scroll: androidx.compose.foundatio
         CompositionLocalProvider(LocalBringIntoViewSpec provides scrollSpec) {
             Box(Modifier.heightIn(max = with(density) {
                 (viewport - DetailsSectionKeyline.roundToPx() - headingHeight.intValue).coerceAtLeast(1).toDp() - DetailsSafeEdge
-            }.coerceAtLeast(1.dp)).verticalScroll(scroll).rowContentEmphasis(emphasis), contentAlignment = Alignment.TopStart) {
+            }.coerceAtLeast(1.dp)).listEdgeFadeMask(32.dp, 32.dp, { scroll.canScrollBackward }, { scroll.canScrollForward }, exposeFades = true)
+                .verticalScroll(scroll).rowContentEmphasis(emphasis), contentAlignment = Alignment.TopStart) {
                 content()
             }
         }
@@ -739,13 +740,13 @@ private fun DetailsFactSection(title: String, scroll: androidx.compose.foundatio
 }
 
 /** A role stays together in a band and its continuation columns have no repeated label. */
-internal fun programmeCreditBands(credits: List<Pair<String, List<String>>>, columns: Int = 4): List<List<Pair<String?, List<String>>>> {
+internal fun programmeCreditBands(credits: List<Pair<String, List<String>>>): List<List<Pair<String?, List<String>>>> {
     val bands = mutableListOf<List<Pair<String?, List<String>>>>()
     var band = mutableListOf<Pair<String?, List<String>>>()
     credits.forEach { (label, names) ->
         if (names.isEmpty()) return@forEach
-        val roleColumns = (names.size / 6).coerceIn(1, minOf(3, columns))
-        if (band.size + roleColumns > columns) {
+        val roleColumns = (names.size / 6).coerceIn(1, 3)
+        if (band.size + roleColumns > 4) {
             bands.add(band)
             band = mutableListOf()
         }
@@ -761,8 +762,8 @@ internal fun programmeCreditBands(credits: List<Pair<String, List<String>>>, col
 }
 
 @Composable
-private fun DetailsCredits(credits: List<Pair<String, List<String>>>, columns: Int) {
-    val bands = programmeCreditBands(credits, columns)
+private fun DetailsCredits(credits: List<Pair<String, List<String>>>) {
+    val bands = programmeCreditBands(credits)
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         bands.forEach { band ->
             Row(horizontalArrangement = Arrangement.spacedBy(32.dp)) {

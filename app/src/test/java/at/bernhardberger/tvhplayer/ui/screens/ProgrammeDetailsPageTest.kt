@@ -40,10 +40,13 @@ import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.testutil.setContentWithArtworkSampling
+import at.bernhardberger.tvhplayer.testutil.pressKey
 import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.common.AppClock
 import at.bernhardberger.tvhplayer.ui.components.LocalChannelAccents
+import at.bernhardberger.tvhplayer.ui.components.ListBottomFadeVisible
+import at.bernhardberger.tvhplayer.ui.components.ListTopFadeVisible
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsPage
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 import at.bernhardberger.tvhplayer.ui.components.RowChangeMs
@@ -129,23 +132,23 @@ class ProgrammeDetailsPageTest {
         compose.onNodeWithText("About Ridge Light").assertDoesNotExist()
     }
 
-    @Test fun plainDetailsOpensReaderAndRestoresTheAiring() {
+    @Test fun plainDetailsStayInPlaceAndUpRestoresTheAiring() {
         show(richFacts = true)
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.pressKey(Key.DirectionDown)
         compose.onNodeWithTag("details-card-2").assertIsFocused()
         compose.onNode(hasText("Genre") and hasAnyAncestor(hasTestTag("details-facts")), useUnmergedTree = true).assertExists()
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.pressKey(Key.DirectionDown)
         compose.onNodeWithTag("details-facts-panel").assertIsFocused()
         compose.onNodeWithTag("details-card-2").assertIsNotFocused()
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionLeft); pressKey(Key.DirectionRight) }
+        compose.pressKey(Key.DirectionLeft)
+        compose.pressKey(Key.DirectionRight)
         compose.onNodeWithTag("details-facts-panel").assertIsFocused()
         compose.onNodeWithText("Mountain • Winter", useUnmergedTree = true).assertIsDisplayed()
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.onNodeWithTag("player-info-reading").assertIsFocused()
-        compose.runOnIdle { back.onBackPressed() }
-        compose.onNodeWithTag("details-facts-panel").assertHasClickAction()
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("player-info-reading").assertDoesNotExist()
+        compose.onNodeWithTag("details-facts-panel").assert(SemanticsMatcher.keyNotDefined(androidx.compose.ui.semantics.SemanticsActions.OnClick))
         compose.onNodeWithTag("details-facts-panel").assertIsFocused()
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
+        compose.pressKey(Key.DirectionUp)
         compose.onNodeWithTag("details-card-2").assertIsFocused()
     }
 
@@ -295,10 +298,14 @@ class ProgrammeDetailsPageTest {
     @Test fun detailsWithoutDescriptionRemainPlainFacts() {
         show(richFacts = true, noDescription = true, noAirings = true)
         compose.onNodeWithTag("details-about-description").assertDoesNotExist()
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
-        compose.onNodeWithTag("details-facts-panel").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.onNodeWithTag("player-info-reading").assertIsFocused()
-        compose.runOnIdle { back.onBackPressed() }
+        compose.pressKey(Key.DirectionDown)
+        val panel = compose.onNodeWithTag("details-facts-panel").assertIsFocused()
+            .assert(SemanticsMatcher.keyNotDefined(androidx.compose.ui.semantics.SemanticsActions.OnClick))
+        listOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter).forEach {
+            compose.pressKey(it)
+            compose.onNodeWithTag("player-info-reading").assertDoesNotExist()
+            panel.assertIsFocused()
+        }
         compose.onNodeWithTag("details-reading-text", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("details-facts", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("details-facts-panel").assertIsFocused()
@@ -787,17 +794,33 @@ class ProgrammeDetailsPageTest {
 
     @Test fun longPlainFactsAreUncappedAndReadableWithoutMovingTheHeading() {
         show(longFacts = true)
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown); pressKey(Key.DirectionDown) }
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
+        val viewport = compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange) and
+            hasAnyAncestor(hasTestTag("details-facts-panel")), useUnmergedTree = true)
+        fun range() = viewport.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
+        val step = viewport.fetchSemanticsNode().boundsInRoot.height / 2f
+        viewport.assert(SemanticsMatcher.expectValue(ListBottomFadeVisible, true))
+        compose.pressKey(Key.DirectionDown)
+        Assert.assertEquals(step, range().value(), 1f)
         val value = compose.onNode(hasText("Mountain ".repeat(100).trim()) and
             hasAnyAncestor(hasTestTag("details-facts")), useUnmergedTree = true)
         val results = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
         value.performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { it(results) }
         Assert.assertTrue(results.single().lineCount > 3)
         Assert.assertFalse(results.single().hasVisualOverflow)
-        repeat(30) { compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) } }
+        repeat(kotlin.math.ceil(((range().maxValue() - range().value()) / step).toDouble()).toInt()) {
+            compose.pressKey(Key.DirectionDown)
+        }
+        Assert.assertEquals(range().maxValue(), range().value(), 1f)
+        viewport.assert(SemanticsMatcher.expectValue(ListBottomFadeVisible, false))
         Assert.assertTrue(value.getUnclippedBoundsInRoot().bottom.value <= 492.5f)
         Assert.assertEquals(160f, compose.onNodeWithText("Details", useUnmergedTree = true).getUnclippedBoundsInRoot().top.value, .5f)
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
+        compose.pressKey(Key.DirectionUp)
+        compose.onNodeWithTag("details-facts-panel").assertIsFocused()
+        repeat(kotlin.math.ceil((range().value() / step).toDouble()).toInt()) { compose.pressKey(Key.DirectionUp) }
+        Assert.assertEquals(0f, range().value(), 1f)
+        compose.pressKey(Key.DirectionUp)
         compose.onNodeWithTag("details-card-2").assertIsFocused()
     }
 
@@ -1117,7 +1140,9 @@ class ProgrammeDetailsPageTest {
 
     @Test fun recordingDeleteChipAndFactsKeepTheAnchorWithoutAirings() {
         val creditsPresent = androidx.compose.runtime.mutableStateOf(true)
-        show(recording = true, recordingFacts = true, longSubtitle = true, creditsPresent = creditsPresent)
+        val factsPresent = androidx.compose.runtime.mutableStateOf(true)
+        show(recording = true, recordingFacts = true, longSubtitle = true,
+            creditsPresent = creditsPresent, factsPresent = factsPresent)
         compose.onNodeWithTag("details-resume").assertIsFocused()
         compose.onRoot().performKeyInput { pressKey(Key.DirectionRight); pressKey(Key.DirectionRight); pressKey(Key.DirectionRight) }
         compose.onNodeWithTag("details-delete").assertIsFocused()
@@ -1133,14 +1158,17 @@ class ProgrammeDetailsPageTest {
         compose.onNodeWithText("No errors", useUnmergedTree = true).assertExists()
         compose.onNodeWithText("English", useUnmergedTree = true).assertExists()
         compose.onNodeWithText("German", useUnmergedTree = true).assertExists()
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionUp); pressKey(Key.DirectionCenter) }
-        compose.onNodeWithTag("player-info-reading").assertIsFocused()
+        compose.pressKey(Key.DirectionUp)
+        compose.onNodeWithTag("details-credits-panel").assertIsFocused()
         compose.runOnIdle { creditsPresent.value = false }
-        compose.onNodeWithTag("player-info-reading").assertDoesNotExist()
         compose.onNodeWithTag("details-credits-panel").assertDoesNotExist()
         compose.onNodeWithTag("details-facts-panel").assertIsFocused()
-        compose.runOnIdle { back.onBackPressed() }
+        compose.runOnIdle { factsPresent.value = false }
+        compose.onNodeWithTag("details-facts-panel").assertDoesNotExist()
         compose.onNodeWithTag("details-delete").assertIsFocused()
+        compose.pressKey(Key.DirectionDown)
+        compose.onNodeWithTag("details-delete").assertIsFocused()
+        compose.runOnIdle { back.onBackPressed() }
     }
 
     @OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
@@ -1168,10 +1196,12 @@ class ProgrammeDetailsPageTest {
             at.bernhardberger.tvhplayer.ui.components.programmeCreditFacts(credited, context.resources))
     }
 
-    @Test fun castHasItsOwnSectionAndEveryNameIsFullOnPageAndInReader() {
-        show(cast = true, noAirings = true, readerCredits = true)
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
-        compose.onNodeWithTag("details-credits-panel").assertIsFocused().assertHasClickAction()
+    @Test fun castHasItsOwnSectionAndEveryNameIsFullOnPage() {
+        var escapedActivations = 0
+        show(cast = true, noAirings = true, fullCast = true, onUnhandledActivation = { escapedActivations++ })
+        compose.pressKey(Key.DirectionDown)
+        val panel = compose.onNodeWithTag("details-credits-panel").assertIsFocused()
+            .assert(SemanticsMatcher.keyNotDefined(androidx.compose.ui.semantics.SemanticsActions.OnClick))
         fun assertNames() {
             listOf("Mara Vale", "Ellis North", "Robin Stone", "Jules Brook", "Taylor Ridge", "Rowan Frost",
                 "Avery Lake", "Sasha Fern", "Quinn Harbor", "Noel Ashby", "Devon Marsh", "Kit Larkin").forEach { name ->
@@ -1184,23 +1214,17 @@ class ProgrammeDetailsPageTest {
         }
         assertNames()
         compose.onNode(hasText("Cast") and hasAnyAncestor(hasTestTag("details-facts")), useUnmergedTree = true).assertDoesNotExist()
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
-        compose.onNodeWithTag("details-watch").assertIsFocused()
-        compose.onNodeWithTag("details-credits-panel").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick) { it() }
-        compose.onNodeWithTag("player-info-reading").assertIsFocused()
-        val readerViewport = compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange) and
-            hasAnyAncestor(hasTestTag("player-info-reading")), useUnmergedTree = true)
-        Assert.assertEquals(0f, readerViewport.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].maxValue(), 0f)
-        assertNames()
-        compose.runOnIdle { back.onBackPressed() }
-        compose.onNodeWithTag("details-credits-panel").assertIsFocused()
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionLeft); pressKey(Key.DirectionRight) }
-        compose.onNodeWithTag("details-credits-panel").assertIsFocused()
-        compose.onNodeWithTag("details-facts-panel").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick) { it() }
-        compose.onNodeWithTag("player-info-reading").assertIsFocused()
-        compose.onNodeWithText("Cast", useUnmergedTree = true).assertDoesNotExist()
-        compose.onNodeWithText("Mara Vale", useUnmergedTree = true).assertDoesNotExist()
-        compose.runOnIdle { back.onBackPressed() }
+        val viewport = compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange) and
+            hasAnyAncestor(hasTestTag("details-credits-panel")), useUnmergedTree = true)
+        Assert.assertEquals(0f, viewport.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].maxValue(), 0f)
+        viewport.assert(SemanticsMatcher.expectValue(ListBottomFadeVisible, false))
+        listOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter, Key.DirectionLeft, Key.DirectionRight).forEach {
+            compose.pressKey(it)
+            panel.assertIsFocused()
+            compose.onNodeWithTag("player-info-reading").assertDoesNotExist()
+        }
+        Assert.assertEquals("Panel activation must not reach its parent", 0, escapedActivations)
+        compose.pressKey(Key.DirectionDown)
         compose.onNodeWithTag("details-facts-panel").assertIsFocused()
     }
 
@@ -1214,10 +1238,7 @@ class ProgrammeDetailsPageTest {
         compose.onNodeWithTag("details-credits-panel").assertIsFocused()
         compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
         compose.onNodeWithTag("details-watch").assertIsFocused()
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown); pressKey(Key.DirectionCenter) }
-        compose.onNodeWithTag("player-info-reading").assertIsFocused()
-        compose.runOnIdle { back.onBackPressed() }
-        compose.onNodeWithTag("details-credits-panel").assertIsFocused()
+        compose.pressKey(Key.DirectionDown)
         compose.runOnIdle { back.onBackPressed() }
         compose.onNodeWithTag("details-watch").assertIsFocused()
     }
@@ -1237,43 +1258,57 @@ class ProgrammeDetailsPageTest {
         val wrapped = at.bernhardberger.tvhplayer.ui.components.programmeCreditBands(
             roles.take(3) + ("Cast" to (1..12).map { "Person $it" }))
         Assert.assertEquals(listOf(3, 2), wrapped.map { it.size })
-        val cast = "Cast" to (1..12).map { "Actor $it" }
-        val credits = listOf(cast, "Director" to listOf("Director One"), "Writers" to listOf("Writer One", "Writer Two", "Writer Three"))
-        val narrow = at.bernhardberger.tvhplayer.ui.components.programmeCreditBands(credits, columns = 3)
-        Assert.assertEquals(listOf(listOf(6, 6, 1), listOf(3)), narrow.map { band -> band.map { it.second.size } })
-        val single = at.bernhardberger.tvhplayer.ui.components.programmeCreditBands(credits, columns = 1)
-        Assert.assertEquals(credits.map { listOf(it) }, single)
     }
 
     @Test fun overflowingCreditsScrollBeforeMovingOnAndReenterAtTheTop() {
-        show(cast = true, noAirings = true, actorCount = 80)
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
-        val panel = compose.onNodeWithTag("details-credits-panel").assertIsFocused()
+        show(cast = true, noAirings = true, actorCount = 62)
         val viewport = compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange) and
             hasAnyAncestor(hasTestTag("details-credits-panel")), useUnmergedTree = true)
+        viewport.assert(SemanticsMatcher.expectValue(ListBottomFadeVisible, true))
+        compose.pressKey(Key.DirectionDown)
+        val panel = compose.onNodeWithTag("details-credits-panel").assertIsFocused()
         fun range() = viewport.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
+        viewport.assert(SemanticsMatcher.expectValue(ListTopFadeVisible, false))
         val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
         compose.onNodeWithText("Person 1 with a name that wraps across the narrow credits column", useUnmergedTree = true)
             .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { it(layouts) }
         Assert.assertTrue(layouts.single().lineCount > 1)
         Assert.assertFalse(layouts.single().hasVisualOverflow)
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.pressKey(Key.DirectionDown)
         panel.assertIsFocused()
-        Assert.assertTrue(range().value() > 0f)
-        var steps = 0
-        while (range().value() < range().maxValue() && steps++ < 50) {
-            compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
-            panel.assertIsFocused()
+        Assert.assertEquals("Down moves half the visible section viewport",
+            viewport.fetchSemanticsNode().boundsInRoot.height / 2f, range().value(), 1f)
+        viewport.assert(SemanticsMatcher.expectValue(ListTopFadeVisible, true))
+        compose.pressKey(Key.DirectionUp)
+        panel.assertIsFocused()
+        Assert.assertEquals("Up reads back before leaving the section", 0f, range().value(), 1f)
+        compose.mainClock.autoAdvance = false
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
+        compose.mainClock.advanceTimeBy(RowChangeMs + 32L)
+        compose.waitForIdle()
+        compose.mainClock.autoAdvance = true
+        Assert.assertEquals("Two rapid presses retain both half-viewport steps",
+            minOf(viewport.fetchSemanticsNode().boundsInRoot.height, range().maxValue()), range().value(), 1f)
+        repeat(2) { compose.pressKey(Key.DirectionUp) }
+        compose.pressKey(Key.DirectionUp)
+        compose.onNodeWithTag("details-watch").assertIsFocused()
+        compose.pressKey(Key.DirectionDown)
+        val step = viewport.fetchSemanticsNode().boundsInRoot.height / 2f
+        repeat(kotlin.math.ceil((range().maxValue() / step).toDouble()).toInt()) { compose.pressKey(Key.DirectionDown) }
+        panel.assertIsFocused()
+        Assert.assertEquals(range().maxValue(), range().value(), 1f)
+        viewport.assert(SemanticsMatcher.expectValue(ListBottomFadeVisible, false))
+        compose.onNodeWithText("Person 62", useUnmergedTree = true).assertIsDisplayed()
+        compose.runOnIdle {
+            view.dispatchKeyEvent(android.view.KeyEvent(0L, 0L, android.view.KeyEvent.ACTION_DOWN,
+                android.view.KeyEvent.KEYCODE_DPAD_DOWN, 1))
+            view.dispatchKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_DPAD_DOWN))
         }
-        Assert.assertEquals(range().maxValue(), range().value(), 1f)
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.onNodeWithTag("player-info-reading").assertIsFocused()
-        compose.runOnIdle { back.onBackPressed() }
         panel.assertIsFocused()
-        Assert.assertEquals(range().maxValue(), range().value(), 1f)
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.pressKey(Key.DirectionDown)
         compose.onNodeWithTag("details-facts-panel").assertIsFocused()
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
+        compose.pressKey(Key.DirectionUp)
         panel.assertIsFocused()
         Assert.assertEquals(0f, range().value(), 0f)
     }
@@ -1325,8 +1360,9 @@ class ProgrammeDetailsPageTest {
         withRating: Boolean = false, longSynopsis: Boolean = false, todayCard: Boolean = false, longFacts: Boolean = false, runningCard: Boolean = false,
         warm: Boolean = false, longMeta: Boolean = false, longSubtitle: Boolean = false, pastYear: Boolean = false,
         recordingFacts: Boolean = false, cast: Boolean = false, stoppedEarly: Boolean = false, aboutLines: Int? = null,
-        summaryAndDescription: Boolean = false, creditsOnly: Boolean = false, actorCount: Int? = null, readerCredits: Boolean = false,
-        creditsPresent: androidx.compose.runtime.State<Boolean>? = null,
+        creditsPresent: androidx.compose.runtime.State<Boolean>? = null, factsPresent: androidx.compose.runtime.State<Boolean>? = null,
+        onUnhandledActivation: () -> Unit = {},
+        summaryAndDescription: Boolean = false, creditsOnly: Boolean = false, actorCount: Int? = null, fullCast: Boolean = false,
         aboutSource: androidx.compose.runtime.State<String>? = null,
         aboutHeaderTall: androidx.compose.runtime.State<Boolean>? = null,
         warmMode: androidx.compose.runtime.State<at.bernhardberger.tvhplayer.settings.WarmPlaybackMode>? = null,
@@ -1346,9 +1382,9 @@ class ProgrammeDetailsPageTest {
                 credits = (actorCount?.let { count -> (1..count).map { if (it == 1)
                     "Person 1 with a name that wraps across the narrow credits column" else "Person $it" } }
                     ?: (listOf("Mara Vale", "Ellis North", "Robin Stone", "Jules Brook", "Taylor Ridge") +
-                        if (readerCredits) listOf("Rowan Frost", "Avery Lake", "Sasha Fern", "Quinn Harbor", "Noel Ashby", "Devon Marsh", "Kit Larkin") else emptyList())).map {
+                        if (fullCast) listOf("Rowan Frost", "Avery Lake", "Sasha Fern", "Quinn Harbor", "Noel Ashby", "Devon Marsh", "Kit Larkin") else emptyList())).map {
                     EpgCredit(it, EpgCreditRole.ACTOR)
-                } + (if (readerCredits) listOf(EpgCredit("Blake Harbor", EpgCreditRole.WRITER), EpgCredit("Jamie Holt", EpgCreditRole.WRITER))
+                } + (if (fullCast) listOf(EpgCredit("Blake Harbor", EpgCreditRole.WRITER), EpgCredit("Jamie Holt", EpgCreditRole.WRITER))
                     else listOf(EpgCredit("Rowan Frost", EpgCreditRole.GUEST), EpgCredit("Avery Lake", EpgCreditRole.PRESENTER))) +
                     listOf(EpgCredit("Morgan Pine", EpgCreditRole.DIRECTOR), EpgCredit("Alex Winter", EpgCreditRole.WRITER)))
             longSubtitle && !longMeta -> EpgEvent.create(event.id, channel.id, start, event.stop, title = event.title,
@@ -1413,6 +1449,8 @@ class ProgrammeDetailsPageTest {
                     view = LocalView.current
                     val railFocus = androidx.compose.runtime.remember { FocusRequester() }
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).onKeyEvent {
+                        if (it.type == KeyEventType.KeyDown && it.key in listOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter))
+                            onUnhandledActivation()
                         if (rail && it.key == Key.DirectionLeft) {
                             if (it.type == KeyEventType.KeyDown) railFocus.requestFocus()
                             true
@@ -1427,7 +1465,9 @@ class ProgrammeDetailsPageTest {
                             subtitle = if (aboutHeaderTall?.value == true) event.subtitle!!.repeat(12) else event.subtitle,
                             genre = if (aboutHeaderTall?.value == true) "Documentary and natural history about northern landscapes" else event.genre,
                             image = event.image, description = aboutSource.value) else shown
-                        ProvideArtworkSession(session) { ProgrammeDetailsPage(current.takeUnless { recording }, entry.takeIf { recording || future }, channel, now,
+                        val currentRecording = if (factsPresent?.value == false)
+                            DvrEntry.create(entry.id, title = entry.title, state = entry.state) else entry
+                        ProvideArtworkSession(session) { ProgrammeDetailsPage(current.takeUnless { recording }, currentRecording.takeIf { recording || future }, channel, now,
                             if (recording) recordingDetailsActions(entry, admitted(entry), true, true, nowSec = now)
                             else programmeDetailsActions(shown, now, entry.takeIf { future }, admitted(entry.takeIf { future }), true, true),
                               {}, onClose, related = if (recording || noAirings) emptyList() else if (runningCard)

@@ -291,8 +291,11 @@ This supersedes the round-3 points above where they conflict. Reference frames:
     is one focus stop on the four-column grid: a column per role, one name per
     line, nothing abbreviated; a role with twelve or more names continues in
     the next column (at least six per column, at most three columns) and a role
-    that no longer fits starts a new band. OK opens either section in the
-    reading box, which moves half its height per Up/Down press.
+    that no longer fits starts a new band. Both sections are read in place:
+    Up/Down scroll half the visible viewport before leaving at its edge, and
+    the bottom fades only while more content remains below, focused or not.
+    OK does nothing on these sections; only a cut description opens the reading
+    box, which also moves half its height per Up/Down press.
 - **Center dialogs** use the kit Two Column dialog for both decisions: resume
   (Resume · Start over; Back closes) and cancel recording (Keep recording
   focused · Cancel recording).
