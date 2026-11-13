@@ -18,11 +18,68 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.test.*
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertHeightIsEqualTo
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsNotFocused
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.assertWidthIsEqualTo
+import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isFocused
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.performKeyPress
+import androidx.compose.ui.test.pressKey
+import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
-import at.bernhardberger.tvheadend.sdk.core.*
+import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
+import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.ChannelTag
+import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
+import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
+import at.bernhardberger.tvheadend.sdk.core.DvrConfigId
+import at.bernhardberger.tvheadend.sdk.core.DvrConfiguration
+import at.bernhardberger.tvheadend.sdk.core.DvrConfigurationsState
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
+import at.bernhardberger.tvheadend.sdk.core.DvrRemoval
+import at.bernhardberger.tvheadend.sdk.core.DvrRepository
+import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.DvrSchedule
+import at.bernhardberger.tvheadend.sdk.core.DvrScheduleRequest
+import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent
+import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
+import at.bernhardberger.tvheadend.sdk.core.EventId
+import at.bernhardberger.tvheadend.sdk.core.RecordingProgressCapability
+import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
+import at.bernhardberger.tvheadend.sdk.core.SessionObservation
+import at.bernhardberger.tvheadend.sdk.core.SessionState
+import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
+import at.bernhardberger.tvheadend.sdk.core.TvheadendTestResultFactory
+import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
@@ -34,10 +91,18 @@ import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
+import at.bernhardberger.tvhplayer.core.RecordingKeepUntilChoice
+import at.bernhardberger.tvhplayer.core.RecordingKeepUntilOption
+import at.bernhardberger.tvhplayer.core.recordingKeepUntilOptions
+import at.bernhardberger.tvhplayer.ui.screens.recordings.recordingTimeRange
+import at.bernhardberger.tvhplayer.ui.components.ProgrammeArtwork
+import at.bernhardberger.tvhplayer.ui.components.ProvideAppArtwork
+import at.bernhardberger.tvhplayer.ui.components.RecordingKeepUntilLevel
 import at.bernhardberger.tvhplayer.viewmodels.resolveChannelScopeState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertNotNull
 import androidx.compose.ui.semantics.SemanticsProperties
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 import org.junit.Rule
@@ -81,6 +146,126 @@ class BrowseContextMenuScreenTest {
         playerEntry.request(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined)) {
             kotlinx.coroutines.awaitCancellation()
         }
+    }
+
+    @Test fun keepUntilSelectsTheMatchingOptionAndReportsAnotherChoiceOnce() {
+        val choices = mutableListOf<RecordingKeepUntilOption>()
+        showKeepUntil(onChoose = { choices += it })
+        val week = compose.onNodeWithTag("keep-until-option-one_week")
+        week.assertIsFocused().assertIsSelected()
+        compose.onRoot().performKeyPress(activation(android.view.KeyEvent.ACTION_DOWN, 1))
+        compose.onRoot().performKeyPress(activation(android.view.KeyEvent.ACTION_UP))
+        assertEquals(0, choices.size)
+        compose.pressKey(Key.DirectionLeft)
+        compose.pressKey(Key.DirectionRight)
+        week.assertIsFocused()
+        compose.pressKey(Key.DirectionDown)
+        compose.onNodeWithTag("keep-until-option-one_month").assertIsFocused()
+        compose.pressKey(Key.DirectionCenter)
+        assertEquals(listOf(RecordingKeepUntilChoice.ONE_MONTH), choices.map { it.choice })
+    }
+
+    @Test fun keepUntilBackReportsBackWithoutChoosing() {
+        var backs = 0
+        val choices = mutableListOf<RecordingKeepUntilOption>()
+        showKeepUntil(onChoose = { choices += it }, onBack = { backs++ })
+        compose.runOnIdle { back.onBackPressed() }
+        compose.settleFrames(4)
+        assertEquals(1, backs)
+        assertTrue(choices.isEmpty())
+    }
+
+    @Test fun keepUntilBusyBlocksAnotherActivationAndShowsProgressOnTheChosenRow() {
+        val busy = androidx.compose.runtime.mutableStateOf(false)
+        val choices = mutableListOf<RecordingKeepUntilOption>()
+        showKeepUntil(busy = busy, onChoose = { choices += it; busy.value = true })
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("keep-until-option-one_month").assertIsNotEnabled()
+        compose.pressKey(Key.DirectionCenter)
+        assertEquals(1, choices.size)
+        compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo) and
+            hasAnyAncestor(hasTestTag("keep-until-option-one_month")), useUnmergedTree = true).assertExists()
+    }
+
+    @Test fun keepUntilCurrentOnlyAppearsForAStoredValueOutsideTheChoices() {
+        for (removal in listOf(DvrRemoval.Days(17), DvrRemoval.Forever, DvrRemoval.Days(110))) {
+            showKeepUntil(removal)
+            val current = compose.onNodeWithTag("keep-until-option-current")
+            if (removal == DvrRemoval.Days(110)) {
+                current.assertIsFocused().assertIsSelected()
+                repeat(7) { compose.pressKey(Key.DirectionDown) }
+                compose.onNodeWithTag("keep-until-option-forever").assertIsFocused()
+                repeat(7) { compose.pressKey(Key.DirectionUp) }
+                current.assertIsFocused()
+            } else current.assertDoesNotExist()
+            compose.onNodeWithTag("keep-until-option-forever").assertTextEquals("Forever")
+            compose.onNodeWithTag("keep-until-option-until_space_needed").assertTextEquals("Until space is needed")
+        }
+    }
+
+    @Test
+    @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
+    @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi")
+    fun keepUntilChoiceLevelCaptures() {
+        val previous = java.util.TimeZone.getDefault()
+        java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("UTC"))
+        try {
+            showKeepUntil()
+            capture("keep-until-selected-en-font1.0")
+            repeat(6) { compose.pressKey(Key.DirectionDown) }
+            compose.onNodeWithTag("keep-until-option-forever").assertIsFocused()
+            capture("keep-until-forever-en-font1.0")
+            showKeepUntil(DvrRemoval.Days(110))
+            compose.onNodeWithTag("keep-until-option-current").assertIsFocused()
+            capture("keep-until-current-en-font1.0")
+        } finally {
+            java.util.TimeZone.setDefault(previous)
+        }
+    }
+
+    private fun showKeepUntil(
+        removal: DvrRemoval = DvrRemoval.Days(17),
+        busy: androidx.compose.runtime.State<Boolean> = androidx.compose.runtime.mutableStateOf(false),
+        onChoose: (RecordingKeepUntilOption) -> Unit = {},
+        onBack: () -> Unit = {},
+    ) {
+        val first = screenContent.value == null
+        if (!first) { compose.runOnIdle { screenContent.value = null }; compose.waitForIdle() }
+        val now = Instant.parse("2026-11-13T12:00:00Z").epochSeconds
+        val recording = DvrEntry.create(DvrEntryId(1), title = "Ridge Light: The remarkable journey along the mountain ridge in winter",
+            channelName = "101 Ridge Earth HD", state = DvrEntryState.COMPLETED, removal = removal,
+            start = Instant.fromEpochSeconds(now - 10 * 86400L - 3600), stop = Instant.fromEpochSeconds(now - 10 * 86400L))
+        val options = recordingKeepUntilOptions(recording, now, java.time.ZoneId.of("UTC"))
+        val session = FakeTvheadendSession(SessionObservation.create(
+            sessionState = SessionState.Ready(ServerCapabilities.create(
+                streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
+            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(emptyList())),
+            epgState = EpgRepositoryState.Current(EpgSnapshot.create(emptyList())),
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(listOf(recording)))))
+        assertNotNull(session.observation.value.currentSession)
+        artworkRequests.clear()
+        images.install(FixtureArt.imageLoader(ApplicationProvider.getApplicationContext<Application>(), mapOf(
+            ArtworkId(1) to FixtureArt.picon("ridge-earth"), ArtworkId(2) to FixtureArt.art("ridge-light"),
+        ), onRequest = { artworkRequests += it }))
+        screenContent.value = {
+            TVHeadendPlayerTheme { ProvideAppArtwork(session) {
+                view = LocalView.current
+                back = requireNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
+                RecordingKeepUntilLevel(
+                    recording.title.orEmpty(), recording.channelName.orEmpty(), "",
+                    recordingTimeRange(recording.start?.epochSeconds, recording.stop?.epochSeconds, java.util.Locale.US),
+                    options, now, onChoose, onBack, busy = busy.value, recordingState = recording.state,
+                    summary = "A winter expedition beyond the Arctic Circle follows the changing light across the ridge.",
+                ) {
+                    ProgrammeArtwork(ChannelIcon.ImageCache(ArtworkId(2)), ChannelIcon.ImageCache(ArtworkId(1)),
+                        null, Modifier.fillMaxSize())
+                }
+            } }
+        }
+        if (first) compose.setContentWithBrowsePreparation { screenContent.value?.invoke() }
+        compose.settleFrames(3)
+        compose.runOnIdle { assertTrue(artworkRequests.any { it.id == ArtworkId(2) }) }
     }
 
     @Test fun channelMenuShowsCurrentProgrammeArtwork() = menuArtwork(recordings = false, artwork = true, geometry = true)

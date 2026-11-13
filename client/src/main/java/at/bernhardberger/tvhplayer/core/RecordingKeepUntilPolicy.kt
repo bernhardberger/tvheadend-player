@@ -22,31 +22,30 @@ data class RecordingKeepUntilOption(
 
 /** Dates reflect the server's whole-day expiry, not the requested calendar target. */
 fun recordingKeepUntilOptions(recording: DvrEntry, nowSec: Long, zone: ZoneId): List<RecordingKeepUntilOption> {
-    val selected = when (recording.removal) {
-        DvrRemoval.UntilSpaceNeeded -> RecordingKeepUntilChoice.UNTIL_SPACE_NEEDED
-        DvrRemoval.Forever -> RecordingKeepUntilChoice.FOREVER
-        else -> RecordingKeepUntilChoice.CURRENT
-    }
     val now = java.time.Instant.ofEpochSecond(nowSec).atZone(zone)
     val stop = recording.stop?.epochSeconds
-    return RecordingKeepUntilChoice.entries
-        .filter { it != RecordingKeepUntilChoice.CURRENT || selected == RecordingKeepUntilChoice.CURRENT }
-        .map { choice ->
-            val removal = when (choice) {
-                RecordingKeepUntilChoice.CURRENT -> recording.removal?.takeUnless { it == DvrRemoval.ServerDefault }
-                RecordingKeepUntilChoice.UNTIL_SPACE_NEEDED -> DvrRemoval.UntilSpaceNeeded
-                RecordingKeepUntilChoice.FOREVER -> DvrRemoval.Forever
-                RecordingKeepUntilChoice.ONE_WEEK,
-                RecordingKeepUntilChoice.ONE_MONTH,
-                RecordingKeepUntilChoice.THREE_MONTHS,
-                RecordingKeepUntilChoice.SIX_MONTHS,
-                RecordingKeepUntilChoice.ONE_YEAR -> recordingKeepUntilTarget(choice, now)?.let { target ->
-                    stop?.let { recordingKeepUntilDays(it, target) }
-                }
+    val options = RecordingKeepUntilChoice.entries.map { choice ->
+        val removal = when (choice) {
+            RecordingKeepUntilChoice.CURRENT -> recording.removal?.takeUnless { it == DvrRemoval.ServerDefault }
+            RecordingKeepUntilChoice.UNTIL_SPACE_NEEDED -> DvrRemoval.UntilSpaceNeeded
+            RecordingKeepUntilChoice.FOREVER -> DvrRemoval.Forever
+            RecordingKeepUntilChoice.ONE_WEEK,
+            RecordingKeepUntilChoice.ONE_MONTH,
+            RecordingKeepUntilChoice.THREE_MONTHS,
+            RecordingKeepUntilChoice.SIX_MONTHS,
+            RecordingKeepUntilChoice.ONE_YEAR -> recordingKeepUntilTarget(choice, now)?.let { target ->
+                stop?.let { recordingKeepUntilDays(it, target) }
             }
-            val expiry = (removal as? DvrRemoval.Days)?.let { days -> stop?.plus(days.days * 1.days.inWholeSeconds) }
-            RecordingKeepUntilOption(choice, removal, expiry, selected = choice == selected)
         }
+        val expiry = (removal as? DvrRemoval.Days)?.let { days -> stop?.plus(days.days * 1.days.inWholeSeconds) }
+        RecordingKeepUntilOption(choice, removal, expiry, selected = false)
+    }
+    val selected = recording.removal?.let { current ->
+        options.firstOrNull { it.choice != RecordingKeepUntilChoice.CURRENT && it.removal == current }?.choice
+    } ?: RecordingKeepUntilChoice.CURRENT
+    return options.filter {
+        it.choice != RecordingKeepUntilChoice.CURRENT || selected == RecordingKeepUntilChoice.CURRENT
+    }.map { it.copy(selected = it.choice == selected) }
 }
 
 private fun recordingKeepUntilTarget(choice: RecordingKeepUntilChoice, now: ZonedDateTime): Long? = when (choice) {

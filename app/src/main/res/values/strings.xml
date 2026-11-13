@@ -1039,6 +1039,26 @@
     <string name="details_retention">Retention</string>
     <!-- Value for the retention label above. Max 36. -->
     <string name="details_kept_until_space_needed">Kept until space is needed</string>
+    <!-- Finished recording action opening its expiry choices; keep short for a menu row. -->
+    <string name="context_keep_until">Keep until…</string>
+    <!-- Heading over the finished recording expiry choices. -->
+    <string name="recording_keep_until_heading">Keep until</string>
+    <!-- Stored expiry that differs from the offered choices; date appears below. -->
+    <string name="recording_keep_until_current">Current</string>
+    <!-- Finished recording expiry choice counted from now, with its actual date below. -->
+    <string name="recording_keep_until_week">In 1 week</string>
+    <!-- Calendar-month expiry choice counted from now, with its actual date below. -->
+    <string name="recording_keep_until_month">In 1 month</string>
+    <!-- Calendar-month expiry choice counted from now, with its actual date below. -->
+    <string name="recording_keep_until_three_months">In 3 months</string>
+    <!-- Calendar-month expiry choice counted from now, with its actual date below. -->
+    <string name="recording_keep_until_six_months">In 6 months</string>
+    <!-- Calendar-year expiry choice counted from now, with its actual date below. -->
+    <string name="recording_keep_until_year">In 1 year</string>
+    <!-- Server-managed finished recording expiry choice; no supporting line. -->
+    <string name="recording_keep_until_space_needed">Until space is needed</string>
+    <!-- Finished recording choice that keeps its file indefinitely; no supporting line. -->
+    <string name="recording_keep_until_forever">Forever</string>
     <!-- Recording expiry badge in details/pane, and spoken card chip. %1$s is a date or time left; keep prefix within 10 characters. -->
     <string name="recording_expires_in">Expires %1$s</string>
     <!-- Spoken hourglass meaning in a recording list row. Max 10 characters. -->

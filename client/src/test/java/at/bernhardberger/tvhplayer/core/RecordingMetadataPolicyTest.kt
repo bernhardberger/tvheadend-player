@@ -30,6 +30,12 @@ class RecordingMetadataPolicyTest {
         assertEquals(RecordingKeepUntilChoice.CURRENT, finite.single { it.selected }.choice)
         assertEquals(DvrRemoval.Days(3), finite.first().removal)
         assertEquals(now + 3 * 86400L, finite.first().expirySec)
+        for (offered in finite.drop(1)) {
+            val matching = options(offered.removal)
+            assertFalse("No duplicate Current row for ${offered.choice}",
+                matching.any { it.choice == RecordingKeepUntilChoice.CURRENT })
+            assertEquals(offered.choice, matching.single { it.selected }.choice)
+        }
         for (removal in listOf(DvrRemoval.UntilSpaceNeeded, DvrRemoval.Forever)) {
             val managed = options(removal)
             assertFalse(managed.any { it.choice == RecordingKeepUntilChoice.CURRENT })
