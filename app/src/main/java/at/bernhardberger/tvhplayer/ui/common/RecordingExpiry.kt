@@ -11,13 +11,13 @@ import at.bernhardberger.tvhplayer.core.recordingRemovalTime
 import java.util.Locale
 
 fun formatRecordingKeepUntil(entry: DvrEntry, nowSec: Long, resources: Resources, locale: Locale): String? =
-    when (entry.removal) {
+    recordingRemovalTime(entry, nowSec)?.let {
+        resources.getString(R.string.recording_expires_in,
+            formatRecordingDate(it, dateOnly = true, locale = locale, nowSec = nowSec))
+    } ?: when (entry.removal) {
         DvrRemoval.Forever -> resources.getString(R.string.recording_keep_until_forever)
         DvrRemoval.UntilSpaceNeeded -> resources.getString(R.string.recording_keep_until_space_needed)
-        else -> recordingRemovalTime(entry, nowSec)?.let {
-            resources.getString(R.string.recording_expires_in,
-                formatRecordingDate(it, dateOnly = true, locale = locale, nowSec = nowSec))
-        }
+        else -> null
     }
 
 /** Shared compact text and plural wording for the card badge, list segment and spoken expiry. */

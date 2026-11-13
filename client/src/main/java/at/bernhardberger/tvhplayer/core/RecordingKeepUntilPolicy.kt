@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.core
 
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrRemoval
+import at.bernhardberger.tvheadend.sdk.core.DvrRetention
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import kotlin.time.Duration.Companion.days
@@ -18,6 +19,7 @@ data class RecordingKeepUntilOption(
     val removal: DvrRemoval?,
     val expirySec: Long?,
     val selected: Boolean,
+    val retention: DvrRetention? = null,
 )
 
 /** Dates reflect the server's whole-day expiry, not the requested calendar target. */
@@ -37,11 +39,17 @@ fun recordingKeepUntilOptions(recording: DvrEntry, nowSec: Long, zone: ZoneId): 
                 stop?.let { recordingKeepUntilDays(it, target) }
             }
         }
-        val expiry = (removal as? DvrRemoval.Days)?.let { days -> stop?.plus(days.days * 1.days.inWholeSeconds) }
-        RecordingKeepUntilOption(choice, removal, expiry, selected = false)
+        val expiry = if (choice == RecordingKeepUntilChoice.CURRENT) recordingRemovalTime(recording, nowSec)
+        else (removal as? DvrRemoval.Days)?.let { days -> stop?.plus(days.days * 1.days.inWholeSeconds) }
+            ?.takeIf { it > nowSec }
+        val retention = DvrRetention.UntilFilesRemoved.takeIf {
+            choice == RecordingKeepUntilChoice.FOREVER && recording.retention is DvrRetention.Days
+        }
+        RecordingKeepUntilOption(choice, removal, expiry, selected = false, retention = retention)
     }
     val selected = recording.removal?.let { current ->
-        options.firstOrNull { it.choice != RecordingKeepUntilChoice.CURRENT && it.removal == current }?.choice
+        options.filterNot { it.choice == RecordingKeepUntilChoice.CURRENT }
+            .firstOrNull { it.removal == current && it.retention == null }?.choice
     } ?: RecordingKeepUntilChoice.CURRENT
     return options.filter {
         it.choice != RecordingKeepUntilChoice.CURRENT || selected == RecordingKeepUntilChoice.CURRENT

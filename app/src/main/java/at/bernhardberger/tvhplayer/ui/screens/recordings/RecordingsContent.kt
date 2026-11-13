@@ -96,7 +96,6 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
-import at.bernhardberger.tvheadend.sdk.core.DvrRemoval
 import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
@@ -1022,11 +1021,9 @@ private fun RecordingSectionHeader(
  */
 @Composable
 private fun RecordingOverline(entry: DvrEntry, focused: Boolean) {
-    val expiry = if (entry.removal is DvrRemoval.Days && entry.state != DvrEntryState.SCHEDULED) {
-        val nowSec = rememberDetailsEpochSeconds()
-        recordingExpiryTimeLeft(recordingExpiryTime(entry, nowSec), nowSec)
-            ?.let { formatRecordingExpiry(it, LocalContext.current.resources) }
-    } else null
+    val nowSec = rememberDetailsEpochSeconds()
+    val expiry = recordingExpiryTimeLeft(recordingExpiryTime(entry, nowSec), nowSec)
+        ?.let { formatRecordingExpiry(it, LocalContext.current.resources) }
     val expiryMark = stringResource(R.string.recording_expires)
     val leading = buildList {
         entry.start?.epochSeconds.recordingDateTime(androidx.compose.ui.platform.LocalConfiguration.current.locales[0])

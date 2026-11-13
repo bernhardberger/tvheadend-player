@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.platform.LocalConfiguration
@@ -71,6 +72,7 @@ internal fun RecordingKeepUntilLevel(
     TwoColumnDialog(
         stringResource(R.string.recording_keep_until_heading), "", onBack,
         modifier.testTag("recording-keep-until"), itemCardLayout = true, dismissLevel = true,
+        backEnabled = !busy,
         onPreviewKeyEvent = { event ->
             event.key == Key.Menu || busy && event.key in listOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter)
         },
@@ -91,38 +93,42 @@ internal fun RecordingKeepUntilChoices(
     val requesters = remember { RecordingKeepUntilChoice.entries.associateWith { FocusRequester() } }
     val initial = options.firstOrNull { it.selected }?.choice ?: options.firstOrNull()?.choice
     var chosen by remember { mutableStateOf<RecordingKeepUntilChoice?>(null) }
+    var focused by remember { mutableStateOf<RecordingKeepUntilChoice?>(null) }
     val locale = LocalConfiguration.current.locales[0]
-    LaunchedEffect(Unit) {
-        withFrameNanos { }
-        initial?.let { requesters.getValue(it).requestFocus() }
+    LaunchedEffect(options) {
+        if (options.none { it.choice == focused }) {
+            withFrameNanos { }
+            initial?.let { requesters.getValue(it).requestFocus() }
+        }
     }
-        Text(stringResource(R.string.recording_keep_until_heading), Modifier.semantics { heading() },
-            style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-        Column(Modifier.verticalScroll(rememberScrollState()).padding(vertical = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            options.forEachIndexed { index, option ->
-                key(option.choice) {
-                    TwoColumnDialogButton(
-                        stringResource(option.choice.label()),
-                        { if (!busy && option.removal != null) { chosen = option.choice; onChoose(option) } },
-                        Modifier.testTag("keep-until-option-${option.choice.name.lowercase()}")
-                            .focusRequester(requesters.getValue(option.choice))
-                            .focusProperties {
-                                up = options.getOrNull(index - 1)?.choice?.let(requesters::get) ?: FocusRequester.Cancel
-                                down = options.getOrNull(index + 1)?.choice?.let(requesters::get)
-                                    ?: FocusRequester.Cancel
-                                left = FocusRequester.Cancel; right = FocusRequester.Cancel
-                            }.semantics {
-                                role = Role.RadioButton; selected = option.selected
-                                if (busy || option.removal == null) disabled()
-                            },
-                        subtitle = option.expirySec?.let { formatRecordingDate(it, dateOnly = true, locale, nowSec) },
-                        trailingContent = { KeepUntilSelectionMark(option.selected,
-                            busy && option.choice == (chosen ?: initial)) },
-                    )
-                }
+    Text(stringResource(R.string.recording_keep_until_heading), Modifier.semantics { heading() },
+        style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+    Column(Modifier.verticalScroll(rememberScrollState()).padding(vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        options.forEachIndexed { index, option ->
+            key(option.choice) {
+                TwoColumnDialogButton(
+                    stringResource(option.choice.label()),
+                    { if (!busy && option.removal != null) { chosen = option.choice; onChoose(option) } },
+                    Modifier.testTag("keep-until-option-${option.choice.name.lowercase()}")
+                        .focusRequester(requesters.getValue(option.choice))
+                        .onFocusChanged { if (it.isFocused) focused = option.choice }
+                        .focusProperties {
+                            up = options.getOrNull(index - 1)?.choice?.let(requesters::get) ?: FocusRequester.Cancel
+                            down = options.getOrNull(index + 1)?.choice?.let(requesters::get)
+                                ?: FocusRequester.Cancel
+                            left = FocusRequester.Cancel; right = FocusRequester.Cancel
+                        }.semantics {
+                            role = Role.RadioButton; selected = option.selected
+                            if (busy || option.removal == null) disabled()
+                        },
+                    subtitle = option.expirySec?.let { formatRecordingDate(it, dateOnly = true, locale, nowSec) },
+                    trailingContent = { KeepUntilSelectionMark(option.selected,
+                        busy && option.choice == (chosen ?: initial)) },
+                )
             }
         }
+    }
 }
 
 @Composable

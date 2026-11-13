@@ -6,6 +6,7 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.DvrRecordingFile
 import at.bernhardberger.tvheadend.sdk.core.DvrRecordingStream
 import at.bernhardberger.tvheadend.sdk.core.DvrRemoval
+import at.bernhardberger.tvheadend.sdk.core.DvrRetention
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionStreamType
 import java.time.ZoneId
@@ -46,6 +47,16 @@ class RecordingMetadataPolicyTest {
             assertNull(options(removal).first().removal)
             assertNull(options(removal).first().expirySec)
         }
+        val retained = recordingKeepUntilOptions(DvrEntry.create(DvrEntryId(1),
+            stop = Instant.fromEpochSeconds(now), removal = DvrRemoval.Forever, retention = DvrRetention.Days(3)),
+            now, ZoneId.of("UTC"))
+        assertEquals(RecordingKeepUntilChoice.CURRENT, retained.single { it.selected }.choice)
+        assertEquals(now + 3 * 86400L, retained.single { it.selected }.expirySec)
+        assertFalse(retained.single { it.choice == RecordingKeepUntilChoice.FOREVER }.selected)
+        assertEquals(DvrRetention.UntilFilesRemoved,
+            retained.single { it.choice == RecordingKeepUntilChoice.FOREVER }.retention)
+        assertTrue(retained.filter { it.choice != RecordingKeepUntilChoice.FOREVER }.all { it.retention == null })
+        assertTrue(options(DvrRemoval.Forever).all { it.retention == null })
     }
 
     @Test fun keepUntilPeriodsCountFromNowAndRoundUpTheServerDayCount() {
@@ -64,6 +75,11 @@ class RecordingMetadataPolicyTest {
         }
         val missingStop = recordingKeepUntilOptions(DvrEntry.create(DvrEntryId(1)), now, ZoneId.of("UTC"))
         assertNull(missingStop.single { it.choice == RecordingKeepUntilChoice.ONE_WEEK }.removal)
+        for (stop in listOf(now - 86400L, now - 86401L)) {
+            val expired = recordingKeepUntilOptions(DvrEntry.create(DvrEntryId(1),
+                stop = Instant.fromEpochSeconds(stop), removal = DvrRemoval.Days(1)), now, ZoneId.of("UTC"))
+            assertNull("A choice never displays a date at or before now", expired.first().expirySec)
+        }
     }
 
     @Test fun keepUntilCalendarTargetsHandleMonthEndsLeapYearsAndThePassedZone() {
@@ -111,6 +127,13 @@ class RecordingMetadataPolicyTest {
         fun entry(removal: DvrRemoval?, stop: Instant? = Instant.fromEpochSeconds(100)) =
             DvrEntry.create(DvrEntryId(1), stop = stop, removal = removal)
         assertEquals(86500L, recordingRemovalTime(entry(DvrRemoval.Days(1)), 100))
+        for (retention in listOf(DvrRetention.Days(1), DvrRetention.UntilFilesRemoved, DvrRetention.Forever, null)) {
+            val forever = DvrEntry.create(DvrEntryId(1), stop = Instant.fromEpochSeconds(100),
+                removal = DvrRemoval.Forever, retention = retention)
+            assertEquals("Forever with $retention", if (retention is DvrRetention.Days) 86500L else null,
+                recordingRemovalTime(forever, 100))
+            assertNull(recordingRemovalTime(forever, 86500))
+        }
         for (removal in listOf(null, DvrRemoval.ServerDefault, DvrRemoval.UntilSpaceNeeded, DvrRemoval.Forever))
             assertNull(recordingRemovalTime(entry(removal), 100))
         assertNull(recordingRemovalTime(entry(DvrRemoval.Days(1)), 86500))

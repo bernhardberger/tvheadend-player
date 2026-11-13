@@ -22,6 +22,7 @@ import at.bernhardberger.tvheadend.sdk.core.TimerecRuleUpdate
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryUpdate
 import at.bernhardberger.tvheadend.sdk.core.DvrRemoval
+import at.bernhardberger.tvheadend.sdk.core.DvrRetention
 import at.bernhardberger.tvheadend.sdk.core.RecordingRuleChannel
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
@@ -89,11 +90,12 @@ internal suspend fun DvrMutationActions.chooseRecordingRemoval(
 ): Boolean {
     val entry = observation.keepUntilEntry(id, openingSession) ?: return true
     val removal = option.removal
+    val retention = option.retention.takeIf { entry.retention is DvrRetention.Days }
     return when {
         removal == null -> false
-        entry.removal == removal -> true
+        entry.removal == removal && (retention == null || entry.retention == retention) -> true
         else -> {
-            val mutation = DvrMutationAction.SetEntryRemoval(requireNotNull(openingSession), entry, removal)
+            val mutation = DvrMutationAction.SetEntryRemoval(requireNotNull(openingSession), entry, removal, retention)
             val context = notices.context()
             val result = execute(mutation)
             notices.postDvrFailure(mutation, result, context)
@@ -269,6 +271,7 @@ internal sealed interface DvrMutationAction {
         val currentSession: CurrentSessionObservation,
         val target: DvrEntry,
         val removal: DvrRemoval,
+        val retention: DvrRetention? = null,
     ) : DvrMutationAction {
         init { require(removal != DvrRemoval.ServerDefault) }
     }
@@ -519,7 +522,8 @@ internal class DvrMutationActions(
                 action.currentSession, action.target.id, DvrEntryUpdate(enabled = action.enabled),
             )
             is DvrMutationAction.SetEntryRemoval -> updateEntry(
-                action.currentSession, action.target.id, DvrEntryUpdate(removal = action.removal),
+                action.currentSession, action.target.id,
+                DvrEntryUpdate(removal = action.removal, retention = action.retention),
             )
             is DvrMutationAction.CreateProgramme -> scheduleEntry(
                 action.target.currentSession,
