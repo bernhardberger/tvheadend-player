@@ -1,17 +1,13 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
-import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
-import androidx.compose.ui.unit.dp
-import androidx.tv.material3.*
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvhplayer.R
@@ -33,9 +29,11 @@ internal fun RecordingPlaybackChoice(
     backEnabled: Boolean = true,
 ) {
     val resources = LocalContext.current.resources
+    val locale = LocalConfiguration.current.locales[0]
     val resumeFocus = remember { FocusRequester() }
     val liveFocus = remember { FocusRequester() }
     val startFocus = remember { FocusRequester() }
+    var focusedChoice by remember { mutableStateOf<FocusRequester?>(null) }
     val playable = recordingPlaybackOffered(admission)
     val deferred = admission == RecordingPlaybackAdmission.GrowingDeferred
     val resumePosition = offeredResumePosition(admission)
@@ -45,77 +43,96 @@ internal fun RecordingPlaybackChoice(
         resumePosition != null -> resumeFocus
         else -> startFocus
     }
-    var startFocused by remember(entry.id) { mutableStateOf(resumePosition == null) }
-    var liveFocused by remember(entry.id) { mutableStateOf(!playable) }
-    val durationMs = recordingDetailsFacts(entry, admission, nowSec)
-        .firstOrNull { it.kind == DetailsFactKind.LENGTH }?.seconds?.times(1000L)
+    val order = listOfNotNull(resumeFocus.takeIf { resumePosition != null }, startFocus.takeIf { playable },
+        liveFocus.takeIf { onWatchLive != null })
+    // The stack runs top to bottom and stops at both ends; nothing leaves the card sideways.
+    fun Modifier.stacked(self: FocusRequester) = focusRequester(self).onFocusChanged {
+        if (it.isFocused) focusedChoice = self else if (focusedChoice == self) focusedChoice = null
+    }.focusProperties {
+        val index = order.indexOf(self)
+        up = order.getOrNull(index - 1) ?: FocusRequester.Cancel
+        down = order.getOrNull(index + 1) ?: FocusRequester.Cancel
+        left = FocusRequester.Cancel
+        right = FocusRequester.Cancel
+    }
+    // A growing recording plays on to its end, so it counts its final length, not what is on disk.
+    val durationMs = (recordingFinalLengthSeconds(entry, nowSec) ?: recordingDetailsFacts(entry, admission, nowSec)
+        .firstOrNull { it.kind == DetailsFactKind.LENGTH }?.seconds)?.times(1000L)
     val resumeEnd = recordingEndsAtSec(nowSec, positionMs, durationMs)
-        ?.let { stringResource(R.string.recording_ends_at, formatClock(it)) }.orEmpty()
+        ?.let { stringResource(R.string.recording_ends_at, formatClock(it)) }
     val startEnd = recordingEndsAtSec(nowSec, 0L, durationMs)
-        ?.let { stringResource(R.string.recording_ends_at, formatClock(it)) }.orEmpty()
+        ?.let { stringResource(R.string.recording_ends_at, formatClock(it)) }
     val spokenResume = stringResource(R.string.recording_resume_from,
         formatDurationMinutes(positionMs / 60_000L, resources, spoken = true))
-    CentredDialog(
-        title = entry.title.orEmpty(),
-        secondaryText = programmeEpisodeLine(entry.episode, entry.subtitle, resources),
-        text = if (deferred) stringResource(R.string.error_305_reason) else "",
-        eyebrow = {
-            ProvideArtworkSession(observation.currentSession, observation) {
-                ProgrammeEyebrow(channel?.icon, listOfNotNull(
-                    (channel?.let { channelTitleText(it.number, it.name.orEmpty()) }
-                        ?: entry.channelName)?.takeIf(String::isNotBlank),
-                    entry.start?.epochSeconds?.formatDateTime(LocalConfiguration.current.locales[0]),
-                    (if (liveFocused) "" else if (startFocused) startEnd else resumeEnd).takeIf(String::isNotBlank),
-                ).joinToString(" • "), Modifier.fillMaxWidth(), Modifier.testTag("recording-resume-picon"))
-            }
-        },
-        onDismiss = onClose,
-        backEnabled = backEnabled,
-    ) {
-        LaunchedEffect(firstFocus) { withFrameNanos { }; firstFocus.requestFocus() }
-        if (resumePosition != null) Button(
-            onClick = { onPlay(RecordingPlaybackStart.RESUME) },
-            modifier = Modifier.height(40.dp).focusRequester(resumeFocus)
-                .onFocusChanged { if (it.isFocused) { startFocused = false; liveFocused = false } }
-                .semantics { contentDescription = spokenResume; if (resumeEnd.isNotBlank()) stateDescription = resumeEnd }
-                .focusProperties { left = FocusRequester.Cancel; right = startFocus }
-                .testTag("recording-resume"),
-            contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
-        ) {
-            Icon(painterResource(R.drawable.ic_play_arrow), null, Modifier.size(ButtonDefaults.IconSize))
-            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-            Text(stringResource(R.string.recording_resume_from, formatPlaybackDuration(positionMs)), maxLines = 1, softWrap = false)
+    val title = entry.title.orEmpty()
+    CentredDialogShell(paneTitle = title, onDismiss = onClose, backEnabled = backEnabled, verticalKeys = true) {
+        LaunchedEffect(firstFocus, order) {
+            withFrameNanos { }
+            if (firstFocus in order && focusedChoice !in order) firstFocus.requestFocus()
         }
-        if (playable) {
-            val startModifier = Modifier.height(40.dp).focusRequester(startFocus)
-                    .onFocusChanged { if (it.isFocused) { startFocused = true; liveFocused = false } }
-                    .semantics { if (startEnd.isNotBlank()) stateDescription = startEnd }
-                    .focusProperties { left = if (resumePosition != null) resumeFocus else FocusRequester.Cancel; right = if (onWatchLive != null) liveFocus else FocusRequester.Cancel }
-                    .testTag("recording-start-over")
-            val startContent: @Composable RowScope.() -> Unit = {
-                Icon(painterResource(if (resumePosition == null) R.drawable.ic_play_arrow else R.drawable.ic_replay), null, Modifier.size(ButtonDefaults.IconSize))
-                Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-                Text(stringResource(if (resumePosition == null) R.string.recording_choice_play else R.string.context_start_over), maxLines = 1, softWrap = false)
+        ProvideArtworkSession(observation.currentSession, observation) {
+            PlaybackChoiceCard(
+                art = recordingArtwork(entry),
+                picon = channel?.icon,
+                channel = (channel?.let { channelTitleText(it.number, it.name.orEmpty()) }
+                    ?: entry.channelName).orEmpty(),
+                airTime = recordingAirTime(entry, locale, nowSec),
+                title = title,
+                episode = programmeEpisodeLine(entry.episode, entry.subtitle, resources),
+                recording = recordingCardState(entry, nowSec),
+                waiting = if (deferred) stringResource(R.string.error_305_reason) else null,
+                buttonCount = order.size,
+                piconModifier = Modifier.testTag("recording-resume-picon"),
+            ) {
+                if (resumePosition != null) PlaybackChoiceButton(
+                    stringResource(R.string.recording_resume_from, formatPlaybackDuration(positionMs)),
+                    R.drawable.ic_play_arrow, resumeEnd, filled = true,
+                    onClick = { onPlay(RecordingPlaybackStart.RESUME) },
+                    modifier = Modifier.stacked(resumeFocus).semantics { contentDescription = spokenResume }
+                        .testTag("recording-resume"),
+                )
+                if (playable) PlaybackChoiceButton(
+                    stringResource(
+                        if (resumePosition == null) R.string.recording_choice_play else R.string.context_start_over,
+                    ),
+                    if (resumePosition == null) R.drawable.ic_play_arrow else R.drawable.ic_replay,
+                    startEnd, filled = resumePosition == null,
+                    onClick = { onPlay(RecordingPlaybackStart.START_OVER) },
+                    modifier = Modifier.stacked(startFocus).testTag("recording-start-over"),
+                )
+                if (onWatchLive != null) PlaybackChoiceButton(
+                    stringResource(R.string.context_watch_live), R.drawable.ic_live_tv_outlined, null, filled = false,
+                    onClick = onWatchLive,
+                    modifier = Modifier.stacked(liveFocus).testTag("recording-watch-live"),
+                )
             }
-            if (resumePosition == null) Button(
-                onClick = { onPlay(RecordingPlaybackStart.START_OVER) }, modifier = startModifier,
-                contentPadding = ButtonDefaults.ButtonWithIconContentPadding, content = startContent,
-            ) else OutlinedButton(
-                onClick = { onPlay(RecordingPlaybackStart.START_OVER) }, modifier = startModifier,
-                contentPadding = OutlinedButtonDefaults.ButtonWithIconContentPadding, content = startContent,
-            )
-        }
-        if (onWatchLive != null) OutlinedButton(
-            onClick = onWatchLive,
-            modifier = Modifier.height(40.dp).focusRequester(liveFocus)
-                .onFocusChanged { if (it.isFocused) { startFocused = false; liveFocused = true } }
-                .focusProperties { left = if (!playable) FocusRequester.Cancel else startFocus; right = FocusRequester.Cancel }
-                .testTag("recording-watch-live"),
-            contentPadding = OutlinedButtonDefaults.ButtonWithIconContentPadding,
-        ) {
-            Icon(painterResource(R.drawable.ic_live_tv_outlined), null, Modifier.size(ButtonDefaults.IconSize))
-            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-            Text(stringResource(R.string.context_watch_live), maxLines = 1, softWrap = false)
         }
     }
+}
+
+private fun recordingAirTime(entry: DvrEntry, locale: java.util.Locale, nowSec: Long): String? {
+    val start = entry.start?.epochSeconds ?: return null
+    return entry.stop?.epochSeconds?.let { stop ->
+        formatTimeInterval(start, stop, withDate = true, locale = locale, nowSec = nowSec)
+    } ?: start.formatDateTime(locale)
+}
+
+/** Only while the server is still recording: how much is on disk of what is planned. */
+@Composable
+private fun recordingCardState(entry: DvrEntry, nowSec: Long): PlaybackCardRecording? {
+    if (!recordingIsRunning(entry)) return null
+    val resources = LocalContext.current.resources
+    val now = stringResource(R.string.recordings_recording_now)
+    val recorded = recordingLengthSeconds(entry, nowSec)
+    // The same total as "Ends at", so what is recorded never passes it.
+    val finalLength = recordingFinalLengthSeconds(entry, nowSec)
+    val planned = finalLength ?: recordingPlannedSeconds(entry)
+    fun line(spoken: Boolean) = if (recorded == null || planned == null) now else
+        "$now · " + resources.getString(R.string.recording_recorded_of,
+            formatRecordedDuration(recorded, resources, spoken), formatRecordedDuration(planned, resources, spoken))
+    // The bar sits under those two numbers, so it shows the same share.
+    val share = if (recorded != null && finalLength != null && finalLength > 0L) {
+        (recorded.toFloat() / finalLength).coerceIn(0f, 1f)
+    } else recordingElapsedProgress(entry, nowSec)
+    return PlaybackCardRecording(line(spoken = false), line(spoken = true), share ?: 0f)
 }

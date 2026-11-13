@@ -301,7 +301,7 @@ Each card behaves like the screen it comes from.
 | Genre | Guide at now with that genre | None |
 
 **Recording choice dialog:** OK on an active recording opens the existing
-centred resume dialog (`RecordingsScreen.kt`, `CentredDialog`) with up to three
+centred resume dialog (`RecordingPlaybackChoice`, `PlaybackChoiceCard`) with up to three
 buttons: **Resume from …** (only with a resume position),
 **Watch from beginning** and **Watch live** (tunes the channel), in that order. Without a resume
 point the start action is **Play recording**, with the play icon; with one,
@@ -416,7 +416,7 @@ How phase 2 is presented remains open; the removed tabs are not a requirement.
 ## 7. Shared components
 
 Reuse, don't copy: `RowEmphasis`, `BrowseContextMenu`, `ProgrammeDetailsPage` /
-`ProgrammeDetailsHost`, `CentredDialog`, `ProgressStrip` and the watching-progress
+`ProgrammeDetailsHost`, `ConfirmationDialog`, `ProgressStrip` and the watching-progress
 locals, the card focus glow, the picon plate and logo fallback, the Channels
 immersive background, `TvGenreColors`, the Guide filter, `NoticeCenter`.
 

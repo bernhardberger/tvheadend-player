@@ -22,6 +22,8 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrPriority
 import at.bernhardberger.tvheadend.sdk.core.RecordingRuleChannel
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.runtime.key
 import at.bernhardberger.tvhplayer.core.resolveOccurrenceOn
@@ -57,6 +59,71 @@ import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
 class AutomaticRecordingEditorTest {
     @get:Rule val compose = createComposeRule()
+
+    @Test fun editorConfirmationCardsKeepDraftsAndDispatchTheChosenActionOnce() {
+        lateinit var fixture: AutomaticRecordingEditorFixture
+        lateinit var automatic: AutomaticRecordingEditorState
+        lateinit var timer: TimerRecordingEditorState
+        var timerMode by mutableStateOf(false)
+        var timerGeneration by mutableStateOf(0)
+        compose.setContent {
+            val scope = rememberCoroutineScope()
+            fixture = remember { AutomaticRecordingEditorFixture(scope) }
+            automatic = remember { fixture.state(automaticRecordingSeries, editing = true) }
+            timer = remember(timerGeneration) { fixture.timer(newTimerDraft(automaticRecordingNow, automaticRecordingZone,
+                startingRepeating = true).copy(channelId = automaticRecordingChannels.first().id,
+                existingTimer = true)) }
+            TVHeadendPlayerTheme {
+                if (timerMode) TimerRecordingEditor(timer, automaticRecordingChannels)
+                else AutomaticRecordingEditor(automatic, automaticRecordingChannels)
+            }
+        }
+        compose.runOnIdle {
+            automatic.updateDraft { it.copy(enabled = false) }
+            automatic.navigation.confirmation = AutomaticRecordingEditorConfirmation.DELETE
+        }
+        confirmationButton("automatic-recording-keep").assertIsFocused()
+        compose.pressKey(Key.Back, settleFrames = 1, frameMillis = PlayerMotion.PanelMs.toLong())
+        compose.runOnIdle { assertTrue(automatic.changed); assertEquals(0, fixture.deletions) }
+        compose.runOnIdle { automatic.navigation.confirmation = AutomaticRecordingEditorConfirmation.DELETE }
+        confirmationButton("automatic-recording-keep").assertIsFocused()
+        compose.pressKey(Key.DirectionRight)
+        compose.pressKey(Key.DirectionCenter, settleFrames = 1, frameMillis = PlayerMotion.PanelMs.toLong())
+        compose.runOnIdle { assertEquals(1, fixture.deletions); assertTrue(automatic.closed); timerMode = true }
+        compose.runOnIdle {
+            timer.updateDraft { it.copy(name = "Late news") }
+            timer.navigation.confirmation = AutomaticRecordingEditorConfirmation.DELETE
+        }
+        confirmationButton("timer-recording-keep").assertIsFocused()
+        compose.pressKey(Key.Back, settleFrames = 1, frameMillis = PlayerMotion.PanelMs.toLong())
+        compose.runOnIdle {
+            assertEquals("Late news", timer.draft.name)
+            timer.navigation.confirmation = AutomaticRecordingEditorConfirmation.DELETE
+        }
+        compose.pressKey(Key.DirectionRight)
+        compose.pressKey(Key.DirectionCenter, settleFrames = 1, frameMillis = PlayerMotion.PanelMs.toLong())
+        compose.runOnIdle { assertEquals(2, fixture.deletions); assertTrue(timer.closed); timerGeneration++ }
+        compose.runOnIdle {
+            timer.updateDraft { it.copy(name = "Late news") }
+            timer.updateDraft { it.copy(days = emptySet()) }
+            timer.navigation.confirmation = AutomaticRecordingEditorConfirmation.LEAVE
+        }
+        compose.onNodeWithTag("timer-recording-keep-editing").assertIsFocused()
+        compose.onNodeWithTag("timer-recording-leave-main").assertIsNotEnabled()
+        compose.pressKey(Key.DirectionLeft)
+        compose.pressKey(Key.DirectionRight)
+        compose.onNodeWithTag("timer-recording-keep-editing").assertIsFocused()
+        compose.pressKey(Key.Back, settleFrames = 1, frameMillis = PlayerMotion.PanelMs.toLong())
+        compose.runOnIdle {
+            assertEquals("Late news", timer.draft.name)
+            timer.updateDraft { it.copy(days = DayOfWeek.entries.toSet()) }
+            timer.navigation.confirmation = AutomaticRecordingEditorConfirmation.LEAVE
+        }
+        compose.pressKey(Key.DirectionDown)
+        compose.onNodeWithTag("timer-recording-leave-main").assertIsFocused()
+        compose.pressKey(Key.DirectionCenter)
+        compose.runOnIdle { assertEquals(1, fixture.timerSubmissions.size); assertTrue(timer.closed) }
+    }
 
     @Test fun ruleMenuSkipAndUnskipWaitForPublishedMetadata() {
         val entry = automaticRecordingEntry()
@@ -210,7 +277,7 @@ class AutomaticRecordingEditorTest {
                     { session.observation.value }, { automaticRecordingNow.epochSeconds },
                     showContextMenu = false, onShowDetails = {}, mutations, notices, scope,
                     remember { mutableStateOf(null) }, onPlay = { _, _ -> }, onPlayRecording = null,
-                    onClose = {}, settingsStore = settings, session = session,
+                    onClose = {}, settingsStore = settings, session = session, signedInUsername = null,
                 )
             }
         }
@@ -474,7 +541,9 @@ class AutomaticRecordingEditorTest {
         verifyMinuteChoiceReturnsToWindow(state)
         compose.pressKey(Key.Back)
         compose.pressKey(Key.DirectionRight)
-        compose.pressKey(Key.DirectionRight)
+        compose.onNodeWithTag("automatic-recording-keep-editing").assertIsFocused()
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
         compose.onNodeWithTag("automatic-recording-discard").assertIsFocused()
         compose.pressKey(Key.DirectionCenter)
         compose.runOnIdle {
@@ -482,6 +551,9 @@ class AutomaticRecordingEditorTest {
             assertTrue(fixture.submissions.isEmpty())
         }
     }
+
+    private fun confirmationButton(tag: String) =
+        compose.onNode(hasTestTag(tag) and hasAnyAncestor(hasTestTag("centred-dialog-card")))
 
     private fun verifyResetRestoresFirstMoreRow(state: AutomaticRecordingEditorState) {
         compose.runOnIdle { state.updateDraft { it.copy(priority = DvrPriority.HIGH) } }

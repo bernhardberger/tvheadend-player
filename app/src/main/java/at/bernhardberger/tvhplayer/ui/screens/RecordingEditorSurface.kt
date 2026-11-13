@@ -5,6 +5,13 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -16,6 +23,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -23,13 +34,15 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.tv.material3.Button
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.ui.components.CentredDialog
+import at.bernhardberger.tvhplayer.ui.components.CentredDialogShell
+import at.bernhardberger.tvhplayer.ui.components.PlaybackChoiceButton
+import at.bernhardberger.tvhplayer.ui.components.PlaybackCardWidth
+import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
+import at.bernhardberger.tvhplayer.ui.TvTextColors
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepLayout
 import at.bernhardberger.tvhplayer.ui.components.backKeyCycleFocus
 import at.bernhardberger.tvhplayer.ui.components.rememberBackKeyCycle
@@ -92,7 +105,8 @@ internal fun editorRowModifier(navigation: RecordingEditorNavigation, id: String
         }
     }
     return Modifier.testTag("${navigation.tagPrefix}-$id").focusRequester(requester).onFocusChanged {
-        if (it.isFocused) navigation.focusedRow = id
+        // The shell can release focus during its fade, before its dismissal restores the opener.
+        if (it.isFocused && navigation.confirmation == null) navigation.focusedRow = id
     }
 }
 
@@ -104,28 +118,36 @@ internal fun RecordingEditorLeaveDialog(
     onBack: () -> Unit,
     onSubmit: () -> Unit,
     onDiscard: () -> Unit,
+    mainIcon: Int,
 ) {
     val keep = remember { FocusRequester() }
     val main = remember { FocusRequester() }
     val discard = remember { FocusRequester() }
     LaunchedEffect(Unit) { withFrameNanos { }; keep.requestFocus() }
-    CentredDialog(
-        title = stringResource(R.string.autorec_editor_leave_title),
-        text = stringResource(R.string.autorec_editor_leave_body), onDismiss = onBack, onBack = onBack,
-        actions = {
-            Button(onClick = onBack, modifier = Modifier.testTag("${navigation.tagPrefix}-keep-editing")
-                .focusRequester(keep).focusProperties { left = FocusRequester.Cancel; right = main }) {
-                Text(stringResource(R.string.autorec_editor_keep_editing))
+    val question = stringResource(R.string.autorec_editor_leave_title)
+    CentredDialogShell(paneTitle = question, onDismiss = onBack, verticalKeys = true) {
+        Column(Modifier.width(PlaybackCardWidth).clip(RoundedCornerShape(16.dp))
+            .background(TvSurfaceColors.container).testTag("centred-dialog-card").padding(24.dp)
+            .onPreviewKeyEvent { it.nativeKeyEvent.keyCode in listOf(
+                KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
+            ) }) {
+            Text(question, Modifier.semantics { heading() }, style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onSurface)
+            Spacer(Modifier.height(16.dp))
+            Text(stringResource(R.string.autorec_editor_leave_body),
+                style = MaterialTheme.typography.bodyLarge, color = TvTextColors.secondary)
+            Spacer(Modifier.height(24.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                PlaybackChoiceButton(stringResource(R.string.autorec_editor_keep_editing), R.drawable.ic_edit,
+                    null, true, onBack, Modifier.testTag("${navigation.tagPrefix}-keep-editing")
+                        .focusRequester(keep).focusProperties { up = FocusRequester.Cancel; down = main })
+                PlaybackChoiceButton(mainLabel, mainIcon, null, false, onSubmit,
+                    Modifier.testTag("${navigation.tagPrefix}-leave-main").focusRequester(main)
+                        .focusProperties { up = keep; down = discard }, enabled = canSubmit)
+                PlaybackChoiceButton(stringResource(R.string.autorec_editor_discard), R.drawable.ic_close,
+                    null, false, onDiscard, Modifier.testTag("${navigation.tagPrefix}-discard")
+                        .focusRequester(discard).focusProperties { up = main; down = FocusRequester.Cancel })
             }
-            OutlinedButton(onClick = onSubmit, enabled = canSubmit,
-                modifier = Modifier.focusRequester(main).focusProperties { left = keep; right = discard }) {
-                Text(mainLabel)
-            }
-            OutlinedButton(onClick = onDiscard,
-                modifier = Modifier.testTag("${navigation.tagPrefix}-discard")
-                .focusRequester(discard).focusProperties { left = main; right = FocusRequester.Cancel }) {
-                Text(stringResource(R.string.autorec_editor_discard))
-            }
-        },
-    )
+        }
+    }
 }

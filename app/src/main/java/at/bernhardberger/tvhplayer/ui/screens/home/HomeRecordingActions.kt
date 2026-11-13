@@ -199,13 +199,9 @@ internal fun HomeRecordingActions(
             else -> PendingRecordingAction.DELETE
         }
         val visibility = remember(mutation) { MutableTransitionState(false).apply { targetState = true } }
-        RecordingConfirmationDialog(visibility = visibility, action = action, title = opened.title.orEmpty(),
-            removeEntry = deleteRemovesEntryOnly(opened),
+        RecordingConfirmationDialog(visibility = visibility, action = action, entry = opened, channel = channel,
+            nowSec = nowSec, currentSession = capability, observation = observation,
             backEnabled = !mutationBusy,
-            channelName = channel?.name ?: opened.channelName.orEmpty(),
-            dateAndTime = at.bernhardberger.tvhplayer.ui.common.formatRecordingSchedule(opened.start?.epochSeconds,
-                dateOnly = action == PendingRecordingAction.DELETE,
-                locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]),
             onDismiss = { if (!mutationBusy) { pendingMutation = null; onClose() } },
             onConfirm = {
                 if (!mutationBusy && owner?.isCurrent != false) {

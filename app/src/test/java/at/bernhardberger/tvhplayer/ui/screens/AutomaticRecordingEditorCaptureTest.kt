@@ -26,6 +26,8 @@ import androidx.tv.material3.Text
 import androidx.test.core.app.ApplicationProvider
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.semantics.SemanticsActions
@@ -306,6 +308,38 @@ class AutomaticRecordingEditorCaptureTest {
         capture("11d-delete-confirm", "slice-3-job-b")
     }
 
+    @Test fun mergedEditorConfirmationReferenceFrames() {
+        for (changed in listOf(false, true)) {
+            show(editing = true)
+            compose.runOnIdle {
+                val state = requireNotNull(shown)
+                if (changed) state.updateDraft { it.copy(enabled = false) }
+                state.navigation.confirmation = AutomaticRecordingEditorConfirmation.DELETE
+            }
+            capture("delete-series-${if (changed) "changed" else "unchanged"}", "merge-main")
+        }
+        show()
+        compose.runOnIdle {
+            requireNotNull(shown).updateDraft { it.copy(removal = DvrRemoval.Forever) }
+            requireNotNull(shown).navigation.confirmation = AutomaticRecordingEditorConfirmation.LEAVE
+        }
+        capture("leave-new-series", "merge-main")
+        compose.runOnIdle {
+            shown = null
+            shownTimer = fixture.timer(newTimerDraft(automaticRecordingNow, automaticRecordingZone,
+                startingRepeating = true).copy(channelId = automaticRecordingChannels[2].id,
+                name = "Late news", existingTimer = true))
+            requireNotNull(shownTimer).navigation.confirmation = AutomaticRecordingEditorConfirmation.DELETE
+        }
+        capture("delete-repeating-timer", "merge-main")
+        compose.runOnIdle {
+            requireNotNull(shownTimer).navigation.confirmation = null
+            requireNotNull(shownTimer).updateDraft { it.copy(days = emptySet()) }
+            requireNotNull(shownTimer).navigation.confirmation = AutomaticRecordingEditorConfirmation.LEAVE
+        }
+        capture("leave-invalid-edited-timer", "merge-main")
+    }
+
     @Test fun timerEditorReferenceFrames() {
         val initialTimer = newTimerDraft(automaticRecordingNow, automaticRecordingZone).copy(
             channelId = automaticRecordingChannels[2].id, date = LocalDate.of(2026, 11, 13),
@@ -372,7 +406,9 @@ class AutomaticRecordingEditorCaptureTest {
             AutomaticRecordingEditorConfirmation.DELETE -> "keep"
             null -> requireNotNull(navigation).focusedRow
         }
-        compose.onNodeWithTag(focusTag ?: "${requireNotNull(navigation).tagPrefix}-$focus")
+        val target = hasTestTag(focusTag ?: "${requireNotNull(navigation).tagPrefix}-$focus")
+        compose.onNode(if (navigation?.confirmation != null)
+            target and hasAnyAncestor(hasTestTag("centred-dialog-card")) else target)
             .performSemanticsAction(SemanticsActions.RequestFocus) { it() }
         compose.settleFrames(1, PlayerMotion.PanelMs.toLong())
         compose.runOnIdle {

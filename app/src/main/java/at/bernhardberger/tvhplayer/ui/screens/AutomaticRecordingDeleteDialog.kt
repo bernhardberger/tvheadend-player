@@ -6,23 +6,35 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.AutomaticRecordingKind
-import at.bernhardberger.tvhplayer.ui.components.CentredDialog
+import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvhplayer.ui.components.ConfirmationDialog
+import at.bernhardberger.tvhplayer.ui.components.ConfirmationChoice
+import at.bernhardberger.tvhplayer.ui.components.ConfirmationSubject
 
 @Composable
-internal fun AutomaticRecordingDeleteDialog(state: AutomaticRecordingEditorState, scheduledCount: Int) {
-    CentredDialog(
-        title = stringResource(when (state.draft.kind) {
+internal fun AutomaticRecordingDeleteDialog(
+    state: AutomaticRecordingEditorState, scheduledCount: Int, channels: List<Channel>,
+) {
+    ConfirmationDialog(
+        question = stringResource(when (state.draft.kind) {
             AutomaticRecordingKind.SERIES -> R.string.autorec_editor_delete_series
             AutomaticRecordingKind.TITLE -> R.string.autorec_editor_delete_title
             else -> R.string.autorec_editor_delete_keyword
         }),
-        message = formatAutomaticRecordingDeleteBody(
+        subject = ConfirmationSubject.Rule(R.drawable.ic_fiber_smart_record, state.draft.pattern.words,
+            listOf(stringResource(when (state.draft.kind) {
+                AutomaticRecordingKind.SERIES -> R.string.automatic_recording_kind_series
+                AutomaticRecordingKind.TITLE -> R.string.automatic_recording_kind_title
+                else -> R.string.automatic_recording_kind_keyword
+            }), automaticRecordingChannelLabel(state.draft, channels)).joinToString(" • ")),
+        sentence = formatAutomaticRecordingDeleteBody(
             LocalContext.current, state.draft.kind, scheduledCount, state.changed,
         ),
-        firstLabel = stringResource(R.string.autorec_editor_keep_recording),
-        secondLabel = stringResource(R.string.autorec_editor_delete),
-        onFirst = state::back, onSecond = state::confirmDestructiveAction, onDismiss = state::back,
-        firstTag = "automatic-recording-keep", secondTag = "automatic-recording-delete-confirm",
+        safe = ConfirmationChoice(stringResource(R.string.autorec_editor_keep_recording),
+            R.drawable.ic_check, "automatic-recording-keep"),
+        action = ConfirmationChoice(stringResource(R.string.autorec_editor_delete),
+            R.drawable.ic_delete_outlined, "automatic-recording-delete-confirm"),
+        onDismiss = state::back, onConfirm = state::confirmDestructiveAction,
     )
 }
 

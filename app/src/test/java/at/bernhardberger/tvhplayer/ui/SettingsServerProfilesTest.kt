@@ -830,7 +830,7 @@ class SettingsServerProfilesTest {
         press(Key.DirectionCenter)
         press(Key.DirectionCenter)
         compose.onNodeWithTag(SWITCH_KEEP).assertIsFocused()
-        compose.onNodeWithText("Switch to kids@tvheadend.home.arpa?").assertIsDisplayed()
+        compose.onNodeWithText("Switch to this server?").assertIsDisplayed()
         compose.onNodeWithText("Live TV stops", substring = true).assertIsDisplayed()
         press(Key.DirectionCenter)
         // Keeping returns focus to the row that asked; nothing switched.
@@ -840,7 +840,7 @@ class SettingsServerProfilesTest {
         assertTrue(stopsAt.isEmpty())
         compose.runOnIdle { interruption = PlaybackInterruption.RECORDING }
         press(Key.DirectionCenter)
-        compose.onNodeWithText("The recording stops", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Playback stops", substring = true).assertIsDisplayed()
         press(Key.Back)
         compose.onNodeWithTag(SWITCH_KEEP).assertDoesNotExist()
         compose.onNodeWithTag("settings-row-$SERVER_USE").assertIsFocused()
@@ -977,7 +977,7 @@ class SettingsServerProfilesTest {
         compose.onNodeWithTag("settings-row-$SERVER_REMOVE").performSemanticsAction(SemanticsActions.RequestFocus)
         press(Key.DirectionCenter)
         compose.onNodeWithTag(REMOVE_KEEP).assertIsFocused()
-        compose.onNodeWithText("Remove Living room?").assertIsDisplayed()
+        compose.onNodeWithText("Remove this connection?").assertIsDisplayed()
         press(Key.DirectionCenter)
         compose.onNodeWithTag(REMOVE_KEEP).assertDoesNotExist()
         compose.onNodeWithTag("settings-row-$SERVER_REMOVE").assertIsFocused()

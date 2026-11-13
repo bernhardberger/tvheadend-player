@@ -23,6 +23,7 @@ import at.bernhardberger.tvhplayer.settings.serverProfileDisplayName
 import at.bernhardberger.tvhplayer.ui.SettingsSection
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthLevel
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthNavigationState
+import at.bernhardberger.tvhplayer.ui.components.serverAvatarLook
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.SetupMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -284,12 +285,11 @@ internal class ServerSettingsState(
         val removeTarget = findProfile(removing, list)
         return when {
             switchTarget != null -> {
-                val username = switchTarget.username?.takeIf {
-                    switchTarget.authenticationMode == ServerProfileAuthenticationMode.PASSWORD
-                }
+                val username = switchTarget.accountName()
                 val name = serverProfileDisplayName(switchTarget)
                 ({
-                    SwitchServerDialog(name, username, interruption(),
+                    SwitchServerDialog(name, serverAvatarLook(switchTarget),
+                        serverConfirmationDetail(switchTarget.host, switchTarget.port, username), interruption(),
                         onSwitch = {
                             switching = null
                             use(switchTarget)
@@ -301,7 +301,9 @@ internal class ServerSettingsState(
                 val name = serverProfileDisplayName(removeTarget)
                 val active = removeTarget.id == activeId
                 ({
-                    RemoveServerDialog(name, active,
+                    RemoveServerDialog(name, serverAvatarLook(removeTarget),
+                        serverConfirmationDetail(removeTarget.host, removeTarget.port, removeTarget.accountName()),
+                        active,
                         onRemove = {
                             removing = null
                             remove(removeTarget)
