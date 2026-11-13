@@ -293,18 +293,19 @@ fun EpgGridScreen(
     notices: NoticeCenter = koinInject(),
     onPlay: (channelId: ChannelId, channelName: String) -> Unit,
 ) {
+    // Outside the screen body, whose generated method has no dex registers to spare.
+    val channelWidth =
+        guideChannelWidth(channelViewModel.scope.collectAsStateWithLifecycle().value.scope.visibleChannels)
+    CompositionLocalProvider(LocalGuideChannelWidth provides channelWidth) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
     val layoutDirection = LocalLayoutDirection.current
     val density = LocalDensity.current
     ProfileCompositionLifetime("guide")
     val startPadding = contentPadding.calculateStartPadding(layoutDirection)
     val endPadding = contentPadding.calculateEndPadding(layoutDirection)
-    // Event callbacks must validate the scope that produced their rows, not a newer
-    // collector value that can arrive before this composition is replaced.
-    val channelScopeState = channelViewModel.scope.collectAsStateWithLifecycle().value
-    val channelScope = channelScopeState.scope
+    @Composable
     fun timelineWidthPixels(): Float {
-    val timelineWidth = (maxWidth - startPadding - TvBrowseLeadingInset - guideChannelWidth(channelScope.visibleChannels) - GuideChannelGap)
+    val timelineWidth = (maxWidth - startPadding - TvBrowseLeadingInset - LocalGuideChannelWidth.current - GuideChannelGap)
         .coerceAtLeast(1.dp)
     return with(density) { timelineWidth.toPx() }
     }
@@ -344,6 +345,10 @@ fun EpgGridScreen(
     val dvrMutationActions = remember(session.dvrRepository) {
         DvrMutationActions(session.dvrRepository)
     }
+    // Event callbacks must validate the scope that produced their rows, not a newer
+    // collector value that can arrive before this composition is replaced.
+    val channelScopeState = channelViewModel.scope.collectAsStateWithLifecycle().value
+    val channelScope = channelScopeState.scope
     val scopeMotion = rememberTabContentMotion(channelScope.activeTagId) {
         channelViewModel.scope.value.scope.activeTagId
     }
@@ -1818,7 +1823,6 @@ fun EpgGridScreen(
     }
 
     val detailsLayering = at.bernhardberger.tvhplayer.ui.components.LocalBrowseContentLayering.current
-    CompositionLocalProvider(LocalGuideChannelWidth provides guideChannelWidth(channelScope.visibleChannels)) {
     Box(Modifier.fillMaxSize().testTag("epg-screen")) content@{
         // Settings writes belong to the screen, not the temporarily gated prepared content.
         val settingsScope = rememberCoroutineScope()
