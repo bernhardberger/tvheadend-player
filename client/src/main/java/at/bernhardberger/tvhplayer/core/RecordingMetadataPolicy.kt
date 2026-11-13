@@ -51,6 +51,18 @@ fun recordingLengthSeconds(recording: DvrEntry, nowSec: Long): Long? = when {
     else -> recordingPlannedSeconds(recording)
 }
 
+/**
+ * How long a running recording's files will be when Tvheadend stops: what is recorded so far plus the
+ * time left until the padded stop. Both count file time, so padding and a late start are included.
+ * Null when the recording is not running or either part is unknown.
+ */
+fun recordingFinalLengthSeconds(recording: DvrEntry, nowSec: Long): Long? {
+    if (!recordingIsRunning(recording)) return null
+    val recorded = recordingLengthSeconds(recording, nowSec) ?: return null
+    val stop = recordingPaddedStop(recording)?.epochSeconds ?: return null
+    return recorded + (stop - nowSec).coerceAtLeast(0L)
+}
+
 /** From the first file's start to the last file's stop, which is when the recording actually ran. */
 fun recordingRecordedSpan(recording: DvrEntry, nowSec: Long): Pair<Instant, Instant>? =
     recordedFileIntervals(recording, nowSec)?.let { it.first().first to it.maxOf { (_, stop) -> stop } }

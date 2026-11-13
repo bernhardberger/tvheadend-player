@@ -648,6 +648,8 @@
     <string name="recording_loading">Loading recording…</string>
     <string name="recording_resume_from">Resume from %1$s</string>
     <string name="recording_ends_at">Ends at %1$s</string>
+    <!-- Beside "Recording now" on the playback choice: how much of the planned length is on disk so far. -->
+    <string name="recording_recorded_of">%1$s of %2$s recorded</string>
     <!-- Beside the programme's time range, so a padded file's longer length does not read as a contradiction. -->
     <string name="recording_length_recorded">%1$s recorded</string>
     <!-- Beside a scheduled recording that one of the server's rules set up. -->
