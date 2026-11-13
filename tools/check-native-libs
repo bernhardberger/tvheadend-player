@@ -16,8 +16,8 @@ from pathlib import Path, PurePosixPath
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SDK_COORDINATE = "at.bernhardberger.tvheadend:sdk-media3:0.39.0-20261113.134926-5"
-SDK_VERSION = "0.39.0-20261113.134926-5"
+SDK_COORDINATE = "at.bernhardberger.tvheadend:sdk-media3:0.39.0"
+SDK_VERSION = "0.39.0"
 EVIDENCE_DIRECTORY = ROOT / "app/build/released-sdk-evidence"
 SDK_AAR_NAME = f"sdk-media3-{SDK_VERSION}.aar"
 NATIVE_DIRECTORY = ROOT / "decoder-ffmpeg"
