@@ -12,7 +12,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.*
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.input.key.*
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
@@ -148,7 +147,6 @@ internal fun ScrollReadingBox(
     val scope = rememberCoroutineScope()
     var focused by remember { mutableStateOf(false) }
     var scrollKey by remember { mutableStateOf<Key?>(null) }
-    val scrollStep = with(LocalDensity.current) { 60.dp.roundToPx() }
     Surface(modifier = modifier, shape = DetailsReadingShape,
         colors = SurfaceDefaults.colors(containerColor = detailsReadingFill(focused),
             contentColor = MaterialTheme.colorScheme.onSurface),
@@ -166,6 +164,7 @@ internal fun ScrollReadingBox(
                     scrollKey = null
                     return@onPreviewKeyEvent true
                 }
+                val scrollStep = scroll.viewportSize / 2
                 val delta = when (event.key) {
                     Key.DirectionDown -> scrollStep
                     Key.DirectionUp -> -scrollStep
