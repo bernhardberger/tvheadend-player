@@ -1,29 +1,24 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.ImeAction
-import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.AutomaticRecordingKind
 import at.bernhardberger.tvhplayer.core.AutorecPreviewState
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepAction
-import at.bernhardberger.tvhplayer.ui.components.TvOutlinedTextField
 
 @Composable
 internal fun AutomaticRecordingWords(state: AutomaticRecordingEditorState) {
     when (state.navigation.page.level) {
-        AutomaticRecordingEditorLevel.WORDS_ENTRY -> AutomaticRecordingWordsEntry(state)
+        AutomaticRecordingEditorLevel.WORDS_ENTRY -> RecordingEditorTextEntry(
+            state.navigation, state.draft.pattern.words, stringResource(R.string.autorec_editor_words), "words-input",
+            { value -> state.applyChoice { it.copy(pattern = it.pattern.copy(words = value)) } },
+        )
         AutomaticRecordingEditorLevel.SEARCH_IN -> {
-            for (fullText in listOf(false, true)) AutomaticRecordingRadio(
-                state, "search-$fullText", automaticRecordingSearchInLabel(fullText), state.draft.fullText == fullText,
+            for (fullText in listOf(false, true)) RecordingEditorRadio(
+                state.navigation, "search-$fullText",
+                automaticRecordingSearchInLabel(fullText), state.draft.fullText == fullText,
                 { state.applyChoice { it.copy(fullText = fullText) } },
             )
         }
@@ -44,34 +39,13 @@ internal fun AutomaticRecordingWords(state: AutomaticRecordingEditorState) {
             if (state.draft.kind == AutomaticRecordingKind.KEYWORD) GuidedStepAction(
                 stringResource(R.string.autorec_editor_search_in),
                 { state.navigation.open(AutomaticRecordingEditorLevel.SEARCH_IN, "search-${state.draft.fullText}") },
-                editorRowModifier(state.navigation, "search-in"), subtitle = automaticRecordingSearchInLabel(state.draft.fullText),
+                editorRowModifier(state.navigation, "search-in"),
+                subtitle = automaticRecordingSearchInLabel(state.draft.fullText),
                 trailingIcon = R.drawable.ic_keyboard_arrow_right,
             )
             AutomaticRecordingEpisodeRows(state)
         }
     }
-}
-
-@Composable
-private fun AutomaticRecordingWordsEntry(state: AutomaticRecordingEditorState) {
-    var words by remember { mutableStateOf(state.draft.pattern.words) }
-    val keyboard = LocalSoftwareKeyboardController.current
-    val commit = {
-        keyboard?.hide()
-        state.applyChoice {
-            it.copy(pattern = it.pattern.copy(words = words))
-        }
-    }
-    TvOutlinedTextField(
-        id = "words-input", editingId = "words-input".takeIf { state.navigation.textEntryEditing },
-        setEditingId = { state.navigation.textEntryEditing = it != null }, value = words, onValueChange = { words = it },
-        label = { Text(stringResource(R.string.autorec_editor_words)) },
-        modifier = editorRowModifier(state.navigation, "words-input"),
-        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done), onImeAction = commit,
-    )
-    GuidedStepAction(
-        stringResource(R.string.autorec_editor_done), commit, editorRowModifier(state.navigation, "done"),
-    )
 }
 
 @Composable

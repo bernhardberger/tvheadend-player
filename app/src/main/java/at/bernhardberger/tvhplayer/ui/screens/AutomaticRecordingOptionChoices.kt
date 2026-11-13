@@ -5,15 +5,12 @@ import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvheadend.sdk.core.BroadcastType
 import at.bernhardberger.tvheadend.sdk.core.DuplicateDetection
 import at.bernhardberger.tvheadend.sdk.core.DvrConfiguration
-import at.bernhardberger.tvheadend.sdk.core.DvrPriority
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.RecordingDraftField
 import at.bernhardberger.tvhplayer.core.offeredDuplicateDetection
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepAction
 import at.bernhardberger.tvhplayer.ui.components.StatusBadge
 import at.bernhardberger.tvhplayer.ui.components.StatusBadgeTone
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.minutes
 
 @Composable
 internal fun AutomaticRecordingOptionChoices(
@@ -23,12 +20,18 @@ internal fun AutomaticRecordingOptionChoices(
     when (state.navigation.page.level) {
         AutomaticRecordingEditorLevel.MORE -> AutomaticRecordingMore(state, configurations)
         AutomaticRecordingEditorLevel.DUPLICATE -> AutomaticRecordingDuplicates(state)
-        AutomaticRecordingEditorLevel.PRIORITY -> AutomaticRecordingPriorities(state)
+        AutomaticRecordingEditorLevel.PRIORITY -> RecordingEditorPriorities(
+            state.navigation, state.draft.priority, state.baseline.priority,
+            { value -> state.applyChoice { it.copy(priority = value) } }, state::back,
+        )
         AutomaticRecordingEditorLevel.PADDING_BEFORE, AutomaticRecordingEditorLevel.PADDING_AFTER ->
             AutomaticRecordingPadding(state)
         AutomaticRecordingEditorLevel.BROADCAST -> AutomaticRecordingBroadcast(state)
         AutomaticRecordingEditorLevel.MAXIMUM -> AutomaticRecordingMaximum(state)
-        AutomaticRecordingEditorLevel.PROFILE -> AutomaticRecordingProfiles(state, configurations)
+        AutomaticRecordingEditorLevel.PROFILE -> RecordingEditorProfiles(
+            state.navigation, configurations, state.draft.configId,
+            { value -> state.applyChoice { it.copy(configId = value) } }, state::back,
+        )
         else -> Unit
     }
 }
@@ -93,24 +96,12 @@ private fun automaticRecordingOptionRowId(state: AutomaticRecordingEditorState, 
 private fun AutomaticRecordingDuplicates(state: AutomaticRecordingEditorState) {
     val current = state.draft.duplicateDetection
     val values = listOf(DuplicateDetection.DVR_PROFILE) + offeredDuplicateDetection
-    if (current !in values) AutomaticRecordingRadio(
-        state, "choice-$current", stringResource(R.string.autorec_editor_current_setting), true, state::back,
+    if (current !in values) RecordingEditorRadio(
+        state.navigation, "choice-$current", stringResource(R.string.autorec_editor_current_setting), true, state::back,
     )
-    for (value in values) AutomaticRecordingRadio(state, "choice-$value", automaticRecordingDuplicateLabel(value),
+    for (value in values) RecordingEditorRadio(
+        state.navigation, "choice-$value", automaticRecordingDuplicateLabel(value),
         current == value, { state.applyChoice { it.copy(duplicateDetection = value) } })
-}
-
-@Composable
-private fun AutomaticRecordingPriorities(state: AutomaticRecordingEditorState) {
-    val current = state.draft.priority
-    val default = state.baseline.priority.takeIf { it == DvrPriority.DEFAULT }
-    val values = listOf(default, DvrPriority.IMPORTANT, DvrPriority.HIGH, DvrPriority.NORMAL,
-        DvrPriority.LOW, DvrPriority.UNIMPORTANT)
-    if (current !in values) AutomaticRecordingRadio(
-        state, "choice-$current", automaticRecordingPriorityLabel(current), true, state::back,
-    )
-    for (value in values) AutomaticRecordingRadio(state, "choice-$value", automaticRecordingPriorityLabel(value),
-        current == value, { state.applyChoice { it.copy(priority = value) } })
 }
 
 @Composable
@@ -118,12 +109,12 @@ private fun AutomaticRecordingPadding(state: AutomaticRecordingEditorState) {
     val before = state.navigation.page.level == AutomaticRecordingEditorLevel.PADDING_BEFORE
     val current = if (before) state.draft.paddingBefore else state.draft.paddingAfter
     val baseline = if (before) state.baseline.paddingBefore else state.baseline.paddingAfter
-    val values = listOf(baseline.takeIf { it == Duration.ZERO }) + listOf(1, 2, 5, 10, 15, 30, 60).map { it.minutes }
-    if (current !in values) AutomaticRecordingRadio(state, "choice-$current",
-        stringResource(R.string.autorec_editor_current, automaticRecordingPaddingLabel(current)), true, state::back)
-    for (value in values) AutomaticRecordingRadio(
-        state, "choice-$value", automaticRecordingPaddingLabel(value), current == value,
-        { state.applyChoice { if (before) it.copy(paddingBefore = value) else it.copy(paddingAfter = value) } },
+    RecordingEditorPadding(
+        state.navigation, current, baseline,
+        { value ->
+            state.applyChoice { if (before) it.copy(paddingBefore = value) else it.copy(paddingAfter = value) }
+        },
+        state::back,
     )
 }
 
@@ -131,11 +122,12 @@ private fun AutomaticRecordingPadding(state: AutomaticRecordingEditorState) {
 private fun AutomaticRecordingBroadcast(state: AutomaticRecordingEditorState) {
     val current = state.draft.broadcastType
     val values = listOf(BroadcastType.ALL, BroadcastType.NEW, BroadcastType.REPEAT)
-    if (current !in values) AutomaticRecordingRadio(
-        state, "choice-$current", stringResource(R.string.autorec_editor_current,
+    if (current !in values) RecordingEditorRadio(
+        state.navigation, "choice-$current", stringResource(R.string.autorec_editor_current,
             automaticRecordingBroadcastLabel(current)), true, state::back,
     )
-    for (value in values) AutomaticRecordingRadio(state, "choice-$value", automaticRecordingBroadcastLabel(value),
+    for (value in values) RecordingEditorRadio(
+        state.navigation, "choice-$value", automaticRecordingBroadcastLabel(value),
         current == value, { state.applyChoice { it.copy(broadcastType = value) } })
 }
 
@@ -143,27 +135,11 @@ private fun AutomaticRecordingBroadcast(state: AutomaticRecordingEditorState) {
 private fun AutomaticRecordingMaximum(state: AutomaticRecordingEditorState) {
     val current = state.draft.maximumRecordings
     val values = listOf(0L, 1L, 2L, 3L, 5L, 10L)
-    if (current !in values) AutomaticRecordingRadio(state, "choice-$current",
+    if (current !in values) RecordingEditorRadio(state.navigation, "choice-$current",
         stringResource(R.string.autorec_editor_current, current.toString()), true, state::back)
-    for (value in values) AutomaticRecordingRadio(state, "choice-$value", automaticRecordingMaximumLabel(value),
+    for (value in values) RecordingEditorRadio(
+        state.navigation, "choice-$value", automaticRecordingMaximumLabel(value),
         current == value, { state.applyChoice { it.copy(maximumRecordings = value) } })
-}
-
-@Composable
-private fun AutomaticRecordingProfiles(
-    state: AutomaticRecordingEditorState,
-    configurations: List<DvrConfiguration>,
-) {
-    val current = state.draft.configId
-    if (current == null || configurations.none { it.id == current }) AutomaticRecordingRadio(
-        state, "choice-${current?.value}", stringResource(if (current == null)
-            R.string.profile_server_default else R.string.autorec_editor_current_setting),
-        true, state::back,
-    )
-    for (configuration in configurations) AutomaticRecordingRadio(
-        state, "choice-${configuration.id.value}", configuration.name, current == configuration.id,
-        { state.applyChoice { it.copy(configId = configuration.id) } },
-    )
 }
 
 @Composable

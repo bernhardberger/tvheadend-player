@@ -43,22 +43,22 @@ internal fun AutomaticRecordingEditor(
         state.navigation, state::back, modifier,
         guidance = { AutomaticRecordingGuidance(state, channels, events) },
     ) {
-                    when (state.navigation.page.level) {
-                        AutomaticRecordingEditorLevel.FIRST -> AutomaticRecordingFirstLevel(state, channels)
-                        AutomaticRecordingEditorLevel.UPCOMING -> AutomaticRecordingEpisodes(state)
-                        AutomaticRecordingEditorLevel.WORDS, AutomaticRecordingEditorLevel.WORDS_ENTRY,
-                        AutomaticRecordingEditorLevel.SEARCH_IN -> AutomaticRecordingWords(state)
-                        AutomaticRecordingEditorLevel.CHANNEL_TIME,
-                        AutomaticRecordingEditorLevel.CHANNEL,
-                        AutomaticRecordingEditorLevel.DAYS,
-                        AutomaticRecordingEditorLevel.START_WINDOW,
-                        AutomaticRecordingEditorLevel.AFTER_HOUR,
-                        AutomaticRecordingEditorLevel.AFTER_MINUTE,
-                        AutomaticRecordingEditorLevel.BEFORE_HOUR,
-                        AutomaticRecordingEditorLevel.BEFORE_MINUTE,
-                        AutomaticRecordingEditorLevel.KEEP -> AutomaticRecordingTimeChoices(state, channels)
-                        else -> AutomaticRecordingOptionChoices(state, configurations)
-                    }
+        when (state.navigation.page.level) {
+            AutomaticRecordingEditorLevel.FIRST -> AutomaticRecordingFirstLevel(state, channels)
+            AutomaticRecordingEditorLevel.UPCOMING -> AutomaticRecordingEpisodes(state)
+            AutomaticRecordingEditorLevel.WORDS, AutomaticRecordingEditorLevel.WORDS_ENTRY,
+            AutomaticRecordingEditorLevel.SEARCH_IN -> AutomaticRecordingWords(state)
+            AutomaticRecordingEditorLevel.CHANNEL_TIME,
+            AutomaticRecordingEditorLevel.CHANNEL,
+            AutomaticRecordingEditorLevel.DAYS,
+            AutomaticRecordingEditorLevel.START_WINDOW,
+            AutomaticRecordingEditorLevel.AFTER_HOUR,
+            AutomaticRecordingEditorLevel.AFTER_MINUTE,
+            AutomaticRecordingEditorLevel.BEFORE_HOUR,
+            AutomaticRecordingEditorLevel.BEFORE_MINUTE,
+            AutomaticRecordingEditorLevel.KEEP -> AutomaticRecordingTimeChoices(state, channels)
+            else -> AutomaticRecordingOptionChoices(state, configurations)
+        }
     }
     if (state.navigation.leaveConfirmation) RecordingEditorLeaveDialog(
         state.navigation, automaticRecordingMainLabel(state), state.mainProblem == null,
@@ -93,7 +93,8 @@ private fun AutomaticRecordingFirstLevel(state: AutomaticRecordingEditorState, c
         title = stringResource(R.string.autorec_editor_channel_time),
         subtitle = automaticRecordingChannelTimeLabel(state.draft, channels),
         onClick = { state.navigation.open(AutomaticRecordingEditorLevel.CHANNEL_TIME, "channel") },
-        modifier = editorRowModifier(state.navigation, "channel-time"), trailingIcon = R.drawable.ic_keyboard_arrow_right,
+        modifier = editorRowModifier(state.navigation, "channel-time"),
+        trailingIcon = R.drawable.ic_keyboard_arrow_right,
         trailingContent = { AutomaticRecordingChanged(state, setOf(
             RecordingDraftField.CHANNEL, RecordingDraftField.DAYS, RecordingDraftField.START_WINDOW,
         )) },

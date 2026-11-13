@@ -44,8 +44,12 @@ internal fun RecordingEditorSurface(
 ) {
     BackHandler(enabled = navigation.confirmation == null, onBack = onBack)
     key(navigation.page.level) {
-        Box(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
-            .recordingEditorKeys(navigation, onBack)) {
+        Box(
+            modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .recordingEditorKeys(navigation, onBack),
+        ) {
             CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
                 GuidedStepLayout(guidance = guidance, actions = actions)
             }

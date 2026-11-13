@@ -21,7 +21,7 @@ internal data class AutomaticRecordingEditorPage(
 internal class RecordingEditorNavigation(
     initialRow: String,
     val tagPrefix: String,
-    private val canNavigate: () -> Boolean,
+    val canNavigate: () -> Boolean,
     private val deletionAllowed: Boolean,
 ) {
     var pages by mutableStateOf(listOf(AutomaticRecordingEditorPage(AutomaticRecordingEditorLevel.FIRST, initialRow)))
@@ -55,20 +55,27 @@ internal class RecordingEditorNavigation(
     /** True only when Back should close an unchanged first level. */
     fun back(changed: Boolean): Boolean {
         if (!canNavigate()) return false
-        when {
+        return when {
             confirmation != null -> {
                 pendingConfirmation = null
                 focusRevision++
+                false
             }
-            textEntryEditing -> textEntryEditing = false
+            textEntryEditing -> {
+                textEntryEditing = false
+                false
+            }
             pages.size > 1 -> {
                 pages = pages.dropLast(1)
                 focusRevision++
+                false
             }
-            changed -> pendingConfirmation = AutomaticRecordingEditorConfirmation.LEAVE
-            else -> return true
+            changed -> {
+                pendingConfirmation = AutomaticRecordingEditorConfirmation.LEAVE
+                false
+            }
+            else -> true
         }
-        return false
     }
 
     fun returnTo(level: AutomaticRecordingEditorLevel) {

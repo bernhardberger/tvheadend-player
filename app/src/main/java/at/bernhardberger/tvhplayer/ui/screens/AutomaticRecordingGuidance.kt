@@ -50,7 +50,7 @@ internal fun AutomaticRecordingGuidance(
     )
     Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (state.deleting) {
-            AutomaticRecordingHeading(stringResource(R.string.autorec_editor_deleting))
+            RecordingEditorHeading(stringResource(R.string.autorec_editor_deleting))
             return@Column
         }
         if (row != null) {
@@ -58,8 +58,8 @@ internal fun AutomaticRecordingGuidance(
         } else {
             AutomaticRecordingFocusedChoice(state)
             if (state.editing && !state.draft.enabled) {
-                AutomaticRecordingHeading(stringResource(R.string.autorec_editor_off_after_save))
-                AutomaticRecordingSecondary(stringResource(R.string.autorec_editor_off_help))
+                RecordingEditorHeading(stringResource(R.string.autorec_editor_off_after_save))
+                RecordingEditorSecondary(stringResource(R.string.autorec_editor_off_help))
             }
             AutomaticRecordingPassivePreview(state)
         }
@@ -97,26 +97,26 @@ private fun AutomaticRecordingFocusedEpisode(
     if (event?.image != null) ProgrammeArtwork(
         programmeArtwork(event), channel?.icon, null, Modifier.fillMaxWidth().aspectRatio(16f / 9),
     )
-    AutomaticRecordingSecondary(
+    RecordingEditorSecondary(
         listOfNotNull(automaticRecordingEpisodeMeta(row, state), channel?.name).joinToString(" · "),
     )
-    event?.description?.takeIf(String::isNotBlank)?.let { AutomaticRecordingSecondary(it) }
+    event?.description?.takeIf(String::isNotBlank)?.let { RecordingEditorSecondary(it) }
 }
 
 @Composable
 private fun AutomaticRecordingFocusedChoice(state: AutomaticRecordingEditorState) {
     when (state.navigation.page.level) {
         AutomaticRecordingEditorLevel.FIRST -> AutomaticRecordingMainGuidance(state)
-        AutomaticRecordingEditorLevel.MORE -> AutomaticRecordingSecondary(automaticRecordingMoreSummary(state))
+        AutomaticRecordingEditorLevel.MORE -> RecordingEditorSecondary(automaticRecordingMoreSummary(state))
         AutomaticRecordingEditorLevel.DUPLICATE -> {
             val focused = (listOf(DuplicateDetection.DVR_PROFILE) + offeredDuplicateDetection)
                 .firstOrNull { "choice-$it" == state.navigation.focusedRow } ?: state.draft.duplicateDetection
-            AutomaticRecordingSecondary(automaticRecordingDuplicateHelp(focused))
+            RecordingEditorSecondary(automaticRecordingDuplicateHelp(focused))
         }
         AutomaticRecordingEditorLevel.KEEP -> AutomaticRecordingKeepGuidance(state)
         AutomaticRecordingEditorLevel.MAXIMUM -> state.navigation.focusedRow.removePrefix("choice-").toLongOrNull()
             ?.takeIf { it > 0 }?.let {
-                AutomaticRecordingSecondary(stringResource(R.string.autorec_editor_maximum_help, it))
+                RecordingEditorSecondary(stringResource(R.string.autorec_editor_maximum_help, it))
             }
         else -> Unit
     }
@@ -124,14 +124,14 @@ private fun AutomaticRecordingFocusedChoice(state: AutomaticRecordingEditorState
 
 @Composable
 private fun AutomaticRecordingMainGuidance(state: AutomaticRecordingEditorState) {
-    if (state.navigation.focusedRow == "more") AutomaticRecordingSecondary(automaticRecordingMoreSummary(state))
+    if (state.navigation.focusedRow == "more") RecordingEditorSecondary(automaticRecordingMoreSummary(state))
     if (state.navigation.focusedRow == "main") {
         val reason = when (state.mainProblem) {
             RecordingSubmitUnavailable.UNCHANGED -> stringResource(R.string.autorec_editor_unchanged)
             RecordingSubmitUnavailable.WORDS_REQUIRED -> stringResource(R.string.autorec_editor_enter_words)
             else -> null
         }
-        reason?.let { AutomaticRecordingSecondary(it) }
+        reason?.let { RecordingEditorSecondary(it) }
     }
 }
 
@@ -140,7 +140,7 @@ private fun AutomaticRecordingKeepGuidance(state: AutomaticRecordingEditorState)
     val focused = listOf(null, DvrRemoval.Days(7), DvrRemoval.Days(30), DvrRemoval.Days(90),
         DvrRemoval.Days(180), DvrRemoval.Days(365), DvrRemoval.UntilSpaceNeeded, DvrRemoval.Forever)
         .firstOrNull { "keep-$it" == state.navigation.focusedRow }
-    AutomaticRecordingSecondary(automaticRecordingKeepLabel(focused ?: state.draft.removal.takeIf {
+    RecordingEditorSecondary(automaticRecordingKeepLabel(focused ?: state.draft.removal.takeIf {
         "keep-$it" == state.navigation.focusedRow
     }))
 }
@@ -148,14 +148,14 @@ private fun AutomaticRecordingKeepGuidance(state: AutomaticRecordingEditorState)
 @Composable
 private fun AutomaticRecordingPassivePreview(state: AutomaticRecordingEditorState) {
     when (val preview = state.preview) {
-        AutorecPreviewState.Loading -> AutomaticRecordingHeading(stringResource(R.string.autorec_editor_searching))
+        AutorecPreviewState.Loading -> RecordingEditorHeading(stringResource(R.string.autorec_editor_searching))
         is AutorecPreviewState.Failed ->
-            AutomaticRecordingHeading(stringResource(R.string.autorec_editor_search_failed))
+            RecordingEditorHeading(stringResource(R.string.autorec_editor_search_failed))
         AutorecPreviewState.NothingToSearch ->
-            AutomaticRecordingHeading(stringResource(R.string.autorec_editor_empty_words))
+            RecordingEditorHeading(stringResource(R.string.autorec_editor_empty_words))
         is AutorecPreviewState.Matches -> {
-            if (preview.rows.isEmpty()) AutomaticRecordingHeading(stringResource(R.string.autorec_editor_no_matches))
-            else if (!state.editing || state.draft.enabled) AutomaticRecordingHeading(pluralStringResource(
+            if (preview.rows.isEmpty()) RecordingEditorHeading(stringResource(R.string.autorec_editor_no_matches))
+            else if (!state.editing || state.draft.enabled) RecordingEditorHeading(pluralStringResource(
                 if (state.draft.kind == AutomaticRecordingKind.SERIES) R.plurals.autorec_editor_upcoming_episodes
                     else R.plurals.autorec_editor_upcoming_programs,
                 preview.willRecordCount, preview.willRecordCount,
@@ -165,35 +165,24 @@ private fun AutomaticRecordingPassivePreview(state: AutomaticRecordingEditorStat
                     Text(automaticRecordingPreviewTitle(state.draft.kind, row),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface)
-                    AutomaticRecordingSecondary(automaticRecordingEpisodeMeta(row, state))
+                    RecordingEditorSecondary(automaticRecordingEpisodeMeta(row, state))
                 }
             }
-            if (preview.rows.size > 3) AutomaticRecordingSecondary(stringResource(
+            if (preview.rows.size > 3) RecordingEditorSecondary(stringResource(
                 R.string.autorec_editor_more_preview, preview.rows.size - 3,
                 stringResource(if (state.draft.kind == AutomaticRecordingKind.SERIES)
                     R.string.autorec_editor_upcoming else R.string.autorec_editor_words),
             ))
-            if (preview.broadcastFilterUnavailable) AutomaticRecordingSecondary(
+            if (preview.broadcastFilterUnavailable) RecordingEditorSecondary(
                 stringResource(R.string.autorec_editor_broadcast_unavailable),
             )
         }
     }
-    AutomaticRecordingSecondary(stringResource(R.string.autorec_editor_guide_horizon))
+    RecordingEditorSecondary(stringResource(R.string.autorec_editor_guide_horizon))
 }
 
 internal fun automaticRecordingPreviewTitle(kind: AutomaticRecordingKind, row: AutorecPreviewRow): String =
     (if (kind == AutomaticRecordingKind.SERIES) row.subtitle ?: row.title else row.title ?: row.subtitle).orEmpty()
-
-@Composable
-private fun AutomaticRecordingHeading(text: String) {
-    Text(text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
-}
-
-@Composable
-private fun AutomaticRecordingSecondary(text: String) {
-    Text(text, style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = TvTextSecondaryAlpha))
-}
 
 @Composable
 internal fun automaticRecordingEpisodeMeta(row: AutorecPreviewRow, state: AutomaticRecordingEditorState): String {

@@ -1,18 +1,11 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
-import androidx.compose.foundation.focusGroup
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.focusProperties
 import at.bernhardberger.tvheadend.sdk.core.AutorecRule
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.DvrConfigurationsState
@@ -27,8 +20,6 @@ import at.bernhardberger.tvhplayer.core.toCreateRequest
 import at.bernhardberger.tvhplayer.core.toDraft
 import at.bernhardberger.tvhplayer.core.toUpdateRequest
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
-import at.bernhardberger.tvhplayer.ui.components.LocalBrowseContentLayering
-import at.bernhardberger.tvhplayer.ui.components.browseDetailsViewport
 import java.time.ZoneId
 import kotlin.time.Instant
 import kotlinx.coroutines.flow.StateFlow
@@ -85,15 +76,7 @@ internal fun AutomaticRecordingEditorHost(
             },
         )
     }
-    val layering = LocalBrowseContentLayering.current
-    val pageKey = remember { Any() }
-    val opacity = remember { mutableFloatStateOf(1f) }
-    DisposableEffect(layering, state) {
-        layering?.details?.set(pageKey, opacity)
-        onDispose { layering?.details?.remove(pageKey) }
-    }
-    Box(Modifier.browseDetailsViewport().fillMaxSize()
-        .focusProperties { onExit = { cancelFocusChange() } }.focusGroup()) {
+    RecordingEditorOverlay(state) {
         AutomaticRecordingEditor(state, observation.channelCatalogForDisplay?.channels.orEmpty(),
             configurations, observation.epgSnapshotForDisplay?.events.orEmpty(),
             scheduledEpisodeCount = observation.dvrSnapshotForDisplay?.entries.orEmpty().count {
