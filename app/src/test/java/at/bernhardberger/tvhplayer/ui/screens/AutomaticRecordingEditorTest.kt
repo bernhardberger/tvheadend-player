@@ -13,14 +13,17 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.DvrPriority
 import at.bernhardberger.tvheadend.sdk.core.RecordingRuleChannel
 import androidx.compose.ui.test.onNodeWithTag
 import at.bernhardberger.tvhplayer.testutil.pressKey
 import at.bernhardberger.tvhplayer.core.AutomaticRecordingKind
+import at.bernhardberger.tvhplayer.core.RecordingStartWindow
 import at.bernhardberger.tvhplayer.core.newAutorecDraft
 import at.bernhardberger.tvhplayer.core.readRecordingPattern
 import at.bernhardberger.tvhplayer.core.toUpdateRequest
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -29,6 +32,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.time.DayOfWeek
+import java.time.LocalTime
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
@@ -89,7 +94,7 @@ class AutomaticRecordingEditorTest {
         compose.setContent {
             val scope = rememberCoroutineScope()
             fixture = remember { AutomaticRecordingEditorFixture(scope) }
-            state = remember { fixture.state() }
+            state = remember { fixture.state(automaticRecordingSeries.copy(days = setOf(DayOfWeek.SATURDAY))) }
             TVHeadendPlayerTheme { AutomaticRecordingEditor(state, channels = automaticRecordingChannels) }
         }
         compose.onNodeWithTag("automatic-recording-main").assertIsFocused()
@@ -97,7 +102,7 @@ class AutomaticRecordingEditorTest {
         compose.pressKey(Key.DirectionCenter)
         compose.onNodeWithTag("automatic-recording-done").assertIsFocused()
         compose.runOnIdle {
-            assertEquals(AutomaticRecordingEditorLevel.UPCOMING, state.page.level)
+            assertEquals(AutomaticRecordingEditorLevel.UPCOMING, state.navigation.page.level)
             assertTrue(fixture.submissions.isEmpty())
         }
         compose.pressKey(Key.DirectionDown)
@@ -123,16 +128,33 @@ class AutomaticRecordingEditorTest {
         compose.pressKey(Key.DirectionDown)
         compose.pressKey(Key.DirectionCenter)
         compose.pressKey(Key.DirectionDown)
-        compose.onNodeWithTag("automatic-recording-any-day").assertIsOn()
+        compose.onNodeWithTag("automatic-recording-any-day").assertIsOff()
+        compose.pressKey(Key.DirectionCenter)
+        compose.runOnIdle {
+            assertEquals(DayOfWeek.entries.toSet(), state.draft.days)
+            assertEquals(DayOfWeek.entries.toSet(), state.draft.toUpdateRequest(state.baseline)?.daysOfWeekMask)
+        }
         compose.pressKey(Key.DirectionDown)
         compose.pressKey(Key.DirectionCenter)
         compose.onNodeWithTag("automatic-recording-any-day").assertIsOff()
+        compose.pressKey(Key.DirectionCenter)
+        compose.runOnIdle { assertEquals(DayOfWeek.entries.toSet(), state.draft.days) }
         compose.pressKey(Key.DirectionUp)
         compose.pressKey(Key.DirectionCenter)
         compose.onNodeWithTag("automatic-recording-any-day").assertIsOn()
         compose.pressKey(Key.DirectionLeft)
+        compose.runOnIdle { state.updateDraft { it.copy(days = emptySet()) } }
+        compose.onNodeWithTag("automatic-recording-days").assertTextContains("No day")
+        compose.pressKey(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionDown)
+        compose.onNodeWithTag("automatic-recording-any-day").assertIsOff()
+        compose.onNodeWithTag("automatic-recording-day-1").assertIsOff()
+        compose.pressKey(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionLeft)
         compose.pressKey(Key.DirectionLeft)
         compose.onNodeWithTag("automatic-recording-channel-time").assertIsFocused()
+        verifyResetRestoresFirstMoreRow(state)
+        verifyMinuteChoiceReturnsToWindow(state)
         compose.pressKey(Key.Back)
         compose.pressKey(Key.DirectionRight)
         compose.pressKey(Key.DirectionRight)
@@ -142,5 +164,53 @@ class AutomaticRecordingEditorTest {
             assertEquals(1, fixture.closes)
             assertTrue(fixture.submissions.isEmpty())
         }
+    }
+
+    private fun verifyResetRestoresFirstMoreRow(state: AutomaticRecordingEditorState) {
+        compose.runOnIdle { state.updateDraft { it.copy(priority = DvrPriority.HIGH) } }
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionCenter)
+        repeat(6) { compose.pressKey(Key.DirectionDown) }
+        compose.onNodeWithTag("automatic-recording-reset-options").assertIsFocused()
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("automatic-recording-duplicate").assertIsFocused()
+        compose.runOnIdle { assertEquals(state.baseline.priority, state.draft.priority) }
+        compose.pressKey(Key.DirectionLeft)
+        compose.pressKey(Key.DirectionUp)
+        compose.pressKey(Key.DirectionUp)
+        compose.onNodeWithTag("automatic-recording-channel-time").assertIsFocused()
+    }
+
+    private fun verifyMinuteChoiceReturnsToWindow(state: AutomaticRecordingEditorState) {
+        compose.pressKey(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionCenter)
+        for (after in listOf(true, false)) {
+            val original = compose.runOnIdle { state.draft.startWindow }
+            compose.pressKey(Key.DirectionDown)
+            compose.pressKey(Key.DirectionCenter)
+            compose.pressKey(Key.DirectionDown)
+            val hour = if (after) 1 else 2
+            compose.onNodeWithTag("automatic-recording-hour-$hour").assertIsFocused()
+            compose.pressKey(Key.DirectionCenter)
+            compose.pressKey(Key.Back)
+            compose.onNodeWithTag("automatic-recording-hour-$hour").assertIsFocused()
+            compose.runOnIdle { assertEquals(original, state.draft.startWindow) }
+            compose.pressKey(Key.DirectionCenter)
+            compose.pressKey(Key.DirectionDown)
+            compose.pressKey(Key.DirectionCenter)
+            val time = LocalTime.of(hour, if (after) 5 else 10)
+            compose.onNodeWithTag("automatic-recording-${if (after) "after" else "before"}")
+                .assertIsFocused().assertTextContains(formatClock(time))
+            compose.runOnIdle {
+                assertEquals(if (after) RecordingStartWindow.After(time) else RecordingStartWindow.Before(time),
+                    state.draft.startWindow)
+            }
+        }
+        compose.pressKey(Key.DirectionLeft)
+        compose.pressKey(Key.DirectionLeft)
+        compose.onNodeWithTag("automatic-recording-channel-time").assertIsFocused()
     }
 }

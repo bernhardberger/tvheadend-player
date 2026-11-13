@@ -41,6 +41,7 @@ import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 import at.bernhardberger.tvhplayer.ui.common.AppClock
 import at.bernhardberger.tvhplayer.settings.ClockFormat
 import java.io.File
+import java.time.DayOfWeek
 import java.util.TimeZone
 import kotlinx.coroutines.Dispatchers
 import org.junit.Rule
@@ -109,7 +110,7 @@ class AutomaticRecordingEditorCaptureTest {
     @Test fun seriesEditorReferenceFrames() {
         show()
         capture("04-new-series-first-level")
-        compose.runOnIdle { requireNotNull(shown).focusedRow = "keep" }
+        compose.runOnIdle { requireNotNull(shown).navigation.focusedRow = "keep" }
         capture("05a-focus-keep-until")
         open(AutomaticRecordingEditorLevel.KEEP, "keep-null")
         capture("05b-keep-until-level")
@@ -118,6 +119,10 @@ class AutomaticRecordingEditorCaptureTest {
         capture("06a-channel-and-time-level")
         open(AutomaticRecordingEditorLevel.DAYS, "any-day")
         capture("06b-days-level")
+        show(initial.copy(days = setOf(DayOfWeek.SATURDAY)))
+        open(AutomaticRecordingEditorLevel.CHANNEL_TIME, "channel")
+        open(AutomaticRecordingEditorLevel.DAYS, "any-day")
+        capture("06b-days-restricted")
         compose.runOnIdle { requireNotNull(shown).back() }
         open(AutomaticRecordingEditorLevel.START_WINDOW, "any-time")
         capture("06c-start-window-level")
@@ -142,7 +147,7 @@ class AutomaticRecordingEditorCaptureTest {
         capture("11a-edit-series-unchanged")
         compose.runOnIdle {
             requireNotNull(shown).updateDraft { it.copy(enabled = false) }
-            requireNotNull(shown).focusedRow = "enabled"
+            requireNotNull(shown).navigation.focusedRow = "enabled"
         }
         capture("11b-edit-series-off-in-draft")
         compose.runOnIdle { requireNotNull(shown).back() }
@@ -166,7 +171,7 @@ class AutomaticRecordingEditorCaptureTest {
         open(AutomaticRecordingEditorLevel.MORE, "delete")
         compose.runOnIdle {
             requireNotNull(shown).updateDraft { it.copy(removal = DvrRemoval.Forever) }
-            requireNotNull(shown).confirmation = AutomaticRecordingEditorConfirmation.DELETE
+            requireNotNull(shown).navigation.confirmation = AutomaticRecordingEditorConfirmation.DELETE
         }
         capture("11d-delete-confirm", "slice-3-job-b")
     }
@@ -191,14 +196,14 @@ class AutomaticRecordingEditorCaptureTest {
     }
 
     private fun open(level: AutomaticRecordingEditorLevel, row: String) = compose.runOnIdle {
-        requireNotNull(shown).open(level, row)
+        requireNotNull(shown).navigation.open(level, row)
     }
 
     private fun capture(name: String, directory: String = "slice-3-job-a") {
-        val focus = when (shown?.confirmation) {
+        val focus = when (shown?.navigation?.confirmation) {
             AutomaticRecordingEditorConfirmation.LEAVE -> "keep-editing"
             AutomaticRecordingEditorConfirmation.DELETE -> "keep"
-            null -> requireNotNull(shown).focusedRow
+            null -> requireNotNull(shown).navigation.focusedRow
         }
         compose.onNodeWithTag("automatic-recording-$focus").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
         compose.settleFrames(1, PlayerMotion.PanelMs.toLong())

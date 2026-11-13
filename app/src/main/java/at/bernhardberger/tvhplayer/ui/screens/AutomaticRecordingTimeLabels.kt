@@ -23,8 +23,13 @@ internal fun automaticRecordingChannelLabel(draft: AutorecDraft, channels: List<
 
 @Composable
 internal fun automaticRecordingDaysLabel(days: Set<DayOfWeek>): String =
-    if (days.isEmpty() || days.size == DayOfWeek.entries.size) stringResource(R.string.autorec_editor_any_day)
-    else days.sortedBy { it.value }.joinToString(", ") { it.getDisplayName(TextStyle.SHORT, Locale.getDefault()) }
+    when {
+        days.isEmpty() -> stringResource(R.string.autorec_editor_no_day)
+        days.size == DayOfWeek.entries.size -> stringResource(R.string.autorec_editor_any_day)
+        else -> days.sortedBy { it.value }.joinToString(", ") {
+            it.getDisplayName(TextStyle.SHORT, Locale.getDefault())
+        }
+    }
 
 @Composable
 internal fun automaticRecordingWindowLabel(window: RecordingStartWindow): String = when (window) {

@@ -20,7 +20,7 @@ internal fun AutomaticRecordingOptionChoices(
     state: AutomaticRecordingEditorState,
     configurations: List<DvrConfiguration>,
 ) {
-    when (state.page.level) {
+    when (state.navigation.page.level) {
         AutomaticRecordingEditorLevel.MORE -> AutomaticRecordingMore(state, configurations)
         AutomaticRecordingEditorLevel.DUPLICATE -> AutomaticRecordingDuplicates(state)
         AutomaticRecordingEditorLevel.PRIORITY -> AutomaticRecordingPriorities(state)
@@ -41,8 +41,8 @@ private fun AutomaticRecordingMore(state: AutomaticRecordingEditorState, configu
         GuidedStepAction(
             title = automaticRecordingFieldLabel(field),
             subtitle = automaticRecordingOptionValue(state, field, configurations),
-            modifier = editorRowModifier(state, level.name.lowercase()),
-            onClick = { state.open(level, automaticRecordingOptionRowId(state, field)) },
+            modifier = editorRowModifier(state.navigation, level.name.lowercase()),
+            onClick = { state.navigation.open(level, automaticRecordingOptionRowId(state, field)) },
             trailingIcon = R.drawable.ic_keyboard_arrow_right,
             trailingContent = { AutomaticRecordingChanged(state, setOf(field)) },
         )
@@ -51,13 +51,15 @@ private fun AutomaticRecordingMore(state: AutomaticRecordingEditorState, configu
     if (changed.isNotEmpty()) GuidedStepAction(
         title = stringResource(R.string.autorec_editor_reset_options, changed.size),
         subtitle = changed.map { automaticRecordingFieldLabel(it) }.joinToString(", "),
-        modifier = editorRowModifier(state, "reset-options"),
-        onClick = { state.updateDraft { resetAutomaticRecordingMoreOptions(it, state.baseline) } },
+        modifier = editorRowModifier(state.navigation, "reset-options"),
+        onClick = {
+            state.updateDraft(restoreFocusTo = "duplicate") { resetAutomaticRecordingMoreOptions(it, state.baseline) }
+        },
     )
     if (state.editing) GuidedStepAction(
         stringResource(R.string.autorec_editor_delete),
-        { state.confirmation = AutomaticRecordingEditorConfirmation.DELETE },
-        editorRowModifier(state, "delete"),
+        { state.navigation.confirmation = AutomaticRecordingEditorConfirmation.DELETE },
+        editorRowModifier(state.navigation, "delete"),
     )
 }
 
@@ -113,7 +115,7 @@ private fun AutomaticRecordingPriorities(state: AutomaticRecordingEditorState) {
 
 @Composable
 private fun AutomaticRecordingPadding(state: AutomaticRecordingEditorState) {
-    val before = state.page.level == AutomaticRecordingEditorLevel.PADDING_BEFORE
+    val before = state.navigation.page.level == AutomaticRecordingEditorLevel.PADDING_BEFORE
     val current = if (before) state.draft.paddingBefore else state.draft.paddingAfter
     val baseline = if (before) state.baseline.paddingBefore else state.baseline.paddingAfter
     val values = listOf(baseline.takeIf { it == Duration.ZERO }) + listOf(1, 2, 5, 10, 15, 30, 60).map { it.minutes }

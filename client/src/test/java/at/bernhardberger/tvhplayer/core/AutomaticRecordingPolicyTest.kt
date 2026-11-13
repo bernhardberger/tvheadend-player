@@ -60,6 +60,7 @@ class AutomaticRecordingPolicyTest {
             value.previewMatches(listOf(candidate), emptyList(), null, now, zone).rows
         assertEquals(listOf(event.id), matches(draft).map { it.eventId })
         assertTrue(matches(draft.copy(days = setOf(DayOfWeek.THURSDAY))).isEmpty())
+        assertTrue(matches(draft.copy(days = emptySet())).isEmpty())
         assertTrue(matches(draft.copy(startWindow = RecordingStartWindow.Before(LocalTime.MIDNIGHT))).isEmpty())
         assertTrue(matches(draft.copy(channel = RecordingRuleChannel.SpecificChannel(ChannelId(4)))).isEmpty())
         assertTrue(matches(draft.copy(kind = AutomaticRecordingKind.SERIES, seriesLinkUri = "other")).isEmpty())
@@ -226,6 +227,9 @@ class AutomaticRecordingPolicyTest {
             AutorecRuleUpdate(enabled = false),
             baseline.copy(enabled = false).toUpdateRequest(baseline),
         )
+        val noDay = AutorecRule.create(AutorecRuleId("no-day"), title = "news", daysOfWeekMask = emptySet()).toDraft()
+        assertTrue(noDay.days.isEmpty())
+        assertNull(noDay.toUpdateRequest(noDay))
     }
 
     @Test fun `start windows use inclusive server day edges and preserve other shapes`() {

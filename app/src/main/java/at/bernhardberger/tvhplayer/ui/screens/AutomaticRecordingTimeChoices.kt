@@ -31,7 +31,7 @@ import java.util.Locale
 
 @Composable
 internal fun AutomaticRecordingTimeChoices(state: AutomaticRecordingEditorState, channels: List<Channel>) {
-    when (state.page.level) {
+    when (state.navigation.page.level) {
         AutomaticRecordingEditorLevel.CHANNEL_TIME -> AutomaticRecordingChannelTime(state, channels)
         AutomaticRecordingEditorLevel.CHANNEL -> AutomaticRecordingChannels(state, channels)
         AutomaticRecordingEditorLevel.DAYS -> AutomaticRecordingDays(state)
@@ -49,19 +49,19 @@ internal fun AutomaticRecordingTimeChoices(state: AutomaticRecordingEditorState,
 private fun AutomaticRecordingChannelTime(state: AutomaticRecordingEditorState, channels: List<Channel>) {
     GuidedStepAction(
         stringResource(R.string.autorec_editor_channel),
-        { state.open(AutomaticRecordingEditorLevel.CHANNEL, channelRowId(state.draft.channel)) },
-        editorRowModifier(state, "channel"), subtitle = automaticRecordingChannelLabel(state.draft, channels),
+        { state.navigation.open(AutomaticRecordingEditorLevel.CHANNEL, channelRowId(state.draft.channel)) },
+        editorRowModifier(state.navigation, "channel"), subtitle = automaticRecordingChannelLabel(state.draft, channels),
         trailingIcon = R.drawable.ic_keyboard_arrow_right,
     )
     GuidedStepAction(
-        stringResource(R.string.autorec_editor_days), { state.open(AutomaticRecordingEditorLevel.DAYS, "done") },
-        editorRowModifier(state, "days"), subtitle = automaticRecordingDaysLabel(state.draft.days),
+        stringResource(R.string.autorec_editor_days), { state.navigation.open(AutomaticRecordingEditorLevel.DAYS, "done") },
+        editorRowModifier(state.navigation, "days"), subtitle = automaticRecordingDaysLabel(state.draft.days),
         trailingIcon = R.drawable.ic_keyboard_arrow_right,
     )
     GuidedStepAction(
         stringResource(R.string.autorec_editor_start_window),
-        { state.open(AutomaticRecordingEditorLevel.START_WINDOW, startWindowRowId(state.draft.startWindow)) },
-        editorRowModifier(state, "start-window"), subtitle = automaticRecordingWindowLabel(state.draft.startWindow),
+        { state.navigation.open(AutomaticRecordingEditorLevel.START_WINDOW, startWindowRowId(state.draft.startWindow)) },
+        editorRowModifier(state.navigation, "start-window"), subtitle = automaticRecordingWindowLabel(state.draft.startWindow),
         trailingIcon = R.drawable.ic_keyboard_arrow_right,
     )
 }
@@ -92,13 +92,13 @@ private fun AutomaticRecordingChannels(state: AutomaticRecordingEditorState, cha
 
 @Composable
 private fun AutomaticRecordingDays(state: AutomaticRecordingEditorState) {
-    val unrestricted = state.baseline.days.takeIf { it.isEmpty() || it.size == DayOfWeek.entries.size }.orEmpty()
-    val anyDay = state.draft.days.isEmpty() || state.draft.days.size == DayOfWeek.entries.size
-    GuidedStepAction(stringResource(R.string.autorec_editor_done), state::back, editorRowModifier(state, "done"))
+    val unrestricted = DayOfWeek.entries.toSet()
+    val anyDay = state.draft.days == unrestricted
+    GuidedStepAction(stringResource(R.string.autorec_editor_done), state::back, editorRowModifier(state.navigation, "done"))
     GuidedStepAction(
         stringResource(R.string.autorec_editor_any_day),
         { state.updateDraft { it.copy(days = unrestricted) } },
-        editorRowModifier(state, "any-day").semantics {
+        editorRowModifier(state.navigation, "any-day").semantics {
             role = Role.Checkbox; toggleableState = ToggleableState(anyDay)
         },
         trailingContent = {
@@ -116,7 +116,7 @@ private fun AutomaticRecordingDays(state: AutomaticRecordingEditorState) {
                     it.copy(days = changed.takeUnless { days -> days.isEmpty() || days.size == 7 } ?: unrestricted)
                 }
             },
-            editorRowModifier(state, "day-${day.value}").semantics {
+            editorRowModifier(state.navigation, "day-${day.value}").semantics {
                 role = Role.Checkbox; toggleableState = ToggleableState(checked)
             },
             trailingContent = {
@@ -152,11 +152,16 @@ private fun AutomaticRecordingStartWindow(state: AutomaticRecordingEditorState) 
                     else -> LocalTime.MIDNIGHT
                 }
                 state.selectedHour = time.hour
-                state.open(if (after) AutomaticRecordingEditorLevel.AFTER_HOUR else
+                state.navigation.open(if (after) AutomaticRecordingEditorLevel.AFTER_HOUR else
                     AutomaticRecordingEditorLevel.BEFORE_HOUR, "hour-${time.hour}")
             },
-            editorRowModifier(state, if (after) "after" else "before"),
+            editorRowModifier(state.navigation, if (after) "after" else "before"),
             trailingIcon = R.drawable.ic_keyboard_arrow_right,
+            subtitle = when {
+                after && current is RecordingStartWindow.After -> formatClock(current.time)
+                !after && current is RecordingStartWindow.Before -> formatClock(current.time)
+                else -> null
+            },
         )
     }
 }
@@ -172,17 +177,17 @@ private fun AutomaticRecordingHours(state: AutomaticRecordingEditorState) {
                 is RecordingStartWindow.Before -> window.time.minute
                 else -> 0
             }
-            state.open(if (state.page.level == AutomaticRecordingEditorLevel.AFTER_HOUR)
+            state.navigation.open(if (state.navigation.page.level == AutomaticRecordingEditorLevel.AFTER_HOUR)
                 AutomaticRecordingEditorLevel.AFTER_MINUTE else AutomaticRecordingEditorLevel.BEFORE_MINUTE,
                 "minute-$minute")
         },
-        editorRowModifier(state, "hour-$hour"), trailingIcon = R.drawable.ic_keyboard_arrow_right,
+        editorRowModifier(state.navigation, "hour-$hour"), trailingIcon = R.drawable.ic_keyboard_arrow_right,
     )
 }
 
 @Composable
 private fun AutomaticRecordingMinutes(state: AutomaticRecordingEditorState) {
-    val after = state.page.level == AutomaticRecordingEditorLevel.AFTER_MINUTE
+    val after = state.navigation.page.level == AutomaticRecordingEditorLevel.AFTER_MINUTE
     for (minute in 0..55 step 5) {
         val time = LocalTime.of(state.selectedHour, minute)
         val window = if (after) RecordingStartWindow.After(time) else RecordingStartWindow.Before(time)
@@ -218,7 +223,7 @@ internal fun AutomaticRecordingRadio(
     subtitle: String? = null,
 ) {
     GuidedStepAction(
-        title, { if (!state.busy) onClick() }, editorRowModifier(state, id).semantics {
+        title, { if (!state.busy) onClick() }, editorRowModifier(state.navigation, id).semantics {
             role = Role.RadioButton; this.selected = selected
         },
         leadingIcon = leadingIcon,

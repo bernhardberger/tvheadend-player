@@ -18,6 +18,7 @@ import at.bernhardberger.tvhplayer.ui.notifications.NoticeFormatter
 import at.bernhardberger.tvhplayer.core.AutomaticRecordingKind
 import at.bernhardberger.tvhplayer.core.AutorecPreviewState
 import at.bernhardberger.tvhplayer.ui.screens.formatAutomaticRecordingPreviewSummary
+import at.bernhardberger.tvhplayer.ui.screens.formatAutomaticRecordingDeleteBody
 import at.bernhardberger.tvhplayer.ui.screens.automaticRecordingMatches
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -29,7 +30,7 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en")
 class NoticeFormatterTest {
-    @Test fun automaticRecordingPreviewSummariesUseKindPluralsAllAndEmpty() {
+    @Test fun automaticRecordingSummariesUseKindPluralsAllAndEmpty() {
         val context = ApplicationProvider.getApplicationContext<Application>()
         val all = automaticRecordingMatches
         assertEquals("In the guide: 6 episodes, all to be recorded",
@@ -43,6 +44,17 @@ class NoticeFormatterTest {
                     all.copy(rows = all.rows.take(1), willRecordCount = 1)))
             assertEquals("None in the guide yet", formatAutomaticRecordingPreviewSummary(
                 context, kind, AutorecPreviewState.Matches(emptyList(), 0, false)))
+        }
+        for (kind in listOf(AutomaticRecordingKind.SERIES, AutomaticRecordingKind.TITLE, AutomaticRecordingKind.KEYWORD)) {
+            val singular = if (kind == AutomaticRecordingKind.SERIES) "episode" else "program"
+            for (count in listOf(0, 1, 5)) {
+                val scheduled = if (count == 0) "" else
+                    "Its $count scheduled $singular${if (count == 1) "" else "s"} will be removed. "
+                val body = scheduled + "Finished recordings stay."
+                assertEquals(body, formatAutomaticRecordingDeleteBody(context, kind, count, false))
+                assertEquals("$body Your unsaved changes will be discarded.",
+                    formatAutomaticRecordingDeleteBody(context, kind, count, true))
+            }
         }
     }
 

@@ -19,19 +19,6 @@ import kotlinx.coroutines.launch
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
 
-internal enum class AutomaticRecordingEditorLevel {
-    FIRST, UPCOMING, WORDS, WORDS_ENTRY, CHANNEL_TIME, CHANNEL, DAYS, START_WINDOW,
-    AFTER_HOUR, AFTER_MINUTE, BEFORE_HOUR, BEFORE_MINUTE, KEEP, MORE,
-    DUPLICATE, PRIORITY, PADDING_BEFORE, PADDING_AFTER, BROADCAST, MAXIMUM, PROFILE, SEARCH_IN,
-}
-
-internal enum class AutomaticRecordingEditorConfirmation { LEAVE, DELETE }
-
-internal data class AutomaticRecordingEditorPage(
-    val level: AutomaticRecordingEditorLevel,
-    val focusedRow: String,
-)
-
 internal class AutomaticRecordingEditorState(
     initial: AutorecDraft,
     private val scope: CoroutineScope,
@@ -47,48 +34,32 @@ internal class AutomaticRecordingEditorState(
     val baseline = initial
     var draft by mutableStateOf(initial)
         private set
-    var pages by mutableStateOf(
-        listOf(
-            AutomaticRecordingEditorPage(
-                AutomaticRecordingEditorLevel.FIRST,
-                if (!editing && prefilled && initial.cannotSubmit() == null) "main" else "matches",
-            ),
-        ),
+    val navigation = RecordingEditorNavigation(
+        initialRow = if (!editing && prefilled && initial.cannotSubmit() == null) "main" else "matches",
+        tagPrefix = "automatic-recording",
+        canNavigate = { !busy && !closed },
+        deletionAllowed = editing,
     )
-        private set
-    var preview by mutableStateOf<AutorecPreviewState>(AutorecPreviewState.Loading)
-        private set
+    private var loadedPreview by mutableStateOf<AutorecPreviewState>(AutorecPreviewState.Loading)
+    val preview: AutorecPreviewState
+        get() = (loadedPreview as? AutorecPreviewState.Matches)?.let { matches ->
+            matches.copy(willRecordCount = matches.rows.count { row ->
+                row.state !in setOf(AutorecEpisodeState.DUPLICATE, AutorecEpisodeState.REMOVED) && episodeEnabled(row)
+            })
+        } ?: loadedPreview
     var enabledChanges by mutableStateOf<Map<EventId, Boolean>>(emptyMap())
         private set
     var busy by mutableStateOf(false)
         private set
-    private var pendingConfirmation by mutableStateOf<AutomaticRecordingEditorConfirmation?>(null)
-    var confirmation: AutomaticRecordingEditorConfirmation?
-        get() = pendingConfirmation
-        set(value) {
-            if (busy || closed) return
-            if (value == AutomaticRecordingEditorConfirmation.DELETE && !editing) return
-            pendingConfirmation = value
-        }
-    val leaveConfirmation get() = confirmation == AutomaticRecordingEditorConfirmation.LEAVE
     var deleting by mutableStateOf(false)
         private set
-    var textEntryEditing by mutableStateOf(false)
     var closed by mutableStateOf(false)
-        private set
-    var focusRevision by mutableStateOf(0)
         private set
     var selectedHour by mutableStateOf(0)
     private var previewJob: Job? = null
     private var saveJob: Job? = null
     private var previewRevision = 0
 
-    val page get() = pages.last()
-    var focusedRow: String
-        get() = page.focusedRow
-        set(row) {
-            if (page.focusedRow != row) pages = pages.dropLast(1) + page.copy(focusedRow = row)
-        }
     val changedFields get() = draft.changedFields(baseline)
     val changed get() = draft != baseline || enabledChanges.isNotEmpty()
     val mainProblem: RecordingSubmitUnavailable?
@@ -101,59 +72,45 @@ internal class AutomaticRecordingEditorState(
         refreshPreview()
     }
 
-    fun open(level: AutomaticRecordingEditorLevel, selectedRow: String) {
-        if (busy || closed) return
-        pages = pages + AutomaticRecordingEditorPage(level, selectedRow)
-        textEntryEditing = false
-        focusRevision++
-    }
-
-    fun updateDraft(update: (AutorecDraft) -> AutorecDraft) {
+    fun updateDraft(restoreFocusTo: String? = null, update: (AutorecDraft) -> AutorecDraft) {
         if (busy || closed) return
         val next = update(draft)
         if (next == draft) return
         val keepMatches = next.changedFields(draft).isEmpty()
         draft = next
         refreshPreview(keepMatches)
+        if (restoreFocusTo != null) {
+            navigation.restoreFocus(restoreFocusTo)
+        }
     }
 
     fun applyChoice(update: (AutorecDraft) -> AutorecDraft) {
         if (busy || closed) return
-        updateDraft(update)
-        textEntryEditing = false
-        back()
+        updateDraft(update = update)
+        navigation.textEntryEditing = false
+        if (navigation.page.level in setOf(
+                 AutomaticRecordingEditorLevel.AFTER_MINUTE, AutomaticRecordingEditorLevel.BEFORE_MINUTE,
+            )) navigation.returnTo(AutomaticRecordingEditorLevel.START_WINDOW)
+        else back()
     }
 
     fun back() {
-        if (busy || closed) return
-        when {
-            confirmation != null -> {
-                pendingConfirmation = null
-                focusRevision++
-            }
-            textEntryEditing -> textEntryEditing = false
-            pages.size > 1 -> {
-                pages = pages.dropLast(1)
-                focusRevision++
-            }
-            changed -> pendingConfirmation = AutomaticRecordingEditorConfirmation.LEAVE
-            else -> close()
-        }
+        if (navigation.back(changed)) close()
     }
 
     fun confirmDestructiveAction() {
         if (busy || closed) return
-        when (confirmation) {
+        when (navigation.confirmation) {
             AutomaticRecordingEditorConfirmation.LEAVE -> close()
             AutomaticRecordingEditorConfirmation.DELETE -> {
                 val remove = requireNotNull(deleteRule)
-                pendingConfirmation = null
+                navigation.confirmation = null
                 busy = true
                 deleting = true
                 saveJob = scope.launch {
                     try {
                         when (remove()) {
-                            is DvrMutationResult.Failed -> focusRevision++
+                            is DvrMutationResult.Failed -> navigation.restoreFocus()
                             else -> close()
                         }
                     } finally {
@@ -166,10 +123,9 @@ internal class AutomaticRecordingEditorState(
         }
     }
 
-    fun episodeEnabled(row: AutorecPreviewRow): Boolean = enabledChanges[row.eventId] ?: (
-        row.eventId !in draft.excludedEventIds &&
-            row.state !in setOf(AutorecEpisodeState.SKIPPED, AutorecEpisodeState.LEFT_OUT)
-        )
+    fun episodeEnabled(row: AutorecPreviewRow): Boolean = if (editing) {
+        enabledChanges[row.eventId] ?: (row.state !in setOf(AutorecEpisodeState.SKIPPED, AutorecEpisodeState.LEFT_OUT))
+    } else row.eventId !in draft.excludedEventIds
 
     fun toggleEpisode(row: AutorecPreviewRow) {
         val id = row.eventId ?: return
@@ -190,16 +146,15 @@ internal class AutomaticRecordingEditorState(
 
     fun submit() {
         if (busy || closed || mainProblem != null) return
+        navigation.confirmation = null
         busy = true
-        pendingConfirmation = null
         val submittedDraft = draft
         val submittedChoices = enabledChanges
         saveJob = scope.launch {
             try {
                 when (saveDraft(submittedDraft, submittedChoices)) {
                     is AutorecSaveOutcome.RuleFailed -> {
-                        pages = listOf(AutomaticRecordingEditorPage(AutomaticRecordingEditorLevel.FIRST, "main"))
-                        focusRevision++
+                        navigation.firstLevel("main")
                     }
                     is AutorecSaveOutcome.Applied, is AutorecSaveOutcome.PartiallyApplied -> close()
                 }
@@ -219,10 +174,10 @@ internal class AutomaticRecordingEditorState(
         previewJob?.cancel()
         val revision = ++previewRevision
         val requestedDraft = draft
-        if (!keepMatches || preview !is AutorecPreviewState.Matches) preview = AutorecPreviewState.Loading
+        if (!keepMatches || loadedPreview !is AutorecPreviewState.Matches) loadedPreview = AutorecPreviewState.Loading
         previewJob = scope.launch {
             val result = loadPreview(requestedDraft, baseline.takeIf { editing }, now(), zone)
-            if (revision == previewRevision && !closed) preview = result
+            if (revision == previewRevision && !closed) loadedPreview = result
         }
     }
 

@@ -10,7 +10,10 @@
     <string name="autorec_editor_keyword_description">Records every program whose title contains “%1$s”.</string>
     <string name="autorec_editor_keyword_full_description">Records every program whose title, subtitle or description contains “%1$s”.</string>
     <string name="autorec_editor_delete">Delete</string>
-    <string name="autorec_editor_delete_title">Delete automatic recording?</string>
+    <string name="autorec_editor_delete_series">Delete series recording?</string>
+    <string name="autorec_editor_delete_title">Delete title recording?</string>
+    <string name="autorec_editor_delete_keyword">Delete keyword recording?</string>
+    <string name="autorec_editor_delete_finished">Finished recordings stay.</string>
     <string name="autorec_editor_keep_recording">Keep</string>
     <string name="autorec_editor_delete_unsaved">Your unsaved changes will be discarded.</string>
     <string name="autorec_editor_deleting">Deleting automatic recording…</string>
@@ -23,12 +26,12 @@
         <item quantity="other">“%1$s” in all text · %2$d programs</item>
     </plurals>
     <plurals name="autorec_editor_delete_episodes">
-        <item quantity="one">Its %1$d scheduled episode will also be removed.</item>
-        <item quantity="other">Its %1$d scheduled episodes will also be removed.</item>
+        <item quantity="one">Its %1$d scheduled episode will be removed.</item>
+        <item quantity="other">Its %1$d scheduled episodes will be removed.</item>
     </plurals>
     <plurals name="autorec_editor_delete_programs">
-        <item quantity="one">Its %1$d scheduled program will also be removed.</item>
-        <item quantity="other">Its %1$d scheduled programs will also be removed.</item>
+        <item quantity="one">Its %1$d scheduled program will be removed.</item>
+        <item quantity="other">Its %1$d scheduled programs will be removed.</item>
     </plurals>
     <plurals name="autorec_editor_upcoming_episodes">
         <item quantity="one">Records %1$d upcoming episode</item>
@@ -73,6 +76,7 @@
     <string name="autorec_editor_channel">Channel</string>
     <string name="autorec_editor_days">Days</string>
     <string name="autorec_editor_any_day">Any day</string>
+    <string name="autorec_editor_no_day">No day</string>
     <string name="autorec_editor_start_window">Start window</string>
     <string name="autorec_editor_any_time">Any time</string>
     <string name="autorec_editor_after">Starts after…</string>

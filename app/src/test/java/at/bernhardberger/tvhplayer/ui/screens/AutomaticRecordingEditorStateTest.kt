@@ -7,6 +7,9 @@ import java.time.DayOfWeek
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.job
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
@@ -25,37 +28,37 @@ import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 class AutomaticRecordingEditorStateTest {
     @Test fun levelsRestoreTheirOpeningRowAndChoicesApplyOnlyWhenConfirmed() = runTest {
         val state = AutomaticRecordingEditorFixture(this).state()
-        state.focusedRow = "channel-time"
-        state.open(AutomaticRecordingEditorLevel.CHANNEL_TIME, "days")
-        state.open(AutomaticRecordingEditorLevel.DAYS, "any")
+        state.navigation.focusedRow = "channel-time"
+        state.navigation.open(AutomaticRecordingEditorLevel.CHANNEL_TIME, "days")
+        state.navigation.open(AutomaticRecordingEditorLevel.DAYS, "any")
         state.updateDraft { it.copy(days = setOf(DayOfWeek.SATURDAY)) }
         state.back()
-        assertEquals("days", state.page.focusedRow)
+        assertEquals("days", state.navigation.page.focusedRow)
         assertEquals(setOf(DayOfWeek.SATURDAY), state.draft.days)
         state.back()
-        assertEquals("channel-time", state.page.focusedRow)
-        state.open(AutomaticRecordingEditorLevel.KEEP, "default")
+        assertEquals("channel-time", state.navigation.page.focusedRow)
+        state.navigation.open(AutomaticRecordingEditorLevel.KEEP, "default")
         state.back()
         assertNull(state.draft.removal)
-        state.open(AutomaticRecordingEditorLevel.WORDS, "words")
-        state.open(AutomaticRecordingEditorLevel.WORDS_ENTRY, "words-input")
-        assertFalse(state.textEntryEditing)
-        state.textEntryEditing = true
+        state.navigation.open(AutomaticRecordingEditorLevel.WORDS, "words")
+        state.navigation.open(AutomaticRecordingEditorLevel.WORDS_ENTRY, "words-input")
+        assertFalse(state.navigation.textEntryEditing)
+        state.navigation.textEntryEditing = true
         state.back()
-        assertFalse(state.textEntryEditing)
-        assertEquals(AutomaticRecordingEditorLevel.WORDS_ENTRY, state.page.level)
+        assertFalse(state.navigation.textEntryEditing)
+        assertEquals(AutomaticRecordingEditorLevel.WORDS_ENTRY, state.navigation.page.level)
         state.back()
-        assertEquals("words", state.focusedRow)
-        state.open(AutomaticRecordingEditorLevel.WORDS_ENTRY, "words-input")
+        assertEquals("words", state.navigation.focusedRow)
+        state.navigation.open(AutomaticRecordingEditorLevel.WORDS_ENTRY, "words-input")
         state.applyChoice { it.copy(fullText = true) }
-        assertEquals(AutomaticRecordingEditorLevel.WORDS, state.page.level)
-        assertFalse(state.textEntryEditing)
+        assertEquals(AutomaticRecordingEditorLevel.WORDS, state.navigation.page.level)
+        assertFalse(state.navigation.textEntryEditing)
         state.dispose()
     }
 
     @Test fun newerDraftCancelsAndRejectsAnObsoletePreview() = runTest {
         val oldResult = CompletableDeferred<AutorecPreviewState>()
-        var cancelled = false
+        lateinit var oldSearch: Job
         var requests = 0
         val state = AutomaticRecordingEditorFixture(this).state(
             load = { _, _, now, zone ->
@@ -63,11 +66,8 @@ class AutomaticRecordingEditorStateTest {
                 assertEquals(automaticRecordingZone, zone)
                 requests++
                 if (requests == 1) {
-                    try {
-                        withContext(NonCancellable) { oldResult.await() }
-                    } finally {
-                        cancelled = true
-                    }
+                    oldSearch = currentCoroutineContext().job
+                    withContext(NonCancellable) { oldResult.await() }
                 } else {
                     AutorecPreviewState.Matches(emptyList(), 0, false)
                 }
@@ -77,9 +77,12 @@ class AutomaticRecordingEditorStateTest {
         state.updateDraft { it.copy(enabled = false) }
         runCurrent()
         assertEquals(0, (state.preview as AutorecPreviewState.Matches).matchCount)
-        oldResult.complete(automaticRecordingMatches)
+        try {
+            assertTrue(oldSearch.isCancelled)
+        } finally {
+            oldResult.complete(automaticRecordingMatches)
+        }
         runCurrent()
-        assertTrue(cancelled)
         assertEquals(0, (state.preview as AutorecPreviewState.Matches).matchCount)
         state.dispose()
     }
@@ -98,7 +101,7 @@ class AutomaticRecordingEditorStateTest {
         state.updateDraft { it.copy(enabled = false) }
         runCurrent()
         assertEquals(automaticRecordingSeries, state.draft)
-        assertEquals("main", state.page.focusedRow)
+        assertEquals("main", state.navigation.page.focusedRow)
         assertFalse(state.closed)
         fixture.outcome = AutorecSaveOutcome.PartiallyApplied(AutorecRuleId("series"), setOf(EventId(1)))
         state.submit()
@@ -107,7 +110,7 @@ class AutomaticRecordingEditorStateTest {
         assertEquals(1, fixture.closes)
         val unchanged = fixture.state(editing = true)
         assertEquals(RecordingSubmitUnavailable.UNCHANGED, unchanged.mainProblem)
-        assertEquals("matches", unchanged.page.focusedRow)
+        assertEquals("matches", unchanged.navigation.page.focusedRow)
         unchanged.submit()
         runCurrent()
         assertEquals(2, fixture.submissions.size)
@@ -119,9 +122,9 @@ class AutomaticRecordingEditorStateTest {
         val state = fixture.state()
         state.updateDraft { it.copy(enabled = false) }
         state.back()
-        assertTrue(state.leaveConfirmation)
+        assertTrue(state.navigation.leaveConfirmation)
         state.back()
-        assertFalse(state.leaveConfirmation)
+        assertFalse(state.navigation.leaveConfirmation)
         assertFalse(state.draft.enabled)
         state.back()
         state.back()
@@ -134,24 +137,24 @@ class AutomaticRecordingEditorStateTest {
         untouched.back()
         assertTrue(untouched.closed)
         val existing = fixture.state(editing = true)
-        existing.open(AutomaticRecordingEditorLevel.MORE, "delete")
+        existing.navigation.open(AutomaticRecordingEditorLevel.MORE, "delete")
         existing.updateDraft { it.copy(enabled = false) }
-        existing.confirmation = AutomaticRecordingEditorConfirmation.DELETE
+        existing.navigation.confirmation = AutomaticRecordingEditorConfirmation.DELETE
         existing.back()
         assertEquals(0, fixture.deletions)
         fixture.deletionResult = DvrMutationResult.Failed(TvheadendFailure.SERVER_REJECTED, false)
-        existing.confirmation = AutomaticRecordingEditorConfirmation.DELETE
+        existing.navigation.confirmation = AutomaticRecordingEditorConfirmation.DELETE
         existing.confirmDestructiveAction()
         assertTrue(existing.busy)
         existing.submit()
         runCurrent()
-        assertNull(existing.confirmation)
+        assertNull(existing.navigation.confirmation)
         assertFalse(existing.closed)
         assertFalse(existing.draft.enabled)
         assertEquals(1, fixture.deletions)
-        assertEquals("delete", existing.focusedRow)
+        assertEquals("delete", existing.navigation.focusedRow)
         fixture.deletionResult = DvrMutationResult.AcceptedButUnconfirmed(Unit)
-        existing.confirmation = AutomaticRecordingEditorConfirmation.DELETE
+        existing.navigation.confirmation = AutomaticRecordingEditorConfirmation.DELETE
         existing.confirmDestructiveAction()
         runCurrent()
         assertTrue(existing.closed)
@@ -161,21 +164,8 @@ class AutomaticRecordingEditorStateTest {
 
     @Test fun episodeChoicesReachSubmitAndUntoggleableRowsNeverDispatch() = runTest {
         val fixture = AutomaticRecordingEditorFixture(this)
-        var loads = 0
-        val pending = CompletableDeferred<AutorecPreviewState>()
-        val state = fixture.state(load = { _, _, _, _ ->
-            if (loads++ == 0) automaticRecordingMatches else pending.await()
-        })
-        runCurrent()
-        state.toggleEpisode(automaticRecordingEpisodes.first())
-        runCurrent()
-        assertEquals(automaticRecordingMatches, state.preview)
-        state.submit()
-        runCurrent()
-        assertEquals(setOf(EventId(1)), fixture.submissions.single().first.excludedEventIds)
-        assertTrue(fixture.submissions.single().second.isEmpty())
-
         val edited = fixture.state(editing = true)
+        runCurrent()
         val scheduled = automaticRecordingEpisodes.first().copy(
             recordingId = DvrEntryId(1),
             state = AutorecEpisodeState.SCHEDULED,
@@ -185,12 +175,37 @@ class AutomaticRecordingEditorStateTest {
         edited.toggleEpisode(scheduled.copy(state = AutorecEpisodeState.DUPLICATE))
         assertTrue(edited.enabledChanges.isEmpty())
         edited.toggleEpisode(scheduled)
+        assertEquals(5, (edited.preview as AutorecPreviewState.Matches).willRecordCount)
         assertNull(edited.mainProblem)
         edited.toggleEpisode(scheduled)
+        assertEquals(6, (edited.preview as AutorecPreviewState.Matches).willRecordCount)
         assertEquals(RecordingSubmitUnavailable.UNCHANGED, edited.mainProblem)
         edited.toggleEpisode(scheduled)
         edited.submit()
         runCurrent()
-        assertEquals(mapOf(EventId(1) to false), fixture.submissions.last().second)
+        assertEquals(mapOf(EventId(1) to false), fixture.submissions.single().second)
+
+        var loads = 0
+        val pending = CompletableDeferred<AutorecPreviewState>()
+        val state = fixture.state(load = { _, _, _, _ ->
+            if (loads++ == 0) automaticRecordingMatches else pending.await()
+        })
+        runCurrent()
+        assertEquals(6, (state.preview as AutorecPreviewState.Matches).willRecordCount)
+        state.toggleEpisode(automaticRecordingEpisodes.first())
+        runCurrent()
+        assertEquals(automaticRecordingMatches.rows, (state.preview as AutorecPreviewState.Matches).rows)
+        assertEquals(5, (state.preview as AutorecPreviewState.Matches).willRecordCount)
+        state.toggleEpisode(automaticRecordingEpisodes.first())
+        runCurrent()
+        assertEquals(6, (state.preview as AutorecPreviewState.Matches).willRecordCount)
+        state.toggleEpisode(automaticRecordingEpisodes.first())
+        runCurrent()
+        assertEquals(5, (state.preview as AutorecPreviewState.Matches).willRecordCount)
+        state.submit()
+        runCurrent()
+        assertEquals(2, fixture.submissions.size)
+        assertEquals(setOf(EventId(1)), fixture.submissions.last().first.excludedEventIds)
+        assertTrue(fixture.submissions.last().second.isEmpty())
     }
 }

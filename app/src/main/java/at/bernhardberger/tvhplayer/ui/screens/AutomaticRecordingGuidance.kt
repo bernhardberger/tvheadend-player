@@ -38,10 +38,10 @@ internal fun AutomaticRecordingGuidance(
     events: List<EpgEvent>,
 ) {
     val row = (state.preview as? AutorecPreviewState.Matches)?.rows
-        ?.firstOrNull { automaticRecordingEpisodeRowId(it) == state.focusedRow }
+        ?.firstOrNull { automaticRecordingEpisodeRowId(it) == state.navigation.focusedRow }
     GuidedStepGuidance(
         title = if (row != null) automaticRecordingPreviewTitle(state.draft.kind, row)
-            else if (state.page.level in setOf(
+            else if (state.navigation.page.level in setOf(
                 AutomaticRecordingEditorLevel.WORDS, AutomaticRecordingEditorLevel.WORDS_ENTRY,
             )) stringResource(R.string.autorec_editor_words) else state.draft.pattern.words,
         body = row?.title ?: automaticRecordingGuidanceBody(state),
@@ -68,8 +68,8 @@ internal fun AutomaticRecordingGuidance(
 
 @Composable
 private fun automaticRecordingGuidanceBody(state: AutomaticRecordingEditorState): String =
-    when (state.page.level) {
-        AutomaticRecordingEditorLevel.FIRST -> when (state.focusedRow) {
+    when (state.navigation.page.level) {
+        AutomaticRecordingEditorLevel.FIRST -> when (state.navigation.focusedRow) {
             "keep" -> stringResource(R.string.autorec_editor_keep_help)
             "channel-time" -> stringResource(R.string.autorec_editor_channel_time_help)
             "more" -> stringResource(R.string.autorec_editor_more_help)
@@ -105,16 +105,16 @@ private fun AutomaticRecordingFocusedEpisode(
 
 @Composable
 private fun AutomaticRecordingFocusedChoice(state: AutomaticRecordingEditorState) {
-    when (state.page.level) {
+    when (state.navigation.page.level) {
         AutomaticRecordingEditorLevel.FIRST -> AutomaticRecordingMainGuidance(state)
         AutomaticRecordingEditorLevel.MORE -> AutomaticRecordingSecondary(automaticRecordingMoreSummary(state))
         AutomaticRecordingEditorLevel.DUPLICATE -> {
             val focused = (listOf(DuplicateDetection.DVR_PROFILE) + offeredDuplicateDetection)
-                .firstOrNull { "choice-$it" == state.focusedRow } ?: state.draft.duplicateDetection
+                .firstOrNull { "choice-$it" == state.navigation.focusedRow } ?: state.draft.duplicateDetection
             AutomaticRecordingSecondary(automaticRecordingDuplicateHelp(focused))
         }
         AutomaticRecordingEditorLevel.KEEP -> AutomaticRecordingKeepGuidance(state)
-        AutomaticRecordingEditorLevel.MAXIMUM -> state.focusedRow.removePrefix("choice-").toLongOrNull()
+        AutomaticRecordingEditorLevel.MAXIMUM -> state.navigation.focusedRow.removePrefix("choice-").toLongOrNull()
             ?.takeIf { it > 0 }?.let {
                 AutomaticRecordingSecondary(stringResource(R.string.autorec_editor_maximum_help, it))
             }
@@ -124,8 +124,8 @@ private fun AutomaticRecordingFocusedChoice(state: AutomaticRecordingEditorState
 
 @Composable
 private fun AutomaticRecordingMainGuidance(state: AutomaticRecordingEditorState) {
-    if (state.focusedRow == "more") AutomaticRecordingSecondary(automaticRecordingMoreSummary(state))
-    if (state.focusedRow == "main") {
+    if (state.navigation.focusedRow == "more") AutomaticRecordingSecondary(automaticRecordingMoreSummary(state))
+    if (state.navigation.focusedRow == "main") {
         val reason = when (state.mainProblem) {
             RecordingSubmitUnavailable.UNCHANGED -> stringResource(R.string.autorec_editor_unchanged)
             RecordingSubmitUnavailable.WORDS_REQUIRED -> stringResource(R.string.autorec_editor_enter_words)
@@ -139,9 +139,9 @@ private fun AutomaticRecordingMainGuidance(state: AutomaticRecordingEditorState)
 private fun AutomaticRecordingKeepGuidance(state: AutomaticRecordingEditorState) {
     val focused = listOf(null, DvrRemoval.Days(7), DvrRemoval.Days(30), DvrRemoval.Days(90),
         DvrRemoval.Days(180), DvrRemoval.Days(365), DvrRemoval.UntilSpaceNeeded, DvrRemoval.Forever)
-        .firstOrNull { "keep-$it" == state.focusedRow }
+        .firstOrNull { "keep-$it" == state.navigation.focusedRow }
     AutomaticRecordingSecondary(automaticRecordingKeepLabel(focused ?: state.draft.removal.takeIf {
-        "keep-$it" == state.focusedRow
+        "keep-$it" == state.navigation.focusedRow
     }))
 }
 

@@ -19,7 +19,7 @@ import at.bernhardberger.tvhplayer.ui.components.TvOutlinedTextField
 
 @Composable
 internal fun AutomaticRecordingWords(state: AutomaticRecordingEditorState) {
-    when (state.page.level) {
+    when (state.navigation.page.level) {
         AutomaticRecordingEditorLevel.WORDS_ENTRY -> AutomaticRecordingWordsEntry(state)
         AutomaticRecordingEditorLevel.SEARCH_IN -> {
             for (fullText in listOf(false, true)) AutomaticRecordingRadio(
@@ -29,13 +29,13 @@ internal fun AutomaticRecordingWords(state: AutomaticRecordingEditorState) {
         }
         else -> {
             GuidedStepAction(
-                stringResource(R.string.autorec_editor_done), state::back, editorRowModifier(state, "done"),
+                stringResource(R.string.autorec_editor_done), state::back, editorRowModifier(state.navigation, "done"),
                 subtitle = stringResource(R.string.autorec_editor_choices_stay),
             )
             GuidedStepAction(
                 stringResource(R.string.autorec_editor_words),
-                { state.open(AutomaticRecordingEditorLevel.WORDS_ENTRY, "words-input") },
-                editorRowModifier(state, "words"),
+                { state.navigation.open(AutomaticRecordingEditorLevel.WORDS_ENTRY, "words-input") },
+                editorRowModifier(state.navigation, "words"),
                 subtitle = if (state.draft.pattern.rawExpression)
                     stringResource(R.string.autorec_editor_raw_value, state.draft.pattern.words)
                 else state.draft.pattern.words.ifBlank { stringResource(R.string.autorec_editor_enter_words) },
@@ -43,8 +43,8 @@ internal fun AutomaticRecordingWords(state: AutomaticRecordingEditorState) {
             )
             if (state.draft.kind == AutomaticRecordingKind.KEYWORD) GuidedStepAction(
                 stringResource(R.string.autorec_editor_search_in),
-                { state.open(AutomaticRecordingEditorLevel.SEARCH_IN, "search-${state.draft.fullText}") },
-                editorRowModifier(state, "search-in"), subtitle = automaticRecordingSearchInLabel(state.draft.fullText),
+                { state.navigation.open(AutomaticRecordingEditorLevel.SEARCH_IN, "search-${state.draft.fullText}") },
+                editorRowModifier(state.navigation, "search-in"), subtitle = automaticRecordingSearchInLabel(state.draft.fullText),
                 trailingIcon = R.drawable.ic_keyboard_arrow_right,
             )
             AutomaticRecordingEpisodeRows(state)
@@ -63,14 +63,14 @@ private fun AutomaticRecordingWordsEntry(state: AutomaticRecordingEditorState) {
         }
     }
     TvOutlinedTextField(
-        id = "words-input", editingId = "words-input".takeIf { state.textEntryEditing },
-        setEditingId = { state.textEntryEditing = it != null }, value = words, onValueChange = { words = it },
+        id = "words-input", editingId = "words-input".takeIf { state.navigation.textEntryEditing },
+        setEditingId = { state.navigation.textEntryEditing = it != null }, value = words, onValueChange = { words = it },
         label = { Text(stringResource(R.string.autorec_editor_words)) },
-        modifier = editorRowModifier(state, "words-input"),
+        modifier = editorRowModifier(state.navigation, "words-input"),
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done), onImeAction = commit,
     )
     GuidedStepAction(
-        stringResource(R.string.autorec_editor_done), commit, editorRowModifier(state, "done"),
+        stringResource(R.string.autorec_editor_done), commit, editorRowModifier(state.navigation, "done"),
     )
 }
 
