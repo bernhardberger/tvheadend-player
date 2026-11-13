@@ -468,7 +468,7 @@ fun RecordingPlayerScreen(
     }
     val recordedLengthMs = durationMs.takeIf { it != C.TIME_UNSET && it > 0L }
     val chromeState = playerStateCell(paused = !playWhenReady)
-    val audioOnly = tracksAudioOnly(rememberPlayerTracks(player))
+    val trackGlance = trackGlance(rememberPlayerTracks(player))
     // The Banner hides after the first frame of the loaded recording; a newly loading one keeps it.
     val bannerFramePresented = at.bernhardberger.tvhplayer.core.bannerFramePresented(
         tuneConfirmed = playbackAvailable &&
@@ -476,7 +476,7 @@ fun RecordingPlayerScreen(
             retainedSelection != null && retainedSelection.currentSession === currentSession,
         videoFrameVisible = videoPresentation.visible,
         playing = playbackState is AppPlaybackState.Playing,
-        audioOnly = audioOnly,
+        audioOnly = trackGlance.audioOnly,
     )
     val busyTarget = AppPlaybackTarget.Recording(recordingId)
     val busyKey = Triple(busyTarget, currentSession, videoPresentation.epoch)
@@ -712,6 +712,7 @@ fun RecordingPlayerScreen(
                         recordedLengthMs, growing),
                     state = chromeState,
                     recordingNow = growing,
+                    badges = trackGlance.badges,
                     picon = channel?.icon,
                     artwork = recordingArtwork(entry),
                     channelId = entry.channelId,

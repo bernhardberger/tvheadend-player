@@ -31,6 +31,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.C
 import androidx.media3.common.Tracks
+import androidx.media3.common.Format
+import at.bernhardberger.tvheadend.sdk.media3.VideoScanType
+import at.bernhardberger.tvheadend.sdk.media3.videoScanType
+import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
+import at.bernhardberger.tvhplayer.core.GlanceBadge
+import at.bernhardberger.tvhplayer.core.VideoScan
+import at.bernhardberger.tvhplayer.core.glanceBadges
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
@@ -83,6 +90,30 @@ internal fun liveInfoBarData(
 /** Positively audio-only: the player reports audio tracks and no video track. */
 internal fun tracksAudioOnly(tracks: Tracks): Boolean =
     tracks.groups.any { it.type == C.TRACK_TYPE_AUDIO } && tracks.groups.none { it.type == C.TRACK_TYPE_VIDEO }
+
+/** Both chrome facts and the audio-only presentation come from the screen's one track snapshot. */
+internal data class TrackGlance(val audioOnly: Boolean, val badges: List<GlanceBadge>)
+
+@OptIn(ExperimentalTvheadendApi::class)
+internal fun trackGlance(tracks: Tracks): TrackGlance {
+    val video = selectedFormat(tracks, C.TRACK_TYPE_VIDEO)
+    val audio = selectedFormat(tracks, C.TRACK_TYPE_AUDIO)
+    return TrackGlance(tracksAudioOnly(tracks), glanceBadges(
+        videoHeight = video?.height,
+        audioMimeType = audio?.sampleMimeType,
+        audioChannelCount = audio?.channelCount,
+        audioDescription = audio?.let { (it.roleFlags and C.ROLE_FLAG_DESCRIBES_VIDEO) != 0 } == true,
+        scan = when (video?.videoScanType()) {
+            VideoScanType.PROGRESSIVE -> VideoScan.PROGRESSIVE
+            VideoScanType.INTERLACED -> VideoScan.INTERLACED
+            VideoScanType.UNKNOWN, null -> null
+        },
+    ))
+}
+
+private fun selectedFormat(tracks: Tracks, type: Int): Format? = tracks.groups
+    .firstOrNull { it.type == type && it.isSelected }
+    ?.let { group -> (0 until group.length).firstOrNull(group::isTrackSelected)?.let(group::getTrackFormat) }
 
 /** Header slot: the top-end clock over a full-width top fade. */
 @Composable

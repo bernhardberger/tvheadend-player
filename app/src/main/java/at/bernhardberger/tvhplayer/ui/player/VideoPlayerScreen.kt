@@ -1271,16 +1271,16 @@ fun VideoPlayerScreen(
     }
     StartupOutcome()
     val busyBlocked = channelUnavailable || statusPresentation == PlaybackStatusPresentation.FULL_RECOVERY
+    val trackGlance = trackGlance(rememberPlayerTracks(player))
     @Composable
     fun rememberBusyStatus(): PlayerBusyStatus? {
-    val audioOnly = tracksAudioOnly(rememberPlayerTracks(player))
     // The Banner stays while tuning and hides after the first frame of this tune; only a
     // service whose tracks are positively audio-only lets its playing state stand in.
     val bannerFramePresented = at.bernhardberger.tvhplayer.core.bannerFramePresented(
         tuneConfirmed = confirmedPlayingChannelId != null,
         videoFrameVisible = videoPresentation.visible,
         playing = playbackState is AppPlaybackState.Playing,
-        audioOnly = audioOnly,
+        audioOnly = trackGlance.audioOnly,
     )
     val busyTarget = AppPlaybackTarget.Live(currentChannelId)
     val busyKey = busyTarget to (currentSession to liveRequestToken)
@@ -1751,6 +1751,7 @@ fun VideoPlayerScreen(
             unavailableTitle = unavailableTitle,
         ),
         recordingNow = currentChannelId in recordingChannelIds,
+        badges = trackGlance.badges.takeIf { confirmedPlayingChannelId != null }.orEmpty(),
         picon = currentChannel?.icon,
         // The info bar's artwork tile.
         artwork = controlsEvent?.let(::programmeArtwork),

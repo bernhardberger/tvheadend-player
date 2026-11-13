@@ -138,3 +138,12 @@ fun humanCodecName(sampleMimeType: String?): String? {
         else -> null
     }
 }
+
+/** Compact names share the MIME classification used by full track/detail labels. */
+fun shortCodecName(sampleMimeType: String?): String? = when (val name = humanCodecName(sampleMimeType)) {
+    "Dolby Digital Plus" -> "DD+"
+    "Dolby Digital" -> "DD"
+    "Dolby AC-4" -> "AC-4"
+    "MPEG-1 Layer II" -> "MP2"
+    else -> name
+}

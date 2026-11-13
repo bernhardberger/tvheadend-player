@@ -1,5 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.core.glanceBadges
+import at.bernhardberger.tvhplayer.core.VideoScan
+
 import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvhplayer.R
 import androidx.compose.ui.semantics.getOrNull
@@ -560,6 +563,14 @@ class PlayerChromeCaptureTest {
                 unavailableTitle = "No program information"),
             state = state,
             recordingNow = scene == Scene.CONTROLS_BEHIND || scene == Scene.BANNER_BEHIND,
+            badges = when (scene) {
+                Scene.BANNER_TUNING -> emptyList()
+                Scene.CONTROLS_BEHIND, Scene.BANNER_BEHIND ->
+                    glanceBadges(2160, "audio/eac3", 6, true, VideoScan.PROGRESSIVE)
+                Scene.BANNER_NO_EPG_BEHIND ->
+                    glanceBadges(1080, "audio/ac3", 6)
+                else -> glanceBadges(1080, "audio/ac3", 6, scan = VideoScan.INTERLACED)
+            },
             picon = if (scene == Scene.CONTROLS_NO_LOGO) null else ChannelIcon.ImageCache(LOGO),
             artwork = programme.image.takeUnless { noEpg }?.let(ChannelIcon::ImageCache),
         )
@@ -710,6 +721,7 @@ class PlayerChromeCaptureTest {
                     // Stepping in the full controls: the focused timeline.
                     restoreFocus = if (scene == Scene.RECORDING_INFO_FOCUSED) "player-info" else "player-seekbar".takeIf { scene == Scene.RECORDING_CONTROLS_STEP || scene == Scene.RECORDING_CONTROLS_STEP_FORWARD },
                     growing = growing,
+                    badges = glanceBadges(1080, "audio/ac3", 6, scan = VideoScan.INTERLACED),
                     info = fixtureRecordingInfo(programme.title.orEmpty(), growing, subtitle = programme.subtitle,
                          positionMs = position, durationMs = duration, nowSec = NOW)
                          .copy(channelName = "Ridge Earth HD", channelNumber = "101"),
