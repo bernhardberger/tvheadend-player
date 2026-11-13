@@ -137,10 +137,11 @@ internal fun ArchiveDepthContent(
     val sections = remember(root, grouping, sort) {
         archiveDateSections(root, grouping, sort, nowSeconds)
     }
-    // Sort and Show away from their defaults, quietly under the active headline.
-    val valuesLine = rememberUpdatedState(
-        DvrArchiveView(grouping, sort, show).nonDefaultValues().joinToString(" · ").ifEmpty { null },
-    )
+    // Sort and Show away from their defaults, quietly under the root's headline; below the root only Show.
+    val valuesLine = rememberUpdatedState(ArchiveValuesLine(
+        root = DvrArchiveView(grouping, sort, show).nonDefaultValues().joinToString(" · ").ifEmpty { null },
+        below = DvrArchiveView(grouping, show = show).nonDefaultValues().singleOrNull(),
+    ))
     val levels = rememberArchiveLevels(
         root, fullRoot, grouping, show, recordingNow, sections, contentPadding, valuesLine,
         latestAdmissionForEntry, latestOnOpenFolderMenu, latestPiconForEntry,
@@ -164,6 +165,9 @@ internal fun ArchiveDepthContent(
     )
 }
 
+/** The quiet line under a headline: the root's non-default Sort and Show, and below the root Show alone. */
+private data class ArchiveValuesLine(val root: String?, val below: String?)
+
 @Composable
 private fun rememberArchiveLevels(
     root: DvrArchiveFolder,
@@ -173,7 +177,7 @@ private fun rememberArchiveLevels(
     recordingNow: List<DvrEntry>,
     sections: Map<Long, DvrDateSection>,
     contentPadding: PaddingValues,
-    valuesLine: State<String?>,
+    valuesLine: State<ArchiveValuesLine>,
     latestAdmissionForEntry: State<(DvrEntry) -> RecordingPlaybackAdmission?>,
     latestOnOpenFolderMenu: State<((DvrArchiveFolder) -> Unit)?>,
     latestPiconForEntry: State<(DvrEntry) -> ChannelIcon?>,
@@ -181,6 +185,7 @@ private fun rememberArchiveLevels(
     latestOnOpenContextMenu: State<((DvrEntry) -> Unit)?>,
 ): Map<String, DepthLevel> = remember(root, fullRoot, grouping, show, recordingNow, sections) {
         val levels = linkedMapOf<String, DepthLevel>()
+        val rootId = archiveLevelId(emptyList())
         fun addLevel(
             path: List<String>,
             heading: @Composable () -> String,
@@ -192,7 +197,10 @@ private fun rememberArchiveLevels(
                 (root.folderAt(path)?.allRecordings()?.size ?: 0)
             levels[id] = DepthLevel(
                 id = id,
-                heading = { emphasis -> ArchiveLevelHeading(heading(), emphasis, valuesLine.value) },
+                heading = { emphasis ->
+                    val line = valuesLine.value
+                    ArchiveLevelHeading(heading(), emphasis, if (id == rootId) line.root else line.below)
+                },
                 emptyContent = {
                     ArchiveEmptyLevel(show, atRoot = path.isEmpty(), hidden = hidden)
                 },

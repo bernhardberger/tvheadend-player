@@ -307,11 +307,13 @@ class RecordingsVisualLayoutTest {
         assertEquals(bounds("recordings-header").right, resting.right, .5f)
         assertEquals(bounds("recordings-mode-tabs").center.y, resting.center.y, 2f)
         assertTrue(bounds("recordings-mode-tabs").right < resting.left)
-        // Neither a folder, the options button nor another tab moves it.
+        // Neither the options button, a folder nor another tab moves it.
+        upToOptions()
+        assertEquals(resting, bounds("recordings-space"))
+        key(Key.DirectionDown)
+        focused("recordings-folder-Documentaries")
         key(Key.DirectionRight)
         focused("recordings-folder-Documentaries/Expeditions")
-        assertEquals(resting, bounds("recordings-space"))
-        upToOptions()
         assertEquals(resting, bounds("recordings-space"))
         key(Key.DirectionUp)
         focused("recordings-mode-archive")
@@ -437,15 +439,22 @@ class RecordingsVisualLayoutTest {
         focused("recordings-mode-archive")
         key(Key.DirectionDown)
         focused("recordings-folder-Documentaries")
-        // The button is the same inside a folder, and Back from it steps up a level.
+        // The button belongs to the root: inside a folder Up goes straight to the tab, Down returns to the row.
         key(Key.DirectionRight)
         focused("recordings-folder-Documentaries/Expeditions")
+        gone(OPTIONS)
         key(Key.DirectionUp)
-        focused(OPTIONS)
+        focused("recordings-mode-archive")
+        key(Key.DirectionDown)
+        focused("recordings-folder-Documentaries/Expeditions")
+        compose.runOnIdle { assertEquals(listOf("Documentaries"), screenState.archivePath) }
         key(Key.Back)
         compose.runOnIdle { assertTrue(screenState.archivePath.isEmpty()) }
+        focused("recordings-folder-Documentaries")
+        upToOptions()
         key(Key.DirectionLeft)
         compose.onNodeWithTag("nav-recordings").assertIsFocused()
+        capture("drawer-expanded", 1f)
         assertNoCommands()
     }
 
@@ -675,25 +684,28 @@ class RecordingsVisualLayoutTest {
     }
 
     @Test fun aFolderTheFilterEmptiesStaysOpenWithTheMessageAndLeavesItsParentWhenBackSteps() {
-        startView = DvrArchiveView(grouping = DvrArchiveGrouping.FOLDERS)
+        startView = DvrArchiveView(grouping = DvrArchiveGrouping.FOLDERS, show = DvrArchiveShow.UNWATCHED)
         show(entries = listOf(
-            recording(2, "Alpha", "Series/a.ts", playCount = 1), recording(3, "Bravo", "Series/b.ts", playCount = 2),
+            recording(2, "Alpha", "Series/a.ts"), recording(3, "Bravo", "Series/b.ts"),
             recording(4, "Charlie", "Other/c.ts"),
         ))
+        awaitList()
+        if (!tagFocused("recordings-folder-Series")) key(Key.DirectionDown)
         focused("recordings-folder-Series")
         key(Key.DirectionRight)
         focused("recording-list-entry-2")
-        upToOptions()
-        openOptionsLevel("show")
-        key(Key.DirectionDown)
-        key(Key.DirectionCenter)
-        closeOptions()
-        // No step back: the folder stays open, says why it is empty, and focus stays on the button.
+        // Both get played elsewhere while the folder is open under Unwatched.
+        publish(listOf(
+            recording(2, "Alpha", "Series/a.ts", playCount = 1), recording(3, "Bravo", "Series/b.ts", playCount = 2),
+            recording(4, "Charlie", "Other/c.ts"),
+        ))
+        // No step back: the folder stays open and says why it is empty.
         compose.runOnIdle { assertEquals(listOf("Series"), screenState.archivePath) }
         compose.onNodeWithText("Everything in this folder has been played.").assertIsDisplayed()
         compose.onNodeWithText("2 recordings are hidden.").assertIsDisplayed()
+        // Focus waits on the tab above, and Back there steps up a level, where the emptied folder has gone.
+        focused(BROWSE_TAB)
         key(Key.Back)
-        // Back steps up a level, where the emptied folder has gone.
         compose.runOnIdle { assertEquals(emptyList<String>(), screenState.archivePath) }
         compose.onNodeWithTag("recordings-folder-Series").assertDoesNotExist()
         compose.onNodeWithTag("recordings-folder-Other").assertExists()
@@ -711,7 +723,8 @@ class RecordingsVisualLayoutTest {
         focused("recordings-folder-Documentaries")
         val active = activeHeading()
         assertEquals("Folders", active.text)
-        assertButtonClearOf(firstListRow())
+        val defaultRow = firstListRow()
+        assertButtonClearOf(defaultRow)
         assertEquals(null, valuesLine())
         compose.onNodeWithTag(OPTIONS).assertContentDescriptionEquals("View options")
         // With the list unfocused both columns start with a folder row: their icons are level.
@@ -742,6 +755,32 @@ class RecordingsVisualLayoutTest {
         assertTrue("The values line stops short of the button", values.right <= bounds(OPTIONS).left)
         downToList()
         assertButtonClearOf(firstListRow())
+        val rootRowWithValues = firstListRow()
+
+        // Below the root there is no button and the line names only the filter, at the same geometry.
+        key(Key.DirectionRight)
+        focused("recordings-folder-Documentaries/Expeditions")
+        gone(OPTIONS)
+        val inFolder = activeHeading()
+        assertEquals(active.baseline, inFolder.baseline, 1f)
+        requireNotNull(valuesLine()).assertTextEquals("Unwatched")
+        assertEquals(rootRowWithValues.top, firstListRow().top, 1f)
+
+        // With Show back at All a non-default sort leaves no line below the root.
+        key(Key.Back)
+        focused("recordings-folder-Documentaries")
+        openOptionsLevel("show")
+        key(Key.DirectionUp)
+        key(Key.DirectionCenter)
+        closeOptions()
+        requireNotNull(valuesLine()).assertTextEquals("Name A–Z")
+        downToList()
+        key(Key.DirectionRight)
+        focused("recordings-folder-Documentaries/Expeditions")
+        assertEquals(null, valuesLine())
+        assertEquals(active.baseline, activeHeading().baseline, 1f)
+        assertEquals("Without a line the folder's rows sit where the root's do at the defaults",
+            defaultRow.top, firstListRow().top, 1f)
         assertNoCommands()
     }
 
@@ -828,6 +867,17 @@ class RecordingsVisualLayoutTest {
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
     fun headerFrameFoldersEntered() = headerFrame("folders-entered", DvrArchiveView(DvrArchiveGrouping.FOLDERS)) {
         key(Key.DirectionDown)
+        focused("recordings-folder-Sport")
+        key(Key.DirectionRight)
+        awaitList()
+    }
+
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun headerFrameFoldersEnteredFilter() = headerFrame("folders-entered-filter",
+        DvrArchiveView(DvrArchiveGrouping.FOLDERS, DvrArchiveSort.NAME, DvrArchiveShow.UNWATCHED)) {
+        // Name A–Z puts Sport after the other folders.
+        repeat(6) { if (!tagFocused("recordings-folder-Sport")) key(Key.DirectionDown) }
         focused("recordings-folder-Sport")
         key(Key.DirectionRight)
         awaitList()
@@ -1428,23 +1478,6 @@ class RecordingsVisualLayoutTest {
         assertNoCommands()
     }
 
-    @Test fun nestedUpReturnsToTheOptionsButtonAndDownKeepsTheArchiveLocation() {
-        show()
-        focused("recordings-folder-Documentaries")
-        key(Key.DirectionRight)
-        focused("recordings-folder-Documentaries/Expeditions")
-        upToOptions()
-        downToList()
-        focused("recordings-folder-Documentaries/Expeditions")
-        compose.runOnIdle { assertEquals(listOf("Documentaries"), screenState.archivePath) }
-        key(Key.Back)
-        focused("recordings-folder-Documentaries")
-        key(Key.DirectionLeft)
-        compose.onNodeWithTag("nav-recordings").assertIsFocused()
-        capture("drawer-expanded", 1f)
-        assertNoCommands()
-    }
-
     @Test fun parentViewportAndInvokingFolderSurviveRepeatedPushPop() {
         show(entries = (1L..24L).map { recording(it, "Episode $it", "Folder%02d/episode.ts".format(it)) })
         focused("recordings-folder-Folder01")
@@ -1495,10 +1528,11 @@ class RecordingsVisualLayoutTest {
         focused("recordings-folder-Documentaries/Expeditions")
         key(Key.DirectionRight)
         focused("recording-list-entry-2")
-        upToOptions()
+        key(Key.DirectionUp)
+        focused(BROWSE_TAB)
         publish(listOf(recording(1, "Remaining", "Documentaries/remaining.ts")))
         compose.runOnIdle { assertEquals(listOf("Documentaries"), screenState.archivePath) }
-        focused(OPTIONS)
+        focused(BROWSE_TAB)
         downToList()
         focused("recording-list-entry-1")
         key(Key.Back)

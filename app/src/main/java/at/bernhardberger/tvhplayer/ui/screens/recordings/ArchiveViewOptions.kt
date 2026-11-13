@@ -1,6 +1,5 @@
 package at.bernhardberger.tvhplayer.ui.screens.recordings
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
@@ -111,8 +110,8 @@ private fun optionLevel(key: String, title: Int, value: Int, choices: List<Brows
  * The one options button at the end of the Browse headline, centred on its capitals: filled while Show
  * hides recordings, its spoken label naming the Sort and Show values that differ from the defaults.
  * Up goes to the tabs ([upFocus]), Down to the list ([onDown]), Left to the navigation rail
- * ([navigationFocus]) and Right stays. Back steps a folder up ([onBack]); from the root it is left to the
- * screen. Placed where the headline starts, it is as wide as the list column so its end meets the rows'.
+ * ([navigationFocus]) and Right stays. It sits at Browse's root only, so Back is left to the screen.
+ * Placed where the headline starts, it is as wide as the list column so its end meets the rows'.
  */
 @Composable
 internal fun ArchiveViewOptionsButton(
@@ -120,15 +119,11 @@ internal fun ArchiveViewOptionsButton(
     focusRequester: FocusRequester,
     upFocus: FocusRequester,
     navigationFocus: FocusRequester?,
-    canStepBack: Boolean,
     onOpen: () -> Unit,
     onDown: () -> Unit,
-    onBack: () -> Unit,
     onFocusChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var hasFocus by remember { mutableStateOf(false) }
-    BackHandler(enabled = hasFocus && canStepBack, onBack = onBack)
     val style = RecordingsHeadlineStyle
     val baseline = rememberTextMeasurer().measure("Ag", style).firstBaseline
     val density = LocalDensity.current
@@ -154,10 +149,7 @@ internal fun ArchiveViewOptionsButton(
                     left = navigationFocus ?: FocusRequester.Default
                     right = FocusRequester.Cancel
                 }
-                .onFocusChanged {
-                    hasFocus = it.hasFocus
-                    onFocusChanged(it.hasFocus)
-                }
+                .onFocusChanged { onFocusChanged(it.hasFocus) }
                 .onPreviewKeyEvent { event ->
                     event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown && onDown().let { true }
                 }

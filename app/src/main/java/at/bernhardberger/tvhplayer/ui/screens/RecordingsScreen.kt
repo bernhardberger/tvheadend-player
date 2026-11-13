@@ -445,13 +445,19 @@ internal fun RecordingsScreenContent(
     val chosenView = pendingView ?: view
     val chosenGrouping = chosenView.grouping
     var optionsOpen by remember { mutableStateOf(false) }
+    // Inside a folder the tabs are the stop above the list, so Back there steps a level up as the list does.
+    var tabsFocused by remember { mutableStateOf(false) }
+    BackHandler(
+        enabled = backEnabled && tabsFocused && mode == DvrLibraryMode.ARCHIVE && archiveNavigation.stack.canPop,
+    ) { archiveNavigation.pop() }
     val optionsFocus = remember { FocusRequester() }
     // The stop the next frames move focus to: the View options button after its panel closes.
     var requestStop by remember { mutableStateOf<FocusRequester?>(null) }
-    // The stop above the list: Browse's View options button, else (or without a list) the selected tab.
+    // The stop above the list: the View options button at Browse's root, else (or without a list) the selected tab.
     fun focusHeader(): Boolean {
         fun request(stop: FocusRequester) = runCatching { stop.requestFocus() }.getOrDefault(false)
-        return (mode == DvrLibraryMode.ARCHIVE && request(optionsFocus)) || request(modeFocus)
+        val atBrowseRoot = mode == DvrLibraryMode.ARCHIVE && !archiveNavigation.stack.canPop
+        return (atBrowseRoot && request(optionsFocus)) || request(modeFocus)
     }
     val naming = rememberArchiveNaming(channelsById)
     // Unwatched, Partially watched and Watched read the position behind the check mark,
@@ -760,6 +766,7 @@ internal fun RecordingsScreenContent(
                     },
                     onMoveToContent = { requestContentFocus = true },
                     modifier = Modifier
+                        .onFocusChanged { tabsFocused = it.hasFocus }
                         .onPreviewKeyEvent {
                             // A deliberate header move gives the viewer ownership, not the loading handoff.
                             screenState.requestedScheduleEntryId.value = null
@@ -901,12 +908,12 @@ internal fun RecordingsScreenContent(
                         }
                     },
                 ) }
-                    ArchiveViewOptionsButton(
+                    // The options belong to Browse's root; inside a folder, channel or genre there is none.
+                    if (!archiveNavigation.stack.canPop) ArchiveViewOptionsButton(
                         view = chosenView,
                         focusRequester = if (owner.isCurrent) optionsFocus else remember { FocusRequester() },
                         upFocus = modeFocus,
                         navigationFocus = drawerFocus,
-                        canStepBack = archiveNavigation.stack.canPop,
                         onOpen = {
                             if (owner.isCurrent) {
                                 contentFocusOwned = false
@@ -914,7 +921,6 @@ internal fun RecordingsScreenContent(
                             }
                         },
                         onDown = { runCatching { contentFocus.requestFocus() } },
-                        onBack = { archiveNavigation.pop() },
                         onFocusChanged = {
                             if (it && owner.isCurrent) {
                                 screenState.requestedScheduleEntryId.value = null
