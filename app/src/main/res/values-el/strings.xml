@@ -580,7 +580,6 @@
     <string name="details_read_more">Περισσότερες πληροφορίες</string>
     <string name="details_important_information">Λεπτομέρειες</string>
     <string name="details_cast_and_crew">Ηθοποιοί και συντελεστές</string>
-    <string name="details_available_until">Διαθέσιμο έως %1$s</string>
     <string name="details_size">Μέγεθος</string>
     <string name="details_recording_profile">Προφίλ εγγραφής</string>
     <string name="details_picture">Εικόνα</string>

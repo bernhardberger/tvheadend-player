@@ -5,6 +5,7 @@ import at.bernhardberger.tvhplayer.notices.NoticeContext
 import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import at.bernhardberger.tvhplayer.testutil.tagBounds
 import at.bernhardberger.tvhplayer.testutil.pressKey
+import at.bernhardberger.tvhplayer.testutil.settleFrames
 import org.junit.experimental.categories.Category
 
 import android.app.Application
@@ -110,6 +111,51 @@ class RecordingsVisualLayoutTest {
     @After fun release() {
         Locale.setDefault(oldLocale)
         TimeZone.setDefault(oldZone)
+    }
+
+    @Test fun expiryIsTheFinalListSegmentAndHasAnExactDateInThePane() {
+        showExpiry()
+        compose.onNodeWithTag("recording-list-metadata-1", useUnmergedTree = true)
+            .assertTextContains("in 45 minutes", substring = true)
+        compose.onNodeWithTag("recording-list-expiry", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("recording-metadata-expiry", useUnmergedTree = true)
+            .assertContentDescriptionContains("in 45 minutes", substring = true)
+    }
+
+    @Test @Category(VisualCapture::class)
+    @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
+    fun expiryListAndPaneCapture() {
+        showExpiry(multiple = true)
+        repeat(2) { compose.pressKey(Key.DirectionDown) }
+        compose.settleFrames(3)
+        compose.onNodeWithTag("recording-list-entry-1").assertIsFocused()
+        capture("recordings-expiry-en-font1.0", 1f)
+    }
+
+    @Test fun expiryOutsideTheWarningWindowIsOnlyInThePane() {
+        showExpiry(left = 8 * 86400L)
+        compose.onNodeWithTag("recording-list-expiry", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("recording-metadata-expiry", useUnmergedTree = true).assertExists()
+    }
+
+    private fun showExpiry(left: Long = 45 * 60L, multiple: Boolean = false) {
+        assertTrue(android.os.SystemClock.setCurrentTimeMillis(1_791_144_900_000L))
+        val now = System.currentTimeMillis() / 1000L
+        val titles = listOf("Ridge Light: A winter expedition beyond the Arctic Circle", "Tide Watch", "Ridge Light")
+        val entries = listOf(left, 5 * 3600L, 4 * 86400L).take(if (multiple) 3 else 1).mapIndexed { index, seconds ->
+            val stop = now + seconds + 59 - 30 * 86400
+            DvrEntry.create(
+                DvrEntryId(index + 1L), title = titles[index],
+                subtitle = "Across the northern frontier".takeIf { index == 0 }, state = DvrEntryState.COMPLETED,
+                start = Instant.fromEpochSeconds(stop - 90 * 60), stop = Instant.fromEpochSeconds(stop),
+                removal = DvrRemoval.Days(30), image = ArtworkId(101 + index), channelName = "Ridge Light",
+                files = listOf(DvrRecordingFile.create(sizeBytes = 2_400_000_000)),
+            )
+        }
+        show(entries = entries)
+        compose.settleFrames(3)
+        compose.pressKey(Key.DirectionCenter)
+        compose.settleFrames(3)
     }
 
     @Test fun rootAlignmentAndImmediateChildPreviewPromotesOnlyOnEntry() {

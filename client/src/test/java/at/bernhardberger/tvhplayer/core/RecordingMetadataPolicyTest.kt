@@ -1,14 +1,106 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvheadend.sdk.core.*
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvheadend.sdk.core.DvrRecordingFile
+import at.bernhardberger.tvheadend.sdk.core.DvrRecordingStream
+import at.bernhardberger.tvheadend.sdk.core.DvrRemoval
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionStreamType
+import java.time.ZoneId
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RecordingMetadataPolicyTest {
+    @Test fun keepUntilChoicesPreserveCurrentAndSelectManagedPoliciesWithoutADuplicateCurrentRow() {
+        val now = Instant.parse("2026-11-13T12:00:00Z").epochSeconds
+        fun options(removal: DvrRemoval?) = recordingKeepUntilOptions(
+            DvrEntry.create(DvrEntryId(1), stop = Instant.fromEpochSeconds(now), removal = removal),
+            now, ZoneId.of("UTC"),
+        )
+        val finite = options(DvrRemoval.Days(3))
+        assertEquals(RecordingKeepUntilChoice.entries, finite.map { it.choice })
+        assertEquals(RecordingKeepUntilChoice.CURRENT, finite.single { it.selected }.choice)
+        assertEquals(DvrRemoval.Days(3), finite.first().removal)
+        assertEquals(now + 3 * 86400L, finite.first().expirySec)
+        for (removal in listOf(DvrRemoval.UntilSpaceNeeded, DvrRemoval.Forever)) {
+            val managed = options(removal)
+            assertFalse(managed.any { it.choice == RecordingKeepUntilChoice.CURRENT })
+            assertEquals(removal, managed.single { it.selected }.removal)
+            assertNull(managed.single { it.selected }.expirySec)
+        }
+        for (removal in listOf(null, DvrRemoval.ServerDefault)) {
+            assertNull(options(removal).first().removal)
+            assertNull(options(removal).first().expirySec)
+        }
+    }
+
+    @Test fun keepUntilPeriodsCountFromNowAndRoundUpTheServerDayCount() {
+        val now = Instant.parse("2026-11-13T12:00:00Z").epochSeconds
+        for ((stop, days) in listOf(
+            now - 10 * 86400L to 17, now to 7, now + 3600L to 7,
+            now - 10 * 86400L - 1 to 18, now + 30 * 86400L to 1,
+        )) {
+            val option = recordingKeepUntilOptions(
+                DvrEntry.create(DvrEntryId(1), stop = Instant.fromEpochSeconds(stop)),
+                now, ZoneId.of("UTC"),
+            ).single { it.choice == RecordingKeepUntilChoice.ONE_WEEK }
+            assertEquals("stop=$stop", DvrRemoval.Days(days), option.removal)
+            assertEquals(stop + days * 86400L, option.expirySec)
+            assertTrue(option.expirySec!! >= now + 7 * 86400L)
+        }
+        val missingStop = recordingKeepUntilOptions(DvrEntry.create(DvrEntryId(1)), now, ZoneId.of("UTC"))
+        assertNull(missingStop.single { it.choice == RecordingKeepUntilChoice.ONE_WEEK }.removal)
+    }
+
+    @Test fun keepUntilCalendarTargetsHandleMonthEndsLeapYearsAndThePassedZone() {
+        val cases = listOf(
+            Triple(RecordingKeepUntilChoice.ONE_MONTH, "2026-01-31T12:00:00Z", "2026-02-28T12:00:00Z"),
+            Triple(RecordingKeepUntilChoice.THREE_MONTHS, "2026-01-31T12:00:00Z", "2026-04-30T11:00:00Z"),
+            Triple(RecordingKeepUntilChoice.SIX_MONTHS, "2026-08-31T12:00:00Z", "2027-02-28T13:00:00Z"),
+            Triple(RecordingKeepUntilChoice.ONE_YEAR, "2024-02-29T12:00:00Z", "2025-02-28T12:00:00Z"),
+            Triple(RecordingKeepUntilChoice.ONE_WEEK, "2026-10-20T10:00:00Z", "2026-10-27T11:00:00Z"),
+        )
+        for ((choice, start, target) in cases) {
+            val now = Instant.parse(start)
+            val targetSec = Instant.parse(target).epochSeconds
+            val option = recordingKeepUntilOptions(
+                DvrEntry.create(DvrEntryId(1), stop = now), now.epochSeconds, ZoneId.of("Europe/Berlin"),
+            ).single { it.choice == choice }
+            val expiry = option.expirySec!!
+            assertTrue("$choice does not expire before its calendar target", expiry >= targetSec)
+            assertTrue("$choice uses the smallest whole day", expiry - 86400L < targetSec)
+        }
+    }
+
+    @Test fun expiryRoundsDownAtMinuteHourAndDayBoundariesWithinSevenDays() {
+        val now = 1_000L
+        val cases = listOf(
+            1L to RecordingExpiryTimeLeft(1, RecordingExpiryUnit.MINUTES),
+            59L to RecordingExpiryTimeLeft(1, RecordingExpiryUnit.MINUTES),
+            60L to RecordingExpiryTimeLeft(1, RecordingExpiryUnit.MINUTES),
+            3599L to RecordingExpiryTimeLeft(59, RecordingExpiryUnit.MINUTES),
+            3600L to RecordingExpiryTimeLeft(1, RecordingExpiryUnit.HOURS),
+            86399L to RecordingExpiryTimeLeft(23, RecordingExpiryUnit.HOURS),
+            86400L to RecordingExpiryTimeLeft(1, RecordingExpiryUnit.DAYS),
+            7L * 86400 - 1 to RecordingExpiryTimeLeft(6, RecordingExpiryUnit.DAYS),
+            7L * 86400 to RecordingExpiryTimeLeft(7, RecordingExpiryUnit.DAYS),
+        )
+        cases.forEach { (seconds, expected) ->
+            assertEquals("$seconds seconds left", expected, recordingExpiryTimeLeft(now + seconds, now))
+        }
+        for (removal in listOf(null, now - 1, now, now + 7L * 86400 + 1)) {
+            assertNull(recordingExpiryTimeLeft(removal, now))
+        }
+    }
+
     @Test fun removalUsesStopAndOnlyFutureFiniteDays() {
         fun entry(removal: DvrRemoval?, stop: Instant? = Instant.fromEpochSeconds(100)) =
             DvrEntry.create(DvrEntryId(1), stop = stop, removal = removal)
@@ -19,6 +111,20 @@ class RecordingMetadataPolicyTest {
         assertNull(recordingRemovalTime(entry(DvrRemoval.Days(1)), 86501))
         assertNull(recordingRemovalTime(entry(DvrRemoval.Days(1), null), 100))
         assertEquals(100L + 2147483645L * 86400L, recordingRemovalTime(entry(DvrRemoval.Days(2147483645)), 100))
+        for (state in listOf(DvrEntryState.COMPLETED, DvrEntryState.COMPLETED_ERROR, DvrEntryState.MISSED)) {
+            for (files in listOf(null, emptyList<DvrRecordingFile>())) {
+                val withoutFile = DvrEntry.create(DvrEntryId(1), state = state, stop = Instant.fromEpochSeconds(100),
+                    removal = DvrRemoval.Days(1), files = files)
+                assertNull("$state without files has no expiry", recordingExpiryTime(withoutFile, 100))
+            }
+        }
+        val file = listOf(DvrRecordingFile.create())
+        val finished = DvrEntry.create(DvrEntryId(1), state = DvrEntryState.COMPLETED, stop = Instant.fromEpochSeconds(100),
+            removal = DvrRemoval.Days(1), files = file)
+        assertEquals(86500L, recordingExpiryTime(finished, 100))
+        val scheduled = DvrEntry.create(DvrEntryId(2), state = DvrEntryState.SCHEDULED, stop = finished.stop,
+            removal = finished.removal, files = file)
+        assertNull(recordingExpiryTime(scheduled, 100))
     }
 
     @Test fun sizePrefersTotalAndFallsBackToKnownFileSizes() {

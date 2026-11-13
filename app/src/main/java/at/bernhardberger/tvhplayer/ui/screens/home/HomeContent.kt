@@ -106,6 +106,8 @@ import at.bernhardberger.tvhplayer.core.homeInitialFocus
 import at.bernhardberger.tvhplayer.core.homeRestoreFocus
 import at.bernhardberger.tvhplayer.core.offeredResumePosition
 import at.bernhardberger.tvhplayer.core.recordingIsRunning
+import at.bernhardberger.tvhplayer.core.recordingExpiryTimeLeft
+import at.bernhardberger.tvhplayer.core.recordingExpiryTime
 import at.bernhardberger.tvhplayer.core.recordingLengthSeconds
 import at.bernhardberger.tvhplayer.core.recordingTimeLeft
 import at.bernhardberger.tvhplayer.core.recordingWatchState
@@ -122,6 +124,7 @@ import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.formatRecordedDuration
 import at.bernhardberger.tvhplayer.ui.common.formatRecordingDate
+import at.bernhardberger.tvhplayer.ui.common.formatRecordingExpiry
 import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
 import at.bernhardberger.tvhplayer.ui.common.rememberCurrentEpochSeconds
 import at.bernhardberger.tvhplayer.ui.components.CardGlowReach
@@ -143,6 +146,8 @@ import at.bernhardberger.tvhplayer.ui.components.RowHeading
 import at.bernhardberger.tvhplayer.ui.components.RowChangeMotion
 import at.bernhardberger.tvhplayer.ui.components.StandardCardTextGap
 import at.bernhardberger.tvhplayer.ui.components.StandardProgrammeCard
+import at.bernhardberger.tvhplayer.ui.components.StatusBadge
+import at.bernhardberger.tvhplayer.ui.components.StatusBadgeTone
 import at.bernhardberger.tvhplayer.ui.components.StartKeylineBringIntoViewSpec
 import at.bernhardberger.tvhplayer.ui.screens.ChannelsHeadline
 import at.bernhardberger.tvhplayer.ui.screens.ChannelsImmersiveBackground
@@ -640,7 +645,11 @@ internal fun HomeContent(
                     val emphasisState = animateFloatAsState(if (focused) 1f else 0f, RowChangeMotion, label = "home-row-emphasis")
                     val emphasis = { emphasisState.value }
                     val lastIndex = (section.itemCount() - 1 +
-                        if (section is HomeSection.ContinueWatching || section is HomeSection.RecentlyRecorded || section is HomeSection.RecentChannels) 1 else 0)
+                        when (section) {
+                            is HomeSection.ContinueWatching, is HomeSection.ExpiringSoon,
+                            is HomeSection.RecentlyRecorded, is HomeSection.RecentChannels -> 1
+                            else -> 0
+                        })
                         .coerceAtLeast(0)
                     val entryIndex = initialKey?.takeIf { it.section == kind }?.let {
                         if (it.item in HomeEndCardKeys) lastIndex else it.position.coerceIn(0, lastIndex)
@@ -806,8 +815,8 @@ internal fun HomeContent(
                                 onContextMenu = contextMenu,
                             )
 
-                            is HomeSection.RecentlyRecorded -> HomeShelfRow(
-                                items = section.items,
+                            is HomeSection.ExpiringSoon, is HomeSection.RecentlyRecorded -> HomeShelfRow(
+                                items = section.recordingShelfItems(),
                                 width = cardWidth,
                                 continueWatching = false,
                                 keyline = keyline,
@@ -1383,6 +1392,12 @@ private fun HomeGenreRow(
     }
 }
 
+private fun HomeSection.recordingShelfItems(): List<at.bernhardberger.tvhplayer.core.RecordingItem> = when (this) {
+    is HomeSection.ExpiringSoon -> items
+    is HomeSection.RecentlyRecorded -> items
+    else -> emptyList()
+}
+
 @Composable
 private fun HomeShelfRow(
     items: List<at.bernhardberger.tvhplayer.core.RecordingItem>,
@@ -1430,6 +1445,11 @@ private fun HomeShelfRow(
             )
         } else {
             val recording = item.entry
+            val resources = LocalContext.current.resources
+            val expiry = recordingExpiryTimeLeft(recordingExpiryTime(recording, nowSec), nowSec)
+            val expiryDescription = expiry?.let {
+                resources.getString(R.string.recording_expires_in, formatRecordingExpiry(it, resources))
+            }
             val channel = recording.channelId?.let { id ->
                 input?.channels?.firstOrNull { it.id == id }
             }
@@ -1510,6 +1530,15 @@ private fun HomeShelfRow(
                         modifier = Modifier.fillMaxSize(),
                         progressColor = progressColor(watching = true),
                     )
+                    expiry?.let {
+                        StatusBadge(
+                            text = formatRecordingExpiry(it, resources, compact = true),
+                            tone = StatusBadgeTone.NEUTRAL,
+                            icon = R.drawable.ic_hourglass_bottom,
+                            contentDescription = expiryDescription,
+                            modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
+                        )
+                    }
                     // Only a recording that is still running carries the red mark; a finished one has none.
                     val runningState = recording.state?.takeIf { recordingIsRunning(recording) }
                     if (runningState != null) Box(
@@ -1584,6 +1613,7 @@ private fun HomeSection.itemCount(): Int = when (this) {
     is HomeSection.OnNow -> items.size
     is HomeSection.Genres -> items.size
     is HomeSection.ContinueWatching -> items.size
+    is HomeSection.ExpiringSoon -> items.size
     is HomeSection.RecentlyRecorded -> items.size
     is HomeSection.Upcoming -> items.size + 1
 }
@@ -1595,6 +1625,7 @@ private fun HomeSection.headingTitle(): String? = when (this) {
     is HomeSection.OnNow -> stringResource(R.string.home_on_now)
     is HomeSection.Genres -> stringResource(R.string.home_browse_by_genre)
     is HomeSection.ContinueWatching -> stringResource(R.string.home_continue_watching)
+    is HomeSection.ExpiringSoon -> stringResource(R.string.home_expiring_soon)
     is HomeSection.RecentlyRecorded -> stringResource(R.string.home_recently_recorded)
     is HomeSection.Upcoming -> stringResource(R.string.home_upcoming_recordings)
 }

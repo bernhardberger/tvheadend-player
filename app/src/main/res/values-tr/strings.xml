@@ -580,7 +580,6 @@
     <string name="details_read_more">Daha fazla bilgi</string>
     <string name="details_important_information">Ayrıntılar</string>
     <string name="details_cast_and_crew">Oyuncular ve ekip</string>
-    <string name="details_available_until">Son kullanılabilirlik: %1$s</string>
     <string name="details_size">Boyut</string>
     <string name="details_recording_profile">Kayıt profili</string>
     <string name="details_picture">Görüntü</string>

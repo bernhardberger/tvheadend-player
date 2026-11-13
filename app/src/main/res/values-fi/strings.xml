@@ -580,7 +580,6 @@
     <string name="details_read_more">Lisätiedot</string>
     <string name="details_important_information">Tiedot</string>
     <string name="details_cast_and_crew">Näyttelijät ja tekijät</string>
-    <string name="details_available_until">Saatavilla ajankohtaan %1$s asti</string>
     <string name="details_size">Koko</string>
     <string name="details_recording_profile">Tallennusprofiili</string>
     <string name="details_picture">Kuva</string>

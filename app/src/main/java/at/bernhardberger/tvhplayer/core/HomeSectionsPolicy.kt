@@ -23,6 +23,7 @@ enum class HomeSectionKind {
     ON_NOW,
     GENRES,
     CONTINUE_WATCHING,
+    EXPIRING_SOON,
     RECENTLY_RECORDED,
     UPCOMING,
 }
@@ -58,6 +59,10 @@ sealed interface HomeSection {
 
     data class ContinueWatching(val items: List<RecordingItem>) : HomeSection {
         override val kind: HomeSectionKind = HomeSectionKind.CONTINUE_WATCHING
+    }
+
+    data class ExpiringSoon(val items: List<RecordingItem>) : HomeSection {
+        override val kind: HomeSectionKind = HomeSectionKind.EXPIRING_SOON
     }
 
     data class RecentlyRecorded(val items: List<RecordingItem>) : HomeSection {
@@ -135,6 +140,7 @@ fun homeSections(input: HomeInput): List<HomeSection> {
         onNowSection(input)?.let(::add)
         genresSection(input)?.let(::add)
         continueWatchingSection(input, resumeOffered)?.let(::add)
+        expiringSoonSection(input)?.let(::add)
         recentlyRecordedSection(input, resumeOffered)?.let(::add)
         upcomingSection(input)?.let(::add)
     }.filterNot { it.kind in input.hiddenSections }
@@ -303,6 +309,26 @@ private fun recentlyRecordedSection(
     return HomeSection.RecentlyRecorded(items)
 }
 
+/** Unwatched or partly watched files, soonest expiry first, using the shared seven-day window. */
+private fun expiringSoonSection(input: HomeInput): HomeSection.ExpiringSoon? {
+    val items = input.dvrEntries.asSequence()
+        .filter { it.state == DvrEntryState.COMPLETED || it.state == DvrEntryState.COMPLETED_ERROR }
+        .filter {
+            recordingWatchState(it, offeredResumePosition(input.admission(it)), input.nowSec) !=
+                RecordingWatchState.Watched
+        }
+        .mapNotNull { entry ->
+            recordingExpiryTime(entry, input.nowSec)
+                ?.takeIf { recordingExpiryTimeLeft(it, input.nowSec) != null }
+                ?.let { entry to it }
+        }
+        .sortedBy { it.second }
+        .take(RECORDING_SHELF_LIMIT)
+        .map { RecordingItem(it.first) }
+        .toList()
+    return items.takeIf { it.isNotEmpty() }?.let(HomeSection::ExpiringSoon)
+}
+
 /** Next-first scheduled recordings; nothing scheduled means no section at all. */
 private fun upcomingSection(input: HomeInput): HomeSection.Upcoming? {
     val scheduled = input.dvrEntries
@@ -321,6 +347,7 @@ private fun HomeSection.itemKeys(): List<String> = when (this) {
     is HomeSection.OnNow -> items.map { "onnow:${it.channel.id.value}" }
     is HomeSection.Genres -> items.map { "genre:${it.category.name}" }
     is HomeSection.ContinueWatching -> items.map { "recording:${it.entry.id.value}" }
+    is HomeSection.ExpiringSoon -> items.map { "recording:${it.entry.id.value}" }
     is HomeSection.RecentlyRecorded -> items.map { "recording:${it.entry.id.value}" }
     is HomeSection.Upcoming -> items.map { "recording:${it.entry.id.value}" }
 }
