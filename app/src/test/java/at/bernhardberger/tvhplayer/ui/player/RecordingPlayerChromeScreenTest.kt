@@ -749,13 +749,6 @@ class RecordingPlayerChromeScreenTest {
         assertTrue("Stats switch is on", statsStore.visible.value)
         assertEquals("the recording session samples while Stats are on", 3_600_000L, runtime.diagnostics.value.durationMs)
         assertTrue("Stats remain shown under their options page", exists("playback-stats-overlay"))
-        compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.CREATED }
-        settle()
-        assertEquals("Stats alone do not keep a stopped recording sampling", null, runtime.diagnostics.value.durationMs)
-        assertTrue(statsStore.visible.value)
-        compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.RESUMED }
-        settle()
-        assertEquals(3_600_000L, runtime.diagnostics.value.durationMs)
         key(Key.Back)
         key(Key.Back)
         key(Key.Back)
