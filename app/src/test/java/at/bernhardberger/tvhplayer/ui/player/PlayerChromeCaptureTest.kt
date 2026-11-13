@@ -315,7 +315,7 @@ class PlayerChromeCaptureTest {
         // Player (i) focus and the channel rail's Recent row.
         INFO_FOCUSED, RECORDING_INFO_FOCUSED, RECENT_OPEN, BROWSER_NOW, BROWSER_EMPTY,
         // The audio button beside Info, focused.
-        AUDIO_FOCUSED, RECORDING_STARTING, RECORDING_STARTING_CONTROLS,
+        AUDIO_FOCUSED, RECORDING_STARTING, RECORDING_STARTING_CONTROLS, BANNER_LONG_EYEBROW,
     }
 
     /** [Scene.CONTROLS_REVEAL_MID] composes the Banner, then the controls take it over. */
@@ -560,7 +560,14 @@ class PlayerChromeCaptureTest {
         val content = PlayerChromeContent(
             clock = formatClock(NOW),
             info = liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 101, "Ridge Earth HD", programme.takeUnless { noEpg }, next.takeUnless { noEpg }, nextScheduled = true, nowSec = NOW,
-                unavailableTitle = "No program information"),
+                unavailableTitle = "No program information").let { info ->
+                when (scene) {
+                    Scene.BANNER_LIVE -> info.copy(title = "Ridge Light")
+                    Scene.BANNER_LONG_EYEBROW -> info.copy(metadata =
+                        "Drama • A journey through mountain communities and their remarkable histories ".repeat(4))
+                    else -> info
+                }
+            },
             state = state,
             recordingNow = scene == Scene.CONTROLS_BEHIND || scene == Scene.BANNER_BEHIND,
             badges = when (scene) {
@@ -608,9 +615,10 @@ class PlayerChromeCaptureTest {
                 recordingChannels = setOf(ChannelId(1)), tray = {}, previewFollowsFocus = true)
             Scene.BANNER_TUNING -> Banner(PlayerChromeMode.BANNER, content,
                 PlayerChromeTimeline.Live(AppTimeshiftState(), NOW, programme, motionKey = ChannelId(1), tuning = true))
-            Scene.BANNER_LIVE -> Banner(PlayerChromeMode.BANNER, content, PlayerChromeTimeline.Live(timeshift, NOW, programme,
-                committedWindow = ProgrammeWindow(programme, Instant.fromEpochSeconds(NOW), 0.57f, 0.46f, 0.57f, 0.57f, true),
-                motionKey = ChannelId(1)))
+            Scene.BANNER_LIVE, Scene.BANNER_LONG_EYEBROW -> Banner(PlayerChromeMode.BANNER, content,
+                PlayerChromeTimeline.Live(timeshift, NOW, programme,
+                    committedWindow = ProgrammeWindow(programme, Instant.fromEpochSeconds(NOW), 0.57f, 0.46f, 0.57f, 0.57f, true),
+                    motionKey = ChannelId(1)))
             Scene.BANNER_BEHIND, Scene.BANNER_PAUSED -> Banner(PlayerChromeMode.BANNER, content, PlayerChromeTimeline.Live(timeshift, NOW, programme,
                 committedWindow = ProgrammeWindow(programme, Instant.fromEpochSeconds(NOW - 203), 0.53f, 0.46f, 0.57f, 0.57f, true),
                 motionKey = ChannelId(1)))

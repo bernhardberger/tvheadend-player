@@ -301,7 +301,7 @@ class PlayerChromeEvidenceTest {
         }
     }
 
-    @Test fun streamBadgesKeepTheirWidthAndKeylineWithoutMovingProgrammeLines() {
+    @Test fun streamBadgesFollowFactsWithoutMovingProgrammeLinesOrShrinking() {
         var badges by mutableStateOf(emptyList<GlanceBadge>())
         var metadata by mutableStateOf("Drama")
         compose.setContent { TVHeadendPlayerTheme {
@@ -316,14 +316,17 @@ class PlayerChromeEvidenceTest {
         compose.runOnIdle { badges = glanceBadges(2160, "audio/eac3", 6, true, VideoScan.PROGRESSIVE) }
         val group = bounds("player-stream-badges")
         lines.forEach { assertEquals("$it keeps its vertical position", before.getValue(it).top, bounds(it).top, 0.5f) }
-        assertEquals(bounds("player-info-title").right, group.right, 0.5f)
+        val gap = with(compose.density) { 12.dp.toPx() }
+        assertEquals("tags follow the facts with the chosen gap", bounds("player-info-programme").right + gap, group.left, 0.5f)
         compose.runOnIdle { metadata = "Very long localized programme metadata ".repeat(30) }
-        assertEquals("badges never shrink", group.width, bounds("player-stream-badges").width, 0.5f)
-        assertTrue("the eyebrow yields before the badges", bounds("player-info-programme").right < group.left)
+        val longGroup = bounds("player-stream-badges")
+        assertEquals("badges never shrink", group.width, longGroup.width, 0.5f)
+        assertEquals("the eyebrow yields before the badges", bounds("player-info-programme").right + gap, longGroup.left, 0.5f)
+        lines.forEach { assertEquals("$it keeps its vertical position with long facts", before.getValue(it).top, bounds(it).top, 0.5f) }
     }
 
     @Test fun streamBadgesRespectTheFactsLineDistanceReserveAndKeepTheirPlaceWithoutEpg() {
-        var facts by mutableStateOf("20:15–21:45")
+        var facts by mutableStateOf("Very long localized programme metadata ".repeat(30))
         val reserve = 180.dp
         compose.setContent { TVHeadendPlayerTheme {
             PlayerInfoBar(
@@ -334,12 +337,13 @@ class PlayerChromeEvidenceTest {
         } }
         fun bounds(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val group = bounds("player-stream-badges")
-        val columnEnd = bounds("player-info-title").right
+        val columnStart = bounds("player-info-title").left
         assertTrue("the facts-line badges leave the distance room",
             group.right <= bounds("player-info-title").right - with(compose.density) { reserve.toPx() } + 0.5f)
         compose.runOnIdle { facts = "" }
         val noEpg = bounds("player-stream-badges")
-        assertEquals("without facts badges return to the text column end", columnEnd, noEpg.right, 0.5f)
+        assertEquals("without facts badges start on the title keyline", columnStart, noEpg.left, 0.5f)
+        assertEquals("no facts do not change the tags' width", group.width, noEpg.width, 0.5f)
         assertEquals("empty facts retain the eyebrow height", group.top, noEpg.top, 0.5f)
     }
 

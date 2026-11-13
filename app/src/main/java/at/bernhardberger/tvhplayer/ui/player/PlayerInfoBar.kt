@@ -25,7 +25,7 @@ import at.bernhardberger.tvhplayer.core.GlanceBadge
 import at.bernhardberger.tvhplayer.ui.components.ScheduledIndicator
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 
-private val InfoBarFactsBadgeGap = 16.dp
+private val InfoBarFactsBadgeGap = 12.dp
 
 /**
  * Presentation strings follow the displayed programme/seek target. Callers pass no next for
@@ -131,10 +131,10 @@ private fun PlayerInfoFacts(facts: String, badges: List<GlanceBadge>, modifier: 
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(facts, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextTertiaryAlpha),
-            modifier = Modifier.weight(1f).testTag("player-info-programme").clearAndSetSemantics {})
+            modifier = Modifier.weight(1f, fill = false).testTag("player-info-programme").clearAndSetSemantics {})
         if (badges.isNotEmpty()) {
-            Spacer(Modifier.width(InfoBarFactsBadgeGap))
-            PlayerGlanceBadges(badges, Modifier.wrapContentWidth(unbounded = true))
+            if (facts.isNotEmpty()) Spacer(Modifier.width(InfoBarFactsBadgeGap))
+            PlayerGlanceBadges(badges)
         }
     }
 }

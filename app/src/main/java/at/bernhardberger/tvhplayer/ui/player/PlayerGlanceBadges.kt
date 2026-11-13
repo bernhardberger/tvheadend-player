@@ -23,15 +23,15 @@ internal fun glanceBadgeSpoken(badge: GlanceBadge): String = when (badge.kind) {
 
 @Composable
 internal fun PlayerGlanceBadges(badges: List<GlanceBadge>, modifier: Modifier = Modifier) {
-    // The same gap as adjacent RecordingBadge status badges.
     Row(modifier.testTag("player-stream-badges").clearAndSetSemantics {},
-        horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         badges.forEach { badge ->
             StatusBadge(
                 if (badge.kind == GlanceBadgeKind.AD) stringResource(R.string.player_ad_short) else badge.value,
                 StatusBadgeTone.NEUTRAL,
                 contentDescription = null,
                 compact = true,
+                outlined = true,
             )
         }
     }
