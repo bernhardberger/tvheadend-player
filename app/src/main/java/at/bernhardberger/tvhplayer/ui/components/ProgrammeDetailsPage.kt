@@ -146,7 +146,9 @@ internal fun ProgrammeDetailsPage(
     val locale = LocalConfiguration.current.locales[0]
     val aboutText = remember(summary, description) { programmeAboutText(summary, description, false) }
     val aboutFacts = remember(event, recording, locale) { programmeAboutFacts(event, recording, resources, locale) }
-    val credits = remember(event ?: recordingEvent, resources) { programmeCreditFacts(event ?: recordingEvent, resources) }
+    val credits = remember(event ?: recordingEvent, resources) {
+        programmeCreditFacts(event ?: recordingEvent, resources)
+    }
     val importantFacts = aboutFacts + (if (event == null && recording != null)
         recordingMetadataFacts(recording, recordingConfigurations, context, locale, nowSec) else emptyList())
     val hasAbout = aboutText.isNotEmpty()
@@ -157,10 +159,11 @@ internal fun ProgrammeDetailsPage(
     var aboutConstraints by remember { mutableStateOf<Constraints?>(null) }
     var aboutIsPanel by remember { mutableStateOf(false) }
     val measurePlain = { constraints: Constraints ->
-        val full = synopsisMeasurer.measure(synopsis, synopsisStyle, maxLines = DetailsSynopsisMaxLines,
+        val full = synopsisMeasurer.measure(synopsis, synopsisStyle, maxLines = DETAILS_SYNOPSIS_MAX_LINES,
             constraints = constraints.copy(maxHeight = Constraints.Infinity))
         if (!full.hasVisualOverflow && full.lineCount <= 2) full
-        else synopsisMeasurer.measure(synopsis, synopsisStyle, maxLines = DetailsSynopsisMaxLines, constraints = constraints)
+        else synopsisMeasurer.measure(synopsis, synopsisStyle,
+            maxLines = DETAILS_SYNOPSIS_MAX_LINES, constraints = constraints)
     }
     val requesters = remember { BrowseContextAction.entries.associateWith { FocusRequester() } }
     val panelFocus = remember { FocusRequester() }
@@ -215,8 +218,10 @@ internal fun ProgrammeDetailsPage(
     }
     BackHandler(enabled = backEnabled, onBack = ::close)
     // Only re-measure the cached viewport while the page is absent; restoration reads the rendered branch.
-    val closeAboutReader = reading && (!hasAbout || aboutConstraints?.let { !measurePlain(it).hasVisualOverflow } == true)
-    LaunchedEffect(reading, backEnabled, credits.isNotEmpty(), importantFacts.isNotEmpty(), closeAboutReader, hasAbout, aboutIsPanel) {
+    val closeAboutReader = reading &&
+        (!hasAbout || aboutConstraints?.let { !measurePlain(it).hasVisualOverflow } == true)
+    LaunchedEffect(reading, backEnabled, credits.isNotEmpty(), importantFacts.isNotEmpty(),
+        closeAboutReader, hasAbout, aboutIsPanel) {
         if (closeAboutReader) reading = false
         else if (!reading && backEnabled) {
             withFrameNanos { }
@@ -251,7 +256,8 @@ internal fun ProgrammeDetailsPage(
     val heroEmphasis = animateFloatAsState(if (focusedSection == DetailsSection.ACTIONS) 1f else 0f, RowChangeMotion, label = "details-hero")
     val airingsEmphasis = animateFloatAsState(if (focusedSection == DetailsSection.AIRINGS) 1f else 0f, RowChangeMotion, label = "details-airings")
     val factsEmphasis = animateFloatAsState(if (focusedSection == DetailsSection.FACTS) 1f else 0f, RowChangeMotion, label = "details-facts")
-    val creditsEmphasis = animateFloatAsState(if (focusedSection == DetailsSection.CREDITS) 1f else 0f, RowChangeMotion, label = "details-credits")
+    val creditsEmphasis = animateFloatAsState(if (focusedSection == DetailsSection.CREDITS) 1f else 0f,
+        RowChangeMotion, label = "details-credits")
     // Focus search moves between the sections. The focused item's section comes to the heading
     // keyline, the hero to the page's top, in one calm motion as the airings row's text shrinks or
     // grows (the hero stands for its About panel too). Once input focus has left the airings row, the
@@ -270,7 +276,8 @@ internal fun ProgrammeDetailsPage(
         when (target) {
             DetailsSection.ACTIONS, DetailsSection.ABOUT -> 0
             DetailsSection.AIRINGS -> heroHeight - headingKeyline
-            DetailsSection.CREDITS -> creditsTop - (if (focused == DetailsSection.AIRINGS) 0 else airingsText.intValue) - headingKeyline
+            DetailsSection.CREDITS ->
+                creditsTop - (if (focused == DetailsSection.AIRINGS) 0 else airingsText.intValue) - headingKeyline
             DetailsSection.FACTS -> factsTop - (if (focused == DetailsSection.AIRINGS) 0 else airingsText.intValue) - headingKeyline
         }
     }
@@ -330,8 +337,10 @@ internal fun ProgrammeDetailsPage(
                        factPanel && (key.key == Key.DirectionDown || key.key == Key.DirectionUp) -> {
                            val scroll = if (section == DetailsSection.CREDITS) creditsScroll else factsScroll
                            val down = key.key == Key.DirectionDown
-                           if (!down && !scroll.canScrollBackward ||
-                               down && !scroll.canScrollForward && section == DetailsSection.CREDITS && importantFacts.isNotEmpty())
+                           val leavingAtTop = !down && !scroll.canScrollBackward
+                           val factsFollowCredits = section == DetailsSection.CREDITS && importantFacts.isNotEmpty()
+                           val leavingAtBottom = down && !scroll.canScrollForward && factsFollowCredits
+                           if (leavingAtTop || leavingAtBottom)
                                key.nativeKeyEvent.repeatCount > 0
                            else {
                                if (key.type == KeyEventType.KeyDown) {
@@ -341,7 +350,8 @@ internal fun ProgrammeDetailsPage(
                                    sectionScrollTargets[scrollingSection] = target
                                    scope.launch {
                                        scroll.animateScrollTo(target, RowChangeMotion)
-                                       if (sectionScrollTargets[scrollingSection] == target) sectionScrollTargets.remove(scrollingSection)
+                                       if (sectionScrollTargets[scrollingSection] == target)
+                                           sectionScrollTargets.remove(scrollingSection)
                                    }
                                }
                                true
@@ -484,7 +494,8 @@ internal fun ProgrammeDetailsPage(
                         onFocused = { lastCard = it }, onTextHeight = { airingsText.intValue = it },
                         onClick = { if (backEnabled) onRelated(it) },
                         onOpenContextMenu = onRelatedContextMenu?.let { open -> { if (backEnabled) open(it) } },
-                        bottomSpace = if (credits.isNotEmpty() || importantFacts.isNotEmpty()) DetailsSectionGap else DetailsSafeEdge)
+                        bottomSpace = if (credits.isNotEmpty() || importantFacts.isNotEmpty())
+                            DetailsSectionGap else DetailsSafeEdge)
                     if (credits.isNotEmpty()) DetailsFactSection(stringResource(R.string.details_cast_and_crew),
                           creditsScroll, rowSpec, viewport, creditsHeadingHeight, { creditsEmphasis.value },
                           if (importantFacts.isNotEmpty()) DetailsSectionGap else DetailsSafeEdge,
@@ -500,9 +511,12 @@ internal fun ProgrammeDetailsPage(
                                   canFocus = backEnabled
                                   down = if (importantFacts.isNotEmpty()) factsFocus else FocusRequester.Cancel
                                   left = FocusRequester.Cancel; right = FocusRequester.Cancel
-                              }.semantics(mergeDescendants = true) {}.focusable().testTag("details-credits-panel")) { DetailsCredits(credits) }
+                              }.semantics(mergeDescendants = true) {}.focusable().testTag("details-credits-panel")) {
+                          DetailsCredits(credits)
+                      }
                     if (importantFacts.isNotEmpty()) DetailsFactSection(stringResource(R.string.details_important_information),
-                          factsScroll, rowSpec, viewport, factsHeadingHeight, { factsEmphasis.value }, DetailsSafeEdge, Modifier
+                          factsScroll, rowSpec, viewport, factsHeadingHeight, { factsEmphasis.value },
+                          DetailsSafeEdge, Modifier
                           .onPlaced { factsTop = it.positionInParent().y.roundToInt() }
                          .scrollSection(pageSpec, DetailsSection.FACTS)
                          .focusRequester(factsFocus).onFocusChanged {
@@ -518,7 +532,9 @@ internal fun ProgrammeDetailsPage(
                               up = if (credits.isNotEmpty()) creditsFocus else FocusRequester.Default
                              down = FocusRequester.Cancel
                              left = FocusRequester.Cancel; right = FocusRequester.Cancel
-                          }.semantics(mergeDescendants = true) {}.focusable().testTag("details-facts-panel")) { DetailsAboutFacts(importantFacts) }
+                          }.semantics(mergeDescendants = true) {}.focusable().testTag("details-facts-panel")) {
+                        DetailsAboutFacts(importantFacts)
+                    }
                     else if (ids.isEmpty() && credits.isEmpty()) Spacer(Modifier.height(DetailsSafeEdge))
                     // Room after the last section, so that it reaches the same keyline as the others.
                     if (ids.isNotEmpty() || credits.isNotEmpty() || importantFacts.isNotEmpty())
@@ -556,22 +572,25 @@ private fun DetailsAbout(synopsis: String?, onRead: () -> Unit, modifier: Modifi
     measurePlain: (Constraints) -> androidx.compose.ui.text.TextLayoutResult) {
     val textHeight = availableHeight - with(LocalDensity.current) { DetailsReadingInset.roundToPx() * 2 }
     BoxWithConstraints(Modifier.widthIn(max = 584.dp).testTag("details-about")) {
-        val plain = measurePlain(Constraints(maxWidth = constraints.maxWidth, maxHeight = availableHeight.coerceAtLeast(0)))
+        val plain = measurePlain(Constraints(maxWidth = constraints.maxWidth,
+            maxHeight = availableHeight.coerceAtLeast(0)))
         if (!plain.hasVisualOverflow) {
             Text(synopsis.orEmpty(), Modifier.fillMaxWidth().testTag("details-synopsis")
                 .onGloballyPositioned { onTextArea(it.boundsInRoot()) },
                 style = MaterialTheme.typography.bodyMedium, color = TvTextColors.secondary,
-                maxLines = DetailsSynopsisMaxLines)
+                maxLines = DETAILS_SYNOPSIS_MAX_LINES)
         } else {
             val interaction = remember { MutableInteractionSource() }
             val focused by interaction.collectIsFocusedAsState()
             DetailsReadingPanel(onRead, modifier.fillMaxWidth().testTag("details-about-description"), interaction) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                     Box(Modifier.weight(1f)) { DetailsSynopsis(synopsis.orEmpty(), onTextArea, textHeight) }
                     // Like a focused button, the arrow's circle turns white and the arrow dark.
                     Icon(painterResource(R.drawable.ic_arrow_forward), null,
                         Modifier.size(32.dp).background(
-                            if (focused) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = .12f),
+                            if (focused) MaterialTheme.colorScheme.onSurface
+                            else MaterialTheme.colorScheme.onSurface.copy(alpha = .12f),
                             CircleShape).padding(6.dp).testTag("details-about-arrow"),
                         tint = if (focused) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.onSurface)
                 }
@@ -580,7 +599,7 @@ private fun DetailsAbout(synopsis: String?, onRead: () -> Unit, modifier: Modifi
     }
 }
 
-private const val DetailsSynopsisMaxLines = 4
+private const val DETAILS_SYNOPSIS_MAX_LINES = 4
 
 @Composable
 private fun DetailsSynopsis(text: String, onTextArea: (androidx.compose.ui.geometry.Rect) -> Unit, availableHeight: Int) {
@@ -590,8 +609,9 @@ private fun DetailsSynopsis(text: String, onTextArea: (androidx.compose.ui.geome
     BoxWithConstraints {
         val width = with(LocalDensity.current) { maxWidth.roundToPx() }
         // Spend room above the action anchor plus its peek slack; two lines retain the old overflow fallback.
-        val maxLines = (DetailsSynopsisMaxLines downTo 3).firstOrNull { lines ->
-            measurer.measure(text, style, maxLines = lines, constraints = Constraints(maxWidth = width)).size.height <= availableHeight
+        val maxLines = (DETAILS_SYNOPSIS_MAX_LINES downTo 3).firstOrNull { lines ->
+            measurer.measure(text, style, maxLines = lines,
+                constraints = Constraints(maxWidth = width)).size.height <= availableHeight
         } ?: 2
         val displayed = remember(text, more, width, style, measurer, maxLines) {
             val constraints = Constraints(maxWidth = width)
@@ -614,7 +634,8 @@ private fun DetailsSynopsis(text: String, onTextArea: (androidx.compose.ui.geome
                 candidate(if (low < text.length && !text[low].isWhitespace() && boundary >= 0) boundary else low)
             }
         }
-        Text(displayed, Modifier.testTag("details-synopsis").onGloballyPositioned { onTextArea(it.boundsInRoot()) }, style = style, maxLines = maxLines)
+        Text(displayed, Modifier.testTag("details-synopsis").onGloballyPositioned { onTextArea(it.boundsInRoot()) },
+            style = style, maxLines = maxLines)
     }
 }
 
@@ -684,7 +705,8 @@ private fun DetailsFirstScreen(screen: Int, lower: Boolean, next: String, modifi
                 else Constraints.Infinity
             subcompose(DetailsFirstScreenPart.ABOUT) { it(available) }.single().measure(loose)
         }
-        val contentHeight = informationContent.height + aboutGap + (aboutContent?.height ?: 0) + actionGap + actionContent.height
+        val contentHeight = informationContent.height + aboutGap + (aboutContent?.height ?: 0) +
+            actionGap + actionContent.height
         val hint = if (lower && bounded && top + contentHeight > anchor + DetailsPeekSlack.roundToPx())
             subcompose(DetailsFirstScreenPart.HINT) { DetailsNextHint(next) }.single().measure(loose) else null
         val edge = DetailsHintEdge.roundToPx()
@@ -730,8 +752,10 @@ private fun DetailsFactSection(title: String, scroll: androidx.compose.foundatio
         // Each panel scrolls by its own spec, not the page's.
         CompositionLocalProvider(LocalBringIntoViewSpec provides scrollSpec) {
             Box(Modifier.heightIn(max = with(density) {
-                (viewport - DetailsSectionKeyline.roundToPx() - headingHeight.intValue).coerceAtLeast(1).toDp() - DetailsSafeEdge
-            }.coerceAtLeast(1.dp)).listEdgeFadeMask(32.dp, 32.dp, { scroll.canScrollBackward }, { scroll.canScrollForward }, exposeFades = true)
+                (viewport - DetailsSectionKeyline.roundToPx() - headingHeight.intValue).coerceAtLeast(1).toDp() -
+                    DetailsSafeEdge
+            }.coerceAtLeast(1.dp)).listEdgeFadeMask(32.dp, 32.dp,
+                { scroll.canScrollBackward }, { scroll.canScrollForward }, exposeFades = true)
                 .verticalScroll(scroll).rowContentEmphasis(emphasis), contentAlignment = Alignment.TopStart) {
                 content()
             }
