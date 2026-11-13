@@ -134,13 +134,15 @@ private const val RECENTLY_RECORDED_WINDOW_SECONDS = 7L * 24 * 60 * 60
 fun homeSections(input: HomeInput): List<HomeSection> {
     val resumeOffered = input.dvrEntries
         .associate { it.id to (offeredResumePosition(input.admission(it)) != null) }
+    val continueWatching = continueWatchingSection(input, resumeOffered)
+        .takeUnless { HomeSectionKind.CONTINUE_WATCHING in input.hiddenSections }
     return buildList {
         currentActivitySection(input)?.let(::add)
         recentChannelsSection(input)?.let(::add)
         onNowSection(input)?.let(::add)
         genresSection(input)?.let(::add)
-        continueWatchingSection(input, resumeOffered)?.let(::add)
-        expiringSoonSection(input)?.let(::add)
+        continueWatching?.let(::add)
+        expiringSoonSection(input, continueWatching?.items.orEmpty().map { it.entry.id }.toSet())?.let(::add)
         recentlyRecordedSection(input, resumeOffered)?.let(::add)
         upcomingSection(input)?.let(::add)
     }.filterNot { it.kind in input.hiddenSections }
@@ -310,8 +312,9 @@ private fun recentlyRecordedSection(
 }
 
 /** Unwatched or partly watched files, soonest expiry first, using the shared seven-day window. */
-private fun expiringSoonSection(input: HomeInput): HomeSection.ExpiringSoon? {
+private fun expiringSoonSection(input: HomeInput, continued: Set<DvrEntryId>): HomeSection.ExpiringSoon? {
     val items = input.dvrEntries.asSequence()
+        .filterNot { it.id in continued }
         .filter { it.state == DvrEntryState.COMPLETED || it.state == DvrEntryState.COMPLETED_ERROR }
         .filter {
             recordingWatchState(it, offeredResumePosition(input.admission(it)), input.nowSec) !=

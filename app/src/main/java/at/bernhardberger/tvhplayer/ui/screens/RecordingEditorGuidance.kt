@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.tv.material3.MaterialTheme
@@ -24,5 +25,12 @@ internal fun RecordingEditorSecondary(text: String, modifier: Modifier = Modifie
 internal fun recordingEditorMoreSummary(changed: Set<RecordingDraftField>, editing: Boolean): String =
     if (changed.isEmpty()) stringResource(if (editing)
         R.string.autorec_editor_unchanged_options else R.string.autorec_editor_defaults)
-    else stringResource(R.string.autorec_editor_changed_options, changed.size,
-        changed.map { automaticRecordingFieldLabel(it) }.joinToString(", "))
+    else changed.map { automaticRecordingFieldLabel(it) }.joinToString(", ")
+
+@Composable
+internal fun RecordingEditorPreviewPair(title: String, meta: String) {
+    Column {
+        Text(title, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+        RecordingEditorSecondary(meta)
+    }
+}

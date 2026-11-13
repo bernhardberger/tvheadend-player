@@ -47,7 +47,7 @@ internal fun TimerRecordingGuidance(
                     Text(timerNameLabel(state.draft, channels), style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface)
                 }
-                if (state.draft.repeating) TimerRecordingUpcoming(state) else TimerRecordingOneOff(state)
+                if (state.draft.repeating) TimerRecordingUpcoming(state, channels) else TimerRecordingOneOff(state)
             }
         }
     }
@@ -72,8 +72,6 @@ private fun timerGuidanceBody(state: TimerRecordingEditorState, channels: List<C
 @Composable
 private fun TimerRecordingOneOff(state: TimerRecordingEditorState) {
     if (state.draft.end < state.draft.start) {
-        StatusBadge(stringResource(R.string.timer_editor_next_day), StatusBadgeTone.NEUTRAL,
-            icon = R.drawable.ic_event)
         RecordingEditorSecondary(stringResource(R.string.timer_editor_ends,
             timerDateLabel(state, state.draft.date.plusDays(1)), formatClock(state.draft.end)))
     }
@@ -83,11 +81,12 @@ private fun TimerRecordingOneOff(state: TimerRecordingEditorState) {
 }
 
 @Composable
-private fun TimerRecordingUpcoming(state: TimerRecordingEditorState) {
+private fun TimerRecordingUpcoming(state: TimerRecordingEditorState, channels: List<Channel>) {
     RecordingEditorSecondary(stringResource(R.string.timer_editor_next_recordings))
     val occurrences = state.draft.nextOccurrences(state.now(), state.zone, 3)
     if (occurrences.isEmpty()) RecordingEditorSecondary(stringResource(R.string.timer_editor_none_upcoming))
-    for (occurrence in occurrences) RecordingEditorSecondary(
+    for (occurrence in occurrences) RecordingEditorPreviewPair(
+        timerNameLabel(state.draft, channels),
         timerDateAndClockLabel(state, occurrence.start) + " – ${formatClock(state.draft.end)}",
     )
     RecordingEditorSecondary(stringResource(R.string.timer_editor_no_padding))
@@ -98,9 +97,7 @@ private fun TimerRecordingRemoved(state: TimerRecordingEditorState, entries: Lis
     RecordingEditorHeading(stringResource(R.string.autorec_editor_off_after_save))
     RecordingEditorSecondary(stringResource(R.string.autorec_editor_off_help))
     for (entry in entries.take(3)) {
-        Text(entry.title.orEmpty(), style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface)
-        RecordingEditorSecondary(listOfNotNull(
+        RecordingEditorPreviewPair(entry.title.orEmpty(), listOfNotNull(
             entry.start?.let { timerDateAndClockLabel(state, it) },
             stringResource(R.string.autorec_editor_removed),
         ).joinToString(" · "))

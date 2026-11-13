@@ -59,7 +59,7 @@ internal fun TimerRecordingRepeat(state: TimerRecordingEditorState) {
             role = Role.Checkbox; toggleableState = ToggleableState(never)
         },
         trailingContent = {
-            Checkbox(never, onCheckedChange = null, modifier = Modifier.clearAndSetSemantics {})
+            RecordingEditorCheckboxMark(never)
         },
     )
     for (day in DayOfWeek.entries) RecordingEditorDay(
@@ -94,7 +94,7 @@ internal fun TimerRecordingHours(state: TimerRecordingEditorState) {
             if (state.draft.repeating) stringResource(R.string.timer_editor_next_day)
             else stringResource(R.string.timer_editor_next_day_date,
                 timerDateLabel(state, state.draft.date.plusDays(1))),
-            Modifier.padding(vertical = 4.dp),
+            Modifier.padding(start = 16.dp, top = 4.dp, bottom = 4.dp),
         )
         RecordingEditorHour(state.navigation, hour, { state.openMinutes(hour) },
             enabled = state.draft.timerMinuteChoices(hour, state.ending).isNotEmpty())

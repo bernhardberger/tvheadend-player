@@ -63,6 +63,7 @@ internal fun TimerRecordingEditor(
         state.navigation, timerMainLabel(state), state.mainProblem == null,
         state::back, state::submit, state::confirmDestructiveAction,
         mainIcon = R.drawable.ic_schedule,
+        unavailableReason = timerUnavailableLabel(state),
     )
     if (state.navigation.confirmation == AutomaticRecordingEditorConfirmation.DELETE) ConfirmationDialog(
         question = stringResource(R.string.timer_editor_delete),

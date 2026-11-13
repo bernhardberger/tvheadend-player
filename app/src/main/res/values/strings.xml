@@ -1,8 +1,7 @@
 <resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en">
     <string name="automatic_recording_new_overline">Automatic recordings</string>
     <string name="automatic_recording_new_title">New automatic recording</string>
-    <string name="automatic_recording_new_choose">Choose how it finds the programs to record.</string>
-    <string name="automatic_recording_new_series_help">To record a series, open one of its programs in the Guide and choose Record series.</string>
+    <string name="automatic_recording_new_choose">Choose how it decides what to record.</string>
     <string name="automatic_recording_new_keyword">Keyword</string>
     <string name="automatic_recording_new_keyword_help">Programs that mention your words</string>
     <string name="automatic_recording_new_title_kind">Title</string>
@@ -66,14 +65,14 @@
     <string name="timer_editor_none_upcoming">No upcoming recordings</string>
     <string name="timer_editor_channel_required">Choose a channel first</string>
     <string name="timer_editor_channel_not_chosen">Not chosen yet</string>
-    <string name="timer_editor_name_default">Channel name</string>
-    <string name="timer_editor_no_channel_description">Records by channel and time, without the guide.</string>
+    <string name="timer_editor_name_default">Same as the channel</string>
+    <string name="timer_editor_no_channel_description">Records a channel at set times, whatever is on.</string>
     <string name="timer_editor_empty_span">Start and end are the same</string>
     <string name="timer_editor_time_passed">That time has passed</string>
     <string name="timer_editor_repeat_required">Choose at least one day</string>
     <string name="timer_editor_starts_now">Starts recording as soon as you confirm</string>
-    <string name="timer_editor_description">Records %1$s from %2$s to %3$s, without the guide.</string>
-    <string name="timer_editor_repeat_help">Tick the days it repeats on. Each tick counts at once.</string>
+    <string name="timer_editor_description">Records %1$s from %2$s to %3$s, whatever is on.</string>
+    <string name="timer_editor_repeat_help">Tick the days it repeats on.</string>
     <string name="timer_editor_clock_help">Pick the hour, then the minutes.</string>
     <string name="timer_editor_minute_help">In 5-minute steps.</string>
     <string name="timer_editor_name_help">Leave the name empty to use the channel’s name.</string>
@@ -225,13 +224,16 @@
     <string name="autorec_editor_repeats_only">Repeats only</string>
     <string name="autorec_editor_new_unknown">New or unknown</string>
     <string name="autorec_editor_maximum">Maximum recordings</string>
+    <plurals name="autorec_editor_maximum_choice">
+        <item quantity="one">%1$d recording</item>
+        <item quantity="other">%1$d recordings</item>
+    </plurals>
     <string name="autorec_editor_no_limit">No limit</string>
     <string name="autorec_editor_maximum_help">Keeps at most %1$d recordings from this automatic recording.</string>
-    <string name="autorec_editor_turned_on">Turned on</string>
+    <string name="autorec_editor_turned_on">Enabled</string>
     <string name="autorec_editor_off_after_save">Off once you save</string>
     <string name="autorec_editor_off_help">A running recording continues and finished recordings stay.</string>
     <string name="autorec_editor_done">Done</string>
-    <string name="autorec_editor_choices_stay">Your choices stay until you save</string>
     <string name="autorec_editor_unchanged">Nothing changed yet</string>
     <string name="autorec_editor_enter_words">Enter words first</string>
     <string name="autorec_editor_searching">Searching the guide…</string>

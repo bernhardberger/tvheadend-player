@@ -1288,6 +1288,7 @@ private fun DetailsInformation(
         if (recording?.state in listOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)) {
             (recordingRule(recordingKind) ?: recording?.rule)?.let {
                 Text(stringResource(it.label), style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 8.dp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }

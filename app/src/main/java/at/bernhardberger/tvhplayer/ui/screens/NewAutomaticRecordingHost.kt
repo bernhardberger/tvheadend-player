@@ -89,10 +89,6 @@ private fun NewAutomaticRecordingGuidance() {
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = TvTextSecondaryAlpha))
         },
     )
-    Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        HorizontalDivider(color = MaterialTheme.colorScheme.borderVariant)
-        RecordingEditorSecondary(stringResource(R.string.automatic_recording_new_series_help))
-    }
 }
 
 @Composable
@@ -108,7 +104,7 @@ private fun NewAutomaticRecordingKinds(
             AutomaticRecordingKind.KEYWORD -> Triple(R.string.automatic_recording_new_keyword,
                 R.string.automatic_recording_new_keyword_help, R.drawable.ic_search)
             AutomaticRecordingKind.TITLE -> Triple(R.string.automatic_recording_new_title_kind,
-                R.string.automatic_recording_new_title_help, R.drawable.ic_fiber_smart_record)
+                R.string.automatic_recording_new_title_help, R.drawable.ic_title)
             else -> Triple(R.string.automatic_recording_new_timer,
                 R.string.automatic_recording_new_timer_help, R.drawable.ic_schedule)
         }

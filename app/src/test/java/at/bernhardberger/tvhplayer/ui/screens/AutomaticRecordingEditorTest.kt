@@ -47,6 +47,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import java.time.DayOfWeek
 import java.time.LocalTime
@@ -233,6 +234,9 @@ class AutomaticRecordingEditorTest {
         }
         compose.onNodeWithTag("timer-recording-keep-editing").assertIsFocused()
         compose.onNodeWithTag("timer-recording-leave-main").assertIsNotEnabled()
+        compose.onNode(hasAnyAncestor(hasTestTag("centred-dialog-card")) and
+            androidx.compose.ui.test.hasText(RuntimeEnvironment.getApplication().getString(
+                at.bernhardberger.tvhplayer.R.string.timer_editor_repeat_required))).assertExists()
         compose.pressKey(Key.DirectionLeft)
         compose.pressKey(Key.DirectionRight)
         compose.onNodeWithTag("timer-recording-keep-editing").assertIsFocused()

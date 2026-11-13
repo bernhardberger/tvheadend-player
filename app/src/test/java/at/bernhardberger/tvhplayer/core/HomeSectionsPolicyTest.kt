@@ -43,7 +43,7 @@ class HomeSectionsPolicyTest {
         val input = homeInput(dvrEntries = entries, admission = admissions(mapOf(4L to 60L)))
         val sections = homeSections(input)
         val expiring = sections.filterIsInstance<HomeSection.ExpiringSoon>().single()
-        assertEquals(listOf(2L, 4L, 1L), expiring.items.map { it.entry.id.value })
+        assertEquals(listOf(2L, 1L), expiring.items.map { it.entry.id.value })
         assertEquals(sections.indexOfFirst { it is HomeSection.ContinueWatching } + 1, sections.indexOf(expiring))
         assertTrue(homeSections(input.copy(hiddenSections = setOf(HomeSectionKind.EXPIRING_SOON)))
             .none { it is HomeSection.ExpiringSoon })
@@ -51,9 +51,20 @@ class HomeSectionsPolicyTest {
             .none { it is HomeSection.ExpiringSoon })
         val previous = HomeFocusKey(HomeSectionKind.EXPIRING_SOON, "recording:2", 0)
         val remaining = homeSections(input.copy(dvrEntries = entries.filterNot { it.id.value == 2L }))
-        assertEquals(HomeFocusKey(HomeSectionKind.EXPIRING_SOON, "recording:4", 0), homeRestoreFocus(remaining, previous))
+        assertEquals(HomeFocusKey(HomeSectionKind.EXPIRING_SOON, "recording:1", 0), homeRestoreFocus(remaining, previous))
         val empty = homeSections(input.copy(dvrEntries = emptyList()))
         assertEquals(homeInitialFocus(empty), homeRestoreFocus(empty, previous))
+        val resumed = (100L..111L).map { expiring(it, 3600) }
+        val capped = homeSections(homeInput(dvrEntries = resumed,
+            admission = admissions(resumed.associate { it.id.value to 60L }))
+            .copy(recentRecordingIds = resumed.map { it.id }))
+        val continued = capped.filterIsInstance<HomeSection.ContinueWatching>().single()
+        assertEquals((100L..109L).toList(), continued.items.map { it.entry.id.value })
+        assertEquals(listOf(110L, 111L),
+            capped.filterIsInstance<HomeSection.ExpiringSoon>().single().items.map { it.entry.id.value })
+        assertEquals(listOf(2L, 4L, 1L), homeSections(input.copy(
+            hiddenSections = setOf(HomeSectionKind.CONTINUE_WATCHING)))
+            .filterIsInstance<HomeSection.ExpiringSoon>().single().items.map { it.entry.id.value })
     }
 
     @Test fun hiddenSectionsAreOmittedBeforeInitialAndRestoreFocusSelection() {
