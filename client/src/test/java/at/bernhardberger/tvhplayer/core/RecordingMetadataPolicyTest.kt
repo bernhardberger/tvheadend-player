@@ -271,6 +271,21 @@ class RecordingMetadataPolicyTest {
         assertNull(recordingPaddedStop(DvrEntry.create(DvrEntryId(1), start = at(10_000))))
     }
 
+    @Test fun finalLengthOfARunningRecordingRunsItsFilesOnToThePaddedStop() {
+        fun running(fileStart: Long, stopExtra: Long = 0, state: DvrEntryState = DvrEntryState.RECORDING) =
+            DvrEntry.create(DvrEntryId(1), state = state, start = at(10_000), stop = at(13_600),
+                startExtraMinutes = 2.minutes, stopExtraMinutes = stopExtra.minutes,
+                files = listOf(DvrRecordingFile.create(start = at(fileStart))))
+        // Pre-padding is on disk and post-padding is still to come; the schedule alone counts neither.
+        assertEquals(120L + 3_600 + 300, recordingFinalLengthSeconds(running(9_880, stopExtra = 5), nowSec = 12_000))
+        // A late start never claims the time it missed.
+        assertEquals(3_000L, recordingFinalLengthSeconds(running(10_600), nowSec = 12_000))
+        // Past the stop it is what is on disk.
+        assertEquals(4_000L, recordingFinalLengthSeconds(running(10_000), nowSec = 14_000))
+        assertNull(recordingFinalLengthSeconds(running(9_880, state = DvrEntryState.COMPLETED), nowSec = 12_000))
+        assertNull(recordingFinalLengthSeconds(timed(DvrEntryState.RECORDING), nowSec = 1_800))
+    }
+
     @Test fun stoppedEarlyNeedsAFinishedFileUnderTheThreshold() {
         val planned = 61L * 60
         val threshold = (planned * RECORDING_STOPPED_EARLY_FRACTION).toLong()

@@ -119,7 +119,8 @@ class GuideHistoryScreenTest {
                     showContextMenu = menu, onShowDetails = {}, mutations = mutations,
                     mutationScope = androidx.compose.runtime.rememberCoroutineScope(),
                     mutationInFlight = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(null) },
-                    notices = notices, onPlay = { _, _ -> }, onPlayRecording = null, onClose = {}, settingsStore = settings)
+                    notices = notices, onPlay = { _, _ -> }, onPlayRecording = null, onClose = {}, settingsStore = settings,
+                    signedInUsername = null)
             }
         }
         val record = if (menu) compose.onNodeWithText("Record") else compose.onNodeWithTag("details-record")

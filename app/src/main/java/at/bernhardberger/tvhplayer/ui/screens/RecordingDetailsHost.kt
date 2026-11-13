@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.*
-import androidx.compose.ui.platform.LocalConfiguration
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvhplayer.core.*
@@ -13,7 +12,6 @@ import at.bernhardberger.tvhplayer.notices.*
 import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
-import at.bernhardberger.tvhplayer.ui.common.formatRecordingSchedule
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsPage
 import at.bernhardberger.tvhplayer.ui.components.LocalWatchingTarget
 import at.bernhardberger.tvhplayer.ui.components.LocalRecordingPlaybackSelection
@@ -44,6 +42,7 @@ internal fun RecordingDetailsHost(
     initialAction: BrowseContextAction? = null,
     backEnabled: Boolean = true,
     visibilityAlpha: State<Float>? = null,
+    onRuleEditorActive: (Boolean) -> Unit = {},
 ) {
     val departing = LocalPlayerEntryHandoff.current?.departing == true
     val entryPending = rememberPlayerEntryPending()
@@ -54,6 +53,8 @@ internal fun RecordingDetailsHost(
     SideEffect { if (!departing) lastPresentation = presentation }
     val (displayObservation, displayNowSec, playingId) = if (departing) lastPresentation else presentation
     var editingRule by remember { mutableStateOf(false) }
+    val reportEditorActive by rememberUpdatedState(onRuleEditorActive)
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { reportEditorActive(false) } }
     val capability = openingObservation.currentSession?.takeIf { displayObservation.currentSession === it }
     val observed = if (capability != null && displayObservation.dvrState is DvrRepositoryState.Current)
         displayObservation.dvrEntry(recording.id)?.takeUnless(::recordingWasRemoved) else recording
@@ -73,7 +74,9 @@ internal fun RecordingDetailsHost(
     var confirmationKey by remember { mutableStateOf<Key?>(null) }
     var mutationBusy by remember { mutableStateOf(false) }
     val latestNowSec by rememberUpdatedState(nowSec)
-    LaunchedEffect(capability) { if (capability == null) editingRule = false }
+    LaunchedEffect(capability) {
+        if (capability == null) { editingRule = false; reportEditorActive(false) }
+    }
     val latestObservation by rememberUpdatedState(currentObservation)
     val pendingCurrent = pending?.recordingStateIsCurrent(observation) == true
     at.bernhardberger.tvhplayer.ui.player.RegisterPlayerModal(
@@ -115,11 +118,14 @@ internal fun RecordingDetailsHost(
                     val session = capability?.takeIf { current.currentSession === it }
                     when (action) {
                         BrowseContextAction.EDIT_RULE -> {
-                            if (session != null && current.recordingRuleAvailable(opened) &&
-                                (current.sessionState as? SessionState.Ready)
-                                    ?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED) {
+                            val entry = current.dvrEntry(opened.id)
+                            val writable = (current.sessionState as? SessionState.Ready)
+                                ?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
+                            if (session != null && entry != null && action in recordingRuleActions(
+                                    entry, writable, current.recordingRuleAvailable(entry))) {
                                 focusedAction = action
                                 editingRule = true
+                                reportEditorActive(true)
                             }
                         }
                         BrowseContextAction.SKIP, BrowseContextAction.UNSKIP -> session?.let { owner ->
@@ -198,11 +204,8 @@ internal fun RecordingDetailsHost(
             }
             val visibility = remember(mutation) { MutableTransitionState(false).apply { targetState = true } }
             RecordingConfirmationDialog(
-                visibility = visibility, action = action, title = opened.title.orEmpty(),
-                removeEntry = deleteRemovesEntryOnly(opened),
-                channelName = channel?.name ?: opened.channelName.orEmpty(),
-                dateAndTime = formatRecordingSchedule(opened.start?.epochSeconds,
-                    dateOnly = action == PendingRecordingAction.DELETE, locale = LocalConfiguration.current.locales[0]),
+                visibility = visibility, action = action, entry = opened, channel = channel,
+                nowSec = displayNowSec, currentSession = capability, observation = displayObservation,
                 backEnabled = backEnabled,
                 onDismiss = { pending = null },
                 onConfirm = {
@@ -220,6 +223,7 @@ internal fun RecordingDetailsHost(
     if (editingRule && capability != null) {
         val session: TvheadendSession = org.koin.compose.koinInject()
         RecordingRuleEditorHost(opened, capability, observation, session, mutations, notices,
-            now = { kotlin.time.Instant.fromEpochSeconds(latestNowSec) }, onClose = { editingRule = false })
+            now = { kotlin.time.Instant.fromEpochSeconds(latestNowSec) },
+            onClose = { editingRule = false; reportEditorActive(false) })
     }
 }

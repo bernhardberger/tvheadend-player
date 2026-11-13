@@ -1,4 +1,10 @@
 package at.bernhardberger.tvhplayer.ui.screens
+import at.bernhardberger.tvhplayer.settings.AppProfileOwner
+import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
+import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
+import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
+import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore
+import kotlinx.coroutines.test.StandardTestDispatcher
 import at.bernhardberger.tvhplayer.testutil.settleFrames
 
 import at.bernhardberger.tvhplayer.testutil.pressKey
@@ -692,11 +698,10 @@ class BrowseContextMenuScreenTest {
         row.performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("recording-resume").assertIsFocused()
         compose.onNodeWithText("Resume from 1:02:00").assertIsFocused()
-        compose.onNode(hasText("The winter ridge") and hasAnyAncestor(hasTestTag("centred-dialog-content"))).assertExists()
-        compose.onNode(hasText("101 Ridge Earth HD • ", substring = true) and hasAnyAncestor(hasTestTag("centred-dialog-content"))).assertExists()
+        compose.onNode(hasText("The winter ridge") and hasAnyAncestor(hasTestTag("centred-dialog-card"))).assertExists()
+        compose.onNode(hasText("101 Ridge Earth HD · ", substring = true) and hasAnyAncestor(hasTestTag("centred-dialog-card"))).assertExists()
         compose.onNodeWithText("Watched", substring = true).assertDoesNotExist()
         assertResumePiconGeometry(picon = true)
-        compose.onNodeWithText(resumeEnd, substring = true).assertExists()
         compose.onNodeWithTag("recording-resume").assert(
             SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, resumeEnd))
         compose.onNodeWithTag("recording-start-over").assert(
@@ -704,11 +709,11 @@ class BrowseContextMenuScreenTest {
         val card = compose.onNodeWithTag("centred-dialog-card").getUnclippedBoundsInRoot()
         assertEquals(480f, (card.left.value + card.right.value) / 2f, 0.5f)
         assertEquals(270f, (card.top.value + card.bottom.value) / 2f, 0.5f)
-        compose.onNodeWithTag("centred-dialog-content").assertWidthIsEqualTo(480.dp)
         val resume = compose.onNodeWithTag("recording-resume").getUnclippedBoundsInRoot()
         val startOver = compose.onNodeWithTag("recording-start-over").getUnclippedBoundsInRoot()
-        assertEquals(resume.top.value, startOver.top.value, 0.5f)
-        assertEquals(12f, (startOver.left - resume.right).value, 0.5f)
+        assertTrue("Start over stacks below Resume", startOver.top >= resume.bottom)
+        assertEquals(resume.left.value, startOver.left.value, 0.5f)
+        assertEquals(resume.right.value, startOver.right.value, 0.5f)
         compose.onNodeWithTag("centred-dialog-scrim").assert(
             SemanticsMatcher.keyIsDefined(SemanticsProperties.IsDialog))
         compose.onNodeWithTag("recording-resume").performKeyPress(activation(android.view.KeyEvent.ACTION_UP))
@@ -746,30 +751,30 @@ class BrowseContextMenuScreenTest {
     }
 
     private fun assertResumePiconGeometry(picon: Boolean) {
-        val content = compose.onNodeWithTag("centred-dialog-content").getUnclippedBoundsInRoot()
-        val text = compose.onNodeWithTag("centred-dialog-text").getUnclippedBoundsInRoot()
-        val eyebrow = compose.onNode(hasText("101 Ridge Earth HD • ", substring = true) and
-            hasAnyAncestor(hasTestTag("centred-dialog-content"))).getUnclippedBoundsInRoot()
+        val card = compose.onNodeWithTag("centred-dialog-card").getUnclippedBoundsInRoot()
+        val keyline = card.left.value + 24f
+        val eyebrow = compose.onNode(hasText("101 Ridge Earth HD", substring = true) and
+            hasAnyAncestor(hasTestTag("centred-dialog-card"))).getUnclippedBoundsInRoot()
         val title = compose.onNode(hasText("Ridge Light: The remarkable journey along the mountain ridge in winter") and
-            hasAnyAncestor(hasTestTag("centred-dialog-content"))).getUnclippedBoundsInRoot()
-        assertEquals(content.left.value, title.left.value, 0.5f)
+            hasAnyAncestor(hasTestTag("centred-dialog-card"))).getUnclippedBoundsInRoot()
+        assertEquals(keyline, title.left.value, 0.5f)
+        assertTrue("Title stays inside the card's keyline", title.right.value <= card.right.value - 24f + 0.5f)
         if (picon) {
             val logo = compose.onNodeWithTag("recording-resume-picon")
                 .assertWidthIsEqualTo(36.dp).assertHeightIsEqualTo(20.dp).getUnclippedBoundsInRoot()
-            assertEquals(content.left.value, logo.left.value, 0.5f)
+            assertEquals(keyline, logo.left.value, 0.5f)
             assertEquals(8f, (eyebrow.left - logo.right).value, 0.5f)
             assertEquals((eyebrow.top.value + eyebrow.bottom.value) / 2f, (logo.top.value + logo.bottom.value) / 2f, 0.5f)
             compose.mainClock.advanceTimeBy(500)
             val bitmap = resumeBitmap()
-            assertEquals("No plate behind the transparent picon corner",
-                bitmap.getPixel((content.left.value * 2).toInt(), (content.top.value * 2).toInt()),
-                bitmap.getPixel((logo.left.value * 2).toInt(), (logo.top.value * 2).toInt()))
+            val beside = bitmap.getPixel(((logo.left.value - 2f) * 2).toInt(), (logo.top.value * 2).toInt())
+            val corner = bitmap.getPixel((logo.left.value * 2).toInt(), (logo.top.value * 2).toInt())
+            assertTrue("No plate behind the transparent picon corner",
+                listOf(16, 8, 0).all { shift -> kotlin.math.abs((beside shr shift and 0xFF) - (corner shr shift and 0xFF)) <= 12 })
             bitmap.recycle()
         } else {
             compose.onNodeWithTag("recording-resume-picon").assertDoesNotExist()
-            assertEquals(content.left.value, text.left.value, 0.5f)
-            assertEquals(content.right.value, text.right.value, 0.5f)
-            assertEquals(content.left.value, eyebrow.left.value, 0.5f)
+            assertEquals(keyline, eyebrow.left.value, 0.5f)
         }
     }
 
@@ -778,7 +783,7 @@ class BrowseContextMenuScreenTest {
         compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithText("Ends at", substring = true).assertDoesNotExist()
         compose.onNodeWithTag("recording-resume").assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.StateDescription))
-        compose.onNodeWithTag("recording-resume").performKeyInput { pressKey(Key.DirectionRight) }
+        compose.onNodeWithTag("recording-resume").performKeyInput { pressKey(Key.DirectionDown) }
         compose.onNodeWithText("Ends at", substring = true).assertDoesNotExist()
         compose.onNodeWithTag("recording-start-over").assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.StateDescription))
     }
@@ -816,11 +821,11 @@ class BrowseContextMenuScreenTest {
         compose.runOnIdle { view.draw(Canvas(before)) }
         row.performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("recording-resume").assertIsFocused().performKeyInput {
-            pressKey(Key.DirectionLeft); pressKey(Key.DirectionDown); pressKey(Key.DirectionUp)
+            pressKey(Key.DirectionLeft); pressKey(Key.DirectionRight); pressKey(Key.DirectionUp)
         }.assertIsFocused()
-        compose.onNodeWithTag("recording-resume").performKeyInput { pressKey(Key.DirectionRight) }
+        compose.onNodeWithTag("recording-resume").performKeyInput { pressKey(Key.DirectionDown) }
         compose.onNodeWithTag("recording-start-over").assertIsFocused().performKeyInput {
-            pressKey(Key.DirectionDown); pressKey(Key.DirectionUp); pressKey(Key.DirectionRight)
+            pressKey(Key.DirectionDown); pressKey(Key.DirectionLeft); pressKey(Key.DirectionRight)
         }.assertIsFocused()
         compose.mainClock.advanceTimeBy(500)
         val after = resumeBitmap()
@@ -1039,6 +1044,23 @@ class BrowseContextMenuScreenTest {
         compose.onNodeWithTag("details-cancel").assertIsFocused()
         compose.onNodeWithTag("centred-dialog-card").assertDoesNotExist()
         compose.runOnIdle { assertTrue(scheduleRequests.isEmpty()) }
+        for (enabled in listOf(true, false)) {
+            show(recordings = false, channelRecording = true, recordingState = DvrEntryState.SCHEDULED,
+                ruleMade = true, recordingEnabled = enabled)
+            compose.onNodeWithTag("channel-row-1").requestFocus()
+            compose.pressKey(Key(android.view.KeyEvent.KEYCODE_MEDIA_RECORD))
+            val ownAction = if (enabled) "skip" else "unskip"
+            compose.onNodeWithTag("details-$ownAction").assertIsFocused()
+            compose.pressKey(Key.DirectionLeft)
+            compose.pressKey(Key(android.view.KeyEvent.KEYCODE_MEDIA_RECORD))
+            compose.onNodeWithTag("details-$ownAction").assertIsFocused()
+            compose.runOnIdle {
+                assertTrue(scheduleRequests.isEmpty())
+                assertTrue(screenNotices.state.value.pending.none {
+                    it.notice is at.bernhardberger.tvhplayer.notices.Notice.RecordUnavailable
+                })
+            }
+        }
     }
 
     @Test fun recordKeyOnChannelWithoutProgrammePostsTypedReason() {
@@ -1524,7 +1546,8 @@ class BrowseContextMenuScreenTest {
         fixedNow: Long? = null, profiles: Boolean = false, scopeTabs: Boolean = false,
         offline: Boolean = false, guideDetails: Boolean = false, entryHandoff: Boolean = false,
         rootArtwork: FakeTvheadendSession? = null, watching: Boolean = false,
-        behindLive: Boolean = false, growingFile: Boolean = false, awaitContent: Boolean = true): FakeTvheadendSession {
+        behindLive: Boolean = false, growingFile: Boolean = false, awaitContent: Boolean = true,
+        ruleMade: Boolean = false, recordingEnabled: Boolean = true): FakeTvheadendSession {
         val firstLeg = screenContent.value == null
         if (!firstLeg) {
             compose.runOnIdle { screenContent.value = null }
@@ -1561,6 +1584,8 @@ class BrowseContextMenuScreenTest {
             summary = "Seasonal mountain light, forests and weather moving over a ridge.",
             description = "Seasonal mountain light, forests and weather moving over a ridge, from the first snow to the thaw. ".repeat(3))
         val entry = DvrEntry.create(DvrEntryId(1), channelId = channel.id, eventId = event.id,
+            autorecRuleId = if (ruleMade) at.bernhardberger.tvheadend.sdk.core.AutorecRuleId("series") else null,
+            enabled = recordingEnabled,
             title = if (recordingState == DvrEntryState.COMPLETED) "Ridge Light: The remarkable journey along the mountain ridge in winter" else "Ridge Light",
             folder = emptyList(),
             summary = summary, description = description, subtitle = episodeSubtitle,
@@ -1603,6 +1628,9 @@ class BrowseContextMenuScreenTest {
         val dependencies = module {
             single<TvheadendSession> { screenSession }; single { notices }
             single { settings }
+            single { AppProfileOwner(screenSession, FakeServerProfileStore(),
+                PlayerSettingsStore(InMemoryPreferencesDataStore()), StandardTestDispatcher(),
+                readProfileForEditing = { ServerProfileEditReadResult.Missing }) }
         }
         val application = org.koin.dsl.koinApplication { modules(dependencies) }
         images.install(FixtureArt.imageLoader(context, if (imageProbe) mapOf(

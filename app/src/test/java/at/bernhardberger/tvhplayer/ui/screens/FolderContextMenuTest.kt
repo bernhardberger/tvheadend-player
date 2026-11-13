@@ -53,8 +53,9 @@ class FolderContextMenuTest {
         show(seriesFolder())
         openFolderMenu()
         compose.onNodeWithText("Delete all").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.onNodeWithText("Delete all recordings in Series?").assertExists()
-        compose.onNodeWithText("3 recordings will be deleted from the server. Recordings still running are kept.")
+        compose.onNodeWithText("Delete all the recordings in this folder?").assertExists()
+        compose.onNodeWithContentDescription("3 recordings", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("They're deleted from the server. Recordings still running are kept.")
             .assertExists()
         compose.onNodeWithTag("folder-delete-back").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
         compose.onNodeWithTag("folder-delete-confirm").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
@@ -67,7 +68,7 @@ class FolderContextMenuTest {
         show(seriesFolder())
         openFolderMenu()
         compose.onNodeWithText("Delete watched").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.onNodeWithText("Delete watched recordings in Series?").assertExists()
+        compose.onNodeWithText("Delete all watched recordings in this folder?").assertExists()
         compose.onNodeWithTag("folder-delete-back").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("folder-delete-back").assertDoesNotExist()
         compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()

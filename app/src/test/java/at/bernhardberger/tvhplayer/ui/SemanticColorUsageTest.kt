@@ -17,10 +17,6 @@ class SemanticColorUsageTest {
             "ui/components/ProgrammeDetailsLayout.kt",
             "color = MaterialTheme.colorScheme.onSurfaceVariant",
         )
-        assertContains(
-            "ui/components/ProgrammeDetailsPage.kt",
-            "DetailsStatus.RECORDING -> RecordingBadge(DvrEntryState.RECORDING,",
-        )
         assertContains("ui/components/StatusBadge.kt", "StatusBadgeTone.RECORDING -> TvRecordingContainerColor")
 
         val scopedSources = listOf(

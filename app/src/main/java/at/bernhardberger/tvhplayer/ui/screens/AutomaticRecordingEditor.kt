@@ -63,9 +63,10 @@ internal fun AutomaticRecordingEditor(
     if (state.navigation.leaveConfirmation) RecordingEditorLeaveDialog(
         state.navigation, automaticRecordingMainLabel(state), state.mainProblem == null,
         state::back, state::submit, state::confirmDestructiveAction,
+        mainIcon = R.drawable.ic_fiber_smart_record,
     )
     if (state.navigation.confirmation == AutomaticRecordingEditorConfirmation.DELETE)
-        AutomaticRecordingDeleteDialog(state, scheduledEpisodeCount)
+        AutomaticRecordingDeleteDialog(state, scheduledEpisodeCount, channels)
 }
 
 @Composable

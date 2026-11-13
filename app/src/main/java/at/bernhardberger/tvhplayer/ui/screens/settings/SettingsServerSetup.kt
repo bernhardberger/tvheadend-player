@@ -10,6 +10,7 @@ import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.compactServerName
 import at.bernhardberger.tvhplayer.settings.serverProfileDisplayName
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.SetupMode
+import at.bernhardberger.tvhplayer.ui.components.serverAvatarLook
 import org.koin.compose.koinInject
 
 @Composable
@@ -43,9 +44,11 @@ internal fun AddServer(
         confirmSwitch = { form, onSwitch, onKeep ->
             val host = form.host.trim()
             val username = form.username.trim().ifBlank { null }
+            val port = form.port.trim().toIntOrNull() ?: DEFAULT_HTSP_PORT
             SwitchServerDialog(
-                name = compactServerName(host, form.port.trim().toIntOrNull() ?: DEFAULT_HTSP_PORT, username),
-                username = username,
+                name = compactServerName(host, port, username),
+                look = serverAvatarLook(host, port, null, username),
+                detail = serverConfirmationDetail(host, port, username),
                 interruption = interruption(),
                 onSwitch = onSwitch,
                 onKeep = onKeep,
@@ -91,7 +94,11 @@ internal fun EditServer(
         sessionLock = owner.connectionChanges,
         connectionGeneration = { owner.configurationGeneration.value },
         confirmSwitch = { form, onSwitch, onKeep ->
-            SwitchServerDialog(name, form.username.trim().ifBlank { null }, interruption(), onSwitch, onKeep)
+            val host = form.host.trim()
+            val port = form.port.trim().toIntOrNull() ?: DEFAULT_HTSP_PORT
+            val username = form.username.trim().ifBlank { null }
+            SwitchServerDialog(name, serverAvatarLook(host, port, target.label, username),
+                serverConfirmationDetail(host, port, username), interruption(), onSwitch, onKeep)
         },
     )
 }

@@ -4,6 +4,7 @@ import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackMarker
 import at.bernhardberger.tvhplayer.ui.components.errorMarkColor
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
 import at.bernhardberger.tvhplayer.ui.components.rule
+import at.bernhardberger.tvhplayer.ui.components.RecordingRule
 import at.bernhardberger.tvhplayer.ui.components.watchingIndicator
 import at.bernhardberger.tvhplayer.ui.components.recordingViewerPosition
 import at.bernhardberger.tvhplayer.ui.components.progressColor
@@ -392,6 +393,7 @@ internal fun RecordingMetadataPane(
     admission: RecordingPlaybackAdmission?,
     modifier: Modifier = Modifier,
     kind: RecordingRowKind = RecordingRowKind.ARCHIVE,
+    recordingRule: RecordingRule? = null,
 ) {
     if (entry == null) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -421,7 +423,7 @@ internal fun RecordingMetadataPane(
     val watched = watchState == RecordingWatchState.Watched
     val viewerFraction = recordingViewerPosition(entry.id)?.fraction ?: (watchState as? RecordingWatchState.PartlyWatched)?.fraction?.toFloat()
     val running = recordingIsRunning(entry)
-    val rule = if (kind == RecordingRowKind.SCHEDULE) recordingRuleLabel(entry) else null
+    val rule = if (kind == RecordingRowKind.SCHEDULE) recordingRuleLabel(recordingRule) else null
     val partialSize = if (kind == RecordingRowKind.PROBLEM) recordingSizeBytes(entry)?.takeIf { it > 0 } else null
     // The Schedule row's own words for the padded stop, when the padding moves it.
     val paddedStop = recordingPaddedStop(entry)?.takeIf {
@@ -530,8 +532,8 @@ private fun problemStateLabel(state: DvrEntryState?): String? = when (state) {
 
 /** The rule a scheduled recording comes from, with its mark, when the server says it has one. */
 @Composable
-private fun recordingRuleLabel(entry: DvrEntry): Pair<String, Int>? =
-    entry.rule?.let { stringResource(it.label) to R.drawable.ic_schedule_rule }
+private fun recordingRuleLabel(rule: RecordingRule?): Pair<String, Int>? =
+    rule?.let { stringResource(it.label) to R.drawable.ic_schedule_rule }
 
 /**
  * A Schedule or Problems list in Archive's first column, with the focused recording's pane where
@@ -545,6 +547,7 @@ private fun RecordingListWithPane(
     piconForEntry: (DvrEntry) -> ChannelIcon?,
     admissionForEntry: (DvrEntry) -> RecordingPlaybackAdmission?,
     paneBottom: Dp,
+    rule: RecordingRule? = null,
     list: @Composable () -> Unit,
 ) {
     Row(Modifier.fillMaxSize()) {
@@ -562,6 +565,7 @@ private fun RecordingListWithPane(
                 admission = entry?.let(admissionForEntry),
                 modifier = Modifier.padding(bottom = paneBottom),
                 kind = kind,
+                recordingRule = rule,
             )
         }
     }
@@ -581,6 +585,7 @@ internal fun RecordingSchedule(
     initialScrollIndex: Int,
     onScrollChanged: (Int) -> Unit,
     paneBottom: Dp = 0.dp,
+    ruleForEntry: (DvrEntry) -> RecordingRule? = { it.rule },
 ) {
     if (groups.isEmpty()) {
         ModeEmptyState(R.string.recordings_schedule_empty)
@@ -618,7 +623,8 @@ internal fun RecordingSchedule(
         }
     }
     val paneEntry = entries.firstOrNull { "recording:${recordingItemKey(it.id)}" == focusTargetKey }
-    RecordingListWithPane(paneEntry, RecordingRowKind.SCHEDULE, piconForEntry, admissionForEntry, paneBottom) {
+    RecordingListWithPane(paneEntry, RecordingRowKind.SCHEDULE, piconForEntry, admissionForEntry,
+        paneBottom, rule = paneEntry?.let(ruleForEntry)) {
         CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoViewSpec) {
             LazyColumn(
                 state = listState,

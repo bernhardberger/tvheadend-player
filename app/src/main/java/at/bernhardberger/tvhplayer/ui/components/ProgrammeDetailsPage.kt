@@ -322,7 +322,7 @@ internal fun ProgrammeDetailsPage(
                     !backEnabled -> true
                     event != null && key.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_MEDIA_RECORD -> {
                         val action = actions.firstOrNull {
-                            it == BrowseContextAction.STOP || it == BrowseContextAction.CANCEL
+                            it in programmeRecordingRecordKeyActions
                         }
                         if (key.type == KeyEventType.KeyDown && key.nativeKeyEvent.repeatCount == 0 && action != null) {
                             lastAction = action
@@ -1413,7 +1413,7 @@ internal fun ProgrammeEyebrow(
  * placeholder, the whole box stands.
  */
 @Composable
-private fun InlineLogo(picon: ChannelIcon, modifier: Modifier) {
+internal fun InlineLogo(picon: ChannelIcon, modifier: Modifier) {
     val density = LocalDensity.current
     var drawnWidth by remember(picon) { mutableStateOf<Dp?>(null) }
     Box(Modifier.size(drawnWidth ?: InlineLogoWidth, InlineLogoHeight)) {
@@ -1425,7 +1425,7 @@ private fun InlineLogo(picon: ChannelIcon, modifier: Modifier) {
     }
 }
 
-private val InlineLogoWidth = 36.dp
+internal val InlineLogoWidth = 36.dp
 private val InlineLogoHeight = 20.dp
 
 /** The outlined age rating that ends a programme's metadata line. */

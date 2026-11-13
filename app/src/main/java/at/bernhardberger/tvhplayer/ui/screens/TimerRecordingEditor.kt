@@ -21,7 +21,10 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.AutomaticRecordingKind
 import at.bernhardberger.tvhplayer.core.RecordingDraftField
-import at.bernhardberger.tvhplayer.ui.components.CentredDialog
+import at.bernhardberger.tvhplayer.ui.common.formatClock
+import at.bernhardberger.tvhplayer.ui.components.ConfirmationDialog
+import at.bernhardberger.tvhplayer.ui.components.ConfirmationChoice
+import at.bernhardberger.tvhplayer.ui.components.ConfirmationSubject
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepAction
 import at.bernhardberger.tvhplayer.ui.components.StatusBadge
 import at.bernhardberger.tvhplayer.ui.components.StatusBadgeTone
@@ -59,16 +62,21 @@ internal fun TimerRecordingEditor(
     if (state.navigation.leaveConfirmation) RecordingEditorLeaveDialog(
         state.navigation, timerMainLabel(state), state.mainProblem == null,
         state::back, state::submit, state::confirmDestructiveAction,
+        mainIcon = R.drawable.ic_schedule,
     )
-    if (state.navigation.confirmation == AutomaticRecordingEditorConfirmation.DELETE) CentredDialog(
-        title = stringResource(R.string.timer_editor_delete),
-        message = formatAutomaticRecordingDeleteBody(
+    if (state.navigation.confirmation == AutomaticRecordingEditorConfirmation.DELETE) ConfirmationDialog(
+        question = stringResource(R.string.timer_editor_delete),
+        subject = ConfirmationSubject.Rule(R.drawable.ic_schedule, timerNameLabel(state, channels),
+            listOf(timerChannelLabel(state, channels), formatTimerRecordingDays(LocalContext.current, state.draft.days),
+                "${formatClock(state.draft.start)} – ${formatClock(state.draft.end)}").joinToString(" • ")),
+        sentence = formatAutomaticRecordingDeleteBody(
             LocalContext.current, AutomaticRecordingKind.TIMER, scheduledEntries.size, state.changed,
         ),
-        firstLabel = stringResource(R.string.autorec_editor_keep_recording),
-        secondLabel = stringResource(R.string.autorec_editor_delete),
-        onFirst = state::back, onSecond = state::confirmDestructiveAction, onDismiss = state::back,
-        firstTag = "timer-recording-keep", secondTag = "timer-recording-delete-confirm",
+        safe = ConfirmationChoice(stringResource(R.string.autorec_editor_keep_recording),
+            R.drawable.ic_check, "timer-recording-keep"),
+        action = ConfirmationChoice(stringResource(R.string.autorec_editor_delete),
+            R.drawable.ic_delete_outlined, "timer-recording-delete-confirm"),
+        onDismiss = state::back, onConfirm = state::confirmDestructiveAction,
     )
 }
 

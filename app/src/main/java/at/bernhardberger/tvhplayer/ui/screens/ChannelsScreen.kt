@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.core.BrowseContextAction
+import at.bernhardberger.tvhplayer.core.programmeRecordingRecordKeyActions
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 
 import at.bernhardberger.tvhplayer.ui.common.rememberCurrentEpochSeconds
@@ -682,7 +683,7 @@ internal fun ChannelsScreenContent(
                     val panelOpen = contextChannelId != null || openPanel != null
                     if (initialPress && contentOwnsRecord && !panelOpen) {
                         val action = focusedChannelId?.let(onRecordKey)
-                        if (action == BrowseContextAction.STOP || action == BrowseContextAction.CANCEL) {
+                        if (action in programmeRecordingRecordKeyActions) {
                             recordInitialAction = action
                             showProgrammeDetails = true
                             contextChannelId = focusedChannelId

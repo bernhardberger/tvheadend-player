@@ -291,7 +291,8 @@ class TimelineEpgPerformanceTest {
             TVHeadendPlayerTheme {
                 ConfirmProgrammeActionDialog(
                     action = ProgrammeAction.STOP_RECORDING,
-                    programmeTitle = "Eine außergewöhnlich lange deutsche Sendungsbezeichnung",
+                    event = event(1, 0L, 3_600L, "Eine außergewöhnlich lange deutsche Sendungsbezeichnung"),
+                    channel = null, nowSec = 1_800L, currentSession = null, observation = null,
                     onDismiss = {},
                     onConfirm = {},
                 )
@@ -306,11 +307,11 @@ class TimelineEpgPerformanceTest {
         composeRule.onNodeWithTag("two-column-second").assertTextEquals("Stop recording")
     }
 
-    private fun event(id: Int, start: Long, stop: Long) = EpgEvent.create(
+    private fun event(id: Int, start: Long, stop: Long, title: String = "Event $id") = EpgEvent.create(
         id = EventId(id.toLong()),
         channelId = ChannelId(1),
         start = Instant.fromEpochSeconds(start),
         stop = Instant.fromEpochSeconds(stop),
-        title = "Event $id",
+        title = title,
     )
 }

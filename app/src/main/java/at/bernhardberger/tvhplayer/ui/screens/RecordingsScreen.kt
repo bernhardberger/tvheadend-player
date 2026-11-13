@@ -8,7 +8,9 @@ import at.bernhardberger.tvhplayer.ui.components.progressColor
 
 import androidx.compose.ui.platform.LocalContext
 import at.bernhardberger.tvhplayer.ui.TvTextColors
-import at.bernhardberger.tvhplayer.ui.components.CentredDialog
+import at.bernhardberger.tvhplayer.ui.components.ConfirmationChoice
+import at.bernhardberger.tvhplayer.ui.components.ConfirmationDialog
+import at.bernhardberger.tvhplayer.ui.components.ConfirmationSubject
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.background
@@ -840,6 +842,7 @@ internal fun RecordingsScreenContent(
                                 entry.channelId?.let(channelsById::get)?.icon
                             },
                             admissionForEntry = { observation.recordingPlaybackAdmission(it) },
+                            ruleForEntry = { recordingRule(observation.recordingRuleKind(it)) },
                             paneBottom = contentPadding.calculateBottomPadding(),
                             initialScrollIndex = frame.scrollIndex,
                             onScrollChanged = {
@@ -902,6 +905,7 @@ internal fun RecordingsScreenContent(
     @Composable
     fun RecordingDetails() {
     var ruleEditorEntry by remember { mutableStateOf<DvrEntry?>(null) }
+    var detailsRuleEditor by remember { mutableStateOf(false) }
     var ruleMutationBusy by remember { mutableStateOf(false) }
     val latestRuleNow by rememberUpdatedState(nowSecProvider)
     // Refresh metadata only within the opening session. Never substitute a colliding ID
@@ -913,7 +917,8 @@ internal fun RecordingsScreenContent(
             observation.dvrEntry(entry.id)?.takeUnless(::recordingWasRemoved)
         } else entry
     }
-    val opened = observed ?: ruleEditorEntry.takeIf { selectedCapability != null }
+    val opened = observed ?: (ruleEditorEntry ?: detailsEntry.takeIf { detailsRuleEditor })
+        .takeIf { selectedCapability != null }
     LaunchedEffect(selectedCapability) { if (selectedCapability == null) ruleEditorEntry = null }
     // The SDK admits the opened entry with the observation it was read from; without its session nothing plays.
     val openedAdmission = opened?.let { entry ->
@@ -951,7 +956,8 @@ internal fun RecordingsScreenContent(
             ?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
         if (!ready || !writable || target == null) return
         if (action == BrowseContextAction.EDIT_RULE) {
-            if (current.recordingRuleAvailable(target)) ruleEditorEntry = target
+            if (action in recordingRuleActions(target, writable, current.recordingRuleAvailable(target)))
+                ruleEditorEntry = target
         } else if (action in recordingRuleActions(target, true, current.recordingRuleAvailable(target))) {
             ruleMutationBusy = true
             scope.launch {
@@ -1181,6 +1187,7 @@ internal fun RecordingsScreenContent(
         val alpha = remember(detailAlpha, menuAlpha) { derivedStateOf { detailAlpha.value * menuAlpha.value } }
         // Details show their pictures with the session they were opened with.
         RecordingDetailsHost(
+            onRuleEditorActive = { detailsRuleEditor = it },
             onShowGuide = onShowGuide,
             recording = opened,
             openingObservation = requireNotNull(detailsObservation),
@@ -1266,12 +1273,11 @@ internal fun RecordingsScreenContent(
         RecordingConfirmationDialog(
             visibility = confirmationVisibility,
             action = action,
-            removeEntry = deleteRemovesEntryOnly(target),
-            title = target.title.orEmpty(),
-            channelName = target.channelId?.let(channelsById::get)?.name ?: target.channelName.orEmpty(),
-            dateAndTime = at.bernhardberger.tvhplayer.ui.common.formatRecordingSchedule(target.start?.epochSeconds,
-                dateOnly = action == PendingRecordingAction.DELETE,
-                locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]),
+            entry = target,
+            channel = target.channelId?.let(channelsById::get),
+            nowSec = at.bernhardberger.tvhplayer.ui.common.rememberDetailsEpochSeconds(nowSecProvider),
+            currentSession = selectedCapability,
+            observation = observation,
             backEnabled = backEnabled,
             onDismiss = {
                 pendingAction = null
@@ -1357,25 +1363,26 @@ internal fun RecordingsScreenContent(
         folderDelete?.let { delete ->
             val count = delete.recordingIds.size
             val size = delete.sizeBytes.takeIf { it > 0 }?.let { formatFileSize(it, context) }
+            val countLabel = pluralStringResource(R.plurals.recordings_folder_recording_count, count, count)
+            val detail = size?.let { stringResource(R.string.server_detail_separator, countLabel, it) } ?: countLabel
             val message = buildString {
-                append(if (size != null) pluralStringResource(R.plurals.delete_folder_confirm_message, count, count, size)
-                    else pluralStringResource(R.plurals.delete_folder_confirm_message_no_size, count, count))
+                append(stringResource(R.string.delete_folder_confirm_body))
                 if (delete.keepsRunning) append(' ').append(stringResource(R.string.delete_folder_running_kept))
             }
-            CentredDialog(
-                title = stringResource(if (delete.action == BrowseContextAction.DELETE_ALL)
-                    R.string.delete_folder_all_confirm_title else R.string.delete_folder_watched_confirm_title, delete.name),
-                message = message,
-                firstLabel = stringResource(R.string.keep),
-                secondLabel = stringResource(delete.action.label(watchChannel = false)),
-                onFirst = ::closeFolderMenu,
-                onSecond = {
+            ConfirmationDialog(
+                question = stringResource(if (delete.action == BrowseContextAction.DELETE_ALL)
+                    R.string.delete_folder_all_confirm_question else R.string.delete_folder_watched_confirm_question),
+                subject = ConfirmationSubject.Folder(delete.name, detail),
+                sentence = message,
+                safe = ConfirmationChoice(stringResource(R.string.keep), R.drawable.ic_check, "folder-delete-back"),
+                action = ConfirmationChoice(stringResource(delete.action.label(watchChannel = false)),
+                    R.drawable.ic_delete_outlined, "folder-delete-confirm"),
+                onConfirm = {
                     closeFolderMenu()
                     runFolderAction(delete.action, session, delete.recordingIds)
                 },
                 onDismiss = ::closeFolderMenu,
                 backEnabled = backEnabled,
-                firstTag = "folder-delete-back", secondTag = "folder-delete-confirm",
             )
         }
     }

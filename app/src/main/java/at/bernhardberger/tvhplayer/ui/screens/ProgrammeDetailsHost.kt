@@ -8,6 +8,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.key.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvhplayer.core.*
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
@@ -22,6 +23,9 @@ import at.bernhardberger.tvhplayer.ui.screens.guide.ConfirmProgrammeActionDialog
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
+import at.bernhardberger.tvhplayer.settings.AppProfileOwner
+import at.bernhardberger.tvhplayer.ui.screens.settings.activeProfile
+import at.bernhardberger.tvhplayer.ui.screens.settings.accountName
 import at.bernhardberger.tvhplayer.ui.rememberCloseBehindPlayer
 import at.bernhardberger.tvhplayer.ui.rememberPlayerEntryPending
 import at.bernhardberger.tvhplayer.ui.LocalPlayerEntryHandoff
@@ -51,7 +55,9 @@ internal fun ProgrammeDetailsHost(
     retainPlayerSnapshot: Boolean = false,
     onContinueWatching: (() -> Unit)? = null,
     initialAction: BrowseContextAction? = null,
-    session: TvheadendSession = koinInject(),
+    session: TvheadendSession? = null,
+    signedInUsername: String? = koinInject<AppProfileOwner>().profiles.collectAsStateWithLifecycle()
+        .value.activeProfile()?.accountName(),
 ) {
     val closeBehindPlayer = rememberCloseBehindPlayer()
     val entryPending = rememberPlayerEntryPending()
@@ -143,8 +149,9 @@ internal fun ProgrammeDetailsHost(
             return@LaunchedEffect
         }
         if (pendingAction != null && currentMutation == null) {
-            returnAction = actions.firstOrNull { it in listOf(BrowseContextAction.RECORD,
-                BrowseContextAction.STOP, BrowseContextAction.CANCEL) } ?: actions.firstOrNull()
+            returnAction = actions.firstOrNull {
+                it == BrowseContextAction.RECORD || it in programmeRecordingRecordKeyActions
+            } ?: actions.firstOrNull()
             pendingAction = null
             pending = null
             if (menuConsumed) close()
@@ -176,9 +183,9 @@ internal fun ProgrammeDetailsHost(
             }
             return@action
         }
-        if (inFlight != null && action in listOf(BrowseContextAction.RECORD,
-                BrowseContextAction.STOP, BrowseContextAction.CANCEL, BrowseContextAction.SKIP,
-                BrowseContextAction.UNSKIP, BrowseContextAction.EDIT_RULE)) return@action
+        val recordingAction = action == BrowseContextAction.RECORD || action == BrowseContextAction.EDIT_RULE ||
+            action in programmeRecordingRecordKeyActions
+        if (inFlight != null && recordingAction) return@action
         val current = currentObservation()
         if (action == BrowseContextAction.WATCH || action == BrowseContextAction.SHOW_GUIDE) {
             // Live playback shares the player's wait for the session, and the guide is browsing:
@@ -276,7 +283,7 @@ internal fun ProgrammeDetailsHost(
         if (closing || departing || entryPending()) true
         else if (key.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_MEDIA_RECORD) {
             if (showContextMenu || pendingAction != null) true
-            else if (actions.any { it == BrowseContextAction.STOP || it == BrowseContextAction.CANCEL }) false
+            else if (actions.any { it in programmeRecordingRecordKeyActions }) false
             else {
                 if (key.type == KeyEventType.KeyDown && key.nativeKeyEvent.repeatCount == 0) {
                     if (BrowseContextAction.RECORD in actions) act(event, BrowseContextAction.RECORD)
@@ -379,13 +386,14 @@ internal fun ProgrammeDetailsHost(
     }
     pendingAction?.takeIf { currentMutation != null }?.let { action ->
         val programme = mutationEvent ?: event
-        ConfirmProgrammeActionDialog(action, programme.title.orEmpty(),
+        ConfirmProgrammeActionDialog(action, programme,
+            channel = programme.channelId?.let(observation::channel),
+            nowSec = nowSec, currentSession = capability, observation = observation,
             entries = pendingEntries,
+            signedInUsername = signedInUsername,
             configurations = observation.currentDvrConfigurations(),
             visibility = confirmationVisibility,
             onPreviewKeyEvent = keyHandler,
-            channelName = programme.channelId?.let(observation::channel)?.name.orEmpty(),
-            dateAndTime = formatRecordingSchedule(programme.start.epochSeconds),
             onDismiss = {
                 pendingAction = null
                 pending = null
@@ -403,10 +411,11 @@ internal fun ProgrammeDetailsHost(
     }
     }
     automaticRecording?.let { (currentSession, programme) ->
+        val editorSession: TvheadendSession = session ?: koinInject()
         val zone = remember { java.time.ZoneId.systemDefault() }
         AutomaticRecordingEditorHost(
-            currentSession, session.observation,
-            remember(session) { AutorecPreviewLoader(session.epgRepository) },
+            currentSession, editorSession.observation,
+            remember(editorSession) { AutorecPreviewLoader(editorSession.epgRepository) },
             mutations, notices, now = { kotlin.time.Instant.fromEpochSeconds(nowSecProvider()) },
             serverZone = zone, onClose = { automaticRecording = null },
             kind = if (programme.seriesLinkUri.isNullOrBlank()) AutomaticRecordingKind.TITLE
@@ -415,7 +424,9 @@ internal fun ProgrammeDetailsHost(
         )
     }
     editingRule?.takeIf { capability != null }?.let { entry ->
-        RecordingRuleEditorHost(entry, requireNotNull(capability), displayObservation, session, mutations, notices,
+        val editorSession: TvheadendSession = session ?: koinInject()
+        RecordingRuleEditorHost(entry, requireNotNull(capability), displayObservation,
+            editorSession, mutations, notices,
             now = { kotlin.time.Instant.fromEpochSeconds(nowSecProvider()) }, onClose = { editingRule = null })
     }
 }

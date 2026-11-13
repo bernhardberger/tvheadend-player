@@ -17,7 +17,10 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.tv.material3.Button
 import androidx.tv.material3.Text
-import at.bernhardberger.tvhplayer.ui.components.CentredDialog
+import at.bernhardberger.tvhplayer.ui.components.ConfirmationChoice
+import at.bernhardberger.tvhplayer.ui.components.ConfirmationDialog
+import at.bernhardberger.tvhplayer.ui.components.ConfirmationSubject
+import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.components.TwoColumnDialog
 import at.bernhardberger.tvhplayer.core.*
 import org.junit.Assert.*
@@ -86,7 +89,7 @@ class PlayerBackKeyTest {
         assertTrue(cycle.intercept(event(false), true, fail, fail))
     }
 
-    @Test fun disabledCentredDialogDoesNotBackThePageUnderneath() = disabledDialog(twoColumn = false)
+    @Test fun disabledConfirmationDialogDoesNotBackThePageUnderneath() = disabledDialog(twoColumn = false)
 
     @Test fun disabledTwoColumnDialogDoesNotBackThePageUnderneath() = disabledDialog(twoColumn = true)
 
@@ -110,8 +113,15 @@ class PlayerBackKeyTest {
                     if (twoColumn) TwoColumnDialog("Choice", "Wait", { dismissals++ }, backEnabled = enabled) {
                         Button(onClick = {}, modifier = Modifier.focusRequester(focus)) { Text("Keep") }
                         LaunchedEffect(Unit) { withFrameNanos { }; focus.requestFocus() }
-                    } else CentredDialog("Choice", "Wait", "Keep", "Cancel", {}, {},
-                        { dismissals++ }, backEnabled = enabled)
+                    } else ConfirmationDialog(
+                        question = "Delete this folder?",
+                        subject = ConfirmationSubject.Folder("Recordings", "2 recordings"),
+                        sentence = "The recordings are deleted.",
+                        safe = ConfirmationChoice("Keep", R.drawable.ic_check, "keep"),
+                        action = ConfirmationChoice("Delete", R.drawable.ic_delete_outlined, "delete"),
+                        onDismiss = { dismissals++ }, onConfirm = {},
+                        backEnabled = enabled,
+                    )
                 }
             }
         }

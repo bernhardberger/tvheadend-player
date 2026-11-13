@@ -45,6 +45,9 @@ import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
@@ -97,7 +100,10 @@ class OverlayInitialFocusDrawTest {
 
     /** The already fixed recording confirmation, which calibrates this check. */
     @Test fun recordingConfirmation() = assertInitialFocusDrawn("recording-confirmation-back") {
-        RecordingConfirmationDialog(PendingRecordingAction.DELETE, "Title", true, {}, {})
+        RecordingConfirmationDialog(PendingRecordingAction.DELETE,
+            DvrEntry.create(DvrEntryId(1), title = "Title", state = DvrEntryState.COMPLETED, folder = emptyList()),
+            channel = null, nowSec = 0L, currentSession = null, observation = null,
+            backEnabled = true, onDismiss = {}, onConfirm = {})
     }
 
     @Test fun recordingMarker() {

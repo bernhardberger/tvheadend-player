@@ -44,6 +44,8 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.core.programmeRecordingTarget
 import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvhplayer.core.programmeDetailsActions
+import at.bernhardberger.tvhplayer.core.recordingRuleAvailable
+import at.bernhardberger.tvhplayer.core.programmeRecordingRecordKeyActions
 import at.bernhardberger.tvheadend.sdk.core.EpgRepository
 import at.bernhardberger.tvheadend.sdk.core.EpgSearchRequest
 import at.bernhardberger.tvheadend.sdk.core.EpgSearchResult
@@ -110,8 +112,9 @@ internal fun programmeRecordKeyAction(event: EpgEvent, observation: SessionObser
         (observation.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
     return programmeDetailsActions(current, nowSec, recording,
         recording?.let(observation::recordingPlaybackAdmission), canModify,
-        current.channelId?.let(observation::channel) != null, liveProgramme = true)
-        .firstOrNull { it in listOf(BrowseContextAction.RECORD, BrowseContextAction.STOP, BrowseContextAction.CANCEL) }
+        current.channelId?.let(observation::channel) != null, liveProgramme = true,
+        ruleAvailable = recording?.let(observation::recordingRuleAvailable) == true)
+        .firstOrNull { it == BrowseContextAction.RECORD || it in programmeRecordingRecordKeyActions }
 }
 
 /** Shared by the action row and dedicated Record key, with the screen's existing lifetime/lock. */
@@ -149,7 +152,8 @@ internal fun DvrMutationActions.recordChannelProgramme(
             }
             null
         }
-        BrowseContextAction.STOP, BrowseContextAction.CANCEL -> action
+        BrowseContextAction.STOP, BrowseContextAction.CANCEL,
+        BrowseContextAction.SKIP, BrowseContextAction.UNSKIP -> action
         else -> { notices.postRecordUnavailable(event, current, nowSecProvider()); null }
     }
 }
