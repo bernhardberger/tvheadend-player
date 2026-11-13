@@ -59,17 +59,9 @@ internal class NoticeFormatter(private val context: Context) {
             icon = AppNoticeIcon.SIGN_IN_REJECTED)
         is Notice.AutomaticAdBreakSkip -> FormattedNotice(context.getString(R.string.recording_ad_break_skipped))
         is Notice.Dvr -> formatDvr(notice, now)
-        is Notice.DvrActionFailed -> FormattedNotice(context.getString(when (notice.failure) {
-            DvrMutationFeedback.TIMEOUT, DvrMutationFeedback.UNKNOWN_OUTCOME -> R.string.recording_action_not_confirmed
-            else -> when (notice.action) {
-                DvrMutationKind.SCHEDULE -> R.string.recording_action_failed_schedule
-                DvrMutationKind.STOP -> R.string.recording_action_failed_stop
-                DvrMutationKind.CANCEL -> R.string.recording_action_failed_cancel
-                DvrMutationKind.DELETE -> R.string.recording_action_failed_delete
-                else -> R.string.recording_action_failed_change
-            }
-        }), context.getString(dvrFailureReason(notice.failure))
-            .let { generic -> notice.serverMessage?.let { "$generic $it" } ?: generic }, AppNoticeIcon.WARNING)
+        is Notice.DvrActionFailed -> formatRecordingFailure(notice)
+        is Notice.DvrRuleActionFailed -> formatAutomaticRecordingFailure(notice)
+        is Notice.AutomaticRecordingEpisodesNotApplied -> formatEpisodeChoicesFailure(notice)
         is Notice.DvrFolderActionFailed -> FormattedNotice(context.resources.getQuantityString(
             if (notice.action == DvrMutationKind.DELETE) R.plurals.recording_folder_action_failed_delete
             else R.plurals.recording_folder_action_failed_change,
@@ -96,6 +88,44 @@ internal class NoticeFormatter(private val context: Context) {
             BackgroundPlaybackNotice.TUNER_LOST -> R.string.background_tuner_lost
             BackgroundPlaybackNotice.INTERRUPTED -> R.string.background_live_interrupted
         }))
+    }
+
+    private fun formatRecordingFailure(notice: Notice.DvrActionFailed): FormattedNotice =
+        FormattedNotice(context.getString(when (notice.failure) {
+            DvrMutationFeedback.TIMEOUT, DvrMutationFeedback.UNKNOWN_OUTCOME -> R.string.recording_action_not_confirmed
+            else -> when (notice.action) {
+                DvrMutationKind.SCHEDULE -> R.string.recording_action_failed_schedule
+                DvrMutationKind.STOP -> R.string.recording_action_failed_stop
+                DvrMutationKind.CANCEL -> R.string.recording_action_failed_cancel
+                DvrMutationKind.DELETE -> R.string.recording_action_failed_delete
+                else -> R.string.recording_action_failed_change
+            }
+        }), context.getString(dvrFailureReason(notice.failure))
+            .let { generic -> notice.serverMessage?.let { "$generic $it" } ?: generic }, AppNoticeIcon.WARNING)
+
+    private fun formatEpisodeChoicesFailure(notice: Notice.AutomaticRecordingEpisodesNotApplied): FormattedNotice =
+        FormattedNotice(context.getString(
+            if (notice.created) R.string.automatic_recording_episodes_not_applied_create
+            else R.string.automatic_recording_episodes_not_applied_change,
+        ), icon = AppNoticeIcon.WARNING)
+
+    private fun formatAutomaticRecordingFailure(notice: Notice.DvrRuleActionFailed): FormattedNotice {
+        val headline = when (notice.failure) {
+            DvrMutationFeedback.TIMEOUT,
+            DvrMutationFeedback.UNKNOWN_OUTCOME -> R.string.automatic_recording_action_not_confirmed
+            else -> when (notice.action) {
+                DvrMutationKind.SCHEDULE -> R.string.automatic_recording_action_failed_create
+                DvrMutationKind.DELETE -> R.string.automatic_recording_action_failed_delete
+                else -> R.string.automatic_recording_action_failed_change
+            }
+        }
+        val reason = if (notice.failure == DvrMutationFeedback.TIMEOUT ||
+            notice.failure == DvrMutationFeedback.UNKNOWN_OUTCOME) R.string.automatic_recording_action_check_first
+            else dvrFailureReason(notice.failure)
+        val detail = context.getString(reason).let { generic ->
+            notice.serverMessage?.let { "$generic $it" } ?: generic
+        }
+        return FormattedNotice(context.getString(headline), detail, AppNoticeIcon.WARNING)
     }
 
     private fun formatDvr(notice: Notice.Dvr, now: Instant): FormattedNotice {

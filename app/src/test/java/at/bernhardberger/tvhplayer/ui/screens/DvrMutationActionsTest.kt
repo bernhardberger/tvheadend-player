@@ -30,8 +30,302 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import at.bernhardberger.tvheadend.sdk.core.AutorecRule
+import at.bernhardberger.tvheadend.sdk.core.AutorecRuleId
+import at.bernhardberger.tvheadend.sdk.core.AutorecRuleCreate
+import at.bernhardberger.tvheadend.sdk.core.AutorecRuleUpdate
+import at.bernhardberger.tvheadend.sdk.core.TimerecRule
+import at.bernhardberger.tvheadend.sdk.core.TimerecRuleId
+import at.bernhardberger.tvheadend.sdk.core.TimerecRuleCreate
+import at.bernhardberger.tvheadend.sdk.core.TimerecRuleUpdate
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryUpdate
+import at.bernhardberger.tvheadend.sdk.core.DvrRemoval
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import kotlin.time.Instant
+import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
+import at.bernhardberger.tvhplayer.notices.Notice
+import at.bernhardberger.tvhplayer.notices.NoticeCenter
+import at.bernhardberger.tvhplayer.notices.NoticeContext
+import at.bernhardberger.tvheadend.sdk.core.DvrMutationKind
+import at.bernhardberger.tvheadend.sdk.core.EpgSearchResult
+import at.bernhardberger.tvhplayer.core.AutomaticRecordingKind
+import at.bernhardberger.tvhplayer.core.AutorecPreviewState
+import at.bernhardberger.tvhplayer.core.RecordingPattern
+import at.bernhardberger.tvhplayer.core.newAutorecDraft
+import java.time.ZoneId
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
+import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 
 class DvrMutationActionsTest {
+    @Test fun previewLoaderMapsNothingFailureAndEntryOnlySeriesWithoutSearching() = runTest {
+        val session = automaticSession()
+        val captured = requireNotNull(session.observation.value.currentSession)
+        val draft = newAutorecDraft(AutomaticRecordingKind.KEYWORD)
+        val loader = AutorecPreviewLoader { _, _ -> EpgSearchResult.Failed(TvheadendFailure.TIMEOUT) }
+        val now = Instant.fromEpochSeconds(100)
+        val zone = ZoneId.of("UTC")
+        assertEquals(AutorecPreviewState.NothingToSearch,
+            loader.load(draft, captured, session.observation.value, null, now, zone))
+        assertEquals(AutorecPreviewState.Failed(TvheadendFailure.TIMEOUT),
+            loader.load(draft.copy(pattern = RecordingPattern("news")),
+                captured, session.observation.value, null, now, zone))
+        val noSearch = AutorecPreviewLoader { _, _ -> error("Wordless all-channel series must not search") }
+        val series = draft.copy(kind = AutomaticRecordingKind.SERIES, seriesLinkUri = "series")
+        val rows = noSearch.load(series, captured, session.observation.value, AutorecRuleId("own"), now, zone, series)
+        assertEquals(0, (rows as AutorecPreviewState.Matches).matchCount)
+        val existing = draft.copy(pattern = RecordingPattern("news"))
+        publishAutomaticEntries(session, listOf(DvrEntry.create(DvrEntryId(9),
+            autorecRuleId = AutorecRuleId("own"), start = Instant.fromEpochSeconds(200))))
+        for (edit in listOf(existing, existing.copy(removal = DvrRemoval.Forever), existing.copy(enabled = false))) {
+            val preview = noSearch.load(edit, captured, session.observation.value, AutorecRuleId("own"),
+                now, zone, baseline = existing) as AutorecPreviewState.Matches
+            assertEquals(1, preview.matchCount)
+            assertEquals(if (edit.enabled) 1 else 0, preview.willRecordCount)
+        }
+        val available = AutorecPreviewLoader { _, _ -> EpgSearchResult.Available.create(emptyList(), captured) }
+        assertEquals(0, (available.load(draft.copy(pattern = RecordingPattern("news")),
+            captured, session.observation.value, null, now, zone) as AutorecPreviewState.Matches).matchCount)
+    }
+
+    @Test fun leftOutEpisodesApplyAfterEntriesArriveAndEmptySetDoesNotWait() = runTest {
+        val session = automaticSession()
+        val ruleId = AutorecRuleId("own")
+        session.dvrRepository.scriptCreateAutorecRule(DvrMutationResult.Confirmed(ruleId))
+        val requests = mutableListOf<Pair<DvrEntryId, DvrEntryUpdate>>()
+        val actions = automaticActions(session) { _, id, update ->
+            requests += id to update
+            DvrMutationResult.Confirmed(Unit)
+        }
+        val context = NoticeContext(1, null)
+        val notices = NoticeCenter({ testScheduler.currentTime }, { context })
+        val action = DvrMutationAction.CreateAutorec(
+            requireNotNull(session.observation.value.currentSession), AutorecRuleCreate("news"))
+        val saving = async(start = CoroutineStart.UNDISPATCHED) {
+            actions.createAutorecWithLeftOut(action, setOf(EventId(7)), session.observation, notices, context)
+        }
+        assertFalse(saving.isCompleted)
+        val entry = DvrEntry.create(DvrEntryId(10), eventId = EventId(7), autorecRuleId = ruleId,
+            state = DvrEntryState.SCHEDULED, enabled = true)
+        publishAutomaticEntries(session, listOf(entry))
+        assertEquals(AutorecSaveOutcome.Applied(ruleId), saving.await())
+        assertEquals(listOf(entry.id to DvrEntryUpdate(enabled = false)), requests)
+        val before = testScheduler.currentTime
+        assertEquals(AutorecSaveOutcome.Applied(ruleId),
+            actions.createAutorecWithLeftOut(action, emptySet(), session.observation, notices, context))
+        assertEquals(before, testScheduler.currentTime)
+    }
+
+    @Test fun missingOrFailedLeftOutUpdatesReturnPartialAndOneNoticeWithoutRetryingRule() = runTest {
+        val session = automaticSession()
+        val ruleId = AutorecRuleId("own")
+        session.dvrRepository.scriptCreateAutorecRule(DvrMutationResult.Confirmed(ruleId))
+        session.dvrRepository.scriptUpdateEntry(
+            DvrMutationResult.Failed(TvheadendFailure.ACCESS_DENIED, mayHaveApplied = false))
+        val actions = DvrMutationActions(session.dvrRepository)
+        val context = NoticeContext(1, null)
+        val notices = NoticeCenter({ testScheduler.currentTime }, { context })
+        val action = DvrMutationAction.CreateAutorec(
+            requireNotNull(session.observation.value.currentSession), AutorecRuleCreate("news"))
+        val before = testScheduler.currentTime
+        assertEquals(AutorecSaveOutcome.PartiallyApplied(ruleId, setOf(EventId(7))),
+            actions.createAutorecWithLeftOut(action, setOf(EventId(7)), session.observation, notices, context))
+        assertTrue(testScheduler.currentTime > before)
+        assertEquals(Notice.AutomaticRecordingEpisodesNotApplied(created = true),
+            notices.state.value.candidate?.notice)
+        publishAutomaticEntries(session, listOf(DvrEntry.create(DvrEntryId(10), eventId = EventId(7),
+            autorecRuleId = ruleId, state = DvrEntryState.SCHEDULED, enabled = true)))
+        val afterTimeout = testScheduler.currentTime
+        assertEquals(AutorecSaveOutcome.PartiallyApplied(ruleId, setOf(EventId(7))),
+            actions.createAutorecWithLeftOut(action, setOf(EventId(7)), session.observation, notices, context))
+        assertEquals(afterTimeout, testScheduler.currentTime)
+        session.dvrRepository.scriptCreateAutorecRule(
+            DvrMutationResult.Failed(TvheadendFailure.ACCESS_DENIED, mayHaveApplied = false))
+        assertTrue(actions.createAutorecWithLeftOut(action, setOf(EventId(7)),
+            session.observation, notices, context) is AutorecSaveOutcome.RuleFailed)
+    }
+
+    @Test fun editingEpisodeChoicesWaitsForRecreatedEntriesAndEnablesAsWellAsDisables() = runTest {
+        val rule = AutorecRule.create(AutorecRuleId("own"), title = "news")
+        val old = DvrEntry.create(DvrEntryId(10), eventId = EventId(7), autorecRuleId = rule.id,
+            state = DvrEntryState.SCHEDULED, enabled = false)
+        val session = automaticSession(listOf(rule), listOf(old))
+        session.dvrRepository.scriptUpdateAutorecRule(DvrMutationResult.Confirmed(Unit))
+        val requests = mutableListOf<Pair<DvrEntryId, DvrEntryUpdate>>()
+        val actions = automaticActions(session) { _, id, update ->
+            requests += id to update
+            DvrMutationResult.Confirmed(Unit)
+        }
+        val context = NoticeContext(1, null)
+        val notices = NoticeCenter({ testScheduler.currentTime }, { context })
+        val saving = async(start = CoroutineStart.UNDISPATCHED) {
+            actions.updateAutorecWithEpisodes(DvrMutationAction.UpdateAutorec(
+                requireNotNull(session.observation.value.currentSession), rule, AutorecRuleUpdate(name = "Changed")),
+                mapOf(EventId(7) to true, EventId(8) to false), session.observation, notices, context)
+        }
+        assertFalse(saving.isCompleted)
+        val enabled = DvrEntry.create(DvrEntryId(11), eventId = EventId(7), autorecRuleId = rule.id,
+            state = DvrEntryState.SCHEDULED, enabled = false)
+        val disabled = DvrEntry.create(DvrEntryId(12), eventId = EventId(8), autorecRuleId = rule.id,
+            state = DvrEntryState.SCHEDULED, enabled = true)
+        publishAutomaticEntries(session, listOf(enabled, disabled), listOf(rule))
+        assertEquals(AutorecSaveOutcome.Applied(rule.id), saving.await())
+        assertEquals(listOf(enabled.id to DvrEntryUpdate(enabled = true),
+            disabled.id to DvrEntryUpdate(enabled = false)), requests)
+    }
+
+    private fun automaticSession(
+        rules: List<AutorecRule> = emptyList(),
+        entries: List<DvrEntry> = emptyList(),
+    ): FakeTvheadendSession = FakeTvheadendSession(SessionObservation.create(
+        sessionState = SessionState.Ready(ServerCapabilities.create(
+            streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
+        channelState = ChannelRepositoryState.Current(ChannelCatalog.create()),
+        epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
+        dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = entries, autorecRules = rules)),
+    ))
+
+    private fun publishAutomaticEntries(
+        session: FakeTvheadendSession,
+        entries: List<DvrEntry>,
+        rules: List<AutorecRule> = emptyList(),
+    ) {
+        val current = session.observation.value
+        session.publish(SessionObservation.create(sessionState = current.sessionState,
+            channelState = current.channelState, epgState = current.epgState,
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = entries, autorecRules = rules))))
+    }
+
+    @OptIn(ExperimentalTvheadendApi::class)
+    private fun automaticActions(
+        session: FakeTvheadendSession,
+        update: suspend (CurrentSessionObservation, DvrEntryId, DvrEntryUpdate) -> DvrMutationResult<Unit>,
+    ): DvrMutationActions = DvrMutationActions(
+        scheduleEntry = session.dvrRepository::scheduleEntry,
+        stopEntry = session.dvrRepository::stopEntry,
+        cancelEntry = session.dvrRepository::cancelEntry,
+        deleteEntry = session.dvrRepository::deleteEntry,
+        updateWatchStateCommand = session.dvrRepository::updateWatchState,
+        createAutorecRule = session.dvrRepository::createAutorecRule,
+        updateAutorecRule = session.dvrRepository::updateAutorecRule,
+        updateEntry = update,
+    )
+
+    @Test fun keepTimeSurvivesProgressButSkipRequiresCurrentlyScheduledEntry() {
+        val entry = DvrEntry.create(DvrEntryId(7), state = DvrEntryState.RECORDING, dataSizeBytes = 10)
+        val initial = SessionObservation.create(
+            sessionState = SessionState.Ready(ServerCapabilities.create(
+                streaming = CapabilityAccess.ALLOWED,
+                dvrWrite = CapabilityAccess.ALLOWED,
+            )),
+            channelState = ChannelRepositoryState.Current(ChannelCatalog.create()),
+            epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = listOf(entry))),
+        )
+        val session = FakeTvheadendSession(initial)
+        val source = session.observation.value
+        val captured = requireNotNull(source.currentSession)
+        session.publish(SessionObservation.create(
+            sessionState = initial.sessionState,
+            channelState = initial.channelState,
+            epgState = initial.epgState,
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = listOf(
+                DvrEntry.create(entry.id, state = DvrEntryState.RECORDING, dataSizeBytes = 20, playCount = 1),
+            ))),
+        ))
+        val keep = DvrMutationAction.SetEntryRemoval(captured, entry, DvrRemoval.Forever)
+        assertSame(keep, currentDvrMutation(keep, source, session.observation.value))
+        val scheduled = DvrEntry.create(entry.id, state = DvrEntryState.SCHEDULED)
+        val skip = DvrMutationAction.SetEntryEnabled(captured, scheduled, false)
+        assertEquals(null, currentDvrMutation(skip, source, session.observation.value))
+    }
+
+    @Test fun newActionsDropChangedTargetsAndExpiredSessionsAndRulesUseRuleFeedback() = runTest {
+        val auto = AutorecRule.create(AutorecRuleId("auto"), title = "news")
+        val timer = TimerecRule.create(TimerecRuleId("timer"))
+        val entry = DvrEntry.create(DvrEntryId(7), state = DvrEntryState.SCHEDULED)
+        val initial = SessionObservation.create(
+            sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
+            channelState = ChannelRepositoryState.Current(ChannelCatalog.create()),
+            epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = listOf(entry),
+                autorecRules = listOf(auto), timerecRules = listOf(timer))))
+        val session = FakeTvheadendSession(initial)
+        val source = session.observation.value
+        val captured = requireNotNull(source.currentSession)
+        val edits = listOf(
+            DvrMutationAction.UpdateAutorec(captured, auto, AutorecRuleUpdate(enabled = false)),
+            DvrMutationAction.DeleteAutorec(captured, auto),
+            DvrMutationAction.UpdateTimerec(captured, timer, TimerecRuleUpdate(enabled = false)),
+            DvrMutationAction.DeleteTimerec(captured, timer),
+            DvrMutationAction.SetEntryEnabled(captured, entry, false),
+            DvrMutationAction.SetEntryRemoval(captured, entry, DvrRemoval.Forever),
+        )
+        edits.forEach { assertSame(it, currentDvrMutation(it, source, source)) }
+        session.publish(SessionObservation.create(sessionState = initial.sessionState,
+            channelState = initial.channelState, epgState = initial.epgState,
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create())))
+        edits.forEach { assertEquals(null, currentDvrMutation(it, source, session.observation.value)) }
+        session.replaceGeneration(initial)
+        val creates = listOf(DvrMutationAction.CreateAutorec(captured, AutorecRuleCreate("news")),
+            DvrMutationAction.CreateTimerec(captured, TimerecRuleCreate("timer")))
+        creates.forEach { assertEquals(null, currentDvrMutation(it, source, session.observation.value)) }
+        val context = NoticeContext(1, null)
+        val notices = NoticeCenter({ testScheduler.currentTime }, { context })
+        val failed = DvrMutationResult.Failed(TvheadendFailure.TIMEOUT, mayHaveApplied = true)
+        notices.postDvrFailure(edits.first(), failed, context)
+        assertEquals(Notice.DvrRuleActionFailed(DvrMutationKind.UPDATE, DvrMutationFeedback.TIMEOUT),
+            notices.state.value.candidate?.notice)
+        notices.postDvrFailure(edits.last(), failed, context)
+        assertEquals(Notice.DvrActionFailed(DvrMutationKind.UPDATE, DvrMutationFeedback.TIMEOUT),
+            notices.state.value.candidate?.notice)
+    }
+
+    @Test fun ruleTimeSkipAndKeepActionsDispatchCapturedRequests() = runTest {
+        val session = currentSession()
+        val auto = AutorecRule.create(AutorecRuleId("auto"), title = "news")
+        val timer = TimerecRule.create(TimerecRuleId("timer"))
+        val entry = DvrEntry.create(DvrEntryId(7), state = DvrEntryState.SCHEDULED)
+        val createdAuto = AutorecRuleCreate("news")
+        val updatedAuto = AutorecRuleUpdate(enabled = false)
+        val createdTimer = TimerecRuleCreate("timer")
+        val updatedTimer = TimerecRuleUpdate(enabled = false)
+        val time = DvrScheduleRequest(DvrSchedule.ExplicitTime(ChannelId(1),
+            Instant.fromEpochSeconds(100), Instant.fromEpochSeconds(200)), title = "Timer")
+        val received = mutableListOf<Any>()
+        val actions = DvrMutationActions(
+            scheduleEntry = { s, r -> assertSame(session, s); received += r; DvrMutationResult.Confirmed(entry.id) },
+            stopEntry = { _, _ -> error("Unexpected stop") },
+            cancelEntry = { _, _ -> error("Unexpected cancel") },
+            deleteEntry = { _, _ -> error("Unexpected delete") },
+            updateWatchStateCommand = { _, _, _ -> error("Unexpected watch") },
+            createAutorecRule = { s, r -> assertSame(session, s); received += r; DvrMutationResult.Confirmed(auto.id) },
+            updateAutorecRule = { s, id, r -> assertSame(session, s); assertEquals(auto.id, id); received += r; DvrMutationResult.Confirmed(Unit) },
+            deleteAutorecRule = { s, id -> assertSame(session, s); received += id; DvrMutationResult.Confirmed(Unit) },
+            createTimerecRule = { s, r -> assertSame(session, s); received += r; DvrMutationResult.Confirmed(timer.id) },
+            updateTimerecRule = { s, id, r -> assertSame(session, s); assertEquals(timer.id, id); received += r; DvrMutationResult.Confirmed(Unit) },
+            deleteTimerecRule = { s, id -> assertSame(session, s); received += id; DvrMutationResult.Confirmed(Unit) },
+            updateEntry = { s, id, r -> assertSame(session, s); assertEquals(entry.id, id); received += r; DvrMutationResult.Confirmed(Unit) },
+        )
+        listOf(
+            DvrMutationAction.CreateAutorec(session, createdAuto),
+            DvrMutationAction.UpdateAutorec(session, auto, updatedAuto),
+            DvrMutationAction.DeleteAutorec(session, auto),
+            DvrMutationAction.CreateTimerec(session, createdTimer),
+            DvrMutationAction.UpdateTimerec(session, timer, updatedTimer),
+            DvrMutationAction.DeleteTimerec(session, timer),
+            DvrMutationAction.ScheduleByTime(session, time),
+            DvrMutationAction.SetEntryEnabled(session, entry, false),
+            DvrMutationAction.SetEntryEnabled(session, entry, true),
+            DvrMutationAction.SetEntryRemoval(session, entry, DvrRemoval.Forever),
+        ).forEach { assertEquals(DvrMutationFeedback.CONFIRMED, actions.execute(it).toDvrMutationFeedback()) }
+        assertEquals(listOf(createdAuto, updatedAuto, auto.id, createdTimer, updatedTimer, timer.id,
+            time, DvrEntryUpdate(enabled = false), DvrEntryUpdate(enabled = true),
+            DvrEntryUpdate(removal = DvrRemoval.Forever)), received)
+    }
+
     @Test
     fun createStopCancelAndDeleteDispatchCapturedTypedActions() = runTest {
         val capability = currentSession()

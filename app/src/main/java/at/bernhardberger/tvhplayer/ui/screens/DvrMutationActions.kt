@@ -11,6 +11,18 @@ import at.bernhardberger.tvheadend.sdk.core.DvrSchedule
 import at.bernhardberger.tvheadend.sdk.core.DvrScheduleRequest
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationKind
+import at.bernhardberger.tvheadend.sdk.core.AutorecRule
+import at.bernhardberger.tvheadend.sdk.core.AutorecRuleId
+import at.bernhardberger.tvheadend.sdk.core.AutorecRuleCreate
+import at.bernhardberger.tvheadend.sdk.core.AutorecRuleUpdate
+import at.bernhardberger.tvheadend.sdk.core.TimerecRule
+import at.bernhardberger.tvheadend.sdk.core.TimerecRuleId
+import at.bernhardberger.tvheadend.sdk.core.TimerecRuleCreate
+import at.bernhardberger.tvheadend.sdk.core.TimerecRuleUpdate
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryUpdate
+import at.bernhardberger.tvheadend.sdk.core.DvrRemoval
+import at.bernhardberger.tvheadend.sdk.core.RecordingRuleChannel
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvhplayer.notices.DvrMutationFeedback
@@ -26,19 +38,69 @@ import at.bernhardberger.tvhplayer.core.BrowseContextAction
 import at.bernhardberger.tvhplayer.core.ProgrammeRecordingTarget
 import at.bernhardberger.tvhplayer.core.folderActionApplies
 import at.bernhardberger.tvhplayer.core.dvrMutationStateIsCurrent
+import at.bernhardberger.tvhplayer.core.dvrMutationTargetIsCurrent
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.core.programmeRecordingTarget
 import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvhplayer.core.programmeDetailsActions
+import at.bernhardberger.tvheadend.sdk.core.EpgRepository
+import at.bernhardberger.tvheadend.sdk.core.EpgSearchRequest
+import at.bernhardberger.tvheadend.sdk.core.EpgSearchResult
+import at.bernhardberger.tvheadend.sdk.core.EventId
+import at.bernhardberger.tvhplayer.core.AutorecDraft
+import at.bernhardberger.tvhplayer.core.AutorecPreviewState
+import at.bernhardberger.tvhplayer.core.previewMatches
+import at.bernhardberger.tvhplayer.core.previewSearchRequest
+import java.time.ZoneId
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import at.bernhardberger.tvhplayer.core.chooseDvrConfig
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import androidx.compose.runtime.MutableState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.first
 
+internal val AutorecEpisodeWaitTimeout = 10.seconds
+
+/** Failed retains SDK mayHaveApplied: an ambiguous rule failure never means "nothing was created". */
+internal sealed interface AutorecSaveOutcome {
+    data class RuleFailed(val result: DvrMutationResult.Failed) : AutorecSaveOutcome
+    data class Applied(val ruleId: AutorecRuleId) : AutorecSaveOutcome
+    data class PartiallyApplied(val ruleId: AutorecRuleId, val unappliedEventIds: Set<EventId>) : AutorecSaveOutcome
+}
+
+internal class AutorecPreviewLoader(
+    private val search: suspend (CurrentSessionObservation, EpgSearchRequest) -> EpgSearchResult,
+) {
+    constructor(repository: EpgRepository) : this(repository::search)
+
+    /** The caller owns cancellation and discarding an obsolete draft's result. */
+    suspend fun load(
+        draft: AutorecDraft,
+        currentSession: CurrentSessionObservation,
+        observation: SessionObservation,
+        ruleId: AutorecRuleId?,
+        now: Instant,
+        zone: ZoneId,
+        baseline: AutorecDraft? = null,
+    ): AutorecPreviewState {
+        require(ruleId == null || baseline != null) { "An existing rule preview requires its baseline draft" }
+        val request = draft.previewSearchRequest(baseline)
+        val events = if (request == null) emptyList() else when (val result = search(currentSession, request)) {
+            is EpgSearchResult.Failed -> return AutorecPreviewState.Failed(result.failure)
+            is EpgSearchResult.Available -> result.events
+        }
+        return if (request == null && ruleId == null) AutorecPreviewState.NothingToSearch
+        else draft.previewMatches(events,
+            (observation.dvrState as? DvrRepositoryState.Current)?.snapshot?.entries.orEmpty(),
+            ruleId, now, zone, baseline)
+    }
+}
 /** The same eligibility as the programme's action row; Record never acts on a retained event. */
 @OptIn(ExperimentalTvheadendApi::class)
 internal fun programmeRecordKeyAction(event: EpgEvent, observation: SessionObservation, nowSec: Long): BrowseContextAction? {
@@ -128,6 +190,52 @@ internal fun DvrMutationActions.launchMutation(
 }
 
 internal sealed interface DvrMutationAction {
+    data class CreateAutorec(
+        val currentSession: CurrentSessionObservation,
+        val request: AutorecRuleCreate,
+    ) : DvrMutationAction
+    data class UpdateAutorec(
+        val currentSession: CurrentSessionObservation,
+        val target: AutorecRule,
+        /** Null means that only episode choices changed, not the rule itself. */
+        val update: AutorecRuleUpdate?,
+    ) : DvrMutationAction
+    data class DeleteAutorec(
+        val currentSession: CurrentSessionObservation,
+        val target: AutorecRule,
+    ) : DvrMutationAction
+    data class CreateTimerec(
+        val currentSession: CurrentSessionObservation,
+        val request: TimerecRuleCreate,
+    ) : DvrMutationAction
+    data class UpdateTimerec(
+        val currentSession: CurrentSessionObservation,
+        val target: TimerecRule,
+        val update: TimerecRuleUpdate,
+    ) : DvrMutationAction
+    data class DeleteTimerec(
+        val currentSession: CurrentSessionObservation,
+        val target: TimerecRule,
+    ) : DvrMutationAction
+    data class ScheduleByTime(
+        val currentSession: CurrentSessionObservation,
+        val request: DvrScheduleRequest,
+    ) : DvrMutationAction {
+        init { require(request.schedule is DvrSchedule.ExplicitTime) }
+    }
+    data class SetEntryEnabled(
+        val currentSession: CurrentSessionObservation,
+        val target: DvrEntry,
+        val enabled: Boolean,
+    ) : DvrMutationAction
+    data class SetEntryRemoval(
+        val currentSession: CurrentSessionObservation,
+        val target: DvrEntry,
+        val removal: DvrRemoval,
+    ) : DvrMutationAction {
+        init { require(removal != DvrRemoval.ServerDefault) }
+    }
+
     data class CreateProgramme(
         val target: ProgrammeRecordingTarget,
         val configId: DvrConfigId?,
@@ -149,7 +257,31 @@ internal sealed interface DvrMutationAction {
     ) : DvrMutationAction
 }
 
+private fun SessionObservation.hasCurrentChannel(
+    capturedSession: CurrentSessionObservation,
+    channelId: ChannelId?,
+): Boolean = currentSession === capturedSession && (channelId == null || channel(channelId) != null)
+
 internal fun DvrMutationAction.recordingStateIsCurrent(observation: SessionObservation): Boolean = when (this) {
+    is DvrMutationAction.CreateAutorec -> observation.hasCurrentChannel(
+        currentSession, (request.channel as? RecordingRuleChannel.SpecificChannel)?.channelId,
+    )
+    is DvrMutationAction.CreateTimerec -> observation.hasCurrentChannel(
+        currentSession, (request.channel as? RecordingRuleChannel.SpecificChannel)?.channelId,
+    )
+    is DvrMutationAction.ScheduleByTime -> observation.hasCurrentChannel(
+        currentSession, (request.schedule as DvrSchedule.ExplicitTime).channelId,
+    )
+    is DvrMutationAction.UpdateAutorec -> dvrMutationTargetIsCurrent(currentSession, target, observation)
+    is DvrMutationAction.DeleteAutorec -> dvrMutationTargetIsCurrent(currentSession, target, observation)
+    is DvrMutationAction.UpdateTimerec -> dvrMutationTargetIsCurrent(currentSession, target, observation)
+    is DvrMutationAction.DeleteTimerec -> dvrMutationTargetIsCurrent(currentSession, target, observation)
+    is DvrMutationAction.SetEntryEnabled -> dvrMutationStateIsCurrent(
+        currentSession, target.id, DvrEntryState.SCHEDULED, observation,
+    )
+    is DvrMutationAction.SetEntryRemoval -> target.state?.let {
+        dvrMutationStateIsCurrent(currentSession, target.id, it, observation)
+    } == true
     is DvrMutationAction.Cancel -> dvrMutationStateIsCurrent(
         currentSession, recordingId, DvrEntryState.SCHEDULED, observation,
     )
@@ -183,6 +315,38 @@ internal class DvrMutationActions(
         DvrEntryId,
         Boolean,
     ) -> DvrProgressResult,
+    private val createAutorecRule: suspend (
+        CurrentSessionObservation,
+        AutorecRuleCreate,
+    ) -> DvrMutationResult<AutorecRuleId> =
+        { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
+    private val updateAutorecRule: suspend (
+        CurrentSessionObservation,
+        AutorecRuleId,
+        AutorecRuleUpdate,
+    ) -> DvrMutationResult<Unit> =
+        { _, _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
+    private val deleteAutorecRule: suspend (CurrentSessionObservation, AutorecRuleId) -> DvrMutationResult<Unit> =
+        { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
+    private val createTimerecRule: suspend (
+        CurrentSessionObservation,
+        TimerecRuleCreate,
+    ) -> DvrMutationResult<TimerecRuleId> =
+        { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
+    private val updateTimerecRule: suspend (
+        CurrentSessionObservation,
+        TimerecRuleId,
+        TimerecRuleUpdate,
+    ) -> DvrMutationResult<Unit> =
+        { _, _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
+    private val deleteTimerecRule: suspend (CurrentSessionObservation, TimerecRuleId) -> DvrMutationResult<Unit> =
+        { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
+    private val updateEntry: suspend (
+        CurrentSessionObservation,
+        DvrEntryId,
+        DvrEntryUpdate,
+    ) -> DvrMutationResult<Unit> =
+        { _, _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
 ) {
     constructor(repository: DvrRepository) : this(
         scheduleEntry = repository::scheduleEntry,
@@ -190,6 +354,13 @@ internal class DvrMutationActions(
         cancelEntry = repository::cancelEntry,
         deleteEntry = repository::deleteEntry,
         updateWatchStateCommand = repository::updateWatchState,
+        createAutorecRule = repository::createAutorecRule,
+        updateAutorecRule = repository::updateAutorecRule,
+        deleteAutorecRule = repository::deleteAutorecRule,
+        createTimerecRule = repository::createTimerecRule,
+        updateTimerecRule = repository::updateTimerecRule,
+        deleteTimerecRule = repository::deleteTimerecRule,
+        updateEntry = repository::updateEntry,
     )
 
     suspend fun updateWatchState(
@@ -198,8 +369,113 @@ internal class DvrMutationActions(
         watched: Boolean,
     ): DvrProgressResult = updateWatchStateCommand(currentSession, recordingId, watched)
 
+    suspend fun createAutorecWithLeftOut(
+        action: DvrMutationAction.CreateAutorec,
+        excludedEventIds: Set<EventId>,
+        observations: StateFlow<SessionObservation>,
+        notices: NoticeCenter,
+        context: NoticeContext,
+    ): AutorecSaveOutcome {
+        val result = if (action.recordingStateIsCurrent(observations.value)) {
+            createAutorecRule(action.currentSession, action.request)
+        } else DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false)
+        val ruleId = when (result) {
+            is DvrMutationResult.Confirmed -> result.value
+            is DvrMutationResult.AcceptedButUnconfirmed -> result.value
+            is DvrMutationResult.Failed -> {
+                notices.postDvrFailure(action, result, context)
+                return AutorecSaveOutcome.RuleFailed(result)
+            }
+        }
+        return applyEpisodeChoices(action.currentSession, ruleId, excludedEventIds.associateWith { false },
+            emptySet(), observations, notices, context, created = true)
+    }
+
+    suspend fun updateAutorecWithEpisodes(
+        action: DvrMutationAction.UpdateAutorec,
+        enabledChanges: Map<EventId, Boolean>,
+        observations: StateFlow<SessionObservation>,
+        notices: NoticeCenter,
+        context: NoticeContext,
+    ): AutorecSaveOutcome {
+        val oldIds = if (action.update == null) emptySet() else observations.value.dvrSnapshotForDisplay
+            ?.entries.orEmpty().filter { it.autorecRuleId == action.target.id }.map { it.id }.toSet()
+        val result = if (action.recordingStateIsCurrent(observations.value)) executeRule(action)
+            else DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false)
+        if (result is DvrMutationResult.Failed) {
+            notices.postDvrFailure(action, result, context)
+            return AutorecSaveOutcome.RuleFailed(result)
+        }
+        return applyEpisodeChoices(action.currentSession, action.target.id, enabledChanges, oldIds,
+            observations, notices, context, created = false)
+    }
+
+    private suspend fun applyEpisodeChoices(
+        session: CurrentSessionObservation,
+        ruleId: AutorecRuleId,
+        changes: Map<EventId, Boolean>,
+        replacedIds: Set<DvrEntryId>,
+        observations: StateFlow<SessionObservation>,
+        notices: NoticeCenter,
+        context: NoticeContext,
+        created: Boolean,
+    ): AutorecSaveOutcome {
+        val pending = changes.toMutableMap()
+        val failed = mutableSetOf<EventId>()
+        if (pending.isNotEmpty()) withTimeoutOrNull(AutorecEpisodeWaitTimeout) {
+            observations.first {
+                applyAvailableEpisodeChoices(session, ruleId, pending, failed, replacedIds, observations)
+                pending.isEmpty()
+            }
+        }
+        val unapplied = failed + pending.keys
+        return if (unapplied.isEmpty()) AutorecSaveOutcome.Applied(ruleId) else {
+            notices.post(Notice.AutomaticRecordingEpisodesNotApplied(created), context)
+            AutorecSaveOutcome.PartiallyApplied(ruleId, unapplied)
+        }
+    }
+
+    private suspend fun applyAvailableEpisodeChoices(
+        session: CurrentSessionObservation,
+        ruleId: AutorecRuleId,
+        pending: MutableMap<EventId, Boolean>,
+        failed: MutableSet<EventId>,
+        replacedIds: Set<DvrEntryId>,
+        observations: StateFlow<SessionObservation>,
+    ) {
+        for ((eventId, enabled) in pending.toMap()) {
+            val current = observations.value
+            if (current.currentSession !== session) {
+                failed += pending.keys
+                pending.clear()
+                return
+            }
+            val entries = (current.dvrState as? DvrRepositoryState.Current)?.snapshot?.entries.orEmpty()
+            val entry = entries.singleOrNull { it.autorecRuleId == ruleId && it.eventId == eventId &&
+                it.state == DvrEntryState.SCHEDULED && it.id !in replacedIds } ?: continue
+            if (entry.enabled != enabled) {
+                val result = updateEntry(session, entry.id, DvrEntryUpdate(enabled = enabled))
+                if (result !is DvrMutationResult.Confirmed) failed += eventId
+            }
+            pending.remove(eventId)
+        }
+    }
+
     suspend fun execute(action: DvrMutationAction?): DvrMutationResult<*> =
         when (action) {
+            is DvrMutationAction.CreateAutorec,
+            is DvrMutationAction.UpdateAutorec,
+            is DvrMutationAction.DeleteAutorec,
+            is DvrMutationAction.CreateTimerec,
+            is DvrMutationAction.UpdateTimerec,
+            is DvrMutationAction.DeleteTimerec -> executeRule(action)
+            is DvrMutationAction.ScheduleByTime -> scheduleEntry(action.currentSession, action.request)
+            is DvrMutationAction.SetEntryEnabled -> updateEntry(
+                action.currentSession, action.target.id, DvrEntryUpdate(enabled = action.enabled),
+            )
+            is DvrMutationAction.SetEntryRemoval -> updateEntry(
+                action.currentSession, action.target.id, DvrEntryUpdate(removal = action.removal),
+            )
             is DvrMutationAction.CreateProgramme -> scheduleEntry(
                 action.target.currentSession,
                 DvrScheduleRequest(
@@ -222,6 +498,20 @@ internal class DvrMutationActions(
             )
             null -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false)
         }
+
+    private suspend fun executeRule(action: DvrMutationAction): DvrMutationResult<*> = when (action) {
+        is DvrMutationAction.CreateAutorec -> createAutorecRule(action.currentSession, action.request)
+        is DvrMutationAction.UpdateAutorec -> action.update?.let {
+            updateAutorecRule(action.currentSession, action.target.id, it)
+        } ?: DvrMutationResult.Confirmed(Unit)
+        is DvrMutationAction.DeleteAutorec -> deleteAutorecRule(action.currentSession, action.target.id)
+        is DvrMutationAction.CreateTimerec -> createTimerecRule(action.currentSession, action.request)
+        is DvrMutationAction.UpdateTimerec -> updateTimerecRule(
+            action.currentSession, action.target.id, action.update,
+        )
+        is DvrMutationAction.DeleteTimerec -> deleteTimerecRule(action.currentSession, action.target.id)
+        else -> error("Not an automatic recording action")
+    }
 }
 
 @OptIn(ExperimentalTvheadendApi::class)
@@ -229,7 +519,16 @@ internal fun NoticeCenter.postDvrFailure(action: DvrMutationAction, result: DvrM
     val feedback = result.toDvrMutationFeedback()
     if (!feedback.isFailure) return
     val kind = when (action) {
-        is DvrMutationAction.CreateProgramme -> DvrMutationKind.SCHEDULE
+        is DvrMutationAction.CreateProgramme,
+        is DvrMutationAction.ScheduleByTime,
+        is DvrMutationAction.CreateAutorec,
+        is DvrMutationAction.CreateTimerec -> DvrMutationKind.SCHEDULE
+        is DvrMutationAction.UpdateAutorec,
+        is DvrMutationAction.UpdateTimerec,
+        is DvrMutationAction.SetEntryEnabled,
+        is DvrMutationAction.SetEntryRemoval -> DvrMutationKind.UPDATE
+        is DvrMutationAction.DeleteAutorec,
+        is DvrMutationAction.DeleteTimerec -> DvrMutationKind.DELETE
         is DvrMutationAction.Stop -> DvrMutationKind.STOP
         is DvrMutationAction.Cancel -> DvrMutationKind.CANCEL
         is DvrMutationAction.Delete -> DvrMutationKind.DELETE
@@ -237,7 +536,11 @@ internal fun NoticeCenter.postDvrFailure(action: DvrMutationAction, result: DvrM
     // The server's own text belongs only to a refusal; any other failure keeps the app's wording.
     val serverMessage = (result as? DvrMutationResult.Failed)?.serverMessage
         ?.takeIf { feedback == DvrMutationFeedback.REJECTED }
-    post(Notice.DvrActionFailed(kind, feedback, serverMessage), context)
+    val rule = action is DvrMutationAction.CreateAutorec || action is DvrMutationAction.UpdateAutorec ||
+        action is DvrMutationAction.DeleteAutorec || action is DvrMutationAction.CreateTimerec ||
+        action is DvrMutationAction.UpdateTimerec || action is DvrMutationAction.DeleteTimerec
+    post(if (rule) Notice.DvrRuleActionFailed(kind, feedback, serverMessage)
+        else Notice.DvrActionFailed(kind, feedback, serverMessage), context)
 }
 
 /**
