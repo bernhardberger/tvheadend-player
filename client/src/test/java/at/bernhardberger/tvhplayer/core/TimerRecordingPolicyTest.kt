@@ -147,8 +147,8 @@ class TimerRecordingPolicyTest {
         assertTrue(reversed.nextOccurrences(beforeGap, zone, 1).isEmpty())
         val repeating = reversed.copy(days = setOf(DayOfWeek.SUNDAY))
             .nextOccurrences(beforeGap, zone, 1).single()
-        assertEquals(Instant.parse("2026-04-05T00:30:00Z"), repeating.start)
-        assertTrue(repeating.stop > repeating.start)
+        assertEquals(Instant.parse("2026-03-29T01:30:00Z"), repeating.start)
+        assertEquals(30.minutes, repeating.stop - repeating.start)
         val overlap = reversed.copy(date = LocalDate.of(2026, 10, 25))
         assertNull(overlap.cannotSubmit(zone))
         val occurrence = overlap.nextOccurrences(Instant.parse("2026-10-24T00:00:00Z"),

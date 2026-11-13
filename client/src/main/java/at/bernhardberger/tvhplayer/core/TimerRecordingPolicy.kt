@@ -14,7 +14,9 @@ import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
 fun newTimerDraft(
@@ -100,14 +102,19 @@ fun TimerDraft.toScheduleRequest(channelName: String, serverZone: ZoneId): DvrSc
     )
 }
 
-/** Repeating equal clock times are zero length (dvr_timerec.c:122-125); one-off wrapping stays unchanged. */
+/**
+ * Repeating gaps keep the date using the nominal clock length, not an emulation of libc's DST retry
+ * (dvr_timerec.c:35-52,122-125). Stored equal times stay zero length; one-off resolution is unchanged.
+ */
 internal fun TimerDraft.resolveOccurrenceOn(date: LocalDate, serverZone: ZoneId): TimerOccurrence {
     val nextDay = if (repeating) end < start else end <= start
     val endDate = if (nextDay) date.plusDays(1) else date
-    return TimerOccurrence(
-        Instant.fromEpochSeconds(date.atTime(start).atZone(serverZone).toEpochSecond()),
-        Instant.fromEpochSeconds(endDate.atTime(end).atZone(serverZone).toEpochSecond()),
-    )
+    val from = Instant.fromEpochSeconds(date.atTime(start).atZone(serverZone).toEpochSecond())
+    val resolvedStop = Instant.fromEpochSeconds(endDate.atTime(end).atZone(serverZone).toEpochSecond())
+    val stop = if (repeating && start != end && resolvedStop <= from) {
+        from + ((ChronoUnit.MINUTES.between(start, end) + 1440) % 1440).minutes
+    } else resolvedStop
+    return TimerOccurrence(from, stop)
 }
 
 fun TimerDraft.toCreateRequest(channelName: String): TimerecRuleCreate {

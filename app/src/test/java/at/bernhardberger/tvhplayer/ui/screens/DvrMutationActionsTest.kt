@@ -124,8 +124,11 @@ class DvrMutationActionsTest {
             actions.createAutorecWithLeftOut(action, setOf(EventId(7)), session.observation, notices, context)
         }
         assertFalse(accepted.isCompleted)
-        publishAutomaticEntries(session, listOf(DvrEntry.create(entry.id, eventId = entry.eventId,
-            autorecRuleId = ruleId, state = DvrEntryState.SCHEDULED, enabled = true, dataSizeBytes = 1)))
+        val unchangedEntry = DvrEntry.create(entry.id, eventId = entry.eventId,
+            autorecRuleId = ruleId, state = DvrEntryState.SCHEDULED, enabled = true, dataSizeBytes = 1)
+        publishAutomaticEntries(session, listOf(unchangedEntry))
+        testScheduler.runCurrent()
+        publishAutomaticEntries(session, listOf(unchangedEntry))
         testScheduler.runCurrent()
         assertEquals(2, requests.size)
         publishAutomaticEntries(session, listOf(DvrEntry.create(entry.id, eventId = entry.eventId,
@@ -190,6 +193,7 @@ class DvrMutationActionsTest {
         assertEquals(AutorecSaveOutcome.Applied(rule.id), saving.await())
         assertEquals(mapOf(enabled.id to DvrEntryUpdate(enabled = true),
             disabled.id to DvrEntryUpdate(enabled = false)), requests.toMap())
+        assertEquals(2, requests.size)
     }
 
     private fun automaticSession(

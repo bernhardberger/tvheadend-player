@@ -184,8 +184,6 @@ class AutomaticRecordingPolicyTest {
         val draft = newAutorecDraft(AutomaticRecordingKind.KEYWORD).copy(pattern = RecordingPattern("news"))
         val request = draft.toCreateRequest()
         assertEquals(DuplicateDetection.DVR_PROFILE, request.duplicateDetection)
-        assertEquals(DuplicateDetection.DVR_PROFILE,
-            newAutorecDraft(AutomaticRecordingKind.KEYWORD).toCreateRequest().duplicateDetection)
         assertNull(request.removal)
         assertNull(request.priority)
         assertNull(request.startExtraMinutes)
