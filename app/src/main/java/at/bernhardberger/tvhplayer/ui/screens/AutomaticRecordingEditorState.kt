@@ -17,12 +17,15 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import at.bernhardberger.tvheadend.sdk.core.EventId
+import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
 
 internal enum class AutomaticRecordingEditorLevel {
-    FIRST, UPCOMING, WORDS, CHANNEL_TIME, CHANNEL, DAYS, START_WINDOW,
+    FIRST, UPCOMING, WORDS, WORDS_ENTRY, CHANNEL_TIME, CHANNEL, DAYS, START_WINDOW,
     AFTER_HOUR, AFTER_MINUTE, BEFORE_HOUR, BEFORE_MINUTE, KEEP, MORE,
     DUPLICATE, PRIORITY, PADDING_BEFORE, PADDING_AFTER, BROADCAST, MAXIMUM, PROFILE, SEARCH_IN,
 }
+
+internal enum class AutomaticRecordingEditorConfirmation { LEAVE, DELETE }
 
 internal data class AutomaticRecordingEditorPage(
     val level: AutomaticRecordingEditorLevel,
@@ -39,6 +42,7 @@ internal class AutomaticRecordingEditorState(
     val editing: Boolean = false,
     prefilled: Boolean = false,
     private val onClose: () -> Unit = {},
+    private val deleteRule: (suspend () -> DvrMutationResult<*>)? = null,
 ) {
     val baseline = initial
     var draft by mutableStateOf(initial)
@@ -58,8 +62,18 @@ internal class AutomaticRecordingEditorState(
         private set
     var busy by mutableStateOf(false)
         private set
-    var leaveConfirmation by mutableStateOf(false)
+    private var pendingConfirmation by mutableStateOf<AutomaticRecordingEditorConfirmation?>(null)
+    var confirmation: AutomaticRecordingEditorConfirmation?
+        get() = pendingConfirmation
+        set(value) {
+            if (busy || closed) return
+            if (value == AutomaticRecordingEditorConfirmation.DELETE && !editing) return
+            pendingConfirmation = value
+        }
+    val leaveConfirmation get() = confirmation == AutomaticRecordingEditorConfirmation.LEAVE
+    var deleting by mutableStateOf(false)
         private set
+    var textEntryEditing by mutableStateOf(false)
     var closed by mutableStateOf(false)
         private set
     var focusRevision by mutableStateOf(0)
@@ -83,12 +97,14 @@ internal class AutomaticRecordingEditorState(
         }
 
     init {
+        require(!editing || deleteRule != null)
         refreshPreview()
     }
 
     fun open(level: AutomaticRecordingEditorLevel, selectedRow: String) {
         if (busy || closed) return
         pages = pages + AutomaticRecordingEditorPage(level, selectedRow)
+        textEntryEditing = false
         focusRevision++
     }
 
@@ -104,27 +120,50 @@ internal class AutomaticRecordingEditorState(
     fun applyChoice(update: (AutorecDraft) -> AutorecDraft) {
         if (busy || closed) return
         updateDraft(update)
+        textEntryEditing = false
         back()
     }
 
     fun back() {
         if (busy || closed) return
         when {
-            leaveConfirmation -> {
-                leaveConfirmation = false
+            confirmation != null -> {
+                pendingConfirmation = null
                 focusRevision++
             }
+            textEntryEditing -> textEntryEditing = false
             pages.size > 1 -> {
                 pages = pages.dropLast(1)
                 focusRevision++
             }
-            changed -> leaveConfirmation = true
+            changed -> pendingConfirmation = AutomaticRecordingEditorConfirmation.LEAVE
             else -> close()
         }
     }
 
-    fun discard() {
-        if (leaveConfirmation && !busy) close()
+    fun confirmDestructiveAction() {
+        if (busy || closed) return
+        when (confirmation) {
+            AutomaticRecordingEditorConfirmation.LEAVE -> close()
+            AutomaticRecordingEditorConfirmation.DELETE -> {
+                val remove = requireNotNull(deleteRule)
+                pendingConfirmation = null
+                busy = true
+                deleting = true
+                saveJob = scope.launch {
+                    try {
+                        when (remove()) {
+                            is DvrMutationResult.Failed -> focusRevision++
+                            else -> close()
+                        }
+                    } finally {
+                        busy = false
+                        deleting = false
+                    }
+                }
+            }
+            null -> Unit
+        }
     }
 
     fun episodeEnabled(row: AutorecPreviewRow): Boolean = enabledChanges[row.eventId] ?: (
@@ -152,7 +191,7 @@ internal class AutomaticRecordingEditorState(
     fun submit() {
         if (busy || closed || mainProblem != null) return
         busy = true
-        leaveConfirmation = false
+        pendingConfirmation = null
         val submittedDraft = draft
         val submittedChoices = enabledChanges
         saveJob = scope.launch {

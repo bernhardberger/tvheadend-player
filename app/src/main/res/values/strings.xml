@@ -1,4 +1,35 @@
 <resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en">
+    <string name="autorec_editor_search_in">Search in</string>
+    <string name="autorec_editor_titles_only">Titles only</string>
+    <string name="autorec_editor_full_text">Titles, subtitles and descriptions</string>
+    <string name="autorec_editor_raw_value">%1$s · Expression from Tvheadend</string>
+    <string name="autorec_editor_words_empty_summary">“%1$s” · None in the guide yet</string>
+    <string name="autorec_editor_raw_help">Uses this expression from Tvheadend exactly as shown.</string>
+    <string name="autorec_editor_title_description">Records every program whose title exactly matches “%1$s”.</string>
+    <string name="autorec_editor_title_full_description">Uses “%1$s” to find programs by title, subtitle and description.</string>
+    <string name="autorec_editor_keyword_description">Records every program whose title contains “%1$s”.</string>
+    <string name="autorec_editor_keyword_full_description">Records every program whose title, subtitle or description contains “%1$s”.</string>
+    <string name="autorec_editor_delete">Delete</string>
+    <string name="autorec_editor_delete_title">Delete automatic recording?</string>
+    <string name="autorec_editor_keep_recording">Keep</string>
+    <string name="autorec_editor_delete_unsaved">Your unsaved changes will be discarded.</string>
+    <string name="autorec_editor_deleting">Deleting automatic recording…</string>
+    <plurals name="autorec_editor_words_titles_summary">
+        <item quantity="one">“%1$s” in titles · %2$d program</item>
+        <item quantity="other">“%1$s” in titles · %2$d programs</item>
+    </plurals>
+    <plurals name="autorec_editor_words_full_summary">
+        <item quantity="one">“%1$s” in all text · %2$d program</item>
+        <item quantity="other">“%1$s” in all text · %2$d programs</item>
+    </plurals>
+    <plurals name="autorec_editor_delete_episodes">
+        <item quantity="one">Its %1$d scheduled episode will also be removed.</item>
+        <item quantity="other">Its %1$d scheduled episodes will also be removed.</item>
+    </plurals>
+    <plurals name="autorec_editor_delete_programs">
+        <item quantity="one">Its %1$d scheduled program will also be removed.</item>
+        <item quantity="other">Its %1$d scheduled programs will also be removed.</item>
+    </plurals>
     <plurals name="autorec_editor_upcoming_episodes">
         <item quantity="one">Records %1$d upcoming episode</item>
         <item quantity="other">Records %1$d upcoming episodes</item>
@@ -51,7 +82,6 @@
     <string name="autorec_editor_current">Current · %1$s</string>
     <string name="autorec_editor_current_setting">Current setting from Tvheadend</string>
     <string name="autorec_editor_channel_unavailable">Channel unavailable</string>
-    <string name="autorec_editor_hour">Hour %1$02d</string>
     <string name="autorec_editor_keep">Keep until</string>
     <string name="autorec_editor_keep_week">1 week after recording</string>
     <string name="autorec_editor_keep_month">1 month after recording</string>

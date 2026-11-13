@@ -164,7 +164,7 @@ private fun AutomaticRecordingStartWindow(state: AutomaticRecordingEditorState) 
 @Composable
 private fun AutomaticRecordingHours(state: AutomaticRecordingEditorState) {
     for (hour in 0..23) GuidedStepAction(
-        stringResource(R.string.autorec_editor_hour, hour),
+        formatClock(LocalTime.of(hour, 0)),
         {
             state.selectedHour = hour
             val minute = when (val window = state.draft.startWindow) {

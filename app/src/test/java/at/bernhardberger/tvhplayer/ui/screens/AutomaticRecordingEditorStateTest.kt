@@ -37,6 +37,19 @@ class AutomaticRecordingEditorStateTest {
         state.open(AutomaticRecordingEditorLevel.KEEP, "default")
         state.back()
         assertNull(state.draft.removal)
+        state.open(AutomaticRecordingEditorLevel.WORDS, "words")
+        state.open(AutomaticRecordingEditorLevel.WORDS_ENTRY, "words-input")
+        assertFalse(state.textEntryEditing)
+        state.textEntryEditing = true
+        state.back()
+        assertFalse(state.textEntryEditing)
+        assertEquals(AutomaticRecordingEditorLevel.WORDS_ENTRY, state.page.level)
+        state.back()
+        assertEquals("words", state.focusedRow)
+        state.open(AutomaticRecordingEditorLevel.WORDS_ENTRY, "words-input")
+        state.applyChoice { it.copy(fullText = true) }
+        assertEquals(AutomaticRecordingEditorLevel.WORDS, state.page.level)
+        assertFalse(state.textEntryEditing)
         state.dispose()
     }
 
@@ -101,7 +114,7 @@ class AutomaticRecordingEditorStateTest {
         unchanged.dispose()
     }
 
-    @Test fun leavingChangedDraftIsSafeUntilExplicitDiscard() = runTest {
+    @Test fun destructiveConfirmationsKeepDraftUntilExplicitChoice() = runTest {
         val fixture = AutomaticRecordingEditorFixture(this)
         val state = fixture.state()
         state.updateDraft { it.copy(enabled = false) }
@@ -114,12 +127,36 @@ class AutomaticRecordingEditorStateTest {
         state.back()
         assertFalse(state.closed)
         state.back()
-        state.discard()
+        state.confirmDestructiveAction()
         assertTrue(state.closed)
         assertTrue(fixture.submissions.isEmpty())
         val untouched = fixture.state()
         untouched.back()
         assertTrue(untouched.closed)
+        val existing = fixture.state(editing = true)
+        existing.open(AutomaticRecordingEditorLevel.MORE, "delete")
+        existing.updateDraft { it.copy(enabled = false) }
+        existing.confirmation = AutomaticRecordingEditorConfirmation.DELETE
+        existing.back()
+        assertEquals(0, fixture.deletions)
+        fixture.deletionResult = DvrMutationResult.Failed(TvheadendFailure.SERVER_REJECTED, false)
+        existing.confirmation = AutomaticRecordingEditorConfirmation.DELETE
+        existing.confirmDestructiveAction()
+        assertTrue(existing.busy)
+        existing.submit()
+        runCurrent()
+        assertNull(existing.confirmation)
+        assertFalse(existing.closed)
+        assertFalse(existing.draft.enabled)
+        assertEquals(1, fixture.deletions)
+        assertEquals("delete", existing.focusedRow)
+        fixture.deletionResult = DvrMutationResult.AcceptedButUnconfirmed(Unit)
+        existing.confirmation = AutomaticRecordingEditorConfirmation.DELETE
+        existing.confirmDestructiveAction()
+        runCurrent()
+        assertTrue(existing.closed)
+        assertEquals(2, fixture.deletions)
+        assertTrue(fixture.submissions.isEmpty())
     }
 
     @Test fun episodeChoicesReachSubmitAndUntoggleableRowsNeverDispatch() = runTest {

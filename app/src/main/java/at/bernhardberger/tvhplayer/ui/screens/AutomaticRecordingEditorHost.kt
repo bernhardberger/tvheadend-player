@@ -16,6 +16,9 @@ import androidx.compose.ui.focus.focusProperties
 import at.bernhardberger.tvheadend.sdk.core.AutorecRule
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.DvrConfigurationsState
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
+import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvhplayer.core.AutomaticRecordingKind
@@ -73,6 +76,13 @@ internal fun AutomaticRecordingEditorHost(
                 )
             },
             now, serverZone, editing = rule != null, prefilled = programme != null, onClose = { close() },
+            deleteRule = {
+                val action = DvrMutationAction.DeleteAutorec(currentSession, requireNotNull(rule))
+                val result = if (action.recordingStateIsCurrent(observations.value)) actions.execute(action)
+                    else DvrMutationResult.Failed(TvheadendFailure.NOT_READY, false)
+                notices.postDvrFailure(action, result, context)
+                result
+            },
         )
     }
     val layering = LocalBrowseContentLayering.current
@@ -85,6 +95,9 @@ internal fun AutomaticRecordingEditorHost(
     Box(Modifier.browseDetailsViewport().fillMaxSize()
         .focusProperties { onExit = { cancelFocusChange() } }.focusGroup()) {
         AutomaticRecordingEditor(state, observation.channelCatalogForDisplay?.channels.orEmpty(),
-            configurations, observation.epgSnapshotForDisplay?.events.orEmpty())
+            configurations, observation.epgSnapshotForDisplay?.events.orEmpty(),
+            scheduledEpisodeCount = observation.dvrSnapshotForDisplay?.entries.orEmpty().count {
+                rule != null && it.autorecRuleId == rule.id && it.state == DvrEntryState.SCHEDULED
+            })
     }
 }

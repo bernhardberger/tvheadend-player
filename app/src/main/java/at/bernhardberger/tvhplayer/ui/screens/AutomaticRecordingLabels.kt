@@ -33,6 +33,17 @@ internal fun formatAutomaticRecordingPreviewSummary(
 }
 
 @Composable
+internal fun automaticRecordingEditorEyebrow(state: AutomaticRecordingEditorState): String = stringResource(
+    when (state.draft.kind) {
+        AutomaticRecordingKind.SERIES ->
+            if (state.editing) R.string.autorec_editor_edit_series else R.string.autorec_editor_new_series
+        AutomaticRecordingKind.TITLE ->
+            if (state.editing) R.string.autorec_editor_edit_title else R.string.autorec_editor_new_title
+        else -> if (state.editing) R.string.autorec_editor_edit_keyword else R.string.autorec_editor_new_keyword
+    },
+)
+
+@Composable
 internal fun automaticRecordingFieldLabel(field: RecordingDraftField): String = stringResource(when (field) {
     RecordingDraftField.DUPLICATE_DETECTION -> R.string.autorec_editor_duplicate
     RecordingDraftField.PRIORITY -> R.string.autorec_editor_priority

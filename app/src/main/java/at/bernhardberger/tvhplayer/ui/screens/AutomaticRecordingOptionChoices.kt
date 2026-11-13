@@ -54,6 +54,11 @@ private fun AutomaticRecordingMore(state: AutomaticRecordingEditorState, configu
         modifier = editorRowModifier(state, "reset-options"),
         onClick = { state.updateDraft { resetAutomaticRecordingMoreOptions(it, state.baseline) } },
     )
+    if (state.editing) GuidedStepAction(
+        stringResource(R.string.autorec_editor_delete),
+        { state.confirmation = AutomaticRecordingEditorConfirmation.DELETE },
+        editorRowModifier(state, "delete"),
+    )
 }
 
 internal fun automaticRecordingOptionLevel(field: RecordingDraftField): AutomaticRecordingEditorLevel = when (field) {

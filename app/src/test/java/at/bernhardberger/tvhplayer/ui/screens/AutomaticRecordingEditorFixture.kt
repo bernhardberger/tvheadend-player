@@ -25,6 +25,7 @@ import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
 import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
 import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
@@ -60,6 +61,7 @@ internal val automaticRecordingChannels = listOf(
     Channel.create(ChannelId(101), "Ridge Earth", number = 1, icon = ChannelIcon.ImageCache(ArtworkId(1))),
     Channel.create(ChannelId(102), "Harbor Sport", number = 2, icon = ChannelIcon.ImageCache(ArtworkId(2))),
     Channel.create(ChannelId(103), "Northline News", number = 3, icon = ChannelIcon.ImageCache(ArtworkId(3))),
+    Channel.create(ChannelId(104), "Kite Kids", number = 4, icon = ChannelIcon.ImageCache(ArtworkId(4))),
 )
 internal val automaticRecordingEvents = automaticRecordingEpisodes.map {
     EpgEvent.create(
@@ -69,6 +71,15 @@ internal val automaticRecordingEvents = automaticRecordingEpisodes.map {
         description = "Seasonal mountain light, forests and weather moving over a ridge.",
     )
 }
+internal val automaticRecordingKeywordEvents = listOf("Marbles and Bowls", "The Quiet Moon", "Round and Round")
+    .mapIndexed { index, subtitle ->
+        val start = Instant.parse("2026-11-14T08:30:00Z") + index.days
+        EpgEvent.create(
+            id = EventId(index.toLong() + 201), channelId = ChannelId(104), start = start, stop = start + 25.minutes,
+            title = "Little Orbit", subtitle = subtitle, image = ArtworkId(102),
+            description = "A gentle science table about orbits using marbles and a bowl.",
+        )
+    }
 internal val automaticRecordingSavedEntries = automaticRecordingEpisodes.take(5).mapIndexed { index, row ->
     DvrEntry.create(
         DvrEntryId(index.toLong() + 1), eventId = row.eventId, autorecRuleId = AutorecRuleId("automatic-recording"),
@@ -82,7 +93,9 @@ internal val automaticRecordingSession = FakeTvheadendSession(
             streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED,
         )),
         channelState = ChannelRepositoryState.Current(ChannelCatalog.create(channels = automaticRecordingChannels)),
-        epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = automaticRecordingEvents)),
+        epgState = EpgRepositoryState.Current(EpgSnapshot.create(
+            events = automaticRecordingEvents + automaticRecordingKeywordEvents,
+        )),
         dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = automaticRecordingSavedEntries)),
     ),
 ).captureCurrentSession()
@@ -93,10 +106,13 @@ internal class AutomaticRecordingEditorFixture(
     val submissions = mutableListOf<Pair<AutorecDraft, Map<EventId, Boolean>>>()
     var outcome: AutorecSaveOutcome = AutorecSaveOutcome.Applied(AutorecRuleId("series"))
     var closes = 0
+    var deletions = 0
+    var deletionResult: DvrMutationResult<*> = DvrMutationResult.Confirmed(Unit)
 
     fun state(
         draft: AutorecDraft = automaticRecordingSeries,
         editing: Boolean = false,
+        prefilled: Boolean = true,
         load: suspend (AutorecDraft, AutorecDraft?, Instant, ZoneId) -> AutorecPreviewState = { _, _, _, _ ->
             automaticRecordingMatches
         },
@@ -111,7 +127,11 @@ internal class AutomaticRecordingEditorFixture(
         now = { automaticRecordingNow },
         zone = automaticRecordingZone,
         editing = editing,
-        prefilled = true,
+        prefilled = prefilled,
         onClose = { closes++ },
+        deleteRule = {
+            deletions++
+            deletionResult
+        },
     )
 }

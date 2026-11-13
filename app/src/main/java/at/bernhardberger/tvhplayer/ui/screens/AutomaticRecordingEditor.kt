@@ -63,9 +63,10 @@ internal fun AutomaticRecordingEditor(
     configurations: List<DvrConfiguration> = emptyList(),
     events: List<EpgEvent> = emptyList(),
     modifier: Modifier = Modifier,
+    scheduledEpisodeCount: Int = 0,
 ) {
     DisposableEffect(state) { onDispose(state::dispose) }
-    BackHandler(enabled = !state.leaveConfirmation) { state.back() }
+    BackHandler(enabled = state.confirmation == null) { state.back() }
     if (state.closed) return
     key(state.page.level) {
         Box(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).editorKeys(state)) {
@@ -76,6 +77,8 @@ internal fun AutomaticRecordingEditor(
                     when (state.page.level) {
                         AutomaticRecordingEditorLevel.FIRST -> AutomaticRecordingFirstLevel(state, channels)
                         AutomaticRecordingEditorLevel.UPCOMING -> AutomaticRecordingEpisodes(state)
+                        AutomaticRecordingEditorLevel.WORDS, AutomaticRecordingEditorLevel.WORDS_ENTRY,
+                        AutomaticRecordingEditorLevel.SEARCH_IN -> AutomaticRecordingWords(state)
                         AutomaticRecordingEditorLevel.CHANNEL_TIME,
                         AutomaticRecordingEditorLevel.CHANNEL,
                         AutomaticRecordingEditorLevel.DAYS,
@@ -92,19 +95,22 @@ internal fun AutomaticRecordingEditor(
         }
     }
     if (state.leaveConfirmation) AutomaticRecordingLeaveDialog(state)
+    if (state.confirmation == AutomaticRecordingEditorConfirmation.DELETE)
+        AutomaticRecordingDeleteDialog(state, scheduledEpisodeCount)
 }
 
 @Composable
 private fun Modifier.editorKeys(state: AutomaticRecordingEditorState): Modifier {
-    val back = rememberBackKeyCycle(!state.leaveConfirmation)
-    val left = rememberBackKeyCycle(!state.leaveConfirmation)
+    val back = rememberBackKeyCycle(state.confirmation == null)
+    val left = rememberBackKeyCycle(state.confirmation == null)
     var openingRelease by remember { mutableStateOf(true) }
     return backKeyCycleFocus(back, left).onPreviewKeyEvent { event ->
         val key = event.nativeKeyEvent
         val down = key.action == KeyEvent.ACTION_DOWN
         if (down && key.repeatCount == 0) openingRelease = false
         when {
-            state.leaveConfirmation -> false
+            state.confirmation != null -> false
+            state.textEntryEditing && key.keyCode == KeyEvent.KEYCODE_DPAD_LEFT -> false
             key.keyCode == KeyEvent.KEYCODE_BACK -> back.handle(
                 down, key.repeatCount, key.isCanceled, onBack = state::back,
             )
@@ -120,7 +126,7 @@ private fun Modifier.editorKeys(state: AutomaticRecordingEditorState): Modifier 
 @Composable
 internal fun editorRowModifier(state: AutomaticRecordingEditorState, id: String): Modifier {
     val requester = remember { FocusRequester() }
-    val restoreFocus = state.focusedRow == id && !state.leaveConfirmation
+    val restoreFocus = state.focusedRow == id && state.confirmation == null
     LaunchedEffect(state.focusRevision) {
         if (restoreFocus) {
             withFrameNanos { }
@@ -145,9 +151,13 @@ private fun AutomaticRecordingFirstLevel(state: AutomaticRecordingEditorState, c
     val series = state.draft.kind == AutomaticRecordingKind.SERIES
     GuidedStepAction(
         title = stringResource(if (series) R.string.autorec_editor_upcoming else R.string.autorec_editor_words),
-        subtitle = automaticRecordingPreviewSummary(state), modifier = editorRowModifier(state, "matches"),
+        subtitle = if (series) automaticRecordingPreviewSummary(state) else automaticRecordingWordsSummary(state),
+        modifier = editorRowModifier(state, "matches"),
         onClick = { state.open(if (series) AutomaticRecordingEditorLevel.UPCOMING else
             AutomaticRecordingEditorLevel.WORDS, "done") }, trailingIcon = R.drawable.ic_keyboard_arrow_right,
+        trailingContent = if (!series) ({
+            AutomaticRecordingChanged(state, setOf(RecordingDraftField.WORDS, RecordingDraftField.SEARCH_IN))
+        }) else null,
     )
     GuidedStepAction(
         title = stringResource(R.string.autorec_editor_channel_time),
@@ -189,13 +199,18 @@ internal fun AutomaticRecordingEpisodes(state: AutomaticRecordingEditorState) {
         stringResource(R.string.autorec_editor_done), state::back, editorRowModifier(state, "done"),
         subtitle = stringResource(R.string.autorec_editor_choices_stay),
     )
+    AutomaticRecordingEpisodeRows(state)
+}
+
+@Composable
+internal fun AutomaticRecordingEpisodeRows(state: AutomaticRecordingEditorState) {
     val rows = (state.preview as? AutorecPreviewState.Matches)?.rows.orEmpty()
     for (row in rows) {
         val toggleable = row.eventId != null && row.state !in
             setOf(AutorecEpisodeState.REMOVED, AutorecEpisodeState.DUPLICATE)
         val checked = state.episodeEnabled(row)
         GuidedStepAction(
-            title = row.subtitle ?: row.title.orEmpty(), onClick = { state.toggleEpisode(row) },
+            title = automaticRecordingPreviewTitle(state.draft.kind, row), onClick = { state.toggleEpisode(row) },
             subtitle = automaticRecordingEpisodeMeta(row, state),
             modifier = editorRowModifier(state, automaticRecordingEpisodeRowId(row)).semantics {
                 if (toggleable) {
@@ -253,7 +268,8 @@ private fun AutomaticRecordingLeaveDialog(state: AutomaticRecordingEditorState) 
                 modifier = Modifier.focusRequester(main).focusProperties { left = keep; right = discard }) {
                 Text(automaticRecordingMainLabel(state))
             }
-            OutlinedButton(onClick = state::discard, modifier = Modifier.testTag("automatic-recording-discard")
+            OutlinedButton(onClick = state::confirmDestructiveAction,
+                modifier = Modifier.testTag("automatic-recording-discard")
                 .focusRequester(discard).focusProperties { left = main; right = FocusRequester.Cancel }) {
                 Text(stringResource(R.string.autorec_editor_discard))
             }

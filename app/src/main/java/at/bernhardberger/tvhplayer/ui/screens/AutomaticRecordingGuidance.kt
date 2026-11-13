@@ -39,20 +39,20 @@ internal fun AutomaticRecordingGuidance(
 ) {
     val row = (state.preview as? AutorecPreviewState.Matches)?.rows
         ?.firstOrNull { automaticRecordingEpisodeRowId(it) == state.focusedRow }
-    val eyebrow = when (state.draft.kind) {
-        AutomaticRecordingKind.SERIES ->
-            if (state.editing) R.string.autorec_editor_edit_series else R.string.autorec_editor_new_series
-        AutomaticRecordingKind.TITLE ->
-            if (state.editing) R.string.autorec_editor_edit_title else R.string.autorec_editor_new_title
-        else -> if (state.editing) R.string.autorec_editor_edit_keyword else R.string.autorec_editor_new_keyword
-    }
     GuidedStepGuidance(
-        title = row?.subtitle ?: state.draft.pattern.words,
+        title = if (row != null) automaticRecordingPreviewTitle(state.draft.kind, row)
+            else if (state.page.level in setOf(
+                AutomaticRecordingEditorLevel.WORDS, AutomaticRecordingEditorLevel.WORDS_ENTRY,
+            )) stringResource(R.string.autorec_editor_words) else state.draft.pattern.words,
         body = row?.title ?: automaticRecordingGuidanceBody(state),
-        lead = { Text(stringResource(eyebrow), style = MaterialTheme.typography.labelLarge,
+        lead = { Text(automaticRecordingEditorEyebrow(state), style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = TvTextSecondaryAlpha)) },
     )
     Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (state.deleting) {
+            AutomaticRecordingHeading(stringResource(R.string.autorec_editor_deleting))
+            return@Column
+        }
         if (row != null) {
             AutomaticRecordingFocusedEpisode(row, state, channels, events)
         } else {
@@ -68,22 +68,22 @@ internal fun AutomaticRecordingGuidance(
 
 @Composable
 private fun automaticRecordingGuidanceBody(state: AutomaticRecordingEditorState): String =
-    stringResource(when (state.page.level) {
+    when (state.page.level) {
         AutomaticRecordingEditorLevel.FIRST -> when (state.focusedRow) {
-            "keep" -> R.string.autorec_editor_keep_help
-            "channel-time" -> R.string.autorec_editor_channel_time_help
-            "more" -> R.string.autorec_editor_more_help
-            else -> R.string.autorec_editor_series_description
+            "keep" -> stringResource(R.string.autorec_editor_keep_help)
+            "channel-time" -> stringResource(R.string.autorec_editor_channel_time_help)
+            "more" -> stringResource(R.string.autorec_editor_more_help)
+            else -> automaticRecordingDescription(state)
         }
-        AutomaticRecordingEditorLevel.KEEP -> R.string.autorec_editor_keep_help
+        AutomaticRecordingEditorLevel.KEEP -> stringResource(R.string.autorec_editor_keep_help)
         AutomaticRecordingEditorLevel.CHANNEL_TIME, AutomaticRecordingEditorLevel.CHANNEL,
         AutomaticRecordingEditorLevel.DAYS, AutomaticRecordingEditorLevel.START_WINDOW,
         AutomaticRecordingEditorLevel.AFTER_HOUR, AutomaticRecordingEditorLevel.BEFORE_HOUR,
         AutomaticRecordingEditorLevel.AFTER_MINUTE, AutomaticRecordingEditorLevel.BEFORE_MINUTE ->
-            R.string.autorec_editor_channel_time_help
-        AutomaticRecordingEditorLevel.MORE -> R.string.autorec_editor_more_help
-        else -> R.string.autorec_editor_series_description
-    })
+            stringResource(R.string.autorec_editor_channel_time_help)
+        AutomaticRecordingEditorLevel.MORE -> stringResource(R.string.autorec_editor_more_help)
+        else -> automaticRecordingDescription(state)
+    }
 
 @Composable
 private fun AutomaticRecordingFocusedEpisode(
@@ -162,7 +162,8 @@ private fun AutomaticRecordingPassivePreview(state: AutomaticRecordingEditorStat
             ))
             for (row in preview.rows.take(3)) {
                 Column {
-                    Text(row.subtitle ?: row.title.orEmpty(), style = MaterialTheme.typography.bodyMedium,
+                    Text(automaticRecordingPreviewTitle(state.draft.kind, row),
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface)
                     AutomaticRecordingSecondary(automaticRecordingEpisodeMeta(row, state))
                 }
@@ -179,6 +180,9 @@ private fun AutomaticRecordingPassivePreview(state: AutomaticRecordingEditorStat
     }
     AutomaticRecordingSecondary(stringResource(R.string.autorec_editor_guide_horizon))
 }
+
+internal fun automaticRecordingPreviewTitle(kind: AutomaticRecordingKind, row: AutorecPreviewRow): String =
+    (if (kind == AutomaticRecordingKind.SERIES) row.subtitle ?: row.title else row.title ?: row.subtitle).orEmpty()
 
 @Composable
 private fun AutomaticRecordingHeading(text: String) {

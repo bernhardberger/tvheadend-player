@@ -21,6 +21,10 @@ import at.bernhardberger.tvheadend.sdk.core.DvrConfiguration
 import at.bernhardberger.tvheadend.sdk.core.RecordingRuleChannel
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import at.bernhardberger.tvhplayer.core.AutorecDraft
+import at.bernhardberger.tvhplayer.core.AutomaticRecordingKind
+import at.bernhardberger.tvhplayer.core.newAutorecDraft
+import at.bernhardberger.tvhplayer.core.RecordingPattern
+import at.bernhardberger.tvheadend.sdk.core.DvrRemoval
 import at.bernhardberger.tvhplayer.core.AutorecPreviewState
 import at.bernhardberger.tvhplayer.core.previewMatches
 import at.bernhardberger.tvheadend.sdk.core.AutorecRuleId
@@ -73,13 +77,15 @@ class AutomaticRecordingEditorCaptureTest {
         channel = RecordingRuleChannel.SpecificChannel(automaticRecordingChannels.first().id),
     )
 
-    @Test fun seriesEditorReferenceFrames() {
+    @Before fun renderFixture() {
         val context = ApplicationProvider.getApplicationContext<Application>()
         images.install(FixtureArt.imageLoader(context, mapOf(
             ArtworkId(1) to FixtureArt.picon("ridge-earth"),
             ArtworkId(2) to FixtureArt.picon("harbor-sport"),
             ArtworkId(3) to FixtureArt.picon("northline-news"),
+            ArtworkId(4) to FixtureArt.picon("kite-kids"),
             ArtworkId(101) to FixtureArt.art("ridge-light"),
+            ArtworkId(102) to FixtureArt.art("little-orbit"),
         )).newBuilder().coroutineContext(Dispatchers.Main.immediate)
             .fetcherCoroutineContext(Dispatchers.Main.immediate).decoderCoroutineContext(Dispatchers.Main.immediate).build())
         compose.setContent {
@@ -92,11 +98,15 @@ class AutomaticRecordingEditorCaptureTest {
                         AutomaticRecordingEditor(state, automaticRecordingChannels, listOf(
                             DvrConfiguration(DvrConfigId("default"), "Default", ""),
                             DvrConfiguration(DvrConfigId("archive"), "Archive", ""),
-                        ), automaticRecordingEvents)
+                         ), automaticRecordingEvents + automaticRecordingKeywordEvents,
+                             scheduledEpisodeCount = if (state.editing) automaticRecordingSavedEntries.size else 0)
                     }
                 }
             }
         }
+    }
+
+    @Test fun seriesEditorReferenceFrames() {
         show()
         capture("04-new-series-first-level")
         compose.runOnIdle { requireNotNull(shown).focusedRow = "keep" }
@@ -147,15 +157,32 @@ class AutomaticRecordingEditorCaptureTest {
         }
     }
 
+    @Test fun keywordAndDeleteReferenceFrames() {
+        show(newAutorecDraft(AutomaticRecordingKind.KEYWORD).copy(pattern = RecordingPattern("orbit")))
+        capture("09b-keyword-with-text", "slice-3-job-b")
+        open(AutomaticRecordingEditorLevel.WORDS, "words")
+        capture("09c-keyword-words-level", "slice-3-job-b")
+        show(editing = true)
+        open(AutomaticRecordingEditorLevel.MORE, "delete")
+        compose.runOnIdle {
+            requireNotNull(shown).updateDraft { it.copy(removal = DvrRemoval.Forever) }
+            requireNotNull(shown).confirmation = AutomaticRecordingEditorConfirmation.DELETE
+        }
+        capture("11d-delete-confirm", "slice-3-job-b")
+    }
+
     private fun show(
         draft: AutorecDraft = initial,
         editing: Boolean = false,
         preview: AutorecPreviewState? = null,
     ) {
         compose.runOnIdle {
-            shown = fixture.state(draft, editing, load = { current, baseline, now, zone ->
+            shown = fixture.state(draft, editing, prefilled = draft.kind == AutomaticRecordingKind.SERIES,
+                load = { current, baseline, now, zone ->
                 preview ?: current.previewMatches(
-                    automaticRecordingEvents, if (editing) automaticRecordingSavedEntries else emptyList(),
+                    if (draft.kind == AutomaticRecordingKind.SERIES) automaticRecordingEvents
+                        else automaticRecordingKeywordEvents,
+                    if (editing) automaticRecordingSavedEntries else emptyList(),
                     if (editing) AutorecRuleId("automatic-recording") else null, now, zone, baseline,
                 )
             })
@@ -167,14 +194,18 @@ class AutomaticRecordingEditorCaptureTest {
         requireNotNull(shown).open(level, row)
     }
 
-    private fun capture(name: String) {
-        val focus = if (shown?.leaveConfirmation == true) "keep-editing" else requireNotNull(shown).focusedRow
+    private fun capture(name: String, directory: String = "slice-3-job-a") {
+        val focus = when (shown?.confirmation) {
+            AutomaticRecordingEditorConfirmation.LEAVE -> "keep-editing"
+            AutomaticRecordingEditorConfirmation.DELETE -> "keep"
+            null -> requireNotNull(shown).focusedRow
+        }
         compose.onNodeWithTag("automatic-recording-$focus").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
         compose.settleFrames(1, PlayerMotion.PanelMs.toLong())
         compose.runOnIdle {
             val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
             view.draw(Canvas(bitmap))
-            val file = File("../captures/autorec-impl/slice-3-job-a", "$name.png")
+            val file = File("../captures/autorec-impl/$directory", "$name.png")
             CaptureOutput.writePng(file, bitmap)
             CaptureOutput.writeText(File(file.parentFile, "$name.txt")) {
                 "Canvas ${view.width}x${view.height}; en-US; font scale 1.0; Europe/Berlin; 24-hour; focus $focus; " +
