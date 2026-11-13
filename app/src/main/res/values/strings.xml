@@ -6,7 +6,9 @@
     <string name="timer_editor_name">Name</string>
     <string name="timer_editor_repeat">Repeat</string>
     <string name="timer_editor_never">Never</string>
-    <string name="timer_editor_never_help">A single recording on the date</string>
+    <string name="timer_editor_every_day">Every day</string>
+    <string name="timer_editor_weekdays">Weekdays</string>
+    <string name="timer_editor_weekends">Weekends</string>
     <string name="timer_editor_date">Date</string>
     <string name="timer_editor_start">Starts at</string>
     <string name="timer_editor_end">Ends at</string>

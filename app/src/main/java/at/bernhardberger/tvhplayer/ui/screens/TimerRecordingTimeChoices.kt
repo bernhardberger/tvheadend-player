@@ -4,7 +4,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.unit.dp
+import androidx.tv.material3.Checkbox
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.timerHourChoices
@@ -44,10 +51,16 @@ internal fun TimerRecordingChannelTime(state: TimerRecordingEditorState, channel
 internal fun TimerRecordingRepeat(state: TimerRecordingEditorState) {
     GuidedStepAction(stringResource(R.string.autorec_editor_done), state::back,
         editorRowModifier(state.navigation, "done"))
-    if (!state.editing) RecordingEditorRadio(
-        state.navigation, "never", stringResource(R.string.timer_editor_never), state.draft.days.isEmpty(),
+    val never = state.draft.days.isEmpty()
+    if (!state.editing) GuidedStepAction(
+        stringResource(R.string.timer_editor_never),
         { state.updateDraft { it.copy(days = emptySet()) } },
-        subtitle = stringResource(R.string.timer_editor_never_help),
+        editorRowModifier(state.navigation, "never").semantics {
+            role = Role.Checkbox; toggleableState = ToggleableState(never)
+        },
+        trailingContent = {
+            Checkbox(never, onCheckedChange = null, modifier = Modifier.clearAndSetSemantics {})
+        },
     )
     for (day in DayOfWeek.entries) RecordingEditorDay(
         state.navigation, day, day in state.draft.days,

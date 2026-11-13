@@ -1,6 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import android.content.Context
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvhplayer.R
@@ -9,6 +11,10 @@ import at.bernhardberger.tvhplayer.core.RecordingSubmitUnavailable
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.formatRecordingDate
 import java.time.LocalDate
+import java.time.DayOfWeek
+import java.time.format.TextStyle
+import java.util.Locale
+import kotlin.time.Instant
 
 internal val timerMoreFields = setOf(
     RecordingDraftField.PRIORITY, RecordingDraftField.PROFILE,
@@ -41,18 +47,34 @@ internal fun timerNameLabel(state: TimerRecordingEditorState, channels: List<Cha
     }
 
 @Composable
-internal fun timerDateLabel(state: TimerRecordingEditorState, date: LocalDate, relative: Boolean = false): String =
-    when {
-        relative && date == state.today -> stringResource(R.string.today)
-        relative && date == state.today.plusDays(1) -> stringResource(R.string.tomorrow)
-        else -> formatRecordingDate(date.atTime(12, 0).atZone(state.zone).toEpochSecond(),
-            dateOnly = true, nowSec = state.now().epochSeconds)
+internal fun timerDateLabel(state: TimerRecordingEditorState, date: LocalDate, relative: Boolean = false): String {
+    val formatted = formatRecordingDate(date.atTime(12, 0).atZone(state.zone).toEpochSecond(),
+        dateOnly = true, nowSec = state.now().epochSeconds)
+    return when {
+        relative && date == state.today -> "${stringResource(R.string.today)} · $formatted"
+        relative && date == state.today.plusDays(1) -> "${stringResource(R.string.tomorrow)} · $formatted"
+        else -> formatted
     }
+}
+
+internal fun timerDateAndClockLabel(state: TimerRecordingEditorState, start: Instant): String =
+    formatRecordingDate(start.epochSeconds, dateOnly = true, nowSec = state.now().epochSeconds) +
+        " · ${formatClock(start.epochSeconds)}"
 
 @Composable
 internal fun timerRepeatLabel(state: TimerRecordingEditorState): String =
     if (!state.editing && state.draft.days.isEmpty()) stringResource(R.string.timer_editor_never)
-    else automaticRecordingDaysLabel(state.draft.days)
+    else formatTimerRecordingDays(LocalContext.current, state.draft.days)
+
+internal fun formatTimerRecordingDays(context: Context, days: Set<DayOfWeek>): String = when {
+    days.isEmpty() -> context.getString(R.string.autorec_editor_no_day)
+    days.size == DayOfWeek.entries.size -> context.getString(R.string.timer_editor_every_day)
+    days == DayOfWeek.entries.take(5).toSet() -> context.getString(R.string.timer_editor_weekdays)
+    days == setOf(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY) -> context.getString(R.string.timer_editor_weekends)
+    else -> days.sortedBy { it.value }.joinToString(", ") {
+        it.getDisplayName(TextStyle.SHORT, Locale.getDefault())
+    }
+}
 
 @Composable
 internal fun timerSpanLabel(state: TimerRecordingEditorState): String =

@@ -82,6 +82,22 @@ class AutomaticRecordingEditorTest {
         }
         compose.pressKey(Key.DirectionCenter)
         compose.onNodeWithTag("timer-recording-date").assertExists()
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionDown)
+        compose.onNodeWithTag("timer-recording-never").assertIsOn()
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("timer-recording-day-1").assertIsOn()
+        compose.onNodeWithTag("timer-recording-never").assertIsOff()
+        compose.pressKey(Key.DirectionUp)
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("timer-recording-never").assertIsOn()
+        compose.onNodeWithTag("timer-recording-day-1").assertIsOff()
+        compose.runOnIdle {
+            assertTrue(state.draft.days.isEmpty())
+            assertTrue(fixture.timerSubmissions.isEmpty())
+        }
     }
 
     @Test fun wordsEntryPreservesRawExpressionAndReturnsWithoutSubmitting() {

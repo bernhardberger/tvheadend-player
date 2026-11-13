@@ -19,6 +19,7 @@ import at.bernhardberger.tvhplayer.core.AutomaticRecordingKind
 import at.bernhardberger.tvhplayer.core.AutorecPreviewState
 import at.bernhardberger.tvhplayer.ui.screens.formatAutomaticRecordingPreviewSummary
 import at.bernhardberger.tvhplayer.ui.screens.formatAutomaticRecordingDeleteBody
+import at.bernhardberger.tvhplayer.ui.screens.formatTimerRecordingDays
 import at.bernhardberger.tvhplayer.ui.screens.automaticRecordingMatches
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -26,10 +27,22 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.time.DayOfWeek
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en")
 class NoticeFormatterTest {
+    @Test fun timerDaySummariesNameCommonSets() {
+        val context = ApplicationProvider.getApplicationContext<Application>()
+        assertEquals("Every day", formatTimerRecordingDays(context, DayOfWeek.entries.toSet()))
+        assertEquals("Weekdays", formatTimerRecordingDays(context, DayOfWeek.entries.take(5).toSet()))
+        assertEquals("Weekends",
+            formatTimerRecordingDays(context, setOf(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY)))
+        assertEquals("Mon, Wed, Sun", formatTimerRecordingDays(context,
+            setOf(DayOfWeek.SUNDAY, DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY)))
+        assertEquals("No day", formatTimerRecordingDays(context, emptySet()))
+    }
+
     @Test fun automaticRecordingSummariesUseKindPluralsAllAndEmpty() {
         val context = ApplicationProvider.getApplicationContext<Application>()
         val all = automaticRecordingMatches

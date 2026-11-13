@@ -16,7 +16,6 @@ import at.bernhardberger.tvhplayer.core.nextOccurrences
 import at.bernhardberger.tvhplayer.core.resolveOccurrenceOn
 import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
 import at.bernhardberger.tvhplayer.ui.common.formatClock
-import at.bernhardberger.tvhplayer.ui.common.formatRecordingDate
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepGuidance
 import at.bernhardberger.tvhplayer.ui.components.StatusBadge
 import at.bernhardberger.tvhplayer.ui.components.StatusBadgeTone
@@ -28,7 +27,7 @@ internal fun TimerRecordingGuidance(
     scheduledEntries: List<DvrEntry>,
 ) {
     GuidedStepGuidance(
-        title = stringResource(R.string.timer_editor_title),
+        title = if (state.editing) timerNameLabel(state, channels) else stringResource(R.string.timer_editor_title),
         body = timerGuidanceBody(state, channels),
         lead = {
             Text(stringResource(if (state.editing) R.string.timer_editor_edit else R.string.timer_editor_new),
@@ -88,8 +87,7 @@ private fun TimerRecordingUpcoming(state: TimerRecordingEditorState) {
     val occurrences = state.draft.nextOccurrences(state.now(), state.zone, 3)
     if (occurrences.isEmpty()) RecordingEditorSecondary(stringResource(R.string.timer_editor_none_upcoming))
     for (occurrence in occurrences) RecordingEditorSecondary(
-        formatRecordingDate(occurrence.start.epochSeconds, dateOnly = true, nowSec = state.now().epochSeconds) +
-            " · ${formatClock(state.draft.start)} – ${formatClock(state.draft.end)}",
+        timerDateAndClockLabel(state, occurrence.start) + " – ${formatClock(state.draft.end)}",
     )
     RecordingEditorSecondary(stringResource(R.string.timer_editor_no_padding))
 }
@@ -102,7 +100,7 @@ private fun TimerRecordingRemoved(state: TimerRecordingEditorState, entries: Lis
         Text(entry.title.orEmpty(), style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface)
         RecordingEditorSecondary(listOfNotNull(
-            entry.start?.let { formatRecordingDate(it.epochSeconds, nowSec = state.now().epochSeconds) },
+            entry.start?.let { timerDateAndClockLabel(state, it) },
             stringResource(R.string.autorec_editor_removed),
         ).joinToString(" · "))
     }
