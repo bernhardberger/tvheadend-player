@@ -93,7 +93,7 @@ private fun AutomaticRecordingDays(state: AutomaticRecordingEditorState) {
             role = Role.Checkbox; toggleableState = ToggleableState(anyDay)
         },
         trailingContent = {
-            Checkbox(anyDay, onCheckedChange = null, modifier = Modifier.clearAndSetSemantics {})
+            RecordingEditorCheckboxMark(anyDay)
         },
     )
     for (day in DayOfWeek.entries) {

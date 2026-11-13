@@ -121,6 +121,7 @@ internal fun RecordingEditorLeaveDialog(
     onSubmit: () -> Unit,
     onDiscard: () -> Unit,
     @DrawableRes mainIcon: Int,
+    unavailableReason: String? = null,
 ) {
     val keep = remember { FocusRequester() }
     val main = remember { FocusRequester() }
@@ -136,7 +137,7 @@ internal fun RecordingEditorLeaveDialog(
             Text(question, Modifier.semantics { heading() }, style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.onSurface)
             Spacer(Modifier.height(16.dp))
-            Text(stringResource(R.string.autorec_editor_leave_body),
+            Text(unavailableReason ?: stringResource(R.string.autorec_editor_leave_body),
                 style = MaterialTheme.typography.bodyLarge, color = TvTextColors.secondary)
             Spacer(Modifier.height(24.dp))
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {

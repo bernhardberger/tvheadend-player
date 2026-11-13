@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.ui.screens
 import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import at.bernhardberger.tvheadend.sdk.core.BroadcastType
 import at.bernhardberger.tvheadend.sdk.core.DuplicateDetection
 import at.bernhardberger.tvheadend.sdk.core.DvrConfiguration
@@ -125,4 +126,5 @@ internal fun automaticRecordingBroadcastLabel(value: BroadcastType): String = st
 
 @Composable
 internal fun automaticRecordingMaximumLabel(value: Long): String =
-    if (value == 0L) stringResource(R.string.autorec_editor_no_limit) else value.toString()
+    if (value == 0L) stringResource(R.string.autorec_editor_no_limit)
+    else pluralStringResource(R.plurals.autorec_editor_maximum_choice, value.toInt(), value)

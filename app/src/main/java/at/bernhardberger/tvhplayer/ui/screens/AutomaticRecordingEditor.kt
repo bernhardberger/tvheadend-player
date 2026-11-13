@@ -64,6 +64,7 @@ internal fun AutomaticRecordingEditor(
         state.navigation, automaticRecordingMainLabel(state), state.mainProblem == null,
         state::back, state::submit, state::confirmDestructiveAction,
         mainIcon = R.drawable.ic_fiber_smart_record,
+        unavailableReason = automaticRecordingUnavailableLabel(state),
     )
     if (state.navigation.confirmation == AutomaticRecordingEditorConfirmation.DELETE)
         AutomaticRecordingDeleteDialog(state, scheduledEpisodeCount, channels)
@@ -131,7 +132,6 @@ private fun AutomaticRecordingFirstLevel(state: AutomaticRecordingEditorState, c
 internal fun AutomaticRecordingEpisodes(state: AutomaticRecordingEditorState) {
     GuidedStepAction(
         stringResource(R.string.autorec_editor_done), state::back, editorRowModifier(state.navigation, "done"),
-        subtitle = stringResource(R.string.autorec_editor_choices_stay),
     )
     AutomaticRecordingEpisodeRows(state)
 }
@@ -153,7 +153,7 @@ internal fun AutomaticRecordingEpisodeRows(state: AutomaticRecordingEditorState)
                 }
             },
             trailingContent = if (toggleable) ({
-                Checkbox(checked, onCheckedChange = null, modifier = Modifier.clearAndSetSemantics {})
+                RecordingEditorCheckboxMark(checked)
             }) else null,
         )
     }

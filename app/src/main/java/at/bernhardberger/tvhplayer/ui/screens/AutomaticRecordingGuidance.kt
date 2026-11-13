@@ -63,6 +63,11 @@ internal fun AutomaticRecordingGuidance(
             }
             AutomaticRecordingPassivePreview(state)
         }
+        if (state.navigation.page.level == AutomaticRecordingEditorLevel.UPCOMING ||
+            state.preview is AutorecPreviewState.Failed ||
+            (state.preview as? AutorecPreviewState.Matches)?.rows?.isEmpty() == true) {
+            RecordingEditorSecondary(stringResource(R.string.autorec_editor_guide_horizon))
+        }
     }
 }
 
@@ -128,14 +133,18 @@ private fun AutomaticRecordingMainGuidance(state: AutomaticRecordingEditorState)
     if (state.navigation.focusedRow == "more") RecordingEditorSecondary(
         recordingEditorMoreSummary(state.changedFields.intersect(automaticRecordingMoreFields), state.editing))
     if (state.navigation.focusedRow == "main") {
-        val reason = when (state.mainProblem) {
-            RecordingSubmitUnavailable.UNCHANGED -> stringResource(R.string.autorec_editor_unchanged)
-            RecordingSubmitUnavailable.WORDS_REQUIRED -> stringResource(R.string.autorec_editor_enter_words)
-            else -> null
-        }
+        val reason = automaticRecordingUnavailableLabel(state)
         reason?.let { RecordingEditorSecondary(it) }
     }
 }
+
+@Composable
+internal fun automaticRecordingUnavailableLabel(state: AutomaticRecordingEditorState): String? =
+    when (state.mainProblem) {
+        RecordingSubmitUnavailable.UNCHANGED -> stringResource(R.string.autorec_editor_unchanged)
+        RecordingSubmitUnavailable.WORDS_REQUIRED -> stringResource(R.string.autorec_editor_enter_words)
+        else -> null
+    }
 
 @Composable
 private fun AutomaticRecordingKeepGuidance(state: AutomaticRecordingEditorState) {
@@ -163,12 +172,8 @@ private fun AutomaticRecordingPassivePreview(state: AutomaticRecordingEditorStat
                 preview.willRecordCount, preview.willRecordCount,
             ))
             for (row in preview.rows.take(3)) {
-                Column {
-                    Text(automaticRecordingPreviewTitle(state.draft.kind, row),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface)
-                    RecordingEditorSecondary(automaticRecordingEpisodeMeta(row, state))
-                }
+                RecordingEditorPreviewPair(automaticRecordingPreviewTitle(state.draft.kind, row),
+                    automaticRecordingEpisodeMeta(row, state))
             }
             if (preview.rows.size > 3) RecordingEditorSecondary(stringResource(
                 R.string.autorec_editor_more_preview, preview.rows.size - 3,
@@ -180,7 +185,6 @@ private fun AutomaticRecordingPassivePreview(state: AutomaticRecordingEditorStat
             )
         }
     }
-    RecordingEditorSecondary(stringResource(R.string.autorec_editor_guide_horizon))
 }
 
 internal fun automaticRecordingPreviewTitle(kind: AutomaticRecordingKind, row: AutorecPreviewRow): String =

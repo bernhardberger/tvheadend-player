@@ -115,7 +115,7 @@ fun RecordingBadge(
                 if (skipped) R.string.autorec_editor_skipped else R.string.recording_state_scheduled)
             StatusBadge(text.takeIf { label }, StatusBadgeTone.NEUTRAL,
                 modifier.testTag("recording-badge-scheduled"),
-                icon = if (rule != null) R.drawable.ic_schedule_rule else R.drawable.ic_schedule,
+                icon = scheduledRecordingBadgeIcon(skipped, rule),
                 contentDescription = if (skipped) text else stringResource(
                     rule?.label ?: R.string.details_status_scheduled))
         }
@@ -132,4 +132,10 @@ fun RecordingBadge(
                 modifier.testTag("recording-badge-cancelled"), icon = R.drawable.ic_cancel_outlined)
         else -> Unit
     }
+}
+
+private fun scheduledRecordingBadgeIcon(skipped: Boolean, rule: RecordingRule?): Int = when {
+    skipped -> R.drawable.ic_event_busy
+    rule != null -> R.drawable.ic_schedule_rule
+    else -> R.drawable.ic_schedule
 }

@@ -25,7 +25,6 @@ internal fun AutomaticRecordingWords(state: AutomaticRecordingEditorState) {
         else -> {
             GuidedStepAction(
                 stringResource(R.string.autorec_editor_done), state::back, editorRowModifier(state.navigation, "done"),
-                subtitle = stringResource(R.string.autorec_editor_choices_stay),
             )
             GuidedStepAction(
                 stringResource(R.string.autorec_editor_words),

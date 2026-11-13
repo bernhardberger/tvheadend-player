@@ -156,7 +156,7 @@ internal fun BrowseContextRecordingCard(
                 color = MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
             if (subtitle.isNotBlank()) Text(subtitle, style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                maxLines = 1, overflow = TextOverflow.Ellipsis)
+                maxLines = 2, overflow = TextOverflow.Ellipsis)
             RecordingBadge(state, Modifier.testTag("browse-context-recording"), rule = rule, skipped = enabled == false)
             if (rule != null && state in listOf(
                     DvrEntryState.SCHEDULED, DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)) {

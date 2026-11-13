@@ -12,6 +12,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.background
@@ -57,6 +58,7 @@ import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.testutil.VisualCapture
+import at.bernhardberger.tvhplayer.testutil.pressKey
 import at.bernhardberger.tvhplayer.testutil.settleFrames
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
@@ -78,6 +80,7 @@ import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
 import java.util.TimeZone
+import kotlin.time.Instant
 import kotlinx.coroutines.Dispatchers
 import org.junit.Rule
 import org.junit.Test
@@ -246,6 +249,10 @@ class AutomaticRecordingEditorCaptureTest {
         capture("05a-focus-keep-until")
         open(AutomaticRecordingEditorLevel.KEEP, "keep-null")
         capture("05b-keep-until-level")
+        compose.onNodeWithTag("automatic-recording-keep-null")
+            .performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+        repeat(7) { compose.pressKey(Key.DirectionDown) }
+        capture("05c-keep-until-end-focused")
         show()
         open(AutomaticRecordingEditorLevel.CHANNEL_TIME, "channel")
         capture("06a-channel-and-time-level")
@@ -269,6 +276,8 @@ class AutomaticRecordingEditorCaptureTest {
         show()
         compose.runOnIdle { requireNotNull(shown).updateDraft { it.copy(maximumRecordings = 3) } }
         capture("07d-first-level-shows-changes")
+        compose.runOnIdle { requireNotNull(shown).navigation.focusedRow = "more" }
+        capture("07f-more-changes-focused")
         open(AutomaticRecordingEditorLevel.MORE, "duplicate")
         open(AutomaticRecordingEditorLevel.DUPLICATE, "choice-${DuplicateDetection.DVR_PROFILE}")
         capture("07e-duplicate-detection-level")
@@ -341,6 +350,7 @@ class AutomaticRecordingEditorCaptureTest {
     }
 
     @Test fun timerEditorReferenceFrames() {
+        fixture.timerNow = Instant.parse("2026-11-13T12:00:00Z")
         val initialTimer = newTimerDraft(automaticRecordingNow, automaticRecordingZone).copy(
             channelId = automaticRecordingChannels[2].id, date = LocalDate.of(2026, 11, 13),
             start = LocalTime.of(23, 30), end = LocalTime.of(0, 30),

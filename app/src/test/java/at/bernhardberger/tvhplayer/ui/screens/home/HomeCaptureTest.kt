@@ -1135,9 +1135,9 @@ class HomeCaptureTest {
 
     private fun dvrEntries(kind: Kind, activityItems: Int, now: Long, portrait: Boolean = false): List<DvrEntry> {
         if (kind == Kind.EXPIRING) {
-            val titles = listOf("Glass Harbor", "Lantern Road", "River Court")
-            val channels = listOf(6L, 5L, 2L)
-            return listOf(45 * 60L, 5 * 3600L, 4 * 86400L).mapIndexed { index, left ->
+            val titles = listOf("Glass Harbor", "Lantern Road", "River Court", "Field Desk")
+            val channels = listOf(6L, 5L, 2L, 3L)
+            return listOf(45 * 60L, 5 * 3600L, 4 * 86400L, 6 * 86400L).mapIndexed { index, left ->
                 val stop = now + left - 30 * 86400L
                 DvrEntry.create(
                     DvrEntryId(201L + index),

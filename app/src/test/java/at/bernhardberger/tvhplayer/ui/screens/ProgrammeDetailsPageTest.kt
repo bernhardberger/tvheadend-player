@@ -1142,7 +1142,8 @@ class ProgrammeDetailsPageTest {
 
     @Test @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
     fun recordingExpiryCapture() {
-        show(recording = true, recordingFacts = true, longSubtitle = true)
+        show(recording = true, recordingFacts = true, longSubtitle = true,
+            nowOverride = event.stop.epochSeconds + 3600)
         capture("details-expiry-en-font1.0", settle = false)
     }
 
@@ -1378,7 +1379,7 @@ class ProgrammeDetailsPageTest {
         aboutSource: androidx.compose.runtime.State<String>? = null,
         aboutHeaderTall: androidx.compose.runtime.State<Boolean>? = null,
         warmMode: androidx.compose.runtime.State<at.bernhardberger.tvhplayer.settings.WarmPlaybackMode>? = null,
-        samplingContext: CoroutineContext = Dispatchers.Default) {
+        samplingContext: CoroutineContext = Dispatchers.Default, nowOverride: Long? = null) {
         val subtitle = if (longSubtitle && recordingFacts) "An extraordinary journey through the snowy mountains of the north, along the coast and across the wide valleys in the changing light of a long winter."
             else if (longSubtitle) "Eine außergewöhnliche Reise durch die verschneiten Berge des Nordens, entlang der Küste und über die weiten Täler im wechselnden Licht des langen Winters." else event.subtitle
         val shown = when {
@@ -1449,7 +1450,7 @@ class ProgrammeDetailsPageTest {
             stop = if (pastYear) Instant.parse("2025-09-15T21:00:00Z") else event.stop,
             subtitle = subtitle.takeIf { longSubtitle }, image = event.image.takeUnless { future }, summary = event.summary.takeUnless { future },
             playPosition = 3723.seconds, state = if (future) DvrEntryState.SCHEDULED else DvrEntryState.COMPLETED)
-        val now = start.epochSeconds + if (future) -60 else 480
+        val now = nowOverride ?: (start.epochSeconds + if (future) -60 else 480)
         val accents = ChannelAccents(ChannelAccentStore(), samplingContext) { _, _ -> null }
         compose.setContentWithArtworkSampling(samplingContext) {
             CompositionLocalProvider(LocalChannelAccents provides accents, LocalDensity provides Density(2f, fontScale),

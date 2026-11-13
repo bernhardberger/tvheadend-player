@@ -14,7 +14,11 @@ import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Checkbox
+import androidx.tv.material3.CheckboxDefaults
+import androidx.tv.material3.LocalContentColor
+import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.RadioButton
+import androidx.tv.material3.RadioButtonDefaults
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrConfigId
@@ -49,7 +53,7 @@ internal fun RecordingEditorRadio(
         },
         leadingIcon = leadingIcon,
         subtitle = subtitle,
-        trailingContent = { RadioButton(selected, onClick = null, modifier = Modifier.clearAndSetSemantics {}) },
+        trailingContent = { RecordingEditorRadioMark(selected) },
     )
 }
 
@@ -182,7 +186,23 @@ internal fun RecordingEditorDay(
             role = Role.Checkbox; toggleableState = ToggleableState(checked)
         },
         trailingContent = {
-            Checkbox(checked, onCheckedChange = null, modifier = Modifier.clearAndSetSemantics {})
+            RecordingEditorCheckboxMark(checked)
         },
     )
+}
+
+@Composable
+internal fun RecordingEditorRadioMark(selected: Boolean) {
+    RadioButton(selected, onClick = null, modifier = Modifier.clearAndSetSemantics {},
+        colors = RadioButtonDefaults.colors(selectedColor = LocalContentColor.current,
+            unselectedColor = LocalContentColor.current))
+}
+
+@Composable
+internal fun RecordingEditorCheckboxMark(checked: Boolean) {
+    val color = LocalContentColor.current
+    val scheme = MaterialTheme.colorScheme
+    Checkbox(checked, onCheckedChange = null, modifier = Modifier.clearAndSetSemantics {},
+        colors = CheckboxDefaults.colors(checkedColor = color, uncheckedColor = color,
+            checkmarkColor = if (color == scheme.onSurface) scheme.inverseOnSurface else scheme.onSurface))
 }
