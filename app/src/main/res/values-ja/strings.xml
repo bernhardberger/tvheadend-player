@@ -685,7 +685,9 @@
     <string name="error_305_title">まだ再生できません</string>
     <string name="error_305_reason">この録画は完了後に再生できます。</string>
     <string name="error_306_title">この録画を再生できません</string>
+    <string name="error_307_title">この録画を再生できません</string>
     <string name="error_306_reason">この端末では録画を再生できませんでした。</string>
+    <string name="error_307_reason">録画ファイルを読み取れませんでした。</string>
     <string name="channel_schedule">放送予定</string>
     <string name="channel_schedule_pane">放送予定、%1$s</string>
     <string name="channel_schedule_loading">放送予定を読み込み中</string>

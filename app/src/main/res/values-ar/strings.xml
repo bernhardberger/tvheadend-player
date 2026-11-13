@@ -755,7 +755,9 @@
     <string name="error_305_title">التشغيل غير متاح بعد</string>
     <string name="error_305_reason">لا يمكن تشغيل هذا التسجيل إلا بعد انتهائه.</string>
     <string name="error_306_title">تعذّر تشغيل هذا التسجيل</string>
+    <string name="error_307_title">تعذّر تشغيل هذا التسجيل</string>
     <string name="error_306_reason">لم يتمكن هذا الجهاز من تشغيل التسجيل.</string>
+    <string name="error_307_reason">تعذرت قراءة ملف التسجيل.</string>
     <string name="channel_schedule">الجدول</string>
     <string name="channel_schedule_pane">الجدول، %1$s</string>
     <string name="channel_schedule_loading">جارٍ تحميل الجدول</string>

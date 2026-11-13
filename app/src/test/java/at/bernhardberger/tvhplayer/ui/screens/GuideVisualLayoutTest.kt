@@ -93,6 +93,7 @@ import at.bernhardberger.tvhplayer.ui.screens.guide.TimelineTimeRuler
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeadlineSettleMs
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeadlineRulerGap
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideHeadlineHeight
+import at.bernhardberger.tvhplayer.ui.screens.guide.guideChannelWidth
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideFocusWindowStart
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideTimePositionPx
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideVisibleWindowSec
@@ -155,7 +156,24 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
     @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
     fun storeGuide() = presentationScene(store = true)
 
-    private fun presentationScene(store: Boolean) {
+    /** Numbers off and a logo on every channel: the column is the logo, and the timeline starts 8dp after it. */
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
+    @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
+    fun logoColumnWithoutNumbers() {
+        try {
+            at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = false
+            presentationScene(store = false, capture = "guide-no-numbers-logo-column")
+            val header = bounds("epg-channel-header-1")
+            val px = context().resources.displayMetrics.density
+            assertEquals(72f * px, header.width, .1f)
+            assertEquals(48f * px, bounds("epg-channel-picon-1").width, .1f)
+            assertEquals(header.right + 8f * px, bounds("epg-time-ruler").left, .1f)
+        } finally {
+            at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = true
+        }
+    }
+
+    private fun presentationScene(store: Boolean, capture: String? = null) {
         val names = listOf("Ridge Earth", "Harbor Sport", "Northline News", "Kite Kids", "Ion Frame", "Amber Stage", "Harbor Lights")
         val picons = listOf("ridge-earth", "harbor-sport", "northline-news", "kite-kids", "ion-frame", "amber-stage", "harbor-lights")
         val art = listOf("ridge-light", "harbor-kickoff", "northline-tonight", "field-desk", "paper-kite-tales", "little-orbit",
@@ -223,7 +241,8 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         }
         compose.mainClock.advanceTimeBy(1_500)
         compose.waitForIdle()
-        capture(if (store) "store-guide" else "guide", 1f, LayoutDirection.Ltr, outputs = "build/outputs/presentation").recycle()
+        if (capture != null) capture(capture, 1f, LayoutDirection.Ltr).recycle()
+        else capture(if (store) "store-guide" else "guide", 1f, LayoutDirection.Ltr, outputs = "build/outputs/presentation").recycle()
     }
 
     @Test fun normalGeometryAndContinuousNowAboveNativeFocus() {
@@ -587,6 +606,10 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
             compose.onNodeWithTag("epg-channel-picon-1", useUnmergedTree = true).assertExists()
             compose.onNodeWithText("Northline News", useUnmergedTree = true).assertExists()
             compose.onNodeWithText("89", useUnmergedTree = true).assertExists()
+            // A channel shown by name keeps the full column; logos alone narrow it to the logo and its padding.
+            assertEquals(104.dp, guideChannelWidth(channels))
+            assertEquals(72.dp, guideChannelWidth(channels.take(1)))
+            assertEquals(104.dp, guideChannelWidth(channels.take(1), numbersShown = true))
             compose.onNodeWithTag("epg-channel-header-1").assertContentDescriptionEquals("Ridge Earth")
             compose.onNodeWithTag("epg-channel-header-2").assertContentDescriptionEquals("Northline News")
             compose.onNodeWithTag("epg-channel-header-3").assertContentDescriptionEquals("89")
@@ -953,7 +976,7 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
     fun enlargedRtlHistoryEdgeKeepsNativeFocusInsidePhysicalSafeArea() = terminalRtlHistory(scale = 1.3f, hours = 2, name = "guide-history-rtl-large")
 
     @Test @Config(qualifiers = "ar-ldrtl-w960dp-h540dp-land-mdpi")
-    fun boundedHistoryLeftKeepsFullCellWhileVerticalMovesClipItsLeadingEdge() {
+    fun boundedHistoryKeepsTheFullCellOnHorizontalAndVerticalMoves() {
         Locale.setDefault(Locale.forLanguageTag("ar"))
         val firstHour = hour - 6 * 3600
         position.save(GuidePosition(ChannelId(1), EventId(111), firstHour + 3600, firstHour, 0))
@@ -973,19 +996,12 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         focused(title(2, 0))
         val vertical = compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot
         assertEquals("Down must not shift the bounded window", firstHour, checkNotNull(position.position.value).windowStartSec)
-        assertEquals("The vertical target clears the readable-start reserve", ruler.left + 8f, vertical.left, 1f)
-        assertEquals(horizontal.right, vertical.right, 1f)
-        assertEquals(horizontal.width - 8f, vertical.width, 1f)
+        assertEquals("The vertical target keeps the complete cell too", horizontal.left, vertical.left, 1f)
+        assertEquals(horizontal.width, vertical.width, 1f)
 
         key(Key.DirectionUp)
         focused(title(1, 0))
-        assertEquals(vertical.left, compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot.left, 1f)
-        key(Key.DirectionRight)
-        focused(title(1, 1))
-        key(Key.DirectionLeft)
-        focused(title(1, 0))
-        assertEquals("Left drops vertical clipping again", horizontal,
-            compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot)
+        assertEquals(horizontal, compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot)
         assertEquals(firstHour, checkNotNull(position.position.value).windowStartSec)
         assertNoPlayback()
     }
@@ -1016,19 +1032,20 @@ class GuideVisualLayoutTest : GuideScreenFixture() {
         assertNoPlayback()
     }
 
-    @Test fun oversizedProgrammeKeepsNativeFocusInsideTheUnfadedViewport() {
+    @Test fun oversizedProgrammeRunsItsFocusRingOffTheScreenEdge() {
         show(longProgramme = true)
         key(Key.DirectionDown)
         focused(title(1, 0))
         assertReadableFocus()
         val bitmap = capture("guide-long-programme", 1f, LayoutDirection.Ltr)
         val ruler = bounds("epg-time-ruler")
-        val y = compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot.center.y.toInt()
-        val nativeFocusPixels = (ruler.left.toInt() until ruler.right.toInt()).filter {
-            android.graphics.Color.red(bitmap.getPixel(it, y)) > 180
+        val focus = compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot
+        // The ring's top line, inside the cell's 2dp stroke.
+        val nativeFocusPixels = (ruler.left.toInt() until bitmap.width).filter {
+            android.graphics.Color.red(bitmap.getPixel(it, focus.top.toInt() + 1)) > 180
         }
-        assertTrue("Native scaled leading edge stays clear of the fade", nativeFocusPixels.first() >= ruler.left + 48)
-        assertTrue("Native scaled trailing edge stays inside the 8dp reserve", nativeFocusPixels.last() < ruler.right - 8)
+        assertTrue("The ring's leading edge stays clear of the fade", nativeFocusPixels.first() >= ruler.left + 48)
+        assertEquals("The screen cuts the ring; it does not close in a corner", bitmap.width - 1, nativeFocusPixels.last())
         bitmap.recycle()
     }
 

@@ -699,7 +699,9 @@
     <string name="error_305_title">Kan inte spela än</string>
     <string name="error_305_reason">Inspelningen kan spelas upp när den är klar.</string>
     <string name="error_306_title">Kan inte spela inspelningen</string>
+    <string name="error_307_title">Kan inte spela inspelningen</string>
     <string name="error_306_reason">Enheten kunde inte spela upp inspelningen.</string>
+    <string name="error_307_reason">Inspelningsfilen kunde inte läsas.</string>
     <string name="channel_schedule">Tablå</string>
     <string name="channel_schedule_pane">Tablå, %1$s</string>
     <string name="channel_schedule_loading">Laddar tablå</string>

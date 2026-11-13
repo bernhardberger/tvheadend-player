@@ -102,16 +102,18 @@ class ProgrammeActionPolicyTest {
     }
 
     @Test
-    fun endedProgrammeWithAFailingRecordingWatchesFromStartOnlyWithOneTransportStreamFile() {
-        assertEquals(listOf(ProgrammeAction.WATCH_FROM_START),
-            ended(recording(DvrEntryState.RECORDING_ERROR, files = listOf(file("/rec/a.ts")))))
+    fun endedProgrammeWithAFailingRecordingWatchesFromStartOnlyWithOnePlayableGrowingFile() {
+        for (path in listOf("/rec/a.ts", "/rec/a.mkv")) {
+            assertEquals(path, listOf(ProgrammeAction.WATCH_FROM_START),
+                ended(recording(DvrEntryState.RECORDING_ERROR, files = listOf(file(path)))))
+        }
         mapOf(
             "no files" to null,
             "empty files" to emptyList(),
             "two files" to listOf(file("/rec/a.ts"), file("/rec/b.ts")),
             "blank path" to listOf(file(" ")),
             "no path" to listOf(DvrRecordingFile.create(fileId = 1)),
-            "not a transport stream" to listOf(file("/rec/a.mkv")),
+            "deferred container" to listOf(file("/rec/a.mp4")),
         ).forEach { (case, files) ->
             assertEquals(case, emptyList<ProgrammeAction>(),
                 ended(recording(DvrEntryState.RECORDING_ERROR, files = files)))

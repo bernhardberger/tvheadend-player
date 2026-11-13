@@ -536,7 +536,7 @@ class TimelineEpgFocusPolicyTest {
     }
 
     @Test
-    fun eventSpansAreClippedToWindowWithoutMinimumWidthOverlap() {
+    fun eventSpansKeepTheirSizePastTheWindowWithoutMinimumWidthOverlap() {
         val first = timelineEventSpan(
             eventStartSec = 0,
             eventEndSec = 5 * 60,
@@ -549,16 +549,25 @@ class TimelineEpgFocusPolicyTest {
             windowStartSec = 0,
             windowEndSec = 180 * 60,
         )
-        val clipped = timelineEventSpan(
+        val overflowing = timelineEventSpan(
             eventStartSec = -30 * 60,
-            eventEndSec = 30 * 60,
+            eventEndSec = 210 * 60,
+            windowStartSec = 0,
+            windowEndSec = 180 * 60,
+        )
+        val endless = timelineEventSpan(
+            eventStartSec = -100_000 * 60,
+            eventEndSec = 100_000 * 60,
             windowStartSec = 0,
             windowEndSec = 180 * 60,
         )
 
         assertEquals(first?.endFraction, second?.startFraction)
-        assertEquals(0f, clipped?.startFraction)
-        assertEquals(1f / 6f, clipped?.endFraction ?: 0f, 0.0001f)
+        assertEquals(-1f / 6f, overflowing?.startFraction ?: 0f, 0.0001f)
+        assertEquals(7f / 6f, overflowing?.endFraction ?: 0f, 0.0001f)
+        // Bounded to one window each way, whatever the programme's length.
+        assertEquals(-1f, endless?.startFraction)
+        assertEquals(2f, endless?.endFraction)
         assertNull(timelineEventSpan(200, 300, 0, 100))
     }
 

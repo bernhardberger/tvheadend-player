@@ -828,11 +828,20 @@ activation, DVR eligibility, confirmations and current-session guards remain.
   (`ui/screens/guide/GuideHeadline.kt` `guideHeadlineDrop`); hidden, they keep
   their place. A 104dp channel column and an 8dp gap lead into the
   timeline, which extends to the physical edge, with the ruler above the
-  programme rows (`ui/screens/guide/GuideViewport.kt` `GuideChannelWidth`, `GuideChannelGap`). Timeline content continues to the physical
+  programme rows (`ui/screens/guide/GuideViewport.kt` `guideChannelWidth`, `GuideChannelGap`).
+  With channel numbers hidden and a logo on every channel in the list, the column
+  is 72dp (the logo and its padding) and the timeline takes the rest; a channel
+  shown by name keeps it at 104dp. Timeline content continues to the physical
   trailing/bottom edges and is simply cut there; only the edge beside the channel
   column (left in LTR, right in RTL) and the top edge under the ruler fade, over a
   local 48dp and only when more content exists there. Headers, controls and scopes remain clear.
-  Settled focused cells remain inside the unfaded area; real data/history bounds
+  A programme that runs past the window keeps its real size, focused or not: the
+  screen edge cuts its cell and title rather than the cell ending in a corner and
+  an ellipsis there, and at the channel column the row's track cuts it square
+  (under the fade when there is one). Only on that inner side does the title stay
+  on the track and ellipsize, a focused cell's clear of the fade
+  (`ui/screens/guide/EpgGridContent.kt` `contentStartInset`).
+  Settled focused cells that fit remain inside the unfaded area; real data/history bounds
   must not imply unavailable overflow. Preserve physical Left earlier/Right later.
 - At a terminal physical edge, reserve 8dp breathing room
   rather than letting focus touch the screen edge. This is blank spatial padding,

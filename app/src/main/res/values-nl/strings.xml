@@ -699,7 +699,9 @@
     <string name="error_305_title">Nog niet afspeelbaar</string>
     <string name="error_305_reason">Deze opname kan worden afgespeeld zodra die klaar is.</string>
     <string name="error_306_title">Deze opname kan niet worden afgespeeld</string>
+    <string name="error_307_title">Deze opname kan niet worden afgespeeld</string>
     <string name="error_306_reason">Dit apparaat kon de opname niet afspelen.</string>
+    <string name="error_307_reason">Het opnamebestand kon niet worden gelezen.</string>
     <string name="channel_schedule">Programmaoverzicht</string>
     <string name="channel_schedule_pane">Programmaoverzicht, %1$s</string>
     <string name="channel_schedule_loading">Programmaoverzicht laden</string>

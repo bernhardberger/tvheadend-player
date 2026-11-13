@@ -199,18 +199,22 @@ class BrowseContextActionsTest {
     }
 
     @Test fun failingRecordingIsWatchedLikeARunningOne() {
-        assertEquals(listOf(WATCH, START_OVER, DETAILS, STOP), actions(recording(DvrEntryState.RECORDING_ERROR, 20, listOf(file()))))
-        assertEquals(listOf(WATCH, DETAILS, STOP), actions(recording(DvrEntryState.RECORDING_ERROR, files = listOf(file()))))
+        for (path in listOf("/rec/a.ts", "/rec/a.mkv")) {
+            assertEquals(path, listOf(WATCH, START_OVER, DETAILS, STOP),
+                actions(recording(DvrEntryState.RECORDING_ERROR, 20, listOf(file(path)))))
+            assertEquals(path, listOf(WATCH, DETAILS, STOP),
+                actions(recording(DvrEntryState.RECORDING_ERROR, files = listOf(file(path)))))
+        }
     }
 
-    @Test fun growingRecordingWithoutOneTransportStreamFileOffersNoPlayback() {
+    @Test fun growingRecordingWithoutOnePlayableGrowingFileOffersNoPlayback() {
         mapOf(
             "no files" to null,
             "empty files" to emptyList(),
             "two files" to listOf(file(), file("/rec/b.ts")),
             "blank path" to listOf(file(" ")),
             "no path" to listOf(DvrRecordingFile.create(fileId = 1)),
-            "not a transport stream" to listOf(file("/rec/a.mkv")),
+            "deferred container" to listOf(file("/rec/a.mp4")),
         ).forEach { (case, files) ->
             assertEquals("RECORDING $case", listOf(DETAILS, STOP), actions(recording(DvrEntryState.RECORDING, 20, files)))
             assertEquals("RECORDING_ERROR $case", listOf(DETAILS, STOP),

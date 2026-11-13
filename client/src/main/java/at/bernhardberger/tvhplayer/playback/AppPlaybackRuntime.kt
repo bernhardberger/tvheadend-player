@@ -35,6 +35,7 @@ import at.bernhardberger.tvheadend.sdk.media3.TvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvheadend.sdk.playback.LiveSubscriptionPriority
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
+import at.bernhardberger.tvhplayer.core.RecordingFailureDetail
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.FrameRateSwitching
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
@@ -49,11 +50,13 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.job
@@ -362,6 +365,10 @@ class AppPlaybackRuntime(
     /** The installed or rejected recording selection owning [recordingAdmission]; not proof of playback. */
     val recordingSelection = _recordingSelection.asStateFlow()
     val recordingAdmission = _recordingAdmission.asStateFlow()
+    @OptIn(ExperimentalTvheadendApi::class)
+    val recordingPlaybackFailure = coordinator.recordingPlaybackFailure.map { failure ->
+        failure?.let { RecordingFailureDetail(it.category, it.detail) }
+    }.stateIn(scope, SharingStarted.Eagerly, null)
     val livePlaybackObservation = coordinator.livePlaybackObservation
     val diagnostics = presentation.diagnostics
     val videoPresentation = presentation.videoPresentation

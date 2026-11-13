@@ -699,7 +699,9 @@
     <string name="error_305_title">Még nem játszható le</string>
     <string name="error_305_reason">Ez a felvétel a befejezése után játszható le.</string>
     <string name="error_306_title">Ez a felvétel nem játszható le</string>
+    <string name="error_307_title">Ez a felvétel nem játszható le</string>
     <string name="error_306_reason">Az eszköz nem tudta lejátszani a felvételt.</string>
+    <string name="error_307_reason">A felvétel fájlját nem sikerült beolvasni.</string>
     <string name="channel_schedule">Műsorrend</string>
     <string name="channel_schedule_pane">Műsorrend, %1$s</string>
     <string name="channel_schedule_loading">Műsorrend betöltése</string>

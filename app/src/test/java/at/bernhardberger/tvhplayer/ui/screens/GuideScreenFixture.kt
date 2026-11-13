@@ -419,8 +419,9 @@ abstract class GuideScreenFixture {
         // Only the edge beside the channel column and the top edge fade; the others keep 8dp.
         val leftInset = if (direction == LayoutDirection.Ltr) 48f else 8f
         val rightInset = if (direction == LayoutDirection.Ltr) 8f else 48f
-        assertTrue("Focus left $focus", focus.left >= ruler.left + leftInset)
-        assertTrue("Focus right $focus", focus.right <= ruler.right - rightInset)
+        // A cell keeps its real size past either edge; enough of it to read sits between the insets.
+        val readable = minOf(focus.right, ruler.right - rightInset) - maxOf(focus.left, ruler.left + leftInset)
+        assertTrue("Readable focus $focus", readable >= minOf(48f, focus.width))
         assertTrue("Focus bottom $focus", focus.bottom <= bounds("epg-timeline-content").bottom - 8f)
         val first = compose.onAllNodesWithTag("epg-channel-row-1").fetchSemanticsNodes().singleOrNull()
         if (first == null || first.boundsInRoot.top < bounds("epg-timeline-content").top) {

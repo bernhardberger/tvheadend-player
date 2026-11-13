@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.ui.screens.home
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.focus.FocusRequester
@@ -17,6 +18,7 @@ import at.bernhardberger.tvhplayer.ui.components.TabOwner
 import at.bernhardberger.tvhplayer.ui.components.LocalTabOwner
 import at.bernhardberger.tvhplayer.ui.components.AppErrorAlert
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
+import at.bernhardberger.tvhplayer.ui.components.LocalBrowseContentLayering
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvhplayer.core.*
@@ -211,6 +213,7 @@ internal fun HomeScreenContent(
     mutationInFlight: MutableState<DvrMutationAction?> = remember { mutableStateOf(null) },
 ) {
     val nowSec = input.nowSec
+    val detailsLayering = LocalBrowseContentLayering.current
     val owner = LocalTabOwner.current
     val playingRecordingId = (input.playing as? HomePlaying.Recording)?.entryId
     val sections = remember(input) { homeSections(input) }
@@ -329,7 +332,9 @@ internal fun HomeScreenContent(
             else homeRestoreFocus(sections, previous)
         } ?: homeInitialFocus(sections),
         onFocused = { focused = it; cardFocused = true; followInitialFocus = false; restoreHeader = false },
-        modifier = modifier.onPreviewKeyEvent { key ->
+        modifier = modifier.graphicsLayer {
+            alpha = 1f - (detailsLayering?.detailsAlpha() ?: 0f)
+        }.onPreviewKeyEvent { key ->
             // Drawer entry may deliver only the release to Home; it is still viewer input.
             followInitialFocus = false
             if (key.nativeKeyEvent.keyCode != android.view.KeyEvent.KEYCODE_MEDIA_RECORD) false

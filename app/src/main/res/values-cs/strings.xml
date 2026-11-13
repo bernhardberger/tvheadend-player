@@ -727,7 +727,9 @@
     <string name="error_305_title">Zatím nelze přehrát</string>
     <string name="error_305_reason">Tuto nahrávku lze přehrát po dokončení.</string>
     <string name="error_306_title">Tuto nahrávku nelze přehrát</string>
+    <string name="error_307_title">Tuto nahrávku nelze přehrát</string>
     <string name="error_306_reason">Toto zařízení nedokázalo přehrát nahrávku.</string>
+    <string name="error_307_reason">Soubor nahrávky se nepodařilo přečíst.</string>
     <string name="channel_schedule">Plán</string>
     <string name="channel_schedule_pane">Plán, %1$s</string>
     <string name="channel_schedule_loading">Načítání plánu</string>

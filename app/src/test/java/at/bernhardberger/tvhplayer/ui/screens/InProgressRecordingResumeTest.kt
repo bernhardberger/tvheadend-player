@@ -80,7 +80,7 @@ class InProgressRecordingResumeTest {
     @Test @Category(VisualCapture::class)
     @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
     fun captureDeferredRecordingChoice() {
-        openDetails(754L, directly = true, serverPath = "evening-news.mkv", onWatch = { _, _ -> })
+        openDetails(754L, directly = true, serverPath = "evening-news.mp4", onWatch = { _, _ -> })
         compose.onNodeWithTag("recording-watch-live").assertIsFocused()
         compose.onNodeWithText(ApplicationProvider.getApplicationContext<Application>().getString(R.string.error_305_reason))
             .assertExists()
@@ -92,7 +92,7 @@ class InProgressRecordingResumeTest {
         CaptureOutput.writePng(output, bitmap)
         bitmap.recycle()
         CaptureOutput.writeText(File(output.parentFile, "deferred-en-font1.0.txt")) {
-            "Production Recordings screen and RecordingPlaybackChoice; fake running Matroska recording; " +
+            "Production Recordings screen and RecordingPlaybackChoice; fake running MP4 recording; " +
                 "1920x1080 pixels, 960x540dp, en, font scale 1.0; Watch live focused. " +
                 "Offline Robolectric capture, not a physical-TV or playback test."
         }

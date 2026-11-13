@@ -79,7 +79,7 @@ import at.bernhardberger.tvhplayer.core.playerControlsAutoHideEligible
 import at.bernhardberger.tvhplayer.core.playerForegroundLayer
 import at.bernhardberger.tvhplayer.core.recordingRetryCommand
 import at.bernhardberger.tvhplayer.core.recordingPlayerAlert
-import at.bernhardberger.tvhplayer.core.deviceFaultDetail
+import at.bernhardberger.tvhplayer.core.recordingFailureDetail
 import at.bernhardberger.tvhplayer.playback.AppPlaybackFailureReason
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
@@ -126,6 +126,7 @@ fun RecordingPlayerScreen(
     val videoPresentation by session.videoPresentation.collectAsStateWithLifecycle()
     val recordingSelection by session.recordingSelection.collectAsStateWithLifecycle()
     val recordingAdmission by session.recordingAdmission.collectAsStateWithLifecycle()
+    val recordingFailure by session.recordingPlaybackFailure.collectAsStateWithLifecycle()
     val recordingMarks by session.recordingMarks.collectAsStateWithLifecycle()
     val markerRevision by session.recordingMarkerRevision.collectAsStateWithLifecycle()
     val skipPrompt by session.recordingSkipPrompt.collectAsStateWithLifecycle()
@@ -823,6 +824,7 @@ fun RecordingPlayerScreen(
                 foregroundLayer == PlayerForegroundLayer.TERMINAL_ERROR,
             alert = recordingPlayerAlert(
                 connectionState, initialConnectionFailure, playbackState, entry, admission, retryCommand,
+                recordingFailure,
             ),
             onRetry = { dispatchRecoveryRetry() },
             // Connection settings leaves through Close, so nothing of this screen starts meanwhile.
@@ -831,7 +833,7 @@ fun RecordingPlayerScreen(
                 onOpenConnectionSettings()
             },
             onClose = playerClose::close,
-            deviceFaultDetail = playbackState.deviceFaultDetail(),
+            deviceFaultDetail = playbackState.recordingFailureDetail(recordingFailure),
         )
         PlayerPanelVisibility(
             value = layers.optionsPage?.let { it to layers.optionsQuickList },

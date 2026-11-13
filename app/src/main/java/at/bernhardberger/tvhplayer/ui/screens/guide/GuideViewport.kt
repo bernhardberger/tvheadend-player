@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens.guide
 
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
@@ -12,11 +13,21 @@ import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers
 import kotlin.math.ceil
 import kotlin.math.floor
 
-/** The channel column, the same in both row densities. */
-internal val GuideChannelWidth = 104.dp
+/**
+ * The channel column, the same in both row densities. With the numbers hidden and a logo for every
+ * channel it is the logo and its padding, and the timeline takes the rest. A channel shown by name
+ * keeps the full width: the narrow column would cut the name to a few letters.
+ */
+internal fun guideChannelWidth(channels: List<Channel>, numbersShown: Boolean = AppChannelNumbers.shown): Dp =
+    if (numbersShown || channels.any { it.icon == null || it.name.isNullOrBlank() }) 104.dp else 72.dp
+
+/** [guideChannelWidth] for the channels on screen, set once by the Guide screen. */
+internal val LocalGuideChannelWidth = compositionLocalOf { 104.dp }
 internal val GuideChannelGap = 8.dp
 internal val GuideEdgeFade = 48.dp
 /** Breathing room between a focused cell and a fade or the edge; the focus ring draws inside the cell. */
@@ -99,12 +110,12 @@ internal fun guideFocusWindowStart(
     val leftReserve = readable.first - windowStartSec
     val rightLimit = readable.last + 1 - windowStartSec
     // A programme longer than the readable viewport cannot fit in one time window.
-    // Its visible fragment is clipped to that viewport, never stretched or overlapped.
+    // It keeps its size and the edges cut it; the window stays where it shows part of it.
     if (eventEndSec - eventStartSec > rightLimit - leftReserve &&
         eventStartSec < windowStartSec + rightLimit && eventEndSec > windowStartSec + leftReserve
     ) return windowStartSec
     // The programme on air keeps a window that shows now with half an hour of it readable, so
-    // now stays where Now put it; its cell is clipped as a long one is.
+    // now stays where Now put it; the edges cut its cell as they cut a long one.
     if (nowSec != null && nowSec in eventStartSec until eventEndSec &&
         nowSec in windowStartSec + leftReserve until windowStartSec + rightLimit &&
         minOf(eventEndSec, windowStartSec + rightLimit) - maxOf(eventStartSec, windowStartSec + leftReserve) >=
@@ -135,19 +146,19 @@ internal fun Modifier.guideNowLine(
 }
 
 /**
- * A row's track ends where its inner fade reaches zero, so a focused cell cannot paint past the fade
- * into the channel gap at full strength. The outer edge has no fade and is not clipped.
+ * A row's track ends at its inner edge, so a cell that began before the window is cut square there
+ * instead of painting into the channel gap. The outer edge is not clipped: the screen cuts it.
  */
-internal fun Modifier.guideFadedEdgeClip(innerContinues: Boolean, isRtl: Boolean): Modifier =
-    if (!innerContinues) this else drawWithContent {
-        // Physical sides, like the fades: the inner edge is left in LTR and right in RTL.
-        clipRect(
-            left = if (isRtl) -size.width else 0f,
-            top = -size.height,
-            right = if (isRtl) size.width else size.width * 2,
-            bottom = size.height * 2,
-        ) { this@drawWithContent.drawContent() }
-    }
+internal fun Modifier.guideInnerEdgeClip(isRtl: Boolean): Modifier = drawWithContent {
+    // Physical sides, like the fades: the inner edge is left in LTR and right in RTL. The far
+    // bounds only need to clear a cell that overflows the window by one window.
+    clipRect(
+        left = if (isRtl) -size.width * 2 else 0f,
+        top = -size.height,
+        right = if (isRtl) size.width else size.width * 3,
+        bottom = size.height * 2,
+    ) { this@drawWithContent.drawContent() }
+}
 
 /**
  * Local alpha masks: no scrim is added to headings, scopes, controls or live video. Only the edge

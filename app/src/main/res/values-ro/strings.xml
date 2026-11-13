@@ -713,7 +713,9 @@
     <string name="error_305_title">Nu se poate reda încă</string>
     <string name="error_305_reason">Această înregistrare poate fi redată după ce se încheie.</string>
     <string name="error_306_title">Această înregistrare nu poate fi redată</string>
+    <string name="error_307_title">Această înregistrare nu poate fi redată</string>
     <string name="error_306_reason">Acest dispozitiv nu a putut reda înregistrarea.</string>
+    <string name="error_307_reason">Fișierul înregistrării nu a putut fi citit.</string>
     <string name="channel_schedule">Program</string>
     <string name="channel_schedule_pane">Program, %1$s</string>
     <string name="channel_schedule_loading">Se încarcă programul</string>

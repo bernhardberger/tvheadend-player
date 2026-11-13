@@ -112,7 +112,7 @@ internal const val PlayerChannelMessageDetailTag = "player-channel-unavailable-d
  * The live and recording player's full-screen alert for [alert]. Its buttons are the alert's, in
  * order, the first focused; Retry runs the alert's [PlaybackRetryCommand]. While playback retries by
  * itself it shows the countdown to the next attempt and only Close. A recording this device's player
- * failed on (306) adds the player's own error ([deviceFaultDetail]) as a faint line. The exit keeps
+ * failed on (306/307) adds the display-only error ([deviceFaultDetail]) as a faint line. The exit keeps
  * what it showed.
  */
 @Composable
@@ -126,7 +126,10 @@ internal fun LivePlayerAlertOverlay(
 ) {
     val current = alert.takeIf { visible }
     val currentDetail = deviceFaultDetail.takeIf {
-        (current as? LivePlayerAlert.Error)?.error?.condition == AppErrorCondition.RECORDING_PLAYBACK_FAILED
+        when ((current as? LivePlayerAlert.Error)?.error?.condition) {
+            AppErrorCondition.RECORDING_PLAYBACK_FAILED, AppErrorCondition.RECORDING_FILE_UNREADABLE -> true
+            else -> false
+        }
     }
     val last = rememberLastShown(current?.let { it to currentDetail })
     val shown = last?.first

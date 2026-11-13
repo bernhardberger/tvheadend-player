@@ -488,11 +488,13 @@ fun timelineEventSpan(
     if (windowDuration <= 0L || eventEndSec <= windowStartSec || eventStartSec >= windowEndSec) {
         return null
     }
-    val visibleStart = max(eventStartSec, windowStartSec)
-    val visibleEnd = min(eventEndSec, windowEndSec)
+    // A cell keeps its real size past the window, so its far end and corners are off the track.
+    // One window each way is enough for that and bounds a programme of any length.
+    val start = max(eventStartSec, windowStartSec - windowDuration)
+    val end = min(eventEndSec, windowEndSec + windowDuration)
     return TimelineEventSpan(
-        startFraction = (visibleStart - windowStartSec).toFloat() / windowDuration,
-        endFraction = (visibleEnd - windowStartSec).toFloat() / windowDuration,
+        startFraction = (start - windowStartSec).toFloat() / windowDuration,
+        endFraction = (end - windowStartSec).toFloat() / windowDuration,
     )
 }
 

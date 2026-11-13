@@ -728,7 +728,9 @@
     <string name="error_305_title">Пока нельзя воспроизвести</string>
     <string name="error_305_reason">Эту запись можно будет воспроизвести после её завершения.</string>
     <string name="error_306_title">Не удалось воспроизвести запись</string>
+    <string name="error_307_title">Не удалось воспроизвести запись</string>
     <string name="error_306_reason">Это устройство не смогло воспроизвести запись.</string>
+    <string name="error_307_reason">Не удалось прочитать файл записи.</string>
     <string name="channel_schedule">Расписание</string>
     <string name="channel_schedule_pane">Расписание, %1$s</string>
     <string name="channel_schedule_loading">Загрузка расписания</string>

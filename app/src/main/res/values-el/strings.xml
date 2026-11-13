@@ -699,7 +699,9 @@
     <string name="error_305_title">Δεν μπορεί να αναπαραχθεί ακόμα</string>
     <string name="error_305_reason">Αυτή η εγγραφή μπορεί να αναπαραχθεί μόλις ολοκληρωθεί.</string>
     <string name="error_306_title">Αδυναμία αναπαραγωγής εγγραφής</string>
+    <string name="error_307_title">Αδυναμία αναπαραγωγής εγγραφής</string>
     <string name="error_306_reason">Αυτή η συσκευή δεν μπόρεσε να αναπαράγει την εγγραφή.</string>
+    <string name="error_307_reason">Δεν ήταν δυνατή η ανάγνωση του αρχείου της εγγραφής.</string>
     <string name="channel_schedule">Πρόγραμμα</string>
     <string name="channel_schedule_pane">Πρόγραμμα, %1$s</string>
     <string name="channel_schedule_loading">Φόρτωση προγράμματος</string>

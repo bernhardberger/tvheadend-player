@@ -685,7 +685,9 @@
     <string name="error_305_title">아직 재생할 수 없습니다</string>
     <string name="error_305_reason">이 녹화는 완료된 후에 재생할 수 있습니다.</string>
     <string name="error_306_title">이 녹화를 재생할 수 없습니다</string>
+    <string name="error_307_title">이 녹화를 재생할 수 없습니다</string>
     <string name="error_306_reason">이 기기에서 녹화를 재생하지 못했습니다.</string>
+    <string name="error_307_reason">녹화 파일을 읽지 못했습니다.</string>
     <string name="channel_schedule">편성</string>
     <string name="channel_schedule_pane">편성, %1$s</string>
     <string name="channel_schedule_loading">편성 불러오는 중</string>

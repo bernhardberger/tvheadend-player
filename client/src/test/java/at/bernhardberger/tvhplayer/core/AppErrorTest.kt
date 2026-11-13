@@ -77,6 +77,9 @@ class AppErrorTest {
 
     @Test fun numbersAreUniqueAndStayInTheirGroup() {
         val all = AppErrorCondition.entries
+        val unreadable = all.single { it.number == 307 }
+        assertEquals(AppErrorKind.RECORDING, unreadable.kind)
+        assertEquals(listOf(AppErrorAction.CLOSE), unreadable.actions())
         assertEquals(all.size, all.map { it.number }.toSet().size)
         for (condition in all) {
             val group = when (condition.kind) {
