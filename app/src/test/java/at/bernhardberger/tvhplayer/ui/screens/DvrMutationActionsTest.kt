@@ -233,7 +233,7 @@ class DvrMutationActionsTest {
         assertTrue(editor.closed)
         editor.dispose()
 
-        for (previewFails in listOf(false, true)) {
+        for ((previewFails, intermediateRemoved) in listOf(false to false, true to false, true to true)) {
             val explicit = DvrEntry.create(DvrEntryId(20), eventId = EventId(8), autorecRuleId = rule.id,
                 state = DvrEntryState.SCHEDULED, enabled = true)
             val gatedSession = automaticSession(listOf(rule), listOf(old, explicit))
@@ -253,7 +253,12 @@ class DvrMutationActionsTest {
             var gatedOutcome: AutorecSaveOutcome? = null
             val gatedEditor = AutomaticRecordingEditorState(baseline, this,
                 loadPreview = { draft, _, _, _ ->
-                    if (draft == baseline) AutorecPreviewState.Matches(rows, 1, false) else previewGate.await()
+                    when {
+                        draft == baseline -> AutorecPreviewState.Matches(rows, 1, false)
+                        draft.pattern.words == "narrow" -> AutorecPreviewState.Matches(
+                            listOf(rows[0].copy(state = AutorecEpisodeState.REMOVED), rows[1]), 1, false)
+                        else -> previewGate.await()
+                    }
                 },
                 saveDraft = { draft, choices ->
                     gatedActions.updateAutorecWithEpisodes(DvrMutationAction.UpdateAutorec(
@@ -264,7 +269,12 @@ class DvrMutationActionsTest {
                 editing = true, deleteRule = { DvrMutationResult.Confirmed(Unit) })
             try {
                 runCurrent()
-                gatedEditor.toggleEpisode(rows[1])
+                if (intermediateRemoved) {
+                    gatedEditor.updateDraft { it.copy(pattern = it.pattern.copy(words = "narrow")) }
+                    runCurrent()
+                    assertEquals(AutorecEpisodeState.REMOVED,
+                        (gatedEditor.preview as AutorecPreviewState.Matches).rows.first().state)
+                } else gatedEditor.toggleEpisode(rows[1])
                 gatedEditor.updateDraft { it.copy(pattern = it.pattern.copy(words = "news updated")) }
                 runCurrent()
                 assertEquals(AutorecPreviewState.Loading, gatedEditor.preview)
@@ -283,7 +293,8 @@ class DvrMutationActionsTest {
                     autorecRuleId = rule.id, state = DvrEntryState.SCHEDULED, enabled = true)
                 publishAutomaticEntries(gatedSession, listOf(newSkipped, newExplicit), listOf(rule))
                 runCurrent()
-                val expected = listOf(newExplicit.id to DvrEntryUpdate(enabled = false)) +
+                val expected = (if (intermediateRemoved) emptyList()
+                    else listOf(newExplicit.id to DvrEntryUpdate(enabled = false))) +
                     if (previewFails) listOf(newSkipped.id to DvrEntryUpdate(enabled = false)) else emptyList()
                 assertEquals(expected.toMap(), appliedChoices.toMap())
                 assertEquals(expected.size, appliedChoices.size)

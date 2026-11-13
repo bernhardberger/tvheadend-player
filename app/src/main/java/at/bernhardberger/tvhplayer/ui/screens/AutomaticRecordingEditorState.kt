@@ -41,7 +41,7 @@ internal class AutomaticRecordingEditorState(
         deletionAllowed = editing,
     )
     private var loadedPreview by mutableStateOf<AutorecPreviewState>(AutorecPreviewState.Loading)
-    private var lastMatchedRows = emptyList<AutorecPreviewRow>()
+    private val knownSkippedEventIds = mutableSetOf<EventId>()
     val preview: AutorecPreviewState
         get() = (loadedPreview as? AutorecPreviewState.Matches)?.let { matches ->
             matches.copy(willRecordCount = matches.rows.count { row ->
@@ -153,7 +153,7 @@ internal class AutomaticRecordingEditorState(
         val updatingRule = editing && changedFields.isNotEmpty()
         saveJob = scope.launch {
             try {
-                // Wait for this locked draft's preview; unavailable results retain explicit and last-known skips.
+                // Wait for this locked draft's preview; unavailable results retain explicit and known skip intent.
                 val submittedChoices = if (updatingRule) {
                     previewJob?.join()
                     episodeChoicesForRuleUpdate()
@@ -176,9 +176,7 @@ internal class AutomaticRecordingEditorState(
             it.state != AutorecEpisodeState.REMOVED && it.eventId != null &&
                 (it.eventId in enabledChanges || !episodeEnabled(it))
         }.associate { requireNotNull(it.eventId) to episodeEnabled(it) }
-        else enabledChanges + lastMatchedRows.filter {
-            it.eventId != null && it.eventId !in enabledChanges && !episodeEnabled(it)
-        }.associate { requireNotNull(it.eventId) to false }
+        else enabledChanges + knownSkippedEventIds.filter { it !in enabledChanges }.associateWith { false }
     }
 
     fun dispose() {
@@ -196,7 +194,15 @@ internal class AutomaticRecordingEditorState(
             val result = loadPreview(requestedDraft, baseline.takeIf { editing }, now(), zone)
             if (revision == previewRevision && !closed) {
                 loadedPreview = result
-                if (result is AutorecPreviewState.Matches) lastMatchedRows = result.rows
+                if (result is AutorecPreviewState.Matches) for (row in result.rows) {
+                    val id = row.eventId ?: continue
+                    when (row.state) {
+                        AutorecEpisodeState.SKIPPED, AutorecEpisodeState.LEFT_OUT -> knownSkippedEventIds.add(id)
+                        AutorecEpisodeState.MATCH, AutorecEpisodeState.SCHEDULED, AutorecEpisodeState.DUPLICATE ->
+                            knownSkippedEventIds.remove(id)
+                        AutorecEpisodeState.REMOVED -> Unit
+                    }
+                }
             }
         }
     }
