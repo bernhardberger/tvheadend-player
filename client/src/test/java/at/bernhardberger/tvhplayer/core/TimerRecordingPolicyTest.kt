@@ -2,6 +2,8 @@ package at.bernhardberger.tvhplayer.core
 
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrSchedule
+import at.bernhardberger.tvheadend.sdk.core.DvrRemoval
+import at.bernhardberger.tvheadend.sdk.core.DvrRetention
 import at.bernhardberger.tvheadend.sdk.core.TimerecRule
 import at.bernhardberger.tvheadend.sdk.core.TimerecRuleId
 import at.bernhardberger.tvheadend.sdk.core.TimerecRuleUpdate
@@ -55,6 +57,12 @@ class TimerRecordingPolicyTest {
         assertEquals("", draft.name)
         assertEquals(5.minutes, request.startExtraMinutes)
         assertNull(request.removal)
+        assertNull(request.retention)
+        for (removal in listOf(DvrRemoval.Forever, DvrRemoval.Days(30), DvrRemoval.UntilSpaceNeeded)) {
+            val keep = draft.copy(removal = removal).toScheduleRequest("Channel", zone, now)
+            assertEquals(removal, keep.removal)
+            assertEquals(if (removal == DvrRemoval.Forever) DvrRetention.UntilFilesRemoved else null, keep.retention)
+        }
         assertNull(request.priority)
         assertNull(draft.cannotSubmit(zone, now))
         assertEquals(RecordingSubmitUnavailable.TIME_PASSED, draft.cannotSubmit(zone, schedule.stop))
@@ -80,6 +88,12 @@ class TimerRecordingPolicyTest {
         assertEquals(LocalTime.of(23, 0), rule.startMinutesSinceMidnight)
         assertEquals(LocalTime.of(1, 0), rule.stopMinutesSinceMidnight)
         assertEquals(setOf(DayOfWeek.MONDAY), rule.daysOfWeekMask)
+        assertNull(rule.retention)
+        for (removal in listOf(DvrRemoval.Forever, DvrRemoval.Days(30), DvrRemoval.UntilSpaceNeeded)) {
+            val keep = repeat.copy(removal = removal).toCreateRequest("Channel")
+            assertEquals(removal, keep.removal)
+            assertEquals(if (removal == DvrRemoval.Forever) DvrRetention.UntilFilesRemoved else null, keep.retention)
+        }
         assertEquals(rule, repeat.copy(date = draft.date.plusDays(1), paddingBefore = null).toCreateRequest("Channel"))
         assertTrue(repeat.copy(date = draft.date.plusDays(1), paddingBefore = null).changedFields(repeat).isEmpty())
     }
@@ -137,9 +151,20 @@ class TimerRecordingPolicyTest {
             daysOfWeekMask = setOf(DayOfWeek.TUESDAY),
             startMinutesSinceMidnight = LocalTime.NOON,
             stopMinutesSinceMidnight = LocalTime.of(13, 0),
+            removal = DvrRemoval.Forever,
+            retention = DvrRetention.Days(30),
         )
         val baseline = rule.toDraft(LocalDate.of(2026, 11, 12))
+        assertEquals(DvrRemoval.Days(30), baseline.removal)
         assertNull(baseline.toUpdateRequest(baseline, "Channel"))
+        val forever = baseline.copy(removal = DvrRemoval.Forever)
+        assertEquals(setOf(RecordingDraftField.KEEP_UNTIL), forever.changedFields(baseline))
+        assertEquals(TimerecRuleUpdate(removal = DvrRemoval.Forever, retention = DvrRetention.UntilFilesRemoved),
+            forever.toUpdateRequest(baseline, "Channel"))
+        for (removal in listOf(DvrRemoval.Days(7), DvrRemoval.UntilSpaceNeeded)) {
+            assertEquals(TimerecRuleUpdate(removal = removal),
+                baseline.copy(removal = removal).toUpdateRequest(baseline, "Channel"))
+        }
         val changed = baseline.copy(enabled = false)
         assertEquals(setOf(RecordingDraftField.ENABLED), changed.changedFields(baseline))
         assertEquals(TimerecRuleUpdate(enabled = false), changed.toUpdateRequest(baseline, "Channel"))

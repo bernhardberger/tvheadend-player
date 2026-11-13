@@ -10,6 +10,7 @@ import at.bernhardberger.tvheadend.sdk.core.DvrConfigId
 import at.bernhardberger.tvheadend.sdk.core.DvrConfiguration
 import at.bernhardberger.tvheadend.sdk.core.DvrPriority
 import at.bernhardberger.tvheadend.sdk.core.DvrRemoval
+import at.bernhardberger.tvheadend.sdk.core.DvrRetention
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.core.RecordingRuleChannel
@@ -207,7 +208,10 @@ fun AutorecRule.toDraft(): AutorecDraft = AutorecDraft(
     mergeText = mergeText ?: false,
     enabled = enabled ?: true,
     name = name.orEmpty(),
-    removal = removal,
+    // A finite log retention also deletes files marked Forever (dvr_db.c:582-586).
+    removal = retention.let {
+        if (removal == DvrRemoval.Forever && it is DvrRetention.Days) DvrRemoval.Days(it.days) else removal
+    },
     duplicateDetection = duplicateDetection ?: DuplicateDetection.DVR_PROFILE,
     priority = priority,
     paddingBefore = startExtraMinutes,
@@ -261,6 +265,7 @@ fun AutorecDraft.toCreateRequest(): AutorecRuleCreate {
         startWindowEndMinutesSinceMidnight = end,
         enabled = enabled,
         removal = removal,
+        retention = DvrRetention.UntilFilesRemoved.takeIf { removal == DvrRemoval.Forever },
         priority = priority,
         name = name.ifBlank { pattern.words },
         configId = configId,
@@ -288,6 +293,9 @@ fun AutorecDraft.toUpdateRequest(baseline: AutorecDraft): AutorecRuleUpdate? {
         enabled = enabled.takeIf { has(RecordingDraftField.ENABLED) },
         name = name.takeIf { has(RecordingDraftField.NAME) },
         removal = (removal ?: DvrRemoval.ServerDefault).takeIf { has(RecordingDraftField.KEEP_UNTIL) },
+        retention = DvrRetention.UntilFilesRemoved.takeIf {
+            has(RecordingDraftField.KEEP_UNTIL) && removal == DvrRemoval.Forever
+        },
         duplicateDetection = duplicateDetection.takeIf { has(RecordingDraftField.DUPLICATE_DETECTION) },
         priority = (priority ?: DvrPriority.DEFAULT).takeIf { has(RecordingDraftField.PRIORITY) },
         startExtraMinutes = (paddingBefore ?: Duration.ZERO).takeIf { has(RecordingDraftField.PADDING_BEFORE) },

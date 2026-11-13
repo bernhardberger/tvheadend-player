@@ -4,6 +4,7 @@ import at.bernhardberger.tvheadend.sdk.core.DvrConfigId
 import at.bernhardberger.tvheadend.sdk.core.DvrConfiguration
 import at.bernhardberger.tvheadend.sdk.core.DvrPriority
 import at.bernhardberger.tvheadend.sdk.core.DvrRemoval
+import at.bernhardberger.tvheadend.sdk.core.DvrRetention
 import at.bernhardberger.tvheadend.sdk.core.DvrSchedule
 import at.bernhardberger.tvheadend.sdk.core.DvrScheduleRequest
 import at.bernhardberger.tvheadend.sdk.core.RecordingRuleChannel
@@ -60,7 +61,10 @@ fun TimerecRule.toDraft(date: LocalDate): TimerDraft = TimerDraft(
     channelId = channelId,
     days = daysOfWeekMask ?: DayOfWeek.entries.toSet(),
     name = name?.takeUnless(String::isBlank) ?: title.orEmpty(),
-    removal = removal,
+    // A finite log retention also deletes files marked Forever (dvr_db.c:582-586).
+    removal = retention.let {
+        if (removal == DvrRemoval.Forever && it is DvrRetention.Days) DvrRemoval.Days(it.days) else removal
+    },
     priority = priority,
     configId = configId,
     enabled = enabled ?: true,
@@ -129,6 +133,7 @@ fun TimerDraft.toScheduleRequest(channelName: String, serverZone: ZoneId, now: I
         configId = configId,
         enabled = enabled,
         removal = removal,
+        retention = DvrRetention.UntilFilesRemoved.takeIf { removal == DvrRemoval.Forever },
         priority = priority,
         startExtraMinutes = paddingBefore,
         stopExtraMinutes = paddingAfter,
@@ -162,6 +167,7 @@ fun TimerDraft.toCreateRequest(channelName: String): TimerecRuleCreate {
         daysOfWeekMask = days,
         enabled = enabled,
         removal = removal,
+        retention = DvrRetention.UntilFilesRemoved.takeIf { removal == DvrRemoval.Forever },
         priority = priority,
         configId = configId,
     )
@@ -183,6 +189,9 @@ fun TimerDraft.toUpdateRequest(baseline: TimerDraft, channelName: String): Timer
         title = title.replace("%", "%%").takeIf { has(RecordingDraftField.NAME) && baseline.titleFollowsName },
         name = title.takeIf { has(RecordingDraftField.NAME) },
         removal = (removal ?: DvrRemoval.ServerDefault).takeIf { has(RecordingDraftField.KEEP_UNTIL) },
+        retention = DvrRetention.UntilFilesRemoved.takeIf {
+            has(RecordingDraftField.KEEP_UNTIL) && removal == DvrRemoval.Forever
+        },
         priority = (priority ?: DvrPriority.DEFAULT).takeIf { has(RecordingDraftField.PRIORITY) },
         configId = configId.takeIf { has(RecordingDraftField.PROFILE) },
         enabled = enabled.takeIf { has(RecordingDraftField.ENABLED) },

@@ -11,6 +11,7 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.DvrRemoval
+import at.bernhardberger.tvheadend.sdk.core.DvrRetention
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.core.RecordingRuleChannel
@@ -186,6 +187,12 @@ class AutomaticRecordingPolicyTest {
         val request = draft.toCreateRequest()
         assertEquals(DuplicateDetection.DVR_PROFILE, request.duplicateDetection)
         assertNull(request.removal)
+        assertNull(request.retention)
+        for (removal in listOf(DvrRemoval.Forever, DvrRemoval.Days(30), DvrRemoval.UntilSpaceNeeded)) {
+            val keep = draft.copy(removal = removal).toCreateRequest()
+            assertEquals(removal, keep.removal)
+            assertEquals(if (removal == DvrRemoval.Forever) DvrRetention.UntilFilesRemoved else null, keep.retention)
+        }
         assertNull(request.priority)
         assertNull(request.startExtraMinutes)
         assertNull(request.stopExtraMinutes)
@@ -230,6 +237,19 @@ class AutomaticRecordingPolicyTest {
         val noDay = AutorecRule.create(AutorecRuleId("no-day"), title = "news", daysOfWeekMask = emptySet()).toDraft()
         assertTrue(noDay.days.isEmpty())
         assertNull(noDay.toUpdateRequest(noDay))
+        val finiteLog = AutorecRule.create(AutorecRuleId("finite-log"), title = "news",
+            removal = DvrRemoval.Forever, retention = DvrRetention.Days(30)).toDraft()
+        assertEquals(DvrRemoval.Days(30), finiteLog.removal)
+        assertNull(finiteLog.toUpdateRequest(finiteLog))
+        assertEquals(AutorecRuleUpdate(enabled = false), finiteLog.copy(enabled = false).toUpdateRequest(finiteLog))
+        val forever = finiteLog.copy(removal = DvrRemoval.Forever)
+        assertEquals(setOf(RecordingDraftField.KEEP_UNTIL), forever.changedFields(finiteLog))
+        assertEquals(AutorecRuleUpdate(removal = DvrRemoval.Forever, retention = DvrRetention.UntilFilesRemoved),
+            forever.toUpdateRequest(finiteLog))
+        for (removal in listOf(DvrRemoval.Days(7), DvrRemoval.UntilSpaceNeeded)) {
+            assertEquals(AutorecRuleUpdate(removal = removal),
+                finiteLog.copy(removal = removal).toUpdateRequest(finiteLog))
+        }
     }
 
     @Test fun `start windows use inclusive server day edges and preserve other shapes`() {
