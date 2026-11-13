@@ -175,11 +175,13 @@ class TimerRecordingPolicyTest {
             TimerDraft(baseline.date, LocalTime.NOON, LocalTime.of(13, 0))
                 .cannotSubmit(ZoneId.of("UTC"), Instant.parse("2026-11-12T00:00:00Z")))
         for (days in listOf(emptySet(), setOf(DayOfWeek.MONDAY))) {
-            val incomplete = TimerecRule.create(TimerecRuleId("incomplete"), daysOfWeekMask = days)
+            val incomplete = TimerecRule.create(TimerecRuleId("incomplete"), daysOfWeekMask = days,
+                channelId = if (days.isEmpty()) ChannelId(1) else null)
                 .toDraft(baseline.date)
             assertEquals(TimerecRuleUpdate(enabled = false),
                 incomplete.copy(enabled = false).toUpdateRequest(incomplete, ""))
-            assertEquals(RecordingSubmitUnavailable.CHANNEL_REQUIRED,
+            assertEquals(if (days.isEmpty()) RecordingSubmitUnavailable.REPEAT_REQUIRED
+                else RecordingSubmitUnavailable.CHANNEL_REQUIRED,
                 incomplete.cannotSubmit(ZoneId.of("UTC"), Instant.parse("2026-11-12T00:00:00Z")))
         }
     }

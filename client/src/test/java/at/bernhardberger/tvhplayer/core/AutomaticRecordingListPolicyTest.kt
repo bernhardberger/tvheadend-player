@@ -54,11 +54,12 @@ class AutomaticRecordingListPolicyTest {
             entry(5, auto.id, state = DvrEntryState.COMPLETED),
             entry(6, AutorecRuleId("other")), entry(7, timer = timer.id, start = 400),
             entry(8, timer = timer.id, enabled = false), entry(9, timer = TimerecRuleId("other")),
+            entry(10, auto.id, start = null),
         )
         val list = automaticRecordingList(observation(listOf(auto), listOf(timer), entries))
         val automatic = list.items.filterIsInstance<AutomaticRecordingListItem.Automatic>().single()
         val timed = list.items.filterIsInstance<AutomaticRecordingListItem.Timer>().single()
-        assertEquals(2, automatic.upcoming)
+        assertEquals(3, automatic.upcoming)
         assertSame(entries[1], automatic.next)
         assertEquals(ChannelId(7), automatic.channelId)
         assertEquals(1, timed.upcoming)
@@ -81,8 +82,15 @@ class AutomaticRecordingListPolicyTest {
         assertEquals(2, list.offCount)
         assertEquals("last", automaticRecordingList(observation(rules, listOf(timer)),
             String.CASE_INSENSITIVE_ORDER.reversed()).items.first().id)
+        val stale = automaticRecordingList(SessionObservation.create(dvrState = DvrRepositoryState.Stale(
+            DvrSnapshot.create(autorecRules = rules, timerecRules = listOf(timer)),
+        )))
+        assertEquals(list.items, stale.items)
+        assertEquals(true, stale.available)
+        assertEquals(true, automaticRecordingList(observation()).available)
         val empty = automaticRecordingList(SessionObservation.create())
         assertEquals(emptyList<AutomaticRecordingListItem>(), empty.items)
+        assertEquals(false, empty.available)
         assertEquals(0, empty.onCount)
         assertEquals(0, empty.offCount)
     }
@@ -97,8 +105,8 @@ class AutomaticRecordingListPolicyTest {
 
     private fun entry(
         id: Long, auto: AutorecRuleId? = null, timer: TimerecRuleId? = null,
-        start: Long = 100, enabled: Boolean? = null, duplicate: Boolean? = null,
+        start: Long? = 100, enabled: Boolean? = null, duplicate: Boolean? = null,
         state: DvrEntryState = DvrEntryState.SCHEDULED,
     ) = DvrEntry.create(DvrEntryId(id), autorecRuleId = auto, timerecRuleId = timer,
-        start = Instant.fromEpochSeconds(start), enabled = enabled, duplicate = duplicate, state = state)
+        start = start?.let { Instant.fromEpochSeconds(it) }, enabled = enabled, duplicate = duplicate, state = state)
 }

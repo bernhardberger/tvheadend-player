@@ -1,9 +1,5 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
-import at.bernhardberger.tvhplayer.core.AutomaticRecordingListItem
-import at.bernhardberger.tvhplayer.core.toDraft
-import at.bernhardberger.tvhplayer.core.toUpdateRequest
-
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.DvrConfigId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
@@ -39,6 +35,7 @@ import at.bernhardberger.tvhplayer.core.recordUnavailableReason
 import at.bernhardberger.tvhplayer.core.recordingWasRemoved
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.SessionState
+import at.bernhardberger.tvhplayer.core.AutomaticRecordingListItem
 import at.bernhardberger.tvhplayer.core.BrowseContextAction
 import at.bernhardberger.tvhplayer.core.ProgrammeRecordingTarget
 import at.bernhardberger.tvhplayer.core.RecordingKeepUntilChoice
@@ -60,6 +57,9 @@ import at.bernhardberger.tvhplayer.core.AutorecDraft
 import at.bernhardberger.tvhplayer.core.AutorecPreviewState
 import at.bernhardberger.tvhplayer.core.previewMatches
 import at.bernhardberger.tvhplayer.core.previewSearchRequest
+import at.bernhardberger.tvhplayer.core.toDraft
+import at.bernhardberger.tvhplayer.core.toUpdateRequest
+import java.time.LocalDate
 import java.time.ZoneId
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
@@ -459,6 +459,10 @@ internal class DvrMutationActions(
             observations, notices, context, created = false)
     }
 
+    /**
+     * [observation] must be the latest published value at call time; the guard is only as fresh as it.
+     * Callers serialize per rule: toggling back to a not-yet-updated item's value is a no-op.
+     */
     suspend fun setRuleEnabled(
         item: AutomaticRecordingListItem,
         enabled: Boolean,
@@ -485,7 +489,7 @@ internal class DvrMutationActions(
             }
             is AutomaticRecordingListItem.Timer -> {
                 // Date is editor context only and is not sent for an existing repeating timer.
-                val baseline = item.rule.toDraft(java.time.LocalDate.MIN)
+                val baseline = item.rule.toDraft(LocalDate.MIN)
                 val update = baseline.copy(enabled = enabled).toUpdateRequest(baseline, baseline.name)
                 update?.let { DvrMutationAction.UpdateTimerec(currentSession, item.rule, it) }
             }

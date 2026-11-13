@@ -4,7 +4,6 @@ import at.bernhardberger.tvheadend.sdk.core.AutorecRule
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
-import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.TimerecRule
 
@@ -44,7 +43,7 @@ sealed interface AutomaticRecordingListItem {
     }
 }
 
-data class AutomaticRecordingList(val items: List<AutomaticRecordingListItem>) {
+data class AutomaticRecordingList(val items: List<AutomaticRecordingListItem>, val available: Boolean) {
     val onCount get() = items.count { it.enabled }
     val offCount get() = items.size - onCount
 }
@@ -56,7 +55,7 @@ fun automaticRecordingList(
     observation: SessionObservation,
     headlineComparator: Comparator<String> = String.CASE_INSENSITIVE_ORDER,
 ): AutomaticRecordingList {
-    val snapshot = (observation.dvrState as? DvrRepositoryState.Current)?.snapshot
+    val snapshot = observation.dvrSnapshotForDisplay
     val upcoming = snapshot?.entries.orEmpty().filter {
         it.state == DvrEntryState.SCHEDULED && it.enabled != false && it.duplicate != true
     }
@@ -74,5 +73,5 @@ fun automaticRecordingList(
     return AutomaticRecordingList(items.sortedWith(
         compareBy<AutomaticRecordingListItem, String>(headlineComparator) { it.headline }
             .thenBy { it.kind }.thenBy { it.id },
-    ))
+    ), available = snapshot != null)
 }
