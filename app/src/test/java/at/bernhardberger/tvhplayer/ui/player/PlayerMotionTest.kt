@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.di.PlayerStatsLevel
+
 import at.bernhardberger.tvhplayer.testutil.drawnBrightness
 import at.bernhardberger.tvhplayer.testutil.changeState
 import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
@@ -242,7 +244,7 @@ class PlayerMotionTest {
                     page = page,
                     aspectRatio = AspectRatioMode.FORCE_16_9,
                     onAspectRatioChange = { aspectChanges++ },
-                    onStatsVisibleChange = { statsChanges++ },
+                    onStatsLevelChange = { statsChanges++ },
                 )
             }
         }
@@ -258,7 +260,7 @@ class PlayerMotionTest {
 
         // The new page focuses its row while the old one is still fading, and OK reaches it.
         compose.mainClock.advanceTimeByFrame()
-        compose.onNode(isFocused() and hasText("Stats for nerds") and hasClickAction()).assertExists()
+        compose.onNode(isFocused() and hasText("Off") and hasClickAction()).assertExists()
         compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
         assertEquals(1, statsChanges)
         assertEquals("a key reached the leaving page", 0, aspectChanges)
@@ -720,7 +722,7 @@ class PlayerMotionTest {
         var context by mutableStateOf(PlayerForegroundContext(
             confirmationVisible = false, infoVisible = false, optionsPage = null, numberEntryVisible = false,
             channelDrawerVisible = false, recoveryVisible = false, terminalErrorVisible = false,
-            seekPreviewPhase = PlayerSeekPreviewPhase.NONE, controlsVisible = false, statsEnabled = false,
+            seekPreviewPhase = PlayerSeekPreviewPhase.NONE, controlsVisible = false,
         ))
         var bannerVisible by mutableStateOf(false)
         var mode = PlayerChromeMode.HIDDEN
@@ -936,7 +938,7 @@ class PlayerMotionTest {
         aspectRatio: AspectRatioMode = AspectRatioMode.FIT,
         onPageChange: (PlaybackOptionsPage) -> Unit = {},
         onAspectRatioChange: (AspectRatioMode) -> Unit = {},
-        onStatsVisibleChange: (Boolean) -> Unit = {},
+        onStatsLevelChange: (PlayerStatsLevel) -> Unit = {},
     ) {
         PlaybackOptionsSheetContent(
             page = page,
@@ -944,12 +946,12 @@ class PlayerMotionTest {
             subtitleTracks = emptyList(),
             tracksResolving = false,
             aspectRatio = aspectRatio,
-            statsVisible = false,
+            statsLevel = PlayerStatsLevel.OFF,
             onPageChange = onPageChange,
             onAudioTrackSelected = {},
             onSubtitleTrackSelected = {},
             onAspectRatioChange = onAspectRatioChange,
-            onStatsVisibleChange = onStatsVisibleChange,
+            onStatsLevelChange = onStatsLevelChange,
         )
     }
 

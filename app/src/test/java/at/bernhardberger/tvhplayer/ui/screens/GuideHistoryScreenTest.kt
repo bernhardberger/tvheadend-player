@@ -124,13 +124,23 @@ class GuideHistoryScreenTest {
                     signedInUsername = null)
             }
         }
-        val record = if (menu) compose.onNodeWithText("Record") else compose.onNodeWithTag("details-record")
+        // Details offer the ways to record behind one button; Record is the first of them.
+        if (!menu) {
+            compose.onNodeWithTag("details-record-choice").requestFocus()
+                .performKeyInput { pressKey(Key.DirectionCenter) }
+            // The Record key does nothing under the choice: it neither records nor closes it.
+            compose.onNodeWithTag("record-choice-record").performKeyInput { pressKey(Key.MediaRecord) }
+            compose.waitForIdle()
+            assertEquals(0, requests)
+            compose.onNodeWithTag("record-choice-record").assertIsFocused()
+        }
+        val record = if (menu) compose.onNodeWithText("Record") else compose.onNodeWithTag("record-choice-record")
         record.requestFocus()
         val click = record.fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsActions.OnClick].action!!
         compose.runOnIdle { click(); click() }
         compose.waitForIdle()
         compose.onNodeWithTag("centred-dialog-card").assertDoesNotExist()
-        if (!menu) compose.onNodeWithTag("details-record").assertIsFocused()
+        if (!menu) compose.onNodeWithTag("details-record-choice").assertIsFocused()
         assertEquals(1, requests)
         compose.runOnIdle { release.complete(Unit) }
         compose.waitForIdle()
@@ -293,10 +303,11 @@ class GuideHistoryScreenTest {
             compose.onNodeWithTag("details-watch").assertIsFocused()
             if (transition == "stack-record") {
                 session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Confirmed(DvrEntryId(42)))
-                compose.onNodeWithTag("details-record").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+                compose.onNodeWithTag("details-record-choice").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+                compose.onNodeWithTag("record-choice-record").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
                 compose.onNodeWithTag("centred-dialog-card").assertDoesNotExist()
                 assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
-                compose.onNodeWithTag("details-record").assertIsFocused()
+                compose.onNodeWithTag("details-record-choice").assertIsFocused()
             }
             compose.runOnIdle { back.onBackPressed() }
             focused("Channel 1 hour 0")
@@ -320,6 +331,8 @@ class GuideHistoryScreenTest {
                 "airing-cancel" -> FakeSessionCall.DVR_CANCEL_ENTRY
                 else -> FakeSessionCall.DVR_SCHEDULE_ENTRY
             }
+            if (transition == "airing-record") compose.onNodeWithTag("details-record-choice").requestFocus()
+                .performKeyInput { pressKey(Key.DirectionCenter) }
             compose.onNodeWithText(label).requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
             if (transition == "airing-record") compose.onNodeWithTag("centred-dialog-card").assertDoesNotExist()
             else {
@@ -356,7 +369,9 @@ class GuideHistoryScreenTest {
                 }
                 compose.onNodeWithText(context.getString(R.string.keep_recording)).assertDoesNotExist()
                 compose.onNodeWithText(label).assertDoesNotExist()
-                val nextLabel = context.getString(if (transition == "cancel") R.string.stop_recording else R.string.record)
+                // Stopped, the recording button offers the ways to record again.
+                val nextLabel = context.getString(if (transition == "cancel") R.string.stop_recording
+                    else R.string.details_record_choice)
                 compose.onNodeWithText(nextLabel).assertIsFocused()
                 // The refreshed Dialog must consume the entire interrupted cycle, not just avoid a click.
                 for (repeat in 1..2) {
@@ -378,6 +393,8 @@ class GuideHistoryScreenTest {
                     compose.onNodeWithText(context.getString(R.string.stop_recording_confirm_title)).assertExists()
                     assertEquals(before, session.calls.size)
                 } else {
+                    compose.onNodeWithTag("record-choice-record").assertIsFocused()
+                        .performKeyInput { pressKey(Key.DirectionCenter) }
                     compose.onNodeWithTag("centred-dialog-card").assertDoesNotExist()
                     assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
                 }

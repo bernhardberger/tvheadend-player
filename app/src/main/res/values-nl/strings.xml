@@ -310,6 +310,7 @@
     <string name="details_recording_progress_spoken">%1$s van %2$s, %3$s</string>
     <string name="details_tomorrow">Morgen %1$s</string>
     <string name="context_record">Opnemen</string>
+    <string name="details_record_choice">Opnemen…</string>
     <string name="context_show_guide">Tonen in tv-gids</string>
     <string name="context_resume">Hervatten</string>
     <string name="context_start_over">Vanaf het begin kijken</string>
@@ -514,13 +515,11 @@
     <string name="player_raster_spoken">%1$s lijnen</string>
     <string name="player_audio_spoken">Audio %1$s</string>
     <string name="player_ad_short">AD</string>
-    <string name="stats_on">Aan</string>
     <string name="stats_off">Uit</string>
     <string name="display_mode">Weergavemodus</string>
     <string name="display_mode_auto">Auto (oorspronkelijke verhouding)</string>
     <string name="display_mode_16_9">16:9 vullen</string>
     <string name="display_mode_4_3">4:3 vullen</string>
-    <string name="stats_video_buffers">Videobuffers</string>
     <string name="stats_video_buffers_value">Weergegeven %1$d • Weggevallen %2$d • Overgeslagen %3$d</string>
     <string name="epg_title">Tv-gids</string>
     <string name="header_button_value_description">%1$s, %2$s</string>

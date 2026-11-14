@@ -29,6 +29,7 @@ import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
+import at.bernhardberger.tvhplayer.testutil.pressKey
 import at.bernhardberger.tvhplayer.testutil.setContentWithArtworkSampling
 import at.bernhardberger.tvhplayer.ui.player.*
 import org.junit.Assert.assertEquals
@@ -217,11 +218,11 @@ class ProgrammeDetailsCaptureTest {
         }
         compose.onNodeWithTag("programme-details-page").assertIsFocused()
         compose.runOnIdle { canModify = true }
-        compose.onNodeWithText("Record").assertIsFocused()
-        // The programme starts: Watch joins ahead of Record, and the focused Record stays focused.
+        compose.onNodeWithTag("details-record-choice").assertIsFocused()
+        // The programme starts: Watch joins ahead of Record…, and the focused Record… stays focused.
         compose.runOnIdle { now = start.epochSeconds + 60 }
         compose.onNodeWithText("Watch").assertExists()
-        compose.onNodeWithText("Record").assertIsFocused()
+        compose.onNodeWithTag("details-record-choice").assertIsFocused()
     }
 
     private fun emptyPanel(guide: Boolean) {
@@ -251,7 +252,8 @@ class ProgrammeDetailsCaptureTest {
         compose.onNodeWithText("Close").assertDoesNotExist()
         // A newly available action takes over, then its removal returns focus to the panel.
         compose.runOnIdle { canModify = true }
-        compose.onNodeWithText(if (guide) "Record" else "Cancel recording").assertIsFocused()
+        (if (guide) compose.onNodeWithTag("details-record-choice") else compose.onNodeWithText("Cancel recording"))
+            .assertIsFocused()
         compose.runOnIdle { canModify = false }
         panel.assertIsFocused()
         listOf(Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight).forEach { direction ->
@@ -320,6 +322,132 @@ class ProgrammeDetailsCaptureTest {
         val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
         compose.runOnIdle { view.draw(Canvas(bitmap)) }
         CaptureOutput.writePng(File("build/outputs/presentation", if (store) "store-details.png" else "details.png"), bitmap)
+        bitmap.recycle()
+    }
+
+    /** The action row's five accepted cases, the Record… choice and More's menu. */
+    @OptIn(TvheadendTestingApi::class)
+    @Test @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
+    fun actionRowCases() {
+        val event = EpgEvent.create(EventId(1), channel.id, start, start + 7200.seconds, title = "Ridge Light",
+            subtitle = "Beyond the Arctic Circle", description = description, image = ArtworkId(2),
+            seriesLinkUri = "crid://ridge-light")
+        val onAir = start.epochSeconds + 600
+        val upcoming = start.epochSeconds - 3600
+        fun entry(state: DvrEntryState, rule: Boolean = false, position: Long = 0) = DvrEntry.create(DvrEntryId(1),
+            eventId = event.id, channelId = channel.id, title = event.title, subtitle = event.subtitle,
+            description = description, channelName = channel.name, start = event.start, stop = event.stop,
+            image = event.image, playPosition = position.seconds, state = state,
+            autorecRuleId = AutorecRuleId("series").takeIf { rule },
+            files = if (state == DvrEntryState.SCHEDULED) null
+                else listOf(TvheadendTestResultFactory.recordingFile(fileId = 1, serverPath = "/rec/ridge-light.ts",
+                    start = event.start, stop = event.stop)))
+        class Case(val name: String, val programme: Boolean, val recording: DvrEntry?, val now: Long,
+            val actions: List<at.bernhardberger.tvhplayer.core.BrowseContextAction>,
+            val kind: at.bernhardberger.tvhplayer.core.AutomaticRecordingKind? = null)
+        val ruleRecording = entry(DvrEntryState.RECORDING, rule = true)
+        val finished = entry(DvrEntryState.COMPLETED, position = 3723)
+        val ruleScheduled = entry(DvrEntryState.SCHEDULED, rule = true)
+        val cases = listOf(
+            Case("case1-on-air-rule-behind-live", true, ruleRecording, onAir, programmeDetailsActions(event, onAir,
+                ruleRecording, admitted(ruleRecording), true, true, playing = true, behindLive = true, ruleAvailable = true),
+                at.bernhardberger.tvhplayer.core.AutomaticRecordingKind.SERIES),
+            Case("case2-upcoming", true, null, upcoming, programmeDetailsActions(event, upcoming, null, null, true, true)),
+            Case("case3-finished-partly-watched", false, finished, onAir,
+                recordingDetailsActions(finished, admitted(finished), true, true, nowSec = onAir)),
+            Case("case4-scheduled-by-rule", true, ruleScheduled, upcoming, programmeDetailsActions(event, upcoming,
+                ruleScheduled, null, true, true, ruleAvailable = true),
+                at.bernhardberger.tvhplayer.core.AutomaticRecordingKind.SERIES),
+            Case("case5-on-air", true, null, onAir, programmeDetailsActions(event, onAir, null, null, true, true)),
+        )
+        var shown by androidx.compose.runtime.mutableStateOf(cases.first())
+        compose.setContentWithArtworkSampling {
+            CompositionLocalProvider(LocalDensity provides Density(2f, 1f)) {
+                TVHeadendPlayerTheme {
+                    view = LocalView.current
+                    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                        androidx.compose.runtime.key(shown) {
+                            ProvideArtworkSession(session) {
+                                ProgrammeDetailsPage(event.takeIf { shown.programme }, shown.recording, channel, shown.now,
+                                    shown.actions, {}, {}, recordingAdmission = admitted(shown.recording),
+                                    recordingKind = shown.kind)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        fun write(name: String) {
+            compose.mainClock.advanceTimeBy(1000)
+            compose.waitForIdle()
+            val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
+            compose.runOnIdle { view.draw(Canvas(bitmap)) }
+            CaptureOutput.writePng(File("build/outputs/details-action-row", "$name.png"), bitmap)
+            bitmap.recycle()
+        }
+        cases.forEach { case ->
+            compose.runOnIdle { shown = case }
+            compose.waitForIdle()
+            write(case.name)
+            when (case.name) {
+                "case2-upcoming" -> {
+                    compose.onNodeWithTag("details-record-choice").requestFocus()
+                    compose.pressKey(Key.DirectionCenter)
+                    compose.onNodeWithTag("record-choice-record").assertIsFocused()
+                    write("case2-record-choice")
+                }
+                "case3-finished-partly-watched" -> {
+                    compose.onNodeWithTag("details-more").requestFocus()
+                    compose.pressKey(Key.DirectionCenter)
+                    compose.onNodeWithTag("browse-context-action-mark_watched").assertIsFocused()
+                    write("case3-more-menu")
+                }
+            }
+        }
+    }
+
+    /** Other airings with a recording now, one scheduled by a rule and a plain one, the row focused. */
+    @Test @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
+    fun otherAiringsRecordingMarks() {
+        val now = start.epochSeconds - 3600
+        val event = EpgEvent.create(EventId(1), channel.id, start, start + 3600.seconds, title = "Ridge Light",
+            subtitle = "Beyond the Arctic Circle", description = description, image = ArtworkId(2))
+        val nowStart = Instant.fromEpochSeconds(now - 1800)
+        val airings = listOf(
+            EpgEvent.create(EventId(2), channel.id, nowStart, nowStart + 3600.seconds, title = event.title,
+                subtitle = event.subtitle, image = ArtworkId(3)),
+            EpgEvent.create(EventId(3), channel.id, start + 86400.seconds, event.stop + 86400.seconds, title = event.title,
+                subtitle = event.subtitle, image = ArtworkId(2)),
+            EpgEvent.create(EventId(4), channel.id, start + (2 * 86400).seconds, event.stop + (2 * 86400).seconds,
+                title = event.title, subtitle = event.subtitle, image = ArtworkId(3)),
+        )
+        val recordings = mapOf(
+            EventId(2) to DvrEntry.create(DvrEntryId(2), eventId = EventId(2), channelId = channel.id,
+                state = DvrEntryState.RECORDING),
+            EventId(3) to DvrEntry.create(DvrEntryId(3), eventId = EventId(3), channelId = channel.id,
+                state = DvrEntryState.SCHEDULED, autorecRuleId = AutorecRuleId("series")),
+        )
+        compose.setContentWithArtworkSampling {
+            CompositionLocalProvider(LocalDensity provides Density(2f, 1f)) {
+                TVHeadendPlayerTheme {
+                    view = LocalView.current
+                    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                        ProvideArtworkSession(session) {
+                            ProgrammeDetailsPage(event, null, channel, now,
+                                programmeDetailsActions(event, now, null, null, true, true), {}, {},
+                                related = airings, channelOf = { channel }, recordingOf = { recordings[it.id] })
+                        }
+                    }
+                }
+            }
+        }
+        compose.onNodeWithTag("details-card-2").requestFocus()
+        compose.mainClock.advanceTimeBy(1000)
+        compose.waitForIdle()
+        compose.onNodeWithTag("details-card-2").assertIsFocused()
+        val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
+        compose.runOnIdle { view.draw(Canvas(bitmap)) }
+        CaptureOutput.writePng(File("build/outputs/details-action-row", "other-airings-recording-marks.png"), bitmap)
         bitmap.recycle()
     }
 

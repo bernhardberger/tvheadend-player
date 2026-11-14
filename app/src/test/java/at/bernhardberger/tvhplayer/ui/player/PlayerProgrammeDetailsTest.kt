@@ -121,6 +121,7 @@ class PlayerProgrammeDetailsTest {
         compose.onNodeWithTag("details-watch").assertDoesNotExist()
         compose.onNodeWithTag("details-show_guide").assertExists()
         compose.onNodeWithTag("details-record").assertDoesNotExist()
+        compose.onNodeWithTag("details-record-choice").assertDoesNotExist()
     }
 
     @Test fun playerDetailsForAnotherTargetOfferWatchInsteadOfContinue() {

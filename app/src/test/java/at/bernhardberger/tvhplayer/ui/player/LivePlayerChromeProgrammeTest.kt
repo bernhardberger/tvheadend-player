@@ -53,7 +53,7 @@ class LivePlayerChromeProgrammeTest : LivePlayerChromeFixture() {
         session.publish(observation(now, listOf(ended, nextProgramme)))
         repeat(2) { settle() }
         assertEquals("Ended programme", texts("details-title"))
-        assertFalse(exists("details-record"))
+        assertFalse(exists("details-record") || exists("details-record-choice"))
         // The ended programme is not the one at the viewer position: it offers Watch, which returns to the picture.
         assertEquals(listOf("details-watch"), focused())
         session.publish(observation(now, listOf(nextProgramme)))
@@ -154,7 +154,9 @@ class LivePlayerChromeProgrammeTest : LivePlayerChromeFixture() {
         screen(recordingProfile = DvrConfigId("archive"))
         session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Confirmed(DvrEntryId(7)))
         key(Key.Info)
-        compose.onNodeWithTag("details-record").performSemanticsAction(SemanticsActions.RequestFocus)
+        compose.onNodeWithTag("details-record-choice").performSemanticsAction(SemanticsActions.RequestFocus)
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("record-choice-record").assertIsFocused()
         key(Key.DirectionCenter)
         compose.onNodeWithTag("centred-dialog-card").assertDoesNotExist()
         assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
@@ -192,14 +194,15 @@ class LivePlayerChromeProgrammeTest : LivePlayerChromeFixture() {
         screen()
         session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Confirmed(DvrEntryId(7)))
         key(Key.Info)
-        compose.onNodeWithTag("details-record").performSemanticsAction(SemanticsActions.RequestFocus)
-        val click = compose.onNodeWithTag("details-record").fetchSemanticsNode()
+        compose.onNodeWithTag("details-record-choice").performSemanticsAction(SemanticsActions.RequestFocus)
+        key(Key.DirectionCenter)
+        val click = compose.onNodeWithTag("record-choice-record").fetchSemanticsNode()
             .config[SemanticsActions.OnClick].action!!
         compose.runOnIdle { click(); click() }
         settle()
         compose.onNodeWithTag("centred-dialog-card").assertDoesNotExist()
         assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
-        assertEquals(listOf("details-record"), focused())
+        assertEquals(listOf("details-record-choice"), focused())
     }
 
     @Test fun playerInfoStopKeepReturnsToTheInvokingButtonWithoutSending() {
@@ -219,11 +222,12 @@ class LivePlayerChromeProgrammeTest : LivePlayerChromeFixture() {
         screen()
         session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Failed(TvheadendFailure.ACCESS_DENIED, mayHaveApplied = false))
         key(Key.Info)
-        compose.onNodeWithTag("details-record").performSemanticsAction(SemanticsActions.RequestFocus)
+        compose.onNodeWithTag("details-record-choice").performSemanticsAction(SemanticsActions.RequestFocus)
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("record-choice-record").assertIsFocused()
         key(Key.DirectionCenter)
         compose.onNodeWithTag("centred-dialog-card").assertDoesNotExist()
-        assertEquals("Record", texts("details-record"))
-        assertEquals(listOf("details-record"), focused())
+        assertEquals(listOf("details-record-choice"), focused())
         val notice = notices.state.value.pending.single().notice
         assertEquals(NoticeSeverity.FAILURE, notice.severity)
         assertEquals(Notice.DvrActionFailed(DvrMutationKind.SCHEDULE, DvrMutationFeedback.PERMISSION_DENIED), notice)
@@ -237,7 +241,9 @@ class LivePlayerChromeProgrammeTest : LivePlayerChromeFixture() {
         screen(scheduleCompletion = completion)
         session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Failed(TvheadendFailure.ACCESS_DENIED, mayHaveApplied = false))
         key(Key.Info)
-        compose.onNodeWithTag("details-record").performSemanticsAction(SemanticsActions.RequestFocus)
+        compose.onNodeWithTag("details-record-choice").performSemanticsAction(SemanticsActions.RequestFocus)
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("record-choice-record").assertIsFocused()
         key(Key.DirectionCenter)
         assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
         compose.onNodeWithTag("details-continue_watching").performSemanticsAction(SemanticsActions.RequestFocus)
@@ -256,7 +262,9 @@ class LivePlayerChromeProgrammeTest : LivePlayerChromeFixture() {
         screen(scheduleCompletion = completion)
         session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Failed(TvheadendFailure.ACCESS_DENIED, mayHaveApplied = false))
         key(Key.Info)
-        compose.onNodeWithTag("details-record").performSemanticsAction(SemanticsActions.RequestFocus)
+        compose.onNodeWithTag("details-record-choice").performSemanticsAction(SemanticsActions.RequestFocus)
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("record-choice-record").assertIsFocused()
         key(Key.DirectionCenter)
         assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
         key(Key.Back)
@@ -271,7 +279,7 @@ class LivePlayerChromeProgrammeTest : LivePlayerChromeFixture() {
         assertEquals(Notice.DvrActionFailed(DvrMutationKind.SCHEDULE, DvrMutationFeedback.PERMISSION_DENIED),
             notices.state.value.pending.single().notice)
         assertEquals(listOf("details-continue_watching"), focused())
-        compose.onNodeWithTag("details-record").assertExists()
+        compose.onNodeWithTag("details-record-choice").assertExists()
         compose.onNodeWithTag("details-stop").assertDoesNotExist()
     }
 
@@ -281,7 +289,9 @@ class LivePlayerChromeProgrammeTest : LivePlayerChromeFixture() {
         publishMatchingFutureProgramme()
         session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Failed(TvheadendFailure.ACCESS_DENIED, mayHaveApplied = false))
         key(Key.Info)
-        compose.onNodeWithTag("details-record").performSemanticsAction(SemanticsActions.RequestFocus)
+        compose.onNodeWithTag("details-record-choice").performSemanticsAction(SemanticsActions.RequestFocus)
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("record-choice-record").assertIsFocused()
         key(Key.DirectionCenter)
         assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
         key(Key.DirectionDown)
@@ -293,7 +303,7 @@ class LivePlayerChromeProgrammeTest : LivePlayerChromeFixture() {
         assertEquals(Notice.DvrActionFailed(DvrMutationKind.SCHEDULE, DvrMutationFeedback.PERMISSION_DENIED),
             notices.state.value.pending.single().notice)
         compose.onNodeWithTag("details-watch").assertIsFocused()
-        compose.onNodeWithTag("details-record").assertExists()
+        compose.onNodeWithTag("details-record-choice").assertExists()
     }
 
     @Test fun playerInfoFutureAiringRecordsThenAutomaticallyFocusesCancel() {
@@ -304,7 +314,9 @@ class LivePlayerChromeProgrammeTest : LivePlayerChromeFixture() {
         key(Key.DirectionDown)
         compose.onNodeWithTag("details-card-12").assertIsFocused()
         key(Key.DirectionCenter)
-        compose.onNodeWithTag("details-record").performSemanticsAction(SemanticsActions.RequestFocus)
+        compose.onNodeWithTag("details-record-choice").performSemanticsAction(SemanticsActions.RequestFocus)
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("record-choice-record").assertIsFocused()
         key(Key.DirectionCenter)
         assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
         publishInfoRecording(DvrEntryState.SCHEDULED, EventId(12))

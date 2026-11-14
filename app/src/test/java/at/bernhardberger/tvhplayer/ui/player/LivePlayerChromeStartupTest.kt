@@ -66,7 +66,7 @@ class LivePlayerChromeStartupTest : LivePlayerChromeFixture() {
         assertTrue("Playing alone is not a video frame", outcomes.isEmpty())
         compose.runOnIdle { playerListeners.toList().forEach { it.onRenderedFirstFrame() } }
         settle()
-        compose.waitUntil(5_000) { outcomes.contains(MainStartupPlaybackOutcome.PRESENTED) }
+        awaitLiveSignal("startup reports the presented frame") { outcomes.contains(MainStartupPlaybackOutcome.PRESENTED) }
         settle()
         // The startup screen now fades over the player: the Banner is already there, passive.
         assertTrue("the Banner shows during the reveal", exists("player-banner"))
@@ -97,7 +97,7 @@ class LivePlayerChromeStartupTest : LivePlayerChromeFixture() {
         }
         playerReady()
         settle()
-        compose.waitUntil(5_000) { outcomes.contains(MainStartupPlaybackOutcome.PRESENTED) }
+        awaitLiveSignal("startup reports the presented frame") { outcomes.contains(MainStartupPlaybackOutcome.PRESENTED) }
         assertFalse(runtime.videoPresentation.value.visible)
     }
 
@@ -105,11 +105,7 @@ class LivePlayerChromeStartupTest : LivePlayerChromeFixture() {
         val outcomes = mutableListOf<MainStartupPlaybackOutcome>()
         screen(failing = true, contentAllowed = { false }, startup = true, onStartupOutcome = { outcomes += it })
         // Media3's real ExoPlayer playback thread reports the undecodable stream's failure.
-        compose.mainClock.autoAdvance = true
-        compose.waitUntil(5_000) {
-            compose.waitForIdle()
-            outcomes.contains(MainStartupPlaybackOutcome.RECOVERY)
-        }
+        awaitLiveSignal("startup reports the failure") { outcomes.contains(MainStartupPlaybackOutcome.RECOVERY) }
         assertFalse(exists("player-banner"))
     }
 
@@ -140,7 +136,7 @@ class LivePlayerChromeStartupTest : LivePlayerChromeFixture() {
                 compose.runOnIdle { screenVisible.value = true }
             }
             settle()
-            compose.waitUntil(5_000) { outcomes.contains(MainStartupPlaybackOutcome.ALREADY_PLAYING) }
+            awaitLiveSignal("startup adopts the playing tune") { outcomes.contains(MainStartupPlaybackOutcome.ALREADY_PLAYING) }
             assertEquals("warm adoption does not install another tune", epoch, runtime.videoPresentation.value.epoch)
             assertTrue("the already-presented frame is retained", runtime.videoPresentation.value.visible)
         }
@@ -237,7 +233,7 @@ class LivePlayerChromeStartupTest : LivePlayerChromeFixture() {
                 superseded = true
             }, onStartupOutcome = { outcomes += it; startup.value = false })
         settle()
-        compose.waitUntil(5_000) { outcomes.contains(MainStartupPlaybackOutcome.RECOVERY) }
+        awaitLiveSignal("startup reports the unavailable channel") { outcomes.contains(MainStartupPlaybackOutcome.RECOVERY) }
         assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
         assertTrue(exists("player-channel-unavailable"))
         val ready = session.observation.value

@@ -310,6 +310,7 @@
     <string name="details_recording_progress_spoken">%1$s av %2$s, %3$s</string>
     <string name="details_tomorrow">I morgen %1$s</string>
     <string name="context_record">Ta opp</string>
+    <string name="details_record_choice">Ta opp…</string>
     <string name="context_show_guide">Vis i TV-guiden</string>
     <string name="context_resume">Fortsett</string>
     <string name="context_start_over">Se fra begynnelsen</string>
@@ -514,13 +515,11 @@
     <string name="player_raster_spoken">%1$s linjer</string>
     <string name="player_audio_spoken">Lyd %1$s</string>
     <string name="player_ad_short">AD</string>
-    <string name="stats_on">På</string>
     <string name="stats_off">Av</string>
     <string name="display_mode">Visningsmodus</string>
     <string name="display_mode_auto">Auto (opprinnelig sideforhold)</string>
     <string name="display_mode_16_9">Fyll 16:9</string>
     <string name="display_mode_4_3">Fyll 4:3</string>
-    <string name="stats_video_buffers">Videobuffere</string>
     <string name="stats_video_buffers_value">Gjengitt %1$d • Tapt %2$d • Hoppet over %3$d</string>
     <string name="epg_title">TV-guide</string>
     <string name="header_button_value_description">%1$s, %2$s</string>

@@ -1,5 +1,17 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.di.PlayerStatsLevel
+import at.bernhardberger.tvhplayer.playback.AppPlaybackDiagnostics
+import at.bernhardberger.tvhplayer.playback.AppPlaybackFormatDiagnostics
+import at.bernhardberger.tvhplayer.playback.AppPlaybackSource
+import at.bernhardberger.tvhplayer.playback.AppPlaybackState
+import at.bernhardberger.tvhplayer.playback.AppPlaybackFailureReason
+import at.bernhardberger.tvhplayer.core.AppErrorCondition
+import androidx.compose.foundation.layout.offset
+import at.bernhardberger.tvhplayer.testutil.settleFrames
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
+
 import android.app.Application
 import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
@@ -27,6 +39,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
@@ -56,6 +69,8 @@ import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
+import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
+import at.bernhardberger.tvhplayer.core.deviceFaultDetail
 import at.bernhardberger.tvhplayer.R
 import androidx.compose.ui.res.stringResource
 import coil3.ImageLoader
@@ -63,6 +78,7 @@ import coil3.map.Mapper
 import coil3.request.Options
 import kotlinx.coroutines.Dispatchers
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -108,6 +124,299 @@ class PlayerMotionCaptureTest {
     @Test fun headerLive() {
         show { session -> live(session, behind = false) }
         capture("header-live")
+    }
+
+    @Test fun statsStreamPathStates() {
+        var diagnostics by mutableStateOf(statsLiveDiagnostics())
+        var level by mutableStateOf(PlayerStatsLevel.STREAM_PATH)
+        var scene by mutableStateOf("dvb-healthy")
+        var window by mutableStateOf(StatsWindow())
+        var raster by mutableStateOf<String?>("1080i")
+        // As on both screens: under the controls or the Banner the debug level draws the stream path card.
+        val lowerChrome = setOf("controls", "banner")
+        lateinit var layers: LivePlayerLayerState
+        show { session ->
+            layers = rememberLivePlayerLayerState()
+            Box(Modifier.fillMaxSize()) {
+                val failed = diagnostics.state as? AppPlaybackState.Failed
+                val noSignal = scene == "live-no-signal"
+                // As on the live screen: the channel message carries the Stats text instead of the card, and the
+                // channel drawer's browse surface takes the card's place.
+                if (failed == null && !noSignal && scene != "channel-drawer") PlaybackStatsOverlay(diagnostics, AspectRatioMode.FIT,
+                    Modifier.offset(58.dp, 100.dp), level = presentedStatsLevel(level, scene in lowerChrome), accessible = scene !in setOf("options", "controls"),
+                    raster = raster)
+                if (scene == "controls") live(session, false)
+                if (scene == "banner") live(session, false, mode = PlayerChromeMode.BANNER)
+                if (scene == "channel-drawer") live(session, false, rail = layers)
+                if (failed != null) PlayerChannelMessage(true, AppErrorCondition.CHANNEL_PLAYBACK_FAILED,
+                    Modifier.align(Alignment.Center), deviceFaultDetail = failed.deviceFaultDetail(), statsFailure = failed)
+                if (noSignal) PlayerChannelMessage(true,
+                    at.bernhardberger.tvhplayer.core.liveErrorCondition(at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue.BAD_SIGNAL),
+                    Modifier.align(Alignment.Center), statsRows = { liveStatsRows(diagnostics, window, level) })
+                if (scene == "options") PlaybackOptionsSheetContent(
+                    PlaybackOptionsPage.STATS, emptyList(), emptyList(), false, AspectRatioMode.FIT, level,
+                    {}, {}, {}, {}, { level = it })
+            }
+        }
+        val report = StringBuilder("canvas=960x540 dp; locale=en; fontScale=1.0; fixture=still-ridge-light\n")
+        // Every stream-path row at its widest, written by the step-value formatter from extreme inputs.
+        val worstRows = run {
+            val full = 65_535L
+            val dvb = statsLiveDiagnostics(signal = full, snr = full, queueDelayUs = 9_999_000).copy(bufferedMs = 30_000)
+            fun video(codec: String, mime: String, width: Int, height: Int) = dvb.copy(video = AppPlaybackFormatDiagnostics(
+                codec, "$width×$height", 23.976f, sampleMimeType = mime, width = width, height = height))
+            fun row(step: StreamPathStep, d: AppPlaybackDiagnostics = dvb, w: StatsWindow = StatsWindow(),
+                output: DisplayOutput? = null, requested: String? = null, declared: String = "23.98",
+                timeshift: AppTimeshiftState? = null, raster: String? = null) =
+                step to stepValue(step, d, w, output, requested, measuredRate = "59.94", declaredRate = declared, timeshift, raster)
+            val locked = dvb
+            val unlocked = statsLiveDiagnostics(locked = false, signal = full, snr = full, queueDelayUs = 9_999_000)
+                .copy(bufferedMs = 30_000)
+            val odd = video("hvc1.2.4.L153.B0", "video/hevc", 3840, 1600)
+            fun MutableList<Triple<String, StreamPathStep, String>>.add(shape: String, row: Pair<StreamPathStep, String>) =
+                add(Triple(shape, row.first, row.second))
+            buildList {
+                add("tuner", row(StreamPathStep.TUNER, locked)); add("tuner", row(StreamPathStep.TUNER, unlocked))
+                add("queue", row(StreamPathStep.SERVER))
+                listOf(9_999L, 999_999L, 99_999_999L).forEach { n ->
+                    add("growth", row(StreamPathStep.TUNER, locked, StatsWindow(uncorrected = n)))
+                    add("growth", row(StreamPathStep.TUNER, unlocked, StatsWindow(uncorrected = n)))
+                    add("growth", row(StreamPathStep.SERVER, w = StatsWindow(serverDrops = n)))
+                    add("growth", row(StreamPathStep.APP, w = StatsWindow(clientDrops = n)))
+                    add("growth", row(StreamPathStep.DECODER, w = StatsWindow(decoderDrops = n)))
+                }
+                add("timing", row(StreamPathStep.APP, timeshift = AppTimeshiftState(available = true,
+                    bufferStartMs = -10_800_000, positionMs = -10_799_000, liveEdgeMs = 0)))
+                add("timing", row(StreamPathStep.APP, dvb.copy(source = AppPlaybackSource.RECORDING, live = null,
+                    positionMs = 10_799_000, durationMs = 10_800_000)))
+                val families = listOf("avc1.640028" to "video/avc", "hvc1.2.4.L153.B0" to "video/hevc",
+                    "av01.0.08M.08" to "video/av01", "vp09.00.40.08" to "video/x-vnd.on2.vp9", "mp2v" to "video/mpeg2")
+                listOf(Triple(3840, 2160, "2160p"), Triple(1920, 1080, "1080i")).forEach { (width, height, raster) ->
+                    families.forEach { (codec, mime) ->
+                        add("family + one rate", row(StreamPathStep.DECODER, video(codec, mime, width, height),
+                            declared = "59.94", raster = raster))
+                    }
+                    add("two rates", row(StreamPathStep.DECODER, video("mp2v", "video/mpeg2", width, height), raster = raster))
+                }
+                add("two rates", row(StreamPathStep.DECODER, odd))
+                add("one rate, no family", row(StreamPathStep.DECODER, odd, declared = "59.94"))
+                add("growth", row(StreamPathStep.DECODER, odd, StatsWindow(decoderDrops = 99_999_999)))
+                add("screen", row(StreamPathStep.SCREEN, output = DisplayOutput(3840, 2160, "23.98", "", null), requested = "59.94"))
+                add("screen", row(StreamPathStep.SCREEN, output = DisplayOutput(3840, 2160, "59.94", "", null), requested = "23.98"))
+                add("screen", row(StreamPathStep.SCREEN, output = DisplayOutput(3840, 2160, "59.94", "", null), requested = "59.94"))
+            }.distinctBy { it.third }
+        }
+        fun shot(name: String, playing: Boolean = true) {
+            compose.settleFrames(2)
+            if (scene == "channel-drawer") {
+                assertTrue("$name: no Stats card in this scene",
+                    compose.onAllNodesWithTag("playback-stats-overlay").fetchSemanticsNodes().isEmpty())
+                report.append("$name: card=none\n")
+                capture("stats-$name", focus = "drawer's current channel", directory = "stats-stream-path")
+                return
+            }
+            val drawn = presentedStatsLevel(level, scene in lowerChrome)
+            if (!playing) {
+                // The tag sits inside the message's 24 dp padding; the box is what must stay TV-safe.
+                val message = compose.onNodeWithTag(PlayerChannelMessageTag).fetchSemanticsNode().boundsInRoot.inflate(24f)
+                report.append("$name: card=none; message=$message\n")
+                compose.onAllNodesWithTag(PlayerChannelMessageDetailTag, useUnmergedTree = true).fetchSemanticsNodes()
+                    .forEach { report.append("  detail: ${it.config[androidx.compose.ui.semantics.SemanticsProperties.Text]
+                        .joinToString("").replace("\n", " | ")}\n") }
+                assertTrue("$name message=$message", message.left >= TvGridHorizontalMargin.value &&
+                    message.right <= 960 - TvGridHorizontalMargin.value && message.top >= TvGridVerticalMargin.value &&
+                    message.bottom <= 540 - TvGridVerticalMargin.value)
+            } else {
+                val bounds = compose.onNodeWithTag("playback-stats-overlay").fetchSemanticsNode().boundsInRoot
+                report.append("$name: bounds=$bounds\n")
+                if (drawn == PlayerStatsLevel.STREAM_PATH) assertTrue("$name bottom=${bounds.bottom}", bounds.bottom <= 300f)
+            }
+            val cardInk = mutableListOf<Pair<String, androidx.compose.ui.geometry.Rect>>()
+            textInk(underCard = true).forEach { (node, layout) ->
+                val input = layout.layoutInput
+                // Header and audio lines wrap their content; their room is the card's content width.
+                val card = compose.onNodeWithTag("playback-stats-overlay").fetchSemanticsNode().boundsInRoot
+                val room = if (node.boundsInRoot.left <= card.left + 16.5f) card.width - 32f else layout.size.width.toFloat()
+                fun spare(text: String) = room - androidx.compose.ui.text.ParagraphIntrinsics(text,
+                    input.style, emptyList(), density = input.density,
+                    fontFamilyResolver = input.fontFamilyResolver).maxIntrinsicWidth
+                // Ring numbers and the flag gutter are single characters with their own fixed width.
+                if (drawn == PlayerStatsLevel.STREAM_PATH && input.text.length > 1) {
+                    report.append("  row: ${input.text}; spare=${spare(input.text.text)} dp\n")
+                }
+                if (layout.hasVisualOverflow) report.append("ellipsis: ${input.text}\n")
+                cardInk += input.text.text to ink(node, layout)
+            }
+            if (playing && drawn == PlayerStatsLevel.DEBUG) {
+                val card = compose.onNodeWithTag("playback-stats-overlay").fetchSemanticsNode().boundsInRoot
+                val (left, right) = cardInk.map { it.second }.partition { it.left < card.left + 16f + 324f }
+                val leftBottom = left.maxOf { it.bottom }
+                val rightBottom = right.maxOf { it.bottom }
+                report.append("  left column bottom=$leftBottom; right column bottom=$rightBottom\n")
+                if (name == "debug-worst-height") assertTrue("the steps outgrow the details", leftBottom <= rightBottom)
+            }
+            if (name.endsWith("-debug") && scene in lowerChrome) {
+                // Where the chrome's text and artwork draw over the card's text (the chrome is above it).
+                val chrome = textInk(underCard = false).map { (node, layout) -> layout.layoutInput.text.text to ink(node, layout) } +
+                    // The info bar's own texts clear their semantics; their layout boxes stand in for their ink.
+                    listOf("player-info-artwork-tile", "player-info-title", "player-info-subtitle", "player-info-programme",
+                        "player-info-last-text").flatMap { tag ->
+                        compose.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().map { tag to it.boundsInRoot }
+                    }
+                var overlaps = 0
+                cardInk.forEach { (cardText, cardRect) ->
+                    chrome.filter { it.second.overlaps(cardRect) }.forEach { (chromeText, chromeRect) ->
+                        val over = cardRect.intersect(chromeRect)
+                        overlaps++
+                        report.append("  overlap: \"${chromeText.replace("\n", " | ")}\" $chromeRect over " +
+                            "\"${cardText.replace("\n", " | ")}\" $cardRect by ${over.width}×${over.height} dp at $over\n")
+                    }
+                }
+                report.append("  overlaps=$overlaps\n")
+                assertEquals("$name: the chrome draws over no card text", 0, overlaps)
+            }
+            capture("stats-$name", focus = if (scene == "options") "selected Stats radio" else "none",
+                directory = "stats-stream-path")
+        }
+        shot("dvb-healthy")
+        // Each worst case in its own step's value text: the text right of the step's name, in its style and the
+        // width the row leaves it beside the flag gutter.
+        run {
+            val texts = textInk(underCard = true)
+            val values = StreamPathStep.entries.associateWith { step ->
+                val name = texts.single { it.second.layoutInput.text.text == stepName(step) }.first.boundsInRoot
+                texts.filter { (node, _) ->
+                    node.boundsInRoot.left >= name.right && name.center.y in node.boundsInRoot.top..node.boundsInRoot.bottom
+                }.minBy { it.first.boundsInRoot.left }.second
+            }
+            assertEquals("every step has its worst cases", StreamPathStep.entries.toSet(),
+                worstRows.map { it.second }.toSet())
+            values.forEach { (step, value) -> report.append("worst-case value room ($step)=${value.size.width} dp\n") }
+            val misfits = mutableListOf<String>()
+            val smallest = mutableMapOf<String, Pair<String, Float>>()
+            worstRows.forEach { (shape, step, row) ->
+                val value = values.getValue(step)
+                val input = value.layoutInput
+                val s = value.size.width - androidx.compose.ui.text.ParagraphIntrinsics(row, input.style, emptyList(),
+                    density = input.density, fontFamilyResolver = input.fontFamilyResolver).maxIntrinsicWidth
+                report.append("  worst ($shape): $row; spare=$s dp\n")
+                if (s < 0f) misfits += "$row overflows by ${-s} dp"
+                if (smallest[shape].let { it == null || s < it.second }) smallest[shape] = row to s
+            }
+            smallest.forEach { (shape, worst) -> report.append("  smallest spare ($shape): ${worst.first}; ${worst.second} dp\n") }
+            // The audio line in the header: the longest codec strings, the track rows' longest language names.
+            val card = compose.onNodeWithTag("playback-stats-overlay").fetchSemanticsNode().boundsInRoot
+            val healthy = statsLiveDiagnostics()
+            val resources = ApplicationProvider.getApplicationContext<Application>().resources
+            val unknownLanguage = resources.getString(R.string.track_unknown_language)
+            val multipleLanguages = resources.getString(R.string.track_multiple_languages)
+            val audioLine = audioSummary(healthy, unknownLanguage, multipleLanguages)
+            val audio = texts.single { it.second.layoutInput.text.text == audioLine }.second.layoutInput
+            listOf("mp4a.40.29", "E-AC-3", null).flatMap { codec ->
+                listOf("mul", "und", "nb", "gd").map { language ->
+                    audioSummary(healthy.copy(audio = healthy.audio?.copy(codec = codec, language = language,
+                        sampleMimeType = "audio/eac3", channelCount = 8, sampleRateHz = 192_000)),
+                        unknownLanguage, multipleLanguages)
+                }
+            }.forEach { row ->
+                val s = card.width - 32f - androidx.compose.ui.text.ParagraphIntrinsics(row, audio.style, emptyList(),
+                    density = audio.density, fontFamilyResolver = audio.fontFamilyResolver).maxIntrinsicWidth
+                report.append("  worst (audio): $row; spare=$s dp\n")
+                if (s < 0f) misfits += "$row overflows by ${-s} dp"
+            }
+            assertTrue(misfits.joinToString("; "), misfits.isEmpty())
+        }
+        compose.runOnIdle { diagnostics = diagnostics.copy(video = diagnostics.video?.copy(
+            codec = "hvc1.2.4.L153.B0", resolution = "3840×2160", frameRate = 50f, width = 3840, height = 2160)); raster = "2160p" }
+        shot("longest-decoder")
+        compose.runOnIdle { raster = "1080i" }
+        compose.runOnIdle { diagnostics = statsLiveDiagnostics(locked = false, uncorrected = 4, serverDrops = 5) }
+        shot("dvb-degraded")
+        compose.runOnIdle { diagnostics = statsLiveDiagnostics(tuner = false) }
+        shot("iptv")
+        compose.runOnIdle { diagnostics = diagnostics.copy(source = AppPlaybackSource.RECORDING, live = null,
+            positionMs = 600_000, durationMs = 3_600_000); raster = "1080p" }
+        shot("recording")
+        compose.runOnIdle { raster = "1080i" }
+        compose.runOnIdle { diagnostics = statsLiveDiagnostics(); scene = "controls" }
+        shot("controls")
+        compose.runOnIdle { scene = "banner" }
+        shot("banner")
+        compose.runOnIdle { scene = "options" }
+        shot("options-stream-path")
+        // Degraded DVB with growth, so the debug card shows its flags and "last 60 s": a baseline first.
+        compose.runOnIdle { scene = ""; level = PlayerStatsLevel.DEBUG; diagnostics = statsLiveDiagnostics(locked = false) }
+        compose.settleFrames(2)
+        compose.runOnIdle { diagnostics = statsLiveDiagnostics(locked = false, uncorrected = 4, serverDrops = 5) }
+        shot("debug-degraded")
+        val longService = "Ridge Earth Documentary Extended Regional Service Original-Language Programme Feed"
+        compose.runOnIdle { diagnostics = statsLiveDiagnostics(locked = false, service = longService) }
+        compose.settleFrames(2)
+        compose.runOnIdle {
+            diagnostics = statsLiveDiagnostics(locked = false, uncorrected = 4, serverDrops = 5, service = longService)
+        }
+        shot("debug-worst-height")
+        // Degraded DVB with growth under the chrome: a baseline first, so the counters can grow.
+        compose.runOnIdle { diagnostics = statsLiveDiagnostics(locked = false); scene = "controls" }
+        compose.settleFrames(2)
+        compose.runOnIdle { diagnostics = statsLiveDiagnostics(locked = false, uncorrected = 4, serverDrops = 5) }
+        shot("controls-debug")
+        compose.runOnIdle { scene = "banner" }
+        shot("banner-debug")
+        compose.runOnIdle { scene = "channel-drawer"; layers.openChannelDrawer() }
+        compose.settleFrames(60)
+        assertTrue("the drawer is open", compose.onAllNodesWithTag("player-channel-browser").fetchSemanticsNodes().isNotEmpty())
+        shot("channel-drawer-debug")
+        compose.runOnIdle { layers.closeChannelDrawer() }
+        val longFailure = AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER,
+            targetResult = at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult.SHUT_DOWN,
+            playerErrorCode = "ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES",
+            playerErrorClassification = "androidx.media3.exoplayer.ExoPlaybackException · MediaCodecVideoRenderer.onInputFormatChanged",
+            recoveryReason = at.bernhardberger.tvheadend.sdk.media3.PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED)
+        compose.runOnIdle {
+            scene = "live-failed"; level = PlayerStatsLevel.STREAM_PATH
+            diagnostics = statsLiveDiagnostics().copy(state = longFailure)
+        }
+        shot("live-failed", playing = false)
+        // This device's player: its own error leads and the error code row is not repeated.
+        compose.runOnIdle {
+            diagnostics = statsLiveDiagnostics().copy(state = longFailure.copy(playerErrorNumber = 4003, deviceFault = true))
+        }
+        shot("live-failed-device-fault", playing = false)
+        // A server-reported issue: the message borrows the Tuner and Tvheadend rows.
+        compose.runOnIdle {
+            scene = "live-no-signal"
+            diagnostics = statsLiveDiagnostics(locked = false, uncorrected = 1_234_567, serverDrops = 5)
+        }
+        shot("live-no-signal", playing = false)
+        // Debug's worst case: every tuner and queue row, with growth and a queue change on the path rows.
+        compose.runOnIdle {
+            level = PlayerStatsLevel.DEBUG
+            window = StatsWindow(uncorrected = 1_234_567, serverDrops = 5, queueChangeUs = -125_000)
+        }
+        shot("live-no-signal-debug", playing = false)
+        CaptureOutput.writeText(File("../captures/stats-stream-path/bounds.txt")) { report.toString() }
+    }
+
+    /** Text nodes with their layouts, inside the Stats card or outside it. */
+    private fun textInk(underCard: Boolean): List<Pair<androidx.compose.ui.semantics.SemanticsNode, androidx.compose.ui.text.TextLayoutResult>> {
+        val inCard = androidx.compose.ui.test.hasAnyAncestor(androidx.compose.ui.test.hasTestTag("playback-stats-overlay"))
+        return compose.onAllNodes(androidx.compose.ui.test.SemanticsMatcher.keyIsDefined(
+            androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) and (if (underCard) inCard else !inCard),
+            useUnmergedTree = true).fetchSemanticsNodes().flatMap { node ->
+            val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+            node.config[androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult].action?.invoke(layouts)
+            layouts.map { node to it }
+        }
+    }
+
+    /** Where a text actually draws: its lines' extent, not its whole layout box (mdpi, so px are dp). */
+    private fun ink(node: androidx.compose.ui.semantics.SemanticsNode, layout: androidx.compose.ui.text.TextLayoutResult):
+        androidx.compose.ui.geometry.Rect {
+        val origin = node.boundsInRoot.topLeft
+        val lines = 0 until layout.lineCount
+        return androidx.compose.ui.geometry.Rect(origin.x + lines.minOf { layout.getLineLeft(it) }, origin.y,
+            origin.x + lines.maxOf { layout.getLineRight(it) }, origin.y + layout.getLineBottom(layout.lineCount - 1))
     }
 
     @Test fun headerBehindLive() {
@@ -179,12 +488,12 @@ class PlayerMotionCaptureTest {
                         subtitleTracks = emptyList(),
                         tracksResolving = false,
                         aspectRatio = AspectRatioMode.FIT,
-                        statsVisible = false,
+                        statsLevel = PlayerStatsLevel.OFF,
                         onPageChange = {},
                         onAudioTrackSelected = {},
                         onSubtitleTrackSelected = {},
                         onAspectRatioChange = {},
-                        onStatsVisibleChange = {},
+                        onStatsLevelChange = {},
                     )
                 }
             }

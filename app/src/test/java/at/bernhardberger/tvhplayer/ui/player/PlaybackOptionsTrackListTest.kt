@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.di.PlayerStatsLevel
 import at.bernhardberger.tvhplayer.testutil.changeState
 import at.bernhardberger.tvhplayer.testutil.pressKey
 import androidx.compose.runtime.getValue
@@ -135,9 +136,9 @@ class PlaybackOptionsTrackListTest {
     ) = compose.setContent {
         TVHeadendPlayerTheme {
             PlaybackOptionsSheetContent(
-                page, audio(), subtitles(), resolving(), AspectRatioMode.FIT, false,
+                page, audio(), subtitles(), resolving(), AspectRatioMode.FIT, PlayerStatsLevel.OFF,
                 onPageChange = {}, onAudioTrackSelected = { chosen = it }, onSubtitleTrackSelected = { chosen = it },
-                onAspectRatioChange = {}, onStatsVisibleChange = {},
+                onAspectRatioChange = {}, onStatsLevelChange = {},
             )
         }
     }
@@ -164,7 +165,7 @@ class PlaybackOptionsTrackListTest {
                 TVHeadendPlayerTheme {
                     view = LocalView.current
                     PlaybackOptionsSheet(
-                        PlaybackOptionsPage.AUDIO, player(orfTracks()), false, AspectRatioMode.FIT, false,
+                        PlaybackOptionsPage.AUDIO, player(orfTracks()), false, AspectRatioMode.FIT, PlayerStatsLevel.OFF,
                         {}, {}, {}, audioAutomatic = true, onAutomaticAudio = {},
                     )
                 }

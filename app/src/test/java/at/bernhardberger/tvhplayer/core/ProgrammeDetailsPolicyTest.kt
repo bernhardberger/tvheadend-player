@@ -224,6 +224,63 @@ class ProgrammeDetailsPolicyTest {
         assertEquals(listOf(REMOVE_ENTRY), actions(recording(DvrEntryState.MISSED, 20)))
     }
 
+    private fun direct(vararg actions: BrowseContextAction) = actions.map(DetailsRowButton::Direct)
+
+    @Test fun detailsRowPlaysFirstThenOneRecordingButtonThenTheRest() {
+        val ruleRecording = recording(DvrEntryState.RECORDING, files = listOf(file(start = event.start)),
+            autorec = AutorecRuleId("series"))
+        // On air, recorded by a rule, watched behind live.
+        assertEquals(direct(CONTINUE_WATCHING, START_OVER, WATCH_LIVE, STOP) +
+            DetailsRowButton.More(listOf(EDIT_RULE, SHOW_GUIDE)), detailsActionRow(programmeDetailsActions(event, 150,
+                ruleRecording, admission(ruleRecording), true, true, playing = true, behindLive = true,
+                ruleAvailable = true)))
+        // Upcoming or on air, not recorded: the ways to record behind one button.
+        for (now in listOf(50L, 150L)) assertEquals(listOf(DetailsRowButton.Direct(WATCH),
+            DetailsRowButton.RecordChoice(listOf(RECORD, RECORD_TITLE)), DetailsRowButton.Direct(SHOW_GUIDE)),
+            detailsActionRow(programmeDetailsActions(event, now, null, null, true, true)))
+        // A finished recording, partly watched.
+        val finished = recording(DvrEntryState.COMPLETED_ERROR, 20, listOf(file()))
+        assertEquals(direct(RESUME, START_OVER, DELETE) + DetailsRowButton.More(listOf(MARK_WATCHED, KEEP_UNTIL)),
+            detailsActionRow(actions(finished)))
+        // Scheduled by a rule, from the programme and from the recording.
+        val scheduled = recording(DvrEntryState.SCHEDULED, autorec = AutorecRuleId("series"))
+        val expected = direct(WATCH, SKIP) + DetailsRowButton.More(listOf(EDIT_RULE, SHOW_GUIDE))
+        assertEquals(expected, detailsActionRow(recordingDetailsActions(scheduled, null, true, true, nowSec = 50,
+            ruleAvailable = true)))
+        assertEquals(expected, detailsActionRow(programmeDetailsActions(event, 50, scheduled, null, true, true,
+            ruleAvailable = true)))
+    }
+
+    @Test fun detailsRowKeepsASingleRecordOrLeftoverActionAsItsOwnButton() {
+        assertEquals(direct(WATCH, RECORD, SHOW_GUIDE), detailsActionRow(listOf(WATCH, RECORD, SHOW_GUIDE)))
+        assertEquals(direct(PLAY, DELETE, MARK_WATCHED), detailsActionRow(actions(recording(DvrEntryState.COMPLETED))))
+        // The recording's own action is the one recording button; another way to record it joins the rest.
+        assertEquals(direct(WATCH, CANCEL) + DetailsRowButton.More(listOf(RECORD_TITLE, SHOW_GUIDE)),
+            detailsActionRow(programmeDetailsActions(event, 50, recording(DvrEntryState.SCHEDULED), null, true, true)))
+    }
+
+    @Test fun detailsRowFocusFindsTheButtonHoldingTheActionOrWhatReplacedIt() {
+        val record = DetailsRowButton.RecordChoice(listOf(RECORD, RECORD_SERIES, RECORD_TITLE))
+        val offering = listOf(DetailsRowButton.Direct(WATCH), record, DetailsRowButton.Direct(SHOW_GUIDE))
+        assertEquals(record, detailsRowFocus(offering, RECORD_TITLE, null))
+        assertEquals(record, detailsRowFocus(offering, null, RECORD_SERIES))
+        assertEquals(offering.first(), detailsRowFocus(offering, null, null))
+        // Recorded: the recording button now holds the recording's own action.
+        val recorded = detailsActionRow(listOf(WATCH, CANCEL, SHOW_GUIDE))
+        assertEquals(DetailsRowButton.Direct(CANCEL), detailsRowFocus(recorded, RECORD, null))
+        val ruled = detailsActionRow(listOf(WATCH, SKIP, EDIT_RULE, SHOW_GUIDE))
+        assertEquals(ruled.last(), detailsRowFocus(ruled, RECORD_SERIES, null))
+        assertEquals(DetailsRowButton.Direct(SKIP), detailsRowFocus(detailsActionRow(listOf(WATCH, SKIP, SHOW_GUIDE)),
+            RECORD_SERIES, null))
+        // Marked inside More: More still holds its replacement.
+        val marked = detailsActionRow(listOf(RESUME, START_OVER, MARK_UNWATCHED, KEEP_UNTIL, DELETE))
+        assertEquals(marked.last(), detailsRowFocus(marked, MARK_WATCHED, null))
+        // Gone from the rest: the last button, when it is the rest's.
+        assertEquals(DetailsRowButton.Direct(SHOW_GUIDE), detailsRowFocus(detailsActionRow(listOf(WATCH, RECORD,
+            SHOW_GUIDE)), EDIT_RULE, null))
+        assertEquals(DetailsRowButton.Direct(WATCH), detailsRowFocus(direct(WATCH, CANCEL), EDIT_RULE, null))
+    }
+
     @Test fun statusPrioritizesRecordingLifecycleOverAiring() {
         assertNull(detailsStatus(event, null, 99))
         assertEquals(DetailsStatus.ON_NOW, detailsStatus(event, null, 100))

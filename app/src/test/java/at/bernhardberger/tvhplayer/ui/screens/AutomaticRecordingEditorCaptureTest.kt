@@ -31,6 +31,7 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.semantics.SemanticsActions
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.DvrConfigId
@@ -163,16 +164,21 @@ class AutomaticRecordingEditorCaptureTest {
         )) {
             compose.runOnIdle {
                 entryScene = {
-                    ProgrammeDetailsPage(
-                        event, null, automaticRecordingChannels.first { it.id == event.channelId },
-                        event.start.epochSeconds + 60,
-                        programmeDetailsActions(event, event.start.epochSeconds + 60, recording = null,
-                            recordingAdmission = null, canModifyRecordings = true, canWatchChannel = true),
-                        onAction = {}, onClose = {}, initialAction = action,
-                    )
+                    // One page per programme, as the hosts show it, so the previous Record… choice is gone.
+                    androidx.compose.runtime.key(event.id) {
+                        ProgrammeDetailsPage(
+                            event, null, automaticRecordingChannels.first { it.id == event.channelId },
+                            event.start.epochSeconds + 60,
+                            programmeDetailsActions(event, event.start.epochSeconds + 60, recording = null,
+                                recordingAdmission = null, canModifyRecordings = true, canWatchChannel = true),
+                            onAction = {}, onClose = {}, initialAction = action,
+                        )
+                    }
                 }
             }
-            capture(name, directory, "details-${action.name.lowercase()}")
+            compose.onNodeWithTag("details-record-choice").requestFocus()
+            compose.pressKey(Key.DirectionCenter)
+            capture(name, directory, "record-choice-${action.name.lowercase()}")
         }
         for (enabled in listOf(true, false)) {
             val entry = automaticRecordingEntry(enabled)

@@ -29,6 +29,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 import at.bernhardberger.tvheadend.sdk.core.EventId
+import at.bernhardberger.tvhplayer.core.GlanceBadgeKind
 import at.bernhardberger.tvhplayer.core.recordingIsRunning
 import at.bernhardberger.tvhplayer.core.programmeArtwork
 import at.bernhardberger.tvhplayer.core.deviceFaultDetail
@@ -146,6 +147,7 @@ import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.Notice
 import at.bernhardberger.tvhplayer.notices.PauseUnavailableReason
 import at.bernhardberger.tvhplayer.ui.screens.postDvrFailure
+import at.bernhardberger.tvhplayer.ui.screens.isScheduled
 import at.bernhardberger.tvhplayer.ui.screens.DvrMutationAction
 import at.bernhardberger.tvhplayer.ui.screens.DvrMutationActions
 import at.bernhardberger.tvhplayer.ui.screens.currentDvrMutation
@@ -369,8 +371,10 @@ fun VideoPlayerScreen(
     connectionUiState: at.bernhardberger.tvhplayer.core.ConnectionUiState? = null,
     guideEntryRequestId: Long? = null,
     consumeGuideEntry: () -> Boolean = { false },
+    statsStore: at.bernhardberger.tvhplayer.di.PlayerStatsStore = koinInject(),
 ) {
     val scope = rememberCoroutineScope()
+    val statsLevel by statsStore.level.collectAsStateWithLifecycle()
     val layerState = rememberLivePlayerLayerState()
     val playerClose = rememberPlayerClose(onClose)
     // First, before any playback effect: a user stop since the last intent closes the screen.
@@ -1480,7 +1484,6 @@ fun VideoPlayerScreen(
                         remoteKeys.lastChromeControl == "player-seekbar",
                     timeshiftAvailable = effectiveTimeshiftState.available,
                     optionsOpen = layerState.core.optionsPage != null,
-                    statsOpen = layerState.core.statsVisible,
                     infoOpen = layerState.core.infoOpen,
                     drawerOpen = showDrawer,
                     confirmationOpen = foregroundLayer == PlayerForegroundLayer.CONFIRMATION,
@@ -1764,7 +1767,39 @@ fun VideoPlayerScreen(
             foregroundLayer == PlayerForegroundLayer.PENDING_SEEK_PREVIEW ||
                 foregroundLayer == PlayerForegroundLayer.DISPATCHED_SEEK_PREVIEW
         }
+        // A pending or dispatched step holds the Banner up after its own timer ran out.
+        val bannerShown = bannerSeekPreview != null ||
+            (layerState.core.chrome.bannerVisible && chromeLayer == PlayerForegroundLayer.NONE)
         val channelRailOpen = foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER
+        // The channel drawer opens with the controls; the page's own Info never holds them here (no details).
+        val controlsLayerShown = chromeLayer == PlayerForegroundLayer.CONTROLS || channelRailOpen
+        val chromePanelOpen = layerState.core.optionsPage != null || layerState.core.infoOpen || layerState.scheduleOpen
+        // The lower chrome's mode, for the chrome itself and for the Stats card under it.
+        fun lowerChromeMode(keepControls: Boolean) = playerChromeMode(
+            controls = controlsLayerShown || keepControls,
+            banner = !channelUnavailable && bannerShown,
+            stepPreview = bannerSeekPreview != null,
+        )
+        // Passive diagnostics sit below all chrome and foreground panels; while the channel is unavailable the
+        // channel message carries their text instead, whatever layer is open. The channel drawer's browse surface
+        // takes the card's place. While the lower chrome is drawn the debug level draws the stream path card only.
+        LivePlayerDiagnostics(
+            viewModel = videoPlayerViewModel,
+            // PlayerPage keeps the controls only while its details compose; this page has none (details = null).
+            level = presentedStatsLevel(statsLevel,
+                lowerChromeMode(keepControls = false) != PlayerChromeMode.HIDDEN && !chromePanelOpen),
+            visible = statsLevel.enabled && foregroundLayer != PlayerForegroundLayer.RECOVERY && !channelUnavailable &&
+                !channelRailOpen,
+            accessible = foregroundLayer == PlayerForegroundLayer.NONE,
+            targetKey = currentChannelId,
+            aspectRatio = targetAspect.mode,
+            timeshiftState = effectiveTimeshiftState,
+            playbackRuntime = playbackRuntime,
+            raster = trackGlance.badges.firstOrNull { it.kind == GlanceBadgeKind.RASTER }?.value,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(start = at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin, top = 100.dp),
+        )
         // Trial: Down from the action row opens the channel rows below on the playing channel, so
         // closing returns to the action it came from.
         val openRailFromActions: () -> Unit = {
@@ -1780,21 +1815,14 @@ fun VideoPlayerScreen(
         // The same availability as the options sheet's quick lists the buttons open.
         val trackButtons = rememberPlayerTrackButtons(
             player, available = !channelFailed && playingLiveChannelId == currentChannelId)
-        val controlsShown = chromeLayer == PlayerForegroundLayer.CONTROLS || channelRailOpen || keepControls
-        val chromePanelOpen = layerState.core.optionsPage != null || layerState.core.infoOpen || layerState.scheduleOpen
+        val controlsShown = controlsLayerShown || keepControls
         // Composed beside the controls rather than in their layer: the closed rail's cards are not
         // built again inside every reveal's first frame.
         val quickZap = rememberQuickZapRail(
             // Keep the departing rail expanded throughout its vertical step.
             expanded = layerState.channelRailPresented, detached = true)
         PlayerChrome(
-            mode = playerChromeMode(
-                controls = controlsShown,
-                // A pending or dispatched step holds the Banner up after its own timer ran out.
-                banner = !channelUnavailable && (bannerSeekPreview != null ||
-                    (layerState.core.chrome.bannerVisible && chromeLayer == PlayerForegroundLayer.NONE)),
-                stepPreview = bannerSeekPreview != null,
-            ),
+            mode = lowerChromeMode(keepControls),
             content = chromeContent(),
             timeline = PlayerChromeTimeline.Live(
                 timeshift = visibleSeekPreview?.let {
@@ -1908,12 +1936,16 @@ fun VideoPlayerScreen(
             header = { PlayerChannelBrowserHint(channelBrowser, recentChannels.isNotEmpty(), channelsTitle()) },
             preview = {
                 val previewChannel = channels.firstOrNull { it.id == selectedId }
+                val previewNext = previewChannel?.let {
+                    observation.nextEvent(it.id, kotlin.time.Instant.fromEpochSeconds(nowSec))
+                }
                 QuickZapTrayPreview(previewChannel,
                     previewChannel?.let { observation.eventAt(it.id, kotlin.time.Instant.fromEpochSeconds(nowSec)) },
-                    previewChannel?.let { observation.nextEvent(it.id, kotlin.time.Instant.fromEpochSeconds(nowSec)) },
+                    previewNext,
                     nowSec,
                     Modifier.padding(horizontal = at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin),
-                    scrolling = channelBrowser.scrolling)
+                    scrolling = channelBrowser.scrolling,
+                    nextScheduled = observation.isScheduled(previewNext))
             },
             peeks = channels.isNotEmpty(),
             visible = controlsShown && !chromePanelOpen,
@@ -1970,18 +2002,6 @@ fun VideoPlayerScreen(
             )
         }
 
-        LivePlayerDiagnostics(
-            viewModel = videoPlayerViewModel,
-            enabled = layerState.core.statsVisible,
-            visible = foregroundLayer == PlayerForegroundLayer.STATS,
-            aspectRatio = aspectRatio,
-            timeshiftState = effectiveTimeshiftState,
-            playbackRuntime = playbackRuntime,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 36.dp, end = 48.dp),
-        )
-
         PlayerPanelVisibility(
             value = layerState.core.optionsPage?.let { it to layerState.core.optionsQuickList },
             // A quick list applies its focused row when it leaves; that must not wait.
@@ -1997,7 +2017,7 @@ fun VideoPlayerScreen(
                     playbackState is AppPlaybackState.Starting ||
                         playbackState is AppPlaybackState.Recovering,
                 aspectRatio = aspectRatio,
-                statsVisible = layerState.core.statsVisible,
+                statsLevel = statsLevel,
                 onPageChange = layerState.core::showOptionsPage,
                 quickList = layerState.core.quickList.takeIf { layerState.core.optionsQuickList },
                 onQuickListClose = layerState.core::closeQuickList,
@@ -2009,7 +2029,7 @@ fun VideoPlayerScreen(
                 },
                 onQuickAudioSelection = { epoch, override -> playbackRuntime.selectQuickListAudio(epoch, override) },
                 onAspectRatioChange = targetAspect.select,
-                onStatsVisibleChange = layerState.core::updateStatsVisibility,
+                onStatsLevelChange = statsStore::setLevel,
             )
         }
 
@@ -2031,6 +2051,8 @@ fun VideoPlayerScreen(
             condition = channelCondition,
             modifier = Modifier.align(Alignment.Center),
             deviceFaultDetail = playbackState.deviceFaultDetail(),
+            statsFailure = (playbackState as? AppPlaybackState.Failed)?.takeIf { statsLevel.enabled },
+            statsRows = { rememberLiveStatsRows(videoPlayerViewModel, statsLevel, currentChannelId) },
         )
         LivePlayerServerWait(serverWait, currentChannel, currentChannelName, rootFocus)
         LivePlayerAlertOverlay(
@@ -2039,6 +2061,7 @@ fun VideoPlayerScreen(
             onRetry = onRecoveryRetry,
             onConnectionSettings = serverWait::openConnectionSettings,
             onClose = playerClose::close,
+            statsFailure = (playbackState as? AppPlaybackState.Failed)?.takeIf { statsLevel.enabled },
         )
     } }
     }

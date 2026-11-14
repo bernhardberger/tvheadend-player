@@ -386,6 +386,7 @@
     <string name="details_recording_progress_spoken">%1$s من %2$s، %3$s</string>
     <string name="details_tomorrow">غدًا %1$s</string>
     <string name="context_record">تسجيل</string>
+    <string name="details_record_choice">تسجيل…</string>
     <string name="context_show_guide">عرض في دليل البرامج</string>
     <string name="context_resume">متابعة</string>
     <string name="context_start_over">المشاهدة من البداية</string>
@@ -590,13 +591,11 @@
     <string name="player_raster_spoken">عدد خطوط المسح: %1$s</string>
     <string name="player_audio_spoken">الصوت %1$s</string>
     <string name="player_ad_short">AD</string>
-    <string name="stats_on">تشغيل</string>
     <string name="stats_off">إيقاف</string>
     <string name="display_mode">وضع العرض</string>
     <string name="display_mode_auto">تلقائي (النسبة الأصلية)</string>
     <string name="display_mode_16_9">تمديد إلى 16:9</string>
     <string name="display_mode_4_3">تمديد إلى 4:3</string>
-    <string name="stats_video_buffers">مخزن الفيديو المؤقت</string>
     <string name="stats_video_buffers_value">عُرض %1$d • أُسقط %2$d • تُخطّي %3$d</string>
     <string name="epg_title">دليل البرامج</string>
     <string name="header_button_value_description">%1$s، %2$s</string>

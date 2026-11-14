@@ -459,10 +459,21 @@ class PlayerChromeEvidenceTest {
         }.build()
         images.install(failing)
         compose.setContent { TVHeadendPlayerTheme { Column(Modifier.width(800.dp)) {
-            ProvideArtworkSession(session) { QuickZapPreview("Failed title", "Failed metadata", null, null, ChannelIcon.ImageCache(ArtworkId(1))) }
-            ProvideArtworkSession(session) { QuickZapPreview("Absent title", "Absent metadata", null, null, null) }
+            ProvideArtworkSession(session) { QuickZapPreview("Failed title", "Failed metadata", null, "21:00 Failed next",
+                ChannelIcon.ImageCache(ArtworkId(1)), nextScheduled = true) }
+            ProvideArtworkSession(session) { QuickZapPreview("Absent title", "Absent metadata", null, "21:00 Absent next", null) }
         } } }
         compose.waitForIdle()
+        // A scheduled Next carries the info bar's clock, leading its line at the text's middle; another has none.
+        val marker = compose.onAllNodesWithTag("player-scheduled-marker", useUnmergedTree = true)
+            .assertCountEquals(1).onFirst().assertWidthIsEqualTo(16.dp).assertHeightIsEqualTo(16.dp)
+            .fetchSemanticsNode().boundsInRoot
+        val scheduledNext = compose.onNodeWithText("Next • 21:00 Failed next", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertTrue("$marker leads $scheduledNext", marker.right <= scheduledNext.left)
+        assertEquals(scheduledNext.center.y, marker.center.y, 1f)
+        compose.onNode(hasText("Next • 21:00 Failed next", substring = true) and hasContentDescription(
+            ApplicationProvider.getApplicationContext<Application>().getString(at.bernhardberger.tvhplayer.R.string.player_scheduled), substring = true))
+            .assertExists()
         val failed = compose.onNodeWithText("Failed title", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val absent = compose.onNodeWithText("Absent title", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val metadata = compose.onNodeWithText("Failed metadata", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot

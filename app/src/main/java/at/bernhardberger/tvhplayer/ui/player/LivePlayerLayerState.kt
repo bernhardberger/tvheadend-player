@@ -248,7 +248,6 @@ internal class LivePlayerLayerState(
         terminalErrorVisible = terminalErrorVisible,
         seekPreviewPhase = seekPreviewPhase,
         controlsVisible = core.chrome.controlsVisible,
-        statsEnabled = core.statsVisible,
         scheduleVisible = scheduleOpen,
     )
 

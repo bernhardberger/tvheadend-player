@@ -26,7 +26,7 @@ import at.bernhardberger.tvhplayer.core.playerParentConsumesRecoveryKey
 import kotlinx.coroutines.CoroutineScope
 
 /**
- * The layers both players share: the options menu and its quick lists, Info, the stats,
+ * The layers both players share: the options menu and its quick lists, Info,
  * the chrome they cover, the opening key's cycle and the control focus returns to.
  *
  * A screen with layers of its own (the live player's channel drawer and schedule) reports
@@ -54,9 +54,6 @@ internal class PlayerLayerState(
     val quickList = PlaybackQuickListSignals()
 
     var infoOpen by mutableStateOf(false)
-        private set
-
-    var statsVisible by mutableStateOf(false)
         private set
 
     var revealingKeyCode by mutableStateOf<Int?>(null)
@@ -173,10 +170,6 @@ internal class PlayerLayerState(
     fun closeOptions() {
         optionsPage = null
         optionsQuickList = false
-    }
-
-    fun updateStatsVisibility(visible: Boolean) {
-        statsVisible = visible
     }
 
     /** Every key down while a quick list is open restarts its auto-close. */
@@ -298,7 +291,6 @@ internal class PlayerLayerState(
             }
             PlayerBackAction.HIDE_BANNER -> chrome.hideBanner()
             PlayerBackAction.HIDE_CONTROLS -> chrome.hideControls()
-            PlayerBackAction.HIDE_STATS -> statsVisible = false
             else -> return false
         }
         return true

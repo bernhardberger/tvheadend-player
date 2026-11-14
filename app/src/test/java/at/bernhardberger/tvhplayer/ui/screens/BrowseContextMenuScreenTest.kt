@@ -299,8 +299,10 @@ class BrowseContextMenuScreenTest {
             first.assertIsFocused()
             // The details actions are horizontal; the context menu uses Down.
             if (details) {
+                // From the start follows Continue watching; live comes last among the play actions.
                 first.performKeyInput { pressKey(Key.DirectionRight) }
-                compose.onNodeWithTag("details-watch_live").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
+                compose.onNodeWithTag("details-start_over").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
+                compose.onNodeWithTag("details-watch_live").assertIsFocused().performKeyInput { pressKey(Key.DirectionLeft) }
                 compose.onNodeWithTag("details-start_over").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
             } else {
                 first.performKeyInput { pressKey(Key.DirectionDown); pressKey(Key.DirectionDown) }
@@ -701,11 +703,16 @@ class BrowseContextMenuScreenTest {
         compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
         compose.onNodeWithTag("browse-context-action-details").requestFocus()
         compose.pressKey(Key.DirectionCenter)
-        compose.onNodeWithTag("details-keep_until").requestFocus()
+        // Keep until is behind More; its dialog returns to More.
+        compose.onNodeWithTag("details-more").requestFocus()
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("browse-context-action-keep_until").requestFocus()
         compose.pressKey(Key.DirectionCenter)
         compose.onNodeWithTag("recording-keep-until").assertExists()
         compose.runOnIdle { back.onBackPressed() }
-        compose.onNodeWithTag("details-keep_until").assertIsFocused()
+        compose.onNodeWithTag("details-more").assertIsFocused()
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("browse-context-action-keep_until").requestFocus()
         compose.pressKey(Key.DirectionCenter)
         session.dvrRepository.scriptUpdateEntry(DvrMutationResult.Confirmed(Unit))
         compose.onNodeWithTag("keep-until-option-one_week").requestFocus()
@@ -744,7 +751,9 @@ class BrowseContextMenuScreenTest {
         compose.runOnIdle { back.onBackPressed() }
         compose.onNodeWithTag("browse-context-action-details").requestFocus()
         compose.pressKey(Key.DirectionCenter)
-        compose.onNodeWithTag("details-keep_until").requestFocus()
+        compose.onNodeWithTag("details-more").requestFocus()
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("browse-context-action-keep_until").requestFocus()
         capture("keep-until-details-action-en-font1.0")
     }
 
@@ -1214,9 +1223,10 @@ class BrowseContextMenuScreenTest {
         compose.onNodeWithTag("details-card-3").performKeyInput { pressKey(Key.DirectionCenter) }
         compose.runOnIdle { back.onBackPressed() }
         compose.onNodeWithTag("details-card-3").assertIsFocused().performKeyInput { pressKey(Key.DirectionUp) }
-        compose.onNodeWithTag("details-record").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("details-record-choice").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("record-choice-record").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("centred-dialog-card").assertDoesNotExist()
-        compose.onNodeWithTag("details-record").assertIsFocused()
+        compose.onNodeWithTag("details-record-choice").assertIsFocused()
     }
 
     @Test fun recordingMenuDetailsBackNeverReopensMenuEveryFrame() {
@@ -1322,7 +1332,7 @@ class BrowseContextMenuScreenTest {
         compose.onRoot().performKeyPress(activation(android.view.KeyEvent.ACTION_UP))
         assertEquals(0, plays)
         compose.onNodeWithTag("details-watch").performKeyInput { pressKey(Key.DirectionRight) }
-        compose.onNodeWithTag("details-record").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.onNodeWithTag("details-record-choice").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
         compose.onNodeWithTag("details-card-3").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("details-watch").assertIsFocused()
         // The stacked airing's own row lists the other airings, never itself.
@@ -1333,7 +1343,7 @@ class BrowseContextMenuScreenTest {
         compose.onNodeWithTag("details-card-3").assertIsFocused().assertIsDisplayed()
         compose.onNodeWithTag("details-card-1").assertDoesNotExist()
         hardwareBack()
-        compose.onNodeWithTag("details-record").assertIsFocused()
+        compose.onNodeWithTag("details-record-choice").assertIsFocused()
         hardwareBack()
         compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
         row.assertIsFocused()

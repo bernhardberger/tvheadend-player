@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui
 
+import at.bernhardberger.tvhplayer.di.PlayerStatsLevel
+
 import at.bernhardberger.tvhplayer.testutil.pressKey
 import at.bernhardberger.tvhplayer.testutil.settleFrames
 import android.app.Application
@@ -263,8 +265,8 @@ class TvFocusArrivalLookTest {
         host {
             drawnView = LocalView.current
             PlaybackOptionsSheetContent(page(), audio, subtitles, tracksResolving = false, AspectRatioMode.FIT,
-                statsVisible = false, onPageChange = {}, onAudioTrackSelected = {}, onSubtitleTrackSelected = {},
-                onAspectRatioChange = {}, onStatsVisibleChange = {})
+                statsLevel = PlayerStatsLevel.OFF, onPageChange = {}, onAudioTrackSelected = {}, onSubtitleTrackSelected = {},
+                onAspectRatioChange = {}, onStatsLevelChange = {})
         }
     }
 

@@ -744,6 +744,7 @@ class PlayerEntryOverlayTest {
             NoticeContext(profiles.configurationGeneration.value, session.observation.value.currentSession?.generationIdentity)
         }
         val dependencies = module {
+            includes(at.bernhardberger.tvhplayer.testutil.playerStatsTestModule())
             single<TvheadendSession> { session }
             single { runtime }
             single { profiles }

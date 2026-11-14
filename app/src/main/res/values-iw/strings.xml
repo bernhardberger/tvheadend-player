@@ -329,6 +329,7 @@
     <string name="details_recording_progress_spoken">%1$s מתוך %2$s, %3$s</string>
     <string name="details_tomorrow">מחר %1$s</string>
     <string name="context_record">הקלטה</string>
+    <string name="details_record_choice">הקלטה…</string>
     <string name="context_show_guide">הצגה במדריך</string>
     <string name="context_resume">המשך צפייה</string>
     <string name="context_start_over">צפייה מההתחלה</string>
@@ -533,13 +534,11 @@
     <string name="player_raster_spoken">%1$s שורות</string>
     <string name="player_audio_spoken">שמע %1$s</string>
     <string name="player_ad_short">AD</string>
-    <string name="stats_on">פעיל</string>
     <string name="stats_off">כבוי</string>
     <string name="display_mode">מצב תצוגה</string>
     <string name="display_mode_auto">אוטומטי (יחס מקורי)</string>
     <string name="display_mode_16_9">מתיחה ל-16:9</string>
     <string name="display_mode_4_3">מתיחה ל-4:3</string>
-    <string name="stats_video_buffers">מאגר הווידאו</string>
     <string name="stats_video_buffers_value">הוצגו %1$d • הושמטו %2$d • דולגו %3$d</string>
     <string name="epg_title">מדריך תוכניות</string>
     <string name="header_button_value_description">%1$s, %2$s</string>

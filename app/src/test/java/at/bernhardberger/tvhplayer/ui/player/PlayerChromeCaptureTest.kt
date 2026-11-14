@@ -326,6 +326,8 @@ class PlayerChromeCaptureTest {
         INFO_FOCUSED, RECORDING_INFO_FOCUSED, RECENT_OPEN, BROWSER_NOW, BROWSER_EMPTY,
         // The audio button beside Info, focused.
         AUDIO_FOCUSED, RECORDING_STARTING, RECORDING_STARTING_CONTROLS, BANNER_LONG_EYEBROW,
+        // The tray preview's Next line with a recording scheduled for it.
+        TRAY_NEXT_SCHEDULED,
     }
 
     /** [Scene.CONTROLS_REVEAL_MID] composes the Banner, then the controls take it over. */
@@ -657,10 +659,11 @@ class PlayerChromeCaptureTest {
             // A quick step on the hidden player: its preview inside the Banner, the programme still shown.
             Scene.BANNER_STEP -> Banner(PlayerChromeMode.BANNER_STEP, content, stepTimeline(timeshift,
                 at.bernhardberger.tvhplayer.playback.TimeshiftSeekDecision(-30_000, -30_000, false)))
-            Scene.TRAY_ART, Scene.TRAY_TEXT -> Controls(timeshift, false, false, content, tray = {
+            Scene.TRAY_ART, Scene.TRAY_TEXT, Scene.TRAY_NEXT_SCHEDULED -> Controls(timeshift, false, false, content, tray = {
                 // The preview follows the focused card; the drawer lands on the playing channel.
-                ProvideArtworkSession(session) { QuickZapTrayPreview(channels[0], if (scene == Scene.TRAY_ART) programme else programme.copyWithoutImage(),
-                    next, NOW, Modifier.padding(horizontal = androidx.compose.ui.unit.Dp(64f))) }
+                ProvideArtworkSession(session) { QuickZapTrayPreview(channels[0], if (scene != Scene.TRAY_TEXT) programme else programme.copyWithoutImage(),
+                    next, NOW, Modifier.padding(horizontal = androidx.compose.ui.unit.Dp(64f)),
+                    nextScheduled = scene == Scene.TRAY_NEXT_SCHEDULED) }
             })
             Scene.PROGRAMME_INFO_NO_EPG, Scene.PROGRAMME_INFO_NO_ART_RECORDING, Scene.PROGRAMME_AIRINGS,
             Scene.PROGRAMME_OPENED, Scene.PROGRAMME_MORE_INFO, Scene.RAIL_PROGRAMME_OPENED, Scene.PROGRAMME_CONFIRM_STOP -> {

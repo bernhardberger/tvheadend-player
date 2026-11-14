@@ -329,6 +329,7 @@
     <string name="details_recording_progress_spoken">%1$s sur %2$s, %3$s</string>
     <string name="details_tomorrow">Demain %1$s</string>
     <string name="context_record">Enregistrer</string>
+    <string name="details_record_choice">Enregistrer…</string>
     <string name="context_show_guide">Voir dans le guide</string>
     <string name="context_resume">Reprendre</string>
     <string name="context_start_over">Regarder depuis le début</string>
@@ -533,13 +534,11 @@
     <string name="player_raster_spoken">%1$s lignes</string>
     <string name="player_audio_spoken">Audio %1$s</string>
     <string name="player_ad_short">AD</string>
-    <string name="stats_on">Activé</string>
     <string name="stats_off">Désactivé</string>
     <string name="display_mode">Mode d’affichage</string>
     <string name="display_mode_auto">Auto (format d’origine)</string>
     <string name="display_mode_16_9">Remplir en 16:9</string>
     <string name="display_mode_4_3">Remplir en 4:3</string>
-    <string name="stats_video_buffers">Tampons vidéo</string>
     <string name="stats_video_buffers_value">Affichés %1$d • Perdus %2$d • Ignorés %3$d</string>
     <string name="epg_title">Guide</string>
     <string name="header_button_value_description">%1$s, %2$s</string>

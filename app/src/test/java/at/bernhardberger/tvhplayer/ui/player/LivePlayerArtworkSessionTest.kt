@@ -155,13 +155,15 @@ class LivePlayerArtworkSessionTest {
         val notices = NoticeCenter(android.os.SystemClock::elapsedRealtime) {
             NoticeContext(profiles.configurationGeneration.value, playerSession.observation.value.currentSession?.generationIdentity)
         }
+        val statsStore = at.bernhardberger.tvhplayer.di.PlayerStatsStore()
         compose.setContent {
             CompositionLocalProvider(LocalLifecycleOwner provides owner) {
                 TVHeadendPlayerTheme {
                     ProvideAppArtwork(rootSession) {
                         VideoPlayerScreen(video, ChannelSelectionStore(), LastPlayedChannelStore(context), TargetAspect(AspectRatioMode.FIT) {},
                             channels, playerSession, ChannelId(1), "Name 1", {}, {}, runtime,
-                            notices = notices, uiSettingsStore = at.bernhardberger.tvhplayer.settings.UiSettingsStore(settingsData))
+                            notices = notices, uiSettingsStore = at.bernhardberger.tvhplayer.settings.UiSettingsStore(settingsData),
+                            statsStore = statsStore)
                     }
                 }
             }

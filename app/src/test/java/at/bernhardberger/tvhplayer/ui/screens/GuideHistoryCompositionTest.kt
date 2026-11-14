@@ -94,6 +94,7 @@ class GuideHistoryCompositionTest {
         capture("$locale-font$scale-past-guide", "Programme 1")
         compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("programme-details-page").assertIsFocused()
+        compose.onNodeWithTag("details-record-choice").assertDoesNotExist()
         compose.onNodeWithText(label(R.string.record)).assertDoesNotExist()
         compose.onNodeWithText(label(R.string.watch_from_start)).assertDoesNotExist()
         capture("$locale-font$scale-historical-details", "Details panel")
@@ -108,9 +109,9 @@ class GuideHistoryCompositionTest {
                 programmeDetailsActions(selected, 4000, recording, admitted(recording), true, false, liveProgramme = live),
                 {}, {})
         } }
-        compose.onNodeWithText(label(R.string.record)).assertDoesNotExist()
+        compose.onNodeWithTag("details-record-choice").assertDoesNotExist()
         compose.runOnIdle { live = true }
-        compose.onNodeWithText(label(R.string.record)).assertExists()
+        compose.onNodeWithTag("details-record-choice").assertExists()
         compose.runOnIdle { selected = event(2, 1, 0, 3600); live = false }
         compose.onNodeWithTag("details-play").assertDoesNotExist()
         compose.runOnIdle { recording = DvrEntry.create(id = DvrEntryId(7), eventId = selected.id, state = DvrEntryState.COMPLETED) }

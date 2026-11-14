@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui
 
+import at.bernhardberger.tvhplayer.di.PlayerStatsLevel
+
 import at.bernhardberger.tvhplayer.testutil.pressKey
 import android.app.Application
 import androidx.compose.foundation.layout.Box
@@ -64,7 +66,7 @@ class AudioPreferenceUiTest {
         var choices = 0
         compose.setContent {
             if (mounted) TVHeadendPlayerTheme {
-                PlaybackOptionsSheet(PlaybackOptionsPage.AUDIO, player, false, AspectRatioMode.FIT, false,
+                PlaybackOptionsSheet(PlaybackOptionsPage.AUDIO, player, false, AspectRatioMode.FIT, PlayerStatsLevel.OFF,
                     {}, {}, {}, audioAutomatic = automatic, onAutomaticAudio = { choices++; automatic = true })
             }
         }
@@ -160,7 +162,7 @@ class AudioPreferenceUiTest {
         compose.setContent {
             CompositionLocalProvider(LocalDensity provides Density(2f, 1f)) {
                 TVHeadendPlayerTheme {
-                    PlaybackOptionsSheetContent(page, tracks, emptyList(), false, AspectRatioMode.FIT, false,
+                    PlaybackOptionsSheetContent(page, tracks, emptyList(), false, AspectRatioMode.FIT, PlayerStatsLevel.OFF,
                         { page = it }, { explicitCalls++; automatic = false }, {}, {}, {},
                         audioAutomatic = automatic, onAutomaticAudio = { automaticCalls++; automatic = true })
                 }

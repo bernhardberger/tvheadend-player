@@ -121,3 +121,81 @@ fun recordingDetailsFacts(recording: DvrEntry, admission: RecordingPlaybackAdmis
         add(DetailsFact(DetailsFactKind.LEFT, length - it))
     }
 }
+
+/** One button of the details page's action row: an action of its own, or several behind one button. */
+sealed interface DetailsRowButton {
+    val actions: List<BrowseContextAction>
+
+    data class Direct(val action: BrowseContextAction) : DetailsRowButton {
+        override val actions get() = listOf(action)
+    }
+
+    /** "Record…": the ways to record this programme, in a choice of their own. */
+    data class RecordChoice(override val actions: List<BrowseContextAction>) : DetailsRowButton
+
+    /** "More": the remaining actions, in the context menu. */
+    data class More(override val actions: List<BrowseContextAction>) : DetailsRowButton
+}
+
+private val continueActions = setOf(BrowseContextAction.WATCH, BrowseContextAction.CONTINUE_WATCHING,
+    BrowseContextAction.RESUME)
+private val fromStartActions = setOf(BrowseContextAction.START_OVER, BrowseContextAction.PLAY)
+private val recordChoiceActions = listOf(BrowseContextAction.RECORD, BrowseContextAction.RECORD_SERIES,
+    BrowseContextAction.RECORD_TITLE)
+private val recordingStateActions = setOf(BrowseContextAction.STOP, BrowseContextAction.CANCEL,
+    BrowseContextAction.SKIP, BrowseContextAction.UNSKIP, BrowseContextAction.DELETE, BrowseContextAction.REMOVE_ENTRY)
+
+private class DetailsRowParts(val play: List<BrowseContextAction>, val recording: List<BrowseContextAction>,
+    val rest: List<BrowseContextAction>)
+
+private fun detailsRowParts(actions: List<BrowseContextAction>): DetailsRowParts {
+    val play = actions.filter { it in continueActions } + actions.filter { it in fromStartActions } +
+        actions.filter { it == BrowseContextAction.WATCH_LIVE }
+    // One recording button: the recording's own action, else the ways to record it.
+    val recording = actions.filter { it in recordingStateActions }
+        .ifEmpty { recordChoiceActions.filter { it in actions } }
+    return DetailsRowParts(play, recording, actions.filter { it !in play && it !in recording })
+}
+
+/**
+ * The details row for a page offering [actions]: play first (continue here, from the start, live),
+ * then the recording button, then the rest as one button, or behind More when there are several.
+ */
+fun detailsActionRow(actions: List<BrowseContextAction>): List<DetailsRowButton> {
+    val parts = detailsRowParts(actions)
+    return parts.play.map(DetailsRowButton::Direct) +
+        (if (parts.recording.size > 1 && parts.recording.all { it in recordChoiceActions })
+            listOf(DetailsRowButton.RecordChoice(parts.recording)) else parts.recording.map(DetailsRowButton::Direct)) +
+        (if (parts.rest.size > 1) listOf(DetailsRowButton.More(parts.rest))
+        else parts.rest.map(DetailsRowButton::Direct))
+}
+
+private val pairedActions = listOf(
+    setOf(BrowseContextAction.SKIP, BrowseContextAction.UNSKIP),
+    setOf(BrowseContextAction.MARK_WATCHED, BrowseContextAction.MARK_UNWATCHED),
+    setOf(BrowseContextAction.RECORD, BrowseContextAction.CANCEL, BrowseContextAction.STOP),
+)
+
+/**
+ * The button that takes focus in [row] after [last] was focused or chosen: the button holding it,
+ * else the one holding what replaced it, else the button in its place (the recording button, or
+ * More or the single last one for the rest), else [initial]'s button, else the first.
+ */
+fun detailsRowFocus(row: List<DetailsRowButton>, last: BrowseContextAction?,
+    initial: BrowseContextAction?): DetailsRowButton? {
+    fun holding(action: BrowseContextAction?) = action?.let { row.firstOrNull { button -> it in button.actions } }
+    val successor = when (last) {
+        BrowseContextAction.RECORD_SERIES, BrowseContextAction.RECORD_TITLE -> BrowseContextAction.EDIT_RULE
+        else -> null
+    }
+    val pair = pairedActions.firstOrNull { last in it }
+    val parts = detailsRowParts(row.flatMap { it.actions })
+    val place = when (last) {
+        null -> null
+        in recordChoiceActions, in recordingStateActions -> parts.recording
+        in continueActions, in fromStartActions, BrowseContextAction.WATCH_LIVE -> null
+        else -> parts.rest
+    }?.firstOrNull()
+    return holding(last) ?: holding(successor) ?: pair?.firstNotNullOfOrNull { holding(it) }
+        ?: holding(place) ?: holding(initial) ?: row.firstOrNull()
+}

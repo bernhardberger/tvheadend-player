@@ -74,5 +74,4 @@ class VideoPlayerViewModel(
 
     suspend fun sampleTimeshiftPresentation() = playbackRuntime.sampleTimeshiftPresentation()
 
-    fun setDiagnosticsEnabled(enabled: Boolean) = playbackRuntime.setDiagnosticsEnabled(enabled)
 }

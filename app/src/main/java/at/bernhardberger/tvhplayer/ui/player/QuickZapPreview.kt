@@ -12,7 +12,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import at.bernhardberger.tvhplayer.ui.components.ScheduledIndicator
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
@@ -39,6 +41,8 @@ fun QuickZapPreview(
     image: ChannelIcon?,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
+    /** A recording is scheduled for Next; its line leads with the info bar's clock. */
+    nextScheduled: Boolean = false,
 ) {
     val artwork = image
     val currentSession = LocalArtworkContext.current.currentSession
@@ -70,8 +74,14 @@ fun QuickZapPreview(
             }
             next?.let {
                 Spacer(Modifier.height(PreviewNextGap))
-                Text(stringResource(R.string.player_next, it), style = MaterialTheme.typography.labelLarge,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis, color = tertiary)
+                Row(verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    // As the info bar's Next line: centred on the text without adding to its height.
+                    if (nextScheduled) ScheduledIndicator(Modifier.noHeight().testTag("player-scheduled-marker"),
+                        tint = tertiary, contentDescription = stringResource(R.string.player_scheduled))
+                    Text(stringResource(R.string.player_next, it), style = MaterialTheme.typography.labelLarge,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis, color = tertiary)
+                }
             }
         }
         if (artwork != null && currentSession != null && !artworkFailed) AsyncImage(

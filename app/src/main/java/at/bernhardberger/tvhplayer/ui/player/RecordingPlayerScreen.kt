@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.ui.player
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.key
 
+import at.bernhardberger.tvhplayer.core.GlanceBadgeKind
 import at.bernhardberger.tvhplayer.ui.components.PlaybackOptionsOverlayFrame
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 
@@ -111,6 +112,7 @@ fun RecordingPlayerScreen(
     onClose: () -> Unit,
     onOpenConnectionSettings: () -> Unit = {},
     onShowGuide: (at.bernhardberger.tvheadend.sdk.core.ChannelId, at.bernhardberger.tvheadend.sdk.core.EpgEvent?) -> Unit = { _, _ -> },
+    statsStore: at.bernhardberger.tvhplayer.di.PlayerStatsStore = koinInject(),
 ) {
     val playerClose = rememberPlayerClose(onClose)
     // First, before the route restore: a user stop since the last intent closes the screen.
@@ -259,13 +261,8 @@ fun RecordingPlayerScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val statsVisible = layers.statsVisible
-    DisposableEffect(statsVisible) {
-        session.setDiagnosticsEnabled(statsVisible)
-        onDispose {
-            if (statsVisible) session.setDiagnosticsEnabled(false)
-        }
-    }
+    val statsLevel by statsStore.level.collectAsStateWithLifecycle()
+    PlayerDiagnosticsEffect(session, statsLevel.enabled)
 
     fun stopAndClose() {
         scope.launch {
@@ -444,7 +441,6 @@ fun RecordingPlayerScreen(
                         playbackState is AppPlaybackState.Failed)),
             seekPreviewPhase = timelineState.seekPreviewPhase(chrome.controlsVisible),
             controlsVisible = chrome.controlsVisible && playbackAvailable,
-            statsEnabled = layers.statsVisible,
             skipPromptOffered = recordingSkipPromptShown(
                 offered = skipPrompt != null && playbackAvailable,
                 playing = isPlaying,
@@ -697,6 +693,27 @@ fun RecordingPlayerScreen(
             .playerRootSemantics(stringResource(R.string.player_recording_surface))
             .focusable(),
     ) {
+        val chromePanelOpen = layers.optionsPage != null || layers.infoOpen
+        // Passive diagnostics remain below every foreground layer, including recovery.
+        PlaybackStatsVisibility(
+            visible = statsLevel.enabled && foregroundLayer != PlayerForegroundLayer.RECOVERY &&
+                foregroundLayer != PlayerForegroundLayer.TERMINAL_ERROR,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(start = at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin, top = 100.dp),
+        ) {
+            PlaybackStatsOverlay(
+                diagnostics = diagnostics,
+                aspectRatio = aspectRatio,
+                frameRate = session.frameRate,
+                // While the lower chrome is drawn the debug level draws the stream path card only.
+                level = presentedStatsLevel(statsLevel,
+                    playbackAvailable && chromeMode(foregroundLayer) != PlayerChromeMode.HIDDEN && !chromePanelOpen),
+                accessible = foregroundLayer == PlayerForegroundLayer.NONE,
+                targetKey = activeTarget,
+                raster = trackGlance.badges.firstOrNull { it.kind == GlanceBadgeKind.RASTER }?.value,
+            )
+        }
         if (playbackAvailable) {
             val entry = requireNotNull(entry)
             val channel = entry.channelId?.let { targetObservation?.channel(it) }
@@ -746,7 +763,7 @@ fun RecordingPlayerScreen(
                     tracks = trackButtons,
                 ),
                 entry = chrome.controlsEntry,
-                panelOpen = layers.optionsPage != null || layers.infoOpen,
+                panelOpen = chromePanelOpen,
                 modifier = Modifier.align(Alignment.BottomCenter),
                 onTogglePause = ::togglePlayPause,
                 onSeek = ::seekBy,
@@ -787,21 +804,6 @@ fun RecordingPlayerScreen(
                     .padding(end = TvGridHorizontalMargin, bottom = TvGridVerticalMargin),
             )
 
-            PlaybackStatsVisibility(
-                // Stats stay up under the Skip prompt, which Back dismisses first.
-                visible = foregroundLayer == PlayerForegroundLayer.STATS ||
-                    foregroundLayer == PlayerForegroundLayer.SKIP_PROMPT && layers.statsVisible,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 36.dp, end = 48.dp),
-            ) {
-                PlaybackStatsOverlay(
-                    diagnostics = diagnostics,
-                    aspectRatio = aspectRatio,
-                    frameRate = session.frameRate,
-                )
-            }
-
         }
         if (!busyBlocked) {
             PlayerBusyIndicator(busyStatus, Modifier.align(Alignment.Center))
@@ -835,6 +837,7 @@ fun RecordingPlayerScreen(
             },
             onClose = playerClose::close,
             deviceFaultDetail = playbackState.recordingFailureDetail(recordingFailure),
+            statsFailure = (playbackState as? AppPlaybackState.Failed).takeIf { statsLevel.enabled },
         )
         PlayerPanelVisibility(
             value = layers.optionsPage?.let { it to layers.optionsQuickList },
@@ -850,7 +853,7 @@ fun RecordingPlayerScreen(
                     playbackState is AppPlaybackState.Starting ||
                         playbackState is AppPlaybackState.Recovering,
                 aspectRatio = aspectRatio,
-                statsVisible = statsVisible,
+                statsLevel = statsLevel,
                 onPageChange = layers::showOptionsPage,
                 quickList = layers.quickList.takeIf { layers.optionsQuickList },
                 onQuickListClose = layers::closeQuickList,
@@ -860,7 +863,7 @@ fun RecordingPlayerScreen(
                 onQuickAudioSelection = { epoch, override -> session.selectQuickListAudio(epoch, override) },
                 recording = true,
                 onAspectRatioChange = targetAspect.select,
-                onStatsVisibleChange = layers::updateStatsVisibility,
+                onStatsLevelChange = statsStore::setLevel,
             )
         }
     }

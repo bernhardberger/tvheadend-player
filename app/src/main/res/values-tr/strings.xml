@@ -310,6 +310,7 @@
     <string name="details_recording_progress_spoken">Toplam %2$s, kaydedilen %1$s, %3$s</string>
     <string name="details_tomorrow">Yarın %1$s</string>
     <string name="context_record">Kaydet</string>
+    <string name="details_record_choice">Kaydet…</string>
     <string name="context_show_guide">Rehberde göster</string>
     <string name="context_resume">Devam et</string>
     <string name="context_start_over">Baştan izle</string>
@@ -514,13 +515,11 @@
     <string name="player_raster_spoken">%1$s satır</string>
     <string name="player_audio_spoken">Ses %1$s</string>
     <string name="player_ad_short">AD</string>
-    <string name="stats_on">Açık</string>
     <string name="stats_off">Kapalı</string>
     <string name="display_mode">Görüntü modu</string>
     <string name="display_mode_auto">Otomatik (özgün en boy oranı)</string>
     <string name="display_mode_16_9">16:9 doldur</string>
     <string name="display_mode_4_3">4:3 doldur</string>
-    <string name="stats_video_buffers">Video arabellekleri</string>
     <string name="stats_video_buffers_value">İşlenen %1$d • Düşen %2$d • Atlanan %3$d</string>
     <string name="epg_title">Program rehberi</string>
     <string name="header_button_value_description">%1$s, %2$s</string>

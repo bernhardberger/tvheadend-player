@@ -310,6 +310,7 @@
     <string name="details_recording_progress_spoken">%1$s από %2$s, %3$s</string>
     <string name="details_tomorrow">Αύριο %1$s</string>
     <string name="context_record">Εγγραφή</string>
+    <string name="details_record_choice">Εγγραφή…</string>
     <string name="context_show_guide">Εμφάνιση στον οδηγό</string>
     <string name="context_resume">Συνέχεια</string>
     <string name="context_start_over">Προβολή από την αρχή</string>
@@ -514,13 +515,11 @@
     <string name="player_raster_spoken">%1$s γραμμές</string>
     <string name="player_audio_spoken">Ήχος %1$s</string>
     <string name="player_ad_short">AD</string>
-    <string name="stats_on">Ενεργό</string>
     <string name="stats_off">Ανενεργό</string>
     <string name="display_mode">Λειτουργία προβολής</string>
     <string name="display_mode_auto">Αυτόματα (αρχική αναλογία)</string>
     <string name="display_mode_16_9">Γέμισμα 16:9</string>
     <string name="display_mode_4_3">Γέμισμα 4:3</string>
-    <string name="stats_video_buffers">Προσωρινές μνήμες βίντεο</string>
     <string name="stats_video_buffers_value">Αποδόθηκαν %1$d • Απορρίφθηκαν %2$d • Παραλείφθηκαν %3$d</string>
     <string name="epg_title">Οδηγός</string>
     <string name="header_button_value_description">%1$s, %2$s</string>

@@ -56,7 +56,6 @@ data class PlayerKeyContext(
     val timeshiftAvailable: Boolean,
     val optionsOpen: Boolean = false,
     val infoOpen: Boolean = false,
-    val statsOpen: Boolean = false,
     val drawerOpen: Boolean = false,
     /** A modal confirmation (e.g. the live recording dialog) owns the keys. */
     val confirmationOpen: Boolean = false,
@@ -245,7 +244,7 @@ fun playerKeyAction(
             // The focused bar owns its symmetric steps, including scrub takeover.
             KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> PlayerKeyAction.PASS_THROUGH
             KeyEvent.KEYCODE_BACK -> when {
-                context.infoOpen || context.optionsOpen || context.statsOpen ||
+                context.infoOpen || context.optionsOpen ||
                     context.drawerOpen -> PlayerKeyAction.DISMISS_OVERLAY_ONLY
                 context.controlsVisible -> PlayerKeyAction.HIDE_CONTROLS
                 else -> PlayerKeyAction.CLOSE_PLAYER
@@ -259,7 +258,7 @@ fun playerKeyAction(
     if (context.controlsVisible) {
         return when (keyCode) {
             KeyEvent.KEYCODE_BACK -> when {
-                context.infoOpen || context.optionsOpen || context.statsOpen ||
+                context.infoOpen || context.optionsOpen ||
                     context.drawerOpen -> PlayerKeyAction.DISMISS_OVERLAY_ONLY
                 else -> PlayerKeyAction.HIDE_CONTROLS
             }
@@ -270,7 +269,7 @@ fun playerKeyAction(
     // Controls hidden.
     return when (keyCode) {
         KeyEvent.KEYCODE_BACK -> when {
-            context.infoOpen || context.optionsOpen || context.statsOpen ||
+            context.infoOpen || context.optionsOpen ||
                 context.drawerOpen -> PlayerKeyAction.DISMISS_OVERLAY_ONLY
             else -> PlayerKeyAction.CLOSE_PLAYER
         }

@@ -291,6 +291,7 @@
     <string name="details_recording_progress_spoken">%2$s中%1$s、%3$s</string>
     <string name="details_tomorrow">明日 %1$s</string>
     <string name="context_record">録画</string>
+    <string name="details_record_choice">録画…</string>
     <string name="context_show_guide">番組表に表示</string>
     <string name="context_resume">再開</string>
     <string name="context_start_over">最初から視聴</string>
@@ -495,13 +496,11 @@
     <string name="player_raster_spoken">走査線数 %1$s</string>
     <string name="player_audio_spoken">音声 %1$s</string>
     <string name="player_ad_short">解</string>
-    <string name="stats_on">オン</string>
     <string name="stats_off">オフ</string>
     <string name="display_mode">表示モード</string>
     <string name="display_mode_auto">自動（元の縦横比）</string>
     <string name="display_mode_16_9">16:9に拡大</string>
     <string name="display_mode_4_3">4:3に拡大</string>
-    <string name="stats_video_buffers">映像バッファ</string>
     <string name="stats_video_buffers_value">描画 %1$d • ドロップ %2$d • スキップ %3$d</string>
     <string name="epg_title">番組表</string>
     <string name="header_button_value_description">%1$s、%2$s</string>

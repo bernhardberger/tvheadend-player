@@ -1123,12 +1123,36 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   the Audio/Subtitles quick list (restores the earlier selection and closes),
   options detail (returns to the options root), options root, numeric entry
   (clears it), channel drawer, recovery, terminal error, controls, pending seek
-  preview, dispatched seek preview, Stats. With no layer, Back hides the Banner
+  preview, dispatched seek preview. With no layer, Back hides the Banner
   when it is visible and otherwise closes the player to warm browse. A pending
   step cancels; a dispatched one only dismisses its feedback and claims no
   undo. Recovery and terminal-error Back close the player at once. Short Back is
   not Stop. Holding Back stops playback while watching, including the passive
-  Banner, paused label, controls, Stats, seek feedback, recovery and errors.
+  Banner, paused label, controls, seek feedback, recovery and errors. Stats is a
+  passive, non-focusable overlay below every player layer; it never changes Back
+  or remote-key handling. Its Off, Stream path and Stream path + debug details
+  levels are shared by live and recording players for the app process, off after
+  a cold start, and are not saved in settings. The compact stream path shows
+  observed problems first: a row with growth in the last minute reads only that
+  count and one related value, and the header then says "last 60 s" until the
+  minute ends, with or without a new observation. Debug details add raw source
+  and timing evidence. While the lower chrome (controls or Banner) is drawn, in
+  live and recording playback, the debug level draws only the compact stream
+  path card, because the lower chrome's programme rows reach into the debug
+  card's height; the full card returns when that chrome is gone and the level
+  stays. The options sheet and Info without the controls under them, Skip and
+  number entry over hidden controls keep the full card. While the channel
+  drawer is open the card is not drawn at any level, because the drawer's
+  browse surface and info strip take its place; it returns when the drawer
+  closes.
+  While a live channel is unavailable the card is not drawn, whatever layer is
+  open; the channel message's faint detail line carries the Stats text instead.
+  After a failed playback that is the raw failure rows, after the player's own
+  error and without repeating its error code. For any other condition it is the
+  Tuner and Tvheadend rows that still have data, without flags, and debug
+  details add the tuner and server-queue rows. The full-screen live and
+  recording recovery messages carry the raw failure rows the same way. With
+  Stats Off all three messages are unchanged.
   With Info, schedule, options, number entry, the channel drawer, recording
   markers or any dialog open, a hold acts as one short Back on release.
 - Controls auto-hide only when they are visible, playback is playing and ready,

@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.di.PlayerStatsLevel
+
 import at.bernhardberger.tvhplayer.ui.components.PanelListEdges
 
 import at.bernhardberger.tvhplayer.ui.components.PlaybackOptionsOverlayFrame
@@ -120,10 +122,10 @@ internal fun PlaybackOptionsSheet(
     player: Player,
     tracksResolving: Boolean,
     aspectRatio: AspectRatioMode,
-    statsVisible: Boolean,
+    statsLevel: PlayerStatsLevel,
     onPageChange: (PlaybackOptionsPage) -> Unit,
     onAspectRatioChange: (AspectRatioMode) -> Unit,
-    onStatsVisibleChange: (Boolean) -> Unit,
+    onStatsLevelChange: (PlayerStatsLevel) -> Unit,
     audioAutomatic: Boolean,
     onAutomaticAudio: () -> Unit,
     quickList: PlaybackQuickListSignals? = null,
@@ -162,7 +164,7 @@ internal fun PlaybackOptionsSheet(
         subtitleTracks = subtitleTracks,
         tracksResolving = tracksResolving,
         aspectRatio = aspectRatio,
-        statsVisible = statsVisible,
+        statsLevel = statsLevel,
         audioAutomatic = audioAutomatic,
         onAutomaticAudio = {
             if (canApply()) {
@@ -192,7 +194,7 @@ internal fun PlaybackOptionsSheet(
             )
         },
         onAspectRatioChange = onAspectRatioChange,
-        onStatsVisibleChange = onStatsVisibleChange,
+        onStatsLevelChange = onStatsLevelChange,
         quickList = quickList,
         onQuickListClose = onQuickListClose,
         onQuickListRestore = {
@@ -304,12 +306,12 @@ internal fun PlaybackOptionsSheetContent(
     subtitleTracks: List<PlaybackOptionTrack>,
     tracksResolving: Boolean,
     aspectRatio: AspectRatioMode,
-    statsVisible: Boolean,
+    statsLevel: PlayerStatsLevel,
     onPageChange: (PlaybackOptionsPage) -> Unit,
     onAudioTrackSelected: (String) -> Unit,
     onSubtitleTrackSelected: (String?) -> Unit,
     onAspectRatioChange: (AspectRatioMode) -> Unit,
-    onStatsVisibleChange: (Boolean) -> Unit,
+    onStatsLevelChange: (PlayerStatsLevel) -> Unit,
     audioAutomatic: Boolean = false,
     onAutomaticAudio: () -> Unit = {},
     quickList: PlaybackQuickListSignals? = null,
@@ -351,7 +353,7 @@ internal fun PlaybackOptionsSheetContent(
             AspectRatioMode.FORCE_4_3 -> R.string.display_mode_4_3
         }
     )
-    val statsValue = stringResource(if (statsVisible) R.string.stats_on else R.string.stats_off)
+    val statsValue = statsLevel.label()
     val playingAudio = audioTracks.firstOrNull(PlaybackOptionTrack::selected)?.label
     val automaticAudioSupport = if (audioAutomatic && playingAudio != null) {
         stringResource(R.string.audio_automatic_playing, playingAudio)
@@ -397,7 +399,7 @@ internal fun PlaybackOptionsSheetContent(
                     audioValue = audioValue,
                     subtitlesValue = subtitlesValue,
                     displayValue = displayValue,
-                    statsVisible = statsVisible,
+                    statsLevel = statsLevel,
                     audioAvailable = true,
                     subtitlesAvailable = subtitleTracks.isNotEmpty(),
                     initialPage = rootRestorePage,
@@ -445,10 +447,10 @@ internal fun PlaybackOptionsSheetContent(
                     onSelect = onAspectRatioChange,
                 )
                 PlaybackOptionsPage.STATS -> StatsOptionsPage(
-                    selected = statsVisible,
+                    selected = statsLevel,
                     currentValue = statsValue,
                     onBack = { onPageChange(PlaybackOptionsPage.ROOT) },
-                    onSelectedChange = onStatsVisibleChange,
+                    onSelectedChange = onStatsLevelChange,
                 )
             }
         }
@@ -516,7 +518,7 @@ private fun PlaybackOptionsRoot(
     audioValue: String,
     subtitlesValue: String,
     displayValue: String,
-    statsVisible: Boolean,
+    statsLevel: PlayerStatsLevel,
     audioAvailable: Boolean,
     subtitlesAvailable: Boolean,
     initialPage: PlaybackOptionsPage,
@@ -585,7 +587,7 @@ private fun PlaybackOptionsRoot(
             )
             PlaybackOptionRow(
                 label = stringResource(R.string.stats_for_nerds),
-                supportingLabel = stringResource(if (statsVisible) R.string.stats_on else R.string.stats_off),
+                supportingLabel = statsLevel.label(),
                 onClick = { onPageChange(PlaybackOptionsPage.STATS) },
                 showChevron = true,
                 modifier = Modifier
@@ -936,37 +938,47 @@ private fun DisplayOptionsPage(
 
 @Composable
 private fun StatsOptionsPage(
-    selected: Boolean,
+    selected: PlayerStatsLevel,
     currentValue: String,
     onBack: () -> Unit,
-    onSelectedChange: (Boolean) -> Unit,
+    onSelectedChange: (PlayerStatsLevel) -> Unit,
 ) {
     val headerBackFocus = remember { FocusRequester() }
-    val statsFocus = remember { FocusRequester() }
+    val requesters = remember { PlayerStatsLevel.entries.map { FocusRequester() } }
+    val initialFocus = requesters[selected.ordinal]
     LaunchedEffect(Unit) {
         // Wait one frame so the row is ready to draw its focused state.
         withFrameNanos { }
-        runCatching { statsFocus.requestFocus() }
+        runCatching { initialFocus.requestFocus() }
     }
     OptionsHeader(
         title = stringResource(R.string.stats_for_nerds),
         currentValue = currentValue,
         onBack = onBack,
         backFocusRequester = headerBackFocus,
-        downFocusRequester = statsFocus,
+        downFocusRequester = initialFocus,
     )
-    SettingsSwitchRow(
-        label = stringResource(R.string.stats_for_nerds),
-        checked = selected,
-        onClick = { onSelectedChange(!selected) },
-        modifier = Modifier.padding(PanelRowsPadding).containedFocus(
-            requester = statsFocus,
-            orderedFocus = listOf(statsFocus),
-            index = 0,
-            headerFocus = headerBackFocus,
-        ),
-    )
+    Column(
+        modifier = Modifier.padding(PanelRowsPadding),
+        verticalArrangement = Arrangement.spacedBy(TvSpacing8),
+    ) {
+        PlayerStatsLevel.entries.forEachIndexed { index, level ->
+            PlaybackOptionRow(
+                label = level.label(),
+                selected = selected == level,
+                onClick = { onSelectedChange(level) },
+                modifier = Modifier.containedFocus(requesters[index], requesters, index, headerBackFocus),
+            )
+        }
+    }
 }
+
+@Composable
+internal fun PlayerStatsLevel.label(): String = stringResource(when (this) {
+    PlayerStatsLevel.OFF -> R.string.stats_off
+    PlayerStatsLevel.STREAM_PATH -> R.string.stats_stream_path
+    PlayerStatsLevel.DEBUG -> R.string.stats_stream_path_debug
+})
 
 @Composable
 internal fun OptionsHeader(

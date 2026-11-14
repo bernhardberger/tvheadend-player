@@ -59,6 +59,7 @@ class AppRootBackNavigationTest {
         val requests = ApplianceLaunchRequests()
         val server = ServerSettings(host = "offline.invalid")
         val dependencies = module {
+            single { at.bernhardberger.tvhplayer.di.PlayerStatsStore() }
             single<TvheadendSession> { owner.session }
             single { owner.playbackRuntime }
             single { owner.appProfileOwner }

@@ -147,7 +147,7 @@ private fun Modifier.reserveEnd(reserve: Dp): Modifier = if (reserve <= 0.dp) th
 }
 
 /** Measures the content at its own height but takes none, centred on where it is placed. */
-private fun Modifier.noHeight(): Modifier = layout { measurable, constraints ->
+internal fun Modifier.noHeight(): Modifier = layout { measurable, constraints ->
     val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
     layout(placeable.width, 0) { placeable.placeRelative(0, -placeable.height / 2) }
 }

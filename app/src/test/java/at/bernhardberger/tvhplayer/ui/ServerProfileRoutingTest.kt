@@ -146,6 +146,7 @@ class ServerProfileRoutingTest {
             TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None, PlaybackRuntimePolicy.fromPlayerSettings(),
             noticeCenter = notices)
         val dependencies = module {
+            includes(at.bernhardberger.tvhplayer.testutil.playerStatsTestModule())
             single<CoroutineScope>(qualifier = named("application")) { scope }
             single<TvheadendSession> { session }
             single { runtime }

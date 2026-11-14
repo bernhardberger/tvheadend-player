@@ -310,6 +310,7 @@
     <string name="details_recording_progress_spoken">%1$s / %2$s, %3$s</string>
     <string name="details_tomorrow">Holnap %1$s</string>
     <string name="context_record">Felvétel</string>
+    <string name="details_record_choice">Felvétel…</string>
     <string name="context_show_guide">Megnyitás a műsorújságban</string>
     <string name="context_resume">Folytatás</string>
     <string name="context_start_over">Megnézés az elejétől</string>
@@ -514,13 +515,11 @@
     <string name="player_raster_spoken">%1$s sor</string>
     <string name="player_audio_spoken">Hang %1$s</string>
     <string name="player_ad_short">AD</string>
-    <string name="stats_on">Be</string>
     <string name="stats_off">Ki</string>
     <string name="display_mode">Megjelenítési mód</string>
     <string name="display_mode_auto">Automatikus (eredeti képarány)</string>
     <string name="display_mode_16_9">16:9 kitöltés</string>
     <string name="display_mode_4_3">4:3 kitöltés</string>
-    <string name="stats_video_buffers">Videopufferek</string>
     <string name="stats_video_buffers_value">Megjelenített %1$d • Eldobott %2$d • Kihagyott %3$d</string>
     <string name="epg_title">Műsorújság</string>
     <string name="header_button_value_description">%1$s, %2$s</string>

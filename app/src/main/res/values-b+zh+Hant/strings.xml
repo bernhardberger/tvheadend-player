@@ -291,6 +291,7 @@
     <string name="details_recording_progress_spoken">已錄製%1$s，總長%2$s，%3$s</string>
     <string name="details_tomorrow">明天%1$s</string>
     <string name="context_record">錄影</string>
+    <string name="details_record_choice">錄影…</string>
     <string name="context_show_guide">在節目表中顯示</string>
     <string name="context_resume">繼續播放</string>
     <string name="context_start_over">從頭觀看</string>
@@ -495,13 +496,11 @@
     <string name="player_raster_spoken">%1$s 線</string>
     <string name="player_audio_spoken">音訊 %1$s</string>
     <string name="player_ad_short">AD</string>
-    <string name="stats_on">開啟</string>
     <string name="stats_off">關閉</string>
     <string name="display_mode">顯示模式</string>
     <string name="display_mode_auto">自動（原始長寬比）</string>
     <string name="display_mode_16_9">填滿16:9</string>
     <string name="display_mode_4_3">填滿4:3</string>
-    <string name="stats_video_buffers">視訊緩衝區</string>
     <string name="stats_video_buffers_value">已繪製%1$d • 已丟棄%2$d • 已略過%3$d</string>
     <string name="epg_title">節目表</string>
     <string name="header_button_value_description">%1$s，%2$s</string>

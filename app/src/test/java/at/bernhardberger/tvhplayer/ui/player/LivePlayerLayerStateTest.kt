@@ -215,7 +215,7 @@ class LivePlayerLayerStateTest {
     }
 
     @Test
-    fun optionKeysReplaceInfoTheDrawerAndStatsButNotAConfirmation() = runTest {
+    fun optionKeysReplaceInfoAndTheDrawerButNotAConfirmation() = runTest {
         val state = LivePlayerLayerState(this, 5_000L)
         fun keyContext() = PlayerKeyContext(
             surface = PlayerSurface.LIVE,
@@ -223,7 +223,6 @@ class LivePlayerLayerStateTest {
             seekbarFocused = false,
             timeshiftAvailable = true,
             optionsOpen = state.core.optionsPage != null,
-            statsOpen = state.core.statsVisible,
             infoOpen = state.core.infoOpen,
             drawerOpen = state.channelDrawerOpen,
             confirmationOpen =
@@ -250,16 +249,13 @@ class LivePlayerLayerStateTest {
 
         state.core.closeQuickList()
         state.core.chrome.hideControls()
-        state.core.updateStatsVisibility(true)
-        assertEquals(PlayerForegroundLayer.STATS, playerForegroundLayer(state.foregroundContext()))
+        assertEquals(PlayerForegroundLayer.NONE, playerForegroundLayer(state.foregroundContext()))
         // No root fallback: the captions key opens the Subtitles list, and the short
         // list leaves the hidden controls hidden.
         assertTrue(state.core.openOptionsForKey(keyContext(), KeyEvent.KEYCODE_CAPTIONS))
         assertEquals(PlaybackOptionsPage.SUBTITLES, state.core.optionsPage)
         assertTrue(state.core.optionsQuickList)
         assertFalse(state.core.chrome.controlsVisible)
-        // Stats stay enabled; they return once the list closes.
-        assertTrue(state.core.statsVisible)
         state.core.endOpeningKeyCycle(KeyEvent.KEYCODE_CAPTIONS)
 
         state.core.closeQuickList()

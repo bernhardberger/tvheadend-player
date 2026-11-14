@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.di.PlayerStatsLevel
+
 import android.app.Application
 import android.view.KeyEvent
 import android.view.View
@@ -138,12 +140,12 @@ class OverlayFocusTransitionTest {
                     subtitleTracks = emptyList(),
                     tracksResolving = false,
                     aspectRatio = aspectRatio,
-                    statsVisible = false,
+                    statsLevel = PlayerStatsLevel.OFF,
                     onPageChange = {},
                     onAudioTrackSelected = {},
                     onSubtitleTrackSelected = {},
                     onAspectRatioChange = { aspectRatio = it },
-                    onStatsVisibleChange = {},
+                    onStatsLevelChange = {},
                 )
             }
         }

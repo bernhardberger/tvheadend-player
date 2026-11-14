@@ -329,6 +329,7 @@
     <string name="details_recording_progress_spoken">%1$s od %2$s, %3$s</string>
     <string name="details_tomorrow">Sutra %1$s</string>
     <string name="context_record">Snimi</string>
+    <string name="details_record_choice">Snimi…</string>
     <string name="context_show_guide">Prikaži u TV vodiču</string>
     <string name="context_resume">Nastavi</string>
     <string name="context_start_over">Gledaj od početka</string>
@@ -533,13 +534,11 @@
     <string name="player_raster_spoken">Broj redaka: %1$s</string>
     <string name="player_audio_spoken">Zvuk %1$s</string>
     <string name="player_ad_short">AD</string>
-    <string name="stats_on">Uključeno</string>
     <string name="stats_off">Isključeno</string>
     <string name="display_mode">Način prikaza</string>
     <string name="display_mode_auto">Automatski (izvorni omjer)</string>
     <string name="display_mode_16_9">Ispuni 16:9</string>
     <string name="display_mode_4_3">Ispuni 4:3</string>
-    <string name="stats_video_buffers">Međuspremnici videa</string>
     <string name="stats_video_buffers_value">Iscrtano %1$d • Odbačeno %2$d • Preskočeno %3$d</string>
     <string name="epg_title">TV vodič</string>
     <string name="header_button_value_description">%1$s, %2$s</string>
