@@ -39,7 +39,11 @@ internal fun LivePlayerDiagnostics(
 
 /** The card's live rows for the channel message, with their own 60 s history while it shows. */
 @Composable
-internal fun rememberLiveStatsRows(viewModel: VideoPlayerViewModel, level: PlayerStatsLevel, targetKey: Any?): List<String> {
+internal fun rememberLiveStatsRows(
+    viewModel: VideoPlayerViewModel,
+    level: PlayerStatsLevel,
+    targetKey: Any?,
+): List<String> {
     if (!level.enabled) return emptyList()
     val diagnostics by viewModel.diagnostics.collectAsStateWithLifecycle()
     return liveStatsRows(diagnostics, rememberStatsWindow(targetKey, diagnostics), level)

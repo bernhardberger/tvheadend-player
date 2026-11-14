@@ -13,6 +13,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertTextEquals
@@ -210,8 +211,12 @@ class LivePlayerChromeNavigationTest : LivePlayerChromeFixture() {
         key(Key.Menu)
         compose.onNodeWithTag("playback-options-stats").performSemanticsAction(SemanticsActions.RequestFocus)
         key(Key.DirectionCenter)
+        // The Stats page opens on its selected Off row; Down moves to the Stream path row, which Center applies.
         key(Key.DirectionDown)
+        val streamPath = context.getString(at.bernhardberger.tvhplayer.R.string.stats_stream_path)
+        compose.onNode(isFocused() and hasText(streamPath)).assertExists()
         key(Key.DirectionCenter)
+        assertEquals(at.bernhardberger.tvhplayer.di.PlayerStatsLevel.STREAM_PATH, statsStore.level.value)
         key(Key.Back); key(Key.Back); key(Key.Back)
         assertTrue(compose.onAllNodesWithText("Stats for nerds").fetchSemanticsNodes().isNotEmpty())
     }

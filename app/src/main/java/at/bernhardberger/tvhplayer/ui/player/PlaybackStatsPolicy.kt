@@ -29,7 +29,8 @@ internal data class StatsWindow(
     /** When the oldest counted growth leaves the 60 s span; null without growth. */
     val growthExpiresAtMillis: Long? = null,
 ) {
-    val hasGrowth: Boolean get() = uncorrected > 0 || bitErrors > 0 || serverDrops > 0 || clientDrops > 0 || decoderDrops > 0
+    val hasGrowth: Boolean
+        get() = listOf(uncorrected, bitErrors, serverDrops, clientDrops, decoderDrops).any { it > 0 }
 }
 
 internal data class StreamPath(
@@ -102,14 +103,12 @@ internal fun videoCodecFamily(codec: String?, mimeType: String?): String? {
     return family ?: codec
 }
 
-/** Measured/nominal, the nominal alone without a measurement, and one value where both read the same. */
 /**
  * The video size as its height where that is a standard raster, with the scan letter only when
  * [raster] (the chrome's declared raster badge, "1080i") is for the same height; else width×height.
  */
 internal fun videoSizeLabel(video: AppPlaybackFormatDiagnostics?, raster: String?): String? {
-    val height = video?.height ?: return video?.resolution
-    if (height !in StandardHeights) return video.resolution
+    val height = video?.height?.takeIf { it in StandardHeights } ?: return video?.resolution
     return raster?.takeIf { it.trimEnd('i', 'p') == height.toString() } ?: height.toString()
 }
 
@@ -118,6 +117,7 @@ internal val StandardHeights = setOf(480, 576, 720, 1080, 1440, 2160, 4320)
 /** Whether [frameRateText] shows the measured and the declared rate, because they read differently. */
 internal fun showsTwoRates(measured: String?, nominal: String?): Boolean = measured != null && measured != nominal
 
+/** Measured/nominal, the nominal alone without a measurement, and one value where both read the same. */
 internal fun frameRateText(measured: String?, nominal: String?): String? = when {
     showsTwoRates(measured, nominal) -> "$measured/${nominal ?: "—"} fps"
     measured == null && nominal == null -> null
@@ -150,8 +150,9 @@ internal class PlaybackStatsHistory(private val nowMillis: () -> Long) {
 
     fun update(target: Any?, diagnostics: AppPlaybackDiagnostics): StatsWindow {
         val now = nowMillis()
-        if (target != key || source != diagnostics.source || liveSource != diagnostics.live?.source ||
-            samples.lastOrNull()?.at?.let { now < it || now - it > 60_000L } == true) {
+        val sameStream = target == key && source == diagnostics.source && liveSource == diagnostics.live?.source
+        val continuous = samples.lastOrNull()?.at?.let { now >= it && now - it <= 60_000L } ?: true
+        if (!sameStream || !continuous) {
             samples.clear()
             key = target
             source = diagnostics.source
@@ -160,14 +161,19 @@ internal class PlaybackStatsHistory(private val nowMillis: () -> Long) {
         val before = samples.lastOrNull()?.diagnostics
         val currentQueue = diagnostics.live?.queue
         val previousQueue = before?.live?.queue
+        val frontend = diagnostics.live?.frontend
+        val previousFrontend = before?.live?.frontend
         val growth = StatsWindow(
-            uncorrected = growth(before?.live?.frontend?.uncorrectedBlockCount, diagnostics.live?.frontend?.uncorrectedBlockCount),
-            bitErrors = growth(before?.live?.frontend?.bitErrorRateRaw, diagnostics.live?.frontend?.bitErrorRateRaw),
+            uncorrected = growth(previousFrontend?.uncorrectedBlockCount, frontend?.uncorrectedBlockCount),
+            bitErrors = growth(previousFrontend?.bitErrorRateRaw, frontend?.bitErrorRateRaw),
             serverDrops = growth(previousQueue?.droppedIFrameCount, currentQueue?.droppedIFrameCount) +
                 growth(previousQueue?.droppedPFrameCount, currentQueue?.droppedPFrameCount) +
                 growth(previousQueue?.droppedBFrameCount, currentQueue?.droppedBFrameCount),
             clientDrops = growth(before?.live?.clientDroppedPacketCount, diagnostics.live?.clientDroppedPacketCount),
-            decoderDrops = growth(before?.videoDecoderCounters?.droppedBufferCount?.toLong(), diagnostics.videoDecoderCounters?.droppedBufferCount?.toLong()),
+            decoderDrops = growth(
+                before?.videoDecoderCounters?.droppedBufferCount?.toLong(),
+                diagnostics.videoDecoderCounters?.droppedBufferCount?.toLong(),
+            ),
         )
         samples.addLast(Sample(now, diagnostics, growth))
         val cutoff = now - 60_000L
@@ -182,8 +188,8 @@ internal class PlaybackStatsHistory(private val nowMillis: () -> Long) {
             decoderDrops = intervals.sumOf { it.growth.decoderDrops },
             bufferChangeMs = diagnostics.bufferedMs - baseline.bufferedMs,
             queueChangeUs = change(baseline.live?.queue?.mediaSpanMicroseconds, currentQueue?.mediaSpanMicroseconds),
-            signalChange = change(baseline.live?.frontend?.relativeSignalPercent, diagnostics.live?.frontend?.relativeSignalPercent),
-            snrChange = change(baseline.live?.frontend?.relativeSnrPercent, diagnostics.live?.frontend?.relativeSnrPercent),
+            signalChange = change(baseline.live?.frontend?.relativeSignalPercent, frontend?.relativeSignalPercent),
+            snrChange = change(baseline.live?.frontend?.relativeSnrPercent, frontend?.relativeSnrPercent),
             growthExpiresAtMillis = intervals.filter { it.growth.hasGrowth }.minOfOrNull { it.at + 60_000L },
         )
     }

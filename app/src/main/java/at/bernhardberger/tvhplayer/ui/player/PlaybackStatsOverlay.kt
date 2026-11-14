@@ -5,8 +5,21 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.layout.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -30,10 +43,20 @@ import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.di.PlayerStatsLevel
-import at.bernhardberger.tvhplayer.playback.*
+import at.bernhardberger.tvhplayer.playback.AppPlaybackDiagnostics
+import at.bernhardberger.tvhplayer.playback.AppPlaybackSource
+import at.bernhardberger.tvhplayer.playback.AppPlaybackState
+import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
+import at.bernhardberger.tvhplayer.playback.AppVideoDecoderCounters
+import at.bernhardberger.tvhplayer.playback.PlaybackFrameRate
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
-import at.bernhardberger.tvhplayer.ui.*
+import at.bernhardberger.tvhplayer.ui.TvGridColumnWidth
+import at.bernhardberger.tvhplayer.ui.TvGridGutter
+import at.bernhardberger.tvhplayer.ui.TvOverlayBoxAlpha
+import at.bernhardberger.tvhplayer.ui.TvSpacing16
+import at.bernhardberger.tvhplayer.ui.TvSpacing4
+import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
 import at.bernhardberger.tvhplayer.ui.common.formatHms
 import java.util.Locale
 import kotlin.time.DurationUnit
@@ -79,22 +102,29 @@ internal fun PlaybackStatsOverlay(
     val foreground = MaterialTheme.colorScheme.onSurface
     val bodySmall = MaterialTheme.typography.bodySmall
     val valueStyle = remember(bodySmall) { bodySmall.copy(fontFeatureSettings = "tnum") }
+    val columns = if (debug) 12 else 5
     Surface(
         modifier = modifier
-            .width(if (debug) TvGridColumnWidth * 12 + TvGridGutter * 11 else TvGridColumnWidth * 5 + TvGridGutter * 4)
+            .width(TvGridColumnWidth * columns + TvGridGutter * (columns - 1))
             .testTag("playback-stats-overlay")
             .then(if (accessible) Modifier.semantics(mergeDescendants = true) { heading() }
                 else Modifier.clearAndSetSemantics {}),
-        colors = SurfaceDefaults.colors(containerColor = Color.Black.copy(alpha = TvOverlayBoxAlpha), contentColor = foreground),
+        colors = SurfaceDefaults.colors(
+            containerColor = Color.Black.copy(alpha = TvOverlayBoxAlpha),
+            contentColor = foreground,
+        ),
         shape = MaterialTheme.shapes.medium,
     ) { ProvideTextStyle(valueStyle) {
         Row(Modifier.padding(TvSpacing16), horizontalArrangement = Arrangement.spacedBy(TvGridGutter)) {
-            Column(Modifier.then(if (debug) Modifier.width(324.dp) else Modifier.fillMaxWidth())) {
+            // The debug card's stream path keeps the light card's inner edge, so its flags line up.
+            Column(if (debug) Modifier.width(324.dp).padding(end = TvSpacing16) else Modifier.fillMaxWidth()) {
                 Row {
                     Text(stringResource(R.string.stats_for_nerds), Modifier.weight(1f).alignByBaseline(),
                         style = MaterialTheme.typography.labelLarge)
                     // The rows' growth facts no longer name their window; the header does, while one shows.
-                    if (path.steps.any { pathGrowth(it, window) > 0 }) StatsText("last 60 s", Modifier.alignByBaseline(), maxLines = 1)
+                    if (path.steps.any { pathGrowth(it, window) > 0 }) {
+                        StatsText("last 60 s", Modifier.alignByBaseline(), maxLines = 1)
+                    }
                 }
                 StatsText(audioSummary(diagnostics), maxLines = 1)
                 if (debug && diagnostics.source == AppPlaybackSource.LIVE_TV) {
@@ -111,16 +141,20 @@ internal fun PlaybackStatsOverlay(
                         number = index + 1, first = index == 0, last = index == path.steps.lastIndex,
                         filled = step == path.firstFlagged, flagged = step in path.flagged,
                         name = stepName(step),
-                        value = stepValue(step, diagnostics, window, output, requested,
-                            measured?.framesPerSecond?.let(::formatRefreshRate), declaredRate, timeshiftState, raster),
+                        value = stepValue(
+                            step, diagnostics, window, output, requested,
+                            measured?.framesPerSecond?.let(::formatRefreshRate), declaredRate, timeshiftState, raster,
+                        ),
                     )
                 }
             }
             if (debug) {
                 Column(Modifier.weight(1f)) {
                     Text("Debug details", style = MaterialTheme.typography.labelLarge)
-                    DebugDetails(diagnostics, aspectRatio, timeshiftState, output, declared?.let(::formatFrameDurationMillis),
-                        declaredRate, requested, measured, window)
+                    DebugDetails(
+                        diagnostics, aspectRatio, timeshiftState, output,
+                        declared?.let(::formatFrameDurationMillis), declaredRate, requested, measured, window,
+                    )
                 }
             }
         }
@@ -146,7 +180,15 @@ internal fun rememberStatsWindow(targetKey: Any?, diagnostics: AppPlaybackDiagno
 
 /** The line uses the whole row's height, with endpoints only at the first and last ring centres. */
 @Composable
-private fun StatsStep(number: Int, first: Boolean, last: Boolean, filled: Boolean, flagged: Boolean, name: String, value: String) {
+private fun StatsStep(
+    number: Int,
+    first: Boolean,
+    last: Boolean,
+    filled: Boolean,
+    flagged: Boolean,
+    name: String,
+    value: String,
+) {
     val color = MaterialTheme.colorScheme.onSurface
     Row(
         Modifier.fillMaxWidth().heightIn(min = TvGridGutter).semantics {
@@ -181,14 +223,19 @@ private fun StatsText(text: String, modifier: Modifier = Modifier, maxLines: Int
 
 private fun decimal(value: Double, digits: Int = 1): String = String.format(Locale.ROOT, "%.${digits}f", value)
 private fun count(value: Long): String = String.format(Locale.ROOT, "%,d", value)
-private fun growth(value: Long, label: String): String? = value.takeIf { it > 0 }?.let { "+${count(it)} $label / 60 s" }
+private fun growth(value: Long, label: String): String? =
+    value.takeIf { it > 0 }?.let { "+${count(it)} $label / 60 s" }
 private fun change(value: Double?, unit: String, digits: Int = 1): String? =
     displayedStatsChange(value, digits)?.let { "${if (it > 0) "+" else ""}${decimal(it, digits)} $unit / 60 s" }
 private fun join(vararg values: String?): String = values.filterNotNull().filter { it.isNotBlank() }.joinToString(" • ")
 private fun audioSummary(d: AppPlaybackDiagnostics): String = d.audio?.let { audio ->
-    join(audio.codec, audio.language, audio.channelCount?.let { "$it ch" }, audio.sampleRateHz?.let { "${count(it.toLong())} Hz" })
+    join(
+        audio.codec, audio.language, audio.channelCount?.let { "$it ch" },
+        audio.sampleRateHz?.let { "${count(it.toLong())} Hz" },
+    )
 }?.takeIf { it.isNotBlank() } ?: "Audio —"
-private fun videoSummary(d: AppPlaybackDiagnostics): String = join(d.video?.codec, d.video?.resolution).ifBlank { "Video —" }
+private fun videoSummary(d: AppPlaybackDiagnostics): String =
+    join(d.video?.codec, d.video?.resolution).ifBlank { "Video —" }
 
 /** A path row's growth fact: compact, and without its window, which the header names. */
 private fun pathGrowthFact(step: StreamPathStep, w: StatsWindow, label: String): String? =
@@ -207,24 +254,31 @@ internal fun stepValue(
         val buffer = "${decimal(d.bufferedMs / 1000.0)} s buffer"
         pathGrowthFact(step, w, "drops")?.let { join(it, buffer) } ?: join(buffer, timing(d, timeshift))
     }
-    StreamPathStep.DECODER -> {
-        val rate = frameRateText(measuredRate, declaredRate)
-        val size = videoSizeLabel(d.video, raster)
-        // A non-standard width×height or a second rate takes the codec family's room; debug keeps the codec.
-        val family = videoCodecFamily(d.video?.codec, d.video?.sampleMimeType)
-            .takeIf { (size == null || d.video?.height in StandardHeights) && !showsTwoRates(measuredRate, declaredRate) }
-        pathGrowthFact(step, w, "drops")?.let { join(it, rate ?: size) }
-            ?: join(family, size, rate).ifBlank { "Video —" }
-    }
-    // A mismatch names the output rate, then the request; the resolution then stays in debug.
-    StreamPathStep.SCREEN -> when {
-        output == null -> "Output —"
-        requested != null && requested != output.refreshRate -> "${output.refreshRate} Hz • requested $requested Hz"
-        else -> "${output.width}×${output.height} @ ${output.refreshRate} Hz"
-    }
+    StreamPathStep.DECODER -> decoderStepValue(d, w, measuredRate, declaredRate, raster)
+    StreamPathStep.SCREEN -> screenStepValue(output, requested)
 }
 
-private fun stepName(step: StreamPathStep): String = when (step) {
+private fun decoderStepValue(
+    d: AppPlaybackDiagnostics, w: StatsWindow, measuredRate: String?, declaredRate: String?, raster: String?,
+): String {
+    val rate = frameRateText(measuredRate, declaredRate)
+    val size = videoSizeLabel(d.video, raster)
+    // A non-standard width×height or a second rate takes the codec family's room; debug keeps the codec.
+    val standardSize = size == null || d.video?.height in StandardHeights
+    val family = videoCodecFamily(d.video?.codec, d.video?.sampleMimeType)
+        .takeIf { standardSize && !showsTwoRates(measuredRate, declaredRate) }
+    return pathGrowthFact(StreamPathStep.DECODER, w, "drops")?.let { join(it, rate ?: size) }
+        ?: join(family, size, rate).ifBlank { "Video —" }
+}
+
+/** A mismatch names the output rate, then the request; the resolution then stays in debug. */
+private fun screenStepValue(output: DisplayOutput?, requested: String?): String = when {
+    output == null -> "Output —"
+    requested != null && requested != output.refreshRate -> "${output.refreshRate} Hz • requested $requested Hz"
+    else -> "${output.width}×${output.height} @ ${output.refreshRate} Hz"
+}
+
+internal fun stepName(step: StreamPathStep): String = when (step) {
     StreamPathStep.TUNER -> "Tuner"
     StreamPathStep.SERVER -> "Tvheadend"
     StreamPathStep.APP -> "This app"
@@ -260,33 +314,50 @@ internal fun liveStatsRows(d: AppPlaybackDiagnostics, w: StatsWindow, level: Pla
     if (!level.enabled) return emptyList()
     val path = streamPath(d, w, outputRate = null, requestedRate = null).steps
         .filter { it == StreamPathStep.TUNER || it == StreamPathStep.SERVER }
-        .mapNotNull { step -> liveStepValue(step, d, w).takeIf { it.isNotEmpty() }?.let { "${stepName(step)}: $it" } }
+        .mapNotNull { step ->
+            liveStepValue(step, d, w).takeIf { it.isNotEmpty() }?.let { "${stepName(step)}: $it" }
+        }
     return if (level == PlayerStatsLevel.DEBUG) path + liveSignalDebugRows(d) else path
 }
 
 private fun statsLine(label: String, value: String?) = "$label: ${value ?: "—"}"
 
 /** The debug card's tuner and server-queue groups. */
-private fun liveSignalDebugRows(d: AppPlaybackDiagnostics): List<String> {
-    val f = d.live?.frontend
-    val q = d.live?.queue
-    return listOfNotNull(
-        f?.let { statsLine("Frontend", join(it.state?.let { s -> when {
+private fun liveSignalDebugRows(d: AppPlaybackDiagnostics): List<String> = frontendDebugRows(d) + queueDebugRows(d)
+
+private fun frontendDebugRows(d: AppPlaybackDiagnostics): List<String> {
+    val f = d.live?.frontend ?: return emptyList()
+    val state = f.state?.let { s ->
+        when {
             s.locked -> "Locked"
             s.partiallySynchronized -> "Synchronizing"
             s.signalDetected -> "Signal detected"
             else -> "No signal"
-        } }, it.relativeSignalPercent?.let { v -> "${decimal(v)}% signal" },
-            it.absoluteSignalDbm?.let { v -> "${decimal(v)} dBm" })) },
-        f?.let { statsLine("SNR", join(it.relativeSnrPercent?.let { v -> "${decimal(v)}%" },
-            it.absoluteSnrDecibels?.let { v -> "${decimal(v)} dB" })) },
-        f?.let { statsLine("BER / uncorrected", join(it.bitErrorRateRaw?.let(::count), it.uncorrectedBlockCount?.let(::count))) },
-        q?.let { statsLine("Queue", join("${count(it.packetCount)} packets • ${count(it.byteCount)} B",
-            it.mediaSpanMicroseconds?.let { us -> "${decimal(us / 1000.0)} ms" })) },
-        q?.let { statsLine("Server drops", "I ${count(it.droppedIFrameCount)} • P ${count(it.droppedPFrameCount)} • B ${count(it.droppedBFrameCount)}") },
-        d.live?.clientDroppedPacketCount?.let { statsLine("Client drops", "${count(it)} packets") },
+        }
+    }
+    return listOf(
+        statsLine("Frontend", join(state, f.relativeSignalPercent?.let { "${decimal(it)}% signal" },
+            f.absoluteSignalDbm?.let { "${decimal(it)} dBm" })),
+        statsLine("SNR", join(f.relativeSnrPercent?.let { "${decimal(it)}%" },
+            f.absoluteSnrDecibels?.let { "${decimal(it)} dB" })),
+        statsLine("BER / uncorrected", join(f.bitErrorRateRaw?.let(::count), f.uncorrectedBlockCount?.let(::count))),
     )
 }
+
+private fun queueDebugRows(d: AppPlaybackDiagnostics): List<String> = listOfNotNull(
+    d.live?.queue?.let { q ->
+        statsLine("Queue", join("${count(q.packetCount)} packets • ${count(q.byteCount)} B",
+            q.mediaSpanMicroseconds?.let { "${decimal(it / 1000.0)} ms" }))
+    },
+    d.live?.queue?.let { q ->
+        statsLine(
+            "Server drops",
+            "I ${count(q.droppedIFrameCount)} • P ${count(q.droppedPFrameCount)} • " +
+                "B ${count(q.droppedBFrameCount)}",
+        )
+    },
+    d.live?.clientDroppedPacketCount?.let { statsLine("Client drops", "${count(it)} packets") },
+)
 
 private fun timing(d: AppPlaybackDiagnostics, timeshift: AppTimeshiftState?): String =
     timeshift?.let {
@@ -303,42 +374,65 @@ private fun DebugDetails(
     duration: String?, declared: String?, requested: String?, measured: MeasuredFrameRate?, window: StatsWindow,
 ) {
     val bufferTemplate = stringResource(R.string.stats_video_buffers_value)
-    val rows = listOfNotNull(
-        statsLine("State", when (d.state) {
-            AppPlaybackState.Playing -> if (d.isPlaying) "Playing" else "Paused"
-            is AppPlaybackState.Recovering -> "Recovering"
-            else -> d.state.toString().substringAfterLast('.')
-        }),
-        statsLine("Timing", join(timing(d, timeshift), "${decimal(d.bufferedMs / 1000.0)} s buffer")),
-        statsLine("Video", join(videoSummary(d), d.video?.frameRate?.let { "${formatRefreshRate(it)} fps" })),
-        statsLine("Frame rate", join(duration?.let { "$it ms • $declared fps declared" },
-            measured?.framesPerSecond?.let { "${formatRefreshRate(it)} measured" },
-            measured?.sameTimePercent?.let { "$it% same-time" }).ifEmpty { null }),
-        d.videoDecoderCounters?.let { statsLine("Video buffers", formatVideoDecoderCounters(it, bufferTemplate)) },
-        statsLine("Display mode", when (aspect) {
-            AspectRatioMode.FIT -> "Auto (original aspect)"
-            AspectRatioMode.FORCE_16_9 -> "16:9"
-            AspectRatioMode.FORCE_4_3 -> "4:3"
-        }),
-        output?.let { statsLine("Output", join("${it.width}×${it.height} @ ${it.refreshRate} Hz",
-            requested?.let { rate -> "requested $rate Hz${if (duration == null) " (kept)" else ""}" })) },
-        output?.refreshRatesByResolution?.takeIf { it.isNotEmpty() }?.let { statsLine("Refresh rates", it) },
-        output?.matchFrameRate?.let { statsLine("Match frame rate", when (it) {
+    val rows = playbackDebugRows(d, timeshift, duration, declared, measured, bufferTemplate) +
+        displayDebugRows(aspect, output, requested, duration) +
+        listOfNotNull(
+            d.startupBuffer?.let {
+                statsLine("Startup buffer", "${it.millis} ms (${if (it.automatic) "automatic" else "fixed"})")
+            },
+            "Stall recoveries: ${d.stallRecoveries} • " +
+                "Fresh decoder per zap: ${if (d.freshDecoderPerZap) "On" else "Off"}",
+        ) + liveSignalDebugRows(d) + windowDebugRows(window)
+    rows.forEach { StatsText(it) }
+}
+
+private fun playbackDebugRows(
+    d: AppPlaybackDiagnostics, timeshift: AppTimeshiftState?, duration: String?, declared: String?,
+    measured: MeasuredFrameRate?, bufferTemplate: String,
+): List<String> = listOfNotNull(
+    statsLine("State", when (d.state) {
+        AppPlaybackState.Playing -> if (d.isPlaying) "Playing" else "Paused"
+        is AppPlaybackState.Recovering -> "Recovering"
+        else -> d.state.toString().substringAfterLast('.')
+    }),
+    statsLine("Timing", join(timing(d, timeshift), "${decimal(d.bufferedMs / 1000.0)} s buffer")),
+    statsLine("Video", join(videoSummary(d), d.video?.frameRate?.let { "${formatRefreshRate(it)} fps" })),
+    statsLine("Frame rate", join(duration?.let { "$it ms • $declared fps declared" },
+        measured?.framesPerSecond?.let { "${formatRefreshRate(it)} measured" },
+        measured?.sameTimePercent?.let { "$it% same-time" }).ifEmpty { null }),
+    d.videoDecoderCounters?.let { statsLine("Video buffers", formatVideoDecoderCounters(it, bufferTemplate)) },
+)
+
+private fun displayDebugRows(
+    aspect: AspectRatioMode, output: DisplayOutput?, requested: String?, duration: String?,
+): List<String> = listOfNotNull(
+    statsLine("Display mode", when (aspect) {
+        AspectRatioMode.FIT -> "Auto (original aspect)"
+        AspectRatioMode.FORCE_16_9 -> "16:9"
+        AspectRatioMode.FORCE_4_3 -> "4:3"
+    }),
+    output?.let {
+        statsLine("Output", join("${it.width}×${it.height} @ ${it.refreshRate} Hz",
+            requested?.let { rate -> "requested $rate Hz${if (duration == null) " (kept)" else ""}" }))
+    },
+    output?.refreshRatesByResolution?.takeIf { it.isNotEmpty() }?.let { statsLine("Refresh rates", it) },
+    output?.matchFrameRate?.let {
+        statsLine("Match frame rate", when (it) {
             MatchFrameRatePreference.NEVER -> "Never"
             MatchFrameRatePreference.SEAMLESS_ONLY -> "Seamless only"
             MatchFrameRatePreference.ALWAYS -> "Always"
-        }) },
-        d.startupBuffer?.let { statsLine("Startup buffer", "${it.millis} ms (${if (it.automatic) "automatic" else "fixed"})") },
-        "Stall recoveries: ${d.stallRecoveries} • Fresh decoder per zap: ${if (d.freshDecoderPerZap) "On" else "Off"}",
-    ) + liveSignalDebugRows(d) + listOfNotNull(
-        join(growth(window.uncorrected, "uncorrected"), growth(window.bitErrors, "BER"),
-            growth(window.serverDrops, "server drops"), growth(window.clientDrops, "client drops"),
-            growth(window.decoderDrops, "decoder drops")).takeIf { it.isNotEmpty() },
-        join(change(window.bufferChangeMs / 1000.0, "s buffer"), change(window.queueChangeUs?.div(1000.0), "ms queue"),
-            change(window.signalChange, "% signal"), change(window.snrChange, "% SNR")).takeIf { it.isNotEmpty() },
-    )
-    rows.forEach { StatsText(it) }
-}
+        })
+    },
+)
+
+/** The window's positive growth, then its changes that show at display precision. */
+private fun windowDebugRows(window: StatsWindow): List<String> = listOf(
+    join(growth(window.uncorrected, "uncorrected"), growth(window.bitErrors, "BER"),
+        growth(window.serverDrops, "server drops"), growth(window.clientDrops, "client drops"),
+        growth(window.decoderDrops, "decoder drops")),
+    join(change(window.bufferChangeMs / 1000.0, "s buffer"), change(window.queueChangeUs?.div(1000.0), "ms queue"),
+        change(window.signalChange, "% signal"), change(window.snrChange, "% SNR")),
+).filter { it.isNotEmpty() }
 
 /** Raw failure fields only, without synthesis or protocol interpretation. */
 internal fun failureStatRows(failed: AppPlaybackState.Failed): List<Pair<Int, String>> = listOfNotNull(

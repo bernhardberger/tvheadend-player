@@ -194,7 +194,9 @@ private fun failureFootnote(
     // Only the error code can repeat the detail, and only as a whole code token.
     val detailTokens = detail?.split(Regex("[^A-Za-z0-9_]+"))?.filter { it.isNotEmpty() }?.toSet().orEmpty()
     val rows = statsFailure?.let(::failureStatRows).orEmpty()
-        .filterNot { (label, value) -> label == R.string.stats_error_code && value.removePrefix("ERROR_CODE_") in detailTokens }
+        .filterNot { (label, value) ->
+            label == R.string.stats_error_code && value.removePrefix("ERROR_CODE_") in detailTokens
+        }
         .map { (label, value) -> "${stringResource(label)}: $value" }
     return (listOfNotNull(detail) + rows + statsRows).joinToString("\n").ifEmpty { null }
 }

@@ -168,12 +168,13 @@ class PlayerMotionCaptureTest {
             fun row(step: StreamPathStep, d: AppPlaybackDiagnostics = dvb, w: StatsWindow = StatsWindow(),
                 output: DisplayOutput? = null, requested: String? = null, declared: String = "23.98",
                 timeshift: AppTimeshiftState? = null, raster: String? = null) =
-                stepValue(step, d, w, output, requested, measuredRate = "59.94", declaredRate = declared, timeshift, raster)
+                step to stepValue(step, d, w, output, requested, measuredRate = "59.94", declaredRate = declared, timeshift, raster)
             val locked = dvb
             val unlocked = statsLiveDiagnostics(locked = false, signal = full, snr = full, queueDelayUs = 9_999_000)
                 .copy(bufferedMs = 30_000)
             val odd = video("hvc1.2.4.L153.B0", "video/hevc", 3840, 1600)
-            fun MutableList<Pair<String, String>>.add(shape: String, text: String) = add(shape to text)
+            fun MutableList<Triple<String, StreamPathStep, String>>.add(shape: String, row: Pair<StreamPathStep, String>) =
+                add(Triple(shape, row.first, row.second))
             buildList {
                 add("tuner", row(StreamPathStep.TUNER, locked)); add("tuner", row(StreamPathStep.TUNER, unlocked))
                 add("queue", row(StreamPathStep.SERVER))
@@ -203,7 +204,7 @@ class PlayerMotionCaptureTest {
                 add("screen", row(StreamPathStep.SCREEN, output = DisplayOutput(3840, 2160, "23.98", "", null), requested = "59.94"))
                 add("screen", row(StreamPathStep.SCREEN, output = DisplayOutput(3840, 2160, "59.94", "", null), requested = "23.98"))
                 add("screen", row(StreamPathStep.SCREEN, output = DisplayOutput(3840, 2160, "59.94", "", null), requested = "59.94"))
-            }.distinctBy { it.second }
+            }.distinctBy { it.third }
         }
         fun shot(name: String, playing: Boolean = true) {
             compose.settleFrames(2)
@@ -278,30 +279,31 @@ class PlayerMotionCaptureTest {
                 directory = "stats-stream-path")
         }
         shot("dvb-healthy")
-        // Worst cases in a value column's own style and width (left of the flag gutter), found by position.
+        // Each worst case in its own step's value text: the text right of the step's name, in its style and the
+        // width the row leaves it beside the flag gutter.
         run {
-            val card = compose.onNodeWithTag("playback-stats-overlay").fetchSemanticsNode().boundsInRoot
-            val values = textInk(underCard = true).filter { (node, _) ->
-                kotlin.math.abs(node.boundsInRoot.left - (card.left + 126f)) < 1f
-            }.map { it.second }
-            assertEquals("one value column per DVB step", 5, values.size)
-            assertTrue("the value columns share one width", values.all { it.size.width == values.first().size.width })
-            val input = values.first().layoutInput
-            val room = values.first().size.width.toFloat()
-            report.append("worst-case value room=$room dp\n")
+            val texts = textInk(underCard = true)
+            val values = StreamPathStep.entries.associateWith { step ->
+                val name = texts.single { it.second.layoutInput.text.text == stepName(step) }.first.boundsInRoot
+                texts.filter { (node, _) ->
+                    node.boundsInRoot.left >= name.right && name.center.y in node.boundsInRoot.top..node.boundsInRoot.bottom
+                }.minBy { it.first.boundsInRoot.left }.second
+            }
+            assertEquals("every step has its worst cases", StreamPathStep.entries.toSet(),
+                worstRows.map { it.second }.toSet())
+            values.forEach { (step, value) -> report.append("worst-case value room ($step)=${value.size.width} dp\n") }
             val misfits = mutableListOf<String>()
-            var measured = 0
             val smallest = mutableMapOf<String, Pair<String, Float>>()
-            worstRows.forEach { (shape, row) ->
-                val s = room - androidx.compose.ui.text.ParagraphIntrinsics(row, input.style, emptyList(),
+            worstRows.forEach { (shape, step, row) ->
+                val value = values.getValue(step)
+                val input = value.layoutInput
+                val s = value.size.width - androidx.compose.ui.text.ParagraphIntrinsics(row, input.style, emptyList(),
                     density = input.density, fontFamilyResolver = input.fontFamilyResolver).maxIntrinsicWidth
-                measured++
                 report.append("  worst ($shape): $row; spare=$s dp\n")
                 if (s < 0f) misfits += "$row overflows by ${-s} dp"
                 if (smallest[shape].let { it == null || s < it.second }) smallest[shape] = row to s
             }
             smallest.forEach { (shape, worst) -> report.append("  smallest spare ($shape): ${worst.first}; ${worst.second} dp\n") }
-            assertTrue("the worst cases were measured", measured > 0 && measured == worstRows.size)
             assertTrue(misfits.joinToString("; "), misfits.isEmpty())
         }
         compose.runOnIdle { diagnostics = diagnostics.copy(video = diagnostics.video?.copy(
@@ -322,10 +324,17 @@ class PlayerMotionCaptureTest {
         shot("banner")
         compose.runOnIdle { scene = "options" }
         shot("options-stream-path")
+        // Degraded DVB with growth, so the debug card shows its flags and "last 60 s": a baseline first.
         compose.runOnIdle { scene = ""; level = PlayerStatsLevel.DEBUG; diagnostics = statsLiveDiagnostics(locked = false) }
+        compose.settleFrames(2)
+        compose.runOnIdle { diagnostics = statsLiveDiagnostics(locked = false, uncorrected = 4, serverDrops = 5) }
         shot("debug-degraded")
-        compose.runOnIdle { diagnostics = statsLiveDiagnostics(locked = false,
-            service = "Ridge Earth Documentary Extended Regional Service Original-Language Programme Feed") }
+        val longService = "Ridge Earth Documentary Extended Regional Service Original-Language Programme Feed"
+        compose.runOnIdle { diagnostics = statsLiveDiagnostics(locked = false, service = longService) }
+        compose.settleFrames(2)
+        compose.runOnIdle {
+            diagnostics = statsLiveDiagnostics(locked = false, uncorrected = 4, serverDrops = 5, service = longService)
+        }
         shot("debug-worst-height")
         // Degraded DVB with growth under the chrome: a baseline first, so the counters can grow.
         compose.runOnIdle { diagnostics = statsLiveDiagnostics(locked = false); scene = "controls" }
