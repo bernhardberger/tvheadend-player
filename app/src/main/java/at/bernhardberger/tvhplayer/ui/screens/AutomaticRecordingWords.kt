@@ -30,6 +30,7 @@ internal fun AutomaticRecordingWords(state: AutomaticRecordingEditorState) {
                 stringResource(R.string.autorec_editor_words),
                 { state.navigation.open(AutomaticRecordingEditorLevel.WORDS_ENTRY, "words-input") },
                 editorRowModifier(state.navigation, "words"),
+                subtitleMaxLines = 2,
                 subtitle = if (state.draft.pattern.rawExpression)
                     stringResource(R.string.autorec_editor_raw_value, state.draft.pattern.words)
                 else state.draft.pattern.words.ifBlank { stringResource(R.string.autorec_editor_enter_words) },
@@ -39,6 +40,7 @@ internal fun AutomaticRecordingWords(state: AutomaticRecordingEditorState) {
                 stringResource(R.string.autorec_editor_search_in),
                 { state.navigation.open(AutomaticRecordingEditorLevel.SEARCH_IN, "search-${state.draft.fullText}") },
                 editorRowModifier(state.navigation, "search-in"),
+                subtitleMaxLines = 2,
                 subtitle = automaticRecordingSearchInLabel(state.draft.fullText),
                 trailingIcon = R.drawable.ic_keyboard_arrow_right,
             )

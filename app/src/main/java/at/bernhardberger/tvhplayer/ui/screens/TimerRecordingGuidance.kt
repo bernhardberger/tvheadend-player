@@ -27,6 +27,7 @@ internal fun TimerRecordingGuidance(
     scheduledEntries: List<DvrEntry>,
 ) {
     GuidedStepGuidance(
+        titleMaxLines = 3,
         title = if (state.editing) timerNameLabel(state.draft, channels)
             else stringResource(R.string.timer_editor_title),
         body = timerGuidanceBody(state, channels),
@@ -86,7 +87,8 @@ private fun TimerRecordingUpcoming(state: TimerRecordingEditorState, channels: L
     val occurrences = state.draft.nextOccurrences(state.now(), state.zone, 3)
     if (occurrences.isEmpty()) RecordingEditorSecondary(stringResource(R.string.timer_editor_none_upcoming))
     for (occurrence in occurrences) RecordingEditorPreviewPair(
-        timerNameLabel(state.draft, channels),
+        if (state.draft.name.isNotBlank() || channels.any { it.id == state.draft.channelId })
+            timerNameLabel(state.draft, channels) else "",
         timerDateAndClockLabel(state, occurrence.start) + " – ${formatClock(state.draft.end)}",
     )
     RecordingEditorSecondary(stringResource(R.string.timer_editor_no_padding))

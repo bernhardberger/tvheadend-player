@@ -1992,6 +1992,24 @@ class RecordingsVisualLayoutTest {
         capture("Bx6-empty-schedule", 1f, "One-line support and centered empty text with 48dp vertical space.", outputs)
     }
 
+    @Test
+    @Category(VisualCapture::class)
+    @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi")
+    fun g10FirstLookScheduleFrames() {
+        presentationLibrary(firstRow = true, scheduled = true)
+        publish(emptyList(), autorecRules = listOf(AutorecRule.create(
+            id = AutorecRuleId("long-expression"), enabled = true, title = automaticRecordingLongExpression,
+        )))
+        openScheduleScreen()
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("automatic-recording-long-expression").assertIsFocused()
+        val outputs = "../captures/autorec-impl/g10-first-look"
+        capture("long-expression-schedule", 1f, "Approved expression; native row focused.", outputs)
+        compose.pressKey(Key.Menu)
+        capture("long-expression-row-menu", 1f, "Approved expression; Edit focused.", outputs)
+    }
+
     @Test @Category(VisualCapture::class) @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
     fun scheduleEntryRowsPhase2Captures() {

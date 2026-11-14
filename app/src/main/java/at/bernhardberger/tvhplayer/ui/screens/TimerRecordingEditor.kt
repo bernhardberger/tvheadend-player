@@ -121,7 +121,8 @@ internal fun TimerRecordingField(
     onClick: () -> Unit,
 ) {
     GuidedStepAction(title, { if (state.navigation.canNavigate()) onClick() },
-        editorRowModifier(state.navigation, id), subtitle = value, trailingIcon = R.drawable.ic_keyboard_arrow_right,
+        editorRowModifier(state.navigation, id), subtitleMaxLines = 2, subtitle = value,
+        trailingIcon = R.drawable.ic_keyboard_arrow_right,
         trailingContent = {
             if (state.changedFields.any { it in fields })
                 StatusBadge(stringResource(R.string.autorec_editor_changed), StatusBadgeTone.CHANGED)

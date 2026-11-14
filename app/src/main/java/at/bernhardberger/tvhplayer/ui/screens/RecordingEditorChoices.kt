@@ -52,7 +52,7 @@ internal fun RecordingEditorRadio(
             role = Role.RadioButton; this.selected = selected
         },
         leadingIcon = leadingIcon,
-        subtitle = subtitle,
+        subtitleMaxLines = 2, subtitle = subtitle,
         trailingContent = { RecordingEditorRadioMark(selected) },
     )
 }

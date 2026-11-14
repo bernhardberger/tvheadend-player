@@ -40,6 +40,7 @@ internal fun AutomaticRecordingGuidance(
     val row = (state.preview as? AutorecPreviewState.Matches)?.rows
         ?.firstOrNull { automaticRecordingEpisodeRowId(it) == state.navigation.focusedRow }
     GuidedStepGuidance(
+        titleMaxLines = 3,
         title = if (row != null) automaticRecordingPreviewTitle(state.draft.kind, row)
             else if (state.navigation.page.level in setOf(
                 AutomaticRecordingEditorLevel.WORDS, AutomaticRecordingEditorLevel.WORDS_ENTRY,
@@ -49,6 +50,9 @@ internal fun AutomaticRecordingGuidance(
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = TvTextSecondaryAlpha)) },
     )
     Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (state.draft.pattern.rawExpression && state.navigation.page.level in setOf(
+                AutomaticRecordingEditorLevel.WORDS, AutomaticRecordingEditorLevel.WORDS_ENTRY,
+            )) RecordingEditorSecondary(state.draft.pattern.words)
         if (state.deleting) {
             RecordingEditorHeading(stringResource(R.string.autorec_editor_deleting))
             return@Column

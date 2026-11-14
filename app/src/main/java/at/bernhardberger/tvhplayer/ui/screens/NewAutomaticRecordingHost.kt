@@ -81,6 +81,7 @@ internal fun NewAutomaticRecordingHost(
 @Composable
 private fun NewAutomaticRecordingGuidance() {
     GuidedStepGuidance(
+        titleMaxLines = 3,
         title = stringResource(R.string.automatic_recording_new_title),
         body = stringResource(R.string.automatic_recording_new_choose),
         lead = {
@@ -109,7 +110,7 @@ private fun NewAutomaticRecordingKinds(
                 R.string.automatic_recording_new_timer_help, R.drawable.ic_schedule)
         }
         GuidedStepAction(
-            title = stringResource(title), subtitle = stringResource(description),
+            title = stringResource(title), subtitleMaxLines = 2, subtitle = stringResource(description),
             leadingIcon = { Icon(painterResource(icon), contentDescription = null) },
             trailingIcon = R.drawable.ic_keyboard_arrow_right,
             modifier = editorRowModifier(navigation, id).focusProperties {

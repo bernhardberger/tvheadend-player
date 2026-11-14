@@ -46,13 +46,14 @@ private fun AutomaticRecordingChannelTime(state: AutomaticRecordingEditorState, 
         stringResource(R.string.autorec_editor_channel),
         { state.navigation.open(AutomaticRecordingEditorLevel.CHANNEL, channelRowId(state.draft.channel)) },
         editorRowModifier(state.navigation, "channel"),
-        subtitle = automaticRecordingChannelLabel(state.draft, channels),
+        subtitleMaxLines = 2, subtitle = automaticRecordingChannelLabel(state.draft, channels),
         trailingIcon = R.drawable.ic_keyboard_arrow_right,
     )
     GuidedStepAction(
         stringResource(R.string.autorec_editor_days),
         { state.navigation.open(AutomaticRecordingEditorLevel.DAYS, "done") },
-        editorRowModifier(state.navigation, "days"), subtitle = automaticRecordingDaysLabel(state.draft.days),
+        editorRowModifier(state.navigation, "days"),
+        subtitleMaxLines = 2, subtitle = automaticRecordingDaysLabel(state.draft.days),
         trailingIcon = R.drawable.ic_keyboard_arrow_right,
     )
     GuidedStepAction(
@@ -61,7 +62,7 @@ private fun AutomaticRecordingChannelTime(state: AutomaticRecordingEditorState, 
             state.navigation.open(AutomaticRecordingEditorLevel.START_WINDOW, startWindowRowId(state.draft.startWindow))
         },
         editorRowModifier(state.navigation, "start-window"),
-        subtitle = automaticRecordingWindowLabel(state.draft.startWindow),
+        subtitleMaxLines = 2, subtitle = automaticRecordingWindowLabel(state.draft.startWindow),
         trailingIcon = R.drawable.ic_keyboard_arrow_right,
     )
 }
@@ -139,7 +140,7 @@ private fun AutomaticRecordingStartWindow(state: AutomaticRecordingEditorState) 
             },
             editorRowModifier(state.navigation, if (after) "after" else "before"),
             trailingIcon = R.drawable.ic_keyboard_arrow_right,
-            subtitle = when {
+            subtitleMaxLines = 2, subtitle = when {
                 after && current is RecordingStartWindow.After -> formatClock(current.time)
                 !after && current is RecordingStartWindow.Before -> formatClock(current.time)
                 else -> null

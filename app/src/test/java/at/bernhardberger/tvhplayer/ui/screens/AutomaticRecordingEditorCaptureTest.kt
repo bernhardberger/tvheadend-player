@@ -43,6 +43,7 @@ import at.bernhardberger.tvhplayer.core.newTimerDraft
 import at.bernhardberger.tvhplayer.core.AutomaticRecordingKind
 import at.bernhardberger.tvhplayer.core.newAutorecDraft
 import at.bernhardberger.tvhplayer.core.RecordingPattern
+import at.bernhardberger.tvhplayer.core.readRecordingPattern
 import at.bernhardberger.tvheadend.sdk.core.DvrRemoval
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvhplayer.core.BrowseContextAction
@@ -384,6 +385,33 @@ class AutomaticRecordingEditorCaptureTest {
             requireNotNull(shownTimer).navigation.focusedRow = "enabled"
         }
         capture("12b-edit-timer-off-in-draft", "slice-4")
+    }
+
+    @Test fun g10FirstLookEditorFrames() {
+        val directory = "g10-first-look"
+        show(newAutorecDraft(AutomaticRecordingKind.KEYWORD).copy(
+            pattern = readRecordingPattern(automaticRecordingLongExpression),
+        ), editing = true)
+        capture("long-expression-first-level", directory, "automatic-recording-matches")
+        open(AutomaticRecordingEditorLevel.WORDS, "words")
+        capture("long-expression-words", directory)
+        compose.runOnIdle {
+            requireNotNull(shown).navigation.returnTo(AutomaticRecordingEditorLevel.FIRST)
+            requireNotNull(shown).navigation.confirmation = AutomaticRecordingEditorConfirmation.DELETE
+        }
+        capture("long-expression-delete", directory)
+        compose.runOnIdle {
+            requireNotNull(shown).navigation.confirmation = null
+            requireNotNull(shown).updateDraft { it.copy(enabled = false) }
+            requireNotNull(shown).back()
+        }
+        capture("long-expression-leave", directory)
+        compose.runOnIdle {
+            shown = null
+            shownTimer = fixture.timer(newTimerDraft(automaticRecordingNow, automaticRecordingZone,
+                startingRepeating = true))
+        }
+        capture("timer-without-channel", directory)
     }
 
     @Test fun newAutomaticRecordingKindReferenceFrames() {

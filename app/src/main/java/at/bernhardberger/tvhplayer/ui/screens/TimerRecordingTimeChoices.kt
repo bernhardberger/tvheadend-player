@@ -28,22 +28,23 @@ internal fun TimerRecordingChannelTime(state: TimerRecordingEditorState, channel
     GuidedStepAction(stringResource(R.string.autorec_editor_channel),
         { state.navigation.open(AutomaticRecordingEditorLevel.CHANNEL,
             "channel-${state.draft.channelId?.value ?: channels.firstOrNull()?.id?.value}") },
-        editorRowModifier(state.navigation, "channel"), subtitle = timerChannelLabel(state.draft, channels),
+        editorRowModifier(state.navigation, "channel"),
+        subtitleMaxLines = 2, subtitle = timerChannelLabel(state.draft, channels),
         trailingIcon = R.drawable.ic_keyboard_arrow_right)
     GuidedStepAction(stringResource(R.string.timer_editor_repeat),
         { state.navigation.open(AutomaticRecordingEditorLevel.REPEAT, "done") },
-        editorRowModifier(state.navigation, "repeat"), subtitle = timerRepeatLabel(state),
+        editorRowModifier(state.navigation, "repeat"), subtitleMaxLines = 2, subtitle = timerRepeatLabel(state),
         trailingIcon = R.drawable.ic_keyboard_arrow_right)
     if (!state.draft.repeating) GuidedStepAction(stringResource(R.string.timer_editor_date),
         { state.navigation.open(AutomaticRecordingEditorLevel.DATE, "date-${state.draft.date}") },
         editorRowModifier(state.navigation, "date"),
-        subtitle = timerDateLabel(state, state.draft.date, relative = true),
+        subtitleMaxLines = 2, subtitle = timerDateLabel(state, state.draft.date, relative = true),
         trailingIcon = R.drawable.ic_keyboard_arrow_right)
     GuidedStepAction(stringResource(R.string.timer_editor_start), { state.openClock(false) },
-        editorRowModifier(state.navigation, "start"), subtitle = formatClock(state.draft.start),
+        editorRowModifier(state.navigation, "start"), subtitleMaxLines = 2, subtitle = formatClock(state.draft.start),
         trailingIcon = R.drawable.ic_keyboard_arrow_right)
     GuidedStepAction(stringResource(R.string.timer_editor_end), { state.openClock(true) },
-        editorRowModifier(state.navigation, "end"), subtitle = timerEndLabel(state),
+        editorRowModifier(state.navigation, "end"), subtitleMaxLines = 2, subtitle = timerEndLabel(state),
         trailingIcon = R.drawable.ic_keyboard_arrow_right)
 }
 

@@ -83,6 +83,7 @@ private fun AutomaticRecordingFirstLevel(state: AutomaticRecordingEditorState, c
     val series = state.draft.kind == AutomaticRecordingKind.SERIES
     GuidedStepAction(
         title = stringResource(if (series) R.string.autorec_editor_upcoming else R.string.autorec_editor_words),
+        subtitleMaxLines = 2,
         subtitle = if (series) automaticRecordingPreviewSummary(state) else automaticRecordingWordsSummary(state),
         modifier = editorRowModifier(state.navigation, "matches"),
         onClick = { state.navigation.open(if (series) AutomaticRecordingEditorLevel.UPCOMING else
@@ -93,7 +94,7 @@ private fun AutomaticRecordingFirstLevel(state: AutomaticRecordingEditorState, c
     )
     GuidedStepAction(
         title = stringResource(R.string.autorec_editor_channel_time),
-        subtitle = automaticRecordingChannelTimeLabel(state.draft, channels),
+        subtitleMaxLines = 2, subtitle = automaticRecordingChannelTimeLabel(state.draft, channels),
         onClick = { state.navigation.open(AutomaticRecordingEditorLevel.CHANNEL_TIME, "channel") },
         modifier = editorRowModifier(state.navigation, "channel-time"),
         trailingIcon = R.drawable.ic_keyboard_arrow_right,
@@ -103,14 +104,14 @@ private fun AutomaticRecordingFirstLevel(state: AutomaticRecordingEditorState, c
     )
     GuidedStepAction(
         title = stringResource(R.string.recording_keep_until_heading),
-        subtitle = automaticRecordingKeepLabel(state.draft.removal),
+        subtitleMaxLines = 2, subtitle = automaticRecordingKeepLabel(state.draft.removal),
         onClick = { state.navigation.open(AutomaticRecordingEditorLevel.KEEP, "keep-${state.draft.removal}") },
         modifier = editorRowModifier(state.navigation, "keep"), trailingIcon = R.drawable.ic_keyboard_arrow_right,
         trailingContent = { AutomaticRecordingChanged(state, setOf(RecordingDraftField.KEEP_UNTIL)) },
     )
     GuidedStepAction(
         title = stringResource(R.string.autorec_editor_more),
-        subtitle = recordingEditorMoreSummary(
+        subtitleMaxLines = 2, subtitle = recordingEditorMoreSummary(
             state.changedFields.intersect(automaticRecordingMoreFields), state.editing),
         onClick = { state.navigation.open(AutomaticRecordingEditorLevel.MORE, "duplicate") },
         modifier = editorRowModifier(state.navigation, "more"), trailingIcon = R.drawable.ic_keyboard_arrow_right,
@@ -145,7 +146,7 @@ internal fun AutomaticRecordingEpisodeRows(state: AutomaticRecordingEditorState)
         val checked = state.episodeEnabled(row)
         GuidedStepAction(
             title = automaticRecordingPreviewTitle(state.draft.kind, row), onClick = { state.toggleEpisode(row) },
-            subtitle = automaticRecordingEpisodeMeta(row, state),
+            subtitleMaxLines = 2, subtitle = automaticRecordingEpisodeMeta(row, state),
             modifier = editorRowModifier(state.navigation, automaticRecordingEpisodeRowId(row)).semantics {
                 if (toggleable) {
                     role = Role.Checkbox

@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.ui.screens
 
 import at.bernhardberger.tvhplayer.testutil.testDvrMutationActions
 import android.app.Application
+import at.bernhardberger.tvhplayer.R
 import androidx.compose.runtime.remember
 import org.koin.compose.KoinIsolatedContext
 import org.koin.dsl.koinApplication
@@ -21,6 +22,10 @@ import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -55,6 +60,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 import java.time.DayOfWeek
 import java.time.LocalTime
 import at.bernhardberger.tvheadend.sdk.core.AutorecRuleCreate
@@ -554,6 +560,12 @@ class AutomaticRecordingEditorTest {
         }
         for (index in sessions.indices) {
             compose.onNodeWithTag("timer-recording-channel-time").assertIsFocused()
+            if (index == 1) {
+                val sameAsChannel = RuntimeEnvironment.getApplication().getString(
+                    R.string.timer_editor_name_default,
+                )
+                compose.onAllNodesWithText(sameAsChannel, useUnmergedTree = true).assertCountEquals(1)
+            }
             compose.pressKey(Key.DirectionCenter)
             compose.pressKey(Key.DirectionCenter)
             compose.pressKey(Key.DirectionCenter)
@@ -580,7 +592,9 @@ class AutomaticRecordingEditorTest {
         }
     }
 
-    @Test fun wordsEntryPreservesRawExpressionAndReturnsWithoutSubmitting() {
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun wordsEntryPreservesRawExpressionAndReturnsWithoutSubmitting() {
         lateinit var fixture: AutomaticRecordingEditorFixture
         lateinit var state: AutomaticRecordingEditorState
         compose.setContent {
@@ -595,7 +609,42 @@ class AutomaticRecordingEditorTest {
         }
         compose.onNodeWithTag("automatic-recording-main").assertIsNotEnabled()
         compose.onNodeWithTag("automatic-recording-matches").assertIsFocused()
+        compose.runOnIdle {
+            state.updateDraft { it.copy(pattern = readRecordingPattern(
+                "Ridge Light|Still Tide",
+            )) }
+        }
+        compose.settleFrames(2)
+        val belowWords = listOf("channel-time", "keep", "more", "enabled", "cancel")
+        val layouts = mutableListOf<TextLayoutResult>()
+        compose.onNodeWithText(RuntimeEnvironment.getApplication().getString(
+            R.string.autorec_editor_raw_value, state.draft.pattern.words,
+        ), useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        assertEquals(2, layouts.single().lineCount)
+        val twoLinePositions = belowWords.map {
+            compose.onNodeWithTag("automatic-recording-$it").fetchSemanticsNode().boundsInRoot.top
+        }
+        compose.runOnIdle {
+            state.updateDraft { it.copy(pattern = readRecordingPattern(automaticRecordingLongExpression)) }
+        }
+        compose.settleFrames(2)
+        assertEquals("Long expressions must not move the fields below Words", twoLinePositions, belowWords.map {
+            compose.onNodeWithTag("automatic-recording-$it").fetchSemanticsNode().boundsInRoot.top
+        })
+        layouts.clear()
+        compose.onNodeWithText(automaticRecordingLongExpression, useUnmergedTree = true)
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        assertTrue("Editor guidance is at most three lines", layouts.single().lineCount <= 3)
+        assertTrue("Long guidance ends in an ellipsis", layouts.single().isLineEllipsized(2))
+        compose.runOnIdle { state.updateDraft { it.copy(pattern = readRecordingPattern("A|B")) } }
         compose.pressKey(Key.DirectionCenter)
+        compose.runOnIdle { state.updateDraft { it.copy(pattern = readRecordingPattern("Tide Watch")) } }
+        compose.onAllNodesWithText("Tide Watch", useUnmergedTree = true).assertCountEquals(1)
+        compose.runOnIdle {
+            state.updateDraft { it.copy(pattern = readRecordingPattern(automaticRecordingLongExpression)) }
+        }
+        compose.onNodeWithText(automaticRecordingLongExpression, useUnmergedTree = true).assertExists()
+        compose.runOnIdle { state.updateDraft { it.copy(pattern = readRecordingPattern("A|B")) } }
         compose.onNodeWithTag("automatic-recording-episode-1")
             .assertTextContains(requireNotNull(automaticRecordingMatches.rows.first().title))
         compose.pressKey(Key.DirectionDown)

@@ -44,7 +44,7 @@ private fun AutomaticRecordingMore(state: AutomaticRecordingEditorState, configu
         val level = automaticRecordingOptionLevel(field)
         GuidedStepAction(
             title = automaticRecordingFieldLabel(field),
-            subtitle = automaticRecordingOptionValue(state, field, configurations),
+            subtitleMaxLines = 2, subtitle = automaticRecordingOptionValue(state, field, configurations),
             modifier = editorRowModifier(state.navigation, level.name.lowercase()),
             onClick = { state.navigation.open(level, automaticRecordingOptionRowId(state, field)) },
             trailingIcon = R.drawable.ic_keyboard_arrow_right,
@@ -54,7 +54,7 @@ private fun AutomaticRecordingMore(state: AutomaticRecordingEditorState, configu
     val changed = state.changedFields.intersect(automaticRecordingMoreFields)
     if (changed.isNotEmpty()) GuidedStepAction(
         title = pluralStringResource(R.plurals.autorec_editor_reset_options, changed.size, changed.size),
-        subtitle = changed.map { automaticRecordingFieldLabel(it) }.joinToString(", "),
+        subtitleMaxLines = 2, subtitle = changed.map { automaticRecordingFieldLabel(it) }.joinToString(", "),
         modifier = editorRowModifier(state.navigation, "reset-options"),
         onClick = {
             state.updateDraft(restoreFocusTo = "duplicate") { resetAutomaticRecordingMoreOptions(it, state.baseline) }

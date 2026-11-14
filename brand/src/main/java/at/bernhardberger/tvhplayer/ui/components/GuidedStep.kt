@@ -40,6 +40,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
@@ -124,6 +125,7 @@ fun GuidedStepGuidance(
     stepper: (@Composable () -> Unit)? = null,
     lead: (@Composable () -> Unit)? = null,
     meta: String? = null,
+    titleMaxLines: Int = Int.MAX_VALUE,
 ) {
     if (stepper != null) {
         val lineHeight = with(LocalDensity.current) { MaterialTheme.typography.bodySmall.lineHeight.toDp() }
@@ -141,6 +143,8 @@ fun GuidedStepGuidance(
         style = MaterialTheme.typography.headlineMedium,
         color = MaterialTheme.colorScheme.onSurface,
         modifier = Modifier.semantics { heading() },
+        maxLines = titleMaxLines,
+        overflow = TextOverflow.Ellipsis,
     )
     Text(
         text = body,
@@ -179,6 +183,7 @@ fun GuidedStepAction(
     /** A status word, badge or switch after the explanation, before [trailingIcon]. */
     trailingContent: (@Composable () -> Unit)? = null,
     enabled: Boolean = true,
+    subtitleMaxLines: Int = Int.MAX_VALUE,
 ) {
     val colors = MaterialTheme.colorScheme
     Surface(
@@ -212,6 +217,8 @@ fun GuidedStepAction(
                         subtitle,
                         style = MaterialTheme.typography.bodySmall,
                         color = LocalContentColor.current.copy(alpha = TvTextSecondaryAlpha),
+                        maxLines = subtitleMaxLines,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }

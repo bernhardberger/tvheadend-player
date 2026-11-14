@@ -41,6 +41,10 @@ import kotlinx.coroutines.CompletableDeferred
 
 internal val automaticRecordingNow = Instant.parse("2026-11-12T12:00:00Z")
 internal val automaticRecordingZone = ZoneId.of("Europe/Berlin")
+internal const val automaticRecordingLongExpression =
+    ".*(24[[:space:]-]*(h|Stunden|Hours).*(Nürburgring|Nordschleife)|" +
+        "(Nürburgring|Nordschleife).*24[[:space:]-]*(h|Stunden|Hours)|" +
+        "ADAC[^[:alnum:]]*(RAVENOL|TOTAL)[^[:alnum:]]*24[[:space:]-]*h).*"
 internal val automaticRecordingSeries = AutorecDraft(
     kind = AutomaticRecordingKind.SERIES,
     pattern = RecordingPattern(words = "Ridge Light"),

@@ -30,7 +30,9 @@ internal fun recordingEditorMoreSummary(changed: Set<RecordingDraftField>, editi
 @Composable
 internal fun RecordingEditorPreviewPair(title: String, meta: String) {
     Column {
-        Text(title, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+        if (title.isNotBlank()) Text(
+            title, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface,
+        )
         RecordingEditorSecondary(meta)
     }
 }
