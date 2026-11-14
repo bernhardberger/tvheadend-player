@@ -30,7 +30,7 @@
         <item quantity="other">%1$d개 사용 안 함</item>
     </plurals>
     <string name="context_record_series">시리즈 녹화</string>
-    <string name="context_record_title">이 제목의 프로그램 모두 녹화</string>
+    <string name="context_record_title">모두 녹화</string>
     <string name="context_edit_series">시리즈 녹화 편집</string>
     <string name="context_edit_title">제목 녹화 편집</string>
     <string name="context_edit_keyword">키워드 녹화 편집</string>

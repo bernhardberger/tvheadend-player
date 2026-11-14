@@ -33,7 +33,7 @@
         <item quantity="other">%1$d uit</item>
     </plurals>
     <string name="context_record_series">Serie opnemen</string>
-    <string name="context_record_title">Alles met deze titel opnemen</string>
+    <string name="context_record_title">Alles opnemen</string>
     <string name="context_edit_series">Serieopname bewerken</string>
     <string name="context_edit_title">Titelopname bewerken</string>
     <string name="context_edit_keyword">Zoekwoordopname bewerken</string>

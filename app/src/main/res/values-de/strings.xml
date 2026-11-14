@@ -33,7 +33,7 @@
         <item quantity="other">%1$d deaktiviert</item>
     </plurals>
     <string name="context_record_series">Serie aufnehmen</string>
-    <string name="context_record_title">Alle mit diesem Titel aufnehmen</string>
+    <string name="context_record_title">Alle aufnehmen</string>
     <string name="context_edit_series">Serienaufnahme bearbeiten</string>
     <string name="context_edit_title">Titelaufnahme bearbeiten</string>
     <string name="context_edit_keyword">Stichwortaufnahme bearbeiten</string>

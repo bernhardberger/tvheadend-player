@@ -45,7 +45,7 @@
         <item quantity="other">المعطّلة: %1$d</item>
     </plurals>
     <string name="context_record_series">تسجيل المسلسل</string>
-    <string name="context_record_title">تسجيل كل ما يحمل هذا العنوان</string>
+    <string name="context_record_title">تسجيل الكل</string>
     <string name="context_edit_series">تعديل تسجيل مسلسل</string>
     <string name="context_edit_title">تعديل تسجيل حسب العنوان</string>
     <string name="context_edit_keyword">تعديل تسجيل حسب الكلمة المفتاحية</string>

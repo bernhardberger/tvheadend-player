@@ -30,7 +30,7 @@
         <item quantity="other">%1$d件が無効</item>
     </plurals>
     <string name="context_record_series">シリーズを録画</string>
-    <string name="context_record_title">このタイトルの番組をすべて録画</string>
+    <string name="context_record_title">すべて録画</string>
     <string name="context_edit_series">シリーズ録画を編集</string>
     <string name="context_edit_title">タイトル録画を編集</string>
     <string name="context_edit_keyword">キーワード録画を編集</string>

@@ -30,7 +30,7 @@
         <item quantity="other">%1$d項已停用</item>
     </plurals>
     <string name="context_record_series">錄影此系列</string>
-    <string name="context_record_title">錄影此標題的所有節目</string>
+    <string name="context_record_title">全部錄影</string>
     <string name="context_edit_series">編輯系列錄影</string>
     <string name="context_edit_title">編輯標題錄影</string>
     <string name="context_edit_keyword">編輯關鍵字錄影</string>

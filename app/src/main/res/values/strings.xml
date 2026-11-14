@@ -50,7 +50,8 @@
         <item quantity="other">%1$d off</item>
     </plurals>
     <string name="context_record_series">Record series</string>
-    <string name="context_record_title">Record all with this title</string>
+    <!-- Short action on a program's details and menu, beside Record and Record series: sets up an automatic recording of every airing with this program's title. Keep it short; it sits in a row of pills. -->
+    <string name="context_record_title">Record all</string>
     <string name="context_edit_series">Edit series recording</string>
     <string name="context_edit_title">Edit title recording</string>
     <string name="context_edit_keyword">Edit keyword recording</string>

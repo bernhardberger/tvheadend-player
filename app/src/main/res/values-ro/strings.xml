@@ -36,7 +36,7 @@
         <item quantity="other">%1$d de dezactivate</item>
     </plurals>
     <string name="context_record_series">Înregistrează seria</string>
-    <string name="context_record_title">Înregistrează tot cu acest titlu</string>
+    <string name="context_record_title">Înregistrează tot</string>
     <string name="context_edit_series">Editează înregistrarea de serie</string>
     <string name="context_edit_title">Editează înregistrarea după titlu</string>
     <string name="context_edit_keyword">Editează înregistrarea după cuvânt-cheie</string>

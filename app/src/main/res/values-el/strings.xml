@@ -33,7 +33,7 @@
         <item quantity="other">%1$d ανενεργές</item>
     </plurals>
     <string name="context_record_series">Εγγραφή σειράς</string>
-    <string name="context_record_title">Εγγραφή όλων με αυτόν τον τίτλο</string>
+    <string name="context_record_title">Εγγραφή όλων</string>
     <string name="context_edit_series">Επεξεργασία εγγραφής σειράς</string>
     <string name="context_edit_title">Επεξεργασία εγγραφής βάσει τίτλου</string>
     <string name="context_edit_keyword">Επεξεργασία εγγραφής βάσει λέξεων-κλειδιών</string>

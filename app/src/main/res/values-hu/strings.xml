@@ -33,7 +33,7 @@
         <item quantity="other">%1$d kikapcsolva</item>
     </plurals>
     <string name="context_record_series">Sorozat felvétele</string>
-    <string name="context_record_title">Összes ilyen című felvétele</string>
+    <string name="context_record_title">Összes felvétele</string>
     <string name="context_edit_series">Sorozatfelvétel szerkesztése</string>
     <string name="context_edit_title">Cím szerinti felvétel szerkesztése</string>
     <string name="context_edit_keyword">Kulcsszavas felvétel szerkesztése</string>

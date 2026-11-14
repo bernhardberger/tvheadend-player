@@ -39,7 +39,7 @@
         <item quantity="other">%1$d vypnutých</item>
     </plurals>
     <string name="context_record_series">Nahrát seriál</string>
-    <string name="context_record_title">Nahrát vše s tímto názvem</string>
+    <string name="context_record_title">Nahrát vše</string>
     <string name="context_edit_series">Upravit nahrávání seriálu</string>
     <string name="context_edit_title">Upravit nahrávání podle názvu</string>
     <string name="context_edit_keyword">Upravit nahrávání podle klíčových slov</string>

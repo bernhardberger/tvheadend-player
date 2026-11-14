@@ -36,7 +36,7 @@
         <item quantity="other">%1$d désactivés</item>
     </plurals>
     <string name="context_record_series">Enregistrer la série</string>
-    <string name="context_record_title">Tout enregistrer avec ce titre</string>
+    <string name="context_record_title">Tout enregistrer</string>
     <string name="context_edit_series">Modifier l’enregistrement de série</string>
     <string name="context_edit_title">Modifier l’enregistrement par titre</string>
     <string name="context_edit_keyword">Modifier l’enregistrement par mot-clé</string>
