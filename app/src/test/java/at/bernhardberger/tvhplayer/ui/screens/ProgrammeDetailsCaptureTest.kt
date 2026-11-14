@@ -406,6 +406,51 @@ class ProgrammeDetailsCaptureTest {
         }
     }
 
+    /** Other airings with a recording now, one scheduled by a rule and a plain one, the row focused. */
+    @Test @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
+    fun otherAiringsRecordingMarks() {
+        val now = start.epochSeconds - 3600
+        val event = EpgEvent.create(EventId(1), channel.id, start, start + 3600.seconds, title = "Ridge Light",
+            subtitle = "Beyond the Arctic Circle", description = description, image = ArtworkId(2))
+        val nowStart = Instant.fromEpochSeconds(now - 1800)
+        val airings = listOf(
+            EpgEvent.create(EventId(2), channel.id, nowStart, nowStart + 3600.seconds, title = event.title,
+                subtitle = event.subtitle, image = ArtworkId(3)),
+            EpgEvent.create(EventId(3), channel.id, start + 86400.seconds, event.stop + 86400.seconds, title = event.title,
+                subtitle = event.subtitle, image = ArtworkId(2)),
+            EpgEvent.create(EventId(4), channel.id, start + (2 * 86400).seconds, event.stop + (2 * 86400).seconds,
+                title = event.title, subtitle = event.subtitle, image = ArtworkId(3)),
+        )
+        val recordings = mapOf(
+            EventId(2) to DvrEntry.create(DvrEntryId(2), eventId = EventId(2), channelId = channel.id,
+                state = DvrEntryState.RECORDING),
+            EventId(3) to DvrEntry.create(DvrEntryId(3), eventId = EventId(3), channelId = channel.id,
+                state = DvrEntryState.SCHEDULED, autorecRuleId = AutorecRuleId("series")),
+        )
+        compose.setContentWithArtworkSampling {
+            CompositionLocalProvider(LocalDensity provides Density(2f, 1f)) {
+                TVHeadendPlayerTheme {
+                    view = LocalView.current
+                    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                        ProvideArtworkSession(session) {
+                            ProgrammeDetailsPage(event, null, channel, now,
+                                programmeDetailsActions(event, now, null, null, true, true), {}, {},
+                                related = airings, channelOf = { channel }, recordingOf = { recordings[it.id] })
+                        }
+                    }
+                }
+            }
+        }
+        compose.onNodeWithTag("details-card-2").requestFocus()
+        compose.mainClock.advanceTimeBy(1000)
+        compose.waitForIdle()
+        compose.onNodeWithTag("details-card-2").assertIsFocused()
+        val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
+        compose.runOnIdle { view.draw(Canvas(bitmap)) }
+        CaptureOutput.writePng(File("build/outputs/details-action-row", "other-airings-recording-marks.png"), bitmap)
+        bitmap.recycle()
+    }
+
     private fun capture(name: String, guide: Boolean, scheduled: Boolean = false, art: Boolean = true, failed: Boolean = false, player: Boolean = false, portrait: Boolean = false) {
         val channel = if (portrait) Channel.create(ChannelId(1), name = "Amber Stage", number = 6,
             icon = ChannelIcon.ImageCache(ArtworkId(1))) else this.channel

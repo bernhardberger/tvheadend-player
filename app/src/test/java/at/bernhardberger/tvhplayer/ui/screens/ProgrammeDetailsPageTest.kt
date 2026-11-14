@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvheadend.sdk.core.*
+import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
 import at.bernhardberger.tvhplayer.core.*
@@ -120,7 +121,27 @@ class ProgrammeDetailsPageTest {
     }
 
     @Test fun airingTopBlockShowsOwnProgressAndAiringsFollowActions() {
-        show(); compose.onNodeWithTag("details-watch").assertIsFocused()
+        fun airingEntry(id: Long, state: DvrEntryState, rule: Boolean = false, enabled: Boolean = true) =
+            DvrEntry.create(DvrEntryId(id), eventId = EventId(id), title = event.title, state = state, enabled = enabled,
+                autorecRuleId = AutorecRuleId("rule").takeIf { rule })
+        show(airingRecordings = mapOf(EventId(2) to airingEntry(2, DvrEntryState.RECORDING),
+            EventId(3) to airingEntry(3, DvrEntryState.SCHEDULED, rule = true),
+            EventId(4) to airingEntry(4, DvrEntryState.SCHEDULED, enabled = false),
+            EventId(5) to airingEntry(5, DvrEntryState.COMPLETED)))
+        compose.onNodeWithTag("details-watch").assertIsFocused()
+        // An airing being recorded or scheduled carries the programme cards' mark, in its rule or skipped form;
+        // the others carry none.
+        val resources = ApplicationProvider.getApplicationContext<Application>().resources
+        fun mark(id: Long) = compose.onNodeWithTag("details-card-recording-$id", useUnmergedTree = true)
+        mark(2).assertExists()
+        compose.onNodeWithTag("details-card-2").assertContentDescriptionContains(
+            resources.getString(R.string.player_recording))
+        compose.onNodeWithTag("details-card-3").assertContentDescriptionContains(
+            resources.getString(R.string.recording_from_automatic))
+        compose.onNodeWithTag("details-card-4").assertContentDescriptionContains(
+            resources.getString(R.string.autorec_editor_skipped))
+        mark(5).assertDoesNotExist()
+        mark(6).assertDoesNotExist()
         compose.onNodeWithText("21:00 • 112m left", substring = true).assertExists()
         compose.onNodeWithText("101 Ridge Earth HD").assertExists()
         compose.onNodeWithTag("details-metadata").assertTextEquals("120m • Documentary • S2\u00a0E3")
@@ -1539,7 +1560,8 @@ class ProgrammeDetailsPageTest {
         aboutSource: androidx.compose.runtime.State<String>? = null,
         aboutHeaderTall: androidx.compose.runtime.State<Boolean>? = null,
         warmMode: androidx.compose.runtime.State<at.bernhardberger.tvhplayer.settings.WarmPlaybackMode>? = null,
-        samplingContext: CoroutineContext = Dispatchers.Default, nowOverride: Long? = null) {
+        samplingContext: CoroutineContext = Dispatchers.Default, nowOverride: Long? = null,
+        airingRecordings: Map<EventId, DvrEntry> = emptyMap()) {
         val subtitle = if (longSubtitle && recordingFacts) "An extraordinary journey through the snowy mountains of the north, along the coast and across the wide valleys in the changing light of a long winter."
             else if (longSubtitle) "Eine außergewöhnliche Reise durch die verschneiten Berge des Nordens, entlang der Küste und über die weiten Täler im wechselnden Licht des langen Winters." else event.subtitle
         val shown = when {
@@ -1647,6 +1669,7 @@ class ProgrammeDetailsPageTest {
                                   listOf(EpgEvent.create(EventId(2), otherChannel.id, start, event.stop, title = event.title)) else if (todayCard)
                                   listOf(EpgEvent.create(EventId(2), channel.id, start + 3600.seconds, event.stop, title = event.title)) else airings,
                             onRelated = onRelated, channelOf = { listOf(channel, otherChannel).firstOrNull { c -> c.id == it } },
+                            recordingOf = { airingRecordings[it.id] },
                              returnToCard = returnToCard, recordingEvent = shown.takeIf { recordingFacts && creditsPresent?.value != false },
                             recordingAdmission = admitted(entry.takeIf { recording || future }),
                             recordingConfigurations = listOf(DvrConfiguration(DvrConfigId("default"), "", ""),

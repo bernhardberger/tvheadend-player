@@ -184,6 +184,7 @@ internal data class QuickZapPreviewSnapshot(
     val next: String?,
     val image: ChannelIcon?,
     val subtitle: String? = null,
+    val nextScheduled: Boolean = false,
 )
 
 /**
@@ -201,6 +202,8 @@ internal fun QuickZapTrayPreview(
     /** Without artwork and summary. */
     compact: Boolean = false,
     scrolling: Boolean = false,
+    /** A recording is scheduled for [next]. */
+    nextScheduled: Boolean = false,
 ) {
     val settledId = rememberUnlessHeld(channel?.id, scrolling)
     val snapshot = channel?.takeIf { it.id == settledId }?.let {
@@ -212,6 +215,7 @@ internal fun QuickZapTrayPreview(
             subtitle = event?.subtitle?.takeIf(String::isNotBlank),
             next = next?.title?.takeIf(String::isNotBlank)?.let { title -> "${formatClock(next.start.epochSeconds)} $title" },
             image = if (compact) null else event?.let(::programmeArtwork),
+            nextScheduled = nextScheduled && next != null,
         )
     }
     Box(modifier, contentAlignment = Alignment.BottomStart) {
@@ -224,6 +228,7 @@ internal fun QuickZapTrayPreview(
                 next = it.next,
                 image = it.image,
                 subtitle = it.subtitle,
+                nextScheduled = it.nextScheduled,
             )
         }
     }

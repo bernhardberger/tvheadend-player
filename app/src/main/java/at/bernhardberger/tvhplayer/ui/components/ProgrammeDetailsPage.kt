@@ -75,6 +75,7 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.*
 import at.bernhardberger.tvhplayer.ui.LocalWarmPlayback
 import at.bernhardberger.tvhplayer.ui.TvCardFocusedScale
+import at.bernhardberger.tvhplayer.ui.TvLogoPlateColor
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.TvTextColors
 import at.bernhardberger.tvhplayer.ui.common.*
@@ -123,6 +124,8 @@ internal fun ProgrammeDetailsPage(
     onRelated: (EpgEvent) -> Unit = {},
     onRelatedContextMenu: ((EpgEvent) -> Unit)? = null,
     channelOf: (ChannelId) -> Channel? = { null },
+    /** The DVR entry of a [related] airing, for its card's recording mark. */
+    recordingOf: (EpgEvent) -> DvrEntry? = { null },
     returnToCard: EventId? = null,
     onReturnToCardConsumed: () -> Unit = {},
     initialAction: BrowseContextAction? = null,
@@ -522,7 +525,7 @@ internal fun ProgrammeDetailsPage(
                         }
                     }
                     if (ids.isNotEmpty()) DetailsAirings(related, title, event?.let { detailsSubtitle(it, resources) } ?: recording?.subtitle,
-                        nowSec, channelOf, listState, cardFocus, lastCard, section == DetailsSection.AIRINGS, { airingsEmphasis.value },
+                        nowSec, channelOf, recordingOf, listState, cardFocus, lastCard, section == DetailsSection.AIRINGS, { airingsEmphasis.value },
                          Modifier.onFocusChanged { if (it.hasFocus) section = DetailsSection.AIRINGS }
                              .scrollSection(pageSpec, DetailsSection.AIRINGS),
                         onFocused = { lastCard = it }, onTextHeight = { airingsText.intValue = it },
@@ -870,7 +873,8 @@ private fun DetailsAboutFacts(facts: List<Pair<String, String>>) {
 @Composable
 private fun DetailsAirings(
     airings: List<EpgEvent>, pageTitle: String, pageEpisode: String?, nowSec: Long,
-    channelOf: (ChannelId) -> Channel?, listState: LazyListState, requesters: Map<EventId, FocusRequester>,
+    channelOf: (ChannelId) -> Channel?, recordingOf: (EpgEvent) -> DvrEntry?,
+    listState: LazyListState, requesters: Map<EventId, FocusRequester>,
     lastCard: EventId?, rowFocused: Boolean, emphasis: () -> Float, modifier: Modifier, onFocused: (EventId) -> Unit,
     onTextHeight: (Int) -> Unit, onClick: (EpgEvent) -> Unit,
     bottomSpace: androidx.compose.ui.unit.Dp,
@@ -908,7 +912,7 @@ private fun DetailsAirings(
                 horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                 itemsIndexed(airings, key = { _, it -> it.id.value }) { index, item ->
                     AiringCard(item, airingEpisode(item, pageTitle, pageEpisode, LocalContext.current.resources), item.channelId?.let(channelOf), nowSec,
-                        textShown,
+                        recordingOf(item), textShown,
                         Modifier.focusRequester(requesters.getValue(item.id))
                             .onSizeChanged { pictureHeight.intValue = it.height; onTextHeight(textHeight()) }
                             .onFocusChanged { if (it.isFocused) onFocused(item.id) }
@@ -930,7 +934,8 @@ internal fun airingEpisode(item: EpgEvent, pageTitle: String, pageEpisode: Strin
 
 @Composable
 private fun AiringCard(
-    item: EpgEvent, episode: String?, channel: Channel?, nowSec: Long, textShown: Transition<Boolean>,
+    item: EpgEvent, episode: String?, channel: Channel?, nowSec: Long, recording: DvrEntry?,
+    textShown: Transition<Boolean>,
     modifier: Modifier, onOpenContextMenu: (() -> Unit)?, onClick: () -> Unit,
 ) {
     val contextMenu = rememberBrowseContextMenuTrigger(onOpenContextMenu)
@@ -955,6 +960,23 @@ private fun AiringCard(
                 Modifier.fillMaxSize(),
                 plateModifier = Modifier.testTag("details-card-plate-${item.id.value}"),
                 progressModifier = Modifier.testTag("details-card-progress-${item.id.value}"))
+            // A recording airing carries the REC badge in the embed corner, as the zap cards do;
+            // a scheduled one the Home shelf's mark.
+            val markState = recording?.state
+            if (markState == DvrEntryState.RECORDING || markState == DvrEntryState.RECORDING_ERROR) RecordingBadge(markState,
+                Modifier.align(Alignment.TopEnd).padding(8.dp).testTag("details-card-recording-${item.id.value}"),
+                rule = recording.rule)
+            else if (markState == DvrEntryState.SCHEDULED) Box(
+                Modifier.align(Alignment.TopEnd).padding(8.dp)
+                    .background(TvLogoPlateColor, MaterialTheme.shapes.extraSmall)
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                    .testTag("details-card-recording-${item.id.value}"),
+                contentAlignment = Alignment.Center,
+            ) {
+                CompositionLocalProvider(LocalContentColor provides TvTextColors.primary) {
+                    RecordingStatusIndicator(markState, rule = recording.rule, skipped = recording.enabled == false)
+                }
+            }
         },
         title = {
             textShown.AnimatedVisibility({ it }, enter = RowTextEnter, exit = RowTextExit) {

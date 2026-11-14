@@ -368,6 +368,7 @@ internal fun ProgrammeDetailsHost(
                 onOverlayOpen = { pageOverlay = it },
                 related = airings,
                 channelOf = displayObservation::channel,
+                recordingOf = { displayObservation.dvrEntryForEvent(it)?.takeUnless(::recordingWasRemoved) },
                 returnToCard = returnCard,
                 onReturnToCardConsumed = { returnCard = null },
                 onRelated = pushPage,

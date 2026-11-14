@@ -147,6 +147,7 @@ import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.Notice
 import at.bernhardberger.tvhplayer.notices.PauseUnavailableReason
 import at.bernhardberger.tvhplayer.ui.screens.postDvrFailure
+import at.bernhardberger.tvhplayer.ui.screens.isScheduled
 import at.bernhardberger.tvhplayer.ui.screens.DvrMutationAction
 import at.bernhardberger.tvhplayer.ui.screens.DvrMutationActions
 import at.bernhardberger.tvhplayer.ui.screens.currentDvrMutation
@@ -1935,12 +1936,16 @@ fun VideoPlayerScreen(
             header = { PlayerChannelBrowserHint(channelBrowser, recentChannels.isNotEmpty(), channelsTitle()) },
             preview = {
                 val previewChannel = channels.firstOrNull { it.id == selectedId }
+                val previewNext = previewChannel?.let {
+                    observation.nextEvent(it.id, kotlin.time.Instant.fromEpochSeconds(nowSec))
+                }
                 QuickZapTrayPreview(previewChannel,
                     previewChannel?.let { observation.eventAt(it.id, kotlin.time.Instant.fromEpochSeconds(nowSec)) },
-                    previewChannel?.let { observation.nextEvent(it.id, kotlin.time.Instant.fromEpochSeconds(nowSec)) },
+                    previewNext,
                     nowSec,
                     Modifier.padding(horizontal = at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin),
-                    scrolling = channelBrowser.scrolling)
+                    scrolling = channelBrowser.scrolling,
+                    nextScheduled = observation.isScheduled(previewNext))
             },
             peeks = channels.isNotEmpty(),
             visible = controlsShown && !chromePanelOpen,
