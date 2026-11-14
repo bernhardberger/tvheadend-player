@@ -408,7 +408,7 @@ internal fun FolderListRow(
                     contentDescription = null,
                     tint = (if (focused) focusedIconTint else iconTint)
                         ?: androidx.tv.material3.LocalContentColor.current,
-                    modifier = Modifier.size(32.dp),
+                    modifier = Modifier.size(32.dp).testTag("recordings-folder-icon-$tag"),
                 )
             }
         },

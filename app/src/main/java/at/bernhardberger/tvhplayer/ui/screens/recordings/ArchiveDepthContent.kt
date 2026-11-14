@@ -5,6 +5,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
@@ -24,10 +25,12 @@ import androidx.compose.ui.util.lerp
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -134,7 +137,11 @@ internal fun ArchiveDepthContent(
     val latestPiconForEntry = rememberUpdatedState(piconForEntry)
     val latestAdmissionForEntry = rememberUpdatedState(admissionForEntry)
     // Only a flat list in date order is cut into days and months; each cut sits above the run's first recording.
-    val sections = remember(root, grouping, sort) {
+    val zone = java.time.ZoneId.systemDefault()
+    val today by remember(nowSeconds, zone) {
+        derivedStateOf { java.time.Instant.ofEpochSecond(nowSeconds()).atZone(zone).toLocalDate() }
+    }
+    val sections = remember(root, grouping, sort, today) {
         archiveDateSections(root, grouping, sort, nowSeconds)
     }
     // Sort and Show away from their defaults, quietly under the active headline.
@@ -196,7 +203,10 @@ private fun rememberArchiveLevels(
                 id = id,
                 heading = { emphasis ->
                     Box {
-                        ArchiveLevelHeading(heading(), emphasis, valuesLine.value)
+                        ArchiveLevelHeading(
+                            heading(), emphasis, valuesLine.value.takeUnless { id == RECORDING_NOW_LEVEL_ID },
+                            atRoot = id == rootId,
+                        )
                         if (id == rootId) latestRootHeadingEnd.value?.invoke()
                     }
                 },
@@ -318,8 +328,9 @@ internal val ValuesLineEndReserve = TvIconButtonSize + TvSpacing16
  * tight under its baseline; the preview slot never makes room for it, so its first row stays put.
  */
 @Composable
-internal fun ArchiveLevelHeading(name: String, emphasis: () -> Float, valuesLine: String?) {
+internal fun ArchiveLevelHeading(name: String, emphasis: () -> Float, valuesLine: String?, atRoot: Boolean = true) {
     val style = RecordingsHeadlineStyle
+    val direction = LocalLayoutDirection.current
     val previewScale = MaterialTheme.typography.titleMedium.fontSize.value / style.fontSize.value
     var baseline by remember { mutableFloatStateOf(0f) }
     val band = recordingsHeadingBandHeight()
@@ -332,7 +343,10 @@ internal fun ArchiveLevelHeading(name: String, emphasis: () -> Float, valuesLine
                 modifier = Modifier.graphicsLayer {
                     scaleX = lerp(previewScale, 1f, emphasis())
                     scaleY = scaleX
-                    transformOrigin = TransformOrigin(0f, if (size.height > 0f) baseline / size.height else 1f)
+                    transformOrigin = TransformOrigin(
+                        if (direction == LayoutDirection.Rtl) 1f else 0f,
+                        if (size.height > 0f) baseline / size.height else 1f,
+                    )
                 }.semantics { heading() }.testTag("archive-level-heading"),
             )
             if (name.isNotEmpty() && valuesLine != null) Text(
@@ -344,7 +358,10 @@ internal fun ArchiveLevelHeading(name: String, emphasis: () -> Float, valuesLine
         modifier = Modifier.fillMaxWidth(),
     ) { measurables, constraints ->
         val loose = constraints.copy(minWidth = 0, minHeight = 0)
-        val title = measurables.getOrNull(0)?.measure(loose)
+        val title = measurables.getOrNull(0)?.measure(
+            loose.copy(maxWidth = (constraints.maxWidth -
+                if (atRoot) ValuesLineEndReserve.roundToPx() else 0).coerceAtLeast(0)),
+        )
         val values = measurables.getOrNull(1)?.measure(
             loose.copy(maxWidth = (constraints.maxWidth - ValuesLineEndReserve.roundToPx()).coerceAtLeast(0)),
         )
@@ -354,8 +371,8 @@ internal fun ArchiveLevelHeading(name: String, emphasis: () -> Float, valuesLine
         val withValues = values?.let { valuesTop + it.height + ValuesLineBottomGap.roundToPx() } ?: bandPx
         val height = lerp(bandPx.toFloat(), maxOf(bandPx, withValues).toFloat(), emphasis()).roundToInt()
         layout(constraints.maxWidth, height) {
-            title?.place(0, 0)
-            values?.place(0, valuesTop)
+            title?.placeRelative(0, 0)
+            values?.placeRelative(0, valuesTop)
         }
     }
 }
