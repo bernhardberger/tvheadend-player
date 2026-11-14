@@ -2,6 +2,16 @@ package at.bernhardberger.tvhplayer.ui.screens
 
 import at.bernhardberger.tvhplayer.testutil.testDvrMutationActions
 import android.app.Application
+import androidx.compose.ui.graphics.toArgb
+import androidx.tv.material3.MaterialTheme
+import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvhplayer.testutil.FixtureArt
+import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
+import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
+import coil3.EventListener
+import coil3.request.ImageRequest
+import coil3.request.transformations
+import kotlinx.coroutines.Dispatchers
 import at.bernhardberger.tvhplayer.R
 import androidx.compose.runtime.remember
 import org.koin.compose.KoinIsolatedContext
@@ -76,8 +86,21 @@ import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
 class AutomaticRecordingEditorTest {
     @get:Rule val compose = createComposeRule()
+    @get:Rule val images = ImageLoaderRule()
 
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
     @Test fun newRecordingFlowRestoresItsKindAndClosesOnceAfterCreating() {
+        val logoRequests = mutableListOf<String>()
+        var focusedGround = 0
+        images.install(FixtureArt.imageLoader(RuntimeEnvironment.getApplication(),
+            mapOf(ArtworkId(1) to FixtureArt.picon("ridge-earth"))).newBuilder()
+            .eventListener(object : EventListener() {
+                override fun onStart(request: ImageRequest) {
+                    logoRequests.addAll(request.transformations.map { it.cacheKey })
+                }
+            }).coroutineContext(Dispatchers.Main.immediate)
+            .fetcherCoroutineContext(Dispatchers.Main.immediate)
+            .decoderCoroutineContext(Dispatchers.Main.immediate).build())
         val session = automaticRecordingFakeSession()
         val current = requireNotNull(session.observation.value.currentSession)
         val notices = NoticeCenter({ compose.mainClock.currentTime }, { NoticeContext(1, null) })
@@ -87,11 +110,14 @@ class AutomaticRecordingEditorTest {
             DvrMutationResult.Confirmed(at.bernhardberger.tvheadend.sdk.core.TimerecRuleId("new")))
         compose.setContent {
             TVHeadendPlayerTheme {
-                if (visible) NewAutomaticRecordingHost(
-                    current, session.observation, remember { AutorecPreviewLoader(session.epgRepository) },
-                    remember { DvrMutationActions(session.dvrRepository) }, notices,
-                    { automaticRecordingNow }, automaticRecordingZone, onClose = { closes++; visible = false },
-                )
+                focusedGround = MaterialTheme.colorScheme.onSurface.toArgb()
+                ProvideArtworkSession(automaticRecordingSession) {
+                    if (visible) NewAutomaticRecordingHost(
+                        current, session.observation, remember { AutorecPreviewLoader(session.epgRepository) },
+                        remember { DvrMutationActions(session.dvrRepository) }, notices,
+                        { automaticRecordingNow }, automaticRecordingZone, onClose = { closes++; visible = false },
+                    )
+                }
             }
         }
         // Check the kind level's initial focus and directional bounds.
@@ -118,6 +144,8 @@ class AutomaticRecordingEditorTest {
         compose.onNodeWithTag("timer-recording-date").assertDoesNotExist()
         compose.pressKey(Key.DirectionCenter)
         compose.pressKey(Key.DirectionCenter)
+        assertTrue("The focused channel logo is inked for the guided row's light fill",
+            logoRequests.any { it.startsWith("logoInk(${Integer.toHexString(focusedGround)},") })
         compose.pressKey(Key.DirectionDown)
         compose.pressKey(Key.DirectionCenter)
         for (day in DayOfWeek.entries) compose.onNodeWithTag("timer-recording-day-${day.value}").assertIsOn()
