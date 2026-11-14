@@ -23,6 +23,7 @@
 - A missed or failed recording that never wrote a file offers *Remove entry* instead of *Delete recording*.
 - A removed recording no longer hides another recording of the same program, and retention cleanup no longer repeats the “Recording deleted” notice.
 - Inside a folder or a settings page, a small chevron left of the headline shows that Left or Back leads back up a level.
+- The *Problems* tab is one list, newest first, under its days, with the number of failed and canceled recordings under the headline. *Clear* removes the entries that never wrote a file in one go; failed recordings with a partial file stay unless you choose to delete them too.
 - On the *Schedule* tab, OK on a recording that's running opens its details like any other scheduled recording; play it, watch the channel or stop it from there (#23).
 
 ### Automatic recordings and timers
