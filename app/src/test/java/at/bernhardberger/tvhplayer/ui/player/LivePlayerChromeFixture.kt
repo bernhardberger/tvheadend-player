@@ -60,6 +60,8 @@ import androidx.media3.common.Player
 import androidx.media3.common.TrackGroup
 import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.test.utils.FakeClock
+import androidx.media3.test.utils.robolectric.TestPlayerRunHelper
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
@@ -171,6 +173,8 @@ abstract class LivePlayerChromeFixture {
     protected val subscriptionDispatcher = StandardTestDispatcher()
 
     protected lateinit var player: ExoPlayer
+
+    private val playerClock = FakeClock(false)
 
     protected lateinit var view: View
 
@@ -291,7 +295,7 @@ abstract class LivePlayerChromeFixture {
             playerListeners.toList().forEach { it.onRenderedFirstFrame() }
             assertMainSettled("the driven frame is presented") { runtime.videoPresentation.value.visible }
             // Media3's ExoPlayer playback thread binds the grant after collection registration.
-            compose.waitUntil(5_000) { idleMainLooper(); runtime.livePause.value.availability == LivePauseAvailability.READY }
+            awaitLiveSignal("the timeshift grant is bound") { runtime.livePause.value.availability == LivePauseAvailability.READY }
             if (mapPosition) {
                 runTest(subscriptionDispatcher) {
                     // A displayed-content mapping is required to select a seek target.
@@ -393,7 +397,7 @@ abstract class LivePlayerChromeFixture {
     ) {
         // Media3's real ExoPlayer playback thread registers the media period's collection.
         val registered = scope.async(start = CoroutineStart.UNDISPATCHED) { connection.awaitCollectionRegistered() }
-        compose.waitUntil(5_000) { idleMainLooper(); registered.isCompleted }
+        awaitLiveSignal("the media period registers its collection") { registered.isCompleted }
         runTest(subscriptionDispatcher) {
             val registration = registered.await()
             connection.emit(registration, SubscriptionEvent.Started(listOf(
@@ -518,14 +522,14 @@ abstract class LivePlayerChromeFixture {
             settle()
             if (pauseBeforeZap) {
                 // Media3's ExoPlayer playback thread binds the grant after collection registration.
-                compose.waitUntil(5_000) { idleMainLooper(); runtime.livePause.value.availability == LivePauseAvailability.READY }
+                awaitLiveSignal("the timeshift grant is bound") { runtime.livePause.value.availability == LivePauseAvailability.READY }
                 key(Key.MediaPause)
                 assertTrue("A's server timeshift is paused", sampleTimeshift().paused)
                 settingsData.open.value = false
             }
             if (returnToSameChannel) {
                 // Media3's ExoPlayer playback thread binds the grant after collection registration.
-                compose.waitUntil(5_000) { idleMainLooper(); runtime.livePause.value.availability == LivePauseAvailability.READY }
+                awaitLiveSignal("the timeshift grant is bound") { runtime.livePause.value.availability == LivePauseAvailability.READY }
                 // With controls open Play keeps its explicit intent; hidden media keys toggle
                 // like Center. End the live-start token without pausing the old sample.
                 key(Key.DirectionDown)
@@ -568,7 +572,7 @@ abstract class LivePlayerChromeFixture {
             // The source worker resumes after the gated opener on subscriptionDispatcher.
             // Media3 can still bind when its real playback thread creates the period, so wait
             // for the grant signal without advancing Compose or coroutine virtual time.
-            compose.waitUntil(5_000) {
+            awaitLiveSignal("the zap target's timeshift is available") {
                 grantDispatcher.scheduler.runCurrent()
                 idleMainLooper()
                 (runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)
@@ -717,6 +721,28 @@ abstract class LivePlayerChromeFixture {
         shadowOf(Looper.getMainLooper()).idle()
     }
 
+    /**
+     * Waits for a signal of live playback on virtual time. The SDK's subscription work runs on
+     * [subscriptionDispatcher] and the player runs on [playerClock], a non-advancing FakeClock, so
+     * the only real thread is Media3's "ExoPlayer:Playback" thread, which prepares the source,
+     * creates its period, binds the grant and surfaces source errors on its timed work. Each pass
+     * runs due coroutine and main-looper work, blocks until that thread has handled every pending
+     * command (Media3's own hang guard is the only wall clock), then steps one frame on the
+     * player and Compose clocks. SDK timers never advance. A signal still missing after
+     * [LiveSignalPasses] frames fails at once.
+     */
+    protected fun awaitLiveSignal(label: String, condition: () -> Boolean) {
+        repeat(LiveSignalPasses) {
+            idleMainLooper()
+            if (condition()) return
+            TestPlayerRunHelper.advance(player).untilPendingCommandsAreFullyHandled()
+            playerClock.advanceTime(LiveSignalFrameMillis)
+            compose.settleFrames(1, LiveSignalFrameMillis)
+        }
+        idleMainLooper()
+        assertTrue("Missing signal after $LiveSignalPasses live frames: $label", condition())
+    }
+
     protected fun assertSubscriptionSettled(message: String, condition: () -> Boolean) {
         idleMainLooper()
         assertTrue(message, condition())
@@ -834,7 +860,7 @@ abstract class LivePlayerChromeFixture {
         acceptStartupOutcome: () -> Boolean = { true },
         onStartupOutcome: (MainStartupPlaybackOutcome) -> Unit = {},
         scheduleCompletion: CompletableDeferred<Unit>? = null,
-        workDispatcher: CoroutineDispatcher = Dispatchers.IO,
+        workDispatcher: CoroutineDispatcher = subscriptionDispatcher,
     ) {
         val now = System.currentTimeMillis() / 1_000L
         session = FakeTvheadendSession(observation(now, if (!epg) emptyList() else listOf(
@@ -871,7 +897,7 @@ abstract class LivePlayerChromeFixture {
         val channels = ChannelsViewModel(session, ChannelTagSettingsStore(InMemoryPreferencesDataStore()), profiles.liveProfile)
         models.put("channels", channels)
         assertMainSettled("the fake channel catalog is collected") { channels.scope.value.scope.visibleChannels.size == if (missingRequestedChannel) 2 else 3 }
-        player = ExoPlayer.Builder(context).build()
+        player = ExoPlayer.Builder(context).setClock(playerClock).build()
         val coordinator = createTvheadendPlaybackCoordinator(player, workDispatcher = workDispatcher).also { it.launchIn(scope) }
         val base = player
         val controlled = object : ExoPlayer by base {
@@ -957,3 +983,7 @@ abstract class LivePlayerChromeFixture {
         }
     }
 }
+
+/** Passes of due work, each ending on the playback thread; a live start needs fewer. */
+private const val LiveSignalPasses = 8
+private const val LiveSignalFrameMillis = 16L

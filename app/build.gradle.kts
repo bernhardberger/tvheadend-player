@@ -356,6 +356,7 @@ dependencies {
     testImplementation(platform(libs.androidx.compose.bom))
     testImplementation(libs.androidx.compose.ui.test.junit4)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.androidx.media3.test.utils.robolectric)
     implementation(libs.kotlinx.serialization.json)
     testImplementation(libs.tvheadend.sdk.testing) {
         version { strictly(libs.versions.tvheadend.sdk.get()) }

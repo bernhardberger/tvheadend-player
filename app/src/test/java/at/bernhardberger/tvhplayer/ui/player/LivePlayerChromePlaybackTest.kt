@@ -542,7 +542,7 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
             startLiveSubscription(connection, height = 1080L, signal = 53739L)
             playerReady()
             // Media3's ExoPlayer playback thread binds the grant after collection registration.
-            compose.waitUntil(5_000) { idleMainLooper(); runtime.livePause.value.availability == LivePauseAvailability.UNAVAILABLE }
+            awaitLiveSignal("the timeshift refusal is bound") { runtime.livePause.value.availability == LivePauseAvailability.UNAVAILABLE }
             key(Key.DirectionDown)
             compose.onNodeWithTag("player-pause").assertIsFocused()
             key(Key.DirectionCenter)
@@ -673,7 +673,7 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
             }
             // Media3's real ExoPlayer playback thread registers the media period's collection.
             val registered = scope.async(start = CoroutineStart.UNDISPATCHED) { connection.awaitCollectionRegistered() }
-            compose.waitUntil(5_000) { idleMainLooper(); registered.isCompleted }
+            awaitLiveSignal("the media period registers its collection") { registered.isCompleted }
             runTest(subscriptionDispatcher) {
                 connection.emit(SubscriptionEvent.Started(listOf(
                     SubscriptionStream(index = StreamIndex(1), type = SubscriptionStreamType.H264,
@@ -752,7 +752,7 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
             key(Key.DirectionDown)
             key(Key.DirectionCenter)
             // Media3's ExoPlayer playback thread publishes the bound subscription's diagnostics.
-            compose.waitUntil(5_000) { idleMainLooper(); runtime.diagnostics.value.live != null }
+            awaitLiveSignal("the bound subscription publishes diagnostics") { runtime.diagnostics.value.live != null }
             key(Key.Back)
             key(Key.Back)
             assertTrue(exists("player-actions"))
@@ -809,8 +809,9 @@ class LivePlayerChromePlaybackTest : LivePlayerChromeFixture() {
     @Test fun playerUnavailableClaimsNeitherPlayingNorLiveInTheControlsNorTheChip() {
         screen(failing = true)
         compose.runOnIdle { statsStore.setLevel(PlayerStatsLevel.STREAM_PATH) }
-        repeat(4) { settle() }
-        assertTrue("centre message", exists("player-channel-unavailable"))
+        // The undecodable stream fails on the player's next timed work.
+        awaitLiveSignal("centre message") { exists("player-channel-unavailable") }
+        settle()
         assertFalse("the message carries the stats instead of the card", exists("playback-stats-overlay"))
         assertFalse("unavailable replaces busy", exists("player-busy-indicator"))
         assertFalse("the Banner gives way to the centre message", exists("player-banner"))
