@@ -324,6 +324,9 @@ internal fun PlaybackOptionsSheetContent(
     val loadingLabel = stringResource(R.string.playback_tracks_loading)
     val noAudioLabel = stringResource(R.string.no_audio_tracks)
     val subtitlesOffLabel = stringResource(R.string.subtitles_off)
+    // Read outside the fallback below: read inside it, a change between a subtitle track and
+    // none rebuilt the whole panel, which moved focus to the page's first row.
+    val noSubtitlesLabel = stringResource(R.string.no_subtitles)
     val audioState = playbackTrackContentState(audioTracks.size, tracksResolving)
     val subtitleState = playbackTrackContentState(subtitleTracks.size, tracksResolving)
     val audioValue = audioTracks.firstOrNull(PlaybackOptionTrack::selected)?.label
@@ -337,7 +340,7 @@ internal fun PlaybackOptionsSheetContent(
         ?: if (subtitleState == PlaybackTrackContentState.LOADING) {
             loadingLabel
         } else if (subtitleState == PlaybackTrackContentState.EMPTY) {
-            "$subtitlesOffLabel / ${stringResource(R.string.no_subtitles)}"
+            "$subtitlesOffLabel / $noSubtitlesLabel"
         } else {
             subtitlesOffLabel
         }
@@ -721,10 +724,15 @@ private fun ColumnScope.TrackOptionsPage(
         }
     }
 
+    // Whether focus has landed on loaded tracks; until then arriving tracks may move it.
+    var landed by remember(quick) { mutableStateOf(false) }
     LaunchedEffect(quick, focusTarget, contentState) {
         // A quick list moves focus only on the first landing: a switched track must
         // not pull focus back from a row the user has moved on to.
         if (quick && focusedRow != null) return@LaunchedEffect
+        // A page keeps focus through a track switch unless its row went away.
+        if (landed && focusedRow in rowKeys) return@LaunchedEffect
+        landed = contentState != PlaybackTrackContentState.LOADING
         when (focusTarget) {
             PlaybackTrackFocusTarget.HeaderBack -> runCatching {
                 headerBackFocus.requestFocus()
