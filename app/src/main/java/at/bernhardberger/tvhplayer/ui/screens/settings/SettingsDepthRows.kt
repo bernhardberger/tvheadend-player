@@ -47,8 +47,8 @@ internal fun settingsLevel(
         connectionName?.let { stringResource(R.string.connection_scope_line, it) }, description,
     )
         .joinToString("\n").ifEmpty { null }
-    // Same heading in the active and preview slots (AOSP TvSettings parity): no
-    // back chevron. It uses the browse header band, so the title sits where the
+    // The shared depth host supplies the nested-level hint. The heading uses the browse
+    // header band, so the title sits where the
     // Channels, Guide and Recordings titles sit. In the preview slot it reads at the
     // row title size and grows to full size as its column slides into the active slot.
     val titleTop = with(LocalDensity.current) {

@@ -21,6 +21,7 @@
 - The choice between *Play recording* and *Watch live* shows the recording's picture and says when each choice would end. For a recording that's still running, that end time counts the part still to come; before, it counted only what was recorded so far.
 - A missed or failed recording that never wrote a file offers *Remove entry* instead of *Delete recording*.
 - A removed recording no longer hides another recording of the same program, and retention cleanup no longer repeats the “Recording deleted” notice.
+- Inside a folder or a settings page, a small chevron left of the headline shows that Left or Back leads back up a level.
 
 ### Automatic recordings and timers
 
