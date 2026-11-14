@@ -52,8 +52,10 @@ import at.bernhardberger.tvhplayer.ui.screens.automaticRecordingWindowLabel
 import at.bernhardberger.tvhplayer.ui.screens.formatTimerRecordingDays
 import java.time.LocalDate
 
-internal fun AutomaticRecordingListItem.rowId() =
-    "automatic-recording-${if (this is AutomaticRecordingListItem.Timer) "timer-" else ""}$id"
+internal fun AutomaticRecordingListItem.rowId() = scheduleRuleRowId(id, kind)
+
+internal fun scheduleRuleRowId(id: String, kind: AutomaticRecordingKind) =
+    "automatic-recording-${if (kind == AutomaticRecordingKind.TIMER) "timer-" else ""}$id"
 
 internal fun AutomaticRecordingListItem.icon() =
     when (kind) {

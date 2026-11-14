@@ -67,7 +67,7 @@ internal class ScheduleState {
     var automaticLevelVisited = false
     private val inFlight = mutableMapOf<String, ArrayDeque<RuleRequest>>()
 
-    fun hasPending(item: AutomaticRecordingListItem): Boolean = item.rowId() in inFlight
+    fun hasPending(id: String, kind: AutomaticRecordingKind): Boolean = scheduleRuleRowId(id, kind) in inFlight
 
     fun launchRuleMutation(
         scope: CoroutineScope,
@@ -229,13 +229,20 @@ private suspend fun deleteScheduleRule(
 }
 
 /**
- * Confirmation covers the app's draft fields, not server metadata; enabled may change in our queue.
+ * Confirms draft fields apart from enabled, plus automatic min/max duration, approximate start and
+ * retention, and timer title and retention. Excludes comment, directory, owner and creator;
+ * enabled may change in our queue.
  */
 private fun AutomaticRecordingListItem.sameConfirmedDraft(confirmed: AutomaticRecordingListItem?): Boolean = when {
     this is AutomaticRecordingListItem.Automatic && confirmed is AutomaticRecordingListItem.Automatic ->
-        rule.toDraft().copy(enabled = false) == confirmed.rule.toDraft().copy(enabled = false)
+        rule.toDraft().copy(enabled = false) == confirmed.rule.toDraft().copy(enabled = false) &&
+            rule.minDuration == confirmed.rule.minDuration && rule.maxDuration == confirmed.rule.maxDuration &&
+            rule.approximateStartMinutesSinceMidnight == confirmed.rule.approximateStartMinutesSinceMidnight &&
+            rule.retention == confirmed.rule.retention
     this is AutomaticRecordingListItem.Timer && confirmed is AutomaticRecordingListItem.Timer ->
-        rule.toDraft(LocalDate.MIN).copy(enabled = false) == confirmed.rule.toDraft(LocalDate.MIN).copy(enabled = false)
+        rule.toDraft(LocalDate.MIN).copy(enabled = false) ==
+            confirmed.rule.toDraft(LocalDate.MIN).copy(enabled = false) &&
+            rule.title == confirmed.rule.title && rule.retention == confirmed.rule.retention
     else -> false
 }
 

@@ -127,6 +127,27 @@ class RecordingsScreenTest {
                 cancelEntry = onCancelRecording,
                 deleteEntry = onDeleteRecording,
                 updateWatchStateCommand = { _, _, _ -> error("Unexpected watch-state update") },
+                createAutorecRule = { _, _ ->
+                    DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false)
+                },
+                updateAutorecRule = { _, _, _ ->
+                    DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false)
+                },
+                deleteAutorecRule = { _, _ ->
+                    DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false)
+                },
+                createTimerecRule = { _, _ ->
+                    DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false)
+                },
+                updateTimerecRule = { _, _, _ ->
+                    DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false)
+                },
+                deleteTimerecRule = { _, _ ->
+                    DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false)
+                },
+                updateEntry = { _, _, _ ->
+                    DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false)
+                },
             )
         }
         val noticeContext = rememberUpdatedState(NoticeContext(0,

@@ -1164,7 +1164,10 @@ internal fun RecordingsScreenContent(
             ?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
         if (!ready || !writable || target == null) return
         if (action == BrowseContextAction.EDIT_RULE) {
-            if (action in recordingRuleActions(target, writable, current.recordingRuleAvailable(target)))
+            val ruleId = target.autorecRuleId?.value ?: target.timerecRuleId?.value
+            val kind = current.recordingRuleKind(target)
+            val pending = ruleId != null && kind != null && screenState.scheduleState.hasPending(ruleId, kind)
+            if (!pending && action in recordingRuleActions(target, writable, current.recordingRuleAvailable(target)))
                 ruleEditorEntry = target
         } else if (action in recordingRuleActions(target, true, current.recordingRuleAvailable(target))) {
             ruleMutationBusy = true
@@ -1750,7 +1753,8 @@ private class RecordingOverlaysState(private val scheduleState: ScheduleState) {
     var scheduleRuleRequest: OpenRule?
         get() = scheduleRequest
         set(value) {
-            if (value?.surface != RuleSurface.EDIT || value.item?.let(scheduleState::hasPending) != true) {
+            if (value?.surface != RuleSurface.EDIT ||
+                value.item?.let { scheduleState.hasPending(it.id, it.kind) } != true) {
                 scheduleRequest = value
             }
         }

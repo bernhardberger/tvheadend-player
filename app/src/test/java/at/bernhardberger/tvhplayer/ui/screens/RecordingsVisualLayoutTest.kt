@@ -1686,6 +1686,12 @@ class RecordingsVisualLayoutTest {
         val id = AutorecRuleId("ridge")
         val enabled = AutorecRule.create(id, title = "^Ridge Light$")
         val disabled = AutorecRule.create(id, title = "^Ridge Light$", enabled = false)
+        val own = listOf(
+            DvrEntry.create(DvrEntryId(401), state = DvrEntryState.SCHEDULED, autorecRuleId = id,
+                start = Instant.fromEpochSeconds(nowSeconds() + 3_600),
+                stop = Instant.fromEpochSeconds(nowSeconds() + 7_200)),
+            DvrEntry.create(DvrEntryId(402), state = DvrEntryState.SCHEDULED, autorecRuleId = id, enabled = false),
+        )
         val release = CompletableDeferred<Unit>()
         val releaseFailure = CompletableDeferred<Unit>()
         var queuedToggle: CompletableDeferred<Unit>? = null
@@ -1733,12 +1739,26 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionDown)
         key(Key.DirectionCenter)
         assertEquals("The same rule cannot submit another toggle while pending", 1, updates.size)
+        publish(own, autorecRules = listOf(enabled))
+        key(Key.DirectionLeft)
+        key(Key.DirectionDown)
+        focused("recording-list-entry-401")
+        key(Key.Menu)
+        repeat(2) { key(Key.DirectionDown) }
+        focused("browse-context-action-edit_rule")
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("automatic-recording-main").assertDoesNotExist()
+        compose.runOnIdle { backDispatcher.onBackPressed() }
+        compose.settleFrames(2)
+        key(Key.DirectionUp)
+        key(Key.DirectionCenter)
+        focused("automatic-recording-ridge")
         compose.runOnIdle { screenShown.value = false }
         compose.waitForIdle()
         compose.runOnIdle { screenShown.value = true }
         focused("automatic-recording-ridge")
         key(Key.Menu)
-        publish(emptyList(), autorecRules = listOf(disabled))
+        publish(own, autorecRules = listOf(disabled))
         compose.onNodeWithTag("automatic-recording-menu-toggle").assert(hasText(
             view.context.getString(R.string.schedule_automatic_turn_on)))
         key(Key.DirectionDown)
@@ -1758,10 +1778,6 @@ class RecordingsVisualLayoutTest {
         compose.onNodeWithTag("automatic-recording-main").assertIsDisplayed()
         compose.runOnIdle { backDispatcher.onBackPressed() }
         compose.settleFrames(2)
-        val own = listOf(
-            DvrEntry.create(DvrEntryId(401), state = DvrEntryState.SCHEDULED, autorecRuleId = id),
-            DvrEntry.create(DvrEntryId(402), state = DvrEntryState.SCHEDULED, autorecRuleId = id, enabled = false),
-        )
         publish(own, autorecRules = listOf(disabled))
         key(Key.Menu)
         repeat(2) { key(Key.DirectionDown) }
@@ -1785,7 +1801,12 @@ class RecordingsVisualLayoutTest {
         publish(emptyList())
         focused("schedule-new-automatic")
         assertEquals("schedule:automatic", screenState.scheduleNavigation.stack.active.levelId)
-        for (changedElsewhere in listOf(true, false)) {
+        for (publishedRule in listOf(
+            AutorecRule.create(id, title = "^Changed elsewhere$", enabled = false),
+            disabled,
+            AutorecRule.create(id, title = "^Ridge Light$", enabled = false, minDuration = 1.minutes),
+        )) {
+            val changedElsewhere = publishedRule != disabled
             publish(emptyList(), autorecRules = listOf(enabled))
             compose.onNodeWithTag("automatic-recording-ridge").requestFocus()
             focused("automatic-recording-ridge")
@@ -1800,8 +1821,7 @@ class RecordingsVisualLayoutTest {
             compose.pressKey(Key.DirectionCenter, settleFrames = 1, frameMillis = PlayerMotion.PanelMs.toLong())
             val before = deletes
             val noticeBefore = noticeCenter.state.value.pending.singleOrNull()
-            publish(emptyList(), autorecRules = listOf(if (changedElsewhere)
-                AutorecRule.create(id, title = "^Changed elsewhere$", enabled = false) else disabled))
+            publish(emptyList(), autorecRules = listOf(publishedRule))
             compose.runOnIdle { queuedToggle.complete(Unit) }
             compose.waitForIdle()
             assertEquals("Delete must use the confirmed rule apart from enabled",
@@ -1812,6 +1832,15 @@ class RecordingsVisualLayoutTest {
                 assertNotEquals(noticeBefore, noticeAfter)
             } else assertEquals(noticeBefore, noticeAfter)
         }
+        publish(own, autorecRules = listOf(disabled))
+        key(Key.DirectionLeft)
+        key(Key.DirectionDown)
+        focused("recording-list-entry-401")
+        key(Key.Menu)
+        repeat(2) { key(Key.DirectionDown) }
+        focused("browse-context-action-edit_rule")
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("automatic-recording-main").assertIsDisplayed()
     }
 
     @Test fun recoveringScheduleKeepsAddingRowsFocusableButDisabled() {
