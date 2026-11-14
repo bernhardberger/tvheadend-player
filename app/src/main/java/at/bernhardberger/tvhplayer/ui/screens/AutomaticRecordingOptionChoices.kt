@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvheadend.sdk.core.BroadcastType
 import at.bernhardberger.tvheadend.sdk.core.DuplicateDetection
@@ -52,7 +53,7 @@ private fun AutomaticRecordingMore(state: AutomaticRecordingEditorState, configu
     }
     val changed = state.changedFields.intersect(automaticRecordingMoreFields)
     if (changed.isNotEmpty()) GuidedStepAction(
-        title = stringResource(R.string.autorec_editor_reset_options, changed.size),
+        title = pluralStringResource(R.plurals.autorec_editor_reset_options, changed.size, changed.size),
         subtitle = changed.map { automaticRecordingFieldLabel(it) }.joinToString(", "),
         modifier = editorRowModifier(state.navigation, "reset-options"),
         onClick = {
@@ -60,7 +61,7 @@ private fun AutomaticRecordingMore(state: AutomaticRecordingEditorState, configu
         },
     )
     if (state.editing) GuidedStepAction(
-        stringResource(R.string.autorec_editor_delete),
+        stringResource(R.string.context_delete),
         { state.navigation.confirmation = AutomaticRecordingEditorConfirmation.DELETE },
         editorRowModifier(state.navigation, "delete"),
     )

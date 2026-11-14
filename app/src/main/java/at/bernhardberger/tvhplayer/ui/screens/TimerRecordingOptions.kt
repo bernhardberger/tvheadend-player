@@ -69,7 +69,7 @@ private fun TimerRecordingMore(state: TimerRecordingEditorState, configurations:
         editorRowModifier(state.navigation, "reset-options"),
     )
     if (state.editing) GuidedStepAction(
-        stringResource(R.string.autorec_editor_delete),
+        stringResource(R.string.context_delete),
         { state.navigation.confirmation = AutomaticRecordingEditorConfirmation.DELETE },
         editorRowModifier(state.navigation, "delete"),
     )

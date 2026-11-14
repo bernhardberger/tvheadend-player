@@ -30,7 +30,7 @@ internal val timerChannelTimeFields = setOf(
 internal fun timerMainLabel(state: TimerRecordingEditorState): String = stringResource(when {
     state.editing -> R.string.autorec_editor_save
     state.draft.repeating -> R.string.timer_editor_create
-    else -> R.string.autorec_editor_record
+    else -> R.string.context_record
 })
 
 @Composable

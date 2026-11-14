@@ -2,8 +2,10 @@
     <string name="automatic_recording_new_overline">Automatic recordings</string>
     <string name="automatic_recording_new_title">New automatic recording</string>
     <string name="automatic_recording_new_choose">Choose how it decides what to record.</string>
+    <!-- Kind of automatic recording that matches words. -->
     <string name="automatic_recording_new_keyword">Keyword</string>
     <string name="automatic_recording_new_keyword_help">Programs that mention your words</string>
+    <!-- Kind of automatic recording that matches a program title; not a field label. -->
     <string name="automatic_recording_new_title_kind">Title</string>
     <string name="automatic_recording_new_title_help">Programs with exactly this title</string>
     <string name="automatic_recording_new_timer">Repeating timer</string>
@@ -70,10 +72,11 @@
     <string name="recording_from_automatic">Part of an automatic recording</string>
     <string name="timer_editor_title">Record by time</string>
     <string name="timer_editor_new">New timer</string>
-    <string name="timer_editor_edit">Edit repeating timer</string>
     <string name="timer_editor_create">Create repeating timer</string>
     <string name="timer_editor_name">Name</string>
+    <!-- Row label for the days a timer repeats on; not a rerun. -->
     <string name="timer_editor_repeat">Repeat</string>
+    <!-- Value of Repeat meaning a one-off recording. -->
     <string name="timer_editor_never">Never</string>
     <string name="timer_editor_every_day">Every day</string>
     <string name="timer_editor_weekdays">Weekdays</string>
@@ -81,11 +84,10 @@
     <string name="timer_editor_date">Date</string>
     <string name="timer_editor_start">Starts at</string>
     <string name="timer_editor_end">Ends at</string>
-    <string name="timer_editor_hour">Hour</string>
-    <string name="timer_editor_minute">Minutes</string>
     <string name="timer_editor_next_day">Next day</string>
     <string name="timer_editor_next_day_time">%1$s · next day</string>
     <string name="timer_editor_next_day_date">Next day · %1$s</string>
+    <!-- %1$s is a date; %2$s is a clock time. -->
     <string name="timer_editor_ends">Ends %1$s at %2$s</string>
     <string name="timer_editor_no_padding">No padding for repeating timers</string>
     <string name="timer_editor_next_recordings">Next recordings</string>
@@ -98,6 +100,7 @@
     <string name="timer_editor_time_passed">That time has passed</string>
     <string name="timer_editor_repeat_required">Choose at least one day</string>
     <string name="timer_editor_starts_now">Starts recording as soon as you confirm</string>
+    <!-- %1$s is the channel name; %2$s is the start time; %3$s is the end time. -->
     <string name="timer_editor_description">Records %1$s from %2$s to %3$s, whatever is on.</string>
     <string name="timer_editor_repeat_help">Tick the days it repeats on.</string>
     <string name="timer_editor_clock_help">Pick the hour, then the minutes.</string>
@@ -123,7 +126,6 @@
     <string name="autorec_editor_title_full_description">Uses “%1$s” to find programs by title, subtitle and description.</string>
     <string name="autorec_editor_keyword_description">Records every program whose title contains “%1$s”.</string>
     <string name="autorec_editor_keyword_full_description">Records every program whose title, subtitle or description contains “%1$s”.</string>
-    <string name="autorec_editor_delete">Delete</string>
     <string name="autorec_editor_delete_series">Delete series recording?</string>
     <string name="automatic_recording_kind_series">Series recording</string>
     <string name="automatic_recording_kind_title">Title recording</string>
@@ -131,7 +133,6 @@
     <string name="autorec_editor_delete_title">Delete title recording?</string>
     <string name="autorec_editor_delete_keyword">Delete keyword recording?</string>
     <string name="autorec_editor_delete_finished">Finished recordings stay.</string>
-    <string name="autorec_editor_keep_recording">Keep</string>
     <string name="autorec_editor_delete_unsaved">Your unsaved changes will be discarded.</string>
     <string name="autorec_editor_deleting">Deleting automatic recording…</string>
     <plurals name="autorec_editor_words_titles_summary">
@@ -175,13 +176,8 @@
         <item quantity="other">In the guide: %1$d programs, %2$d to be recorded</item>
     </plurals>
     <string name="autorec_editor_new_series">New series recording</string>
-    <string name="autorec_editor_edit_series">Edit series recording</string>
-    <string name="autorec_editor_edit_title">Edit title recording</string>
-    <string name="autorec_editor_edit_keyword">Edit keyword recording</string>
     <string name="autorec_editor_new_title">New title recording</string>
     <string name="autorec_editor_new_keyword">New keyword recording</string>
-    <string name="autorec_editor_record_series">Record series</string>
-    <string name="autorec_editor_record">Record</string>
     <string name="autorec_editor_save">Save changes</string>
     <string name="autorec_editor_series_description">Records every episode the guide links to this series, whatever its title.</string>
     <string name="autorec_editor_keep_help">Choose how long to keep the recordings this automatic recording makes.</string>
@@ -194,31 +190,35 @@
     <string name="autorec_editor_days">Days</string>
     <string name="autorec_editor_any_day">Any day</string>
     <string name="autorec_editor_no_day">No day</string>
+    <!-- Span of clock times in which a program must start to be recorded. -->
     <string name="autorec_editor_start_window">Start window</string>
     <string name="autorec_editor_any_time">Any time</string>
     <string name="autorec_editor_after">Starts after…</string>
     <string name="autorec_editor_before">Starts before…</string>
     <string name="autorec_editor_after_time">Starts after %1$s</string>
     <string name="autorec_editor_before_time">Starts before %1$s</string>
+    <!-- A stored value outside the offered choices; %1$s is that value. -->
     <string name="autorec_editor_current">Current · %1$s</string>
     <string name="autorec_editor_current_setting">Current setting from Tvheadend</string>
     <string name="autorec_editor_channel_unavailable">Channel unavailable</string>
-    <string name="autorec_editor_keep">Keep until</string>
     <string name="autorec_editor_keep_week">1 week after recording</string>
     <string name="autorec_editor_keep_month">1 month after recording</string>
     <string name="autorec_editor_keep_three_months">3 months after recording</string>
     <string name="autorec_editor_keep_six_months">6 months after recording</string>
     <string name="autorec_editor_keep_year">1 year after recording</string>
-    <string name="autorec_editor_keep_days">%1$d days after recording</string>
-    <string name="autorec_editor_days_after_recording">%1$d days after recording</string>
-    <string name="autorec_editor_until_space">Until space is needed</string>
-    <string name="autorec_editor_forever">Forever</string>
+    <plurals name="autorec_editor_days_after_recording">
+        <item quantity="one">%1$d day after recording</item>
+        <item quantity="other">%1$d days after recording</item>
+    </plurals>
     <string name="autorec_editor_more">More options</string>
     <string name="autorec_editor_defaults">All at default</string>
     <string name="autorec_editor_unchanged_options">No changes here</string>
+    <!-- Small badge on a setting that differs from its default or stored value. -->
     <string name="autorec_editor_changed">Changed</string>
-    <string name="autorec_editor_changed_options">%1$d changed: %2$s</string>
-    <string name="autorec_editor_reset_options">Reset these %1$d options</string>
+    <plurals name="autorec_editor_reset_options">
+        <item quantity="one">Reset this option</item>
+        <item quantity="other">Reset these %1$d options</item>
+    </plurals>
     <string name="autorec_editor_duplicate">Duplicate detection</string>
     <string name="autorec_editor_duplicate_all">Record all</string>
     <string name="autorec_editor_duplicate_episode">Same episode number</string>
@@ -235,6 +235,7 @@
     <string name="autorec_editor_duplicate_week_help">Records at most one matching program each week.</string>
     <string name="autorec_editor_current_help">Keeps this setting from Tvheadend unless you choose another.</string>
     <string name="autorec_editor_priority">Priority</string>
+    <!-- Value of Priority meaning the server's default priority. -->
     <string name="autorec_editor_default">Default</string>
     <string name="autorec_editor_priority_important">Important</string>
     <string name="autorec_editor_priority_high">High</string>
@@ -242,10 +243,16 @@
     <string name="autorec_editor_priority_low">Low</string>
     <string name="autorec_editor_priority_unimportant">Unimportant</string>
     <string name="autorec_editor_priority_unset">Not set</string>
+    <!-- Extra recording time before the start. -->
     <string name="autorec_editor_padding_before">Padding before</string>
+    <!-- Extra recording time after the end. -->
     <string name="autorec_editor_padding_after">Padding after</string>
-    <string name="autorec_editor_minutes">%1$d minutes</string>
+    <plurals name="autorec_editor_minutes">
+        <item quantity="one">%1$d minute</item>
+        <item quantity="other">%1$d minutes</item>
+    </plurals>
     <string name="autorec_editor_broadcast">Broadcast type</string>
+    <!-- Value of Broadcast type meaning no restriction. -->
     <string name="autorec_editor_any">Any</string>
     <string name="autorec_editor_new_only">New only</string>
     <string name="autorec_editor_repeats_only">Repeats only</string>
@@ -256,7 +263,11 @@
         <item quantity="other">%1$d recordings</item>
     </plurals>
     <string name="autorec_editor_no_limit">No limit</string>
-    <string name="autorec_editor_maximum_help">Keeps at most %1$d recordings from this automatic recording.</string>
+    <plurals name="autorec_editor_maximum_help">
+        <item quantity="one">Keeps at most %1$d recording from this automatic recording.</item>
+        <item quantity="other">Keeps at most %1$d recordings from this automatic recording.</item>
+    </plurals>
+    <!-- Label of the switch that turns an automatic recording or timer on or off. -->
     <string name="autorec_editor_turned_on">Enabled</string>
     <string name="autorec_editor_off_after_save">Off once you save</string>
     <string name="autorec_editor_off_help">A running recording continues and finished recordings stay.</string>
@@ -267,12 +278,16 @@
     <string name="autorec_editor_search_failed">Couldn’t search the guide</string>
     <string name="autorec_editor_no_matches">None in the guide yet</string>
     <string name="autorec_editor_empty_words">Enter words and the programs they find appear here</string>
+    <!-- %1$d is how many more programs match; %2$s names their level (e.g. Upcoming episodes). -->
     <string name="autorec_editor_more_preview">and %1$d more · all under %2$s</string>
     <string name="autorec_editor_guide_horizon">The guide covers only the coming days.</string>
     <string name="autorec_editor_broadcast_unavailable">May include programs this automatic recording leaves out.</string>
     <string name="autorec_editor_duplicate_state">Duplicate, not recorded</string>
+    <!-- Badge and state of a scheduled recording the user chose not to record. -->
     <string name="autorec_editor_skipped">Skipped</string>
+    <!-- State of a matching episode the user unticked. -->
     <string name="autorec_editor_left_out">Left out</string>
+    <!-- State of a scheduled episode the edited settings no longer match. -->
     <string name="autorec_editor_removed">Removed</string>
     <string name="autorec_editor_leave_title">Leave without saving?</string>
     <string name="autorec_editor_leave_body">Your changes have not been saved.</string>
@@ -625,6 +640,9 @@
     <string name="playback_options_next_category">Next options category</string>
     <string name="player_live_tv_surface">Live TV player</string>
     <string name="player_recording_surface">Recording player</string>
+    <string name="player_raster_spoken">%1$s lines</string>
+    <string name="player_audio_spoken">Audio %1$s</string>
+    <string name="player_ad_short">AD</string>
     <string name="stats_on">On</string>
     <string name="stats_off">Off</string>
     <string name="display_mode">Display mode</string>
@@ -1137,7 +1155,7 @@
     <string name="details_kept_until_space_needed">Kept until space is needed</string>
     <!-- Finished recording action opening its expiry choices; keep short for a menu row. -->
     <string name="context_keep_until">Keep until…</string>
-    <!-- Heading over the finished recording expiry choices. -->
+    <!-- Heading over finished recording expiry choices or an automatic recording/timer retention setting. -->
     <string name="recording_keep_until_heading">Keep until</string>
     <!-- Stored expiry that differs from the offered choices; date appears below. -->
     <string name="recording_keep_until_current">Current</string>
@@ -1151,9 +1169,9 @@
     <string name="recording_keep_until_six_months">In 6 months</string>
     <!-- Calendar-year expiry choice counted from now, with its actual date below. -->
     <string name="recording_keep_until_year">In 1 year</string>
-    <!-- Server-managed finished recording expiry choice; no supporting line. -->
+    <!-- Server-managed expiry or automatic recording/timer setting: keep files until space is needed. -->
     <string name="recording_keep_until_space_needed">Until space is needed</string>
-    <!-- Finished recording choice that keeps its file indefinitely; no supporting line. -->
+    <!-- Expiry or automatic recording/timer setting that keeps recording files indefinitely. -->
     <string name="recording_keep_until_forever">Forever</string>
     <!-- Recording expiry badge in details/pane, and spoken card chip. %1$s is a date or time left; keep prefix within 10 characters. -->
     <string name="recording_expires_in">Expires %1$s</string>

@@ -40,9 +40,12 @@ Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retain
 
 0.5 confirmation and playback card strings (`server_switch_question`, `server_remove_*`, `*_confirm_body`, `delete_folder_*_confirm_question`, `recording_recorded_of`) drafted against `90078f81` by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer.
 
+0.5 automatic recording, timer, Keep until and expiry strings (`automatic_recording_*`, `autorec_editor_*`, `timer_editor_*`, `context_edit_*`, `context_skip_*`, `context_unskip_*`, `context_record_*`, `context_keep_until`, `recording_keep_until_*`, `recording_expir*`, `home_expiring_soon`, `recording_from_automatic`, `recording_state_and_origin`) drafted against `9e30bc99` by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer. Reviewer corrections accepted for `autorec_editor_defaults`, `autorec_editor_left_out`, `autorec_editor_removed`.
+
 ## Open questions
 
 - Check TTS pronunciation of `player_scrub_*` speed multipliers.
 
 - Confirm *Tv-läge* / *tv-starttjänst* and whether TV users expect the English term for audio passthrough.
 - `guide_time_prime_time` exceeds the soft length limit.
+- `recording_keep_until_*` rows read *Till om 1 vecka* under the heading; check the idiom.

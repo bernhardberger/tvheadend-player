@@ -2,6 +2,7 @@
 @file:OptIn(at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class)
 
 package at.bernhardberger.tvhplayer.ui.player
+
 import androidx.compose.ui.test.requestFocus
 import at.bernhardberger.tvhplayer.testutil.focusedTags
 import at.bernhardberger.tvhplayer.testutil.tagExists
@@ -140,9 +141,12 @@ class RecordingPlayerChromeScreenTest {
         override val lifecycle = LifecycleRegistry.createUnsafe(this)
     }
     private val playerListeners = mutableListOf<Player.Listener>()
+    private val formatListeners = mutableListOf<androidx.media3.exoplayer.analytics.AnalyticsListener>()
     /** The player reports READY and playing, as once the recording's first frame is out. */
     private var forcedReady = false
     private var forcedTracks: Tracks? = null
+    private var forcedVideoFormat: Format? = null
+    private var forcedAudioFormat: Format? = null
     private var positionMs = 600_000L
     private val loadGate = CountDownLatch(1)
 
@@ -164,6 +168,38 @@ class RecordingPlayerChromeScreenTest {
             .assertTextEquals(context.getString(AppErrorCondition.RECORDING_UNAVAILABLE.titleRes()))
         assertFalse("loading must not cover a terminal failure", loadingShown())
         assertFalse("startup ring must not cover a terminal failure", exists("player-busy-indicator"))
+    }
+
+    @Test fun streamBadgesRequireTheRetainedRecordingSessionToBeCurrent() {
+        val video = Format.Builder().setSampleMimeType(MimeTypes.VIDEO_H264).setHeight(1080).build()
+        val audio = Format.Builder().setSampleMimeType(MimeTypes.AUDIO_AAC).setChannelCount(2)
+            .setRoleFlags(C.ROLE_FLAG_DESCRIBES_VIDEO).build()
+        forcedVideoFormat = video
+        forcedAudioFormat = audio
+        forcedTracks = Tracks(listOf(
+            Tracks.Group(TrackGroup(video), false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(true)),
+            Tracks.Group(TrackGroup(audio), false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(true))))
+        val server = screen()
+        playingWithoutFrame()
+        compose.runOnIdle {
+            val event = androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime(
+                0, player.currentTimeline, 0, null, 0, player.currentTimeline, 0, null, 0, 0)
+            formatListeners.toList().forEach {
+                it.onVideoInputFormatChanged(event, video, null)
+                it.onAudioInputFormatChanged(event, audio, null)
+            }
+        }
+        assertTrue(description("player-info-bar").contains("1080 lines"))
+        compose.runOnIdle {
+            server.replaceGeneration(SessionObservation.create(
+                sessionState = server.observation.value.sessionState,
+                channelState = server.observation.value.channelState,
+                dvrState = server.observation.value.dvrState,
+            ))
+        }
+        settle()
+        assertTrue("the installed recording retains its programme facts", exists("player-info-bar"))
+        assertFalse("old formats cannot appear under this recording's retained title", exists("player-stream-badges"))
     }
 
     @Test fun loadingStaysUntilTheFirstFrameAndDoesNotReturnForBuffering() {
@@ -1144,6 +1180,16 @@ class RecordingPlayerChromeScreenTest {
             override fun isPlaying(): Boolean = forcedReady && base.playWhenReady
             override fun getDuration(): Long = 3_600_000L
             override fun getCurrentTracks(): Tracks = forcedTracks ?: base.currentTracks
+            override fun getVideoFormat(): Format? = forcedVideoFormat ?: base.videoFormat
+            override fun getAudioFormat(): Format? = forcedAudioFormat ?: base.audioFormat
+            override fun addAnalyticsListener(listener: androidx.media3.exoplayer.analytics.AnalyticsListener) {
+                formatListeners += listener
+                base.addAnalyticsListener(listener)
+            }
+            override fun removeAnalyticsListener(listener: androidx.media3.exoplayer.analytics.AnalyticsListener) {
+                formatListeners -= listener
+                base.removeAnalyticsListener(listener)
+            }
             override fun getCurrentPosition(): Long = positionMs
             override fun isCurrentMediaItemSeekable(): Boolean = true
             override fun isCommandAvailable(command: Int): Boolean =

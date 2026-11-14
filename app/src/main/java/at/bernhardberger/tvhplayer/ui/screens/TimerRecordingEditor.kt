@@ -93,7 +93,7 @@ private fun TimerRecordingFirstLevel(state: TimerRecordingEditorState, channels:
         timerNameLabel(state.draft, channels), setOf(RecordingDraftField.NAME)) {
         state.navigation.open(AutomaticRecordingEditorLevel.NAME, "name-input")
     }
-    TimerRecordingField(state, "keep", stringResource(R.string.autorec_editor_keep),
+    TimerRecordingField(state, "keep", stringResource(R.string.recording_keep_until_heading),
         automaticRecordingKeepLabel(state.draft.removal), setOf(RecordingDraftField.KEEP_UNTIL)) {
         state.navigation.open(AutomaticRecordingEditorLevel.KEEP, "keep-${state.draft.removal}")
     }

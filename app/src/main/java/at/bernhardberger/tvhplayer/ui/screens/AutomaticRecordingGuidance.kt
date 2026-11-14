@@ -122,7 +122,7 @@ private fun AutomaticRecordingFocusedChoice(state: AutomaticRecordingEditorState
         AutomaticRecordingEditorLevel.KEEP -> AutomaticRecordingKeepGuidance(state)
         AutomaticRecordingEditorLevel.MAXIMUM -> state.navigation.focusedRow.removePrefix("choice-").toLongOrNull()
             ?.takeIf { it > 0 }?.let {
-                RecordingEditorSecondary(stringResource(R.string.autorec_editor_maximum_help, it))
+                RecordingEditorSecondary(pluralStringResource(R.plurals.autorec_editor_maximum_help, it.toInt(), it))
             }
         else -> Unit
     }
