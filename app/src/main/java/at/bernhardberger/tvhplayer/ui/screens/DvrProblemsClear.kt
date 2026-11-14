@@ -12,18 +12,20 @@ import at.bernhardberger.tvhplayer.notices.Notice
 import at.bernhardberger.tvhplayer.notices.toDvrMutationFeedback
 
 /**
- * Removes the problem entries [entryIds] one request at a time. Each is checked against the latest
- * observation first: one that is no longer a problem is skipped, and so is one with a file unless
- * [withPartial] was chosen. Once the opening session or the permission is gone, the rest count as
- * not cleared. Returns the notice to post when any request failed.
+ * Removes the problem entries the card counted, one request at a time: [fileless] as they were when it
+ * opened, and [partial] only when the user chose to delete those too (empty otherwise). Each is checked
+ * against the latest observation first, so consent never widens: one that is no longer a problem is
+ * skipped, and so is a [fileless] one that has gained a file since. Once the opening session or the
+ * permission is gone, the rest count as not cleared. Returns the notice to post when any request failed.
  */
 @OptIn(ExperimentalTvheadendApi::class)
 internal suspend fun DvrMutationActions.clearDvrProblems(
     openingSession: CurrentSessionObservation,
-    entryIds: List<DvrEntryId>,
-    withPartial: Boolean,
+    fileless: List<DvrEntryId>,
+    partial: List<DvrEntryId>,
     latestObservation: () -> SessionObservation,
 ): Notice.DvrProblemsClearFailed? {
+    val entryIds = fileless + partial
     var attempted = 0
     var failed = 0
     var failure: DvrMutationFeedback? = null
@@ -37,7 +39,7 @@ internal suspend fun DvrMutationActions.clearDvrProblems(
             break
         }
         val targets = dvrProblemClearTargets(listOfNotNull(current.dvrEntry(id)))
-        val clears = targets.fileless.isNotEmpty() || (withPartial && targets.partial.isNotEmpty())
+        val clears = targets.fileless.isNotEmpty() || (index >= fileless.size && targets.partial.isNotEmpty())
         val feedback = if (clears) {
             execute(DvrMutationAction.Delete(openingSession, id)).toDvrMutationFeedback()
         } else {

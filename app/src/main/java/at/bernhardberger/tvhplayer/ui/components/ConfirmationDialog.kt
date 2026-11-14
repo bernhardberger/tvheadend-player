@@ -113,11 +113,15 @@ internal fun ConfirmationDialog(
     },
         modifier = Modifier.onPreviewKeyEvent(onPreviewKeyEvent), backEnabled = backEnabled,
         visibility = visibility) {
+        // The first choice wins: presses while the card fades out change nothing.
+        fun choose(choice: Boolean?) {
+            if (!visibility.targetState) return
+            confirmed = choice
+            visibility.targetState = false
+        }
         ConfirmationCard(question, subject, sentence, spokenSentence) {
             ConfirmationButtons(safe, action, cancel,
-                onSafe = { confirmed = false; visibility.targetState = false },
-                onAction = { confirmed = true; visibility.targetState = false },
-                onCancel = { visibility.targetState = false })
+                onSafe = { choose(false) }, onAction = { choose(true) }, onCancel = { choose(null) })
         }
     }
 }

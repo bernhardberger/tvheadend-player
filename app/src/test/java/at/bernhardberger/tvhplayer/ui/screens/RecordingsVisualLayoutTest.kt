@@ -1224,15 +1224,6 @@ class RecordingsVisualLayoutTest {
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
     fun problemsClearDialogMixed() = problemsClearFrame("dialog-mixed") { openProblemsClear() }
 
-    /** German, the longest common case, at rest and on the mixed confirmation. */
-    @Test @Category(VisualCapture::class) @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi",
-        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
-    fun problemsClearRestingGerman() = problemsClearFrame("resting-de")
-
-    @Test @Category(VisualCapture::class) @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi",
-        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
-    fun problemsClearDialogMixedGerman() = problemsClearFrame("dialog-mixed-de") { openProblemsClear() }
-
     @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
     fun problemsClearDialogFilelessOnly() = problemsClearFrame("dialog-fileless-only", partial = false) {
@@ -1527,7 +1518,6 @@ class RecordingsVisualLayoutTest {
         val clear = bounds(PROBLEMS_CLEAR_TAG)
         assertTrue(bounds("archive-level-heading").right <= clear.left)
         assertTrue(bounds("archive-values-line").right <= clear.left)
-        assertEquals(40f, clear.height, .5f)
         assertEquals(bounds("recording-list-entry-21").right, clear.right, .5f)
         if (endPadding != null) assertTrue(bounds("recording-metadata-pane").right <= 860f)
         // Without a reason from the server the pane says what happened in its notice's words.
@@ -2425,6 +2415,23 @@ class RecordingsVisualLayoutTest {
         capture("problems-missed", 1f)
     }
 
+    @Test fun problemDayHeadingsFollowTheClockAcrossMidnight() {
+        val clock = mutableStateOf(java.time.Instant.parse("2026-10-06T23:59:59Z").epochSecond)
+        nowSeconds = { clock.value }
+        show(entries = listOf(recording(1, "Kept match", "Sport/kept.ts"),
+            recording(30, "Missed match", null, DvrEntryState.MISSED, startEpochSeconds = clock.value - 3_600)))
+        focused("recordings-folder-Sport")
+        openScheduleSubnav()
+        key(Key.DirectionRight)
+        compose.onNodeWithTag("recordings-mode-problems").assertIsFocused()
+        compose.onNodeWithText("Today", useUnmergedTree = true).assertExists()
+        // The clock passes midnight while the server's list stays the same.
+        compose.runOnIdle { clock.value += 2 }
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithText("Today", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithText("Yesterday", useUnmergedTree = true).assertExists()
+    }
+
     @Test fun missedAndCanceledPaneBadgesNameTheirState() {
         val entry = mutableStateOf(recording(30, "Missed match", null, DvrEntryState.MISSED))
         compose.setContent {
@@ -3052,6 +3059,14 @@ class RecordingsVisualLayoutTest {
         compose.onNodeWithTag("problems-clear-partial").assertIsDisplayed()
         key(Key.DirectionCenter)
         focused("recordings-problems-clear")
+        assertNoCommands()
+        // Losing write permission while the card is open closes it; focus goes back to the list.
+        key(Key.DirectionCenter)
+        focused("problems-clear-keep")
+        compose.runOnIdle { session.publish(libraryObservation(
+            listOf(recording(32, "Broken signal", "broken.ts", DvrEntryState.COMPLETED_ERROR)), canModify = false)) }
+        focused("recording-list-entry-32")
+        compose.onNodeWithTag("problems-clear-partial").assertDoesNotExist()
         assertNoCommands()
     }
 

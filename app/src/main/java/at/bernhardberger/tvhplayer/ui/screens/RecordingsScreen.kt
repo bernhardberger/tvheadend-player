@@ -230,8 +230,17 @@ private data class RecordingLibraryPresentation(
     val archive: DvrArchiveFolder,
     val archiveEntries: List<DvrEntry>,
     val schedule: List<DvrScheduleSection>,
-    val problems: List<DvrScheduleSection>,
 )
+
+/** Problems fall under their day as the browse clock sees it, so Today turns into Yesterday at midnight. */
+@Composable
+private fun rememberProblemSections(problems: List<DvrEntry>, nowSeconds: () -> Long): List<DvrScheduleSection> {
+    val zone = java.time.ZoneId.systemDefault()
+    val today by remember(nowSeconds, zone) {
+        derivedStateOf { java.time.Instant.ofEpochSecond(nowSeconds()).atZone(zone).toLocalDate() }
+    }
+    return remember(problems, today, zone) { groupDvrProblems(problems, nowSeconds(), zone) }
+}
 
 class RecordingsScreenState(initialMode: DvrLibraryMode = DvrLibraryMode.ARCHIVE) {
     val selectedKeys = mutableStateMapOf<String, String>()
@@ -543,7 +552,6 @@ internal fun RecordingsScreenContent(
             archive = archive,
             archiveEntries = archiveEntries,
             schedule = groupDvrSchedule(library.schedule, System.currentTimeMillis() / 1000L),
-            problems = groupDvrProblems(library.problems, System.currentTimeMillis() / 1000L),
         )
     }
     Box(Modifier.fillMaxSize().onPreviewKeyEvent { event ->
@@ -628,7 +636,7 @@ internal fun RecordingsScreenContent(
         archiveLevelItems(archive, archiveLevel, recordingNow) ?: archive.listItems(recordingNow)
     }
     val scheduleGroups = presentation.schedule
-    val problemGroups = presentation.problems
+    val problemGroups = rememberProblemSections(library.problems, nowSecProvider)
     val itemKeys = when (mode) {
         DvrLibraryMode.ARCHIVE -> archiveItems.map { it.key }
         DvrLibraryMode.SCHEDULE -> scheduleManagement + scheduleGroups.flatMap { it.entries }
@@ -1679,6 +1687,11 @@ internal fun RecordingsScreenContent(
     @Composable
     fun ProblemsClear() {
         val clear = overlays.problemsClear ?: return
+        // Another session or lost write permission leaves nothing the choices could do: close the card.
+        if (currentSession !== clear.session || !canModifyRecordings) LaunchedEffect(clear) {
+            overlays.problemsClear = null
+            overlays.pendingDetailsReturn = true
+        }
         val fileless = clear.targets.fileless.size
         val partial = clear.targets.partial.size
         // Keep, Cancel and Back return to the Clear control; a clear returns to the list as it is then.
@@ -1691,13 +1704,13 @@ internal fun RecordingsScreenContent(
         fun run(withPartial: Boolean) {
             overlays.pendingDetailsReturn = !runCatching { contentFocus.requestFocus() }.getOrDefault(false)
             overlays.problemsClear = null
-            val ids = clear.targets.fileless.map { it.id } +
-                if (withPartial) clear.targets.partial.map { it.id } else emptyList()
+            val filelessIds = clear.targets.fileless.map { it.id }
+            val partialIds = if (withPartial) clear.targets.partial.map { it.id } else emptyList()
             scope.launch {
                 val noticeContext = notices.context()
                 withContext(NonCancellable) {
                     screenState.folderActionLock.withLock {
-                        dvrMutationActions.clearDvrProblems(clear.session, ids, withPartial) {
+                        dvrMutationActions.clearDvrProblems(clear.session, filelessIds, partialIds) {
                             latestObservationProvider()
                         }
                     }?.let { notices.post(it, noticeContext) }
@@ -1707,14 +1720,12 @@ internal fun RecordingsScreenContent(
         val sentence = listOfNotNull(
             fileless.takeIf { it > 0 }
                 ?.let { pluralStringResource(R.plurals.problems_clear_fileless_sentence, it, it) },
-            partial.takeIf { it > 0 }
-                ?.let { pluralStringResource(R.plurals.problems_clear_partial_sentence, it, it) },
+            partial.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.problems_clear_partial_sentence, it, it) },
         ).joinToString(" ")
         val deletePartial = ConfirmationChoice(
             pluralStringResource(
                 if (fileless > 0) R.plurals.problems_clear_also_delete_partial
-                else R.plurals.problems_clear_delete_partial,
-                partial, partial,
+                else R.plurals.problems_clear_delete_partial, partial, partial,
             ),
             R.drawable.ic_delete_outlined, "problems-clear-partial",
         )
