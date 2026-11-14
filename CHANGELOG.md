@@ -28,7 +28,7 @@
 
 ### Automatic recordings and timers
 
-- Program details offer *Record series* when the guide marks the program as part of a series, and *Record all with this title* otherwise. Either opens a page where you choose the channel, the days, a start window and how long recordings are kept. *More options* holds priority, recording profile, padding, duplicate detection and a maximum number of recordings. The page lists the upcoming programs it would record, and you can untick the ones you don't want (#17).
+- Program details offer *Record series* when the guide marks the program as part of a series, and *Record all* otherwise. Either opens a page where you choose the channel, the days, a start window and how long recordings are kept. *More options* holds priority, recording profile, padding, duplicate detection and a maximum number of recordings. The page lists the upcoming programs it would record, and you can untick the ones you don't want (#17).
 - The *Schedule* tab starts with two rows, *New timer* and *Automatic recordings*. *New timer* records a channel at set times, once or repeating on chosen days.
 - *Automatic recordings* lists your series, title and keyword recordings and your repeating timers, including the ones made in Tvheadend's web interface. You can add one by keyword, by title or as a repeating timer, edit it, turn it off or delete it. The side pane shows what the focused one records, how long it keeps recordings and what's next.
 - A scheduled recording that comes from an automatic recording offers *Skip this episode* in place of *Cancel recording*, and *Record this episode* to take that back. A skipped one stays in the Schedule, marked *Skipped*. *Edit series recording* opens the automatic recording from any of its entries.
