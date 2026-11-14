@@ -1703,6 +1703,19 @@ class RecordingsVisualLayoutTest {
             AutorecRuleId("title"), title = "^Ridge Light$", channelId = ChannelId(7))))
         compose.onAllNodes(hasText(" • Ridge Earth", substring = true) and
             hasAnyAncestor(hasTestTag("automatic-recording-pane")), useUnmergedTree = true).assertCountEquals(1)
+        // An entry with neither title nor time still reads as a recording; a channel outside the catalog keeps its name.
+        publish(listOf(
+            DvrEntry.create(DvrEntryId(801), state = DvrEntryState.SCHEDULED, autorecRuleId = AutorecRuleId("title")),
+            DvrEntry.create(DvrEntryId(802), title = "Harbor Kickoff", state = DvrEntryState.SCHEDULED,
+                autorecRuleId = AutorecRuleId("title"), channelId = ChannelId(999), channelName = "Harbor Sport",
+                start = Instant.fromEpochSeconds(nowSeconds() + 3_600),
+                stop = Instant.fromEpochSeconds(nowSeconds() + 5_400)),
+        ), autorecRules = listOf(AutorecRule.create(AutorecRuleId("title"), title = "^Ridge Light$")))
+        val inPane = hasAnyAncestor(hasTestTag("automatic-recording-pane"))
+        compose.onAllNodes(hasText(" • Harbor Sport", substring = true) and inPane, useUnmergedTree = true)
+            .assertCountEquals(1)
+        compose.onAllNodes(hasText("Ridge Light") and inPane, useUnmergedTree = true).assertCountEquals(2)
+        compose.onAllNodes(hasText("") and inPane, useUnmergedTree = true).assertCountEquals(0)
         publish(listOf(entry), autorecRules = listOf(AutorecRule.create(AutorecRuleId("title"), title = "^Ridge Light$")))
         compose.onNodeWithText(sectionHeading, useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithText(view.context.getString(R.string.schedule_automatic_nothing),
@@ -2123,9 +2136,9 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionDown)
         focused("automatic-recording-ridge")
         val outputs = "../captures/autorec-impl/emulator-feedback-1"
-        capture("series-upcoming-five", 1f, "Two-line series name, four ordered pairs and remaining count.", outputs)
+        capture("series-upcoming", 1f, "Two-line series name, four ordered pairs and remaining count.", outputs)
         publish(upcoming, autorecRules = listOf(AutorecRule.create(id, title = title, seriesLinkUri = "ridge")))
-        capture("all-channels-upcoming-five", 1f, "Known channel appears on each upcoming pair.", outputs)
+        capture("all-channels-upcoming", 1f, "Known channel appears on each upcoming pair.", outputs)
         publish(emptyList(), autorecRules = listOf(AutorecRule.create(id, title = title, seriesLinkUri = "ridge")))
         capture("automatic-nothing-scheduled", 1f, "No upcoming heading or list.", outputs)
     }

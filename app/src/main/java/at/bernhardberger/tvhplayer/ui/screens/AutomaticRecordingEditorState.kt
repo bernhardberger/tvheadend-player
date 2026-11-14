@@ -151,9 +151,8 @@ internal class AutomaticRecordingEditorState(
         val problem = mainProblem
         if (problem != null) {
             navigation.confirmation = null
-            if (problem == RecordingSubmitUnavailable.UNCHANGED) close()
-            else navigation.firstLevel(if (problem == RecordingSubmitUnavailable.WORDS_REQUIRED) "matches"
-                else "channel-time")
+            // cannotSubmit only reports UNCHANGED or WORDS_REQUIRED for automatic recordings.
+            if (problem == RecordingSubmitUnavailable.UNCHANGED) close() else navigation.firstLevel("matches")
             return
         }
         navigation.confirmation = null

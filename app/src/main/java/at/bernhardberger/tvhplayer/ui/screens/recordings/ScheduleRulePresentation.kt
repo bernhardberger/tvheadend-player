@@ -169,7 +169,7 @@ internal fun ScheduleRulePane(item: AutomaticRecordingListItem, channels: List<C
                                 R.drawable.ic_schedule, "automatic-recording-pane-next", maxLines = 2)
                         }
                     }
-                    if (item.upcomingEntries.isNotEmpty()) ScheduleUpcomingEntries(item, channels)
+                    if (item.upcomingEntries.isNotEmpty()) ScheduleUpcomingEntries(item, channels, subject.name)
                 }
             },
         )
@@ -181,18 +181,20 @@ internal const val SCHEDULE_UPCOMING_SHOWN = 4
 
 /** Its own section under the status lines, spaced like the editors' guidance column. */
 @Composable
-private fun ScheduleUpcomingEntries(item: AutomaticRecordingListItem, channels: List<Channel>) {
+private fun ScheduleUpcomingEntries(item: AutomaticRecordingListItem, channels: List<Channel>, fallbackTitle: String) {
     Column(Modifier.padding(top = TvSpacing16), verticalArrangement = Arrangement.spacedBy(TvSpacing12)) {
         RecordingEditorHeading(stringResource(R.string.timer_editor_next_recordings),
             Modifier.semantics { heading() })
         for (entry in item.upcomingEntries.take(SCHEDULE_UPCOMING_SHOWN)) {
-            val meta = entry.start?.epochSeconds?.let { start ->
+            val time = entry.start?.epochSeconds?.let { start ->
                 formatRecordingDate(start, dateOnly = true) + " • " +
                     (entry.stop?.epochSeconds?.let { formatTimeInterval(start, it) } ?: formatClock(start))
-            }.orEmpty()
-            val channel = if (item.channelId == null) channels.firstOrNull { it.id == entry.channelId }?.name else null
-            RecordingEditorPreviewPair(entry.subtitle?.takeIf(String::isNotBlank) ?: entry.title.orEmpty(),
-                listOfNotNull(meta.takeIf(String::isNotBlank), channel).joinToString(" • "), titleMaxLines = 1)
+            }
+            val channel = if (item.channelId != null) null
+                else channels.firstOrNull { it.id == entry.channelId }?.name ?: entry.channelName
+            val title = listOf(entry.subtitle, entry.title).firstOrNull { !it.isNullOrBlank() } ?: fallbackTitle
+            val meta = listOfNotNull(time, channel?.takeIf(String::isNotBlank)).joinToString(" • ")
+            RecordingEditorPreviewPair(title, meta, titleMaxLines = 1)
         }
         if (item.upcoming > SCHEDULE_UPCOMING_SHOWN) {
             RecordingEditorSecondary(
