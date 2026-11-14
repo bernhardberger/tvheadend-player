@@ -1,6 +1,10 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.testutil.changeState
 import at.bernhardberger.tvhplayer.testutil.pressKey
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -78,6 +82,70 @@ class PlaybackOptionsTrackListTest {
      * park it on the bottom edge. The panel's own inset keeps it above the band either way.
      */
     @Test fun englishLargeTextMinimalScroll() = trackList("en", 1.3f, ENGLISH, minimalScroll = true)
+
+    /**
+     * The page lands once, on the checked row even when tracks arrive after it opened. A
+     * track switch then passes through states with no or another checked track; focus stays
+     * on the row it is on and moves only when that row goes away.
+     */
+    @Test fun audioPageFocusStaysOnItsRowThroughATrackSwitch() {
+        var audio by mutableStateOf(emptyList<PlaybackOptionTrack>())
+        var resolving by mutableStateOf(true)
+        showOptions(PlaybackOptionsPage.AUDIO, audio = { audio }, subtitles = { emptyList() }, resolving = { resolving })
+        assertFocused("automatic")
+
+        compose.changeState {
+            audio = choices("a", "b", "c", selected = "b")
+            resolving = false
+        }
+        assertFocused("b")
+
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionCenter)
+        assertEquals("c", chosen)
+        listOf(null, "a", "c").forEach { selected ->
+            compose.changeState { audio = choices("a", "b", "c", selected = selected) }
+            assertFocused("c")
+        }
+        compose.changeState { audio = choices("a", "b", selected = "a") }
+        assertFocused("a")
+    }
+
+    @Test fun subtitlesPageFocusStaysOnItsRowThroughATrackSwitch() {
+        var subtitles by mutableStateOf(choices("x", "y", selected = "x"))
+        showOptions(PlaybackOptionsPage.SUBTITLES, audio = { emptyList() }, subtitles = { subtitles }, resolving = { false })
+        assertFocused("x")
+
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionCenter)
+        assertEquals("y", chosen)
+        listOf(null, "x", "y").forEach { selected ->
+            compose.changeState { subtitles = choices("x", "y", selected = selected) }
+            assertFocused("y")
+        }
+    }
+
+    private var chosen: String? = null
+
+    private fun showOptions(
+        page: PlaybackOptionsPage,
+        audio: () -> List<PlaybackOptionTrack>,
+        subtitles: () -> List<PlaybackOptionTrack>,
+        resolving: () -> Boolean,
+    ) = compose.setContent {
+        TVHeadendPlayerTheme {
+            PlaybackOptionsSheetContent(
+                page, audio(), subtitles(), resolving(), AspectRatioMode.FIT, false,
+                onPageChange = {}, onAudioTrackSelected = { chosen = it }, onSubtitleTrackSelected = { chosen = it },
+                onAspectRatioChange = {}, onStatsVisibleChange = {},
+            )
+        }
+    }
+
+    private fun choices(vararg keys: String, selected: String?) =
+        keys.map { PlaybackOptionTrack(it, "Track $it", selected = it == selected) }
+
+    private fun assertFocused(key: String) = compose.onNodeWithTag("playback-options-track-$key").assertIsFocused()
 
     private class RowTexts(
         val language: String,

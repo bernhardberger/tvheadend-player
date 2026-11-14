@@ -9,6 +9,7 @@
 - A recording file the player can't read says *The recording file couldn't be read* and shows the player's error underneath, instead of *Recording interrupted* with a retry that fails the same way.
 - Matroska recordings start with subtitles off until you choose a subtitle track.
 - Starting a recording shows the loading ring until the first picture instead of several seconds of black screen (#30).
+- Choosing an audio or subtitle track in the playback options keeps focus on that track while the player switches, instead of jumping through the list first.
 
 ### Recordings
 
