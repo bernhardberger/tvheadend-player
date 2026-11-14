@@ -1486,8 +1486,10 @@ class RecordingsVisualLayoutTest {
         assertNoCommands()
     }
 
-    @Test fun schedulePaneGivesThePaddedStopAndRuleAndProblemsPaneWhatWentWrong() {
-        show(entries = paneEntries(long = false, skipped = true), autorecRules = listOf(
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
+    fun schedulePaneGivesThePaddedStopAndRuleAndProblemsPaneWhatWentWrong() {
+        val longChannel = "Ridge Earth Mountain Channel HD Extra International"
+        show(entries = paneEntries(long = false, skipped = true, channelName = longChannel), autorecRules = listOf(
             at.bernhardberger.tvheadend.sdk.core.AutorecRule.create(
                 AutorecRuleId("series"), seriesLinkUri = "series:ridge-light")))
         focused("recordings-folder-Sport")
@@ -1511,14 +1513,16 @@ class RecordingsVisualLayoutTest {
         compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-metadata")) and hasText("recorded", substring = true),
             useUnmergedTree = true).assertDoesNotExist()
         capture("schedule-pane", 1f)
-        publish(paneEntries(long = false), autorecRules = listOf(
+        publish(paneEntries(long = false, channelName = longChannel), autorecRules = listOf(
             AutorecRule.create(AutorecRuleId("series"), seriesLinkUri = "series:ridge-light")))
+        assertPaneEyebrow(longChannel, 1_791_086_400L, "recording-badge-scheduled",
+            "schedule-long-channel")
         val seriesOrigin = view.resources.getString(R.string.recording_from_series_rule)
         compose.onNodeWithTag("recording-list-state-40", useUnmergedTree = true)
             .assert(hasContentDescription(seriesOrigin))
         compose.onNodeWithTag("recording-badge-scheduled", useUnmergedTree = true)
             .assert(hasContentDescription(seriesOrigin))
-        publish(paneEntries(long = false), autorecRules = listOf(
+        publish(paneEntries(long = false, channelName = longChannel), autorecRules = listOf(
             at.bernhardberger.tvheadend.sdk.core.AutorecRule.create(AutorecRuleId("series"), title = "^Ridge Light$")))
         compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-rule")) and
             hasText("Part of an automatic recording"), useUnmergedTree = true).assertIsDisplayed()
@@ -1534,6 +1538,8 @@ class RecordingsVisualLayoutTest {
         compose.onNodeWithText("Problems").assertIsFocused()
         key(Key.DirectionDown)
         focused("recording-list-entry-60")
+        assertPaneEyebrow(longChannel, 1_791_086_400L - 86_400, "recording-badge-failed",
+            "problems-long-channel")
         // The server's reason in plain words, and what is left of the file.
         val size = formatFileSize(1_200_000_000L, ApplicationProvider.getApplicationContext<Application>())
         compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-failure")) and hasText("Recording storage full"),
@@ -1547,6 +1553,18 @@ class RecordingsVisualLayoutTest {
         compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-failure")) and hasText("Recording missed"),
             useUnmergedTree = true).assertIsDisplayed()
         compose.onNodeWithTag("recording-metadata-partial-file", useUnmergedTree = true).assertDoesNotExist()
+        key(Key.DirectionUp)
+        key(Key.DirectionUp)
+        key(Key.DirectionLeft)
+        key(Key.DirectionLeft)
+        key(Key.DirectionDown)
+        key(Key.DirectionRight)
+        focused("recording-list-entry-1")
+        publish(listOf(recording(3, "Kept match", "Sport/kept.ts")))
+        focused("recording-list-entry-3")
+        compose.onNodeWithTag("recording-metadata-time-left", useUnmergedTree = true).assertDoesNotExist()
+        assertPaneEyebrow("Ridge Earth HD", 1_791_000_000L - 3 * 86_400, null,
+            "browse-finished-short-channel", ellipsized = false)
         assertNoCommands()
     }
 
@@ -2153,6 +2171,7 @@ class RecordingsVisualLayoutTest {
         val origin = ApplicationProvider.getApplicationContext<Application>().getString(R.string.recording_from_automatic)
         compose.onNodeWithTag("recording-badge", useUnmergedTree = true)
             .assert(hasContentDescription(origin, substring = true))
+        compose.onNodeWithTag("recording-metadata-time-left", useUnmergedTree = true).assertDoesNotExist()
     }
 
     @Test fun missedRecordingIsListedWithTheFailuresAndSaysMissed() {
@@ -2218,11 +2237,12 @@ class RecordingsVisualLayoutTest {
             compose.onNodeWithTag(it, useUnmergedTree = true).assertIsDisplayed()
             assertTrue("$it ends inside the pane", bounds(it).bottom <= pane.bottom + 0.5f)
         }
-        // The title gives way to one line first; the subtitle says what the recording is.
+        // The title gives way first; removing the watching-end hint leaves room for more title.
         val title = mutableListOf<TextLayoutResult>()
         compose.onNodeWithTag("recording-metadata-title", useUnmergedTree = true)
             .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(title) }
-        assertEquals(1, title.single().lineCount)
+        assertTrue("The title shortens rather than clipping the subtitle or status",
+            title.single().isLineEllipsized(title.single().lineCount - 1))
     }
 
     @Test fun zeroLengthIsAbsentFromRowsAndPane() {
@@ -2688,8 +2708,8 @@ class RecordingsVisualLayoutTest {
         assertWatchMark(1, "Partly watched")
         assertWatchMark(2, "Watched")
         compose.onNodeWithTag("recording-list-watched-3", useUnmergedTree = true).assertDoesNotExist()
-        // 1:02:03 into 90 minutes leaves 27:57, rounded up, ending that long from now.
-        assertTimeLeft("28m left • Ends at ")
+        // 1:02:03 into 90 minutes leaves 27:57, rounded up, without a predicted watching-end clock.
+        assertTimeLeft("28m left")
         capture("archive-watch-partly", 1f)
         key(Key.DirectionDown)
         focused("recording-list-entry-2")
@@ -2700,7 +2720,8 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionDown)
         focused("recording-list-entry-3")
         compose.onNodeWithTag("recording-metadata-watched", useUnmergedTree = true).assertDoesNotExist()
-        assertTimeLeft("Ends at ")
+        compose.onNodeWithTag("recording-metadata-time-left", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithText("Ends at ", substring = true, useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithText("left", substring = true).assertDoesNotExist()
         capture("archive-watch-marks", 1f)
         assertNoCommands()
@@ -3024,11 +3045,36 @@ class RecordingsVisualLayoutTest {
         }
     }
 
-    private fun paneEntries(long: Boolean, skipped: Boolean = false): List<DvrEntry> {
+    private fun assertPaneEyebrow(channel: String, start: Long, badgeTag: String?, frame: String,
+        ellipsized: Boolean = true) {
+        val date = formatRecordingDate(start, dateOnly = true, locale = Locale.US)
+        fun textNode(text: String) = compose.onNode(
+            hasAnyAncestor(hasTestTag("recording-metadata-eyebrow")) and hasText(text, substring = true),
+            useUnmergedTree = true)
+        val dateNode = textNode(date)
+        val layouts = mutableListOf<TextLayoutResult>()
+        dateNode.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        assertFalse("The pane date must not be ellipsized", layouts.single().isLineEllipsized(0))
+        assertFalse("The pane date must not overflow", layouts.single().hasVisualOverflow)
+        val dateBounds = dateNode.fetchSemanticsNode().boundsInRoot
+        val nameNode = textNode(channel)
+        layouts.clear()
+        nameNode.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        assertEquals("Only the channel gives way", ellipsized, layouts.single().isLineEllipsized(0))
+        val nameBounds = nameNode.fetchSemanticsNode().boundsInRoot
+        val badgeBounds = badgeTag?.let { bounds(it) }
+        assertTrue("Name ends before date", nameBounds.right <= dateBounds.left)
+        assertTrue("Date ends before badge or pane edge",
+            dateBounds.right <= (badgeBounds?.left ?: bounds("recording-metadata-pane").right))
+        capture(frame, 1f, "name=$nameBounds; date=$dateBounds; badge=$badgeBounds",
+            outputs = "build/outputs/pane-eyebrow")
+    }
+
+    private fun paneEntries(long: Boolean, skipped: Boolean = false, channelName: String? = null): List<DvrEntry> {
         val start = 1_791_086_400L
         val title = if (long) "Die außergewöhnliche Reise der Polarlichter: Eine Winterexpedition durch die Arktis"
             else "Coastal Final"
-        val channel = if (long) "Ridge Earth Mountain Channel HD Extra" else "Ridge Earth HD"
+        val channel = channelName ?: if (long) "Ridge Earth Mountain Channel HD Extra" else "Ridge Earth HD"
         return listOf(
             recording(1, "Kept match", "Sport/kept.ts"),
             DvrEntry.create(DvrEntryId(40), title = title, state = DvrEntryState.SCHEDULED,

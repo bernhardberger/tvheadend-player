@@ -473,12 +473,14 @@ internal fun RecordingMetadataPane(
     }
     val resources = LocalContext.current.resources
     val locale = LocalConfiguration.current.locales[0]
-    // The minute clock moves a running recording's length and the end of watching it from now.
+    // The minute clock moves a running recording's length and expiry wording.
     val nowSec = rememberDetailsEpochSeconds()
     val expiry = recordingExpiryTime(entry, nowSec)
         ?.let { formatRecordingExpiryDate(it, nowSec, resources, locale) }
     val watchState = recordingWatchState(entry, offeredResumePosition(admission), nowSec)
-    val timeLeft = remember(entry, admission) { recordingTimeLeft(entry, admission) }
+    val timeLeft = remember(entry, admission, watchState) {
+        if (watchState is RecordingWatchState.PartlyWatched) recordingTimeLeft(entry, admission) else null
+    }
     val facts = remember(entry, resources, locale) {
         programmeHeaderMetadata(programmeAboutFacts(null, entry, resources, locale), resources, entry.episode, null, locale, entry.contentGenre)
     }
@@ -503,10 +505,11 @@ internal fun RecordingMetadataPane(
         )
         ProgrammeHeadline(
             eyebrow = {
-                ProgrammeEyebrow(piconPath, listOfNotNull(
-                    entry.channelName?.takeIf(String::isNotBlank),
-                    entry.start?.epochSeconds?.let { formatRecordingDate(it, dateOnly = true, locale = locale) },
-                ).joinToString(" • "), Modifier.testTag("recording-metadata-eyebrow")) {
+                ProgrammeEyebrow(piconPath, entry.channelName.orEmpty().takeIf(String::isNotBlank).orEmpty(),
+                    Modifier.testTag("recording-metadata-eyebrow"),
+                    pinned = entry.start?.epochSeconds?.let {
+                        formatRecordingDate(it, dateOnly = true, locale = locale)
+                    }) {
                     // The pane's eyebrow badge, as on the details page; a completed recording needs none.
                     androidx.compose.runtime.CompositionLocalProvider(
                         androidx.tv.material3.LocalContentColor provides TvTextColors.secondary,
@@ -544,7 +547,7 @@ internal fun RecordingMetadataPane(
             fitSynopsis = true,
             titleStyle = MaterialTheme.typography.titleLarge,
             synopsisStyle = MaterialTheme.typography.bodyMedium,
-            // Under its time, how it ended and how watching it would go, each with its row's mark.
+            // Under its time, how it ended and the saved watch progress, each with its row's mark.
             status = if (listOf(failure, timeLeft, rule, partialSize, expiry).all { it == null } &&
                 !stoppedEarly && !watched) null else { statusModifier ->
                 Column(statusModifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -571,11 +574,9 @@ internal fun RecordingMetadataPane(
                         watched -> ProgrammeStatusLine(stringResource(R.string.recording_watched),
                             R.drawable.ic_check_circle_outlined, "recording-metadata-watched")
                         timeLeft != null -> {
-                            val endsAt = stringResource(R.string.recording_ends_at, formatClock(nowSec + timeLeft.inWholeSeconds))
                             val partly = watchState as? RecordingWatchState.PartlyWatched
                             ProgrammeStatusLine(
-                                if (partly == null) endsAt
-                                else "${playerMinutesLeft(((timeLeft.inWholeSeconds + 59L) / 60L).toInt())} • $endsAt",
+                                playerMinutesLeft(((timeLeft.inWholeSeconds + 59L) / 60L).toInt()),
                                 partly?.let { partlyWatchedIcon(it.fraction) }, "recording-metadata-time-left",
                             )
                         }
