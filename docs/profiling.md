@@ -3,12 +3,19 @@
 ## Baseline profile generation
 
 `:baselineprofile` uses Jetpack `BaselineProfileRule` against the real configured
-server with four startup journeys, in this order:
+server with three journeys, in this order:
 
-1. Immersive Channels (the default), tune a channel and Back.
-2. Grid Channels, tune a channel and Back.
-3. List Channels, tune a channel and Back.
-4. Autostart playback of a previously tuned channel, then Back to Immersive Channels.
+1. `startup01Home`: cold start to Home, then down to the On now row.
+2. `startup02Autostart`: autostart playback of a previously tuned channel, then
+   to Home.
+3. `evening01BrowseAndWatch`: Home rows, player zap, schedule, channel row, Guide,
+   the Channels layouts and recording playback. It skips the details page, which
+   crashes QEMU on the swiftshader emulator.
+
+The two startup journeys produce startup rules; the evening journey produces
+baseline rules only. The Home journey does not check the header: a Right now row
+that arrives after the first card took focus sits above it and scrolls the header
+off screen.
 
 Each journey selects its layout in Channels View options and sets autoplay in
 Settings before collection. Each collected iteration force-stops and launches the
@@ -66,17 +73,17 @@ Inside the tunnel, after the usual exact-target identity check:
      at.bernhardberger.tvhplayer.baselineprofile/androidx.test.runner.AndroidJUnitRunner
    ```
 
-   A full run of all four can exceed 20 minutes. One journey can be repeated on
-   its own with `-e class …PlayerBaselineProfile#startup04AutostartPlayback`.
-3. Require each of the four named tests to report status code 0, plus
+   A full run of all three can exceed 20 minutes. One journey can be repeated on
+   its own with `-e class …PlayerBaselineProfile#startup02Autostart`.
+3. Require each of the three named tests to report status code 0, plus
    `OK (n tests)`; an ADB exit status alone is insufficient. Then
    `adb pull "$DIR"` and force-stop both packages.
 
-The committed profile is the union of the four pulled `*-startup-prof.txt`
-files: one line per rule signature with the union of its `H`, `S` and `P`
-flags, sorted, ending with a newline, written identically to
-`app/src/main/generated/baselineProfiles/baseline-prof.txt` and
-`startup-prof.txt`. Both shipping flavors consume them, and R8 maps them into
+`app/src/main/generated/baselineProfiles/startup-prof.txt` is the union of the
+two pulled `*-startup-prof.txt` files; `baseline-prof.txt` is that union plus the
+evening journey's `*-baseline-prof.txt`. A union has one line per rule signature
+with the union of its `H`, `S` and `P` flags, sorted by signature, ending with a
+newline. Both shipping flavors consume them, and R8 maps them into
 the minified releases (`assets/dexopt/baseline.prof` and `baseline.profm`).
 Commit the regenerated text only for an authorized final generation, not a
 trial run, and time it on the G10 before release.

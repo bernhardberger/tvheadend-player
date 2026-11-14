@@ -27,8 +27,9 @@ class PlayerBaselineProfile {
     @Test fun startup01Home() = journey(startup = true) {
         coldStart()
         awaitHome()
-        await(By.res("home-header"), "Fresh Home must draw its header")
-        await(By.res(FirstHomeCard).focused(true), "Fresh Home must focus its topmost card")
+        // No header check: a Right now row that arrives after the first card took focus sits above
+        // it and pushes the header off screen.
+        await(By.res(FirstHomeCard).focused(true), "Fresh Home must focus a first card")
         focusToward(By.res("home-onnow-0"), KeyEvent.KEYCODE_DPAD_DOWN)
     }
 
