@@ -930,7 +930,6 @@
     <string name="recordings_show_watched_detail">Played to the end</string>
     <!-- Empty states when the Show filter hides everything, then the count of hidden recordings. -->
     <string name="recordings_empty_not_watched_root">Everything here has been played.</string>
-    <string name="recordings_empty_not_watched_folder">Everything in this folder has been played.</string>
     <string name="recordings_empty_started">Nothing started yet.</string>
     <string name="recordings_empty_watched">Nothing has been watched to the end yet.</string>
     <plurals name="recordings_hidden_count">

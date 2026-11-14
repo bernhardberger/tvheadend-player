@@ -808,7 +808,7 @@ class RecordingsVisualLayoutTest {
         compose.onNodeWithTag("recording-list-entry-2").assertExists()
     }
 
-    @Test fun aFolderTheFilterEmptiesStaysOpenWithTheMessageAndLeavesItsParentWhenBackSteps() {
+    @Test fun aFolderTheFilterEmptiesReturnsToItsParentAndFocusesTheNearestRow() {
         startView = DvrArchiveView(grouping = DvrArchiveGrouping.FOLDERS, show = DvrArchiveShow.UNWATCHED)
         show(entries = listOf(
             recording(2, "Alpha", "Series/a.ts"), recording(3, "Bravo", "Series/b.ts"),
@@ -824,16 +824,54 @@ class RecordingsVisualLayoutTest {
             recording(2, "Alpha", "Series/a.ts", playCount = 1), recording(3, "Bravo", "Series/b.ts", playCount = 2),
             recording(4, "Charlie", "Other/c.ts"),
         ))
-        // No step back: the folder stays open and says why it is empty.
-        compose.runOnIdle { assertEquals(listOf("Series"), screenState.archivePath) }
-        compose.onNodeWithText("Everything in this folder has been played.").assertIsDisplayed()
-        compose.onNodeWithText("2 recordings are hidden.").assertIsDisplayed()
-        // Focus waits on the tab above, and Back there steps up a level, where the emptied folder has gone.
-        focused(BROWSE_TAB)
-        key(Key.Back)
         compose.runOnIdle { assertEquals(emptyList<String>(), screenState.archivePath) }
+        focused("recordings-folder-Other")
         compose.onNodeWithTag("recordings-folder-Series").assertDoesNotExist()
         compose.onNodeWithTag("recordings-folder-Other").assertExists()
+        assertNoCommands()
+    }
+
+    @Test fun backOnATabInsideAFolderLeavesForTheRailWithoutPoppingTheFolder() {
+        show(shellBackEnabled = true)
+        focused("recordings-folder-Documentaries")
+        key(Key.DirectionRight)
+        focused("recordings-folder-Documentaries/Expeditions")
+        key(Key.DirectionUp)
+        focused(BROWSE_TAB)
+        key(Key.Back)
+        compose.onNodeWithTag("nav-recordings").assertIsFocused()
+        compose.runOnIdle { assertEquals(listOf("Documentaries"), screenState.archivePath) }
+        assertNoCommands()
+    }
+
+    @Test fun aChangedStoredShowFilterReconcilesTheOpenFolderWithoutAnEntryUpdate() {
+        show(entries = listOf(
+            recording(2, "Alpha", "Series/a.ts", playCount = 1),
+            recording(3, "Other", "Other/b.ts"),
+        ))
+        focused("recordings-folder-Series")
+        key(Key.DirectionRight)
+        focused("recording-list-entry-2")
+        compose.runOnIdle { startView = startView.copy(show = DvrArchiveShow.UNWATCHED) }
+        compose.waitForIdle()
+        compose.runOnIdle { assertEquals(emptyList<String>(), screenState.archivePath) }
+        focused("recordings-folder-Other")
+        assertNoCommands()
+    }
+
+    @Test fun deletingTheLastNestedRecordingReturnsToTheNearestPopulatedAncestor() {
+        val keep = recording(3, "Other", "Series/other.ts")
+        show(entries = listOf(recording(2, "Alpha", "Series/Season/Episode/a.ts"), keep))
+        focused("recordings-folder-Series")
+        key(Key.DirectionRight)
+        focused("recordings-folder-Series/Season")
+        key(Key.DirectionRight)
+        focused("recordings-folder-Series/Season/Episode")
+        key(Key.DirectionRight)
+        focused("recording-list-entry-2")
+        publish(listOf(keep))
+        compose.runOnIdle { assertEquals(listOf("Series"), screenState.archivePath) }
+        focused("recording-list-entry-3")
         assertNoCommands()
     }
 
@@ -2343,7 +2381,8 @@ class RecordingsVisualLayoutTest {
     private fun show(scale: Float = 1f, empty: Boolean = false, entries: List<DvrEntry>? = null, endPadding: Dp? = null,
         diskSpace: DvrDiskSpaceState = DvrDiskSpaceState.Unknown, channels: List<Channel> = emptyList(),
         snapshotLoaded: Boolean = true, autorecRules: List<at.bernhardberger.tvheadend.sdk.core.AutorecRule> = emptyList(),
-        canModify: Boolean = true, repository: (DvrRepository) -> DvrRepository = { it }) {
+        canModify: Boolean = true, repository: (DvrRepository) -> DvrRepository = { it },
+        shellBackEnabled: Boolean = false) {
         endPaddingState.value = endPadding
         val recordings = entries ?: if (empty) emptyList() else listOf(
             recording(1, LONG_TITLE, "Documentaries/northern.ts"),
@@ -2382,6 +2421,8 @@ class RecordingsVisualLayoutTest {
                 LocalBrowsePreparationContext provides preparationContext.value,
             ) {
                 TVHeadendPlayerTheme {
+                    var shellBack by androidx.compose.runtime.remember { mutableStateOf<() -> Unit>({}) }
+                    androidx.activity.compose.BackHandler(enabled = shellBackEnabled) { shellBack() }
                     view = LocalView.current
                     backDispatcher = requireNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -2390,6 +2431,7 @@ class RecordingsVisualLayoutTest {
                             currentRoute = railRoute.value,
                             onRootBack = { navigationRequests++ },
                             onNavigate = { navigationRequests++ },
+                            onBackHandlerChanged = { shellBack = it },
                         ) { padding, drawer ->
                             val direction = LocalLayoutDirection.current
                             if (screenShown.value) RecordingsScreenContent(

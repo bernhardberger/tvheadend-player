@@ -8,7 +8,6 @@ import at.bernhardberger.tvhplayer.core.buildDvrArchive
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthFrame
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthStack
 import at.bernhardberger.tvhplayer.ui.screens.recordings.reconcileArchiveStack
-import at.bernhardberger.tvhplayer.ui.screens.recordings.ArchiveListItem
 import at.bernhardberger.tvhplayer.ui.screens.recordings.archiveLevelId
 import at.bernhardberger.tvhplayer.ui.screens.recordings.archiveLevelItems
 import at.bernhardberger.tvhplayer.ui.screens.recordings.listItems
@@ -48,17 +47,16 @@ class RecordingsDepthNavigationTest {
         assertEquals(9, result.visit)
     }
 
-    @Test fun validEmptyFolderIsNotMistakenForMissingPath() {
+    @Test fun emptyNonRootLevelReturnsToRoot() {
         val empty = DvrArchiveFolder("Empty", listOf("Empty"), emptyList(), emptyList())
         val root = DvrArchiveFolder("", emptyList(), listOf(empty), emptyList())
         val stack = DepthStack(listOf(DepthFrame("archive:"), DepthFrame("archive:Empty", "recording:1")), visit = 3)
 
         val result = reconcileArchiveStack(stack, root)
 
-        assertEquals(stack.path, result.path)
-        assertEquals(stack.visit, result.visit)
-        assertNull(result.active.focusedItemId)
-        assertTrue(result.canPop)
+        assertEquals(listOf("archive:"), result.path)
+        assertEquals(stack.visit + 1, result.visit)
+        assertFalse(result.canPop)
     }
 
     @Test fun removedRecordingUsesNeighborAtOldIndexAndClampsAtEnd() {
@@ -71,17 +69,26 @@ class RecordingsDepthNavigationTest {
         assertEquals(middle.visit, reconcileArchiveStack(middle, root).visit)
     }
 
-    @Test fun aFolderTheShowFilterEmptiesStaysOpenAsAnEmptyLevelAndLeavesItsParent() {
-        val series = DvrEntry.create(DvrEntryId(1), folder = listOf("Series"))
-        val full = buildDvrArchive(listOf(series))
+    @Test fun aRestoredFolderTheShowFilterEmptiesReturnsToTheEmptyRoot() {
         val filtered = buildDvrArchive(emptyList())
         val stack = DepthStack(listOf(DepthFrame("archive:", "folder:Series", 0), DepthFrame("archive:Series")))
 
-        assertEquals(listOf("archive:", "archive:Series"), reconcileArchiveStack(stack, filtered, full).path)
-        assertEquals(emptyList<ArchiveListItem>(), archiveLevelItems(filtered, "archive:Series", full))
-        assertTrue(archiveLevelItems(filtered, "archive:", full)!!.isEmpty())
-        // Without the unfiltered archive the folder is simply gone and the stack steps back to the root.
         assertEquals(listOf("archive:"), reconcileArchiveStack(stack, filtered).path)
+        assertTrue(archiveLevelItems(filtered, "archive:")!!.isEmpty())
+    }
+
+    @Test fun emptiedNestedLevelsPopRepeatedlyAndSelectTheNearestSurvivingRow() {
+        val remaining = DvrEntry.create(DvrEntryId(2), folder = listOf("Series", "Other"))
+        val filtered = buildDvrArchive(listOf(remaining))
+        val stack = DepthStack(listOf(
+            DepthFrame("archive:", "folder:Series"),
+            DepthFrame("archive:Series", "folder:Series/Season", 1),
+            DepthFrame("archive:Series/Season", "folder:Series/Season/Episode"),
+            DepthFrame("archive:Series/Season/Episode", "recording:1"),
+        ))
+        val result = reconcileArchiveStack(stack, filtered)
+        assertEquals(listOf("archive:", "archive:Series"), result.path)
+        assertEquals("folder:Series/Other", result.active.focusedItemId)
     }
 
     private fun entry(id: Long) = DvrEntry.create(id = DvrEntryId(id), title = "Recording $id")
