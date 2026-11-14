@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Remote buttons
+
+- The GUIDE button opens the Guide from every screen, not only from the startup screen and the live player, where it still shows the channel's schedule. The TV button starts live TV on the last channel from every screen (#33).
+
 ## 0.5.1
 
 ### Playback
