@@ -1279,7 +1279,8 @@ The live player's Schedule action opens a 480dp right sheet using the playback
 options frame, without dimming the remaining picture. GUIDE toggles it where
 the activity receives that key, except while a modal playback options sheet or
 quick list is open: GUIDE is consumed without interrupting its preview/undo
-session. Appliance entry routing is unchanged. Outside the live player, GUIDE
+session. Appliance entry routing is unchanged. Once the app has left setup
+and startup, GUIDE outside the live player
 opens the Guide from every screen, including the recordings player, and does
 nothing in the Guide itself. TV starts live TV on the last channel from every
 screen and does nothing in the live player. The Recordings key opens Recordings

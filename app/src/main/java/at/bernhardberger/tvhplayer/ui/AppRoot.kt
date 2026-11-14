@@ -1468,7 +1468,8 @@ fun AppRoot(
                     }
                     true
                 }
-                // TV returns to live TV on the last channel, as the Appliance entry does.
+                // TV returns to live TV on the last channel through the Appliance entry's request.
+                // Unlike that entry it also leaves the recordings player: only live TV is "already there".
                 android.view.KeyEvent.KEYCODE_TV -> {
                     if (initialPress && navigationAllowed) {
                         applianceLaunchRequests.requestEntry(
@@ -1478,21 +1479,20 @@ fun AppRoot(
                     }
                     true
                 }
-                else -> false
-            }
-        }.onKeyEvent { event ->
-            val key = event.nativeKeyEvent
-            when (key.keyCode) {
-                android.view.KeyEvent.KEYCODE_MEDIA_RECORD -> true
-                // The live player toggles its schedule sheet with GUIDE and consumes it first.
-                android.view.KeyEvent.KEYCODE_GUIDE -> {
-                    val initialPress = key.action == android.view.KeyEvent.ACTION_DOWN && key.repeatCount == 0
-                    if (initialPress && visibleLivePlayer == null && currentDestination != GuideKey && navigationAllowed) {
+                // The live player toggles its schedule sheet with GUIDE; every other screen opens
+                // the Guide, ahead of a layer that keeps unknown keys to itself.
+                android.view.KeyEvent.KEYCODE_GUIDE -> if (visibleLivePlayer != null) false else {
+                    if (initialPress && currentDestination != GuideKey && navigationAllowed) {
                         playbackOrchestrator.browseNavigationSelected(playingChannelId, playingRecordingId)
                         navigateTopLevel(GuideKey)
                     }
                     true
                 }
+                else -> false
+            }
+        }.onKeyEvent { event ->
+            when (event.nativeKeyEvent.keyCode) {
+                android.view.KeyEvent.KEYCODE_MEDIA_RECORD, android.view.KeyEvent.KEYCODE_GUIDE -> true
                 else -> false
             }
         },
