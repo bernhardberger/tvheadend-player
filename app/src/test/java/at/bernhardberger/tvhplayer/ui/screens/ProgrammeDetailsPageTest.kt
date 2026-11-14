@@ -1353,9 +1353,18 @@ class ProgrammeDetailsPageTest {
         compose.onNodeWithTag("details-synopsis", useUnmergedTree = true).performSemanticsAction(
             androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { it(synopsis) }
         Assert.assertFalse(synopsis.single().hasVisualOverflow)
-        listOf("details-watch", "details-record", "details-show_guide").forEach {
+        // Later actions may start off screen; focusing each one must scroll it wholly into the safe area.
+        compose.onNodeWithTag("details-watch").assertIsFocused()
+        listOf("details-watch", "details-record").forEach {
             Assert.assertTrue(it, compose.onNodeWithTag(it).getUnclippedBoundsInRoot().right.value <= 960f - 48f)
         }
+        val laterActions = listOf("details-record", "details-record_title", "details-show_guide")
+        laterActions.forEach { tag ->
+            compose.pressKey(Key.DirectionRight)
+            val bounds = compose.onNodeWithTag(tag).assertIsFocused().assertIsDisplayed().getUnclippedBoundsInRoot()
+            Assert.assertTrue("$tag: $bounds", bounds.left.value >= 48f && bounds.right.value <= 960f - 48f)
+        }
+        repeat(laterActions.size) { compose.pressKey(Key.DirectionLeft) }
         compose.onNodeWithTag("details-watch").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
         compose.onNodeWithTag("details-card-2").assertIsFocused().assertIsDisplayed()
         Assert.assertEquals(160f, compose.onNodeWithText("Weitere Ausstrahlungen von", substring = true)
