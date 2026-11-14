@@ -51,7 +51,7 @@ internal fun scheduleManagementRows(
     ) { modifier, activate ->
         Column {
             Column(Modifier.offset(y = (-4).dp).testTag("schedule-upcoming-heading")) {
-                ArchiveLevelHeading(stringResource(R.string.schedule_upcoming), { 1f }, null)
+                ArchiveLevelHeading(stringResource(R.string.schedule_upcoming), { 1f }, null, atRoot = false)
             }
             ScheduleManagementRow(SCHEDULE_NEW_TIMER, stringResource(R.string.schedule_new_timer),
                 stringResource(R.string.schedule_new_timer_help), R.drawable.ic_schedule, R.drawable.ic_add,
@@ -64,7 +64,7 @@ internal fun scheduleManagementRows(
     ) { modifier, activate ->
         Column {
             if (!canModify) Column(Modifier.offset(y = (-4).dp)) {
-                ArchiveLevelHeading(stringResource(R.string.schedule_upcoming), { 1f }, null)
+                ArchiveLevelHeading(stringResource(R.string.schedule_upcoming), { 1f }, null, atRoot = false)
             }
             ScheduleManagementRow(SCHEDULE_AUTOMATIC_ROW, stringResource(R.string.automatic_recording_new_overline),
                 automaticRecordingCountLabel(automatic), R.drawable.ic_fiber_smart_record,

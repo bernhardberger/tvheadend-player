@@ -38,6 +38,7 @@ internal fun scheduleAutomaticLevels(
     channels: List<Channel>,
     channelMap: Map<ChannelId, Channel>,
     navigation: DepthNavigationState,
+    scheduleState: ScheduleState,
     paneModifier: Modifier,
     onNew: () -> Unit,
     onEdit: (AutomaticRecordingListItem) -> Unit,
@@ -65,7 +66,7 @@ internal fun scheduleAutomaticLevels(
             automatic.items.forEach { item ->
                 val previewId = "$SCHEDULE_AUTOMATIC_LEVEL:${item.rowId()}"
                 levels[previewId] = DepthLevel(previewId, emptyList(),
-                    heading = { ArchiveLevelHeading("", it, null) },
+                    heading = { ArchiveLevelHeading("", it, null, atRoot = false) },
                     passiveContent = { ScheduleRulePane(item, channels, paneModifier) })
                 add(DepthRow(DepthItem(item.rowId()), onActivate = { if (canModify) latestEdit.value(item) },
                     previewLevelId = previewId) { modifier, activate ->
@@ -79,12 +80,14 @@ internal fun scheduleAutomaticLevels(
         }
         levels[SCHEDULE_AUTOMATIC_LEVEL] = DepthLevel(
             SCHEDULE_AUTOMATIC_LEVEL, rows,
-            heading = { ArchiveLevelHeading(stringResource(R.string.automatic_recording_new_overline), it, null) },
+            heading = {
+                ArchiveLevelHeading(stringResource(R.string.automatic_recording_new_overline), it, null, atRoot = false)
+            },
             emptyContent = { ModeEmptyState(R.string.schedule_automatic_empty) },
         )
         levels
     }
-    rememberInitialAutomaticFrame(automatic, canModify, levels, navigation)
+    rememberInitialAutomaticFrame(automatic, canModify, levels, navigation, scheduleState)
     return levels
 }
 
@@ -94,13 +97,16 @@ private fun rememberInitialAutomaticFrame(
     canModify: Boolean,
     levels: Map<String, DepthLevel>,
     navigation: DepthNavigationState,
+    scheduleState: ScheduleState,
 ) {
     val stack = navigation.stack
-    var visited by remember(navigation) { mutableStateOf(false) }
     val active = stack.frames.any { it.levelId == SCHEDULE_AUTOMATIC_LEVEL }
-    val needsSeed = !visited && !active && automatic.available
+    val hasRememberedFrame = SCHEDULE_AUTOMATIC_LEVEL in stack.remembered
+    val needsSeed = !active && automatic.available && (!scheduleState.automaticLevelVisited || !hasRememberedFrame)
     SideEffect {
-        if (active) visited = true
+        if (active) scheduleState.automaticLevelVisited = true
+        else scheduleState.automaticLevelVisited =
+            scheduleState.automaticLevelVisited.takeIf { hasRememberedFrame } == true
         if (!canModify && automatic.items.isEmpty() && stack.active.levelId == SCHEDULE_AUTOMATIC_LEVEL) {
             navigation.pop()
         } else if (needsSeed && navigation.stack == stack) {

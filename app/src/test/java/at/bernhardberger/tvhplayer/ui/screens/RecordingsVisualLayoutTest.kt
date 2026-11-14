@@ -63,6 +63,9 @@ import at.bernhardberger.tvhplayer.core.DvrArchiveView
 import at.bernhardberger.tvhplayer.core.DvrArchiveSort
 import at.bernhardberger.tvhplayer.core.DvrArchiveShow
 import at.bernhardberger.tvhplayer.core.partitionDvrLibrary
+import at.bernhardberger.tvhplayer.core.groupDvrSchedule
+import at.bernhardberger.tvhplayer.ui.screens.recordings.SCHEDULE_NEW_TIMER
+import at.bernhardberger.tvhplayer.ui.screens.recordings.SCHEDULE_AUTOMATIC_ROW
 import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
@@ -1619,6 +1622,10 @@ class RecordingsVisualLayoutTest {
         focused("automatic-recording-second")
         compose.pressKey(Key.Back)
         focused("schedule-automatic-recordings")
+        compose.runOnIdle { screenShown.value = false }
+        compose.waitForIdle()
+        compose.runOnIdle { screenShown.value = true }
+        focused("schedule-automatic-recordings")
         key(Key.DirectionCenter)
         focused("automatic-recording-second")
         key(Key.DirectionUp)
@@ -1650,6 +1657,14 @@ class RecordingsVisualLayoutTest {
         focused("schedule-new-automatic")
         key(Key.DirectionLeft)
         focused("schedule-automatic-recordings")
+        val entry = recording(99, "Requested programme", null, DvrEntryState.SCHEDULED)
+        publish(listOf(entry), autorecRules = rules)
+        compose.runOnIdle { screenState.open(screenState.mode.value, entry.id) }
+        focused("recording-list-entry-${entry.id.value}")
+        key(Key.DirectionUp)
+        focused("schedule-automatic-recordings")
+        key(Key.DirectionCenter)
+        focused("automatic-recording-first")
         assertNoCommands()
     }
 
@@ -1693,6 +1708,10 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionDown)
         key(Key.DirectionCenter)
         assertEquals("The same rule cannot submit another toggle while pending", 1, updates.size)
+        compose.runOnIdle { screenShown.value = false }
+        compose.waitForIdle()
+        compose.runOnIdle { screenShown.value = true }
+        focused("automatic-recording-ridge")
         key(Key.Menu)
         publish(emptyList(), autorecRules = listOf(disabled))
         compose.onNodeWithTag("automatic-recording-menu-toggle").assert(hasText(
@@ -1783,6 +1802,53 @@ class RecordingsVisualLayoutTest {
         assertNoCommands()
     }
 
+    @Test fun schedulePageKeysMoveThroughDisplayedRowsAndStopAtTheFirstRow() {
+        val entries = (20L..35L).map {
+            recording(it, "Scheduled programme $it", null, DvrEntryState.SCHEDULED)
+        }
+        show(entries = entries)
+        openScheduleScreen()
+        val scheduledRows = groupDvrSchedule(entries, nowSeconds()).flatMap { it.entries }
+            .map { "recording-list-entry-${it.id.value}" }
+        val rows = listOf(SCHEDULE_NEW_TIMER, SCHEDULE_AUTOMATIC_ROW) + scheduledRows
+        fun focusedPosition(): Int {
+            val nodes = compose.onAllNodes(isFocused()).fetchSemanticsNodes()
+            val node = nodes.singleOrNull { it.config.getOrNull(SemanticsProperties.TestTag) in rows }
+            assertNotNull("Focus must remain on a Schedule row: " +
+                nodes.map { "${it.config.getOrNull(SemanticsProperties.TestTag)} ${it.boundsInRoot}" }, node)
+            val tag = checkNotNull(node).config[SemanticsProperties.TestTag]
+            assertTrue("Focused $tag must be displayed; bounds=${node.boundsInRoot}",
+                compose.onNodeWithTag(tag).isDisplayed())
+            return rows.indexOf(tag)
+        }
+        focused(scheduledRows.first())
+        val first = focusedPosition()
+        compose.pressKey(Key(android.view.KeyEvent.KEYCODE_CHANNEL_DOWN))
+        compose.settleFrames(2)
+        val later = focusedPosition()
+        assertTrue("Page Down must focus a later scheduled entry: $first -> $later", later > first)
+        assertTrue(rows[later] in scheduledRows)
+        compose.pressKey(Key(android.view.KeyEvent.KEYCODE_CHANNEL_UP))
+        compose.settleFrames(2)
+        var earlier = focusedPosition()
+        assertTrue("Page Up must focus an earlier row: $later -> $earlier", earlier < later)
+        repeat(rows.size) {
+            if (earlier > 0) {
+                compose.pressKey(Key(android.view.KeyEvent.KEYCODE_CHANNEL_UP))
+                compose.settleFrames(2)
+                val next = focusedPosition()
+                assertTrue("Page Up must progress toward the first row: $earlier -> $next", next < earlier)
+                earlier = next
+            }
+        }
+        assertEquals(0, earlier)
+        focused(SCHEDULE_NEW_TIMER)
+        compose.pressKey(Key(android.view.KeyEvent.KEYCODE_CHANNEL_UP))
+        compose.settleFrames(2)
+        assertEquals(0, focusedPosition())
+        assertNoCommands()
+    }
+
     @Test @Category(VisualCapture::class) @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
     fun scheduleAutomaticPhase3Captures() {
@@ -1812,7 +1878,9 @@ class RecordingsVisualLayoutTest {
         capture("Bx3-automatic-recordings-focused", 1f, "Fixture pack: Ridge Light.", outputs)
         key(Key.DirectionCenter)
         focused("automatic-recording-ridge")
-        capture("Bx4-automatic-level", 1f, "First rule focused; next entry supplies Ridge Light artwork.", outputs)
+        capture("Bx4-automatic-level", 1f, activeHeading().let {
+            "First rule focused; no pane artwork. Heading=${it.bounds}; baseline=${it.baseline}"
+        }, outputs)
         key(Key.Menu)
         key(Key.DirectionDown)
         focused("automatic-recording-menu-toggle")
@@ -1856,7 +1924,9 @@ class RecordingsVisualLayoutTest {
         publish(entries, autorecRules = automaticRules)
         openScheduleScreen()
         focused("recording-list-entry-9")
-        capture("Bx1-schedule-opens", 1f, "Fixture pack artwork and channel picons.", outputs)
+        capture("Bx1-schedule-opens", 1f, activeHeading().let {
+            "Fixture pack artwork and channel picons. Heading=${it.bounds}; baseline=${it.baseline}"
+        }, outputs)
         repeat(2) { key(Key.DirectionUp) }
         focused("schedule-new-timer")
         capture("Bx2-new-timer-focused", 1f, "Right column is intentionally blank.", outputs)

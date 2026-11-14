@@ -56,6 +56,42 @@ internal data class OpenRule(
     val item: AutomaticRecordingListItem? = null,
 )
 
+/** Kept beside Schedule navigation, so reopening joins accepted work and retains its visit. */
+internal class ScheduleState {
+    var automaticLevelVisited = false
+    private val inFlight = mutableMapOf<String, ArrayDeque<RuleRequest>>()
+
+    fun launchRuleMutation(
+        scope: CoroutineScope,
+        item: AutomaticRecordingListItem,
+        desired: Boolean? = null,
+        mutation: suspend () -> Unit,
+    ) {
+        val request = RuleRequest(desired, mutation)
+        val pending = inFlight[item.rowId()]
+        if (pending != null) {
+            if (pending.any { it.desired == desired || it.desired == null }) return
+            if (desired == null) while (pending.size > 1) pending.removeLast()
+            pending.addLast(request)
+            return
+        }
+        val queue = ArrayDeque<RuleRequest>().apply { addLast(request) }
+        inFlight[item.rowId()] = queue
+        scope.launch {
+            withContext(NonCancellable) {
+                try {
+                    while (queue.isNotEmpty()) {
+                        queue.first().run()
+                        queue.removeFirst()
+                    }
+                } finally {
+                    inFlight.remove(item.rowId())
+                }
+            }
+        }
+    }
+}
+
 /** The Schedule consumer keeps its row mounted while an existing editor or dialog owns focus. */
 @Composable
 internal fun ScheduleRuleActions(
@@ -68,8 +104,8 @@ internal fun ScheduleRuleActions(
     actions: DvrMutationActions,
     notices: NoticeCenter,
     now: () -> Instant,
+    state: ScheduleState,
 ) {
-    val inFlight = remember { mutableMapOf<String, ArrayDeque<RuleRequest>>() }
     val scope = rememberCoroutineScope()
     val close = { onChange(null) }
     val target = opened ?: return
@@ -80,7 +116,7 @@ internal fun ScheduleRuleActions(
             onEdit = { onChange(target.copy(surface = RuleSurface.EDIT)) },
             onDelete = { onChange(target.copy(surface = RuleSurface.DELETE)) },
             onToggle = {
-                scope.launchRuleMutation(inFlight, item, desired = !item.enabled) {
+                state.launchRuleMutation(scope, item, desired = !item.enabled) {
                     val latest = observation()
                     if (target.readyIn(latest, isCurrent, notices, DvrMutationKind.UPDATE)) {
                         target.item?.currentIn(latest)?.let { current ->
@@ -94,7 +130,7 @@ internal fun ScheduleRuleActions(
         RuleSurface.DELETE -> if (item != null) RecordingRuleDeleteDialog(
             item.kind, item.subject(channels), item.scheduledCount(published), onDismiss = close,
             onConfirm = {
-                scope.launchRuleMutation(inFlight, item) {
+                state.launchRuleMutation(scope, item) {
                     deleteScheduleRule(target, observation(), isCurrent, actions, notices)
                 }
                 close()
@@ -133,36 +169,6 @@ private fun ScheduleRuleEditor(
 }
 
 private data class RuleRequest(val desired: Boolean?, val run: suspend () -> Unit)
-
-private fun CoroutineScope.launchRuleMutation(
-    inFlight: MutableMap<String, ArrayDeque<RuleRequest>>,
-    item: AutomaticRecordingListItem,
-    desired: Boolean? = null,
-    mutation: suspend () -> Unit,
-) {
-    val request = RuleRequest(desired, mutation)
-    val pending = inFlight[item.rowId()]
-    if (pending != null) {
-        if (pending.any { it.desired == desired || it.desired == null }) return
-        if (desired == null) while (pending.size > 1) pending.removeLast()
-        pending.addLast(request)
-        return
-    }
-    val queue = ArrayDeque<RuleRequest>().apply { addLast(request) }
-    inFlight[item.rowId()] = queue
-    launch {
-        withContext(NonCancellable) {
-            try {
-                while (queue.isNotEmpty()) {
-                    queue.first().run()
-                    queue.removeFirst()
-                }
-            } finally {
-                inFlight.remove(item.rowId())
-            }
-        }
-    }
-}
 
 private fun OpenRule.readyIn(
     observation: SessionObservation,

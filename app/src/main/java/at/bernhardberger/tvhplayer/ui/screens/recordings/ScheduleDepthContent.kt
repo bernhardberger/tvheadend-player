@@ -52,6 +52,7 @@ internal fun ScheduleDepthContent(
     onEditRule: (AutomaticRecordingListItem) -> Unit,
     onRuleMenu: (AutomaticRecordingListItem) -> Unit,
     navigation: DepthNavigationState,
+    scheduleState: ScheduleState,
     contentPadding: PaddingValues,
     isCurrent: Boolean,
     initialFocusEnabled: Boolean,
@@ -77,7 +78,7 @@ internal fun ScheduleDepthContent(
             contentPadding, paneWidth, onOpenRecording, onOpenContextMenu,
             piconForEntry, admissionForEntry, ruleForEntry,
         ) + scheduleAutomaticLevels(
-            automatic, canModify && automatic.available, canAdd, channelList, channels, navigation,
+            automatic, canModify && automatic.available, canAdd, channelList, channels, navigation, scheduleState,
             Modifier.widthIn(max = paneWidth), onNewAutomatic, onEditRule, onRuleMenu)
         DepthNavigation(
             state = navigation,
@@ -141,7 +142,7 @@ private fun rememberScheduleLevels(
                         if (entryIndex == 0) {
                             if (!canModify && automatic.items.isEmpty() && sectionIndex == 0) {
                                 ArchiveLevelHeading(
-                                    stringResource(R.string.schedule_upcoming), { 1f }, null)
+                                    stringResource(R.string.schedule_upcoming), { 1f }, null, atRoot = false)
                             }
                             RecordingSectionHeader(scheduleSectionLabel(section), first = sectionIndex == 0)
                             if (sectionIndex != 0) Spacer(Modifier.height(4.dp))

@@ -23,7 +23,6 @@ import at.bernhardberger.tvhplayer.core.AutomaticRecordingKind
 import at.bernhardberger.tvhplayer.core.RecordingDraftField
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.components.ConfirmationDialog
-import at.bernhardberger.tvhplayer.ui.components.ConfirmationChoice
 import at.bernhardberger.tvhplayer.ui.components.ConfirmationSubject
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepAction
 import at.bernhardberger.tvhplayer.ui.components.StatusBadge

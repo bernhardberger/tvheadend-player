@@ -215,6 +215,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import at.bernhardberger.tvhplayer.core.automaticRecordingList
 import at.bernhardberger.tvhplayer.ui.screens.recordings.SCHEDULE_NEW_TIMER
 import at.bernhardberger.tvhplayer.ui.screens.recordings.scheduleManagementKeys
+import at.bernhardberger.tvhplayer.ui.screens.recordings.ScheduleState
 import java.text.Collator
 
 private fun recordingOverlayOpen(
@@ -241,6 +242,7 @@ class RecordingsScreenState(initialMode: DvrLibraryMode = DvrLibraryMode.ARCHIVE
     val scheduleNavigation = DepthNavigationState(DepthStack(listOf(
         DepthFrame(SCHEDULE_ROOT_LEVEL, firstVisibleItemId = SCHEDULE_NEW_TIMER),
     )))
+    internal val scheduleState = ScheduleState()
     val archivePath: List<String> get() = archiveLevelPath(archiveNavigation.stack.active.levelId)
 
     /** Home can enter Schedule at an entry; ordinary tab/rail entry keeps its saved position. */
@@ -1018,6 +1020,7 @@ internal fun RecordingsScreenContent(
                         onEditRule = { if (owner.isCurrent) openScheduleRule(RuleSurface.EDIT, it) },
                         onRuleMenu = { if (owner.isCurrent) openScheduleRule(RuleSurface.MENU, it) },
                         navigation = scheduleNavigation,
+                        scheduleState = screenState.scheduleState,
                         contentPadding = PaddingValues(
                             start = startPadding + TvBrowseLeadingInset,
                             bottom = contentPadding.calculateBottomPadding(),
@@ -1554,6 +1557,7 @@ internal fun RecordingsScreenContent(
             isCurrent = screenState.mode.value == DvrLibraryMode.SCHEDULE,
             channels = scheduleChannels, actions = dvrMutationActions, notices = notices,
             now = { kotlin.time.Instant.fromEpochSeconds(nowSecProvider()) },
+            state = screenState.scheduleState,
         )
         overlays.newTimerSession?.let { openingSession ->
             val editorSession: TvheadendSession = koinInject()
