@@ -386,6 +386,7 @@
     <string name="details_recording_progress_spoken">%1$s من %2$s، %3$s</string>
     <string name="details_tomorrow">غدًا %1$s</string>
     <string name="context_record">تسجيل</string>
+    <string name="details_record_choice">تسجيل…</string>
     <string name="context_show_guide">عرض في دليل البرامج</string>
     <string name="context_resume">متابعة</string>
     <string name="context_start_over">المشاهدة من البداية</string>

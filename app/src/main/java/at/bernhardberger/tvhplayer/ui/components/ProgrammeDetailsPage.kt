@@ -104,6 +104,9 @@ import kotlin.math.roundToInt
 
 private enum class DetailsSection { ACTIONS, ABOUT, AIRINGS, CREDITS, FACTS }
 
+/** What a row button opens over the page: the ways to record, or More's menu. */
+private enum class DetailsOverlay { RECORD, MORE }
+
 /** Browse details only; the shell remains the sole owner of the video scrim. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -131,6 +134,8 @@ internal fun ProgrammeDetailsPage(
     /** The SDK's admission of a [recording] shown without [event]; its time left follows the Resume it offers. */
     recordingAdmission: RecordingPlaybackAdmission? = null,
     recordingKind: AutomaticRecordingKind? = null,
+    /** Whether the page's Record… choice or More menu is open; a host's own keys wait for it as for its menus. */
+    onOverlayOpen: (Boolean) -> Unit = {},
 ) {
     val layering = LocalBrowseContentLayering.current
     val pageKey = remember { Any() }
@@ -168,6 +173,28 @@ internal fun ProgrammeDetailsPage(
             maxLines = DETAILS_SYNOPSIS_MAX_LINES, constraints = constraints)
     }
     val requesters = remember { BrowseContextAction.entries.associateWith { FocusRequester() } }
+    val recordChoiceFocus = remember { FocusRequester() }
+    val moreFocus = remember { FocusRequester() }
+    val row = remember(actions) { detailsActionRow(actions) }
+    fun requester(button: DetailsRowButton) = when (button) {
+        is DetailsRowButton.Direct -> requesters.getValue(button.action)
+        is DetailsRowButton.RecordChoice -> recordChoiceFocus
+        is DetailsRowButton.More -> moreFocus
+    }
+    // An overlay belongs to one programme or recording; another subject on the page closes it.
+    var overlay by remember(event?.id, recording?.id) { mutableStateOf<DetailsOverlay?>(null) }
+    // The button whose overlay is open; a refresh that takes it away closes the overlay.
+    val overlayButton = row.firstOrNull {
+        overlay == DetailsOverlay.RECORD && it is DetailsRowButton.RecordChoice ||
+            overlay == DetailsOverlay.MORE && it is DetailsRowButton.More
+    }
+    LaunchedEffect(overlay, overlayButton == null) { if (overlayButton == null) overlay = null }
+    val currentOverlayOpen by rememberUpdatedState(onOverlayOpen)
+    val overlayOpen = overlayButton != null
+    DisposableEffect(overlayOpen) {
+        currentOverlayOpen(overlayOpen)
+        onDispose { if (overlayOpen) currentOverlayOpen(false) }
+    }
     val panelFocus = remember { FocusRequester() }
     val aboutFocus = remember { FocusRequester() }
     val factsFocus = remember { FocusRequester() }
@@ -195,22 +222,8 @@ internal fun ProgrammeDetailsPage(
     val density = LocalDensity.current
     val headingKeyline = with(density) { DetailsSectionKeyline.roundToPx() }
     val scope = rememberCoroutineScope()
-    // The action last focused, or its replacement after an action changed the row.
-    fun actionFocus() = (lastAction?.takeIf { it in actions }?.let(requesters::get)
-            ?: BrowseContextAction.EDIT_RULE.takeIf {
-                lastAction in listOf(BrowseContextAction.RECORD_SERIES, BrowseContextAction.RECORD_TITLE) &&
-                    it in actions
-            }?.let(requesters::get)
-            ?: actions.firstOrNull {
-                lastAction in listOf(BrowseContextAction.SKIP, BrowseContextAction.UNSKIP) &&
-                    it in listOf(BrowseContextAction.SKIP, BrowseContextAction.UNSKIP)
-            }?.let(requesters::get)
-            ?: actions.firstOrNull { lastAction in listOf(BrowseContextAction.MARK_WATCHED, BrowseContextAction.MARK_UNWATCHED) &&
-                it in listOf(BrowseContextAction.MARK_WATCHED, BrowseContextAction.MARK_UNWATCHED) }?.let(requesters::get)
-            ?: actions.firstOrNull { lastAction in listOf(BrowseContextAction.RECORD, BrowseContextAction.CANCEL, BrowseContextAction.STOP) &&
-                it in listOf(BrowseContextAction.RECORD, BrowseContextAction.CANCEL, BrowseContextAction.STOP) }?.let(requesters::get)
-            ?: initialAction?.takeIf { it in actions }?.let(requesters::get)
-            ?: actions.firstOrNull()?.let(requesters::get) ?: panelFocus)
+    // The button holding the action last focused, or its replacement after an action changed the row.
+    fun actionFocus() = detailsRowFocus(row, lastAction, initialAction)?.let(::requester) ?: panelFocus
     fun restoreAction() {
         section = DetailsSection.ACTIONS
         actionFocus().requestFocus()
@@ -226,14 +239,14 @@ internal fun ProgrammeDetailsPage(
         if (reading) reading = false
         else if (section == DetailsSection.ACTIONS) onClose() else restoreAction()
     }
-    BackHandler(enabled = backEnabled, onBack = ::close)
+    BackHandler(enabled = backEnabled && overlay == null, onBack = ::close)
     // Only re-measure the cached viewport while the page is absent; restoration reads the rendered branch.
     val closeAboutReader = reading &&
         (!hasAbout || aboutConstraints?.let { !measurePlain(it).hasVisualOverflow } == true)
     LaunchedEffect(reading, backEnabled, credits.isNotEmpty(), importantFacts.isNotEmpty(),
         closeAboutReader, hasAbout, aboutIsPanel) {
         if (closeAboutReader) reading = false
-        else if (!reading && backEnabled) {
+        else if (!reading && backEnabled && overlay == null) {
             withFrameNanos { }
             when (section) {
                 DetailsSection.ACTIONS -> restoreAction()
@@ -248,8 +261,8 @@ internal fun ProgrammeDetailsPage(
             }
         }
     }
-    LaunchedEffect(actions, backEnabled) {
-        if (!backEnabled) return@LaunchedEffect
+    LaunchedEffect(actions, backEnabled, overlay == null) {
+        if (!backEnabled || overlay != null) return@LaunchedEffect
         withFrameNanos { }
         val card = returnToCard?.takeIf { it in ids }
         if (card != null) {
@@ -320,6 +333,9 @@ internal fun ProgrammeDetailsPage(
                  val factPanel = section == DetailsSection.CREDITS || section == DetailsSection.FACTS
                 when {
                     !backEnabled -> true
+                    // An open overlay owns the keys; the page acts on none of them underneath, and the
+                    // Record key, which neither overlay uses, stops here instead of reaching the screen.
+                    overlay != null -> key.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_MEDIA_RECORD
                     event != null && key.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_MEDIA_RECORD -> {
                         val action = actions.firstOrNull {
                             it in programmeRecordingRecordKeyActions
@@ -369,7 +385,7 @@ internal fun ProgrammeDetailsPage(
                       }
                        factPanel && (key.key == Key.DirectionLeft || key.key == Key.DirectionRight) -> true
                     key.key == Key.DirectionLeft && (section == DetailsSection.ABOUT ||
-                        section == DetailsSection.ACTIONS && lastAction == actions.firstOrNull() ||
+                        section == DetailsSection.ACTIONS && lastAction in row.firstOrNull()?.actions.orEmpty() ||
                         section == DetailsSection.AIRINGS && lastCard == ids.firstOrNull()) -> true
                     else -> false
                 }
@@ -442,7 +458,7 @@ internal fun ProgrammeDetailsPage(
               BoxWithConstraints {
                 val screen = constraints.maxHeight
                 Column(Modifier.fillMaxSize().testTag("details-page-scroll").verticalScroll(pageScroll)
-                    .then(if (!backEnabled) Modifier.clearAndSetSemantics { } else Modifier)) {
+                    .then(if (!backEnabled || overlay != null) Modifier.clearAndSetSemantics { } else Modifier)) {
                      DetailsFirstScreen(screen, ids.isNotEmpty() || credits.isNotEmpty() || importantFacts.isNotEmpty(),
                          if (ids.isNotEmpty()) stringResource(R.string.details_other_airings, title)
                          else if (credits.isNotEmpty()) stringResource(R.string.details_cast_and_crew)
@@ -491,9 +507,16 @@ internal fun ProgrammeDetailsPage(
                         CompositionLocalProvider(LocalBringIntoViewSpec provides rowSpec) {
                             Box(Modifier.focusProperties { onEnter = { actionFocus().requestFocus() } }.focusGroup()
                                 .onGloballyPositioned { textArea("actions", it.boundsInRoot(), true) }) {
-                                DetailsActions(actions, event, recording, nowSec, recordingKind, requesters,
-                                    { if (backEnabled) onAction(it) }) {
-                                    lastAction = it; section = DetailsSection.ACTIONS; onActionFocused(it)
+                                DetailsActions(row, event, recording, nowSec, recordingKind, ::requester, { button ->
+                                    if (backEnabled) when (button) {
+                                        is DetailsRowButton.Direct -> onAction(button.action)
+                                        is DetailsRowButton.RecordChoice -> overlay = DetailsOverlay.RECORD
+                                        is DetailsRowButton.More -> overlay = DetailsOverlay.MORE
+                                    }
+                                }) {
+                                    // A button holding several actions stands for its first.
+                                    lastAction = it.actions.first(); section = DetailsSection.ACTIONS
+                                    onActionFocused(it.actions.first())
                                 }
                             }
                         }
@@ -555,6 +578,17 @@ internal fun ProgrammeDetailsPage(
             }
             }
             }
+            }
+            // Choosing closes the overlay first; focus then returns to the button holding the choice.
+            val choose: (BrowseContextAction) -> Unit = { action ->
+                if (backEnabled) { lastAction = action; overlay = null; onAction(action) }
+            }
+            when (overlayButton) {
+                is DetailsRowButton.RecordChoice -> DetailsRecordChoice(overlayButton.actions, event, recording,
+                    channel, nowSec, recordingKind, backEnabled, choose) { overlay = null }
+                is DetailsRowButton.More -> DetailsMoreMenu(overlayButton.actions, event, recording, channel, nowSec,
+                    recordingKind, backEnabled, choose) { overlay = null }
+                else -> Unit
             }
         }
     }
@@ -1468,43 +1502,163 @@ private fun DetailsTimeline(
 
 @Composable
 private fun DetailsActions(
-    actions: List<BrowseContextAction>, event: EpgEvent?, recording: DvrEntry?, nowSec: Long,
+    row: List<DetailsRowButton>, event: EpgEvent?, recording: DvrEntry?, nowSec: Long,
     recordingKind: AutomaticRecordingKind?,
-    requesters: Map<BrowseContextAction, FocusRequester>, onAction: (BrowseContextAction) -> Unit,
-    onFocused: (BrowseContextAction) -> Unit,
+    requester: (DetailsRowButton) -> FocusRequester, onClick: (DetailsRowButton) -> Unit,
+    onFocused: (DetailsRowButton) -> Unit,
 ) {
+    val watchChannel = detailsWatchChannel(event, recording, nowSec)
     Row(Modifier.horizontalScroll(rememberScrollState()).padding(8.dp).testTag("details-actions"),
         horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        actions.forEachIndexed { index, action ->
-            key(if (action == BrowseContextAction.MARK_UNWATCHED) BrowseContextAction.MARK_WATCHED else action) {
-                val modifier = Modifier.height(40.dp).focusRequester(requesters.getValue(action))
-                    .onFocusChanged { if (it.isFocused) onFocused(action) }
+        row.forEachIndexed { index, button ->
+            key(when (button) {
+                is DetailsRowButton.Direct -> if (button.action == BrowseContextAction.MARK_UNWATCHED)
+                    BrowseContextAction.MARK_WATCHED else button.action
+                is DetailsRowButton.RecordChoice -> DetailsOverlay.RECORD
+                is DetailsRowButton.More -> DetailsOverlay.MORE
+            }) {
+                val modifier = Modifier.height(40.dp).focusRequester(requester(button))
+                    .onFocusChanged { if (it.isFocused) onFocused(button) }
                     .focusProperties {
-                        left = actions.getOrNull(index - 1)?.let(requesters::get) ?: FocusRequester.Cancel
-                        right = actions.getOrNull(index + 1)?.let(requesters::get) ?: FocusRequester.Cancel
-                    }.testTag("details-${action.name.lowercase()}")
+                        left = row.getOrNull(index - 1)?.let(requester) ?: FocusRequester.Cancel
+                        right = row.getOrNull(index + 1)?.let(requester) ?: FocusRequester.Cancel
+                    }.testTag(when (button) {
+                        is DetailsRowButton.Direct -> "details-${button.action.name.lowercase()}"
+                        is DetailsRowButton.RecordChoice -> "details-record-choice"
+                        is DetailsRowButton.More -> "details-more"
+                    })
                 val content: @Composable RowScope.() -> Unit = {
-                    val indicator = when (action) {
-                        BrowseContextAction.WATCH -> watchingIndicator(event, nowSec)
-                        BrowseContextAction.PLAY, BrowseContextAction.RESUME -> watchingIndicator(recording?.id)
-                        // Behind live this can be the programme on air, not the one at the viewer's position.
-                        BrowseContextAction.CONTINUE_WATCHING -> if (event == null) watchingIndicator(recording?.id)
-                            else channelWatchingIndicator(event.channelId)
-                        else -> ChannelPlaybackIndicator.NONE
+                    when (button) {
+                        is DetailsRowButton.Direct -> {
+                            val action = button.action
+                            val indicator = when (action) {
+                                BrowseContextAction.WATCH -> watchingIndicator(event, nowSec)
+                                BrowseContextAction.PLAY, BrowseContextAction.RESUME -> watchingIndicator(recording?.id)
+                                // Behind live this can be the programme on air, not the one at the viewer's position.
+                                BrowseContextAction.CONTINUE_WATCHING ->
+                                    if (event == null) watchingIndicator(recording?.id)
+                                    else channelWatchingIndicator(event.channelId)
+                                else -> ChannelPlaybackIndicator.NONE
+                            }
+                            BrowseContextActionIcon(action, indicator, ButtonDefaults.IconSize, watchChannel)
+                            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                            Text(stringResource(action.label(action == BrowseContextAction.WATCH && watchChannel,
+                                recordingKind)), maxLines = 1, softWrap = false)
+                        }
+                        is DetailsRowButton.RecordChoice, is DetailsRowButton.More -> {
+                            Icon(painterResource(if (button is DetailsRowButton.More) R.drawable.ic_more_horiz
+                                else BrowseContextAction.RECORD.icon(watchChannel = false)), null,
+                                Modifier.size(ButtonDefaults.IconSize))
+                            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                            Text(stringResource(if (button is DetailsRowButton.More) R.string.details_more
+                                else R.string.details_record_choice), maxLines = 1, softWrap = false)
+                        }
                     }
-                    BrowseContextActionIcon(action, indicator, ButtonDefaults.IconSize)
-                    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-                    Text(stringResource(action.label(action == BrowseContextAction.WATCH &&
-                        (event == null && recording?.state == DvrEntryState.SCHEDULED ||
-                            event != null && !event.isRunning(nowSec)), recordingKind)),
-                        maxLines = 1, softWrap = false)
                 }
-                 if (index == 0 && action != BrowseContextAction.DELETE && action != BrowseContextAction.REMOVE_ENTRY) Button(onClick = { onAction(action) }, modifier = modifier,
+                val destructive = button is DetailsRowButton.Direct && (button.action == BrowseContextAction.DELETE ||
+                    button.action == BrowseContextAction.REMOVE_ENTRY)
+                if (index == 0 && !destructive) Button(onClick = { onClick(button) }, modifier = modifier,
                     contentPadding = ButtonDefaults.ButtonWithIconContentPadding, content = content)
-                else OutlinedButton(onClick = { onAction(action) }, modifier = modifier,
+                else OutlinedButton(onClick = { onClick(button) }, modifier = modifier,
                     contentPadding = OutlinedButtonDefaults.ButtonWithIconContentPadding, content = content)
             }
         }
+    }
+}
+
+/** Watch tunes the channel's live programme when this one is not on air. */
+private fun detailsWatchChannel(event: EpgEvent?, recording: DvrEntry?, nowSec: Long) =
+    event == null && recording?.state == DvrEntryState.SCHEDULED || event != null && !event.isRunning(nowSec)
+
+/** "Record…": the ways to record the programme, as a choice over the page. */
+@Composable
+private fun DetailsRecordChoice(
+    actions: List<BrowseContextAction>, event: EpgEvent?, recording: DvrEntry?, channel: Channel?, nowSec: Long,
+    recordingKind: AutomaticRecordingKind?, backEnabled: Boolean,
+    onChoose: (BrowseContextAction) -> Unit, onClose: () -> Unit,
+) {
+    val resources = LocalContext.current.resources
+    val focus = remember { BrowseContextAction.entries.associateWith { FocusRequester() } }
+    // A refresh can change the offered ways while the choice is open: focus stays on the same way,
+    // else on the one now in its place, else on the first.
+    var focusedAction by remember { mutableStateOf<BrowseContextAction?>(null) }
+    var focusedIndex by remember { mutableIntStateOf(0) }
+    val title = event?.title ?: recording?.title.orEmpty()
+    CentredDialogShell(paneTitle = title, onDismiss = onClose, backEnabled = backEnabled, verticalKeys = true) {
+        LaunchedEffect(actions) {
+            withFrameNanos { }
+            val target = focusedAction.takeIf { it in actions }
+                ?: actions.getOrNull(focusedIndex) ?: actions.firstOrNull()
+            target?.let { focus.getValue(it).requestFocus() }
+        }
+        PlaybackChoiceCard(
+            art = event?.let(::programmeArtwork) ?: recording?.let(::recordingArtwork),
+            picon = channel?.icon,
+            channel = channel?.let { channelTitleText(it.number, it.name.orEmpty()) }
+                ?: recording?.channelName.orEmpty(),
+            airTime = event?.let { programmeAiringTime(it, nowSec) },
+            title = title,
+            episode = programmeEpisodeLine(event?.episode ?: recording?.episode, event?.subtitle ?: recording?.subtitle,
+                resources),
+            recording = null, waiting = null, buttonCount = actions.size,
+        ) {
+            // The stack runs top to bottom and stops at both ends; nothing leaves the card sideways.
+            actions.forEachIndexed { index, action -> key(action) {
+                PlaybackChoiceButton(stringResource(action.label(false, recordingKind)),
+                    action.icon(watchChannel = false), null, filled = index == 0, onClick = { onChoose(action) },
+                    modifier = Modifier.focusRequester(focus.getValue(action)).focusProperties {
+                        up = actions.getOrNull(index - 1)?.let(focus::getValue) ?: FocusRequester.Cancel
+                        down = actions.getOrNull(index + 1)?.let(focus::getValue) ?: FocusRequester.Cancel
+                        left = FocusRequester.Cancel; right = FocusRequester.Cancel
+                    }.onFocusChanged {
+                        if (it.isFocused) { focusedAction = action; focusedIndex = index }
+                    }.testTag("record-choice-${action.name.lowercase()}"))
+            } }
+        }
+    }
+}
+
+/** "More": the row's remaining actions in the shared context menu. */
+@Composable
+private fun DetailsMoreMenu(
+    actions: List<BrowseContextAction>, event: EpgEvent?, recording: DvrEntry?, channel: Channel?, nowSec: Long,
+    recordingKind: AutomaticRecordingKind?, backEnabled: Boolean,
+    onChoose: (BrowseContextAction) -> Unit, onClose: () -> Unit,
+) {
+    val resources = LocalContext.current.resources
+    val locale = LocalConfiguration.current.locales[0]
+    BrowseContextMenu(
+        title = event?.title ?: recording?.title.orEmpty(),
+        channel = channel?.let { channelTitleText(it.number, it.name.orEmpty()) } ?: recording?.channelName.orEmpty(),
+        episode = programmeEpisodeLine(event?.episode ?: recording?.episode, event?.subtitle ?: recording?.subtitle,
+            resources),
+        time = detailsMenuTime(event, recording, nowSec, locale),
+        summary = (event?.summary ?: recording?.summary)?.takeIf(String::isNotBlank)
+            ?: (event?.description ?: recording?.description).orEmpty(),
+        actions = actions, onAction = onChoose, onClose = onClose, backEnabled = backEnabled,
+        watchChannel = detailsWatchChannel(event, recording, nowSec),
+        recordingState = recording?.state,
+        recordingRule = recordingRule(recordingKind) ?: recording?.rule,
+        recordingKind = recordingKind,
+        recordingEnabled = recording?.enabled,
+        keepUntilSupport = recording?.let { formatRecordingKeepUntil(it, nowSec, resources, locale) },
+        nowSec = nowSec,
+        artwork = {
+            ProgrammeArtwork(event?.let(::programmeArtwork) ?: recording?.let(::recordingArtwork), channel?.icon,
+                event?.let { programmeProgress(it, nowSec) }, Modifier.fillMaxSize())
+        },
+    )
+}
+
+/** The menu header's time: the programme's airing, else the recording's span. */
+@Composable
+private fun detailsMenuTime(event: EpgEvent?, recording: DvrEntry?, nowSec: Long, locale: java.util.Locale): String {
+    val start = recording?.start?.epochSeconds
+    val stop = recording?.stop?.epochSeconds
+    return when {
+        event != null -> programmeAiringTime(event, nowSec)
+        start != null && stop != null -> formatTimeInterval(start, stop, withDate = true, locale = locale)
+        else -> ""
     }
 }
 

@@ -82,6 +82,7 @@ internal fun ProgrammeDetailsHost(
     var editingRule by remember { mutableStateOf<DvrEntry?>(null) }
     var pending by remember { mutableStateOf<DvrMutationAction?>(null) }
     var pendingAction by remember { mutableStateOf<ProgrammeAction?>(null) }
+    var pageOverlay by remember { mutableStateOf(false) }
     var pendingEntries by remember { mutableStateOf<DvrEventEntries?>(null) }
     var inFlight by mutationInFlight
     val confirmationVisibility = remember(pendingAction) {
@@ -285,7 +286,7 @@ internal fun ProgrammeDetailsHost(
     PlayerMotionFrame(leaving = closing, modifier = Modifier.onPreviewKeyEvent { key ->
         if (closing || departing || entryPending()) true
         else if (key.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_MEDIA_RECORD) {
-            if (showContextMenu || pendingAction != null) true
+            if (showContextMenu || pendingAction != null || pageOverlay) true
             else if (actions.any { it in programmeRecordingRecordKeyActions }) false
             else {
                 if (key.type == KeyEventType.KeyDown && key.nativeKeyEvent.repeatCount == 0) {
@@ -364,6 +365,7 @@ internal fun ProgrammeDetailsHost(
                 recordingKind = pageRecording?.let(displayObservation::recordingRuleKind),
                 backEnabled = !closing && page.id == selected.id && menu == showContextMenu && !covered,
                 onActionFocused = { returnAction = it },
+                onOverlayOpen = { pageOverlay = it },
                 related = airings,
                 channelOf = displayObservation::channel,
                 returnToCard = returnCard,

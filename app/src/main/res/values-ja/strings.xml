@@ -291,6 +291,7 @@
     <string name="details_recording_progress_spoken">%2$s中%1$s、%3$s</string>
     <string name="details_tomorrow">明日 %1$s</string>
     <string name="context_record">録画</string>
+    <string name="details_record_choice">録画…</string>
     <string name="context_show_guide">番組表に表示</string>
     <string name="context_resume">再開</string>
     <string name="context_start_over">最初から視聴</string>

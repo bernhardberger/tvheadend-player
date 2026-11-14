@@ -329,6 +329,7 @@
     <string name="details_recording_progress_spoken">%1$s מתוך %2$s, %3$s</string>
     <string name="details_tomorrow">מחר %1$s</string>
     <string name="context_record">הקלטה</string>
+    <string name="details_record_choice">הקלטה…</string>
     <string name="context_show_guide">הצגה במדריך</string>
     <string name="context_resume">המשך צפייה</string>
     <string name="context_start_over">צפייה מההתחלה</string>

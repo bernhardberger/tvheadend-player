@@ -310,6 +310,7 @@
     <string name="details_recording_progress_spoken">%1$s, yhteensä %2$s, %3$s</string>
     <string name="details_tomorrow">Huomenna %1$s</string>
     <string name="context_record">Tallenna</string>
+    <string name="details_record_choice">Tallenna…</string>
     <string name="context_show_guide">Näytä ohjelmaoppaassa</string>
     <string name="context_resume">Jatka</string>
     <string name="context_start_over">Katso alusta</string>

@@ -310,6 +310,7 @@
     <string name="details_recording_progress_spoken">%1$s av %2$s, %3$s</string>
     <string name="details_tomorrow">I morgon %1$s</string>
     <string name="context_record">Spela in</string>
+    <string name="details_record_choice">Spela in…</string>
     <string name="context_show_guide">Visa i tv-guiden</string>
     <string name="context_resume">Fortsätt</string>
     <string name="context_start_over">Titta från början</string>

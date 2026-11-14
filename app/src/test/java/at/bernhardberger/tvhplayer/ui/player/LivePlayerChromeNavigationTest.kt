@@ -115,12 +115,12 @@ class LivePlayerChromeNavigationTest : LivePlayerChromeFixture() {
             key(Key.DirectionDown)
             compose.onNodeWithTag("details-card-12").assertIsFocused()
             key(Key.DirectionCenter)
-            compose.onNodeWithTag("details-record").performSemanticsAction(SemanticsActions.RequestFocus)
-            compose.onNodeWithTag("details-record").assertIsFocused()
+            compose.onNodeWithTag("details-record-choice").performSemanticsAction(SemanticsActions.RequestFocus)
+            compose.onNodeWithTag("details-record-choice").assertIsFocused()
         }
         settle()
         assertTrue(exists("programme-details-page"))
-        compose.onNodeWithTag("details-record").assertIsFocused()
+        compose.onNodeWithTag("details-record-choice").assertIsFocused()
         assertTrue(runtime.activeTarget.value != null)
     }
 

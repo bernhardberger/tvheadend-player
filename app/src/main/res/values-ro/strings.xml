@@ -329,6 +329,7 @@
     <string name="details_recording_progress_spoken">%1$s din %2$s, %3$s</string>
     <string name="details_tomorrow">Mâine %1$s</string>
     <string name="context_record">Înregistrează</string>
+    <string name="details_record_choice">Înregistrează…</string>
     <string name="context_show_guide">Arată în ghid</string>
     <string name="context_resume">Reia</string>
     <string name="context_start_over">Vizionează de la început</string>

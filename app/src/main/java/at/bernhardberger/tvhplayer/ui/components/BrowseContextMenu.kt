@@ -132,7 +132,8 @@ internal fun BrowseContextMenu(
                             at.bernhardberger.tvhplayer.core.formatPlaybackDuration(it)) },
                 ) {
                     BrowseContextActionIcon(action, playbackIndicator.takeIf {
-                        action == BrowseContextAction.CONTINUE_WATCHING } ?: ChannelPlaybackIndicator.NONE, 24.dp)
+                        action == BrowseContextAction.CONTINUE_WATCHING } ?: ChannelPlaybackIndicator.NONE, 24.dp,
+                        watchChannel)
                 }
             }
         }
@@ -140,11 +141,15 @@ internal fun BrowseContextMenu(
     }
 }
 
-/** An action's icon; the playing item's [indicator] mark replaces it on the action that returns to that item. */
+/**
+ * An action's icon, for the label [watchChannel] picks; the playing item's [indicator] mark replaces it
+ * on the action that returns to that item.
+ */
 @Composable
-internal fun BrowseContextActionIcon(action: BrowseContextAction, indicator: ChannelPlaybackIndicator, size: Dp) {
+internal fun BrowseContextActionIcon(action: BrowseContextAction, indicator: ChannelPlaybackIndicator, size: Dp,
+    watchChannel: Boolean) {
     if (indicator.isPlayingItem) ChannelPlaybackMarker(indicator, size = size)
-    else Icon(painterResource(action.icon()), null, Modifier.size(size))
+    else Icon(painterResource(action.icon(watchChannel)), null, Modifier.size(size))
 }
 
 internal fun BrowseContextAction.label(watchChannel: Boolean, kind: AutomaticRecordingKind? = null): Int = when (this) {
@@ -198,7 +203,11 @@ private fun contextActionSupport(action: BrowseContextAction, kind: AutomaticRec
     else -> null
 }
 
-internal fun BrowseContextAction.icon(): Int = when (this) {
+/** [watchChannel] as for [label]: Watch channel tunes the live programme, so it shows live TV's icon. */
+internal fun BrowseContextAction.icon(watchChannel: Boolean): Int =
+    if (this == BrowseContextAction.WATCH && watchChannel) R.drawable.ic_live_tv_outlined else icon()
+
+private fun BrowseContextAction.icon(): Int = when (this) {
     BrowseContextAction.DETAILS -> R.drawable.ic_info
     BrowseContextAction.RECORD -> R.drawable.ic_fiber_manual_record
     BrowseContextAction.RECORD_SERIES, BrowseContextAction.RECORD_TITLE -> R.drawable.ic_fiber_smart_record

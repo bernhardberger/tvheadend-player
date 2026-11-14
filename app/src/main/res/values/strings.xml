@@ -412,6 +412,7 @@
     <!-- Program details start fact. %1$s = time like "20:15". Max 18. -->
     <string name="details_tomorrow">Tomorrow %1$s</string>
     <string name="context_record">Record</string>
+    <string name="details_record_choice">Record…</string>
     <string name="context_show_guide">Show in Guide</string>
     <string name="context_resume">Resume</string>
     <string name="context_start_over">Watch from beginning</string>

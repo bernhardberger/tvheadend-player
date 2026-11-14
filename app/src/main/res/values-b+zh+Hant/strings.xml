@@ -291,6 +291,7 @@
     <string name="details_recording_progress_spoken">已錄製%1$s，總長%2$s，%3$s</string>
     <string name="details_tomorrow">明天%1$s</string>
     <string name="context_record">錄影</string>
+    <string name="details_record_choice">錄影…</string>
     <string name="context_show_guide">在節目表中顯示</string>
     <string name="context_resume">繼續播放</string>
     <string name="context_start_over">從頭觀看</string>

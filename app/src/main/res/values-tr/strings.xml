@@ -310,6 +310,7 @@
     <string name="details_recording_progress_spoken">Toplam %2$s, kaydedilen %1$s, %3$s</string>
     <string name="details_tomorrow">Yarın %1$s</string>
     <string name="context_record">Kaydet</string>
+    <string name="details_record_choice">Kaydet…</string>
     <string name="context_show_guide">Rehberde göster</string>
     <string name="context_resume">Devam et</string>
     <string name="context_start_over">Baştan izle</string>

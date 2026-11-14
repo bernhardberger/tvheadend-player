@@ -310,6 +310,7 @@
     <string name="details_recording_progress_spoken">%1$s van %2$s, %3$s</string>
     <string name="details_tomorrow">Morgen %1$s</string>
     <string name="context_record">Opnemen</string>
+    <string name="details_record_choice">Opnemen…</string>
     <string name="context_show_guide">Tonen in tv-gids</string>
     <string name="context_resume">Hervatten</string>
     <string name="context_start_over">Vanaf het begin kijken</string>

@@ -329,6 +329,7 @@
     <string name="details_recording_progress_spoken">%1$s od %2$s, %3$s</string>
     <string name="details_tomorrow">Sutra %1$s</string>
     <string name="context_record">Snimi</string>
+    <string name="details_record_choice">Snimi…</string>
     <string name="context_show_guide">Prikaži u TV vodiču</string>
     <string name="context_resume">Nastavi</string>
     <string name="context_start_over">Gledaj od početka</string>

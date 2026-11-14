@@ -329,6 +329,7 @@
     <string name="details_recording_progress_spoken">%1$s sur %2$s, %3$s</string>
     <string name="details_tomorrow">Demain %1$s</string>
     <string name="context_record">Enregistrer</string>
+    <string name="details_record_choice">Enregistrer…</string>
     <string name="context_show_guide">Voir dans le guide</string>
     <string name="context_resume">Reprendre</string>
     <string name="context_start_over">Regarder depuis le début</string>

@@ -310,6 +310,7 @@
     <string name="details_recording_progress_spoken">%1$s af %2$s, %3$s</string>
     <string name="details_tomorrow">I morgen %1$s</string>
     <string name="context_record">Optag</string>
+    <string name="details_record_choice">Optag…</string>
     <string name="context_show_guide">Vis i tv-guiden</string>
     <string name="context_resume">Fortsæt</string>
     <string name="context_start_over">Se fra begyndelsen</string>

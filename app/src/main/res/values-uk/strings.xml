@@ -348,6 +348,7 @@
     <string name="details_recording_progress_spoken">%1$s із %2$s, %3$s</string>
     <string name="details_tomorrow">Завтра %1$s</string>
     <string name="context_record">Записати</string>
+    <string name="details_record_choice">Записати…</string>
     <string name="context_show_guide">Показати в телепрограмі</string>
     <string name="context_resume">Продовжити</string>
     <string name="context_start_over">Дивитися від початку</string>

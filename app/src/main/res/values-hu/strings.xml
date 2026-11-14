@@ -310,6 +310,7 @@
     <string name="details_recording_progress_spoken">%1$s / %2$s, %3$s</string>
     <string name="details_tomorrow">Holnap %1$s</string>
     <string name="context_record">Felvétel</string>
+    <string name="details_record_choice">Felvétel…</string>
     <string name="context_show_guide">Megnyitás a műsorújságban</string>
     <string name="context_resume">Folytatás</string>
     <string name="context_start_over">Megnézés az elejétől</string>

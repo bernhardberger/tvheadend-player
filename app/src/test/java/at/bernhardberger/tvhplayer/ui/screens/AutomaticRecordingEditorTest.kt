@@ -384,7 +384,11 @@ class AutomaticRecordingEditorTest {
         }
         compose.onNodeWithTag("browse-context-action-details").assertIsFocused()
         compose.pressKey(Key.DirectionCenter)
-        compose.onNodeWithTag("details-edit_rule")
+        // Edit is behind More on the details page.
+        compose.onNodeWithTag("details-more")
+            .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.RequestFocus) { it() }
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("browse-context-action-edit_rule")
             .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.RequestFocus) { it() }
         compose.pressKey(Key.DirectionCenter)
         compose.onNodeWithTag("automatic-recording-enabled")
@@ -428,8 +432,12 @@ class AutomaticRecordingEditorTest {
                 session.publish(automaticRecordingObservation(entries = listOf(entry), autorecRules = listOf(rule)))
                 detailsRoute = details
             }
-            val tag = if (details) "details-edit_rule" else "browse-context-action-edit_rule"
-            val activate = requireNotNull(compose.onNodeWithTag(tag).fetchSemanticsNode()
+            // On the details page, Edit is behind More, in the same menu.
+            if (details) {
+                compose.onNodeWithTag("details-more").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.RequestFocus) { it() }
+                compose.pressKey(Key.DirectionCenter)
+            }
+            val activate = requireNotNull(compose.onNodeWithTag("browse-context-action-edit_rule").fetchSemanticsNode()
                 .config[androidx.compose.ui.semantics.SemanticsActions.OnClick].action)
             compose.runOnIdle {
                 session.publish(automaticRecordingObservation(
@@ -477,24 +485,29 @@ class AutomaticRecordingEditorTest {
                 }
             }
         }
+        // Record series is the second way to record, behind Record….
+        fun recordSeries() {
+            compose.onNodeWithTag("details-record-choice").assertIsFocused()
+            compose.pressKey(Key.DirectionCenter)
+            compose.pressKey(Key.DirectionDown)
+            compose.onNodeWithTag("record-choice-record_series").assertIsFocused()
+            compose.pressKey(Key.DirectionCenter)
+        }
         compose.onNodeWithTag("details-watch").assertIsFocused()
         compose.pressKey(Key.DirectionRight)
-        compose.pressKey(Key.DirectionRight)
-        compose.onNodeWithTag("details-record_series").assertIsFocused()
-        compose.pressKey(Key.DirectionCenter)
+        recordSeries()
         compose.onNodeWithTag("automatic-recording-main").assertIsFocused()
         assertTrue(requests.isEmpty())
         compose.pressKey(Key.Back)
-        compose.onNodeWithTag("details-record_series").assertIsFocused()
-        compose.pressKey(Key.DirectionCenter)
+        recordSeries()
         compose.onNodeWithTag("automatic-recording-main").assertIsFocused()
         compose.pressKey(Key.DirectionCenter)
-        compose.onNodeWithTag("details-record_series").assertIsFocused()
+        compose.onNodeWithTag("details-record-choice").assertIsFocused()
         assertEquals(1, requests.size)
         assertEquals(automaticRecordingEvents.first().seriesLinkUri, requests.single().seriesLinkUri)
         assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_CREATE_AUTOREC_RULE })
         assertTrue(notices.state.value.pending.isEmpty())
-        compose.pressKey(Key.DirectionCenter)
+        recordSeries()
         compose.onNodeWithTag("automatic-recording-main").assertIsFocused()
         val ready = session.observation.value
         compose.runOnIdle { session.publish(SessionObservation.create()) }

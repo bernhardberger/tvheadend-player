@@ -310,6 +310,7 @@
     <string name="details_recording_progress_spoken">%1$s από %2$s, %3$s</string>
     <string name="details_tomorrow">Αύριο %1$s</string>
     <string name="context_record">Εγγραφή</string>
+    <string name="details_record_choice">Εγγραφή…</string>
     <string name="context_show_guide">Εμφάνιση στον οδηγό</string>
     <string name="context_resume">Συνέχεια</string>
     <string name="context_start_over">Προβολή από την αρχή</string>

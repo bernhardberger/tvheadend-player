@@ -41,6 +41,7 @@ import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.testutil.setContentWithArtworkSampling
 import at.bernhardberger.tvhplayer.testutil.pressKey
+import at.bernhardberger.tvhplayer.testutil.changeState
 import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.common.AppClock
@@ -168,7 +169,7 @@ class ProgrammeDetailsPageTest {
     @Test fun headerBlockDimsWithAirings() {
         show(heroVariant = 1)
         fun brightestAboutText(): Int {
-            val bounds = compose.onNodeWithText("Record", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+            val bounds = compose.onNodeWithTag("details-record-choice").fetchSemanticsNode().boundsInRoot
             val bitmap = snapshot()
             val brightest = (bounds.top.toInt().coerceAtLeast(0) until bounds.bottom.toInt().coerceAtMost(1080)).maxOf { y ->
                 (bounds.left.toInt() until bounds.right.toInt()).maxOf { x -> android.graphics.Color.red(bitmap.getPixel(x, y)) }
@@ -359,7 +360,7 @@ class ProgrammeDetailsPageTest {
             }
         }
         compose.onNodeWithTag("details-resume").assertIsFocused()
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionRight); pressKey(Key.DirectionRight) }
+        compose.onRoot().performKeyInput { repeat(3) { pressKey(Key.DirectionRight) } }
         compose.onNodeWithText("Mark as watched").assertIsFocused().assertHasClickAction()
         compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
         Assert.assertEquals(listOf(BrowseContextAction.MARK_WATCHED), selected)
@@ -373,6 +374,159 @@ class ProgrammeDetailsPageTest {
         compose.runOnIdle { writable.value = false }
         compose.onNodeWithText("Mark as unwatched").assertDoesNotExist()
         compose.onNodeWithTag("details-play").assertIsFocused()
+    }
+
+    private fun rowTags() = compose.onAllNodes(hasClickAction() and hasAnyAncestor(hasTestTag("details-actions")))
+        .fetchSemanticsNodes().sortedBy { it.boundsInRoot.left }.map { it.config[SemanticsProperties.TestTag] }
+
+
+    private fun showActions(recording: androidx.compose.runtime.State<DvrEntry?>, actions: () -> List<BrowseContextAction>,
+        selected: MutableList<BrowseContextAction>, onClose: () -> Unit, programme: Boolean = true,
+        initialAction: BrowseContextAction? = null) {
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                back = requireNotNull(androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
+                view = LocalView.current
+                // Counts Record keys the page lets through to what holds it.
+                Box(Modifier.onKeyEvent { if (it.key == Key.MediaRecord) parentRecordKeys++; false }) {
+                    ProvideArtworkSession(session) {
+                        ProgrammeDetailsPage(event = event.takeIf { programme }, recording = recording.value, channel = channel,
+                            nowSec = start.epochSeconds - 60, actions = actions(), recordingAdmission = admitted(recording.value),
+                            onAction = selected::add, onClose = onClose, initialAction = initialAction)
+                    }
+                }
+            }
+        }
+        compose.waitForIdle()
+    }
+
+    private var parentRecordKeys = 0
+
+    /** A remote's Back: down and up through the activity, falling back to its back dispatcher. */
+    private fun remoteBack() {
+        compose.runOnIdle {
+            val activity = view.context as android.app.Activity
+            activity.dispatchKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_BACK))
+            activity.dispatchKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_BACK))
+        }
+        compose.waitForIdle()
+    }
+
+    @Test fun waysToRecordOpenFromOneButtonAndBackReturnsToIt() {
+        val recording = androidx.compose.runtime.mutableStateOf<DvrEntry?>(null)
+        // Series metadata arriving turns "all with this title" into "series".
+        val series = androidx.compose.runtime.mutableStateOf(false)
+        val selected = mutableListOf<BrowseContextAction>()
+        var closed = false
+        showActions(recording, { programmeDetailsActions(event, start.epochSeconds - 60, recording.value, null, true, true)
+            .map { if (series.value && it == BrowseContextAction.RECORD_TITLE) BrowseContextAction.RECORD_SERIES else it } },
+            selected, { closed = true })
+        Assert.assertEquals(listOf("details-watch", "details-record-choice", "details-show_guide"), rowTags())
+        compose.pressKey(Key.DirectionRight)
+        compose.onNodeWithTag("details-record-choice").assertIsFocused()
+        // The opening press only opens the choice, on its first way to record, even when the ways
+        // change before its first focus frame.
+        compose.mainClock.autoAdvance = false
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.mainClock.advanceTimeByFrame()
+        compose.runOnIdle { series.value = true }
+        compose.mainClock.advanceTimeByFrame()
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        compose.onNodeWithTag("record-choice-record").assertIsFocused()
+        Assert.assertEquals(emptyList<BrowseContextAction>(), selected)
+        compose.pressKey(Key.DirectionDown)
+        compose.pressKey(Key.DirectionDown)
+        compose.onNodeWithTag("record-choice-record_series").assertIsFocused()
+        // The focused way goes away: focus stays in the choice, on the way in its place.
+        compose.changeState { series.value = false }
+        compose.waitForIdle()
+        compose.onNodeWithTag("record-choice-record_title").assertIsFocused()
+        // A remote's Back closes only the choice.
+        remoteBack()
+        compose.onNodeWithTag("record-choice-record").assertDoesNotExist()
+        compose.onNodeWithTag("details-record-choice").assertIsFocused()
+        Assert.assertFalse(closed)
+        compose.pressKey(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
+        Assert.assertEquals(listOf(BrowseContextAction.RECORD), selected)
+        compose.onNodeWithTag("record-choice-record").assertDoesNotExist()
+        // Recorded, the recording button cancels it and keeps the focus.
+        compose.changeState { recording.value = DvrEntry.create(DvrEntryId(1), channelId = channel.id, title = event.title,
+            start = start, stop = event.stop, state = DvrEntryState.SCHEDULED) }
+        compose.waitForIdle()
+        compose.onNodeWithTag("details-cancel").assertIsFocused()
+        Assert.assertEquals(listOf("details-watch", "details-cancel", "details-more"), rowTags())
+    }
+
+    @Test fun moreHoldsTheRestClosesBackToItselfAndFollowsTheRecording() {
+        val recording = androidx.compose.runtime.mutableStateOf<DvrEntry?>(DvrEntry.create(DvrEntryId(1),
+            title = "Ridge Light", state = DvrEntryState.COMPLETED_ERROR, playPosition = 20.seconds, start = start,
+            stop = event.stop, files = listOf(DvrRecordingFile.create(start = start, stop = event.stop))))
+        val writable = androidx.compose.runtime.mutableStateOf(true)
+        val selected = mutableListOf<BrowseContextAction>()
+        var closed = false
+        showActions(recording, { recordingDetailsActions(recording.value!!, admitted(recording.value), writable.value, false,
+            nowSec = 0) }, selected, { closed = true }, programme = false)
+        Assert.assertEquals(listOf("details-resume", "details-start_over", "details-delete", "details-more"), rowTags())
+        repeat(4) { compose.pressKey(Key.DirectionRight) }
+        compose.onNodeWithTag("details-more").assertIsFocused()
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("browse-context-action-mark_watched").assertIsFocused()
+        compose.onNodeWithTag("browse-context-action-keep_until").assertExists()
+        Assert.assertEquals(emptyList<BrowseContextAction>(), selected)
+        compose.runOnIdle { back.onBackPressed() }
+        compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
+        compose.onNodeWithTag("details-more").assertIsFocused()
+        Assert.assertFalse(closed)
+        // Another recording on the page closes the menu even though its row has More too.
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("browse-context-action-mark_watched").assertIsFocused()
+        compose.changeState { recording.value = DvrEntry.create(DvrEntryId(2), title = "Ridge Light",
+            state = DvrEntryState.COMPLETED_ERROR, playPosition = 20.seconds, start = start, stop = event.stop,
+            files = listOf(DvrRecordingFile.create(start = start, stop = event.stop))) }
+        compose.waitForIdle()
+        compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
+        compose.onNodeWithTag("details-more").assertIsFocused()
+        compose.pressKey(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionCenter)
+        Assert.assertEquals(listOf(BrowseContextAction.MARK_WATCHED), selected)
+        compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
+        compose.changeState { recording.value = DvrEntry.create(DvrEntryId(1), title = "Ridge Light",
+            state = DvrEntryState.COMPLETED_ERROR, playCount = 1, start = start, stop = event.stop,
+            files = listOf(DvrRecordingFile.create(start = start, stop = event.stop))) }
+        compose.waitForIdle()
+        compose.onNodeWithTag("details-more").assertIsFocused()
+        // A refresh that takes More's actions away closes the menu onto a button still in the row.
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("browse-context-action-mark_unwatched").assertIsFocused()
+        compose.changeState { writable.value = false }
+        compose.waitForIdle()
+        compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
+        compose.onNodeWithTag("details-play").assertIsFocused()
+        Assert.assertFalse(closed)
+    }
+
+    @Test fun anActionBehindMoreFocusesMoreAndTheRecordKeyWaitsForTheMenu() {
+        val recording = androidx.compose.runtime.mutableStateOf<DvrEntry?>(DvrEntry.create(DvrEntryId(1),
+            channelId = channel.id, title = event.title, start = start, stop = event.stop,
+            state = DvrEntryState.SCHEDULED, autorecRuleId = AutorecRuleId("series")))
+        val selected = mutableListOf<BrowseContextAction>()
+        showActions(recording, { programmeDetailsActions(event, start.epochSeconds - 60, recording.value, null, true, true,
+            ruleAvailable = true) }, selected, {}, initialAction = BrowseContextAction.EDIT_RULE)
+        Assert.assertEquals(listOf("details-watch", "details-skip", "details-more"), rowTags())
+        compose.onNodeWithTag("details-more").assertIsFocused()
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("browse-context-action-edit_rule").assertIsFocused()
+        compose.pressKey(Key.MediaRecord)
+        compose.onNodeWithTag("browse-context-action-edit_rule").assertIsFocused()
+        // The menu keeps the key from what holds the page.
+        Assert.assertEquals(0, parentRecordKeys)
+        compose.runOnIdle { back.onBackPressed() }
+        compose.onNodeWithTag("details-more").assertIsFocused()
+        compose.pressKey(Key.MediaRecord)
+        compose.onNodeWithTag("details-skip").assertIsFocused()
+        Assert.assertEquals(emptyList<BrowseContextAction>(), selected)
     }
 
     @Test fun upFocusesPanelAboveActionsAndBackReturnsToTheActions() {
@@ -686,8 +840,7 @@ class ProgrammeDetailsPageTest {
     @Test fun largeTextKeepsActionsAboutAndAiringsReachable() {
         show(fontScale = 1.3f)
         compose.onNodeWithTag("details-watch").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
-        compose.onNodeWithTag("details-record").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
-        compose.onNodeWithTag("details-record_title").assertIsFocused().assertIsDisplayed()
+        compose.onNodeWithTag("details-record-choice").assertIsFocused().assertIsDisplayed()
             .performKeyInput { pressKey(Key.DirectionRight) }
         compose.onNodeWithTag("details-show_guide").assertIsFocused().assertIsDisplayed()
             .performKeyInput { pressKey(Key.DirectionDown) }
@@ -1153,12 +1306,10 @@ class ProgrammeDetailsPageTest {
         show(recording = true, recordingFacts = true, longSubtitle = true,
             creditsPresent = creditsPresent, factsPresent = factsPresent)
         compose.onNodeWithTag("details-resume").assertIsFocused()
-        compose.onRoot().performKeyInput {
-            pressKey(Key.DirectionRight); pressKey(Key.DirectionRight); pressKey(Key.DirectionRight)
-        }
-        compose.onNodeWithTag("details-keep_until").assertIsFocused()
-        compose.pressKey(Key.DirectionRight)
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionRight); pressKey(Key.DirectionRight) }
         compose.onNodeWithTag("details-delete").assertIsFocused()
+        compose.pressKey(Key.DirectionRight)
+        compose.onNodeWithTag("details-more").assertIsFocused()
         compose.onNodeWithContentDescription("Expires Tue, Sep 22 21:00").assertExists()
         assertBottomAnchored(peek = false)
         assertTwoLineSubtitle()
@@ -1178,9 +1329,9 @@ class ProgrammeDetailsPageTest {
         compose.onNodeWithTag("details-facts-panel").assertIsFocused()
         compose.runOnIdle { factsPresent.value = false }
         compose.onNodeWithTag("details-facts-panel").assertDoesNotExist()
-        compose.onNodeWithTag("details-delete").assertIsFocused()
+        compose.onNodeWithTag("details-more").assertIsFocused()
         compose.pressKey(Key.DirectionDown)
-        compose.onNodeWithTag("details-delete").assertIsFocused()
+        compose.onNodeWithTag("details-more").assertIsFocused()
         compose.runOnIdle { back.onBackPressed() }
     }
 
@@ -1355,10 +1506,10 @@ class ProgrammeDetailsPageTest {
         Assert.assertFalse(synopsis.single().hasVisualOverflow)
         // Later actions may start off screen; focusing each one must scroll it wholly into the safe area.
         compose.onNodeWithTag("details-watch").assertIsFocused()
-        listOf("details-watch", "details-record").forEach {
+        listOf("details-watch", "details-record-choice").forEach {
             Assert.assertTrue(it, compose.onNodeWithTag(it).getUnclippedBoundsInRoot().right.value <= 960f - 48f)
         }
-        val laterActions = listOf("details-record", "details-record_title", "details-show_guide")
+        val laterActions = listOf("details-record-choice", "details-show_guide")
         laterActions.forEach { tag ->
             compose.pressKey(Key.DirectionRight)
             val bounds = compose.onNodeWithTag(tag).assertIsFocused().assertIsDisplayed().getUnclippedBoundsInRoot()

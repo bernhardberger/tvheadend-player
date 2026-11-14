@@ -136,6 +136,9 @@ class ProgrammeDvrSdkAdoptionTest {
             else -> "Record"
         }
         if (stale) compose.runOnIdle { session.publish(observation(DvrEntryState.COMPLETED)) }
+        // Details offer the ways to record behind one button; Record is the first of them.
+        if (details && state == null) compose.onNodeWithTag("details-record-choice").requestFocus()
+            .performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithText(actionText).requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         if (!stale && state != null) {
             compose.onNodeWithText(actionText).requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
