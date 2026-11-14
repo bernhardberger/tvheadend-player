@@ -17,7 +17,6 @@
     <string name="schedule_automatic_turn_off">Disattiva</string>
     <string name="schedule_automatic_turn_on">Attiva</string>
     <string name="schedule_automatic_off">Disattivata</string>
-    <string name="schedule_automatic_next">Prossima: %1$s • %2$s</string>
     <string name="schedule_automatic_nothing">Nessuna registrazione programmata</string>
     <string name="schedule_automatic_keep">Conserva fino a: %1$s</string>
     <plurals name="schedule_automatic_upcoming">

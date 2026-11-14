@@ -22,7 +22,6 @@ import at.bernhardberger.tvhplayer.core.AutomaticRecordingList
 import at.bernhardberger.tvhplayer.core.AutomaticRecordingListItem
 import at.bernhardberger.tvhplayer.ui.TvSpacing48
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
-import at.bernhardberger.tvhplayer.ui.components.depth.DepthFrame
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthItem
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthLevel
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthNavigationState
@@ -38,7 +37,6 @@ internal fun scheduleAutomaticLevels(
     channels: List<Channel>,
     channelMap: Map<ChannelId, Channel>,
     navigation: DepthNavigationState,
-    scheduleState: ScheduleState,
     paneModifier: Modifier,
     onNew: () -> Unit,
     onEdit: (AutomaticRecordingListItem) -> Unit,
@@ -87,37 +85,10 @@ internal fun scheduleAutomaticLevels(
         )
         levels
     }
-    rememberInitialAutomaticFrame(automatic, canModify, levels, navigation, scheduleState)
-    return levels
-}
-
-@Composable
-private fun rememberInitialAutomaticFrame(
-    automatic: AutomaticRecordingList,
-    canModify: Boolean,
-    levels: Map<String, DepthLevel>,
-    navigation: DepthNavigationState,
-    scheduleState: ScheduleState,
-) {
-    val stack = navigation.stack
-    val active = stack.frames.any { it.levelId == SCHEDULE_AUTOMATIC_LEVEL }
-    val hasRememberedFrame = SCHEDULE_AUTOMATIC_LEVEL in stack.remembered
-    val needsSeed = !active && automatic.available && (!scheduleState.automaticLevelVisited || !hasRememberedFrame)
     SideEffect {
-        if (active) scheduleState.automaticLevelVisited = true
-        else scheduleState.automaticLevelVisited =
-            scheduleState.automaticLevelVisited.takeIf { hasRememberedFrame } == true
-        if (!canModify && automatic.items.isEmpty() && stack.active.levelId == SCHEDULE_AUTOMATIC_LEVEL) {
+        if (!canModify && automatic.items.isEmpty() && navigation.stack.active.levelId == SCHEDULE_AUTOMATIC_LEVEL) {
             navigation.pop()
-        } else if (needsSeed && navigation.stack == stack) {
-            val rows = levels.getValue(SCHEDULE_AUTOMATIC_LEVEL).rows
-            val first = automatic.items.firstOrNull()?.rowId() ?: rows.firstOrNull()?.item?.id
-            val frame = DepthFrame(SCHEDULE_AUTOMATIC_LEVEL, first,
-                if (canModify && automatic.items.isNotEmpty()) 1 else 0,
-                firstVisibleItemId = rows.firstOrNull()?.item?.id)
-            if (stack.remembered[SCHEDULE_AUTOMATIC_LEVEL] != frame) {
-                navigation.update(stack.copy(remembered = stack.remembered + (SCHEDULE_AUTOMATIC_LEVEL to frame)))
-            }
         }
     }
+    return levels
 }

@@ -39,7 +39,7 @@ internal class TimerRecordingEditorState(
     var closed by mutableStateOf(false)
         private set
     val navigation = RecordingEditorNavigation(
-        "channel-time", "timer-recording", { !busy && !closed }, editing,
+        if (editing) "main" else "channel-time", "timer-recording", { !busy && !closed }, editing,
     )
     var selectedHour by mutableStateOf(initial.start.hour)
         private set
@@ -107,7 +107,8 @@ internal class TimerRecordingEditorState(
         if (problem != null) {
             lastRefusal = problem
             navigation.confirmation = null
-            navigation.firstLevel("main")
+            if (problem == RecordingSubmitUnavailable.UNCHANGED) close()
+            else navigation.firstLevel("channel-time")
             return
         }
         val submitted = draft

@@ -17,7 +17,6 @@
     <string name="schedule_automatic_turn_off">Uitschakelen</string>
     <string name="schedule_automatic_turn_on">Inschakelen</string>
     <string name="schedule_automatic_off">Uit</string>
-    <string name="schedule_automatic_next">Volgende: %1$s • %2$s</string>
     <string name="schedule_automatic_nothing">Niets gepland</string>
     <string name="schedule_automatic_keep">Bewaren: %1$s</string>
     <plurals name="schedule_automatic_upcoming">

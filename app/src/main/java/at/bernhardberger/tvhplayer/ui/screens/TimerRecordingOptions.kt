@@ -72,6 +72,7 @@ private fun TimerRecordingMore(state: TimerRecordingEditorState, configurations:
         stringResource(R.string.context_delete),
         { state.navigation.confirmation = AutomaticRecordingEditorConfirmation.DELETE },
         editorRowModifier(state.navigation, "delete"),
+        icon = R.drawable.ic_delete_outlined,
     )
 }
 

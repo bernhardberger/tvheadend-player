@@ -73,6 +73,14 @@ internal fun automaticRecordingWordsSummary(state: AutomaticRecordingEditorState
 
 @Composable
 internal fun automaticRecordingDescription(state: AutomaticRecordingEditorState): String {
+    // Until words are entered, the kind's plain help line instead of a sentence quoting nothing.
+    if (state.draft.kind != AutomaticRecordingKind.SERIES && !state.draft.pattern.rawExpression &&
+        state.draft.pattern.words.isBlank()) {
+        return stringResource(
+            if (state.draft.kind == AutomaticRecordingKind.TITLE) R.string.automatic_recording_new_title_help
+            else R.string.automatic_recording_new_keyword_help,
+        )
+    }
     val resource = when {
         state.draft.kind == AutomaticRecordingKind.SERIES -> R.string.autorec_editor_series_description
         state.draft.pattern.rawExpression -> R.string.autorec_editor_raw_help

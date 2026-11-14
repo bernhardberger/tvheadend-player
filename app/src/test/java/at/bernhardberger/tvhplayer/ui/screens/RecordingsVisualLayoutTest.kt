@@ -70,6 +70,7 @@ import at.bernhardberger.tvhplayer.core.groupDvrSchedule
 import at.bernhardberger.tvhplayer.ui.screens.recordings.PROBLEMS_CLEAR_TAG
 import at.bernhardberger.tvhplayer.ui.screens.recordings.SCHEDULE_NEW_TIMER
 import at.bernhardberger.tvhplayer.ui.screens.recordings.SCHEDULE_AUTOMATIC_ROW
+import at.bernhardberger.tvhplayer.ui.screens.recordings.SCHEDULE_UPCOMING_SHOWN
 import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
@@ -1735,7 +1736,8 @@ class RecordingsVisualLayoutTest {
     fun readOnlyScheduleHasNoAddingRowsAndOnlyShowsAnExistingAutomaticRecordingsLevel() {
         screenState.open(at.bernhardberger.tvhplayer.core.DvrLibraryMode.SCHEDULE)
         val entry = recording(20, "Tomorrow's documentary", null, DvrEntryState.SCHEDULED)
-        show(entries = listOf(entry), canModify = false)
+        show(entries = listOf(entry), canModify = false,
+            channels = listOf(Channel.create(ChannelId(7), name = "Ridge Earth")))
         focused("recording-list-entry-20")
         compose.onNodeWithTag("schedule-new-timer").assertDoesNotExist()
         compose.onNodeWithTag("schedule-automatic-recordings").assertDoesNotExist()
@@ -1778,6 +1780,66 @@ class RecordingsVisualLayoutTest {
             view.context.getString(R.string.automatic_recording_kind_title) +
                 " • ${view.context.getString(R.string.all_channels)}",
         ))
+        val upcoming = (1L..7L).map { index ->
+            DvrEntry.create(DvrEntryId(700 + index), title = "Programme $index", subtitle = "Episode $index",
+                state = DvrEntryState.SCHEDULED, autorecRuleId = AutorecRuleId("title"),
+                channelId = ChannelId(7), channelName = "Ridge Earth",
+                start = Instant.fromEpochSeconds(nowSeconds() + index * 3_600),
+                stop = Instant.fromEpochSeconds(nowSeconds() + index * 3_600 + 1_800))
+        }
+        publish(upcoming.reversed(), autorecRules = listOf(AutorecRule.create(
+            AutorecRuleId("title"), title = "^Ridge Light across the northern frontier and the winter mountains$",
+            seriesLinkUri = "ridge", enabled = false)))
+        val sectionHeading = view.context.getString(R.string.timer_editor_next_recordings)
+        val more = view.context.getString(R.string.timer_editor_more_removed, upcoming.size - SCHEDULE_UPCOMING_SHOWN)
+        compose.onNodeWithText(sectionHeading, useUnmergedTree = true).assertExists()
+        val pairs = (1..SCHEDULE_UPCOMING_SHOWN).map { index ->
+            compose.onNode(hasText("Episode $index") and hasAnyAncestor(hasTestTag("automatic-recording-pane")),
+                useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        }
+        assertTrue("Upcoming pairs follow start order", pairs.zipWithNext().all { (a, b) -> a.bottom <= b.top })
+        val moreNode = compose.onNodeWithText(more, useUnmergedTree = true)
+        moreNode.assertExists()
+        val meta = compose.onAllNodes(hasText(" • Ridge Earth", substring = true) and
+            hasAnyAncestor(hasTestTag("automatic-recording-pane")), useUnmergedTree = true)
+            .fetchSemanticsNodes().first().boundsInRoot
+        val headingBounds = compose.onNodeWithText(sectionHeading, useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot
+        assertTrue("Pairs have more separation than the two lines within a pair",
+            pairs[1].top - meta.bottom > meta.top - pairs[0].bottom)
+        val statusGap = bounds("automatic-recording-pane-keep").top - bounds("automatic-recording-pane-when").bottom
+        assertTrue("The section heading separates itself from the status lines",
+            headingBounds.top - bounds("automatic-recording-pane-keep").bottom > statusGap)
+        assertTrue("The heading separates itself from the first pair", pairs[0].top - headingBounds.bottom > statusGap)
+        val safeBottom = compose.onRoot().fetchSemanticsNode().boundsInRoot.bottom -
+            35 * view.resources.displayMetrics.density
+        val lowest = moreNode.fetchSemanticsNode().boundsInRoot.bottom
+        assertTrue("Lowest upcoming text fits the safe preview column: bottom=$lowest, safe=$safeBottom",
+            lowest <= safeBottom)
+        compose.onAllNodes(hasText(" • Ridge Earth", substring = true) and
+            hasAnyAncestor(hasTestTag("automatic-recording-pane")), useUnmergedTree = true)
+            .assertCountEquals(SCHEDULE_UPCOMING_SHOWN)
+        publish(upcoming, autorecRules = listOf(AutorecRule.create(
+            AutorecRuleId("title"), title = "^Ridge Light$", channelId = ChannelId(7))))
+        compose.onAllNodes(hasText(" • Ridge Earth", substring = true) and
+            hasAnyAncestor(hasTestTag("automatic-recording-pane")), useUnmergedTree = true).assertCountEquals(1)
+        // An entry with neither title nor time still reads as a recording; a channel outside the catalog keeps its name.
+        publish(listOf(
+            DvrEntry.create(DvrEntryId(801), state = DvrEntryState.SCHEDULED, autorecRuleId = AutorecRuleId("title")),
+            DvrEntry.create(DvrEntryId(802), title = "Harbor Kickoff", state = DvrEntryState.SCHEDULED,
+                autorecRuleId = AutorecRuleId("title"), channelId = ChannelId(999), channelName = "Harbor Sport",
+                start = Instant.fromEpochSeconds(nowSeconds() + 3_600),
+                stop = Instant.fromEpochSeconds(nowSeconds() + 5_400)),
+        ), autorecRules = listOf(AutorecRule.create(AutorecRuleId("title"), title = "^Ridge Light$")))
+        val inPane = hasAnyAncestor(hasTestTag("automatic-recording-pane"))
+        compose.onAllNodes(hasText(" • Harbor Sport", substring = true) and inPane, useUnmergedTree = true)
+            .assertCountEquals(1)
+        compose.onAllNodes(hasText("Ridge Light") and inPane, useUnmergedTree = true).assertCountEquals(2)
+        compose.onAllNodes(hasText("") and inPane, useUnmergedTree = true).assertCountEquals(0)
+        publish(listOf(entry), autorecRules = listOf(AutorecRule.create(AutorecRuleId("title"), title = "^Ridge Light$")))
+        compose.onNodeWithText(sectionHeading, useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithText(view.context.getString(R.string.schedule_automatic_nothing),
+            useUnmergedTree = true).assertExists()
         publish(listOf(entry))
         assertEquals("schedule:", screenState.scheduleNavigation.stack.active.levelId)
         focused("recording-list-entry-20")
@@ -1796,9 +1858,15 @@ class RecordingsVisualLayoutTest {
         publish(emptyList(), autorecRules = rules.drop(1))
         publish(emptyList(), autorecRules = rules)
         key(Key.DirectionDown)
-        key(Key.DirectionCenter)
+        key(Key.DirectionRight)
+        focused("schedule-new-automatic")
+        key(Key.DirectionDown)
         focused("automatic-recording-first")
         key(Key.DirectionDown)
+        focused("automatic-recording-second")
+        compose.pressKey(Key.Back)
+        focused("schedule-automatic-recordings")
+        key(Key.DirectionCenter)
         focused("automatic-recording-second")
         compose.pressKey(Key.Back)
         focused("schedule-automatic-recordings")
@@ -1848,7 +1916,7 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionUp)
         focused("schedule-automatic-recordings")
         key(Key.DirectionCenter)
-        focused("automatic-recording-first")
+        focused("schedule-new-automatic")
         assertNoCommands()
     }
 
@@ -1893,6 +1961,8 @@ class RecordingsVisualLayoutTest {
         })
         key(Key.DirectionDown)
         key(Key.DirectionCenter)
+        focused("schedule-new-automatic")
+        key(Key.DirectionDown)
         focused("automatic-recording-ridge")
         key(Key.Menu)
         key(Key.DirectionDown)
@@ -2041,6 +2111,7 @@ class RecordingsVisualLayoutTest {
         show(empty = true, autorecRules = listOf(rule))
         key(Key.DirectionDown)
         key(Key.DirectionCenter)
+        key(Key.DirectionDown)
         key(Key.Menu)
         repeat(2) { key(Key.DirectionDown) }
         key(Key.DirectionCenter)
@@ -2131,10 +2202,10 @@ class RecordingsVisualLayoutTest {
         focused("schedule-automatic-recordings")
         capture("Bx3-automatic-recordings-focused", 1f, "Fixture pack: Ridge Light.", outputs)
         key(Key.DirectionCenter)
+        focused("schedule-new-automatic")
+        capture("Bx4-automatic-level", 1f, "First row focused on entry; intentionally blank pane.", outputs)
+        key(Key.DirectionDown)
         focused("automatic-recording-ridge")
-        capture("Bx4-automatic-level", 1f, activeHeading().let {
-            "First rule focused; no pane artwork. Heading=${it.bounds}; baseline=${it.baseline}"
-        }, outputs)
         key(Key.Menu)
         key(Key.DirectionDown)
         focused("automatic-recording-menu-toggle")
@@ -2163,6 +2234,35 @@ class RecordingsVisualLayoutTest {
         capture("Bx6-empty-schedule", 1f, "One-line support and centered empty text with 48dp vertical space.", outputs)
     }
 
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun upcomingAutomaticRecordingFrames() {
+        presentationLibrary(firstRow = true, scheduled = true)
+        val channel = requireNotNull(session.observation.value.channelCatalogForDisplay)
+            .channels.first { it.name == "Ridge Earth" }
+        val id = AutorecRuleId("ridge")
+        val title = "^Ridge Light across the northern frontier and the winter mountains$"
+        val upcoming = (1L..7L).map { index ->
+            DvrEntry.create(DvrEntryId(700 + index), title = "Ridge Light", subtitle = "The winter journey $index",
+                state = DvrEntryState.SCHEDULED, autorecRuleId = id, channelId = channel.id,
+                start = Instant.fromEpochSeconds(nowSeconds() + index * 86_400),
+                stop = Instant.fromEpochSeconds(nowSeconds() + index * 86_400 + 1_800))
+        }
+        publish(upcoming, autorecRules = listOf(AutorecRule.create(id, title = title,
+            seriesLinkUri = "ridge", channelId = channel.id)))
+        openScheduleScreen()
+        key(Key.DirectionUp)
+        key(Key.DirectionCenter)
+        key(Key.DirectionDown)
+        focused("automatic-recording-ridge")
+        val outputs = "../captures/autorec-impl/emulator-feedback-1"
+        capture("series-upcoming", 1f, "Two-line series name, four ordered pairs and remaining count.", outputs)
+        publish(upcoming, autorecRules = listOf(AutorecRule.create(id, title = title, seriesLinkUri = "ridge")))
+        capture("all-channels-upcoming", 1f, "Known channel appears on each upcoming pair.", outputs)
+        publish(emptyList(), autorecRules = listOf(AutorecRule.create(id, title = title, seriesLinkUri = "ridge")))
+        capture("automatic-nothing-scheduled", 1f, "No upcoming heading or list.", outputs)
+    }
+
     @Test
     @Category(VisualCapture::class)
     @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi")
@@ -2174,6 +2274,7 @@ class RecordingsVisualLayoutTest {
         openScheduleScreen()
         compose.pressKey(Key.DirectionDown)
         compose.pressKey(Key.DirectionCenter)
+        compose.pressKey(Key.DirectionDown)
         compose.onNodeWithTag("automatic-recording-long-expression").assertIsFocused()
         val outputs = "../captures/autorec-impl/g10-first-look"
         capture("long-expression-schedule", 1f, "Approved expression; native row focused.", outputs)

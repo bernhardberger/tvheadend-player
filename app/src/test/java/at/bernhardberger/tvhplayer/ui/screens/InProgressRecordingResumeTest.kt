@@ -81,7 +81,8 @@ class InProgressRecordingResumeTest {
     @Test @Category(VisualCapture::class)
     @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
     fun captureDeferredRecordingChoice() {
-        openDetails(754L, directly = true, serverPath = "evening-news.mp4", onWatch = { _, _ -> })
+        openDetails(754L, directly = true, serverPath = "evening-news.mp4", onWatch = { _, _ -> },
+            libraryMode = DvrLibraryMode.ARCHIVE)
         compose.onNodeWithTag("recording-watch-live").assertIsFocused()
         compose.onNodeWithText(ApplicationProvider.getApplicationContext<Application>().getString(R.string.error_305_reason))
             .assertExists()
@@ -101,7 +102,8 @@ class InProgressRecordingResumeTest {
 
     @Test fun recordingNowOkOffersWatchChannelBelowResume() {
         var watched: at.bernhardberger.tvheadend.sdk.core.ChannelId? = null
-        val starts = openDetails(754L, directly = true, onWatch = { id, _ -> watched = id })
+        val starts = openDetails(754L, directly = true, onWatch = { id, _ -> watched = id },
+            libraryMode = DvrLibraryMode.ARCHIVE)
         compose.onNodeWithTag("recording-resume").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionDown) }
         compose.onNodeWithTag("recording-start-over").assertIsFocused()
@@ -115,7 +117,7 @@ class InProgressRecordingResumeTest {
     }
 
     @Test fun recordingNowOkWithoutPositionOffersStartAfterWatchLive() {
-        val starts = openDetails(null, directly = true, onWatch = { _, _ -> })
+        val starts = openDetails(null, directly = true, onWatch = { _, _ -> }, libraryMode = DvrLibraryMode.ARCHIVE)
         compose.onNodeWithTag("recording-resume").assertDoesNotExist()
         compose.onNodeWithTag("recording-start-over").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionCenter) }
@@ -125,7 +127,7 @@ class InProgressRecordingResumeTest {
     @Test fun recordingWatchLiveRejectsAReplacedSessionBeforeRecomposition() {
         var latest: SessionObservation? = null
         val starts = openDetails(754L, directly = true, onWatch = { _, _ -> error("stale Watch live") },
-            latestObservation = { latest })
+            latestObservation = { latest }, libraryMode = DvrLibraryMode.ARCHIVE)
         compose.onNodeWithTag("recording-resume").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionDown) }
         compose.onNodeWithTag("recording-start-over").assertIsFocused()
@@ -149,8 +151,12 @@ class InProgressRecordingResumeTest {
 
     @Test
     fun anInProgressRecordingOffersStopBesideWatch() {
-        val starts = openDetails(playPositionSeconds = 754L)
+        // OK on a running recording in Schedule opens its details, without the Play / Watch live card (#23).
+        val starts = openDetails(playPositionSeconds = 754L, directly = true, onWatch = { _, _ -> })
 
+        compose.onNodeWithTag("recording-resume").assertDoesNotExist()
+        compose.onNodeWithTag("recording-watch-live").assertDoesNotExist()
+        compose.onNodeWithTag("programme-details-page").assertExists()
         compose.onNodeWithTag("details-watch").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionRight) }
         compose.onNodeWithTag("details-start_over").assertIsFocused()
@@ -236,7 +242,7 @@ class InProgressRecordingResumeTest {
 
     @Test
     fun okOnRunningRecordingResumesDirectlyWithoutPrompt() {
-        val starts = openDetails(754L, directly = true)
+        val starts = openDetails(754L, directly = true, libraryMode = DvrLibraryMode.ARCHIVE)
         compose.onNodeWithTag("recording-resume").assertDoesNotExist()
         compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
         compose.runOnIdle { assertEquals(listOf(RecordingPlaybackStart.RESUME), starts) }
@@ -352,6 +358,7 @@ class InProgressRecordingResumeTest {
         onWatch: ((at.bernhardberger.tvheadend.sdk.core.ChannelId, String) -> Unit)? = null,
         latestObservation: (() -> SessionObservation?)? = null,
         serverPath: String = "evening-news.ts",
+        libraryMode: DvrLibraryMode = if (completed) DvrLibraryMode.ARCHIVE else DvrLibraryMode.SCHEDULE,
         onReturn: (DvrEntryId) -> Boolean = { true }): List<RecordingPlaybackStart> {
         val starts = mutableListOf<RecordingPlaybackStart>()
         val observation = observation(playPositionSeconds, completed, serverPath)
@@ -364,7 +371,7 @@ class InProgressRecordingResumeTest {
             deleteEntry = { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
             updateWatchStateCommand = { _, _, _ -> error("Unexpected watch-state update") },
         )
-        val state = RecordingsScreenState().apply { mode.value = if (completed) DvrLibraryMode.ARCHIVE else DvrLibraryMode.SCHEDULE }
+        val state = RecordingsScreenState().apply { mode.value = libraryMode }
         val notices = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) {
             at.bernhardberger.tvhplayer.notices.NoticeContext(0, observation.currentSession?.generationIdentity)
         }

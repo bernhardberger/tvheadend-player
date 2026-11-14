@@ -14,13 +14,13 @@ sealed interface AutomaticRecordingListItem {
     val headline: String
     val channelId: ChannelId?
     val enabled: Boolean
-    val upcoming: Int
-    val next: DvrEntry?
+    val upcomingEntries: List<DvrEntry>
+    val upcoming: Int get() = upcomingEntries.size
+    val next: DvrEntry? get() = upcomingEntries.firstOrNull()
 
     data class Automatic(
         val rule: AutorecRule,
-        override val upcoming: Int,
-        override val next: DvrEntry?,
+        override val upcomingEntries: List<DvrEntry>,
     ) : AutomaticRecordingListItem {
         override val kind get() = autorecKind(rule)
         override val id get() = rule.id.value
@@ -32,8 +32,7 @@ sealed interface AutomaticRecordingListItem {
 
     data class Timer(
         val rule: TimerecRule,
-        override val upcoming: Int,
-        override val next: DvrEntry?,
+        override val upcomingEntries: List<DvrEntry>,
     ) : AutomaticRecordingListItem {
         override val kind get() = AutomaticRecordingKind.TIMER
         override val id get() = rule.id.value
@@ -63,12 +62,11 @@ fun automaticRecordingList(
     val timed = upcoming.groupBy { it.timerecRuleId }
     val items = snapshot?.autorecRules.orEmpty().map {
         val own = automatic[it.id].orEmpty()
-        AutomaticRecordingListItem.Automatic(it, own.size,
-            own.minWithOrNull(compareBy(nullsLast()) { entry: DvrEntry -> entry.start }))
+        AutomaticRecordingListItem.Automatic(it,
+            own.sortedWith(compareBy(nullsLast()) { entry: DvrEntry -> entry.start }))
     } + snapshot?.timerecRules.orEmpty().map {
         val own = timed[it.id].orEmpty()
-        AutomaticRecordingListItem.Timer(it, own.size,
-            own.minWithOrNull(compareBy(nullsLast()) { entry: DvrEntry -> entry.start }))
+        AutomaticRecordingListItem.Timer(it, own.sortedWith(compareBy(nullsLast()) { entry: DvrEntry -> entry.start }))
     }
     return AutomaticRecordingList(items.sortedWith(
         compareBy<AutomaticRecordingListItem> { it.headline.isBlank() }

@@ -17,7 +17,6 @@
     <string name="schedule_automatic_turn_off">تعطيل</string>
     <string name="schedule_automatic_turn_on">تفعيل</string>
     <string name="schedule_automatic_off">معطّل</string>
-    <string name="schedule_automatic_next">التالي: %1$s • %2$s</string>
     <string name="schedule_automatic_nothing">لا توجد تسجيلات مجدولة</string>
     <string name="schedule_automatic_keep">الاحتفاظ: %1$s</string>
     <plurals name="schedule_automatic_upcoming">

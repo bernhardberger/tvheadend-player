@@ -125,9 +125,9 @@ class AutomaticRecordingEditorTest {
         compose.pressKey(Key.DirectionUp)
         compose.onNodeWithTag("automatic-recording-new-keyword").assertIsFocused()
         repeat(3) { compose.pressKey(Key.DirectionDown) }
-        compose.onNodeWithTag("automatic-recording-new-cancel").assertIsFocused()
+        compose.onNodeWithTag("automatic-recording-new-timer").assertIsFocused()
         compose.pressKey(Key.DirectionDown)
-        compose.onNodeWithTag("automatic-recording-new-cancel").assertIsFocused()
+        compose.onNodeWithTag("automatic-recording-new-timer").assertIsFocused()
         repeat(3) { compose.pressKey(Key.DirectionUp) }
         // Open Keyword, then leave without saving.
         compose.pressKey(Key.DirectionCenter)
@@ -168,6 +168,8 @@ class AutomaticRecordingEditorTest {
         compose.onNodeWithTag("automatic-recording-new-keyword").assertDoesNotExist()
     }
 
+    // Native graphics measures text, so the safe-bottom check below sees real row positions.
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
     @Test fun editorConfirmationCardsKeepDraftsAndDispatchTheChosenActionOnce() {
         lateinit var fixture: AutomaticRecordingEditorFixture
         lateinit var automatic: AutomaticRecordingEditorState
@@ -202,6 +204,13 @@ class AutomaticRecordingEditorTest {
                 else AutomaticRecordingEditor(automatic, channels = automaticRecordingChannels)
             }
         }
+        compose.settleFrames(2)
+        val lastBottom = compose.onAllNodes(hasTestTag("automatic-recording-more"))
+            .fetchSemanticsNodes().maxOf { it.boundsInRoot.bottom }
+        val screenBottom = compose.onRoot().fetchSemanticsNode().boundsInRoot.bottom
+        val reserve = 35 * RuntimeEnvironment.getApplication().resources.displayMetrics.density
+        assertTrue("One-line edit fields fit at rest: last=$lastBottom, safe bottom=${screenBottom - reserve}",
+            lastBottom > 0 && lastBottom <= screenBottom - reserve)
         compose.onNodeWithTag("automatic-recording-enabled")
             .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.RequestFocus) { it() }
         compose.pressKey(Key.DirectionCenter)
@@ -273,7 +282,7 @@ class AutomaticRecordingEditorTest {
             timer.navigation.confirmation = AutomaticRecordingEditorConfirmation.LEAVE
         }
         compose.onNodeWithTag("timer-recording-keep-editing").assertIsFocused()
-        compose.onNodeWithTag("timer-recording-leave-main").assertIsNotEnabled()
+        compose.onNodeWithTag("timer-recording-leave-main").assertIsEnabled()
         compose.onNode(hasAnyAncestor(hasTestTag("centred-dialog-card")) and
             androidx.compose.ui.test.hasText(RuntimeEnvironment.getApplication().getString(
                 at.bernhardberger.tvhplayer.R.string.timer_editor_repeat_required))).assertExists()
@@ -283,8 +292,12 @@ class AutomaticRecordingEditorTest {
         compose.pressKey(Key.DirectionDown)
         compose.onNodeWithTag("timer-recording-leave-main").assertIsFocused()
         compose.pressKey(Key.DirectionCenter)
-        compose.onNodeWithTag("centred-dialog-card").assertExists()
+        compose.onNodeWithTag("centred-dialog-card").assertDoesNotExist()
+        compose.onNodeWithTag("timer-recording-channel-time").assertIsFocused()
+        timerOpener = "channel-time"
         compose.runOnIdle { assertTrue(fixture.timerSubmissions.isEmpty()) }
+        compose.pressKey(Key.Back)
+        compose.pressKey(Key.DirectionDown)
         compose.pressKey(Key.DirectionDown)
         compose.onNodeWithTag("timer-recording-discard").assertIsFocused()
         compose.pressKey(Key.Back, settleFrames = 1, frameMillis = PlayerMotion.PanelMs.toLong())
@@ -355,7 +368,7 @@ class AutomaticRecordingEditorTest {
         compose.pressKey(Key.DirectionDown)
         compose.onNodeWithTag("browse-context-action-edit_rule").assertIsFocused()
         compose.pressKey(Key.DirectionCenter)
-        compose.onNodeWithTag("automatic-recording-matches").assertIsFocused()
+        compose.onNodeWithTag("automatic-recording-main").assertIsFocused()
         compose.onNodeWithTag("automatic-recording-enabled")
             .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.RequestFocus) { it() }
         compose.pressKey(Key.DirectionCenter)
@@ -503,6 +516,10 @@ class AutomaticRecordingEditorTest {
             state = replacement ?: initial
             TVHeadendPlayerTheme { TimerRecordingEditor(state, channels = automaticRecordingChannels) }
         }
+        compose.onNodeWithTag("timer-recording-main").assertIsFocused()
+        compose.pressKey(Key.DirectionDown)
+        compose.onNodeWithTag("timer-recording-enabled").assertIsFocused()
+        compose.pressKey(Key.DirectionDown)
         compose.onNodeWithTag("timer-recording-channel-time").assertIsFocused()
         compose.pressKey(Key.DirectionCenter)
         compose.onNodeWithTag("timer-recording-date").assertDoesNotExist()
@@ -519,7 +536,10 @@ class AutomaticRecordingEditorTest {
         compose.onNodeWithTag("timer-recording-repeat").assertIsFocused()
         compose.onNodeWithTag("timer-recording-date").assertDoesNotExist()
         compose.pressKey(Key.Back)
-        compose.onNodeWithTag("timer-recording-main").assertIsNotEnabled()
+        compose.onNodeWithTag("timer-recording-main").assertIsEnabled()
+            .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.RequestFocus) { it() }
+        compose.pressKey(Key.DirectionCenter)
+        compose.onNodeWithTag("timer-recording-channel-time").assertIsFocused()
         compose.runOnIdle {
             assertTrue(state.draft.repeating)
             assertTrue(state.draft.days.isEmpty())
@@ -561,7 +581,8 @@ class AutomaticRecordingEditorTest {
             fixture.timerNow = state.draft.resolveOccurrenceOn(state.draft.date, state.zone).stop
         }
         compose.pressKey(Key.DirectionCenter)
-        compose.onNodeWithTag("timer-recording-main").assertIsNotEnabled()
+        compose.onNodeWithTag("timer-recording-main").assertIsEnabled()
+        compose.onNodeWithTag("timer-recording-channel-time").assertIsFocused()
         compose.onNodeWithText(org.robolectric.RuntimeEnvironment.getApplication().getString(
             at.bernhardberger.tvhplayer.R.string.timer_editor_time_passed,
         )).assertExists()
@@ -588,6 +609,11 @@ class AutomaticRecordingEditorTest {
         }
         for (index in sessions.indices) {
             compose.onNodeWithTag("timer-recording-channel-time").assertIsFocused()
+            compose.onNodeWithTag("timer-recording-main")
+                .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.RequestFocus) { it() }
+            compose.pressKey(Key.DirectionCenter)
+            compose.onNodeWithTag("timer-recording-channel-time").assertIsFocused()
+            compose.runOnIdle { assertEquals(0, notices[index].state.value.pending.size) }
             if (index == 1) {
                 val sameAsChannel = RuntimeEnvironment.getApplication().getString(
                     R.string.timer_editor_name_default,
@@ -635,7 +661,10 @@ class AutomaticRecordingEditorTest {
             }
             TVHeadendPlayerTheme { AutomaticRecordingEditor(state) }
         }
-        compose.onNodeWithTag("automatic-recording-main").assertIsNotEnabled()
+        compose.onNodeWithTag("automatic-recording-main").assertIsEnabled().assertIsFocused()
+        compose.pressKey(Key.DirectionDown)
+        compose.onNodeWithTag("automatic-recording-enabled").assertIsFocused()
+        compose.pressKey(Key.DirectionDown)
         compose.onNodeWithTag("automatic-recording-matches").assertIsFocused()
         compose.runOnIdle {
             state.updateDraft { it.copy(pattern = readRecordingPattern(
@@ -643,7 +672,7 @@ class AutomaticRecordingEditorTest {
             )) }
         }
         compose.settleFrames(2)
-        val belowWords = listOf("channel-time", "keep", "more", "enabled", "cancel")
+        val belowWords = listOf("channel-time", "keep", "more", "enabled")
         val layouts = mutableListOf<TextLayoutResult>()
         compose.onNodeWithText(RuntimeEnvironment.getApplication().getString(
             R.string.autorec_editor_raw_value, state.draft.pattern.words,
@@ -702,6 +731,18 @@ class AutomaticRecordingEditorTest {
         compose.runOnIdle {
             assertEquals("A|B$", state.draft.pattern.words)
             assertTrue(fixture.submissions.isEmpty())
+        }
+        for (kind in listOf(AutomaticRecordingKind.KEYWORD, AutomaticRecordingKind.TITLE)) {
+            for (fullText in listOf(false, true)) {
+                compose.runOnIdle {
+                    state.navigation.firstLevel("matches")
+                    state.updateDraft { it.copy(kind = kind, pattern = readRecordingPattern(""), fullText = fullText) }
+                }
+                val help = if (kind == AutomaticRecordingKind.KEYWORD) R.string.automatic_recording_new_keyword_help
+                    else R.string.automatic_recording_new_title_help
+                compose.onNodeWithText(RuntimeEnvironment.getApplication().getString(help)).assertExists()
+                compose.onAllNodesWithText("“”", substring = true).assertCountEquals(0)
+            }
         }
     }
 

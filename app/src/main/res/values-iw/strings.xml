@@ -17,7 +17,6 @@
     <string name="schedule_automatic_turn_off">כיבוי</string>
     <string name="schedule_automatic_turn_on">הפעלה</string>
     <string name="schedule_automatic_off">כבויה</string>
-    <string name="schedule_automatic_next">הבאה: %1$s • %2$s</string>
     <string name="schedule_automatic_nothing">אין הקלטות מתוזמנות</string>
     <string name="schedule_automatic_keep">שמירה עד: %1$s</string>
     <plurals name="schedule_automatic_upcoming">

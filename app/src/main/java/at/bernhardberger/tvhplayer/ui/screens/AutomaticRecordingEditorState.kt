@@ -36,7 +36,7 @@ internal class AutomaticRecordingEditorState(
     var draft by mutableStateOf(initial)
         private set
     val navigation = RecordingEditorNavigation(
-        initialRow = if (!editing && prefilled && initial.cannotSubmit() == null) "main" else "matches",
+        initialRow = if (editing || prefilled && initial.cannotSubmit() == null) "main" else "matches",
         tagPrefix = "automatic-recording",
         canNavigate = { !busy && !closed },
         deletionAllowed = editing,
@@ -147,7 +147,14 @@ internal class AutomaticRecordingEditorState(
     }
 
     fun submit() {
-        if (busy || closed || mainProblem != null) return
+        if (busy || closed) return
+        val problem = mainProblem
+        if (problem != null) {
+            navigation.confirmation = null
+            // cannotSubmit only reports UNCHANGED or WORDS_REQUIRED for automatic recordings.
+            if (problem == RecordingSubmitUnavailable.UNCHANGED) close() else navigation.firstLevel("matches")
+            return
+        }
         navigation.confirmation = null
         busy = true
         val submittedDraft = draft

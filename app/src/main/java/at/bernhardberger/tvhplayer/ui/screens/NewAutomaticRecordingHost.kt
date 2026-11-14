@@ -64,7 +64,7 @@ internal fun NewAutomaticRecordingHost(
     when (val selected = kind) {
         null -> RecordingEditorOverlay(navigation, modifier) {
             RecordingEditorSurface(navigation, closeFlow, guidance = { NewAutomaticRecordingGuidance() }) {
-                NewAutomaticRecordingKinds(navigation, closeFlow) { kind = it }
+                NewAutomaticRecordingKinds(navigation) { kind = it }
             }
         }
         AutomaticRecordingKind.TIMER -> TimerRecordingEditorHost(
@@ -95,7 +95,6 @@ private fun NewAutomaticRecordingGuidance() {
 @Composable
 private fun NewAutomaticRecordingKinds(
     navigation: RecordingEditorNavigation,
-    onClose: () -> Unit,
     onKind: (AutomaticRecordingKind) -> Unit,
 ) {
     val kinds = listOf(AutomaticRecordingKind.KEYWORD, AutomaticRecordingKind.TITLE, AutomaticRecordingKind.TIMER)
@@ -115,6 +114,7 @@ private fun NewAutomaticRecordingKinds(
             trailingIcon = R.drawable.ic_keyboard_arrow_right,
             modifier = editorRowModifier(navigation, id).focusProperties {
                 if (kind == AutomaticRecordingKind.KEYWORD) up = FocusRequester.Cancel
+                if (kind == AutomaticRecordingKind.TIMER) down = FocusRequester.Cancel
             },
             onClick = {
                 navigation.focusedRow = id
@@ -122,9 +122,4 @@ private fun NewAutomaticRecordingKinds(
             },
         )
     }
-    GuidedStepAction(
-        stringResource(R.string.cancel), onClose,
-        editorRowModifier(navigation, "cancel").focusProperties { down = FocusRequester.Cancel },
-        leadingIcon = { Icon(painterResource(R.drawable.ic_close), contentDescription = null) },
-    )
 }

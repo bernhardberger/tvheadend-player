@@ -17,7 +17,6 @@
     <string name="schedule_automatic_turn_off">Απενεργοποίηση</string>
     <string name="schedule_automatic_turn_on">Ενεργοποίηση</string>
     <string name="schedule_automatic_off">Ανενεργό</string>
-    <string name="schedule_automatic_next">Επόμενη: %1$s • %2$s</string>
     <string name="schedule_automatic_nothing">Καμία προγραμματισμένη εγγραφή</string>
     <string name="schedule_automatic_keep">Διατήρηση: %1$s</string>
     <plurals name="schedule_automatic_upcoming">

@@ -17,7 +17,6 @@
     <string name="schedule_automatic_turn_off">Isključi</string>
     <string name="schedule_automatic_turn_on">Uključi</string>
     <string name="schedule_automatic_off">Isključeno</string>
-    <string name="schedule_automatic_next">Sljedeće: %1$s • %2$s</string>
     <string name="schedule_automatic_nothing">Nema zakazanih snimanja</string>
     <string name="schedule_automatic_keep">Zadrži: %1$s</string>
     <plurals name="schedule_automatic_upcoming">
