@@ -43,6 +43,8 @@ import at.bernhardberger.tvhplayer.ui.screens.postDvrFailure
 import at.bernhardberger.tvhplayer.ui.screens.recordingStateIsCurrent
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
@@ -77,7 +79,9 @@ internal class ScheduleState {
         }
         val queue = ArrayDeque<RuleRequest>().apply { addLast(request) }
         inFlight[item.rowId()] = queue
-        scope.launch {
+        // Accepted work must reach its non-cancellable loop even if the screen leaves before dispatch.
+        @OptIn(DelicateCoroutinesApi::class)
+        scope.launch(start = CoroutineStart.ATOMIC) {
             withContext(NonCancellable) {
                 try {
                     while (queue.isNotEmpty()) {
