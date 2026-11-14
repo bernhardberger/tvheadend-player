@@ -129,8 +129,8 @@ android {
         applicationId = "at.bernhardberger.tvhplayer"
         minSdk = 28
         targetSdk = 36
-        versionCode = 181
-        versionName = "0.5.0"
+        versionCode = 182
+        versionName = "0.5.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "PROFILE_TRACE", "false")
@@ -560,7 +560,7 @@ tasks.register("verifyExternalSdkConsumption") {
         }
 
         val expectedTvheadendModules = mapOf(
-            "htsp" to "1.0.0-rc.1",
+            "htsp" to "1.0.0-rc.2",
             "sdk-android" to sdkVersion,
             "sdk-core" to sdkVersion,
             "sdk-media3" to sdkVersion,

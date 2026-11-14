@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.1
+
+### Playback
+
+- On an NVIDIA Shield, switching from a 1080i channel to a 720p one, such as
+  from ServusTV HD to ORF 1 HD, plays the new channel. Before, it could stay on
+  the loading ring without a picture.
+- A request that times out or is canceled while the connection drops no longer
+  leaves the old connection open in the background.
+
 ## 0.5.0
 
 ### Playback
