@@ -22,6 +22,18 @@
 - A missed or failed recording that never wrote a file offers *Remove entry* instead of *Delete recording*.
 - A removed recording no longer hides another recording of the same program, and retention cleanup no longer repeats the “Recording deleted” notice.
 
+### Automatic recordings and timers
+
+- Program details offer *Record series* when the guide marks the program as part of a series, and *Record all with this title* otherwise. Either opens a page where you choose the channel, the days, a start window and how long recordings are kept. *More options* holds priority, recording profile, padding, duplicate detection and a maximum number of recordings. The page lists the upcoming programs it would record, and you can untick the ones you don't want (#17).
+- The *Schedule* tab starts with two rows, *New timer* and *Automatic recordings*. *New timer* records a channel at set times, once or repeating on chosen days.
+- *Automatic recordings* lists your series, title and keyword recordings and your repeating timers, including the ones made in Tvheadend's web interface. You can add one by keyword, by title or as a repeating timer, edit it, turn it off or delete it. The side pane shows what the focused one records, how long it keeps recordings and what's next.
+- A scheduled recording that comes from an automatic recording offers *Skip this episode* in place of *Cancel recording*, and *Record this episode* to take that back. A skipped one stays in the Schedule, marked *Skipped*. *Edit series recording* opens the automatic recording from any of its entries.
+- Turning an automatic recording off removes its scheduled entries. Turning it on again schedules them afresh, without the skips you had set.
+- While it records, an entry that comes from an automatic recording shows the red dot with a half ring.
+- *Keep until…* on a finished recording, in its menu and on its details page, changes when Tvheadend removes it: in 1 week, 1 month, 3 months, 6 months or 1 year from today, until space is needed, or forever.
+- A recording that expires within a week shows an hourglass with the time left on its Home card and in the list, where it takes the place of the file size. The side pane and the details page give the date and time; *Available until* is now *Expires*.
+- Home has an *Expiring soon* row for unwatched recordings that expire within a week. Like the other rows, it can be hidden in Home's options.
+
 ### Remote buttons
 
 - Play/Pause in the player pauses or plays and shows only the banner, like OK, instead of opening the full controls.
