@@ -1680,6 +1680,21 @@ class RecordingsVisualLayoutTest {
         assertTrue("Upcoming pairs follow start order", pairs.zipWithNext().all { (a, b) -> a.bottom <= b.top })
         val moreNode = compose.onNodeWithText(more, useUnmergedTree = true)
         moreNode.assertExists()
+        // Each next recording carries the scheduled mark on the status lines' icon keyline, its text on their text edge.
+        val whenLine = bounds("automatic-recording-pane-when")
+        val whenText = compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.Text) and
+            hasAnyAncestor(hasTestTag("automatic-recording-pane-when")), useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot
+        val marks = compose.onAllNodesWithTag("automatic-recording-pane-next-mark", useUnmergedTree = true)
+            .fetchSemanticsNodes().map { it.boundsInRoot }
+        assertEquals("One mark per shown entry", SCHEDULE_UPCOMING_SHOWN, marks.size)
+        marks.zip(pairs).forEach { (mark, title) ->
+            assertEquals("Mark on the status icons' left edge", whenLine.left, mark.left, 1f)
+            assertEquals("Mark centred on the title's first line: $title, $mark", title.center.y, mark.center.y, 1f)
+            assertEquals("Entry text on the status text edge", whenText.left, title.left, 1f)
+        }
+        assertEquals("'and N more' starts at the entries' text edge", whenText.left,
+            moreNode.fetchSemanticsNode().boundsInRoot.left, 1f)
         val meta = compose.onAllNodes(hasText(" • Ridge Earth", substring = true) and
             hasAnyAncestor(hasTestTag("automatic-recording-pane")), useUnmergedTree = true)
             .fetchSemanticsNodes().first().boundsInRoot
@@ -2135,7 +2150,7 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionCenter)
         key(Key.DirectionDown)
         focused("automatic-recording-ridge")
-        val outputs = "../captures/autorec-impl/emulator-feedback-1"
+        val outputs = "../captures/autorec-impl/pane-next-icons"
         capture("series-upcoming", 1f, "Two-line series name, four ordered pairs and remaining count.", outputs)
         publish(upcoming, autorecRules = listOf(AutorecRule.create(id, title = title, seriesLinkUri = "ridge")))
         capture("all-channels-upcoming", 1f, "Known channel appears on each upcoming pair.", outputs)
