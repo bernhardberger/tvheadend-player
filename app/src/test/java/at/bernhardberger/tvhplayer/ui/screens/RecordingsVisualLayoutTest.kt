@@ -2447,6 +2447,21 @@ class RecordingsVisualLayoutTest {
         compose.onNodeWithText("Yesterday", useUnmergedTree = true).assertExists()
     }
 
+    @Test fun scheduleDayHeadingsFollowTheClockAcrossMidnight() {
+        val clock = mutableStateOf(java.time.Instant.parse("2026-10-06T23:59:59Z").epochSecond)
+        nowSeconds = { clock.value }
+        screenState.open(at.bernhardberger.tvhplayer.core.DvrLibraryMode.SCHEDULE)
+        show(entries = listOf(recording(20, "Night documentary", null, DvrEntryState.SCHEDULED,
+            startEpochSeconds = clock.value + 3_600)))
+        focused("recording-list-entry-20")
+        compose.onNodeWithText("Tomorrow", useUnmergedTree = true).assertExists()
+        // The clock passes midnight while the server's list stays the same.
+        compose.runOnIdle { clock.value += 2 }
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithText("Tomorrow", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithText("Today", useUnmergedTree = true).assertExists()
+    }
+
     @Test fun missedAndCanceledPaneBadgesNameTheirState() {
         val entry = mutableStateOf(recording(30, "Missed match", null, DvrEntryState.MISSED))
         compose.setContent {

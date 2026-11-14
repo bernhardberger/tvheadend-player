@@ -229,17 +229,23 @@ private data class RecordingLibraryPresentation(
     val library: DvrLibraryPartition,
     val archive: DvrArchiveFolder,
     val archiveEntries: List<DvrEntry>,
-    val schedule: List<DvrScheduleSection>,
 )
 
-/** Problems fall under their day as the browse clock sees it, so Today turns into Yesterday at midnight. */
+/**
+ * Schedule and problem entries fall under their day as the browse clock sees it, so Tomorrow turns
+ * into Today and Today into Yesterday at midnight without a DVR change.
+ */
 @Composable
-private fun rememberProblemSections(problems: List<DvrEntry>, nowSeconds: () -> Long): List<DvrScheduleSection> {
+private fun rememberDaySections(
+    entries: List<DvrEntry>,
+    nowSeconds: () -> Long,
+    group: (List<DvrEntry>, Long, java.time.ZoneId) -> List<DvrScheduleSection>,
+): List<DvrScheduleSection> {
     val zone = java.time.ZoneId.systemDefault()
     val today by remember(nowSeconds, zone) {
         derivedStateOf { java.time.Instant.ofEpochSecond(nowSeconds()).atZone(zone).toLocalDate() }
     }
-    return remember(problems, today, zone) { groupDvrProblems(problems, nowSeconds(), zone) }
+    return remember(entries, today, zone) { group(entries, nowSeconds(), zone) }
 }
 
 class RecordingsScreenState(initialMode: DvrLibraryMode = DvrLibraryMode.ARCHIVE) {
@@ -551,7 +557,6 @@ internal fun RecordingsScreenContent(
             library = library,
             archive = archive,
             archiveEntries = archiveEntries,
-            schedule = groupDvrSchedule(library.schedule, System.currentTimeMillis() / 1000L),
         )
     }
     Box(Modifier.fillMaxSize().onPreviewKeyEvent { event ->
@@ -635,8 +640,8 @@ internal fun RecordingsScreenContent(
     val archiveItems = remember(archive, archiveLevel, fullArchive, recordingNow) {
         archiveLevelItems(archive, archiveLevel, recordingNow) ?: archive.listItems(recordingNow)
     }
-    val scheduleGroups = presentation.schedule
-    val problemGroups = rememberProblemSections(library.problems, nowSecProvider)
+    val scheduleGroups = rememberDaySections(library.schedule, nowSecProvider, ::groupDvrSchedule)
+    val problemGroups = rememberDaySections(library.problems, nowSecProvider, ::groupDvrProblems)
     val itemKeys = when (mode) {
         DvrLibraryMode.ARCHIVE -> archiveItems.map { it.key }
         DvrLibraryMode.SCHEDULE -> scheduleManagement + scheduleGroups.flatMap { it.entries }
