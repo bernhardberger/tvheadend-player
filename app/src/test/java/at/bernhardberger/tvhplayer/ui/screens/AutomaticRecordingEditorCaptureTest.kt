@@ -429,7 +429,52 @@ class AutomaticRecordingEditorCaptureTest {
             }
         }
         capture("new-kind-keyword-focused", "slice-7a", "automatic-recording-new-keyword")
-        capture("new-kind-cancel-focused", "slice-7a", "automatic-recording-new-cancel")
+        capture("new-kind-timer-focused", "slice-7a", "automatic-recording-new-timer")
+    }
+
+    @Test fun emulatorFeedbackEditorFrames() {
+        val directory = "emulator-feedback-1"
+        show(automaticRecordingSeries)
+        capture("new-series-first-level", directory)
+        for (kind in listOf(AutomaticRecordingKind.SERIES, AutomaticRecordingKind.KEYWORD, AutomaticRecordingKind.TITLE)) {
+            show(automaticRecordingSeries.copy(kind = kind,
+                seriesLinkUri = automaticRecordingSeries.seriesLinkUri.takeIf { kind == AutomaticRecordingKind.SERIES }),
+                editing = true)
+            capture("edit-${kind.name.lowercase()}-first-level", directory)
+        }
+        show(automaticRecordingSeries, editing = true)
+        open(AutomaticRecordingEditorLevel.MORE, "delete")
+        capture("series-more-delete", directory)
+        compose.runOnIdle {
+            requireNotNull(shown).navigation.firstLevel("main")
+            requireNotNull(shown).updateDraft { it.copy(enabled = false) }
+            requireNotNull(shown).back()
+        }
+        capture("edit-series-leave", directory)
+        // A new rule without words never searches: the real loader answers NothingToSearch.
+        show(newAutorecDraft(AutomaticRecordingKind.KEYWORD), preview = AutorecPreviewState.NothingToSearch)
+        compose.runOnIdle { requireNotNull(shown).submit() }
+        capture("invalid-words-focus", directory)
+        compose.runOnIdle {
+            requireNotNull(shown).updateDraft { it.copy(enabled = false) }
+            requireNotNull(shown).back()
+        }
+        capture("invalid-words-leave-main", directory, "automatic-recording-leave-main")
+        compose.runOnIdle {
+            shown = null
+            shownTimer = fixture.timer(newTimerDraft(automaticRecordingNow, automaticRecordingZone,
+                startingRepeating = true).copy(channelId = automaticRecordingChannels.first().id,
+                name = "Northline Tonight", existingTimer = true))
+        }
+        capture("edit-timer-first-level", directory)
+        compose.runOnIdle { requireNotNull(shownTimer).navigation.open(AutomaticRecordingEditorLevel.MORE, "delete") }
+        capture("timer-more-delete", directory)
+        compose.runOnIdle {
+            requireNotNull(shownTimer).navigation.firstLevel("main")
+            requireNotNull(shownTimer).updateDraft { it.copy(enabled = false) }
+            requireNotNull(shownTimer).back()
+        }
+        capture("edit-timer-leave", directory)
     }
 
     @Test fun channelLogoFocusFrames() {

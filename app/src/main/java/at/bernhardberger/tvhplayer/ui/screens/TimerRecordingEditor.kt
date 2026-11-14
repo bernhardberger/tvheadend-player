@@ -59,9 +59,9 @@ internal fun TimerRecordingEditor(
         }
     }
     if (state.navigation.leaveConfirmation) RecordingEditorLeaveDialog(
-        state.navigation, timerMainLabel(state), state.mainProblem == null,
+        state.navigation, timerMainLabel(state),
         state::back, state::submit, state::confirmDestructiveAction,
-        mainIcon = R.drawable.ic_schedule,
+        mainIcon = if (state.editing) R.drawable.ic_save else R.drawable.ic_schedule,
         unavailableReason = timerUnavailableLabel(state),
     )
     if (state.navigation.confirmation == AutomaticRecordingEditorConfirmation.DELETE) RecordingRuleDeleteDialog(
@@ -79,10 +79,19 @@ internal fun TimerRecordingEditor(
 private fun TimerRecordingFirstLevel(state: TimerRecordingEditorState, channels: List<Channel>) {
     GuidedStepAction(
         timerMainLabel(state), state::submit, editorRowModifier(state.navigation, "main"),
-        icon = R.drawable.ic_schedule, enabled = !state.busy && state.mainProblem == null,
+        icon = if (state.editing) R.drawable.ic_save else R.drawable.ic_schedule,
+        enabled = !state.busy,
         leadingIcon = if (state.busy) ({
             CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 3.dp)
         }) else null,
+    )
+    if (state.editing) GuidedStepAction(
+        stringResource(R.string.autorec_editor_turned_on),
+        { state.updateDraft { it.copy(enabled = !it.enabled) } },
+        editorRowModifier(state.navigation, "enabled").semantics {
+            role = Role.Switch; toggleableState = ToggleableState(state.draft.enabled)
+        },
+        trailingContent = { Switch(state.draft.enabled, null, Modifier.clearAndSetSemantics {}) },
     )
     TimerRecordingField(state, "channel-time", stringResource(R.string.autorec_editor_channel_time),
         "${timerChannelLabel(state.draft, channels)} · ${timerSpanLabel(state)}", timerChannelTimeFields) {
@@ -100,15 +109,6 @@ private fun TimerRecordingFirstLevel(state: TimerRecordingEditorState, channels:
         recordingEditorMoreSummary(state.changedFields.intersect(timerMoreFields), state.editing), timerMoreFields) {
         state.navigation.open(AutomaticRecordingEditorLevel.MORE, "priority")
     }
-    if (state.editing) GuidedStepAction(
-        stringResource(R.string.autorec_editor_turned_on),
-        { state.updateDraft { it.copy(enabled = !it.enabled) } },
-        editorRowModifier(state.navigation, "enabled").semantics {
-            role = Role.Switch; toggleableState = ToggleableState(state.draft.enabled)
-        },
-        trailingContent = { Switch(state.draft.enabled, null, Modifier.clearAndSetSemantics {}) },
-    )
-    GuidedStepAction(stringResource(R.string.cancel), state::back, editorRowModifier(state.navigation, "cancel"))
 }
 
 @Composable

@@ -2,6 +2,8 @@ package at.bernhardberger.tvhplayer.ui.screens
 
 import at.bernhardberger.tvhplayer.core.AutorecEpisodeState
 import at.bernhardberger.tvhplayer.core.AutorecPreviewState
+import at.bernhardberger.tvhplayer.core.AutomaticRecordingKind
+import at.bernhardberger.tvhplayer.core.RecordingPattern
 import at.bernhardberger.tvhplayer.core.RecordingSubmitUnavailable
 import at.bernhardberger.tvhplayer.core.newTimerDraft
 import at.bernhardberger.tvhplayer.core.resolveOccurrenceOn
@@ -44,7 +46,7 @@ class AutomaticRecordingEditorStateTest {
         assertNull(state.navigation.confirmation)
         assertEquals(AutomaticRecordingEditorLevel.FIRST, state.navigation.page.level)
         assertEquals(RecordingSubmitUnavailable.TIME_PASSED, state.mainProblem)
-        assertEquals("main", state.navigation.focusedRow)
+        assertEquals("channel-time", state.navigation.focusedRow)
         state.updateDraft { it.copy(date = it.date.plusDays(1), name = "Viewer name") }
         assertNull(state.mainProblem)
         val submitted = state.draft
@@ -68,6 +70,11 @@ class AutomaticRecordingEditorStateTest {
         runCurrent()
         assertTrue(state.closed)
         assertEquals(1, fixture.closes)
+        val untouched = fixture.timer(submitted.copy(existingTimer = true, days = DayOfWeek.entries.toSet()))
+        assertEquals("main", untouched.navigation.focusedRow)
+        untouched.submit()
+        assertTrue(untouched.closed)
+        assertEquals(2, fixture.timerSubmissions.size)
         val existing = fixture.timer(submitted.copy(existingTimer = true, days = setOf(DayOfWeek.MONDAY)))
         existing.updateDraft { it.copy(name = "Unsaved timer") }
         val beforeDelete = existing.draft
@@ -169,15 +176,28 @@ class AutomaticRecordingEditorStateTest {
         val unchanged = fixture.state(editing = true)
         assertEquals(1, fixture.saves)
         assertEquals(RecordingSubmitUnavailable.UNCHANGED, unchanged.mainProblem)
-        assertEquals("matches", unchanged.navigation.page.focusedRow)
+        assertEquals("main", unchanged.navigation.page.focusedRow)
         unchanged.submit()
         runCurrent()
         assertEquals(2, fixture.submissions.size)
+        assertTrue(unchanged.closed)
         unchanged.dispose()
     }
 
     @Test fun destructiveConfirmationsKeepDraftUntilExplicitChoice() = runTest {
         val fixture = AutomaticRecordingEditorFixture(this)
+        val invalid = fixture.state(automaticRecordingSeries.copy(
+            kind = AutomaticRecordingKind.KEYWORD,
+            seriesLinkUri = null, pattern = RecordingPattern(""),
+        ))
+        invalid.updateDraft { it.copy(enabled = false) }
+        invalid.back()
+        invalid.submit()
+        assertNull(invalid.navigation.confirmation)
+        assertFalse(invalid.closed)
+        assertEquals("matches", invalid.navigation.focusedRow)
+        assertEquals(RecordingSubmitUnavailable.WORDS_REQUIRED, invalid.mainProblem)
+        assertTrue(fixture.submissions.isEmpty())
         val state = fixture.state()
         state.updateDraft { it.copy(enabled = false) }
         state.back()

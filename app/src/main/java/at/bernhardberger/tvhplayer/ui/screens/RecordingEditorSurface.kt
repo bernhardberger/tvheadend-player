@@ -116,7 +116,6 @@ internal fun editorRowModifier(navigation: RecordingEditorNavigation, id: String
 internal fun RecordingEditorLeaveDialog(
     navigation: RecordingEditorNavigation,
     mainLabel: String,
-    canSubmit: Boolean,
     onBack: () -> Unit,
     onSubmit: () -> Unit,
     onDiscard: () -> Unit,
@@ -146,7 +145,7 @@ internal fun RecordingEditorLeaveDialog(
                         .focusRequester(keep).focusProperties { up = FocusRequester.Cancel; down = main })
                 PlaybackChoiceButton(mainLabel, mainIcon, null, false, onSubmit,
                     Modifier.testTag("${navigation.tagPrefix}-leave-main").focusRequester(main)
-                        .focusProperties { up = keep; down = discard }, enabled = canSubmit)
+                        .focusProperties { up = keep; down = discard })
                 PlaybackChoiceButton(stringResource(R.string.autorec_editor_discard), R.drawable.ic_close,
                     null, false, onDiscard, Modifier.testTag("${navigation.tagPrefix}-discard")
                         .focusRequester(discard).focusProperties { up = main; down = FocusRequester.Cancel })

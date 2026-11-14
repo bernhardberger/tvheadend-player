@@ -17,7 +17,6 @@
     <string name="schedule_automatic_turn_off">無効にする</string>
     <string name="schedule_automatic_turn_on">有効にする</string>
     <string name="schedule_automatic_off">無効</string>
-    <string name="schedule_automatic_next">次回：%1$s • %2$s</string>
     <string name="schedule_automatic_nothing">録画予定なし</string>
     <string name="schedule_automatic_keep">保存期間：%1$s</string>
     <plurals name="schedule_automatic_upcoming">

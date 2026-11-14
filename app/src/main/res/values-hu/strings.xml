@@ -17,7 +17,6 @@
     <string name="schedule_automatic_turn_off">Kikapcsolás</string>
     <string name="schedule_automatic_turn_on">Bekapcsolás</string>
     <string name="schedule_automatic_off">Kikapcsolva</string>
-    <string name="schedule_automatic_next">Következő: %1$s • %2$s</string>
     <string name="schedule_automatic_nothing">Nincs ütemezett felvétel</string>
     <string name="schedule_automatic_keep">Megtartás: %1$s</string>
     <plurals name="schedule_automatic_upcoming">

@@ -17,7 +17,6 @@
     <string name="schedule_automatic_turn_off">Désactiver</string>
     <string name="schedule_automatic_turn_on">Activer</string>
     <string name="schedule_automatic_off">Désactivé</string>
-    <string name="schedule_automatic_next">Prochain : %1$s • %2$s</string>
     <string name="schedule_automatic_nothing">Aucun enregistrement programmé</string>
     <string name="schedule_automatic_keep">Conserver jusqu’à : %1$s</string>
     <plurals name="schedule_automatic_upcoming">

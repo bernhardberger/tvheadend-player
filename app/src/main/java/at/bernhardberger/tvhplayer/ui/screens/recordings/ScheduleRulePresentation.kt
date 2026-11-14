@@ -11,6 +11,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
@@ -31,6 +33,8 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.AutomaticRecordingKind
 import at.bernhardberger.tvhplayer.core.AutomaticRecordingListItem
 import at.bernhardberger.tvhplayer.core.toDraft
+import at.bernhardberger.tvhplayer.ui.TvSpacing12
+import at.bernhardberger.tvhplayer.ui.TvSpacing16
 import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.formatRecordingDate
@@ -50,6 +54,9 @@ import at.bernhardberger.tvhplayer.ui.screens.automaticRecordingDaysLabel
 import at.bernhardberger.tvhplayer.ui.screens.automaticRecordingKeepLabel
 import at.bernhardberger.tvhplayer.ui.screens.automaticRecordingWindowLabel
 import at.bernhardberger.tvhplayer.ui.screens.formatTimerRecordingDays
+import at.bernhardberger.tvhplayer.ui.screens.RecordingEditorHeading
+import at.bernhardberger.tvhplayer.ui.screens.RecordingEditorPreviewPair
+import at.bernhardberger.tvhplayer.ui.screens.RecordingEditorSecondary
 import java.time.LocalDate
 
 internal fun AutomaticRecordingListItem.rowId() = scheduleRuleRowId(id, kind)
@@ -144,7 +151,6 @@ internal fun ScheduleRulePane(item: AutomaticRecordingListItem, channels: List<C
             keepLabel = automaticRecordingKeepLabel(draft.removal)
         }
     }
-    val next = item.next
     Column(modifier.padding(top = 4.dp).testTag("automatic-recording-pane")) {
         ProgrammeHeadline(
             eyebrow = { ProgrammeEyebrow(channel?.icon, subject.detail) {
@@ -153,18 +159,44 @@ internal fun ScheduleRulePane(item: AutomaticRecordingListItem, channels: List<C
             title = subject.name, tagPrefix = "automatic-recording-pane", synopsisLines = 0,
             titleStyle = MaterialTheme.typography.titleLarge,
             status = { statusModifier ->
-                Column(statusModifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    ProgrammeStatusLine(whenLabel, R.drawable.ic_event, "automatic-recording-pane-when")
-                    ProgrammeStatusLine(stringResource(R.string.schedule_automatic_keep, keepLabel),
-                        R.drawable.ic_hourglass_bottom, "automatic-recording-pane-keep")
-                    val nextLabel = next?.start?.epochSeconds?.let { start ->
-                        stringResource(R.string.schedule_automatic_next, formatRecordingDate(start, dateOnly = true),
-                            next.stop?.epochSeconds?.let { formatTimeInterval(start, it) } ?: formatClock(start))
-                    } ?: stringResource(R.string.schedule_automatic_nothing)
-                    ProgrammeStatusLine(nextLabel, R.drawable.ic_schedule,
-                        "automatic-recording-pane-next", maxLines = 2)
+                Column(statusModifier) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        ProgrammeStatusLine(whenLabel, R.drawable.ic_event, "automatic-recording-pane-when")
+                        ProgrammeStatusLine(stringResource(R.string.schedule_automatic_keep, keepLabel),
+                            R.drawable.ic_hourglass_bottom, "automatic-recording-pane-keep")
+                        if (item.upcomingEntries.isEmpty()) {
+                            ProgrammeStatusLine(stringResource(R.string.schedule_automatic_nothing),
+                                R.drawable.ic_schedule, "automatic-recording-pane-next", maxLines = 2)
+                        }
+                    }
+                    if (item.upcomingEntries.isNotEmpty()) ScheduleUpcomingEntries(item, channels)
                 }
             },
         )
+    }
+}
+
+/** How many next recordings the pane lists before "and N more". */
+internal const val SCHEDULE_UPCOMING_SHOWN = 4
+
+/** Its own section under the status lines, spaced like the editors' guidance column. */
+@Composable
+private fun ScheduleUpcomingEntries(item: AutomaticRecordingListItem, channels: List<Channel>) {
+    Column(Modifier.padding(top = TvSpacing16), verticalArrangement = Arrangement.spacedBy(TvSpacing12)) {
+        RecordingEditorHeading(stringResource(R.string.timer_editor_next_recordings),
+            Modifier.semantics { heading() })
+        for (entry in item.upcomingEntries.take(SCHEDULE_UPCOMING_SHOWN)) {
+            val meta = entry.start?.epochSeconds?.let { start ->
+                formatRecordingDate(start, dateOnly = true) + " • " +
+                    (entry.stop?.epochSeconds?.let { formatTimeInterval(start, it) } ?: formatClock(start))
+            }.orEmpty()
+            val channel = if (item.channelId == null) channels.firstOrNull { it.id == entry.channelId }?.name else null
+            RecordingEditorPreviewPair(entry.subtitle?.takeIf(String::isNotBlank) ?: entry.title.orEmpty(),
+                listOfNotNull(meta.takeIf(String::isNotBlank), channel).joinToString(" • "), titleMaxLines = 1)
+        }
+        if (item.upcoming > SCHEDULE_UPCOMING_SHOWN) {
+            RecordingEditorSecondary(
+                stringResource(R.string.timer_editor_more_removed, item.upcoming - SCHEDULE_UPCOMING_SHOWN))
+        }
     }
 }
