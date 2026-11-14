@@ -457,13 +457,18 @@ internal fun RecordingsScreenContent(
     }
 
     // [beforePlay] runs only when the recording plays, before the request; a menu stays up through it.
-    fun openRecording(entry: DvrEntry, returnIfPlaying: Boolean = true, beforePlay: () -> Unit = { overlays.showContextMenu = false }) {
-        if (returnIfPlaying && entry.id == playingRecordingId && onReturnToRecording(entry.id, {})) return
+    // With [runningOpensDetails] (Schedule) a running recording opens its details: no choice, no return to its player.
+    fun openRecording(entry: DvrEntry, returnIfPlaying: Boolean = true, beforePlay: () -> Unit = { overlays.showContextMenu = false },
+        runningOpensDetails: Boolean = false) {
+        val details = runningOpensDetails && recordingIsRunning(entry)
+        val returnToPlayer = returnIfPlaying && !details
+        if (returnToPlayer && entry.id == playingRecordingId && onReturnToRecording(entry.id, {})) return
         val current = latestObservationProvider()
         val capability = current.currentSession
-        val action = at.bernhardberger.tvhplayer.core.recordingOpenAction(
-            capability?.let { current.recordingPlaybackAdmission(entry) })
-        val activeChoice = recordingIsRunning(entry) && entry.channelId?.let(current::channel) != null &&
+        val action = if (details) at.bernhardberger.tvhplayer.core.RecordingOpenAction.DETAILS
+            else at.bernhardberger.tvhplayer.core.recordingOpenAction(
+                capability?.let { current.recordingPlaybackAdmission(entry) })
+        val activeChoice = !details && recordingIsRunning(entry) && entry.channelId?.let(current::channel) != null &&
             capability != null && onWatchChannel != null
         if (!activeChoice && capability != null && (action == at.bernhardberger.tvhplayer.core.RecordingOpenAction.START_OVER ||
                 action == at.bernhardberger.tvhplayer.core.RecordingOpenAction.RESUME)) {
@@ -1042,7 +1047,7 @@ internal fun RecordingsScreenContent(
                         } },
                         onOpenRecording = {
                             if (!owner.isCurrent) return@ScheduleDepthContent
-                            openRecording(it)
+                            openRecording(it, runningOpensDetails = true)
                         },
                         onOpenContextMenu = {
                             if (owner.isCurrent) {
