@@ -102,7 +102,7 @@ private fun AutomaticRecordingFirstLevel(state: AutomaticRecordingEditorState, c
         )) },
     )
     GuidedStepAction(
-        title = stringResource(R.string.autorec_editor_keep),
+        title = stringResource(R.string.recording_keep_until_heading),
         subtitle = automaticRecordingKeepLabel(state.draft.removal),
         onClick = { state.navigation.open(AutomaticRecordingEditorLevel.KEEP, "keep-${state.draft.removal}") },
         modifier = editorRowModifier(state.navigation, "keep"), trailingIcon = R.drawable.ic_keyboard_arrow_right,
@@ -166,8 +166,8 @@ internal fun automaticRecordingEpisodeRowId(row: AutorecPreviewRow): String =
 internal fun automaticRecordingMainLabel(state: AutomaticRecordingEditorState): String = stringResource(
     when {
         state.editing -> R.string.autorec_editor_save
-        state.draft.kind == AutomaticRecordingKind.SERIES -> R.string.autorec_editor_record_series
-        else -> R.string.autorec_editor_record
+        state.draft.kind == AutomaticRecordingKind.SERIES -> R.string.context_record_series
+        else -> R.string.context_record
     },
 )
 

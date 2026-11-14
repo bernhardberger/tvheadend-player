@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.DvrRemoval
@@ -49,20 +50,20 @@ internal fun automaticRecordingChannelTimeLabel(draft: AutorecDraft, channels: L
 @Composable
 internal fun automaticRecordingKeepLabel(value: DvrRemoval?): String = when (value) {
     null, DvrRemoval.ServerDefault -> stringResource(R.string.profile_server_default)
-    is DvrRemoval.Days -> stringResource(R.string.autorec_editor_days_after_recording, value.days)
-    DvrRemoval.UntilSpaceNeeded -> stringResource(R.string.autorec_editor_until_space)
-    DvrRemoval.Forever -> stringResource(R.string.autorec_editor_forever)
+    is DvrRemoval.Days -> pluralStringResource(R.plurals.autorec_editor_days_after_recording, value.days, value.days)
+    DvrRemoval.UntilSpaceNeeded -> stringResource(R.string.recording_keep_until_space_needed)
+    DvrRemoval.Forever -> stringResource(R.string.recording_keep_until_forever)
 }
 
 @Composable
 internal fun automaticRecordingKeepChoiceLabel(value: DvrRemoval?): String = when (value) {
-    is DvrRemoval.Days -> stringResource(when (value.days) {
-        7 -> R.string.autorec_editor_keep_week
-        30 -> R.string.autorec_editor_keep_month
-        90 -> R.string.autorec_editor_keep_three_months
-        180 -> R.string.autorec_editor_keep_six_months
-        365 -> R.string.autorec_editor_keep_year
-        else -> R.string.autorec_editor_keep_days
-    }, value.days)
+    is DvrRemoval.Days -> when (value.days) {
+        7 -> stringResource(R.string.autorec_editor_keep_week)
+        30 -> stringResource(R.string.autorec_editor_keep_month)
+        90 -> stringResource(R.string.autorec_editor_keep_three_months)
+        180 -> stringResource(R.string.autorec_editor_keep_six_months)
+        365 -> stringResource(R.string.autorec_editor_keep_year)
+        else -> automaticRecordingKeepLabel(value)
+    }
     else -> automaticRecordingKeepLabel(value)
 }

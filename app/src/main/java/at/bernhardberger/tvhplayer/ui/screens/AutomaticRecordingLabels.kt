@@ -37,10 +37,10 @@ internal fun formatAutomaticRecordingPreviewSummary(
 internal fun automaticRecordingEditorEyebrow(state: AutomaticRecordingEditorState): String = stringResource(
     when (state.draft.kind) {
         AutomaticRecordingKind.SERIES ->
-            if (state.editing) R.string.autorec_editor_edit_series else R.string.autorec_editor_new_series
+            if (state.editing) R.string.context_edit_series else R.string.autorec_editor_new_series
         AutomaticRecordingKind.TITLE ->
-            if (state.editing) R.string.autorec_editor_edit_title else R.string.autorec_editor_new_title
-        else -> if (state.editing) R.string.autorec_editor_edit_keyword else R.string.autorec_editor_new_keyword
+            if (state.editing) R.string.context_edit_title else R.string.autorec_editor_new_title
+        else -> if (state.editing) R.string.context_edit_keyword else R.string.autorec_editor_new_keyword
     },
 )
 
@@ -113,7 +113,7 @@ internal fun automaticRecordingPriorityLabel(value: DvrPriority?): String = stri
 @Composable
 internal fun automaticRecordingPaddingLabel(value: Duration?): String =
     if (value == null || value == Duration.ZERO) stringResource(R.string.profile_server_default)
-    else stringResource(R.string.autorec_editor_minutes, value.inWholeMinutes)
+    else pluralStringResource(R.plurals.autorec_editor_minutes, value.inWholeMinutes.toInt(), value.inWholeMinutes)
 
 @Composable
 internal fun automaticRecordingBroadcastLabel(value: BroadcastType): String = stringResource(when (value) {

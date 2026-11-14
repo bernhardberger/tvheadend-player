@@ -30,9 +30,9 @@ internal fun AutomaticRecordingDeleteDialog(
         sentence = formatAutomaticRecordingDeleteBody(
             LocalContext.current, state.draft.kind, scheduledCount, state.changed,
         ),
-        safe = ConfirmationChoice(stringResource(R.string.autorec_editor_keep_recording),
+        safe = ConfirmationChoice(stringResource(R.string.keep),
             R.drawable.ic_check, "automatic-recording-keep"),
-        action = ConfirmationChoice(stringResource(R.string.autorec_editor_delete),
+        action = ConfirmationChoice(stringResource(R.string.context_delete),
             R.drawable.ic_delete_outlined, "automatic-recording-delete-confirm"),
         onDismiss = state::back, onConfirm = state::confirmDestructiveAction,
     )

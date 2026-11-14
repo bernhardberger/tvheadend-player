@@ -31,7 +31,7 @@ internal fun TimerRecordingGuidance(
             else stringResource(R.string.timer_editor_title),
         body = timerGuidanceBody(state, channels),
         lead = {
-            Text(stringResource(if (state.editing) R.string.timer_editor_edit else R.string.timer_editor_new),
+            Text(stringResource(if (state.editing) R.string.context_edit_timer else R.string.timer_editor_new),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = TvTextSecondaryAlpha))
         },

@@ -74,9 +74,9 @@ internal fun TimerRecordingEditor(
         sentence = formatAutomaticRecordingDeleteBody(
             LocalContext.current, AutomaticRecordingKind.TIMER, scheduledEntries.size, state.changed,
         ),
-        safe = ConfirmationChoice(stringResource(R.string.autorec_editor_keep_recording),
+        safe = ConfirmationChoice(stringResource(R.string.keep),
             R.drawable.ic_check, "timer-recording-keep"),
-        action = ConfirmationChoice(stringResource(R.string.autorec_editor_delete),
+        action = ConfirmationChoice(stringResource(R.string.context_delete),
             R.drawable.ic_delete_outlined, "timer-recording-delete-confirm"),
         onDismiss = state::back, onConfirm = state::confirmDestructiveAction,
     )
@@ -99,7 +99,7 @@ private fun TimerRecordingFirstLevel(state: TimerRecordingEditorState, channels:
         timerNameLabel(state.draft, channels), setOf(RecordingDraftField.NAME)) {
         state.navigation.open(AutomaticRecordingEditorLevel.NAME, "name-input")
     }
-    TimerRecordingField(state, "keep", stringResource(R.string.autorec_editor_keep),
+    TimerRecordingField(state, "keep", stringResource(R.string.recording_keep_until_heading),
         automaticRecordingKeepLabel(state.draft.removal), setOf(RecordingDraftField.KEEP_UNTIL)) {
         state.navigation.open(AutomaticRecordingEditorLevel.KEEP, "keep-${state.draft.removal}")
     }
