@@ -294,9 +294,9 @@ fun DepthNavigation(
     val displayed = if (moving) unionStrip(held, desired) else desired
 
     // A control in a level's heading (Recordings' options button) takes its own keys, not the list's.
-    var headingFocused by remember { mutableStateOf(false) }
+    var focusedHeadingPath by remember { mutableStateOf<List<String>?>(null) }
     Box(modifier.backKeyCycleFocus(backCycle).onPreviewKeyEvent { event ->
-        if (!isCurrent || headingFocused) {
+        if (!isCurrent || focusedHeadingPath != null) {
             backCycle.reset()
             return@onPreviewKeyEvent false
         }
@@ -380,7 +380,10 @@ fun DepthNavigation(
                             stepPixels = stepPixels,
                             xOffset = columnOffset,
                             emphasis = { (1f - abs(columnOffset + stripOffset.value) / stepPixels).coerceIn(0f, 1f) },
-                            onHeadingFocus = { headingFocused = it },
+                            onHeadingFocus = { focused ->
+                                if (focused) focusedHeadingPath = column.path
+                                else if (focusedHeadingPath == column.path) focusedHeadingPath = null
+                            },
                             columnWidth = columnWidth,
                             contentPadding = contentPadding,
                             previewAlpha = previewAlpha,
@@ -517,6 +520,9 @@ private fun DepthStripPane(
 ) {
     val visuallyActive = column.path == activePath
     val active = visuallyActive && isCurrent
+    DisposableEffect(column.path) {
+        onDispose { onHeadingFocus(false) }
+    }
     val capturedVisit = visit
     val latestActive = rememberUpdatedState(active)
     val latestStillOwning = rememberUpdatedState(stillOwning)

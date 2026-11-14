@@ -22,12 +22,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalDensity
@@ -57,6 +62,9 @@ import at.bernhardberger.tvhplayer.core.DvrArchiveShow
 import at.bernhardberger.tvhplayer.core.partitionDvrLibrary
 import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
+import at.bernhardberger.tvhplayer.ui.TvIconButtonSize
+import at.bernhardberger.tvhplayer.ui.screens.recordings.ArchiveLevelHeading
 import at.bernhardberger.tvhplayer.ui.common.formatFileSize
 import at.bernhardberger.tvhplayer.ui.common.formatRecordedDuration
 import at.bernhardberger.tvhplayer.ui.components.SideRail
@@ -105,7 +113,7 @@ class RecordingsVisualLayoutTest {
     private val endPaddingState = mutableStateOf<Dp?>(null)
     private val connectionState = mutableStateOf<ConnectionUiState>(ConnectionUiState.Ready)
     private var startView by mutableStateOf(DvrArchiveView(grouping = DvrArchiveGrouping.FOLDERS))
-    private var nowSeconds: () -> Long = { System.currentTimeMillis() / 1000L }
+    private var nowSeconds: () -> Long = { 1_791_144_900L }
     private val viewChanges = mutableListOf<DvrArchiveView>()
     private val preparationContext = mutableStateOf<CoroutineContext>(EmptyCoroutineContext)
 
@@ -461,6 +469,11 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionUp)
         key(Key.DirectionUp)
         focused(OPTIONS)
+        // A list update swaps the preview pane while the root heading still owns focus.
+        publish(listOf(
+            recording(1, "Replacement", "Replacement/episode.ts"),
+            recording(2, "Tide Watch", "Replacement/Expeditions/blue.ts"),
+        ))
         // Right from the button stays; Up reaches the selected tab, and Down from a tab skips the button.
         key(Key.DirectionRight)
         focused(OPTIONS)
@@ -468,6 +481,17 @@ class RecordingsVisualLayoutTest {
         focused("recordings-mode-archive")
         key(Key.DirectionUp)
         focused("recordings-mode-archive")
+        key(Key.DirectionDown)
+        focused("recordings-folder-Replacement")
+        // Restore the original sibling preview while the heading is focused, too.
+        upToOptions()
+        publish(listOf(
+            recording(1, LONG_TITLE, "Documentaries/northern.ts"),
+            recording(2, "Tide Watch", "Documentaries/Expeditions/blue.ts"),
+            recording(3, "Ridge Light", "Documentaries/mountains.ts"),
+        ))
+        key(Key.DirectionRight)
+        focused(OPTIONS)
         key(Key.DirectionDown)
         focused("recordings-folder-Documentaries")
         // The button belongs to the root: inside a folder Up goes straight to the tab, Down returns to the row.
@@ -609,9 +633,11 @@ class RecordingsVisualLayoutTest {
     }
 
     @Test fun aFlatListSortsTheRunningRecordingInPlaceAndItsDateDividersTakeNoFocus() {
+        val clock = mutableStateOf(java.time.Instant.parse("2026-10-06T23:59:59Z").epochSecond)
+        nowSeconds = { clock.value }
         startView = DvrArchiveView(grouping = DvrArchiveGrouping.FLAT)
         show(entries = (1L..5L).map { recording(it, "Recording $it", "recording$it.ts") } +
-            recording(6, "Running now", "running.ts", DvrEntryState.RECORDING, startEpochSeconds = 1_791_100_000))
+            recording(6, "Running now", "running.ts", DvrEntryState.RECORDING, startEpochSeconds = clock.value - 60))
         // The running recording is the newest row of the list, with its dot: no card, no virtual row.
         compose.onNodeWithTag("recordings-now-cards").assertDoesNotExist()
         focused("recording-list-entry-6")
@@ -623,6 +649,12 @@ class RecordingsVisualLayoutTest {
                     node.config.contains(SemanticsProperties.ContentDescription)
             })
         }
+        compose.onNodeWithContentDescription("Today", useUnmergedTree = true).assertExists()
+        // The clock signal advances across midnight; the archive and its ordering do not change.
+        compose.runOnIdle { clock.value += 2 }
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithContentDescription("Today", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithContentDescription("Yesterday", useUnmergedTree = true).assertExists()
         key(Key.DirectionDown)
         focused("recording-list-entry-1")
         key(Key.DirectionUp)
@@ -903,6 +935,28 @@ class RecordingsVisualLayoutTest {
         val values = requireNotNull(valuesLine()).fetchSemanticsNode().boundsInRoot
         assertTrue("The values line ends before the button", values.right <= bounds(OPTIONS).left)
         assertButtonClearOf(firstListRow())
+    }
+
+    @Test fun aLongRootHeadlineAndItsValuesStayClearOfTheOptionsButtonInRtl() {
+        compose.setContent {
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                TVHeadendPlayerTheme {
+                    Box(Modifier.width(TvBrowseColumnWidth).testTag("heading-band")) {
+                        ArchiveLevelHeading("عنوان طويل جداً ".repeat(20), { 1f }, "خيارات العرض")
+                        Box(Modifier.align(Alignment.TopEnd).size(TvIconButtonSize).testTag(OPTIONS))
+                    }
+                }
+            }
+        }
+        val title = bounds("archive-level-heading")
+        val button = bounds(OPTIONS)
+        val values = bounds("archive-values-line")
+        assertFalse("The root title must not overlap its options button", title.overlaps(button))
+        assertTrue("RTL title starts at the logical start", kotlin.math.abs(title.right - bounds("heading-band").right) < 1f)
+        assertTrue("RTL values stay on the other side of the button", values.left >= button.right)
+        val layouts = mutableListOf<TextLayoutResult>()
+        compose.onNodeWithTag("archive-level-heading").performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        assertTrue("A long root title is ellipsized", layouts.single().isLineEllipsized(0))
     }
 
     @Test fun theTabsOpenScheduleAndProblemsBesideTheStorageWithTheProblemCountOnTheTab() {
@@ -1828,6 +1882,7 @@ class RecordingsVisualLayoutTest {
     }
 
     @Test fun aRunningRecordingLeadsTheFoldersRootInRecordingNowAndDotsItsFolderIcon() {
+        startView = DvrArchiveView(DvrArchiveGrouping.FOLDERS, DvrArchiveSort.NAME, DvrArchiveShow.UNWATCHED)
         show(entries = listOf(
             recording(10, "Growing", "Series/Season/growing.ts", DvrEntryState.RECORDING),
             recording(12, "Kept", "kept.ts"),
@@ -1836,9 +1891,11 @@ class RecordingsVisualLayoutTest {
         compose.onNodeWithTag("recordings-now-cards").assertDoesNotExist()
         // The Recording now folder leads the root and opens on the running recording.
         focused("recordings-recording-now-folder")
+        requireNotNull(valuesLine()).assertTextEquals("Name A–Z · Unwatched")
         assertTrue(bounds("recordings-recording-now-folder").top < bounds("recordings-folder-Series").top)
         key(Key.DirectionRight)
         focused("recording-list-entry-10")
+        assertEquals("Sort and Show do not apply to Recording now", null, valuesLine())
         compose.runOnIdle { assertEquals(listOf("recording-now"), screenState.archiveNavigation.stack.frames.drop(1).map { it.levelId }) }
         key(Key.DirectionLeft)
         focused("recordings-recording-now-folder")
@@ -2147,14 +2204,15 @@ class RecordingsVisualLayoutTest {
         return map[map.width / 6, map.height / 2].toArgb()
     }
 
-    /** The running recording's dot sits on the folder's 32 dp icon or logo, not after its title. */
+    /** The running recording's dot overlaps the folder icon or logo, not its title. */
     private fun assertFolderDotOnIcon(folder: String) {
         val dot = compose.onNodeWithTag("recordings-folder-running-$folder", useUnmergedTree = true)
             .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
-        val row = bounds("recordings-folder-$folder")
-        val density = view.resources.displayMetrics.density
-        assertTrue("The dot sits on the 32 dp icon (${dot.width} px)", dot.width in 32f * density - 1f..32f * 1.05f * density + 1f)
-        assertTrue("The dot is at the row's start", dot.left - row.left < 40f * density)
+        val icon = compose.onNode(
+            hasTestTag("recordings-folder-icon-$folder") or hasTestTag("recordings-folder-logo-$folder"),
+            useUnmergedTree = true,
+        ).fetchSemanticsNode().boundsInRoot
+        assertTrue("The dot sits on the folder icon or logo", dot.overlaps(icon) && icon.contains(dot.center))
     }
 
     /** Reopens the screen on its Schedule tab, as Home's upcoming card does. */

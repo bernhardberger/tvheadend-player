@@ -125,13 +125,21 @@ private fun DvrArchiveFolder.arranged(sort: DvrArchiveSort, lastGroup: String?):
     val collator = Collator.getInstance().apply { strength = Collator.SECONDARY }
     val newest = compareByDescending<DvrEntry> { it.start?.epochSeconds ?: Long.MIN_VALUE }
     val recordingOrder = archiveRecordingOrder(sort, collator, newest)
-    val groupOrder = archiveGroupOrder(sort, collator)
-    fun DvrArchiveFolder.sorted(): DvrArchiveFolder = copy(
-        folders = folders.map { it.sorted() }
-            .sortedWith(compareBy<DvrArchiveFolder> { lastGroup != null && it.path == listOf(lastGroup) }
-                .then(groupOrder)),
-        recordings = recordings.sortedWith(recordingOrder),
-    )
+    fun DvrArchiveFolder.sorted(): DvrArchiveFolder {
+        val children = folders.map { it.sorted() }
+        val summaries = when (sort) {
+            DvrArchiveSort.OLDEST, DvrArchiveSort.LARGEST, DvrArchiveSort.SMALLEST ->
+                children.associate { it.path to summarizeDvrFolder(it) }
+            else -> emptyMap()
+        }
+        val groupOrder = archiveGroupOrder(sort, collator, summaries)
+        return copy(
+            folders = children.sortedWith(
+                compareBy<DvrArchiveFolder> { lastGroup != null && it.path == listOf(lastGroup) }.then(groupOrder),
+            ),
+            recordings = recordings.sortedWith(recordingOrder),
+        )
+    }
     return sorted()
 }
 
@@ -166,19 +174,23 @@ private fun archiveRecordingOrder(
     }
 }
 
-private fun archiveGroupOrder(sort: DvrArchiveSort, collator: Collator): Comparator<DvrArchiveFolder> {
+private fun archiveGroupOrder(
+    sort: DvrArchiveSort,
+    collator: Collator,
+    summaries: Map<List<String>, DvrFolderSummary>,
+): Comparator<DvrArchiveFolder> {
     val newestFirst = compareByDescending<DvrArchiveFolder> { it.newestRecordingStart ?: Long.MIN_VALUE }
     return when (sort) {
         DvrArchiveSort.NEWEST -> newestFirst
         DvrArchiveSort.OLDEST ->
-            compareBy<DvrArchiveFolder> { summarizeDvrFolder(it).oldestStart ?: Long.MAX_VALUE }.then(newestFirst)
+            compareBy<DvrArchiveFolder> { summaries.getValue(it.path).oldestStart ?: Long.MAX_VALUE }.then(newestFirst)
         DvrArchiveSort.NAME ->
             Comparator<DvrArchiveFolder> { a, b -> collator.compare(a.name, b.name) }.then(newestFirst)
         DvrArchiveSort.NAME_DESCENDING ->
             Comparator<DvrArchiveFolder> { a, b -> collator.compare(b.name, a.name) }.then(newestFirst)
-        DvrArchiveSort.LARGEST -> compareByDescending<DvrArchiveFolder> { summarizeDvrFolder(it).totalSizeBytes }
+        DvrArchiveSort.LARGEST -> compareByDescending<DvrArchiveFolder> { summaries.getValue(it.path).totalSizeBytes }
             .then(newestFirst)
-        DvrArchiveSort.SMALLEST -> compareBy<DvrArchiveFolder> { summarizeDvrFolder(it).totalSizeBytes }
+        DvrArchiveSort.SMALLEST -> compareBy<DvrArchiveFolder> { summaries.getValue(it.path).totalSizeBytes }
             .then(newestFirst)
     }
 }

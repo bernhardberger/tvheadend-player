@@ -106,18 +106,24 @@ class PlayerBenchmarks {
 
     @Test fun recordingsTabs() = interaction("P44:measure:recordings", setup = {
         navigate("nav-recordings", "recordings-header")
-        await(By.res("recordings-pills"), "Recordings pills must draw")
+        await(By.res("recordings-mode-tabs"), "Recordings tabs must draw")
+        // Up from the first root row visits View options before the selected tab.
+        keys(KeyEvent.KEYCODE_DPAD_UP, 2)
+        await(By.res("recordings-mode-archive").focused(true), "Start on the Browse tab")
     }) {
-        key(KeyEvent.KEYCODE_DPAD_UP)
         keys(KeyEvent.KEYCODE_DPAD_RIGHT, 2)
         keys(KeyEvent.KEYCODE_DPAD_LEFT, 2)
-        await(By.res("recordings-pills"), "Recordings pills must remain visible")
+        await(By.res("recordings-mode-tabs").hasDescendant(By.focused(true)), "Recordings tabs must retain focus")
     }
 
     @Test fun recordingsScroll() = interaction("P44:measure:recordings", setup = {
         navigate("nav-recordings", "recordings-header")
-        // Archive is first; Schedule is second. Avoid opening an archive folder or recording.
+        await(By.res("recordings-mode-tabs"), "Recordings tabs must draw")
+        keys(KeyEvent.KEYCODE_DPAD_UP, 2)
+        await(By.res("recordings-mode-archive").focused(true), "Start on the Browse tab")
+        // Browse is first; Schedule is second. Avoid opening an archive folder or recording.
         key(KeyEvent.KEYCODE_DPAD_RIGHT)
+        await(By.res("recordings-mode-schedule").focused(true), "Select the Schedule tab")
         key(KeyEvent.KEYCODE_DPAD_DOWN)
         await(By.res("recordings-schedule-list").hasDescendant(By.focused(true)),
             "Precondition: nonempty Schedule with enough entries to scroll")

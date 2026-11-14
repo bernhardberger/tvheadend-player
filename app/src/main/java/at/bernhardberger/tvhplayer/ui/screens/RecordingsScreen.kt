@@ -333,7 +333,7 @@ internal fun RecordingsScreenContent(
     dvrMutationActions: DvrMutationActions,
     currentObservation: () -> SessionObservation = { observation },
     notices: NoticeCenter = koinInject(),
-    nowSecProvider: () -> Long = { System.currentTimeMillis() / 1000L },
+    nowSecProvider: () -> Long = at.bernhardberger.tvhplayer.ui.common.rememberCurrentEpochSeconds(),
     view: DvrArchiveView = DvrArchiveView(),
     onViewChange: (DvrArchiveView) -> Unit = {},
 ) {
