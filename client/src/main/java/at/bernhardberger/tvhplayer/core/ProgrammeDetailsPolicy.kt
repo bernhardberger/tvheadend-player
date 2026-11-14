@@ -166,7 +166,8 @@ fun detailsActionRow(actions: List<BrowseContextAction>): List<DetailsRowButton>
     return parts.play.map(DetailsRowButton::Direct) +
         (if (parts.recording.size > 1 && parts.recording.all { it in recordChoiceActions })
             listOf(DetailsRowButton.RecordChoice(parts.recording)) else parts.recording.map(DetailsRowButton::Direct)) +
-        (if (parts.rest.size > 1) listOf(DetailsRowButton.More(parts.rest)) else parts.rest.map(DetailsRowButton::Direct))
+        (if (parts.rest.size > 1) listOf(DetailsRowButton.More(parts.rest))
+        else parts.rest.map(DetailsRowButton::Direct))
 }
 
 private val pairedActions = listOf(
