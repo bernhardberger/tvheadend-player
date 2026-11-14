@@ -304,6 +304,26 @@ class PlayerMotionCaptureTest {
                 if (smallest[shape].let { it == null || s < it.second }) smallest[shape] = row to s
             }
             smallest.forEach { (shape, worst) -> report.append("  smallest spare ($shape): ${worst.first}; ${worst.second} dp\n") }
+            // The audio line in the header: the longest codec strings, the track rows' longest language names.
+            val card = compose.onNodeWithTag("playback-stats-overlay").fetchSemanticsNode().boundsInRoot
+            val healthy = statsLiveDiagnostics()
+            val resources = ApplicationProvider.getApplicationContext<Application>().resources
+            val unknownLanguage = resources.getString(R.string.track_unknown_language)
+            val multipleLanguages = resources.getString(R.string.track_multiple_languages)
+            val audioLine = audioSummary(healthy, unknownLanguage, multipleLanguages)
+            val audio = texts.single { it.second.layoutInput.text.text == audioLine }.second.layoutInput
+            listOf("mp4a.40.29", "E-AC-3", null).flatMap { codec ->
+                listOf("mul", "und", "nb", "gd").map { language ->
+                    audioSummary(healthy.copy(audio = healthy.audio?.copy(codec = codec, language = language,
+                        sampleMimeType = "audio/eac3", channelCount = 8, sampleRateHz = 192_000)),
+                        unknownLanguage, multipleLanguages)
+                }
+            }.forEach { row ->
+                val s = card.width - 32f - androidx.compose.ui.text.ParagraphIntrinsics(row, audio.style, emptyList(),
+                    density = audio.density, fontFamilyResolver = audio.fontFamilyResolver).maxIntrinsicWidth
+                report.append("  worst (audio): $row; spare=$s dp\n")
+                if (s < 0f) misfits += "$row overflows by ${-s} dp"
+            }
             assertTrue(misfits.joinToString("; "), misfits.isEmpty())
         }
         compose.runOnIdle { diagnostics = diagnostics.copy(video = diagnostics.video?.copy(

@@ -50,6 +50,8 @@ import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.playback.AppVideoDecoderCounters
 import at.bernhardberger.tvhplayer.playback.PlaybackFrameRate
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
+import at.bernhardberger.tvhplayer.core.humanLanguageName
+import at.bernhardberger.tvhplayer.core.shortCodecName
 import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
 import at.bernhardberger.tvhplayer.ui.TvGridColumnWidth
 import at.bernhardberger.tvhplayer.ui.TvGridGutter
@@ -126,7 +128,14 @@ internal fun PlaybackStatsOverlay(
                         StatsText("last 60 s", Modifier.alignByBaseline(), maxLines = 1)
                     }
                 }
-                StatsText(audioSummary(diagnostics), maxLines = 1)
+                StatsText(
+                    audioSummary(
+                        diagnostics,
+                        stringResource(R.string.track_unknown_language),
+                        stringResource(R.string.track_multiple_languages),
+                    ),
+                    maxLines = 1,
+                )
                 if (debug && diagnostics.source == AppPlaybackSource.LIVE_TV) {
                     diagnostics.live?.source?.let { source ->
                         val names = listOfNotNull(source.adapterName, source.muxName, source.networkName,
@@ -228,12 +237,20 @@ private fun growth(value: Long, label: String): String? =
 private fun change(value: Double?, unit: String, digits: Int = 1): String? =
     displayedStatsChange(value, digits)?.let { "${if (it > 0) "+" else ""}${decimal(it, digits)} $unit / 60 s" }
 private fun join(vararg values: String?): String = values.filterNotNull().filter { it.isNotBlank() }.joinToString(" • ")
-private fun audioSummary(d: AppPlaybackDiagnostics): String = d.audio?.let { audio ->
-    join(
-        audio.codec, audio.language, audio.channelCount?.let { "$it ch" },
-        audio.sampleRateHz?.let { "${count(it.toLong())} Hz" },
-    )
-}?.takeIf { it.isNotBlank() } ?: "Audio —"
+/**
+ * The audio line: the codec (the chrome badge's short name when the stream declares no codec string),
+ * the language named as in the options sheet's track rows, the channel count and the sample rate.
+ */
+internal fun audioSummary(d: AppPlaybackDiagnostics, unknownLanguage: String, multipleLanguages: String): String =
+    d.audio?.let { audio ->
+        join(
+            audio.codec ?: shortCodecName(audio.sampleMimeType),
+            humanLanguageName(audio.language, unknownLanguage, multipleLanguages),
+            audio.channelCount?.let { "$it ch" },
+            audio.sampleRateHz?.let { "${count(it.toLong())} Hz" },
+        )
+    }?.takeIf { it.isNotBlank() } ?: "Audio —"
+private fun packets(value: Long): String = "${count(value)} ${if (value == 1L) "packet" else "packets"}"
 private fun videoSummary(d: AppPlaybackDiagnostics): String =
     join(d.video?.codec, d.video?.resolution).ifBlank { "Video —" }
 
@@ -346,7 +363,7 @@ private fun frontendDebugRows(d: AppPlaybackDiagnostics): List<String> {
 
 private fun queueDebugRows(d: AppPlaybackDiagnostics): List<String> = listOfNotNull(
     d.live?.queue?.let { q ->
-        statsLine("Queue", join("${count(q.packetCount)} packets • ${count(q.byteCount)} B",
+        statsLine("Queue", join("${packets(q.packetCount)} • ${count(q.byteCount)} B",
             q.mediaSpanMicroseconds?.let { "${decimal(it / 1000.0)} ms" }))
     },
     d.live?.queue?.let { q ->
@@ -356,7 +373,7 @@ private fun queueDebugRows(d: AppPlaybackDiagnostics): List<String> = listOfNotN
                 "B ${count(q.droppedBFrameCount)}",
         )
     },
-    d.live?.clientDroppedPacketCount?.let { statsLine("Client drops", "${count(it)} packets") },
+    d.live?.clientDroppedPacketCount?.let { statsLine("Client drops", packets(it)) },
 )
 
 private fun timing(d: AppPlaybackDiagnostics, timeshift: AppTimeshiftState?): String =
@@ -366,7 +383,12 @@ private fun timing(d: AppPlaybackDiagnostics, timeshift: AppTimeshiftState?): St
             !it.available || timeshiftPositionPresentation(it).atLiveEdge -> "Live"
             else -> "${formatHms(-it.positionMs / 1000)} behind"
         }
-    } ?: (formatHms(d.positionMs / 1000) + (d.durationMs?.let { "/${formatHms(it / 1000)}" } ?: ""))
+    } ?: d.durationMs.let { duration ->
+        // An hour-long duration reads h:mm:ss, so the position before it does too, as in the chrome.
+        val position = formatHms(d.positionMs / 1000)
+        val hours = duration != null && duration >= 3_600_000L && d.positionMs < 3_600_000L
+        (if (hours) "0:$position" else position) + (duration?.let { "/${formatHms(it / 1000)}" } ?: "")
+    }
 
 @Composable
 private fun DebugDetails(

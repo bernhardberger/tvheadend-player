@@ -9,6 +9,7 @@ import at.bernhardberger.tvhplayer.di.PlayerStatsLevel
 import at.bernhardberger.tvhplayer.playback.*
 import org.junit.Assert.*
 import org.junit.Test
+import java.util.Locale
 
 class PlaybackStatsPolicyTest {
     @Test fun sourceEvidenceChoosesThePathNotTheNames() {
@@ -56,6 +57,26 @@ class PlaybackStatsPolicyTest {
         val debug = liveStatsRows(noLock, StatsWindow(), PlayerStatsLevel.DEBUG)
         assertEquals(listOf("Tuner", "Tvheadend", "Frontend", "SNR", "BER / uncorrected", "Queue", "Server drops", "Client drops"),
             debug.map { it.substringBefore(":") })
+        val one = liveStatsRows(statsLiveDiagnostics(locked = false, packetCount = 1, clientDrops = 1), StatsWindow(),
+            PlayerStatsLevel.DEBUG)
+        assertTrue(one.toString(), one.any { it.startsWith("Queue: 1 packet • ") })
+        assertTrue(one.toString(), "Client drops: 1 packet" in one)
+        assertTrue(debug.toString(), debug.any { it.startsWith("Queue: 1,500 packets • ") })
+    }
+
+    @Test fun theAudioLineNamesTheLanguageAsTheTrackRowsAndFallsBackToTheBadgeCodec() {
+        val default = Locale.getDefault()
+        try {
+            Locale.setDefault(Locale.US)
+            val d = statsLiveDiagnostics()
+            assertEquals("E-AC-3 • English • 6 ch • 48,000 Hz", audioSummary(d, "Unknown language", "Multiple languages"))
+            val htsp = d.copy(audio = d.audio?.copy(codec = null, language = "de", sampleMimeType = "audio/ac3"))
+            assertEquals("DD • German • 6 ch • 48,000 Hz", audioSummary(htsp, "Unknown language", "Multiple languages"))
+            assertEquals("DD • Unknown language • 6 ch • 48,000 Hz",
+                audioSummary(htsp.copy(audio = htsp.audio?.copy(language = "und")), "Unknown language", "Multiple languages"))
+        } finally {
+            Locale.setDefault(default)
+        }
     }
 
     @Test fun countersGrowOnlyInsideTheWindowAndResetsAreNotNegativeGrowth() {
@@ -112,6 +133,10 @@ class PlaybackStatsPolicyTest {
         assertEquals("1920×1080 @ 23.98 Hz", stepValue(StreamPathStep.SCREEN, d, StatsWindow(), output, "23.98", null, null, null))
         val recording = d.copy(source = AppPlaybackSource.RECORDING, live = null, positionMs = 10_799_000, durationMs = 10_800_000)
         assertEquals("5.0 s buffer • 2:59:59/3:00:00", row(StreamPathStep.APP, StatsWindow(), recording))
+        assertEquals("an hour-long duration gives the position its hours", "5.0 s buffer • 0:00:04/2:14:59",
+            row(StreamPathStep.APP, StatsWindow(), recording.copy(positionMs = 4_000, durationMs = 8_099_000)))
+        assertEquals("5.0 s buffer • 00:04/59:59",
+            row(StreamPathStep.APP, StatsWindow(), recording.copy(positionMs = 4_000, durationMs = 3_599_000)))
         assertEquals(0L, pathGrowth(StreamPathStep.SCREEN, StatsWindow(uncorrected = 1, serverDrops = 1)))
         assertEquals(listOf("9999", "10k", "999k", "1.0M", "12.3M"),
             listOf(9_999L, 10_000L, 999_999L, 1_000_000L, 12_399_999L).map(::compactCount))
@@ -152,6 +177,8 @@ internal fun statsLiveDiagnostics(
     signal: Long = 49_152,
     snr: Long = 49_152,
     queueDelayUs: Long = 250_000,
+    packetCount: Long = 1_500,
+    clientDrops: Long = 0,
 ): AppPlaybackDiagnostics {
     var live = LiveSubscriptionDiagnostics.update(null, SubscriptionEvent.Started(
         source = LiveSubscriptionSource.create(adapterName = if (tuner) "DVB-T adapter" else null,
@@ -163,11 +190,12 @@ internal fun statsLiveDiagnostics(
         bitErrorRate = 0, uncorrectedBlockCount = uncorrected, frontendStatusReported = true,
         frontendState = LiveFrontendState.create(signalDetected = true, partiallySynchronized = true, locked = locked)))
     live = LiveSubscriptionDiagnostics.update(live, SubscriptionEvent.Queue(
-        packetCount = 1_500, byteCount = 2_000_000, delay = queueDelayUs,
+        packetCount = packetCount, byteCount = 2_000_000, delay = queueDelayUs,
         bFrameDropCount = serverDrops, pFrameDropCount = 0, iFrameDropCount = 0))
+    if (clientDrops > 0) live = LiveSubscriptionDiagnostics.update(live, SubscriptionEvent.Dropped(clientDrops))
     return AppPlaybackDiagnostics(source = AppPlaybackSource.LIVE_TV, state = AppPlaybackState.Playing,
         isPlaying = true, bufferedMs = 5_000,
         video = AppPlaybackFormatDiagnostics(codec = "H.264", resolution = "1920×1080", frameRate = 50f, width = 1920, height = 1080),
-        audio = AppPlaybackFormatDiagnostics(codec = "E-AC-3", language = "English", channelCount = 6, sampleRateHz = 48_000),
+        audio = AppPlaybackFormatDiagnostics(codec = "E-AC-3", language = "en", channelCount = 6, sampleRateHz = 48_000),
         videoDecoderCounters = AppVideoDecoderCounters(12_000, 0, 2), live = live)
 }
