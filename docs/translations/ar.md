@@ -47,6 +47,8 @@ Review corrections: past-tense recorded dates, singular TV/GUIDE button, channel
 
 0.5 confirmation and playback card strings (`server_switch_question`, `server_remove_*`, `*_confirm_body`, `delete_folder_*_confirm_question`, `recording_recorded_of`) drafted against `90078f81` by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer.
 
+0.5 automatic recording, timer, Keep until and expiry strings (`automatic_recording_*`, `autorec_editor_*`, `timer_editor_*`, `context_edit_*`, `context_skip_*`, `context_unskip_*`, `context_record_*`, `context_keep_until`, `recording_keep_until_*`, `recording_expir*`, `home_expiring_soon`, `recording_from_automatic`, `recording_state_and_origin`) drafted against `9e30bc99` by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer. Reviewer corrections accepted for `recording_expiry_minutes`, `recording_expiry_hours`, `recording_expiry_days`, `autorec_editor_minutes`, `autorec_editor_maximum_choice`, `autorec_editor_reset_options`, `context_edit_title`, `autorec_editor_new_title`, `automatic_recording_kind_title`, `autorec_editor_delete_title`, `context_edit_keyword`, `autorec_editor_new_keyword`, `automatic_recording_kind_keyword`, `autorec_editor_delete_keyword`, `home_expiring_soon`, `autorec_editor_delete_unsaved`, `autorec_editor_maximum_help`, `recording_keep_until_forever`, `autorec_editor_programs_all`, `autorec_editor_programs_selected`, `autorec_editor_off_after_save`, `automatic_recording_episodes_not_applied_change`, `autorec_editor_days_after_recording`.
+
 ## Open questions
 
 - Review `player_scrub_backward` إرجاع as the media rewind term, RTL speed placement and TTS pronunciation of × in `player_scrub_*`.
@@ -54,3 +56,4 @@ Review corrections: past-tense recorded dates, singular TV/GUIDE button, channel
 - Regional broadcast terminology for multiplex and timeshift needs reviewer attention.
 - Actual RTL layout, focus mirroring and digit presentation need captures and a TV check.
 - Mixed-direction rendering of `server_confirmation_anonymous_detail` and the duration strings is unverified.
+- `recording_expires*` use *ينتهي*, which also reads as "ends"; check for a term that says the recording is removed.

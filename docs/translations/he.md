@@ -43,6 +43,8 @@ Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retain
 
 0.5 confirmation and playback card strings (`server_switch_question`, `server_remove_*`, `*_confirm_body`, `delete_folder_*_confirm_question`, `recording_recorded_of`) drafted against `90078f81` by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer.
 
+0.5 automatic recording, timer, Keep until and expiry strings (`automatic_recording_*`, `autorec_editor_*`, `timer_editor_*`, `context_edit_*`, `context_skip_*`, `context_unskip_*`, `context_record_*`, `context_keep_until`, `recording_keep_until_*`, `recording_expir*`, `home_expiring_soon`, `recording_from_automatic`, `recording_state_and_origin`) drafted against `9e30bc99` by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer. Reviewer corrections accepted for `autorec_editor_search_in`, `timer_editor_ends`, `home_expiring_soon`, `autorec_editor_raw_help`, `autorec_editor_no_matches`, `autorec_editor_words_empty_summary`, `timer_editor_deleting`, `autorec_editor_new_unknown`, `autorec_editor_off_after_save`, `context_skip_series_support`, `context_skip_automatic_support`, `context_skip_timer_support`, `autorec_editor_turned_on`, `timer_editor_delete_scheduled`, `autorec_editor_delete_episodes`, `autorec_editor_delete_programs`, `timer_editor_never`, `autorec_editor_deleting`, `automatic_recording_new_keyword_help`, `autorec_editor_no_day`.
+
 ## Open questions
 
 - Check remote-key RTL speed placement and spoken numeral pronunciation in `player_scrub_*`.
@@ -50,3 +52,4 @@ Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retain
 - Verify the plural categories on supported Android versions before integration.
 - Mux vocabulary still needs native review. The timeshift setting description explicitly includes rewind.
 - Mixed-direction rendering of `server_confirmation_anonymous_detail` and the duration strings is unverified.
+- `recording_expires*` use a bare *תפוג*; check that it reads naturally before a date or a time span.
