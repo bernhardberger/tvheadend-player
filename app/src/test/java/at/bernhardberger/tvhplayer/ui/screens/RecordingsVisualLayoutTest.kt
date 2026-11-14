@@ -923,9 +923,13 @@ class RecordingsVisualLayoutTest {
     fun theBrowseHeadlineNamesTheGroupingAndItsColumnsShareTheFirstRow() {
         show()
         focused("recordings-folder-Documentaries")
+        compose.onNodeWithTag("depth-back-hint").assertDoesNotExist()
         val active = activeHeading()
+        val rootHeadingBand = bounds("depth-heading")
+        capture("recordings-root", 1f, "hint=absent; headline=$rootHeadingBand", outputs = "build/outputs/back-hint")
         assertEquals("Folders", active.text)
         val defaultRow = firstListRow()
+        val capitalCenter = bounds(OPTIONS).center.y
         assertButtonClearOf(defaultRow)
         assertEquals(null, valuesLine())
         compose.onNodeWithTag(OPTIONS).assertContentDescriptionEquals("View options")
@@ -936,8 +940,30 @@ class RecordingsVisualLayoutTest {
         assertEquals("Both columns start their rows level", listIcon, previewIcon, 1f)
         // Below the root at the defaults: no button, no line, the same headline and rows.
         downToList()
-        key(Key.DirectionRight)
+        compose.mainClock.autoAdvance = false
+        try {
+            compose.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
+            compose.waitForIdle()
+            compose.mainClock.advanceTimeBy(160)
+            compose.waitForIdle()
+            capture("recordings-folder-transition", 1f,
+                "hint=${bounds("depth-back-hint")}; headline=${bounds("depth-heading")}; entering folder at 160ms",
+                outputs = "build/outputs/back-hint")
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        compose.waitForIdle()
         focused("recordings-folder-Documentaries/Expeditions")
+        val hint = bounds("depth-back-hint")
+        val nestedHeading = activeHeading().bounds
+        val nestedHeadingBand = bounds("depth-heading")
+        val density = view.resources.displayMetrics.density
+        assertEquals("Hint ends in the start gutter", nestedHeading.left - 8 * density, hint.right, 1f)
+        assertEquals("Hint retains the existing headline keyline", active.bounds.left, nestedHeading.left, 1f)
+        assertEquals("Hint does not change the headline band", rootHeadingBand, nestedHeadingBand)
+        assertEquals("Hint is centered on the headline capitals like View options", capitalCenter, hint.center.y, 1f)
+        assertEquals("Hint uses the existing 24dp glyph", 24 * density, hint.width, 1f)
+        capture("recordings-folder", 1f, "hint=$hint; headline=$nestedHeadingBand", outputs = "build/outputs/back-hint")
         gone(OPTIONS)
         assertEquals(null, valuesLine())
         assertEquals(active.baseline, activeHeading().baseline, 1f)
@@ -1567,7 +1593,8 @@ class RecordingsVisualLayoutTest {
         assertNoCommands()
     }
 
-    @Test fun readOnlyScheduleHasNoAddingRowsAndOnlyShowsAnExistingAutomaticRecordingsLevel() {
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
+    fun readOnlyScheduleHasNoAddingRowsAndOnlyShowsAnExistingAutomaticRecordingsLevel() {
         screenState.open(at.bernhardberger.tvhplayer.core.DvrLibraryMode.SCHEDULE)
         val entry = recording(20, "Tomorrow's documentary", null, DvrEntryState.SCHEDULED)
         show(entries = listOf(entry), canModify = false)
@@ -1581,6 +1608,12 @@ class RecordingsVisualLayoutTest {
         focused("schedule-automatic-recordings")
         key(Key.DirectionCenter)
         focused("automatic-recording-series")
+        val hint = bounds("depth-back-hint")
+        val heading = bounds("depth-heading")
+        val density = view.resources.displayMetrics.density
+        assertEquals(heading.left - 8 * density, hint.right, 1f)
+        assertTrue("Hint stays beside the headline", hint.top >= heading.top && hint.bottom <= heading.bottom)
+        capture("schedule-automatic-level", 1f, "hint=$hint; headline=$heading", outputs = "build/outputs/back-hint")
         compose.onNodeWithTag("schedule-new-automatic").assertDoesNotExist()
         key(Key.DirectionCenter)
         key(Key.Menu)

@@ -24,6 +24,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.*
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.AlignmentLine
+import androidx.compose.ui.layout.FirstBaseline
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalContext
@@ -37,6 +42,10 @@ import androidx.compose.ui.zIndex
 import at.bernhardberger.tvhplayer.ui.components.backKeyCycleFocus
 import at.bernhardberger.tvhplayer.ui.components.rememberBackKeyCycle
 import at.bernhardberger.tvhplayer.ui.TvPassiveAlpha
+import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.ui.TvTextColors
+import androidx.tv.material3.Icon
+import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvhplayer.ui.components.BrowseContentLayer
 import at.bernhardberger.tvhplayer.ui.components.ListBottomReserve
 import at.bernhardberger.tvhplayer.ui.components.listEdgeFades
@@ -519,6 +528,8 @@ private fun DepthStripPane(
     onViewport: (Int, Int, Long, List<DepthItem>) -> Unit,
 ) {
     val visuallyActive = column.path == activePath
+    // Same sans-serif cap-height rule as the headline's ArchiveViewOptionsButton.
+    val capHeight = with(LocalDensity.current) { MaterialTheme.typography.headlineMedium.fontSize.toPx() } * 0.711f
     val active = visuallyActive && isCurrent
     DisposableEffect(column.path) {
         onDispose { onHeadingFocus(false) }
@@ -684,7 +695,34 @@ private fun DepthStripPane(
                     },
                 ),
         ) {
-            Box(Modifier.onFocusChanged { onHeadingFocus(it.hasFocus) }) { column.level.heading(emphasis) }
+            Layout(
+                modifier = Modifier.onFocusChanged { onHeadingFocus(it.hasFocus) },
+                content = {
+                    Box(if (visuallyActive) Modifier.testTag("depth-heading") else Modifier) {
+                        column.level.heading(emphasis)
+                    }
+                    if (column.path.size > 1) {
+                        Icon(
+                            painterResource(R.drawable.ic_keyboard_arrow_left),
+                            contentDescription = null,
+                            tint = TvTextColors.secondary.copy(alpha = 0.5f),
+                            modifier = Modifier.size(24.dp)
+                                .graphicsLayer { this.alpha = emphasis() }
+                                .then(if (visuallyActive) Modifier.testTag("depth-back-hint") else Modifier)
+                                .clearAndSetSemantics { hideFromAccessibility() },
+                        )
+                    }
+                },
+            ) { measurables, constraints ->
+                val heading = measurables[0].measure(constraints)
+                val hint = measurables.getOrNull(1)?.measure(constraints.copy(minWidth = 0, minHeight = 0))
+                val center = heading[FirstBaseline].takeUnless { it == AlignmentLine.Unspecified }
+                    ?.let { (it - capHeight / 2).roundToInt() } ?: (heading.height / 2)
+                layout(heading.width, heading.height) {
+                    heading.placeRelative(0, 0)
+                    hint?.placeRelative(-8.dp.roundToPx() - hint.width, center - hint.height / 2)
+                }
+            }
             if (column.level.passiveContent != null) {
                 column.level.passiveContent.invoke()
                 return@Column

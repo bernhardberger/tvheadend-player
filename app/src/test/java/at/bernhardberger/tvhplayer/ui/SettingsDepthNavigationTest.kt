@@ -3,6 +3,10 @@ package at.bernhardberger.tvhplayer.ui
 import at.bernhardberger.tvhplayer.testutil.pressKey
 
 import android.app.Application
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import java.io.File
+import at.bernhardberger.tvhplayer.testutil.CaptureOutput
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import android.view.View
 import android.view.accessibility.AccessibilityNodeInfo
@@ -11,6 +15,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -73,8 +82,40 @@ class SettingsDepthNavigationTest {
     @get:Rule val compose = createComposeRule()
     private lateinit var captureView: View
 
+    @Test fun nestedHeadingHintUsesTheLogicalStartGutterAndDirectionInRtl() {
+        val navigation = DepthNavigationState(DepthStack(listOf(DepthFrame("root"))))
+        compose.setContent {
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                TVHeadendPlayerTheme {
+                    val levels = listOf("root", "child").associateWith { id ->
+                        settingsLevel(id, "عنوان الإعدادات", listOf(settingsRow("leaf", "اختيار")))
+                    }
+                    DepthNavigation(navigation, levels, { error("Unexpected level") },
+                        columnWidth = 340.dp, columnGap = 92.dp, contentPadding = PaddingValues(64.dp),
+                        initialFocusEnabled = false)
+                }
+            }
+        }
+        compose.onNodeWithTag("depth-back-hint").assertDoesNotExist()
+        compose.runOnIdle { navigation.update(DepthStack(listOf(DepthFrame("root"), DepthFrame("child")))) }
+        compose.waitForIdle()
+        val after = compose.onNodeWithTag("settings-level-child").fetchSemanticsNode().boundsInRoot
+        val hint = compose.onNodeWithTag("depth-back-hint").fetchSemanticsNode().boundsInRoot
+        assertEquals("RTL hint is beyond the logical start", after.right + 8, hint.left, 1f)
+        assertEquals("Hint is centered on the capitals", capitalCenter("settings-level-child"), hint.center.y, 1f)
+        val pixels = compose.onNodeWithTag("depth-back-hint").captureToImage().toPixelMap()
+        fun inkCenter(y: Int): Double = (0 until pixels.width).filter {
+            kotlin.math.abs(pixels[it, y].luminance() - pixels[0, 0].luminance()) > 0.01f
+        }.average()
+        assertTrue("RTL chevron points right",
+            inkCenter(pixels.height / 2) > inkCenter(pixels.height / 3))
+        compose.onNodeWithTag("depth-back-hint")
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Focused)).assertHasNoClickAction()
+    }
+
     @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
-    @Test fun deeperSettingsRemainExposedToAccessibilityThroughPushAndPop() {
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
+    fun deeperSettingsRemainExposedToAccessibilityThroughPushAndPop() {
         compose.setContent {
             TVHeadendPlayerTheme {
                 captureView = LocalView.current
@@ -91,15 +132,61 @@ class SettingsDepthNavigationTest {
             }
         }
         assertAccessibleSettings(SETTINGS_ROOT, "settings-row-PLAYER")
+        compose.onNodeWithTag("depth-back-hint").assertDoesNotExist()
+        val rootHeading = compose.onNodeWithTag("depth-heading").fetchSemanticsNode().boundsInRoot
+        captureBackHint("settings-root", SETTINGS_ROOT)
         press(Key.DirectionCenter)
         assertAccessibleSettings(SettingsSection.PLAYER.name, "settings-row-autoplay")
+        val hint = compose.onNodeWithTag("depth-back-hint").fetchSemanticsNode().boundsInRoot
+        val title = compose.onNodeWithTag("settings-level-PLAYER").fetchSemanticsNode().boundsInRoot
+        val density = captureView.resources.displayMetrics.density
+        assertEquals("Hint ends in the start gutter", title.left - 8 * density, hint.right, 1f)
+        assertEquals("Hint is centered on the capitals", capitalCenter("settings-level-PLAYER"), hint.center.y, 1f)
+        assertEquals("Hint does not change the headline band", rootHeading,
+            compose.onNodeWithTag("depth-heading").fetchSemanticsNode().boundsInRoot)
+        captureBackHint("settings-level1", SettingsSection.PLAYER.name)
         press(Key.DirectionDown)
         press(Key.DirectionRight)
         assertAccessibleSettings(WARM_PLAYBACK_LEVEL, "settings-row-ON")
+        val deeperHint = compose.onNodeWithTag("depth-back-hint").fetchSemanticsNode().boundsInRoot
+        val deeperTitle = compose.onNodeWithTag("settings-level-$WARM_PLAYBACK_LEVEL").fetchSemanticsNode().boundsInRoot
+        assertEquals(deeperTitle.left - 8 * density, deeperHint.right, 1f)
+        assertEquals(capitalCenter("settings-level-$WARM_PLAYBACK_LEVEL"), deeperHint.center.y, 1f)
+        captureBackHint("settings-level2", WARM_PLAYBACK_LEVEL)
         press(Key.Back)
         assertAccessibleSettings(SettingsSection.PLAYER.name, "settings-row-$WARM_PLAYBACK_LEVEL")
         press(Key.Back)
         assertAccessibleSettings(SETTINGS_ROOT, "settings-row-PLAYER")
+    }
+
+    private fun capitalCenter(tag: String): Float {
+        val node = compose.onNodeWithTag(tag)
+        val layouts = mutableListOf<TextLayoutResult>()
+        node.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        val layout = layouts.single()
+        val metrics = RuntimeEnvironment.getApplication().resources.displayMetrics
+        val paint = android.graphics.Paint().apply { textSize = layout.layoutInput.style.fontSize.value * metrics.scaledDensity }
+        val capitals = android.graphics.Rect()
+        paint.getTextBounds("H", 0, 1, capitals)
+        return node.fetchSemanticsNode().boundsInRoot.top + layout.firstBaseline - capitals.height() / 2f
+    }
+
+    private fun captureBackHint(name: String, level: String) {
+        if (!CaptureOutput.enabled) return
+        val heading = compose.onNodeWithTag("depth-heading").fetchSemanticsNode().boundsInRoot
+        val title = compose.onNodeWithTag("settings-level-$level").fetchSemanticsNode().boundsInRoot
+        val hint = compose.onAllNodesWithTag("depth-back-hint").fetchSemanticsNodes().singleOrNull()?.boundsInRoot
+        compose.runOnIdle {
+            val bitmap = Bitmap.createBitmap(captureView.width, captureView.height, Bitmap.Config.ARGB_8888)
+            captureView.draw(Canvas(bitmap))
+            CaptureOutput.writePng(File("build/outputs/back-hint/$name.png"), bitmap)
+            CaptureOutput.writeText(File("build/outputs/back-hint/$name.txt")) {
+                "Production SettingsScreenNavigation + SideRail; ${bitmap.width}x${bitmap.height}; " +
+                    "English; fontScale=1.0; offline native Robolectric; no video or physical-TV proof\n" +
+                    "hint=$hint; headline=$heading; title=$title\n"
+            }
+            bitmap.recycle()
+        }
     }
 
     private fun assertAccessibleSettings(level: String, focusedRow: String) {
@@ -117,6 +204,8 @@ class SettingsDepthNavigationTest {
             val exposedLevels = nodes.mapNotNull { it.tag }
                 .filter { it.startsWith("settings-level-") }
             assertEquals("Inactive headings must stay hidden", listOf("settings-level-$level"), exposedLevels)
+            assertFalse("Decorative hint must stay hidden from accessibility",
+                nodes.any { it.tag == "depth-back-hint" && it.visibleToUser })
         }
         compose.onNodeWithTag("depth-active").assertIsDisplayed()
         compose.onNodeWithTag(focusedRow).assertIsDisplayed()
