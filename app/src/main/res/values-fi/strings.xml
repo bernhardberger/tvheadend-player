@@ -630,6 +630,41 @@
         <item quantity="one">%1$d tallenteen poistaminen epäonnistui, yhteensä %2$d tallenne</item>
         <item quantity="other">%1$d tallenteen poistaminen epäonnistui, yhteensä %2$d tallennetta</item>
     </plurals>
+    <plurals name="problems_clear_failed">
+        <item quantity="one">%1$d merkinnän poistaminen epäonnistui, yhteensä %2$d merkintä</item>
+        <item quantity="other">%1$d merkinnän poistaminen epäonnistui, yhteensä %2$d merkintää</item>
+    </plurals>
+    <string name="problems_clear">Tyhjennä ongelmat</string>
+    <string name="problems_clear_question">Tyhjennetäänkö ongelmat?</string>
+    <string name="problems_clear_button">Tyhjennä</string>
+    <plurals name="problems_count_failed">
+        <item quantity="one">%1$d epäonnistunut</item>
+        <item quantity="other">%1$d epäonnistunutta</item>
+    </plurals>
+    <plurals name="problems_count_canceled">
+        <item quantity="one">%1$d peruttu</item>
+        <item quantity="other">%1$d peruttua</item>
+    </plurals>
+    <plurals name="problems_clear_entries">
+        <item quantity="one">Poista %1$d merkintä luettelosta</item>
+        <item quantity="other">Poista %1$d merkintää luettelosta</item>
+    </plurals>
+    <plurals name="problems_clear_also_delete_partial">
+        <item quantity="one">Poista myös %1$d osittainen tallenne</item>
+        <item quantity="other">Poista myös %1$d osittaista tallennetta</item>
+    </plurals>
+    <plurals name="problems_clear_delete_partial">
+        <item quantity="one">Poista %1$d osittainen tallenne</item>
+        <item quantity="other">Poista %1$d osittaista tallennetta</item>
+    </plurals>
+    <plurals name="problems_clear_fileless_sentence">
+        <item quantity="one">%1$d merkinnällä ei ole tiedostoa, joten sen poistaminen ei poista levyltä mitään.</item>
+        <item quantity="other">%1$d merkinnällä ei ole tiedostoa, joten niiden poistaminen ei poista levyltä mitään.</item>
+    </plurals>
+    <plurals name="problems_clear_partial_sentence">
+        <item quantity="one">%1$d epäonnistuneella tallenteella on osittainen tiedosto. Se säilyy, ellei sitäkin poisteta.</item>
+        <item quantity="other">%1$d epäonnistuneella tallenteella on osittaiset tiedostot. Ne säilyvät, ellei niitäkin poisteta.</item>
+    </plurals>
     <plurals name="recording_notice_canceled_count">
         <item quantity="one">%d tallennus peruttu</item>
         <item quantity="other">%d tallennusta peruttu</item>
@@ -719,8 +754,6 @@
         <item quantity="other">%1$d tallennusta käynnissä</item>
     </plurals>
     <string name="recordings_schedule_end_duration">päättyy %1$s • %2$s</string>
-    <string name="recordings_failed">Epäonnistuneet</string>
-    <string name="recordings_cancelled">Perutut</string>
     <string name="recordings_upcoming_active">Tulevat ja käynnissä olevat</string>
     <string name="recordings_completed">Valmiit</string>
     <string name="recordings_failed_cancelled">Epäonnistuneet ja perutut</string>

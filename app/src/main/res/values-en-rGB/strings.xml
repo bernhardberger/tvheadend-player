@@ -61,7 +61,6 @@
         <item quantity="other">%d recordings cancelled</item>
     </plurals>
     <string name="recording_already_scheduled">This programme is recording or scheduled.</string>
-    <string name="recordings_cancelled">Cancelled</string>
     <string name="recordings_failed_cancelled">Failed and cancelled</string>
     <string name="tunneling_setting">Tunnelled playback</string>
     <string name="player_identity_info_hint">OK shows the programme info.</string>
@@ -74,4 +73,8 @@
     <string name="appliance_companion_qr_description">QR code for the appliance companion setup steps</string>
     <string name="recording_mark_program_starts">Programme starts</string>
     <string name="recording_mark_program_ends">Programme ends</string>
+    <plurals name="problems_count_canceled">
+        <item quantity="one">%1$d cancelled</item>
+        <item quantity="other">%1$d cancelled</item>
+    </plurals>
 </resources>

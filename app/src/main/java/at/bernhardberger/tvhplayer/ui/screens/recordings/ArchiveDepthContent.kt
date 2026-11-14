@@ -326,9 +326,16 @@ internal val ValuesLineEndReserve = TvIconButtonSize + TvSpacing16
  * the row title size, on the active headline's baseline, and grow to full size as the column slides
  * into the active slot. The active one carries [valuesLine], the non-default Sort and Show values,
  * tight under its baseline; the preview slot never makes room for it, so its first row stays put.
+ * Both lines end [endReserve] short of the column's end, where a headline button sits.
  */
 @Composable
-internal fun ArchiveLevelHeading(name: String, emphasis: () -> Float, valuesLine: String?, atRoot: Boolean = true) {
+internal fun ArchiveLevelHeading(
+    name: String,
+    emphasis: () -> Float,
+    valuesLine: String?,
+    atRoot: Boolean = true,
+    endReserve: Dp = ValuesLineEndReserve,
+) {
     val style = RecordingsHeadlineStyle
     val direction = LocalLayoutDirection.current
     val previewScale = MaterialTheme.typography.titleMedium.fontSize.value / style.fontSize.value
@@ -360,10 +367,10 @@ internal fun ArchiveLevelHeading(name: String, emphasis: () -> Float, valuesLine
         val loose = constraints.copy(minWidth = 0, minHeight = 0)
         val title = measurables.getOrNull(0)?.measure(
             loose.copy(maxWidth = (constraints.maxWidth -
-                if (atRoot) ValuesLineEndReserve.roundToPx() else 0).coerceAtLeast(0)),
+                if (atRoot) endReserve.roundToPx() else 0).coerceAtLeast(0)),
         )
         val values = measurables.getOrNull(1)?.measure(
-            loose.copy(maxWidth = (constraints.maxWidth - ValuesLineEndReserve.roundToPx()).coerceAtLeast(0)),
+            loose.copy(maxWidth = (constraints.maxWidth - endReserve.roundToPx()).coerceAtLeast(0)),
         )
         val bandPx = band.roundToPx()
         val valuesTop = (title?.get(FirstBaseline)?.takeIf { it != AlignmentLine.Unspecified } ?: bandPx) +

@@ -872,6 +872,43 @@
         <item quantity="one">Couldn’t delete %1$d of %2$d recording</item>
         <item quantity="other">Couldn’t delete %1$d of %2$d recordings</item>
     </plurals>
+    <!-- Notice after clearing the Problems list; %2$d is how many entries were asked to go. -->
+    <plurals name="problems_clear_failed">
+        <item quantity="one">Couldn’t clear %1$d of %2$d entry</item>
+        <item quantity="other">Couldn’t clear %1$d of %2$d entries</item>
+    </plurals>
+    <!-- The list-wide action of the Recordings › Problems tab. -->
+    <string name="problems_clear">Clear problems</string>
+    <string name="problems_clear_question">Clear problems?</string>
+    <string name="problems_clear_button">Clear</string>
+    <plurals name="problems_count_failed">
+        <item quantity="one">%1$d failed</item>
+        <item quantity="other">%1$d failed</item>
+    </plurals>
+    <plurals name="problems_count_canceled">
+        <item quantity="one">%1$d canceled</item>
+        <item quantity="other">%1$d canceled</item>
+    </plurals>
+    <plurals name="problems_clear_entries">
+        <item quantity="one">Clear %1$d entry</item>
+        <item quantity="other">Clear %1$d entries</item>
+    </plurals>
+    <plurals name="problems_clear_also_delete_partial">
+        <item quantity="one">Also delete %1$d partial recording</item>
+        <item quantity="other">Also delete %1$d partial recordings</item>
+    </plurals>
+    <plurals name="problems_clear_delete_partial">
+        <item quantity="one">Delete %1$d partial recording</item>
+        <item quantity="other">Delete %1$d partial recordings</item>
+    </plurals>
+    <plurals name="problems_clear_fileless_sentence">
+        <item quantity="one">%1$d entry has no file, so clearing it deletes nothing on disk.</item>
+        <item quantity="other">%1$d entries have no file, so clearing them deletes nothing on disk.</item>
+    </plurals>
+    <plurals name="problems_clear_partial_sentence">
+        <item quantity="one">%1$d failed recording has a partial file. It stays unless you delete it too.</item>
+        <item quantity="other">%1$d failed recordings have partial files. They stay unless you delete them too.</item>
+    </plurals>
     <!-- Notice after canceling several scheduled recordings. Note: %d, not %1$d. -->
     <plurals name="recording_notice_canceled_count">
         <item quantity="one">%d recording canceled</item>
@@ -965,8 +1002,6 @@
         <item quantity="other">%1$d recordings in progress</item>
     </plurals>
     <string name="recordings_schedule_end_duration">until %1$s • %2$s</string>
-    <string name="recordings_failed">Failed</string>
-    <string name="recordings_cancelled">Canceled</string>
     <string name="recordings_upcoming_active">Upcoming and active</string>
     <string name="recordings_completed">Completed</string>
     <string name="recordings_failed_cancelled">Failed and canceled</string>

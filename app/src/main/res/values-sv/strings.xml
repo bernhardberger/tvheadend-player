@@ -630,6 +630,41 @@
         <item quantity="one">Kunde inte radera %1$d av %2$d inspelning</item>
         <item quantity="other">Kunde inte radera %1$d av %2$d inspelningar</item>
     </plurals>
+    <plurals name="problems_clear_failed">
+        <item quantity="one">Kunde inte ta bort %1$d av %2$d post</item>
+        <item quantity="other">Kunde inte ta bort %1$d av %2$d poster</item>
+    </plurals>
+    <string name="problems_clear">Ta bort problem</string>
+    <string name="problems_clear_question">Ta bort problemen?</string>
+    <string name="problems_clear_button">Ta bort</string>
+    <plurals name="problems_count_failed">
+        <item quantity="one">%1$d misslyckad</item>
+        <item quantity="other">%1$d misslyckade</item>
+    </plurals>
+    <plurals name="problems_count_canceled">
+        <item quantity="one">%1$d avbruten</item>
+        <item quantity="other">%1$d avbrutna</item>
+    </plurals>
+    <plurals name="problems_clear_entries">
+        <item quantity="one">Ta bort %1$d post</item>
+        <item quantity="other">Ta bort %1$d poster</item>
+    </plurals>
+    <plurals name="problems_clear_also_delete_partial">
+        <item quantity="one">Radera även %1$d ofullständig inspelning</item>
+        <item quantity="other">Radera även %1$d ofullständiga inspelningar</item>
+    </plurals>
+    <plurals name="problems_clear_delete_partial">
+        <item quantity="one">Radera %1$d ofullständig inspelning</item>
+        <item quantity="other">Radera %1$d ofullständiga inspelningar</item>
+    </plurals>
+    <plurals name="problems_clear_fileless_sentence">
+        <item quantity="one">%1$d post har ingen fil, så inget raderas från disken när den tas bort.</item>
+        <item quantity="other">%1$d poster har ingen fil, så inget raderas från disken när de tas bort.</item>
+    </plurals>
+    <plurals name="problems_clear_partial_sentence">
+        <item quantity="one">%1$d misslyckad inspelning har en ofullständig fil. Den finns kvar om du inte raderar den också.</item>
+        <item quantity="other">%1$d misslyckade inspelningar har ofullständiga filer. De finns kvar om du inte raderar dem också.</item>
+    </plurals>
     <plurals name="recording_notice_canceled_count">
         <item quantity="one">%d inspelning avbokad</item>
         <item quantity="other">%d inspelningar avbokade</item>
@@ -719,8 +754,6 @@
         <item quantity="other">%1$d pågående inspelningar</item>
     </plurals>
     <string name="recordings_schedule_end_duration">till %1$s • %2$s</string>
-    <string name="recordings_failed">Misslyckade</string>
-    <string name="recordings_cancelled">Avbrutna</string>
     <string name="recordings_upcoming_active">Kommande och pågående</string>
     <string name="recordings_completed">Slutförda</string>
     <string name="recordings_failed_cancelled">Misslyckade och avbrutna</string>

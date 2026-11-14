@@ -67,6 +67,9 @@ internal class NoticeFormatter(private val context: Context) {
             else R.plurals.recording_folder_action_failed_change,
             notice.total, notice.failed, notice.total,
         ), context.getString(dvrFailureReason(notice.failure)), AppNoticeIcon.WARNING)
+        is Notice.DvrProblemsClearFailed -> FormattedNotice(context.resources.getQuantityString(
+            R.plurals.problems_clear_failed, notice.total, notice.failed, notice.total,
+        ), context.getString(dvrFailureReason(notice.failure)), AppNoticeIcon.WARNING)
         is Notice.Connection -> FormattedNotice(context.getString(when (notice.kind) {
             ConnectionNoticeKind.LOST -> if (notice.showingSavedChannels) R.string.connection_notice_lost_saved
                 else R.string.connection_notice_lost

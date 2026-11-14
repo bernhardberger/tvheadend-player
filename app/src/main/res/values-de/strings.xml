@@ -638,6 +638,41 @@
         <item quantity="one">%1$d von %2$d Aufnahme konnte nicht gelöscht werden</item>
         <item quantity="other">%1$d von %2$d Aufnahmen konnten nicht gelöscht werden</item>
     </plurals>
+    <plurals name="problems_clear_failed">
+        <item quantity="one">%1$d von %2$d Eintrag konnte nicht entfernt werden</item>
+        <item quantity="other">%1$d von %2$d Einträgen konnten nicht entfernt werden</item>
+    </plurals>
+    <string name="problems_clear">Probleme entfernen</string>
+    <string name="problems_clear_question">Probleme entfernen?</string>
+    <string name="problems_clear_button">Entfernen</string>
+    <plurals name="problems_count_failed">
+        <item quantity="one">%1$d fehlgeschlagen</item>
+        <item quantity="other">%1$d fehlgeschlagen</item>
+    </plurals>
+    <plurals name="problems_count_canceled">
+        <item quantity="one">%1$d abgebrochen</item>
+        <item quantity="other">%1$d abgebrochen</item>
+    </plurals>
+    <plurals name="problems_clear_entries">
+        <item quantity="one">%1$d Eintrag entfernen</item>
+        <item quantity="other">%1$d Einträge entfernen</item>
+    </plurals>
+    <plurals name="problems_clear_also_delete_partial">
+        <item quantity="one">Auch %1$d Teilaufnahme löschen</item>
+        <item quantity="other">Auch %1$d Teilaufnahmen löschen</item>
+    </plurals>
+    <plurals name="problems_clear_delete_partial">
+        <item quantity="one">%1$d Teilaufnahme löschen</item>
+        <item quantity="other">%1$d Teilaufnahmen löschen</item>
+    </plurals>
+    <plurals name="problems_clear_fileless_sentence">
+        <item quantity="one">%1$d Eintrag hat keine Datei, beim Entfernen wird also nichts auf dem Datenträger gelöscht.</item>
+        <item quantity="other">%1$d Einträge haben keine Datei, beim Entfernen wird also nichts auf dem Datenträger gelöscht.</item>
+    </plurals>
+    <plurals name="problems_clear_partial_sentence">
+        <item quantity="one">%1$d fehlgeschlagene Aufnahme hat eine Teildatei. Sie bleibt erhalten, sofern du sie nicht ebenfalls löschst.</item>
+        <item quantity="other">%1$d fehlgeschlagene Aufnahmen haben Teildateien. Sie bleiben erhalten, sofern du sie nicht ebenfalls löschst.</item>
+    </plurals>
     <plurals name="recording_notice_canceled_count">
         <item quantity="one">%d Aufnahme abgebrochen</item>
         <item quantity="other">%d Aufnahmen abgebrochen</item>
@@ -727,8 +762,6 @@
         <item quantity="other">%1$d laufende Aufnahmen</item>
     </plurals>
     <string name="recordings_schedule_end_duration">bis %1$s • %2$s</string>
-    <string name="recordings_failed">Fehlgeschlagen</string>
-    <string name="recordings_cancelled">Abgebrochen</string>
     <string name="recordings_upcoming_active">Geplant und aktiv</string>
     <string name="recordings_completed">Abgeschlossen</string>
     <string name="recordings_failed_cancelled">Fehlgeschlagen und abgebrochen</string>

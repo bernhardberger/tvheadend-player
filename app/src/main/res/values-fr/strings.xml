@@ -652,6 +652,49 @@
         <item quantity="many">Suppression impossible : %1$d sur un total de %2$d enregistrements</item>
         <item quantity="other">Suppression impossible : %1$d sur un total de %2$d enregistrements</item>
     </plurals>
+    <plurals name="problems_clear_failed">
+        <item quantity="one">Retrait impossible pour %1$d entrée sur %2$d</item>
+        <item quantity="many">Retrait impossible : %1$d sur un total de %2$d entrées</item>
+        <item quantity="other">Retrait impossible : %1$d sur un total de %2$d entrées</item>
+    </plurals>
+    <string name="problems_clear">Retirer les problèmes</string>
+    <string name="problems_clear_question">Retirer les problèmes ?</string>
+    <string name="problems_clear_button">Retirer</string>
+    <plurals name="problems_count_failed">
+        <item quantity="one">%1$d en échec</item>
+        <item quantity="many">%1$d en échec</item>
+        <item quantity="other">%1$d en échec</item>
+    </plurals>
+    <plurals name="problems_count_canceled">
+        <item quantity="one">%1$d annulé</item>
+        <item quantity="many">%1$d annulés</item>
+        <item quantity="other">%1$d annulés</item>
+    </plurals>
+    <plurals name="problems_clear_entries">
+        <item quantity="one">Retirer %1$d entrée</item>
+        <item quantity="many">Retirer %1$d entrées</item>
+        <item quantity="other">Retirer %1$d entrées</item>
+    </plurals>
+    <plurals name="problems_clear_also_delete_partial">
+        <item quantity="one">Supprimer aussi %1$d enregistrement partiel</item>
+        <item quantity="many">Supprimer aussi %1$d enregistrements partiels</item>
+        <item quantity="other">Supprimer aussi %1$d enregistrements partiels</item>
+    </plurals>
+    <plurals name="problems_clear_delete_partial">
+        <item quantity="one">Supprimer %1$d enregistrement partiel</item>
+        <item quantity="many">Supprimer %1$d enregistrements partiels</item>
+        <item quantity="other">Supprimer %1$d enregistrements partiels</item>
+    </plurals>
+    <plurals name="problems_clear_fileless_sentence">
+        <item quantity="one">%1$d entrée n’a pas de fichier : la retirer ne supprime rien sur le disque.</item>
+        <item quantity="many">%1$d entrées n’ont pas de fichier : les retirer ne supprime rien sur le disque.</item>
+        <item quantity="other">%1$d entrées n’ont pas de fichier : les retirer ne supprime rien sur le disque.</item>
+    </plurals>
+    <plurals name="problems_clear_partial_sentence">
+        <item quantity="one">%1$d enregistrement en échec a un fichier partiel. Il est conservé, sauf si tu le supprimes aussi.</item>
+        <item quantity="many">%1$d enregistrements en échec ont des fichiers partiels. Ils sont conservés, sauf si tu les supprimes aussi.</item>
+        <item quantity="other">%1$d enregistrements en échec ont des fichiers partiels. Ils sont conservés, sauf si tu les supprimes aussi.</item>
+    </plurals>
     <plurals name="recording_notice_canceled_count">
         <item quantity="one">%d enregistrement annulé</item>
         <item quantity="many">%d enregistrements annulés</item>
@@ -746,8 +789,6 @@
         <item quantity="other">%1$d enregistrements en cours</item>
     </plurals>
     <string name="recordings_schedule_end_duration">jusqu’à %1$s • %2$s</string>
-    <string name="recordings_failed">Échecs</string>
-    <string name="recordings_cancelled">Annulés</string>
     <string name="recordings_upcoming_active">À venir et en cours</string>
     <string name="recordings_completed">Terminés</string>
     <string name="recordings_failed_cancelled">Échoués et annulés</string>

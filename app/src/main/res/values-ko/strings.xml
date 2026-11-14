@@ -608,6 +608,33 @@
     <plurals name="recording_folder_action_failed_delete">
         <item quantity="other">전체 녹화 %2$d개 중 %1$d개를 삭제하지 못했습니다</item>
     </plurals>
+    <plurals name="problems_clear_failed">
+        <item quantity="other">전체 항목 %2$d개 중 %1$d개를 제거하지 못했습니다</item>
+    </plurals>
+    <string name="problems_clear">문제 제거</string>
+    <string name="problems_clear_question">문제를 제거할까요?</string>
+    <string name="problems_clear_button">제거</string>
+    <plurals name="problems_count_failed">
+        <item quantity="other">실패 %1$d개</item>
+    </plurals>
+    <plurals name="problems_count_canceled">
+        <item quantity="other">취소됨 %1$d개</item>
+    </plurals>
+    <plurals name="problems_clear_entries">
+        <item quantity="other">항목 %1$d개 제거</item>
+    </plurals>
+    <plurals name="problems_clear_also_delete_partial">
+        <item quantity="other">불완전한 녹화 %1$d개도 삭제</item>
+    </plurals>
+    <plurals name="problems_clear_delete_partial">
+        <item quantity="other">불완전한 녹화 %1$d개 삭제</item>
+    </plurals>
+    <plurals name="problems_clear_fileless_sentence">
+        <item quantity="other">항목 %1$d개는 파일이 없으므로 제거해도 디스크에서 아무것도 삭제되지 않습니다.</item>
+    </plurals>
+    <plurals name="problems_clear_partial_sentence">
+        <item quantity="other">실패한 녹화 %1$d개에 불완전한 파일이 있습니다. 함께 삭제하지 않으면 그대로 남습니다.</item>
+    </plurals>
     <plurals name="recording_notice_canceled_count">
         <item quantity="other">녹화 예약 %d개가 취소되었습니다</item>
     </plurals>
@@ -692,8 +719,6 @@
         <item quantity="other">녹화 %1$d개 진행 중</item>
     </plurals>
     <string name="recordings_schedule_end_duration">%1$s까지 • %2$s</string>
-    <string name="recordings_failed">실패</string>
-    <string name="recordings_cancelled">취소됨</string>
     <string name="recordings_upcoming_active">예정 및 진행 중</string>
     <string name="recordings_completed">완료</string>
     <string name="recordings_failed_cancelled">실패 및 취소됨</string>

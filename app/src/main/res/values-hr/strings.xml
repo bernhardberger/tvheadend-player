@@ -652,6 +652,49 @@
         <item quantity="few">Nije moguće izbrisati %1$d od ukupno %2$d snimke</item>
         <item quantity="other">Nije moguće izbrisati %1$d od ukupno %2$d snimki</item>
     </plurals>
+    <plurals name="problems_clear_failed">
+        <item quantity="one">Nije moguće ukloniti %1$d od ukupno %2$d stavke</item>
+        <item quantity="few">Nije moguće ukloniti %1$d od ukupno %2$d stavke</item>
+        <item quantity="other">Nije moguće ukloniti %1$d od ukupno %2$d stavki</item>
+    </plurals>
+    <string name="problems_clear">Ukloni probleme</string>
+    <string name="problems_clear_question">Ukloniti probleme?</string>
+    <string name="problems_clear_button">Ukloni</string>
+    <plurals name="problems_count_failed">
+        <item quantity="one">Neuspjelo: %1$d</item>
+        <item quantity="few">Neuspjelo: %1$d</item>
+        <item quantity="other">Neuspjelo: %1$d</item>
+    </plurals>
+    <plurals name="problems_count_canceled">
+        <item quantity="one">Otkazano: %1$d</item>
+        <item quantity="few">Otkazano: %1$d</item>
+        <item quantity="other">Otkazano: %1$d</item>
+    </plurals>
+    <plurals name="problems_clear_entries">
+        <item quantity="one">Ukloni %1$d stavku</item>
+        <item quantity="few">Ukloni %1$d stavke</item>
+        <item quantity="other">Ukloni %1$d stavki</item>
+    </plurals>
+    <plurals name="problems_clear_also_delete_partial">
+        <item quantity="one">Izbriši i %1$d djelomičnu snimku</item>
+        <item quantity="few">Izbriši i %1$d djelomične snimke</item>
+        <item quantity="other">Izbriši i %1$d djelomičnih snimki</item>
+    </plurals>
+    <plurals name="problems_clear_delete_partial">
+        <item quantity="one">Izbriši %1$d djelomičnu snimku</item>
+        <item quantity="few">Izbriši %1$d djelomične snimke</item>
+        <item quantity="other">Izbriši %1$d djelomičnih snimki</item>
+    </plurals>
+    <plurals name="problems_clear_fileless_sentence">
+        <item quantity="one">%1$d stavka nema datoteku pa se njezinim uklanjanjem ništa ne briše s diska.</item>
+        <item quantity="few">%1$d stavke nemaju datoteku pa se njihovim uklanjanjem ništa ne briše s diska.</item>
+        <item quantity="other">%1$d stavki nema datoteku pa se njihovim uklanjanjem ništa ne briše s diska.</item>
+    </plurals>
+    <plurals name="problems_clear_partial_sentence">
+        <item quantity="one">%1$d neuspjela snimka ima djelomičnu datoteku. Zadržava se, osim ako i nju izbrišeš.</item>
+        <item quantity="few">%1$d neuspjele snimke imaju djelomične datoteke. Zadržavaju se, osim ako i njih izbrišeš.</item>
+        <item quantity="other">%1$d neuspjelih snimki ima djelomične datoteke. Zadržavaju se, osim ako i njih izbrišeš.</item>
+    </plurals>
     <plurals name="recording_notice_canceled_count">
         <item quantity="one">Otkazano snimanje: %d</item>
         <item quantity="few">Otkazana snimanja: %d</item>
@@ -746,8 +789,6 @@
         <item quantity="other">%1$d snimki u tijeku</item>
     </plurals>
     <string name="recordings_schedule_end_duration">do %1$s • %2$s</string>
-    <string name="recordings_failed">Neuspjele</string>
-    <string name="recordings_cancelled">Otkazane</string>
     <string name="recordings_upcoming_active">Nadolazeće i aktivne</string>
     <string name="recordings_completed">Dovršene</string>
     <string name="recordings_failed_cancelled">Neuspjele i otkazane</string>

@@ -4,6 +4,7 @@ import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.Notice
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationKind
 import at.bernhardberger.tvhplayer.notices.NoticeContext
+import at.bernhardberger.tvhplayer.notices.DvrMutationFeedback
 import at.bernhardberger.tvhplayer.testutil.tagBounds
 import at.bernhardberger.tvhplayer.testutil.labelToFocusedFillGap
 import at.bernhardberger.tvhplayer.testutil.pressKey
@@ -66,6 +67,7 @@ import at.bernhardberger.tvhplayer.core.DvrArchiveSort
 import at.bernhardberger.tvhplayer.core.DvrArchiveShow
 import at.bernhardberger.tvhplayer.core.partitionDvrLibrary
 import at.bernhardberger.tvhplayer.core.groupDvrSchedule
+import at.bernhardberger.tvhplayer.ui.screens.recordings.PROBLEMS_CLEAR_TAG
 import at.bernhardberger.tvhplayer.ui.screens.recordings.SCHEDULE_NEW_TIMER
 import at.bernhardberger.tvhplayer.ui.screens.recordings.SCHEDULE_AUTOMATIC_ROW
 import at.bernhardberger.tvhplayer.ui.AppDestination
@@ -267,7 +269,7 @@ class RecordingsVisualLayoutTest {
 
     /** Eight recordings of the README evening's channels, with their logos, focused on the Documentaries folder. */
     private fun presentationLibrary(store: Boolean = false, firstRow: Boolean = false, problems: Boolean = false,
-        portrait: Boolean = false, scale: Float = 1f, scheduled: Boolean = false,
+        portrait: Boolean = false, scale: Float = 1f, scheduled: Boolean = false, filelessProblems: Boolean = false,
         diskSpace: DvrDiskSpaceState = DvrDiskSpaceState.Current(
             DvrDiskSpace(1_240_000_000_000L, 2_760_000_000_000L, 4_000_000_000_000L))) {
         assertTrue(android.os.SystemClock.setCurrentTimeMillis(1_791_144_900_000L))
@@ -278,14 +280,15 @@ class RecordingsVisualLayoutTest {
         val channels = listOf("Ridge Earth", "Harbor Sport", "Northline News", "Kite Kids", "Ion Frame", "Amber Stage", "Harbor Lights")
             .mapIndexed { index, name -> Channel.create(ChannelId(index + 1L), name = name, number = index + 1L, icon = ChannelIcon.ImageCache(ArtworkId(index + 1))) }
         val genres = mapOf(1L to 0x90L, 2L to 0x90L, 3L to 0x90L, 4L to 0x40L, 5L to 0x40L, 6L to 0x10L, 7L to 0x60L,
-            8L to 0x50L, 9L to 0x40L, 10L to 0x10L, 11L to 0x40L, 12L to 0x90L, 13L to 0x60L)
+            8L to 0x50L, 9L to 0x40L, 10L to 0x10L, 11L to 0x40L, 12L to 0x90L, 13L to 0x60L, 14L to 0x40L, 15L to 0x60L)
         fun recording(id: Long, title: String, channel: Int, folder: String?, start: Long, minutes: Long,
             art: String?, synopsis: String, position: Long? = null, plays: Long? = null,
-            state: DvrEntryState = DvrEntryState.COMPLETED) = DvrEntry.create(
+            state: DvrEntryState = DvrEntryState.COMPLETED, withFile: Boolean = true) = DvrEntry.create(
             DvrEntryId(id), title = title, state = state, folder = listOfNotNull(folder),
             start = Instant.fromEpochSeconds(start), stop = Instant.fromEpochSeconds(start + minutes * 60),
             files = listOf(DvrRecordingFile.create(start = Instant.fromEpochSeconds(start),
-                stop = Instant.fromEpochSeconds(start + minutes * 60), sizeBytes = minutes * 40_000_000L)),
+                stop = Instant.fromEpochSeconds(start + minutes * 60), sizeBytes = minutes * 40_000_000L))
+                .takeIf { withFile }.orEmpty(),
             channelId = ChannelId(channel.toLong()), channelName = channels[channel - 1].name,
             image = art?.let { ArtworkId(100 + id.toInt()) }, description = synopsis,
             subtitle = "Winter on the ridge".takeIf { id == 1L }, playPosition = position?.seconds, playCount = plays,
@@ -317,6 +320,18 @@ class RecordingsVisualLayoutTest {
                     "A quiet drama about night-shift workers in a harbor glass workshop.", state = DvrEntryState.COMPLETED_ERROR),
                 recording(11, "River Court", 2, null, evening - 6 * 86400, 105, null,
                     "Indoor basketball, River Court against North Quay.", state = DvrEntryState.COMPLETED_ERROR),
+            )
+        } else {
+            emptyList()
+        } + if (filelessProblems) {
+            // A missed match and a canceled episode: entries without a file, for the Problems tab's Clear.
+            listOf(
+                recording(14, "Harbor Kickoff", 2, "Sport", evening - 4 * 86400, 135, null,
+                    "Match coverage from a floodlit stadium as Harbor FC meet Amber Town.",
+                    state = DvrEntryState.MISSED, withFile = false),
+                recording(15, "Paper Kite Tales", 4, null, evening - 4 * 86400 - 7200, 30, null,
+                    "2D animation about a paper kite over painted hills.",
+                    state = DvrEntryState.INVALID, withFile = false),
             )
         } else {
             emptyList()
@@ -506,11 +521,11 @@ class RecordingsVisualLayoutTest {
         show(snapshotLoaded = false)
         compose.onNodeWithText("Schedule").assertIsFocused()
         key(Key.DirectionRight)
-        compose.onNodeWithText("Problems").assertIsFocused()
+        compose.onNodeWithTag("recordings-mode-problems").assertIsFocused()
         publish(listOf(recording(48, "Scheduled expedition", null, DvrEntryState.SCHEDULED),
             recording(99, "Failed expedition", null, DvrEntryState.COMPLETED_ERROR)))
         compose.mainClock.advanceTimeBy(600)
-        compose.onNodeWithText("Problems").assertIsFocused()
+        compose.onNodeWithTag("recordings-mode-problems").assertIsFocused()
         compose.runOnIdle { assertNull(screenState.requestedScheduleEntryId.value) }
     }
 
@@ -1082,6 +1097,9 @@ class RecordingsVisualLayoutTest {
         assertEquals(storage, bounds("recordings-space"))
         key(Key.DirectionDown)
         focused("recording-list-entry-21")
+        // Clear is the stop between the first problem and the tabs.
+        key(Key.DirectionUp)
+        focused("recordings-problems-clear")
         key(Key.DirectionUp)
         focused("recordings-mode-problems")
         // Problems is the last tab; Left walks back to Browse, whose Down returns to the row it left.
@@ -1187,6 +1205,99 @@ class RecordingsVisualLayoutTest {
         repeat(2) { key(Key.DirectionRight) }
         focused("recordings-mode-problems")
         downToList()
+    }
+
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun problemsClearResting() = problemsClearFrame("resting")
+
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun problemsClearButtonFocused() = problemsClearFrame("button-focused") { upToProblemsClear() }
+
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun problemsClearOneKind() = problemsClearFrame("one-kind", fileless = false)
+
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun problemsClearDialogMixed() = problemsClearFrame("dialog-mixed") { openProblemsClear() }
+
+    /** German, the longest common case, at rest and on the mixed confirmation. */
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun problemsClearRestingGerman() = problemsClearFrame("resting-de")
+
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun problemsClearDialogMixedGerman() = problemsClearFrame("dialog-mixed-de") { openProblemsClear() }
+
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun problemsClearDialogFilelessOnly() = problemsClearFrame("dialog-fileless-only", partial = false) {
+        openProblemsClear()
+    }
+
+    /** The empty tab a full clear leaves, focus on the tab: the list follows the server, so it is this scene. */
+    @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun problemsClearAfterClearEmpty() = problemsClearFrame("after-clear-empty", fileless = false, partial = false)
+
+    /**
+     * The README evening's library on the Problems tab: [fileless] adds a missed and a canceled entry
+     * without a file, [partial] two failed recordings with partial files.
+     */
+    private fun problemsClearFrame(name: String, fileless: Boolean = true, partial: Boolean = true,
+        steps: () -> Unit = {}) {
+        startView = DvrArchiveView(DvrArchiveGrouping.FOLDERS)
+        presentationLibrary(firstRow = true, problems = partial, filelessProblems = fileless, scheduled = true,
+            diskSpace = diskSpacePercentUsed(70))
+        upToOptions()
+        key(Key.DirectionUp)
+        repeat(2) { key(Key.DirectionRight) }
+        focused("recordings-mode-problems")
+        if (fileless || partial) downToList()
+        steps()
+        compose.mainClock.advanceTimeBy(1_500)
+        compose.waitForIdle()
+        capture(name, 1f, "${headerReport()}\n${problemsReport()}", outputs = "build/outputs/problems-clear")
+    }
+
+    /** Where the Problems headline, counts line, Clear, first day heading, first row and pane sit. */
+    private fun problemsReport(): String {
+        fun r(rect: Rect) = "%.1f,%.1f-%.1f,%.1f".format(rect.left, rect.top, rect.right, rect.bottom)
+        fun tagged(tag: String) = runCatching {
+            compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        }.getOrNull()
+        val dayHeading = runCatching {
+            compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading) and
+                hasAnyAncestor(hasTestTag("recordings-problems-list")), useUnmergedTree = true)
+                .fetchSemanticsNodes().minByOrNull { it.boundsInRoot.top }?.boundsInRoot
+        }.getOrNull()
+        val firstRow = runCatching { visibleListRows().first() }.getOrNull()
+        return listOf(
+            "problemsHeadline=${tagged("archive-level-heading")?.let(::r)}",
+            "countsLine=${tagged("archive-values-line")?.let(::r)}",
+            "clear=${tagged(PROBLEMS_CLEAR_TAG)?.let(::r)}",
+            "firstDayHeading=${dayHeading?.let(::r)}",
+            "firstRow=${firstRow?.let(::r)}",
+            "paneTop=${tagged("recording-metadata-pane")?.top}",
+            "card=${tagged("centred-dialog-card")?.let(::r)}",
+            "safe=${tagged("problems-clear-fileless")?.let(::r)}",
+            "partial=${tagged("problems-clear-partial")?.let(::r)}",
+            "cancel=${tagged("problems-clear-cancel")?.let(::r)}",
+        ).joinToString("\n")
+    }
+
+    private fun openProblemsClear() {
+        upToProblemsClear()
+        key(Key.DirectionCenter)
+        focused("problems-clear-fileless")
+    }
+
+    private fun upToProblemsClear() {
+        key(Key.DirectionUp)
+        focused(PROBLEMS_CLEAR_TAG)
     }
 
     @Test @Category(VisualCapture::class) @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
@@ -1404,11 +1515,19 @@ class RecordingsVisualLayoutTest {
         capture("schedule", 1f)
         repeat(3) { key(Key.DirectionUp) }
         key(Key.DirectionRight)
-        compose.onNodeWithText("Problems").assertIsFocused()
+        compose.onNodeWithTag("recordings-mode-problems").assertIsFocused()
         key(Key.DirectionDown)
         focused("recording-list-entry-21")
         assertOverlineAboveTitle(21)
-        assertArchiveColumns(21, archiveRow, "Unfinished expedition")
+        // The headline and its counts line stay in the list column: the pane starts beside the headline,
+        // at the top of the tab's content, never pushed below the left column's header.
+        assertArchiveColumns(21, archiveRow, "Unfinished expedition", paneBesideHeadline = true)
+        // The headline and its counts line end short of Clear, whatever the label's length.
+        val clear = bounds(PROBLEMS_CLEAR_TAG)
+        assertTrue(bounds("archive-level-heading").right <= clear.left)
+        assertTrue(bounds("archive-values-line").right <= clear.left)
+        assertEquals(40f, clear.height, .5f)
+        assertEquals(bounds("recording-list-entry-21").right, clear.right, .5f)
         if (endPadding != null) assertTrue(bounds("recording-metadata-pane").right <= 860f)
         // Without a reason from the server the pane says what happened in its notice's words.
         compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-failure")) and hasText("Recording failed"),
@@ -1456,10 +1575,11 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionUp)
         repeat(3) { key(Key.DirectionUp) }
         key(Key.DirectionRight)
-        compose.onNodeWithText("Problems").assertIsFocused()
+        compose.onNodeWithTag("recordings-mode-problems").assertIsFocused()
         key(Key.DirectionDown)
         focused("recording-list-entry-60")
-        assertDenseListGeometry()
+        // The Problems headline with its Clear button takes one row of the list's height.
+        assertDenseListGeometry(expectedRows = 5)
         assertEquals(archivePane.width, bounds("recording-metadata-pane").width, .1f)
         assertEquals(archivePane.left, bounds("recording-metadata-pane").left, .1f)
         assertPaneTitle("Unfinished expedition 1")
@@ -1535,7 +1655,7 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionUp)
         repeat(3) { key(Key.DirectionUp) }
         key(Key.DirectionRight)
-        compose.onNodeWithText("Problems").assertIsFocused()
+        compose.onNodeWithTag("recordings-mode-problems").assertIsFocused()
         key(Key.DirectionDown)
         focused("recording-list-entry-60")
         assertPaneEyebrow(longChannel, 1_791_086_400L - 86_400, "recording-badge-failed",
@@ -1553,8 +1673,8 @@ class RecordingsVisualLayoutTest {
         compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-failure")) and hasText("Recording missed"),
             useUnmergedTree = true).assertIsDisplayed()
         compose.onNodeWithTag("recording-metadata-partial-file", useUnmergedTree = true).assertDoesNotExist()
-        key(Key.DirectionUp)
-        key(Key.DirectionUp)
+        // Up passes Clear on its way to the tabs.
+        repeat(3) { key(Key.DirectionUp) }
         key(Key.DirectionLeft)
         key(Key.DirectionLeft)
         key(Key.DirectionDown)
@@ -1604,7 +1724,7 @@ class RecordingsVisualLayoutTest {
         compose.onNodeWithText("Nothing is recording or scheduled.").assertIsDisplayed()
         compose.onNodeWithTag("recording-metadata-pane", useUnmergedTree = true).assertDoesNotExist()
         key(Key.DirectionRight)
-        compose.onNodeWithText("Problems").assertIsFocused()
+        compose.onNodeWithTag("recordings-mode-problems").assertIsFocused()
         compose.onNodeWithText("No recording problems.").assertIsDisplayed()
         compose.onNodeWithTag("recording-metadata-pane", useUnmergedTree = true).assertDoesNotExist()
         capture("empty-problems", 1f)
@@ -2181,12 +2301,17 @@ class RecordingsVisualLayoutTest {
         focused("recordings-folder-Sport")
         openScheduleSubnav()
         key(Key.DirectionRight)
-        compose.onNodeWithText("Problems").assertIsFocused()
+        compose.onNodeWithTag("recordings-mode-problems").assertIsFocused()
         key(Key.DirectionDown)
         focused("recording-list-entry-30")
-        // One "Failed" section holds both; a missed row carries the failure mark, read out as what happened.
-        compose.onNodeWithText("Failed").assertIsDisplayed()
-        compose.onNodeWithText("Canceled").assertDoesNotExist()
+        // One list, newest first under a heading per day; the counts line counts the missed one as failed.
+        compose.onNodeWithText("Failed").assertDoesNotExist()
+        compose.onNode(hasTestTag("archive-values-line") and hasText("2 failed"), useUnmergedTree = true)
+            .assertIsDisplayed()
+        compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading) and
+            hasAnyAncestor(hasTestTag("recordings-problems-list")), useUnmergedTree = true).assertCountEquals(2)
+        assertTrue(bounds("recording-list-entry-30").bottom <= bounds("recording-list-entry-31").top)
+        // A missed row carries the failure mark, read out as what happened.
         compose.onNode(hasTestTag("recording-list-metadata-30") and hasText("Missed", substring = true),
             useUnmergedTree = true).assertExists()
         // Neither left a file, so both rows give their date but no length.
@@ -2463,7 +2588,7 @@ class RecordingsVisualLayoutTest {
         focused("recording-list-entry-3")
         openScheduleSubnav()
         key(Key.DirectionRight)
-        compose.onNodeWithText("Problems").assertIsFocused()
+        compose.onNodeWithTag("recordings-mode-problems").assertIsFocused()
         compose.onNodeWithText("Failed").assertDoesNotExist()
         compose.onNodeWithText("No recording problems.").assertIsDisplayed()
         compose.onNodeWithTag("recording-list-entry-2").assertDoesNotExist()
@@ -2749,6 +2874,86 @@ class RecordingsVisualLayoutTest {
         if (awaitPreparation) compose.waitForIdle()
     }
 
+    @Test fun clearingProblemsRemovesEntriesWithoutAFileAndKeepsPartialRecordings() {
+        val deleted = showClearableProblems()
+        // The headline's button is the stop above the list: Right stays on it, Up goes on to the tabs.
+        key(Key.DirectionUp)
+        focused("recordings-problems-clear")
+        key(Key.DirectionRight)
+        focused("recordings-problems-clear")
+        key(Key.DirectionUp)
+        focused("recordings-mode-problems")
+        key(Key.DirectionDown)
+        focused("recording-list-entry-30")
+        key(Key.DirectionUp)
+        key(Key.DirectionCenter)
+        // Clearing what has no file is the focused choice; deleting the partial file is a separate one.
+        focused("problems-clear-fileless")
+        compose.onNodeWithTag("problems-clear-partial").assertIsDisplayed()
+        key(Key.Back)
+        focused("recordings-problems-clear")
+        compose.runOnIdle { assertEquals(emptyList<DvrEntryId>(), deleted) }
+        key(Key.DirectionCenter)
+        focused("problems-clear-fileless")
+        key(Key.DirectionCenter)
+        compose.mainClock.advanceTimeUntil { deleted.size == 2 }
+        assertEquals(listOf(DvrEntryId(30), DvrEntryId(31)), deleted)
+        // The list follows the server: the partial recording is what is left, and it takes focus.
+        focused("recording-list-entry-32")
+        compose.runOnIdle { assertNull(noticeCenter.state.value.candidate) }
+    }
+
+    @Test fun alsoDeletingPartialRecordingsReportsWhatCouldNotBeCleared() {
+        val deleted = showClearableProblems(failing = setOf(31))
+        key(Key.DirectionUp)
+        key(Key.DirectionCenter)
+        focused("problems-clear-fileless")
+        key(Key.DirectionRight)
+        focused("problems-clear-partial")
+        key(Key.DirectionRight)
+        focused("problems-clear-cancel")
+        key(Key.DirectionRight)
+        focused("problems-clear-cancel")
+        key(Key.DirectionLeft)
+        key(Key.DirectionCenter)
+        compose.mainClock.advanceTimeUntil { deleted.size == 3 }
+        assertEquals(listOf(DvrEntryId(30), DvrEntryId(31), DvrEntryId(32)), deleted)
+        compose.mainClock.advanceTimeUntil { noticeCenter.state.value.candidate != null }
+        assertEquals(Notice.DvrProblemsClearFailed(failed = 1, total = 3, DvrMutationFeedback.PERMISSION_DENIED),
+            noticeCenter.state.value.candidate?.notice)
+        focused("recording-list-entry-31")
+    }
+
+    @Test fun clearingEveryProblemLeavesTheEmptyTabWithoutTheAction() {
+        val deleted = showClearableProblems()
+        key(Key.DirectionUp)
+        key(Key.DirectionCenter)
+        key(Key.DirectionRight)
+        focused("problems-clear-partial")
+        key(Key.DirectionCenter)
+        compose.mainClock.advanceTimeUntil { deleted.size == 3 }
+        focused("recordings-mode-problems")
+        compose.onNodeWithText("No recording problems.").assertIsDisplayed()
+        compose.onNodeWithTag("recordings-problems-clear").assertDoesNotExist()
+    }
+
+    @Test fun onlyPartialRecordingsKeepThemUnlessDeletingIsChosen() {
+        show(entries = listOf(recording(32, "Broken signal", "broken.ts", DvrEntryState.COMPLETED_ERROR)))
+        openScheduleSubnav()
+        key(Key.DirectionRight)
+        key(Key.DirectionDown)
+        focused("recording-list-entry-32")
+        key(Key.DirectionUp)
+        key(Key.DirectionCenter)
+        // Nothing can be cleared without deleting a file, so the safe choice keeps everything.
+        focused("problems-clear-keep")
+        compose.onNodeWithTag("problems-clear-fileless").assertDoesNotExist()
+        compose.onNodeWithTag("problems-clear-partial").assertIsDisplayed()
+        key(Key.DirectionCenter)
+        focused("recordings-problems-clear")
+        assertNoCommands()
+    }
+
     private fun show(scale: Float = 1f, empty: Boolean = false, entries: List<DvrEntry>? = null, endPadding: Dp? = null,
         diskSpace: DvrDiskSpaceState = DvrDiskSpaceState.Unknown, channels: List<Channel> = emptyList(),
         snapshotLoaded: Boolean = true, autorecRules: List<at.bernhardberger.tvheadend.sdk.core.AutorecRule> = emptyList(),
@@ -2764,18 +2969,7 @@ class RecordingsVisualLayoutTest {
             recording(20, "Tomorrow's documentary", null, DvrEntryState.SCHEDULED),
             recording(21, "Unfinished expedition", null, DvrEntryState.COMPLETED_ERROR),
         )
-        val observation = SessionObservation.create(
-            sessionState = SessionState.Ready(ServerCapabilities.create(
-                streaming = CapabilityAccess.ALLOWED,
-                dvrWrite = if (canModify) CapabilityAccess.ALLOWED else CapabilityAccess.DENIED,
-            )),
-            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(channels, emptyList())),
-            epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
-            dvrState = if (snapshotLoaded) DvrRepositoryState.Current(DvrSnapshot.create(recordings,
-                autorecRules = autorecRules)) else SessionObservation.create().dvrState,
-            dvrDiskSpaceState = diskSpace,
-            recordingProgressCapability = RecordingProgressCapability.SUPPORTED,
-        )
+        val observation = libraryObservation(recordings, channels, canModify, snapshotLoaded, autorecRules, diskSpace)
         session = FakeTvheadendSession(observation)
         val currentObservation = session.observation.value
         if (snapshotLoaded) assertNotNull("Exercise live capability/session guards, not cached-only rows", currentObservation.currentSession)
@@ -2854,6 +3048,57 @@ class RecordingsVisualLayoutTest {
             playPosition = if (id == 1L) 3723.seconds else null,
             playCount = playCount,
         )
+
+    private fun libraryObservation(recordings: List<DvrEntry>, channels: List<Channel> = emptyList(),
+        canModify: Boolean = true, snapshotLoaded: Boolean = true,
+        autorecRules: List<at.bernhardberger.tvheadend.sdk.core.AutorecRule> = emptyList(),
+        diskSpace: DvrDiskSpaceState = DvrDiskSpaceState.Unknown) = SessionObservation.create(
+        sessionState = SessionState.Ready(ServerCapabilities.create(
+            streaming = CapabilityAccess.ALLOWED,
+            dvrWrite = if (canModify) CapabilityAccess.ALLOWED else CapabilityAccess.DENIED,
+        )),
+        channelState = ChannelRepositoryState.Current(ChannelCatalog.create(channels, emptyList())),
+        epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
+        dvrState = if (snapshotLoaded) DvrRepositoryState.Current(DvrSnapshot.create(recordings,
+            autorecRules = autorecRules)) else SessionObservation.create().dvrState,
+        dvrDiskSpaceState = diskSpace,
+        recordingProgressCapability = RecordingProgressCapability.SUPPORTED,
+    )
+
+    /** Two entries without a file, one failed recording with a partial file, and a finished recording. */
+    private fun clearableProblems() = listOf(
+        recording(1, "Tide Watch", "tide.ts"),
+        recording(30, "Missed match", null, DvrEntryState.MISSED),
+        recording(31, "Canceled concert", null, DvrEntryState.INVALID),
+        recording(32, "Broken signal", "broken.ts", DvrEntryState.COMPLETED_ERROR),
+    )
+
+    /**
+     * [clearableProblems] on a server that deletes each entry it is asked to, except [failing] ones,
+     * and publishes the shorter list; the ids asked for are in the returned list.
+     */
+    private fun showClearableProblems(failing: Set<Long> = emptySet()): List<DvrEntryId> {
+        val deleted = mutableListOf<DvrEntryId>()
+        var remaining = clearableProblems()
+        show(entries = remaining, repository = { delegate ->
+            object : DvrRepository by delegate {
+                override suspend fun deleteEntry(currentSession: CurrentSessionObservation, id: DvrEntryId):
+                    DvrMutationResult<Unit> {
+                    deleted += id
+                    if (id.value in failing) return DvrMutationResult.Failed(TvheadendFailure.ACCESS_DENIED, false)
+                    remaining = remaining.filterNot { it.id == id }
+                    session.publish(libraryObservation(remaining))
+                    return DvrMutationResult.Confirmed(Unit)
+                }
+            }
+        })
+        openScheduleSubnav()
+        key(Key.DirectionRight)
+        compose.onNodeWithTag("recordings-mode-problems").assertIsFocused()
+        key(Key.DirectionDown)
+        focused("recording-list-entry-30")
+        return deleted
+    }
 
     private fun key(key: Key) {
         if (key == Key.Back) compose.runOnIdle { backDispatcher.onBackPressed() }
@@ -3005,13 +3250,16 @@ class RecordingsVisualLayoutTest {
     }
 
     /** The row in Archive's first column, the pane where Archive shows its preview, level with the first row. */
-    private fun assertArchiveColumns(id: Long, archiveRow: Rect, paneTitle: String, paneTopTag: String? = null) {
+    private fun assertArchiveColumns(
+        id: Long, archiveRow: Rect, paneTitle: String, paneTopTag: String? = null, paneBesideHeadline: Boolean = false,
+    ) {
         val row = bounds("recording-list-entry-$id")
         assertEquals(archiveRow.left, row.left, .5f)
         assertEquals(archiveRow.width, row.width, .5f)
         val pane = bounds("recording-metadata-pane")
         assertEquals(row.left + 340f + 92f, pane.left, .5f)
-        assertEquals(paneTopTag?.let { bounds(it).top } ?: row.top, pane.top, .5f)
+        if (paneBesideHeadline) assertTrue(pane.top < bounds("archive-level-heading").bottom)
+        else assertEquals(paneTopTag?.let { bounds(it).top } ?: row.top, pane.top, .5f)
         assertPaneTitle(paneTitle)
     }
 

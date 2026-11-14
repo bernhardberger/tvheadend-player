@@ -81,14 +81,14 @@ internal sealed interface ConfirmationSubject {
 internal data class ConfirmationChoice(val label: String, @DrawableRes val icon: Int, val tag: String)
 
 /**
- * A yes/no confirmation: a fixed question, the subject's panel, what happens, and the safe choice
- * first and focused. Back and the safe button dismiss; the action runs after the fade, through [onDismiss]
+ * A yes/no confirmation: a fixed question, the subject's panel (none without a [subject]), what happens,
+ * and the safe choice first and focused. Back and the safe button dismiss; the action runs after the fade, through [onDismiss]
  * as the other centred dialogs do. [spokenSentence] is what TalkBack reads for the sentence when it differs.
  */
 @Composable
 internal fun ConfirmationDialog(
     question: String,
-    subject: ConfirmationSubject,
+    subject: ConfirmationSubject?,
     sentence: String,
     safe: ConfirmationChoice,
     action: ConfirmationChoice,
@@ -100,25 +100,36 @@ internal fun ConfirmationDialog(
         MutableTransitionState(false).apply { targetState = true }
     },
     spokenSentence: String? = null,
+    onSafeConfirm: (() -> Unit)? = null,
+    cancel: ConfirmationChoice? = null,
 ) {
-    var confirmed by remember { mutableStateOf(false) }
-    CentredDialogShell(paneTitle = question, onDismiss = { if (confirmed) onConfirm() else onDismiss() },
+    var confirmed by remember { mutableStateOf<Boolean?>(null) }
+    CentredDialogShell(paneTitle = question, onDismiss = {
+        when (confirmed) {
+            true -> onConfirm()
+            false -> onSafeConfirm?.invoke() ?: onDismiss()
+            null -> onDismiss()
+        }
+    },
         modifier = Modifier.onPreviewKeyEvent(onPreviewKeyEvent), backEnabled = backEnabled,
         visibility = visibility) {
         ConfirmationCard(question, subject, sentence, spokenSentence) {
-            ConfirmationButtons(safe, action,
-                onSafe = { visibility.targetState = false },
-                onAction = { confirmed = true; visibility.targetState = false })
+            ConfirmationButtons(safe, action, cancel,
+                onSafe = { confirmed = false; visibility.targetState = false },
+                onAction = { confirmed = true; visibility.targetState = false },
+                onCancel = { visibility.targetState = false })
         }
     }
 }
 
 @Composable
 private fun ConfirmationButtons(
-    safe: ConfirmationChoice, action: ConfirmationChoice, onSafe: () -> Unit, onAction: () -> Unit,
+    safe: ConfirmationChoice, action: ConfirmationChoice, cancel: ConfirmationChoice?,
+    onSafe: () -> Unit, onAction: () -> Unit, onCancel: () -> Unit,
 ) {
     val safeFocus = remember { FocusRequester() }
     val actionFocus = remember { FocusRequester() }
+    val cancelFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) {
         withFrameNanos { }; safeFocus.requestFocus()
     }
@@ -128,9 +139,16 @@ private fun ConfirmationButtons(
         ChoiceContent(safe)
     }
     OutlinedButton(onClick = onAction, modifier = Modifier.height(40.dp).focusRequester(actionFocus).focusProperties {
-        left = safeFocus; right = FocusRequester.Cancel
+        left = safeFocus; right = if (cancel != null) cancelFocus else FocusRequester.Cancel
     }.testTag(action.tag), contentPadding = OutlinedButtonDefaults.ButtonWithIconContentPadding) {
         ChoiceContent(action)
+    }
+    if (cancel != null) OutlinedButton(
+        onClick = onCancel, modifier = Modifier.height(40.dp).focusRequester(cancelFocus).focusProperties {
+            left = actionFocus; right = FocusRequester.Cancel
+        }.testTag(cancel.tag), contentPadding = OutlinedButtonDefaults.ButtonWithIconContentPadding,
+    ) {
+        ChoiceContent(cancel)
     }
 }
 
@@ -143,7 +161,7 @@ private fun ChoiceContent(choice: ConfirmationChoice) {
 
 @Composable
 private fun ConfirmationCard(
-    question: String, subject: ConfirmationSubject, sentence: String, spokenSentence: String?,
+    question: String, subject: ConfirmationSubject?, sentence: String, spokenSentence: String?,
     buttons: @Composable RowScope.() -> Unit,
 ) {
     val measurer = rememberTextMeasurer()
@@ -161,8 +179,10 @@ private fun ConfirmationCard(
                 Text(question, Modifier.semantics { heading() }, style = styles.question,
                     color = MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Spacer(Modifier.height(16.dp))
-                ConfirmationPanel(subject, styles)
-                Spacer(Modifier.height(16.dp))
+                if (subject != null) {
+                    ConfirmationPanel(subject, styles)
+                    Spacer(Modifier.height(16.dp))
+                }
                 Text(sentence, spokenSentence?.takeIf { it != sentence }
                     ?.let { spoken -> Modifier.semantics { contentDescription = spoken } } ?: Modifier,
                     style = styles.sentence, color = TvTextColors.secondary)
@@ -196,16 +216,18 @@ private val ConfirmationBaseColumn = 352.dp
 private val ConfirmationMaxColumn = 520.dp
 private fun confirmationNeedsMoreWidth(
     measurer: TextMeasurer, styles: ConfirmationStyles, density: Density,
-    question: String, sentence: String, subject: ConfirmationSubject, column: Int,
+    question: String, sentence: String, subject: ConfirmationSubject?, column: Int,
 ): Boolean = with(density) {
     fun measure(text: String, style: TextStyle, width: Int): TextLayoutResult =
         measurer.measure(text, style, constraints = Constraints(maxWidth = width.coerceAtLeast(0)), density = density)
     fun orphaned(text: String, style: TextStyle) = measure(text, style, column).let { layout ->
         layout.lineCount > 1 && endsOnOneWord(text.substring(layout.getLineStart(layout.lineCount - 1)))
     }
-    val panelText = column - (PanelPadding * 2 + subject.leadWidth() + PanelTextGap).roundToPx()
-    orphaned(question, styles.question) || orphaned(sentence, styles.sentence) ||
-        confirmationPanelNeedsMoreWidth(subject, styles, panelText, density, ::measure)
+    orphaned(question, styles.question) || orphaned(sentence, styles.sentence) || subject != null &&
+        confirmationPanelNeedsMoreWidth(
+            subject, styles, column - (PanelPadding * 2 + subject.leadWidth() + PanelTextGap).roundToPx(), density,
+            ::measure,
+        )
 }
 
 private fun confirmationPanelNeedsMoreWidth(

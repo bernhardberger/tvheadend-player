@@ -602,6 +602,17 @@
     <string name="recording_action_not_confirmed">录制更改尚未确认</string>
     <plurals name="recording_folder_action_failed_change"><item quantity="other">共%2$d项录制中有%1$d项无法更改</item></plurals>
     <plurals name="recording_folder_action_failed_delete"><item quantity="other">共%2$d项录制中有%1$d项无法删除</item></plurals>
+    <plurals name="problems_clear_failed"><item quantity="other">共%2$d个条目中有%1$d个无法移除</item></plurals>
+    <string name="problems_clear">移除问题</string>
+    <string name="problems_clear_question">要移除问题吗？</string>
+    <string name="problems_clear_button">移除</string>
+    <plurals name="problems_count_failed"><item quantity="other">失败%1$d项</item></plurals>
+    <plurals name="problems_count_canceled"><item quantity="other">已取消%1$d项</item></plurals>
+    <plurals name="problems_clear_entries"><item quantity="other">移除%1$d个条目</item></plurals>
+    <plurals name="problems_clear_also_delete_partial"><item quantity="other">同时删除%1$d项不完整录制</item></plurals>
+    <plurals name="problems_clear_delete_partial"><item quantity="other">删除%1$d项不完整录制</item></plurals>
+    <plurals name="problems_clear_fileless_sentence"><item quantity="other">%1$d个条目没有文件，因此移除不会删除磁盘上的任何内容。</item></plurals>
+    <plurals name="problems_clear_partial_sentence"><item quantity="other">%1$d项失败的录制有不完整文件。除非同时删除，否则会保留。</item></plurals>
     <plurals name="recording_notice_canceled_count"><item quantity="other">已取消%d项录制</item></plurals>
     <string name="connection_notice_lost">连接已断开</string>
     <string name="connection_notice_lost_saved">连接已断开 • 正在显示已保存的频道</string>
@@ -680,8 +691,6 @@
         <item quantity="other">%1$d项录制正在进行</item>
     </plurals>
     <string name="recordings_schedule_end_duration">至%1$s • %2$s</string>
-    <string name="recordings_failed">失败</string>
-    <string name="recordings_cancelled">已取消</string>
     <string name="recordings_upcoming_active">即将录制及录制中</string>
     <string name="recordings_completed">已完成</string>
     <string name="recordings_failed_cancelled">失败及已取消</string>
