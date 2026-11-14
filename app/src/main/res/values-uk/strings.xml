@@ -671,6 +671,57 @@
         <item quantity="many">Не вдалося видалити %1$d із %2$d записів</item>
         <item quantity="other">Не вдалося видалити %1$d із %2$d запису</item>
     </plurals>
+    <plurals name="problems_clear_failed">
+        <item quantity="one">Не вдалося прибрати %1$d із %2$d елемента</item>
+        <item quantity="few">Не вдалося прибрати %1$d із %2$d елементів</item>
+        <item quantity="many">Не вдалося прибрати %1$d із %2$d елементів</item>
+        <item quantity="other">Не вдалося прибрати %1$d із %2$d елемента</item>
+    </plurals>
+    <string name="problems_clear">Прибрати проблеми</string>
+    <string name="problems_clear_question">Прибрати проблеми?</string>
+    <string name="problems_clear_button">Прибрати</string>
+    <plurals name="problems_count_failed">
+        <item quantity="one">З помилкою: %1$d</item>
+        <item quantity="few">З помилкою: %1$d</item>
+        <item quantity="many">З помилкою: %1$d</item>
+        <item quantity="other">З помилкою: %1$d</item>
+    </plurals>
+    <plurals name="problems_count_canceled">
+        <item quantity="one">Скасовано: %1$d</item>
+        <item quantity="few">Скасовано: %1$d</item>
+        <item quantity="many">Скасовано: %1$d</item>
+        <item quantity="other">Скасовано: %1$d</item>
+    </plurals>
+    <plurals name="problems_clear_entries">
+        <item quantity="one">Прибрати %1$d елемент</item>
+        <item quantity="few">Прибрати %1$d елементи</item>
+        <item quantity="many">Прибрати %1$d елементів</item>
+        <item quantity="other">Прибрати %1$d елемента</item>
+    </plurals>
+    <plurals name="problems_clear_also_delete_partial">
+        <item quantity="one">Видалити також %1$d неповний запис</item>
+        <item quantity="few">Видалити також %1$d неповні записи</item>
+        <item quantity="many">Видалити також %1$d неповних записів</item>
+        <item quantity="other">Видалити також %1$d неповного запису</item>
+    </plurals>
+    <plurals name="problems_clear_delete_partial">
+        <item quantity="one">Видалити %1$d неповний запис</item>
+        <item quantity="few">Видалити %1$d неповні записи</item>
+        <item quantity="many">Видалити %1$d неповних записів</item>
+        <item quantity="other">Видалити %1$d неповного запису</item>
+    </plurals>
+    <plurals name="problems_clear_fileless_sentence">
+        <item quantity="one">%1$d елемент не має файлу, тож його прибирання нічого не видаляє з диска.</item>
+        <item quantity="few">%1$d елементи не мають файлу, тож їх прибирання нічого не видаляє з диска.</item>
+        <item quantity="many">%1$d елементів не мають файлу, тож їх прибирання нічого не видаляє з диска.</item>
+        <item quantity="other">%1$d елемента не мають файлу, тож їх прибирання нічого не видаляє з диска.</item>
+    </plurals>
+    <plurals name="problems_clear_partial_sentence">
+        <item quantity="one">%1$d невдалий запис має неповний файл. Він залишиться, якщо не видалити і його.</item>
+        <item quantity="few">%1$d невдалі записи мають неповні файли. Вони залишаться, якщо не видалити і їх.</item>
+        <item quantity="many">%1$d невдалих записів мають неповні файли. Вони залишаться, якщо не видалити і їх.</item>
+        <item quantity="other">%1$d невдалого запису мають неповні файли. Вони залишаться, якщо не видалити і їх.</item>
+    </plurals>
     <plurals name="recording_notice_canceled_count">
         <item quantity="one">Скасовано %d запис</item>
         <item quantity="few">Скасовано %d записи</item>
@@ -770,8 +821,6 @@
         <item quantity="other">%1$d запису триває</item>
     </plurals>
     <string name="recordings_schedule_end_duration">до %1$s • %2$s</string>
-    <string name="recordings_failed">З помилками</string>
-    <string name="recordings_cancelled">Скасовані</string>
     <string name="recordings_upcoming_active">Майбутні й поточні</string>
     <string name="recordings_completed">Завершені</string>
     <string name="recordings_failed_cancelled">З помилками й скасовані</string>

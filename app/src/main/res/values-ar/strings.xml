@@ -715,6 +715,73 @@
         <item quantity="many">تعذّر حذف %1$d من أصل %2$d من التسجيلات</item>
         <item quantity="other">تعذّر حذف %1$d من أصل %2$d من التسجيلات</item>
     </plurals>
+    <plurals name="problems_clear_failed">
+        <item quantity="zero">تعذّرت إزالة %1$d من أصل %2$d من الإدخالات</item>
+        <item quantity="one">تعذّرت إزالة %1$d من أصل %2$d من الإدخالات</item>
+        <item quantity="two">تعذّرت إزالة %1$d من أصل %2$d من الإدخالات</item>
+        <item quantity="few">تعذّرت إزالة %1$d من أصل %2$d من الإدخالات</item>
+        <item quantity="many">تعذّرت إزالة %1$d من أصل %2$d من الإدخالات</item>
+        <item quantity="other">تعذّرت إزالة %1$d من أصل %2$d من الإدخالات</item>
+    </plurals>
+    <string name="problems_clear">إزالة المشكلات</string>
+    <string name="problems_clear_question">إزالة المشكلات؟</string>
+    <string name="problems_clear_button">إزالة</string>
+    <plurals name="problems_count_failed">
+        <item quantity="zero">فاشلة: %1$d</item>
+        <item quantity="one">فاشلة: %1$d</item>
+        <item quantity="two">فاشلة: %1$d</item>
+        <item quantity="few">فاشلة: %1$d</item>
+        <item quantity="many">فاشلة: %1$d</item>
+        <item quantity="other">فاشلة: %1$d</item>
+    </plurals>
+    <plurals name="problems_count_canceled">
+        <item quantity="zero">ملغاة: %1$d</item>
+        <item quantity="one">ملغاة: %1$d</item>
+        <item quantity="two">ملغاة: %1$d</item>
+        <item quantity="few">ملغاة: %1$d</item>
+        <item quantity="many">ملغاة: %1$d</item>
+        <item quantity="other">ملغاة: %1$d</item>
+    </plurals>
+    <plurals name="problems_clear_entries">
+        <item quantity="zero">إزالة %1$d من الإدخالات</item>
+        <item quantity="one">إزالة %1$d من الإدخالات</item>
+        <item quantity="two">إزالة %1$d من الإدخالات</item>
+        <item quantity="few">إزالة %1$d من الإدخالات</item>
+        <item quantity="many">إزالة %1$d من الإدخالات</item>
+        <item quantity="other">إزالة %1$d من الإدخالات</item>
+    </plurals>
+    <plurals name="problems_clear_also_delete_partial">
+        <item quantity="zero">حذف %1$d من التسجيلات الجزئية أيضًا</item>
+        <item quantity="one">حذف %1$d من التسجيلات الجزئية أيضًا</item>
+        <item quantity="two">حذف %1$d من التسجيلات الجزئية أيضًا</item>
+        <item quantity="few">حذف %1$d من التسجيلات الجزئية أيضًا</item>
+        <item quantity="many">حذف %1$d من التسجيلات الجزئية أيضًا</item>
+        <item quantity="other">حذف %1$d من التسجيلات الجزئية أيضًا</item>
+    </plurals>
+    <plurals name="problems_clear_delete_partial">
+        <item quantity="zero">حذف %1$d من التسجيلات الجزئية</item>
+        <item quantity="one">حذف %1$d من التسجيلات الجزئية</item>
+        <item quantity="two">حذف %1$d من التسجيلات الجزئية</item>
+        <item quantity="few">حذف %1$d من التسجيلات الجزئية</item>
+        <item quantity="many">حذف %1$d من التسجيلات الجزئية</item>
+        <item quantity="other">حذف %1$d من التسجيلات الجزئية</item>
+    </plurals>
+    <plurals name="problems_clear_fileless_sentence">
+        <item quantity="zero">لا يوجد ملف لـ %1$d من الإدخالات، لذا لا تحذف إزالتها أي شيء من القرص.</item>
+        <item quantity="one">لا يوجد ملف لـ %1$d من الإدخالات، لذا لا تحذف إزالتها أي شيء من القرص.</item>
+        <item quantity="two">لا يوجد ملف لـ %1$d من الإدخالات، لذا لا تحذف إزالتها أي شيء من القرص.</item>
+        <item quantity="few">لا يوجد ملف لـ %1$d من الإدخالات، لذا لا تحذف إزالتها أي شيء من القرص.</item>
+        <item quantity="many">لا يوجد ملف لـ %1$d من الإدخالات، لذا لا تحذف إزالتها أي شيء من القرص.</item>
+        <item quantity="other">لا يوجد ملف لـ %1$d من الإدخالات، لذا لا تحذف إزالتها أي شيء من القرص.</item>
+    </plurals>
+    <plurals name="problems_clear_partial_sentence">
+        <item quantity="zero">لدى %1$d من التسجيلات الفاشلة ملفات جزئية. ستبقى ما لم تحذفها أيضًا.</item>
+        <item quantity="one">لدى %1$d من التسجيلات الفاشلة ملفات جزئية. ستبقى ما لم تحذفها أيضًا.</item>
+        <item quantity="two">لدى %1$d من التسجيلات الفاشلة ملفات جزئية. ستبقى ما لم تحذفها أيضًا.</item>
+        <item quantity="few">لدى %1$d من التسجيلات الفاشلة ملفات جزئية. ستبقى ما لم تحذفها أيضًا.</item>
+        <item quantity="many">لدى %1$d من التسجيلات الفاشلة ملفات جزئية. ستبقى ما لم تحذفها أيضًا.</item>
+        <item quantity="other">لدى %1$d من التسجيلات الفاشلة ملفات جزئية. ستبقى ما لم تحذفها أيضًا.</item>
+    </plurals>
     <plurals name="recording_notice_canceled_count">
         <item quantity="zero">التسجيلات المجدولة الملغاة: %d</item>
         <item quantity="one">التسجيلات المجدولة الملغاة: %d</item>
@@ -824,8 +891,6 @@
         <item quantity="other">التسجيلات الجارية: %1$d</item>
     </plurals>
     <string name="recordings_schedule_end_duration">حتى %1$s • %2$s</string>
-    <string name="recordings_failed">فشل</string>
-    <string name="recordings_cancelled">ملغى</string>
     <string name="recordings_upcoming_active">قادمة وجارية</string>
     <string name="recordings_completed">مكتملة</string>
     <string name="recordings_failed_cancelled">فاشلة وملغاة</string>

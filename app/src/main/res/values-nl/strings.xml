@@ -256,7 +256,7 @@
     <string name="autorec_editor_leave_title">Verlaten zonder opslaan?</string>
     <string name="autorec_editor_leave_body">Je wijzigingen zijn niet opgeslagen.</string>
     <string name="autorec_editor_keep_editing">Verder bewerken</string>
-    <string name="autorec_editor_discard">Verwerpen</string>
+    <string name="autorec_editor_discard">Wijzigingen verwerpen</string>
     <string name="record_unavailable">Dit programma kan niet worden opgenomen</string>
     <string name="record_unavailable_ended">Het is al afgelopen.</string>
     <string name="record_unavailable_no_programme">Er is geen programma-informatie voor deze zender.</string>
@@ -627,6 +627,41 @@
         <item quantity="one">%1$d van %2$d opname kon niet worden verwijderd</item>
         <item quantity="other">%1$d van %2$d opnamen konden niet worden verwijderd</item>
     </plurals>
+    <plurals name="problems_clear_failed">
+        <item quantity="one">%1$d van %2$d vermelding kon niet worden gewist</item>
+        <item quantity="other">%1$d van %2$d vermeldingen konden niet worden gewist</item>
+    </plurals>
+    <string name="problems_clear">Problemen wissen</string>
+    <string name="problems_clear_question">Problemen wissen?</string>
+    <string name="problems_clear_button">Wissen</string>
+    <plurals name="problems_count_failed">
+        <item quantity="one">%1$d mislukt</item>
+        <item quantity="other">%1$d mislukt</item>
+    </plurals>
+    <plurals name="problems_count_canceled">
+        <item quantity="one">%1$d geannuleerd</item>
+        <item quantity="other">%1$d geannuleerd</item>
+    </plurals>
+    <plurals name="problems_clear_entries">
+        <item quantity="one">%1$d vermelding wissen</item>
+        <item quantity="other">%1$d vermeldingen wissen</item>
+    </plurals>
+    <plurals name="problems_clear_also_delete_partial">
+        <item quantity="one">Ook %1$d gedeeltelijke opname verwijderen</item>
+        <item quantity="other">Ook %1$d gedeeltelijke opnamen verwijderen</item>
+    </plurals>
+    <plurals name="problems_clear_delete_partial">
+        <item quantity="one">%1$d gedeeltelijke opname verwijderen</item>
+        <item quantity="other">%1$d gedeeltelijke opnamen verwijderen</item>
+    </plurals>
+    <plurals name="problems_clear_fileless_sentence">
+        <item quantity="one">%1$d vermelding heeft geen bestand, dus wissen verwijdert niets van de schijf.</item>
+        <item quantity="other">%1$d vermeldingen hebben geen bestand, dus wissen verwijdert niets van de schijf.</item>
+    </plurals>
+    <plurals name="problems_clear_partial_sentence">
+        <item quantity="one">%1$d mislukte opname heeft een gedeeltelijk bestand. Die blijft staan, tenzij je die ook verwijdert.</item>
+        <item quantity="other">%1$d mislukte opnamen hebben gedeeltelijke bestanden. Die blijven staan, tenzij je ze ook verwijdert.</item>
+    </plurals>
     <plurals name="recording_notice_canceled_count">
         <item quantity="one">%d opname geannuleerd</item>
         <item quantity="other">%d opnamen geannuleerd</item>
@@ -716,8 +751,6 @@
         <item quantity="other">%1$d lopende opnamen</item>
     </plurals>
     <string name="recordings_schedule_end_duration">tot %1$s • %2$s</string>
-    <string name="recordings_failed">Mislukt</string>
-    <string name="recordings_cancelled">Geannuleerd</string>
     <string name="recordings_upcoming_active">Gepland en bezig</string>
     <string name="recordings_completed">Voltooid</string>
     <string name="recordings_failed_cancelled">Mislukt en geannuleerd</string>

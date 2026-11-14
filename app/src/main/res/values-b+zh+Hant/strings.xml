@@ -237,7 +237,7 @@
     <string name="autorec_editor_leave_title">不儲存就離開？</string>
     <string name="autorec_editor_leave_body">變更尚未儲存。</string>
     <string name="autorec_editor_keep_editing">繼續編輯</string>
-    <string name="autorec_editor_discard">捨棄</string>
+    <string name="autorec_editor_discard">捨棄變更</string>
     <string name="record_unavailable">無法錄影此節目</string>
     <string name="record_unavailable_ended">節目已結束。</string>
     <string name="record_unavailable_no_programme">此頻道無節目資訊。</string>
@@ -599,6 +599,17 @@
     <string name="recording_action_not_confirmed">尚未確認錄影變更</string>
     <plurals name="recording_folder_action_failed_change"><item quantity="other">共%2$d項錄影中有%1$d項無法變更</item></plurals>
     <plurals name="recording_folder_action_failed_delete"><item quantity="other">共%2$d項錄影中有%1$d項無法刪除</item></plurals>
+    <plurals name="problems_clear_failed"><item quantity="other">共%2$d個項目中有%1$d個無法移除</item></plurals>
+    <string name="problems_clear">移除問題</string>
+    <string name="problems_clear_question">要移除問題嗎？</string>
+    <string name="problems_clear_button">移除</string>
+    <plurals name="problems_count_failed"><item quantity="other">失敗%1$d項</item></plurals>
+    <plurals name="problems_count_canceled"><item quantity="other">已取消%1$d項</item></plurals>
+    <plurals name="problems_clear_entries"><item quantity="other">移除%1$d個項目</item></plurals>
+    <plurals name="problems_clear_also_delete_partial"><item quantity="other">同時刪除%1$d項不完整錄影</item></plurals>
+    <plurals name="problems_clear_delete_partial"><item quantity="other">刪除%1$d項不完整錄影</item></plurals>
+    <plurals name="problems_clear_fileless_sentence"><item quantity="other">%1$d個項目沒有檔案，因此移除不會刪除磁碟上的任何內容。</item></plurals>
+    <plurals name="problems_clear_partial_sentence"><item quantity="other">%1$d項失敗的錄影有不完整檔案。除非同時刪除，否則會保留。</item></plurals>
     <plurals name="recording_notice_canceled_count"><item quantity="other">已取消%d項錄影</item></plurals>
     <string name="connection_notice_lost">連線中斷</string>
     <string name="connection_notice_lost_saved">連線中斷 • 正在顯示已儲存的頻道</string>
@@ -677,8 +688,6 @@
         <item quantity="other">%1$d項錄影進行中</item>
     </plurals>
     <string name="recordings_schedule_end_duration">至%1$s • %2$s</string>
-    <string name="recordings_failed">失敗</string>
-    <string name="recordings_cancelled">已取消</string>
     <string name="recordings_upcoming_active">即將錄影及錄影中</string>
     <string name="recordings_completed">已完成</string>
     <string name="recordings_failed_cancelled">失敗及已取消</string>

@@ -275,7 +275,7 @@
     <string name="autorec_editor_leave_title">Ieși fără să salvezi?</string>
     <string name="autorec_editor_leave_body">Modificările nu au fost salvate.</string>
     <string name="autorec_editor_keep_editing">Continuă editarea</string>
-    <string name="autorec_editor_discard">Abandonează</string>
+    <string name="autorec_editor_discard">Abandonează modificările</string>
     <string name="record_unavailable">Această emisiune nu poate fi înregistrată</string>
     <string name="record_unavailable_ended">S-a încheiat deja.</string>
     <string name="record_unavailable_no_programme">Nu există informații despre emisiune pentru acest canal.</string>
@@ -649,6 +649,49 @@
         <item quantity="few">Ștergere eșuată: %1$d din %2$d înregistrări</item>
         <item quantity="other">Ștergere eșuată: %1$d din %2$d de înregistrări</item>
     </plurals>
+    <plurals name="problems_clear_failed">
+        <item quantity="one">Eliminare eșuată: %1$d din %2$d intrare</item>
+        <item quantity="few">Eliminare eșuată: %1$d din %2$d intrări</item>
+        <item quantity="other">Eliminare eșuată: %1$d din %2$d de intrări</item>
+    </plurals>
+    <string name="problems_clear">Elimină problemele</string>
+    <string name="problems_clear_question">Elimini problemele?</string>
+    <string name="problems_clear_button">Elimină</string>
+    <plurals name="problems_count_failed">
+        <item quantity="one">Eșuată: %1$d</item>
+        <item quantity="few">Eșuate: %1$d</item>
+        <item quantity="other">Eșuate: %1$d</item>
+    </plurals>
+    <plurals name="problems_count_canceled">
+        <item quantity="one">Anulată: %1$d</item>
+        <item quantity="few">Anulate: %1$d</item>
+        <item quantity="other">Anulate: %1$d</item>
+    </plurals>
+    <plurals name="problems_clear_entries">
+        <item quantity="one">Elimină %1$d intrare</item>
+        <item quantity="few">Elimină %1$d intrări</item>
+        <item quantity="other">Elimină %1$d de intrări</item>
+    </plurals>
+    <plurals name="problems_clear_also_delete_partial">
+        <item quantity="one">Șterge și %1$d înregistrare parțială</item>
+        <item quantity="few">Șterge și %1$d înregistrări parțiale</item>
+        <item quantity="other">Șterge și %1$d de înregistrări parțiale</item>
+    </plurals>
+    <plurals name="problems_clear_delete_partial">
+        <item quantity="one">Șterge %1$d înregistrare parțială</item>
+        <item quantity="few">Șterge %1$d înregistrări parțiale</item>
+        <item quantity="other">Șterge %1$d de înregistrări parțiale</item>
+    </plurals>
+    <plurals name="problems_clear_fileless_sentence">
+        <item quantity="one">%1$d intrare nu are fișier, deci eliminarea ei nu șterge nimic de pe disc.</item>
+        <item quantity="few">%1$d intrări nu au fișier, deci eliminarea lor nu șterge nimic de pe disc.</item>
+        <item quantity="other">%1$d de intrări nu au fișier, deci eliminarea lor nu șterge nimic de pe disc.</item>
+    </plurals>
+    <plurals name="problems_clear_partial_sentence">
+        <item quantity="one">%1$d înregistrare eșuată are un fișier parțial. Rămâne, dacă nu o ștergi și pe ea.</item>
+        <item quantity="few">%1$d înregistrări eșuate au fișiere parțiale. Rămân, dacă nu le ștergi și pe ele.</item>
+        <item quantity="other">%1$d de înregistrări eșuate au fișiere parțiale. Rămân, dacă nu le ștergi și pe ele.</item>
+    </plurals>
     <plurals name="recording_notice_canceled_count">
         <item quantity="one">%d înregistrare anulată</item>
         <item quantity="few">%d înregistrări anulate</item>
@@ -743,8 +786,6 @@
         <item quantity="other">%1$d de înregistrări în curs</item>
     </plurals>
     <string name="recordings_schedule_end_duration">până la %1$s • %2$s</string>
-    <string name="recordings_failed">Eșuate</string>
-    <string name="recordings_cancelled">Anulate</string>
     <string name="recordings_upcoming_active">Viitoare și active</string>
     <string name="recordings_completed">Finalizate</string>
     <string name="recordings_failed_cancelled">Eșuate și anulate</string>

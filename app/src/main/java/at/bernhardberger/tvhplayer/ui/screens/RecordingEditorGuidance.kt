@@ -35,6 +35,6 @@ internal fun RecordingEditorPreviewPair(title: String, meta: String, titleMaxLin
             title, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface,
             maxLines = titleMaxLines, overflow = TextOverflow.Ellipsis,
         )
-        RecordingEditorSecondary(meta)
+        if (meta.isNotBlank()) RecordingEditorSecondary(meta)
     }
 }

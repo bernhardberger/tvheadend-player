@@ -366,6 +366,32 @@ class HomeNavigationJourneyTest {
         compose.onNodeWithTag("recordings-schedule-list").assertExists()
         compose.onNodeWithTag("recording-list-entry-9").assertIsFocused().assertIsDisplayed()
         // The Schedule tab lives in Recordings: Left enters the rail on Recordings, never on Home first.
+        leftEntersTheRailOnRecordings()
+        fixture.key(Key.DirectionRight)
+        compose.onNodeWithTag("recording-list-entry-9").assertIsFocused()
+        compose.runOnIdle { fixture.back.onBackPressed() }
+        fixture.settle()
+        compose.onNodeWithTag("nav-recordings").assertIsFocused().assertIsSelected()
+        compose.runOnIdle { fixture.back.onBackPressed() }
+        fixture.settle()
+        compose.onNodeWithTag("nav-home").assertIsFocused()
+        fixture.key(Key.DirectionRight)
+        compose.onNodeWithTag("home-upcoming-8").assertIsFocused()
+    }
+
+    @Test fun leftFromTheFirstRecordingsTabEntersTheRailOnRecordings() {
+        fixture.app()
+        fixture.focus("nav-channels")
+        repeat(2) { fixture.key(Key.DirectionDown) }
+        compose.onNodeWithTag("nav-recordings").assertIsFocused()
+        fixture.key(Key.Enter)
+        // The fixture has no recordings, so Right from the rail lands on the first tab itself.
+        fixture.key(Key.DirectionRight)
+        compose.onNodeWithTag("recordings-mode-archive").assertIsFocused()
+        leftEntersTheRailOnRecordings()
+    }
+
+    private fun leftEntersTheRailOnRecordings() {
         compose.mainClock.autoAdvance = false
         try {
             compose.onRoot().performKeyInput { pressKey(Key.DirectionLeft) }
@@ -378,16 +404,6 @@ class HomeNavigationJourneyTest {
         } finally {
             compose.mainClock.autoAdvance = true
         }
-        fixture.key(Key.DirectionRight)
-        compose.onNodeWithTag("recording-list-entry-9").assertIsFocused()
-        compose.runOnIdle { fixture.back.onBackPressed() }
-        fixture.settle()
-        compose.onNodeWithTag("nav-recordings").assertIsFocused().assertIsSelected()
-        compose.runOnIdle { fixture.back.onBackPressed() }
-        fixture.settle()
-        compose.onNodeWithTag("nav-home").assertIsFocused()
-        fixture.key(Key.DirectionRight)
-        compose.onNodeWithTag("home-upcoming-8").assertIsFocused()
     }
 
     @Test fun allScheduledBackRestoresTheEndCard() {

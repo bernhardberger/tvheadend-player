@@ -10,6 +10,7 @@
 - Matroska recordings start with subtitles off until you choose a subtitle track.
 - Starting a recording shows the loading ring until the first picture instead of several seconds of black screen (#30).
 - *Stats for nerds* is now a small card at the top left that follows the stream from the tuner through Tvheadend and the app to the decoder and the screen, one line per step, and marks a step where something went wrong in the last minute. The player options offer *Off*, *Stream path* and *Stream path + debug details*; the last adds every raw value. The card appears as soon as you choose a level, stays on across channels and recordings until you turn it off or the app restarts, and Back no longer closes it. While a channel or recording can't be played, the values move into the error message.
+- Choosing an audio or subtitle track in the playback options keeps focus on that track while the player switches, instead of jumping through the list first.
 
 ### Recordings
 
@@ -23,6 +24,8 @@
 - A missed or failed recording that never wrote a file offers *Remove entry* instead of *Delete recording*.
 - A removed recording no longer hides another recording of the same program, and retention cleanup no longer repeats the “Recording deleted” notice.
 - Inside a folder or a settings page, a small chevron left of the headline shows that Left or Back leads back up a level.
+- The *Problems* tab is one list, newest first, under its days, with the number of failed and canceled recordings under the headline. *Clear* removes the entries that never wrote a file in one go; failed recordings with a partial file stay unless you choose to delete them too.
+- On the *Schedule* tab, OK on a recording that's running opens its details like any other scheduled recording; play it, watch the channel or stop it from there (#23).
 
 ### Automatic recordings and timers
 

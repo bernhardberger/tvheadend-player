@@ -275,7 +275,7 @@
     <string name="autorec_editor_leave_title">¿Salir sin guardar?</string>
     <string name="autorec_editor_leave_body">Tus cambios no se han guardado.</string>
     <string name="autorec_editor_keep_editing">Seguir editando</string>
-    <string name="autorec_editor_discard">Descartar</string>
+    <string name="autorec_editor_discard">Descartar cambios</string>
     <string name="record_unavailable">No se puede grabar este programa</string>
     <string name="record_unavailable_ended">Ya ha terminado.</string>
     <string name="record_unavailable_no_programme">No hay información del programa para este canal.</string>
@@ -649,6 +649,49 @@
         <item quantity="many">No se pudo eliminar: %1$d de un total de %2$d grabaciones</item>
         <item quantity="other">No se pudo eliminar: %1$d de un total de %2$d grabaciones</item>
     </plurals>
+    <plurals name="problems_clear_failed">
+        <item quantity="one">No se pudo quitar: %1$d de un total de %2$d entrada</item>
+        <item quantity="many">No se pudo quitar: %1$d de un total de %2$d entradas</item>
+        <item quantity="other">No se pudo quitar: %1$d de un total de %2$d entradas</item>
+    </plurals>
+    <string name="problems_clear">Quitar problemas</string>
+    <string name="problems_clear_question">¿Quitar problemas?</string>
+    <string name="problems_clear_button">Quitar</string>
+    <plurals name="problems_count_failed">
+        <item quantity="one">%1$d fallida</item>
+        <item quantity="many">%1$d fallidas</item>
+        <item quantity="other">%1$d fallidas</item>
+    </plurals>
+    <plurals name="problems_count_canceled">
+        <item quantity="one">%1$d cancelada</item>
+        <item quantity="many">%1$d canceladas</item>
+        <item quantity="other">%1$d canceladas</item>
+    </plurals>
+    <plurals name="problems_clear_entries">
+        <item quantity="one">Quitar %1$d entrada</item>
+        <item quantity="many">Quitar %1$d entradas</item>
+        <item quantity="other">Quitar %1$d entradas</item>
+    </plurals>
+    <plurals name="problems_clear_also_delete_partial">
+        <item quantity="one">Eliminar también %1$d grabación parcial</item>
+        <item quantity="many">Eliminar también %1$d grabaciones parciales</item>
+        <item quantity="other">Eliminar también %1$d grabaciones parciales</item>
+    </plurals>
+    <plurals name="problems_clear_delete_partial">
+        <item quantity="one">Eliminar %1$d grabación parcial</item>
+        <item quantity="many">Eliminar %1$d grabaciones parciales</item>
+        <item quantity="other">Eliminar %1$d grabaciones parciales</item>
+    </plurals>
+    <plurals name="problems_clear_fileless_sentence">
+        <item quantity="one">%1$d entrada no tiene archivo, así que quitarla no elimina nada del disco.</item>
+        <item quantity="many">%1$d entradas no tienen archivo, así que quitarlas no elimina nada del disco.</item>
+        <item quantity="other">%1$d entradas no tienen archivo, así que quitarlas no elimina nada del disco.</item>
+    </plurals>
+    <plurals name="problems_clear_partial_sentence">
+        <item quantity="one">%1$d grabación fallida tiene un archivo parcial. Se conserva, a menos que también la elimines.</item>
+        <item quantity="many">%1$d grabaciones fallidas tienen archivos parciales. Se conservan, a menos que también las elimines.</item>
+        <item quantity="other">%1$d grabaciones fallidas tienen archivos parciales. Se conservan, a menos que también las elimines.</item>
+    </plurals>
     <plurals name="recording_notice_canceled_count">
         <item quantity="one">%d grabación cancelada</item>
         <item quantity="many">%d grabaciones canceladas</item>
@@ -743,8 +786,6 @@
         <item quantity="other">%1$d grabaciones en curso</item>
     </plurals>
     <string name="recordings_schedule_end_duration">hasta las %1$s • %2$s</string>
-    <string name="recordings_failed">Fallidas</string>
-    <string name="recordings_cancelled">Canceladas</string>
     <string name="recordings_upcoming_active">Próximas y en curso</string>
     <string name="recordings_completed">Completadas</string>
     <string name="recordings_failed_cancelled">Fallidas y canceladas</string>

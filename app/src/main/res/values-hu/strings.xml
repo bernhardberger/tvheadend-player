@@ -256,7 +256,7 @@
     <string name="autorec_editor_leave_title">Kilépsz mentés nélkül?</string>
     <string name="autorec_editor_leave_body">A módosításaid nincsenek mentve.</string>
     <string name="autorec_editor_keep_editing">Szerkesztés folytatása</string>
-    <string name="autorec_editor_discard">Elvetés</string>
+    <string name="autorec_editor_discard">Módosítások elvetése</string>
     <string name="record_unavailable">Ez a műsor nem vehető fel</string>
     <string name="record_unavailable_ended">Már véget ért.</string>
     <string name="record_unavailable_no_programme">Ehhez a csatornához nem érhető el műsorinformáció.</string>
@@ -627,6 +627,41 @@
         <item quantity="one">Nem sikerült törölni %1$d felvételt az összesen %2$d közül</item>
         <item quantity="other">Nem sikerült törölni %1$d felvételt az összesen %2$d közül</item>
     </plurals>
+    <plurals name="problems_clear_failed">
+        <item quantity="one">Nem sikerült eltávolítani %1$d bejegyzést az összesen %2$d közül</item>
+        <item quantity="other">Nem sikerült eltávolítani %1$d bejegyzést az összesen %2$d közül</item>
+    </plurals>
+    <string name="problems_clear">Problémák eltávolítása</string>
+    <string name="problems_clear_question">Eltávolítod a problémákat?</string>
+    <string name="problems_clear_button">Eltávolítás</string>
+    <plurals name="problems_count_failed">
+        <item quantity="one">%1$d sikertelen</item>
+        <item quantity="other">%1$d sikertelen</item>
+    </plurals>
+    <plurals name="problems_count_canceled">
+        <item quantity="one">%1$d lemondva</item>
+        <item quantity="other">%1$d lemondva</item>
+    </plurals>
+    <plurals name="problems_clear_entries">
+        <item quantity="one">%1$d bejegyzés eltávolítása</item>
+        <item quantity="other">%1$d bejegyzés eltávolítása</item>
+    </plurals>
+    <plurals name="problems_clear_also_delete_partial">
+        <item quantity="one">%1$d részleges felvétel törlése is</item>
+        <item quantity="other">%1$d részleges felvétel törlése is</item>
+    </plurals>
+    <plurals name="problems_clear_delete_partial">
+        <item quantity="one">%1$d részleges felvétel törlése</item>
+        <item quantity="other">%1$d részleges felvétel törlése</item>
+    </plurals>
+    <plurals name="problems_clear_fileless_sentence">
+        <item quantity="one">%1$d bejegyzéshez nem tartozik fájl, így az eltávolítása semmit sem töröl a lemezről.</item>
+        <item quantity="other">%1$d bejegyzéshez nem tartozik fájl, így az eltávolításuk semmit sem töröl a lemezről.</item>
+    </plurals>
+    <plurals name="problems_clear_partial_sentence">
+        <item quantity="one">%1$d sikertelen felvételnek részleges fájlja van. Megmarad, hacsak azt is nem törlöd.</item>
+        <item quantity="other">%1$d sikertelen felvételnek részleges fájlja van. Megmaradnak, hacsak azokat is nem törlöd.</item>
+    </plurals>
     <plurals name="recording_notice_canceled_count">
         <item quantity="one">%d felvétel lemondva</item>
         <item quantity="other">%d felvétel lemondva</item>
@@ -716,8 +751,6 @@
         <item quantity="other">%1$d folyamatban lévő felvétel</item>
     </plurals>
     <string name="recordings_schedule_end_duration">eddig: %1$s • %2$s</string>
-    <string name="recordings_failed">Sikertelenek</string>
-    <string name="recordings_cancelled">Lemondottak</string>
     <string name="recordings_upcoming_active">Közelgő és aktív</string>
     <string name="recordings_completed">Befejezettek</string>
     <string name="recordings_failed_cancelled">Sikertelenek és lemondottak</string>

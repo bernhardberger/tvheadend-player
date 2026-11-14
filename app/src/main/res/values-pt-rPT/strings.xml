@@ -275,7 +275,7 @@
     <string name="autorec_editor_leave_title">Sair sem guardar?</string>
     <string name="autorec_editor_leave_body">As tuas alterações não foram guardadas.</string>
     <string name="autorec_editor_keep_editing">Continuar a editar</string>
-    <string name="autorec_editor_discard">Descartar</string>
+    <string name="autorec_editor_discard">Descartar alterações</string>
     <string name="record_unavailable">Não é possível gravar este programa</string>
     <string name="record_unavailable_ended">Já terminou.</string>
     <string name="record_unavailable_no_programme">Não há informações do programa para este canal.</string>
@@ -637,6 +637,17 @@
     <string name="recording_action_not_confirmed">Alteração da gravação não confirmada</string>
     <plurals name="recording_folder_action_failed_change"><item quantity="one">Não foi possível alterar %1$d de %2$d gravação</item><item quantity="many">Não foi possível alterar %1$d de %2$d gravações</item><item quantity="other">Não foi possível alterar %1$d de %2$d gravações</item></plurals>
     <plurals name="recording_folder_action_failed_delete"><item quantity="one">Não foi possível eliminar %1$d de %2$d gravação</item><item quantity="many">Não foi possível eliminar %1$d de %2$d gravações</item><item quantity="other">Não foi possível eliminar %1$d de %2$d gravações</item></plurals>
+    <plurals name="problems_clear_failed"><item quantity="one">Não foi possível remover %1$d de %2$d entrada</item><item quantity="many">Não foi possível remover %1$d de %2$d entradas</item><item quantity="other">Não foi possível remover %1$d de %2$d entradas</item></plurals>
+    <string name="problems_clear">Remover problemas</string>
+    <string name="problems_clear_question">Remover problemas?</string>
+    <string name="problems_clear_button">Remover</string>
+    <plurals name="problems_count_failed"><item quantity="one">%1$d com falha</item><item quantity="many">%1$d com falha</item><item quantity="other">%1$d com falha</item></plurals>
+    <plurals name="problems_count_canceled"><item quantity="one">%1$d cancelada</item><item quantity="many">%1$d canceladas</item><item quantity="other">%1$d canceladas</item></plurals>
+    <plurals name="problems_clear_entries"><item quantity="one">Remover %1$d entrada</item><item quantity="many">Remover %1$d entradas</item><item quantity="other">Remover %1$d entradas</item></plurals>
+    <plurals name="problems_clear_also_delete_partial"><item quantity="one">Eliminar também %1$d gravação parcial</item><item quantity="many">Eliminar também %1$d gravações parciais</item><item quantity="other">Eliminar também %1$d gravações parciais</item></plurals>
+    <plurals name="problems_clear_delete_partial"><item quantity="one">Eliminar %1$d gravação parcial</item><item quantity="many">Eliminar %1$d gravações parciais</item><item quantity="other">Eliminar %1$d gravações parciais</item></plurals>
+    <plurals name="problems_clear_fileless_sentence"><item quantity="one">%1$d entrada não tem ficheiro, por isso removê-la não elimina nada do disco.</item><item quantity="many">%1$d entradas não têm ficheiro, por isso removê-las não elimina nada do disco.</item><item quantity="other">%1$d entradas não têm ficheiro, por isso removê-las não elimina nada do disco.</item></plurals>
+    <plurals name="problems_clear_partial_sentence"><item quantity="one">%1$d gravação falhada tem um ficheiro parcial. É mantida, a menos que também a elimines.</item><item quantity="many">%1$d gravações falhadas têm ficheiros parciais. São mantidas, a menos que também as elimines.</item><item quantity="other">%1$d gravações falhadas têm ficheiros parciais. São mantidas, a menos que também as elimines.</item></plurals>
     <plurals name="recording_notice_canceled_count"><item quantity="one">%d gravação cancelada</item><item quantity="many">%d gravações canceladas</item><item quantity="other">%d gravações canceladas</item></plurals>
     <string name="connection_notice_lost">Ligação perdida</string>
     <string name="connection_notice_lost_saved">Ligação perdida • A mostrar canais guardados</string>
@@ -719,8 +730,6 @@
         <item quantity="other">%1$d gravações em curso</item>
     </plurals>
     <string name="recordings_schedule_end_duration">até %1$s • %2$s</string>
-    <string name="recordings_failed">Com falha</string>
-    <string name="recordings_cancelled">Canceladas</string>
     <string name="recordings_upcoming_active">Agendadas e em curso</string>
     <string name="recordings_completed">Concluídas</string>
     <string name="recordings_failed_cancelled">Com falha e canceladas</string>

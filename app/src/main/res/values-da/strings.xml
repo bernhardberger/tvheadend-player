@@ -256,7 +256,7 @@
     <string name="autorec_editor_leave_title">Forlad uden at gemme?</string>
     <string name="autorec_editor_leave_body">Dine ændringer er ikke gemt.</string>
     <string name="autorec_editor_keep_editing">Fortsæt redigering</string>
-    <string name="autorec_editor_discard">Kassér</string>
+    <string name="autorec_editor_discard">Kassér ændringer</string>
     <string name="record_unavailable">Kan ikke optage dette program</string>
     <string name="record_unavailable_ended">Det er allerede slut.</string>
     <string name="record_unavailable_no_programme">Der er ingen programoplysninger for denne kanal.</string>
@@ -627,6 +627,41 @@
         <item quantity="one">Kunne ikke slette %1$d af %2$d optagelse</item>
         <item quantity="other">Kunne ikke slette %1$d af %2$d optagelser</item>
     </plurals>
+    <plurals name="problems_clear_failed">
+        <item quantity="one">Kunne ikke fjerne %1$d af %2$d post</item>
+        <item quantity="other">Kunne ikke fjerne %1$d af %2$d poster</item>
+    </plurals>
+    <string name="problems_clear">Fjern problemer</string>
+    <string name="problems_clear_question">Fjern problemer?</string>
+    <string name="problems_clear_button">Fjern</string>
+    <plurals name="problems_count_failed">
+        <item quantity="one">%1$d mislykket</item>
+        <item quantity="other">%1$d mislykkede</item>
+    </plurals>
+    <plurals name="problems_count_canceled">
+        <item quantity="one">%1$d annulleret</item>
+        <item quantity="other">%1$d annullerede</item>
+    </plurals>
+    <plurals name="problems_clear_entries">
+        <item quantity="one">Fjern %1$d post</item>
+        <item quantity="other">Fjern %1$d poster</item>
+    </plurals>
+    <plurals name="problems_clear_also_delete_partial">
+        <item quantity="one">Slet også %1$d delvis optagelse</item>
+        <item quantity="other">Slet også %1$d delvise optagelser</item>
+    </plurals>
+    <plurals name="problems_clear_delete_partial">
+        <item quantity="one">Slet %1$d delvis optagelse</item>
+        <item quantity="other">Slet %1$d delvise optagelser</item>
+    </plurals>
+    <plurals name="problems_clear_fileless_sentence">
+        <item quantity="one">%1$d post har ingen fil, så der slettes intet på disken, når den fjernes.</item>
+        <item quantity="other">%1$d poster har ingen fil, så der slettes intet på disken, når de fjernes.</item>
+    </plurals>
+    <plurals name="problems_clear_partial_sentence">
+        <item quantity="one">%1$d mislykket optagelse har en delvis fil. Den bliver liggende, medmindre du også sletter den.</item>
+        <item quantity="other">%1$d mislykkede optagelser har delvise filer. De bliver liggende, medmindre du også sletter dem.</item>
+    </plurals>
     <plurals name="recording_notice_canceled_count">
         <item quantity="one">%d optagelse annulleret</item>
         <item quantity="other">%d optagelser annulleret</item>
@@ -716,8 +751,6 @@
         <item quantity="other">%1$d igangværende optagelser</item>
     </plurals>
     <string name="recordings_schedule_end_duration">til %1$s • %2$s</string>
-    <string name="recordings_failed">Mislykkede</string>
-    <string name="recordings_cancelled">Annullerede</string>
     <string name="recordings_upcoming_active">Kommende og aktive</string>
     <string name="recordings_completed">Fuldførte</string>
     <string name="recordings_failed_cancelled">Mislykkede og annullerede</string>

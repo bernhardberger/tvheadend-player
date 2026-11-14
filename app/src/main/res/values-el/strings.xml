@@ -256,7 +256,7 @@
     <string name="autorec_editor_leave_title">Έξοδος χωρίς αποθήκευση;</string>
     <string name="autorec_editor_leave_body">Οι αλλαγές σου δεν έχουν αποθηκευτεί.</string>
     <string name="autorec_editor_keep_editing">Συνέχιση επεξεργασίας</string>
-    <string name="autorec_editor_discard">Απόρριψη</string>
+    <string name="autorec_editor_discard">Απόρριψη αλλαγών</string>
     <string name="record_unavailable">Δεν είναι δυνατή η εγγραφή αυτής της εκπομπής</string>
     <string name="record_unavailable_ended">Έχει ήδη τελειώσει.</string>
     <string name="record_unavailable_no_programme">Δεν υπάρχουν πληροφορίες εκπομπής για αυτό το κανάλι.</string>
@@ -627,6 +627,41 @@
         <item quantity="one">Αποτυχία διαγραφής: %1$d από %2$d εγγραφή</item>
         <item quantity="other">Αποτυχία διαγραφής: %1$d από %2$d εγγραφές</item>
     </plurals>
+    <plurals name="problems_clear_failed">
+        <item quantity="one">Αποτυχία αφαίρεσης: %1$d από %2$d καταχώριση</item>
+        <item quantity="other">Αποτυχία αφαίρεσης: %1$d από %2$d καταχωρίσεις</item>
+    </plurals>
+    <string name="problems_clear">Αφαίρεση προβλημάτων</string>
+    <string name="problems_clear_question">Αφαίρεση προβλημάτων;</string>
+    <string name="problems_clear_button">Αφαίρεση</string>
+    <plurals name="problems_count_failed">
+        <item quantity="one">Αποτυχημένη: %1$d</item>
+        <item quantity="other">Αποτυχημένες: %1$d</item>
+    </plurals>
+    <plurals name="problems_count_canceled">
+        <item quantity="one">Ακυρωμένη: %1$d</item>
+        <item quantity="other">Ακυρωμένες: %1$d</item>
+    </plurals>
+    <plurals name="problems_clear_entries">
+        <item quantity="one">Αφαίρεση %1$d καταχώρισης</item>
+        <item quantity="other">Αφαίρεση %1$d καταχωρίσεων</item>
+    </plurals>
+    <plurals name="problems_clear_also_delete_partial">
+        <item quantity="one">Διαγραφή και %1$d μερικής εγγραφής</item>
+        <item quantity="other">Διαγραφή και %1$d μερικών εγγραφών</item>
+    </plurals>
+    <plurals name="problems_clear_delete_partial">
+        <item quantity="one">Διαγραφή %1$d μερικής εγγραφής</item>
+        <item quantity="other">Διαγραφή %1$d μερικών εγγραφών</item>
+    </plurals>
+    <plurals name="problems_clear_fileless_sentence">
+        <item quantity="one">%1$d καταχώριση δεν έχει αρχείο, οπότε η αφαίρεσή της δεν διαγράφει τίποτα από τον δίσκο.</item>
+        <item quantity="other">%1$d καταχωρίσεις δεν έχουν αρχείο, οπότε η αφαίρεσή τους δεν διαγράφει τίποτα από τον δίσκο.</item>
+    </plurals>
+    <plurals name="problems_clear_partial_sentence">
+        <item quantity="one">%1$d αποτυχημένη εγγραφή έχει μερικό αρχείο. Παραμένει, εκτός αν τη διαγράψεις κι αυτή.</item>
+        <item quantity="other">%1$d αποτυχημένες εγγραφές έχουν μερικά αρχεία. Παραμένουν, εκτός αν τις διαγράψεις κι αυτές.</item>
+    </plurals>
     <plurals name="recording_notice_canceled_count">
         <item quantity="one">Ακυρώθηκε %d εγγραφή</item>
         <item quantity="other">Ακυρώθηκαν %d εγγραφές</item>
@@ -716,8 +751,6 @@
         <item quantity="other">%1$d εγγραφές σε εξέλιξη</item>
     </plurals>
     <string name="recordings_schedule_end_duration">έως %1$s • %2$s</string>
-    <string name="recordings_failed">Αποτυχημένες</string>
-    <string name="recordings_cancelled">Ακυρωμένες</string>
     <string name="recordings_upcoming_active">Προσεχείς και ενεργές</string>
     <string name="recordings_completed">Ολοκληρωμένες</string>
     <string name="recordings_failed_cancelled">Αποτυχημένες και ακυρωμένες</string>

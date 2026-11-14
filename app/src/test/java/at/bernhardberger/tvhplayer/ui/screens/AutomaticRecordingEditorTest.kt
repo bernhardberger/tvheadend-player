@@ -168,6 +168,7 @@ class AutomaticRecordingEditorTest {
         compose.onNodeWithTag("automatic-recording-new-keyword").assertDoesNotExist()
     }
 
+    // Native graphics measures text, so the safe-bottom check below sees real row positions.
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
     @Test fun editorConfirmationCardsKeepDraftsAndDispatchTheChosenActionOnce() {
         lateinit var fixture: AutomaticRecordingEditorFixture
@@ -204,8 +205,8 @@ class AutomaticRecordingEditorTest {
             }
         }
         compose.settleFrames(2)
-        val lastBottom = compose.onAllNodes(hasTestTag("automatic-recording-more") or
-            hasTestTag("automatic-recording-cancel")).fetchSemanticsNodes().maxOf { it.boundsInRoot.bottom }
+        val lastBottom = compose.onAllNodes(hasTestTag("automatic-recording-more"))
+            .fetchSemanticsNodes().maxOf { it.boundsInRoot.bottom }
         val screenBottom = compose.onRoot().fetchSemanticsNode().boundsInRoot.bottom
         val reserve = 35 * RuntimeEnvironment.getApplication().resources.displayMetrics.density
         assertTrue("One-line edit fields fit at rest: last=$lastBottom, safe bottom=${screenBottom - reserve}",

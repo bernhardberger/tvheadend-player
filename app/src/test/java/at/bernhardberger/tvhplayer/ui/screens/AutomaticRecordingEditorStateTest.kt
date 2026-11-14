@@ -72,9 +72,10 @@ class AutomaticRecordingEditorStateTest {
         assertEquals(1, fixture.closes)
         val untouched = fixture.timer(submitted.copy(existingTimer = true, days = DayOfWeek.entries.toSet()))
         assertEquals("main", untouched.navigation.focusedRow)
+        val submissionsBefore = fixture.timerSubmissions.size
         untouched.submit()
         assertTrue(untouched.closed)
-        assertEquals(2, fixture.timerSubmissions.size)
+        assertEquals(submissionsBefore, fixture.timerSubmissions.size)
         val existing = fixture.timer(submitted.copy(existingTimer = true, days = setOf(DayOfWeek.MONDAY)))
         existing.updateDraft { it.copy(name = "Unsaved timer") }
         val beforeDelete = existing.draft
@@ -190,11 +191,14 @@ class AutomaticRecordingEditorStateTest {
             kind = AutomaticRecordingKind.KEYWORD,
             seriesLinkUri = null, pattern = RecordingPattern(""),
         ))
+        // Start away from the row that needs fixing, so the move to it is observable.
+        invalid.navigation.firstLevel("main")
         invalid.updateDraft { it.copy(enabled = false) }
         invalid.back()
         invalid.submit()
         assertNull(invalid.navigation.confirmation)
         assertFalse(invalid.closed)
+        assertEquals(AutomaticRecordingEditorLevel.FIRST, invalid.navigation.page.level)
         assertEquals("matches", invalid.navigation.focusedRow)
         assertEquals(RecordingSubmitUnavailable.WORDS_REQUIRED, invalid.mainProblem)
         assertTrue(fixture.submissions.isEmpty())

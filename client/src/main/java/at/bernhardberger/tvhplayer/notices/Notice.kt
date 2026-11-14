@@ -130,6 +130,15 @@ sealed interface Notice {
         override val severity = NoticeSeverity.FAILURE
     }
 
+    data class DvrProblemsClearFailed(val failed: Int, val total: Int, val failure: DvrMutationFeedback) : Notice {
+        init {
+            require(failure.isFailure)
+            require(failed in 1..total)
+        }
+        override val key = "dvr-action"
+        override val severity = NoticeSeverity.FAILURE
+    }
+
     data class Connection(val kind: ConnectionNoticeKind, val showingSavedChannels: Boolean = false) : Notice {
         override val key = "connection"
         override val severity = if (kind == ConnectionNoticeKind.RESTORED) NoticeSeverity.INFO else NoticeSeverity.FAILURE

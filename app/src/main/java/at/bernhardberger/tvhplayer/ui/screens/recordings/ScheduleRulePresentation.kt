@@ -58,6 +58,19 @@ import at.bernhardberger.tvhplayer.ui.screens.RecordingEditorHeading
 import at.bernhardberger.tvhplayer.ui.screens.RecordingEditorPreviewPair
 import at.bernhardberger.tvhplayer.ui.screens.RecordingEditorSecondary
 import java.time.LocalDate
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.height
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.rememberTextMeasurer
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvhplayer.ui.TvSpacing4
+import at.bernhardberger.tvhplayer.ui.TvTextColors
+import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
+import at.bernhardberger.tvhplayer.ui.components.StatusIconSize
+import at.bernhardberger.tvhplayer.ui.components.recordingRule
 
 internal fun AutomaticRecordingListItem.rowId() = scheduleRuleRowId(id, kind)
 
@@ -169,7 +182,7 @@ internal fun ScheduleRulePane(item: AutomaticRecordingListItem, channels: List<C
                                 R.drawable.ic_schedule, "automatic-recording-pane-next", maxLines = 2)
                         }
                     }
-                    if (item.upcomingEntries.isNotEmpty()) ScheduleUpcomingEntries(item, channels)
+                    if (item.upcomingEntries.isNotEmpty()) ScheduleUpcomingEntries(item, channels, subject.name)
                 }
             },
         )
@@ -181,22 +194,42 @@ internal const val SCHEDULE_UPCOMING_SHOWN = 4
 
 /** Its own section under the status lines, spaced like the editors' guidance column. */
 @Composable
-private fun ScheduleUpcomingEntries(item: AutomaticRecordingListItem, channels: List<Channel>) {
+private fun ScheduleUpcomingEntries(item: AutomaticRecordingListItem, channels: List<Channel>, fallbackTitle: String) {
+    // The pair's one-line title as laid out (line-height trimming included), to centre the mark on it.
+    val titleStyle = MaterialTheme.typography.bodyMedium
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val titleLine = remember(titleStyle, density) {
+        with(density) { measurer.measure("A", titleStyle, maxLines = 1).size.height.toDp() }
+    }
     Column(Modifier.padding(top = TvSpacing16), verticalArrangement = Arrangement.spacedBy(TvSpacing12)) {
         RecordingEditorHeading(stringResource(R.string.timer_editor_next_recordings),
             Modifier.semantics { heading() })
         for (entry in item.upcomingEntries.take(SCHEDULE_UPCOMING_SHOWN)) {
-            val meta = entry.start?.epochSeconds?.let { start ->
+            val time = entry.start?.epochSeconds?.let { start ->
                 formatRecordingDate(start, dateOnly = true) + " • " +
                     (entry.stop?.epochSeconds?.let { formatTimeInterval(start, it) } ?: formatClock(start))
-            }.orEmpty()
-            val channel = if (item.channelId == null) channels.firstOrNull { it.id == entry.channelId }?.name else null
-            RecordingEditorPreviewPair(entry.subtitle?.takeIf(String::isNotBlank) ?: entry.title.orEmpty(),
-                listOfNotNull(meta.takeIf(String::isNotBlank), channel).joinToString(" • "), titleMaxLines = 1)
+            }
+            val channel = if (item.channelId != null) null
+                else channels.firstOrNull { it.id == entry.channelId }?.name ?: entry.channelName
+            val title = listOf(entry.subtitle, entry.title).firstOrNull { !it.isNullOrBlank() } ?: fallbackTitle
+            val meta = listOfNotNull(time, channel?.takeIf(String::isNotBlank)).joinToString(" • ")
+            Row {
+                // The mark sits on the status lines' icon keyline, centred on the title's line.
+                Box(Modifier.padding(end = TvSpacing4).height(titleLine), contentAlignment = Alignment.Center) {
+                    CompositionLocalProvider(LocalContentColor provides TvTextColors.tertiary) {
+                        RecordingStatusIndicator(DvrEntryState.SCHEDULED,
+                            Modifier.testTag("automatic-recording-pane-next-mark"),
+                            rule = recordingRule(item.kind), announceState = false)
+                    }
+                }
+                RecordingEditorPreviewPair(title, meta, titleMaxLines = 1)
+            }
         }
         if (item.upcoming > SCHEDULE_UPCOMING_SHOWN) {
             RecordingEditorSecondary(
-                stringResource(R.string.timer_editor_more_removed, item.upcoming - SCHEDULE_UPCOMING_SHOWN))
+                stringResource(R.string.timer_editor_more_removed, item.upcoming - SCHEDULE_UPCOMING_SHOWN),
+                Modifier.padding(start = StatusIconSize + TvSpacing4))
         }
     }
 }

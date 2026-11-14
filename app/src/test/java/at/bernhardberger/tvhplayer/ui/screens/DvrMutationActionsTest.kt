@@ -43,6 +43,7 @@ import at.bernhardberger.tvheadend.sdk.core.TvheadendTestResultFactory
 import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvheadend.sdk.core.DvrRecordingFile
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryUpdate
 import at.bernhardberger.tvheadend.sdk.core.DvrRemoval
 import at.bernhardberger.tvheadend.sdk.core.DvrRetention
@@ -789,6 +790,76 @@ class DvrMutationActionsTest {
         }
         assertEquals(listOf("schedule", "stop", "cancel", "delete"), calls)
     }
+
+    @Test fun clearingProblemsSkipsWhatChangedSinceTheCardOpened() = runTest {
+        // 30 has gained a file and 33 finished normally since the card counted them as file-less.
+        val session = FakeTvheadendSession(problemObservation(listOf(
+            problem(30, withFile = true), problem(31), problem(32, withFile = true),
+            problem(33, state = DvrEntryState.COMPLETED),
+        )))
+        val deleted = mutableListOf<DvrEntryId>()
+        val actions = problemActions { deleted += it; DvrMutationResult.Confirmed(Unit) }
+        val opening = requireNotNull(session.observation.value.currentSession)
+
+        val keepPartial = actions.clearDvrProblems(opening, ids(30, 31, 33), emptyList()) { session.observation.value }
+        assertEquals(ids(31), deleted)
+        assertEquals(null, keepPartial)
+
+        // Also deleting partial recordings covers only those the card counted as partial: 30's new file stays.
+        deleted.clear()
+        actions.clearDvrProblems(opening, ids(30), ids(32)) { session.observation.value }
+        assertEquals(ids(32), deleted)
+    }
+
+    @Test fun clearingProblemsFailsTheRestOnceTheSessionOrPermissionIsGone() = runTest {
+        val entries = listOf(problem(30), problem(31), problem(33))
+        val swapped = FakeTvheadendSession(problemObservation(entries)).observation.value
+        val revoked = problemObservation(entries, dvrWrite = CapabilityAccess.DENIED)
+        listOf(
+            DvrMutationFeedback.CONNECTION_UNAVAILABLE to { _: FakeTvheadendSession -> swapped },
+            DvrMutationFeedback.PERMISSION_DENIED to { session: FakeTvheadendSession ->
+                session.publish(revoked); session.observation.value
+            },
+        ).forEach { (reason, afterFirst) ->
+            val session = FakeTvheadendSession(problemObservation(entries))
+            var latest = { session.observation.value }
+            val deleted = mutableListOf<DvrEntryId>()
+            val actions = problemActions { id ->
+                deleted += id
+                val next = afterFirst(session)
+                latest = { next }
+                DvrMutationResult.Confirmed(Unit)
+            }
+            val notice = actions.clearDvrProblems(requireNotNull(session.observation.value.currentSession),
+                ids(30, 31, 33), emptyList()) { latest() }
+            assertEquals(reason.name, ids(30), deleted)
+            assertEquals(Notice.DvrProblemsClearFailed(failed = 2, total = 3, reason), notice)
+        }
+    }
+
+    private fun ids(vararg ids: Long) = ids.map(::DvrEntryId)
+
+    private fun problem(id: Long, state: DvrEntryState = DvrEntryState.MISSED, withFile: Boolean = false) =
+        DvrEntry.create(DvrEntryId(id), state = if (withFile) DvrEntryState.COMPLETED_ERROR else state,
+            files = if (withFile) listOf(DvrRecordingFile.create()) else emptyList())
+
+    private fun problemActions(deleteEntry: suspend (DvrEntryId) -> DvrMutationResult<Unit>) = testDvrMutationActions(
+        scheduleEntry = { _, _ -> error("Unexpected schedule") },
+        stopEntry = { _, _ -> error("Unexpected stop") },
+        cancelEntry = { _, _ -> error("Unexpected cancel") },
+        deleteEntry = { _, id -> deleteEntry(id) },
+        updateWatchStateCommand = { _, _, _ -> error("Unexpected watch-state update") },
+    )
+
+    private fun problemObservation(entries: List<DvrEntry>, dvrWrite: CapabilityAccess = CapabilityAccess.ALLOWED) =
+        SessionObservation.create(
+            sessionState = SessionState.Ready(ServerCapabilities.create(
+                streaming = CapabilityAccess.ALLOWED, dvrWrite = dvrWrite,
+            )),
+            channelState = ChannelRepositoryState.Current(ChannelCatalog.create()),
+            epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = entries)),
+        )
 
     private fun currentSession(): CurrentSessionObservation = FakeSessionObservation(
         SessionObservation.create(
