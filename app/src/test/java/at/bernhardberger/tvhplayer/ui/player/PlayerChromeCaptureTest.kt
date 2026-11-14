@@ -271,6 +271,8 @@ class PlayerChromeCaptureTest {
                                 recordingNow = false,
                                 picon = ChannelIcon.ImageCache(ArtworkId(201 + playingIndex)),
                                 artwork = programme.image?.let(ChannelIcon::ImageCache),
+                                // The decoded format of the concert stream, as the stream-badge scenes supply it.
+                                badges = if (concert) glanceBadges(1080, "audio/eac3", 6, scan = VideoScan.INTERLACED) else emptyList(),
                             ),
                             window = if (concert) ProgrammeWindow(programme, Instant.fromEpochSeconds(now), 75f / 180f,
                                 65f / 180f, 75f / 180f, 75f / 180f, true)

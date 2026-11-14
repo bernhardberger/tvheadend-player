@@ -1022,7 +1022,7 @@ class HomeCaptureTest {
                 genre = "Documentary".takeIf { index == 0 },
                 episode = EpgEpisode(null, null, 2, 5, 3, 10, null, null, "S2 E3").takeIf { index == 0 },
                 copyrightYear = 2024L.takeIf { index == 0 },
-                rating = EpgRating(12, "XMLTV:FSK:12", null, null, null, null).takeIf { index == 0 },
+                rating = EpgRating(12, "XMLTV:12", null, null, null, null).takeIf { index == 0 },
                 summary = when {
                     portrait && index == 5 -> "A quiet drama about night-shift workers in a harbour glass workshop."
                     infoLineCounts && index == 0 -> "Mountain light."

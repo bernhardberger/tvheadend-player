@@ -93,7 +93,7 @@ fictional content, not evidence of SurfaceView capture, decoding or response.
 
 ## Play Store set
 
-From the repository root, render the seven store scenes and package them:
+From the repository root, render the eight store scenes and package them:
 
 ```bash
 ANDROID_HOME=/opt/android-sdk timeout --kill-after=5s 20m ./gradlew \
@@ -102,9 +102,9 @@ ANDROID_HOME=/opt/android-sdk timeout --kill-after=5s 20m ./gradlew \
   --tests '*.ChannelsLayoutCaptureTest.storeChannels' \
   --tests '*.GuideVisualLayoutTest.storeGuide' \
   --tests '*.PlayerChromeCaptureTest.storePlayer' \
-  --tests '*.RecordingsVisualLayoutTest.storeRecording' \
+  --tests '*.RecordingsVisualLayoutTest.store*' \
+  --tests '*.RecordingMarksCaptureTest.storeRecordingMarks' \
   --tests '*.ProgrammeDetailsCaptureTest.storeDetails' \
-  --tests '*.ChannelScheduleCaptureTest.storeSchedule' \
   --console=plain --no-scan
 python3 tools/prepare-play-assets.py
 ```
@@ -117,11 +117,13 @@ It writes only graphics under ignored
 `app/src/play/play/listings/en-US/graphics/`, replacing the contents of these
 five directories and leaving everything else alone:
 
-- `tv-screenshots/01.png` through `07.png`: Home, Channels, Guide (Dense rows),
-  Player, Recordings, details and schedule, in order;
+- `tv-screenshots/01.png` through `08.png`: Home, Channels, Guide (Dense rows),
+  Player with its stream badges, Recordings (Browse with the options panel open),
+  a recording with ad-break marks, Automatic recordings and details, in order;
   1920×1080 RGB, with every source pixel preserved and no frame or crop.
   Home uses `store-home-onnow.png`, not the warm-playback scene.
-- `large-tablet-screenshots/01.png` and `02.png`: copies of Channels and Guide.
+- `large-tablet-screenshots/01.png` and `02.png`: copies of the recording with
+  ad-break marks and Recordings.
 - `feature-graphic/01.png`: 1024×500 RGB, with the complete Channels screen in a
   slim frame; the background and backlight colors come from that screen.
 - `icon/01.png`: the app's Play Store icon as fully opaque 512×512 RGBA.

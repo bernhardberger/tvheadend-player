@@ -20,8 +20,9 @@ SCENES = (
     ("store-guide.png", "03.png"),
     ("store-player.png", "04.png"),
     ("store-recording.png", "05.png"),
-    ("store-details.png", "06.png"),
-    ("store-schedule.png", "07.png"),
+    ("store-recording-marks.png", "06.png"),
+    ("store-automatic-recordings.png", "07.png"),
+    ("store-details.png", "08.png"),
 )
 
 
@@ -131,7 +132,7 @@ def main():
     for source, target in SCENES:
         with Image.open(SOURCE / source) as image:
             save(image.convert("RGB"), f"tv-screenshots/{target}")
-    for source, target in (("02.png", "01.png"), ("03.png", "02.png")):
+    for source, target in (("06.png", "01.png"), ("05.png", "02.png")):
         shutil.copyfile(OUT / "tv-screenshots" / source, OUT / "large-tablet-screenshots" / target)
     feature()
     with Image.open(icon_path) as image:

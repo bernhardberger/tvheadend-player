@@ -113,6 +113,14 @@ class RecordingMarksCaptureTest {
     @Test fun adBreakSeekbar() = capture("ad-break-seekbar", MIXED, positionMs = AD_MIDDLE, focus = "player-settings",
         keys = listOf(Key.DirectionUp), focused = "player-seekbar")
 
+    /**
+     * Store scene: Ridge Light recorded on Ridge Earth on 2026-10-03 20:00, played back under the store set's
+     * 2026-10-04 20:15 clock with the marks row open on the first ad break.
+     */
+    @Test @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi")
+    fun storeRecordingMarks() = capture("store-recording-marks", MIXED, focus = "player-seekbar", openAt = 1_140_000L,
+        name = "Ad break", store = true)
+
     private fun capture(
         scene: String,
         marks: List<RecordingMark>,
@@ -124,6 +132,8 @@ class RecordingMarksCaptureTest {
         name: String? = null,
         keys: List<Key> = emptyList(),
         focused: String? = null,
+        /** The store set's channel, dates and output, see docs/presentation-captures.md. */
+        store: Boolean = false,
     ) {
         val still = FixtureArt.art("still-ridge-light")
         val navigation = RecordingMarkerNavigation()
@@ -143,7 +153,10 @@ class RecordingMarksCaptureTest {
                                 positionMs = positionMs,
                                 durationMs = durationMs,
                                 restoreFocus = focus,
-                                info = fixtureRecordingInfo("Ridge Light", subtitle = "Winter on the ridge",
+                                info = if (store) fixtureRecordingInfo("Ridge Light", subtitle = "Winter on the ridge",
+                                    positionMs = positionMs, durationMs = durationMs, nowSec = STORE_NOW, startSec = STORE_START)
+                                    .copy(channelName = "Ridge Earth", channelNumber = "1")
+                                else fixtureRecordingInfo("Ridge Light", subtitle = "Winter on the ridge",
                                     positionMs = positionMs, durationMs = durationMs)
                                     .copy(channelName = "Ridge Earth HD", channelNumber = "101"),
                                 picon = PICON,
@@ -183,8 +196,8 @@ class RecordingMarksCaptureTest {
         }
         val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
         compose.runOnIdle { view.draw(Canvas(bitmap)) }
-        val directory = File("build/outputs/recording-marks").apply { mkdirs() }
-        File(directory, "$scene-en-font1.0.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        val directory = File(if (store) "build/outputs/presentation" else "build/outputs/recording-marks").apply { mkdirs() }
+        File(directory, if (store) "$scene.png" else "$scene-en-font1.0.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         bitmap.recycle()
     }
 
@@ -200,6 +213,9 @@ class RecordingMarksCaptureTest {
         val PICON = ArtworkId(1)
         val ART = ArtworkId(2)
         const val AD_MIDDLE = 1_290_000L
+        /** 2026-10-03 20:00 and 2026-10-04 20:15 UTC. */
+        const val STORE_START = 1_791_057_600L
+        const val STORE_NOW = 1_791_144_900L
         /** 1:12:30 at 0:17:25: a played cut, a named chapter, two ad breaks, an unplayed cut, chapters. */
         val MIXED = listOf(
             RecordingMark(RecordingMarkKind.CUT, 300_000L, 420_000L),

@@ -284,7 +284,6 @@ class ProgrammeDetailsCaptureTest {
             number = if (store) 5 else 1, icon = ChannelIcon.ImageCache(ArtworkId(1)))
         val event = if (store) EpgEvent.create(EventId(5), channel.id, start, start + 3900.seconds,
             title = "Ion Wake", subtitle = "A signal beyond the city", genre = "Animation",
-            summary = "A night courier follows a mysterious signal across a city of light.",
             description = "A night courier follows a mysterious signal across a city of light. " +
                 "With the last train gone, she takes the rooftops towards the old relay tower, " +
                 "where an unexpected voice is waiting on the other end.",

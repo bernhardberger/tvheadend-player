@@ -271,7 +271,7 @@ class RecordingsVisualLayoutTest {
     /** Eight recordings of the README evening's channels, with their logos, focused on the Documentaries folder. */
     private fun presentationLibrary(store: Boolean = false, firstRow: Boolean = false, problems: Boolean = false,
         portrait: Boolean = false, scale: Float = 1f, scheduled: Boolean = false, filelessProblems: Boolean = false,
-        diskSpace: DvrDiskSpaceState = DvrDiskSpaceState.Current(
+        automatic: Boolean = false, diskSpace: DvrDiskSpaceState = DvrDiskSpaceState.Current(
             DvrDiskSpace(1_240_000_000_000L, 2_760_000_000_000L, 4_000_000_000_000L))) {
         assertTrue(android.os.SystemClock.setCurrentTimeMillis(1_791_144_900_000L))
         nowSeconds = { 1_791_144_900L }
@@ -303,7 +303,8 @@ class RecordingsVisualLayoutTest {
                 "A walking travel strand along a temperate coast."),
             recording(4, "Harbor Kickoff", 2, "Sport", evening - 86400 - 1800, 135, "harbor-kickoff",
                 "Match coverage from a floodlit stadium as Harbor FC meet Amber Town.", plays = 1),
-            recording(5, "River Court", 2, "Sport", evening - 3 * 86400, 105, "river-court",
+            // The store set keeps every recording within the three previous evenings.
+            recording(5, "River Court", 2, "Sport", if (store) evening - 2 * 86400 + 5400 else evening - 3 * 86400, 105, "river-court",
                 "Indoor basketball, River Court against North Quay."),
             recording(6, "Glass Harbor", 6, null, evening + 1800, 120, "glass-harbor",
                 "A quiet drama about night-shift workers in a harbor glass workshop.", position = 2145.takeIf { store }?.toLong()),
@@ -346,7 +347,7 @@ class RecordingsVisualLayoutTest {
             )
         } else {
             emptyList()
-        }
+        } + if (automatic) storeAutomaticEntries(evening) else emptyList()
         val art = listOf("ridge-light", "still-tide-watch", "still-coastal-miles", "harbor-kickoff", "river-court",
             "glass-harbor", "harbor-lights-live", "paper-kite-tales", "harbor-kickoff")
         images.install(FixtureArt.imageLoader(ApplicationProvider.getApplicationContext<Application>(), buildMap {
@@ -356,6 +357,7 @@ class RecordingsVisualLayoutTest {
         }))
         // A household server's disk, as the Recordings header reports it.
         show(scale = scale, entries = library, channels = channels, diskSpace = diskSpace)
+        if (automatic) publish(library, autorecRules = STORE_AUTOREC_RULES, timerecRules = STORE_TIMEREC_RULES)
         compose.mainClock.advanceTimeBy(1_500)
         if (firstRow) {
             awaitList()
@@ -380,17 +382,63 @@ class RecordingsVisualLayoutTest {
         capture("recordings-portrait-artwork", 1f, outputs = "build/outputs/presentation")
     }
 
-    /** Store archive: a complete, partly watched drama, distinct from tonight's live scenes. */
+    /** Store archive: the default Browse list, newest first under date labels, with its options panel open. */
     @Test @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
     @Category(VisualCapture::class)
     fun storeRecording() {
-        presentationLibrary(store = true)
-        key(Key.DirectionDown)
-        focused("recording-list-entry-6")
+        startView = DvrArchiveView()
+        presentationLibrary(store = true, firstRow = true)
+        upToOptions()
+        key(Key.DirectionCenter)
+        focused("recordings-view-group")
         compose.mainClock.advanceTimeBy(1_500)
         compose.waitForIdle()
         capture("store-recording", 1f, outputs = "build/outputs/presentation")
+    }
+
+    /** Store schedule: the Automatic recordings level with a series, a keyword, a title and a timer, the series focused. */
+    @Test @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    @Category(VisualCapture::class)
+    fun storeAutomaticRecordings() {
+        presentationLibrary(store = true, firstRow = true, automatic = true)
+        openScheduleScreen()
+        // The schedule opens on tonight's first timer; its management rows sit above the list.
+        key(Key.DirectionUp)
+        focused("schedule-automatic-recordings")
+        key(Key.DirectionCenter)
+        // The level opens on its New row; the rules follow by name: Harbor FC, Northline Tonight, Ridge Light, Tide Watch.
+        focused("schedule-new-automatic")
+        key(Key.DirectionDown)
+        focused("automatic-recording-harbor-fc")
+        key(Key.DirectionDown)
+        key(Key.DirectionDown)
+        focused("automatic-recording-ridge-light")
+        compose.mainClock.advanceTimeBy(1_500)
+        compose.waitForIdle()
+        compose.onNodeWithTag("automatic-recording-pane-when", useUnmergedTree = true).assertIsDisplayed()
+        capture("store-automatic-recordings", 1f, outputs = "build/outputs/presentation")
+    }
+
+    /** Upcoming timers of [STORE_AUTOREC_RULES] and [STORE_TIMEREC_RULES], from tonight's 21:00 Tide Watch on. */
+    private fun storeAutomaticEntries(evening: Long): List<DvrEntry> {
+        val tonight = evening + 86400
+        fun upcoming(id: Long, title: String, subtitle: String?, channel: Long, channelName: String, start: Long,
+            minutes: Long, autorec: String? = null, timerec: String? = null) = DvrEntry.create(DvrEntryId(id),
+            title = title, subtitle = subtitle, state = DvrEntryState.SCHEDULED, channelId = ChannelId(channel),
+            channelName = channelName, start = Instant.fromEpochSeconds(start), stop = Instant.fromEpochSeconds(start + minutes * 60),
+            autorecRuleId = autorec?.let(::AutorecRuleId), timerecRuleId = timerec?.let(::TimerecRuleId))
+        return listOf(
+            upcoming(40, "Tide Watch", null, 1, "Ridge Earth", tonight + 3600, 60, autorec = "tide-watch"),
+            upcoming(41, "Tide Watch", null, 1, "Ridge Earth", tonight + 86400 + 3600, 60, autorec = "tide-watch"),
+            upcoming(42, "Ridge Light", "Snow on the pass", 1, "Ridge Earth", tonight + 86400, 60, autorec = "ridge-light"),
+            upcoming(43, "Ridge Light", "The thaw", 1, "Ridge Earth", tonight + 2 * 86400, 60, autorec = "ridge-light"),
+            upcoming(44, "Ridge Light", "Valley woods", 1, "Ridge Earth", tonight + 3 * 86400, 60, autorec = "ridge-light"),
+            upcoming(45, "Harbor Kickoff", null, 2, "Harbor Sport", tonight + 7 * 86400 - 1800, 135, autorec = "harbor-fc"),
+        ) + (1..5).map { day ->
+            upcoming(45L + day, "Northline Tonight", null, 3, "Northline News", tonight + day * 86400, 45, timerec = "northline-tonight")
+        }
     }
 
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
@@ -3747,6 +3795,21 @@ class RecordingsVisualLayoutTest {
         const val HEADER_CAPTURES = "build/outputs/recordings-header-final"
         const val LABEL_CAPTURES = "build/outputs/list-label-spacing"
         const val OPTIONS = "recordings-view-options"
+        /** The store set's automatic recordings on the README channels. */
+        val STORE_AUTOREC_RULES = listOf(
+            AutorecRule.create(AutorecRuleId("ridge-light"), title = "^Ridge Light$", name = "Ridge Light",
+                seriesLinkUri = "series:ridge-light", channelId = ChannelId(1), removal = DvrRemoval.Days(30)),
+            AutorecRule.create(AutorecRuleId("harbor-fc"), title = "Harbor FC", fullText = true,
+                removal = DvrRemoval.Days(14)),
+            AutorecRule.create(AutorecRuleId("tide-watch"), title = "^Tide Watch$", channelId = ChannelId(1),
+                removal = DvrRemoval.Forever),
+        )
+        val STORE_TIMEREC_RULES = listOf(
+            TimerecRule.create(TimerecRuleId("northline-tonight"), name = "Northline Tonight", title = "Northline Tonight",
+                channelId = ChannelId(3), startMinutesSinceMidnight = java.time.LocalTime.of(20, 0),
+                stopMinutesSinceMidnight = java.time.LocalTime.of(20, 45),
+                daysOfWeekMask = java.time.DayOfWeek.entries.take(5).toSet(), removal = DvrRemoval.Days(7)),
+        )
         const val BROWSE_TAB = "recordings-mode-archive"
         const val LONG_TITLE = "Ridge Light: The Remarkable Journey of the Northern Lights Across the Arctic"
     }
