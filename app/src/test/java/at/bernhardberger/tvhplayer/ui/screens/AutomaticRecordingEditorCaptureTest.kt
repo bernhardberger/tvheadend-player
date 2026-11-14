@@ -432,6 +432,25 @@ class AutomaticRecordingEditorCaptureTest {
         capture("new-kind-cancel-focused", "slice-7a", "automatic-recording-new-cancel")
     }
 
+    @Test fun channelLogoFocusFrames() {
+        val directory = "g10-feedback-1"
+        val channelRow = "channel-${automaticRecordingChannels.first().id.value}"
+        show()
+        open(AutomaticRecordingEditorLevel.CHANNEL, channelRow)
+        capture("automatic-channel-focused", directory)
+        compose.pressKey(Key.DirectionDown)
+        capture("automatic-channel-resting", directory)
+        compose.runOnIdle {
+            shown = null
+            shownTimer = fixture.timer(newTimerDraft(automaticRecordingNow, automaticRecordingZone,
+                startingRepeating = true).copy(channelId = automaticRecordingChannels.first().id))
+            requireNotNull(shownTimer).navigation.open(AutomaticRecordingEditorLevel.CHANNEL, channelRow)
+        }
+        capture("timer-channel-focused", directory)
+        compose.pressKey(Key.DirectionDown)
+        capture("timer-channel-resting", directory)
+    }
+
     private fun show(
         draft: AutorecDraft = initial,
         editing: Boolean = false,

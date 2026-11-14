@@ -2,7 +2,12 @@ package at.bernhardberger.tvhplayer.ui.screens
 
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -74,11 +79,21 @@ internal fun RecordingEditorChannels(
         stringResource(R.string.autorec_editor_current, stringResource(R.string.autorec_editor_channel_unavailable)),
         true, onCurrent,
     )
-    for (channel in orderBrowseChannels(channels)) RecordingEditorRadio(
-        navigation, "channel-${channel.id.value}", channel.name.orEmpty(), current == channel.id,
-        { onChoice(channel.id) },
-        leadingIcon = { PiconBox(channel.icon, Modifier.size(40.dp, 28.dp)) },
-    )
+    for (channel in orderBrowseChannels(channels)) {
+        var focused by remember(channel.id) { mutableStateOf(false) }
+        RecordingEditorRadio(
+            navigation, "channel-${channel.id.value}", channel.name.orEmpty(), current == channel.id,
+            { onChoice(channel.id) },
+            modifier = Modifier.onFocusChanged { focused = it.isFocused },
+            leadingIcon = {
+                val restingFill = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .4f)
+                val focusedFill = MaterialTheme.colorScheme.onSurface
+                PiconBox(channel.icon, Modifier.size(40.dp, 28.dp),
+                    ground = if (focused) focusedFill else restingFill,
+                    prefetchGround = if (focused) restingFill else focusedFill)
+            },
+        )
+    }
 }
 
 @Composable
