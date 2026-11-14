@@ -1455,18 +1455,47 @@ fun AppRoot(
     // nothing for guide or recording updates.
     ProvideAppArtwork(tvheadendSession) {
     MainStartupComposition(
+        // Remote shortcuts that work on every screen. Each owns its whole key cycle, so the
+        // release and repeats never reach what the press brought into focus.
         modifier = Modifier.fillMaxSize().onPreviewKeyEvent { event ->
             val key = event.nativeKeyEvent
-            if (key.keyCode == android.view.KeyEvent.KEYCODE_DVR) {
-                val initialPress = key.action == android.view.KeyEvent.ACTION_DOWN && key.repeatCount == 0
-                val canOpenRecordings = currentDestination != RecordingsKey && navigationAllowed
-                if (initialPress && canOpenRecordings) {
-                    playbackOrchestrator.browseNavigationSelected(playingChannelId, playingRecordingId)
-                    navigateTopLevel(RecordingsKey)
+            val initialPress = key.action == android.view.KeyEvent.ACTION_DOWN && key.repeatCount == 0
+            when (key.keyCode) {
+                android.view.KeyEvent.KEYCODE_DVR -> {
+                    if (initialPress && currentDestination != RecordingsKey && navigationAllowed) {
+                        playbackOrchestrator.browseNavigationSelected(playingChannelId, playingRecordingId)
+                        navigateTopLevel(RecordingsKey)
+                    }
+                    true
                 }
-                true
-            } else false
-        }.onKeyEvent { it.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_MEDIA_RECORD },
+                // TV returns to live TV on the last channel, as the Appliance entry does.
+                android.view.KeyEvent.KEYCODE_TV -> {
+                    if (initialPress && navigationAllowed) {
+                        applianceLaunchRequests.requestEntry(
+                            ApplianceEntryDestination.LIVE,
+                            isPlayerVisible = visibleLivePlayer != null,
+                        )
+                    }
+                    true
+                }
+                else -> false
+            }
+        }.onKeyEvent { event ->
+            val key = event.nativeKeyEvent
+            when (key.keyCode) {
+                android.view.KeyEvent.KEYCODE_MEDIA_RECORD -> true
+                // The live player toggles its schedule sheet with GUIDE and consumes it first.
+                android.view.KeyEvent.KEYCODE_GUIDE -> {
+                    val initialPress = key.action == android.view.KeyEvent.ACTION_DOWN && key.repeatCount == 0
+                    if (initialPress && visibleLivePlayer == null && currentDestination != GuideKey && navigationAllowed) {
+                        playbackOrchestrator.browseNavigationSelected(playingChannelId, playingRecordingId)
+                        navigateTopLevel(GuideKey)
+                    }
+                    true
+                }
+                else -> false
+            }
+        },
         state = MainStartupCompositionState(
             presentation = effectiveStartupPresentation,
             navigationStartDestination = navigationStartDestination,

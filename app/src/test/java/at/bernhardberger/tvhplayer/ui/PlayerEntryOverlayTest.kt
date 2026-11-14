@@ -166,7 +166,7 @@ class PlayerEntryOverlayTest {
     private lateinit var playerSettings: PlayerSettingsStore
     private var playerVisible = false
     private var unconsumedCenterUps = 0
-    private var unconsumedDvrEvents = 0
+    private var unconsumedShortcutEvents = 0
     private var beforeSettingsRead: suspend () -> Unit = {}
     private val loadGate = CountDownLatch(1)
 
@@ -178,20 +178,35 @@ class PlayerEntryOverlayTest {
 
     @Test fun watchFromTheContextMenuFadesTheMenuIntoThePlayer() = watchFromOverlay(details = false)
 
-    @Test fun recordingsKeyNavigatesFromBrowseAndConsumesReleaseAndRepeats() {
+    @Test fun recordingsKeyNavigatesFromBrowseAndConsumesReleaseAndRepeats() =
+        shortcutFromBrowse(android.view.KeyEvent.KEYCODE_DVR) {
+            compose.onNodeWithTag("recording-list-entry-7").assertExists()
+        }
+
+    @Test fun guideKeyOpensTheGuideFromBrowseAndConsumesReleaseAndRepeats() =
+        shortcutFromBrowse(android.view.KeyEvent.KEYCODE_GUIDE) {
+            compose.onNodeWithTag("epg-screen").assertExists()
+        }
+
+    @Test fun tvKeyStartsTheLastChannelFromBrowseAndConsumesReleaseAndRepeats() =
+        shortcutFromBrowse(android.view.KeyEvent.KEYCODE_TV) {
+            compose.awaitScheduledWork(profileDispatcher) { playerVisible }
+            compose.onNodeWithTag("player-page-first", useUnmergedTree = true).assertExists()
+        }
+
+    /** A remote shortcut acts once from a browse screen and keeps its repeats and release. */
+    private fun shortcutFromBrowse(keyCode: Int, arrived: () -> Unit) {
         app(programme = true, recordings = true)
-        compose.pressKey(Key(android.view.KeyEvent.KEYCODE_DVR))
+        compose.pressKey(Key(keyCode))
         settle()
-        compose.onNodeWithTag("recording-list-entry-7").assertExists()
+        arrived()
         compose.runOnUiThread {
-            view.dispatchKeyEvent(android.view.KeyEvent(0, 0, android.view.KeyEvent.ACTION_DOWN,
-                android.view.KeyEvent.KEYCODE_DVR, 1))
-            view.dispatchKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_UP,
-                android.view.KeyEvent.KEYCODE_DVR))
+            view.dispatchKeyEvent(android.view.KeyEvent(0, 0, android.view.KeyEvent.ACTION_DOWN, keyCode, 1))
+            view.dispatchKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, keyCode))
         }
         settle()
-        compose.onNodeWithTag("recording-list-entry-7").assertExists()
-        assertEquals("the whole DVR key cycle stays inside AppRoot", 0, unconsumedDvrEvents)
+        arrived()
+        assertEquals("the whole shortcut key cycle stays inside AppRoot", 0, unconsumedShortcutEvents)
     }
 
     @Test fun watchFromDetailsFadesTheDetailsIntoThePlayer() = watchFromOverlay(details = true)
@@ -770,7 +785,8 @@ class PlayerEntryOverlayTest {
                 TVHeadendPlayerTheme {
                     Box(Modifier.onKeyEvent {
                         if (it.key == Key.DirectionCenter && it.type == KeyEventType.KeyUp) unconsumedCenterUps++
-                        if (it.key == Key(android.view.KeyEvent.KEYCODE_DVR)) unconsumedDvrEvents++
+                        if (it.nativeKeyEvent.keyCode in setOf(android.view.KeyEvent.KEYCODE_DVR,
+                                android.view.KeyEvent.KEYCODE_GUIDE, android.view.KeyEvent.KEYCODE_TV)) unconsumedShortcutEvents++
                         false
                     }) {
                         AppRoot(

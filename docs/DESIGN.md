@@ -1279,7 +1279,12 @@ The live player's Schedule action opens a 480dp right sheet using the playback
 options frame, without dimming the remaining picture. GUIDE toggles it where
 the activity receives that key, except while a modal playback options sheet or
 quick list is open: GUIDE is consumed without interrupting its preview/undo
-session. Appliance entry routing is unchanged. The
+session. Appliance entry routing is unchanged. Outside the live player, GUIDE
+opens the Guide from every screen, including the recordings player, and does
+nothing in the Guide itself. TV starts live TV on the last channel from every
+screen and does nothing in the live player. The Recordings key opens Recordings
+the same way. Each of these keys is consumed for its whole press, repeats and
+release. The
 recordings player has no Schedule action. The reusable column owns no tuning or
 playback: its caller supplies events, viewer position, recording marks and actions.
 The sheet header carries the picon, the `channelTitleText` title in the options
