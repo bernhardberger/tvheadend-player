@@ -63,6 +63,8 @@
 
 - The description gets up to four lines instead of two, without a box around it when it fits. A longer one ends in *… More*, and OK opens the full text (#18).
 - Cast and crew have their own section, one column per role and one name per line, nothing abbreviated. *Cast & crew* and *Details* show everything on the page and scroll when they're taller than the screen (#18).
+- The buttons under the description are sorted: the ways to watch come first, then one button for recording, then the rest. *Record…* opens the ways to record; once the program is scheduled or recording, that button cancels, skips or stops it instead. Further actions sit behind *More* when there are two or more.
+- *Other airings* cards show which airings are already recorded or scheduled, and the channel preview in the player marks a next program that's scheduled to record.
 - Opening details from Home while something keeps playing in the background no longer shows Home's text through the details page.
 
 ### Pictures
