@@ -275,7 +275,7 @@
     <string name="autorec_editor_leave_title">Ieși fără să salvezi?</string>
     <string name="autorec_editor_leave_body">Modificările nu au fost salvate.</string>
     <string name="autorec_editor_keep_editing">Continuă editarea</string>
-    <string name="autorec_editor_discard">Abandonează</string>
+    <string name="autorec_editor_discard">Abandonează modificările</string>
     <string name="record_unavailable">Această emisiune nu poate fi înregistrată</string>
     <string name="record_unavailable_ended">S-a încheiat deja.</string>
     <string name="record_unavailable_no_programme">Nu există informații despre emisiune pentru acest canal.</string>

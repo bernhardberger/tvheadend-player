@@ -275,7 +275,7 @@
     <string name="autorec_editor_leave_title">¿Salir sin guardar?</string>
     <string name="autorec_editor_leave_body">Tus cambios no se han guardado.</string>
     <string name="autorec_editor_keep_editing">Seguir editando</string>
-    <string name="autorec_editor_discard">Descartar</string>
+    <string name="autorec_editor_discard">Descartar cambios</string>
     <string name="record_unavailable">No se puede grabar este programa</string>
     <string name="record_unavailable_ended">Ya ha terminado.</string>
     <string name="record_unavailable_no_programme">No hay información del programa para este canal.</string>

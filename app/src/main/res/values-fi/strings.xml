@@ -256,7 +256,7 @@
     <string name="autorec_editor_leave_title">Poistutaanko tallentamatta?</string>
     <string name="autorec_editor_leave_body">Muutoksiasi ei ole tallennettu.</string>
     <string name="autorec_editor_keep_editing">Jatka muokkausta</string>
-    <string name="autorec_editor_discard">Hylkää</string>
+    <string name="autorec_editor_discard">Hylkää muutokset</string>
     <string name="record_unavailable">Tätä ohjelmaa ei voi tallentaa</string>
     <string name="record_unavailable_ended">Se on jo päättynyt.</string>
     <string name="record_unavailable_no_programme">Tälle kanavalle ei ole ohjelmatietoja.</string>

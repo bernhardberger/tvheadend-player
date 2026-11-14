@@ -275,7 +275,7 @@
     <string name="autorec_editor_leave_title">Quitter sans enregistrer ?</string>
     <string name="autorec_editor_leave_body">Tes modifications n’ont pas été enregistrées.</string>
     <string name="autorec_editor_keep_editing">Continuer à modifier</string>
-    <string name="autorec_editor_discard">Abandonner</string>
+    <string name="autorec_editor_discard">Abandonner les modifications</string>
     <string name="record_unavailable">Impossible d’enregistrer ce programme</string>
     <string name="record_unavailable_ended">Il est déjà terminé.</string>
     <string name="record_unavailable_no_programme">Aucune information sur le programme n’est disponible pour cette chaîne.</string>

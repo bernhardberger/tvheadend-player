@@ -256,7 +256,7 @@
     <string name="autorec_editor_leave_title">Forlad uden at gemme?</string>
     <string name="autorec_editor_leave_body">Dine ændringer er ikke gemt.</string>
     <string name="autorec_editor_keep_editing">Fortsæt redigering</string>
-    <string name="autorec_editor_discard">Kassér</string>
+    <string name="autorec_editor_discard">Kassér ændringer</string>
     <string name="record_unavailable">Kan ikke optage dette program</string>
     <string name="record_unavailable_ended">Det er allerede slut.</string>
     <string name="record_unavailable_no_programme">Der er ingen programoplysninger for denne kanal.</string>

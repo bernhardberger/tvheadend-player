@@ -275,7 +275,7 @@
     <string name="autorec_editor_leave_title">Izaći bez spremanja?</string>
     <string name="autorec_editor_leave_body">Tvoje promjene nisu spremljene.</string>
     <string name="autorec_editor_keep_editing">Nastavi uređivati</string>
-    <string name="autorec_editor_discard">Odbaci</string>
+    <string name="autorec_editor_discard">Odbaci promjene</string>
     <string name="record_unavailable">Ovu emisiju nije moguće snimiti</string>
     <string name="record_unavailable_ended">Već je završila.</string>
     <string name="record_unavailable_no_programme">Nema podataka o emisiji za ovaj kanal.</string>

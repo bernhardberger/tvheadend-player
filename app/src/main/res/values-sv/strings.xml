@@ -256,7 +256,7 @@
     <string name="autorec_editor_leave_title">Lämna utan att spara?</string>
     <string name="autorec_editor_leave_body">Dina ändringar har inte sparats.</string>
     <string name="autorec_editor_keep_editing">Fortsätt redigera</string>
-    <string name="autorec_editor_discard">Förkasta</string>
+    <string name="autorec_editor_discard">Förkasta ändringar</string>
     <string name="record_unavailable">Det går inte att spela in det här programmet</string>
     <string name="record_unavailable_ended">Det har redan slutat.</string>
     <string name="record_unavailable_no_programme">Det finns ingen programinformation för den här kanalen.</string>

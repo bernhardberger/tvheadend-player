@@ -237,7 +237,7 @@
     <string name="autorec_editor_leave_title">不儲存就離開？</string>
     <string name="autorec_editor_leave_body">變更尚未儲存。</string>
     <string name="autorec_editor_keep_editing">繼續編輯</string>
-    <string name="autorec_editor_discard">捨棄</string>
+    <string name="autorec_editor_discard">捨棄變更</string>
     <string name="record_unavailable">無法錄影此節目</string>
     <string name="record_unavailable_ended">節目已結束。</string>
     <string name="record_unavailable_no_programme">此頻道無節目資訊。</string>

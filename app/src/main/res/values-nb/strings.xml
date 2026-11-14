@@ -256,7 +256,7 @@
     <string name="autorec_editor_leave_title">Forlate uten å lagre?</string>
     <string name="autorec_editor_leave_body">Endringene dine er ikke lagret.</string>
     <string name="autorec_editor_keep_editing">Fortsett å redigere</string>
-    <string name="autorec_editor_discard">Forkast</string>
+    <string name="autorec_editor_discard">Forkast endringer</string>
     <string name="record_unavailable">Kan ikke ta opp dette programmet</string>
     <string name="record_unavailable_ended">Det er allerede slutt.</string>
     <string name="record_unavailable_no_programme">Det finnes ingen programinformasjon for denne kanalen.</string>

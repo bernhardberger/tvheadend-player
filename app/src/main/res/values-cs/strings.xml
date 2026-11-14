@@ -294,7 +294,7 @@
     <string name="autorec_editor_leave_title">Odejít bez uložení?</string>
     <string name="autorec_editor_leave_body">Tvé změny nebyly uloženy.</string>
     <string name="autorec_editor_keep_editing">Pokračovat v úpravách</string>
-    <string name="autorec_editor_discard">Zahodit</string>
+    <string name="autorec_editor_discard">Zahodit změny</string>
     <string name="record_unavailable">Tento pořad nelze nahrát</string>
     <string name="record_unavailable_ended">Už skončil.</string>
     <string name="record_unavailable_no_programme">Pro tento kanál nejsou dostupné informace o pořadu.</string>

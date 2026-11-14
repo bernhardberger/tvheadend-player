@@ -256,7 +256,7 @@
     <string name="autorec_editor_leave_title">Verlaten zonder opslaan?</string>
     <string name="autorec_editor_leave_body">Je wijzigingen zijn niet opgeslagen.</string>
     <string name="autorec_editor_keep_editing">Verder bewerken</string>
-    <string name="autorec_editor_discard">Verwerpen</string>
+    <string name="autorec_editor_discard">Wijzigingen verwerpen</string>
     <string name="record_unavailable">Dit programma kan niet worden opgenomen</string>
     <string name="record_unavailable_ended">Het is al afgelopen.</string>
     <string name="record_unavailable_no_programme">Er is geen programma-informatie voor deze zender.</string>

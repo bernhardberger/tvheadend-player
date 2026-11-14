@@ -256,7 +256,7 @@
     <string name="autorec_editor_leave_title">Ohne Speichern verlassen?</string>
     <string name="autorec_editor_leave_body">Deine Änderungen wurden nicht gespeichert.</string>
     <string name="autorec_editor_keep_editing">Weiter bearbeiten</string>
-    <string name="autorec_editor_discard">Verwerfen</string>
+    <string name="autorec_editor_discard">Änderungen verwerfen</string>
     <string name="record_unavailable">Diese Sendung kann nicht aufgenommen werden</string>
     <string name="record_unavailable_ended">Sie ist bereits zu Ende.</string>
     <string name="record_unavailable_no_programme">Für diesen Sender sind keine Programmdaten verfügbar.</string>

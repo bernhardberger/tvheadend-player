@@ -275,7 +275,7 @@
     <string name="autorec_editor_leave_title">Uscire senza salvare?</string>
     <string name="autorec_editor_leave_body">Le modifiche non sono state salvate.</string>
     <string name="autorec_editor_keep_editing">Continua a modificare</string>
-    <string name="autorec_editor_discard">Scarta</string>
+    <string name="autorec_editor_discard">Scarta modifiche</string>
     <string name="record_unavailable">Impossibile registrare questo programma</string>
     <string name="record_unavailable_ended">È già terminato.</string>
     <string name="record_unavailable_no_programme">Non sono disponibili informazioni sul programma per questo canale.</string>

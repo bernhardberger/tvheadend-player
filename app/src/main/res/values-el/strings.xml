@@ -256,7 +256,7 @@
     <string name="autorec_editor_leave_title">Έξοδος χωρίς αποθήκευση;</string>
     <string name="autorec_editor_leave_body">Οι αλλαγές σου δεν έχουν αποθηκευτεί.</string>
     <string name="autorec_editor_keep_editing">Συνέχιση επεξεργασίας</string>
-    <string name="autorec_editor_discard">Απόρριψη</string>
+    <string name="autorec_editor_discard">Απόρριψη αλλαγών</string>
     <string name="record_unavailable">Δεν είναι δυνατή η εγγραφή αυτής της εκπομπής</string>
     <string name="record_unavailable_ended">Έχει ήδη τελειώσει.</string>
     <string name="record_unavailable_no_programme">Δεν υπάρχουν πληροφορίες εκπομπής για αυτό το κανάλι.</string>

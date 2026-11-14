@@ -237,7 +237,7 @@
     <string name="autorec_editor_leave_title">保存せずに戻りますか？</string>
     <string name="autorec_editor_leave_body">変更は保存されていません。</string>
     <string name="autorec_editor_keep_editing">編集を続ける</string>
-    <string name="autorec_editor_discard">破棄</string>
+    <string name="autorec_editor_discard">変更を破棄</string>
     <string name="record_unavailable">この番組は録画できません</string>
     <string name="record_unavailable_ended">すでに終了しています。</string>
     <string name="record_unavailable_no_programme">このチャンネルの番組情報はありません。</string>

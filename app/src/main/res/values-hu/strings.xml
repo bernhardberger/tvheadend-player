@@ -256,7 +256,7 @@
     <string name="autorec_editor_leave_title">Kilépsz mentés nélkül?</string>
     <string name="autorec_editor_leave_body">A módosításaid nincsenek mentve.</string>
     <string name="autorec_editor_keep_editing">Szerkesztés folytatása</string>
-    <string name="autorec_editor_discard">Elvetés</string>
+    <string name="autorec_editor_discard">Módosítások elvetése</string>
     <string name="record_unavailable">Ez a műsor nem vehető fel</string>
     <string name="record_unavailable_ended">Már véget ért.</string>
     <string name="record_unavailable_no_programme">Ehhez a csatornához nem érhető el műsorinformáció.</string>

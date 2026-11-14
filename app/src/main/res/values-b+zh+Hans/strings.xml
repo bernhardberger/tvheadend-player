@@ -237,7 +237,7 @@
     <string name="autorec_editor_leave_title">不保存就离开？</string>
     <string name="autorec_editor_leave_body">更改尚未保存。</string>
     <string name="autorec_editor_keep_editing">继续编辑</string>
-    <string name="autorec_editor_discard">舍弃</string>
+    <string name="autorec_editor_discard">舍弃更改</string>
     <string name="record_unavailable">无法录制此节目</string>
     <string name="record_unavailable_ended">节目已结束。</string>
     <string name="record_unavailable_no_programme">此频道暂无节目信息。</string>

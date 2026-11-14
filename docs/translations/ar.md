@@ -51,6 +51,8 @@ Review corrections: past-tense recorded dates, singular TV/GUIDE button, channel
 
 0.5 Schedule tab strings for timers and the list of automatic recordings (`schedule_*`) drafted against `b257da70` by GPT-6.1 Sol (medium) and reviewed by Sonnet 5.5 (medium); still machine-drafted, no human reviewer. Reviewer corrections accepted for `schedule_automatic_keep`, `schedule_automatic_new_help`, `schedule_automatic_upcoming`.
 
+0.5 leave-card label `autorec_editor_discard` (English now "Discard changes") checked against `dcad2205` by GPT-6.1 Sol (medium) and Sonnet 5.5 (medium); the existing wording already says what is lost and stays.
+
 ## Open questions
 
 - Review `player_scrub_backward` إرجاع as the media rewind term, RTL speed placement and TTS pronunciation of × in `player_scrub_*`.
