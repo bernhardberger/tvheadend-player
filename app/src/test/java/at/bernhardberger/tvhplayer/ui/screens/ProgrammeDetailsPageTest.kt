@@ -906,6 +906,10 @@ class ProgrammeDetailsPageTest {
         Assert.assertEquals(listOf("Long\ntext"), programmeAboutText("Short", "Long\\ntext", synopsisShownInFull = true))
         Assert.assertEquals(emptyList<String>(), programmeAboutText(" Same", "Same ", synopsisShownInFull = true))
         Assert.assertEquals(listOf("Same"), programmeAboutText(" Same", "Same ", synopsisShownInFull = false))
+        // A description that opens with the summary already says it: the summary is not repeated.
+        Assert.assertEquals(listOf("A courier follows a signal.\nThe city lights up."),
+            programmeAboutText("A courier follows a signal. ", "A courier follows a signal.\\nThe city lights up.",
+                synopsisShownInFull = false))
         Assert.assertEquals(emptyList<String>(), programmeAboutText(" ", null, synopsisShownInFull = false))
     }
 
