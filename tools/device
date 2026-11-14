@@ -134,6 +134,9 @@ TEST_DEVICE_ACTIONS = {
 }
 RELEASE_DEVICE_ACTIONS = {"install-release"}
 PRODUCTION_DEVICE_ACTIONS = {"uninstall-legacy"}
+# Writes only into the separately installed debug app, never the household's
+# release app, so household (production) TVs may use it as well as test TVs.
+HOUSEHOLD_DEBUG_ACTIONS = {"provision-test-credentials"}
 VALID_ROLES = {"production", "test", "unclassified"}
 TARGET_NAME_PATTERN = re.compile(r"[a-z0-9][a-z0-9-]{0,63}")
 
@@ -342,6 +345,8 @@ def action_policy_error(role: str, action: str) -> str | None:
     if action not in TEST_DEVICE_ACTIONS:
         return None
     if role == "test":
+        return None
+    if role == "production" and action in HOUSEHOLD_DEBUG_ACTIONS:
         return None
     if role == "production":
         return (
@@ -1720,11 +1725,15 @@ def main() -> int:
         return 0
 
     if args.action == "provision-test-credentials":
-        if package_name != DEFAULT_PACKAGE:
+        # A target's configured package names the app it normally runs (the
+        # release app on household TVs); provisioning always means the debug app.
+        explicit_package = args.package_name or os.environ.get("TVHPLAYER_ANDROID_PACKAGE")
+        if explicit_package and explicit_package != DEFAULT_PACKAGE:
             fail(
                 "credential provisioning is available only for the debug "
                 f"package {DEFAULT_PACKAGE}"
             )
+        package_name = DEFAULT_PACKAGE
         credential_path = Path(
             os.environ.get("TVHPLAYER_CREDENTIAL_FILE")
             or config.get("credential_file")

@@ -1,19 +1,25 @@
 # Test-device credential provisioning
 
-This workflow exists only to make repeatable development setup possible on an
-explicitly designated Android TV test device. It applies to any designated test
-device and only to the debug player `at.bernhardberger.tvhplayer.debug`, not the
+This workflow exists only to make repeatable development setup possible on a
+configured Android TV test device or household TV. It applies only to the debug
+player `at.bernhardberger.tvhplayer.debug`, not the release app or the
 companion. It is development tooling, not a release feature or a general
 credential-import API.
 
 ## Policy
 
 - The selected target in local `.tvhplayer-device.json` must set `role` to
-  `test` and contain the exact expected manufacturer, model, device, and
-  product. `tools/device` re-reads all four properties from the connected TV
-  before provisioning.
-- Production and unclassified devices are rejected before the local secret is
-  read.
+  `test` or `production` and contain the exact expected manufacturer, model,
+  device, and product. `tools/device` re-reads all four properties from the
+  connected TV before provisioning.
+- On a household (`production`) TV the debug app sits beside the release app
+  and has its own storage, so provisioning never touches the household's app.
+  It does not authorize installing the debug app there; that install needs the
+  owner's approval for the occasion.
+- Provisioning always targets the debug package, whatever `package` the target
+  configures; an explicit `--package` or `TVHPLAYER_ANDROID_PACKAGE` naming any
+  other app is rejected.
+- Unclassified devices are rejected before the local secret is read.
 - Credential values must come from an ignored, owner-only local file. They must
   not appear in command arguments, environment variables, Git, committed config,
   console output, logs, screenshots, or generated reports.
@@ -62,7 +68,7 @@ path. It carries only the path; never put credential values in that variable.
 
 ## Data flow
 
-1. `tools/device` rejects every role except `test`, verifies ADB readiness, and
+1. `tools/device` rejects every role except `test` and `production`, verifies ADB readiness, and
    compares all four live identity properties with local expected values.
 2. It reads and validates the local JSON without printing it, force-stops the
    app, and streams canonical JSON through subprocess stdin.
@@ -100,7 +106,7 @@ export app-private files to confirm cleanup.
   reports. It also prevents an agent from targeting a device whose configured
   role or live identity does not match policy.
 - The operator, local agent host, ADB client/server, USB or trusted-LAN ADB
-  transport, Android shell, and designated test TV are trusted during setup. A
+  transport, Android shell, and selected TV are trusted during setup. A
   compromised host, ADB endpoint, rooted TV, malicious same-UID process, or
   privileged device software can observe plaintext.
 - The payload exists briefly as a mode-`0600` app-private plaintext file and in

@@ -206,7 +206,9 @@ tell decoder or renderer work from dispatcher or main-thread churn.
 
 ## Test credential provisioning
 
-Provision only a designated test device after installing the debug APK. Put the
+Provision only a configured test or household (production) target after
+installing the debug APK; it always writes into the debug app, never the release
+app. Installing the debug APK on a household TV needs the owner's approval. Put the
 credential JSON in the ignored path configured by `credential_file`, set its
 mode to `0600`, and run `./tools/device provision-test-credentials`. The wrapper
 validates role plus all four live identity properties before reading the secret,

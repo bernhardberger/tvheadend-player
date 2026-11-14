@@ -8,15 +8,14 @@ roles. Do not treat a generic model name as an unambiguous target.
 | Role | Location | Device/product | Runtime baseline | Allowed use |
 |---|---|---|---|---|
 | **Current development target** | Development site | TCL C655 / `G10` / `G10_4K_GB` | V548, Android TV 12/API 31, 32-bit ARMv7 | Debug and release-candidate installs, bounded ADB diagnostics, synthetic remote keys, playback and appliance regression tests |
-| **Temporary deployment target** | Temporary test site | NVIDIA SHIELD Android TV / `darcy` | Android TV 11, ARM64 with ARMv7 compatibility | Debug and signed release-candidate installs, bounded ADB diagnostics, and remote-first product checks while the G10 handover is pending |
+| **Production household TV** | Production site | NVIDIA SHIELD Android TV / `darcy` | Android TV 11, ARM64 with ARMv7 compatibility | Production-signed updates, bounded read-only maintenance, and debug-app credential provisioning |
 | **Additional deployment target** | Additional test site | Sony Bravia 8 / `BRAVIA_AE2` / `BRAVIA_AE2_EU` | Android TV 14/API 34, 32-bit ARMv7 | Debug and signed release-candidate installs, bounded ADB diagnostics, remote keys, and playback checks |
 | **Production appliance** | Production site | TCL Smart TV Pro / `G08` / `G08_4K_GB` | V655, Android TV 14/API 34, 32-bit ARMv7 | Production-signed updates and bounded read-only maintenance only |
 
 ## Required target behavior
 
-- The G10 remains the acceptance target. The NVIDIA Shield
-  may be selected in ignored local configuration with role `test` as a temporary
-  deployment target while the G10 handover is pending.
+- The G10 remains the acceptance target. The NVIDIA Shield is a household TV
+  with the Play release; keep its local role `production`.
 - The owner has given standing authorization for agents to take over the G10
   at any time for the allowed uses in its row, including launching Player. Do not
   ask the owner first; the primary's dispatch packet is the device handover. This
@@ -29,7 +28,9 @@ roles. Do not treat a generic model name as an unambiguous target.
   & port** before use.
 - The G08 has been handed over. Keep its local role `production`; do not
   use it for debug installs, key injection, smoke tests, signing experiments, or
-  routine development.
+  routine development. Household TVs with role `production` may receive
+  `provision-test-credentials`, which writes only into the debug app; installing
+  that debug app on one needs the owner's approval for the occasion.
 - Before mutation, confirm the intended serial, role, manufacturer/model and
   device/product against the selected indexed target. Stop on mismatch. Use
   official CLI with explicit `--device` for ordinary install/capture as documented

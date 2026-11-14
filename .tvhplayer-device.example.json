@@ -13,8 +13,8 @@
     },
     "nvidia-shield": {
       "serial": "replace-with-shield-adb-serial",
-      "package": "at.bernhardberger.tvhplayer.debug",
-      "role": "test",
+      "package": "at.bernhardberger.tvhplayer",
+      "role": "production",
       "expected_manufacturer": "NVIDIA",
       "expected_model": "SHIELD Android TV",
       "expected_device": "darcy",

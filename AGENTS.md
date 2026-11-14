@@ -189,8 +189,9 @@ physical-TV acceptance. Reuse the configured AVD rather than rebuilding the setu
   only on a generic model string.
 - Do not use broad `logcat`, `dumpsys`, `uiautomator dump`, app-data export, or
   credential-bearing UI automation. Credential provisioning is allowed only
-  through `./tools/device provision-test-credentials` on an exact designated
-  test target under `docs/test-device-credential-provisioning.md`.
+  through `./tools/device provision-test-credentials` on an exact configured
+  test or household (production) target, into the debug app only, under
+  `docs/test-device-credential-provisioning.md`.
 - Do not add debug exported components for secret injection or modify Tvheadend
   accounts, tuners, OSCam, storage, stream profiles, TV packages, or network
   infrastructure without separate explicit approval.

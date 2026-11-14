@@ -1056,7 +1056,6 @@ class DevicePolicyTest(unittest.TestCase):
                 "key",
                 "keys",
                 "screenshot",
-                "provision-test-credentials",
                 "channel-guide-check",
                 "timeshift-command-check",
                 "foreground-playback-lifecycle-check",
@@ -1065,6 +1064,9 @@ class DevicePolicyTest(unittest.TestCase):
             ):
                 with self.subTest(role=role, action=action):
                     self.assertIsNotNone(action_policy_error(role, action))
+        # The debug-app login reaches household TVs, never unclassified ones.
+        self.assertIsNone(action_policy_error("production", "provision-test-credentials"))
+        self.assertIsNotNone(action_policy_error("unclassified", "provision-test-credentials"))
 
     def test_test_device_allows_mutation(self) -> None:
         for action in (
@@ -2571,10 +2573,11 @@ class DevicePolicyTest(unittest.TestCase):
                 {
                     "load_local_config": Mock(
                         return_value=(
-                            "g10",
+                            "household-tv",
                             {
                                 "serial": "private-device",
-                                "role": "test",
+                                "role": "production",
+                                "package": DEVICE["RELEASE_PACKAGE"],
                                 "expected_device": "G10",
                             },
                         )
@@ -2599,6 +2602,9 @@ class DevicePolicyTest(unittest.TestCase):
                 DEVICE["main"]()
 
         self.assertEqual(run_mock.call_count, 4)
+        for call in run_mock.call_args_list:
+            self.assertNotIn(DEVICE["RELEASE_PACKAGE"], call.args[0])
+            self.assertIn(DEVICE["DEFAULT_PACKAGE"], call.args[0])
         cleanup = run_mock.call_args_list[-1]
         self.assertIn("files/tvhplayer_test_provisioning.json", cleanup.args[0])
         self.assertIn("files/tvhplayer_test_provisioning.result", cleanup.args[0])
